@@ -70,6 +70,7 @@
       "entry": [
         "check-editor-backlog.mjs",
         "agent/browser.ts",
+        "agent/scenarios/editor-retention-count-policy-driver.ts",
         "agent/desktop-display.ts",
         "large-file/bench.ts",
         "heavy/pi/launch.ts",

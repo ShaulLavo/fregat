@@ -19,6 +19,7 @@ import {
   type EditorDocumentAnalysis,
 } from '../src/editor/documentAnalysis'
 import { EDITOR_OPTION_DESCRIPTORS } from '../src/editor/optionDescriptors'
+import { EditorSyntaxController } from '../src/editor/syntaxController'
 import {
   acquireDocumentMutationLease,
   commitPreparedDocumentTransaction,
@@ -686,6 +687,12 @@ function tokenHighlightRanges(): AbstractRange[] {
 
 function tokenSnapshotFromLastEvent(events: readonly ViewContributionEvent[]) {
   return events.findLast((event) => event.kind === 'tokens')?.snapshot?.tokens.toTokens() ?? []
+}
+
+function syntaxControllerFrom(editor: Editor): EditorSyntaxController {
+  const syntax: unknown = Reflect.get(editor, 'syntax')
+  if (syntax instanceof EditorSyntaxController) return syntax
+  return expect.unreachable('Editor syntax controller is missing')
 }
 
 function latestFoldMarkers(events: readonly ViewContributionEvent[]) {
@@ -6561,9 +6568,27 @@ describe('Editor', () => {
       expect(latestFoldMarkers(events)).toHaveLength(1)
     })
 
-    it('keeps previously queried syntax tokens while scrolling to a new range', async () => {
+    it('keeps complete current syntax contributors while releasing optional scroll history', async () => {
       const events: ViewContributionEvent[] = []
       const ranges: EditorSyntaxRange[] = []
+      const text = Array.from(
+        { length: 20000 },
+        (_value, index) => `const line${index} = ${index};`,
+      ).join('\n')
+      const initialToken = { start: 10, end: 15, style: { color: '#00ff00' } }
+      const enclosingStart = text.indexOf('const line10500 =') + 10
+      const currentStart = text.indexOf('const line12500 =') + 10
+      const enclosingToken = {
+        start: enclosingStart,
+        end: enclosingStart + 5,
+        style: { color: '#00ff00' },
+      }
+      const currentToken = {
+        start: currentStart,
+        end: currentStart + 5,
+        style: { color: '#00ff00' },
+      }
+      const documentTokens = [initialToken, enclosingToken, currentToken]
       editor.dispose()
       editor = createVisibleEditor(container, {
         plugins: withTestLanguagePlugins(createViewContributionPlugin(events)),
@@ -6573,20 +6598,14 @@ describe('Editor', () => {
           refresh: async () => createSyntaxResult([]),
           queryRange: async (range) => {
             ranges.push(range)
-            return createSyntaxResult([
-              {
-                start: range.startIndex + 10,
-                end: range.startIndex + 15,
-                style: { color: '#00ff00' },
-              },
-            ])
+            return createSyntaxResult(
+              documentTokens.filter(
+                (token) => token.start >= range.startIndex && token.end <= range.endIndex,
+              ),
+            )
           },
         }),
       )
-      const text = Array.from(
-        { length: 20000 },
-        (_value, index) => `const line${index} = ${index};`,
-      ).join('\n')
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -6595,25 +6614,49 @@ describe('Editor', () => {
       })
       await flushSyntaxDebounce()
       const rangeCountAfterOpen = ranges.length
-      const initialToken = tokenSnapshotFromLastEvent(events)[0]
-      expect(initialToken).toMatchObject({ start: 10, end: 15 })
+      expect(tokenSnapshotFromLastEvent(events)).toContainEqual(initialToken)
       editor.setScrollPosition({ top: 300000, left: 0 })
-      await flushSyntaxDebounce()
+      await flushSyntaxUntilSettled(() => ranges.length)
       const tokens = tokenSnapshotFromLastEvent(events)
       const scrolledRanges = ranges.slice(rangeCountAfterOpen)
-      const scrolledToken = tokens.find((token) =>
-        scrolledRanges.some(
-          (range) => range.startIndex > 0 && token.start === range.startIndex + 10,
-        ),
-      )
+      const syntax = syntaxControllerFrom(editor)
 
-      expect(tokens).toContainEqual(initialToken)
-      expect(scrolledToken).toBeDefined()
+      expect(scrolledRanges.some((range) => range.startIndex > enclosingStart)).toBe(true)
+      expect(
+        scrolledRanges.some(
+          (range) => range.startIndex <= enclosingStart && range.endIndex >= currentToken.end,
+        ),
+      ).toBe(true)
+      expect(tokens).toEqual([enclosingToken, currentToken])
+      expect(syntax.copyTokens.toTokens()).toEqual([enclosingToken, currentToken])
+      expect(syntax.renderDataReady).toBe(true)
+      expect(editor.getState().syntaxStatus).toBe('ready')
+      const currentPaint = tokenHighlightRanges().find(
+        (range) => range.startContainer === rowTextNode(12500),
+      )
+      expect(currentPaint).toMatchObject({ startOffset: 10, endOffset: 15 })
     })
 
-    it('repaints cached syntax immediately when scrolling back to a previous range', async () => {
+    it('cold queries released syntax history before restoring ready paint and copy', async () => {
       const events: ViewContributionEvent[] = []
       const ranges: EditorSyntaxRange[] = []
+      const pending: {
+        range: EditorSyntaxRange
+        result: Deferred<EditorSyntaxResult>
+      }[] = []
+      let deferRangeQueries = false
+      const text = Array.from(
+        { length: 20000 },
+        (_value, index) => `const line${index} = ${index};`,
+      ).join('\n')
+      const initialToken = { start: 10, end: 15, style: { color: '#00ff00' } }
+      const currentStart = text.indexOf('const line12500 =') + 10
+      const currentToken = {
+        start: currentStart,
+        end: currentStart + 5,
+        style: { color: '#00ff00' },
+      }
+      const documentTokens = [initialToken, currentToken]
       editor.dispose()
       editor = createVisibleEditor(container, {
         plugins: withTestLanguagePlugins(createViewContributionPlugin(events)),
@@ -6621,22 +6664,22 @@ describe('Editor', () => {
       setEditorSyntaxSessionFactory(() =>
         createMockSyntaxSession({
           refresh: async () => createSyntaxResult([]),
-          queryRange: async (range) => {
+          queryRange: (range) => {
             ranges.push(range)
-            return createSyntaxResult([
-              {
-                start: range.startIndex + 10,
-                end: range.startIndex + 15,
-                style: { color: '#00ff00' },
-              },
-            ])
+            if (!deferRangeQueries)
+              return Promise.resolve(
+                createSyntaxResult(
+                  documentTokens.filter(
+                    (token) => token.start >= range.startIndex && token.end <= range.endIndex,
+                  ),
+                ),
+              )
+            const result = createDeferred<EditorSyntaxResult>()
+            pending.push({ range, result })
+            return result.promise
           },
         }),
       )
-      const text = Array.from(
-        { length: 20000 },
-        (_value, index) => `const line${index} = ${index};`,
-      ).join('\n')
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -6644,17 +6687,37 @@ describe('Editor', () => {
         text,
       })
       await flushSyntaxDebounce()
-      const initialToken = tokenSnapshotFromLastEvent(events)[0]
+      expect(tokenSnapshotFromLastEvent(events)).toContainEqual(initialToken)
       editor.setScrollPosition({ top: 300000, left: 0 })
       const rangeCountAfterScrollAway = await flushSyntaxUntilSettled(() => ranges.length)
+      const syntax = syntaxControllerFrom(editor)
+      expect(tokenSnapshotFromLastEvent(events)).toEqual([currentToken])
+      expect(syntax.copyTokens.toTokens()).toEqual([currentToken])
+      expect(syntax.renderDataReady).toBe(true)
 
+      deferRangeQueries = true
+      events.length = 0
       editor.setScrollPosition({ top: 0, left: 0 })
-      await flushSyntaxDebounce()
-      const tokens = tokenSnapshotFromLastEvent(events)
-
+      await vi.waitFor(() => expect(pending).toHaveLength(1))
       expect(rangeCountAfterScrollAway).toBeGreaterThan(1)
-      expect(ranges).toHaveLength(rangeCountAfterScrollAway)
-      expect(tokens).toContainEqual(initialToken)
+      expect(ranges.length).toBeGreaterThan(rangeCountAfterScrollAway)
+      const cold = pending[0]!
+      expect(cold.range.startIndex).toBe(0)
+      expect(cold.range.endIndex).toBeGreaterThanOrEqual(initialToken.end)
+      expect(syntax.renderDataReady).toBe(false)
+      expect(editor.getState().syntaxStatus).toBe('loading')
+      expect(events.at(-1)?.snapshot?.paintLayers).toBeNull()
+
+      deferRangeQueries = false
+      cold.result.resolve(createSyntaxResult([initialToken]))
+      await vi.waitFor(() => expect(syntax.renderDataReady).toBe(true))
+      expect(tokenSnapshotFromLastEvent(events)).toContainEqual(initialToken)
+      expect(syntax.copyTokens.toTokens()).toContainEqual(initialToken)
+      expect(editor.getState().syntaxStatus).toBe('ready')
+      const restoredPaint = tokenHighlightRanges().find(
+        (range) => range.startContainer === rowTextNode(0),
+      )
+      expect(restoredPaint).toMatchObject({ startOffset: 10, endOffset: 15 })
     })
 
     it('does not reuse cached visible syntax after newline edits', async () => {
