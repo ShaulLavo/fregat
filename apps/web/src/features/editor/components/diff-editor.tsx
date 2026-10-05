@@ -1,7 +1,10 @@
 import type { DiffAttachment } from '@/lib/diff-attachment'
-import type { TabPresentation } from '@/features/editor/state/tab-presentation'
+import type {
+  DiffPanePublicationSink,
+  TabPresentation,
+} from '@/features/editor/state/tab-presentation'
 import type { TabId } from '@/lib/documents/utils/types'
-import { type DiffRegionStore } from '@singapore-editor/diff'
+import type { DiffRegionStore } from '@singapore-editor/diff'
 import {
   type GroupImperativeHandle,
   ResizableHandle,
@@ -34,6 +37,7 @@ export function DiffEditor({
   regions,
   presentation: suppliedPresentation,
   tabId,
+  onPublication,
 }: {
   attachment: DiffAttachment | null
   failure?: string | null
@@ -42,6 +46,7 @@ export function DiffEditor({
   presentation?: TabPresentation
   regions?: DiffRegionStore
   tabId?: TabId
+  onPublication?: DiffPanePublicationSink
 }) {
   const documentStore = use(EditorDocumentStateContext)
   const operation = attachment?.kind === 'operation' ? attachment.read.input : null
@@ -101,6 +106,7 @@ export function DiffEditor({
           syntaxTheme={syntax.theme}
           tabId={tabId}
           theme={editorTheme}
+          onPublication={onPublication}
         />
       </div>
     )
@@ -117,6 +123,7 @@ export function DiffEditor({
     theme: editorTheme,
     onFocus: panes.handleFocus,
     onRegisterEditor: panes.registerEditor,
+    onPublication,
     onScroll: panes.handleScroll,
   }
 

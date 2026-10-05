@@ -20,7 +20,14 @@ import {
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { operationDiffAttachment } from '@/lib/diff-attachment'
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
+import type {
+  DiffPanePublication,
+  DiffPanePublicationEvent,
+} from '@/features/editor/state/tab-presentation'
+import type { EditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
+import { editorQueryKeys } from '@/features/editor/utils/query-keys'
+import { editorMutationKeys } from '@/features/editor/utils/mutation-keys'
 import { mutationOptions, queryOptions, useQuery } from '@tanstack/react-query'
 import { ModuleLoadError } from '@/components/module-load-error'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
@@ -28,27 +35,32 @@ import { runMutation } from '@/lib/mutations/run'
 
 import { useWorkspaceEditState } from '@/features/editor/hooks/use-workspace-edit-state'
 import { useWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
-import type { WorkspaceEditPreviewRow } from '@/features/editor/state/workspace-edit-service'
+import type {
+  WorkspaceEditPreview,
+  WorkspaceEditPreviewRow,
+} from '@/features/editor/state/workspace-edit-service'
 import { selectWorkspaceEditPreview } from '@/features/editor/utils/workspace-edit-dialog-state'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
 import type { FocusTargetToken } from '@/lib/focus/state/service'
 
 type PreviewEditorModule = typeof import('@/features/editor/components/diff-editor')
-const previewEditorKey = ['editor', 'workspace-edit-preview', 'module'] as const
 const loadPreviewEditor = mutationOptions({
-  mutationKey: previewEditorKey,
+  mutationKey: editorMutationKeys.previewDiffModule,
   scope: { id: 'editor.workspace-edit-preview.module' },
   networkMode: 'always',
   retry: false,
   mutationFn: async () => {
-    const cached = resourceQueryClient.getQueryData<PreviewEditorModule>(previewEditorKey)
+    const cached = resourceQueryClient.getQueryData<PreviewEditorModule>(
+      editorQueryKeys.previewDiffModule,
+    )
     if (cached) return cached
     return import('@/features/editor/components/diff-editor')
   },
-  onSuccess: (module) => resourceQueryClient.setQueryData(previewEditorKey, module),
+  onSuccess: (module) =>
+    resourceQueryClient.setQueryData(editorQueryKeys.previewDiffModule, module),
 })
 const previewEditorOptions = queryOptions({
-  queryKey: previewEditorKey,
+  queryKey: editorQueryKeys.previewDiffModule,
   staleTime: 'static',
   gcTime: Infinity,
   structuralSharing: false,
@@ -69,6 +81,25 @@ export function WorkspaceEditPreviewDialog() {
   const stale = state?.phase === 'stale'
   const open = state !== null
   const preview = state?.preview
+  const mode: EditorDiffViewMode = 'stacked'
+  const operationId = preview?.operationId ?? null
+  const [presentation, setPresentation] = useState<{
+    operationId: string | null
+    mode: EditorDiffViewMode
+    publications: readonly DiffPanePublication[]
+  }>(() => ({ operationId, mode, publications: [] }))
+  if (presentation.operationId !== operationId || presentation.mode !== mode) {
+    setPresentation({ operationId, mode, publications: [] })
+  }
+  const notePublication = (event: DiffPanePublicationEvent) => {
+    if (!preview) return
+    setPresentation((current) => {
+      const publications = updateWorkspaceEditPublications(current.publications, event, preview)
+      return publications === current.publications ? current : { operationId, mode, publications }
+    })
+  }
+  const previewPresented =
+    !!preview && workspaceEditPreviewIsPresented(preview, presentation.publications, mode)
   const editorModule = useQuery(
     {
       ...previewEditorOptions,
@@ -179,7 +210,8 @@ export function WorkspaceEditPreviewDialog() {
                         {DiffEditor ? (
                           <DiffEditor
                             attachment={operationDiffAttachment(row.comparison, row.file)}
-                            mode='stacked'
+                            mode={mode}
+                            onPublication={notePublication}
                           />
                         ) : null}
                         {!DiffEditor && editorModule.isError ? (
@@ -234,8 +266,10 @@ export function WorkspaceEditPreviewDialog() {
             {stale ? 'Close' : 'Cancel'}
           </Button>
           <Button
-            disabled={!awaiting || processing}
-            onClick={() => preview && service.confirmPreview(preview.operationId)}
+            disabled={!awaiting || processing || !previewPresented}
+            onClick={() =>
+              awaiting && preview && previewPresented && service.confirmPreview(preview.operationId)
+            }
             type='button'
           >
             {processing ? (
@@ -249,6 +283,28 @@ export function WorkspaceEditPreviewDialog() {
       </DialogContent>
     </Dialog>
   )
+}
+
+export function updateWorkspaceEditPublications(
+  current: readonly DiffPanePublication[],
+  event: DiffPanePublicationEvent,
+  preview: WorkspaceEditPreview,
+): readonly DiffPanePublication[] {
+  const incoming = event.publication
+  if (!matchesPreview(incoming, preview)) return current
+  if (event.kind === 'withdrawn') {
+    const next = current.filter((publication) => publication !== incoming)
+    return next.length === current.length ? current : next
+  }
+  if (current.includes(incoming)) return current
+  return [
+    ...current.filter(
+      (publication) =>
+        publication.side !== incoming.side ||
+        publication.attachment.file !== incoming.attachment.file,
+    ),
+    incoming,
+  ]
 }
 
 function targetLabel(row: WorkspaceEditPreviewRow): string {
@@ -277,4 +333,38 @@ function rowIcon(row: WorkspaceEditPreviewRow) {
   if (row.kind === 'rename')
     return <FolderSimpleIcon className='text-info size-(--icon-size) shrink-0' />
   return <FileTextIcon className='text-foreground size-(--icon-size) shrink-0' />
+}
+
+function matchesPreview(publication: DiffPanePublication, preview: WorkspaceEditPreview): boolean {
+  const attachment = publication.attachment
+  if (attachment.kind !== 'operation' || attachment.read.input.operationId !== preview.operationId)
+    return false
+  return preview.rows.some(
+    (row) =>
+      row.comparison?.kind === 'ready' &&
+      row.comparison === attachment.read &&
+      row.comparison.input === attachment.read.input &&
+      row.file === attachment.file &&
+      attachment.read.input.display === row.file,
+  )
+}
+
+export function workspaceEditPreviewIsPresented(
+  preview: WorkspaceEditPreview,
+  publications: readonly DiffPanePublication[],
+  mode: EditorDiffViewMode,
+): boolean {
+  const requiredSides = mode === 'split' ? ['old', 'new'] : ['stacked']
+  return preview.rows.every(
+    (row) =>
+      row.kind !== 'text-document' ||
+      requiredSides.every((side) =>
+        publications.some(
+          (publication) =>
+            publication.side === side &&
+            publication.attachment.file === row.file &&
+            matchesPreview(publication, preview),
+        ),
+      ),
+  )
 }
