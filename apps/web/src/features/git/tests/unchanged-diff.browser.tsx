@@ -1,3 +1,4 @@
+import { projectionControl } from '../../../../test/factories/diff-attachment'
 import '@workspace/ui/globals.css'
 import { createDiffRegionStore, createTextDiff } from '@singapore-editor/diff'
 import { StrictMode } from 'react'
@@ -52,7 +53,11 @@ function mountRenameDiff() {
     root?.render(
       <StrictMode>
         <AppProviders queryClient={createTestQueryClient()}>
-          <DiffEditor file={file} mode='split' regions={createDiffRegionStore()} />
+          <DiffEditor
+            attachment={projectionControl(file)}
+            mode='split'
+            regions={createDiffRegionStore()}
+          />
         </AppProviders>
       </StrictMode>,
     ),

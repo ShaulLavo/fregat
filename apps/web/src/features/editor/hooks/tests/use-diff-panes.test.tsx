@@ -13,7 +13,7 @@ import { expect, test } from '../../../../../test/fixtures'
 test('a scroll in one pane is mirrored onto the other', () => {
   const { panes, old: left, new: right } = mountPanes()
 
-  panes.handleScroll('old', { left: 0, top: 300 })
+  panes.handleScroll('old', { left: 0, top: 300 }, 'scroll')
 
   expect(right.position).toEqual({ left: 0, top: 300 })
   expect(left.position).toEqual({ left: 0, top: 0 })
@@ -23,7 +23,7 @@ test('the horizontal axis is mirrored too, which is the whole reason this is hos
   // A mirror that quietly dropped `left` would look fine on every vertical test.
   const { panes, new: right } = mountPanes()
 
-  panes.handleScroll('old', { left: 140, top: 20 })
+  panes.handleScroll('old', { left: 140, top: 20 }, 'scroll')
 
   expect(right.position).toEqual({ left: 140, top: 20 })
 })
@@ -31,10 +31,10 @@ test('the horizontal axis is mirrored too, which is the whole reason this is hos
 test('the mirrored pane answering back does not move the pane the reader is driving', () => {
   const { panes, old: left, new: right } = mountPanes()
 
-  panes.handleScroll('old', { left: 0, top: 300 })
+  panes.handleScroll('old', { left: 0, top: 300 }, 'scroll')
   // The mirror already reported its move from inside `setScrollPosition`; a late repeat of it
   // (the browser's own scroll event) changes nothing either.
-  panes.handleScroll('new', right.position)
+  panes.handleScroll('new', right.position, 'scroll')
 
   expect(left.position).toEqual({ left: 0, top: 0 })
 })
@@ -44,10 +44,10 @@ test('a mirror that cannot scroll as far does not drag the driving pane back to 
   // pane that clamps at 150 and then believing the pane's answer would yank the reader back.
   const { panes, old: left, new: right } = mountPanes({ newMaxLeft: 150 })
 
-  panes.handleScroll('old', { left: 400, top: 0 })
+  panes.handleScroll('old', { left: 400, top: 0 }, 'scroll')
   expect(right.position).toEqual({ left: 150, top: 0 })
 
-  panes.handleScroll('new', right.position)
+  panes.handleScroll('new', right.position, 'scroll')
 
   expect(left.position).toEqual({ left: 0, top: 0 })
 })
@@ -58,10 +58,10 @@ test('a write that moves the mirror nowhere does not swallow the reader scrollin
   // then eats the reader's own scroll of that pane.
   const { panes, old: left, new: right } = mountPanes({ newMaxLeft: 0 })
 
-  panes.handleScroll('old', { left: 90, top: 0 })
+  panes.handleScroll('old', { left: 90, top: 0 }, 'scroll')
   expect(right.position).toEqual({ left: 0, top: 0 })
 
-  panes.handleScroll('new', { left: 0, top: 250 })
+  panes.handleScroll('new', { left: 0, top: 250 }, 'scroll')
 
   expect(left.position).toEqual({ left: 0, top: 250 })
 })
@@ -72,11 +72,11 @@ test('an unanswered mirror write does not swallow a later scroll that lands on i
   // of `new` that happened to land where the write did would be read as the echo and dropped.
   const { panes, old: left, new: right } = mountPanes()
 
-  panes.handleScroll('old', { left: 0, top: 300 })
+  panes.handleScroll('old', { left: 0, top: 300 }, 'scroll')
   expect(right.position).toEqual({ left: 0, top: 300 })
-  panes.handleScroll('new', { left: 0, top: 0 })
+  panes.handleScroll('new', { left: 0, top: 0 }, 'scroll')
 
-  panes.handleScroll('new', { left: 0, top: 300 })
+  panes.handleScroll('new', { left: 0, top: 300 }, 'scroll')
 
   expect(left.position).toEqual({ left: 0, top: 300 })
 })
@@ -94,12 +94,12 @@ test('a vertical scroll does not drag the other pane sideways', () => {
   // pane where the browser would have put it first — otherwise the driver never actually moves and
   // the assertion below passes for the wrong reason.
   wide.setScrollPosition({ left: 150, top: 0 })
-  panes.handleScroll('old', { left: 150, top: 0 })
+  panes.handleScroll('old', { left: 150, top: 0 }, 'scroll')
   // The narrow pane cannot follow, so the two diverge — legitimately.
   expect(narrow.position).toEqual({ left: 0, top: 0 })
 
   // Now they scroll the narrow pane DOWN. Its `left` was already 0 and has not moved.
-  panes.handleScroll('new', { left: 0, top: 90 })
+  panes.handleScroll('new', { left: 0, top: 90 }, 'scroll')
 
   // The wide pane follows vertically and holds its horizontal position.
   expect(wide.position).toEqual({ left: 150, top: 90 })
@@ -118,7 +118,7 @@ test('focusing one pane collapses the other pane selection without scrolling it'
 test('a stacked pane has nothing to mirror or clear', () => {
   const { panes, old: left, new: right } = mountPanes()
 
-  panes.handleScroll('stacked', { left: 10, top: 10 })
+  panes.handleScroll('stacked', { left: 10, top: 10 }, 'scroll')
   panes.handleFocus('stacked')
 
   expect(left.position).toEqual({ left: 0, top: 0 })
@@ -163,9 +163,11 @@ function fakeEditor(
 function mountPanes({ newMaxLeft = Number.POSITIVE_INFINITY } = {}) {
   const { result } = renderHook(() => useDiffPanes())
   const left = fakeEditor(Number.POSITIVE_INFINITY, (position) =>
-    result.current.handleScroll('old', position),
+    result.current.handleScroll('old', position, 'scroll'),
   )
-  const right = fakeEditor(newMaxLeft, (position) => result.current.handleScroll('new', position))
+  const right = fakeEditor(newMaxLeft, (position) =>
+    result.current.handleScroll('new', position, 'scroll'),
+  )
   result.current.registerEditor('old', left)
   result.current.registerEditor('new', right)
 

@@ -2,6 +2,8 @@ import {
   sameCheckpointCapture,
   promoteCheckpointCapture,
   sameHistoryCapture,
+  sameOperationCapture,
+  operationComparisonSubject,
 } from '@/lib/snapshot-comparison'
 import { isPdfFile } from '@/lib/pdf-viewer/format'
 import { pdfError } from '@/lib/pdf-viewer/structured-errors'
@@ -51,7 +53,7 @@ import type {
   SavedComparisonRequest,
   SavedComparisonScope,
   SavedComparisonRefresh,
-} from '@/features/editor/utils/saved-comparison'
+} from '@/lib/saved-comparison'
 import {
   createEditorViewSession,
   acquireDocumentMutationLease,
@@ -249,6 +251,7 @@ type SnapshotComparisonInterest = {
 }
 
 export type WorkspaceDocumentServiceState = {
+  readonly environmentId: EnvironmentId | null
   snapshotComparisonTabs: ReadonlyMap<TabId, SnapshotComparisonLease>
   snapshotComparisons: ReadonlyMap<SnapshotComparisonLease, SnapshotComparisonRead>
   savedComparisonTabs: ReadonlyMap<TabId, SavedComparisonLease>
@@ -360,7 +363,7 @@ export class WorkspaceDocumentService {
     const key = snapshotGroupKey(input)
     const groups = this.snapshotGroups.get(key) ?? new Set<SnapshotComparisonGroup>()
     const retained =
-      input.kind === 'history'
+      input.kind === 'history' || input.kind === 'operation'
         ? [...groups].find((candidate) => compatibleCapture(candidate.current.input, input))
         : groups.values().next().value
     const group = retained ?? {
@@ -1478,6 +1481,7 @@ export class WorkspaceDocumentService {
     const previous = this.cachedState
     const viewsByTabId = recordFromMap(this.viewsByTabId, previous?.viewsByTabId)
     const next: WorkspaceDocumentServiceState = {
+      environmentId: this.environmentId,
       snapshotComparisonTabs: this.snapshotComparisonTabs,
       snapshotComparisons: this.snapshotComparisons,
       savedComparisonTabs: this.savedComparisonTabs,
@@ -2159,41 +2163,82 @@ function assertTextFile(file: FileSnapshot): void {
 }
 
 function snapshotGroupKey(input: SnapshotComparisonInput): string {
-  if (input.kind === 'history')
-    return JSON.stringify(['history', input.scope.rootPath, input.subject])
-  if (input.kind === 'checkpoint')
-    return JSON.stringify([
-      input.scope.rootPath,
-      input.subject,
-      input.files.map((file) => [file.path, file.revision, file.hunks.map((hunk) => hunk.id)]),
-    ])
-  return JSON.stringify([input.scope.rootPath, input.subject])
+  switch (input.kind) {
+    case 'operation':
+      return operationComparisonSubject(input)
+    case 'history':
+      return JSON.stringify(['history', input.scope.rootPath, input.subject])
+    case 'checkpoint':
+      return JSON.stringify([
+        input.scope.rootPath,
+        input.subject,
+        input.files.map((file) => [file.path, file.revision, file.hunks.map((hunk) => hunk.id)]),
+      ])
+    case 'snapshot':
+      return JSON.stringify([input.scope.rootPath, input.subject])
+  }
+  const exhaustive: never = input
+  return exhaustive
 }
 
 function validSnapshotCapture(input: SnapshotComparisonInput): boolean {
-  if (input.kind === 'history')
-    return input.subject === documentKey({ kind: 'history', file: { path: input.path } })
-  if (input.kind === 'checkpoint')
-    return (
-      input.comparison.owner === input.scope.rootPath &&
-      input.subject === documentKey({ kind: 'git-diff', source: input.comparison })
-    )
-  const target = input.comparison.target
-  return (
-    target.rootPath === input.scope.rootPath &&
-    input.subject === documentKey({ kind: 'git-diff', source: input.comparison }) &&
-    (target.kind === 'moving' || sameGitInputRevision(target.revision, input.revision))
-  )
+  switch (input.kind) {
+    case 'operation':
+      return (
+        input.subject === operationComparisonSubject(input) &&
+        input.root.path === input.scope.rootPath &&
+        input.old.snapshot === input.segment.snapshotBefore &&
+        input.new.snapshot === input.segment.snapshotAfter &&
+        input.segment.steps.some((step) => step.operationIndex === input.operationIndex) &&
+        input.display.oldPath === input.path &&
+        input.display.newPath === input.path
+      )
+    case 'history':
+      return input.subject === documentKey({ kind: 'history', file: { path: input.path } })
+    case 'checkpoint':
+      return (
+        input.comparison.owner === input.scope.rootPath &&
+        input.subject === documentKey({ kind: 'git-diff', source: input.comparison })
+      )
+    case 'snapshot': {
+      const target = input.comparison.target
+      return (
+        target.rootPath === input.scope.rootPath &&
+        input.subject === documentKey({ kind: 'git-diff', source: input.comparison }) &&
+        (target.kind === 'moving' || sameGitInputRevision(target.revision, input.revision))
+      )
+    }
+  }
+  const exhaustive: never = input
+  return exhaustive
 }
 
 function comparisonRoot(input: SnapshotComparisonInput): FilesystemPath {
-  if (input.kind === 'history') return input.scope.rootPath
-  return input.kind === 'checkpoint' ? input.comparison.owner : input.comparison.target.rootPath
+  switch (input.kind) {
+    case 'operation':
+      return input.root.path
+    case 'history':
+      return input.scope.rootPath
+    case 'checkpoint':
+      return input.comparison.owner
+    case 'snapshot':
+      return input.comparison.target.rootPath
+  }
+  const exhaustive: never = input
+  return exhaustive
 }
 
 function compatibleCapture(left: SnapshotComparisonInput, right: SnapshotComparisonInput): boolean {
-  if (left.kind === 'history' || right.kind === 'history')
-    return left.kind === 'history' && right.kind === 'history' && sameHistoryCapture(left, right)
-  if (left.kind !== 'checkpoint' || right.kind !== 'checkpoint') return left.kind === right.kind
-  return sameCheckpointCapture(left, right)
+  switch (left.kind) {
+    case 'operation':
+      return right.kind === 'operation' && sameOperationCapture(left, right)
+    case 'history':
+      return right.kind === 'history' && sameHistoryCapture(left, right)
+    case 'checkpoint':
+      return right.kind === 'checkpoint' && sameCheckpointCapture(left, right)
+    case 'snapshot':
+      return right.kind === 'snapshot'
+  }
+  const exhaustive: never = left
+  return exhaustive
 }

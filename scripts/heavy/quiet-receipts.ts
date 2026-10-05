@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { closeSync, readdirSync, readFileSync } from 'node:fs'
+import { closeSync, readdirSync, readFileSync, readlinkSync } from 'node:fs'
 import path from 'node:path'
 
 import { bootSeconds } from './admission'
@@ -11,11 +11,30 @@ type Failure = {
   readonly jobs: Readonly<Record<string, ReturnType<typeof start> | undefined>>
   readonly units?: readonly string[]
   readonly manager?: ReturnType<typeof spawnSync>
+  readonly launcher?: {
+    readonly pid: number | undefined
+    readonly resultFile: string
+    readonly checkpoints: readonly ReturnType<typeof quietLauncherReceipt>[]
+  }
 }
 
-export function quietFailureReceipt({ box, jobs, units = [], manager }: Failure) {
+export function quietLauncherReceipt(pid: number | undefined, phase: string) {
+  const boot = capture(bootSeconds)
+  if (pid === undefined) return { phase, bootSeconds: boot, created: false }
+  return {
+    phase,
+    bootSeconds: boot,
+    pid,
+    status: capture(() => readFileSync(`/proc/${pid}/status`, 'utf8')),
+    cgroup: capture(() => readFileSync(`/proc/${pid}/cgroup`, 'utf8')),
+    fd6: capture(() => readlinkSync(`/proc/${pid}/fd/6`)),
+    fd6Info: capture(() => readFileSync(`/proc/${pid}/fdinfo/6`, 'utf8')),
+  }
+}
+
+export function quietFailureReceipt({ box, jobs, units = [], manager, launcher }: Failure) {
   return capture(() => ({
-    bootSeconds: bootSeconds(),
+    bootSeconds: capture(bootSeconds),
     fixtureRoot: box.root,
     sliceRoot: box.sliceRoot,
     jobs: Object.entries(jobs).map(([name, job]) => {
@@ -40,6 +59,15 @@ export function quietFailureReceipt({ box, jobs, units = [], manager }: Failure)
     ),
     holder: capture(() => readFileSync(path.join(box.state, 'quiet.holder'), 'utf8')),
     records: files(box.logs),
+    launcher: launcher
+      ? {
+          current: quietLauncherReceipt(launcher.pid, 'failure'),
+          result: capture(() => readFileSync(launcher.resultFile, 'utf8')),
+          checkpoints: launcher.checkpoints,
+        }
+      : null,
+    clientVersion: query(['systemd-run', '--version']),
+    managerVersion: query(['systemctl', '--user', 'show', '--property=Version,SystemState']),
     managerCommand: manager ? resultReceipt(manager) : null,
     managerUnits: query([
       'systemctl',

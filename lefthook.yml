@@ -8,9 +8,10 @@ pre-commit:
       run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun x oxfmt --no-error-on-unmatched-pattern --write {staged_files}
       stage_fixed: true
 
+    # The spread fixer can erase Array conversion from typed-array slice results.
     - name: lint fix staged files
       glob: '*.{ts,tsx,js,jsx,mjs,cjs}'
-      run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun x oxlint --fix {staged_files}
+      run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun x oxlint --fix --allow=unicorn/no-useless-spread {staged_files}
       stage_fixed: true
 
     - name: lint check staged files
