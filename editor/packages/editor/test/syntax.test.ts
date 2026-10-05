@@ -76,6 +76,113 @@ it('marks current highlighter work pending on the direct provider path while kee
   }
 })
 
+it.each(['ready', 'error'] as const)(
+  'keeps the current edit pending when a prior structural replacement becomes %s',
+  async (outcome) => {
+    const update = deferred<EditorHighlightResult>()
+    const structure = deferred<EditorSyntaxResult>()
+    const initialTokens = EditorTokenStore.fromTokens([{ start: 0, end: 5, style: RED }])
+    let refreshes = 0
+    const events: EditorInitialPaintEvent[] = []
+    const host = document.createElement('div')
+    document.body.append(host)
+    const editor = new Editor(host, {
+      plugins: [
+        highlighterPlugin({
+          refresh: () =>
+            ++refreshes === 1 ? Promise.resolve({ tokens: initialTokens }) : update.promise,
+          applyChange: () => update.promise,
+          dispose: () => undefined,
+        }),
+      ],
+      onInitialPaint: (event) => events.push(event),
+    })
+    try {
+      editor.openDocument({ documentId: 'overlap.ts', languageId: 'typescript', text: TEXT })
+      await expect.poll(() => editor.getState().initialHighlightStatus).toBe('painted')
+      editor.addPlugin(syntaxPlugin(syntaxSession(structure)))
+      expect(editor.getState().initialHighlightStatus).toBe('loading')
+      editor.edit({ from: 0, to: 0, text: '// pending\n' })
+      expect(editor.materializeFullText()).toBe('// pending\n' + TEXT)
+      expect(editor.getState().initialHighlightStatus).toBe('loading')
+      if (outcome === 'ready') structure.resolve(createEmptySyntaxResult())
+      if (outcome === 'error') structure.reject(new TypeError('Held structural provider failed'))
+      await expect.poll(() => editor.getState().syntaxStatus).toBe(outcome)
+      expect(editor.getState().initialHighlightStatus).toBe('loading')
+      expect(editor['syntax'].renderDataReady).toBe(false)
+      expect(editor['syntax'].copyTokens.length).toBe(0)
+      expect(editor['syntax'].tokens.toTokens()).toEqual([{ start: 11, end: 16, style: RED }])
+      expect(events.filter(isHighlightSettled)).toHaveLength(1)
+      const current = EditorTokenStore.fromTokens([
+        { start: 0, end: 10, style: { color: '#008000' } },
+        { start: 11, end: 16, style: RED },
+      ])
+      update.resolve({ tokens: current })
+      await expect.poll(() => editor.getState().initialHighlightStatus).toBe('painted')
+      expect(editor['syntax'].tokens.toTokens()).toEqual(current.toTokens())
+      expect(editor['syntax'].copyTokens.toTokens()).toEqual(current.toTokens())
+      expect(editor['syntax'].renderDataReady).toBe(true)
+      expect(events.filter(isHighlightSettled)).toHaveLength(2)
+    } finally {
+      structure.resolve(createEmptySyntaxResult())
+      update.resolve({ tokens: EditorTokenStore.empty() })
+      editor.dispose()
+      host.remove()
+    }
+  },
+)
+
+it('keeps a current edit pending when a theme terminal captured before the edit settles', async () => {
+  const update = deferred<EditorHighlightResult>()
+  const theme = deferred<EditorTheme>()
+  const initialTokens = EditorTokenStore.fromTokens([{ start: 0, end: 5, style: RED }])
+  const events: EditorInitialPaintEvent[] = []
+  const host = document.createElement('div')
+  document.body.append(host)
+  const editor = new Editor(host, {
+    plugins: [
+      highlighterPlugin(
+        {
+          refresh: async () => ({ tokens: initialTokens }),
+          applyChange: () => update.promise,
+          dispose: () => undefined,
+        },
+        () => theme.promise,
+      ),
+    ],
+    onInitialPaint: (event) => events.push(event),
+  })
+  try {
+    editor.openDocument({ documentId: 'theme-overlap.ts', languageId: 'typescript', text: TEXT })
+    await expect.poll(() => editor['syntax'].tokens.length).toBe(1)
+    expect(editor.getState().initialHighlightStatus).toBe('loading')
+    expect(events.filter(isHighlightSettled)).toHaveLength(0)
+    editor.edit({ from: 0, to: 0, text: '// pending\n' })
+    const appearance = { foregroundColor: '#222222' }
+    theme.resolve(appearance)
+    await expect.poll(() => editor['syntax'].providerTheme).toEqual(appearance)
+    expect(editor.materializeFullText()).toBe('// pending\n' + TEXT)
+    expect(editor.getState().initialHighlightStatus).toBe('loading')
+    expect(editor['syntax'].renderDataReady).toBe(false)
+    expect(editor['syntax'].copyTokens.length).toBe(0)
+    expect(editor['syntax'].tokens.toTokens()).toEqual([{ start: 11, end: 16, style: RED }])
+    expect(events.filter(isHighlightSettled)).toHaveLength(0)
+    const current = EditorTokenStore.fromTokens([
+      { start: 0, end: 10, style: { color: '#008000' } },
+      { start: 11, end: 16, style: RED },
+    ])
+    update.resolve({ tokens: current })
+    await expect.poll(() => editor.getState().initialHighlightStatus).toBe('painted')
+    expect(editor['syntax'].copyTokens.toTokens()).toEqual(current.toTokens())
+    expect(events.filter(isHighlightSettled)).toHaveLength(1)
+  } finally {
+    theme.resolve({})
+    update.resolve({ tokens: EditorTokenStore.empty() })
+    editor.dispose()
+    host.remove()
+  }
+})
+
 describe('syntax capture conversion', () => {
   it('maps known capture names to editor token styles', () => {
     expect(styleForTreeSitterCapture('keyword.declaration')).toEqual({
