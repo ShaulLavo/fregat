@@ -1,10 +1,12 @@
+import type { ChatAttachment } from '@workspace/contracts'
+import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
+import type { attachmentTextOptions } from '../utils/attachment-file'
 import { FileIcon } from '@phosphor-icons/react'
 import { ChatFilePreview } from './chat-file-preview'
 import { useQueryClient } from '@tanstack/react-query'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { serverEndpoint } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
-import type { ChatAttachment } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { cn } from '@workspace/ui/lib/utils'
@@ -25,11 +27,23 @@ export function ChatAttachmentThumbnails({
   attachments: readonly ChatAttachment[]
   className?: string
 }) {
-  const owner = originForQueryClient(useQueryClient())
+  const queryClient = useQueryClient()
+  const environmentId = useEnvironmentId()
+  const owner = originForQueryClient(queryClient)
   const environment = useEnvironmentsStore((state) => state.entries[owner])
   const origin = serverEndpoint(environment?.origin ?? owner)
   const [openIndex, setOpenIndex] = useState<number | null>(null)
-  const [openFile, setOpenFile] = useState<Extract<ChatAttachment, { type: 'file' }> | null>(null)
+  const [openFile, setOpenFile] = useState<{
+    input: Parameters<typeof attachmentTextOptions>[0]
+    queryClient: typeof queryClient
+  } | null>(null)
+  if (
+    openFile &&
+    (openFile.queryClient !== queryClient ||
+      openFile.input.environmentId !== environmentId ||
+      openFile.input.origin !== origin)
+  )
+    setOpenFile(null)
   if (attachments.length === 0) return null
 
   const images = chatAttachmentImages(attachments, origin)
@@ -71,14 +85,28 @@ export function ChatAttachmentThumbnails({
             size='sm'
             variant='outline'
             title={attachment.name}
-            onClick={() => setOpenFile(attachment)}
+            onClick={() =>
+              setOpenFile({
+                input: Object.freeze({
+                  attachment: Object.freeze({ ...attachment }),
+                  environmentId,
+                  origin,
+                  provenance: 'sent' as const,
+                }),
+                queryClient,
+              })
+            }
           >
             <FileIcon className='size-(--icon-size-sm)' />
             <span className='max-w-56 truncate'>{attachment.name}</span>
           </Button>
         ))}
       {openFile && (
-        <ChatFilePreview attachment={openFile} origin={origin} onClose={() => setOpenFile(null)} />
+        <ChatFilePreview
+          input={openFile.input}
+          queryClient={openFile.queryClient}
+          onClose={() => setOpenFile(null)}
+        />
       )}
       {unrenderable.map((attachment) => (
         <span
