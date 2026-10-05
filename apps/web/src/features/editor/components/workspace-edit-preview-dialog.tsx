@@ -191,7 +191,7 @@ export function WorkspaceEditPreviewDialog() {
               <ol className='grid gap-2'>
                 {preview.rows.map((row) => (
                   <li
-                    className='bg-card rounded-lg p-3'
+                    className='bg-card min-w-0 rounded-lg p-3'
                     key={`${row.index}:${row.path}`}
                     title={resourcePathLabel(row)}
                   >
