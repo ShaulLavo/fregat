@@ -22,7 +22,14 @@ import {
   type RetentionAcceptanceReference,
 } from './retention-acceptance-projection'
 
-export function retentionAcceptanceSubject(app: RetentionAcceptanceApp, path: FilesystemPath) {
+type RetentionPaintApp = {
+  readonly read: () => Pick<
+    ReturnType<RetentionAcceptanceApp['read']>,
+    'documents' | 'theme' | 'ui' | 'workspace'
+  >
+}
+
+export function retentionAcceptanceSubject(app: RetentionPaintApp, path: FilesystemPath) {
   const state = app.read()
   const document = state.documents.getState().getLiveEditorDocument(fileDocumentKey(path))
   if (!document)
@@ -50,7 +57,7 @@ export function retentionAcceptanceSubject(app: RetentionAcceptanceApp, path: Fi
 }
 
 export function retentionAcceptanceReference(
-  app: RetentionAcceptanceApp,
+  app: RetentionPaintApp,
   path: FilesystemPath,
 ): RetentionAcceptanceReference {
   const subject = retentionAcceptanceSubject(app, path)
@@ -90,7 +97,7 @@ export function retentionAcceptanceReference(
 }
 
 export function retentionAcceptanceBinding(
-  app: RetentionAcceptanceApp,
+  app: RetentionPaintApp,
   path: FilesystemPath,
   snapshot: EditorViewSnapshot,
 ): RetentionAcceptanceBinding {
@@ -115,10 +122,7 @@ export function retentionAcceptanceBinding(
   }
 }
 
-export async function awaitRetentionAcceptanceReady(
-  app: RetentionAcceptanceApp,
-  path: FilesystemPath,
-) {
+export async function awaitRetentionAcceptanceReady(app: RetentionPaintApp, path: FilesystemPath) {
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
   await expect
     .poll(
@@ -160,7 +164,7 @@ export async function awaitRetentionAcceptanceReady(
 }
 
 export function captureRetentionAcceptancePaint(
-  app: RetentionAcceptanceApp,
+  app: RetentionPaintApp,
   path: FilesystemPath,
   tab: TabId,
 ) {
