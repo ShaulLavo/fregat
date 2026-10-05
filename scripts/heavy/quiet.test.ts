@@ -15,7 +15,7 @@ import { bootSeconds, sliceState } from './admission'
 import { DEADLINE_START_SECONDS, SCOPE_SHIM, stopTimeoutSeconds } from './job'
 import { tryLock, unlock } from './lock'
 import { live } from './queue'
-import { quietFailureReceipt } from './quiet-receipts'
+import { quietFailureReceipt, quietLauncherReceipt } from './quiet-receipts'
 
 import {
   alive,
@@ -1186,7 +1186,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         preload,
         `const spawn = Bun.spawn.bind(Bun)
         Bun.spawn = (options) => spawn(options.cmd?.[0] === 'systemd-run'
-          ? { ...options, cmd: ['bash', '-p', ${JSON.stringify(launcher)}, ...options.cmd] }
+          ? { ...options, env: { ...options.env, SYSTEMD_LOG_LEVEL: 'debug' }, cmd: ['bash', '-p', ${JSON.stringify(launcher)}, ...options.cmd] }
           : options)
         `,
       )
@@ -1197,6 +1197,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         preload,
       })
       let launcherPid: number | undefined
+      const launcherCheckpoints: ReturnType<typeof quietLauncherReceipt>[] = []
       let next: ReturnType<typeof start> | undefined
       let ordinary: ReturnType<typeof start> | undefined
       try {
@@ -1205,6 +1206,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         await expect
           .poll(() => readFileSync(`/proc/${launcherPid}/status`, 'utf8'), { timeout: 5_000 })
           .toMatch(/^State:\s+T/m)
+        launcherCheckpoints.push(quietLauncherReceipt(launcherPid, 'waiting'))
         delayed.child.kill('SIGSTOP')
         const owner = live(box.state, 'jobs').find((entry) => entry.label === 'delayed')!
         expect(owner).toBeDefined()
@@ -1230,8 +1232,12 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         expect(next.stdout()).toBe('')
         expect(recordOf(box, 'successor')).toBeUndefined()
         expect(live(box.state, 'jobs').some((entry) => entry.id === owner.id)).toBe(true)
+        launcherCheckpoints.push(quietLauncherReceipt(launcherPid, 'expired-before-release'))
         process.kill(launcherPid, 'SIGCONT')
         await expect.poll(() => existsSync(launcherDone), { timeout: 5_000 }).toBe(true)
+        launcherCheckpoints.push(
+          quietLauncherReceipt(launcherPid, 'returned-before-exit-assertion'),
+        )
         expect(existsSync(delayedPayload)).toBe(false)
         expect(readFileSync(launcherDone, 'utf8')).toBe('75')
         expect(next.stdout()).toBe('')
@@ -1251,7 +1257,17 @@ describe.skipIf(!userScopes)('quiet holds', () => {
       } catch (error) {
         console.error(
           '[quiet-fixture-failure]',
-          JSON.stringify(quietFailureReceipt({ box, jobs: { delayed, next, ordinary } })),
+          JSON.stringify(
+            quietFailureReceipt({
+              box,
+              jobs: { delayed, next, ordinary },
+              launcher: {
+                pid: launcherPid,
+                resultFile: launcherDone,
+                checkpoints: launcherCheckpoints,
+              },
+            }),
+          ),
         )
         throw error
       } finally {
