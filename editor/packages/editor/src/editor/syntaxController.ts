@@ -1,4 +1,8 @@
-import { retainedSyntaxCanWarm, setRetainedSyntaxDisplayDemand } from './documentAnalysis'
+import {
+  readRetainedHighlighterResult,
+  retainedSyntaxCanWarm,
+  setRetainedSyntaxDisplayDemand,
+} from './documentAnalysis'
 import type {
   EditorDocumentAnalysis,
   EditorRetainedSyntaxSession,
@@ -809,9 +813,31 @@ export class EditorSyntaxController {
 
   refreshHighlighterTheme(): void {
     if (this.retainedHighlighter) {
+      const retained = this.retainedHighlighter
+      const session = this.options.getSession()
       this.highlighterThemeRequests.cancel()
       this.highlighterThemePending = true
-      this.consumeRetainedProviderTheme()
+      const read = retained.read()
+      if (read.kind === 'ready' && read.providerTheme.kind === 'ready') {
+        this.consumeRetainedProviderTheme()
+        return
+      }
+      if (!session) return
+      const documentVersion = this.options.getDocumentVersion()
+      const generation = this.beginInitialHighlightReplacement('theme')
+      const settle = () => {
+        if (!this.preparedResultStillCurrent(retained, documentVersion, generation)) return
+        const current = retained.read()
+        if (current.kind === 'pending') return
+        if (current.kind === 'failed') {
+          this.completeProviderHighlighterTheme(null)
+          this.commitInitialHighlightError(generation)
+          return
+        }
+        this.consumeRetainedProviderTheme()
+        this.applyHighlightResult(current.result, documentVersion, nowMs(), generation)
+      }
+      void retained.refresh(session.getTextSnapshot()).then(settle, settle)
       return
     }
     const context = this.options.pluginHost.getHighlighterProvider()
@@ -1467,7 +1493,10 @@ export class EditorSyntaxController {
     const chain = this.options.getDocumentEditChain()
     const point = this.highlightDispatchPoint
     this.highlightDispatchPoint = chain.point
-    if (!change) return this.highlighterSession.refresh(session.getTextSnapshot())
+    if (!change)
+      return this.retainedHighlighter
+        ? readRetainedHighlighterResult(this.retainedHighlighter, session.getTextSnapshot())
+        : this.highlighterSession.refresh(session.getTextSnapshot())
 
     return this.highlighterSession.applyChange(composeSkippedChanges(chain, point, change))
   }

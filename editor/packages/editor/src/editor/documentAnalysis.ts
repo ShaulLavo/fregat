@@ -111,6 +111,16 @@ export type EditorRetainedHighlighterSession = EditorHighlighterSession & {
   readonly runtimeSessionId: string
   read(): HighlighterAnalysisRead
 }
+
+export function readRetainedHighlighterResult(
+  session: EditorRetainedHighlighterSession,
+  snapshot: DocumentTextSnapshot,
+): Promise<EditorHighlightResult> {
+  const read = session.read()
+  if (read.kind === 'ready') return Promise.resolve(read.result)
+  if (read.kind === 'failed') return Promise.reject(read.error)
+  return session.refresh(snapshot)
+}
 type ProviderThemeOutcome =
   | { readonly kind: 'ready'; readonly theme: EditorTheme | null }
   | { readonly kind: 'failed'; readonly error: unknown }
@@ -1267,7 +1277,12 @@ function highlighterLease(
     runtimeSessionId: entry.runtimeSessionId,
     refresh: () =>
       lease.wait(() => {
-        if (entry.read().kind === 'failed') entry.refresh()
+        const read = entry.read()
+        if (
+          read.kind === 'failed' ||
+          (read.kind === 'ready' && read.result.providerTheme.kind === 'failed')
+        )
+          entry.refresh()
         return entry.current().then((result) => result.highlightResult)
       }),
     applyChange: () => lease.wait(() => entry.current().then((result) => result.highlightResult)),

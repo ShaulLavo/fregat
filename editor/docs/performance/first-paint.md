@@ -60,7 +60,10 @@ and configured Editor theme retain that override order.
 
 Compatible fully ready preparation attaches synchronously through the existing atomic render,
 without a new constructor theme acquisition. Ordinary edits reuse the entry's certified theme
-while current tokens advance. Explicit theme refresh/retry reacquires admission. Source,
+while current tokens advance. Explicit theme refresh retries a failed retained certificate once
+through its existing owner; shared pending retries join that acquisition. Ordinary reads and
+prepared borrowing stay passive. A failed preparation remains failed after another caller's
+successful retry, and it supplies no ready transfer. Source,
 configuration and generation checks reject obsolete replies, and disposing the entry releases its
 theme outcome. An already invoked signal-less loader can still finish its side effect after
 cancellation; its old result cannot publish. Unknown or unprepared cohorts keep ordinary async

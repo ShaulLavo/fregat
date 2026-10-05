@@ -3,6 +3,7 @@ import type {
   EditorRetainedSyntaxSession,
   EditorRetainedHighlighterSession,
 } from './documentAnalysis'
+import { readRetainedHighlighterResult } from './documentAnalysis'
 import type { EditorTextBuffer } from '../documentSession'
 import type { PieceTableSnapshot } from '@singapore-editor/textbuffer'
 import type { EditorHighlighterProvider, EditorHighlightResult } from '../syntax/highlighter'
@@ -612,6 +613,7 @@ function borrowHighlighter(
   analysis: EditorDocumentAnalysis,
 ): EditorPreparedHighlighterBorrow | null {
   if (!stage?.provider) return null
+  if (stage.failed()) return disposeStage(stage)
   if (stage.provider !== expected.highlighterProvider) return disposeStage(stage)
   const providers = expected.highlighterThemeProviders ?? [expected.highlighterProvider]
   if (!sameThemeCohort(stage.cohort, captureThemeCohort(providers))) return disposeStage(stage)
@@ -626,7 +628,7 @@ function borrowHighlighter(
   })
   if (!session) return null
   stage.dispose()
-  const result = session.refresh(analysis.buffer.getTextSnapshot())
+  const result = readRetainedHighlighterResult(session, analysis.buffer.getTextSnapshot())
   void result.catch(() => undefined)
   return borrowWithReadyResult(
     {

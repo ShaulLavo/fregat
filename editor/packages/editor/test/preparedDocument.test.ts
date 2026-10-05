@@ -171,7 +171,9 @@ describe('prepared editor documents', () => {
     const buffer = createEditorTextBuffer('alpha')
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
     const failure = new TypeError('external theme loader failed')
+    let healthy = false
     const loader = vi.fn(async () => {
+      if (healthy) return { foregroundColor: '#abcdef' }
       throw failure
     })
     const provider: EditorHighlighterProvider = {
@@ -187,20 +189,21 @@ describe('prepared editor documents', () => {
       tabSizePolicy: 'detect-indentation',
       documentConfigurationTag: [],
     })
-    expect(
-      await prepared.startStage({
-        family: 'highlighter',
-        provider,
-        configurationTag: ['shiki', 'dark'],
-        range: 'full',
-        abortSignal: new AbortController().signal,
-      }),
-    ).toBe('failed')
+    const stage = prepared.startStage({
+      family: 'highlighter',
+      provider,
+      configurationTag: ['shiki', 'dark'],
+      range: 'full',
+      abortSignal: new AbortController().signal,
+    })
+    expect(await stage).toBe('failed')
     const borrow = prepared.borrow
-    let transferredReady: EditorHighlightResult | null | undefined
+    let transferredHighlighter:
+      | NonNullable<ReturnType<typeof prepared.borrow>>['highlighter']
+      | undefined
     prepared.borrow = (expected) => {
       const payload = borrow(expected)
-      transferredReady = payload?.highlighter?.readyResult
+      transferredHighlighter = payload?.highlighter
       return payload
     }
     const container = document.createElement('div')
@@ -216,10 +219,20 @@ describe('prepared editor documents', () => {
         documentConfigurationTag: [],
         highlighterConfigurationTag: ['shiki', 'dark'],
       })
-      expect(transferredReady).toBeNull()
+      expect(transferredHighlighter).toBeNull()
       await vi.waitFor(() => expect(editor.getState().initialHighlightStatus).toBe('painted'))
       expect(loader).toHaveBeenCalledTimes(1)
       expect(editor['syntax'].providerTheme).toBeNull()
+      healthy = true
+      editor['syntax'].refreshHighlighterTheme()
+      await vi.waitFor(() =>
+        expect(editor['syntax'].providerTheme).toEqual({ foregroundColor: '#abcdef' }),
+      )
+      expect(editor.getState().initialHighlightStatus).toBe('painted')
+      expect(loader).toHaveBeenCalledTimes(2)
+      expect(await stage).toBe('failed')
+      expect(prepared.borrow(match(buffer, null, provider))?.highlighter).toBeNull()
+      expect(loader).toHaveBeenCalledTimes(2)
     } finally {
       editor.dispose()
       container.remove()
