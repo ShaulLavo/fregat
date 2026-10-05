@@ -60,6 +60,7 @@ import {
   type TerminalFitEnvironment,
   type TerminalFitResult,
 } from './fit.js'
+import { fontResourcesMatch } from './font-resources.js'
 import {
   createDomInputController,
   createDomInputLifecycleController,
@@ -1180,9 +1181,11 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
       this.cleanup.add(observeWorkerLayout(elements, update))
       return
     }
-    const refreshFontResources = () => {
+    const refreshFontResources = (event: FontFaceSetLoadEvent) => {
+      if (!fontResourcesMatch(this.execution.appearance.font.family, event.fontfaces)) return
       this.runUiOperation('appearance.font-resources', () => {
-        if (!this.autoFit) this.remeasureFixedFont(this.execution.appearance.font)
+        if (this.autoFit) this.fit?.requestFit()
+        if (!this.autoFit) this.measureFixedFont(this.execution.appearance.font)
         this.renderer?.clearTextureAtlas?.()
       })
     }
@@ -1350,8 +1353,13 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   }
 
   private remeasureFixedFont(settings: TerminalFontSettings): void {
+    if (fittedFontSettingsEqual(this.fittedFont, settings)) return
+    this.measureFixedFont(settings)
+  }
+
+  private measureFixedFont(settings: TerminalFontSettings): void {
     const canvas = this.elementsValue?.canvas
-    if (!canvas || fittedFontSettingsEqual(this.fittedFont, settings)) return
+    if (!canvas) return
     const font = fitTerminalFont(
       canvas.ownerDocument,
       settings,

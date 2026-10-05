@@ -63,16 +63,18 @@ async function pixels(renderer: Renderer, terminal: Terminal): Promise<Uint8Arra
 }
 
 const cases = (['webgl', 'webgpu', 'pixels', 'fill-text'] as const).flatMap((backend) =>
-  [true, false].map((autoFit) => ({ backend, autoFit })),
+  [true, false].map((autoFit) => ({ backend, autoFit, fallback: false })),
 )
 
+cases.push({ backend: 'webgl', autoFit: false, fallback: true })
+
 it.each(cases)(
-  'refreshes $backend glyph resources after same-metric font replacement, autoFit $autoFit',
-  async ({ backend, autoFit }) => {
+  'refreshes $backend glyph resources after same-metric font replacement, autoFit $autoFit, fallback $fallback',
+  async ({ backend, autoFit, fallback }) => {
     const runtime = await GhosttyRuntime.create()
     const family = `FontResource-${backend}-${autoFit}`
     const font: TerminalFontSettings = {
-      family,
+      family: fallback ? `MissingResource812, "${family}"` : family,
       size: 20,
       weight: 400,
       boldWeight: 700,
@@ -116,6 +118,9 @@ it.each(cases)(
       terminal.setCursor({ style: 'bar' })
       await settle()
       expect(resourceClears).not.toHaveBeenCalled()
+      faces.push(await load(`${family}-Unrelated`, resources.before))
+      await settle()
+      expect(resourceClears).not.toHaveBeenCalled()
       const beforeFit = fitTerminalFont(document, font, devicePixelRatio)
       const before = await pixels(renderers[0]!, terminal)
       document.fonts.delete(faces[0]!)
@@ -135,6 +140,17 @@ it.each(cases)(
       const fresh = await pixels(renderers[1]!, freshTerminal)
       expect(fresh).not.toEqual(before)
       expect(after).toEqual(fresh)
+      faces.filter((face) => face.family === family).forEach((face) => document.fonts.delete(face))
+      faces.push(await load(family, resources.changed))
+      await settle()
+      const resourceFit = fitTerminalFont(document, terminal.appearance.font, devicePixelRatio)
+      expect(resourceFit.deviceCellWidth).not.toBe(beforeFit.deviceCellWidth)
+      expect(terminal.submittedFrame!.font.deviceCellWidth).toBe(resourceFit.deviceCellWidth)
+      expect(terminal.appearance.grid.cellWidth).toBe(resourceFit.cssCellWidth)
+      expect(terminal.canvas!.width).toBe(
+        terminal.appearance.grid.columns * resourceFit.deviceCellWidth,
+      )
+
       const changedFamily = `${family}-ChangedMetric`
       faces.push(await load(changedFamily, resources.changed))
       terminal.setFont({ family: changedFamily })
