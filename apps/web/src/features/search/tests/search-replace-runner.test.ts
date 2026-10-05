@@ -78,6 +78,11 @@ test.describe('workspace search replacement runner', () => {
         workspacePath: filesystemPath(''),
       }),
     })
+    onTestFinished(() => {
+      service.dispose()
+      store.getState().disposeEditorDocuments()
+      queries.clear()
+    })
     const phases: WorkspaceEditServicePhase[] = []
     const unsubscribe = service.subscribe(() => {
       const { phase } = service.getSnapshot()
