@@ -246,6 +246,7 @@ export type WorkspaceEditServiceOptions = {
   readonly documentStore: EditorDocumentStoreApi
   readonly fileSync: FileSyncService
   readonly getRoot: () => WorkspaceEditRoot | null
+  readonly onHistorySettled?: (rootPath: FilesystemPath) => void
   readonly inspectPath?: (
     path: FilesystemPath,
     signal: AbortSignal,
@@ -355,6 +356,7 @@ type WorkspaceEditGroup = {
   readonly affectedPaths: readonly FilesystemPath[]
   readonly legs: LocalLeg[]
   readonly operationId: string
+  readonly root: WorkspaceEditRoot
   projection: WorkspaceMutationProjectionReceipt | null
   receipts: Map<PreparedTarget, DocumentTransactionReceipt>
   server: WorkspaceEditResult | null
@@ -1350,6 +1352,7 @@ export class WorkspaceEditService {
       operationId: prepared.operationId,
       projection: local.projection,
       receipts: local.receipts,
+      root: prepared.root,
       server,
     }
     this.undoStack.push(group)
@@ -1398,7 +1401,7 @@ export class WorkspaceEditService {
     let provisional = group.server
     let localReversed = false
     let projection: WorkspaceMutationProjectionReceipt | null = null
-    const rootPath = group.projection?.rootPath ?? this.options.getRoot()?.path ?? null
+    const rootPath = group.root.path
     try {
       // A refetch since the edit landed replaced the projected cache entries with disk truth. That
       // supersedes the projection, it does not conflict with it: the server's version guards
@@ -1451,17 +1454,20 @@ export class WorkspaceEditService {
       group.projection = projection ?? group.projection
       // A persisted group with no projection left, discarded now or on an earlier transition,
       // settles the cache from disk: nothing else will.
-      if (provisional && !group.projection && rootPath) {
+      if (provisional && !group.projection) {
         await this.reconcileProjectionSafely(rootPath, group.affectedPaths)
       }
       source.pop()
       const destination = direction === 'undo' ? this.redoStack : this.undoStack
       destination.push(group)
+      const settlementFailure = this.notifyHistorySettled(rootPath)
       this.publish({ phase: direction === 'undo' ? 'applied' : 'applied' })
-      log.info({
+      log[settlementFailure ? 'warn' : 'info']({
         action: 'workspace_edit.reverse',
         area: 'workspace-edit',
         direction,
+        historySettlement: settlementFailure ? 'failed' : 'settled',
+        historySettlementError: settlementFailure?.error,
         operationId: group.operationId,
         outcome: 'applied',
       })
@@ -1498,7 +1504,7 @@ export class WorkspaceEditService {
         locks = null
         return false
       }
-      if ((group.projection || provisional) && rootPath) {
+      if (group.projection || provisional) {
         await this.reconcileProjectionSafely(rootPath, group.affectedPaths)
       }
       await this.invalidateHistoryDependencyChain(source, group.affectedPaths)
@@ -1510,6 +1516,16 @@ export class WorkspaceEditService {
       return false
     } finally {
       if (locks) releaseWorkspaceLocks(this.options.documentStore, locks)
+    }
+  }
+
+  private notifyHistorySettled(rootPath: FilesystemPath): { readonly error: unknown } | null {
+    try {
+      this.options.onHistorySettled?.(rootPath)
+      return null
+    } catch (error) {
+      // Read invalidation cannot compensate a completed history transaction.
+      return { error }
     }
   }
 
