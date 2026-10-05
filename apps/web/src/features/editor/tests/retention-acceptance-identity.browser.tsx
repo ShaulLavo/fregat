@@ -28,6 +28,9 @@ import {
   captureRetentionIdentityPaint,
   retentionIdentityCaptureFrame,
   assertRetentionIdentityCapture,
+  retentionIdentityColdFailureConfiguration,
+  retentionIdentityColdFailureOwner,
+  retentionIdentityColdFailureFrame,
 } from '../../../../test/factories/retention-acceptance-identity-paint'
 import {
   awaitRetentionAcceptanceReady,
@@ -473,7 +476,19 @@ test.for(['shiki', 'tree-sitter'] as const)(
     let current: Awaited<ReturnType<typeof retentionIdentityReference>> | null = null
     let finalSample: ReturnType<typeof captureRetentionIdentityPaint> | null = null
     try {
-      await expect.poll(() => gate.held().length).toBe(1)
+      try {
+        await expect.poll(() => gate.held().length).toBe(1)
+      } catch (error) {
+        await recordColdHoldFailure(family, context, {
+          configuration: () => retentionIdentityColdFailureConfiguration(app),
+          controller: () => retentionIdentityColdFailureOwner(app, sourcePath, tab.id),
+          held: () => gate.held(),
+          requests: () => gate.requests(),
+          lastFrame: () => retentionIdentityColdFailureFrame(observations.at(-1)),
+          trace: () => Boolean(Reflect.get(globalThis, '__editorPerfTrace')),
+        })
+        throw error
+      }
       const held = gate.held()
       expect(held[0]?.response).toMatchObject({ id: held[0]?.request.id })
       const before = retentionAcceptanceSubject(
@@ -609,6 +624,45 @@ function assertFrame(observation: Awaited<ReturnType<typeof referenceFrames>>[nu
 
 function frame() {
   return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+}
+
+async function recordColdHoldFailure(
+  family: 'shiki' | 'tree-sitter',
+  context: TestContext,
+  readers: Readonly<Record<string, () => unknown>>,
+) {
+  if (family !== 'tree-sitter') return
+  try {
+    const facts = Object.fromEntries(
+      Object.entries(readers).map(([name, read]) => [name, readColdFailureFact(read)]),
+    )
+    const packet = {
+      family,
+      point: 'cold-held-poll-failure-before-cleanup',
+      at: performance.now(),
+      facts,
+      nativeCallbacks: 'UNKNOWN: this case has no callback observer',
+      workerInspection: 'UNKNOWN: shared Tree SDK owner is not exposed by this case',
+      sdkFence: 'not-issued: the cold case fence follows native forwarding',
+    }
+    const serialized = JSON.stringify(packet)
+    console.info('identity-cold-failure-last-state', serialized)
+    await context.annotate(serialized, 'identity-cold-failure-last-state')
+  } catch {
+    return
+  }
+}
+
+function readColdFailureFact(read: () => unknown) {
+  try {
+    return { kind: 'observed', value: read() } as const
+  } catch (error) {
+    return { kind: 'UNKNOWN', error: coldFailureError(error) } as const
+  }
+}
+
+function coldFailureError(error: unknown) {
+  return { type: typeof error }
 }
 
 function installTrace(context: { onTestFinished(callback: () => void): void }) {

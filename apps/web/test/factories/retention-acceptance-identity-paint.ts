@@ -16,6 +16,7 @@ import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import type { SettingsSnapshot } from '@workspace/contracts'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
+import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { RetentionAcceptanceApp } from './retention-acceptance-app'
 import {
   retentionAcceptanceSubject,
@@ -185,6 +186,108 @@ export function retentionIdentityInput(app: RetentionAcceptanceApp, path: Filesy
     tags,
     configuredBackend: backend.kind,
     retention: subject.document.analysis.inspectRetention(),
+  }
+}
+
+export function retentionIdentityColdFailureConfiguration(app: RetentionAcceptanceApp) {
+  const confirmed = app.queryClient.getQueryData<SettingsSnapshot>(settingsKeys.document())
+  const projection = readLiveSettingsProjection(app.queryClient)
+  const query = app.queryClient.getQueryState(settingsKeys.document())
+  const theme = app.read().theme
+  return {
+    confirmed: confirmed?.values['editor.syntaxHighlighting.enabled'] ?? null,
+    effective: projection?.values['editor.syntaxHighlighting.enabled'] ?? null,
+    boot: readSettingsMirror()['editor.syntaxHighlighting.enabled'],
+    pendingMutationIds: projection?.pendingMutationIds ?? [],
+    query: {
+      status: query?.status,
+      fetchStatus: query?.fetchStatus,
+      updatedAt: query?.dataUpdatedAt,
+    },
+    theme: {
+      selected: theme.selectedThemeId,
+      applied: theme.appliedThemeId,
+      contentHash: theme.appliedThemeContentHash,
+    },
+  }
+}
+
+export function retentionIdentityColdFailureOwner(
+  app: RetentionAcceptanceApp,
+  path: FilesystemPath,
+  tab: TabId,
+) {
+  const runtime = app.read()
+  const controller = runtime.ui.getState().controllersByTabId.get(tab)
+  const snapshot = controller?.getSnapshot()
+  const editor = controller?.getEditor()
+  const capture = editor?.captureSnapshot()
+  const canonical = runtime.documents.getState().getLiveEditorDocument(fileDocumentKey(path))
+  return {
+    tabId: tab,
+    controllerCount: runtime.ui.getState().controllersByTabId.size,
+    canonical: canonical
+      ? {
+          key: canonical.key,
+          documentId: canonical.analysis.documentId,
+          revision: canonical.buffer.getRevision(),
+          dirty: canonical.buffer.isDirty(),
+          retention: canonical.analysis.inspectRetention(),
+        }
+      : null,
+    snapshot: snapshot
+      ? {
+          documentId: snapshot.documentId,
+          revision: snapshot.documentSyncPoint.revision,
+          textVersion: snapshot.textVersion,
+          languageId: snapshot.languageId,
+          syntaxStatus: snapshot.syntaxStatus,
+          initialHighlightStatus: snapshot.initialHighlightStatus,
+          paintLayersAvailable: snapshot.paintLayers !== null,
+        }
+      : null,
+    presentation: editor?.getPresentationState() ?? null,
+    capture: capture
+      ? {
+          documentId: capture.documentId,
+          bufferRevision: capture.bufferRevision,
+          textVersion: capture.textVersion,
+          bufferMatchesCanonical: capture.buffer === canonical?.buffer,
+          paint: capture.paint,
+        }
+      : null,
+  }
+}
+
+export function retentionIdentityColdFailureFrame(
+  observation:
+    | {
+        readonly phase: string
+        readonly path: FilesystemPath
+        readonly input: ReturnType<typeof retentionIdentityInput>
+        readonly sample: ReturnType<typeof captureRetentionIdentityPaint>
+      }
+    | undefined,
+) {
+  if (!observation) return null
+  const { input, sample } = observation
+  return {
+    at: sample.frame.at,
+    phase: observation.phase,
+    path: observation.path,
+    identity: input.identity,
+    configuration: input.syntaxSettingInput,
+    enabled: input.enabled,
+    colors: input.colors,
+    configuredBackend: input.configuredBackend,
+    languageId: input.configuredOwner.languageId,
+    selectedThemeId: input.selectedThemeId,
+    appliedThemeId: input.appliedThemeId,
+    installed: {
+      syncPoint: sample.installed.syncPoint,
+      syntaxStatus: sample.installed.syntaxStatus,
+      initialHighlightStatus: sample.installed.initialHighlightStatus,
+    },
   }
 }
 
