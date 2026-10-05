@@ -99,6 +99,7 @@ function parseTabs(raw: string | null): RouteSearch['tabs'] {
       continue
     }
     const reference = editorReferenceForToken(token)
+    if (!reference && token.startsWith('d/')) continue
     if (!reference) return undefined
     tabs.push(reference)
   }

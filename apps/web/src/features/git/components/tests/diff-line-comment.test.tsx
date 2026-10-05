@@ -12,7 +12,7 @@ import {
   useComposerInboxStore,
 } from '@/features/chat/state/composer-inbox-store'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
-import { fetchDiff } from '@/features/git/utils/api'
+import { fetchDiff } from '@/lib/git-diff-query'
 import { DiffView } from '@/features/git/components/diff-view'
 import { snapshotComparison } from '../../../../../test/factories/git-diff'
 import { testDiffLanguageHost } from '../../../../../test/factories/diff-language-host'

@@ -19,10 +19,11 @@ import { useTimelineRevealStore } from '@/features/chat/state/timeline-reveal-st
 import { chatMutationKeys } from '@/features/chat/utils/mutation-keys'
 import { blockQuoteLines, diffQuoteLines, linesMatch } from '@/features/chat/utils/review-source'
 import { blobDiffQueryOptions } from '@/lib/blob-diff-query'
-import { snapshotDocument } from '@/lib/documents/utils/comparisons'
+import { capturedReviewDocument } from '@/lib/documents/utils/comparisons'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { documentTab } from '@/lib/documents/utils/tabs'
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
+import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import { getNavigation } from '@/state/navigation-binding'
 
 /** How far back a cited reply is looked for before it counts as gone. */
@@ -46,6 +47,7 @@ export function useOpenReviewSource(hostSessionId: SessionId) {
   const queryClient = useQueryClient()
   const { openDefinition, openTabContent } = useEditorCommands()
   const environmentId = transport.environmentId
+  const workspace = useEditorWorkspaceStoreApi()
 
   async function openDiff(comment: Anchored<'diff'>): Promise<Outcome> {
     const { anchor } = comment
@@ -75,6 +77,8 @@ export function useOpenReviewSource(hostSessionId: SessionId) {
     const { anchor } = comment
     const expected = diffQuoteLines(comment.quote, 'old')
     if (!expected || !anchor.oldObjectId) return 'missing'
+    const rootPath = workspace.getState().rootFolder?.path
+    if (rootPath === undefined) return 'missing'
     const diffs = await queryClient
       .query(
         blobDiffQueryOptions({
@@ -85,7 +89,8 @@ export function useOpenReviewSource(hostSessionId: SessionId) {
       )
       .catch(() => null)
     const diff = diffs?.find((entry) => entry.oldText !== undefined)
-    const document = diff ? snapshotDocument(diff) : null
+    if (workspace.getState().rootFolder?.path !== rootPath) return 'left'
+    const document = diff ? capturedReviewDocument(diff, filesystemPath(rootPath)) : null
     if (!diff?.oldText || !document) return 'missing'
     if (!linesMatch(diff.oldText, range, expected)) return 'changed'
     openTabContent(documentTab(document))

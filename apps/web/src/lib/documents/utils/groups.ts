@@ -12,7 +12,7 @@ import {
   type TabPlacement,
   type TabPlacementResult,
 } from '@/lib/documents/utils/group-types'
-import { sameTabContent, tabContentKey } from '@/lib/documents/utils/tabs'
+import { sameTabCapture, sameTabContent, tabContentKey } from '@/lib/documents/utils/tabs'
 import type { EditorTabRecord, TabContent, TabId } from '@/lib/documents/utils/types'
 
 export function createEditorGroups(id: GroupId = createGroupId()): EditorGroups {
@@ -86,7 +86,15 @@ export function openTabInGroups(
 
   const existingGroup = existingTabGroup(groups, group, tab)
   const existing = existingGroup?.tabs.find((item) => sameTabContent(item.content, tab.content))
-  if (existing && existingGroup) return selectEditorGroupTab(groups, existingGroup.id, existing.id)
+  if (existing && existingGroup) {
+    const next = sameTabCapture(existing.content, tab.content)
+      ? groups
+      : mapGroupTabs(groups, (entry) => {
+          if (entry.id !== existing.id) return entry
+          return { ...entry, content: tab.content }
+        })
+    return selectEditorGroupTab(next, existingGroup.id, existing.id)
+  }
   if (groupForTab(groups, tab.id)) return groups
 
   const root = replaceNode(groups.root, groupId, {
@@ -239,7 +247,7 @@ function uniqueGroupTabs(group: EditorGroup): readonly EditorTabRecord[] {
   return [...byContent.values()]
 }
 
-function normalizedSelection(selected: TabId | null, tabs: readonly EditorTabRecord[]) {
+export function normalizedSelection(selected: TabId | null, tabs: readonly EditorTabRecord[]) {
   if (selected === null || tabs.some((tab) => tab.id === selected)) return selected
   return tabs[0]?.id ?? null
 }
@@ -478,59 +486,81 @@ function resizedSplit(node: EditorSplit, resize: GroupResize): GroupNode {
   return withChildren(node, children)
 }
 
-export function validEditorGroups(groups: EditorGroups): boolean {
+type GroupStructure =
+  | (Pick<EditorGroup, 'kind' | 'id' | 'selectedTabId'> & {
+      readonly tabs: readonly Pick<EditorTabRecord, 'id'>[]
+    })
+  | (Pick<EditorSplit, 'kind' | 'id' | 'axis'> & {
+      readonly children: readonly { readonly node: GroupStructure; readonly size: number }[]
+    })
+
+export function validEditorGroupStructure(
+  groups: { readonly root: GroupStructure; readonly activeGroupId: GroupId },
+  { allowEmptyGroups = false }: { readonly allowEmptyGroups?: boolean } = {},
+): boolean {
   const identities = new Set<string>()
-  const singletons = new Set<string>()
+  const leaves = new Set<GroupId>()
   return (
-    validNode(groups.root, null, identities, singletons, true) &&
-    groupById(groups, groups.activeGroupId) !== undefined
+    validStructureNode(groups.root, null, identities, leaves, true, allowEmptyGroups) &&
+    leaves.has(groups.activeGroupId)
   )
 }
 
-function validNode(
-  node: GroupNode,
+function validStructureNode(
+  node: GroupStructure,
   parentAxis: EditorSplit['axis'] | null,
   identities: Set<string>,
-  singletons: Set<string>,
+  leaves: Set<GroupId>,
   root: boolean,
+  allowEmptyGroups: boolean,
 ): boolean {
   if (identities.has(node.id)) return false
   identities.add(node.id)
-  if (node.kind === 'group') return validLeaf(node, identities, singletons, root)
+  if (node.kind === 'group') {
+    leaves.add(node.id)
+    return validStructureLeaf(node, identities, root || allowEmptyGroups)
+  }
   if (node.axis === parentAxis || node.children.length < 2) return false
   if (!node.children.every((child) => Number.isFinite(child.size) && child.size > 0)) return false
   const total = node.children.reduce((sum, child) => sum + child.size, 0)
   if (Math.abs(total - 100) > 1e-6) return false
   return node.children.every((child) =>
-    validNode(child.node, node.axis, identities, singletons, false),
+    validStructureNode(child.node, node.axis, identities, leaves, false, allowEmptyGroups),
   )
 }
 
-function validLeaf(
-  group: EditorGroup,
+function validStructureLeaf(
+  group: Extract<GroupStructure, { kind: 'group' }>,
   identities: Set<string>,
-  singletons: Set<string>,
-  root: boolean,
+  allowEmpty: boolean,
 ): boolean {
-  if (!root && group.tabs.length === 0) return false
+  if (!allowEmpty && group.tabs.length === 0) return false
   if (group.selectedTabId !== null && !group.tabs.some((tab) => tab.id === group.selectedTabId))
     return false
-  const contents = new Set<string>()
   for (const tab of group.tabs) {
-    if (!validTab(tab, identities, contents, singletons)) return false
+    if (identities.has(tab.id)) return false
+    identities.add(tab.id)
   }
   return true
 }
 
-function validTab(
-  tab: EditorTabRecord,
-  identities: Set<string>,
-  contents: Set<string>,
-  singletons: Set<string>,
+export function validEditorGroups(
+  groups: EditorGroups,
+  options: { readonly allowEmptyGroups?: boolean } = {},
 ): boolean {
+  if (!validEditorGroupStructure(groups, options)) return false
+  const singletons = new Set<string>()
+  return allEditorGroups(groups).every((group) => validLeaf(group, singletons))
+}
+
+function validLeaf(group: EditorGroup, singletons: Set<string>): boolean {
+  const contents = new Set<string>()
+  return group.tabs.every((tab) => validTab(tab, contents, singletons))
+}
+
+function validTab(tab: EditorTabRecord, contents: Set<string>, singletons: Set<string>): boolean {
   const key = tabContentKey(tab.content)
-  if (identities.has(tab.id) || contents.has(key)) return false
-  identities.add(tab.id)
+  if (contents.has(key)) return false
   contents.add(key)
   if (canCopyTabContent(tab.content)) return true
   if (singletons.has(key)) return false

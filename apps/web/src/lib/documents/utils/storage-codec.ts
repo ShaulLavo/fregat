@@ -1,5 +1,6 @@
 import * as v from 'valibot'
 import { GIT_FILE_STATUSES, sessionIdSchema } from '@workspace/contracts'
+import { gitSnapshotTargetSchema } from '@workspace/contracts'
 import { toWorkspaceAbsolute, toWorkspaceRelative } from '@workspace/client-core/files/path'
 import { durableTab } from '@/lib/documents/utils/capabilities'
 import {
@@ -9,7 +10,7 @@ import {
   filesystemPath,
 } from '@/lib/documents/utils/identity'
 import { documentTab } from '@/lib/documents/utils/tabs'
-import type { TabContent, WorkspaceRoot } from '@/lib/documents/utils/types'
+import type { GitSnapshotTarget, TabContent, WorkspaceRoot } from '@/lib/documents/utils/types'
 
 const textSchema = v.pipe(
   v.string(),
@@ -32,13 +33,23 @@ const checkpointEntries = {
   fromTurnCount: v.pipe(v.number(), v.integer(), v.minValue(0)),
   toTurnCount: v.pipe(v.number(), v.integer(), v.minValue(0)),
 }
+const targetSchema = v.pipe(
+  gitSnapshotTargetSchema,
+  v.transform((target): GitSnapshotTarget => {
+    const paths = { rootPath: filesystemPath(target.rootPath), path: filesystemPath(target.path) }
+    if (target.kind === 'moving') return { ...target, ...paths }
+    return {
+      ...target,
+      ...paths,
+      revision: { ...target.revision, oldPath: filesystemPath(target.revision.oldPath) },
+    }
+  }),
+)
 const comparisonSchema = v.pipe(
   v.variant('kind', [
     v.strictObject({
-      ...revisionEntries,
       kind: v.literal('snapshot'),
-      path: pathSchema,
-      source: v.optional(v.picklist(['staged', 'worktree', 'historical'])),
+      target: targetSchema,
     }),
     v.strictObject({
       ...checkpointEntries,
@@ -55,9 +66,7 @@ const comparisonSchema = v.pipe(
     }),
   ]),
   v.check((source) =>
-    source.kind === 'snapshot'
-      ? Boolean(source.oldObjectId || source.newObjectId)
-      : source.toTurnCount >= source.fromTurnCount,
+    source.kind === 'snapshot' ? true : source.toTurnCount >= source.fromTurnCount,
   ),
 )
 const storedDocumentSchema = v.variant('kind', [
@@ -77,7 +86,7 @@ const storedDocumentSchema = v.variant('kind', [
   }),
 ])
 
-export const storedTabContentSchema = v.variant('kind', [
+const storedTabContentSchema = v.variant('kind', [
   v.strictObject({ kind: v.literal('settings') }),
   v.strictObject({
     kind: v.literal('document'),

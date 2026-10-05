@@ -1,6 +1,6 @@
 import { useGitReloadOwner } from '@/features/git/hooks/use-reload-owner'
 import type { EditorResolvedSelection } from '@singapore-editor/core/extensions'
-import type { DiffReloadView } from '@/features/git/utils/reload-schema'
+import type { DiffReloadView, DiffReloadIdentity } from '@/features/git/utils/reload-schema'
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { DiffFile, DiffRegionStore } from '@singapore-editor/diff'
@@ -20,7 +20,7 @@ type Presentation = {
 }
 
 export function useDiffReloadView(
-  identity: string,
+  identity: DiffReloadIdentity | null,
   diffs: readonly GitFileDiff[],
   file: DiffFile | null,
   presentation: Presentation,
@@ -28,13 +28,14 @@ export function useDiffReloadView(
   const owner = useQueryClient()
   const generation = useGitReloadOwner(owner)
   const [restoredIdentity, setRestoredIdentity] = useState<string | null>(null)
-  if (file && restoredIdentity !== identity) {
+  const key = identity ? JSON.stringify(identity) : null
+  if (file && identity && restoredIdentity !== key) {
     const view = savedDiffView(owner, identity)
     if (view) presentation.restoreDiffView(file, view)
-    setRestoredIdentity(identity)
+    setRestoredIdentity(key)
   }
   useEffect(() => {
-    if (!file || !diffs.length) return
+    if (!file || !diffs.length || !identity) return
     const flush = () =>
       captureDiffView(owner, generation, identity, {
         expanded: [...presentation.regions.getExpandedRegions()],

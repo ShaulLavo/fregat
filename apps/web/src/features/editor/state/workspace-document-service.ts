@@ -9,6 +9,7 @@ import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
 import { createBinaryFileError, createClientInvariantError } from '@/lib/structured-errors'
 
+import { sameGitInputRevision } from '@/lib/documents/utils/comparisons'
 import { contentRevisionForText, fileContentRevision } from '@/features/editor/utils/text-snapshot'
 import { textSnapshotEqualsText } from '@/lib/text-snapshot-equality'
 import type { PreparedFileOpenClaim } from '@/lib/file-open-intent/types'
@@ -324,6 +325,10 @@ export class WorkspaceDocumentService {
     tabId?: TabId,
   ): SnapshotComparisonLease {
     this.assertComparisonOwner(input.scope)
+    if (!validSnapshotCapture(input))
+      throw createClientInvariantError('Comparison capture does not match its target', {
+        rootMatches: input.scope.rootPath === input.comparison.target.rootPath,
+      })
     const entry: SnapshotComparisonInterest = {
       current: {
         kind: 'released',
@@ -373,6 +378,10 @@ export class WorkspaceDocumentService {
     request: SnapshotComparisonRequest,
   ): SnapshotComparisonLease {
     this.assertComparisonOwner(request.input.scope)
+    if (!validSnapshotCapture(request.input))
+      throw createClientInvariantError('Comparison capture does not match its target', {
+        rootMatches: request.input.scope.rootPath === request.input.comparison.target.rootPath,
+      })
     if (this.sourceOwnerDisposed || request.signal.aborted)
       return this.acquireSnapshotComparison(request)
     const previous = this.snapshotComparisonTabs.get(tabId)
@@ -1818,6 +1827,7 @@ export class WorkspaceDocumentService {
       return false
     if (
       input.scope.environmentId !== this.environmentId ||
+      !validSnapshotCapture(input) ||
       snapshotGroupKey(input) !== snapshotGroupKey(entry.group.current.input)
     )
       return false
@@ -2127,4 +2137,13 @@ function assertTextFile(file: FileSnapshot): void {
 
 function snapshotGroupKey(input: SnapshotComparisonInput): string {
   return JSON.stringify([input.scope.rootPath, input.subject])
+}
+
+function validSnapshotCapture(input: SnapshotComparisonInput): boolean {
+  const target = input.comparison.target
+  return (
+    target.rootPath === input.scope.rootPath &&
+    input.subject === documentKey({ kind: 'git-diff', source: input.comparison }) &&
+    (target.kind === 'moving' || sameGitInputRevision(target.revision, input.revision))
+  )
 }

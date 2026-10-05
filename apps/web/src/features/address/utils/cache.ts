@@ -115,6 +115,13 @@ function withDocumentToken(
 ) {
   const parsed = contentForDocumentToken(rootPath, token)
   if (parsed.kind !== 'content') return panels
+  if (
+    parsed.content.kind === 'document' &&
+    parsed.content.document.kind === 'git-diff' &&
+    parsed.content.document.source.kind === 'snapshot' &&
+    parsed.content.document.source.target.kind === 'historical'
+  )
+    return panels
 
   const groups = panels.editorGroups
   const existing =

@@ -1,9 +1,13 @@
 import type { DocumentRead } from '../src/editor/documentDelivery'
-import { createEditorHighlighterOperation, createEditorStructuralOperation } from '../src/editor/operationDefinitions'
+import {
+  createEditorHighlighterOperation,
+  createEditorStructuralOperation,
+} from '../src/editor/operationDefinitions'
 import { describe, expect, it, vi } from 'vitest'
 import { createEditorBufferSession, createEditorTextBuffer } from '../src/documentSession'
 import {
   createEditorDocumentAnalysis,
+  retainedSyntaxCanWarm,
   setRetainedSyntaxDisplayDemand,
 } from '../src/editor/documentAnalysis'
 import { EditorTokenStore } from '../src/syntax/tokenStore'
@@ -17,6 +21,133 @@ import {
 } from '../src/syntax/session'
 
 describe('active range retention', () => {
+  it('keeps optional retirement on the source generation across compatible lease reborrow', async () => {
+    const fixture = await optionalRetirementFixture()
+    const { analysis, buffer, request, lease, current, optional } = fixture
+    try {
+      setRetainedSyntaxDisplayDemand(lease, current.demand, [current.contributor], [optional])
+      expect(retainedSyntaxCanWarm(lease)).toBe(false)
+      expect(typeof fixture.sourceState().stoppedWarmGeneration).toBe('number')
+      expect(fixture.sourceState().stoppedWarmGeneration).toBe(fixture.sourceState().generation)
+      const id = lease.runtimeSessionId
+      const before = fixture.ranges.mock.calls.length
+      lease.dispose()
+      const warm = analysis.borrowStructural(request)!
+      expect(warm.runtimeSessionId).toBe(id)
+      expect(retainedSyntaxCanWarm(warm)).toBe(false)
+      expect(warm.read(current.contributor.range).kind).toBe('ready')
+      await warm.queryRange(current.contributor.range)
+      expect(fixture.ranges).toHaveBeenCalledTimes(before)
+
+      createEditorBufferSession(buffer).applyText('!')
+      await warm.refresh(buffer.getTextSnapshot())
+      expect(retainedSyntaxCanWarm(warm)).toBe(true)
+      expect(fixture.sourceState().stoppedWarmGeneration).not.toBe(fixture.sourceState().generation)
+      setRetainedSyntaxDisplayDemand(
+        warm,
+        { kind: 'frame', snapshot: buffer.getTextSnapshot(), ranges: [current.contributor.range] },
+        [],
+        [optional],
+      )
+      expect(retainedSyntaxCanWarm(warm)).toBe(true)
+      warm.dispose()
+    } finally {
+      analysis.dispose()
+    }
+  })
+
+  it('keeps an installed current copy contributor out of optional retirement', async () => {
+    const { analysis, lease, current, optional } = await optionalRetirementFixture()
+    try {
+      setRetainedSyntaxDisplayDemand(
+        lease,
+        current.demand,
+        [current.contributor, optional],
+        [optional],
+      )
+      expect(retainedSyntaxCanWarm(lease)).toBe(true)
+      expect(lease.read(optional.range).kind).toBe('ready')
+      setRetainedSyntaxDisplayDemand(lease, current.demand, [current.contributor], [optional])
+      expect(retainedSyntaxCanWarm(lease)).toBe(false)
+    } finally {
+      lease.dispose()
+      analysis.dispose()
+    }
+  })
+
+  it.each(['frame', 'preparation', 'unknown', 'unmanaged', 'contributor', 'waiter'] as const)(
+    'preserves shared %s interest before marking optional retirement',
+    async (pin) => {
+      const fixture = await optionalRetirementFixture()
+      const { analysis, buffer, request, lease, current, optional } = fixture
+      const other = analysis.borrowStructural(request)!
+      const gate = deferred<EditorSyntaxResult>()
+      let pending: Promise<EditorSyntaxResult> | null = null
+      try {
+        if (pin === 'unknown') other.setDisplayDemand({ kind: 'unknown' })
+        if (pin === 'frame' || pin === 'preparation')
+          other.setDisplayDemand({
+            kind: pin,
+            snapshot: buffer.getTextSnapshot(),
+            ranges: [optional.range],
+          })
+        if (pin === 'contributor')
+          setRetainedSyntaxDisplayDemand(other, current.demand, [current.contributor, optional])
+        if (pin === 'waiter') {
+          setRetainedSyntaxDisplayDemand(other, current.demand, [current.contributor])
+          fixture.ranges.mockImplementationOnce(() => gate.promise)
+          pending = other.queryRange({ startIndex: 105, endIndex: 125 })
+          await vi.waitFor(() =>
+            expect(analysis.inspectRetention().entries[0]!.pendingRangeCount).toBe(1),
+          )
+        }
+
+        setRetainedSyntaxDisplayDemand(lease, current.demand, [current.contributor], [optional])
+        expect(retainedSyntaxCanWarm(lease)).toBe(true)
+        expect(retainedSyntaxCanWarm(other)).toBe(true)
+        gate.resolve(createEmptySyntaxResult())
+        await pending
+        setRetainedSyntaxDisplayDemand(other, current.demand, [current.contributor], [optional])
+        expect(retainedSyntaxCanWarm(lease)).toBe(false)
+      } finally {
+        gate.resolve(createEmptySyntaxResult())
+        await pending
+        other.dispose()
+        lease.dispose()
+        analysis.dispose()
+      }
+    },
+  )
+
+  it('reopens optional work after a same-revision retry generation and configuration replacement', async () => {
+    const fixture = await optionalRetirementFixture()
+    const { analysis, buffer, request, lease, current, optional } = fixture
+    try {
+      setRetainedSyntaxDisplayDemand(lease, current.demand, [current.contributor], [optional])
+      expect(retainedSyntaxCanWarm(lease)).toBe(false)
+      fixture.retry()
+      await lease.refresh(buffer.getTextSnapshot())
+      expect(retainedSyntaxCanWarm(lease)).toBe(true)
+      setRetainedSyntaxDisplayDemand(lease, current.demand, [current.contributor], [optional])
+      expect(retainedSyntaxCanWarm(lease)).toBe(true)
+      const changed = analysis.borrowStructural({ ...request, includeCaptures: true })!
+      await changed.refresh(buffer.getTextSnapshot())
+      expect(changed.runtimeSessionId).not.toBe(lease.runtimeSessionId)
+      expect(retainedSyntaxCanWarm(changed)).toBe(true)
+      changed.dispose()
+      lease.dispose()
+      analysis.reclaimInactive({ reason: 'inactive-budget' })
+      expect(retainedSyntaxCanWarm(lease)).toBe(false)
+      expect(fixture.sourceState().stoppedWarmGeneration).toBeNull()
+      const recreated = analysis.borrowStructural(request)!
+      expect(recreated.runtimeSessionId).not.toBe(lease.runtimeSessionId)
+      expect(retainedSyntaxCanWarm(recreated)).toBe(true)
+      recreated.dispose()
+    } finally {
+      analysis.dispose()
+    }
+  })
+
   it('releases the actual private lease binding when its signal closes', () => {
     const buffer = createEditorTextBuffer('alpha')
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'lease-binding' })
@@ -362,7 +493,12 @@ describe('analysis retention notifications', () => {
       const lease = boundary.startsWith('structural')
         ? analysis.borrowStructural({
             languageId: null,
-            provider: { operation: createEditorStructuralOperation(() => ({ ...emptyStructuralRuntime(), dispose })) },
+            provider: {
+              operation: createEditorStructuralOperation(() => ({
+                ...emptyStructuralRuntime(),
+                dispose,
+              })),
+            },
           })
         : analysis.borrowHighlighter({
             languageId: null,
@@ -380,7 +516,7 @@ describe('analysis retention notifications', () => {
       expect(snapshots).toHaveLength(before + 1)
       expect(snapshots.at(-1)!.entries).toEqual([])
       expect(fail).toHaveBeenCalledTimes(1)
-      expect(dispose).toHaveBeenCalledTimes(boundary === 'highlighter-unsubscribe' ? 0 : 1)
+      expect(dispose).toHaveBeenCalledTimes(1)
       expect(unsubscribe).toHaveBeenCalledTimes(boundary === 'structural-dispose' ? 0 : 1)
       analysis.dispose()
     },
@@ -631,7 +767,7 @@ describe('retained document analysis', () => {
           }
           return {
             analyze: refresh,
-            
+
             onDidChangeTheme: () => () => {
               if (id === 1 && boundary.endsWith('unsubscribe')) reenter()
             },
@@ -761,7 +897,7 @@ describe('retained document analysis', () => {
           calls.push(`analyze:${snapshot.text.readRange(0, snapshot.text.length)}`)
           return { tokens: EditorTokenStore.empty() }
         },
-        
+
         dispose: () => undefined,
       })),
     }
@@ -785,7 +921,9 @@ describe('retained document analysis', () => {
       const refresh = vi.fn(() => gate.promise)
       const dispose = vi.fn()
       const create = vi.fn(() => ({ analyze: refresh, dispose }))
-      const provider: EditorHighlighterProvider = { operation: createEditorHighlighterOperation(create) }
+      const provider: EditorHighlighterProvider = {
+        operation: createEditorHighlighterOperation(create),
+      }
       const interest = new AbortController()
       const lease = analysis.borrowHighlighter({
         provider,
@@ -820,11 +958,16 @@ describe('retained document analysis', () => {
       tokens: EditorTokenStore.fromTokens([{ start: 0, end: 5, style: { color: 'new' } }]),
     }
     const started = deferred<void>()
-    const refresh = vi.fn(() => Promise.resolve(current)).mockImplementationOnce(() => { started.resolve(); return gate.promise })
+    const refresh = vi
+      .fn(() => Promise.resolve(current))
+      .mockImplementationOnce(() => {
+        started.resolve()
+        return gate.promise
+      })
     const provider: EditorHighlighterProvider = {
       operation: createEditorHighlighterOperation(() => ({
         analyze: refresh,
-        
+
         dispose: () => undefined,
         onDidChangeTheme: (listener) => {
           listeners.add(listener)
@@ -888,7 +1031,7 @@ describe('retained document analysis', () => {
       let created = 0
       const structural: EditorSyntaxProvider = {
         operation: createEditorStructuralOperation(() => ({
- analyze: async () => createEmptySyntaxResult(),
+          analyze: async () => createEmptySyntaxResult(),
           ...emptyStructuralRuntime(),
           dispose: created++ === 0 ? disposeFirst : disposeSecond,
         })),
@@ -899,7 +1042,7 @@ describe('retained document analysis', () => {
           const first = created++ === 0
           return {
             analyze: refresh,
-            
+
             dispose: first ? disposeFirst : disposeSecond,
             onDidChangeTheme: first ? firstTheme : secondTheme,
           }
@@ -1178,7 +1321,7 @@ describe('retained document analysis', () => {
     const highlighter: EditorHighlighterProvider = {
       operation: createEditorHighlighterOperation(() => ({
         analyze: refresh,
-        
+
         dispose,
         onDidChangeTheme: (listener) => {
           listeners.add(listener)
@@ -1519,7 +1662,10 @@ describe('retained document analysis', () => {
     }
     const dispose = vi.fn()
     const createOperation = vi.fn(() => ({ analyze: refresh, dispose }))
-    const request = { provider: { operation: createEditorHighlighterOperation(createOperation) }, languageId: 'markdown' }
+    const request = {
+      provider: { operation: createEditorHighlighterOperation(createOperation) },
+      languageId: 'markdown',
+    }
     const first = analysis.borrowHighlighter(request)!
     await expect(first.refresh(buffer.getTextSnapshot())).rejects.toThrow('provider unavailable')
     const second = analysis.borrowHighlighter({ ...request, signal: abort.signal })!
@@ -1546,7 +1692,7 @@ describe('retained document analysis', () => {
     const highlighter: EditorHighlighterProvider = {
       operation: createEditorHighlighterOperation(() => ({
         analyze: refresh,
-        
+
         dispose: () => undefined,
         onDidChangeTheme: (listener) => {
           listeners.add(listener)
@@ -1573,35 +1719,43 @@ describe('retained document analysis', () => {
 
 function provider(initial?: Promise<EditorSyntaxResult>, canQueryRange?: () => boolean) {
   const dispose = vi.fn()
-  const edits = vi.fn(async (_read: DocumentRead) =>
-    createEmptySyntaxResult(),
-  )
+  const edits = vi.fn(async (_read: DocumentRead) => createEmptySyntaxResult())
   const ranges = vi.fn(async (range: EditorSyntaxRange) =>
     createEmptySyntaxResult({ requestedRanges: [range] }),
   )
   const started = deferred<void>()
-  const transitions = vi.fn((_change: import('../src/editor/editChain').DocumentChangesSinceSyncPoint | null) => {})
-  const create = vi.fn((context: import('../src/document/operations').EditorStructuralOperationContext) => {
-    let initialized = false
-    let previous: DocumentRead | null = null
-    return {
-    foldingSupport: 'supported' as const,
-    analyze: (read: DocumentRead) => {
-      const changes = previous ? context.source.changesBetween(previous.revision, read.revision) : null
-      previous = read
-      if (initialized) { transitions(changes); return edits(read) }
-      initialized = true
-      started.resolve()
-      return initial ?? Promise.resolve(createEmptySyntaxResult())
+  const transitions = vi.fn(
+    (_change: import('../src/editor/editChain').DocumentChangesSinceSyncPoint | null) => {},
+  )
+  const create = vi.fn(
+    (context: import('../src/document/operations').EditorStructuralOperationContext) => {
+      let initialized = false
+      let previous: DocumentRead | null = null
+      return {
+        foldingSupport: 'supported' as const,
+        analyze: (read: DocumentRead) => {
+          const changes = previous
+            ? context.source.changesBetween(previous.revision, read.revision)
+            : null
+          previous = read
+          if (initialized) {
+            transitions(changes)
+            return edits(read)
+          }
+          initialized = true
+          started.resolve()
+          return initial ?? Promise.resolve(createEmptySyntaxResult())
+        },
+
+        queryRange: ranges,
+        canQueryRange,
+        getResult: () => createEmptySyntaxResult(),
+        getTokens: () => [],
+        getSnapshotVersion: () => 1,
+        dispose,
+      }
     },
-    
-    queryRange: ranges,
-    canQueryRange,
-    getResult: () => createEmptySyntaxResult(),
-    getTokens: () => [],
-    getSnapshotVersion: () => 1,
-    dispose,
-  }})
+  )
   return {
     provider: { operation: createEditorStructuralOperation(create) } satisfies EditorSyntaxProvider,
     create,
@@ -1629,5 +1783,65 @@ function emptyStructuralRuntime(): EditorSyntaxRuntime {
     getTokens: () => [],
     getSnapshotVersion: () => 0,
     dispose: () => {},
+  }
+}
+
+async function optionalRetirementFixture() {
+  const buffer = createEditorTextBuffer('x'.repeat(500))
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'optional-source' })
+  const session = provider()
+  const request = {
+    provider: session.provider,
+    languageId: 'typescript',
+    syntaxMode: 'range' as const,
+    includeCaptures: false,
+  }
+  const lease = analysis.borrowStructural(request)!
+  const currentRange = { startIndex: 0, endIndex: 20 }
+  const optionalRange = { startIndex: 100, endIndex: 120 }
+  const currentResult = await lease.queryRange(currentRange)
+  const optionalResult = await lease.queryRange(optionalRange)
+  const current = {
+    contributor: { range: currentRange, result: currentResult },
+    demand: { kind: 'frame' as const, snapshot: buffer.getTextSnapshot(), ranges: [currentRange] },
+  }
+  const optional = { range: optionalRange, result: optionalResult }
+  setRetainedSyntaxDisplayDemand(lease, current.demand, [current.contributor, optional])
+  const binding: {
+    retry: (() => void) | null
+    sourceState: (() => { generation: unknown; stoppedWarmGeneration: unknown }) | null
+  } = { retry: null, sourceState: null }
+  const original = WeakMap.prototype.get
+  WeakMap.prototype.get = function (this: WeakMap<WeakKey, unknown>, key: WeakKey) {
+    const value = original.call(this, key)
+    if (key !== lease || typeof value !== 'object' || value === null || !('entry' in value))
+      return value
+    const entry = value.entry
+    if (typeof entry !== 'object' || entry === null || !('refresh' in entry)) return value
+    const refresh = entry.refresh
+    if (typeof refresh === 'function') binding.retry = () => refresh.call(entry)
+    binding.sourceState = () => ({
+      generation: Reflect.get(entry, 'generation'),
+      stoppedWarmGeneration: Reflect.get(entry, 'stoppedWarmGeneration'),
+    })
+    return value
+  }
+  try {
+    retainedSyntaxCanWarm(lease)
+  } finally {
+    WeakMap.prototype.get = original
+  }
+  if (!binding.retry || !binding.sourceState)
+    throw new TypeError('Controlled source generation unavailable')
+  return {
+    analysis,
+    buffer,
+    request,
+    lease,
+    current,
+    optional,
+    ranges: session.ranges,
+    retry: binding.retry,
+    sourceState: binding.sourceState,
   }
 }

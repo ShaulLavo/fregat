@@ -14,10 +14,10 @@ import { join } from 'node:path'
 import { createEditorRuntime } from '@/features/editor/state/runtime'
 import { createEditorApplyActions } from '@/features/editor/state/apply-actions'
 import { createSnapshotComparisonFixture } from '../../../../test/factories/snapshot-comparison'
-import { blobDiffQueryOptions } from '@/lib/blob-diff-query'
+import { snapshotComparisonQueryOptions } from '@/lib/snapshot-comparison-query'
 import { snapshotDocument } from '@/lib/documents/utils/comparisons'
 import { allEditorTabs } from '@/lib/documents/utils/groups'
-import { fetchDiff } from '@/features/git/utils/api'
+import { fetchDiff } from '@/lib/git-diff-query'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
 import { openEditorContentInWorkbenchPanels } from '@/features/workbench/utils/panels'
 import { getClient, setClient } from '@/lib/client'
@@ -43,7 +43,18 @@ const preparationPath = filesystemPath('repo/review.ts')
 
 test.for([
   { kind: 'git-ref', source: { path: preparationPath, ref: 'HEAD' } },
-  { kind: 'git-diff', source: { kind: 'snapshot', path: preparationPath } },
+  {
+    kind: 'git-diff',
+    source: {
+      kind: 'snapshot',
+      target: {
+        kind: 'moving',
+        rootPath: filesystemPath('repo'),
+        path: preparationPath,
+        changeSource: 'worktree',
+      },
+    },
+  },
   { kind: 'compare-saved', file: { path: preparationPath } },
   { kind: 'history', file: { path: preparationPath } },
 ] satisfies readonly StandaloneDocumentRef[])(
@@ -444,7 +455,7 @@ test('a trimmed snapshot stays released through unrelated query and workspace pu
     retainedTextBudget: () => 10000000,
   })
   try {
-    const key = blobDiffQueryOptions(f.comparison).queryKey
+    const key = snapshotComparisonQueryOptions(f.comparison).queryKey
     const data = [f.worktree]
     queries.setQueryData(key, data)
     const workspaceAddress = await registerTestWorkspaceAddress(client, f.scope.rootPath)
@@ -516,10 +527,10 @@ test('normal four-project navigation retains three snapshot interests and explic
       const [diff] = await fetchDiff(`${name}/source.ts`, false, undefined, client)
       expect(diff).toBeDefined()
       if (!diff) return
-      const target = snapshotDocument(diff)
+      const target = snapshotDocument(diff, filesystemPath(name), 'worktree')
       expect(target).not.toBeNull()
       if (!target || target.source.kind !== 'snapshot') return
-      queries.setQueryData(blobDiffQueryOptions(target.source).queryKey, [diff])
+      queries.setQueryData(snapshotComparisonQueryOptions(target.source).queryKey, [diff])
       const path = filesystemPath(name)
       const workspaceAddress = await registerTestWorkspaceAddress(client, path)
       actions.switchRootFolder({ ...root, workspaceAddress, name, path })
@@ -532,7 +543,7 @@ test('normal four-project navigation retains three snapshot interests and explic
     expect(
       retained.flatMap((read) =>
         read.kind === 'ready'
-          ? [{ scope: read.input.scope, path: read.input.comparison.path }]
+          ? [{ scope: read.input.scope, path: read.input.comparison.target.path }]
           : [],
       ),
     ).toEqual(
@@ -541,7 +552,7 @@ test('normal four-project navigation retains three snapshot interests and explic
         path: `${rootPath}/source.ts`,
       })),
     )
-    const firstKey = blobDiffQueryOptions(f.comparison).queryKey
+    const firstKey = snapshotComparisonQueryOptions(f.comparison).queryKey
     const warmData = queries.getQueryData(firstKey)
     expect(warmData).toBeDefined()
     actions.switchRootFolder({

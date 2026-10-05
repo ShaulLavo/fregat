@@ -13,7 +13,8 @@ import { useNavigation } from '@/hooks/use-navigation'
 import { useRef, useLayoutEffect, useState } from 'react'
 import { useHistoryView } from '@/features/git/hooks/use-history-view'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
-import type { GitCommitFile } from '@workspace/contracts'
+import type { HistoricalDiffOpen } from '@/lib/documents/utils/comparisons'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
@@ -35,7 +36,7 @@ export function CommitDetails({
   rootPath: string
   commit: string
   onClose: () => void
-  onOpen: (file: GitCommitFile) => void
+  onOpen: (input: HistoricalDiffOpen) => void
 }) {
   const requested = useCommitDetails(nextRoot, nextCommit)
   const ready = !requested.isPending && !requested.isPlaceholderData
@@ -71,7 +72,8 @@ export function CommitDetails({
     onSelect: setActivePath,
     onCommit: (path) => {
       const file = details.data?.files.find((file) => file.path === path)
-      if (file) onOpen(file)
+      if (file && details.data)
+        onOpen({ rootPath: filesystemPath(rootPath), details: details.data, file })
     },
   })
   const loadedCommit = details.data?.id
@@ -206,7 +208,10 @@ export function CommitDetails({
                 disabledReason={
                   file.kind === 'submodule' ? 'Submodule reference changed' : undefined
                 }
-                onOpen={() => onOpen(file)}
+                onOpen={() => {
+                  if (details.data)
+                    onOpen({ rootPath: filesystemPath(rootPath), details: details.data, file })
+                }}
               />
             ))}
           </div>

@@ -1,10 +1,10 @@
 import { useDiffIntent } from '@/lib/intent-prefetch/hooks/use-diff-intent'
-import { commitDetailsQueryOptions } from '@/features/git/utils/history-query'
+import { commitDetailsQueryOptions } from '@/lib/git-commit-details-query'
 import { useEffect, useRef, useState } from 'react'
 import { useDebouncedValue } from '@tanstack/react-pacer/debouncer'
 import { useHistoryView } from '@/features/git/hooks/use-history-view'
 import { useQueryClient } from '@tanstack/react-query'
-import type { GitCommitFile } from '@workspace/contracts'
+import type { HistoricalDiffOpen } from '@/lib/documents/utils/comparisons'
 import { GitBranchIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
@@ -87,8 +87,8 @@ export function History({ rootPath: nextRoot }: { rootPath: string }) {
     void updateView({ expanded })
   }
 
-  async function openFile(file: GitCommitFile) {
-    const result = await openDiff(file)
+  async function openFile(input: HistoricalDiffOpen) {
+    const result = await openDiff(input)
     if (result.status === 'applied') setExpanded(false)
   }
 

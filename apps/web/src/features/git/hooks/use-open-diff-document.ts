@@ -3,7 +3,7 @@ import { useNavigation } from '@/hooks/use-navigation'
 import type { ChangeRow } from '@/features/git/utils/types'
 import { useState } from 'react'
 
-export function useOpenDiffDocument() {
+export function useOpenDiffDocument(rootPath: string) {
   const owner = useEditorWorkspaceStoreApi()
   const navigation = useNavigation()
   const [openingCount, setOpeningCount] = useState(0)
@@ -11,7 +11,7 @@ export function useOpenDiffDocument() {
   async function openDiff(row: ChangeRow) {
     setOpeningCount((count) => count + 1)
     try {
-      const result = await navigation.openDiff({ owner, row })
+      const result = await navigation.openDiff({ owner, row, rootPath })
       setOpeningCount((count) => count - 1)
       return result
     } catch (error) {

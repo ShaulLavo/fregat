@@ -19,6 +19,10 @@ it('rejects outgoing range contributors after a same-revision segment rotation',
     operation: createEditorStructuralOperation(() => ({
       analyze: async () => createEmptySyntaxResult(),
       queryRange: async () => createEmptySyntaxResult(),
+      foldingSupport: 'unsupported',
+      getResult: createEmptySyntaxResult,
+      getTokens: () => [],
+      getSnapshotVersion: () => 0,
       dispose() {},
     })),
   }

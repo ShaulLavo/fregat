@@ -4,7 +4,7 @@ import { createTestQueryClient } from '../../../../test/render'
 import { testScopedStorage } from '../../../../test/factories/scoped-storage'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { createSnapshotComparisonOwner } from '@/features/editor/state/snapshot-comparison-owner'
-import { blobDiffQueryOptions } from '@/lib/blob-diff-query'
+import { snapshotComparisonQueryOptions } from '@/lib/snapshot-comparison-query'
 import { tabId } from '@/lib/documents/utils/identity'
 
 test('adopts cached sources synchronously before tab publication and shares them across two views', async ({
@@ -13,7 +13,7 @@ test('adopts cached sources synchronously before tab publication and shares them
 }) => {
   const f = await createSnapshotComparisonFixture(server.root, client)
   const queries = createTestQueryClient()
-  queries.setQueryData(blobDiffQueryOptions(f.comparison).queryKey, [f.worktree])
+  queries.setQueryData(snapshotComparisonQueryOptions(f.comparison).queryKey, [f.worktree])
   const documents = createEditorDocumentStore({ environmentId: testScopedStorage.environmentId })
   const owner = createSnapshotComparisonOwner(documents, queries)
   owner.prepare(tabId('first'), f.scope, f.comparison)
@@ -43,14 +43,17 @@ test('query settlement adopts only the captured current subject and rejects late
   const tab = tabId('moving-view')
   owner.prepare(tab, f.scope, f.comparison)
   owner.prepare(tab, f.scope, f.stagedInput.comparison)
-  queries.setQueryData(blobDiffQueryOptions(f.comparison).queryKey, [f.worktree])
+  queries.setQueryData(snapshotComparisonQueryOptions(f.comparison).queryKey, [f.worktree])
   expect(documents.getState().snapshotComparisonTabs.has(tab)).toBe(false)
-  queries.setQueryData(blobDiffQueryOptions(f.stagedInput.comparison).queryKey, [f.staged])
+  queries.setQueryData(snapshotComparisonQueryOptions(f.stagedInput.comparison).queryKey, [
+    f.staged,
+  ])
   const read = documents.getState().snapshotComparisonTabs.get(tab)?.read()
   expect(read?.kind).toBe('ready')
-  if (read?.kind === 'ready') expect(read.input.comparison.source).toBe('staged')
+  if (read?.kind === 'ready')
+    expect(read.input.comparison.target).toMatchObject({ kind: 'moving', changeSource: 'staged' })
   owner.dispose()
-  queries.setQueryData(blobDiffQueryOptions(f.stagedInput.comparison).queryKey, [
+  queries.setQueryData(snapshotComparisonQueryOptions(f.stagedInput.comparison).queryKey, [
     ...f.historicalDiffs,
   ])
   expect(documents.getState().snapshotComparisons.size).toBe(0)
@@ -65,7 +68,7 @@ test('a nested query publication during first adoption retains the latest captur
   const f = await createSnapshotComparisonFixture(server.root, client)
   const queries = createTestQueryClient()
   const documents = createEditorDocumentStore({ environmentId: f.scope.environmentId })
-  const key = blobDiffQueryOptions(f.comparison).queryKey
+  const key = snapshotComparisonQueryOptions(f.comparison).queryKey
   const partial = { ...f.worktree, oldText: undefined, newText: undefined }
   queries.setQueryData(key, [partial])
   const owner = createSnapshotComparisonOwner(documents, queries)
@@ -94,7 +97,7 @@ test('document retention suspends only the ended binding while a logical copy an
   const queries = createTestQueryClient()
   const documents = createEditorDocumentStore({ environmentId: f.scope.environmentId })
   const owner = createSnapshotComparisonOwner(documents, queries)
-  const key = blobDiffQueryOptions(f.comparison).queryKey
+  const key = snapshotComparisonQueryOptions(f.comparison).queryKey
   const firstId = tabId('first')
   const secondId = tabId('second')
   const copyId = tabId('copy')
@@ -146,7 +149,7 @@ test('retention during synchronous first adoption stays suspended until explicit
   const queries = createTestQueryClient()
   const documents = createEditorDocumentStore({ environmentId: f.scope.environmentId })
   const owner = createSnapshotComparisonOwner(documents, queries)
-  const key = blobDiffQueryOptions(f.comparison).queryKey
+  const key = snapshotComparisonQueryOptions(f.comparison).queryKey
   const tab = tabId('nested-retention')
   let trimmed = false
   const stop = documents.subscribe((state) => {

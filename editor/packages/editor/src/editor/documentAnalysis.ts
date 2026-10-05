@@ -8,6 +8,7 @@ import {
 import type { EditorTextBuffer } from '../documentSession'
 import type { DocumentTextSnapshot } from '../documentTextSnapshot'
 import { EditorEventSource } from './emitter'
+import { completeDocumentCleanup } from './documentCleanup'
 import type {
   EditorHighlighterProvider,
   EditorHighlighterRuntime,
@@ -427,11 +428,7 @@ export class AnalysisEntry<T> {
 
   dispose(): void {
     if (!this.stop()) return
-    try {
-      this.session.dispose()
-    } finally {
-      this.finishDispose()
-    }
+    completeDocumentCleanup([() => this.session.dispose(), () => this.finishDispose()])
   }
 
   protected stop(): boolean {
@@ -447,8 +444,12 @@ export class AnalysisEntry<T> {
   }
 
   protected finishDispose(): void {
-    this.sourceScope.dispose()
-    if (this.active) this.retention.changed()
+    completeDocumentCleanup([
+      () => this.sourceScope.dispose(),
+      () => {
+        if (this.active) this.retention.changed()
+      },
+    ])
   }
 
   private enqueue(read: DocumentRead): Promise<T> {
@@ -561,10 +562,17 @@ export function setRetainedSyntaxDisplayDemand(
   session: EditorRetainedSyntaxSession,
   demand: EditorAnalysisDisplayDemand,
   contributors: readonly RetainedRangeContributor[] | null,
+  discarded: readonly RetainedRangeContributor[] | null = null,
 ): void {
   const owner = structuralLeaseOwners.get(session)
   owner?.entry.setContributors(owner.signal, contributors)
   session.setDisplayDemand(demand)
+  if (discarded) owner?.entry.retireOptionalContributors(owner.signal, discarded)
+}
+
+export function retainedSyntaxCanWarm(session: EditorRetainedSyntaxSession): boolean {
+  const owner = structuralLeaseOwners.get(session)
+  return owner !== undefined && owner.entry.canWarm(owner.signal)
 }
 
 export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
@@ -576,11 +584,16 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
   private readonly contributors = new Map<AbortSignal, readonly RetainedRangeContributor[]>()
   private readonly resultOrigins = new WeakMap<
     EditorSyntaxResult,
-    { readonly snapshot: DocumentTextSnapshot; readonly point: DocumentSyncPoint }
+    {
+      readonly snapshot: DocumentTextSnapshot
+      readonly point: DocumentSyncPoint
+      readonly generation: number
+    }
   >()
   private ranges = new Map<string, ReadyRange>()
   private queries = new Map<string, PendingRangeQuery>()
   private rangePoint: DocumentSyncPoint | null = null
+  private stoppedWarmGeneration: number | null = null
 
   constructor(
     buffer: EditorTextBuffer,
@@ -649,7 +662,39 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     else this.contributors.delete(signal)
   }
 
-  private trimOptionalRanges(): void {
+  canWarm(signal: AbortSignal): boolean {
+    if (signal.aborted || this.signal.aborted) return false
+    return this.stoppedWarmGeneration !== this.generation
+  }
+
+  retireOptionalContributors(
+    signal: AbortSignal,
+    discarded: readonly RetainedRangeContributor[],
+  ): void {
+    if (signal.aborted || this.signal.aborted) return
+    const protection = this.rangeProtection()
+    if (protection.fullyPinned) return
+    const snapshot = this.buffer.getTextSnapshot()
+    const point = this.buffer.getDocumentSyncPoint()
+    const retired = discarded.some((contributor) => {
+      const origin = this.resultOrigins.get(contributor.result)
+      if (
+        origin?.snapshot !== snapshot ||
+        origin.point !== point ||
+        origin.generation !== this.generation
+      )
+        return false
+      if (protection.intervals.some((range) => rangesIntersect(range, contributor.range)))
+        return false
+      return ![...protection.protectedSlots].some(
+        (cached) =>
+          cached.result === contributor.result && rangeContains(cached.range, contributor.range),
+      )
+    })
+    if (retired) this.stoppedWarmGeneration = this.generation
+  }
+
+  private rangeProtection() {
     const snapshot = this.buffer.getTextSnapshot()
     const intervals: EditorSyntaxRange[] = []
     const protectedSlots = new Set<ReadyRange>()
@@ -675,6 +720,11 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
       intervals.push(waiter.range)
       this.protectLookup([waiter.range], protectedSlots)
     }
+    return { intervals, protectedSlots, fullyPinned }
+  }
+
+  private trimOptionalRanges(): void {
+    const { intervals, protectedSlots, fullyPinned } = this.rangeProtection()
     for (const query of this.queries.values()) {
       query.admission =
         fullyPinned || intervals.some((range) => rangesIntersect(range, query.range))
@@ -710,7 +760,8 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     if (
       !cached &&
       origin?.snapshot === snapshot &&
-      origin.point === this.buffer.getDocumentSyncPoint()
+      origin.point === this.buffer.getDocumentSyncPoint() &&
+      origin.generation === this.generation
     ) {
       cached = { ...contributor, point: origin.point }
       this.ranges.set(rangeKey(contributor.range), cached)
@@ -824,6 +875,7 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
   }
 
   override dispose(): void {
+    this.stoppedWarmGeneration = null
     this.displayed.clear()
     this.contributors.clear()
     this.queryWaiters.clear()
@@ -880,7 +932,11 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
         return this.structuralSession.queryRange?.(range) ?? this.current()
       }).then((result) => {
         if (queried && this.canAdmitRange(key, pending)) {
-          this.resultOrigins.set(result, { snapshot: pending.snapshot, point })
+          this.resultOrigins.set(result, {
+            snapshot: pending.snapshot,
+            point,
+            generation: this.generation,
+          })
           this.ranges.set(rangeKey(range), { point, range, result })
         }
         this.retention.changed()
@@ -965,12 +1021,11 @@ export class HighlighterEntry extends AnalysisEntry<EditorHighlightResult> {
     if (!this.stop()) return
     const unsubscribe = this.unsubscribeTheme
     this.unsubscribeTheme = undefined
-    try {
-      unsubscribe?.()
-      this.highlighterSession.dispose()
-    } finally {
-      this.finishDispose()
-    }
+    completeDocumentCleanup([
+      () => unsubscribe?.(),
+      () => this.highlighterSession.dispose(),
+      () => this.finishDispose(),
+    ])
   }
   onDidChangeTheme(listener: () => void): () => void {
     const subscription = this.themes.subscribe(listener)
@@ -1142,11 +1197,14 @@ function createAnalysis(options: {
       if (analysisOwners.get(buffer)?.analysis === analysis) analysisOwners.delete(buffer)
       const owned = Array.from(entries)
       entries.clear()
-      unsubscribe?.()
+      const releaseBuffer = unsubscribe
       unsubscribe = undefined
-      for (const entry of owned) entry.dispose()
-      scheduler.dispose()
-      void delivery.dispose().catch(() => undefined)
+      completeDocumentCleanup([
+        () => releaseBuffer?.(),
+        ...owned.map((entry) => () => entry.dispose()),
+        () => scheduler.dispose(),
+        () => delivery.dispose(),
+      ])
     },
   }
   return analysis
@@ -1160,6 +1218,7 @@ function reclaimEntries(
   const runtimeSessionIds: string[] = []
   let cachedRangeCount = 0
   let pendingRangeCount = 0
+  const cleanups: (() => void)[] = []
   for (const entry of Array.from(entries)) {
     if (entry.leaseCount > 0 || (requested && !requested.has(entry.runtimeSessionId))) continue
     runtimeSessionIds.push(entry.runtimeSessionId)
@@ -1168,8 +1227,9 @@ function reclaimEntries(
       pendingRangeCount += entry.pendingRangeCount
     }
     entries.delete(entry)
-    entry.dispose()
+    cleanups.push(() => entry.dispose())
   }
+  completeDocumentCleanup(cleanups)
   return { reason: options.reason, runtimeSessionIds, cachedRangeCount, pendingRangeCount }
 }
 

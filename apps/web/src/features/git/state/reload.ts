@@ -5,6 +5,7 @@ import { writeWorkspaceCacheEntry } from '@/lib/workspace-cache-storage'
 import {
   gitViewSchema,
   type DiffReloadView,
+  type DiffReloadIdentity,
   type GitViewRecord,
 } from '@/features/git/utils/reload-schema'
 
@@ -45,15 +46,15 @@ export function captureGitView(
   write(state, { ...state.record, list })
 }
 
-export function savedDiffView(owner: QueryClient, identity: string) {
+export function savedDiffView(owner: QueryClient, identity: DiffReloadIdentity) {
   const diff = owners.get(owner)?.record.diff
-  return diff?.identity === identity ? diff.view : undefined
+  return diff && JSON.stringify(diff.identity) === JSON.stringify(identity) ? diff.view : undefined
 }
 
 export function captureDiffView(
   owner: QueryClient,
   generation: object | undefined,
-  identity: string,
+  identity: DiffReloadIdentity,
   view: DiffReloadView,
 ) {
   const state = owners.get(owner)

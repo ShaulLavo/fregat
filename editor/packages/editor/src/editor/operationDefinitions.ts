@@ -180,6 +180,7 @@ class GenericDefinition<Input, Result> extends DocumentOperation<
       input: Input,
     ) => DocumentOperationRuntime<Result> | null,
     private readonly compatible: (left: Input, right: Input) => boolean,
+    private readonly scheduling: 'requested' | 'ordered',
   ) {
     super()
   }
@@ -198,7 +199,7 @@ class GenericDefinition<Input, Result> extends DocumentOperation<
           host.scheduler,
           runtimeSessionId,
           host.retention,
-          context.scheduling === 'pinned' ? 'pinned' : 'requested',
+          context.scheduling === 'pinned' ? 'pinned' : this.scheduling,
         )
       : null
   }
@@ -216,6 +217,7 @@ export function defineDocumentOperation<Input, Result>(
     input: Input,
   ) => DocumentOperationRuntime<Result> | null,
   compatible: (left: Input, right: Input) => boolean,
+  options: { readonly scheduling: 'requested' | 'ordered' } = { scheduling: 'requested' },
 ): DocumentOperation<Input, Result, AnalysisEntry<Result>> {
-  return new GenericDefinition(create, compatible)
+  return new GenericDefinition(create, compatible, options.scheduling)
 }

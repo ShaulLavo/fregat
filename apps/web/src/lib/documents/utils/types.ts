@@ -4,6 +4,11 @@ import type {
   SettingsViewTarget,
   SettingsWriteTarget,
 } from '@workspace/contracts'
+import type {
+  GitCommitOrigin,
+  GitInputRevision as SharedGitInputRevision,
+  GitRevisionSide,
+} from '@workspace/contracts'
 
 declare const identityBrand: unique symbol
 export type FilesystemPath = string & {
@@ -17,7 +22,30 @@ export type ConflictId = string & { readonly [identityBrand]: 'ConflictId' }
 export type FileResource = { readonly path: FilesystemPath }
 type GitFileReference = { readonly path: FilesystemPath; readonly ref: string }
 export type GitChangeStatus = GitFileStatus['index']
-type GitChangeSource = 'staged' | 'worktree' | 'historical'
+export type GitInputRevision = Omit<SharedGitInputRevision, 'oldPath'> & {
+  readonly oldPath: FilesystemPath
+}
+export type GitSnapshotTarget =
+  | {
+      readonly kind: 'moving'
+      readonly rootPath: WorkspaceRoot
+      readonly path: FilesystemPath
+      readonly changeSource: 'worktree' | 'staged'
+    }
+  | {
+      readonly kind: 'historical'
+      readonly rootPath: WorkspaceRoot
+      readonly path: FilesystemPath
+      readonly origin: GitCommitOrigin
+      readonly revision: GitInputRevision
+    }
+  | {
+      readonly kind: 'captured-review'
+      readonly rootPath: WorkspaceRoot
+      readonly path: FilesystemPath
+      readonly revision: GitInputRevision
+    }
+export type { GitRevisionSide }
 type ComparisonRevision = {
   readonly oldObjectId?: string
   readonly newObjectId?: string
@@ -31,11 +59,10 @@ type CheckpointRange = ComparisonRevision & {
   readonly toTurnCount: number
 }
 export type GitComparison =
-  | (ComparisonRevision & {
+  | {
       readonly kind: 'snapshot'
-      readonly path: FilesystemPath
-      readonly source?: GitChangeSource
-    })
+      readonly target: GitSnapshotTarget
+    }
   | (CheckpointRange & {
       readonly kind: 'checkpoint-file'
       readonly file: FileResource
