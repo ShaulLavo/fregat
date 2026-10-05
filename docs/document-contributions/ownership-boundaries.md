@@ -4,14 +4,14 @@
 projections, composes changes from each endpoint's acknowledged revision, and owns source release.
 Backend sessions retain parser, token, clipped projection, or protocol results.
 
-| Owner | State | Lifetime |
-| --- | --- | --- |
-| `DocumentDelivery` | Issued reads, endpoint acknowledgements, shared source transactions and exact pins | Document and retained source scopes |
-| `AnalysisEntry` | Computation demand, configuration identity and accepted result | Compatible operation interests |
-| Tree-sitter and Shiki adapters | Parser or tokenizer progress and domain results | Runtime session and physical worker |
-| Minimap source adapter | Clipped render data and source receipt | Retained document source |
-| LSP source adapter | Protocol attachment, URI, version and connection epoch | Retained protocol source |
-| Syntax controller | Displayed tokens, folds, range demand and paint admission | View |
+| Owner                          | State                                                                              | Lifetime                            |
+| ------------------------------ | ---------------------------------------------------------------------------------- | ----------------------------------- |
+| `DocumentDelivery`             | Issued reads, endpoint acknowledgements, shared source transactions and exact pins | Document and retained source scopes |
+| `AnalysisEntry`                | Computation demand, configuration identity and accepted result                     | Compatible operation interests      |
+| Tree-sitter and Shiki adapters | Parser or tokenizer progress and domain results                                    | Runtime session and physical worker |
+| Minimap source adapter         | Clipped render data and source receipt                                             | Retained document source            |
+| LSP source adapter             | Protocol attachment, URI, version and connection epoch                             | Retained protocol source            |
+| Syntax controller              | Displayed tokens, folds, range demand and paint admission                          | View                                |
 
 Computation cancellation interrupts a waiter through its work signal. A shared source transaction
 uses the endpoint's lifetime signal. An abandoned computation releases a pin that arrives later.
@@ -27,11 +27,11 @@ source revision while its configuration remains subject to these checks.
 These consumers receive canonical view publications and use the canonical edit history to project
 their own results. Their saved points identify the source of those results.
 
-| Consumer | Saved state | Use |
-| --- | --- | --- |
-| Find | `elsewhereSyncPoint` | Projects offscreen match offsets before bringing them into the painted range |
-| Merge conflicts | `parsedPoint` | Carries parsed conflict regions through supported edits |
-| Semantic-token layer | `syncPointsByTextVersion` | Projects a delayed protocol result or drops it after a history gap |
+| Consumer             | Saved state               | Use                                                                          |
+| -------------------- | ------------------------- | ---------------------------------------------------------------------------- |
+| Find                 | `elsewhereSyncPoint`      | Projects offscreen match offsets before bringing them into the painted range |
+| Merge conflicts      | `parsedPoint`             | Carries parsed conflict regions through supported edits                      |
+| Semantic-token layer | `syncPointsByTextVersion` | Projects a delayed protocol result or drops it after a history gap           |
 
 Syntax-controller dispatch cursors and edit composition are removed. Its retained sessions request
 the current canonical read. Displayed contributors remain protected; optional offscreen range
