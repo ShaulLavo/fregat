@@ -148,18 +148,21 @@ describe('word wrap', () => {
     },
   )
 
-  it('takes a host setter before the first external logical view attachment', () => {
-    const session = createEditorBufferSession(createEditorTextBuffer(LONG_LINE))
-    editor = new Editor(container)
-    editor.attachSession(session)
-    editor.setWordWrap(false)
-    editor.dispose()
+  it.each([undefined, false])(
+    'takes a host setter before external attachment with constructor wrap %s',
+    (wordWrap) => {
+      const session = createEditorBufferSession(createEditorTextBuffer(LONG_LINE))
+      editor = new Editor(container)
+      editor.attachSession(session)
+      editor.setWordWrap(false)
+      editor.dispose()
 
-    editor = new Editor(container, { defaultText: '', wordWrap: false })
-    editor.setWordWrap(true)
-    editor.attachSession(session)
-    expect(editor.isWordWrapEnabled()).toBe(true)
-  })
+      editor = new Editor(container, { defaultText: '', wordWrap })
+      editor.setWordWrap(true)
+      editor.attachSession(session)
+      expect(editor.isWordWrapEnabled()).toBe(true)
+    },
+  )
 
   it('keeps fresh-session switching behavior and restores each chosen view', () => {
     const first = createEditorBufferSession(createEditorTextBuffer(LONG_LINE))

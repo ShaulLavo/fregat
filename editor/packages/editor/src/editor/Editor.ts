@@ -326,6 +326,7 @@ export class Editor {
   private syntaxScrollDirection: SyntaxScrollDirection = 0
   private readonly options: EditorOptions
   private pendingWordWrapOverride: boolean | undefined
+  private wordWrapOwner: 'host' | 'external-view' = 'host'
   private readonly pluginHost: EditorPluginHost
   private readonly ambientPlugins: EditorAmbientPluginController
   private readonly commandRouter: EditorCommandRouter
@@ -1297,9 +1298,8 @@ export class Editor {
     this.view.setWrapEnabled(enabled)
     const actual = this.isWordWrapEnabled()
     const logicalView = editorBufferSession(this.session)?.view
-    if (logicalView) logicalView.setWordWrap(actual)
-    else this.pendingWordWrapOverride = actual
-    if (this.pendingWordWrapOverride !== undefined) this.pendingWordWrapOverride = actual
+    logicalView?.setWordWrap(actual)
+    if (this.wordWrapOwner === 'host') this.pendingWordWrapOverride = actual
     return actual
   }
 
@@ -1309,12 +1309,16 @@ export class Editor {
 
   private restoreViewWordWrap(): void {
     const logicalView = editorBufferSession(this.session)?.view
-    if (!logicalView) return
+    if (!logicalView) {
+      this.wordWrapOwner = 'host'
+      return
+    }
     const enabled =
       this.pendingWordWrapOverride ?? logicalView.getWordWrap() ?? this.isWordWrapEnabled()
     this.view.setWrapEnabled(enabled)
     logicalView.setWordWrap(this.isWordWrapEnabled())
     this.pendingWordWrapOverride = undefined
+    this.wordWrapOwner = 'external-view'
   }
 
   /**
@@ -2280,6 +2284,7 @@ export class Editor {
     this.syntax.clearDocument()
     this.releaseAnalysis()
     this.document.detachSession()
+    this.wordWrapOwner = 'host'
     this.inputSelection.clearSelectionHighlight()
     this.view.setEditable(false)
     this.lifecycleSummary.document.detachedCount += 1
@@ -2294,6 +2299,7 @@ export class Editor {
     this.detachedEditChain.rotate()
     this.disposeBufferSubscriptions()
     this.document.clear()
+    this.wordWrapOwner = 'host'
     this.syntax.clearDocument()
     this.releaseAnalysis()
     this.inputSelection.clearSelectionHighlight()
@@ -2358,6 +2364,7 @@ export class Editor {
     const replacingDocument = this.session !== null
     this.disposeBufferSubscriptions()
     const attachment = this.document.resetOwnedDocument(document, options)
+    this.wordWrapOwner = 'host'
     editorBufferSession(attachment.session)?.view.setWordWrap(this.isWordWrapEnabled())
     this.attachAnalysis(attachment.session)
     this.subscribeToBufferSession(attachment.session)
