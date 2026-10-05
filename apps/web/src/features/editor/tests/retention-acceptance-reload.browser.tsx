@@ -1,7 +1,10 @@
 import { expect, test } from 'vitest'
 import { commands } from 'vitest/browser'
 import type { RetentionAcceptanceReloadResult } from '../../../../retention-acceptance.vitest.config'
-import { retentionAcceptanceReloadFrameOutcome } from '../../../../test/factories/retention-acceptance-reload-frame'
+import {
+  retentionAcceptanceReloadFrameOutcome,
+  type RetentionAcceptanceReloadAdmission,
+} from '../../../../test/factories/retention-acceptance-reload-frame'
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
@@ -48,41 +51,44 @@ for (const arm of [
           : undefined
       expect(settledReference).toBeDefined()
       if (!settledReference) return
-      let currentReady = false
+      let admission: RetentionAcceptanceReloadAdmission = 'unbound'
       for (const frame of result.frames ?? []) {
         const outcome = retentionAcceptanceReloadFrameOutcome({
           frame,
           settledReference,
           expectedPath: 'repo/src/editor-tab-a.ts',
           syntax: arm.syntax,
-          currentReady,
+          admission,
         })
         expect(
           outcome.kind,
-          JSON.stringify({ at: frame.at, outcome, currentReady, frame, settledReference }),
+          JSON.stringify({ at: frame.at, outcome, admission, frame, settledReference }),
         ).not.toBe('mismatch')
-        if (outcome.kind === 'current') currentReady = true
+        if (outcome.kind === 'pending' && admission === 'unbound') admission = 'source'
+        if (outcome.kind === 'current') admission = 'current'
       }
-      expect(currentReady).toBe(true)
+      expect(admission).toBe('current')
       if (arm.font === 'slow') {
         expect(result.fontLoadReceipt.faceCount).toBeGreaterThan(0)
         expect(result.fontLoadReceipt.codeLoaded).toBe(true)
         expect(result.fontLoadReceipt.status).toBe('loaded')
-        const endpoint = result.frames?.slice(-2)
-        expect(endpoint?.length).toBe(2)
-        for (const frame of endpoint ?? []) {
-          expect(frame.fonts).toEqual({ status: 'loaded', codeLoaded: true })
-          expect(
-            retentionAcceptanceReloadFrameOutcome({
-              frame,
-              settledReference,
-              expectedPath: 'repo/src/editor-tab-a.ts',
-              syntax: arm.syntax,
-              currentReady: true,
-            }).kind,
-          ).toBe('current')
-        }
       }
+      const endpoint = result.frames?.slice(-2)
+      expect(endpoint?.length).toBe(2)
+      for (const frame of endpoint ?? []) {
+        expect(frame.fonts).toEqual({ status: 'loaded', codeLoaded: true })
+        expect(
+          retentionAcceptanceReloadFrameOutcome({
+            frame,
+            settledReference,
+            expectedPath: 'repo/src/editor-tab-a.ts',
+            syntax: arm.syntax,
+            admission: 'current',
+          }).kind,
+        ).toBe('current')
+      }
+      const current = endpoint?.at(-1)
+      if (current) assertCurrentFrameControls(current, settledReference, arm.syntax)
       expect(result.before?.kind).toBe('mounted')
       expect(result.after?.kind).toBe('mounted')
       if (result.before?.kind !== 'mounted' || result.after?.kind !== 'mounted') return
@@ -121,3 +127,70 @@ test(
     expect(result.after?.kind).toBe('mounted')
   },
 )
+
+function assertCurrentFrameControls(
+  frame: NonNullable<RetentionAcceptanceReloadResult['frames']>[number],
+  settledReference: Parameters<typeof retentionAcceptanceReloadFrameOutcome>[0]['settledReference'],
+  syntax: 'plain' | 'colored',
+) {
+  const visible = frame.observation?.kind === 'mounted' ? frame.observation.views[0] : null
+  expect(visible?.kind).toBe('observed')
+  if (visible?.kind !== 'observed') return
+  const input = {
+    frame,
+    settledReference,
+    expectedPath: 'repo/src/editor-tab-a.ts',
+    syntax,
+    admission: 'current',
+  } as const
+  expect(
+    retentionAcceptanceReloadFrameOutcome({
+      ...input,
+      settledReference: { ...settledReference, source: 'wrong source' },
+    }).kind,
+  ).toBe('mismatch')
+  const controls = [
+    { ...visible, headerPath: null },
+    { ...visible, initialHighlightStatus: 'loading' as const },
+    { ...visible, publicCapture: null },
+    { ...visible, frame: { ...visible.frame, rows: [] } },
+    {
+      ...visible,
+      frame: {
+        ...visible.frame,
+        identity: {
+          ...visible.frame.identity,
+          revision: (settledReference.identity.revision ?? 0) + 1,
+        },
+      },
+    },
+  ]
+  for (const control of controls)
+    expect(
+      retentionAcceptanceReloadFrameOutcome({
+        ...input,
+        frame: { ...frame, observation: { kind: 'mounted', views: [control] } },
+      }).kind,
+    ).toBe('mismatch')
+  expect(
+    retentionAcceptanceReloadFrameOutcome({ ...input, frame: { ...frame, rows: [] } }).kind,
+  ).toBe('mismatch')
+  if (syntax !== 'colored') return
+  expect(visible.frame.runs.length).toBeGreaterThan(0)
+  const runs = visible.frame.runs.map((run) => ({
+    ...run,
+    style: { ...run.style, color: 'rgb(0, 0, 0)' },
+  }))
+  expect(
+    retentionAcceptanceReloadFrameOutcome({
+      ...input,
+      frame: {
+        ...frame,
+        observation: {
+          kind: 'mounted',
+          views: [{ ...visible, frame: { ...visible.frame, runs } }],
+        },
+      },
+    }).kind,
+  ).toBe('mismatch')
+}

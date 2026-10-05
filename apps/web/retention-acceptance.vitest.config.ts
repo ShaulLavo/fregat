@@ -165,6 +165,9 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
       })
       const tick = () => {
         const input = document.querySelector<HTMLElement>('.editor-virtualized-input')
+        const selectedTab = document.querySelector<HTMLElement>(
+          '[data-editor-tab-id][aria-selected="true"]',
+        )
         frames.push({
           at: performance.now(),
           editor: Boolean(document.querySelector('.editor-virtualized')),
@@ -179,6 +182,15 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
               input?.getAttribute('aria-readonly') === 'true' ||
               (input instanceof HTMLTextAreaElement && input.readOnly),
             disabled: input instanceof HTMLTextAreaElement && input.disabled,
+          },
+          header: {
+            tabId: selectedTab?.dataset.editorTabId ?? null,
+            groupId:
+              selectedTab?.closest<HTMLElement>('[data-editor-group-id]')?.dataset.editorGroupId ??
+              null,
+            path: selectedTab?.dataset.editorTabPath ?? null,
+            busy: selectedTab?.getAttribute('aria-busy') === 'true',
+            loading: selectedTab?.dataset.editorTabLoading === 'true',
           },
           observation: window.__retentionAcceptanceEntry?.capture() ?? null,
         })
@@ -312,6 +324,13 @@ type ReloadFrame = {
     readonly mounted: boolean
     readonly readonly: boolean
     readonly disabled: boolean
+  }
+  readonly header: {
+    readonly tabId: string | null
+    readonly groupId: string | null
+    readonly path: string | null
+    readonly busy: boolean
+    readonly loading: boolean
   }
   readonly observation: ReturnType<
     NonNullable<Window['__retentionAcceptanceEntry']>['capture']
