@@ -5,19 +5,23 @@ import type {
   SnapshotComparisonRead,
   SnapshotComparisonFile,
   HistoryComparisonInput,
+  OperationComparisonInput,
 } from '@/lib/snapshot-comparison'
+import { operationComparisonSubject } from '@/lib/snapshot-comparison'
 import { materializeFileSnapshotText } from '@/lib/file-snapshot'
 import { languageIdForFilePath } from '@/lib/file-language'
 
 type ReadyComparison = Extract<SnapshotComparisonRead, { kind: 'ready' }>
 type ReadySnapshot = ReadyComparison & {
-  readonly input: Exclude<ReadyComparison['input'], HistoryComparisonInput>
+  readonly input: Extract<ReadyComparison['input'], { kind: 'snapshot' | 'checkpoint' }>
 }
+type ReadyOperation = ReadyComparison & { readonly input: OperationComparisonInput }
 type ReadyHistory = ReadyComparison & { readonly input: HistoryComparisonInput }
 type TextChild = Exclude<SnapshotComparisonFile, { kind: 'no-text' }>
 type ReadySaved = Extract<SavedComparisonRead, { kind: 'ready' }>
 
 export type DiffAttachment =
+  | { readonly kind: 'operation'; readonly read: ReadyOperation; readonly file: DiffFile }
   | {
       readonly kind: 'snapshot'
       readonly read: ReadySnapshot
@@ -81,8 +85,21 @@ export function historyDiffAttachment(
   return { kind: 'history', read, file, meaning }
 }
 
+export function operationDiffAttachment(
+  read: SnapshotComparisonRead | null,
+  file: DiffFile | null,
+): DiffAttachment | null {
+  if (!read || read.kind !== 'ready' || !isOperationRead(read) || file !== read.input.display)
+    return null
+  return { kind: 'operation', read, file }
+}
+
+function isOperationRead(read: ReadyComparison): read is ReadyOperation {
+  return read.input.kind === 'operation'
+}
+
 function isSnapshotRead(read: ReadyComparison): read is ReadySnapshot {
-  return read.input.kind !== 'history'
+  return read.input.kind === 'snapshot' || read.input.kind === 'checkpoint'
 }
 
 function isHistoryRead(read: ReadyComparison): read is ReadyHistory {
@@ -90,28 +107,56 @@ function isHistoryRead(read: ReadyComparison): read is ReadyHistory {
 }
 
 export function diffAttachmentSubject(attachment: DiffAttachment): DiffAttachmentSubject {
-  if (attachment.kind === 'projection-control') return { key: attachment.subject, buffer: null }
-  if (attachment.kind === 'saved') {
-    const { read } = attachment
-    return {
-      key: JSON.stringify(['saved', read.scope.environmentId, read.scope.rootPath, read.live.key]),
-      buffer: read.live.buffer,
+  switch (attachment.kind) {
+    case 'projection-control':
+      return { key: attachment.subject, buffer: null }
+    case 'saved': {
+      const { read } = attachment
+      return {
+        key: JSON.stringify([
+          'saved',
+          read.scope.environmentId,
+          read.scope.rootPath,
+          read.live.key,
+        ]),
+        buffer: read.live.buffer,
+      }
+    }
+    case 'operation':
+      return { key: operationComparisonSubject(attachment.read.input), buffer: null }
+    case 'history': {
+      const input = attachment.read.input
+      const sides =
+        attachment.meaning === 'focused' ? ['current', input.new.id] : [input.old.id, input.new.id]
+      return {
+        key: JSON.stringify([
+          'history',
+          input.scope.environmentId,
+          input.scope.rootPath,
+          input.subject,
+          attachment.meaning,
+          ...sides,
+        ]),
+        buffer: input.buffer,
+      }
+    }
+    case 'snapshot': {
+      const input = attachment.read.input
+      return {
+        key: JSON.stringify([
+          'snapshot',
+          input.scope.environmentId,
+          input.scope.rootPath,
+          input.subject,
+          attachment.file.oldPath,
+          attachment.file.newPath,
+        ]),
+        buffer: null,
+      }
     }
   }
-  const input = attachment.read.input
-  const scope = [input.scope.environmentId, input.scope.rootPath, input.subject]
-  if (attachment.kind === 'history' && input.kind === 'history') {
-    const sides =
-      attachment.meaning === 'focused' ? ['current', input.new.id] : [input.old.id, input.new.id]
-    return {
-      key: JSON.stringify(['history', ...scope, attachment.meaning, ...sides]),
-      buffer: input.buffer,
-    }
-  }
-  return {
-    key: JSON.stringify(['snapshot', ...scope, attachment.file.oldPath, attachment.file.newPath]),
-    buffer: null,
-  }
+  const exhaustive: never = attachment
+  return exhaustive
 }
 
 export function sameDiffAttachmentSubject(
@@ -122,40 +167,82 @@ export function sameDiffAttachmentSubject(
 }
 
 export function diffAttachmentRevision(attachment: DiffAttachment): string {
-  if (attachment.kind === 'projection-control') return attachment.revision
-  if (attachment.kind === 'saved')
-    return JSON.stringify([attachment.read.live.revision, attachment.read.saved.snapshot.version])
-  const input = attachment.read.input
-  if (input.kind === 'history')
-    return JSON.stringify([input.old.id, input.old.revision, input.new.id, input.new.revision])
-  if (input.kind === 'snapshot') return JSON.stringify(input.revision)
-  const child = input.files.find(
-    (entry) => entry.kind !== 'no-text' && entry.display.includes(attachment.file),
-  )
-  return JSON.stringify([child?.revision, child?.hunks.map((hunk) => hunk.id)])
+  switch (attachment.kind) {
+    case 'projection-control':
+      return attachment.revision
+    case 'saved':
+      return JSON.stringify([attachment.read.live.revision, attachment.read.saved.snapshot.version])
+    case 'operation': {
+      const segment = attachment.read.input.segment
+      return JSON.stringify([
+        segment.segmentIndex,
+        segment.sequenceSegmentIndex,
+        segment.logicalRevisionCount,
+        segment.simulatedVersionBefore,
+        segment.simulatedVersionAfter,
+      ])
+    }
+    case 'history': {
+      const input = attachment.read.input
+      return JSON.stringify([input.old.id, input.old.revision, input.new.id, input.new.revision])
+    }
+    case 'snapshot': {
+      const input = attachment.read.input
+      if (input.kind === 'snapshot') return JSON.stringify(input.revision)
+      const child = input.files.find(
+        (entry) => entry.kind !== 'no-text' && entry.display.includes(attachment.file),
+      )
+      return JSON.stringify([child?.revision, child?.hunks.map((hunk) => hunk.id)])
+    }
+  }
+  const exhaustive: never = attachment
+  return exhaustive
 }
 
 export function diffAttachmentLines(
   attachment: DiffAttachment,
 ): Readonly<Record<'old' | 'new', readonly string[] | null>> {
-  if (attachment.file.isPartial) return { old: null, new: null }
-  if (
-    attachment.kind === 'snapshot' &&
-    attachment.read.input.kind === 'checkpoint' &&
-    attachment.child.kind === 'full'
-  ) {
-    return {
-      old: attachment.child.old.kind === 'blob' ? splitTextLines(attachment.child.old.text) : [],
-      new: attachment.child.new.kind === 'blob' ? splitTextLines(attachment.child.new.text) : [],
+  switch (attachment.kind) {
+    case 'operation':
+      return {
+        old: splitTextLines(attachment.read.input.old.materializeFullText()),
+        new: splitTextLines(attachment.read.input.new.materializeFullText()),
+      }
+    case 'snapshot': {
+      if (attachment.file.isPartial) return { old: null, new: null }
+      if (attachment.read.input.kind !== 'checkpoint' || attachment.child.kind !== 'full')
+        return { old: attachment.file.oldLines, new: attachment.file.newLines }
+      return {
+        old: attachment.child.old.kind === 'blob' ? splitTextLines(attachment.child.old.text) : [],
+        new: attachment.child.new.kind === 'blob' ? splitTextLines(attachment.child.new.text) : [],
+      }
     }
+    case 'saved':
+    case 'history':
+    case 'projection-control':
+      return attachment.file.isPartial
+        ? { old: null, new: null }
+        : { old: attachment.file.oldLines, new: attachment.file.newLines }
   }
-  return { old: attachment.file.oldLines, new: attachment.file.newLines }
+  const exhaustive: never = attachment
+  return exhaustive
 }
 
 export function diffAttachmentReferences(attachment: DiffAttachment): readonly object[] {
-  if (attachment.kind === 'projection-control') return [attachment.file]
-  if (attachment.kind === 'snapshot') return [attachment.child]
-  if (attachment.kind === 'saved')
-    return [attachment.read.live.snapshot, attachment.read.saved.snapshot]
-  return [attachment.read.input.old.snapshot, attachment.read.input.new.snapshot]
+  switch (attachment.kind) {
+    case 'projection-control':
+      return [attachment.file]
+    case 'snapshot':
+      return [attachment.child]
+    case 'saved':
+      return [attachment.read.live.snapshot, attachment.read.saved.snapshot]
+    case 'history':
+      return [attachment.read.input.old.snapshot, attachment.read.input.new.snapshot]
+    case 'operation': {
+      const input = attachment.read.input
+      return [input.segment, input.old.snapshot, input.new.snapshot, input.display]
+    }
+  }
+  const exhaustive: never = attachment
+  return exhaustive
 }

@@ -9,7 +9,12 @@ import { joinRenderLines } from '@singapore-editor/diff'
 import type { EditorPlugin, EditorViewContributionContext } from '@singapore-editor/core/extensions'
 import type { Editor } from '@singapore-editor/core/editor'
 import type { EditorToken } from '@singapore-editor/core/syntax'
-import type { DiffPanePresentation, DiffInputClaim } from '@/features/editor/state/tab-presentation'
+import type {
+  DiffPanePresentation,
+  DiffInputClaim,
+  DiffPanePublication,
+  DiffPanePublicationSink,
+} from '@/features/editor/state/tab-presentation'
 import {
   diffAttachmentRevision,
   diffAttachmentReferences,
@@ -29,9 +34,12 @@ type SyntaxConfiguration = {
 export function createDiffPresentationBinding(
   presentation: DiffPanePresentation,
   side: DiffGutterSide = 'stacked',
+  onPublication?: DiffPanePublicationSink,
 ) {
   let view: EditorViewContributionContext | null = null
   let restored = false
+  let publication: DiffPanePublication | null = null
+  let queued: { currentView: EditorViewContributionContext; entry: object } | null = null
   let installed: {
     editor: Editor
     attachment: DiffAttachment
@@ -39,7 +47,60 @@ export function createDiffPresentationBinding(
     tokens: readonly EditorToken[]
     lines: ReturnType<typeof diffAttachmentLines>
     configuration: SyntaxConfiguration
+    documentId: string | null
+    textVersion: number
+    projectionLength: number
   } | null = null
+
+  function withdraw() {
+    if (!publication) return
+    const previous = publication
+    publication = null
+    onPublication?.({ kind: 'withdrawn', publication: previous })
+  }
+
+  function schedulePublication() {
+    if (!onPublication || !view || !installed || !restored) return
+    const currentView = view
+    const entry = installed
+    if (queued?.currentView === currentView && queued.entry === entry) return
+    const pending = { currentView, entry }
+    queued = pending
+    // Contribution updates run inside paint delivery; inspect the committed view after it returns.
+    queueMicrotask(() => {
+      if (queued !== pending || view !== currentView || installed !== entry || !restored) return
+      queued = null
+      const snapshot = currentView.getSnapshot()
+      if (
+        snapshot.documentId === null ||
+        snapshot.documentId !== entry.documentId ||
+        snapshot.textVersion !== entry.textVersion ||
+        snapshot.geometryCommitted !== true ||
+        snapshot.viewport.clientWidth <= 0 ||
+        snapshot.viewport.clientHeight <= 0 ||
+        (entry.projectionLength > 0 && snapshot.visibleRows.length === 0)
+      ) {
+        withdraw()
+        return
+      }
+      const next: DiffPanePublication = {
+        attachment: entry.attachment,
+        side,
+        editor: entry.editor,
+        documentId: snapshot.documentId,
+        textVersion: snapshot.textVersion,
+        geometryCommitted: true,
+        viewportWidth: snapshot.viewport.clientWidth,
+        viewportHeight: snapshot.viewport.clientHeight,
+        visibleRowCount: snapshot.visibleRows.length,
+        projectionLength: entry.projectionLength,
+      }
+      if (publication && samePublication(publication, next)) return
+      withdraw()
+      publication = next
+      onPublication({ kind: 'presented', publication: next })
+    })
+  }
 
   function matchesInput(attachment: DiffAttachment, saved: DiffInputClaim) {
     const subject = diffAttachmentSubject(attachment)
@@ -76,6 +137,7 @@ export function createDiffPresentationBinding(
   }
 
   function capture() {
+    schedulePublication()
     if (!view || !restored) return
     if (presentation.reload?.file.deref()) return
     const snapshot = view.getSnapshot()
@@ -102,6 +164,8 @@ export function createDiffPresentationBinding(
     capture()
     restored = false
     installed = null
+    queued = null
+    withdraw()
   }
 
   function dispose() {
@@ -152,7 +216,7 @@ export function createDiffPresentationBinding(
     if (
       !pendingReload &&
       previous?.editor === editor &&
-      previous.attachment === attachment &&
+      sameAttachment(previous.attachment, attachment) &&
       previous.rows === rows &&
       previous.tokens === tokens &&
       sameConfiguration(previous.configuration, configuration)
@@ -170,7 +234,9 @@ export function createDiffPresentationBinding(
     const saved = matchingView(attachment)
     const selected = anchors ?? saved?.anchors ?? null
     const lines =
-      previous?.attachment === attachment ? previous.lines : diffAttachmentLines(attachment)
+      previous && sameAttachment(previous.attachment, attachment)
+        ? previous.lines
+        : diffAttachmentLines(attachment)
     const sameInput =
       !previous ||
       diffAttachmentRevision(previous.attachment) === diffAttachmentRevision(attachment)
@@ -184,7 +250,6 @@ export function createDiffPresentationBinding(
           sameInput,
         )
       : null
-    installed = { editor, attachment, rows, tokens, lines, configuration }
     const text = joinRenderLines(rows)
     if (sameSubject) {
       editor.syncText(text, { documentMode: 'static', languageId: null, tokens })
@@ -197,6 +262,18 @@ export function createDiffPresentationBinding(
         tokens,
         scrollPosition: { left: 0, top: 0 },
       })
+    }
+    const installedSnapshot = view.getSnapshot()
+    installed = {
+      editor,
+      attachment,
+      rows,
+      tokens,
+      lines,
+      configuration,
+      documentId: `projection:diff:${subject.key}:${side}`,
+      textVersion: installedSnapshot.textVersion,
+      projectionLength: text.length,
     }
     if (reload) {
       restore(editor)
@@ -222,7 +299,7 @@ export function createDiffPresentationBinding(
   ) {
     if (
       installed?.editor !== editor ||
-      installed.attachment !== attachment ||
+      !sameAttachment(installed.attachment, attachment) ||
       installed.rows !== rows ||
       !sameConfiguration(installed.configuration, configuration) ||
       !restored
@@ -230,9 +307,45 @@ export function createDiffPresentationBinding(
       return
     editor.setTokens(tokens)
     installed = { ...installed, tokens }
+    schedulePublication()
   }
 
   return { plugin, detach, restore, publish, publishTokens, isRestoringProjection: () => !restored }
+}
+
+function sameAttachment(left: DiffAttachment, right: DiffAttachment): boolean {
+  if (left === right) return true
+  if (left.file !== right.file || left.kind !== right.kind) return false
+  switch (left.kind) {
+    case 'operation':
+      return right.kind === 'operation' && left.read === right.read
+    case 'snapshot':
+      return right.kind === 'snapshot' && left.read === right.read && left.child === right.child
+    case 'saved':
+      return right.kind === 'saved' && left.read === right.read
+    case 'history':
+      return right.kind === 'history' && left.read === right.read && left.meaning === right.meaning
+    case 'projection-control':
+      return (
+        right.kind === 'projection-control' &&
+        left.subject === right.subject &&
+        left.revision === right.revision
+      )
+  }
+}
+
+function samePublication(left: DiffPanePublication, right: DiffPanePublication): boolean {
+  return (
+    sameAttachment(left.attachment, right.attachment) &&
+    left.side === right.side &&
+    left.editor === right.editor &&
+    left.documentId === right.documentId &&
+    left.textVersion === right.textVersion &&
+    left.viewportWidth === right.viewportWidth &&
+    left.viewportHeight === right.viewportHeight &&
+    left.visibleRowCount === right.visibleRowCount &&
+    left.projectionLength === right.projectionLength
+  )
 }
 
 function sameConfiguration(left: SyntaxConfiguration, right: SyntaxConfiguration): boolean {

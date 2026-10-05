@@ -32,6 +32,7 @@ import type { HighlightingThemeSource } from '@singapore-editor/highlighting'
 import type {
   DiffPanePresentation,
   DiffScrollPosition,
+  DiffPanePublicationSink,
 } from '@/features/editor/state/tab-presentation'
 import { diffSyntaxState } from '@/features/editor/utils/diff-syntax-state'
 
@@ -52,6 +53,7 @@ export function DiffPane({
   theme,
   onFocus,
   onRegisterEditor,
+  onPublication,
   onScroll,
 }: {
   attachment: DiffAttachment
@@ -68,6 +70,7 @@ export function DiffPane({
   theme: EditorTheme
   onFocus?: (side: DiffGutterSide) => void
   onRegisterEditor?: (side: DiffGutterSide, editor: Editor | null) => void
+  onPublication?: DiffPanePublicationSink
   onScroll?: (
     side: DiffGutterSide,
     position: DiffScrollPosition,
@@ -108,9 +111,19 @@ export function DiffPane({
   // A plugin instance owns its registered view context for the lifetime of this pane.
   // Manual, because the layout effect below depends on it and the compiler's cache is a cache,
   // not an identity guarantee: a recompute would re-register the context.
+  const [publicationSink] = useState(() => ({ notify: onPublication }))
+  useLayoutEffect(() => {
+    Object.assign(publicationSink, { notify: onPublication })
+  }, [onPublication, publicationSink])
+  const observesPublication = onPublication !== undefined
   const persistence = useMemo(
-    () => (presentation ? createDiffPresentationBinding(presentation, side) : null),
-    [presentation, side],
+    () =>
+      createDiffPresentationBinding(
+        presentation,
+        side,
+        observesPublication ? (event) => publicationSink.notify?.(event) : undefined,
+      ),
+    [presentation, side, observesPublication, publicationSink],
   )
   const plugins = [
     plugin,
