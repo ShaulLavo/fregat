@@ -1,7 +1,4 @@
-import {
-  snapshotDiffAttachment,
-  type DiffAttachmentRequest,
-} from '@/features/editor/utils/diff-attachment'
+import type { DiffAttachment } from '@/lib/diff-attachment'
 import type { TabPresentation } from '@/features/editor/state/tab-presentation'
 import type { TabId } from '@/lib/documents/utils/types'
 import { type DiffRegionStore } from '@singapore-editor/diff'
@@ -29,7 +26,7 @@ import type { EditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
  * block there, and a context row carries no row class of its own, so it inherits from here.
  */
 export function DiffEditor({
-  attachment: request,
+  attachment,
   failure,
   languageServer = null,
   mode,
@@ -37,7 +34,7 @@ export function DiffEditor({
   presentation: suppliedPresentation,
   tabId,
 }: {
-  attachment: DiffAttachmentRequest | null
+  attachment: DiffAttachment | null
   failure?: string | null
   languageServer?: DiffLanguageServerContext | null
   mode: EditorDiffViewMode
@@ -45,8 +42,6 @@ export function DiffEditor({
   regions?: DiffRegionStore
   tabId?: TabId
 }) {
-  const attachment =
-    request?.kind === 'comparison' ? snapshotDiffAttachment(request.read, request.file) : request
   const file = attachment?.file ?? null
   const { editorTheme, shikiTheme } = useEditorColorTheme()
   const colors = editorSyntaxColors(shikiTheme)

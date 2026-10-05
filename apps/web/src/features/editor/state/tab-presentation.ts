@@ -11,22 +11,27 @@ import type { TabId } from '@/lib/documents/utils/types'
 import type { EditorScrollPosition } from '@singapore-editor/core/editor'
 import type { EditorTextBuffer } from '@singapore-editor/core/document'
 import type { DiffPaneAnchors } from '@/features/editor/utils/diff-source-anchors'
+import {
+  diffAttachmentReferences,
+  diffAttachmentRevision,
+  diffAttachmentSubject,
+  type DiffAttachment,
+} from '@/lib/diff-attachment'
 
 export type DiffScrollPosition = Required<EditorScrollPosition>
 
+export type DiffInputClaim = {
+  readonly buffer: WeakRef<EditorTextBuffer> | null
+  readonly revision: string
+  readonly references: readonly WeakRef<object>[]
+}
+
 export type DiffPanePresentation = {
   plugin: DiffPlugin | null
+  reload: (DiffInputClaim & { readonly file: WeakRef<DiffFile>; readonly subject: string }) | null
   scroll: DiffScrollPosition | null
   selections: readonly EditorResolvedSelection[]
-  views: Map<
-    string,
-    {
-      readonly buffer: WeakRef<EditorTextBuffer> | null
-      readonly references: readonly WeakRef<object>[]
-      readonly revision: string
-      readonly anchors: DiffPaneAnchors
-    }
-  >
+  views: Map<string, DiffInputClaim & { readonly anchors: DiffPaneAnchors }>
 }
 
 export type HistoryPresentation = {
@@ -38,9 +43,9 @@ export type HistoryPresentation = {
 export class TabPresentation {
   readonly regions: DiffRegionStore = createDiffRegionStore()
   readonly diffPanes: Readonly<Record<DiffGutterSide, DiffPanePresentation>> = {
-    old: { scroll: null, selections: [], plugin: null, views: new Map() },
-    new: { scroll: null, selections: [], plugin: null, views: new Map() },
-    stacked: { scroll: null, selections: [], plugin: null, views: new Map() },
+    old: { scroll: null, selections: [], plugin: null, reload: null, views: new Map() },
+    new: { scroll: null, selections: [], plugin: null, reload: null, views: new Map() },
+    stacked: { scroll: null, selections: [], plugin: null, reload: null, views: new Map() },
   }
   readonly history: HistoryPresentation = {
     focusedId: null,
@@ -51,7 +56,7 @@ export class TabPresentation {
   diffFile: DiffFile | null = null
 
   restoreDiffView(
-    file: DiffFile,
+    attachment: DiffAttachment,
     view: {
       expanded: readonly string[]
       layout?: Record<string, number>
@@ -63,12 +68,21 @@ export class TabPresentation {
       stacked: DiffScrollPosition | null
     },
   ): void {
+    const file = attachment.file
+    const subject = diffAttachmentSubject(attachment)
     this.regions.setFile(file)
     for (const key of view.expanded) {
       if (!this.regions.getExpandedRegions().has(key)) this.regions.toggleRegion(key)
     }
     this.diffLayout = view.layout
     for (const side of ['old', 'new', 'stacked'] as const) {
+      this.diffPanes[side].reload = {
+        file: new WeakRef(file),
+        subject: subject.key,
+        buffer: subject.buffer ? new WeakRef(subject.buffer) : null,
+        revision: diffAttachmentRevision(attachment),
+        references: diffAttachmentReferences(attachment).map((reference) => new WeakRef(reference)),
+      }
       this.diffPanes[side].scroll = view[side]
       this.diffPanes[side].selections = view[`${side}Selections`] ?? []
     }
@@ -119,6 +133,7 @@ export class TabPresentations {
     for (const side of ['old', 'new', 'stacked'] as const) {
       target.diffPanes[side].scroll = source.diffPanes[side].scroll
       target.diffPanes[side].selections = source.diffPanes[side].selections
+      target.diffPanes[side].reload = source.diffPanes[side].reload
       target.diffPanes[side].views = new Map(source.diffPanes[side].views)
     }
     Object.assign(target.history, source.history)

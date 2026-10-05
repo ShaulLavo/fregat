@@ -31,7 +31,7 @@ import {
   diffAttachmentSubject,
   snapshotDiffAttachment,
   historyDiffAttachment,
-} from '@/features/editor/utils/diff-attachment'
+} from '@/lib/diff-attachment'
 import { snapshotComparisonInput } from '@/lib/snapshot-comparison-input'
 import { fetchDiff } from '@/lib/git-diff-query'
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'

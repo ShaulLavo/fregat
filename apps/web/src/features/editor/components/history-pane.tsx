@@ -18,7 +18,7 @@ import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { useEffect, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 
-import { historyDiffAttachment, type DiffAttachment } from '@/features/editor/utils/diff-attachment'
+import { historyDiffAttachment, type DiffAttachment } from '@/lib/diff-attachment'
 import { DiffEditor } from '@/features/editor/components/diff-editor'
 import { HistoryClearDialog } from '@/features/editor/components/history-clear-dialog'
 import { HistoryGraphStrip } from '@/features/editor/components/history-graph-strip'
@@ -90,7 +90,9 @@ export function HistoryPane({
   )
 
   const graph = state?.graph ?? null
-  const focused = state && viewer && state.focusedId !== null ? viewer.node(state.focusedId) : null
+  const focused = graph?.nodes.find((node) => node.id === state?.focusedId) ?? null
+  const restoreTarget =
+    state && viewer && state.focusedId !== null ? viewer.node(state.focusedId) : null
   const focusedDiff = shown?.focusedComparison ?? null
   const selectedComparison = state?.comparison?.status === 'ready' ? state.comparison.result : null
   const focusedComparison = state?.lostIds.length ? null : focusedDiff
@@ -125,7 +127,8 @@ export function HistoryPane({
   const barrier = graph.barrier
   const barrierActive = barrierFocused && barrier !== null
   const barrierLabel = barrierAriaLabel(barrierGroup)
-  const canRestore = focused !== null && !focused.isCurrent && !restoring && !barrierActive
+  const canRestore =
+    restoreTarget !== null && !restoreTarget.isCurrent && !restoring && !barrierActive
   const twoSelected = state.selectedIds.length === 2
 
   function setBarrierFocused(value: boolean) {
@@ -154,7 +157,7 @@ export function HistoryPane({
     }
     const handled = historyKeyAction(event, viewer, {
       restore: () => {
-        if (canRestore && focused) restore.mutate(focused.id)
+        if (canRestore && restoreTarget) restore.mutate(restoreTarget.id)
       },
       leave: () => onLeave?.(),
       // Left from the root reaches the barrier, the state before the workspace edit.
@@ -214,7 +217,7 @@ export function HistoryPane({
                 size='sm'
                 type='button'
                 variant='outline'
-                onClick={() => focused && restore.mutate(focused.id)}
+                onClick={() => canRestore && restoreTarget && restore.mutate(restoreTarget.id)}
               >
                 {restoring ? <Spinner /> : <ArrowCounterClockwiseIcon data-icon='inline-start' />}
                 Use this version

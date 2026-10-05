@@ -38,6 +38,7 @@ export function captureDiffAnchors(
   rows: readonly DiffRenderRow[],
   side: DiffGutterSide,
   snapshot: EditorViewSnapshot,
+  unwrapped = false,
 ): DiffPaneAnchors {
   const starts = rowStarts(rows)
   const capture = (offset: number) => anchorAt(rows, starts, lines, side, offset)
@@ -48,7 +49,8 @@ export function captureDiffAnchors(
   )
   const first =
     visible ??
-    snapshot.visibleRows.find((row) => row.top + row.height > snapshot.viewport.scrollTop)
+    snapshot.visibleRows.find((row) => row.top + row.height > snapshot.viewport.scrollTop) ??
+    projectedViewportRow(rows, starts, capture, snapshot, unwrapped)
   return {
     selections: snapshot.selections.map((selection) => ({
       anchor: capture(selection.anchorOffset),
@@ -60,6 +62,26 @@ export function captureDiffAnchors(
       : null,
     left: snapshot.viewport.scrollLeft,
   }
+}
+
+function projectedViewportRow(
+  rows: readonly DiffRenderRow[],
+  starts: readonly number[],
+  capture: (offset: number) => Anchor,
+  snapshot: EditorViewSnapshot,
+  unwrapped: boolean,
+) {
+  if (!unwrapped || snapshot.visibleRows.length > 0 || snapshot.metrics.rowHeight <= 0) return null
+  if (snapshot.totalHeight !== rows.length * snapshot.metrics.rowHeight) return null
+  if (snapshot.lineStartsView.length !== rows.length) return null
+  const start = Math.max(0, Math.floor(snapshot.viewport.scrollTop / snapshot.metrics.rowHeight))
+  const source = rows.findIndex(
+    (_, index) => index >= start && capture(starts[index]!).kind === 'source',
+  )
+  const index = source < 0 ? Math.min(start, rows.length - 1) : source
+  const startOffset = starts[index]
+  if (startOffset === undefined) return null
+  return { startOffset, top: index * snapshot.metrics.rowHeight }
 }
 
 export function resolveDiffAnchors(

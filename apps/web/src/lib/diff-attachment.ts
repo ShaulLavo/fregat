@@ -1,6 +1,6 @@
 import type { EditorTextBuffer } from '@singapore-editor/core/document'
 import { createTextDiff, splitTextLines, type DiffFile } from '@singapore-editor/diff'
-import type { SavedComparisonRead } from '@/features/editor/utils/saved-comparison'
+import type { SavedComparisonRead } from '@/lib/saved-comparison'
 import type {
   SnapshotComparisonRead,
   SnapshotComparisonFile,
@@ -37,10 +37,6 @@ export type DiffAttachment =
       readonly revision: string
       readonly file: DiffFile
     }
-
-export type DiffAttachmentRequest =
-  | DiffAttachment
-  | { readonly kind: 'comparison'; readonly read: ReadyComparison; readonly file: DiffFile }
 
 export type DiffAttachmentSubject = {
   readonly key: string

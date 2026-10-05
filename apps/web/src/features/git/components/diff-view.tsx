@@ -5,6 +5,7 @@ import { filesystemPath } from '@/lib/documents/utils/identity'
 import { useRef } from 'react'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'
+import { snapshotDiffAttachment } from '@/lib/diff-attachment'
 import { EditorTabPlaceholder } from '@/features/editor/components/tab-placeholder'
 import { useDiffLanguageContext } from '@/features/editor/hooks/use-diff-language-context'
 import { useTabPresentation } from '@/features/editor/hooks/use-tab-presentation'
@@ -60,7 +61,14 @@ export function DiffView({
   // that have to agree and nothing made them. The file list is off either way for a multi-file
   // diff, so a checkpoint diff touching several files deliberately shows one.
   const file = renderableDiffFile(files)
+  const attachment = snapshotDiffAttachment(source, file)
   const snapshotInput = input?.kind === 'snapshot' ? input : null
+  const checkpointChild =
+    input?.kind === 'checkpoint'
+      ? (input.files.find(
+          (entry) => entry.kind !== 'no-text' && file !== null && entry.display.includes(file),
+        ) ?? null)
+      : null
   const reloadIdentity =
     comparison.kind === 'snapshot'
       ? snapshotInput && {
@@ -68,8 +76,17 @@ export function DiffView({
           target: snapshotInput.comparison.target,
           revision: snapshotInput.revision,
         }
-      : { kind: 'checkpoint' as const, identity: JSON.stringify(diffDocumentQueryKey(comparison)) }
-  useDiffReloadView(reloadIdentity, diffs, file, presentation)
+      : checkpointChild && {
+          kind: 'checkpoint' as const,
+          identity: JSON.stringify([
+            diffDocumentQueryKey(comparison),
+            checkpointChild.path,
+            checkpointChild.kind,
+            checkpointChild.revision,
+            checkpointChild.hunks.map((hunk) => hunk.id),
+          ]),
+        }
+  useDiffReloadView(reloadIdentity, diffs, attachment, presentation)
   // What an editor tab currently holds for this path, if anything. That is the only text a
   // language server can be asked about, and comparing it to the diff's new side is what makes an
   // answer true — see `diffQueryTargetAt`. Called before the early returns below: hooks are not
@@ -120,7 +137,7 @@ export function DiffView({
           "Ask" button would otherwise clear the selection before the click landed. */}
       <div className='min-h-0 w-full min-w-0 flex-1' ref={containerRef}>
         <DiffEditor
-          attachment={source && file ? { kind: 'comparison', read: source, file } : null}
+          attachment={attachment}
           failure={failure}
           languageServer={file ? languageServer : null}
           mode={mode}

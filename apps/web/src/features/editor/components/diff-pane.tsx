@@ -1,5 +1,5 @@
 import { useUnicodeHighlights } from '@/features/editor/hooks/use-unicode-highlights'
-import type { DiffAttachment } from '@/features/editor/utils/diff-attachment'
+import type { DiffAttachment } from '@/lib/diff-attachment'
 import { createTabPresentation } from '@/features/editor/state/tab-presentation'
 import type { TabId } from '@/lib/documents/utils/types'
 import type { EditorTheme } from '@singapore-editor/core/rendering'
