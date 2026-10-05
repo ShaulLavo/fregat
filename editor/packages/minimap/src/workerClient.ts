@@ -2,6 +2,7 @@ import { computeFrameLayout, computeRenderLayout, visibleDocumentLineRange } fro
 import {
   documentSummaryPayload,
   documentSummaryPatchPayload,
+  sequentialMinimapEdits,
   summarySource,
   type SummarySource,
   type SummaryLineStarts,
@@ -977,8 +978,7 @@ function incrementalTextEdits(
 ): readonly TextEdit[] | null {
   if (!change || change.edits.length === 0) return null
 
-  const sorted = change.edits.toSorted(compareTextEdits)
-  return sequentialTextEdits(sorted)
+  return sequentialMinimapEdits(change.edits)
 }
 
 function sameViewport(previous: MinimapViewport | null, next: MinimapViewport): boolean {
@@ -1157,20 +1157,6 @@ function shouldDeferMinimapUpdate(update: PendingMinimapUpdate): boolean {
   if (update.reason.includes('content')) return true
   if (update.syncTokens) return true
   return update.syncExternalDecorations
-}
-
-function sequentialTextEdits(edits: readonly TextEdit[]): readonly TextEdit[] {
-  let delta = 0
-  return edits.map((edit) => {
-    const from = edit.from + delta
-    const to = edit.to + delta
-    delta += edit.text.length - (edit.to - edit.from)
-    return { from, to, text: edit.text }
-  })
-}
-
-function compareTextEdits(left: TextEdit, right: TextEdit): number {
-  return left.from - right.from || left.to - right.to
 }
 
 function tokenSourceAfterEdits(

@@ -41,6 +41,18 @@ export function documentSummaryPayload(
 
 export type SummaryShape = { readonly textLength: number; readonly lineCount: number }
 
+export function sequentialMinimapEdits(canonical: readonly TextEdit[]): readonly TextEdit[] {
+  let delta = 0
+  return canonical
+    .toSorted((left, right) => left.from - right.from || left.to - right.to)
+    .map((edit) => {
+      const from = edit.from + delta
+      const to = edit.to + delta
+      delta += edit.text.length - (edit.to - edit.from)
+      return { from, to, text: edit.text }
+    })
+}
+
 export function documentSummaryPatchPayload(
   text: TextReadSnapshot,
   previous: SummarySource,
