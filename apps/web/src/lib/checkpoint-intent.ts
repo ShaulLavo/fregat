@@ -1,5 +1,5 @@
 import type { GitFileDiff } from '@workspace/contracts'
-import { queryOptions } from '@tanstack/react-query'
+import { queryOptions, type QueryClient } from '@tanstack/react-query'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { checkpointAvailability } from '@/lib/checkpoint-availability'
 import {
@@ -10,15 +10,16 @@ import {
 } from '@/lib/checkpoint-diff-query'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 
-export function checkpointIntentOptions(summary: ChatTurnDiffSummary) {
+export function checkpointIntentOptions(summary: ChatTurnDiffSummary, queries: QueryClient) {
   if (checkpointAvailability(summary).kind !== 'available') return null
-  const input = checkpointDiffInputForSummary(summary)
+  const display = checkpointDiffInputForSummary(summary)
+  const counted = cachedCountedTurnDiff(queries, display)
+  const input = { ...display, ignoreWhitespace: counted === undefined }
   return queryOptions<readonly GitFileDiff[]>({
     queryKey: checkpointDiffQueryKey(input),
     staleTime: Infinity,
     retry: false,
     queryFn: ({ client, signal }) =>
-      cachedCountedTurnDiff(client, input) ??
-      fetchCheckpointDiff(input, signal, clientForQueryClient(client)),
+      counted ?? fetchCheckpointDiff(input, signal, clientForQueryClient(client)),
   })
 }

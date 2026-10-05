@@ -21,8 +21,369 @@ import {
   type EditorSyntaxSession,
 } from '../src/syntax/session'
 import { EditorTokenStore } from '../src/syntax/tokenStore'
+import type { EditorInitialPaintEvent } from '../src/plugins'
 
 describe('prepared editor documents', () => {
+  it('rejects a constructor theme reply already invoked before certified attachment', async () => {
+    const buffer = createEditorTextBuffer('alpha')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
+    const late = deferred<{ foregroundColor: string }>()
+    let producerReturned = false
+    const loader = vi
+      .fn(async () => ({ foregroundColor: '#123456' }))
+      .mockImplementationOnce(async () => ({ foregroundColor: '#123456' }))
+      .mockImplementationOnce(async () => {
+        const theme = await late.promise
+        producerReturned = true
+        return theme
+      })
+    const provider: EditorHighlighterProvider = {
+      createSession: () => highlightSession(),
+      loadTheme: loader,
+    }
+    const prepared = createEditorPreparedDocument({
+      buffer,
+      analysis,
+      documentId: 'file.ts',
+      languageId: 'typescript',
+      configuredTabSize: 4,
+      tabSizePolicy: 'detect-indentation',
+      documentConfigurationTag: [],
+    })
+    expect(
+      await prepared.startStage({
+        family: 'highlighter',
+        provider,
+        configurationTag: ['shiki', 'dark'],
+        range: 'full',
+        abortSignal: new AbortController().signal,
+      }),
+    ).toBe('ready')
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const editor = createVisibleEditor(container, {
+      plugins: [{ activate: (context) => context.registerHighlighter(provider) }],
+    })
+    try {
+      await vi.waitFor(() => expect(loader).toHaveBeenCalledTimes(2))
+      editor.attachSession(createEditorBufferSession(buffer), {
+        preparedDocument: prepared,
+        documentId: 'file.ts',
+        languageId: 'typescript',
+        documentConfigurationTag: [],
+        highlighterConfigurationTag: ['shiki', 'dark'],
+      })
+      expect(editor.getState().initialHighlightStatus).toBe('painted')
+      expect(editor['syntax'].providerTheme).toEqual({ foregroundColor: '#123456' })
+      late.resolve({ foregroundColor: '#abcdef' })
+      await vi.waitFor(() => expect(producerReturned).toBe(true))
+      expect(editor['syntax'].providerTheme).toEqual({ foregroundColor: '#123456' })
+      expect(loader).toHaveBeenCalledTimes(2)
+    } finally {
+      late.resolve({ foregroundColor: '#abcdef' })
+      editor.dispose()
+      container.remove()
+      prepared.dispose()
+      analysis.dispose()
+    }
+  })
+
+  it('keeps ordinary provider colors before opening and after clearing an Editor', async () => {
+    const loader = vi.fn(async () => ({ gutterForegroundColor: '#123456' }))
+    const provider: EditorHighlighterProvider = {
+      createSession: () => highlightSession(),
+      loadTheme: loader,
+    }
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const editor = createVisibleEditor(container, {
+      plugins: [{ activate: (context) => context.registerHighlighter(provider) }],
+    })
+    try {
+      await vi.waitFor(() =>
+        expect(editor['syntax'].providerTheme).toEqual({ gutterForegroundColor: '#123456' }),
+      )
+      editor.openDocument({ documentId: 'file.ts', languageId: 'typescript', text: 'alpha' })
+      await vi.waitFor(() => expect(editor.getState().initialHighlightStatus).toBe('painted'))
+      editor.detachSession()
+      await vi.waitFor(() =>
+        expect(editor['syntax'].providerTheme).toEqual({ gutterForegroundColor: '#123456' }),
+      )
+      expect(loader).toHaveBeenCalledTimes(2)
+    } finally {
+      editor.dispose()
+      container.remove()
+    }
+  })
+
+  it.each(['reorder', 'replace', 'configuration', 'loader'] as const)(
+    'rejects the old ready theme cohort after secondary %s without restarting its stage',
+    async (change) => {
+      const buffer = createEditorTextBuffer('alpha')
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
+      const loader = vi.fn(async () => ({ foregroundColor: '#123456' }))
+      const primary: EditorHighlighterProvider = { createSession: () => highlightSession() }
+      const secondary: EditorHighlighterProvider = { createSession: () => null, loadTheme: loader }
+      const prepared = createEditorPreparedDocument({
+        buffer,
+        analysis,
+        documentId: 'file.ts',
+        languageId: 'typescript',
+        configuredTabSize: 4,
+        tabSizePolicy: 'detect-indentation',
+        documentConfigurationTag: [],
+      })
+      try {
+        expect(
+          await prepared.startStage({
+            family: 'highlighter',
+            provider: primary,
+            themeProviders: [primary, secondary],
+            configurationTag: ['shiki', 'dark'],
+            range: 'full',
+            abortSignal: new AbortController().signal,
+          }),
+        ).toBe('ready')
+        const expected = {
+          ...match(buffer, null, primary),
+          highlighterThemeProviders: [primary, secondary],
+        }
+        if (change === 'reorder') expected.highlighterThemeProviders = [secondary, primary]
+        if (change === 'replace') expected.highlighterThemeProviders = [primary, { ...secondary }]
+        if (change === 'loader')
+          secondary.loadTheme = vi.fn(async () => ({ foregroundColor: '#abcdef' }))
+        const payload = prepared.borrow(
+          change === 'configuration'
+            ? { ...expected, highlighterConfigurationTag: ['shiki', 'light'] }
+            : expected,
+        )
+        expect(payload?.highlighter).toBeNull()
+        expect(loader).toHaveBeenCalledTimes(1)
+        expect(analysis.inspectRetention().entries).toHaveLength(1)
+      } finally {
+        prepared.dispose()
+        analysis.dispose()
+      }
+    },
+  )
+
+  it('fails theme preparation with successful tokens and keeps ordinary null-base fallback', async () => {
+    const buffer = createEditorTextBuffer('alpha')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
+    const failure = new TypeError('external theme loader failed')
+    let healthy = false
+    const loader = vi.fn(async () => {
+      if (healthy) return { foregroundColor: '#abcdef' }
+      throw failure
+    })
+    const provider: EditorHighlighterProvider = {
+      createSession: () => highlightSession(),
+      loadTheme: loader,
+    }
+    const prepared = createEditorPreparedDocument({
+      buffer,
+      analysis,
+      documentId: 'file.ts',
+      languageId: 'typescript',
+      configuredTabSize: 4,
+      tabSizePolicy: 'detect-indentation',
+      documentConfigurationTag: [],
+    })
+    const stage = prepared.startStage({
+      family: 'highlighter',
+      provider,
+      configurationTag: ['shiki', 'dark'],
+      range: 'full',
+      abortSignal: new AbortController().signal,
+    })
+    expect(await stage).toBe('failed')
+    const borrow = prepared.borrow
+    let transferredHighlighter:
+      | NonNullable<ReturnType<typeof prepared.borrow>>['highlighter']
+      | undefined
+    prepared.borrow = (expected) => {
+      const payload = borrow(expected)
+      transferredHighlighter = payload?.highlighter
+      return payload
+    }
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const editor = createVisibleEditor(container, {
+      plugins: [{ activate: (context) => context.registerHighlighter(provider) }],
+    })
+    try {
+      editor.attachSession(createEditorBufferSession(buffer), {
+        preparedDocument: prepared,
+        documentId: 'file.ts',
+        languageId: 'typescript',
+        documentConfigurationTag: [],
+        highlighterConfigurationTag: ['shiki', 'dark'],
+      })
+      expect(transferredHighlighter).toBeNull()
+      await vi.waitFor(() => expect(editor.getState().initialHighlightStatus).toBe('painted'))
+      expect(loader).toHaveBeenCalledTimes(1)
+      expect(editor['syntax'].providerTheme).toBeNull()
+      healthy = true
+      editor['syntax'].refreshHighlighterTheme()
+      await vi.waitFor(() =>
+        expect(editor['syntax'].providerTheme).toEqual({ foregroundColor: '#abcdef' }),
+      )
+      expect(editor.getState().initialHighlightStatus).toBe('painted')
+      expect(loader).toHaveBeenCalledTimes(2)
+      expect(await stage).toBe('failed')
+      expect(prepared.borrow(match(buffer, null, provider))?.highlighter).toBeNull()
+      expect(loader).toHaveBeenCalledTimes(2)
+    } finally {
+      editor.dispose()
+      container.remove()
+      prepared.dispose()
+      analysis.dispose()
+    }
+  })
+
+  it('aborts one pending theme preparation while its shared live borrower receives admission', async () => {
+    const buffer = createEditorTextBuffer('alpha')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
+    const theme = deferred<{ foregroundColor: string }>()
+    const loader = vi.fn(() => theme.promise)
+    const provider: EditorHighlighterProvider = {
+      createSession: () => highlightSession(),
+      loadTheme: loader,
+    }
+    const prepared = createEditorPreparedDocument({
+      buffer,
+      analysis,
+      documentId: 'file.ts',
+      languageId: 'typescript',
+      configuredTabSize: 4,
+      tabSizePolicy: 'detect-indentation',
+      documentConfigurationTag: [],
+    })
+    const abort = new AbortController()
+    const stage = prepared.startStage({
+      family: 'highlighter',
+      provider,
+      configurationTag: ['dark'],
+      range: 'full',
+      abortSignal: abort.signal,
+    })
+    const survivor = analysis.borrowHighlighter({
+      provider,
+      languageId: 'typescript',
+      configurationTag: ['dark'],
+    })!
+    try {
+      await vi.waitFor(() => expect(loader).toHaveBeenCalledTimes(1))
+      abort.abort()
+      expect(await stage).toBe('aborted')
+      theme.resolve({ foregroundColor: '#123456' })
+      await survivor.refresh(buffer.getTextSnapshot())
+      expect(survivor.read()).toMatchObject({
+        kind: 'ready',
+        providerTheme: { kind: 'ready', theme: { foregroundColor: '#123456' } },
+      })
+      expect(loader).toHaveBeenCalledTimes(1)
+    } finally {
+      survivor.dispose()
+      prepared.dispose()
+      analysis.dispose()
+    }
+  })
+
+  it.each(['no-loader', 'secondary-loader'] as const)(
+    'adopts the complete prepared %s cohort synchronously in a fresh Editor',
+    async (mode) => {
+      const buffer = createEditorTextBuffer('const value = 1;\n')
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
+      const loader = vi.fn(async () => ({
+        gutterForegroundColor: '#123456',
+        foregroundColor: '#111111',
+        backgroundColor: '#101010',
+      }))
+      const primary: EditorHighlighterProvider = {
+        createSession: () => ({
+          ...highlightSession(),
+          refresh: async () => ({
+            tokens: EditorTokenStore.empty(),
+            theme: { foregroundColor: '#222222', backgroundColor: '#202020' },
+          }),
+        }),
+      }
+      const secondary: EditorHighlighterProvider = { createSession: () => null, loadTheme: loader }
+      const providers = mode === 'secondary-loader' ? [primary, secondary] : [primary]
+      const structural = { createSession: () => syntaxSession() }
+      const prepared = createEditorPreparedDocument({
+        buffer,
+        analysis,
+        documentId: 'file.ts',
+        languageId: 'typescript',
+        configuredTabSize: 4,
+        tabSizePolicy: 'detect-indentation',
+        documentConfigurationTag: [],
+      })
+      expect(
+        await prepared.startStage({
+          family: 'structural',
+          provider: structural,
+          configuration: structuralConfiguration,
+          configurationTag: ['tree-sitter', 1],
+          range: { startIndex: 0, endIndex: buffer.getSnapshot().length },
+          abortSignal: new AbortController().signal,
+        }),
+      ).toBe('ready')
+      expect(
+        await prepared.startStage({
+          family: 'highlighter',
+          provider: primary,
+          themeProviders: providers,
+          configurationTag: ['shiki', 'dark'],
+          range: 'full',
+          abortSignal: new AbortController().signal,
+        }),
+      ).toBe('ready')
+      const events: EditorInitialPaintEvent[] = []
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      const editor = createVisibleEditor(container, {
+        theme: { foregroundColor: '#333333' },
+        onInitialPaint: (event) => events.push(event),
+        plugins: [
+          {
+            activate: (context) => [
+              context.registerSyntaxProvider(structural),
+              ...providers.map((provider) => context.registerHighlighter(provider)),
+            ],
+          },
+        ],
+      })
+      try {
+        editor.attachSession(createEditorBufferSession(buffer), {
+          preparedDocument: prepared,
+          documentId: 'file.ts',
+          languageId: 'typescript',
+          documentConfigurationTag: [],
+          structuralConfigurationTag: ['tree-sitter', 1],
+          highlighterConfigurationTag: ['shiki', 'dark'],
+        })
+        expect(editor.getState()).toMatchObject({
+          syntaxStatus: 'ready',
+          initialHighlightStatus: 'painted',
+        })
+        expect(events.map((event) => event.phase)).toEqual(['text', 'highlight-settled'])
+        expect(container.firstElementChild?.getAttribute('style')).toContain('#333333')
+        expect(container.firstElementChild?.getAttribute('style')).toContain('#202020')
+        if (mode === 'secondary-loader')
+          expect(container.firstElementChild?.getAttribute('style')).toContain('#123456')
+        await Promise.resolve()
+        expect(loader).toHaveBeenCalledTimes(mode === 'secondary-loader' ? 1 : 0)
+      } finally {
+        editor.dispose()
+        container.remove()
+        prepared.dispose()
+        analysis.dispose()
+      }
+    },
+  )
   it.each(['structural', 'highlighter'] as const)(
     'marks pending %s promotion stale while the mounted view receives its shared result',
     async (family) => {

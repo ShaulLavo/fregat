@@ -115,12 +115,14 @@ function diffToken(rootPath: string, source: GitComparison): DocumentTokenResult
   }
   if (source.owner !== rootPath)
     return { kind: 'unaddressable', reason: 'checkpoint belongs to another workspace' }
-  const extras = tokenExtras({
-    newObjectId: source.newObjectId,
-    oldObjectId: source.oldObjectId,
-    oldPath: relativeOrNull(rootPath, source.oldPath),
-    status: source.status,
-  })
+  const extras =
+    `,w=${source.ignoreWhitespace ? 1 : 0}` +
+    tokenExtras({
+      newObjectId: source.newObjectId,
+      oldObjectId: source.oldObjectId,
+      oldPath: relativeOrNull(rootPath, source.oldPath),
+      status: source.status,
+    })
   const head = `k/${encodeSegment(source.sessionId)}/${source.fromTurnCount}..${source.toTurnCount}${extras}`
   if (source.kind === 'checkpoint-session') return { kind: 'token', token: head }
   if (source.kind === 'checkpoint-turn')
@@ -232,6 +234,7 @@ function checkpointDiffContent(rootPath: string, segments: readonly string[]): P
     return { kind: 'rejected', reason: 'checkpoint file is outside this workspace' }
   const range = {
     owner: workspaceRoot(rootPath),
+    ignoreWhitespace: turns.ignoreWhitespace,
     fromTurnCount: turns.from,
     newObjectId: turns.newObjectId,
     oldObjectId: turns.oldObjectId,
@@ -250,13 +253,16 @@ function checkpointDiffContent(rootPath: string, segments: readonly string[]): P
 
 function parseTurnRange(segment: string) {
   const [range, ...extras] = segment.split(',')
+  if (extras.filter((extra) => extra.startsWith('w=')).length !== 1) return null
   const [fromRaw, toRaw] = range.split('..')
   const from = Number(fromRaw)
   const to = Number(toRaw)
   if (!Number.isInteger(from) || !Number.isInteger(to)) return null
   if (from < 0 || to < from) return null
 
-  return { from, to, ...parseExtras(extras) }
+  const metadata = parseExtras(extras)
+  if (metadata.ignoreWhitespace === undefined) return null
+  return { from, to, ...metadata, ignoreWhitespace: metadata.ignoreWhitespace }
 }
 
 function parseExtras(extras: readonly string[]) {
@@ -268,6 +274,7 @@ function parseExtras(extras: readonly string[]) {
   )
 
   return {
+    ignoreWhitespace: whitespacePolicy(byKey.get('w')),
     // Validated, not trusted: an arbitrary URL string must not become a git object id.
     newObjectId: objectIdOrUndefined(byKey.get('n') ?? ''),
     oldObjectId: objectIdOrUndefined(byKey.get('o') ?? ''),
@@ -298,4 +305,10 @@ function absoluteOrUndefined(rootPath: string, relative: string | undefined) {
   if (!relative) return undefined
   const path = toWorkspaceAbsolute(rootPath, relative)
   return path === null ? undefined : filesystemPath(path)
+}
+
+function whitespacePolicy(value: string | null | undefined): boolean | undefined {
+  if (value === '0') return false
+  if (value === '1') return true
+  return undefined
 }

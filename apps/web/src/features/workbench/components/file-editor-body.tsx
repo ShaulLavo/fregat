@@ -125,7 +125,12 @@ export function FileEditorBody({
 
   if (historyPath) {
     return (
-      <HistoryView path={historyPath} tabId={tabId} onLeave={() => actions.showFile(historyPath)} />
+      <HistoryView
+        path={historyPath}
+        rootPath={rootPath}
+        tabId={tabId}
+        onLeave={() => actions.showFile(historyPath)}
+      />
     )
   }
 

@@ -214,7 +214,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
     }
   }, 20_000)
 
-  test.each(['cancelled', 'expired admission'])(
+  test.each(['cancelled', 'expired admission', 'resumed admission', 'resumed expired admission'])(
     'runtime mutex contention leaves a %s request bounded while the mutex remains held',
     async (mode) => {
       const box = quietBox(600)
@@ -231,6 +231,8 @@ describe.skipIf(!userScopes)('quiet holds', () => {
       )
       let next: ReturnType<typeof start> | undefined
       let lock: number | null = null
+      const observed: { event: string; at: number }[] = []
+      const expires = mode !== 'cancelled'
       try {
         await expect.poll(quiet.stdout, { timeout: 5_000 }).toContain('active')
         expect(
@@ -245,8 +247,8 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         lock = tryLock(path.join(box.state, 'runtime.lock'))
         expect(lock).not.toBeNull()
         next = start(box, 'bounded-waiter', ['echo', 'unexpected-launch'], {
-          quiet: mode === 'expired admission',
-          jobClass: mode === 'expired admission' ? 'bench' : 'light',
+          quiet: expires,
+          jobClass: expires ? 'bench' : 'light',
           machine: true,
         })
         await expect
@@ -260,6 +262,25 @@ describe.skipIf(!userScopes)('quiet holds', () => {
             { timeout: 1_500 },
           )
           .toBe(true)
+        if (mode === 'resumed admission' || mode === 'resumed expired admission') {
+          const deadline = live(box.state, 'queue').find(
+            (job) => job.pid === next!.child.pid,
+          )!.quietAdmissionUntil!
+          observed.push({ event: 'admission deadline', at: deadline })
+          expect(bootSeconds()).toBeLessThan(deadline)
+          expect(next.child.exitCode).toBeNull()
+          next.child.kill('SIGSTOP')
+          await expect
+            .poll(() => bootSeconds(), { timeout: 3_000 })
+            .toBeGreaterThan(deadline + (mode === 'resumed admission' ? -0.25 : 0.05))
+          const resumedAt = bootSeconds()
+          observed.push({ event: 'resumed', at: resumedAt })
+          expect(resumedAt < deadline).toBe(mode === 'resumed admission')
+          next.child.kill('SIGCONT')
+          await expect.poll(() => bootSeconds(), { timeout: 1_500 }).toBeGreaterThan(deadline)
+          observed.push({ event: 'expired', at: bootSeconds() })
+          await expect.poll(() => next!.child.exitCode, { timeout: 500 }).toBe(75)
+        }
         if (mode === 'cancelled') next.child.kill('SIGTERM')
         await expect
           .poll(() => next!.child.exitCode, { timeout: 3_000 })
@@ -270,7 +291,18 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         expect(live(box.state, 'queue')).toEqual([])
         expect(tryLock(path.join(box.state, 'runtime.lock'))).toBeNull()
         expect(quiet.child.exitCode).toBeNull()
+      } catch (error) {
+        console.error(
+          '[quiet-mutex-failure]',
+          JSON.stringify({
+            mode,
+            observed,
+            receipt: quietFailureReceipt({ box, jobs: { quiet, next } }),
+          }),
+        )
+        throw error
       } finally {
+        next?.child.kill('SIGCONT')
         if (lock !== null) unlock(lock)
         writeFileSync(releaseQuiet, '')
         await Promise.all([quiet.done, next?.done])
@@ -982,7 +1014,6 @@ describe.skipIf(!userScopes)('quiet holds', () => {
     expect(runtime.stdout.toString().trim()).toBe('3s')
     quiet.child.kill('SIGSTOP')
     let next: ReturnType<typeof start> | undefined
-    let expired: ReturnType<typeof spawnSync> | undefined
     try {
       await expect
         .poll(() => readFileSync(`/proc/${quiet.child.pid}/status`, 'utf8'), {
@@ -990,9 +1021,11 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         })
         .toMatch(/^State:\s+T/m)
       await expect.poll(bootSeconds, { timeout: 5_000 }).toBeGreaterThan(owner.quietDeadline!)
-      expired = spawnSync('systemctl', ['--user', 'stop', scope])
-      expect(expired.status).toBe(0)
-      await expect.poll(() => unitActive(scope), { timeout: 10_000 }).toBe(false)
+      await expect
+        .poll(() => unitActive(scope) || sliceState(box.sliceRoot, slice) === 'running', {
+          timeout: 10_000,
+        })
+        .toBe(false)
       writeFileSync(
         path.join(box.state, 'jobs', `${owner.id}.json`),
         JSON.stringify({
@@ -1015,7 +1048,6 @@ describe.skipIf(!userScopes)('quiet holds', () => {
             box,
             jobs: { quiet, next },
             units: [scope, slice],
-            manager: expired,
           }),
         ),
       )

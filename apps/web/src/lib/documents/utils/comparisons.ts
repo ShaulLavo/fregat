@@ -138,7 +138,7 @@ export function comparisonRequest(source: GitComparison) {
   return { kind: 'checkpoint' as const, query: checkpointRequest(source) }
 }
 
-export function snapshotRequest(source: Extract<GitComparison, { kind: 'snapshot' }>) {
+function snapshotRequest(source: Extract<GitComparison, { kind: 'snapshot' }>) {
   const target = source.target
   if (target.kind === 'moving')
     return {
@@ -159,6 +159,7 @@ export function snapshotRequest(source: Extract<GitComparison, { kind: 'snapshot
 
 export function checkpointRequest(source: Exclude<GitComparison, { kind: 'snapshot' }>) {
   const query = {
+    ignoreWhitespace: source.ignoreWhitespace,
     sessionId: source.sessionId,
     fromTurnCount: source.fromTurnCount,
     toTurnCount: source.toTurnCount,

@@ -46,6 +46,29 @@ then settles as `error` with one `editor.syntax.highlight_retries_exhausted` war
 paints logs `editor.syntax.highlight_recovered`. Failure stays an observable terminal outcome. Before any document the status is `idle`, so every other value
 except `loading` means settled.
 
+Highlighter preparation includes the provider-base theme prerequisite. A cold highlighter
+`startStage` acquires its token result and the actual ordered `themeProviders` loader result in the
+same retained analysis entry. A singleton request defaults to its session provider. Multi-provider
+callers pass every registered provider in order, including providers without a loader, and use the
+highlighter configuration tag for the complete cohort. Borrow matching uses
+`highlighterThemeProviders`, provider identities and captured loader-function identities.
+
+The ordered search skips absent loaders, continues after `undefined`, and accepts the first theme
+or explicit `null`. Rejection fails preparation. A ready retained highlighter read exposes its
+`providerTheme` outcome alongside the session's token result. Provider base, session-result theme
+and configured Editor theme retain that override order.
+
+Compatible fully ready preparation attaches synchronously through the existing atomic render,
+without a new constructor theme acquisition. Ordinary edits reuse the entry's certified theme
+while current tokens advance. Explicit theme refresh retries a failed retained certificate once
+through its existing owner; shared pending retries join that acquisition. Ordinary reads and
+prepared borrowing stay passive. A failed preparation remains failed after another caller's
+successful retry, and it supplies no ready transfer. Source,
+configuration and generation checks reject obsolete replies, and disposing the entry releases its
+theme outcome. An already invoked signal-less loader can still finish its side effect after
+cancellation; its old result cannot publish. Unknown or unprepared cohorts keep ordinary async
+readiness.
+
 ## Verification references
 
 - [Browser contracts](../../packages/editor/test/firstPaint.browser.test.ts) hold the real grammar
@@ -56,6 +79,10 @@ except `loading` means settled.
   current edits, replacement, clear/disposal, and immediate public and keyboard commands.
 - [Prepared-document contracts](../../packages/editor/test/preparedDocument.test.ts) retain stale
   revision/configuration rejection, transferred-session disposal, and ready first-render assertions.
+- [Prepared theme browser contracts](../../packages/editor/test/preparedTheme.browser.test.ts) use
+  real public Shiki and Tree workers for synchronous ready events, capture and constructor-work
+  suppression. [Provider theme contracts](../../packages/editor/test/providerTheme.node.test.ts)
+  cover loader order, edit reuse and source/owner cancellation.
 - [Runner instructions](../../examples/stress/README.md#first-text-and-highlighted-paint) reproduce the built
   package measurements without starting a development server.
 

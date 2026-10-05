@@ -24,6 +24,7 @@ import type {
   EditorHighlighterSession,
   EditorHighlighterProvider,
 } from './syntax/highlighter'
+import { captureThemeCohort, loadOrderedHighlighterTheme } from './syntax/providerTheme'
 import type { DisplayTextRowSource, InjectedTextRow } from './displayTransforms'
 import {
   type BracketInfo,
@@ -1405,19 +1406,16 @@ export class EditorPluginHost implements EditorDisposable {
     return this.highlighters.length > 0
   }
 
-  public getHighlighterProvider(): EditorHighlighterProvider | null {
-    return this.highlighters[0] ?? null
+  public getHighlighterProvider(): {
+    readonly provider: EditorHighlighterProvider
+    readonly themeProviders: readonly EditorHighlighterProvider[]
+  } | null {
+    const provider = this.highlighters[0]
+    return provider ? { provider, themeProviders: this.highlighters.slice() } : null
   }
 
-  public async loadHighlighterTheme(): Promise<EditorTheme | null | undefined> {
-    for (const provider of this.highlighters) {
-      if (!provider.loadTheme) continue
-
-      const theme = await provider.loadTheme()
-      if (theme !== undefined) return theme
-    }
-
-    return undefined
+  public loadHighlighterTheme(signal?: AbortSignal): Promise<EditorTheme | null | undefined> {
+    return loadOrderedHighlighterTheme(captureThemeCohort(this.highlighters), signal)
   }
 
   public createSyntaxSession(options: EditorSyntaxSessionOptions): EditorSyntaxSession | null {

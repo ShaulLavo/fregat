@@ -30,7 +30,7 @@ for (const kind of ['worktree', 'staged', 'historical'] as const) {
     const lease = service.acquireSnapshotComparison({ input, signal: new AbortController().signal })
     const read = lease.read()
     expect(read.kind).toBe('ready')
-    if (read.kind !== 'ready') return
+    if (read.kind !== 'ready' || read.input.kind !== 'snapshot') return
     expect(read.input).toBe(input)
     expect(
       read.input.comparison.target.kind === 'moving'
@@ -264,8 +264,10 @@ test('a newly admitted complete capture updates an earlier partial interest and 
   })
   expect(first.read()).toBe(second.read())
   const latest = first.read()
-  if (latest.kind === 'ready') expect(latest.input.files[0]?.kind).toBe('full')
-  if (oldRead.kind === 'ready') expect(oldRead.input.files[0]?.kind).toBe('partial')
+  if (latest.kind === 'ready' && latest.input.kind !== 'history')
+    expect(latest.input.files[0]?.kind).toBe('full')
+  if (oldRead.kind === 'ready' && oldRead.input.kind !== 'history')
+    expect(oldRead.input.files[0]?.kind).toBe('partial')
   expect(first.refresh(partial, oldRequest)).toBe(false)
   service.dispose()
 })

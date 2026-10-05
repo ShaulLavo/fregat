@@ -73,6 +73,7 @@ test('live status wins over the status baked into the document target', () => {
 test('a file-scoped checkpoint diff points at its file', () => {
   const source: GitComparison = {
     kind: 'checkpoint-file',
+    ignoreWhitespace: true,
     file: fileResource(FILE),
     owner: ROOT,
     sessionId: SESSION_ID,
@@ -88,6 +89,7 @@ test('a file-scoped checkpoint diff points at its file', () => {
 test('turn and session checkpoint diffs span many files, so they target none', () => {
   const turn: GitComparison = {
     kind: 'checkpoint-turn',
+    ignoreWhitespace: true,
     owner: ROOT,
     sessionId: SESSION_ID,
     fromTurnCount: 1,
@@ -95,6 +97,7 @@ test('turn and session checkpoint diffs span many files, so they target none', (
   }
   const session: GitComparison = {
     kind: 'checkpoint-session',
+    ignoreWhitespace: true,
     owner: ROOT,
     sessionId: SESSION_ID,
     fromTurnCount: 0,

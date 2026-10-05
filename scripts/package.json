@@ -1,6 +1,6 @@
 {
   "name": "scripts",
-  "version": "0.0.18",
+  "version": "0.0.21",
   "private": true,
   "type": "module",
   "scripts": {
