@@ -1,6 +1,7 @@
+import type { DiffAttachment } from '@/lib/diff-attachment'
 import type { TabPresentation } from '@/features/editor/state/tab-presentation'
 import type { TabId } from '@/lib/documents/utils/types'
-import { type DiffFile, type DiffRegionStore } from '@singapore-editor/diff'
+import { type DiffRegionStore } from '@singapore-editor/diff'
 import {
   type GroupImperativeHandle,
   ResizableHandle,
@@ -25,7 +26,7 @@ import type { EditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
  * block there, and a context row carries no row class of its own, so it inherits from here.
  */
 export function DiffEditor({
-  file,
+  attachment,
   failure,
   languageServer = null,
   mode,
@@ -33,7 +34,7 @@ export function DiffEditor({
   presentation: suppliedPresentation,
   tabId,
 }: {
-  file: DiffFile | null
+  attachment: DiffAttachment | null
   failure?: string | null
   languageServer?: DiffLanguageServerContext | null
   mode: EditorDiffViewMode
@@ -41,6 +42,7 @@ export function DiffEditor({
   regions?: DiffRegionStore
   tabId?: TabId
 }) {
+  const file = attachment?.file ?? null
   const { editorTheme, shikiTheme } = useEditorColorTheme()
   const colors = editorSyntaxColors(shikiTheme)
   // Stable backend identity preserves diff sessions when only their colors change.
@@ -66,7 +68,7 @@ export function DiffEditor({
 
   if (failure && !file) return null
 
-  if (!file)
+  if (!file || !attachment)
     return (
       <LoadingState className='flex h-full flex-col gap-3 p-4' label='Loading comparison'>
         <div className='skeleton-sweep h-4 w-3/4 rounded-md' />
@@ -78,7 +80,7 @@ export function DiffEditor({
     return (
       <div className='editor-diff-view flex h-full min-h-0 w-full min-w-0 overflow-hidden'>
         <DiffPane
-          file={file}
+          attachment={attachment}
           languageServer={languageServer}
           regions={regionStore}
           presentation={presentation.diffPanes.stacked}
@@ -94,7 +96,7 @@ export function DiffEditor({
   }
 
   const splitPane = {
-    file,
+    attachment,
     languageServer,
     regions: regionStore,
     syntaxBackend: syntax.backend,

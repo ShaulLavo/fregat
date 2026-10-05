@@ -253,14 +253,27 @@ function stubParsers(parsed: string[]) {
 
 /** Each pane's latest buffer text and the tokens applied over it. */
 function recordPaint(painted: Map<Editor, Painted>) {
-  const setText = Editor.prototype.setText
+  const openDocument = Editor.prototype.openDocument
+  const syncText = Editor.prototype.syncText
   const setTokens = Editor.prototype.setTokens
-  const textSpy = vi.spyOn(Editor.prototype, 'setText').mockImplementation(function (
+  const openSpy = vi.spyOn(Editor.prototype, 'openDocument').mockImplementation(function (
     this: Editor,
-    ...args: Parameters<Editor['setText']>
+    ...args: Parameters<Editor['openDocument']>
   ) {
-    painted.set(this, { text: args[0], tokens: tokenList(args[1]?.tokens ?? []) })
-    return setText.apply(this, args)
+    const result = openDocument.apply(this, args)
+    painted.set(this, { text: this.materializeFullText(), tokens: tokenList(args[0].tokens ?? []) })
+    return result
+  })
+  const syncSpy = vi.spyOn(Editor.prototype, 'syncText').mockImplementation(function (
+    this: Editor,
+    ...args: Parameters<Editor['syncText']>
+  ) {
+    const result = syncText.apply(this, args)
+    painted.set(this, {
+      text: this.materializeFullText(),
+      tokens: tokenList(args[1]?.tokens ?? []),
+    })
+    return result
   })
   const tokensSpy = vi.spyOn(Editor.prototype, 'setTokens').mockImplementation(function (
     this: Editor,
@@ -271,7 +284,8 @@ function recordPaint(painted: Map<Editor, Painted>) {
     return setTokens.apply(this, args)
   })
   onTestFinished(() => {
-    textSpy.mockRestore()
+    openSpy.mockRestore()
+    syncSpy.mockRestore()
     tokensSpy.mockRestore()
   })
 }
