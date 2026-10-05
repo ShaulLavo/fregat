@@ -1,5 +1,17 @@
 # @singapore-editor/tree-sitter
 
+## 0.2.3
+
+### Patch Changes
+
+- 8cd7175: Expose current committed bytes and pages for the shared Tree-sitter and Markdown WASM runtime through the existing retention fence, with explicit uninitialized state and allocator-live bytes remaining unmeasured.
+- Updated dependencies [9d726b3]
+- Updated dependencies [33e949e]
+- Updated dependencies [4e053fc]
+- Updated dependencies [d297a23]
+- Updated dependencies [5365760]
+  - @singapore-editor/core@0.2.3
+
 ## 0.2.2
 
 ### Patch Changes
