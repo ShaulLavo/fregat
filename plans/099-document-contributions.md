@@ -1,8 +1,9 @@
 # Plan 099: Route document consumers through one contribution runtime
 
 Status: Approved. The owner approved units 2–7 on 2026-10-04, including benchmark repairs and
-acceptance proofs. Production unit 2 starts after accepted Plan 282 evidence and the exact host
-prerequisites below. Unit 1 publication implemented and focused proof delivered in the foundations wave,
+acceptance proofs. Their implementation is integrated in [draft PR #787](https://github.com/ShaulLavo/fregat/pull/787).
+Production cutover waits for final performance, source-volume, retention and host qualification.
+Unit 1 publication implemented and focused proof delivered in the foundations wave,
 2026-09-30. Unit 0 is partial: 5/10 configurations calibrated; the remaining absolute-threshold matrix
 is superseded by Plan 282's paired A/B instrument. The session diff correction and
 Editor E057 transport removal landed. Retained-analysis subscribers now consume captured frames.
@@ -12,6 +13,28 @@ Requested on 2026-09-12.
 Owner: Editor and Platform. Priority P1, effort XL, change risk high.
 Inspected Platform: `2f9528ac1e147615cf81431ef8509f551af4b290`.
 Inspected Editor: `64926519bfdd39f4afcfae225019a932d3e27785`.
+
+## Execution checkpoint, 2026-10-05
+
+Units 2–5 route Tree-sitter, Shiki, minimap, local TypeScript and external LSP through retained
+document contributions. Prepared, diff, snippet and excerpt callers use that ownership. Replaced
+provider factories, generic source cursors and duplicate delivery paths are removed. Unit 7 adds
+an AST ownership check with 29 adversarial probes to the normal gates, verification and CI.
+
+The integrated correctness evidence includes 3,444 core checks with one skipped case, real worker
+transport and mounted highlighting checks, and six retained Platform browser cases without
+unhandled errors. The draft's CI still needs caller-fixture and inventory reconciliation. These
+results establish the checked behavior; they do not close the performance or retention gates.
+
+Final qualification compares untouched pre-cutover main `03facb356` with candidate `806317781`,
+using matched external dependencies and the repaired measurement instrument `74b65e35`.
+Documentation and test-only follow-ups retain those product bytes. Fresh controls are being
+verified before default, full-matrix, loaded and reliability acceptance. Source-volume and E001
+retention coverage remain open. The historical instrument `341` Undo failure, 215 of 216 passing
+keys, remains preserved with its original identity and earns no final-candidate acceptance.
+
+The sections below retain the design, unit contracts and historical decisions. The current
+authorization is Approved; remaining gates require evidence and delivery, not another owner decision.
 
 The editor already has contribution registration, immutable text snapshots, and an edit chain.
 Its consumers independently manage how documents reach their workers. Replace those independent

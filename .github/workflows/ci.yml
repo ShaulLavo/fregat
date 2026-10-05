@@ -379,6 +379,21 @@ jobs:
         timeout-minutes: 5
         run: bun run --cwd apps/web test:tree-browser
 
+      - name: Browser test (retention reload)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: bun run --cwd apps/web test:retention-reload-browser
+
+      - name: Upload failed retention reload evidence
+        if: ${{ failure() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: retention-reload-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/retention-acceptance-reload-*
+          if-no-files-found: ignore
+
   # The site's demo build bundles apps/web in a different mode than the app build, so it
   # pulls in packages (like MSW) the other CI jobs never touch and needs its own licence
   # check. Building it here is what site.yml's push-to-main build does, run before merge.
