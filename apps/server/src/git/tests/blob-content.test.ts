@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { test, expect } from '../../../../web/test/fixtures'
-import type { TestServer } from '../../../../web/test/server'
+import { expect } from 'vitest'
 import { gitBlobRepository } from '../../../test/factories/git-blobs'
+import { test, workspaceRequest } from '../../../test/factories/workspace-address'
 import { runGit } from '../../testing/git'
 import type { GitBlobDiffQuery } from '../contracts'
 
@@ -14,8 +14,8 @@ const captures = [
 ]
 
 for (const capture of captures) {
-  test(`blob reader retains complete text for ${capture.name}`, async ({ server }) => {
-    const repo = await gitBlobRepository(server.root)
+  test(`blob reader retains complete text for ${capture.name}`, async ({ workspace }) => {
+    const repo = await gitBlobRepository(workspace.root)
     const object = await runGit(repo.directory, ['cat-file', '-p', repo.emptyObjectId])
     const size = await runGit(repo.directory, ['cat-file', '-s', repo.emptyObjectId])
     expect(object.exitCode).toBe(0)
@@ -33,7 +33,7 @@ for (const capture of captures) {
       newObjectId: capture.newPresent ? repo.emptyObjectId : undefined,
     }
 
-    const response = await blobDiff(server, query)
+    const response = await blobDiff(workspace.openApp(), query)
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual([
@@ -52,10 +52,10 @@ for (const capture of captures) {
   })
 }
 
-test('blob reader retains unchanged nonempty text', async ({ server }) => {
-  const repo = await gitBlobRepository(server.root)
+test('blob reader retains unchanged nonempty text', async ({ workspace }) => {
+  const repo = await gitBlobRepository(workspace.root)
   const object = await runGit(repo.directory, ['cat-file', '-p', repo.controlObjectId])
-  const response = await blobDiff(server, {
+  const response = await blobDiff(workspace.openApp(), {
     path: 'blob-repo/control.txt',
     oldObjectId: repo.controlObjectId,
     newObjectId: repo.controlObjectId,
@@ -76,22 +76,24 @@ test('blob reader retains unchanged nonempty text', async ({ server }) => {
   ])
 })
 
-test('blob reader keeps absent object IDs unavailable', async ({ server }) => {
-  await gitBlobRepository(server.root)
-  const response = await blobDiff(server, { path: 'blob-repo/empty.txt' })
+test('blob reader keeps absent object IDs unavailable', async ({ workspace }) => {
+  await gitBlobRepository(workspace.root)
+  const response = await blobDiff(workspace.openApp(), { path: 'blob-repo/empty.txt' })
 
   expect(response.status).toBe(200)
   expect(await response.json()).toEqual([])
 })
 
-test('blob reader fails an unavailable object without manufacturing text', async ({ server }) => {
-  const repo = await gitBlobRepository(server.root)
+test('blob reader fails an unavailable object without manufacturing text', async ({
+  workspace,
+}) => {
+  const repo = await gitBlobRepository(workspace.root)
   const objectId = '0123456789abcdef0123456789abcdef01234567'
   const object = await runGit(repo.directory, ['cat-file', '-p', objectId], {
     allowFailure: true,
   })
   expect(object.exitCode).not.toBe(0)
-  const response = await blobDiff(server, {
+  const response = await blobDiff(workspace.openApp(), {
     path: 'blob-repo/empty.txt',
     oldObjectId: objectId,
     newObjectId: objectId,
@@ -101,13 +103,13 @@ test('blob reader fails an unavailable object without manufacturing text', async
   expect(await response.json()).toMatchObject({ error: { code: 'GIT_COMMAND_FAILED' } })
 })
 
-test('blob reader keeps unchanged binary content unavailable as text', async ({ server }) => {
-  const repo = await gitBlobRepository(server.root)
+test('blob reader keeps unchanged binary content unavailable as text', async ({ workspace }) => {
+  const repo = await gitBlobRepository(workspace.root)
   await writeFile(path.join(repo.directory, 'binary.bin'), 'before\0after')
   const objectId = (await runGit(repo.directory, ['hash-object', '-w', 'binary.bin'])).stdout.trim()
   const object = await runGit(repo.directory, ['cat-file', '-p', objectId])
   expect(object.stdout).toContain('\0')
-  const response = await blobDiff(server, {
+  const response = await blobDiff(workspace.openApp(), {
     path: 'blob-repo/binary.bin',
     oldObjectId: objectId,
     newObjectId: objectId,
@@ -117,20 +119,19 @@ test('blob reader keeps unchanged binary content unavailable as text', async ({ 
   expect(await response.json()).toEqual([])
 })
 
-test('blob reader keeps oversized unchanged content omitted', async ({ server }) => {
-  const repo = await gitBlobRepository(server.root)
-  await mkdir(path.join(server.root, '.platform-test'), { recursive: true })
+test('blob reader keeps oversized unchanged content omitted', async ({ workspace }) => {
+  const repo = await gitBlobRepository(workspace.root)
+  await mkdir(path.join(workspace.directory, '.platform-test'), { recursive: true })
   await writeFile(
-    path.join(server.root, '.platform-test', 'settings.json'),
+    path.join(workspace.directory, '.platform-test', 'settings.json'),
     JSON.stringify({ 'git.maxDiffFileSizeMiB': 1 }),
   )
-  await server.restart()
   await writeFile(path.join(repo.directory, 'large.txt'), 'x'.repeat(1024 * 1024 + 1))
   const objectId = (await runGit(repo.directory, ['hash-object', '-w', 'large.txt'])).stdout.trim()
   const size = await runGit(repo.directory, ['cat-file', '-s', objectId])
   expect(Number(size.stdout.trim())).toBeGreaterThan(1024 * 1024)
   const query = { path: 'blob-repo/large.txt', oldObjectId: objectId, newObjectId: objectId }
-  const response = await blobDiff(server, query)
+  const response = await blobDiff(workspace.openApp(), query)
 
   expect(response.status).toBe(200)
   expect(await response.json()).toEqual([
@@ -138,14 +139,10 @@ test('blob reader keeps oversized unchanged content omitted', async ({ server })
   ])
 })
 
-function blobDiff(server: TestServer, query: GitBlobDiffQuery) {
+function blobDiff(app: Parameters<typeof workspaceRequest>[0], query: GitBlobDiffQuery) {
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query)) {
     if (value !== undefined) params.set(key, value)
   }
-  return server.app.handle(
-    new Request(`http://local/git/diff/blob?${params}`, {
-      headers: { origin: server.origin },
-    }),
-  )
+  return workspaceRequest(app, `/git/diff/blob?${params}`)
 }
