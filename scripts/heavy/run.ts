@@ -470,7 +470,8 @@ async function admit(
         console.error(`[wave-heavy] '${options.label}' is waiting: ${attempt.reason}`)
         nextNotice += WAIT_NOTICE_MS
       }
-      await Bun.sleep(POLL_MS)
+      const remainingMs = ((waiting.entry.quietAdmissionUntil ?? Infinity) - bootSeconds()) * 1000
+      await Bun.sleep(Math.max(0, Math.min(POLL_MS, remainingMs)))
     }
   } finally {
     for (const { signal, handler } of cancellations) process.off(signal, handler)
