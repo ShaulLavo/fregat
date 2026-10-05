@@ -1180,6 +1180,15 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
       this.cleanup.add(observeWorkerLayout(elements, update))
       return
     }
+    const refreshFontResources = () => {
+      this.runUiOperation('appearance.font-resources', () => {
+        if (!this.autoFit) this.remeasureFixedFont(this.execution.appearance.font)
+        this.renderer?.clearTextureAtlas?.()
+      })
+    }
+    const fonts = elements.root.ownerDocument.fonts
+    fonts.addEventListener('loadingdone', refreshFontResources, { signal: elements.signal })
+    fonts.addEventListener('loadingerror', refreshFontResources, { signal: elements.signal })
     if (!this.autoFit) {
       const font = this.fittedFont
       if (!font) throw new Error('Fixed terminal layout requires a measured font')
