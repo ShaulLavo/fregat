@@ -10,8 +10,10 @@ import {
 } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
+import * as v from 'valibot'
 import { afterEach, describe, expect, test } from 'vitest'
 
+import { copyDependencies } from './package-fixture'
 import { heavy, removeSandboxes, sandbox, userScopes, writeMachine } from './sandbox'
 
 const checkout = path.resolve(import.meta.dirname, '../..')
@@ -179,7 +181,7 @@ function localResolution(box: ReturnType<typeof sandbox>, name: string) {
   return child.stdout.toString().trim()
 }
 
-async function exportedGhostty() {
+function exportedGhostty() {
   const box = sandbox()
   const files = spawnSync('git', ['ls-files', '-z', 'ghostty-webgpu'], { cwd: checkout })
   expect(files.status, files.stderr.toString()).toBe(0)
@@ -189,27 +191,37 @@ async function exportedGhostty() {
     copyFileSync(path.join(checkout, file), destination)
   }
   expect(existsSync(path.join(box.root, 'node_modules'))).toBe(false)
-  const install = Bun.spawn(['bun', 'install', '--ignore-scripts'], {
-    cwd: box.root,
-    stdout: 'pipe',
-    stderr: 'pipe',
-  })
-  const [code, stdout, stderr] = await Promise.all([
-    install.exited,
-    new Response(install.stdout).text(),
-    new Response(install.stderr).text(),
+  expect(readFileSync(path.join(box.root, 'patches/vitest@5.0.2.patch'))).toEqual(
+    readFileSync(path.join(checkout, 'patches/vitest@5.0.2.patch')),
+  )
+  const versions = copyDependencies(path.join(checkout, 'ghostty-webgpu/package.json'), box.root, [
+    'vitest',
+    '@vitest/browser-playwright',
+    'playwright',
+    'vite',
+    '@xterm/xterm',
   ])
-  expect(code, stdout + stderr).toBe(0)
+  const metadata = v.parse(
+    v.object({
+      devDependencies: v.record(v.string(), v.string()),
+      patchedDependencies: v.record(v.string(), v.string()),
+    }),
+    JSON.parse(readFileSync(path.join(box.root, 'package.json'), 'utf8')),
+  )
+  for (const [name, version] of versions) expect(metadata.devDependencies[name]).toBe(version)
+  expect(metadata.patchedDependencies[`vitest@${versions.get('vitest')}`]).toBe(
+    'patches/vitest@5.0.2.patch',
+  )
   const installed = path.join(box.root, 'node_modules/vitest/package.json')
   expect(existsSync(installed)).toBe(true)
   const resolved = realpathSync(localResolution(box, 'vitest/package.json'))
-  // Bun may store package link targets in its cache; the export must own the entry link.
   expect(resolved).toBe(realpathSync(installed))
+  expect(resolved.startsWith(box.root + path.sep)).toBe(true)
   return box
 }
 
-test('an exact Ghostty export installs the serial policy without root dependencies', async () => {
-  const box = await exportedGhostty()
+test('an exact Ghostty export resolves the serial policy without root dependencies', async () => {
+  const box = exportedGhostty()
   const result = path.join(box.root, 'browser-policy.json')
   const child = Bun.spawn(
     [
@@ -232,6 +244,7 @@ writeFileSync(${JSON.stringify(result)}, JSON.stringify({
       cwd: box.root,
       env: {
         ...process.env,
+        NODE_PATH: '',
         VITEST_MAX_WORKERS: '4',
         PLAYWRIGHT_BROWSERS_PATH: path.join(box.root, 'browser-payloads'),
         GHOSTTY_BROWSER_ENGINE: 'chromium',
@@ -261,7 +274,7 @@ describe.skipIf(!userScopes)('exact exported Ghostty test-body concurrency', () 
     { label: 'export serial', options: { fileParallelism: false }, workers: 1 },
     { label: 'export parallel', options: {}, workers: 4 },
   ])('$label', async ({ label, options, workers }) => {
-    const box = await exportedGhostty()
+    const box = exportedGhostty()
     const { result, script } = probe(box, true)
     writeSpecs(box)
     const env = { ...process.env }
