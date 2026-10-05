@@ -17,6 +17,13 @@ import type {
   EditorHighlightResult,
 } from '../syntax/highlighter'
 import type { EditorTokenInput } from '../syntax/tokenStore'
+import type { EditorTheme } from '../theme'
+import {
+  captureThemeCohort,
+  loadOrderedHighlighterTheme,
+  themeCohortIsCurrent,
+  type ThemeCohort,
+} from '../syntax/providerTheme'
 import {
   createEmptySyntaxResult,
   type EditorSyntaxProvider,
@@ -124,8 +131,27 @@ export type EditorRetainedSyntaxSession = Omit<EditorSyntaxSession, 'queryRange'
 }
 export type EditorRetainedHighlighterSession = EditorHighlighterSession & {
   readonly runtimeSessionId: string
-  read(): EditorAnalysisRead<EditorHighlightResult>
+  read(): HighlighterAnalysisRead
+  waitForProviderTheme(signal: AbortSignal): Promise<ProviderThemeOutcome>
 }
+
+export function readRetainedHighlighterResult(
+  session: EditorRetainedHighlighterSession,
+  snapshot: DocumentTextSnapshot,
+): Promise<EditorHighlightResult> {
+  const read = session.read()
+  if (read.kind === 'ready') return Promise.resolve(read.result)
+  if (read.kind === 'failed') return Promise.reject(read.error)
+  return session.refresh(snapshot)
+}
+type ProviderThemeOutcome =
+  | { readonly kind: 'ready'; readonly theme: EditorTheme | null }
+  | { readonly kind: 'failed'; readonly error: unknown }
+type HighlighterAnalysisRead =
+  | Extract<EditorAnalysisRead<EditorHighlightResult>, { kind: 'pending' | 'failed' }>
+  | (Extract<EditorAnalysisRead<EditorHighlightResult>, { kind: 'ready' }> & {
+      readonly providerTheme: ProviderThemeOutcome
+    })
 export type EditorAnalysisStructuralRequest = Omit<
   EditorSyntaxSessionOptions,
   'documentId' | 'runtimeSessionId' | 'source' | 'initialRead'
@@ -136,6 +162,7 @@ export type EditorAnalysisStructuralRequest = Omit<
 }
 export type EditorAnalysisHighlighterRequest = {
   readonly provider: EditorHighlighterProvider
+  readonly themeProviders?: readonly EditorHighlighterProvider[]
   readonly languageId: string | null
   readonly configurationTag?: EditorAnalysisConfigurationTag
   readonly signal?: AbortSignal
@@ -560,6 +587,94 @@ export class AnalysisEntry<T> {
 
   isConfigurationCurrent(): boolean {
     return this.queuedConfiguration === this.session.configurationKey?.()
+  }
+}
+
+class HighlighterAnalysisSession implements AnalysisSession<EditorHighlightResult> {
+  private readonly invalidCohort = {}
+  private providerTheme: ProviderThemeOutcome | null = null
+  private themeWork: Promise<ProviderThemeOutcome> | null = null
+  private readonly lifetime = new AbortController()
+  private configurationWork: AbortController | null = null
+
+  constructor(
+    private readonly highlighter: EditorHighlighterRuntime,
+    private readonly cohort: ThemeCohort,
+  ) {}
+
+  configurationKey(): unknown {
+    return themeCohortIsCurrent(this.cohort)
+      ? this.highlighter.configurationKey?.()
+      : this.invalidCohort
+  }
+
+  analyze(read: DocumentRead, signal: AbortSignal): Promise<EditorHighlightResult> {
+    return this.combine(this.highlighter.analyze(read, signal), signal)
+  }
+
+  themeOutcome(): ProviderThemeOutcome {
+    return this.providerTheme ?? { kind: 'ready', theme: null }
+  }
+
+  waitForProviderTheme(signal: AbortSignal): Promise<ProviderThemeOutcome> {
+    if (!themeCohortIsCurrent(this.cohort)) return Promise.reject(cancelled())
+    return interruptible(
+      this.providerTheme
+        ? Promise.resolve(this.providerTheme)
+        : (this.themeWork ??= this.loadTheme(this.lifetime.signal)),
+      signal,
+    )
+  }
+
+  invalidateTheme(): void {
+    this.configurationWork?.abort()
+    this.providerTheme = null
+    this.themeWork = null
+  }
+
+  dispose(): void {
+    this.lifetime.abort()
+    this.invalidateTheme()
+    this.highlighter.dispose()
+  }
+
+  private async combine(
+    tokens: Promise<EditorHighlightResult>,
+    signal: AbortSignal,
+  ): Promise<EditorHighlightResult> {
+    const [highlight, theme] = await Promise.allSettled([tokens, this.waitForProviderTheme(signal)])
+    if (theme.status === 'rejected') throw theme.reason
+    if (highlight.status === 'rejected') throw highlight.reason
+    signal.throwIfAborted()
+    if (!themeCohortIsCurrent(this.cohort)) throw cancelled()
+    return highlight.value
+  }
+
+  private async loadTheme(owner: AbortSignal): Promise<ProviderThemeOutcome> {
+    const work = new AbortController()
+    this.configurationWork = work
+    const abort = () => work.abort(owner.reason)
+    owner.addEventListener('abort', abort, { once: true })
+    if (owner.aborted) abort()
+    try {
+      const theme = await interruptible(
+        loadOrderedHighlighterTheme(this.cohort, work.signal),
+        work.signal,
+      )
+      work.signal.throwIfAborted()
+      if (!themeCohortIsCurrent(this.cohort)) throw cancelled()
+      const outcome = { kind: 'ready' as const, theme: theme ?? null }
+      this.providerTheme = outcome
+      return outcome
+    } catch (error) {
+      work.signal.throwIfAborted()
+      const outcome = { kind: 'failed' as const, error }
+      this.providerTheme = outcome
+      return outcome
+    } finally {
+      owner.removeEventListener('abort', abort)
+      if (this.configurationWork === work) this.configurationWork = null
+    }
   }
 }
 
@@ -1016,6 +1131,7 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
 }
 
 export class HighlighterEntry extends AnalysisEntry<EditorHighlightResult> {
+  private readonly highlighter: HighlighterAnalysisSession
   private readonly themes = new EditorEventSource<void>({ action: 'document.highlighter.theme' })
   private unsubscribeTheme: (() => void) | void
   constructor(
@@ -1027,10 +1143,12 @@ export class HighlighterEntry extends AnalysisEntry<EditorHighlightResult> {
     runtimeSessionId: string,
     retention: RetentionChanges,
     scheduling: 'requested' | 'ordered' | 'pinned' = 'ordered',
+    readonly cohort: ThemeCohort = [],
   ) {
+    const adapter = new HighlighterAnalysisSession(highlighterSession, cohort)
     super(
       buffer,
-      highlighterSession,
+      adapter,
       delivery,
       sourceScope,
       scheduler,
@@ -1038,10 +1156,25 @@ export class HighlighterEntry extends AnalysisEntry<EditorHighlightResult> {
       retention,
       scheduling,
     )
+    this.highlighter = adapter
     this.unsubscribeTheme = highlighterSession.onDidChangeTheme?.(() => {
       this.refresh()
       this.themes.fire()
     })
+  }
+  override read(): HighlighterAnalysisRead {
+    if (!themeCohortIsCurrent(this.cohort)) {
+      this.highlighter.invalidateTheme()
+      return { kind: 'failed', revision: this.buffer.getRevision(), error: cancelled() }
+    }
+    const state = super.read()
+    return state.kind === 'ready'
+      ? { ...state, providerTheme: this.highlighter.themeOutcome() }
+      : state
+  }
+  override refresh(): void {
+    this.highlighter.invalidateTheme()
+    super.refresh()
   }
   override dispose(): void {
     if (!this.stop()) return
@@ -1049,13 +1182,17 @@ export class HighlighterEntry extends AnalysisEntry<EditorHighlightResult> {
     this.unsubscribeTheme = undefined
     completeDocumentCleanup([
       () => unsubscribe?.(),
-      () => this.highlighterSession.dispose(),
+      () => this.highlighter.dispose(),
       () => this.finishDispose(),
     ])
   }
   onDidChangeTheme(listener: () => void): () => void {
     const subscription = this.themes.subscribe(listener)
     return () => subscription.dispose()
+  }
+
+  waitForProviderTheme(signal: AbortSignal): Promise<ProviderThemeOutcome> {
+    return this.highlighter.waitForProviderTheme(signal)
   }
 }
 
@@ -1171,7 +1308,10 @@ function createAnalysis(options: {
   }
   function borrowHighlighter(request: EditorAnalysisHighlighterRequest) {
     if (lifecycle.signal.aborted || request.signal?.aborted) return null
-    const input = { languageId: request.languageId }
+    const input = {
+      languageId: request.languageId,
+      themeCohort: captureThemeCohort(request.themeProviders ?? [request.provider]),
+    }
     let entry = bindDocumentOperation(request.provider.operation, host, input, request)
     if (entry?.read().kind === 'failed' && entry.leaseCount === 0) {
       entry.dispose()
@@ -1368,10 +1508,20 @@ function highlighterLease(
   signal?: AbortSignal,
 ): EditorRetainedHighlighterSession {
   const lease = entry.lease(signal)
-  const refresh = refreshRetainedAnalysis(entry, () => entry.current())
+  const refresh = refreshRetainedAnalysis(
+    entry,
+    () => entry.current(),
+    () => {
+      const read = entry.read()
+      return (
+        read.kind === 'failed' || (read.kind === 'ready' && read.providerTheme.kind === 'failed')
+      )
+    },
+  )
   return {
     runtimeSessionId: entry.runtimeSessionId,
     refresh: () => lease.wait(refresh),
+    waitForProviderTheme: (signal) => lease.wait(() => entry.waitForProviderTheme(signal)),
     applyChange: () => lease.wait(() => entry.current()),
     onDidChangeTheme: session.onDidChangeTheme
       ? (listener) => {
@@ -1386,10 +1536,17 @@ function highlighterLease(
           return release
         }
       : undefined,
-    read: () =>
-      lease.signal.aborted
-        ? { kind: 'failed', revision: entry.buffer.getRevision(), error: cancelled() }
-        : entry.read(),
+    read: () => {
+      if (lease.signal.aborted)
+        return { kind: 'failed', revision: entry.buffer.getRevision(), error: cancelled() }
+      const read = entry.read()
+      if (read.kind !== 'ready') return read
+      return {
+        ...read,
+        result: read.result,
+        providerTheme: read.providerTheme,
+      }
+    },
     dispose: lease.dispose,
   }
 }
@@ -1397,16 +1554,17 @@ function highlighterLease(
 function refreshRetainedAnalysis<Result>(
   entry: Pick<AnalysisEntry<Result>, 'read' | 'refresh' | 'synchronize' | 'analysisGeneration'>,
   run: () => Promise<Result>,
+  hasFailed: () => boolean = () => entry.read().kind === 'failed',
 ): () => Promise<Result> {
-  let failedGeneration: number | null =
-    entry.read().kind === 'failed' ? entry.analysisGeneration : null
+  let failedGeneration: number | null = hasFailed() ? entry.analysisGeneration : null
   return async () => {
     entry.synchronize()
-    if (entry.read().kind === 'failed' && failedGeneration === entry.analysisGeneration)
-      entry.refresh()
+    if (hasFailed() && failedGeneration === entry.analysisGeneration) entry.refresh()
     const generation = entry.analysisGeneration
     try {
-      return await run()
+      const result = await run()
+      if (entry.analysisGeneration === generation && hasFailed()) failedGeneration = generation
+      return result
     } catch (error) {
       if (entry.analysisGeneration === generation) failedGeneration = generation
       throw error

@@ -40,4 +40,3 @@ export function setHighlightRegistry(registry: HighlightRegistry | undefined): v
 export function getHighlightRegistry(): HighlightRegistry | undefined {
   return highlightRegistry ?? globalThis.CSS?.highlights
 }
-

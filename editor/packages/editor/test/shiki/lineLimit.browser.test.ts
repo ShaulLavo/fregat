@@ -21,7 +21,9 @@ function openSession(
 ) {
   const buffer = createEditorTextBuffer(text)
   const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'line-limit.ts' })
-  const provider = createShikiHighlighterProvider({ workerOwner: owner, theme: 'github-dark',
+  const provider = createShikiHighlighterProvider({
+    workerOwner: owner,
+    theme: 'github-dark',
     resolveLanguage: async () => (await registrations).languageRegistrations,
     resolveTheme: async () => {
       const theme = (await registrations).themeRegistration
@@ -31,7 +33,6 @@ function openSession(
   })
   const session = analysis.borrowHighlighter({ provider, languageId: 'typescript' })!
   return { session, analysis, textSnapshot: buffer.getTextSnapshot() }
-
 }
 
 describe.skipIf(typeof Worker === 'undefined')('Shiki line limit in the worker', () => {
@@ -78,12 +79,20 @@ describe.skipIf(typeof Worker === 'undefined')('Shiki line limit in the worker',
   it('reopens a document under a changed limit on its next request', async () => {
     let limit = 10
     const requests: ShikiWorkerRequest[] = []
-    const owner = createShikiWorkerOwner({ maxTokenizationLineLength: () => limit, workerFactory: () => {
-      const worker = new Worker(new URL('../../src/shiki/shiki.worker.ts', import.meta.url), { type: 'module' })
-      const post = worker.postMessage.bind(worker)
-      vi.spyOn(worker, 'postMessage').mockImplementation((request: ShikiWorkerRequest) => { if (request.payload.type === 'open') requests.push(request); post(request) })
-      return worker
-    } })
+    const owner = createShikiWorkerOwner({
+      maxTokenizationLineLength: () => limit,
+      workerFactory: () => {
+        const worker = new Worker(new URL('../../src/shiki/shiki.worker.ts', import.meta.url), {
+          type: 'module',
+        })
+        const post = worker.postMessage.bind(worker)
+        vi.spyOn(worker, 'postMessage').mockImplementation((request: ShikiWorkerRequest) => {
+          if (request.payload.type === 'open') requests.push(request)
+          post(request)
+        })
+        return worker
+      },
+    })
     const text = 'const value = 1\nlet x'
     const { session, analysis, textSnapshot } = openSession(owner, text, resolveRegistrations())
 
@@ -93,7 +102,7 @@ describe.skipIf(typeof Worker === 'undefined')('Shiki line limit in the worker',
     requests.length = 0
     limit = 100
     const reopened = await session.refresh(textSnapshot)
-    expect(requests.map(request => request.payload.type)).toEqual(['open'])
+    expect(requests.map((request) => request.payload.type)).toEqual(['open'])
     expect(requests[0]?.payload).toMatchObject({ maxLineLength: 100 })
     expect(owner.inspect().untokenizedLines).toBe(0)
     expect(reopened.tokens.toTokens().length).toBeGreaterThan(2)

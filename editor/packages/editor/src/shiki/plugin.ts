@@ -1,9 +1,10 @@
 import type { EditorPlugin } from '../plugins'
-import type {
-  EditorHighlighterProvider,
-} from '../syntax/highlighter'
+import type { EditorHighlighterProvider } from '../syntax/highlighter'
 import type { EditorSyntaxLanguageId } from '../syntax/session'
-import { defineHighlighterOperation, type HighlighterOperationContext } from '../editor/operationDefinitions'
+import {
+  defineHighlighterOperation,
+  type HighlighterOperationContext,
+} from '../editor/operationDefinitions'
 import {
   createShikiWorkerOwner,
   createShikiDocumentOperation,
@@ -73,7 +74,9 @@ export function createShikiHighlighterProvider(
   const registrations = createRegistrationCache(options)
   return {
     loadTheme: () => loadConfiguredTheme(options, registrations, owner),
-    operation: defineHighlighterOperation((context) => createSession(context, options, registrations, owner)),
+    operation: defineHighlighterOperation((context) =>
+      createSession(context, options, registrations, owner),
+    ),
   }
 }
 

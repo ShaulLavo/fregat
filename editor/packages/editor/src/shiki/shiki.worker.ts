@@ -10,7 +10,11 @@ import { createIncrementalTokenizer, type CreateIncrementalTokenizerResult } fro
 import { packTokenLines, snapshotToPackedEditorTokens } from './editor-tokens'
 import type { EditorTheme } from '../theme'
 import { packedEditorTokenTransfers } from '../syntax/packedTokens'
-import { DocumentWorkerReader, documentWorkerPointsEqual, type DocumentWorkerRead } from '../document/workerReader'
+import {
+  DocumentWorkerReader,
+  documentWorkerPointsEqual,
+  type DocumentWorkerRead,
+} from '../document/workerReader'
 import { editorThemeFromShikiTheme, type ShikiThemeLike } from './theme-extract'
 import type {
   ShikiWorkerDocumentOptions,
@@ -71,13 +75,15 @@ const handleRequest = async (request: ShikiWorkerRequest): Promise<void> => {
 const runRequest = (
   payload: ShikiWorkerRequest['payload'],
 ): Promise<ShikiWorkerTransportResult | undefined> => {
-  if (payload.type === 'source') return Promise.resolve({ source: sourceReader.apply(payload.command) })
+  if (payload.type === 'source')
+    return Promise.resolve({ source: sourceReader.apply(payload.command) })
   if (payload.type === 'open' || payload.type === 'edit') {
     const source = sourceReader.acquire(payload.source)
-    if (!source) return Promise.reject(new DOMException('Document source read is unavailable', 'AbortError'))
-    return runDocumentTask(payload.runtimeSessionId, () => payload.type === 'open'
-      ? openDocument(payload, source)
-      : editDocument(payload, source)).finally(() => source.dispose())
+    if (!source)
+      return Promise.reject(new DOMException('Document source read is unavailable', 'AbortError'))
+    return runDocumentTask(payload.runtimeSessionId, () =>
+      payload.type === 'open' ? openDocument(payload, source) : editDocument(payload, source),
+    ).finally(() => source.dispose())
   }
   if (payload.type === 'recolor') {
     return runDocumentTask(payload.runtimeSessionId, () => recolorDocument(payload))
@@ -226,7 +232,10 @@ const editDocument = async (
   }
 
   assertSource(source)
-  if (!existing.source.isValid() || !documentWorkerPointsEqual(existing.source.point, payload.previousPoint))
+  if (
+    !existing.source.isValid() ||
+    !documentWorkerPointsEqual(existing.source.point, payload.previousPoint)
+  )
     throw new DOMException('Shiki analysed source base is stale', 'InvalidStateError')
   const retained = source.retain()
   if (!retained) throw new DOMException('Document source scope was released', 'AbortError')

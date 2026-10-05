@@ -53,6 +53,7 @@ type ComparisonRevision = {
   readonly status?: GitChangeStatus
 }
 type CheckpointRange = ComparisonRevision & {
+  readonly ignoreWhitespace: boolean
   readonly owner: WorkspaceRoot
   readonly sessionId: SessionId
   readonly fromTurnCount: number

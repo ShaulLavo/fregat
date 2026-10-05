@@ -1,7 +1,11 @@
 import type { TextEdit } from '@singapore-editor/core/document'
 import type { EditorToken, PackedEditorTokens } from '@singapore-editor/core/syntax'
 import type { TreeSitterLanguageDescriptor, TreeSitterLanguageId } from './registry'
-import type { DocumentWorkerReadReference, DocumentWorkerSourceCommand, DocumentWorkerSourceResult } from '@singapore-editor/core/internal/document-worker'
+import type {
+  DocumentWorkerReadReference,
+  DocumentWorkerSourceCommand,
+  DocumentWorkerSourceResult,
+} from '@singapore-editor/core/internal/document-worker'
 
 export type { TreeSitterLanguageId } from './registry'
 

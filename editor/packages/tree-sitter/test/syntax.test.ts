@@ -1,10 +1,14 @@
-import { describe, expect, expectTypeOf, it } from 'vitest'
+import {
+  createTreeDocument,
+  createSourceEndpoint,
+  disposeTreeDocuments,
+} from './factories/document'
+import { readAll } from '../../editor/test/factories/snapshotText'
+import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 
 import {
-  applyBatchToPieceTable,
   createDocumentSession,
   createPieceTableSnapshot,
-  diffPieceTableSnapshots,
   createDocumentTextSnapshot,
 } from '@singapore-editor/core/document'
 import {
@@ -24,12 +28,18 @@ import {
   TreeSitterLanguageRegistry,
   type TreeSitterLanguageContribution,
 } from '../src'
-import {
-  createTextDiffEdit,
-  createTreeSitterEditPayload,
-  TreeSitterSyntaxSession,
-} from '../src/session'
-import { createTreeSitterSourceDescriptor } from '../src/treeSitter/source'
+import { createTreeSitterEditPayload } from '../src/session'
+import type { DocumentWorkerReadReference } from '@singapore-editor/core/internal/document-worker'
+const messageSource: DocumentWorkerReadReference = {
+  identity: {
+    documentId: 'message-doc',
+    documentGeneration: 1,
+    endpointGeneration: 1,
+    registrationId: 1,
+  },
+  point: { segment: 'message-segment', revision: 0, textVersion: 0 },
+  readId: 'message-read',
+}
 import type {
   TreeSitterEditRequest,
   TreeSitterParseAckResult,
@@ -43,6 +53,8 @@ import type {
   TreeSitterEditPayload,
   TreeSitterRangePayload,
 } from '../src/treeSitter/workerClient'
+
+afterEach(disposeTreeDocuments)
 
 describe('Tree-sitter syntax capture conversion', () => {
   it('maps known capture names to editor token styles', () => {
@@ -125,33 +137,13 @@ describe('Tree-sitter syntax capture conversion', () => {
     await expect(registry.resolveTreeSitterLanguage('typescript')).resolves.toBeNull()
   })
 
-  it('registers language contributions through editor plugins', () => {
+  it('registers language contributions through typed editor plugin providers', () => {
     const host = new EditorPluginHost([
       createTreeSitterLanguagePlugin([testLanguage('sql', ['.sql'])], { name: 'sql-language' }),
     ])
-    const snapshot = createPieceTableSnapshot('select 1;')
-
-    expect(
-      host.createSyntaxSession({
-        documentId: 'query.sql',
-        languageId: 'sql',
-        includeHighlights: true,
-        textSnapshot: createDocumentTextSnapshot(snapshot),
-        snapshot,
-      }),
-    ).not.toBeNull()
-
+    expect(host.getSyntaxProvider()).not.toBeNull()
     host.dispose()
-
-    expect(
-      host.createSyntaxSession({
-        documentId: 'query.sql',
-        languageId: 'sql',
-        includeHighlights: true,
-        textSnapshot: createDocumentTextSnapshot(snapshot),
-        snapshot,
-      }),
-    ).toBeNull()
+    expect(host.getSyntaxProvider()).toBeNull()
   })
 
   it('registers a host-owned syntax provider without constructing another provider', () => {
@@ -210,15 +202,14 @@ describe('Tree-sitter syntax capture conversion', () => {
   it('builds single-edit payloads for incremental reparsing', () => {
     const previousSnapshot = createPieceTableSnapshot('const a = 1;\n')
     const edits = [{ from: 6, to: 7, text: 'answer' }]
-    const nextSnapshot = applyBatchToPieceTable(previousSnapshot, edits)
     const payload = createTreeSitterEditPayload({
       documentId: 'file.ts',
       runtimeSessionId: 'runtime-file.ts',
       languageId: 'typescript',
       previousSnapshotVersion: 1,
       snapshotVersion: 2,
-      previousSnapshot,
-      nextSnapshot,
+      previousRead: createDocumentTextSnapshot(previousSnapshot),
+      source: messageSource,
       edits,
     })
 
@@ -240,8 +231,7 @@ describe('Tree-sitter syntax capture conversion', () => {
   })
 
   it('keeps worker parse and edit requests source-based', () => {
-    const snapshot = createPieceTableSnapshot('const a = 1;\n')
-    const source = createTreeSitterSourceDescriptor(snapshot)
+    const source = messageSource
     const parseRequest: TreeSitterParseRequest = {
       type: 'parse',
       documentId: 'file.ts',
@@ -284,15 +274,14 @@ describe('Tree-sitter syntax capture conversion', () => {
       { from: 0, to: 1, text: 'x' },
       { from: 3, to: 5, text: 'yz' },
     ]
-    const nextSnapshot = applyBatchToPieceTable(previousSnapshot, edits)
     const payload = createTreeSitterEditPayload({
       documentId: 'file.ts',
       runtimeSessionId: 'runtime-file.ts',
       languageId: 'typescript',
       previousSnapshotVersion: 1,
       snapshotVersion: 2,
-      previousSnapshot,
-      nextSnapshot,
+      previousRead: createDocumentTextSnapshot(previousSnapshot),
+      source: messageSource,
       edits,
     })
 
@@ -316,54 +305,24 @@ describe('Tree-sitter syntax capture conversion', () => {
     ])
   })
 
-  it('diffs snapshots in the fallback path identically to the text diff', () => {
-    const vectors: [string, string][] = [
-      ['const a = 1;', 'const a = 1;!?'],
-      ['const a = 1;', 'let a = 1;'],
-      ['aaaa', 'aaa'],
-      ['same', 'same'],
-      ['', 'fresh'],
-    ]
-
-    for (const [previousText, nextText] of vectors) {
-      const snapshotEdit = diffPieceTableSnapshots(
-        createPieceTableSnapshot(previousText),
-        createPieceTableSnapshot(nextText),
-      )
-      expect(snapshotEdit).toEqual(createTextDiffEdit(previousText, nextText))
-    }
-  })
-
-  it('diffs skipped typing edits against the cached syntax text', () => {
-    const previousText = 'const a = 1;'
-    const nextText = 'const a = 1;!?'
-    const previousSnapshot = createPieceTableSnapshot(previousText)
-    const nextSnapshot = createPieceTableSnapshot(nextText)
-    const edit = createTextDiffEdit(previousText, nextText)
-
-    expect(edit).toEqual({ from: 12, to: 12, text: '!?' })
-
-    const payload = createTreeSitterEditPayload({
+  it('composes skipped typing through the canonical owner before incremental parsing', async () => {
+    const backend = createCapturingTreeSitterBackend()
+    const session = createTreeDocument({
+      backend,
       documentId: 'file.ts',
-      runtimeSessionId: 'runtime-file.ts',
       languageId: 'typescript',
-      previousSnapshotVersion: 1,
-      snapshotVersion: 2,
-      previousSnapshot,
-      nextSnapshot,
-      edits: edit ? [edit] : [],
+      text: 'const a = 1;',
     })
-
-    expect(payload?.inputEdits).toMatchObject([
-      {
-        startIndex: 12,
-        oldEndIndex: 12,
-        newEndIndex: 14,
-        startPosition: { row: 0, column: 12 },
-        oldEndPosition: { row: 0, column: 12 },
-        newEndPosition: { row: 0, column: 14 },
-      },
-    ])
+    try {
+      await session.run()
+      session.view.applyEdits([{ from: 12, to: 12, text: '!' }])
+      session.view.applyEdits([{ from: 13, to: 13, text: '?' }])
+      await session.run()
+      expect(backend.latestEdit?.edits).toEqual([{ from: 12, to: 12, text: '!?' }])
+      expect(session.buffer.materializeFullText()).toBe('const a = 1;!?')
+    } finally {
+      session.dispose()
+    }
   })
 
   it.each([
@@ -374,11 +333,10 @@ describe('Tree-sitter syntax capture conversion', () => {
     async ({ foldQuerySource, expected }) => {
       const registration = createDeferred<void>()
       const snapshot = createPieceTableSnapshot('const config = {}')
-      const session = new TreeSitterSyntaxSession({
+      const session = createTreeDocument({
         documentId: 'config.js',
         languageId: 'javascript',
-        snapshot,
-        textSnapshot: createDocumentTextSnapshot(snapshot),
+        text: readAll(createDocumentTextSnapshot(snapshot)),
         backend: createCapturingTreeSitterBackend(),
         languageResolver: {
           resolveTreeSitterLanguage: async () => {
@@ -393,11 +351,11 @@ describe('Tree-sitter syntax capture conversion', () => {
           },
         },
       })
-      const result = session.refresh(createDocumentTextSnapshot(snapshot))
-      expect(session.foldingSupport).toBe('pending')
+      const result = session.run()
+      expect(session.runtime.foldingSupport).toBe('pending')
       registration.resolve()
       await result
-      expect(session.foldingSupport).toBe(expected)
+      expect(session.runtime.foldingSupport).toBe(expected)
       session.dispose()
     },
   )
@@ -406,6 +364,8 @@ describe('Tree-sitter syntax capture conversion', () => {
     const parsePayloads: TreeSitterBackendParsePayload[] = []
     const tokens = [{ start: 0, end: 5, style: { color: '#123456' } }]
     const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
       disposeDocument: () => undefined,
       edit: async () => undefined,
       parse: async (payload) => {
@@ -416,18 +376,15 @@ describe('Tree-sitter syntax capture conversion', () => {
       select: async () => undefined,
     } satisfies TreeSitterBackend
     const text = 'const a = 1;'
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       includeCaptures: false,
       languageId: 'typescript',
-      snapshot: createPieceTableSnapshot(text),
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text)),
+      text: readAll(createDocumentTextSnapshot(createPieceTableSnapshot(text))),
     })
 
-    const result = await session.refresh(
-      createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
-    )
+    const result = await session.run()
 
     expect(parsePayloads[0]?.includeCaptures).toBe(false)
     expect(result.captures).toEqual([])
@@ -438,21 +395,22 @@ describe('Tree-sitter syntax capture conversion', () => {
     const text = 'const a = 1;'
     const snapshot = createPieceTableSnapshot(text)
     const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
       disposeDocument: () => undefined,
       edit: async () => undefined,
       parse: async (payload) => createParseResult(payload),
       registerLanguages: async () => undefined,
       select: async () => undefined,
     } satisfies TreeSitterBackend
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       languageId: 'typescript',
-      snapshot,
-      textSnapshot: createDocumentTextSnapshot(snapshot),
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
-    const result = await session.refresh(createDocumentTextSnapshot(snapshot, text))
+    const result = await session.run()
 
     expect(result.degraded).toBeNull()
     expect(result.projection).toEqual({
@@ -476,6 +434,8 @@ describe('Tree-sitter syntax capture conversion', () => {
     const text = 'select 1;'
     const snapshot = createPieceTableSnapshot(text)
     const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
       disposeDocument: () => undefined,
       edit: async () => undefined,
       parse: async (payload) => {
@@ -485,18 +445,17 @@ describe('Tree-sitter syntax capture conversion', () => {
       registerLanguages: async () => undefined,
       select: async () => undefined,
     } satisfies TreeSitterBackend
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'query.sql',
       languageId: 'sql',
       languageResolver: {
         resolveTreeSitterLanguage: async () => null,
       },
-      snapshot,
-      textSnapshot: createDocumentTextSnapshot(snapshot),
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
-    const result = await session.refresh(createDocumentTextSnapshot(snapshot, text))
+    const result = await session.run()
 
     expect(parseCount).toBe(0)
     expect(result.degraded).toMatchObject({
@@ -505,7 +464,7 @@ describe('Tree-sitter syntax capture conversion', () => {
     expect(result.projection.snapshot).toEqual({
       documentId: 'query.sql',
       length: text.length,
-      version: 1,
+      version: 0,
     })
     expect(result.projection.language).toMatchObject({
       languageId: 'sql',
@@ -517,6 +476,8 @@ describe('Tree-sitter syntax capture conversion', () => {
     const parsePayloads: TreeSitterBackendParsePayload[] = []
     const captures = [{ startIndex: 0, endIndex: 5, captureName: 'keyword.declaration' }]
     const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
       disposeDocument: () => undefined,
       edit: async () => undefined,
       parse: async (payload) => {
@@ -527,17 +488,14 @@ describe('Tree-sitter syntax capture conversion', () => {
       select: async () => undefined,
     } satisfies TreeSitterBackend
     const text = 'const a = 1;'
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       languageId: 'typescript',
-      snapshot: createPieceTableSnapshot(text),
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text)),
+      text: readAll(createDocumentTextSnapshot(createPieceTableSnapshot(text))),
     })
 
-    const result = await session.refresh(
-      createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
-    )
+    const result = await session.run()
 
     expect(parsePayloads[0]?.includeCaptures).toBe(true)
     expect(result.captures).toEqual(captures)
@@ -549,6 +507,8 @@ describe('Tree-sitter syntax capture conversion', () => {
     const rangePayloads: TreeSitterRangePayload[] = []
     const tokens = [{ start: 0, end: 5, style: { color: '#123456' } }]
     const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
       disposeDocument: () => undefined,
       edit: async () => undefined,
       parse: async (payload) => {
@@ -563,19 +523,16 @@ describe('Tree-sitter syntax capture conversion', () => {
       select: async () => undefined,
     } satisfies TreeSitterBackend
     const text = 'const a = 1;'
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       languageId: 'typescript',
-      snapshot: createPieceTableSnapshot(text),
       syntaxMode: 'range',
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text)),
+      text: readAll(createDocumentTextSnapshot(createPieceTableSnapshot(text))),
     })
 
-    const refreshed = await session.refresh(
-      createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
-    )
-    const ranged = await session.queryRange({ startIndex: 0, endIndex: 6 })
+    const refreshed = await session.run()
+    const ranged = await session.runtime.queryRange({ startIndex: 0, endIndex: 6 })
 
     expect(parsePayloads[0]?.resultMode).toBe('parseOnly')
     expect(tokenObjects(refreshed.tokens)).toEqual([])
@@ -596,6 +553,8 @@ describe('Tree-sitter syntax capture conversion', () => {
 
   it('maps worker degraded states onto syntax results', async () => {
     const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
       disposeDocument: () => undefined,
       edit: async () => undefined,
       parse: async (payload) => ({
@@ -612,18 +571,15 @@ describe('Tree-sitter syntax capture conversion', () => {
       select: async () => undefined,
     } satisfies TreeSitterBackend
     const text = 'const a = 1;'
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       languageId: 'typescript',
-      snapshot: createPieceTableSnapshot(text),
       syntaxMode: 'range',
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text)),
+      text: readAll(createDocumentTextSnapshot(createPieceTableSnapshot(text))),
     })
 
-    const result = await session.refresh(
-      createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
-    )
+    const result = await session.run()
 
     expect(result.degraded).toEqual({
       kind: 'optional-phase-failed',
@@ -636,6 +592,8 @@ describe('Tree-sitter syntax capture conversion', () => {
     const parsePayloads: TreeSitterBackendParsePayload[] = []
     const rangePayloads: TreeSitterRangePayload[] = []
     const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
       disposeDocument: () => undefined,
       edit: async () => undefined,
       parse: async (payload) => {
@@ -654,17 +612,16 @@ describe('Tree-sitter syntax capture conversion', () => {
       (_value, index) => `export const value${index} = ${index};`,
     ).join('\n')
     const snapshot = createPieceTableSnapshot(text)
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'large.ts',
       languageId: 'typescript',
-      snapshot,
       syntaxMode: 'range',
-      textSnapshot: createDocumentTextSnapshot(snapshot),
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
-    await session.refresh(createDocumentTextSnapshot(snapshot, text))
-    await session.queryRange({ startIndex: 1_000, endIndex: 2_000 })
+    await session.run()
+    await session.runtime.queryRange({ startIndex: 1_000, endIndex: 2_000 })
 
     expect(parsePayloads[0]?.resultMode).toBe('parseOnly')
     expect(rangePayloads).toMatchObject([
@@ -678,6 +635,8 @@ describe('Tree-sitter syntax capture conversion', () => {
     const parseResult = createDeferred<TreeSitterParseAckResult>()
     const rangePayloads: TreeSitterRangePayload[] = []
     const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
       disposeDocument: () => undefined,
       edit: async () => undefined,
       parse: async () => parseResult.promise,
@@ -690,27 +649,26 @@ describe('Tree-sitter syntax capture conversion', () => {
     } satisfies TreeSitterBackend
     const text = 'const a = 1;'
     const snapshot = createPieceTableSnapshot(text)
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       languageId: 'typescript',
-      snapshot,
       syntaxMode: 'range',
-      textSnapshot: createDocumentTextSnapshot(snapshot),
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
-    const refresh = session.refresh(createDocumentTextSnapshot(snapshot, text))
-    const pendingRange = await session.queryRange({ startIndex: 0, endIndex: 6 })
+    const refresh = session.run()
+    const pendingRange = await session.runtime.queryRange({ startIndex: 0, endIndex: 6 })
 
-    expect(session.canQueryRange()).toBe(false)
+    expect(session.runtime.canQueryRange()).toBe(false)
     expect(tokenObjects(pendingRange.tokens)).toEqual([])
     expect(rangePayloads).toHaveLength(0)
 
     parseResult.resolve(createParseAck(1))
     await refresh
-    const readyRange = await session.queryRange({ startIndex: 0, endIndex: 6 })
+    const readyRange = await session.runtime.queryRange({ startIndex: 0, endIndex: 6 })
 
-    expect(session.canQueryRange()).toBe(true)
+    expect(session.runtime.canQueryRange()).toBe(true)
     expect(rangePayloads).toHaveLength(1)
     expect(tokenObjects(readyRange.tokens)).toEqual([
       { start: 0, end: 5, style: { color: '#123456' } },
@@ -719,6 +677,8 @@ describe('Tree-sitter syntax capture conversion', () => {
 
   it('suppresses stale range query results', async () => {
     const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
       disposeDocument: () => undefined,
       edit: async () => undefined,
       parse: async (payload) => createParseAck(payload.snapshotVersion),
@@ -730,17 +690,16 @@ describe('Tree-sitter syntax capture conversion', () => {
       select: async () => undefined,
     } satisfies TreeSitterBackend
     const text = 'const a = 1;'
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       languageId: 'typescript',
-      snapshot: createPieceTableSnapshot(text),
       syntaxMode: 'range',
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text)),
+      text: readAll(createDocumentTextSnapshot(createPieceTableSnapshot(text))),
     })
 
-    await session.refresh(createDocumentTextSnapshot(createPieceTableSnapshot(text), text))
-    const result = await session.queryRange({ startIndex: 0, endIndex: 6 })
+    await session.run()
+    const result = await session.runtime.queryRange({ startIndex: 0, endIndex: 6 })
 
     expect(tokenObjects(result.tokens)).toEqual([])
   })
@@ -751,6 +710,8 @@ describe('Tree-sitter syntax capture conversion', () => {
       readonly result: Deferred<TreeSitterParseResult>
     }[] = []
     const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
       disposeDocument: () => undefined,
       edit: async () => undefined,
       parse: (payload) => {
@@ -761,22 +722,17 @@ describe('Tree-sitter syntax capture conversion', () => {
       registerLanguages: async () => undefined,
       select: async () => undefined,
     } satisfies TreeSitterBackend
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       languageId: 'typescript',
-      snapshot: createPieceTableSnapshot('const a = 1;'),
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot('const a = 1;')),
+      text: readAll(createDocumentTextSnapshot(createPieceTableSnapshot('const a = 1;'))),
     })
 
-    const firstRefresh = session.refresh(
-      createDocumentTextSnapshot(createPieceTableSnapshot('const a = 1;'), 'const a = 1;'),
-    )
+    const firstRefresh = session.run()
     await Promise.resolve()
-    const secondRefresh = session.refresh(
-      createDocumentTextSnapshot(createPieceTableSnapshot('const b = 2;'), 'const b = 2;'),
-    )
-    await Promise.resolve()
+    const secondRefresh = session.run()
+    await vi.waitFor(() => expect(parses).toHaveLength(2))
 
     const second = parses[1]!
     second.result.resolve({
@@ -792,7 +748,7 @@ describe('Tree-sitter syntax capture conversion', () => {
     })
     await firstRefresh
 
-    expect(tokenObjects(session.getResult().tokens)).toEqual([
+    expect(tokenObjects(session.runtime.getResult().tokens)).toEqual([
       { start: 6, end: 7, style: { color: '#00ff00' } },
     ])
   })
@@ -801,72 +757,70 @@ describe('Tree-sitter syntax capture conversion', () => {
     const backend = createCapturingTreeSitterBackend()
     const text = 'const a = 1;'
     const document = createDocumentSession(text)
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       languageId: 'typescript',
-      snapshot: document.getSnapshot(),
-      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
+      text: readAll(createDocumentTextSnapshot(document.getSnapshot())),
     })
-    await session.refresh(
-      createDocumentTextSnapshot(document.getSnapshot(), document.materializeFullText()),
-    )
+    await session.run()
 
     const change = document.applyEdits([
       { from: text.length, text: '\nconst b = 2;', to: text.length },
     ])
 
-    await session.applyChange(change)
+    await session.edit(change.edits)
 
     expect(backend.latestEdit?.edits).toEqual([
       { from: text.length, text: '\nconst b = 2;', to: text.length },
     ])
   })
 
-  it('falls back to a cached-text diff when document edits do not apply', async () => {
+  it('resets admitted source after the canonical history bound is exceeded', async () => {
     const backend = createCapturingTreeSitterBackend()
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       languageId: 'typescript',
-      snapshot: createPieceTableSnapshot('abc'),
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot('abc')),
+      text: 'abc',
     })
-    await session.refresh(createDocumentTextSnapshot(createPieceTableSnapshot('abc'), 'abc'))
-
-    const staleDocument = createDocumentSession('abc!')
-    const change = staleDocument.applyEdits([{ from: 4, text: '?', to: 4 }])
-
-    await session.applyChange(change)
-
-    expect(backend.latestEdit?.edits).toEqual([{ from: 3, text: '!?', to: 3 }])
+    try {
+      await session.run()
+      for (let index = 0; index < 129; index++) {
+        const end = session.buffer.getTextSnapshot().length
+        session.view.applyEdits([{ from: end, to: end, text: '!' }])
+      }
+      await session.run()
+      expect(backend.latestEdit).toBeNull()
+      expect(session.runtime.getSnapshotVersion()).toBe(2)
+      expect(session.buffer.materializeFullText()).toBe('abc' + '!'.repeat(129))
+    } finally {
+      session.dispose()
+    }
   })
 
   it('targets incremental edits at the parsed snapshot version', async () => {
     const { backend, edits } = createDeferredTreeSitterBackend()
     const initialText = 'const a = 1;'
     const document = createDocumentSession(initialText)
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       languageId: 'typescript',
-      snapshot: document.getSnapshot(),
-      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
+      text: readAll(createDocumentTextSnapshot(document.getSnapshot())),
     })
 
-    await session.refresh(
-      createDocumentTextSnapshot(document.getSnapshot(), document.materializeFullText()),
-    )
+    await session.run()
 
     const firstChange = document.applyEdits([
       { from: initialText.length, text: '!', to: initialText.length },
     ])
-    const firstPromise = session.applyChange(firstChange)
+    const firstPromise = session.edit(firstChange.edits)
     const secondChange = document.applyEdits([
       { from: firstChange.textSnapshot.length, text: '?', to: firstChange.textSnapshot.length },
     ])
-    const secondPromise = session.applyChange(secondChange)
-    await Promise.resolve()
+    const secondPromise = session.edit(secondChange.edits)
+    await vi.waitFor(() => expect(edits).toHaveLength(2))
 
     expect(edits.map(({ payload }) => payload.previousSnapshotVersion)).toEqual([1, 1])
     expect(edits.map(({ payload }) => payload.snapshotVersion)).toEqual([2, 3])
@@ -885,8 +839,8 @@ describe('Tree-sitter syntax capture conversion', () => {
     const thirdChange = document.applyEdits([
       { from: currentText.length, text: ';', to: currentText.length },
     ])
-    const thirdPromise = session.applyChange(thirdChange)
-    await Promise.resolve()
+    const thirdPromise = session.edit(thirdChange.edits)
+    await vi.waitFor(() => expect(edits).toHaveLength(3))
 
     expect(edits[2]?.payload.previousSnapshotVersion).toBe(3)
 
@@ -899,6 +853,8 @@ describe('Tree-sitter syntax capture conversion', () => {
     const parseVersions: number[] = []
     let editCount = 0
     const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
       disposeDocument: () => undefined,
       edit: async () => {
         editCount += 1
@@ -913,22 +869,21 @@ describe('Tree-sitter syntax capture conversion', () => {
     } satisfies TreeSitterBackend
     const initialText = 'const a = 1;'
     const document = createDocumentSession(initialText)
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       languageId: 'typescript',
-      snapshot: document.getSnapshot(),
-      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
+      text: readAll(createDocumentTextSnapshot(document.getSnapshot())),
     })
 
     const change = document.applyEdits([
       { from: initialText.length, text: '\nconst b = 2;', to: initialText.length },
     ])
-    await session.applyChange(change)
+    await session.edit(change.edits)
 
     expect(editCount).toBe(0)
     expect(parseVersions).toEqual([1])
-    expect(session.getSnapshotVersion()).toBe(1)
+    expect(session.runtime.getSnapshotVersion()).toBe(1)
   })
 
   it('falls back to a full refresh when incremental parsing fails', async () => {
@@ -937,6 +892,8 @@ describe('Tree-sitter syntax capture conversion', () => {
     const disposedRuntimeSessionIds = new Set<string>()
     const parseRuntimeSessionIds: string[] = []
     const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
       disposeDocument: (runtimeSessionId) => {
         disposedDocuments.push(runtimeSessionId)
         disposedRuntimeSessionIds.add(runtimeSessionId)
@@ -955,36 +912,35 @@ describe('Tree-sitter syntax capture conversion', () => {
     } satisfies TreeSitterBackend
     const initialText = 'const a = 1;'
     const document = createDocumentSession(initialText)
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       languageId: 'typescript',
-      snapshot: document.getSnapshot(),
-      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
+      text: readAll(createDocumentTextSnapshot(document.getSnapshot())),
     })
 
-    await session.refresh(
-      createDocumentTextSnapshot(document.getSnapshot(), document.materializeFullText()),
-    )
+    await session.run()
     const change = document.applyEdits([
       { from: initialText.length, text: '\nconst b = 2;', to: initialText.length },
     ])
-    const result = await session.applyChange(change)
+    const result = await session.edit(change.edits)
 
     expect(parseVersions).toEqual([1, 3])
     expect(parseRuntimeSessionIds).toHaveLength(2)
     expect(parseRuntimeSessionIds[1]).not.toBe(parseRuntimeSessionIds[0])
     expect(disposedDocuments).toEqual([parseRuntimeSessionIds[0]])
     expect(parseRuntimeSessionIds).not.toContain('file.ts')
-    expect(session.getSnapshotVersion()).toBe(3)
+    expect(session.runtime.getSnapshotVersion()).toBe(3)
     expect(result.projection.snapshot.version).toBe(3)
-    expect(session.getResult()).toBe(result)
+    expect(session.runtime.getResult()).toBe(result)
   })
 
   it('ignores parse results that complete after syntax session disposal', async () => {
     const disposedDocuments: string[] = []
     const parse = createDeferred<TreeSitterParseResult>()
     const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
       disposeDocument: (documentId) => {
         disposedDocuments.push(documentId)
       },
@@ -994,17 +950,14 @@ describe('Tree-sitter syntax capture conversion', () => {
       select: async () => undefined,
     } satisfies TreeSitterBackend
     const document = createDocumentSession('const a = 1;')
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       languageId: 'typescript',
-      snapshot: document.getSnapshot(),
-      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
+      text: readAll(createDocumentTextSnapshot(document.getSnapshot())),
     })
-    const initialResult = session.getResult()
-    const refresh = session.refresh(
-      createDocumentTextSnapshot(document.getSnapshot(), document.materializeFullText()),
-    )
+    const initialResult = session.runtime.getResult()
+    const refresh = session.run()
 
     session.dispose()
     parse.resolve(
@@ -1018,7 +971,7 @@ describe('Tree-sitter syntax capture conversion', () => {
 
     expect(disposedDocuments).toHaveLength(1)
     expect(disposedDocuments[0]).not.toBe('file.ts')
-    expect(session.getResult()).toBe(initialResult)
+    expect(session.runtime.getResult()).toBe(initialResult)
   })
 
   it('falls back to a full refresh when current incremental parsing is cancelled', async () => {
@@ -1026,6 +979,8 @@ describe('Tree-sitter syntax capture conversion', () => {
     const disposedDocuments: string[] = []
     const parseRuntimeSessionIds: string[] = []
     const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
       disposeDocument: (documentId) => {
         disposedDocuments.push(documentId)
       },
@@ -1040,29 +995,26 @@ describe('Tree-sitter syntax capture conversion', () => {
     } satisfies TreeSitterBackend
     const initialText = 'const a = 1;'
     const document = createDocumentSession(initialText)
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       languageId: 'typescript',
-      snapshot: document.getSnapshot(),
-      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
+      text: readAll(createDocumentTextSnapshot(document.getSnapshot())),
     })
 
-    await session.refresh(
-      createDocumentTextSnapshot(document.getSnapshot(), document.materializeFullText()),
-    )
+    await session.run()
     const change = document.applyEdits([
       { from: initialText.length, text: '\nconst b = 2;', to: initialText.length },
     ])
-    const result = await session.applyChange(change)
+    const result = await session.edit(change.edits)
 
     expect(parseVersions).toEqual([1, 3])
     expect(parseRuntimeSessionIds).toHaveLength(2)
     expect(parseRuntimeSessionIds[1]).not.toBe(parseRuntimeSessionIds[0])
     expect(disposedDocuments).toEqual([parseRuntimeSessionIds[0]])
     expect(parseRuntimeSessionIds).not.toContain('file.ts')
-    expect(session.getSnapshotVersion()).toBe(3)
-    expect(session.getResult()).toBe(result)
+    expect(session.runtime.getSnapshotVersion()).toBe(3)
+    expect(session.runtime.getResult()).toBe(result)
   })
 
   it('does not run stale incremental fallbacks after a newer edit starts', async () => {
@@ -1070,6 +1022,8 @@ describe('Tree-sitter syntax capture conversion', () => {
     const disposedDocuments: string[] = []
     const edits: { payload: TreeSitterEditPayload; result: Deferred<TreeSitterParseResult> }[] = []
     const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
       disposeDocument: (documentId) => {
         disposedDocuments.push(documentId)
       },
@@ -1087,26 +1041,23 @@ describe('Tree-sitter syntax capture conversion', () => {
     } satisfies TreeSitterBackend
     const initialText = 'const a = 1;'
     const document = createDocumentSession(initialText)
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       backend,
       documentId: 'file.ts',
       languageId: 'typescript',
-      snapshot: document.getSnapshot(),
-      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
+      text: readAll(createDocumentTextSnapshot(document.getSnapshot())),
     })
 
-    await session.refresh(
-      createDocumentTextSnapshot(document.getSnapshot(), document.materializeFullText()),
-    )
+    await session.run()
     const firstChange = document.applyEdits([
       { from: initialText.length, text: '!', to: initialText.length },
     ])
-    const firstPromise = session.applyChange(firstChange)
+    const firstPromise = session.edit(firstChange.edits)
     const secondChange = document.applyEdits([
       { from: firstChange.textSnapshot.length, text: '?', to: firstChange.textSnapshot.length },
     ])
-    const secondPromise = session.applyChange(secondChange)
-    await Promise.resolve()
+    const secondPromise = session.edit(secondChange.edits)
+    await vi.waitFor(() => expect(edits).toHaveLength(2))
 
     edits[0]?.result.reject(new Error('stale incremental parse failed'))
     await firstPromise
@@ -1116,7 +1067,7 @@ describe('Tree-sitter syntax capture conversion', () => {
 
     expect(parseVersions).toEqual([1])
     expect(disposedDocuments).toEqual([])
-    expect(session.getSnapshotVersion()).toBe(3)
+    expect(session.runtime.getSnapshotVersion()).toBe(3)
   })
 })
 
@@ -1126,6 +1077,8 @@ function tokenObjects(tokens: EditorTokenInput): readonly EditorToken[] {
 
 function createCapturingTreeSitterBackend() {
   const backend = {
+    generation: 1,
+    sourceEndpoint: createSourceEndpoint(),
     latestEdit: null as TreeSitterEditPayload | null,
     disposeDocument: () => undefined,
     edit: async (payload: TreeSitterEditPayload) => {
@@ -1169,6 +1122,8 @@ function createDeferred<T>(): Deferred<T> {
 function createDeferredTreeSitterBackend() {
   const edits: { payload: TreeSitterEditPayload; result: Deferred<TreeSitterParseResult> }[] = []
   const backend = {
+    generation: 1,
+    sourceEndpoint: createSourceEndpoint(),
     disposeDocument: () => undefined,
     edit: (payload: TreeSitterEditPayload) => {
       const result = createDeferred<TreeSitterParseResult>()
@@ -1243,14 +1198,7 @@ function createTestLanguageRegistry(): TreeSitterLanguageRegistry {
 }
 
 function createSqlSyntaxSession(host: EditorPluginHost) {
-  const text = 'select 1;'
-  return host.createSyntaxSession({
-    documentId: 'query.sql',
-    languageId: 'sql',
-    includeHighlights: true,
-    textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text)),
-    snapshot: createPieceTableSnapshot(text),
-  })
+  return host.getSyntaxProvider()
 }
 
 function testLanguage(

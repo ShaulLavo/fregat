@@ -274,12 +274,11 @@ export async function connectedEditor(
   await vi.waitUntil(() => connected, { interval: 1, timeout: 1000 })
 
   const awaitRequest = async (method: string, count = 1): Promise<void> => {
-    for (let turn = 0; turn < 100; turn++) {
-      if (transport.sent.map(jsonMessage).filter((sent) => sent.method === method).length >= count)
-        return
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    }
-    throw new Error(`no ${method} request after waiting`)
+    await vi.waitUntil(
+      () =>
+        transport.sent.map(jsonMessage).filter((sent) => sent.method === method).length >= count,
+      { interval: 1, timeout: 1000 },
+    )
   }
 
   const answer = (method: string, result: unknown): void => {

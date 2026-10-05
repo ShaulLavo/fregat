@@ -12,6 +12,9 @@ import { DocumentOperation, type BoundOperationContext } from './contributionOpe
 import { AnalysisEntry, HighlighterEntry, StructuralEntry } from './documentAnalysis'
 import { createEditorRuntimeSessionId, type EditorSyntaxResult } from '../syntax/session'
 import type { EditorHighlightResult } from '../syntax/highlighter'
+import { sameThemeCohort, type ThemeCohort } from '../syntax/providerTheme'
+
+type HighlighterInput = EditorHighlighterSessionOptions & { readonly themeCohort?: ThemeCohort }
 
 export type DocumentOperationContext = {
   readonly documentId: string
@@ -77,7 +80,7 @@ export class StructuralDefinition extends DocumentOperation<
 }
 
 export class HighlighterDefinition extends DocumentOperation<
-  EditorHighlighterSessionOptions,
+  HighlighterInput,
   EditorHighlightResult,
   HighlighterEntry
 > {
@@ -94,7 +97,7 @@ export class HighlighterDefinition extends DocumentOperation<
   }
   protected create(
     context: BoundOperationContext,
-    input: EditorHighlighterSessionOptions,
+    input: HighlighterInput,
   ): HighlighterEntry | null {
     const { host, sourceScope, initialRead, runtimeSessionId } = context
     const runtime = this.openRuntime({
@@ -114,17 +117,18 @@ export class HighlighterDefinition extends DocumentOperation<
       runtimeSessionId,
       host.retention,
       context.scheduling,
+      input.themeCohort,
     )
     return entry
   }
   protected createRuntimeSessionId(): string {
     return createEditorRuntimeSessionId()
   }
-  protected matches(
-    left: EditorHighlighterSessionOptions,
-    right: EditorHighlighterSessionOptions,
-  ): boolean {
-    return left.languageId === right.languageId
+  protected matches(left: HighlighterInput, right: HighlighterInput): boolean {
+    return (
+      left.languageId === right.languageId &&
+      sameThemeCohort(left.themeCohort ?? [], right.themeCohort ?? [])
+    )
   }
 }
 

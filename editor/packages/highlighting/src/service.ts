@@ -1,5 +1,8 @@
 import type { DiffFile, DiffGutterSide } from '@singapore-editor/diff'
-import { createEditorDocumentAnalysis, type EditorDocumentAnalysis } from '@singapore-editor/core/editor'
+import {
+  createEditorDocumentAnalysis,
+  type EditorDocumentAnalysis,
+} from '@singapore-editor/core/editor'
 import type { EditorHighlighterProvider } from '@singapore-editor/core/extensions'
 import {
   effectiveEditorTheme,
@@ -368,7 +371,10 @@ class EditorHighlightingService implements HighlightingService {
     const lang = grammar
     this.assertLive()
     const snippet = createSnippetDocument(text, 'as-submitted')
-    const analysis = createEditorDocumentAnalysis({ buffer: snippet.buffer, documentId: `highlight-snippet-${this.nextSnippetId++}` })
+    const analysis = createEditorDocumentAnalysis({
+      buffer: snippet.buffer,
+      documentId: `highlight-snippet-${this.nextSnippetId++}`,
+    })
     const provider = createShikiHighlighterProvider({
       workerOwner: this.shiki(),
       resolveLanguage: async () => languageRegistrations,
@@ -379,14 +385,34 @@ class EditorHighlightingService implements HighlightingService {
     this.snippetSessions++
     try {
       const result = lang
-        ? await this.live(analysis.contributions.request(provider.operation, { languageId: lang }, { kind: 'latest', audience: analysis.contributions.createAudience({ signal }), signal }).settled.then(outcome => {
-            if (outcome.kind === 'completed') return outcome.result
-            if (outcome.kind === 'failed') throw outcome.failure
-            throw new HighlightingError('unavailable', 'This environment cannot complete a highlighting request')
-          }), signal)
+        ? await this.live(
+            analysis.contributions
+              .request(
+                provider.operation,
+                { languageId: lang },
+                {
+                  kind: 'latest',
+                  audience: analysis.contributions.createAudience({ signal }),
+                  signal,
+                },
+              )
+              .settled.then((outcome) => {
+                if (outcome.kind === 'completed') return outcome.result
+                if (outcome.kind === 'failed') throw outcome.failure
+                throw new HighlightingError(
+                  'unavailable',
+                  'This environment cannot complete a highlighting request',
+                )
+              }),
+            signal,
+          )
         : { tokens: [], theme: await this.live(provider.loadTheme!(), signal) }
       this.assertLive()
-      if (!result) throw new HighlightingError('unavailable', 'This environment cannot start a highlighting worker')
+      if (!result)
+        throw new HighlightingError(
+          'unavailable',
+          'This environment cannot start a highlighting worker',
+        )
       const tokens = snippet.submittedTokens(result.tokens).map(freezeToken)
       return Object.freeze({
         language: lang ?? PLAIN_TEXT,
@@ -419,7 +445,10 @@ class EditorHighlightingService implements HighlightingService {
     const palette = effectiveEditorTheme(theme.definition)
     const foreground = palette.foregroundColor ?? DEFAULT_FOREGROUND
     const snippet = createSnippetDocument(text, 'as-document')
-    const analysis = createEditorDocumentAnalysis({ buffer: snippet.buffer, documentId: `highlight-snippet-${this.nextSnippetId++}` })
+    const analysis = createEditorDocumentAnalysis({
+      buffer: snippet.buffer,
+      documentId: `highlight-snippet-${this.nextSnippetId++}`,
+    })
     const session = analysis.borrowStructural({
       provider: this.syntaxProvider(),
       languageId,
@@ -457,11 +486,19 @@ class EditorHighlightingService implements HighlightingService {
   private finishSnippet(analysis: EditorDocumentAnalysis, releaseSession?: () => void): void {
     let failed = false
     let failure: unknown
-    try { releaseSession?.() }
-    catch (error) { failed = true; failure = error }
-    try { analysis.dispose() }
-    catch (error) {
-      if (!failed) { failed = true; failure = error }
+    try {
+      releaseSession?.()
+    } catch (error) {
+      failed = true
+      failure = error
+    }
+    try {
+      analysis.dispose()
+    } catch (error) {
+      if (!failed) {
+        failed = true
+        failure = error
+      }
     }
     this.snippetSessions--
     if (failed) throw failure

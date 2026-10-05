@@ -56,6 +56,7 @@ const snapshotSchema = v.object({ version: v.literal(3), target: gitSnapshotTarg
 const checkpointSchema = v.pipe(
   v.object({
     ...revisionEntries,
+    ignoreWhitespace: v.boolean(),
     version: v.literal(1),
     path: v.string(),
     filePath: v.optional(v.string()),
@@ -133,6 +134,7 @@ function decodeCheckpoint(encoded: string, owner: WorkspaceRoot): DecodedDocumen
   if (invalidPaths(value.path, value.filePath, value.oldPath)) return invalidTarget()
   const range = {
     owner,
+    ignoreWhitespace: value.ignoreWhitespace,
     sessionId: value.sessionId,
     fromTurnCount: value.fromTurnCount,
     toTurnCount: value.toTurnCount,

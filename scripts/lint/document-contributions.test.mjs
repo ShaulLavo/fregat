@@ -7,6 +7,9 @@ test.each([
   "import { TreeSitterWorkerClient as Parser } from '@singapore-editor/tree-sitter'; new Parser()",
   "export { TreeSitterSyntaxSession as Session } from '@singapore-editor/tree-sitter'",
   "import * as Tree from '@singapore-editor/tree-sitter'; new Tree['TreeSitterWorkerClient']()",
+  "import * as Tree from '../../../packages/tree-sitter/src/treeSitter/workerClient'; const { TreeSitterWorkerClient: Client } = Tree; new Client()",
+  'const { subscribe: observe } = context.buffer; observe.call(context.buffer, listener)',
+  "import { createEditorTextBuffer as create } from '@singapore-editor/core/document'; const text = create('x'); text.subscribe(listener)",
   "snapshot?.['changesSinceDocumentSyncPoint']?.(old)",
   'const { changesSinceDocumentSyncPoint: changes } = snapshot; changes(old)',
   'buffer?.subscribe(listener)',
@@ -45,6 +48,10 @@ test.each([
     'snapshot.changesSinceDocumentSyncPoint(point, null)',
   ],
   ['editor/packages/editor/src/editor/documentDelivery.ts', 'buffer.subscribe(listener)'],
+  [
+    'apps/web/src/features/workbench/components/csv-table.tsx',
+    'const { subscribe: observe } = context.buffer; observe.call(context.buffer, listener)',
+  ],
 ])('permits the explicit %s adapter', (filename, source) => {
   expect(documentContributionFindings(source, filename)).toEqual([])
 })

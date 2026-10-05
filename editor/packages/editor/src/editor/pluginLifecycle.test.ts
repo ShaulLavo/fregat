@@ -549,7 +549,9 @@ describe('editor plugin lifecycle', () => {
     let registration: EditorDisposable | null = null
     const plugin: EditorPlugin = {
       activate: (context) => {
-        registration = context.registerSyntaxProvider({ operation: defineStructuralOperation(() => null) })
+        registration = context.registerSyntaxProvider({
+          operation: defineStructuralOperation(() => null),
+        })
         return registration
       },
     }

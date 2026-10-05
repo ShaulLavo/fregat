@@ -828,7 +828,11 @@ test.describe('WorkspaceEditService', () => {
     const source = addLiveDocument(harness, '/repo/before.ts', 'saved')
     const events: string[] = []
     source.buffer.subscribe(() => events.push('change'))
-    harness.onUriTransition = () => events.push('uri')
+    const transitionTexts: string[] = []
+    harness.onUriTransition = () => {
+      events.push('uri')
+      transitionTexts.push(source.buffer.materializeFullText())
+    }
     const sourceUri = fileUri(source.target)
     const destinationUri = fileUri('/repo/after.ts')
     const provenance = currentProvenance(source.buffer, sourceUri, 4)
@@ -849,7 +853,7 @@ test.describe('WorkspaceEditService', () => {
       fromUri: sourceUri,
       toUri: destinationUri,
     })
-    expect(harness.uriTransitions[0]?.textSnapshot.materializeFullText()).toBe('Saved')
+    expect(transitionTexts).toEqual(['Saved'])
     expect(
       harness.store.getState().getLiveEditorDocument(testDocumentKey('/repo/after.ts'))?.buffer,
     ).toBe(source.buffer)
@@ -860,7 +864,11 @@ test.describe('WorkspaceEditService', () => {
     const source = addLiveDocument(harness, '/repo/before.ts', 'saved')
     const events: string[] = []
     source.buffer.subscribe(() => events.push('change'))
-    harness.onUriTransition = () => events.push('uri')
+    const transitionTexts: string[] = []
+    harness.onUriTransition = () => {
+      events.push('uri')
+      transitionTexts.push(source.buffer.materializeFullText())
+    }
     const sourceUri = fileUri(source.target)
     const destinationUri = fileUri('/repo/after.ts')
     const pending = harness.service.onApplyWorkspaceEdit(
@@ -878,7 +886,7 @@ test.describe('WorkspaceEditService', () => {
     await expect(pending).resolves.toEqual({ status: 'applied' })
 
     expect(events).toEqual(['uri', 'change'])
-    expect(harness.uriTransitions[0]?.textSnapshot.materializeFullText()).toBe('saved')
+    expect(transitionTexts).toEqual(['saved'])
     expect(source.buffer.materializeFullText()).toBe('Saved')
   })
 

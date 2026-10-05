@@ -9,7 +9,11 @@ import { turnDiffSummary } from './chat'
 import { runGit } from './git'
 import type { TestServer } from '../server'
 
-export async function checkpointTurn(client: Client, server: TestServer) {
+export async function checkpointTurn(
+  client: Client,
+  server: TestServer,
+  after: readonly string[] = ['after\n', 'after\n'],
+) {
   const root = server.root
   runGit(root, ['init', '--quiet'])
   const paths = ['app.txt', 'next.txt']
@@ -20,7 +24,8 @@ export async function checkpointTurn(client: Client, server: TestServer) {
   const harness = await createRailHarness(client, server, ['Checkpoint'], '')
   const sessionId = harness.sessionIds[0]!
   runGit(root, ['update-ref', checkpointRefForSessionTurn(sessionId, 0), 'HEAD'])
-  for (const path of paths) await writeFile(join(root, path), 'after\n')
+  for (const [index, path] of paths.entries())
+    await writeFile(join(root, path), after[index] ?? 'after\n')
   runGit(root, [...identity, 'commit', '-qam', 'turn'])
   const checkpointRef = checkpointRefForSessionTurn(sessionId, 1)
   runGit(root, ['update-ref', checkpointRef, 'HEAD'])

@@ -1,5 +1,8 @@
 import { createEditorTextBuffer } from '@singapore-editor/core/document'
-import { createEditorDocumentAnalysis, type EditorDocumentAnalysis } from '@singapore-editor/core/editor'
+import {
+  createEditorDocumentAnalysis,
+  type EditorDocumentAnalysis,
+} from '@singapore-editor/core/editor'
 import {
   toEditorTokenStore,
   type EditorSyntaxProvider,
@@ -73,19 +76,33 @@ export class SearchResultSyntaxCache {
 
   private start(key: string, options: ExcerptOptions): PendingExcerpt | null {
     const buffer = createEditorTextBuffer(options.text)
-    const analysis = createEditorDocumentAnalysis({ buffer, documentId: `${options.documentId}:excerpt:${++this.nextDocumentId}` })
+    const analysis = createEditorDocumentAnalysis({
+      buffer,
+      documentId: `${options.documentId}:excerpt:${++this.nextDocumentId}`,
+    })
     const owner = analysis.contributions.pin()
-    if (!owner) { analysis.dispose(); return null }
-    const task = analysis.contributions.request(this.provider.operation, {
-      languageId: options.languageId,
-      includeCaptures: options.includeCaptures,
-      includeHighlights: options.includeHighlights,
-      syntaxMode: 'full',
-    }, { kind: 'pinned', owner })
-    const result = task.settled.then(outcome => {
-      if (outcome.kind === 'failed') throw outcome.failure
-      return outcome.kind === 'completed' ? toEditorTokenStore(outcome.result.tokens).toTokens() : []
-    }).finally(() => owner.dispose())
+    if (!owner) {
+      analysis.dispose()
+      return null
+    }
+    const task = analysis.contributions.request(
+      this.provider.operation,
+      {
+        languageId: options.languageId,
+        includeCaptures: options.includeCaptures,
+        includeHighlights: options.includeHighlights,
+        syntaxMode: 'full',
+      },
+      { kind: 'pinned', owner },
+    )
+    const result = task.settled
+      .then((outcome) => {
+        if (outcome.kind === 'failed') throw outcome.failure
+        return outcome.kind === 'completed'
+          ? toEditorTokenStore(outcome.result.tokens).toTokens()
+          : []
+      })
+      .finally(() => owner.dispose())
     const entry = { readers: 0, result, analysis }
     this.pending.set(key, entry)
     void result.then(

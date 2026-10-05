@@ -2055,9 +2055,15 @@ class StaticTextBuffer extends PieceTableEditorTextBuffer {
     return change
   }
 
-  public override canUndo(): boolean { return false }
-  public override canRedo(): boolean { return false }
-  public override isDirty(): boolean { return false }
+  public override canUndo(): boolean {
+    return false
+  }
+  public override canRedo(): boolean {
+    return false
+  }
+  public override isDirty(): boolean {
+    return false
+  }
 }
 
 class StaticDocumentSession extends EditorBufferDocumentSession {
@@ -2066,24 +2072,50 @@ class StaticDocumentSession extends EditorBufferDocumentSession {
     super(buffer, createEditorViewSession(buffer))
   }
 
-  public override applyText(_text: string): DocumentSessionChange { return this.unchanged() }
-  public override indentSelection(_text: string): DocumentSessionChange { return this.unchanged() }
-  public override outdentSelection(_tabSize: number): DocumentSessionChange { return this.unchanged() }
-  public override backspace(_tabSize?: number): DocumentSessionChange { return this.unchanged() }
-  public override deleteSelection(): DocumentSessionChange { return this.unchanged() }
-  public override undo(): DocumentSessionChange { return this.unchanged() }
-  public override redo(): DocumentSessionChange { return this.unchanged() }
+  public override applyText(_text: string): DocumentSessionChange {
+    return this.unchanged()
+  }
+  public override indentSelection(_text: string): DocumentSessionChange {
+    return this.unchanged()
+  }
+  public override outdentSelection(_tabSize: number): DocumentSessionChange {
+    return this.unchanged()
+  }
+  public override backspace(_tabSize?: number): DocumentSessionChange {
+    return this.unchanged()
+  }
+  public override deleteSelection(): DocumentSessionChange {
+    return this.unchanged()
+  }
+  public override undo(): DocumentSessionChange {
+    return this.unchanged()
+  }
+  public override redo(): DocumentSessionChange {
+    return this.unchanged()
+  }
 
   private unchanged(): DocumentSessionChange {
     return createDocumentSessionChange({
-      kind: 'none', edits: [], transaction: null, snapshot: this.getSnapshot(),
-      selections: this.getSelections(), textSnapshot: this.getTextSnapshot(), timings: [],
-      canUndo: false, canRedo: false, isDirty: false, logicalRevisionCount: 0, logicalRevisionScope: null,
+      kind: 'none',
+      edits: [],
+      transaction: null,
+      snapshot: this.getSnapshot(),
+      selections: this.getSelections(),
+      textSnapshot: this.getTextSnapshot(),
+      timings: [],
+      canUndo: false,
+      canRedo: false,
+      isDirty: false,
+      logicalRevisionCount: 0,
+      logicalRevisionScope: null,
     })
   }
 }
 
-function initialBufferSource(source: string | PieceTableSnapshot): { readonly snapshot: PieceTableSnapshot; readonly text?: string } {
+function initialBufferSource(source: string | PieceTableSnapshot): {
+  readonly snapshot: PieceTableSnapshot
+  readonly text?: string
+} {
   if (typeof source !== 'string') return { snapshot: retainPieceTableSnapshot(source) }
   const ingested = normalizeDocumentText(source)
   return {

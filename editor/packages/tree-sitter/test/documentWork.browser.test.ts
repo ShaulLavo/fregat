@@ -10,51 +10,54 @@ import { TreeSitterWorkerClient } from '../src/treeSitter/workerClient'
 import type { TreeSitterWorkerRequest } from '../src/treeSitter/types'
 import { createTreeSitterSyntaxProvider, createTreeSitterWorkerOwner } from '../src/index'
 
-it.each([true, false])('queries accepted source after a real worker restart, range cached=%s', async cached => {
-  const workers: Worker[] = []
-  const owner = createTreeSitterWorkerOwner({
-    workerFactory: () => {
-      const worker = new Worker(
-        new URL('../src/treeSitter/treeSitter.worker.ts', import.meta.url),
-        { type: 'module' },
+it.each([true, false])(
+  'queries accepted source after a real worker restart, range cached=%s',
+  async (cached) => {
+    const workers: Worker[] = []
+    const owner = createTreeSitterWorkerOwner({
+      workerFactory: () => {
+        const worker = new Worker(
+          new URL('../src/treeSitter/treeSitter.worker.ts', import.meta.url),
+          { type: 'module' },
+        )
+        workers.push(worker)
+        return worker
+      },
+    })
+    const provider = createTreeSitterSyntaxProvider({ workerOwner: owner })
+    provider.registerLanguage(TYPESCRIPT_TREE_SITTER_LANGUAGE)
+    const buffer = createEditorTextBuffer('const recovered = 1;')
+    const owned = acquireEditorDocumentAnalysis({ buffer, documentId: 'restart.ts' })
+    const lease = owned.analysis.borrowStructural({
+      provider,
+      languageId: 'typescript',
+      includeCaptures: true,
+      syntaxMode: 'range',
+    })!
+    const range = { startIndex: 0, endIndex: cached ? buffer.getTextSnapshot().length : 6 }
+    try {
+      await lease.refresh(buffer.getTextSnapshot())
+      const initial = await lease.queryRange(range)
+      expect(initial.captures.length).toBeGreaterThan(0)
+      workers[0]!.dispatchEvent(
+        new ErrorEvent('error', { message: 'Controlled parser worker restart' }),
       )
-      workers.push(worker)
-      return worker
-    },
-  })
-  const provider = createTreeSitterSyntaxProvider({ workerOwner: owner })
-  provider.registerLanguage(TYPESCRIPT_TREE_SITTER_LANGUAGE)
-  const buffer = createEditorTextBuffer('const recovered = 1;')
-  const owned = acquireEditorDocumentAnalysis({ buffer, documentId: 'restart.ts' })
-  const lease = owned.analysis.borrowStructural({
-    provider,
-    languageId: 'typescript',
-    includeCaptures: true,
-    syntaxMode: 'range',
-  })!
-  const range = { startIndex: 0, endIndex: cached ? buffer.getTextSnapshot().length : 6 }
-  try {
-    await lease.refresh(buffer.getTextSnapshot())
-    const initial = await lease.queryRange(range)
-    expect(initial.captures.length).toBeGreaterThan(0)
-    workers[0]!.dispatchEvent(
-      new ErrorEvent('error', { message: 'Controlled parser worker restart' }),
-    )
-    expect(owner.inspect().lifecycle).toBe('crashed')
-    const recovered = await lease.queryRange({ startIndex: 6, endIndex: 15 })
-    expect(
-      recovered.captures.some((capture) => capture.startIndex === 6 && capture.endIndex === 15),
-    ).toBe(true)
-    expect(workers).toHaveLength(cached ? 1 : 2)
-    expect(owner.inspect().workerGeneration).toBe(cached ? 1 : 2)
-    if (cached) expect(await owner.inspectRetention()).toBeNull()
-    else expect((await owner.inspectRetention())?.source.documentCount).toBe(1)
-  } finally {
-    lease.dispose()
-    owned.dispose()
-    await owner.dispose()
-  }
-})
+      expect(owner.inspect().lifecycle).toBe('crashed')
+      const recovered = await lease.queryRange({ startIndex: 6, endIndex: 15 })
+      expect(
+        recovered.captures.some((capture) => capture.startIndex === 6 && capture.endIndex === 15),
+      ).toBe(true)
+      expect(workers).toHaveLength(cached ? 1 : 2)
+      expect(owner.inspect().workerGeneration).toBe(cached ? 1 : 2)
+      if (cached) expect(await owner.inspectRetention()).toBeNull()
+      else expect((await owner.inspectRetention())?.source.documentCount).toBe(1)
+    } finally {
+      lease.dispose()
+      owned.dispose()
+      await owner.dispose()
+    }
+  },
+)
 
 it('aborts the posted parser waiter and parses newest source on the same real worker', async () => {
   const worker = new Worker(new URL('../src/treeSitter/treeSitter.worker.ts', import.meta.url), {

@@ -525,7 +525,10 @@ export class MinimapWorkerClient {
   private finishSourceWait(token: number): void {
     this.cancelScheduledRender(token)
     if (this.renderInFlight) return
-    if (this.pendingUpdate) { this.scheduleFlush(); return }
+    if (this.pendingUpdate) {
+      this.scheduleFlush()
+      return
+    }
     if (this.pendingRender) this.requestRender()
   }
 

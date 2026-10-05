@@ -54,33 +54,51 @@ async function tokenizeSnippet(
   if (text.length === 0) return []
 
   const documentId = `editor-snippet-${nextSnippetId++}`
-  const highlighters = [...sources.flatMap(source => source.highlighter ? [source.highlighter] : []), ...pluginHost.getHighlighterProviders()]
-  const structural = [...sources.flatMap(source => source.syntax ? [source.syntax] : []), ...pluginHost.getSyntaxProviders()]
+  const highlighters = [
+    ...sources.flatMap((source) => (source.highlighter ? [source.highlighter] : [])),
+    ...pluginHost.getHighlighterProviders(),
+  ]
+  const structural = [
+    ...sources.flatMap((source) => (source.syntax ? [source.syntax] : [])),
+    ...pluginHost.getSyntaxProviders(),
+  ]
   if (highlighters.length > 0) {
     const submitted = createSnippetDocument(text, 'as-submitted')
     const analysis = createEditorDocumentAnalysis({ buffer: submitted.buffer, documentId })
     try {
       for (const provider of highlighters) {
         const audience = analysis.contributions.createAudience()
-        const task = analysis.contributions.request(provider.operation, { languageId }, { kind: 'latest', audience })
+        const task = analysis.contributions.request(
+          provider.operation,
+          { languageId },
+          { kind: 'latest', audience },
+        )
         const outcome = await task.settled
         audience.dispose()
         if (outcome.kind === 'failed') throw outcome.failure
         if (outcome.kind === 'completed') return submitted.submittedTokens(outcome.result.tokens)
       }
-    } finally { analysis.dispose() }
+    } finally {
+      analysis.dispose()
+    }
   }
   const folded = createSnippetDocument(text, 'as-document')
   const analysis = createEditorDocumentAnalysis({ buffer: folded.buffer, documentId })
   try {
     for (const provider of structural) {
       const audience = analysis.contributions.createAudience()
-      const task = analysis.contributions.request(provider.operation, { languageId, includeHighlights: true, syntaxMode: 'full' }, { kind: 'latest', audience })
+      const task = analysis.contributions.request(
+        provider.operation,
+        { languageId, includeHighlights: true, syntaxMode: 'full' },
+        { kind: 'latest', audience },
+      )
       const outcome = await task.settled
       audience.dispose()
       if (outcome.kind === 'failed') throw outcome.failure
       if (outcome.kind === 'completed') return folded.submittedTokens(outcome.result.tokens)
     }
     return []
-  } finally { analysis.dispose() }
+  } finally {
+    analysis.dispose()
+  }
 }

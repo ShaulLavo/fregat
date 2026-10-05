@@ -1,6 +1,9 @@
+import { documentKey } from '@/lib/documents/utils/identity'
+import type { HistoryComparisonInput } from '@/lib/snapshot-comparison'
+import type { SnapshotComparisonScope } from '@/lib/documents/utils/snapshot-comparison'
 import { languageIdForFilePath } from '@/lib/file-language'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
-import type { HistoryComparisonSide } from '@singapore-editor/core/document'
+import type { EditorTextBuffer, HistoryComparisonSide } from '@singapore-editor/core/document'
 import { createTextDiff, type DiffFile } from '@singapore-editor/diff'
 import { materializePieceTableFullText } from '@singapore-editor/textbuffer'
 
@@ -27,4 +30,27 @@ export function compareHistoryStates(
     newFile: { languageId, path, text: materializePieceTableFullText(newSide.snapshot) },
     oldFile: { languageId, path, text: materializePieceTableFullText(oldSide.snapshot) },
   })
+}
+
+export function historyComparisonInput(
+  buffer: EditorTextBuffer,
+  path: FilesystemPath,
+  scope: SnapshotComparisonScope,
+  old: HistoryComparisonSide,
+  next: HistoryComparisonSide,
+): HistoryComparisonInput {
+  return {
+    kind: 'history',
+    scope,
+    path,
+    buffer,
+    subject: documentKey({ kind: 'history', file: { path } }),
+    old,
+    new: next,
+    coverage:
+      old.snapshot.length > MAX_HISTORY_COMPARE_LENGTH ||
+      next.snapshot.length > MAX_HISTORY_COMPARE_LENGTH
+        ? 'too-large'
+        : 'full',
+  }
 }

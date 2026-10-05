@@ -212,9 +212,25 @@ export { editorCommandMutates, editorCommandDeclaration } from './editor/command
 
 export type { DocumentRead, DocumentRevision } from './editor/documentDelivery'
 export type { EditorStructuralOperation, EditorHighlighterOperation } from './document/operations'
-export { createEditorStructuralOperation, createEditorHighlighterOperation } from './editor/operationDefinitions'
-export type { EditorStructuralOperationContext, EditorHighlighterOperationContext } from './document/operations'
+export {
+  createEditorStructuralOperation,
+  createEditorHighlighterOperation,
+} from './editor/operationDefinitions'
+export type {
+  EditorStructuralOperationContext,
+  EditorHighlighterOperationContext,
+} from './document/operations'
 
-export type { DocumentOperation, DocumentOperationOptions, DocumentContributionLease } from './editor/contributionOperation'
+export type {
+  DocumentOperation,
+  DocumentOperationOptions,
+  DocumentContributionLease,
+} from './editor/contributionOperation'
 
-export type { DocumentContributionAudience, DocumentContributionOwner, DocumentContributionDemand, DocumentContributionTask, DocumentContributionOutcome } from './editor/contributionDemand'
+export type {
+  DocumentContributionAudience,
+  DocumentContributionOwner,
+  DocumentContributionDemand,
+  DocumentContributionTask,
+  DocumentContributionOutcome,
+} from './editor/contributionDemand'

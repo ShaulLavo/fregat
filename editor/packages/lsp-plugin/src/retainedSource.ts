@@ -26,7 +26,6 @@ type ProtocolInput = {
   readonly languageId: string
   readonly logicalRevisionScope: DocumentLogicalRevisionScope
   readonly connection: LanguageServerSourceConnection
-  readonly acceptSource?: (length: number) => boolean
 }
 
 export type LanguageServerSourceOwner =
@@ -80,8 +79,7 @@ const protocolOperation = defineDocumentOperation(
     left.uri === right.uri &&
     left.languageId === right.languageId &&
     left.logicalRevisionScope === right.logicalRevisionScope &&
-    left.connection === right.connection &&
-    left.acceptSource === right.acceptSource,
+    left.connection === right.connection,
   { scheduling: 'ordered' },
 )
 
@@ -200,10 +198,6 @@ class ProtocolSource {
   }
 
   public async analyze(read: DocumentProjectionUpdate['read']): Promise<LspDocument | null> {
-    if (this.input.acceptSource?.(read.text.length) === false) {
-      this.close()
-      return null
-    }
     const receipt = await this.context.source.prepareProjection(this, read)
     if (receipt && this.publication) publishSource(this.input.workspace, this.publication)
     return receipt ? this.document : null

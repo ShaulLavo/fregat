@@ -1,8 +1,4 @@
-export {
-  observeEditorMountTiming,
-  resetEditorInstanceCount,
-  setHighlightRegistry,
-} from '../editor'
+export { observeEditorMountTiming, resetEditorInstanceCount, setHighlightRegistry } from '../editor'
 export { EditorPluginHost } from '../plugins'
 export type { EditorPluginHostEvents } from '../plugins'
 export {

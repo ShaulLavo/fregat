@@ -488,6 +488,7 @@ async function settledActions(
   editor.moveCaret(3)
   vi.advanceTimersByTime(250)
   await flushPromises()
+  await editor.awaitRequest('textDocument/codeAction')
   editor.answerCodeAction(actions)
   await flushPromises()
 }

@@ -510,11 +510,23 @@ function highlighterDiffSyntaxSession(
   provider: EditorHighlighterProvider,
   document: DiffSyntaxDocument,
 ): DiffSyntaxServiceSession | null {
-  const analysis = createEditorDocumentAnalysis({ buffer: document.snippet.buffer, documentId: document.documentId })
+  const analysis = createEditorDocumentAnalysis({
+    buffer: document.snippet.buffer,
+    documentId: document.documentId,
+  })
   const session = analysis.borrowHighlighter({ provider, languageId: document.languageId })
-  if (!session) { analysis.dispose(); return null }
+  if (!session) {
+    analysis.dispose()
+    return null
+  }
   const retained = tokenHighlighterDiffSyntaxSession(document, session)
-  return { ...retained, dispose() { retained.dispose(); analysis.dispose() } }
+  return {
+    ...retained,
+    dispose() {
+      retained.dispose()
+      analysis.dispose()
+    },
+  }
 }
 
 function treeSitterDiffSyntaxService(
@@ -532,7 +544,10 @@ function treeSitterDiffSyntaxSession(
   provider: EditorSyntaxProvider,
   document: DiffSyntaxDocument,
 ): DiffSyntaxServiceSession | null {
-  const analysis = createEditorDocumentAnalysis({ buffer: document.snippet.buffer, documentId: document.documentId })
+  const analysis = createEditorDocumentAnalysis({
+    buffer: document.snippet.buffer,
+    documentId: document.documentId,
+  })
   const session = analysis.borrowStructural({
     provider,
     includeCaptures: document.request.language.includeCaptures,
@@ -540,10 +555,16 @@ function treeSitterDiffSyntaxSession(
     languageId: document.languageId,
     syntaxMode: document.request.language.mode === 'range' ? 'range' : 'full',
   })
-  if (!session) { analysis.dispose(); return null }
+  if (!session) {
+    analysis.dispose()
+    return null
+  }
 
   return {
-    dispose: () => { session.dispose(); analysis.dispose() },
+    dispose: () => {
+      session.dispose()
+      analysis.dispose()
+    },
     refresh: async () => {
       const result = await session.refresh(document.textSnapshot)
       return { ...result, tokens: document.snippet.submittedTokens(result.tokens) }

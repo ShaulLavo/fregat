@@ -16,7 +16,7 @@ import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { Spinner } from '@workspace/ui/components/spinner'
-import { useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
+import { useEffect, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'
 import { HistoryClearDialog } from '@/features/editor/components/history-clear-dialog'
@@ -30,10 +30,7 @@ import {
   historyClearMutationOptions,
   historyRestoreMutationOptions,
 } from '@/features/editor/state/history-mutations'
-import {
-  compareHistoryStates,
-  type HistoryComparisonResult,
-} from '@/features/editor/utils/history-compare'
+import { type HistoryComparisonResult } from '@/features/editor/utils/history-compare'
 import {
   historyStateExcerpt,
   historyStateLabel,
@@ -52,18 +49,20 @@ export function HistoryPane({
   buffer,
   documentKey,
   path,
+  rootPath,
   tabId,
   onLeave,
 }: {
   buffer: EditorTextBuffer
   documentKey: DocumentKey
   path: FilesystemPath
+  rootPath: FilesystemPath
   tabId: TabId
   /** Escape with nothing selected: hand focus back to the file's own editor. */
   onLeave?: () => void
 }) {
   const mode = useSettingValue('editor.diff.viewMode')
-  const snapshot = useHistoryViewer(buffer, path, tabId)
+  const snapshot = useHistoryViewer(buffer, path, rootPath, tabId)
   const presentation = useTabPresentation(tabId)
   const viewer = snapshot?.viewer ?? null
   const nextState = snapshot?.state ?? null
@@ -90,16 +89,7 @@ export function HistoryPane({
 
   const graph = state?.graph ?? null
   const focused = state && viewer && state.focusedId !== null ? viewer.node(state.focusedId) : null
-  const current = graph && viewer ? viewer.node(graph.currentId) : null
-  // Manual memo: the compiler keys this full-text diff on the whole viewer `state`, so a selection
-  // change would redo it. Nodes are immutable and rebuilt per graph revision, so identity is exact.
-  const focusedDiff = useMemo(
-    () =>
-      focused && current && !focused.isCurrent
-        ? compareHistoryStates(current, focused, path)
-        : null,
-    [current, focused, path],
-  )
+  const focusedDiff = snapshot?.focusedComparison ?? null
   const selectedComparison = state?.comparison?.status === 'ready' ? state.comparison.result : null
   const focusedComparison = state?.lostIds.length ? null : focusedDiff
   const displayedDiff = state?.selectedIds.length === 2 ? selectedComparison : focusedComparison

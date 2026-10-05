@@ -22,10 +22,7 @@ import { MINIMAP_DECORATION_MERGE_LIMIT } from '../src/decorationMerge'
 import { createMinimapPlugin } from '../src/plugin'
 import { RenderMinimap } from '../src/types'
 import { minimapViewportGeometry } from '../src/viewportGeometry'
-import type {
-  EditorMinimapOptions,
-  MinimapWorkerRequest,
-} from '../src/types'
+import type { EditorMinimapOptions, MinimapWorkerRequest } from '../src/types'
 import {
   createTestCapabilityContributionContext,
   createTestPluginContext,

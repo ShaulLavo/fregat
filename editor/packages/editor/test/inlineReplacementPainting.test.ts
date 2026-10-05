@@ -3,10 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { Editor } from '../src/editor/Editor'
 import { createVisibleEditor } from './factories/visibleEditor'
-import {
-  resetEditorInstanceCount,
-  setHighlightRegistry,
-} from '../src/public/testing'
+import { resetEditorInstanceCount, setHighlightRegistry } from '../src/public/testing'
 import type { EditorPlugin } from '../src/plugins'
 import { EditorTokenStore } from '../src/syntax/tokenStore'
 

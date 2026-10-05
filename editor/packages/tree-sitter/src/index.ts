@@ -57,7 +57,12 @@ import type {
 import { TreeSitterLanguageRegistry, resolveTreeSitterLanguageClosure } from './treeSitter/registry'
 import { TreeSitterSyntaxSession } from './session'
 import { treeSitterSelectionRanges } from './structuralSelection'
-import { createTreeSitterWorkerOwner, treeSitterBackendForOwner, type TreeSitterBackend, type TreeSitterWorkerOwner } from './treeSitter/workerClient'
+import {
+  createTreeSitterWorkerOwner,
+  treeSitterBackendForOwner,
+  type TreeSitterBackend,
+  type TreeSitterWorkerOwner,
+} from './treeSitter/workerClient'
 
 export type TreeSitterSyntaxProviderOptions = {
   readonly workerOwner?: TreeSitterWorkerOwner

@@ -1,6 +1,9 @@
 import { createEditorTextBuffer, createEditorBufferSession } from '@singapore-editor/core/document'
 import { createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
-import { createShikiWorkerOwner, createShikiHighlighterProvider } from '@singapore-editor/core/shiki'
+import {
+  createShikiWorkerOwner,
+  createShikiHighlighterProvider,
+} from '@singapore-editor/core/shiki'
 import { observeWorkerTransport } from './workerObservation'
 import { createError } from '@singapore-editor/core/logging/evlog'
 
@@ -39,18 +42,24 @@ async function setup(size: number, instrumented: boolean) {
     settings: [{ settings: { foreground: '#ffffff', background: '#000000' } }],
   }
   const owner = createShikiWorkerOwner()
-  const stopObservation = observeWorkerTransport(event => {
+  const stopObservation = observeWorkerTransport((event) => {
     if (event.durationMs !== undefined) return
     heapAtRequest = Math.max(heapAtRequest, performance.memory.usedJSHeapSize)
     wireUnits += event.sourceUnits
   })
-  const buffer = createEditorTextBuffer(`${'x'.repeat(4095)}\n`.repeat(Math.ceil(size / 4096)).slice(0, size))
+  const buffer = createEditorTextBuffer(
+    `${'x'.repeat(4095)}\n`.repeat(Math.ceil(size / 4096)).slice(0, size),
+  )
   const view = createEditorBufferSession(buffer)
   for (let index = 1; index <= 32; index++) {
     const offset = Math.floor((size * index) / 33)
     view.applyEdits([{ from: offset, to: offset + 1, text: 'y' }], { history: 'skip' })
   }
-  const provider = createShikiHighlighterProvider({ workerOwner: owner, resolveLanguage: async () => [language], resolveTheme: async () => theme })
+  const provider = createShikiHighlighterProvider({
+    workerOwner: owner,
+    resolveLanguage: async () => [language],
+    resolveTheme: async () => theme,
+  })
   const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'copy-proof' })
   const session = analysis.borrowHighlighter({ provider, languageId: 'copy-proof' })
   check(session, 'Shiki session was not created')
@@ -83,19 +92,26 @@ async function run(repetitions: number) {
     const before = active.buffer.getTextSnapshot()
     const first = { from: before.length - 9, to: before.length - 9, text: 'a' }
     const last = { from: before.length + 1 - 8, to: before.length + 1 - 8, text: 'b' }
-    samples.push(await measure('skipped-edit', async () => {
-      view.applyEdits([first])
-      view.applyEdits([last])
-      await session.refresh(buffer.getTextSnapshot())
-    }))
-    samples.push(await measure('undo-branch', async () => {
-      view.undo(); view.undo()
-      await session.refresh(buffer.getTextSnapshot())
-    }))
-    samples.push(await measure('incremental', async () => {
-      view.applyEdits([first])
-      await session.refresh(buffer.getTextSnapshot())
-    }))
+    samples.push(
+      await measure('skipped-edit', async () => {
+        view.applyEdits([first])
+        view.applyEdits([last])
+        await session.refresh(buffer.getTextSnapshot())
+      }),
+    )
+    samples.push(
+      await measure('undo-branch', async () => {
+        view.undo()
+        view.undo()
+        await session.refresh(buffer.getTextSnapshot())
+      }),
+    )
+    samples.push(
+      await measure('incremental', async () => {
+        view.applyEdits([first])
+        await session.refresh(buffer.getTextSnapshot())
+      }),
+    )
   }
   await verifyTokens()
   return samples
@@ -111,8 +127,14 @@ async function verifyTokens() {
   try {
     const expected = await fresh.refresh(reference.getTextSnapshot())
     const actual = await session.refresh(buffer.getTextSnapshot())
-    check(JSON.stringify(actual.tokens.toTokens()) === JSON.stringify(expected.tokens.toTokens()), 'Catch-up tokens differ from a fresh full tokenization')
-  } finally { fresh.dispose(); analysis.dispose() }
+    check(
+      JSON.stringify(actual.tokens.toTokens()) === JSON.stringify(expected.tokens.toTokens()),
+      'Catch-up tokens differ from a fresh full tokenization',
+    )
+  } finally {
+    fresh.dispose()
+    analysis.dispose()
+  }
   await owner.awaitIdleFence()
 }
 

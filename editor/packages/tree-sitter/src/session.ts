@@ -578,31 +578,6 @@ export function createTreeSitterEditPayload(
   }
 }
 
-export const createTextDiffEdit = (previousText: string, nextText: string): TextEdit | null => {
-  if (previousText === nextText) return null
-
-  let start = 0
-  const maxPrefixLength = Math.min(previousText.length, nextText.length)
-  while (start < maxPrefixLength && previousText[start] === nextText[start]) start += 1
-
-  let previousEnd = previousText.length
-  let nextEnd = nextText.length
-  while (
-    previousEnd > start &&
-    nextEnd > start &&
-    previousText[previousEnd - 1] === nextText[nextEnd - 1]
-  ) {
-    previousEnd -= 1
-    nextEnd -= 1
-  }
-
-  return {
-    from: start,
-    to: previousEnd,
-    text: nextText.slice(start, nextEnd),
-  }
-}
-
 type TreeSitterSyntaxResultContext = {
   readonly includeCaptures: boolean
   readonly includeHighlights: boolean

@@ -83,7 +83,8 @@ describe('syntax captures for inline replacement providers', () => {
   it('withholds old capture offsets after an edit until a current parse lands', async () => {
     let readCaptures: () => readonly EditorSyntaxCapture[] | null = () => null
     editor = new Editor(container, {
-      plugins: [syntaxPlugin,
+      plugins: [
+        syntaxPlugin,
         {
           name: 'test.capture-reader',
           activate: (context) =>

@@ -1184,7 +1184,7 @@ export class Editor {
   }
 
   setTokens(tokens: EditorTokenInput): void {
-    this.adoptTokens(toEditorTokenStore(tokens))
+    this.syntax.setExternalTokens(toEditorTokenStore(tokens))
   }
 
   /**

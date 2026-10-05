@@ -314,7 +314,8 @@ function markdownCaptures(): EditorPlugin {
     dispose() {},
   }
   return {
-    activate: (context) => context.registerSyntaxProvider({ operation: createEditorStructuralOperation(() => session) }),
+    activate: (context) =>
+      context.registerSyntaxProvider({ operation: createEditorStructuralOperation(() => session) }),
   }
 }
 

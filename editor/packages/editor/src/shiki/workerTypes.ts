@@ -1,5 +1,10 @@
 import type { EditorTheme } from '../theme'
-import type { DocumentWorkerPoint, DocumentWorkerReadReference, DocumentWorkerSourceCommand, DocumentWorkerSourceResult } from '../document/workerReader'
+import type {
+  DocumentWorkerPoint,
+  DocumentWorkerReadReference,
+  DocumentWorkerSourceCommand,
+  DocumentWorkerSourceResult,
+} from '../document/workerReader'
 import type { TextEdit } from '../tokens'
 import type { PackedEditorTokenPatch, PackedEditorTokens } from '../syntax/packedTokens'
 import type { EditorShikiThemeSettingLike } from './theme'
@@ -103,7 +108,12 @@ export type ShikiWorkerRequestPayload =
   | ShikiWorkerThemeRequest
 
 export type ShikiWorkerRetentionSnapshot = {
-  readonly source: { readonly documents: number; readonly reads: number; readonly pins: number; readonly sourceUnits: number }
+  readonly source: {
+    readonly documents: number
+    readonly reads: number
+    readonly pins: number
+    readonly sourceUnits: number
+  }
   readonly documentCount: number
   readonly tokenizerCount: number
   /** Session identifiers retained after document disposal. */

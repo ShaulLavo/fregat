@@ -365,7 +365,7 @@ describe.skipIf(typeof Worker === 'undefined')('Shiki worker highlighter', () =>
     await first
     expect((await next).tokens.toTokens()).toEqual(await fullTokens(text))
     session.dispose()
-    expect((await session.run()).tokens.length).toBe(0)
+    await expect(session.run()).rejects.toMatchObject({ name: 'AbortError' })
   })
 
   it('applies a multi-edit change as one batch of incremental edits', async () => {

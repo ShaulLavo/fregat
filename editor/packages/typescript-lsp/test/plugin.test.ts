@@ -1,5 +1,11 @@
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
-import { createStringTextSnapshot, type TextReadSnapshot } from '@singapore-editor/core/document'
+import {
+  createStringTextSnapshot,
+  createEditorTextBuffer,
+  createEditorBufferSession,
+  type TextReadSnapshot,
+} from '@singapore-editor/core/document'
+import { acquireEditorDocumentAnalysis } from '@singapore-editor/core/internal/document-worker'
 import type { EditorAnyCommandId } from '@singapore-editor/core/editor'
 import type {
   DocumentSessionChange,
@@ -33,7 +39,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LspConnectionPool } from '@singapore-editor/lsp-plugin'
 import type * as lsp from 'vscode-languageserver-protocol'
 import {
-  createTypeScriptLspPlugin,
+  createTypeScriptLspPlugin as createBaseTypeScriptLspPlugin,
   TypeScriptLspWorkspace,
   type TypeScriptLspDiagnosticSummary,
 } from '../src'
@@ -46,6 +52,34 @@ import {
 
 type Listener = (event: Event) => void
 type JsonMessage = Record<string, unknown>
+const loadingConnections = new Set<object>()
+const connectedSources = new Set<
+  import('@singapore-editor/lsp-plugin').LanguageServerConnectionContext
+>()
+function createTypeScriptLspPlugin(
+  options: Parameters<typeof createBaseTypeScriptLspPlugin>[0] = {},
+) {
+  const identity = {}
+  return createBaseTypeScriptLspPlugin({
+    ...options,
+    onConnectionCreated(context) {
+      connectedSources.add(context)
+      const registration = options.onConnectionCreated?.(context)
+      return {
+        dispose() {
+          registration?.dispose()
+          connectedSources.delete(context)
+          loadingConnections.delete(identity)
+        },
+      }
+    },
+    onStatusChange(status) {
+      if (status === 'loading') loadingConnections.add(identity)
+      else loadingConnections.delete(identity)
+      options.onStatusChange?.(status)
+    },
+  })
+}
 
 class FakeWorker implements LspWorkerLike {
   public readonly sent: unknown[] = []
@@ -151,6 +185,10 @@ class FakeWebSocket implements LspWebSocketLike {
 
 describe('createTypeScriptLspPlugin', () => {
   afterEach(() => {
+    for (const dispose of ownedCleanups) dispose()
+    ownedCleanups.clear()
+    loadingConnections.clear()
+    connectedSources.clear()
     vi.useRealTimers()
     document.body.replaceChildren()
   })
@@ -194,9 +232,11 @@ describe('createTypeScriptLspPlugin', () => {
       expect(workerFactory).toHaveBeenCalledTimes(1)
       worker.receive(initializeResponse(message(worker.sent[0])))
       await flushPromises()
-      expect(
-        sentMethods(worker).filter((method) => method === 'editor/typescript/setWorkspaceFiles'),
-      ).toHaveLength(1)
+      await expect
+        .poll(() =>
+          sentMethods(worker).filter((method) => method === 'editor/typescript/setWorkspaceFiles'),
+        )
+        .toHaveLength(1)
       first?.dispose()
       expect(worker.terminated).toBe(false)
       workspace.upsertWorkspaceFiles([{ path: '/a.ts', text: 'b' }])
@@ -679,7 +719,7 @@ describe('createTypeScriptLspPlugin', () => {
     if (!socket) throw new Error('missing socket')
 
     socket.open()
-    await flushPromises()
+    await vi.waitUntil(() => socket.sent.length > 0, { interval: 1, timeout: 1000 })
     socket.receive(initializeResponse(jsonMessage(socket.sent[0])))
     await flushPromises()
 
@@ -726,7 +766,7 @@ describe('createTypeScriptLspPlugin', () => {
     if (!socket) throw new Error('missing socket')
 
     socket.open()
-    await flushPromises()
+    await vi.waitUntil(() => socket.sent.length > 0, { interval: 1, timeout: 1000 })
     const initialize = jsonMessage(socket.sent[0])
     socket.receive(initializeResponse(initialize))
     await flushPromises()
@@ -774,6 +814,7 @@ describe('createTypeScriptLspPlugin', () => {
       'content',
       documentChange([{ from: 22, to: 23, text: '2' }]),
     )
+    await flushPromises()
     vi.mocked(context.setRangeHighlight!).mockClear()
 
     worker.receive({
@@ -817,6 +858,7 @@ describe('createTypeScriptLspPlugin', () => {
       'content',
       documentChange([{ from: 22, to: 23, text: '2' }]),
     )
+    await flushPromises()
 
     const didChange = message(worker.sent.toReversed().find(hasMethod('textDocument/didChange')))
     expect(contentChangesFor(didChange)).toEqual([
@@ -854,6 +896,7 @@ describe('createTypeScriptLspPlugin', () => {
       'content',
       documentChange([{ from: 23, to: 25, text: '' }]),
     )
+    await flushPromises()
 
     expect(latestRangeHighlightRanges(context, 'editor-test-typescript-lsp-error')).toEqual([
       { start: 22, end: 23 },
@@ -884,6 +927,7 @@ describe('createTypeScriptLspPlugin', () => {
       'content',
       documentChange([{ from: 22, to: 25, text: '' }]),
     )
+    await flushPromises()
 
     expect(latestRangeHighlightRanges(context, 'editor-test-typescript-lsp-error')).toEqual([])
   })
@@ -1668,6 +1712,14 @@ function activateViewProvider(plugin: {
 // A real context answers getSnapshot() with the snapshot of the update in flight, and the plugin's
 // document sync reads the text there rather than from the update's argument.
 const currentSnapshots = new WeakMap<EditorViewContributionContext, EditorViewSnapshot>()
+const ownedCleanups = new Set<() => void>()
+const sourceUpdates = new WeakMap<
+  EditorViewContributionContext,
+  (
+    snapshot: EditorViewSnapshot,
+    change: Parameters<EditorViewContribution['update']>[2],
+  ) => EditorViewSnapshot
+>()
 
 function followingSnapshots(
   provider: EditorViewContributionProvider,
@@ -1678,8 +1730,9 @@ function followingSnapshots(
       if (!contribution) return null
       const update = contribution.update.bind(contribution)
       contribution.update = (snapshot, kind, change) => {
-        currentSnapshots.set(context, snapshot)
-        update(snapshot, kind, change)
+        const current = sourceUpdates.get(context)?.(snapshot, change) ?? snapshot
+        currentSnapshots.set(context, current)
+        update(current, kind, change)
       }
       return contribution
     },
@@ -1801,6 +1854,27 @@ function viewContributionContext(
   } = {},
 ): EditorViewContributionContext {
   const element = options.container ?? document.createElement('div')
+  let display = snapshot
+  let buffer = createEditorTextBuffer(
+    snapshot.textSnapshot.readRange(0, snapshot.textSnapshot.length),
+  )
+  let session = createEditorBufferSession(buffer)
+  const appliedChanges = new WeakSet<object>()
+  let owner = acquireEditorDocumentAnalysis({
+    buffer,
+    documentId: snapshot.documentId ?? 'fixture',
+  })
+  const getSnapshot = () => ({
+    ...display,
+    textSnapshot: buffer.getTextSnapshot(),
+    documentSyncPoint: buffer.getDocumentSyncPoint(),
+    changesSinceDocumentSyncPoint: buffer.changesSinceDocumentSyncPoint.bind(buffer),
+  })
+  const dispose = () => {
+    owner.dispose()
+    ownedCleanups.delete(dispose)
+  }
+  ownedCleanups.add(dispose)
   let context: EditorViewContributionContext | null = null
   const getFeature = vi.fn((token: unknown): unknown | null => {
     const feature = options.features?.get(token)
@@ -1812,7 +1886,8 @@ function viewContributionContext(
     scrollElement: element,
     contentElement: element,
     highlightPrefix: 'editor-test',
-    getSnapshot: () => (context && currentSnapshots.get(context)) ?? snapshot,
+    getSnapshot,
+    getDocumentContributions: () => owner.analysis.contributions,
     getFeature,
     setSelection: vi.fn(),
     textOffsetFromPoint: vi.fn(() => 22),
@@ -1822,6 +1897,20 @@ function viewContributionContext(
     ...(options.registerKeymapContextKey
       ? { registerKeymapContextKey: options.registerKeymapContextKey }
       : {}),
+  })
+  sourceUpdates.set(context, (next, change) => {
+    if (next.documentId !== display.documentId) {
+      const previous = owner
+      buffer = createEditorTextBuffer(next.textSnapshot.readRange(0, next.textSnapshot.length))
+      session = createEditorBufferSession(buffer)
+      owner = acquireEditorDocumentAnalysis({ buffer, documentId: next.documentId ?? 'fixture' })
+      previous.dispose()
+    } else if (change?.edits.length && !appliedChanges.has(change)) {
+      appliedChanges.add(change)
+      session.applyEdits(change.edits)
+    }
+    display = next
+    return getSnapshot()
   })
   return context
 }
@@ -2171,6 +2260,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 async function flushPromises(): Promise<void> {
+  await vi.waitUntil(() => loadingConnections.size === 0, { interval: 1, timeout: 1000 })
+  for (const context of connectedSources) {
+    for (const document of context.workspace.documents) {
+      const prepared = context.workspace.prepareDocumentRequest(document.uri)
+      if (prepared.kind === 'pending') await prepared.ready
+    }
+  }
   await Promise.resolve()
   await Promise.resolve()
   await Promise.resolve()

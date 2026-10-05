@@ -177,7 +177,7 @@ export function leaseDocumentOperation<Input, Result, Entry extends Contribution
   return operation[leaseBinding](entry, signal)
 }
 
-export function contributionLease<Result>(
+function contributionLease<Result>(
   entry: ContributionEntry<Result>,
   signal?: AbortSignal,
   retire = false,

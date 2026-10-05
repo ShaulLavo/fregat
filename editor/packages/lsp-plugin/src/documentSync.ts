@@ -32,7 +32,6 @@ export type DocumentSyncDiagnosticsPresenter = {
 }
 export type DocumentSyncOptions = LanguageServerDocumentSyncOptions & {
   readonly logicalRevisionScope: DocumentLogicalRevisionScope
-  readonly acceptSource?: (length: number) => boolean
   getSourceOwner(): LanguageServerSourceOwner | null
   getConnection(): LanguageServerSourceConnection | null
   onDocumentClosed(): void
@@ -205,7 +204,6 @@ export class DocumentSync {
       languageId: descriptor.languageId,
       logicalRevisionScope: this.options.logicalRevisionScope,
       connection,
-      acceptSource: this.options.acceptSource,
     })
     this.binding = lease
       ? { source, connection, uri: descriptor.uri, languageId: descriptor.languageId, lease }

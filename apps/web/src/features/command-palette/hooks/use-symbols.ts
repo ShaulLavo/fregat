@@ -54,9 +54,7 @@ export function useSymbols({
           rootPath: rootPath ?? '',
           serverId: serverId ?? '',
           signal,
-          text: selectedDocument?.buffer.isDirty()
-            ? selectedDocument.buffer.materializeFullText()
-            : null,
+          buffer: selectedDocument?.buffer,
         },
         clientForQueryClient(client),
       )

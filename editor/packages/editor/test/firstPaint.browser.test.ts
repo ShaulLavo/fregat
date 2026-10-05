@@ -1,5 +1,8 @@
 import { createEditorStructuralOperation } from '../src/editor/operationDefinitions'
-import { TreeSitterWorkerClient, type TreeSitterBackend } from '../../tree-sitter/src/treeSitter/workerClient'
+import {
+  TreeSitterWorkerClient,
+  type TreeSitterBackend,
+} from '../../tree-sitter/src/treeSitter/workerClient'
 import { TreeSitterSyntaxSession } from '../../tree-sitter/src/session'
 import { defineStructuralOperation } from '../src/editor/operationDefinitions'
 import { afterEach, expect, test, vi } from 'vitest'
@@ -55,7 +58,9 @@ function delayedGrammar() {
   const parsedSessions: string[] = []
   let loadStarted = false
   const backend = {
-    get generation() { return worker.generation },
+    get generation() {
+      return worker.generation
+    },
     sourceEndpoint: worker.sourceEndpoint,
     registerLanguages: (languages) => worker.registerLanguages(languages),
     parse: (payload, signal) => {
@@ -72,11 +77,18 @@ function delayedGrammar() {
   } satisfies TreeSitterBackend
   const languageProvider = new TreeSitterLanguageRegistry()
   const provider: TreeSitterSyntaxProvider = {
-    registerLanguage: (contribution, options) => languageProvider.registerLanguage(contribution, options),
-    resolveTreeSitterLanguage: languageId => languageProvider.resolveTreeSitterLanguage(languageId),
-    operation: defineStructuralOperation(context => {
+    registerLanguage: (contribution, options) =>
+      languageProvider.registerLanguage(contribution, options),
+    resolveTreeSitterLanguage: (languageId) =>
+      languageProvider.resolveTreeSitterLanguage(languageId),
+    operation: defineStructuralOperation((context) => {
       if (!context.languageId) return null
-      return new TreeSitterSyntaxSession({ ...context, languageId: context.languageId, languageResolver: languageProvider, backend })
+      return new TreeSitterSyntaxSession({
+        ...context,
+        languageId: context.languageId,
+        languageResolver: languageProvider,
+        backend,
+      })
     }),
   }
   provider.registerLanguage({
@@ -258,19 +270,19 @@ test('paints retained full tokens immediately when the provider cannot query ran
   }
   const queryRange = vi.fn(async () => createEmptySyntaxResult())
   const providerOpenRuntime = vi.fn(
-      () =>
-        ({
-          foldingSupport: 'supported',
-          analyze: async () => result,
-          canQueryRange: () => false,
-          queryRange,
-          getResult: () => result,
-          getTokens: () => result.tokens,
-          getSnapshotVersion: () => 1,
-          dispose: () => undefined,
-        }) satisfies EditorSyntaxRuntime,
-    )
-const provider: EditorSyntaxProvider = {
+    () =>
+      ({
+        foldingSupport: 'supported',
+        analyze: async () => result,
+        canQueryRange: () => false,
+        queryRange,
+        getResult: () => result,
+        getTokens: () => result.tokens,
+        getSnapshotVersion: () => 1,
+        dispose: () => undefined,
+      }) satisfies EditorSyntaxRuntime,
+  )
+  const provider: EditorSyntaxProvider = {
     operation: createEditorStructuralOperation(providerOpenRuntime),
   }
   const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'retained.ts' })
@@ -366,7 +378,12 @@ test('reclaims inactive real parser sessions while the shared provider remains u
   analysis.dispose()
   survivorAnalysis.dispose()
   await grammar.worker.awaitIdleFence()
-  expect((await grammar.worker.inspectRetention())?.source).toEqual({ documentCount: 0, readCount: 0, pinCount: 0, sourceUnits: 0 })
+  expect((await grammar.worker.inspectRetention())?.source).toEqual({
+    documentCount: 0,
+    readCount: 0,
+    pinCount: 0,
+    sourceUnits: 0,
+  })
   expect(grammar.worker.inspect().pendingRequests).toBe(0)
 })
 
@@ -390,7 +407,12 @@ test('disposes a waiting session without parsing it and preserves the simultaneo
   expect(second.editor.materializeFullText()).toBe('const second = 222;')
   second.editor.dispose()
   await grammar.worker.awaitIdleFence()
-  expect((await grammar.worker.inspectRetention())?.source).toEqual({ documentCount: 0, readCount: 0, pinCount: 0, sourceUnits: 0 })
+  expect((await grammar.worker.inspectRetention())?.source).toEqual({
+    documentCount: 0,
+    readCount: 0,
+    pinCount: 0,
+    sourceUnits: 0,
+  })
   expect(grammar.worker.inspect().pendingRequests).toBe(0)
   await grammar.worker.dispose()
   expect(grammar.worker.inspect().lifecycle).toBe('disposed')

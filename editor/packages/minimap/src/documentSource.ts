@@ -52,7 +52,7 @@ export function retainMinimapDocumentSource(
   return lease ? { source, lease } : null
 }
 
-export class MinimapDocumentSource {
+class MinimapDocumentSource {
   private worker: MinimapWorkerOwner | null = null
   private connection: DocumentProjectionConnection | null = null
   private nextRegistration = 0

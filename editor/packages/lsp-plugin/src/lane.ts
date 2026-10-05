@@ -191,7 +191,7 @@ function resolveConnectionOptions(
   }
 }
 
-export function logicalRevisionScopeFor(workspace: LspWorkspace): DocumentLogicalRevisionScope {
+function logicalRevisionScopeFor(workspace: LspWorkspace): DocumentLogicalRevisionScope {
   const current = logicalRevisionScopes.get(workspace)
   if (current) return current
 

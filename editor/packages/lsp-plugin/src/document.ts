@@ -51,7 +51,6 @@ export type LanguageServerDocumentOptions = {
   readonly lanes: readonly LanguageServerLaneOptions[]
   readonly onApplyWorkspaceEdit?: OnApplyWorkspaceEdit
   readonly controller?: LanguageServerDocumentSyncOptions['controller']
-  readonly acceptSource?: (length: number) => boolean
 }
 
 /** A document's protocol state. Views borrow it; its creator disposes it. */
@@ -65,13 +64,11 @@ export class LanguageServerDocument {
     options: {
       readonly lanes: readonly LanguageServerResolvedLaneOptions[]
       readonly documentSync: LanguageServerDocumentSyncOptions
-      readonly acceptSource?: (length: number) => boolean
     },
   ) {
     this.syncOptions = options.documentSync
     this.lanes = options.lanes.map(
-      (lane) =>
-        new DocumentLanguageServerLane(source, lane, options.documentSync, options.acceptSource),
+      (lane) => new DocumentLanguageServerLane(source, lane, options.documentSync),
     )
   }
 
@@ -109,7 +106,6 @@ export function createLanguageServerDocument(
         controller: options.controller,
         uriForDocument: () => options.uri,
       },
-      acceptSource: options.acceptSource,
     },
   )
 }
@@ -136,7 +132,6 @@ export class DocumentLanguageServerLane {
     private readonly source: DocumentSource,
     readonly options: LanguageServerResolvedLaneOptions,
     syncOptions: LanguageServerDocumentSyncOptions,
-    acceptSource?: (length: number) => boolean,
   ) {
     this.connection = acquireResolvedLanguageServerLane(
       {
@@ -196,7 +191,6 @@ export class DocumentLanguageServerLane {
         logicalRevisionScope: this.connection.logicalRevisionScope,
         getSourceOwner: () => this.source.getSourceOwner(),
         getConnection: () => languageServerSourceConnection(this.connection.client),
-        acceptSource,
         onDocumentClosed: () => this.notify(),
         onDocumentChanged: () => {
           this.pullDiagnostics?.synchronize()

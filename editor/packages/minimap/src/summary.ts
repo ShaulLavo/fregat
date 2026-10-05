@@ -1,7 +1,7 @@
 import type { TextEdit, TextReadSnapshot } from '@singapore-editor/core/document'
 import type { MinimapDocumentSummaryPayload, MinimapDocumentSummaryPatch } from './types'
 
-export type SummaryLineStarts = {
+type SummaryLineStarts = {
   readonly length: number
   at(index: number): number | undefined
   indexForOffset(offset: number): number

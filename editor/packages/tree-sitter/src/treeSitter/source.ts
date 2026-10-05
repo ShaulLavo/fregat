@@ -10,16 +10,30 @@ export type TreeSitterPieceTableInput = {
 // web-tree-sitter copies callback text into a fixed 10KB UTF-16 buffer.
 const PARSER_READ_BATCH_CODE_UNITS = 4096
 
+// Cached parser trees keep the request's text callback until their source retires.
 export function createTreeSitterInput(read: DocumentWorkerRead): TreeSitterPieceTableInput {
+  return inputHandle({ read, owners: 1 })
+}
+
+function inputHandle(shared: {
+  readonly read: DocumentWorkerRead
+  owners: number
+}): TreeSitterPieceTableInput {
+  let disposed = false
   return {
-    read,
-    length: read.text.length,
+    read: shared.read,
+    length: shared.read.text.length,
     retain() {
-      const retained = read.retain()
-      if (!retained) throw new DOMException('Document source scope was released', 'AbortError')
-      return createTreeSitterInput(retained)
+      if (disposed || !shared.read.isValid())
+        throw new DOMException('Document source scope was released', 'AbortError')
+      shared.owners++
+      return inputHandle(shared)
     },
-    dispose: () => read.dispose(),
+    dispose() {
+      if (disposed) return
+      disposed = true
+      if (--shared.owners === 0) shared.read.dispose()
+    },
   }
 }
 

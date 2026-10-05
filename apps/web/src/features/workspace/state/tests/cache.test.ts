@@ -312,6 +312,7 @@ describe('workspace cache', () => {
         kind: 'git-diff',
         source: {
           kind: 'checkpoint-session',
+          ignoreWhitespace: true,
           owner: '/repo',
           sessionId: TEST_SESSION_ID,
           fromTurnCount: 2,

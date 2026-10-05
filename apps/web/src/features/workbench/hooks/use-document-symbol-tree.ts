@@ -32,7 +32,7 @@ export function useDocumentSymbolTree(rootPath: FilesystemPath, filePath: Filesy
           rootPath,
           serverId: serverId ?? '',
           signal,
-          text: liveDocument?.buffer.isDirty() ? liveDocument.buffer.materializeFullText() : null,
+          buffer: liveDocument?.buffer,
         },
         clientForQueryClient(client),
       )

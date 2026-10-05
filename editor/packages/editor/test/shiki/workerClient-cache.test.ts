@@ -1,7 +1,10 @@
 import { readAll } from '../factories/snapshotText'
 import { createHighlighterDocument } from './documentFixture'
 import { createShikiWorkerOwner } from '../../src/shiki/workerClient'
-import { DocumentWorkerReader, type DocumentWorkerSourceCommand } from '../../src/document/workerReader'
+import {
+  DocumentWorkerReader,
+  type DocumentWorkerSourceCommand,
+} from '../../src/document/workerReader'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createDocumentTextSnapshot, createPieceTableSnapshot } from '../../src/public/document'
 
@@ -37,7 +40,8 @@ class FakeWorker {
 
   public postMessage(message: FakeWorkerRequest): void {
     this.messages.push(message)
-    if (FakeWorker.autoResolve || message.payload.type === 'source') queueMicrotask(() => this.resolveRequest(message))
+    if (FakeWorker.autoResolve || message.payload.type === 'source')
+      queueMicrotask(() => this.resolveRequest(message))
   }
 
   public terminate(): void {
@@ -51,7 +55,9 @@ class FakeWorker {
 
   public resolveRequest(
     message: FakeWorkerRequest,
-    result: unknown = message.payload.type === 'source' && message.payload.command ? { source: this.reader.apply(message.payload.command) } : defaultResult(message),
+    result: unknown = message.payload.type === 'source' && message.payload.command
+      ? { source: this.reader.apply(message.payload.command) }
+      : defaultResult(message),
   ): void {
     if (this.terminated) return
 
@@ -176,7 +182,18 @@ describe('Shiki worker client theme cache', () => {
     FakeWorker.autoResolve = false
     const owner = await loadWorkerOwner()
     const theme = owner.loadTheme(themeOptions())
-    const busy = createHighlighterDocument(owner, { text: 'const value = 1', documentId: 'busy.ts', languageId: 'typescript', lang: 'typescript', theme: 'github-dark', registrations: { languageRegistrations: [], themeRegistration: { name: 'github-dark' }, themeRegistrations: [] } })
+    const busy = createHighlighterDocument(owner, {
+      text: 'const value = 1',
+      documentId: 'busy.ts',
+      languageId: 'typescript',
+      lang: 'typescript',
+      theme: 'github-dark',
+      registrations: {
+        languageRegistrations: [],
+        themeRegistration: { name: 'github-dark' },
+        themeRegistrations: [],
+      },
+    })
     const highlight = busy.run()
     await untilRequested('theme')
     await untilRequested('open')
@@ -239,7 +256,15 @@ describe('Shiki worker client theme cache', () => {
     }
     const resolvePreload = vi.fn(() => preloadRegistrations)
     const snapshot = createPieceTableSnapshot('const value = 1;')
-    const session = createHighlighterDocument(owner, { documentId: 'file.ts', languageId: 'typescript', lang: 'typescript', theme: 'github-dark', registrations: resolvedRegistrations(), preloadRegistrations: resolvePreload, text: readAll(createDocumentTextSnapshot(snapshot, 'const value = 1;')) })
+    const session = createHighlighterDocument(owner, {
+      documentId: 'file.ts',
+      languageId: 'typescript',
+      lang: 'typescript',
+      theme: 'github-dark',
+      registrations: resolvedRegistrations(),
+      preloadRegistrations: resolvePreload,
+      text: readAll(createDocumentTextSnapshot(snapshot, 'const value = 1;')),
+    })
     if (!session) throw new Error('missing Shiki highlighter session')
 
     const highlight = session.run()
@@ -250,7 +275,9 @@ describe('Shiki worker client theme cache', () => {
       resolvedRegistrations().languageRegistrations,
     )
     expect(resolvePreload).not.toHaveBeenCalled()
-    expect(fakeWorkerAt(0).messages.filter(message => message.payload.type !== 'source')).toHaveLength(1)
+    expect(
+      fakeWorkerAt(0).messages.filter((message) => message.payload.type !== 'source'),
+    ).toHaveLength(1)
 
     fakeWorkerAt(0).resolveRequest(openRequest, { tokens: [] })
     await highlight
@@ -264,7 +291,14 @@ describe('Shiki worker client theme cache', () => {
     FakeWorker.autoResolve = false
     const owner = await loadWorkerOwner()
     const snapshot = createPieceTableSnapshot('const value = 1;')
-    const session = createHighlighterDocument(owner, { documentId: 'file.ts', languageId: 'typescript', lang: 'typescript', theme: 'github-dark', registrations: resolvedRegistrations(), text: readAll(createDocumentTextSnapshot(snapshot, 'const value = 1;')) })
+    const session = createHighlighterDocument(owner, {
+      documentId: 'file.ts',
+      languageId: 'typescript',
+      lang: 'typescript',
+      theme: 'github-dark',
+      registrations: resolvedRegistrations(),
+      text: readAll(createDocumentTextSnapshot(snapshot, 'const value = 1;')),
+    })
     if (!session) throw new Error('missing Shiki highlighter session')
 
     const highlight = session.run()
@@ -296,7 +330,14 @@ describe('Shiki worker client theme cache', () => {
     FakeWorker.autoResolve = false
     const owner = await loadWorkerOwner()
     const snapshot = createPieceTableSnapshot('const value = 1;')
-    const session = createHighlighterDocument(owner, { documentId: 'file.ts', languageId: 'typescript', lang: 'typescript', theme: 'github-dark', registrations: resolvedRegistrations(), text: readAll(createDocumentTextSnapshot(snapshot, 'const value = 1;')) })
+    const session = createHighlighterDocument(owner, {
+      documentId: 'file.ts',
+      languageId: 'typescript',
+      lang: 'typescript',
+      theme: 'github-dark',
+      registrations: resolvedRegistrations(),
+      text: readAll(createDocumentTextSnapshot(snapshot, 'const value = 1;')),
+    })
     if (!session) throw new Error('missing Shiki highlighter session')
 
     const highlight = session.run()
@@ -320,9 +361,7 @@ describe('Shiki worker client theme cache', () => {
       },
     })
 
-    const dropped = await highlight
-    expect(dropped.tokens.toTokens()).toEqual([])
-    expect(dropped.theme).toBeUndefined()
+    await expect(highlight).rejects.toMatchObject({ name: 'AbortError' })
     await flushMicrotasks()
     expect(requestOfType('disposeDocument').payload).toMatchObject({
       runtimeSessionId: expect.any(String),
@@ -371,10 +410,18 @@ describe('Shiki worker client theme cache', () => {
     const owner = await loadWorkerOwner()
     const registrations = deferred<ReturnType<typeof resolvedRegistrations>>()
     const snapshot = createPieceTableSnapshot('const value = 1;')
-    const session = createHighlighterDocument(owner, { documentId: 'delayed.ts', languageId: 'typescript', lang: 'typescript', theme: 'github-dark', registrations: registrations.promise, text: readAll(createDocumentTextSnapshot(snapshot, 'const value = 1;')) })
+    const session = createHighlighterDocument(owner, {
+      documentId: 'delayed.ts',
+      languageId: 'typescript',
+      lang: 'typescript',
+      theme: 'github-dark',
+      registrations: registrations.promise,
+      text: readAll(createDocumentTextSnapshot(snapshot, 'const value = 1;')),
+    })
     if (!session) throw new Error('missing Shiki highlighter session')
 
     const highlight = session.run()
+    const canceled = expect(highlight).rejects.toMatchObject({ name: 'AbortError' })
     session.dispose()
     let idle = false
     const fence = owner.awaitIdleFence().then(() => {
@@ -382,14 +429,13 @@ describe('Shiki worker client theme cache', () => {
     })
     await flushMicrotasks()
 
-    expect(idle).toBe(false)
+    await canceled
+    await fence
+    expect(idle).toBe(true)
     expect(fakeWorkers).toHaveLength(0)
 
     registrations.resolve(resolvedRegistrations())
-    const dropped = await highlight
-    expect(dropped.tokens.toTokens()).toEqual([])
-    expect(dropped.theme).toBeUndefined()
-    await fence
+    await flushMicrotasks()
 
     expect(fakeWorkers).toHaveLength(0)
     expect(owner.inspect()).toMatchObject({ lifecycle: 'idle', pendingRequests: 0 })

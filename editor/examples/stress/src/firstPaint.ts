@@ -111,10 +111,17 @@ async function configure(options: Configuration) {
   paints = []
   diagnostics = []
   if (!stopWorkerObservation) {
-    stopWorkerObservation = observeWorkerTransport(event => {
-      if (event.durationMs === undefined || !configuration.diagnostics) return
-      recordDiagnostic({ name: `startup.worker.transport.${event.type}`, durationMs: event.durationMs, detail: { boundary: 'postMessage-to-reply' } })
-    }, () => configuration.diagnostics)
+    stopWorkerObservation = observeWorkerTransport(
+      (event) => {
+        if (event.durationMs === undefined || !configuration.diagnostics) return
+        recordDiagnostic({
+          name: `startup.worker.transport.${event.type}`,
+          durationMs: event.durationMs,
+          detail: { boundary: 'postMessage-to-reply' },
+        })
+      },
+      () => configuration.diagnostics,
+    )
     globalThis.addEventListener('pagehide', () => stopWorkerObservation?.(), { once: true })
   }
   droppedDiagnostics = 0

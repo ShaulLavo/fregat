@@ -3018,7 +3018,9 @@ const handleRequest = async (
   return undefined
 }
 
-const executeRequest = async (request: TreeSitterWorkerRequest): Promise<TreeSitterWorkerResult> => {
+const executeRequest = async (
+  request: TreeSitterWorkerRequest,
+): Promise<TreeSitterWorkerResult> => {
   const { payload } = request
   if (payload.type === 'source') return Promise.resolve(sourceReader.apply(payload.command))
   if (payload.type === 'runtimeBarrier') {

@@ -41,7 +41,7 @@
     },
     "apps/server": {
       "name": "server",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.283",
         "@elysiajs/cors": "^1.4.2",
@@ -98,7 +98,7 @@
     },
     "apps/tui": {
       "name": "tui",
-      "version": "0.0.2",
+      "version": "0.0.5",
       "dependencies": {
         "@fregat/hotkeys": "catalog:",
         "@opentui/core": "catalog:",
@@ -131,7 +131,7 @@
     },
     "apps/web": {
       "name": "web",
-      "version": "0.0.14",
+      "version": "0.0.18",
       "dependencies": {
         "@dnd-kit/core": "^6.3.1",
         "@dnd-kit/modifiers": "^9.0.0",
@@ -249,6 +249,7 @@
         "@singapore-editor/find": "workspace:*",
         "@singapore-editor/gutters": "workspace:*",
         "@singapore-editor/lsp": "workspace:*",
+        "@singapore-editor/lsp-plugin": "workspace:*",
         "@singapore-editor/markdown": "workspace:*",
         "@singapore-editor/minimap": "workspace:*",
         "@singapore-editor/paged": "workspace:*",
@@ -669,6 +670,7 @@
         "@singapore-editor/core": "workspace:*",
         "@singapore-editor/plugin-ui": "workspace:*",
         "@types/node": "^26.6.3",
+        "@vitest/browser-playwright": "5.0.2",
         "happy-dom": "^20.14.5",
         "oxfmt": "0.70.0",
         "oxlint": "1.85.0",
@@ -775,7 +777,7 @@
     },
     "packages/client-core": {
       "name": "@workspace/client-core",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "@elysia/eden": "^1.4.10",
         "@fregat/hotkeys": "catalog:",
@@ -970,7 +972,7 @@
     },
     "scripts": {
       "name": "scripts",
-      "version": "0.0.18",
+      "version": "0.0.21",
       "dependencies": {
         "@workspace/utils": "workspace:*",
       },
@@ -3678,13 +3680,11 @@
 
     "@mswjs/interceptors/@open-draft/deferred-promise": ["@open-draft/deferred-promise@2.2.0", "", {}, "sha512-CecwLWx3rhxVQF6V4bAgPS5t+So2sTbPgAzafKkVizyi7tlwpcFpdFqq+wqF2OwNBmqFuu6tOyouTuxgpMfzmA=="],
 
-    "@opentui/core/web-tree-sitter": ["web-tree-sitter@github:ShaulLavo/tree-sitter-x#3805c89", {}, "ShaulLavo-tree-sitter-x-3805c89", "sha512-JJf1yahzT8bEQhS4fH/5jEJwwLjDgz5PTtfil5YTzKBz7d9TqJywZeYHjXaY5DPgbPirfZK7TLA+blj5oYYUJg=="],
-
     "@singapore-editor/markdown/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#f7263d7", { "peerDependencies": { "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#3805c8921570361c317cb766cc8e96ae700de8cb" } }, "ShaulLavo-tree-sitter-md-f7263d7", "sha512-vBP+vsFndiIFUiN5sn6ehWROlitgwl2NJy4uKMM8yO8aFU0Kh1E51CA1Rec/TDrU1/44nkNSi50VvxZeCB5izQ=="],
 
-    "@singapore-editor/tree-sitter-languages/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#f7263d7", { "peerDependencies": { "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#3805c8921570361c317cb766cc8e96ae700de8cb" } }, "ShaulLavo-tree-sitter-md-f7263d7", "sha512-vBP+vsFndiIFUiN5sn6ehWROlitgwl2NJy4uKMM8yO8aFU0Kh1E51CA1Rec/TDrU1/44nkNSi50VvxZeCB5izQ=="],
+    "@singapore-editor/tree-sitter/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#f7263d7", { "peerDependencies": { "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#3805c8921570361c317cb766cc8e96ae700de8cb" } }, "ShaulLavo-tree-sitter-md-f7263d7", "sha512-vBP+vsFndiIFUiN5sn6ehWROlitgwl2NJy4uKMM8yO8aFU0Kh1E51CA1Rec/TDrU1/44nkNSi50VvxZeCB5izQ=="],
 
-    "@singapore-editor/tree-sitter-languages/web-tree-sitter": ["web-tree-sitter@github:ShaulLavo/tree-sitter-x#3805c89", {}, "ShaulLavo-tree-sitter-x-3805c89", "sha512-JJf1yahzT8bEQhS4fH/5jEJwwLjDgz5PTtfil5YTzKBz7d9TqJywZeYHjXaY5DPgbPirfZK7TLA+blj5oYYUJg=="],
+    "@singapore-editor/tree-sitter-languages/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#f7263d7", { "peerDependencies": { "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#3805c8921570361c317cb766cc8e96ae700de8cb" } }, "ShaulLavo-tree-sitter-md-f7263d7", "sha512-vBP+vsFndiIFUiN5sn6ehWROlitgwl2NJy4uKMM8yO8aFU0Kh1E51CA1Rec/TDrU1/44nkNSi50VvxZeCB5izQ=="],
 
     "@tailwindcss/node/lightningcss": ["lightningcss@1.32.0", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.32.0", "lightningcss-darwin-arm64": "1.32.0", "lightningcss-darwin-x64": "1.32.0", "lightningcss-freebsd-x64": "1.32.0", "lightningcss-linux-arm-gnueabihf": "1.32.0", "lightningcss-linux-arm64-gnu": "1.32.0", "lightningcss-linux-arm64-musl": "1.32.0", "lightningcss-linux-x64-gnu": "1.32.0", "lightningcss-linux-x64-musl": "1.32.0", "lightningcss-win32-arm64-msvc": "1.32.0", "lightningcss-win32-x64-msvc": "1.32.0" } }, "sha512-NXYBzinNrblfraPGyrbPoD19C1h9lfI/1mzgWYvXUTe414Gz/X1FD2XBZSZM7rRTrMA8JL3OtAaGifrIKhQ5yQ=="],
 
@@ -3804,6 +3804,8 @@
 
     "tree-sitter-cpp/tree-sitter-c": ["tree-sitter-c@0.23.6", "", { "dependencies": { "node-addon-api": "^8.3.0", "node-gyp-build": "^4.8.4" }, "peerDependencies": { "tree-sitter": "^0.22.1" }, "optionalPeers": ["tree-sitter"] }, "sha512-0dxXKznVyUA0s6PjNolJNs2yF87O5aL538A/eR6njA5oqX3C3vH4vnx3QdOKwuUdpKEcFdHuiDpRKLLCA/tjvQ=="],
 
+    "tree-sitter-md/web-tree-sitter": ["web-tree-sitter@github:ShaulLavo/tree-sitter-x#3805c89", {}, "ShaulLavo-tree-sitter-x-3805c89", "sha512-JJf1yahzT8bEQhS4fH/5jEJwwLjDgz5PTtfil5YTzKBz7d9TqJywZeYHjXaY5DPgbPirfZK7TLA+blj5oYYUJg=="],
+
     "tree-sitter-typescript/tree-sitter-javascript": ["tree-sitter-javascript@0.23.1", "", { "dependencies": { "node-addon-api": "^8.2.2", "node-gyp-build": "^4.8.2" }, "peerDependencies": { "tree-sitter": "^0.21.1" }, "optionalPeers": ["tree-sitter"] }, "sha512-/bnhbrTD9frUYHQTiYnPcxyHORIw157ERBa6dqzaKxvR/x3PC4Yzd+D1pZIMS6zNg2v3a8BZ0oK7jHqsQo9fWA=="],
 
     "type-is/content-type": ["content-type@2.1.0", "", {}, "sha512-mj7UPXE0jaqaOsukNZRUEfEi2AcL7C/vwmwcHV0O97eO1E1pxBZuyjlZrx5seTaNBg1U6+o35wpa35Qfcc+7ag=="],
@@ -3841,8 +3843,6 @@
     "@astrojs/compiler-binding-wasm32-wasi/@emnapi/core/@emnapi/wasi-threads": ["@emnapi/wasi-threads@1.2.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-ELEBe8PsLvvJ6QMr0zLt8ffvOHW/dc1m3CEzNMg7aJUv3bMaoDtw2TXyDAwkYBuroxxuHEwhRTLJSe5sya547g=="],
 
     "@modelcontextprotocol/sdk/ajv/json-schema-traverse": ["json-schema-traverse@1.0.0", "", {}, "sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug=="],
-
-    "@singapore-editor/markdown/tree-sitter-md/web-tree-sitter": ["web-tree-sitter@github:ShaulLavo/tree-sitter-x#3805c89", {}, "ShaulLavo-tree-sitter-x-3805c89", "sha512-JJf1yahzT8bEQhS4fH/5jEJwwLjDgz5PTtfil5YTzKBz7d9TqJywZeYHjXaY5DPgbPirfZK7TLA+blj5oYYUJg=="],
 
     "@tailwindcss/node/lightningcss/lightningcss-android-arm64": ["lightningcss-android-arm64@1.32.0", "", { "os": "android", "cpu": "arm64" }, "sha512-YK7/ClTt4kAK0vo6w3X+Pnm0D2cf2vPHbhOXdoNti1Ga0al1P4TBZhwjATvjNwLEBCnKvjJc2jQgHXH0NEwlAg=="],
 

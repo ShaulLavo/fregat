@@ -153,6 +153,10 @@ export function documentContributionFindings(source, filename) {
     for (const message of importFindings(node, filename)) report(node, message)
     for (const binding of cursorBindings(node, filename))
       report(binding, 'Generic document progress belongs to canonical delivery')
+    for (const binding of runtimeBindings(node, filename))
+      report(binding, 'Create backend work through a document operation')
+    for (const binding of subscriptionBindings(node, buffers, filename))
+      report(binding, 'Retain document source through its contribution owner')
     if (node.type !== 'MemberExpression') continue
     const name = staticName(node.property)
     if (name === 'changesSinceDocumentSyncPoint' && !cursorOwners.has(filename))
@@ -161,12 +165,7 @@ export function documentContributionFindings(source, filename) {
       report(node, `Route ${name} through a document operation`)
     const receiver = node.object
     const buffer = isBuffer(receiver, buffers)
-    if (
-      name === 'subscribe' &&
-      buffer &&
-      !filename.startsWith('editor/packages/editor/') &&
-      !viewObservers.has(filename)
-    )
+    if (name === 'subscribe' && buffer && !permitsBufferObserver(filename))
       report(node, 'Retain document source through its contribution owner')
   }
   return findings
@@ -181,20 +180,44 @@ function isBuffer(node, aliases) {
 
 function bufferAliases(program) {
   const aliases = new Set(['buffer'])
-  const declarations = [...syntaxNodes(program)].filter(
-    (node) => node.type === 'VariableDeclarator',
-  )
+  const nodes = [...syntaxNodes(program)]
+  const factories = new Set(['createEditorTextBuffer'])
+  for (const node of nodes) addBufferFactory(node, factories)
+  const declarations = nodes.filter((node) => node.type === 'VariableDeclarator')
   let changed = true
   while (changed) {
-    const before = aliases.size
-    for (const node of declarations) addBufferAlias(node, aliases)
-    changed = aliases.size !== before
+    const before = aliases.size + factories.size
+    for (const node of declarations) addBufferAlias(node, aliases, factories)
+    changed = aliases.size + factories.size !== before
   }
   return aliases
 }
 
-function addBufferAlias(node, aliases) {
-  if (node.id.type === 'Identifier' && isBuffer(node.init, aliases)) {
+function addBufferFactory(node, factories) {
+  if (node.type !== 'ImportDeclaration') return
+  for (const binding of node.specifiers) {
+    if (staticName(binding.imported) === 'createEditorTextBuffer') factories.add(binding.local.name)
+  }
+}
+
+function createsBuffer(node, factories) {
+  if (node?.type !== 'CallExpression') return false
+  return (
+    factories.has(staticName(node.callee)) ||
+    (node.callee.type === 'MemberExpression' &&
+      staticName(node.callee.property) === 'createEditorTextBuffer')
+  )
+}
+
+function addBufferAlias(node, aliases, factories) {
+  if (node.id.type === 'Identifier' && factories.has(staticName(node.init))) {
+    factories.add(node.id.name)
+    return
+  }
+  if (
+    node.id.type === 'Identifier' &&
+    (isBuffer(node.init, aliases) || createsBuffer(node.init, factories))
+  ) {
     aliases.add(node.id.name)
     return
   }
@@ -203,6 +226,26 @@ function addBufferAlias(node, aliases) {
     if (staticName(binding.key) === 'buffer' && binding.value?.type === 'Identifier')
       aliases.add(binding.value.name)
   }
+}
+
+function runtimeBindings(node, filename) {
+  if (node.type !== 'ObjectPattern' || runtimeFactories.has(filename)) return []
+  return node.properties.filter((binding) => rawRuntimeNames.has(staticName(binding.key)))
+}
+
+function permitsBufferObserver(filename) {
+  return filename.startsWith('editor/packages/editor/') || viewObservers.has(filename)
+}
+
+function subscriptionBindings(node, buffers, filename) {
+  if (
+    node.type !== 'VariableDeclarator' ||
+    node.id.type !== 'ObjectPattern' ||
+    permitsBufferObserver(filename)
+  )
+    return []
+  if (!isBuffer(node.init, buffers)) return []
+  return node.id.properties.filter((binding) => staticName(binding.key) === 'subscribe')
 }
 
 function cursorBindings(node, filename) {
