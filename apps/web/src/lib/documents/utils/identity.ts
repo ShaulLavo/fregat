@@ -119,6 +119,7 @@ function comparisonIdentity(source: GitComparison): readonly unknown[] {
   ]
   const range = [
     source.owner,
+    source.ignoreWhitespace,
     source.sessionId,
     source.fromTurnCount,
     source.toTurnCount,

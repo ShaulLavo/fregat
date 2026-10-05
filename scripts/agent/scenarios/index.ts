@@ -138,7 +138,7 @@ import { chatTimelinePattern } from './chat-timeline-pattern'
 import { copyFeedback } from './copy-feedback'
 import { fileLabelCohesion } from './file-label-cohesion'
 import { checkpointStates } from './checkpoint-states'
-import { checkpointDiffTokens } from './checkpoint-diff-tokens'
+import { checkpointDiffTokens, checkpointDiffSourceRefusal } from './checkpoint-diff-tokens'
 import { sessionRailMenu } from './session-rail-menu'
 import { sessionActionsSurfaces } from './session-actions-surfaces'
 import { exportTranscript } from './export-transcript'
@@ -607,6 +607,7 @@ export const scenarios: readonly Scenario[] = [
   fileLabelCohesion,
   checkpointStates,
   checkpointDiffTokens,
+  checkpointDiffSourceRefusal,
   sessionActionsSurfaces,
   sessionRailMenu,
   exportTranscript,

@@ -1,16 +1,10 @@
 import type { GitFileDiff } from '@workspace/contracts'
-import { comparisonRequest, matchesHistoricalTarget } from '@/lib/documents/utils/comparisons'
+import { matchesHistoricalTarget } from '@/lib/documents/utils/comparisons'
 import { commitDetailsQueryOptions } from '@/lib/git-commit-details-query'
-import { diffQueryOptions } from '@/lib/git-diff-query'
-import { clientForQueryClient } from '@/lib/environments/state/query-clients'
+import { snapshotComparisonQueryOptions } from '@/lib/snapshot-comparison-query'
 import { useQueries, type UseQueryOptions } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
-import {
-  checkpointDiffRetry,
-  checkpointDiffRetryDelay,
-  fetchCheckpointDiff,
-} from '@/lib/checkpoint-diff-query'
 import { errorMessage } from '@/lib/error-message'
 
 import { blobDiffQueryOptions } from '@/lib/blob-diff-query'
@@ -18,9 +12,8 @@ import {
   checkpointBlobRequest,
   displayedCheckpointEntry,
   withCheckpointSources,
-} from '@/features/git/utils/checkpoint-blob-request'
+} from '@/lib/checkpoint-sources'
 import type { GitComparison } from '@/lib/documents/utils/types'
-import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 
 type DiffList = readonly GitFileDiff[]
 type DiffQueryOptions = UseQueryOptions<DiffList, Error, DiffList, readonly unknown[]>
@@ -42,7 +35,7 @@ export function useDiffDocumentDiffs(info: GitComparison | null) {
     historical === null ||
     (details?.data !== undefined && matchesHistoricalTarget(historical, details.data))
   const documentQueries: DiffQueryOptions[] = info
-    ? [{ ...diffDocumentQueryOptions(info), enabled: admitted }]
+    ? [{ ...snapshotComparisonQueryOptions(info), enabled: admitted }]
     : []
   const [query] = useQueries({ queries: documentQueries })
   const displayed =
@@ -74,23 +67,4 @@ export function useDiffDocumentDiffs(info: GitComparison | null) {
     failure: failure ?? relationshipFailure,
     pending: Boolean(details?.isPending) || (admitted && Boolean(query?.isPending)) || blobPending,
   }
-}
-
-function diffDocumentQueryOptions(info: GitComparison): DiffQueryOptions {
-  const request = comparisonRequest(info)
-  if (request.kind === 'moving') return diffQueryOptions(request.query.path, request.query.staged)
-  if (request.kind === 'checkpoint') {
-    const input = request.query
-
-    return {
-      queryFn: ({ signal, client }) =>
-        fetchCheckpointDiff(input, signal, clientForQueryClient(client)),
-      queryKey: diffDocumentQueryKey(info),
-      retry: checkpointDiffRetry,
-      retryDelay: checkpointDiffRetryDelay,
-      staleTime: Infinity,
-    }
-  }
-
-  return blobDiffQueryOptions(request.query)
 }

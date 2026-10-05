@@ -27,6 +27,7 @@ const revisionEntries = {
   status: v.optional(statusSchema),
 }
 const checkpointEntries = {
+  ignoreWhitespace: v.boolean(),
   ...revisionEntries,
   owner: pathSchema,
   sessionId: sessionIdSchema,

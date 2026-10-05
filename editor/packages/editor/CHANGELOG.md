@@ -1,5 +1,16 @@
 # @singapore-editor/core
 
+## 0.2.3
+
+### Patch Changes
+
+- 9d726b3: Release optional active syntax range history using each view's actual token and fold contributors. Preserve shared requests and warm current-frame readiness while preventing canceled optional replies from restoring discarded caches.
+- 33e949e: End rendering when height, gutter, or inline widget callbacks dispose their editor. Release late cells and widgets, finish owned cleanup after callback errors, and preserve live atomic viewport completion.
+- 4e053fc: Track displayed structural ranges and preparation pins separately from cancelable query waiters. Release original preparation interest during view handoff, report promoted pending stages as stale, and stop failed highlighter replacement after terminal reentrant disposal.
+- d297a23: Notify retention subscribers after analysis entry, lease, display demand and query changes settle. Detach subscriptions before terminal provider disposal.
+- 5365760: Preserve optional syntax warming suppression across compatible view attachments after discarded history is retired.
+- @singapore-editor/textbuffer@0.2.3
+
 ## 0.2.2
 
 ### Patch Changes
