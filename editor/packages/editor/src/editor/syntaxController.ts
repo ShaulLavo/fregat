@@ -540,12 +540,12 @@ export class EditorSyntaxController {
     preparedDocument: EditorPreparedDocument,
     tags: EditorPreparedDocumentBorrowOptions,
   ): EditorPreparedDocumentPayload | null {
-    const highlighterProvider = this.options.pluginHost.getHighlighterProvider()
+    const highlighter = this.options.pluginHost.getHighlighterProvider()
     const structuralProvider = this.options.pluginHost.getSyntaxProvider()
     const structuralConfiguration = this.preparedStructuralConfiguration(
       document.languageId,
       structuralProvider !== null,
-      highlighterProvider !== null,
+      highlighter !== null,
     )
     return preparedDocument.borrow({
       configuredTabSize: tags.configuredTabSize,
@@ -555,7 +555,8 @@ export class EditorSyntaxController {
       snapshot: document.snapshot,
       documentConfigurationTag: tags.documentConfigurationTag,
       structuralProvider,
-      highlighterProvider,
+      highlighterProvider: highlighter?.provider ?? null,
+      highlighterThemeProviders: highlighter?.themeProviders ?? [],
       structuralConfiguration,
       structuralConfigurationTag: tags.structuralConfigurationTag,
       highlighterConfigurationTag: tags.highlighterConfigurationTag,
@@ -614,6 +615,11 @@ export class EditorSyntaxController {
         : 'plain'
     this.lastInitialHighlightTerminalStatus =
       this.initialHighlightState === 'plain' ? 'plain' : null
+    if (this.retainedHighlighter) {
+      this.highlighterThemeRequests.cancel()
+      this.highlighterThemePending = true
+      this.consumeRetainedProviderTheme()
+    }
     this.observePreparedResults(prepared)
     this.logSyntaxStatus('editor.syntax.document_started')
   }
@@ -664,13 +670,15 @@ export class EditorSyntaxController {
       )
     }
     const highlighter = this.retainedHighlighter?.read()
-    if (highlighter?.kind === 'ready')
+    if (highlighter?.kind === 'ready') {
+      this.consumeRetainedProviderTheme()
       this.applyHighlightResult(
         highlighter.result,
         documentVersion,
         nowMs(),
         configurationGeneration,
       )
+    }
   }
 
   notifyBaseTextPainted(): void {
@@ -701,6 +709,7 @@ export class EditorSyntaxController {
     this.disposeSyntaxSession()
     this.disposeHighlighterSession()
     this.analysis = null
+    this.refreshHighlighterTheme()
     this.logSyntaxStatus('editor.syntax.document_cleared')
   }
 
@@ -730,6 +739,7 @@ export class EditorSyntaxController {
     this.failedHighlightRefreshes = 0
     this.reloadHighlighterSession()
     this.reloadSyntaxSession(false)
+    if (!this.options.getSession()) this.refreshHighlighterTheme()
     this.settlePlainInitialHighlightIfNeeded()
   }
 
@@ -798,7 +808,14 @@ export class EditorSyntaxController {
   }
 
   refreshHighlighterTheme(): void {
-    if (!this.options.pluginHost.hasHighlighterProviders()) {
+    if (this.retainedHighlighter) {
+      this.highlighterThemeRequests.cancel()
+      this.highlighterThemePending = true
+      this.consumeRetainedProviderTheme()
+      return
+    }
+    const context = this.options.pluginHost.getHighlighterProvider()
+    if (!context?.themeProviders.some((provider) => provider.loadTheme !== undefined)) {
       this.highlighterThemeRequests.cancel()
       this.completeProviderHighlighterTheme(null)
       return
@@ -807,7 +824,7 @@ export class EditorSyntaxController {
     this.highlighterThemePending = true
     this.highlighterThemeRequests.schedule({
       tags: { configuration: 'highlighterTheme' },
-      run: () => this.options.pluginHost.loadHighlighterTheme(),
+      run: (signal) => this.options.pluginHost.loadHighlighterTheme(signal),
       apply: (theme) => this.completeProviderHighlighterTheme(theme),
       fail: () => this.completeProviderHighlighterTheme(null),
     })
@@ -1018,6 +1035,10 @@ export class EditorSyntaxController {
     this.unsubscribeHighlighterTheme =
       this.highlighterSession?.onDidChangeTheme?.(() => {
         this.failedHighlightRefreshes = 0
+        if (this.retainedHighlighter) {
+          this.beginInitialHighlightReplacement('theme')
+          this.highlighterThemePending = true
+        }
         this.refreshHighlightTokens(this.options.getDocumentVersion(), null, { delayMs: 0 })
       }) ?? null
   }
@@ -1176,11 +1197,12 @@ export class EditorSyntaxController {
     textSnapshot: DocumentTextSnapshot,
     snapshot: PieceTableSnapshot,
   ): EditorHighlighterSession | null {
-    const provider = this.options.pluginHost.getHighlighterProvider()
+    const context = this.options.pluginHost.getHighlighterProvider()
     this.retainedHighlighter =
-      this.analysis && provider
+      this.analysis && context
         ? this.analysis.borrowHighlighter({
-            provider,
+            provider: context.provider,
+            themeProviders: context.themeProviders,
             languageId,
             configurationTag: this.highlighterConfigurationTag,
           })
@@ -1792,6 +1814,7 @@ export class EditorSyntaxController {
     }
     const failedRefreshes = this.failedHighlightRefreshes
     this.failedHighlightRefreshes = 0
+    this.consumeRetainedProviderTheme()
     if (result.theme !== undefined) this.setHighlighterTheme(result.theme)
     this.commitInitialHighlightStatus(
       'painted',
@@ -2034,6 +2057,14 @@ export class EditorSyntaxController {
     }
 
     this.settlePlainInitialHighlightIfNeeded()
+  }
+
+  private consumeRetainedProviderTheme(): void {
+    const read = this.retainedHighlighter?.read()
+    if (read?.kind !== 'ready') return
+    this.completeProviderHighlighterTheme(
+      read.providerTheme.kind === 'ready' ? read.providerTheme.theme : null,
+    )
   }
 
   private beginInitialHighlightReplacement(replacement: InitialHighlightReplacement): number {
