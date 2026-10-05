@@ -1,4 +1,6 @@
 import { expect } from 'vitest'
+import type { Editor } from '@singapore-editor/core/editor'
+import { decodePaintSnapshot } from '../../../../editor/packages/editor/src/editor/paintSnapshot'
 import { editorPreparedDocumentTags } from '@/features/editor/utils/prepared-document'
 import {
   editorSyntaxColors,
@@ -9,7 +11,11 @@ import { highlightingService } from '@/lib/highlighting/state/service'
 import { themeRegistrationQueryOptions } from '@/lib/code-theme/state/registration-query'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
-import type { FilesystemPath } from '@/lib/documents/utils/types'
+import { readLiveSettingsProjection } from '@/features/settings/state/live-projection'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import type { SettingsSnapshot } from '@workspace/contracts'
+import { createClientInvariantError } from '@/lib/structured-errors'
+import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import type { RetentionAcceptanceApp } from './retention-acceptance-app'
 import {
   retentionAcceptanceSubject,
@@ -19,12 +25,130 @@ import type { RetentionAcceptanceReference } from './retention-acceptance-projec
 import {
   resolveTokenPaintRuns,
   tokenPaintMismatch,
+  sourceTokenPaintWindow,
+  type TokenPaintObservation,
 } from '../../../../scripts/agent/scenarios/editor-tab-hover-highlights-probe'
+
+export function retentionIdentityCaptureFrame(
+  capture: ReturnType<Editor['captureSnapshot']> | undefined,
+  source: string,
+) {
+  if (!capture) return { kind: 'absent' } as const
+  const paint = decodePaintSnapshot(capture.paint)
+  if (!paint || !paint.rows.length) return { kind: 'unsupported', paint: capture.paint } as const
+  const height = paint.rows[0]?.height ?? 0
+  const lines = source.split('\n')
+  const starts: number[] = []
+  let offset = 0
+  for (const line of lines) {
+    starts.push(offset)
+    offset += line.length + 1
+  }
+  const rows: TokenPaintObservation['rows'][number][] = []
+  const runs: TokenPaintObservation['runs'][number][] = []
+  for (const row of paint.rows) {
+    const index = row.top / height
+    const start = starts[index]
+    const text = row.segments.map((segment) => segment.text).join('')
+    if (
+      !Number.isSafeInteger(index) ||
+      start === undefined ||
+      row.height !== height ||
+      row.left !== 0 ||
+      row.fold !== null ||
+      row.segments.some((segment) => segment.kind !== 'text') ||
+      text !== lines[index]
+    )
+      return { kind: 'unsupported', paint: capture.paint } as const
+    rows.push({ start, end: start + text.length, text, mapping: 'source', presentation: 'live' })
+    const tokens = []
+    let end = start
+    for (const segment of row.segments) {
+      tokens.push({ start: end, end: end + segment.text.length, style: segment })
+      end += segment.text.length
+    }
+    runs.push(...captureStyleRuns(source, tokens, row.color))
+  }
+  const frame: TokenPaintObservation = {
+    at: performance.now(),
+    identity: {
+      document: capture.documentId,
+      revision: capture.bufferRevision,
+      configuration: 'unknown',
+      paintedGeneration: 'unknown',
+    },
+    window: sourceTokenPaintWindow({
+      source,
+      geometryWindow: {
+        start: Math.floor(paint.scrollTop / height),
+        end: Math.ceil((paint.scrollTop + paint.viewportHeight) / height),
+      },
+    }),
+    rows,
+    runs,
+  }
+  return { kind: 'projected', paint: capture.paint, frame } as const
+}
+
+function captureStyleRuns(
+  source: string,
+  tokens: Parameters<typeof resolveTokenPaintRuns>[0]['tokens'],
+  foreground: string,
+) {
+  const viewport = document.querySelector('.editor-virtualized-viewport')
+  if (!viewport) return []
+  const probe = document.createElement('div')
+  probe.dataset.retentionIdentityCaptureProbe = ''
+  probe.style.display = 'none'
+  probe.style.color = foreground
+  viewport.append(probe)
+  try {
+    return resolveTokenPaintRuns({
+      source,
+      tokens,
+      viewportSelector: '[data-retention-identity-capture-probe]',
+    })
+  } finally {
+    probe.remove()
+  }
+}
+
+export function assertRetentionIdentityCapture(
+  capture: unknown,
+  projection: ReturnType<typeof retentionIdentityCaptureFrame>,
+  sample: ReturnType<typeof captureRetentionAcceptancePaint>,
+  reference: RetentionAcceptanceReference,
+) {
+  if (
+    !capture ||
+    typeof capture !== 'object' ||
+    !('paint' in capture) ||
+    typeof capture.paint !== 'string' ||
+    !('documentId' in capture) ||
+    !('bufferRevision' in capture) ||
+    !('textVersion' in capture)
+  )
+    throw createClientInvariantError('Current identity frame has no supported public capture')
+  expect(capture.documentId).toBe(reference.identity.document)
+  expect(capture.bufferRevision).toBe(reference.identity.revision)
+  expect(capture.textVersion).toBe(sample.installed.editorTextVersion)
+  expect(projection.kind).toBe('projected')
+  if (projection.kind !== 'projected') return
+  expect(projection.paint).toBe(capture.paint)
+  expect(projection.frame.identity.document).toBe(capture.documentId)
+  expect(projection.frame.identity.revision).toBe(capture.bufferRevision)
+  expect(projection.frame.window).toEqual(sample.frame.window)
+  expect(tokenPaintMismatch(projection.frame, reference)).toBeNull()
+}
 
 export function retentionIdentityInput(app: RetentionAcceptanceApp, path: FilesystemPath) {
   const subject = retentionAcceptanceSubject(app, path)
   const theme = app.read().theme
-  const enabled = readSettingsMirror()['editor.syntaxHighlighting.enabled']
+  const projection = readLiveSettingsProjection(app.queryClient)
+  const confirmed = app.queryClient.getQueryData<SettingsSnapshot>(settingsKeys.document())
+  const enabled =
+    projection?.values['editor.syntaxHighlighting.enabled'] ??
+    readSettingsMirror()['editor.syntaxHighlighting.enabled']
   const languageId = languageIdForFilePath(path)
   const tags = editorPreparedDocumentTags(
     path,
@@ -36,7 +160,7 @@ export function retentionIdentityInput(app: RetentionAcceptanceApp, path: Filesy
     },
     true,
   )
-  const colors = editorSyntaxColors(theme.selectedThemeId, languageId)
+  const colors = enabled ? editorSyntaxColors(theme.selectedThemeId, languageId) : 'disabled'
   const backend = highlightingService().documentBackend(EDITOR_THEME_SOURCE)
   return {
     identity: { ...subject.identity, document: subject.document.key, configuration: 'unknown' },
@@ -50,10 +174,34 @@ export function retentionIdentityInput(app: RetentionAcceptanceApp, path: Filesy
     selectedThemeId: theme.selectedThemeId,
     appliedThemeId: theme.appliedThemeId,
     enabled,
+    syntaxSettingInput: {
+      authority: projection ? 'live-projection' : 'boot-mirror',
+      effective: enabled,
+      confirmed: confirmed?.values['editor.syntaxHighlighting.enabled'] ?? null,
+      bootMirror: readSettingsMirror()['editor.syntaxHighlighting.enabled'],
+      pendingMutationIds: projection?.pendingMutationIds ?? [],
+    },
     colors,
     tags,
     configuredBackend: backend.kind,
     retention: subject.document.analysis.inspectRetention(),
+  }
+}
+
+export function captureRetentionIdentityPaint(
+  app: RetentionAcceptanceApp,
+  path: FilesystemPath,
+  tab: TabId,
+) {
+  const sample = captureRetentionAcceptancePaint(app, path, tab)
+  const input = retentionIdentityInput(app, path)
+  return {
+    ...sample,
+    installed: {
+      ...sample.installed,
+      configuredProviderConfiguration: input.configuredOwner.configuration,
+      configuredTheme: input.tags.highlighterConfigurationTag,
+    },
   }
 }
 

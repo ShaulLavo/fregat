@@ -25,14 +25,19 @@ import {
   retentionIdentityInput,
   retentionIdentityReference,
   calibrateRetentionIdentityOracle,
+  captureRetentionIdentityPaint,
+  retentionIdentityCaptureFrame,
+  assertRetentionIdentityCapture,
 } from '../../../../test/factories/retention-acceptance-identity-paint'
 import {
-  captureRetentionAcceptancePaint,
   awaitRetentionAcceptanceReady,
   retentionAcceptanceSubject,
   assertRetentionAcceptancePaint,
 } from '../../../../test/factories/retention-acceptance-paint'
 import { tokenPaintMismatch } from '../../../../../../scripts/agent/scenarios/editor-tab-hover-highlights-probe'
+import { createShikiWorkerOwner } from '@singapore-editor/core/shiki'
+import { TreeSitterWorkerClient } from '@singapore-editor/tree-sitter'
+import { highlightingService } from '@/lib/highlighting/state/service'
 
 const sourcePath = filesystemPath('repo/src/editor-tab-a.ts')
 const cases = [
@@ -45,6 +50,60 @@ const cases = [
   { family: 'shiki', axis: 'configuration' },
   { family: 'tree-sitter', axis: 'configuration' },
 ] as const
+
+test.for(['shiki', 'tree-sitter'] as const)(
+  '$0 native gate retains actual SDK pending request and unsettled idle fence',
+  { timeout: 30_000 },
+  async (family, context) => {
+    installTrace(context)
+    const gate = holdRetentionIdentityWorkerReply()
+    const sdk = family === 'shiki' ? createShikiWorkerOwner() : new TreeSitterWorkerClient()
+    context.onTestFinished(async () => {
+      gate.release()
+      await sdk.dispose()
+    })
+    if (sdk instanceof TreeSitterWorkerClient) await sdk.warmLanguages([])
+    else
+      await sdk.highlight({
+        text: 'native SDK wire calibration',
+        lang: null,
+        theme: 'identity-sdk-wire',
+        languageRegistrations: [],
+        themeRegistration: { name: 'identity-sdk-wire', fg: '#ffffff', bg: '#000000' },
+      })
+    await sdk.awaitIdleFence()
+    const before = sdk.inspect()
+    expect(before.pendingRequests).toBe(0)
+    gate.arm('idleFence', family)
+    const fence = sdk.awaitIdleFence()
+    try {
+      await expect.poll(() => gate.held().length).toBe(1)
+      const held = gate.held()
+      const pending = sdk.inspect()
+      const beforeForward = await Promise.race([
+        fence.then(() => 'settled' as const),
+        frame().then(() => 'animation-frame' as const),
+      ])
+      await context.annotate(
+        JSON.stringify({ family, before, pending, beforeForward, held, requests: gate.requests() }),
+        'identity-actual-sdk-wire-before-forward',
+      )
+      expect(pending.pendingRequests).toBe(1)
+      expect(beforeForward).toBe('animation-frame')
+      expect(held[0]?.response).toMatchObject({ id: held[0]?.request.id })
+      gate.release()
+      await fence
+      const after = sdk.inspect()
+      expect(after.pendingRequests).toBe(0)
+      await context.annotate(
+        JSON.stringify({ family, after, originalFenceSettled: true }),
+        'identity-actual-sdk-wire-after-forward',
+      )
+    } finally {
+      gate.release()
+    }
+  },
+)
 
 test.for(cases)(
   '$family held native reply across application $axis change',
@@ -74,7 +133,7 @@ test.for(cases)(
     if (!controller) return
     const initialInput = retentionIdentityInput(app, initialPath)
     const initial = await retentionIdentityReference(initialInput)
-    const initialSample = captureRetentionAcceptancePaint(app, initialPath, tab.id)
+    const initialSample = captureRetentionIdentityPaint(app, initialPath, tab.id)
     assertRetentionAcceptancePaint(initialSample, initial, initialPath)
     const controls = calibrateRetentionIdentityOracle(initialSample, initial)
     await context.annotate(
@@ -89,10 +148,11 @@ test.for(cases)(
       readonly phase: string
       readonly path: ReturnType<typeof filesystemPath>
       readonly input: ReturnType<typeof retentionIdentityInput>
-      readonly sample: ReturnType<typeof captureRetentionAcceptancePaint>
+      readonly sample: ReturnType<typeof captureRetentionIdentityPaint>
       readonly capturedPaint:
         | ReturnType<NonNullable<ReturnType<typeof controller.getEditor>>['captureSnapshot']>
         | undefined
+      readonly captureFrame: ReturnType<typeof retentionIdentityCaptureFrame>
     }[] = []
     let phase = 'held-before-change'
     let recording = true
@@ -102,20 +162,40 @@ test.for(cases)(
       const selected = activeEditorTab(app.read().workspace.getState().workbenchPanels.editorGroups)
       const activePath = tabFileResource(selected?.content)?.path
       if (!activePath) throw createClientInvariantError('Identity frame has no selected file owner')
+      const input = retentionIdentityInput(app, activePath)
+      const capturedPaint = controller.getEditor()?.captureSnapshot()
       observations.push({
         phase,
         path: activePath,
-        input: retentionIdentityInput(app, activePath),
-        sample: captureRetentionAcceptancePaint(app, activePath, tab.id),
-        capturedPaint: controller.getEditor()?.captureSnapshot(),
+        input,
+        sample: captureRetentionIdentityPaint(app, activePath, tab.id),
+        capturedPaint,
+        captureFrame: retentionIdentityCaptureFrame(capturedPaint, input.source),
       })
       handle = requestAnimationFrame(record)
     }
     record()
-    let finalSample: ReturnType<typeof captureRetentionAcceptancePaint> | null = null
+    let finalSample: ReturnType<typeof captureRetentionIdentityPaint> | null = null
     let current: Awaited<ReturnType<typeof retentionIdentityReference>> | null = null
     let renameOperationId: string | null = null
     try {
+      if (axis === 'configuration') {
+        const runtimeSessionId = gate.held()[0]?.request.runtimeSessionId
+        expect(runtimeSessionId).not.toBeNull()
+        if (!runtimeSessionId) return
+        const sdkAtHold = highlightingService().inspect()
+        const runtimeIdle = highlightingService().awaitRuntimeSessionIdle(runtimeSessionId)
+        const beforeForward = await Promise.race([
+          runtimeIdle.then(() => 'settled' as const),
+          frame().then(() => 'animation-frame' as const),
+        ])
+        await context.annotate(
+          JSON.stringify({ family, runtimeSessionId, sdkAtHold, beforeForward, held: gate.held() }),
+          'identity-application-native-runtime-before-forward',
+        )
+        expect(beforeForward).toBe('animation-frame')
+        if (family === 'shiki') expect(sdkAtHold.shiki?.pendingRequests).toBeGreaterThan(0)
+      }
       phase = 'identity-change-requested-response-held'
       if (axis === 'language') {
         path = filesystemPath(`repo/src/identity-language-${family}.js`)
@@ -178,7 +258,7 @@ test.for(cases)(
       recording = false
       cancelAnimationFrame(handle)
       current = await retentionIdentityReference(retentionIdentityInput(app, path))
-      finalSample = captureRetentionAcceptancePaint(app, path, tab.id)
+      finalSample = captureRetentionIdentityPaint(app, path, tab.id)
       expect(tokenPaintMismatch(finalSample.frame, current)).toBeNull()
       if (axis !== 'configuration') assertRetentionAcceptancePaint(finalSample, current, path)
       if (axis === 'language')
@@ -377,18 +457,21 @@ test.for(['shiki', 'tree-sitter'] as const)(
     let handle = 0
     const record = () => {
       if (!recording) return
+      const input = retentionIdentityInput(app, sourcePath)
+      const capturedPaint = controller.getEditor()?.captureSnapshot()
       observations.push({
         phase,
         path: sourcePath,
-        input: retentionIdentityInput(app, sourcePath),
-        sample: captureRetentionAcceptancePaint(app, sourcePath, tab.id),
-        capturedPaint: controller.getEditor()?.captureSnapshot(),
+        input,
+        sample: captureRetentionIdentityPaint(app, sourcePath, tab.id),
+        capturedPaint,
+        captureFrame: retentionIdentityCaptureFrame(capturedPaint, input.source),
       })
       handle = requestAnimationFrame(record)
     }
     record()
     let current: Awaited<ReturnType<typeof retentionIdentityReference>> | null = null
-    let finalSample: ReturnType<typeof captureRetentionAcceptancePaint> | null = null
+    let finalSample: ReturnType<typeof captureRetentionIdentityPaint> | null = null
     try {
       await expect.poll(() => gate.held().length).toBe(1)
       const held = gate.held()
@@ -421,7 +504,7 @@ test.for(['shiki', 'tree-sitter'] as const)(
       recording = false
       cancelAnimationFrame(handle)
       current = await retentionIdentityReference(retentionIdentityInput(app, sourcePath))
-      finalSample = captureRetentionAcceptancePaint(app, sourcePath, tab.id)
+      finalSample = captureRetentionIdentityPaint(app, sourcePath, tab.id)
       assertRetentionAcceptancePaint(finalSample, current, sourcePath)
       const archived = await referenceFrames(observations)
       await context.annotate(
@@ -448,8 +531,9 @@ type IdentityObservation = {
   readonly phase: string
   readonly path: ReturnType<typeof filesystemPath>
   readonly input: ReturnType<typeof retentionIdentityInput>
-  readonly sample: ReturnType<typeof captureRetentionAcceptancePaint>
+  readonly sample: ReturnType<typeof captureRetentionIdentityPaint>
   readonly capturedPaint: unknown
+  readonly captureFrame: ReturnType<typeof retentionIdentityCaptureFrame>
 }
 
 async function referenceFrames(observations: readonly IdentityObservation[]) {
@@ -482,6 +566,43 @@ function assertFrame(observation: Awaited<ReturnType<typeof referenceFrames>>[nu
   ) {
     expect(sample.installed.syncPoint.revision).toBe(observation.input.identity.revision)
     assertRetentionAcceptancePaint(sample, reference, observation.path)
+    assertRetentionIdentityCapture(
+      observation.capturedPaint,
+      observation.captureFrame,
+      sample,
+      reference,
+    )
+  }
+  if (
+    sample.installed.syntaxStatus === 'plain' &&
+    sample.installed.initialHighlightStatus === 'plain'
+  ) {
+    expect(sample.headerPath).toBe(observation.path)
+    expect(sample.frame.identity).toEqual(reference.identity)
+    expect(tokenPaintMismatch(sample.frame, reference)).toBeNull()
+    if (sample.installed.paintLayers !== null || observation.capturedPaint !== null)
+      assertRetentionIdentityCapture(
+        observation.capturedPaint,
+        observation.captureFrame,
+        sample,
+        reference,
+      )
+  }
+  const currentHighlights = observation.input.retention.entries.some(
+    (entry) =>
+      entry.family === 'highlighter' &&
+      entry.status === 'ready' &&
+      entry.leaseCount > 0 &&
+      entry.revision === observation.input.identity.revision,
+  )
+  if (
+    sample.installed.syntaxStatus === 'loading' &&
+    sample.installed.initialHighlightStatus === 'painted' &&
+    currentHighlights
+  ) {
+    expect(sample.installed.syncPoint.revision).toBe(observation.input.identity.revision)
+    expect(tokenPaintMismatch(sample.frame, reference)).toBeNull()
+    expect(observation.capturedPaint).toBeNull()
   }
   if (!observation.input.enabled) expect(observation.mismatch).toBeNull()
 }
