@@ -3,6 +3,11 @@ import { activeEditorTab, allEditorGroups } from '@/lib/documents/utils/groups'
 import { fileDocumentKey, fileResource, filesystemPath } from '@/lib/documents/utils/identity'
 import { documentTab } from '@/lib/documents/utils/tabs'
 import { activeEnvironmentId } from '@/lib/environments/state/domain'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { projectSettings } from '@workspace/client-core/settings/projection'
+import { settingsIntentStore } from '@workspace/client-core/settings/intent-store'
+import type { SettingsSnapshot } from '@workspace/contracts'
 import { ensureFileSnapshotQuery } from '@/lib/file-snapshot-query-cache'
 import { syncEditorThemeSelection } from '@/features/editor/state/color-theme-store'
 import {
@@ -13,6 +18,7 @@ import { savedDiffAttachment, diffAttachmentSubject } from '@/lib/diff-attachmen
 import { joinRenderLines, projectDiffSyntaxTokens } from '@singapore-editor/diff'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { mountRetentionAcceptanceApp } from '../../../../test/factories/retention-acceptance-app'
+import type { RetentionAcceptanceApp } from '../../../../test/factories/retention-acceptance-app'
 import {
   awaitRetentionAcceptanceReady,
   retentionAcceptanceSubject,
@@ -24,6 +30,55 @@ import {
 } from '../../../../test/factories/diff-attachment'
 
 const path = filesystemPath('repo/src/editor-tab-a.ts')
+
+function liveReadinessObservation(app: RetentionAcceptanceApp) {
+  const subject = retentionAcceptanceSubject(app, path)
+  const settings = app.queryClient.getQueryData<SettingsSnapshot>(settingsKeys.document())
+  const projection = settings
+    ? projectSettings(
+        settings,
+        settingsIntentStore
+          .getState()
+          .active.filter((entry) => entry.patch.owner === app.queryClient),
+      )
+    : null
+  return {
+    at: performance.now(),
+    enabled: readSettingsMirror()['editor.syntaxHighlighting.enabled'],
+    confirmedEnabled: settings?.values['editor.syntaxHighlighting.enabled'],
+    projectedEnabled: projection?.values['editor.syntaxHighlighting.enabled'],
+    pendingSettingsIntents: settingsIntentStore
+      .getState()
+      .active.filter((entry) => entry.patch.owner === app.queryClient)
+      .map((entry) => ({
+        target: entry.patch.request.target,
+        operations: entry.patch.request.operations.map((operation) => operation.kind),
+      })),
+    configuration: subject.configuration,
+    currentRevision: subject.document.buffer.getRevision(),
+    currentText: subject.document.buffer.materializeFullText(),
+    analysis: subject.document.analysis.inspectRetention(),
+    documentId: subject.document.analysis.documentId,
+    theme: {
+      selected: app.read().theme.selectedThemeId,
+      applied: app.read().theme.appliedThemeId,
+      hash: app.read().theme.appliedThemeContentHash,
+    },
+    controllers: [...app.read().ui.getState().controllersByTabId].map(([tab, controller]) => {
+      const snapshot = controller.getSnapshot()
+      return {
+        tab,
+        documentId: snapshot?.documentId,
+        revision: snapshot?.documentSyncPoint.revision,
+        syntax: snapshot?.syntaxStatus,
+        initial: snapshot?.initialHighlightStatus,
+        paintAvailable: snapshot ? snapshot.paintLayers !== null : false,
+        textVersion: snapshot?.textVersion,
+        tokenCount: snapshot?.tokens.length,
+      }
+    }),
+  }
+}
 
 declare module 'vitest' {
   interface TaskMeta {
@@ -179,12 +234,31 @@ test.for(['resolve', 'reject'] as const)(
     const app = await mountRetentionAcceptanceApp()
     await ensureFileSnapshotQuery(app.queryClient, path)
     expect(await app.read().commands.openFileSurface(path)).toMatchObject({ status: 'applied' })
-    await awaitRetentionAcceptanceReady(app, path)
+    const phases: unknown[] = []
+    const waitForLive = async (phase: 'opened' | 'edited') => {
+      phases.push({ phase, event: 'start', observation: liveReadinessObservation(app) })
+      try {
+        await awaitRetentionAcceptanceReady(app, path)
+        phases.push({ phase, event: 'ready', observation: liveReadinessObservation(app) })
+      } catch (error) {
+        try {
+          phases.push({ phase, event: 'failed', observation: liveReadinessObservation(app) })
+          context.task.meta.attachment200 = { outcome, phases }
+          await context.annotate(
+            JSON.stringify({ outcome, phases }),
+            'actual-initial-live-readiness-failure',
+          )
+        } finally {
+          throw error
+        }
+      }
+    }
+    await waitForLive('opened')
     const document = retentionAcceptanceSubject(app, path).document
     const liveTab = activeEditorTab(app.read().workspace.getState().workbenchPanels.editorGroups)!
     const live = app.read().ui.getState().controllersByTabId.get(liveTab.id)!
     live.commands.edit({ from: 0, to: 0, text: 'export const oldLoan = 10\n' })
-    await awaitRetentionAcceptanceReady(app, path)
+    await waitForLive('edited')
     const loans = observeDiffSyntaxLoans()
     const observed = observeDiffEditors()
     loans.holdNext()
@@ -224,6 +298,7 @@ test.for(['resolve', 'reject'] as const)(
     expect(document.buffer.materializeFullText()).toContain('currentLoan')
     const evidence = {
       outcome,
+      phases,
       oldReaderCount: oldReaders.length,
       currentText: text,
       installed: captureDiffSnapshot(observed.read('stacked').delivered!),
