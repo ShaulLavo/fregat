@@ -1,3 +1,8 @@
+import {
+  captureNativeConflictOwner,
+  type NativeConflictOwner,
+  type NativeConflictFiber as Fiber,
+} from '../native-conflict-owner'
 import { scratchPath } from '../paths'
 import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert/strict'
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
@@ -49,7 +54,18 @@ export const editorConflictMerge: Scenario = {
       await page.keyboard.press('ArrowUp')
       await page.keyboard.press('ArrowUp')
       await page.keyboard.press('Shift+ArrowRight')
-      identity = await selectors.editorInput(page).first().evaluateHandle(captureConflictIdentity)
+      const owner = await selectors
+        .editorInput(page)
+        .first()
+        .evaluateHandle<NativeConflictOwner | null, 'filesystem'>(
+          captureNativeConflictOwner,
+          'filesystem',
+        )
+      try {
+        identity = await owner.evaluateHandle(captureConflictIdentity)
+      } finally {
+        await owner.dispose()
+      }
       const before = await identity.evaluate(observeConflict)
       ok(
         before?.editing?.insideMarker,
@@ -210,13 +226,6 @@ type BrowserRuntime = {
   }
   uiStore: { getState(): { controllersByTabId: ReadonlyMap<string, ObservedController> } }
 }
-type Fiber = {
-  return: Fiber | null
-  child: Fiber | null
-  sibling: Fiber | null
-  memoizedProps: Record<string, unknown>
-  stateNode?: { current: Fiber }
-}
 type ConflictIdentity = {
   runtime: BrowserRuntime
   conflict: Conflict
@@ -229,40 +238,18 @@ type ConflictIdentity = {
 }
 
 // The existing provider and native controller are read through development fiber; no app probe is installed.
-function captureConflictIdentity(element: Element): ConflictIdentity | null {
-  let host: Element | null = element
-  let fiber: Fiber | null = null
-  while (host && !fiber) {
-    const key = Object.keys(host).find((entry) => entry.startsWith('__reactFiber$'))
-    if (key) fiber = Reflect.get(host, key)
-    host = host.parentElement
-  }
-  let runtime: BrowserRuntime | null = null
-  const isStore = (value: unknown): value is { getState(): unknown } =>
+function captureConflictIdentity(owner: NativeConflictOwner | null): ConflictIdentity | null {
+  if (!owner) return null
+  const isRuntime = (value: NativeConflictOwner['runtime']): value is BrowserRuntime =>
+    'conflictStore' in value &&
     Boolean(
-      value &&
-      typeof value === 'object' &&
-      'getState' in value &&
-      typeof value.getState === 'function',
+      value.conflictStore &&
+      typeof value.conflictStore === 'object' &&
+      'getState' in value.conflictStore &&
+      typeof value.conflictStore.getState === 'function',
     )
-  const isRuntime = (value: unknown): value is BrowserRuntime =>
-    Boolean(
-      value &&
-      typeof value === 'object' &&
-      'documentStore' in value &&
-      'conflictStore' in value &&
-      'uiStore' in value &&
-      isStore(value.documentStore) &&
-      isStore(value.conflictStore) &&
-      isStore(value.uiStore),
-    )
-  while (fiber) {
-    const candidate = fiber.memoizedProps?.runtime
-    if (isRuntime(candidate)) runtime = candidate
-    if (!fiber.return) break
-    fiber = fiber.return
-  }
-  if (!runtime || !fiber?.stateNode) return null
+  if (!isRuntime(owner.runtime)) return null
+  const runtime = owner.runtime
   const conflict = Object.values(runtime.conflictStore.getState().conflicts).find(
     (entry) => entry.seed,
   )
@@ -280,8 +267,8 @@ function captureConflictIdentity(element: Element): ConflictIdentity | null {
     resolution,
     view: view.view,
     tabId: view.tabId,
-    root: fiber.stateNode,
-    ownerDocument: element.ownerDocument,
+    root: owner.root,
+    ownerDocument: owner.ownerDocument,
   }
 }
 

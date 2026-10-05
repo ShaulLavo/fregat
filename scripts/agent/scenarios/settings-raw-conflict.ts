@@ -1,3 +1,8 @@
+import {
+  captureNativeConflictOwner,
+  type NativeConflictOwner,
+  type NativeConflictFiber as Fiber,
+} from '../native-conflict-owner'
 import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
 import type { JSHandle } from 'playwright'
@@ -39,10 +44,20 @@ export const settingsRawConflict: Scenario = {
       await page.keyboard.type(' ')
       for (let line = 0; line < 65; line++) await page.keyboard.press('ArrowDown')
       await page.keyboard.press('Shift+ArrowDown')
-      identity = await selectors.writableEditorInput(page).evaluateHandle(captureSettingsIdentity, {
-        comparison: settingsComparisonSelector,
-        host: settingsNativeHostSelector,
-      })
+      const owner = await selectors
+        .writableEditorInput(page)
+        .evaluateHandle<NativeConflictOwner | null, 'settings'>(
+          captureNativeConflictOwner,
+          'settings',
+        )
+      try {
+        identity = await owner.evaluateHandle(captureSettingsIdentity, {
+          comparison: settingsComparisonSelector,
+          host: settingsNativeHostSelector,
+        })
+      } finally {
+        await owner.dispose()
+      }
       const edited = await identity.evaluate(observeSettings, null)
       const settingsOwner = identity
       ok(edited?.native.focused)
@@ -330,13 +345,6 @@ type SettingsRuntime = {
   workspaceStore: { getState(): { rootFolder: { path: string } | null } }
   uiStore: { getState(): { controllersByTabId: ReadonlyMap<string, Controller> } }
 }
-type Fiber = {
-  return: Fiber | null
-  child: Fiber | null
-  sibling: Fiber | null
-  memoizedProps: Record<string, unknown>
-  stateNode?: { current: Fiber }
-}
 type SettingsIdentity = {
   runtime: SettingsRuntime
   key: string
@@ -357,42 +365,20 @@ type SettingsAttachment = {
 type SettingsBinding = { lease: SettingsLease; read: SettingsRead; file: object | null }
 
 function captureSettingsIdentity(
-  element: Element,
+  owner: NativeConflictOwner | null,
   dom: SettingsIdentity['dom'],
 ): SettingsIdentity | null {
-  let host: Element | null = element
-  let fiber: Fiber | null = null
-  while (host && !fiber) {
-    const key = Object.keys(host).find((entry) => entry.startsWith('__reactFiber$'))
-    if (key) fiber = Reflect.get(host, key)
-    host = host.parentElement
-  }
-  let runtime: SettingsRuntime | null = null
-  const isStore = (value: unknown): value is { getState(): unknown } =>
+  if (!owner) return null
+  const isRuntime = (value: NativeConflictOwner['runtime']): value is SettingsRuntime =>
+    'workspaceStore' in value &&
     Boolean(
-      value &&
-      typeof value === 'object' &&
-      'getState' in value &&
-      typeof value.getState === 'function',
+      value.workspaceStore &&
+      typeof value.workspaceStore === 'object' &&
+      'getState' in value.workspaceStore &&
+      typeof value.workspaceStore.getState === 'function',
     )
-  const isRuntime = (value: unknown): value is SettingsRuntime =>
-    Boolean(
-      value &&
-      typeof value === 'object' &&
-      'documentStore' in value &&
-      'workspaceStore' in value &&
-      'uiStore' in value &&
-      isStore(value.documentStore) &&
-      isStore(value.workspaceStore) &&
-      isStore(value.uiStore),
-    )
-  while (fiber) {
-    const candidate = fiber.memoizedProps?.runtime
-    if (isRuntime(candidate)) runtime = candidate
-    if (!fiber.return) break
-    fiber = fiber.return
-  }
-  if (!runtime || !fiber?.stateNode) return null
+  if (!isRuntime(owner.runtime)) return null
+  const runtime = owner.runtime
   const docs = runtime.documentStore.getState()
   const document = Object.values(docs.liveDocumentsByKey).find(
     (entry) => entry.target.kind === 'settings-json' && entry.target.target === 'user',
@@ -400,7 +386,7 @@ function captureSettingsIdentity(
   const view = Object.values(docs.viewsByTabId).find((entry) => entry.documentKey === document?.key)
   const controller = view ? runtime.uiStore.getState().controllersByTabId.get(view.tabId) : null
   const native = controller?.getEditor()
-  if (!document || !view || !controller || !native || native.getInputElement() !== element)
+  if (!document || !view || !controller || !native || native.getInputElement() !== owner.element)
     return null
   return {
     runtime,
@@ -410,8 +396,8 @@ function captureSettingsIdentity(
     view: view.view,
     controller,
     native,
-    root: fiber.stateNode,
-    ownerDocument: element.ownerDocument,
+    root: owner.root,
+    ownerDocument: owner.ownerDocument,
     dom,
   }
 }
