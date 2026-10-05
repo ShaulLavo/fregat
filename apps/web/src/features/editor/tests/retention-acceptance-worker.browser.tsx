@@ -57,7 +57,14 @@ test.for(['shiki', 'tree-sitter'] as const)(
         JSON.stringify({
           family,
           requests: gate.requests(),
-          marks: performance.getEntriesByName('editor.worker.request'),
+          marks: performance
+            .getEntriesByName('editor.worker.request')
+            .map((entry) => ({
+              name: entry.name,
+              startTime: entry.startTime,
+              duration: entry.duration,
+              detail: entry instanceof PerformanceMark ? entry.detail : null,
+            })),
         }),
         'retention-acceptance-worker-gate-calibration',
       )
@@ -71,6 +78,8 @@ test.for(['shiki', 'tree-sitter'] as const)(
       readonly snapshotRevision: number | null
       readonly sample: ReturnType<typeof captureRetentionAcceptancePaint>
     }[] = []
+    let currentReference: ReturnType<typeof retentionAcceptanceReference> | null = null
+    let finalSample: ReturnType<typeof captureRetentionAcceptancePaint> | null = null
     let recording = true
     let frameHandle = 0
     const record = () => {
@@ -98,17 +107,15 @@ test.for(['shiki', 'tree-sitter'] as const)(
       await awaitRetentionAcceptanceReady(app, path)
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
       const current = retentionAcceptanceReference(app, path)
+      currentReference = current
       expect(current.identity.revision).toBe(revision)
       const ready = observations.filter((observation) => observation.status === 'ready')
       for (const observation of ready) {
         expect(observation.snapshotRevision).toBe(revision)
         assertRetentionAcceptancePaint(observation.sample, current, path)
       }
-      assertRetentionAcceptancePaint(
-        captureRetentionAcceptancePaint(app, path, tab.id),
-        current,
-        path,
-      )
+      finalSample = captureRetentionAcceptancePaint(app, path, tab.id)
+      assertRetentionAcceptancePaint(finalSample, current, path)
       if (typeof commands.retentionAcceptanceScreenshot === 'function')
         await commands.retentionAcceptanceScreenshot(`held-edit-${family}`)
     } finally {
@@ -116,7 +123,7 @@ test.for(['shiki', 'tree-sitter'] as const)(
       cancelAnimationFrame(frameHandle)
       gate.release()
       await context.annotate(
-        JSON.stringify({ family, observations }),
+        JSON.stringify({ family, current: currentReference, finalSample, observations }),
         'retention-acceptance-worker-raw-frames',
       )
     }
