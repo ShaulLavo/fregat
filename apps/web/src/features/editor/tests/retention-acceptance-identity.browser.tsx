@@ -627,7 +627,7 @@ function installTrace(context: { onTestFinished(callback: () => void): void }) {
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
-    proofKeyPress(input: { readonly key: string }): Promise<void>
+    proofKeyPress: (input: { readonly key: string }) => Promise<void>
     retentionAcceptanceScreenshot(label: string): Promise<string>
   }
 }

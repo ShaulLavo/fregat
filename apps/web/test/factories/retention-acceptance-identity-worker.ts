@@ -19,10 +19,28 @@ export function holdRetentionIdentityWorkerReply() {
   if (!original) throw createClientInvariantError('Native Worker postMessage is unavailable')
   const gate = holdRetentionAcceptanceWorkerReply()
   const forward = Worker.prototype.postMessage
+  const message = Object.getOwnPropertyDescriptor(Worker.prototype, 'onmessage')
+  const setMessage = message?.set
+  if (!message || !setMessage) {
+    gate.restore()
+    throw createClientInvariantError('Native Worker message handler is unavailable')
+  }
+  const hookedWorkers = new WeakSet<Worker>()
   const receipts: Receipt[] = []
+  Object.defineProperty(Worker.prototype, 'onmessage', {
+    ...message,
+    set: function (this: Worker, listener: Worker['onmessage']) {
+      hookedWorkers.add(this)
+      setMessage.call(this, listener)
+    },
+  })
   Object.defineProperty(Worker.prototype, 'postMessage', {
     ...original,
     value: function (this: Worker, ...args: Parameters<Worker['postMessage']>) {
+      if (!hookedWorkers.has(this) && this.onmessage) {
+        setMessage.call(this, this.onmessage)
+        hookedWorkers.add(this)
+      }
       const receipt = packetReceipt(args[0])
       if (receipt) receipts.push(receipt)
       Reflect.apply(forward, this, args)
