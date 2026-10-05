@@ -35,6 +35,14 @@ test('invalidates Search before WorkspaceEdit Undo resolves and retains restored
   const application = createTestApplicationRuntime()
   const { editor, queryClient } = application.getSnapshot()
   const search = editor.searchBufferStore
+  editor.workspaceStore
+    .getState()
+    .switchWorkspace({ ...root, workspaceAddress, name: 'Root', type: 'directory' })
+  const a = editor.documentStore.getState().ensureLiveEditorDocument(fileA)
+  const b = editor.documentStore.getState().ensureLiveEditorDocument(fileB)
+  createEditorBufferSession(a.buffer).applyText(dirtyComment)
+  search.getState().setQuery('', 'renameMe')
+  search.getState().setReplaceText('', 'renamedValue')
   const view = renderWithProviders(
     <TestEditorStateProvider>
       <SearchControl />
@@ -43,18 +51,6 @@ test('invalidates Search before WorkspaceEdit Undo resolves and retains restored
   )
   try {
     const replace = await view.findByRole('button', { name: 'Replace all' })
-    act(() => {
-      editor.workspaceStore
-        .getState()
-        .switchWorkspace({ ...root, workspaceAddress, name: 'Root', type: 'directory' })
-    })
-    const a = editor.documentStore.getState().ensureLiveEditorDocument(fileA)
-    const b = editor.documentStore.getState().ensureLiveEditorDocument(fileB)
-    act(() => {
-      createEditorBufferSession(a.buffer).applyText(dirtyComment)
-      search.getState().setQuery('', 'renameMe')
-      search.getState().setReplaceText('', 'renamedValue')
-    })
     await waitForMatches(search, 3)
     expect(replace).toBeEnabled()
     act(() => replace.click())
