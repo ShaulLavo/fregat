@@ -1,16 +1,13 @@
-import { useIsFetching } from '@tanstack/react-query'
 import { useDebouncedValue } from '@tanstack/react-pacer/debouncer'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 
 import type { FsEntry } from '@/lib/file-system-types'
-import { filePreviewKeys } from '@/lib/query-keys'
 import { EntryContent } from '@/features/file-picker/components/entry-content'
 import { EntryFacts } from '@/features/file-picker/components/entry-facts'
 import { NoPreview } from '@/features/file-picker/components/no-preview'
 import type { FilePickerMode } from '@/features/file-picker/utils/model'
 import { PREVIEW_SETTLE_MS } from '@/lib/file-preview/utils/preview'
-import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
 import { usePreviewReady } from '@/features/file-picker/hooks/use-preview-ready'
 
 /**
@@ -32,10 +29,7 @@ export function PreviewPane({
   showHidden: boolean
 }) {
   const [settled] = useDebouncedValue(entry, { wait: PREVIEW_SETTLE_MS })
-  const ready = usePreviewReady(settled, { mode, showHidden })
-  const shown = useHeldUntilReady(settled, ready)
-  const refetching = useIsFetching({ queryKey: filePreviewKeys.file(shown?.path ?? '') }) > 0
-  const fetching = shown !== settled || refetching
+  const { shown, fetching } = usePreviewReady(settled, { mode, showHidden })
 
   return (
     <ToolPane
@@ -48,16 +42,23 @@ export function PreviewPane({
       {shown ? (
         <div
           className='flex min-h-0 flex-1 flex-col gap-(--density-section-gap)'
-          data-file-preview={shown.path}
+          data-file-preview={shown.entry.path}
         >
           <div className='flex min-h-0 w-full flex-1 flex-col items-center'>
-            <EntryContent accept={accept} entry={shown} mode={mode} showHidden={showHidden} />
+            <EntryContent
+              accept={accept}
+              entry={shown.entry}
+              mode={mode}
+              showHidden={showHidden}
+              read={shown.read}
+              origin={shown.origin}
+            />
           </div>
           <div className='flex shrink-0 flex-col gap-(--density-control-gap)'>
-            <div className='w-full min-w-0 text-center' title={shown.path}>
-              <div className='truncate text-xs font-medium'>{shown.name}</div>
+            <div className='w-full min-w-0 text-center' title={shown.entry.path}>
+              <div className='truncate text-xs font-medium'>{shown.entry.name}</div>
             </div>
-            <EntryFacts entry={shown} />
+            <EntryFacts entry={shown.entry} read={shown.read} />
           </div>
         </div>
       ) : (

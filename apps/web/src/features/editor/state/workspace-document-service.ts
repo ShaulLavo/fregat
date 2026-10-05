@@ -1,4 +1,12 @@
 import {
+  boundedPreviewPrefix,
+  samePreviewScope,
+  type PreviewSourceRead,
+  type PreviewSourceLease,
+  type LivePreviewRequest,
+  type DiskHeadInput,
+} from '@/lib/file-preview/utils/source'
+import {
   filesystemComparisonSubject,
   sameFilesystemCapture,
   settingsComparisonSubject,
@@ -260,6 +268,8 @@ type SnapshotComparisonInterest = {
 
 export type WorkspaceDocumentServiceState = {
   readonly environmentId: EnvironmentId | null
+  previewScope: import('@/lib/documents/utils/snapshot-comparison').SnapshotComparisonScope | null
+  previewSources: ReadonlyMap<PreviewSourceLease, PreviewSourceRead>
   snapshotComparisonTabs: ReadonlyMap<TabId, SnapshotComparisonLease>
   snapshotComparisons: ReadonlyMap<SnapshotComparisonLease, SnapshotComparisonRead>
   savedComparisonTabs: ReadonlyMap<TabId, SavedComparisonLease>
@@ -281,7 +291,23 @@ type SavedComparisonInterest = {
   stop: () => void
 }
 
+type PreviewInterest = {
+  current: PreviewSourceRead
+  readonly key: DocumentKey | null
+  readonly buffer: EditorTextBuffer | null
+  readonly maxBytes: number
+  readonly releasePin: () => void
+  stop: () => void
+}
+
 export class WorkspaceDocumentService {
+  private previewScope:
+    | import('@/lib/documents/utils/snapshot-comparison').SnapshotComparisonScope
+    | null = null
+  private previewOrigin: string | null = null
+  private previewSources: ReadonlyMap<PreviewSourceLease, PreviewSourceRead> = new Map()
+  private readonly previewInterests = new Map<PreviewSourceLease, PreviewInterest>()
+
   private snapshotComparisonTabs: ReadonlyMap<TabId, SnapshotComparisonLease> = new Map()
   private snapshotComparisons: ReadonlyMap<SnapshotComparisonLease, SnapshotComparisonRead> =
     new Map()
@@ -331,6 +357,169 @@ export class WorkspaceDocumentService {
     private readonly onStateChange: () => void = () => undefined,
     private readonly environmentId: EnvironmentId | null = null,
   ) {}
+
+  setPreviewScope(rootPath: FilesystemPath | null, origin: string): void {
+    if (this.sourceOwnerDisposed) return
+    const next =
+      rootPath !== null && this.environmentId !== null
+        ? { environmentId: this.environmentId, rootPath }
+        : null
+    if (samePreviewScope(next, this.previewScope) && origin === this.previewOrigin) return
+    this.previewScope = next
+    this.previewOrigin = origin
+    for (const lease of Array.from(this.previewInterests.keys()))
+      this.endPreview(lease, { kind: 'released', reason: 'interest-ended' })
+    this.onStateChange()
+  }
+
+  acquireLivePreview({
+    scope,
+    key,
+    maxBytes,
+    signal,
+  }: LivePreviewRequest): PreviewSourceLease | null {
+    this.assertPreviewScope(scope)
+    if (this.sourceOwnerDisposed || signal.aborted)
+      return this.createPreviewInterest(
+        {
+          kind: 'released',
+          reason: this.sourceOwnerDisposed ? 'owner-disposed' : 'interest-ended',
+        },
+        signal,
+      )
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < 0)
+      throw createClientInvariantError('Preview budget must be bounded bytes', {
+        validBudget: false,
+      })
+    const document = this.liveDocumentsByKey.get(key)
+    if (!document || document.target.kind !== 'file') return null
+    const pin = this.acquireFilePreparation({ kind: 'live-document', documentKey: key })
+    if (!pin || pin.document.buffer !== document.buffer) {
+      pin?.release()
+      return null
+    }
+    const read: PreviewSourceRead = {
+      kind: 'live',
+      scope,
+      key,
+      buffer: document.buffer,
+      revision: document.buffer.getRevision(),
+      snapshot: document.buffer.getTextSnapshot(),
+      ...boundedPreviewPrefix(document.buffer.getTextSnapshot(), maxBytes),
+      maxBytes,
+      dirty: this.isDirtyDocument(key),
+    }
+    return this.createPreviewInterest(read, signal, {
+      key,
+      buffer: document.buffer,
+      maxBytes,
+      releasePin: pin.release,
+    })
+  }
+
+  adoptPreviewCapture({
+    input,
+    signal,
+  }: {
+    readonly input: DiskHeadInput
+    readonly signal: AbortSignal
+  }): PreviewSourceLease {
+    this.assertPreviewScope(input.scope)
+    if (input.origin !== this.previewOrigin)
+      throw createClientInvariantError('Preview capture belongs to a different origin', {
+        originMatches: false,
+      })
+    return this.createPreviewInterest({ kind: 'disk', input }, signal)
+  }
+
+  private assertPreviewScope(
+    scope: import('@/lib/documents/utils/snapshot-comparison').SnapshotComparisonScope,
+  ): void {
+    if (samePreviewScope(scope, this.previewScope)) return
+    throw createClientInvariantError('Preview source belongs to a different namespace', {
+      environmentMatches: scope.environmentId === this.environmentId,
+      rootMatches: scope.rootPath === this.previewScope?.rootPath,
+    })
+  }
+
+  private createPreviewInterest(
+    read: PreviewSourceRead,
+    signal: AbortSignal,
+    live?: Pick<PreviewInterest, 'key' | 'buffer' | 'maxBytes' | 'releasePin'>,
+  ): PreviewSourceLease {
+    const entry: PreviewInterest = {
+      current: read,
+      key: live?.key ?? null,
+      buffer: live?.buffer ?? null,
+      maxBytes: live?.maxBytes ?? 0,
+      releasePin: live?.releasePin ?? (() => undefined),
+      stop: () => undefined,
+    }
+    const lease: PreviewSourceLease = {
+      read: () => entry.current,
+      release: () => this.endPreview(lease, { kind: 'released', reason: 'interest-ended' }),
+    }
+    if (this.sourceOwnerDisposed || signal.aborted) {
+      entry.releasePin()
+      entry.current = {
+        kind: 'released',
+        reason: this.sourceOwnerDisposed ? 'owner-disposed' : 'interest-ended',
+      }
+      return lease
+    }
+    const abort = () => lease.release()
+    signal.addEventListener('abort', abort, { once: true })
+    entry.stop = () => signal.removeEventListener('abort', abort)
+    this.previewInterests.set(lease, entry)
+    this.previewSources = new Map(this.previewSources).set(lease, read)
+    this.onStateChange()
+    return lease
+  }
+
+  private endPreview(
+    lease: PreviewSourceLease,
+    terminal: Extract<PreviewSourceRead, { kind: 'released' | 'unavailable' }>,
+  ): void {
+    const entry = this.previewInterests.get(lease)
+    if (!entry) return
+    this.previewInterests.delete(lease)
+    entry.stop()
+    entry.current = terminal
+    const reads = new Map(this.previewSources)
+    reads.delete(lease)
+    this.previewSources = reads
+    entry.releasePin()
+    if (!this.sourceOwnerDisposed) this.onStateChange()
+  }
+
+  private refreshPreviewSources(
+    key: DocumentKey,
+    committed?: { readonly revision: number; readonly snapshot: DocumentTextSnapshot },
+  ): void {
+    for (const [lease, entry] of Array.from(this.previewInterests)) {
+      if (
+        this.previewInterests.get(lease) !== entry ||
+        entry.key !== key ||
+        entry.current.kind !== 'live'
+      )
+        continue
+      const document = this.liveDocumentsByKey.get(key)
+      if (!document || document.buffer !== entry.buffer) {
+        this.endPreview(lease, { kind: 'unavailable', reason: 'live-ended' })
+        continue
+      }
+      if (committed && committed.revision < entry.current.revision) continue
+      const snapshot = committed?.snapshot ?? document.buffer.getTextSnapshot()
+      entry.current = {
+        ...entry.current,
+        revision: committed?.revision ?? document.buffer.getRevision(),
+        snapshot,
+        ...boundedPreviewPrefix(snapshot, entry.maxBytes),
+        dirty: document.buffer.isDirty(),
+      }
+      this.previewSources = new Map(this.previewSources).set(lease, entry.current)
+    }
+  }
 
   acquireSettingsComparison({
     scope,
@@ -531,6 +720,8 @@ export class WorkspaceDocumentService {
 
   dispose(): void {
     this.sourceOwnerDisposed = true
+    for (const lease of Array.from(this.previewInterests.keys()))
+      this.endPreview(lease, { kind: 'released', reason: 'owner-disposed' })
     for (const lease of this.snapshotInterests.keys())
       this.releaseSnapshotComparison(lease, 'owner-disposed')
     for (const lease of this.comparisonInterests.keys())
@@ -1539,6 +1730,8 @@ export class WorkspaceDocumentService {
     const viewsByTabId = recordFromMap(this.viewsByTabId, previous?.viewsByTabId)
     const next: WorkspaceDocumentServiceState = {
       environmentId: this.environmentId,
+      previewScope: this.previewScope,
+      previewSources: this.previewSources,
       snapshotComparisonTabs: this.snapshotComparisonTabs,
       snapshotComparisons: this.snapshotComparisons,
       savedComparisonTabs: this.savedComparisonTabs,
@@ -2072,6 +2265,7 @@ export class WorkspaceDocumentService {
     key: DocumentKey,
     committed?: { readonly revision: number; readonly snapshot: DocumentTextSnapshot },
   ): void {
+    this.refreshPreviewSources(key, committed)
     this.refreshSettingsComparisons(key, committed)
     for (const [lease, entry] of this.comparisonInterests) {
       if (fileDocumentKey(entry.path) !== key || entry.current.kind === 'released') continue

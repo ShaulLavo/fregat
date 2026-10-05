@@ -49,6 +49,9 @@ type CreateEditorDocumentStoreOptions = {
 }
 
 type EditorDocumentStoreActions = {
+  setPreviewScope: WorkspaceDocumentService['setPreviewScope']
+  acquireLivePreview: WorkspaceDocumentService['acquireLivePreview']
+  adoptPreviewCapture: WorkspaceDocumentService['adoptPreviewCapture']
   acquireFilePreparation: WorkspaceDocumentService['acquireFilePreparation']
   enumerateEditorAnalyses: WorkspaceDocumentService['enumerateEditorAnalyses']
   subscribeEditorAnalyses: WorkspaceDocumentService['subscribeEditorAnalyses']
@@ -220,6 +223,9 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
 
       return {
         ...service.state(),
+        setPreviewScope: (root, origin) => service.setPreviewScope(root, origin),
+        acquireLivePreview: (request) => service.acquireLivePreview(request),
+        adoptPreviewCapture: (request) => service.adoptPreviewCapture(request),
         acquireFilePreparation: (input) => {
           const source = service.acquireFilePreparation(input)
           publish()
