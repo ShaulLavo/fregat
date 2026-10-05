@@ -1,4 +1,4 @@
-import { fetchDiff } from '@/features/git/utils/api'
+import { fetchDiff } from '@/lib/git-diff-query'
 import { snapshotComparison } from '../../../../../test/factories/git-diff'
 import { runGit } from '../../../../../test/factories/git'
 import { mkdir, writeFile } from 'node:fs/promises'

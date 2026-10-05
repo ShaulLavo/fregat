@@ -84,15 +84,13 @@ export function intentForAddress(
 
 function referencesForTabs(tokens: readonly string[] | null) {
   if (tokens === null) return null
-  const references = tokens.map(editorReferenceForToken)
-  if (
-    references.some(
-      (reference) =>
-        reference === null || (reference.kind === 'snapshot' && reference.source === 'branch'),
-    )
-  )
-    return null
-  return references.filter((reference) => reference !== null)
+  const references: EditorReference[] = []
+  for (const token of tokens) {
+    const reference = editorReferenceForToken(token)
+    if (reference) references.push(reference)
+    else if (!token.startsWith('d/')) return null
+  }
+  return references
 }
 
 function unavailableReason(
@@ -107,8 +105,6 @@ function unavailableReason(
     return 'This link to a chat is broken.'
   if (address.mode === 'workbench' && address.document && !editor)
     return 'This link to a file is broken.'
-  if (editor?.kind === 'snapshot' && editor.source === 'branch')
-    return 'Links to branch diffs cannot be opened yet.'
   if (editor && editor.kind !== 'settings' && address.workspace === '-')
     return 'Open a folder to view this file.'
   return null

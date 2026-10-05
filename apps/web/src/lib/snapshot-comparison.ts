@@ -1,5 +1,5 @@
 import type { DiffFile } from '@singapore-editor/diff'
-import type { DocumentKey } from '@/lib/documents/utils/types'
+import type { DocumentKey, GitInputRevision } from '@/lib/documents/utils/types'
 import type {
   ImmutableGitSide,
   SnapshotComparison,
@@ -19,6 +19,7 @@ export type SnapshotComparisonInput = {
   readonly scope: SnapshotComparisonScope
   readonly subject: DocumentKey
   readonly comparison: SnapshotComparison
+  readonly revision: GitInputRevision
   readonly files: readonly SnapshotComparisonFile[]
   readonly display: readonly DiffFile[]
 }

@@ -77,7 +77,15 @@ export function DiffView({
   // that have to agree and nothing made them. The file list is off either way for a multi-file
   // diff, so a checkpoint diff touching several files deliberately shows one.
   const file = renderableDiffFile(files)
-  useDiffReloadView(JSON.stringify(diffDocumentQueryKey(comparison)), diffs, file, presentation)
+  const reloadIdentity =
+    comparison.kind === 'snapshot'
+      ? source && {
+          kind: 'snapshot' as const,
+          target: source.input.comparison.target,
+          revision: source.input.revision,
+        }
+      : { kind: 'checkpoint' as const, identity: JSON.stringify(diffDocumentQueryKey(comparison)) }
+  useDiffReloadView(reloadIdentity, diffs, file, presentation)
   // What an editor tab currently holds for this path, if anything. That is the only text a
   // language server can be asked about, and comparing it to the diff's new side is what makes an
   // answer true — see `diffQueryTargetAt`. Called before the early returns below: hooks are not
@@ -89,7 +97,9 @@ export function DiffView({
   const languageServer = useDiffLanguageContext(
     languagePath === null ? null : filesystemPath(languagePath),
     rootPath,
-    comparison.kind === 'snapshot' && comparison.source === 'worktree',
+    comparison.kind === 'snapshot' &&
+      comparison.target.kind === 'moving' &&
+      comparison.target.changeSource === 'worktree',
     languageHost,
   )
 

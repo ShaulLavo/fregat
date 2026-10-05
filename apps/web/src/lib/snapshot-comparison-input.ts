@@ -1,10 +1,13 @@
 import { isBinaryGitDiff, type GitFileDiff } from '@workspace/contracts'
 import { editorDiffFiles } from '@workspace/client-core/git/diff-files'
 import { documentKey, filesystemPath } from '@/lib/documents/utils/identity'
+import { gitInputRevisionForDiff, sameGitInputRevision } from '@/lib/documents/utils/comparisons'
+import type { GitInputRevision, GitRevisionSide } from '@/lib/documents/utils/types'
+import { resolvedGitObjectIdSchema } from '@workspace/contracts'
+import * as v from 'valibot'
 import { languageIdForFilePath } from '@/lib/file-language'
 import type {
   ImmutableGitSide,
-  ResolvedGitObjectId,
   SnapshotComparison,
   SnapshotComparisonScope,
 } from '@/lib/documents/utils/snapshot-comparison'
@@ -19,22 +22,50 @@ export function snapshotComparisonInput({
   readonly comparison: SnapshotComparison
   readonly diffs: readonly GitFileDiff[]
 }): SnapshotComparisonInput {
-  const files = diffs.map((diff) => snapshotFile(diff, comparison))
+  const target = comparison.target
+  const captured = diffs.find((diff) => diff.path === target.path)
+  const revision = capturedRevision(comparison, captured)
+  const files = diffs.map((diff) => snapshotFile(diff, comparison, revision))
   return {
     scope,
     subject: documentKey({ kind: 'git-diff', source: comparison }),
     comparison,
+    revision,
     files,
     display: files.flatMap((file) => (file.kind === 'no-text' ? [] : file.display)),
   }
 }
 
-function snapshotFile(diff: GitFileDiff, comparison: SnapshotComparison): SnapshotComparisonFile {
+function capturedRevision(
+  comparison: SnapshotComparison,
+  captured: GitFileDiff | undefined,
+): GitInputRevision {
+  const target = comparison.target
+  if (target.kind !== 'moving') return target.revision
+  if (captured) return gitInputRevisionForDiff(captured, target.changeSource)
+  return {
+    old: { kind: 'unresolved' },
+    new: { kind: 'unresolved' },
+    oldPath: target.path,
+    status: 'modified',
+  }
+}
+
+function snapshotFile(
+  diff: GitFileDiff,
+  comparison: SnapshotComparison,
+  revision: GitInputRevision,
+): SnapshotComparisonFile {
   if (diff.omitted) return { kind: 'no-text', reason: 'size' }
   if (isBinaryGitDiff(diff)) return { kind: 'no-text', reason: 'binary' }
+  if (diff.path !== comparison.target.path || (diff.oldPath ?? diff.path) !== revision.oldPath)
+    return { kind: 'no-text', reason: 'unavailable' }
   if (
-    diff.path !== comparison.path ||
-    (diff.oldPath ?? diff.path) !== (comparison.oldPath ?? comparison.path)
+    comparison.target.kind !== 'moving' &&
+    !sameGitInputRevision(
+      { ...gitInputRevisionForDiff(diff, 'historical'), status: revision.status },
+      revision,
+    )
   )
     return { kind: 'no-text', reason: 'unavailable' }
   const old = gitSide(
@@ -42,15 +73,9 @@ function snapshotFile(diff: GitFileDiff, comparison: SnapshotComparison): Snapsh
     diff.oldObjectId,
     diff.oldText,
     diff.oldFileMissing,
-    comparison.oldObjectId,
+    revision.old,
   )
-  const next = gitSide(
-    diff.path,
-    diff.newObjectId,
-    diff.newText,
-    diff.newFileMissing,
-    comparison.newObjectId,
-  )
+  const next = gitSide(diff.path, diff.newObjectId, diff.newText, diff.newFileMissing, revision.new)
   if (old && next)
     return {
       kind: 'full',
@@ -67,13 +92,17 @@ function gitSide(
   objectId: string | undefined,
   text: string | undefined,
   missing: boolean | undefined,
-  expected: string | undefined,
+  expected: GitRevisionSide,
 ): ImmutableGitSide | null {
-  if (missing) return expected ? null : { kind: 'missing', path: filesystemPath(path) }
-  if (text === undefined || !isResolvedGitObjectId(objectId) || objectId !== expected) return null
-  return { kind: 'blob', path: filesystemPath(path), objectId, text }
-}
-
-function isResolvedGitObjectId(value: string | undefined): value is ResolvedGitObjectId {
-  return value !== undefined && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value) && !/^0+$/.test(value)
+  if (missing)
+    return expected.kind === 'missing' ? { kind: 'missing', path: filesystemPath(path) } : null
+  const parsed = v.safeParse(resolvedGitObjectIdSchema, objectId)
+  if (
+    text === undefined ||
+    !parsed.success ||
+    expected.kind !== 'blob' ||
+    parsed.output !== expected.objectId
+  )
+    return null
+  return { kind: 'blob', path: filesystemPath(path), objectId: parsed.output, text }
 }

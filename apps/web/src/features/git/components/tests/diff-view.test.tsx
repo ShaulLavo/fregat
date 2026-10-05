@@ -8,12 +8,12 @@ import { screen, waitFor } from '@testing-library/react'
 import type { ReactElement } from 'react'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
-import { fetchDiff } from '@/features/git/utils/api'
+import { fetchDiff } from '@/lib/git-diff-query'
 import { fetchBlobDiff } from '@/lib/blob-diff-query'
 import { DiffView } from '@/features/git/components/diff-view'
 import { useDiffDocumentDiffs } from '@/features/git/hooks/use-diff-document-diffs'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
-import { snapshotComparison } from '../../../../../test/factories/git-diff'
+import { snapshotComparison, snapshotTarget } from '../../../../../test/factories/git-diff'
 import { editorDiffFiles } from '@workspace/client-core/git/diff-files'
 import { testDiffLanguageHost } from '../../../../../test/factories/diff-language-host'
 import { gitFileDiff } from '../../../../../test/factories/git-diff'
@@ -234,9 +234,17 @@ test('a document whose two sides are identical still shows the file', async ({
   void client
   const repo = await initRepo(server.root)
   const objectId = runGit(repo, ['rev-parse', 'HEAD:lines.ts'], { cwdMode: 'option' }).stdout.trim()
-  const documentInfo = snapshotComparison({
-    ...gitFileDiff({ oldObjectId: objectId, path: 'repo/lines.ts' }),
-    newObjectId: objectId,
+  expect(await fetchDiff('repo/lines.ts', false, undefined, getClient())).toEqual([])
+  const documentInfo = snapshotTarget({
+    kind: 'captured-review',
+    rootPath: 'repo',
+    path: 'repo/lines.ts',
+    revision: {
+      old: { kind: 'blob', objectId },
+      new: { kind: 'blob', objectId },
+      oldPath: 'repo/lines.ts',
+      status: 'modified',
+    },
   })
 
   renderDiffView(

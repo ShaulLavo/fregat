@@ -1,3 +1,4 @@
+import { snapshotTarget } from '../../../../test/factories/git-diff'
 import type { GitFileStatus } from '@workspace/contracts'
 import { editorTabModel } from '@/features/workspace/utils/tab-model'
 import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
@@ -124,7 +125,18 @@ test('a conflict diff targets the file on disk it is reconciling', () => {
 function snapshot(status: 'modified' | 'deleted' = 'modified'): TabContent {
   return documentTab({
     kind: 'git-diff',
-    source: { kind: 'snapshot', path: FILE, oldObjectId: 'old1', status },
+    source: snapshotTarget({
+      kind: 'captured-review',
+      rootPath: ROOT,
+      path: FILE,
+      revision: {
+        old: { kind: 'blob', objectId: 'a'.repeat(40) },
+        new:
+          status === 'deleted' ? { kind: 'missing' } : { kind: 'blob', objectId: 'b'.repeat(40) },
+        oldPath: FILE,
+        status,
+      },
+    }),
   })
 }
 

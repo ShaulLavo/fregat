@@ -16,7 +16,7 @@ import path from 'node:path'
 import { onTestFinished, vi } from 'vitest'
 
 import { DiffView } from '@/features/git/components/diff-view'
-import { fetchDiff } from '@/features/git/utils/api'
+import { fetchDiff } from '@/lib/git-diff-query'
 import { saveSettings } from '@/features/settings/utils/api'
 import { blobDiffQueryKey, fetchBlobDiff } from '@/lib/blob-diff-query'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'

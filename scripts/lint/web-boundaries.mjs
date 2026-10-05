@@ -22,6 +22,9 @@ const RESERVED_PREFIXES = [
 ]
 const PUBLIC_SCHEMAS = new Set([
   'sessionIdSchema',
+  'gitCommitOriginSchema',
+  'resolvedGitObjectIdSchema',
+  'gitSnapshotTargetSchema',
   'GIT_FILE_STATUSES',
   'normalizeChatAttachmentMimeType',
   'LOG_TIME_RANGES',
