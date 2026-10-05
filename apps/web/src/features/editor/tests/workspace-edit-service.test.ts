@@ -1,3 +1,4 @@
+import { testScopedStorage } from '../../../../test/factories/scoped-storage'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -209,7 +210,23 @@ test.describe('WorkspaceEditService', () => {
     const uri = fileUri(document.target)
     const provenance = currentProvenance(document.buffer, uri, 7)
     const phases: WorkspaceEditServicePhase[] = []
-    harness.service.subscribe(() => phases.push(harness.service.getSnapshot().phase))
+    const captures: unknown[] = []
+    harness.service.subscribe(() => {
+      const state = harness.service.getSnapshot()
+      phases.push(state.phase)
+      if (state.phase !== 'committing') return
+      const row = state.preview?.rows[0]
+      const read = row?.comparison
+      if (read?.kind !== 'ready' || read.input.kind !== 'operation') return
+      captures.push({
+        old: read.input.old.materializeFullText(),
+        new: read.input.new.materializeFullText(),
+        exactBefore: read.input.old.snapshot === read.input.segment.snapshotBefore,
+        exactAfter: read.input.new.snapshot === read.input.segment.snapshotAfter,
+        exactFile: row?.file === read.input.display,
+        admitted: [...harness.store.getState().snapshotComparisons.values()].includes(read),
+      })
+    })
 
     const result = await harness.service.onApplyWorkspaceEdit(
       request([textOperation(uri, 7, 0, 1, 'A')], {
@@ -219,6 +236,17 @@ test.describe('WorkspaceEditService', () => {
     )
 
     expect(result).toEqual({ status: 'applied' })
+    expect(captures).toEqual([
+      {
+        old: 'alpha',
+        new: 'Alpha',
+        exactBefore: true,
+        exactAfter: true,
+        exactFile: true,
+        admitted: true,
+      },
+    ])
+    expect(harness.store.getState().snapshotComparisons.size).toBe(0)
     expect(document.buffer.materializeFullText()).toBe('Alpha')
     expect(document.buffer.canUndo()).toBe(true)
     expect(harness.service.getSnapshot()).toMatchObject({
@@ -271,23 +299,29 @@ test.describe('WorkspaceEditService', () => {
 
     expect(harness.service.getSnapshot().preview?.rows).toMatchObject([
       {
-        afterText: 'Active!',
-        beforeText: 'active!',
         path: '/repo/active.ts',
         targetKind: 'dirty',
       },
       {
-        afterText: 'Secondary',
-        beforeText: 'secondary',
         path: '/repo/secondary.ts',
         targetKind: 'open',
       },
       {
-        afterText: 'Unopened',
-        beforeText: 'unopened',
         path: '/repo/unopened.ts',
         targetKind: 'unopened',
       },
+    ])
+    expect(
+      harness.service.getSnapshot().preview?.rows.map((row) => {
+        const read = row.comparison
+        return read?.kind === 'ready' && read.input.kind === 'operation'
+          ? [read.input.old.materializeFullText(), read.input.new.materializeFullText()]
+          : null
+      }),
+    ).toEqual([
+      ['active!', 'Active!'],
+      ['secondary', 'Secondary'],
+      ['unopened', 'Unopened'],
     ])
     expect(harness.service.getSnapshot()).toMatchObject({ canCancel: true })
 
@@ -1376,7 +1410,7 @@ test.describe('WorkspaceEditService', () => {
 })
 
 function createHarness(options: HarnessOptions = {}) {
-  const store = createEditorDocumentStore()
+  const store = createEditorDocumentStore({ environmentId: testScopedStorage.environmentId })
   const files = new Map<string, FileResult>()
   const inspections = new Map<string, WorkspaceEditPathInspection>()
   const transport = new RecordingWorkspaceMutationTransport(options)

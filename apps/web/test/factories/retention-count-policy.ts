@@ -743,10 +743,10 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     await observation.frame()
     await Promise.resolve()
     await expect.poll(hasPendingRetentionMutation).toBe(false)
+    await Promise.all([tree.awaitIdleFence(), shiki.awaitIdleFence()])
     await expect
       .poll(() => tree.inspect().pendingRequests + shiki.inspect().pendingRequests)
       .toBe(0)
-    await Promise.all([tree.awaitIdleFence(), shiki.awaitIdleFence()])
     await Promise.resolve()
     await expect.poll(hasPendingRetentionMutation).toBe(false)
     await expect
@@ -853,6 +853,26 @@ export async function retentionCountHost(fixture: RetentionFixture) {
       b: { revision: b.buffer.getRevision(), dirty: b.buffer.isDirty() },
     }
   }
+  let disposal: Promise<void> | null = null
+  function dispose() {
+    disposal ??= disposeHost()
+    return disposal
+  }
+  async function disposeHost() {
+    try {
+      for (const view of views) view.dispose()
+      releaseViewMetadata()
+      application.dispose()
+    } finally {
+      for (const stop of stopPublications) stop()
+      await Promise.all([tree.dispose(), shiki.dispose()])
+      useEnvironmentsStore.setState(previousEnvironments, true)
+      if (previousSettings === undefined)
+        queries.removeQueries({ queryKey: settingsKeys.document(), exact: true })
+      else queries.setQueryData(settingsKeys.document(), previousSettings)
+      observation.restore()
+    }
+  }
   return {
     application,
     a,
@@ -886,20 +906,6 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     survivorEditor,
     tree,
     shiki,
-    async dispose() {
-      try {
-        for (const view of views) view.dispose()
-        releaseViewMetadata()
-        application.dispose()
-      } finally {
-        for (const stop of stopPublications) stop()
-        await Promise.all([tree.dispose(), shiki.dispose()])
-        useEnvironmentsStore.setState(previousEnvironments, true)
-        if (previousSettings === undefined)
-          queries.removeQueries({ queryKey: settingsKeys.document(), exact: true })
-        else queries.setQueryData(settingsKeys.document(), previousSettings)
-        observation.restore()
-      }
-    },
+    dispose,
   }
 }

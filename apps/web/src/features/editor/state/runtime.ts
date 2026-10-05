@@ -199,6 +199,7 @@ export function createEditorRuntime({
     documentSyncController,
     fileSync,
     getRoot: () => workspaceRoot(workspaceStore, rootGeneration),
+    onHistorySettled: (rootPath) => searchBufferStore.getState().requestSearchRefresh(rootPath),
   })
   const workspaceEditHost: WorkspaceEditHost = {
     documentSyncController,

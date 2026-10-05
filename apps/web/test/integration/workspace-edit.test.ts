@@ -1,3 +1,4 @@
+import { testScopedStorage } from '../factories/scoped-storage'
 import { lstat, mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -75,23 +76,29 @@ test('applies one group across a dirty active buffer an open secondary and an un
 
   expect(harness.service.getSnapshot().preview?.rows).toMatchObject([
     {
-      afterText: 'Active!',
-      beforeText: 'active!',
       path: activePath,
       targetKind: 'dirty',
     },
     {
-      afterText: 'Secondary',
-      beforeText: 'secondary',
       path: secondaryPath,
       targetKind: 'open',
     },
     {
-      afterText: 'Unopened',
-      beforeText: 'unopened',
       path: unopenedPath,
       targetKind: 'unopened',
     },
+  ])
+  expect(
+    harness.service.getSnapshot().preview?.rows.map((row) => {
+      const read = row.comparison
+      return read?.kind === 'ready' && read.input.kind === 'operation'
+        ? [read.input.old.materializeFullText(), read.input.new.materializeFullText()]
+        : null
+    }),
+  ).toEqual([
+    ['active!', 'Active!'],
+    ['secondary', 'Secondary'],
+    ['unopened', 'Unopened'],
   ])
   harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
   await expect(pending).resolves.toEqual({ status: 'applied' })
@@ -1013,7 +1020,7 @@ type IntegrationHarness = ReturnType<typeof createHarness>
 
 function createHarness() {
   const client = getClient()
-  const store = createEditorDocumentStore()
+  const store = createEditorDocumentStore({ environmentId: testScopedStorage.environmentId })
   const queryClient = createTestQueryClient()
   const fileSync = new FileSyncService(store, queryClient)
   const service = new WorkspaceEditService({

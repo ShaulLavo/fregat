@@ -1,5 +1,5 @@
 import { createEditorStructuralOperation } from '@singapore-editor/core/editor'
-import { expect, test } from 'vitest'
+import { afterAll, afterEach, expect, inject, test } from 'vitest'
 import { commands } from 'vitest/browser'
 import '@singapore-editor/core/style.css'
 import { pieceTableSnapshotsHaveSameText } from '@singapore-editor/textbuffer'
@@ -9,6 +9,12 @@ import {
   RETENTION_COUNT_PROTOCOL,
   type RetentionRun,
 } from '../../../../test/factories/retention-count-policy-protocol'
+
+declare module 'vitest' {
+  interface ProvidedContext {
+    retentionRun: RetentionRun | undefined
+  }
+}
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
@@ -36,20 +42,26 @@ async function record(sample: unknown) {
     expect(sample.point.consistent).toBe(true)
 }
 
+const discoveryRun = {
+  sourceHead: 'vitest-discovery-pilot',
+  protocol: RETENTION_COUNT_PROTOCOL,
+  cycles: 2,
+  fixtures: [
+    { id: 'tree-ts-pilot', provider: 'tree-sitter', language: 'typescript', sourceUnits: 4096 },
+  ],
+} satisfies RetentionRun
+const collectedRun = inject('retentionRun') ?? discoveryRun
+let runRecord: Promise<void> | null = null
+const caseOutcomes: { fixture: string; status: string; errors: unknown[] }[] = []
+let activeCase: { dispose(): Promise<void>; flight: Promise<void>; stopAbort(): void } | null = null
+
 async function configuration() {
   if (typeof commands.retentionManifest === 'function') return commands.retentionManifest()
-  return {
-    sourceHead: 'vitest-discovery-pilot',
-    protocol: RETENTION_COUNT_PROTOCOL,
-    cycles: 2,
-    fixtures: [
-      { id: 'tree-ts-pilot', provider: 'tree-sitter', language: 'typescript', sourceUnits: 4096 },
-    ],
-  } satisfies RetentionRun
+  return discoveryRun
 }
-
-test('actual host global count, warm reuse, pressure, growth control and retained survivor', async () => {
+async function recordRun() {
   const run = await configuration()
+  expect(run).toEqual(collectedRun)
   expect(DEFAULT_SETTING_VALUES['editor.inactiveAnalysisEntryLimit']).toBe(
     run.protocol.expectedInactiveEntryLimit,
   )
@@ -69,26 +81,87 @@ test('actual host global count, warm reuse, pressure, growth control and retaine
       'obsolete-abandoned-preparation-caller-matrix-unqualified',
     ],
   })
-  const failures: { fixture: string; message: string }[] = []
-  for (const fixture of run.fixtures) {
-    try {
-      await verifyFixture(fixture, run.cycles)
-    } catch (error) {
-      const failure = {
-        fixture: fixture.id,
-        message: String(error),
-        stack: error instanceof Error ? error.stack : null,
-      }
-      failures.push(failure)
-      await record({ kind: 'failure', ...failure })
-    }
-  }
-  await record({ kind: 'result', fixtures: run.fixtures.length, cycles: run.cycles, failures })
-  expect(failures).toEqual([])
-}, 600_000)
+}
 
-async function verifyFixture(fixture: RetentionRun['fixtures'][number], cycles: number) {
+for (const fixture of collectedRun.fixtures) {
+  test(`actual retention fixture ${fixture.id}`, async (context) => {
+    let ownedHost: Host | null = null
+    const dispose = async () => {
+      await ownedHost?.dispose()
+    }
+    const abort = () => {
+      void dispose().catch(() => undefined)
+    }
+    context.signal.addEventListener('abort', abort, { once: true })
+    context.onTestFinished(async ({ task }) => {
+      const outcome = {
+        fixture: fixture.id,
+        status: task.result?.state ?? 'fail',
+        errors: task.result?.errors ?? [],
+      }
+      caseOutcomes.push(outcome)
+      await record({ kind: 'fixture-case-complete', cycle: collectedRun.cycles, ...outcome })
+    })
+    const flight = runCase(fixture, (host) => {
+      ownedHost = host
+      if (context.signal.aborted) abort()
+    })
+    activeCase = {
+      dispose,
+      flight,
+      stopAbort: () => context.signal.removeEventListener('abort', abort),
+    }
+    await flight
+  }, 600_000)
+}
+
+async function runCase(fixture: RetentionRun['fixtures'][number], ownHost: (host: Host) => void) {
+  try {
+    runRecord ??= recordRun()
+    await runRecord
+    await verifyFixture(fixture, collectedRun.cycles, ownHost)
+  } catch (error) {
+    await record({
+      kind: 'failure',
+      fixture: fixture.id,
+      message: String(error),
+      stack: error instanceof Error ? error.stack : null,
+    })
+    throw error
+  }
+}
+
+afterEach(async () => {
+  const owned = activeCase
+  if (!owned) return
+  try {
+    const [released] = await Promise.allSettled([owned.dispose(), owned.flight])
+    if (released.status === 'rejected') throw released.reason
+  } finally {
+    owned.stopAbort()
+    activeCase = null
+  }
+})
+afterAll(async () => {
+  const failures = caseOutcomes.filter((outcome) => outcome.status !== 'pass')
+  await record({
+    kind: 'result',
+    fixtures: collectedRun.fixtures.length,
+    cycles: collectedRun.cycles,
+    failures,
+    cases: caseOutcomes,
+  })
+  expect(caseOutcomes).toHaveLength(collectedRun.fixtures.length)
+  expect(failures).toEqual([])
+})
+
+async function verifyFixture(
+  fixture: RetentionRun['fixtures'][number],
+  cycles: number,
+  ownHost: (host: Host) => void,
+) {
   const host = await retentionCountHost(fixture)
+  ownHost(host)
   const b = host.borrow(host.b.analysis)
   let bView: ReturnType<Host['createView']> | null = null
   try {
