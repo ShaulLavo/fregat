@@ -59,42 +59,34 @@ export const {
 )
 
 export function createEditorConflictStore() {
-  return createStore<EditorConflictStore>()((set) => ({
+  return createStore<EditorConflictStore>()((set, get) => ({
     conflicts: {},
-    addConflict: (conflict) =>
-      set((state) => {
-        const previous = state.conflicts[conflict.id]
-        const next =
-          !conflict.seed && previous?.seed ? { ...conflict, seed: previous.seed } : conflict
-        if (previous?.latest !== next.latest) previous?.latest.lease.release()
-        if (previous?.seed && previous.seed !== next.seed) previous.seed.comparison.lease.release()
-        return { conflicts: { ...state.conflicts, [conflict.id]: next } }
-      }),
-    clearConflicts: () =>
-      set((state) => {
-        for (const conflict of Object.values(state.conflicts)) releaseConflictSources(conflict)
-        return { conflicts: {} }
-      }),
-    removeConflict: (id) =>
-      set((state) => {
-        const conflict = state.conflicts[id]
-        if (conflict) releaseConflictSources(conflict)
-        return { conflicts: omitKey(state.conflicts, id) }
-      }),
-    updateConflict: (id, update) =>
-      set((state) => {
-        const conflict = state.conflicts[id]
-        if (!conflict) return state
-
-        if (update.seed && conflict.seed && update.seed !== conflict.seed)
-          conflict.seed.comparison.lease.release()
-        return {
-          conflicts: {
-            ...state.conflicts,
-            [id]: { ...conflict, ...update },
-          },
-        }
-      }),
+    addConflict: (conflict) => {
+      const previous = get().conflicts[conflict.id]
+      const next =
+        !conflict.seed && previous?.seed ? { ...conflict, seed: previous.seed } : conflict
+      set((state) => ({ conflicts: { ...state.conflicts, [conflict.id]: next } }))
+      if (previous?.latest !== next.latest) previous?.latest.lease.release()
+      if (previous?.seed && previous.seed !== next.seed) previous.seed.comparison.lease.release()
+    },
+    clearConflicts: () => {
+      const conflicts = Object.values(get().conflicts)
+      set({ conflicts: {} })
+      for (const conflict of conflicts) releaseConflictSources(conflict)
+    },
+    removeConflict: (id) => {
+      const conflict = get().conflicts[id]
+      if (!conflict) return
+      set((state) => ({ conflicts: omitKey(state.conflicts, id) }))
+      releaseConflictSources(conflict)
+    },
+    updateConflict: (id, update) => {
+      const conflict = get().conflicts[id]
+      if (!conflict) return
+      const next = { ...conflict, ...update }
+      set((state) => ({ conflicts: { ...state.conflicts, [id]: next } }))
+      if (conflict.seed && conflict.seed !== next.seed) conflict.seed.comparison.lease.release()
+    },
   }))
 }
 

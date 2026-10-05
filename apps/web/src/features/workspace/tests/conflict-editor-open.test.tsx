@@ -9,7 +9,7 @@ import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { activeEditorTab as selectedGroupTab, allEditorTabs } from '@/lib/documents/utils/groups'
 import { getClient } from '@/lib/client'
-import { documentKey, filesystemPath } from '@/lib/documents/utils/identity'
+import { conflictId, documentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { documentSourcePath } from '@/lib/documents/utils/capabilities'
 import { tabLabel } from '@/lib/documents/utils/labels'
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
@@ -199,3 +199,107 @@ test('first capture seeds the actual resolution once; latest and two display int
   expect(f.editor.documentStore.getState().snapshotComparisons.size).toBe(0)
   toaster.unmount()
 })
+
+test('first seed acquisition publication releases a candidate after reentrant clear', async ({
+  server,
+}) => {
+  const f = await createConflictCompletionFixture(server)
+  createEditorBufferSession(f.destination.buffer).applyText(' local')
+  const rendered = renderWithProviders(<Toaster />, {
+    application: f.application,
+    queryClient: f.queryClient,
+  })
+  act(() => notifyChangedFilesystemConflict(f.path, f.remote, f.context))
+  const original = Object.values(f.editor.conflictStore.getState().conflicts)[0]
+  if (!original) throw new RangeError('Actual notified conflict required')
+  let ended = false
+  const stop = f.editor.documentStore.subscribe((state) => {
+    if (ended || state.snapshotComparisons.size !== 2) return
+    ended = true
+    f.editor.conflictStore.getState().clearConflicts()
+  })
+  try {
+    fireEvent.click(await rendered.findByRole('button', { name: 'Compare' }))
+    expect(ended).toBe(true)
+    expect(f.editor.conflictStore.getState().conflicts).toEqual({})
+    expect(original.latest.lease.read().kind).toBe('released')
+    expect(f.editor.documentStore.getState().snapshotComparisons.size).toBe(0)
+    const target = {
+      kind: 'conflict',
+      conflictId: conflictId(original.id),
+      path: original.remotePath,
+    } as const
+    const resolution = f.documents.getLiveEditorDocument(documentKey(target))
+    if (!resolution) throw new RangeError('Created resolution must survive source refusal')
+    const text = resolution.buffer.materializeFullText()
+    expect(text).toContain('<<<<<<<')
+    expect(text).toContain('remote text local')
+    const editing = createEditorBufferSession(resolution.buffer)
+    act(() => editing.applyText('draft '))
+    act(() => editing.undo())
+    expect(resolution.buffer.materializeFullText()).toBe(text)
+  } finally {
+    stop()
+    rendered.unmount()
+    f.editor.conflictStore.getState().clearConflicts()
+  }
+})
+
+for (const change of ['metadata', 'buffer'] as const) {
+  test(`first seed acquisition publication checks the actual ${change} transfer`, async ({
+    server,
+  }) => {
+    const f = await createConflictCompletionFixture(server)
+    createEditorBufferSession(f.destination.buffer).applyText(' local')
+    const rendered = renderWithProviders(<Toaster />, {
+      application: f.application,
+      queryClient: f.queryClient,
+    })
+    act(() => notifyChangedFilesystemConflict(f.path, f.remote, f.context))
+    const original = Object.values(f.editor.conflictStore.getState().conflicts)[0]
+    if (!original) throw new RangeError('Actual notified conflict required')
+    const target = {
+      kind: 'conflict',
+      conflictId: conflictId(original.id),
+      path: original.remotePath,
+    } as const
+    const key = documentKey(target)
+    let changed = false
+    const stop = f.editor.documentStore.subscribe((state) => {
+      if (changed || state.snapshotComparisons.size !== 2) return
+      changed = true
+      if (change === 'metadata') {
+        f.editor.conflictStore.getState().updateConflict(original.id, { toastId: 'seed-metadata' })
+        return
+      }
+      const resolution = f.documents.getLiveEditorDocument(key)
+      if (!resolution) throw new RangeError('Actual resolution required')
+      const content = resolution.buffer.materializeFullText()
+      f.documents.deleteLiveEditorDocument(key)
+      f.documents.ensureUnsyncedEditorDocument({ target, content })
+    })
+    try {
+      fireEvent.click(await rendered.findByRole('button', { name: 'Compare' }))
+      const current = f.editor.conflictStore.getState().conflicts[original.id]
+      expect(changed).toBe(true)
+      expect(current?.latest).toBe(original.latest)
+      expect(f.documents.getLiveEditorDocument(key)?.buffer.materializeFullText()).toContain(
+        'remote text local',
+      )
+      if (change === 'metadata') {
+        expect(current?.seed?.comparison.input).toBe(original.latest.input)
+        expect(current?.seed?.buffer).toBe(f.documents.getLiveEditorDocument(key)?.buffer)
+        expect(current?.seed?.comparison.lease.read().kind).toBe('ready')
+        expect(f.editor.documentStore.getState().snapshotComparisons.size).toBe(2)
+      }
+      if (change === 'buffer') {
+        expect(current?.seed).toBeUndefined()
+        expect(f.editor.documentStore.getState().snapshotComparisons.size).toBe(1)
+      }
+    } finally {
+      stop()
+      rendered.unmount()
+      f.editor.conflictStore.getState().clearConflicts()
+    }
+  })
+}

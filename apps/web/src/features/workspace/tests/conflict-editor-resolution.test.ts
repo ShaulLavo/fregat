@@ -1,3 +1,4 @@
+import { workspaceMutationKeys } from '@/features/workspace/utils/mutation-keys'
 import type { FilesystemConflict } from '@/features/editor/state/conflict-state'
 import { readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -319,3 +320,44 @@ test.for([false, true])(
     }
   },
 )
+
+test('ACK acquisition publication refuses a disposed coordinator and removed conflict', async ({
+  server,
+}) => {
+  const f = await createConflictResolutionFixture(server)
+  const original = f.conflictStore.getState().conflicts[f.target.conflictId]
+  if (!original?.seed) throw new RangeError('Actual seeded conflict required')
+  let ended = false
+  const stop = f.documentStore.subscribe((state) => {
+    if (
+      ended ||
+      state.snapshotComparisons.size !== 3 ||
+      original.latest.lease.read().kind !== 'ready'
+    )
+      return
+    ended = true
+    f.coordinator.dispose()
+    f.conflictStore.getState().removeConflict(original.id)
+  })
+  const mutation = () =>
+    f.queryClient
+      .getMutationCache()
+      .find({ mutationKey: workspaceMutationKeys.resolveConflict(original.id) })
+  try {
+    f.schedule()
+    await f.transport.entered
+    f.editResolution()
+    f.transport.release()
+    await expect.poll(() => mutation()?.state.status).toBe('success')
+    expect(ended).toBe(true)
+    expect(await readFile(join(server.root, f.path), 'utf8')).toBe('merged text')
+    expect(f.resolution.buffer.materializeFullText()).toBe('merged textnew ')
+    expect(f.conflictStore.getState().conflicts).toEqual({})
+    expect(f.documentStore.getState().snapshotComparisons.size).toBe(0)
+    expect(original.seed.comparison.lease.read().kind).toBe('released')
+    expect(mutation()?.state.data).toBe('unresolved')
+  } finally {
+    stop()
+    f.dispose()
+  }
+})

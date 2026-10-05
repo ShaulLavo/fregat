@@ -161,9 +161,26 @@ function notifyFilesystemConflict(
     context,
     local,
   )
-  if (adopted.latest.lease.read().kind !== 'ready') return
+  if (
+    context.signal.aborted ||
+    matchingConflict(conflict, context) !== current ||
+    adopted.latest.lease.read().kind !== 'ready'
+  ) {
+    adopted.latest.lease.release()
+    return
+  }
   const next = current ? refreshedConflict(current, adopted) : adopted
   context.conflictStore.getState().addConflict(next)
+  const stored = context.conflictStore.getState().conflicts[next.id]
+  if (
+    context.signal.aborted ||
+    stored?.latest !== next.latest ||
+    next.latest.lease.read().kind !== 'ready'
+  ) {
+    if (stored?.latest === next.latest) context.conflictStore.getState().removeConflict(next.id)
+    next.latest.lease.release()
+    return
+  }
 
   const toastId = toast(
     () =>
@@ -248,17 +265,46 @@ function ensureConflictEditorDocument(
   context.ensureUnsyncedEditorDocument({ content, target })
   const document = context.getLiveEditorDocument(documentKey(target))
   if (!document) return
+  const incumbent = context.conflictStore.getState().conflicts[conflict.id]
+  if (
+    context.signal.aborted ||
+    incumbent?.latest !== conflict.latest ||
+    incumbent.seed !== conflict.seed
+  )
+    return
   const lease = context.acquireSnapshotComparison({
     input: conflict.latest.input,
     signal: context.signal,
   })
-  context.conflictStore.getState().updateConflict(conflict.id, {
-    seed: {
-      resolutionKey: documentKey(target),
-      buffer: document.buffer,
-      comparison: { input: conflict.latest.input, lease },
-    },
-  })
+  const current = context.conflictStore.getState().conflicts[conflict.id]
+  const key = documentKey(target)
+  if (
+    context.signal.aborted ||
+    current?.latest !== conflict.latest ||
+    current.seed !== conflict.seed ||
+    context.getLiveEditorDocument(key)?.buffer !== document.buffer ||
+    lease.read().kind !== 'ready'
+  ) {
+    lease.release()
+    return
+  }
+  const seed = {
+    resolutionKey: key,
+    buffer: document.buffer,
+    comparison: { input: conflict.latest.input, lease },
+  }
+  context.conflictStore.getState().updateConflict(conflict.id, { seed })
+  const stored = context.conflictStore.getState().conflicts[conflict.id]
+  if (
+    context.signal.aborted ||
+    stored?.seed !== seed ||
+    context.getLiveEditorDocument(key)?.buffer !== document.buffer ||
+    lease.read().kind !== 'ready'
+  ) {
+    if (stored?.seed === seed)
+      context.conflictStore.getState().updateConflict(conflict.id, { seed: undefined })
+    lease.release()
+  }
 }
 
 function resolveConflict(

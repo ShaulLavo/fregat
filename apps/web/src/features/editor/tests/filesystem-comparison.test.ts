@@ -5,15 +5,17 @@ import { createWideEventScope } from '@/lib/wide-event-scope'
 import { fetchFile } from '@/lib/file-server'
 import { rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { filesystemComparisonInput } from '@/lib/snapshot-comparison'
+import { captureFilesystemLocal, filesystemComparisonInput } from '@/lib/snapshot-comparison'
 import { filesystemDiffAttachment } from '@/lib/diff-attachment'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
 import {
+  retainFilesystemConflict,
   notifyChangedFilesystemConflict,
   markDeletedFilesystemDocument,
   notifyRenamedFilesystemConflict,
 } from '@/features/workspace/state/event-conflict-adapter'
+import { createConflictResolutionFixture } from '../../../../test/factories/conflict-resolution'
 import { createConflictCompletionFixture } from '../../../../test/factories/conflict-completion'
 import { expect, test } from '../../../../test/fixtures'
 
@@ -247,3 +249,187 @@ test('actual empty, missing, deleted and PDF incoming sources keep their recorde
   f.editor.conflictStore.getState().clearConflicts()
   expect(f.editor.documentStore.getState().snapshotComparisons.size).toBe(0)
 })
+
+for (const end of ['none', 'remove', 'clear'] as const) {
+  test(`replacement publication preserves reentrant termination: ${end}`, async ({ server }) => {
+    const f = await createConflictResolutionFixture(server)
+    const original = f.conflictStore.getState().conflicts[f.target.conflictId]
+    if (!original?.seed) throw new RangeError('Actual seeded conflict required')
+    const replacement = retainFilesystemConflict(
+      original,
+      {
+        comparisonScope: original.latest.input.scope,
+        acquireSnapshotComparison: f.documentStore.getState().acquireSnapshotComparison,
+        signal: new AbortController().signal,
+      },
+      captureFilesystemLocal(f.path, f.destination.buffer),
+    )
+    let ended = false
+    const stop = f.documentStore.subscribe((state) => {
+      if (end === 'none' || ended || original.latest.lease.read().kind !== 'released') return
+      ended = true
+      expect(state.snapshotComparisons.has(original.latest.lease)).toBe(false)
+      if (end === 'remove') f.conflictStore.getState().removeConflict(original.id)
+      if (end === 'clear') f.conflictStore.getState().clearConflicts()
+    })
+    try {
+      f.conflictStore.getState().addConflict(replacement)
+      expect(original.latest.lease.read().kind).toBe('released')
+      const current = f.conflictStore.getState().conflicts[original.id]
+      if (end === 'none') {
+        expect(current?.latest).toBe(replacement.latest)
+        expect(current?.seed).toBe(original.seed)
+        expect(original.seed.comparison.lease.read().kind).toBe('ready')
+        expect(f.documentStore.getState().snapshotComparisons.size).toBe(2)
+        expect(() => expect(current).toBeUndefined()).toThrow()
+        return
+      }
+      expect(ended).toBe(true)
+      expect(current).toBeUndefined()
+      expect(replacement.latest.lease.read().kind).toBe('released')
+      expect(original.seed.comparison.lease.read().kind).toBe('released')
+      expect(f.documentStore.getState().snapshotComparisons.size).toBe(0)
+    } finally {
+      stop()
+      replacement.latest.lease.release()
+      f.dispose()
+    }
+  })
+}
+
+test('public map publication before release keeps a reentrant clear terminal', async ({
+  server,
+}) => {
+  const f = await createConflictResolutionFixture(server)
+  const original = f.conflictStore.getState().conflicts[f.target.conflictId]
+  if (!original?.seed) throw new RangeError('Actual seeded conflict required')
+  const replacement = retainFilesystemConflict(
+    original,
+    {
+      comparisonScope: original.latest.input.scope,
+      acquireSnapshotComparison: f.documentStore.getState().acquireSnapshotComparison,
+      signal: new AbortController().signal,
+    },
+    captureFilesystemLocal(f.path, f.destination.buffer),
+  )
+  let ended = false
+  const stop = f.documentStore.subscribe(() => {
+    if (ended || original.latest.lease.read().kind !== 'released') return
+    ended = true
+    f.conflictStore.getState().clearConflicts()
+  })
+  try {
+    f.conflictStore.setState((state) => ({
+      conflicts: { ...state.conflicts, [original.id]: replacement },
+    }))
+    original.latest.lease.release()
+    expect(ended).toBe(true)
+    expect(f.conflictStore.getState().conflicts).toEqual({})
+    expect(f.documentStore.getState().snapshotComparisons.size).toBe(0)
+    expect(replacement.latest.lease.read().kind).toBe('released')
+    expect(original.seed.comparison.lease.read().kind).toBe('released')
+  } finally {
+    stop()
+    replacement.latest.lease.release()
+    f.dispose()
+  }
+})
+
+for (const end of ['remove', 'clear'] as const) {
+  test(`notification acquisition publication refuses an ended incumbent: ${end}`, async ({
+    server,
+  }) => {
+    const f = await createConflictCompletionFixture(server)
+    notifyChangedFilesystemConflict(f.path, f.remote, f.context)
+    const original = Object.values(f.editor.conflictStore.getState().conflicts)[0]
+    if (!original) throw new RangeError('Actual notified conflict required')
+    let ended = false
+    const stop = f.editor.documentStore.subscribe((state) => {
+      if (
+        ended ||
+        state.snapshotComparisons.size !== 2 ||
+        original.latest.lease.read().kind !== 'ready'
+      )
+        return
+      ended = true
+      if (end === 'remove') f.editor.conflictStore.getState().removeConflict(original.id)
+      if (end === 'clear') f.editor.conflictStore.getState().clearConflicts()
+    })
+    try {
+      notifyChangedFilesystemConflict(f.path, f.remote, f.context)
+      expect(ended).toBe(true)
+      expect(f.editor.conflictStore.getState().conflicts).toEqual({})
+      expect(f.editor.documentStore.getState().snapshotComparisons.size).toBe(0)
+      stop()
+      notifyChangedFilesystemConflict(f.path, f.remote, f.context)
+      const fresh = Object.values(f.editor.conflictStore.getState().conflicts)[0]
+      expect(fresh?.id).not.toBe(original.id)
+      expect(fresh?.latest.lease.read().kind).toBe('ready')
+      expect(f.editor.documentStore.getState().snapshotComparisons.size).toBe(1)
+    } finally {
+      stop()
+      f.editor.conflictStore.getState().clearConflicts()
+    }
+  })
+
+  test(`seed replacement publication preserves reentrant termination: ${end}`, async ({
+    server,
+  }) => {
+    const f = await createConflictResolutionFixture(server)
+    const original = f.conflictStore.getState().conflicts[f.target.conflictId]
+    if (!original?.seed) throw new RangeError('Actual seeded conflict required')
+    const originalSeed = original.seed
+    const lease = f.documentStore.getState().acquireSnapshotComparison({
+      input: original.latest.input,
+      signal: new AbortController().signal,
+    })
+    const seed = { ...originalSeed, comparison: { input: original.latest.input, lease } }
+    let ended = false
+    const stop = f.documentStore.subscribe(() => {
+      if (ended || originalSeed.comparison.lease.read().kind !== 'released') return
+      ended = true
+      if (end === 'remove') f.conflictStore.getState().removeConflict(original.id)
+      if (end === 'clear') f.conflictStore.getState().clearConflicts()
+    })
+    try {
+      f.conflictStore.getState().updateConflict(original.id, { seed })
+      expect(ended).toBe(true)
+      expect(f.conflictStore.getState().conflicts).toEqual({})
+      expect(lease.read().kind).toBe('released')
+      expect(f.documentStore.getState().snapshotComparisons.size).toBe(0)
+    } finally {
+      stop()
+      lease.release()
+      f.dispose()
+    }
+  })
+}
+
+for (const end of ['remove', 'clear'] as const) {
+  test(`terminal publication permits a fresh notification after ${end}`, async ({ server }) => {
+    const f = await createConflictCompletionFixture(server)
+    createEditorBufferSession(f.destination.buffer).applyText(' local')
+    notifyChangedFilesystemConflict(f.path, f.remote, f.context)
+    const original = Object.values(f.editor.conflictStore.getState().conflicts)[0]
+    if (!original) throw new RangeError('Actual notified conflict required')
+    let entered = false
+    const stop = f.editor.documentStore.subscribe(() => {
+      if (entered || original.latest.lease.read().kind !== 'released') return
+      entered = true
+      expect(f.editor.conflictStore.getState().conflicts).toEqual({})
+      notifyChangedFilesystemConflict(f.path, f.remote, f.context)
+    })
+    try {
+      if (end === 'remove') f.editor.conflictStore.getState().removeConflict(original.id)
+      if (end === 'clear') f.editor.conflictStore.getState().clearConflicts()
+      const fresh = Object.values(f.editor.conflictStore.getState().conflicts)[0]
+      expect(entered).toBe(true)
+      expect(fresh?.id).not.toBe(original.id)
+      expect(fresh?.latest.lease.read().kind).toBe('ready')
+      expect(f.editor.documentStore.getState().snapshotComparisons.size).toBe(1)
+    } finally {
+      stop()
+      f.editor.conflictStore.getState().clearConflicts()
+    }
+  })
+}
