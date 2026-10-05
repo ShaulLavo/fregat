@@ -2,11 +2,15 @@ import { expect, test } from 'vitest'
 import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
-import { Glob, YAML } from 'bun'
+import { createRequire } from 'node:module'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { Glob } from 'bun'
 import { withWorkspace } from './fixture.mjs'
 
 const checkout = fileURLToPath(new URL('../../', import.meta.url))
+const require = createRequire(import.meta.url)
+const cliRequire = createRequire(require.resolve('@changesets/cli/package.json'))
+const { readChangesets } = await import(pathToFileURL(cliRequire.resolve('@changesets/read')).href)
 const fixture = JSON.parse(
   await readFile(new URL('./editor-fixture.json', import.meta.url), 'utf8'),
 )
@@ -22,17 +26,14 @@ async function expectPublicChangesets(root) {
     }
   }
   const config = JSON.parse(await readFile(join(root, '.changeset/config.json'), 'utf8'))
+  const targets = (await readChangesets(root)).flatMap(({ id, releases }) =>
+    releases.map(({ name }) => ({ file: `.changeset/${id}.md`, name })),
+  )
   const privateTargets = []
-  for await (const file of new Glob('.changeset/*.md').scan({ cwd: root })) {
-    if (file === '.changeset/README.md') continue
-    const content = await readFile(join(root, file), 'utf8')
-    const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)?.[1]
-    expect(frontmatter, `${file} must contain changeset frontmatter`).toBeDefined()
-    for (const name of Object.keys(YAML.parse(frontmatter) ?? {})) {
-      expect(manifests.has(name), `${file} targets an unknown workspace: ${name}`).toBe(true)
-      if (config.privatePackages?.version === false && manifests.get(name).private)
-        privateTargets.push(`${file}: ${name}`)
-    }
+  for (const { file, name } of targets) {
+    expect(manifests.has(name), `${file} targets an unknown workspace: ${name}`).toBe(true)
+    if (config.privatePackages?.version !== false || !manifests.get(name).private) continue
+    privateTargets.push(`${file}: ${name}`)
   }
   expect(
     privateTargets,
@@ -42,6 +43,36 @@ async function expectPublicChangesets(root) {
 
 test('pending changesets target versioned workspace manifests', async () => {
   await expectPublicChangesets(checkout)
+})
+
+test('accepts compact empty changesets', async () => {
+  await withWorkspace(async ({ root, put }) => {
+    await put('', { name: 'empty-release-fixture', private: true, workspaces: ['packages/*'] })
+    await mkdir(join(root, '.changeset'))
+    await writeFile(
+      join(root, '.changeset/config.json'),
+      await readFile(join(checkout, '.changeset/config.json')),
+    )
+    await writeFile(join(root, '.changeset/empty.md'), '---\n---\n\nNo release.\n')
+    await expectPublicChangesets(root)
+  })
+})
+
+test('rejects invalid public release types', async () => {
+  await withWorkspace(async ({ root, put }) => {
+    await put('', { name: 'public-release-fixture', private: true, workspaces: ['packages/*'] })
+    await put('packages/example', { name: '@release-fixture/example', version: '0.0.1' })
+    await mkdir(join(root, '.changeset'))
+    await writeFile(
+      join(root, '.changeset/config.json'),
+      await readFile(join(checkout, '.changeset/config.json')),
+    )
+    await writeFile(
+      join(root, '.changeset/invalid.md'),
+      '---\n"@release-fixture/example": banana\n---\n\nInvalid release.\n',
+    )
+    await expect(expectPublicChangesets(root)).rejects.toThrow(/invalid version type "banana"/)
+  })
 })
 
 test('rejects private-only changesets that versioning retains without package changes', async () => {
