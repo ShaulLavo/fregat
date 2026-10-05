@@ -2,43 +2,24 @@
   "duplicateModules": {
     "lsp-plugin-vs-typescript-lsp": [
       {
-        "files": [
-          "packages/lsp-plugin/src/index.ts",
-          "packages/typescript-lsp/src/index.ts"
-        ],
+        "files": ["packages/lsp-plugin/src/index.ts", "packages/typescript-lsp/src/index.ts"],
         "modulePath": "index.ts"
       },
       {
-        "files": [
-          "packages/lsp-plugin/src/paths.ts",
-          "packages/typescript-lsp/src/paths.ts"
-        ],
+        "files": ["packages/lsp-plugin/src/paths.ts", "packages/typescript-lsp/src/paths.ts"],
         "modulePath": "paths.ts"
       },
       {
-        "files": [
-          "packages/lsp-plugin/src/plugin.ts",
-          "packages/typescript-lsp/src/plugin.ts"
-        ],
+        "files": ["packages/lsp-plugin/src/plugin.ts", "packages/typescript-lsp/src/plugin.ts"],
         "modulePath": "plugin.ts"
       },
       {
-        "files": [
-          "packages/lsp-plugin/src/types.ts",
-          "packages/typescript-lsp/src/types.ts"
-        ],
+        "files": ["packages/lsp-plugin/src/types.ts", "packages/typescript-lsp/src/types.ts"],
         "modulePath": "types.ts"
       }
     ]
   },
-  "expectedPackageScripts": [
-    "build",
-    "test",
-    "typecheck",
-    "lint",
-    "format",
-    "format:check"
-  ],
+  "expectedPackageScripts": ["build", "test", "typecheck", "lint", "format", "format:check"],
   "ignoredRoots": [
     ".desloppify",
     ".git",
@@ -62,8 +43,17 @@
         "packages/editor/src/textMeasurements.ts"
       ],
       [
+        "packages/editor/src/document/operations.ts",
+        "packages/editor/src/document/workerReader.ts",
         "packages/editor/src/documentSession.ts",
+        "packages/editor/src/editor/contributionDemand.ts",
+        "packages/editor/src/editor/contributionOperation.ts",
+        "packages/editor/src/editor/documentAnalysis.ts",
+        "packages/editor/src/editor/documentDelivery.ts",
+        "packages/editor/src/editor/operationDefinitions.ts",
         "packages/editor/src/historySerialization.ts",
+        "packages/editor/src/syntax/highlighter.ts",
+        "packages/editor/src/syntax/providerTheme.ts",
         "packages/editor/src/syntax/session.ts",
         "packages/editor/src/viewFolds.ts"
       ],
@@ -75,7 +65,6 @@
         "packages/editor/src/editor/jumpHistory.ts",
         "packages/editor/src/editor/paintSnapshot.ts",
         "packages/editor/src/editor/preparedDocument.ts",
-        "packages/editor/src/editor/runtime.ts",
         "packages/editor/src/editor/selectionReveal.ts",
         "packages/editor/src/editor/syntaxController.ts",
         "packages/editor/src/editor/types.ts",
@@ -101,10 +90,7 @@
         "packages/editor/src/virtualization/virtualizedTextViewTypes.ts",
         "packages/editor/src/virtualization/wheelScrollTarget.ts"
       ],
-      [
-        "packages/editor/src/shiki/scopedTokens.ts",
-        "packages/editor/src/shiki/tokenizer.ts"
-      ],
+      ["packages/editor/src/shiki/scopedTokens.ts", "packages/editor/src/shiki/tokenizer.ts"],
       [
         "packages/editor/src/syntax/packedTokens.ts",
         "packages/editor/src/syntax/tokenStore.ts",
@@ -142,10 +128,7 @@
         "packages/lsp-plugin/src/types.ts",
         "packages/lsp-plugin/src/viewDocumentSnapshot.ts"
       ],
-      [
-        "packages/lsp-plugin/src/workspaceEdit.ts",
-        "packages/lsp-plugin/src/workspaceTextEdits.ts"
-      ]
+      ["packages/lsp-plugin/src/workspaceEdit.ts", "packages/lsp-plugin/src/workspaceTextEdits.ts"]
     ],
     "plugin-ui": [
       [
