@@ -19,9 +19,12 @@ import {
 } from '@workspace/ui/components/dialog'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { Spinner } from '@workspace/ui/components/spinner'
-import { DiffEditor } from '@/features/editor/components/diff-editor'
 import { operationDiffAttachment } from '@/lib/diff-attachment'
 import { useLayoutEffect, useRef } from 'react'
+import { mutationOptions, queryOptions, useQuery } from '@tanstack/react-query'
+import { ModuleLoadError } from '@/components/module-load-error'
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
+import { runMutation } from '@/lib/mutations/run'
 
 import { useWorkspaceEditState } from '@/features/editor/hooks/use-workspace-edit-state'
 import { useWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
@@ -29,6 +32,30 @@ import type { WorkspaceEditPreviewRow } from '@/features/editor/state/workspace-
 import { selectWorkspaceEditPreview } from '@/features/editor/utils/workspace-edit-dialog-state'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
 import type { FocusTargetToken } from '@/lib/focus/state/service'
+
+type PreviewEditorModule = typeof import('@/features/editor/components/diff-editor')
+const previewEditorKey = ['editor', 'workspace-edit-preview', 'module'] as const
+const loadPreviewEditor = mutationOptions({
+  mutationKey: previewEditorKey,
+  scope: { id: 'editor.workspace-edit-preview.module' },
+  networkMode: 'always',
+  retry: false,
+  mutationFn: async () => {
+    const cached = resourceQueryClient.getQueryData<PreviewEditorModule>(previewEditorKey)
+    if (cached) return cached
+    return import('@/features/editor/components/diff-editor')
+  },
+  onSuccess: (module) => resourceQueryClient.setQueryData(previewEditorKey, module),
+})
+const previewEditorOptions = queryOptions({
+  queryKey: previewEditorKey,
+  staleTime: 'static',
+  gcTime: Infinity,
+  structuralSharing: false,
+  networkMode: 'always',
+  retry: false,
+  queryFn: () => runMutation(resourceQueryClient, loadPreviewEditor, undefined),
+})
 
 export function WorkspaceEditPreviewDialog() {
   const service = useWorkspaceEditService()
@@ -42,6 +69,14 @@ export function WorkspaceEditPreviewDialog() {
   const stale = state?.phase === 'stale'
   const open = state !== null
   const preview = state?.preview
+  const editorModule = useQuery(
+    {
+      ...previewEditorOptions,
+      enabled: preview?.rows.some((row) => row.comparison && row.file) ?? false,
+    },
+    resourceQueryClient,
+  )
+  const DiffEditor = editorModule.data?.DiffEditor
 
   useLayoutEffect(() => {
     if (open) return
@@ -141,10 +176,23 @@ export function WorkspaceEditPreviewDialog() {
                     </div>
                     {row.comparison && row.file ? (
                       <div className='mt-2 h-52 min-w-0 overflow-hidden'>
-                        <DiffEditor
-                          attachment={operationDiffAttachment(row.comparison, row.file)}
-                          mode='stacked'
-                        />
+                        {DiffEditor ? (
+                          <DiffEditor
+                            attachment={operationDiffAttachment(row.comparison, row.file)}
+                            mode='stacked'
+                          />
+                        ) : null}
+                        {!DiffEditor && editorModule.isError ? (
+                          <ModuleLoadError
+                            label='the comparison'
+                            onRetry={() => void editorModule.refetch()}
+                          />
+                        ) : null}
+                        {!DiffEditor && !editorModule.isError ? (
+                          <div className='flex h-full items-center justify-center'>
+                            <Spinner size='md' label='Loading comparison' />
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                   </li>

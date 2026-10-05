@@ -1,3 +1,5 @@
+import { onTestFinished } from 'vitest'
+import { testScopedStorage } from '../../../../test/factories/scoped-storage'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { QueryClient } from '@tanstack/react-query'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -52,10 +54,11 @@ test.describe('workspace search replacement runner', () => {
     const path = 'unopened.ts'
     const diskPath = join(server.root, path)
     await writeFile(diskPath, 'needle')
-    const store = createEditorDocumentStore()
+    const store = createEditorDocumentStore({ environmentId: testScopedStorage.environmentId })
     const ports = createFileSyncPorts(client)
     let firstRead = true
-    const fileSync = new FileSyncService(store, new QueryClient(), {
+    const queries = new QueryClient()
+    const fileSync = new FileSyncService(store, queries, {
       ...ports,
       readFileContent: async (filePath, signal) => {
         const file = await fetchFile(filePath, signal, client)
@@ -110,17 +113,28 @@ test.describe('workspace search replacement runner', () => {
 
     expect(harness.service.getSnapshot().preview?.rows).toMatchObject([
       {
-        afterText: 'pin',
-        beforeText: 'needle',
         path: '/repo/live.ts',
         targetKind: 'open',
       },
       {
-        afterText: 'const value = "pin"',
-        beforeText: 'const value = "needle"',
         path: '/repo/unopened.ts',
         targetKind: 'unopened',
       },
+    ])
+    const rows = harness.service.getSnapshot().preview!.rows
+    expect(
+      rows.map((row) => {
+        const read = row.comparison
+        if (read?.kind !== 'ready' || read.input.kind !== 'operation') return null
+        expect(read.input.scope.environmentId).toBe(testScopedStorage.environmentId)
+        expect(read.input.old.snapshot).toBe(read.input.segment.snapshotBefore)
+        expect(read.input.new.snapshot).toBe(read.input.segment.snapshotAfter)
+        expect(row.file).toBe(read.input.display)
+        return [read.input.old.materializeFullText(), read.input.new.materializeFullText()]
+      }),
+    ).toEqual([
+      ['needle', 'pin'],
+      ['const value = "needle"', 'const value = "pin"'],
     ])
     harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
 
@@ -217,9 +231,10 @@ type Harness = ReturnType<typeof createHarness>
 
 function createHarness(options: { readonly failFinalize?: boolean } = {}) {
   const files = new Map<string, FileResult>()
-  const store = createEditorDocumentStore()
+  const store = createEditorDocumentStore({ environmentId: testScopedStorage.environmentId })
   const transport = new SearchWorkspaceMutationTransport(ROOT, files, options)
-  const fileSync = new FileSyncService(store, new QueryClient(), {
+  const queries = new QueryClient()
+  const fileSync = new FileSyncService(store, queries, {
     recreateFileContent: () => Promise.reject('Unexpected file recreation'),
     readFileContent: async (path, signal) => {
       signal.throwIfAborted()
@@ -247,6 +262,11 @@ function createHarness(options: { readonly failFinalize?: boolean } = {}) {
         version: file.version,
       }
     },
+  })
+  onTestFinished(() => {
+    service.dispose()
+    store.getState().disposeEditorDocuments()
+    queries.clear()
   })
   return { files, service, store, transport }
 }
