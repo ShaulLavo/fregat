@@ -10,10 +10,18 @@ type ForwardOutcome =
 type ForwardSettlement = Exclude<ForwardOutcome, { readonly kind: 'cancelled' }>
 
 type ForwardObservation = {
+  readonly requestId: number
   readonly url: string
   readonly phase: 'operation' | 'restoration' | 'shutdown'
   readonly operationInvoked: boolean
   readonly registeredAt: number
+  action: {
+    kind: 'fulfill' | 'abort'
+    selectedAt: number
+    settledAt: number | null
+    error: string | null
+  } | null
+  skippedActions: ('fulfill' | 'abort')[]
   terminal: { kind: ForwardOutcome['kind']; at: number } | null
   settlement: {
     kind: 'succeeded' | 'failed' | 'not-started'
@@ -22,7 +30,55 @@ type ForwardObservation = {
   } | null
 }
 
-type RecordForwardError = (url: string, stage: string, error: unknown) => void
+type RecordForwardError = (observation: ForwardObservation, stage: string, error: unknown) => void
+
+type FulfillForward = (action: () => Promise<void>) => Promise<void>
+
+function createRetentionRouteAction(
+  observation: ForwardObservation,
+  abort: () => Promise<void>,
+  record: RecordForwardError,
+) {
+  let owned: Promise<void> | null = null
+  const claim = (kind: 'fulfill' | 'abort', action: () => Promise<void>) => {
+    if (observation.action) {
+      observation.skippedActions.push(kind)
+      return Promise.resolve()
+    }
+    const state: NonNullable<ForwardObservation['action']> = {
+      kind,
+      selectedAt: Date.now(),
+      settledAt: null,
+      error: null,
+    }
+    observation.action = state
+    owned = performRetentionRouteAction(state, action).catch((error: unknown) => {
+      record(observation, 'route-action-' + kind, error)
+      throw error
+    })
+    void owned.catch(() => {})
+    return owned
+  }
+  return {
+    fulfill: (action: () => Promise<void>) => claim('fulfill', action),
+    abort: () => claim('abort', abort),
+    join: () => owned ?? Promise.resolve(),
+  }
+}
+
+async function performRetentionRouteAction(
+  state: NonNullable<ForwardObservation['action']>,
+  action: () => Promise<void>,
+) {
+  try {
+    await action()
+    state.settledAt = Date.now()
+  } catch (error) {
+    state.settledAt = Date.now()
+    state.error = String(error)
+    throw error
+  }
+}
 
 function createRetentionForward(
   observation: ForwardObservation,
@@ -35,14 +91,15 @@ function createRetentionForward(
     resolve = complete
   })
   const select = (value: ForwardOutcome) => {
-    if (outcome) return
+    if (outcome) return false
     outcome = value
     observation.terminal = { kind: value.kind, at: Date.now() }
     if (value.kind === 'failed') {
-      record(observation.url, 'forward', value.error)
+      record(observation, 'forward', value.error)
       failed(value.error)
     }
     resolve(value)
+    return true
   }
   return { terminal, select, cancel: () => select({ kind: 'cancelled' }) }
 }
@@ -67,19 +124,16 @@ async function completeRetentionForward(
   observation: ForwardObservation,
   terminal: Promise<ForwardOutcome>,
   actual: Promise<ForwardSettlement> | null,
-  abort: () => Promise<void>,
+  routeAction: ReturnType<typeof createRetentionRouteAction>,
   record: RecordForwardError,
 ) {
   const outcome = await terminal
   if (outcome.kind !== 'succeeded') {
-    try {
-      await abort()
-    } catch (error) {
-      record(observation.url, 'abort', error)
-    }
+    void routeAction.abort().catch(() => {})
   }
   if (!actual) {
     observation.settlement = { kind: 'not-started', at: Date.now(), error: null }
+    await routeAction.join().catch(() => {})
     return
   }
   const settled = await actual
@@ -89,14 +143,17 @@ async function completeRetentionForward(
     error: settled.kind === 'failed' ? String(settled.error) : null,
   }
   if (outcome.kind === 'cancelled' && settled.kind === 'failed')
-    record(observation.url, 'settled-after-owned-cancellation', settled.error)
+    record(observation, 'settled-after-owned-cancellation', settled.error)
+  await routeAction.join().catch(() => {})
 }
 
 export function createRetentionReloadTransport() {
   const tasks = new Set<Promise<void>>()
+  const routeActions: ReturnType<typeof createRetentionRouteAction>[] = []
   const pending = new Set<() => void>()
   const requests: ForwardObservation[] = []
-  const failures: { url: string; at: number; stage: string; error: string }[] = []
+  const failures: { requestId: number; url: string; at: number; stage: string; error: string }[] =
+    []
   let phase: ForwardObservation['phase'] = 'operation'
   let admitting = true
   let firstFailure: { error: unknown } | null = null
@@ -104,9 +161,10 @@ export function createRetentionReloadTransport() {
   const failure = new Promise<unknown>((resolve) => {
     fail = resolve
   })
-  const record: RecordForwardError = (url, stage, error) => {
+  const record: RecordForwardError = (observation, stage, error) => {
     failures.push({
-      url,
+      requestId: observation.requestId,
+      url: observation.url,
       at: Date.now(),
       stage,
       error: error instanceof Error ? error.message : String(error),
@@ -125,6 +183,13 @@ export function createRetentionReloadTransport() {
     },
     get hasFailure() {
       return firstFailure !== null
+    },
+    get needsContextClose() {
+      return requests.some(
+        (request) =>
+          request.action !== null &&
+          (request.action.settledAt === null || request.action.error !== null),
+      )
     },
     beginRestoration() {
       phase = 'restoration'
@@ -145,29 +210,51 @@ export function createRetentionReloadTransport() {
         }),
       ])
     },
-    run(url: string, operation: () => Promise<void>, abort: () => Promise<void>) {
+    run(
+      url: string,
+      operation: (fulfill: FulfillForward) => Promise<void>,
+      abort: () => Promise<void>,
+    ) {
       const observation: ForwardObservation = {
+        requestId: requests.length + 1,
         url,
         phase,
         operationInvoked: admitting,
         registeredAt: Date.now(),
+        action: null,
+        skippedActions: [],
         terminal: null,
         settlement: null,
       }
       requests.push(observation)
       const request = createRetentionForward(observation, record, failed)
-      pending.add(request.cancel)
-      const actual = admitting ? observeRetentionForward(operation, request.select) : null
+      const routeAction = createRetentionRouteAction(observation, abort, record)
+      routeActions.push(routeAction)
+      const cancel = () => {
+        if (!request.cancel()) return
+        void routeAction.abort().catch(() => {})
+      }
+      pending.add(cancel)
+      const actual = admitting
+        ? observeRetentionForward(() => operation(routeAction.fulfill), request.select)
+        : null
       if (!admitting) request.cancel()
-      const task = completeRetentionForward(observation, request.terminal, actual, abort, record)
+      const task = completeRetentionForward(
+        observation,
+        request.terminal,
+        actual,
+        routeAction,
+        record,
+      )
       tasks.add(task)
       return task.finally(() => {
-        pending.delete(request.cancel)
+        pending.delete(cancel)
         tasks.delete(task)
       })
     },
     async drain() {
       await Promise.all(tasks)
+      await Promise.all(routeActions.map((action) => action.join()))
     },
   }
 }

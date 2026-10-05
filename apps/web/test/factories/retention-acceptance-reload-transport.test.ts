@@ -426,3 +426,99 @@ test('a real fetch error after admission closes still wins before request cancel
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
 })
+
+test.for(['abort-pending', 'abort-rejected', 'fulfill-pending'] as const)(
+  'terminal action $0 leaves disposal and context close reachable before joining',
+  async (mode, { annotate }) => {
+    const owner = createRetentionReloadTransport()
+    const operation = Promise.withResolvers<void>()
+    const acknowledgement = Promise.withResolvers<void>()
+    const actionStarted = Promise.withResolvers<void>()
+    const actionError = await Promise.resolve()
+      .then(() => JSON.parse('controlled external terminal action rejection'))
+      .catch((error: unknown) => error)
+    const calls: string[] = []
+    const action = () => {
+      calls.push(mode.startsWith('fulfill') ? 'fulfill' : 'abort')
+      actionStarted.resolve()
+      if (mode === 'abort-rejected') return Promise.reject(actionError)
+      return acknowledgement.promise
+    }
+    const task = owner.run(
+      'synthetic-terminal-action-boundary',
+      async (fulfill) => {
+        if (mode === 'fulfill-pending') {
+          await fulfill(action)
+          return
+        }
+        await operation.promise
+        await fulfill(async () => {
+          calls.push('late-fulfill')
+        })
+      },
+      action,
+    )
+    if (mode === 'fulfill-pending') await actionStarted.promise
+    owner.stopAdmission()
+    const cleanup = await settleRetentionReloadCleanup([
+      { stage: 'cancel-forwarding', run: () => owner.cancelPending() },
+      {
+        stage: 'dispose-forward-context',
+        run: async () => {
+          calls.push('dispose')
+          expect(owner.needsContextClose).toBe(true)
+          if (mode === 'abort-rejected') throw actionError
+        },
+      },
+      {
+        stage: 'fallback-context-close',
+        run: async () => {
+          calls.push('close')
+          operation.resolve()
+          acknowledgement.resolve()
+        },
+      },
+      {
+        stage: 'drain-routes',
+        run: async () => {
+          calls.push('drain')
+          await owner.drain()
+        },
+      },
+      { stage: 'unroute', run: async () => calls.push('unroute') },
+    ])
+    await task
+    expect(calls).toEqual([
+      mode === 'fulfill-pending' ? 'fulfill' : 'abort',
+      'dispose',
+      'close',
+      'drain',
+      'unroute',
+    ])
+    expect(owner.requests[0]).toMatchObject({
+      requestId: 1,
+      terminal: { kind: 'cancelled' },
+      settlement: { kind: 'succeeded' },
+      action: { kind: mode === 'fulfill-pending' ? 'fulfill' : 'abort' },
+    })
+    expect(owner.requests[0]?.action?.settledAt).toBeTypeOf('number')
+    expect(owner.hasFailure).toBe(false)
+    if (mode !== 'fulfill-pending') expect(owner.requests[0]?.skippedActions).toContain('fulfill')
+    if (mode === 'abort-rejected') {
+      expect(cleanup[1]?.error).toBe(actionError)
+      expect(cleanup[3]?.error).toBe(actionError)
+      expect(owner.failures[0]).toMatchObject({ requestId: 1, stage: 'route-action-abort' })
+    }
+    await annotate(
+      JSON.stringify({
+        mode,
+        boundary: 'synthetic external terminal actions, no native Route claim',
+        calls,
+        requests: owner.requests,
+        failures: owner.failures,
+        cleanup: cleanup.map(({ stage, error }) => ({ stage, error: String(error) })),
+      }),
+      'retention-terminal-action-control',
+    )
+  },
+)
