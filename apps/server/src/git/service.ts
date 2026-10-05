@@ -1410,13 +1410,15 @@ export class GitService {
     if (await this.isBlobDiffTooLarge(repository, query)) return []
 
     const text = await this.gitObjectText(repository, objectId)
-    if (!text || isBinaryText(text)) return []
+    if (isBinaryText(text)) return []
 
     return [
       {
         hunks: [],
+        newFileMissing: query.newObjectId ? undefined : true,
         newObjectId: query.newObjectId,
         newText: text,
+        oldFileMissing: query.oldObjectId ? undefined : true,
         oldObjectId: query.oldObjectId,
         oldPath: oldPath === query.path ? undefined : oldPath,
         oldText: text,

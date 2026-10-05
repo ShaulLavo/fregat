@@ -412,12 +412,16 @@ test('a refused review awaits independently blocked activity settlement before r
 }) => {
   void client
   const gate = Promise.withResolvers<void>()
+  const initialComments = Promise.withResolvers<void>()
+  forge.control.beforeCommentsRead = () => initialComments.promise
   renderWithProviders(
     <PullRequestDiscussion rootPath='' number={7} url='https://github.com/fixture/repo/pull/7' />,
   )
   await userEvent.click(screen.getByRole('button', { name: 'Discussion' }))
   await userEvent.click(await screen.findByRole('tab', { name: 'Activity' }))
   await screen.findByText('No reviews')
+  expect(screen.queryByRole('textbox', { name: 'Review summary' })).toBeNull()
+  initialComments.resolve()
   forge.control.failReview = true
   forge.control.beforeActivityRead = () => gate.promise
   forge.activityReviews.push({
@@ -428,7 +432,7 @@ test('a refused review awaits independently blocked activity settlement before r
     submitted_at: '2026-10-01T10:00:00Z',
   })
   await userEvent.type(
-    screen.getByRole('textbox', { name: 'Review summary' }),
+    await screen.findByRole('textbox', { name: 'Review summary' }),
     'Keep this activity draft',
   )
   await userEvent.click(screen.getByRole('button', { name: 'Submit review' }))

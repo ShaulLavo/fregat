@@ -1,3 +1,4 @@
+import { snapshotTarget } from '../../../../../test/factories/git-diff'
 import { selectEditorGroupTab } from '@/lib/documents/utils/groups'
 import { groupLeaf, groupTree, groupBranch } from '../../../../../test/factories/editor-groups'
 import {
@@ -14,7 +15,6 @@ import { testWorkspaceAddress } from '../../../../../test/factories/workspace-ad
 import {
   documentTargets,
   DOCUMENT_TARGET_CASES,
-  DOCUMENT_OLD_OBJECT_ID,
   DOCUMENT_NEW_OBJECT_ID,
   testTabContent,
   testScrollPositions,
@@ -275,15 +275,20 @@ describe('workspace cache', () => {
     }
   })
 
-  it('preserves an explicitly empty comparison side when the other side names a snapshot', () => {
+  it('preserves an explicit missing side beside an existing snapshot', () => {
     const content = documentTab({
       kind: 'git-diff',
-      source: {
-        kind: 'snapshot',
-        path: filesystemPath('/repo/a.ts'),
-        oldObjectId: '',
-        newObjectId: DOCUMENT_NEW_OBJECT_ID,
-      },
+      source: snapshotTarget({
+        kind: 'captured-review',
+        rootPath: '/repo',
+        path: '/repo/a.ts',
+        revision: {
+          old: { kind: 'missing' },
+          new: { kind: 'blob', objectId: DOCUMENT_NEW_OBJECT_ID },
+          oldPath: '/repo/a.ts',
+          status: 'added',
+        },
+      }),
     })
     const slice: CachedWorkspaceSlice = { ...emptyWorkspaceSlice(), editorHistory: [content] }
     writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
@@ -349,11 +354,12 @@ describe('workspace cache', () => {
                     kind: 'git-diff',
                     source: {
                       kind: 'snapshot',
-                      path: '/repo/src/a.ts',
-                      oldPath: '/repo/src/old.ts',
-                      oldObjectId: DOCUMENT_OLD_OBJECT_ID,
-                      newObjectId: DOCUMENT_NEW_OBJECT_ID,
-                      status: 'renamed',
+                      target: {
+                        kind: 'moving',
+                        rootPath: '/repo',
+                        path: '/repo/src/a.ts',
+                        changeSource: 'worktree',
+                      },
                     },
                   },
                 },

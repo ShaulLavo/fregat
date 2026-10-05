@@ -1,5 +1,5 @@
 import type { EditorGroup, GroupId, GroupNode, SplitChild } from '@/lib/documents/utils/group-types'
-import { sameTabContent, tabContentKey } from '@/lib/documents/utils/tabs'
+import { sameTabCapture, sameTabContent, tabContentKey } from '@/lib/documents/utils/tabs'
 import type { TabContent } from '@/lib/documents/utils/types'
 import {
   applicableTabs,
@@ -89,11 +89,11 @@ function applyTabs(context: EditorApplyContext, transient: boolean): string | nu
   if (!tokens) return 'tab collection exceeds the supported limit'
   const contents = contentsForTabs(tokens, rootPath)
   if (contents === null) return 'tab collection contains an unavailable document'
-  const openKeys = new Set(context.workspaceStore.getState().openTabContents.map(tabContentKey))
+  const open = context.workspaceStore.getState().openTabContents
   const selected = editorDocumentToken(address)
   const anchored = selected ? contentForDocumentToken(rootPath, selected) : null
   for (const content of contents) {
-    if (openKeys.has(tabContentKey(content))) continue
+    if (open.some((current) => sameTabCapture(current, content))) continue
     if (transient && anchored?.kind === 'content' && sameTabContent(anchored.content, content))
       continue
     commands.openTabContent(content)
@@ -182,7 +182,7 @@ function selectExistingContent(context: EditorApplyContext, content: TabContent)
 
 function selectedContentMatches(store: EditorWorkspaceStoreApi, content: TabContent): boolean {
   const selected = store.getState().selectedTabContent
-  return selected !== null && sameTabContent(selected, content)
+  return selected !== null && sameTabCapture(selected, content)
 }
 
 function reorderGroups(node: GroupNode, groups: ReadonlyMap<GroupId, EditorGroup>): GroupNode {

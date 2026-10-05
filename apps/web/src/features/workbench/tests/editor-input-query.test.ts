@@ -1,7 +1,7 @@
 import { fileDocument, fileResource, filesystemPath } from '@/lib/documents/utils/identity'
 import { documentTab, settingsTab } from '@/lib/documents/utils/tabs'
 import { snapshotDocument } from '@/lib/documents/utils/comparisons'
-import { blobDiffQueryKey } from '@/lib/blob-diff-query'
+import { gitKeys } from '@/lib/query-keys'
 import { editorInputQueryKey } from '@/features/workbench/hooks/use-editor-input-pending'
 import { fileSystemKeys } from '@/lib/query-keys'
 import { gitFileDiff } from '../../../../test/factories/git-diff'
@@ -24,13 +24,12 @@ test('maps editor inputs to the query that must resolve before they can draw', (
   expect(
     editorInputQueryKey(documentTab({ kind: 'history', file: fileResource(filePath) })),
   ).toEqual(fileSystemKeys.fileSnapshot(filePath))
-  expect(editorInputQueryKey(documentTab(snapshotDocument(diff)!))).toEqual(
-    blobDiffQueryKey({
-      newObjectId: diff.newObjectId,
-      oldObjectId: diff.oldObjectId,
-      oldPath: diff.oldPath,
-      path: diff.path,
-    }),
-  )
+  expect(
+    editorInputQueryKey(
+      documentTab(
+        snapshotDocument(diff, filesystemPath('/repo'), diff.staged ? 'staged' : 'worktree')!,
+      ),
+    ),
+  ).toEqual(gitKeys.diff(filePath, false))
   expect(editorInputQueryKey(settingsTab())).toBeNull()
 })

@@ -47,7 +47,7 @@ export function ChangesList({
   const navigation = useNavigation()
   const activeId = useGitState((state) => state.activeChangeId)
   const select = useGitState((state) => state.selectChange)
-  const { openDiff } = useOpenDiffDocument()
+  const { openDiff } = useOpenDiffDocument(rootPath)
   const scrollRef = useRef<HTMLDivElement>(null)
   const virtualList = useRef<VirtualListHandle>(null)
   const entries = changeEntries([

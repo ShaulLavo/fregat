@@ -50,7 +50,7 @@ function WorktreeGroupActions({
       >
         <ArrowBendUpLeftIcon />
       </RowActionButton>
-      <OpenAllDiffsButton rows={rows} />
+      <OpenAllDiffsButton rows={rows} rootPath={rootPath} />
       <RowActionButton
         disabled={!confirmed || stage.isPending}
         label='Stage all changes'
@@ -84,7 +84,7 @@ function StagedGroupActions({
       >
         <ArrowBendUpLeftIcon />
       </RowActionButton>
-      <OpenAllDiffsButton rows={rows} />
+      <OpenAllDiffsButton rows={rows} rootPath={rootPath} />
       <RowActionButton
         disabled={!confirmed || unstage.isPending}
         label='Unstage all changes'
@@ -96,8 +96,8 @@ function StagedGroupActions({
   )
 }
 
-function OpenAllDiffsButton({ rows }: { rows: readonly ChangeRow[] }) {
-  const { openDiffs } = useOpenDiffDocument()
+function OpenAllDiffsButton({ rows, rootPath }: { rows: readonly ChangeRow[]; rootPath: string }) {
+  const { openDiffs } = useOpenDiffDocument(rootPath)
 
   return (
     <RowActionButton disabled={false} label='Open all diffs' onClick={() => void openDiffs(rows)}>

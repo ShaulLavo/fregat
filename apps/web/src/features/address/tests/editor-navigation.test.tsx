@@ -135,6 +135,7 @@ test('resource changes reconcile an async preparation without canceling its dest
   try {
     const pending = navigation.openDiff({
       owner: harness.workspace,
+      rootPath: workspace.rootPath,
       row: {
         file: { path: 'repo/a.ts', status: 'modified', index: 'unmodified', worktree: 'modified' },
         section: 'worktree',
@@ -153,7 +154,13 @@ test('resource changes reconcile an async preparation without canceling its dest
     expect(editorTabContents(harness.workspace)).not.toContainEqual(testTabContent('repo/b.ts'))
     expect(harness.workspace.getState().selectedTabContent).toMatchObject({
       kind: 'document',
-      document: { kind: 'git-diff', source: { kind: 'snapshot', path: 'repo/a.ts' } },
+      document: {
+        kind: 'git-diff',
+        source: {
+          kind: 'snapshot',
+          target: { kind: 'moving', rootPath: 'repo', path: 'repo/a.ts', changeSource: 'worktree' },
+        },
+      },
     })
   } finally {
     released.resolve()
@@ -252,6 +259,7 @@ test('a change row that outlived its change keeps the current view', async ({ cl
   await waitForNavigation(navigation)
   const result = await navigation.openDiff({
     owner: harness.workspace,
+    rootPath: workspace.rootPath,
     row: {
       file: { path: 'repo/a.ts', status: 'modified', index: 'modified', worktree: 'unmodified' },
       section: 'staged',

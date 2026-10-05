@@ -3,7 +3,10 @@ import { useEffectEvent, useId, useLayoutEffect } from 'react'
 import { useStore } from 'zustand'
 import type { GitFileDiff } from '@workspace/contracts'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
-import { blobDiffQueryOptions } from '@/lib/blob-diff-query'
+import {
+  snapshotComparisonQueryOptions,
+  snapshotComparisonIsAdmitted,
+} from '@/lib/snapshot-comparison-query'
 import { documentKey } from '@/lib/documents/utils/identity'
 import { snapshotComparisonInput } from '@/lib/snapshot-comparison-input'
 import type {
@@ -74,7 +77,11 @@ export function useSnapshotComparison(
 }
 
 function adoptSnapshotComparison(request: SnapshotAdoption): SnapshotComparisonLease | null {
-  const current = request.queries.getQueryData(blobDiffQueryOptions(request.comparison).queryKey)
+  if (!snapshotComparisonIsAdmitted(request.queries, request.scope.rootPath, request.comparison))
+    return null
+  const current = request.queries.getQueryData<readonly GitFileDiff[]>(
+    snapshotComparisonQueryOptions(request.comparison).queryKey,
+  )
   if (request.controller.signal.aborted || current !== request.diffs) return null
   return request.documents.getState().acquireSnapshotComparison({
     input: snapshotComparisonInput({

@@ -1,9 +1,13 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Client } from '@/lib/client'
-import { fetchDiff } from '@/features/git/utils/api'
+import { fetchDiff } from '@/lib/git-diff-query'
 import { fetchBlobDiff } from '@/lib/blob-diff-query'
-import { snapshotDocument } from '@/lib/documents/utils/comparisons'
+import {
+  snapshotDocument,
+  historicalDocument,
+  comparisonRequest,
+} from '@/lib/documents/utils/comparisons'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { snapshotComparisonInput } from '@/lib/snapshot-comparison-input'
 import { createClientInvariantError } from '@/lib/structured-errors'
@@ -27,8 +31,9 @@ export async function createSnapshotComparisonFixture(root: string, client: Clie
   const [worktree] = await fetchDiff(path, false, undefined, client)
   if (!staged || !worktree)
     throw createClientInvariantError('Git source fixture requires two diffs')
-  const stageDocument = snapshotDocument(staged)
-  const workDocument = snapshotDocument(worktree)
+  const scope = { environmentId: testScopedStorage.environmentId, rootPath: filesystemPath('repo') }
+  const stageDocument = snapshotDocument(staged, scope.rootPath, 'staged')
+  const workDocument = snapshotDocument(worktree, scope.rootPath, 'worktree')
   if (
     !stageDocument ||
     !workDocument ||
@@ -36,9 +41,28 @@ export async function createSnapshotComparisonFixture(root: string, client: Clie
     workDocument.source.kind !== 'snapshot'
   )
     throw createClientInvariantError('Git source fixture requires resolved objects')
-  const scope = { environmentId: testScopedStorage.environmentId, rootPath: filesystemPath('repo') }
-  const historical = { ...stageDocument.source, source: 'historical' as const }
-  const historicalDiffs = await fetchBlobDiff(historical, undefined, client)
+  const parent = runGit(repo, ['rev-parse', 'HEAD']).stdout.trim()
+  const tree = runGit(repo, ['write-tree']).stdout.trim()
+  const commit = runGit(repo, [
+    'commit-tree',
+    tree,
+    '-p',
+    parent,
+    '-m',
+    'Captured historical index',
+  ]).stdout.trim()
+  const response = await client.git.history.commit.get({ query: { path: scope.rootPath, commit } })
+  const details = response.data
+  const file = details?.files.find((entry) => entry.path === path)
+  const document =
+    details && file ? historicalDocument({ rootPath: scope.rootPath, details, file }) : null
+  if (!document || document.source.kind !== 'snapshot')
+    throw createClientInvariantError('Git source fixture requires actual commit details')
+  const historical = document.source
+  const request = comparisonRequest(historical)
+  if (request.kind !== 'snapshot')
+    throw createClientInvariantError('Git source fixture requires a fixed historical pair')
+  const historicalDiffs = await fetchBlobDiff(request.query, undefined, client)
   return {
     scope,
     path,

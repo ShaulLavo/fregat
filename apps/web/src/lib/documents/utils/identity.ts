@@ -95,14 +95,28 @@ function identityParts(document: DocumentRef): readonly unknown[] {
 }
 
 function comparisonIdentity(source: GitComparison): readonly unknown[] {
+  if (source.kind === 'snapshot') {
+    const target = source.target
+    const subject = [source.kind, target.rootPath, target.path, target.kind]
+    if (target.kind === 'moving') return [...subject, target.changeSource]
+    if (target.kind === 'historical') return [...subject, target.origin.id]
+    const revision = target.revision
+    return [
+      ...subject,
+      revision.old.kind,
+      revision.old.kind === 'blob' ? revision.old.objectId : null,
+      revision.new.kind,
+      revision.new.kind === 'blob' ? revision.new.objectId : null,
+      revision.oldPath,
+      revision.status,
+    ]
+  }
   const revisions = [
     source.oldObjectId ?? null,
     source.newObjectId ?? null,
     source.oldPath ?? null,
     source.status ?? null,
   ]
-  if (source.kind === 'snapshot')
-    return [source.kind, source.path, source.source ?? null, ...revisions]
   const range = [
     source.owner,
     source.sessionId,
