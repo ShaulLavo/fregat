@@ -14,7 +14,9 @@ declare module 'vitest/browser' {
   }
 }
 
-test('keeps current input and rebased paint pending until the native highlight reply is accepted', async () => {
+test('keeps current input and rebased paint pending until the native highlight reply is accepted', async ({
+  annotate,
+}) => {
   const language = await import('@shikijs/langs/typescript')
   const theme = await import('@shikijs/themes/dark-plus')
   const gate = heldNativeShikiReplies()
@@ -128,12 +130,14 @@ test('keeps current input and rebased paint pending until the native highlight r
     expect(
       analysis.inspectRetention().entries.find((entry) => entry.family === 'highlighter'),
     ).toMatchObject({ revision: 1, status: 'pending' })
-    console.log(
-      '[current-ready198-held]',
+    await annotate(
       JSON.stringify({
         state: editor.getState(),
         source: buffer.getTextSnapshot().readRange(0, buffer.getSnapshot().length),
         retained: analysis.inspectRetention(),
+        revision: buffer.getRevision(),
+        worker: worker.inspect(),
+        copy: editor['syntax'].copyTokens.toTokens(),
         rebased,
         exact: exact.tokens.toTokens(),
         captured: editor.captureSnapshot() !== null,
@@ -141,6 +145,7 @@ test('keeps current input and rebased paint pending until the native highlight r
         held: gate.held.map((event) => event.data),
         screenshot: await commands.proofViewportScreenshot(host.id),
       }),
+      'current-ready198-held',
     )
     expect(editor.getState()).toMatchObject({
       syntaxStatus: 'ready',
@@ -148,6 +153,18 @@ test('keeps current input and rebased paint pending until the native highlight r
     })
     expect(editor.captureSnapshot()).toBeNull()
     expect(editor['syntax'].copyTokens.length).toBe(0)
+    editor.setTheme({ backgroundColor: '#161616' })
+    await annotate(
+      JSON.stringify({
+        state: editor.getState(),
+        source: buffer.getTextSnapshot().readRange(0, buffer.getSnapshot().length),
+        captured: editor.captureSnapshot() !== null,
+        retained: analysis.inspectRetention(),
+      }),
+      'current-ready198-appearance',
+    )
+    expect(editor.getState().initialHighlightStatus).toBe('loading')
+    expect(editor.captureSnapshot()).toBeNull()
     editor.edit({ from: 0, to: 0, text: 'x' })
     expect(buffer.getTextSnapshot().readRange(0, buffer.getSnapshot().length)).toBe(
       'x' + prefix + source,
@@ -165,19 +182,24 @@ test('keeps current input and rebased paint pending until the native highlight r
     const finalBuffer = createEditorTextBuffer('x' + prefix + source)
     const finalReference = await reference!.refresh(finalBuffer.getTextSnapshot())
     expect(editor['syntax'].tokens.toTokens()).toEqual(finalReference.tokens.toTokens())
+    expect(editor['syntax'].copyTokens.toTokens()).toEqual(finalReference.tokens.toTokens())
     expect(editor.captureSnapshot()).not.toBeNull()
     expect(paints).toHaveLength(settledPaints)
-    console.log(
-      '[current-ready198-current]',
+    await annotate(
       JSON.stringify({
         state: editor.getState(),
         source: buffer.getTextSnapshot().readRange(0, buffer.getSnapshot().length),
         retained: analysis.inspectRetention(),
+        revision: buffer.getRevision(),
+        worker: worker.inspect(),
+        copy: editor['syntax'].copyTokens.toTokens(),
+        captured: editor.captureSnapshot() !== null,
         actual: editor['syntax'].tokens.toTokens(),
         exact: finalReference.tokens.toTokens(),
         requests: gate.requests,
         screenshot: await commands.proofViewportScreenshot(host.id),
       }),
+      'current-ready198-current',
     )
     reference!.dispose()
   } finally {
@@ -217,16 +239,18 @@ function heldNativeShikiReplies() {
       const worker = new Worker(new URL('../src/shiki/shiki.worker.ts', import.meta.url), {
         type: 'module',
       })
-      const post = worker.postMessage.bind(worker)
-      worker.postMessage = (...args: Parameters<Worker['postMessage']>) => {
-        const value: unknown = args[0]
+      const post = worker.postMessage
+      worker.postMessage = (
+        value: unknown,
+        transferOrOptions?: Transferable[] | StructuredSerializeOptions,
+      ) => {
         requests.push(value)
         const id = nativeEditId(value)
         if (id !== null) edits.push(id)
-        Reflect.apply(post, worker, args)
+        Reflect.apply(post, worker, [value, transferOrOptions])
       }
       const descriptor = Object.getOwnPropertyDescriptor(Worker.prototype, 'onmessage')
-      if (!descriptor?.set) throw new TypeError('Native worker message descriptor unavailable')
+      if (!descriptor?.set) expect.fail('Native worker message descriptor unavailable')
       Object.defineProperty(worker, 'onmessage', {
         configurable: true,
         set: (listener: Worker['onmessage']) => {

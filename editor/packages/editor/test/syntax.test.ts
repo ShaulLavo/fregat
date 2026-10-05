@@ -48,6 +48,7 @@ it('marks current highlighter work pending on the direct provider path while kee
     const settled = events.length
     const prefix = '// pending\n'
     editor.edit({ from: 0, to: 0, text: prefix })
+    expect(editor.getState().initialHighlightStatus).toBe('loading')
     await vi.waitFor(() => expect(editor.getState().syntaxStatus).toBe('ready'))
     expect(editor.getState()).toMatchObject({
       syntaxStatus: 'ready',

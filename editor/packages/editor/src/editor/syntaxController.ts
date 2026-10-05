@@ -1370,6 +1370,7 @@ export class EditorSyntaxController {
     const session = this.options.getSession()
     if (!this.highlighterSession || !session) return
 
+    if (change) this.initialHighlightState = 'loading'
     const configurationGeneration = this.initialHighlightConfigurationGeneration
     const delayMs = options.delayMs ?? syntaxRefreshDelay(change)
     this.highlightRequests.schedule({
