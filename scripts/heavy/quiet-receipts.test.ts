@@ -1,13 +1,69 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import { live } from './queue'
 import { quietFailureReceipt, quietLauncherReceipt } from './quiet-receipts'
 import { alive, removeSandboxes, sandbox, start, until, userScopes, writeMachine } from './sandbox'
 
-afterEach(removeSandboxes)
+const uptime = vi.hoisted(() => ({ unavailable: false }))
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+  return {
+    ...actual,
+    readFileSync: (...args: Parameters<typeof actual.readFileSync>) => {
+      if (args[0] === '/proc/uptime' && uptime.unavailable) return actual.readFileSync(-1, args[1])
+      return actual.readFileSync(...args)
+    },
+  }
+})
+
+afterEach(() => {
+  uptime.unavailable = false
+  return removeSandboxes()
+})
+
+test('unavailable uptime preserves launcher checkpoints, completion, and the primary outcome', () => {
+  const box = sandbox()
+  const resultFile = path.join(box.root, 'launcher.done')
+  writeFileSync(resultFile, 'retained completion')
+  const cached = quietLauncherReceipt(process.pid, 'waiting')
+  uptime.unavailable = true
+  try {
+    for (const phase of ['waiting', 'expired-before-release', 'returned-before-exit-assertion']) {
+      const checkpoint = quietLauncherReceipt(process.pid, phase)
+      expect(checkpoint).toMatchObject({ pid: process.pid, phase })
+      expect(checkpoint.bootSeconds).toHaveProperty('receiptError')
+    }
+    const uncreated = quietLauncherReceipt(undefined, 'not-created')
+    expect(uncreated).toMatchObject({ created: false })
+    expect(uncreated.bootSeconds).toHaveProperty('receiptError')
+    const receipt = quietFailureReceipt({
+      box,
+      jobs: {},
+      launcher: { pid: process.pid, resultFile, checkpoints: [cached] },
+    })
+    if ('receiptError' in receipt) expect.fail(receipt.receiptError)
+    expect(receipt.bootSeconds).toHaveProperty('receiptError')
+    expect(receipt.launcher?.current.bootSeconds).toHaveProperty('receiptError')
+    expect(receipt.launcher?.checkpoints).toEqual([cached])
+    expect(receipt.launcher?.result).toBe('retained completion')
+    const primary = Symbol('primary outcome')
+    let observed: unknown
+    try {
+      quietLauncherReceipt(process.pid, 'returned-before-exit-assertion')
+      throw primary
+    } catch (error) {
+      JSON.stringify(receipt)
+      observed = error
+    }
+    expect(observed).toBe(primary)
+  } finally {
+    uptime.unavailable = false
+  }
+})
 
 describe.skipIf(!userScopes)('quiet failure receipts', () => {
   test('captures a suspended launcher entry descriptor before it returns and is reaped', async () => {

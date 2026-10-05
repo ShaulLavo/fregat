@@ -19,7 +19,7 @@ type Failure = {
 }
 
 export function quietLauncherReceipt(pid: number | undefined, phase: string) {
-  const boot = bootSeconds()
+  const boot = capture(bootSeconds)
   if (pid === undefined) return { phase, bootSeconds: boot, created: false }
   return {
     phase,
@@ -34,7 +34,7 @@ export function quietLauncherReceipt(pid: number | undefined, phase: string) {
 
 export function quietFailureReceipt({ box, jobs, units = [], manager, launcher }: Failure) {
   return capture(() => ({
-    bootSeconds: bootSeconds(),
+    bootSeconds: capture(bootSeconds),
     fixtureRoot: box.root,
     sliceRoot: box.sliceRoot,
     jobs: Object.entries(jobs).map(([name, job]) => {
