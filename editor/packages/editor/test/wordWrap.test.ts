@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Editor } from '../src/editor/Editor'
 import { EDITOR_OPTION_DESCRIPTORS } from '../src/editor/optionDescriptors'
 import { resetEditorInstanceCount, setHighlightRegistry } from '../src/public/testing'
+import { createEditorBufferSession, createEditorTextBuffer } from '../src/documentSession'
 
 /**
  * The wrap machinery (WrapMap, setWrapEnabledLayout) was already built and covered; what was
@@ -98,5 +99,110 @@ describe('word wrap', () => {
     editor.setWordWrap(true)
 
     expect(editor.materializeFullText()).toBe(LONG_LINE)
+  })
+
+  it('keeps wrap through simple setText replacements', () => {
+    editor = new Editor(container)
+    editor.setText(LONG_LINE)
+    expect(editor.dispatchCommand('editor.action.toggleWordWrap')).toBe(true)
+    editor.setText('replacement text')
+    expect(editor.isWordWrapEnabled()).toBe(true)
+    expect(editor.materializeFullText()).toBe('replacement text')
+  })
+
+  it('retains the user command across native remount of the same logical view', () => {
+    const buffer = createEditorTextBuffer(LONG_LINE)
+    const session = createEditorBufferSession(buffer)
+    editor = new Editor(container, { defaultText: '' })
+    editor.attachSession(session)
+    expect(editor.isWordWrapEnabled()).toBe(false)
+    expect(editor.dispatchCommand('editor.action.toggleWordWrap')).toBe(true)
+    expect(editor.isWordWrapEnabled()).toBe(true)
+    editor.dispose()
+
+    editor = new Editor(container, { defaultText: '' })
+    editor.attachSession(session)
+    expect(editor.isWordWrapEnabled()).toBe(true)
+    expect(editor.getTextSnapshot()).toBe(buffer.getTextSnapshot())
+    expect(buffer.getRevision()).toBe(0)
+    expect(buffer.canUndo()).toBe(false)
+  })
+
+  it.each([false, true])(
+    'honors explicit constructor wrap %s through owned and empty initialization',
+    (wordWrap) => {
+      const session = createEditorBufferSession(createEditorTextBuffer(LONG_LINE))
+      editor = new Editor(container)
+      editor.attachSession(session)
+      editor.setWordWrap(!wordWrap)
+      editor.dispose()
+
+      editor = new Editor(container, { defaultText: '', wordWrap })
+      editor.clearDocument()
+      editor.attachSession(session)
+      expect(editor.isWordWrapEnabled()).toBe(wordWrap)
+      editor.setWordWrap(!wordWrap)
+      editor.detachSession()
+      editor.attachSession(session)
+      expect(editor.isWordWrapEnabled()).toBe(!wordWrap)
+    },
+  )
+
+  it.each([undefined, false])(
+    'takes a host setter before external attachment with constructor wrap %s',
+    (wordWrap) => {
+      const session = createEditorBufferSession(createEditorTextBuffer(LONG_LINE))
+      editor = new Editor(container)
+      editor.attachSession(session)
+      editor.setWordWrap(false)
+      editor.dispose()
+
+      editor = new Editor(container, { defaultText: '', wordWrap })
+      editor.setWordWrap(true)
+      editor.attachSession(session)
+      expect(editor.isWordWrapEnabled()).toBe(true)
+    },
+  )
+
+  it('keeps fresh-session switching behavior and restores each chosen view', () => {
+    const first = createEditorBufferSession(createEditorTextBuffer(LONG_LINE))
+    const second = createEditorBufferSession(createEditorTextBuffer('second'))
+    editor = new Editor(container)
+    editor.attachSession(first)
+    editor.setWordWrap(true)
+    editor.attachSession(second)
+    expect(editor.isWordWrapEnabled()).toBe(true)
+    editor.setWordWrap(false)
+    editor.attachSession(first)
+    expect(editor.isWordWrapEnabled()).toBe(true)
+    editor.attachSession(second)
+    expect(editor.isWordWrapEnabled()).toBe(false)
+  })
+
+  it('keeps independent wrap choices for two logical views of one buffer', () => {
+    const buffer = createEditorTextBuffer(LONG_LINE)
+    const first = createEditorBufferSession(buffer)
+    const second = createEditorBufferSession(buffer)
+    const otherContainer = document.createElement('div')
+    document.body.appendChild(otherContainer)
+    const other = new Editor(otherContainer)
+    editor = new Editor(container)
+    try {
+      editor.attachSession(first)
+      other.attachSession(second)
+      editor.setWordWrap(true)
+      expect(other.isWordWrapEnabled()).toBe(false)
+      editor.dispose()
+      editor = new Editor(container)
+      editor.attachSession(first)
+      expect(editor.isWordWrapEnabled()).toBe(true)
+      expect(other.isWordWrapEnabled()).toBe(false)
+      editor.attachSession(second)
+      expect(editor.isWordWrapEnabled()).toBe(false)
+      expect(buffer.getRevision()).toBe(0)
+    } finally {
+      other.dispose()
+      otherContainer.remove()
+    }
   })
 })
