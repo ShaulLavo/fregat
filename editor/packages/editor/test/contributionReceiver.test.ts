@@ -200,3 +200,58 @@ it.each(['ready', 'in-flight'] as const)('rejects an old %s source across a same
   releaseDocumentMutationLease(buffer, acquired.lease)
   retained.dispose(); analysis.dispose()
 })
+
+it('keeps independent pinned owners exact after head advances and settles invalid owner, audience and cancellation', async () => {
+  const buffer = createEditorTextBuffer('old')
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'tasks' })
+  const owner = analysis.contributions.pin()!
+  const peerOwner = analysis.contributions.pin()!
+  const operation = defineDocumentOperation(() => ({ analyze: async read => read.text.readRange(0, read.text.length), dispose: () => {} }), () => true)
+  createEditorBufferSession(buffer).applyEdits([{ from: 0, to: 3, text: 'new' }])
+  const [first, peer] = await Promise.all([
+    analysis.contributions.request(operation, null, { kind: 'pinned', owner }).settled,
+    analysis.contributions.request(operation, null, { kind: 'pinned', owner: peerOwner }).settled,
+  ])
+  expect(first).toMatchObject({ kind: 'completed', result: 'old', revision: owner.revision })
+  expect(peer).toMatchObject({ kind: 'completed', result: 'old', revision: peerOwner.revision })
+  const audience = analysis.contributions.createAudience()
+  expect(await analysis.contributions.request(operation, null, { kind: 'latest', audience }).settled).toMatchObject({ kind: 'completed', result: 'new' })
+  const other = createEditorDocumentAnalysis({ buffer: createEditorTextBuffer('foreign'), documentId: 'foreign' })
+  expect(await other.contributions.request(operation, null, { kind: 'pinned', owner }).settled).toEqual({ kind: 'unavailable' })
+  expect(await other.contributions.request(operation, null, { kind: 'latest', audience }).settled).toEqual({ kind: 'unavailable' })
+  const cancelled = analysis.contributions.request(operation, null, { kind: 'latest', audience })
+  cancelled.cancel()
+  expect(await cancelled.settled).toEqual({ kind: 'cancelled' })
+  const disposed = analysis.contributions.request(operation, null, { kind: 'latest', audience })
+  audience.dispose()
+  expect(await disposed.settled).toEqual({ kind: 'disposed' })
+  owner.dispose(); peerOwner.dispose(); analysis.dispose(); other.dispose()
+})
+
+it.each(['source', 'configuration'] as const)('rejects stale latest %s before accepting a result', async change => {
+  const buffer = createEditorTextBuffer('old')
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'stale' })
+  const audience = analysis.contributions.createAudience()
+  let finish = () => {}
+  let start = () => {}
+  const started = new Promise<void>(resolve => { start = resolve })
+  const operation = defineDocumentOperation((_context, input: string) => ({ analyze: async read => {
+    if (input === 'old') { start(); await new Promise<void>(resolve => { finish = resolve }) }
+    return read.revision.point
+  }, dispose: () => {} }), (left, right) => left === right)
+  let accepts = 0
+  const old = analysis.contributions.request(operation, 'old', { kind: 'latest', audience, configurationTag: ['old'], accept: () => { accepts++ } })
+  await started
+  if (change === 'source') {
+    const acquired = acquireDocumentMutationLease(buffer, buffer.getRevision(), buffer.getSnapshot(), 'stale')
+    if (acquired.status !== 'acquired') throw new TypeError('Expected mutation lease')
+    rotateDocumentSyncSegment(buffer, buffer.getDocumentSyncPoint(), acquired.lease)
+    releaseDocumentMutationLease(buffer, acquired.lease)
+  } else {
+    expect(await analysis.contributions.request(operation, 'new', { kind: 'latest', audience, configurationTag: ['new'] }).settled).toMatchObject({ kind: 'completed' })
+  }
+  finish()
+  expect(await old.settled).toEqual({ kind: 'superseded' })
+  expect(accepts).toBe(0)
+  audience.dispose(); analysis.dispose()
+})

@@ -194,3 +194,31 @@ it.each(['atomic', 'deferred', 'logical-only'] as const)('preserves scoped logic
   }
   first.dispose(); peer.dispose(); unsubscribe(); await delivery.dispose()
 })
+
+it.each([false, true])('imports a late captured read without rewinding ACK progress, previously delivered=%s', async delivered => {
+  const buffer = createEditorTextBuffer('old😀\r\nline')
+  const delivery = new DocumentDelivery(buffer, 'late.ts')
+  const unsubscribe = buffer.subscribe(event => delivery.accept(event))
+  const scope = delivery.createScope()
+  const external = endpoint()
+  const old = delivery.current()!
+  if (delivered) { const loan = await scope.source.prepareReader(external.transport, old); await loan!.dispose() }
+  createEditorBufferSession(buffer).applyEdits([{ from: 0, to: 3, text: 'new' }])
+  const current = delivery.current()!
+  const newest = await scope.source.prepareReader(external.transport, current)
+  await newest!.dispose()
+  const commands = external.commands.length
+  const late = await scope.source.prepareReader(external.transport, old)
+  const read = external.reader.acquire(late!.reference)!
+  expect(read.text.readRange(0, read.text.length)).toBe('old😀\nline')
+  expect(read.point.revision).toBe(old.revision.point.revision)
+  expect(external.commands.slice(commands).map(command => command.kind)).toEqual(['pin', 'importRead'])
+  const resumed = await scope.source.prepareReader(external.transport, current)
+  const latest = external.reader.acquire(resumed!.reference)!
+  expect(latest.text.readRange(0, latest.text.length)).toBe('new😀\nline')
+  expect(external.commands.slice(commands).some(command => command.kind === 'reset' || command.kind === 'advance')).toBe(false)
+  read.dispose(); latest.dispose(); await late!.dispose(); await resumed!.dispose()
+  expect(external.reader.inspect()).toMatchObject({ reads: 0, pins: 0, sourceUnits: current.text.length })
+  scope.dispose(); unsubscribe(); await delivery.dispose()
+  expect(external.reader.inspect()).toEqual({ documents: 0, reads: 0, pins: 0, sourceUnits: 0 })
+})

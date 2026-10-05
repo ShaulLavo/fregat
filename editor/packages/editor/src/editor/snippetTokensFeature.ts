@@ -61,8 +61,12 @@ async function tokenizeSnippet(
     const analysis = createEditorDocumentAnalysis({ buffer: submitted.buffer, documentId })
     try {
       for (const provider of highlighters) {
-        const result = await analysis.contributions.request(provider.operation, { languageId })
-        if (result) return submitted.submittedTokens(result.tokens)
+        const audience = analysis.contributions.createAudience()
+        const task = analysis.contributions.request(provider.operation, { languageId }, { kind: 'latest', audience })
+        const outcome = await task.settled
+        audience.dispose()
+        if (outcome.kind === 'failed') throw outcome.failure
+        if (outcome.kind === 'completed') return submitted.submittedTokens(outcome.result.tokens)
       }
     } finally { analysis.dispose() }
   }
@@ -70,8 +74,12 @@ async function tokenizeSnippet(
   const analysis = createEditorDocumentAnalysis({ buffer: folded.buffer, documentId })
   try {
     for (const provider of structural) {
-      const result = await analysis.contributions.request(provider.operation, { languageId, includeHighlights: true, syntaxMode: 'full' })
-      if (result) return folded.submittedTokens(result.tokens)
+      const audience = analysis.contributions.createAudience()
+      const task = analysis.contributions.request(provider.operation, { languageId, includeHighlights: true, syntaxMode: 'full' }, { kind: 'latest', audience })
+      const outcome = await task.settled
+      audience.dispose()
+      if (outcome.kind === 'failed') throw outcome.failure
+      if (outcome.kind === 'completed') return folded.submittedTokens(outcome.result.tokens)
     }
     return []
   } finally { analysis.dispose() }

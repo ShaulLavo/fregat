@@ -216,3 +216,5 @@ export { createEditorStructuralOperation, createEditorHighlighterOperation } fro
 export type { EditorStructuralOperationContext, EditorHighlighterOperationContext } from './document/operations'
 
 export type { DocumentOperation, DocumentOperationOptions, DocumentContributionLease } from './editor/contributionOperation'
+
+export type { DocumentContributionAudience, DocumentContributionOwner, DocumentContributionDemand, DocumentContributionTask, DocumentContributionOutcome } from './editor/contributionDemand'

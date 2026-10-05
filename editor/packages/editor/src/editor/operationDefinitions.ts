@@ -26,7 +26,7 @@ export class StructuralDefinition extends DocumentOperation<EditorSyntaxSessionO
   protected create(context: BoundOperationContext, input: EditorSyntaxSessionOptions): StructuralEntry | null {
     const { host, sourceScope, initialRead, runtimeSessionId } = context
     const runtime = this.openRuntime({ ...input, documentId: host.documentId, source: sourceScope.source, initialRead, runtimeSessionId })
-    return runtime ? new StructuralEntry(host.buffer, runtime, host.delivery, sourceScope, host.scheduler, runtimeSessionId) : null
+    return runtime ? new StructuralEntry(host.buffer, runtime, host.delivery, sourceScope, host.scheduler, runtimeSessionId, context.scheduling) : null
   }
   protected createRuntimeSessionId(): string { return createEditorRuntimeSessionId() }
   protected matches(left: EditorSyntaxSessionOptions, right: EditorSyntaxSessionOptions): boolean {
@@ -42,7 +42,7 @@ export class HighlighterDefinition extends DocumentOperation<EditorHighlighterSe
     const { host, sourceScope, initialRead, runtimeSessionId } = context
     const runtime = this.openRuntime({ ...input, documentId: host.documentId, source: sourceScope.source, initialRead, runtimeSessionId })
     if (!runtime) return null
-    const entry = new HighlighterEntry(host.buffer, runtime, host.delivery, sourceScope, host.scheduler, runtimeSessionId)
+    const entry = new HighlighterEntry(host.buffer, runtime, host.delivery, sourceScope, host.scheduler, runtimeSessionId, context.scheduling)
     return entry
   }
   protected createRuntimeSessionId(): string { return createEditorRuntimeSessionId() }

@@ -1,3 +1,4 @@
+import type { DocumentContributionOwner } from './contributionDemand'
 import type {
   EditorDocumentAnalysis,
   EditorRetainedSyntaxSession,
@@ -96,6 +97,7 @@ export type EditorPreparedDocument = {
   startStage(request: EditorPreparedStageRequest): Promise<EditorPreparedStageOutcome> | null
   runtimeSessionIds(): EditorPreparedRuntimeSessionIds
   readonly analysis: EditorDocumentAnalysis
+  readonly contributionOwner: DocumentContributionOwner
   borrow(expected: EditorPreparedDocumentMatch): EditorPreparedDocumentPayload | null
   dispose(): void
   readonly estimatedBytes: number
@@ -137,6 +139,8 @@ export function createEditorPreparedDocument(
 ): EditorPreparedDocument {
   if (options.analysis.buffer !== options.buffer)
     throw new TypeError('Prepared analysis must reference the source buffer')
+  const contributionOwner = options.analysis.contributions.pin()
+  if (!contributionOwner) throw new TypeError('Prepared analysis must have a live source')
   const snapshot = options.buffer.getSnapshot()
   const textSnapshot = options.buffer.getTextSnapshot()
   const lineStarts = computeLineStarts(textSnapshot)
@@ -164,6 +168,7 @@ export function createEditorPreparedDocument(
     if (disposed) return
 
     disposed = true
+    contributionOwner.dispose()
     fallback.dispose()
     structural?.dispose()
     highlighter?.dispose()
@@ -171,6 +176,7 @@ export function createEditorPreparedDocument(
 
   return {
     analysis: options.analysis,
+    contributionOwner,
     fallbackReady: fallback.ready,
     get estimatedBytes() {
       const documentBytes =

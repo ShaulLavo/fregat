@@ -35,6 +35,16 @@ export type DocumentWorkerSourceCommand =
   | { readonly kind: 'pin'; readonly identity: DocumentWorkerIdentity; readonly point: DocumentWorkerPoint; readonly readId: string }
   | { readonly kind: 'unpin'; readonly identity: DocumentWorkerIdentity; readonly readId: string }
   | {
+      readonly kind: 'importRead'
+      readonly identity: DocumentWorkerIdentity
+      readonly point: DocumentWorkerPoint
+      readonly readId: string
+      readonly chunks: readonly string[]
+      readonly lineEnding: DocumentLineEnding
+      readonly byteOrderMark: string
+      readonly containsUnusualLineTerminators: boolean
+    }
+  | {
       readonly kind: 'reset'
       readonly identity: DocumentWorkerIdentity
       readonly base: DocumentWorkerPoint | null
@@ -142,7 +152,7 @@ function isSourceReply(value: unknown): value is DocumentWorkerSourceResult {
 
 function replyMatches(command: DocumentWorkerSourceCommand, result: DocumentWorkerSourceResult): boolean {
   if (result.kind === 'pinned')
-    return command.kind === 'pin' && identitiesEqual(command.identity, result.reference.identity) && documentWorkerPointsEqual(command.point, result.reference.point) && command.readId === result.reference.readId
+    return (command.kind === 'pin' || command.kind === 'importRead') && identitiesEqual(command.identity, result.reference.identity) && documentWorkerPointsEqual(command.point, result.reference.point) && command.readId === result.reference.readId
   if (!identitiesEqual(command.identity, result.identity)) return false
   if (result.kind === 'rejected') return true
   if (result.kind === 'registered') return command.kind === 'register'
@@ -181,6 +191,12 @@ export class DocumentWorkerReader {
     const document = this.documents.get(command.identity.documentId)
     if (!document) return rejected(command.identity, 'detached')
     if (!identitiesEqual(document.identity, command.identity)) return rejected(command.identity, 'generation')
+    if (command.kind === 'importRead') {
+      if (!validPoint(command.point) || document.pins.has(command.readId)) return rejected(command.identity, 'point')
+      const read = this.createRead(document, command.point, resetSnapshot(command))
+      document.pins.set(command.readId, read)
+      return { kind: 'pinned', reference: { identity: command.identity, point: command.point, readId: command.readId } }
+    }
     if (command.kind === 'pin') {
       if (document.pins.has(command.readId)) return rejected(command.identity, 'point')
       const read = this.acquire({ identity: command.identity, point: command.point })
@@ -219,12 +235,16 @@ export class DocumentWorkerReader {
       ? document.frame.snapshot
       : retainedSnapshot(document, reference.point)
     if (!snapshot) return null
+    return this.createRead(document, reference.point, snapshot)
+  }
+
+  private createRead(document: SourceDocument, point: DocumentWorkerPoint, snapshot: PieceTableSnapshot): DocumentWorkerRead {
     const text = createDocumentTextSnapshot(retainPieceTableSnapshot(snapshot))
     let released = false
     const read: DocumentWorkerRead = {
-      ...reference,
+      identity: document.identity, point,
       text,
-      isValid: () => !released && !this.disposed && this.documents.get(reference.identity.documentId) === document,
+      isValid: () => !released && !this.disposed && this.documents.get(document.identity.documentId) === document,
       retain: () => read.isValid() ? this.acquire({ identity: read.identity, point: read.point }) : null,
       dispose: () => {
         if (released) return
@@ -297,7 +317,7 @@ function retainedSnapshot(document: SourceDocument, point: DocumentWorkerPoint):
   return null
 }
 
-function resetSnapshot(command: Extract<DocumentWorkerSourceCommand, { kind: 'reset' }>): PieceTableSnapshot {
+function resetSnapshot(command: Extract<DocumentWorkerSourceCommand, { kind: 'reset' | 'importRead' }>): PieceTableSnapshot {
   let snapshot = createPieceTableSnapshot('', {
     normalized: true,
     transient: true,

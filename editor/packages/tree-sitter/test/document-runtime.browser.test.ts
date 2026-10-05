@@ -89,3 +89,69 @@ it('shares ordinary source across real configurations, composes edits and undo, 
   expect(tree.inspect()).toMatchObject({ lifecycle: 'disposed', pendingRequests: 0 })
   expect(shiki.inspect()).toMatchObject({ lifecycle: 'disposed', pendingRequests: 0 })
 })
+
+it.each([false, true])('uses live late pins in both real backends and resumes latest source, previously admitted=%s', async admitted => {
+  const tree = createTreeSitterWorkerOwner()
+  const shiki = createShikiWorkerOwner()
+  const parser = createTreeSitterSyntaxProvider({ workerOwner: tree })
+  const language = TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find(item => item.id === 'typescript')
+  if (!language) throw new TypeError('TypeScript fixture is required')
+  parser.registerLanguage(language)
+  const highlighter = createShikiHighlighterProvider({ workerOwner: shiki, resolveLanguage: async () => typescript, resolveTheme: async () => ({ ...githubDark, name: 'github-dark' }) })
+  const buffer = createEditorTextBuffer('const mark = "old😀";\r\nconst end = 1;\r\n')
+  createEditorBufferSession(buffer).applyEdits([{ from: buffer.getTextSnapshot().length, to: buffer.getTextSnapshot().length, text: '// captured😀\n' }])
+  const old = buffer.getTextSnapshot().readRange(0, buffer.getTextSnapshot().length)
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'pinned.ts' })
+  const owner = analysis.contributions.pin()!
+  const syntax = analysis.borrowStructural({ provider: parser, languageId: 'typescript', includeCaptures: true })!
+  const color = analysis.borrowHighlighter({ provider: highlighter, languageId: 'typescript' })!
+  const pinned = async () => {
+    const [structure, highlight] = await Promise.all([
+      analysis.contributions.request(parser.operation, { languageId: 'typescript', includeCaptures: true }, { kind: 'pinned', owner }).settled,
+      analysis.contributions.request(highlighter.operation, { languageId: 'typescript' }, { kind: 'pinned', owner }).settled,
+    ])
+    expect(structure.kind).toBe('completed'); expect(highlight.kind).toBe('completed')
+    if (structure.kind !== 'completed' || highlight.kind !== 'completed') throw new TypeError('Expected real pinned results')
+    expect(structure.revision).toBe(owner.revision)
+    expect(highlight.revision).toBe(owner.revision)
+    expect(structure.result.captures.some(capture => old.slice(capture.startIndex, capture.endIndex) === '"old😀"')).toBe(true)
+    expect(highlight.result.tokens.toTokens().some(token => old.slice(token.start, token.end).includes('old😀'))).toBe(true)
+  }
+  try {
+    await Promise.all([syntax.refresh(buffer.getTextSnapshot()), color.refresh(buffer.getTextSnapshot())])
+    if (admitted) await pinned()
+    const start = old.indexOf('old😀')
+    createEditorBufferSession(buffer).applyEdits([{ from: start, to: start + 'old😀'.length, text: 'new🪐' }])
+    for (let gap = 0; gap < 129; gap++) {
+      const length = buffer.getTextSnapshot().length
+      createEditorBufferSession(buffer).applyEdits([{ from: length, to: length, text: '// gap😀\n' }])
+    }
+    await Promise.all([syntax.refresh(buffer.getTextSnapshot()), color.refresh(buffer.getTextSnapshot())])
+    await pinned()
+    const pinnedRuntimeIds = analysis.inspectRetention().entries.filter(entry => entry.runtimeSessionId !== syntax.runtimeSessionId && entry.runtimeSessionId !== color.runtimeSessionId).map(entry => entry.runtimeSessionId)
+    expect(pinnedRuntimeIds).toHaveLength(2)
+    owner.dispose()
+    await Promise.all([tree.awaitIdleFence(), shiki.awaitIdleFence()])
+    const treeRetained = await tree.inspectRetention()
+    expect(treeRetained?.documents.map(item => item.runtimeSessionId)).toEqual([syntax.runtimeSessionId])
+    expect(treeRetained?.snapshotCount).toBe(2)
+    expect(treeRetained?.documents.flatMap(item => item.snapshots).map(snapshot => snapshot.sourceUnits)).toEqual([buffer.getTextSnapshot().length, old.length])
+    expect(analysis.inspectRetention().entries.some(entry => pinnedRuntimeIds.includes(entry.runtimeSessionId))).toBe(false)
+    expect(treeRetained?.source.readCount).toBe(treeRetained?.snapshotCount)
+    expect(treeRetained?.source.pinCount).toBe(0)
+    expect(treeRetained?.source.sourceUnits).toBe(treeRetained?.documents.flatMap(item => item.snapshots).reduce((units, snapshot) => units + snapshot.sourceUnits, 0))
+    expect((await shiki.inspectRetention())?.source.sourceUnits).toBe(buffer.getTextSnapshot().length)
+    createEditorBufferSession(buffer).applyEdits([{ from: start, to: start + 'new🪐'.length, text: 'last😀' }])
+    const [latest, highlighted] = await Promise.all([syntax.refresh(buffer.getTextSnapshot()), color.refresh(buffer.getTextSnapshot())])
+    const text = buffer.getTextSnapshot().readRange(0, buffer.getTextSnapshot().length)
+    expect(latest.captures.some(capture => text.slice(capture.startIndex, capture.endIndex) === '"last😀"')).toBe(true)
+    expect(highlighted.tokens.toTokens().some(token => text.slice(token.start, token.end).includes('last😀'))).toBe(true)
+    syntax.dispose(); color.dispose()
+    analysis.reclaimInactive({ reason: 'inactive-budget' })
+    await Promise.all([tree.awaitIdleFence(), shiki.awaitIdleFence()])
+    expect((await tree.inspectRetention())?.source).toEqual({ documentCount: 0, readCount: 0, pinCount: 0, sourceUnits: 0 })
+    expect((await shiki.inspectRetention())?.source).toEqual({ documents: 0, reads: 0, pins: 0, sourceUnits: 0 })
+  } finally { owner.dispose(); analysis.dispose(); await Promise.all([tree.dispose(), shiki.dispose()]) }
+  expect(tree.inspect()).toMatchObject({ lifecycle: 'disposed', pendingRequests: 0 })
+  expect(shiki.inspect()).toMatchObject({ lifecycle: 'disposed', pendingRequests: 0 })
+})

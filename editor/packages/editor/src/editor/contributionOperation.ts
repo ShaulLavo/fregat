@@ -20,6 +20,7 @@ export type ContributionEntry<Result> = {
   readonly lastLeaseReleasedAt: number | null
   changed(read: DocumentRead): void
   current(): Promise<Result>
+  at(read: DocumentRead): Promise<Result>
   read(): EditorAnalysisRead<Result>
   lease(signal?: AbortSignal): { readonly signal: AbortSignal; wait<T>(run: () => Promise<T>): Promise<T>; dispose(): void }
   dispose(): void
@@ -39,12 +40,14 @@ export type BoundOperationContext = {
   readonly runtimeSessionId: string
   readonly initialRead: DocumentRead
   readonly sourceScope: DocumentContributionScope
+  readonly scheduling: 'requested' | 'ordered'
 }
 
 type Slot<Input, Entry> = {
   readonly input: Input
   readonly tag: readonly (string | number | boolean | null)[]
   readonly entry: Entry
+  readonly owner: object | null
 }
 const binding = Symbol('document.operation.binding')
 const leaseBinding = Symbol('document.operation.lease')
@@ -57,19 +60,19 @@ export abstract class DocumentOperation<Input, Result, Entry extends Contributio
   protected abstract createRuntimeSessionId(): string
   protected get cacheInactive(): boolean { return false }
 
-  public [binding](host: DocumentOperationHost, input: Input, options: DocumentOperationOptions): Entry | null {
+  public [binding](host: DocumentOperationHost, input: Input, options: DocumentOperationOptions, owner: object | null = null): Entry | null {
     if (options.signal?.aborted || host.signal.aborted) return null
     host.subscribe()
     const tag = options.configurationTag ?? []
     const slots = this.slots.get(host) ?? []
-    const found = slots.find(slot => !slot.entry.signal.aborted && sameTag(slot.tag, tag) && this.matches(slot.input, input))
+    const found = slots.find(slot => !slot.entry.signal.aborted && slot.owner === owner && sameTag(slot.tag, tag) && this.matches(slot.input, input))
     if (found) return found.entry
     const initialRead = host.delivery.current()
     if (!initialRead) return null
     const sourceScope = host.delivery.createScope()
-    const entry = this.create({ host, initialRead, sourceScope, runtimeSessionId: this.createRuntimeSessionId() }, input)
+    const entry = this.create({ host, initialRead, sourceScope, runtimeSessionId: this.createRuntimeSessionId(), scheduling: owner ? 'requested' : 'ordered' }, input)
     if (!entry) { sourceScope.dispose(); host.releaseIdleSubscription(); return null }
-    const slot: Slot<Input, Entry> = { input, tag: [...tag], entry }
+    const slot: Slot<Input, Entry> = { input, tag: [...tag], entry, owner }
     slots.push(slot)
     this.slots.set(host, slots)
     entry.signal.addEventListener('abort', () => this.retire(host, slot), { once: true })
@@ -91,9 +94,9 @@ export abstract class DocumentOperation<Input, Result, Entry extends Contributio
 }
 
 export function bindDocumentOperation<Input, Result, Entry extends ContributionEntry<Result>>(
-  operation: DocumentOperation<Input, Result, Entry>, host: DocumentOperationHost, input: Input, options: DocumentOperationOptions = {},
+  operation: DocumentOperation<Input, Result, Entry>, host: DocumentOperationHost, input: Input, options: DocumentOperationOptions = {}, owner: object | null = null,
 ): Entry | null {
-  return operation[binding](host, input, options)
+  return operation[binding](host, input, options, owner)
 }
 
 export function retainDocumentOperation<Input, Result, Entry extends ContributionEntry<Result>>(
@@ -101,6 +104,12 @@ export function retainDocumentOperation<Input, Result, Entry extends Contributio
 ): DocumentContributionLease<Result> | null {
   const entry = operation[binding](host, input, options)
   return entry ? operation[leaseBinding](entry, options.signal) : null
+}
+
+export function leaseDocumentOperation<Input, Result, Entry extends ContributionEntry<Result>>(
+  operation: DocumentOperation<Input, Result, Entry>, entry: Entry, signal?: AbortSignal,
+): DocumentContributionLease<Result> {
+  return operation[leaseBinding](entry, signal)
 }
 
 export function contributionLease<Result>(entry: ContributionEntry<Result>, signal?: AbortSignal, retire = false): DocumentContributionLease<Result> {

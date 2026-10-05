@@ -261,10 +261,10 @@ export class DocumentDelivery {
       if (result.kind !== 'registered') throw admissionFailure(command, result)
       progress.registered = true
     }
-    if (progress.point && progress.point.revision > read.revision.point.revision)
-      return this.pinRead(endpoint, progress, read.revision.point)
+    if (read.revision.point !== this.buffer.getDocumentSyncPoint())
+      return this.pinRead(endpoint, progress, read)
     if (progress.point === read.revision.point)
-      return this.pinRead(endpoint, progress, read.revision.point)
+      return this.pinRead(endpoint, progress, read)
     const text = this.snapshot(read)
     if (!text) return null
     const target = read.revision.point
@@ -274,14 +274,23 @@ export class DocumentDelivery {
       ? { kind: 'advance', identity: progress.identity, base, target: this.wirePoint(target), edits: changed.edits }
       : resetSource(progress.identity, base, this.wirePoint(target), text)
     if (!await this.applySource(endpoint, progress, command, target)) return null
-    return this.pinRead(endpoint, progress, target)
+    return this.pinRead(endpoint, progress, read)
   }
 
-  private async pinRead(endpoint: DocumentSourceEndpoint, progress: ReaderProgress, point: DocumentSyncPoint): Promise<PreparedDocumentWorkerRead | null> {
+  private async pinRead(endpoint: DocumentSourceEndpoint, progress: ReaderProgress, read: DocumentRead): Promise<PreparedDocumentWorkerRead | null> {
+    const point = read.revision.point
     const readId = `${this.documentId}:${++this.nextRead}`
-    const result = await progress.connection.send({ kind: 'pin', identity: progress.identity, point: this.wirePoint(point), readId }, progress.cancellation.signal)
+    let command: DocumentWorkerSourceCommand = { kind: 'pin', identity: progress.identity, point: this.wirePoint(point), readId }
+    let result = await progress.connection.send(command, progress.cancellation.signal)
+    if (result.kind === 'rejected' && result.reason === 'unavailable') {
+      const snapshot = this.snapshot(read)
+      if (!snapshot) return null
+      const source = resetSource(progress.identity, null, this.wirePoint(point), snapshot)
+      command = { kind: 'importRead', identity: progress.identity, point: this.wirePoint(point), readId, chunks: source.chunks, lineEnding: source.lineEnding, byteOrderMark: source.byteOrderMark, containsUnusualLineTerminators: source.containsUnusualLineTerminators }
+      result = await progress.connection.send(command, progress.cancellation.signal)
+    }
     if (this.disposed || this.endpoints.get(endpoint) !== progress || progress.cancellation.signal.aborted) return null
-    if (result.kind !== 'pinned') throw admissionFailure({ kind: 'pin', identity: progress.identity, point: this.wirePoint(point), readId }, result)
+    if (result.kind !== 'pinned') throw admissionFailure(command, result)
     let disposed = false
     return {
       reference: result.reference,
@@ -347,7 +356,7 @@ function resetSource(
   text: DocumentTextSnapshot,
 ): Extract<DocumentWorkerSourceCommand, { kind: 'reset' }> {
   const chunks: string[] = []
-  text.forEachTextChunk((value, from, to) => chunks.push(value.slice(from, to)))
+  text.forEachTextChunk(value => chunks.push(value))
   return {
     kind: 'reset', identity, base, target, chunks,
     lineEnding: pieceTableLineEnding(text.snapshot),

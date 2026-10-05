@@ -1,3 +1,4 @@
+import { DocumentContributionAudience, DocumentContributionOwner, requestDocumentContribution, type DocumentContributionDemand, type DocumentContributionTask } from './contributionDemand'
 import { EditorEventSource } from './emitter'
 import type {
   EditorTextBuffer,
@@ -131,7 +132,9 @@ export type EditorHighlighterContributionRequest = Omit<EditorAnalysisHighlighte
 }
 export type EditorDocumentContributions = {
   retain<Input, Result, Entry extends ContributionEntry<Result>>(operation: DocumentOperation<Input, Result, Entry>, input: Input, options?: DocumentOperationOptions): DocumentContributionLease<Result> | null
-  request<Input, Result, Entry extends ContributionEntry<Result>>(operation: DocumentOperation<Input, Result, Entry>, input: Input, options?: DocumentOperationOptions): Promise<Result | null>
+  createAudience(options?: { readonly signal?: AbortSignal }): DocumentContributionAudience
+  pin(options?: { readonly signal?: AbortSignal }): DocumentContributionOwner | null
+  request<Input, Result, Entry extends ContributionEntry<Result>>(operation: DocumentOperation<Input, Result, Entry>, input: Input, demand: DocumentContributionDemand<Result>): DocumentContributionTask<Result>
 }
 
 export type EditorDocumentAnalysis = {
@@ -167,9 +170,10 @@ export class AnalysisEntry<T> {
     readonly revision: number
     readonly generation: number
     readonly snapshot: DocumentTextSnapshot
-    readonly settle: () => void
+    readonly settle: (result: T) => void
+    readonly reject: (error: unknown) => void
   } | null = null
-  private completion: Promise<void> = Promise.resolve()
+  private completion: Promise<T> | null = null
   private state: EditorAnalysisRead<T>
 
   constructor(
@@ -272,6 +276,7 @@ export class AnalysisEntry<T> {
     this.requests++
     this.schedulePending()
     try {
+      if (!this.completion) throw cancelled()
       await interruptible(this.completion, this.pendingInterest.signal)
       this.assertCurrent(point, generation)
       const state = this.read()
@@ -281,6 +286,15 @@ export class AnalysisEntry<T> {
     } finally {
       this.requests--
     }
+  }
+
+  async at(read: DocumentRead): Promise<T> {
+    if (this.signal.aborted || this.delivery.read(read.revision) !== read) throw cancelled()
+    const result = this.enqueue(read)
+    this.requests++
+    this.schedulePending()
+    try { return await interruptible(result, this.signal) }
+    finally { this.requests-- }
   }
 
   async query(run: () => Promise<T>): Promise<T> {
@@ -300,27 +314,31 @@ export class AnalysisEntry<T> {
     this.cancellation.abort()
     this.pendingInterest.abort()
     this.scheduler.cancel(this.runtimeSessionId, 'scope-released')
-    this.pending?.settle()
+    this.pending?.reject(cancelled())
     this.pending = null
     this.state = { kind: 'failed', revision: this.buffer.getRevision(), error: cancelled() }
     this.session.dispose()
     this.sourceScope.dispose()
   }
 
-  private enqueue(read: DocumentRead): void {
+  private enqueue(read: DocumentRead): Promise<T> {
     this.pendingInterest.abort()
     this.pendingInterest = new AbortController()
     const revision = read.revision.point.revision
     this.queuedPoint = read.revision.point
     const generation = ++this.generation
     this.state = { kind: 'pending', revision }
-    this.pending?.settle()
-    let settle = () => {}
-    this.completion = new Promise<void>((resolve) => { settle = resolve })
+    this.pending?.reject(cancelled())
+    let settle: (result: T) => void = () => {}
+    let reject: (error: unknown) => void = () => {}
+    const completion = new Promise<T>((resolve, fail) => { settle = resolve; reject = fail })
+    void completion.catch(() => undefined)
+    this.completion = completion
     const snapshot = this.delivery.snapshot(read)
-    if (!snapshot) { settle(); return }
-    this.pending = { read, revision, generation, snapshot, settle }
+    if (!snapshot) { reject(cancelled()); return completion }
+    this.pending = { read, revision, generation, snapshot, settle, reject }
     this.schedulePending()
+    return completion
   }
 
   private schedulePending(): void {
@@ -343,11 +361,14 @@ export class AnalysisEntry<T> {
     try {
       const result = await this.session.analyze(read)
       this.publish(read.revision.point, generation, { kind: 'ready', revision, snapshot, result })
+      if (this.signal.aborted) demand.reject(cancelled())
+      else demand.settle(result)
     } catch (error) {
       this.publish(read.revision.point, generation, { kind: 'failed', revision, error })
+      demand.reject(error)
     } finally {
       this.running = false
-      demand.settle()
+      if (this.scheduling === 'ordered' && !this.pending) this.synchronize()
       this.schedulePending()
     }
   }
@@ -392,8 +413,9 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     sourceScope: DocumentContributionScope,
     scheduler: EditorWorkScheduler,
     runtimeSessionId: string,
+    scheduling: 'requested' | 'ordered' = 'ordered',
   ) {
-    super(buffer, structuralSession, delivery, sourceScope, scheduler, runtimeSessionId, 'ordered')
+    super(buffer, structuralSession, delivery, sourceScope, scheduler, runtimeSessionId, scheduling)
   }
 
   canQueryRange(): boolean {
@@ -551,8 +573,8 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
 
 export class HighlighterEntry extends AnalysisEntry<EditorHighlightResult> {
   private readonly themes = new EditorEventSource<void>({ action: 'document.highlighter.theme' })
-  constructor(buffer: EditorTextBuffer, readonly highlighterSession: EditorHighlighterRuntime, delivery: DocumentDelivery, sourceScope: DocumentContributionScope, scheduler: EditorWorkScheduler, runtimeSessionId: string) {
-    super(buffer, highlighterSession, delivery, sourceScope, scheduler, runtimeSessionId, 'ordered')
+  constructor(buffer: EditorTextBuffer, readonly highlighterSession: EditorHighlighterRuntime, delivery: DocumentDelivery, sourceScope: DocumentContributionScope, scheduler: EditorWorkScheduler, runtimeSessionId: string, scheduling: 'requested' | 'ordered' = 'ordered') {
+    super(buffer, highlighterSession, delivery, sourceScope, scheduler, runtimeSessionId, scheduling)
     const unsubscribe = highlighterSession.onDidChangeTheme?.(() => {
       this.refresh()
       this.themes.fire()
@@ -705,18 +727,18 @@ function contributions(host: DocumentOperationHost): EditorDocumentContributions
   function retain<Input, Result, Entry extends ContributionEntry<Result>>(operation: DocumentOperation<Input, Result, Entry>, input: Input, options?: DocumentOperationOptions): DocumentContributionLease<Result> | null {
     return retainDocumentOperation(operation, host, input, options)
   }
-  async function request<Input, Result, Entry extends ContributionEntry<Result>>(operation: DocumentOperation<Input, Result, Entry>, input: Input, options?: DocumentOperationOptions): Promise<Result | null> {
-    const lease = retain(operation, input, options)
-    if (!lease) return null
-    try { return await lease.request() }
-    finally { lease.dispose() }
+  return {
+    retain,
+    createAudience: options => DocumentContributionAudience.issue(host, options?.signal),
+    pin: options => DocumentContributionOwner.issue(host, options?.signal),
+    request: (operation, input, demand) => requestDocumentContribution(host, operation, input, demand),
   }
-  return { retain, request }
+
 }
 
-function inspectEntry(
+function inspectEntry<T extends RetentionResult>(
   family: AnalysisRetentionEntry['family'],
-  entry: AnalysisEntry<RetentionResult>,
+  entry: AnalysisEntry<T>,
   sharedRecords: Set<ArrayBufferLike>,
 ): AnalysisRetentionEntry {
   const results = new Set(entry.retainedResults())
