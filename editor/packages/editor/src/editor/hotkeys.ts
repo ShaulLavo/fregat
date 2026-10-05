@@ -1,5 +1,7 @@
 import {
   createBrowserDispatcher,
+  createKeyContext,
+  parseKeyContext,
   detectPlatform,
   type BrowserDispatcher,
   type CommandHandler,
@@ -33,11 +35,18 @@ export type EditorKeymapNodeOptions = {
   readonly commands: Readonly<Record<string, CommandHandler<KeyboardEvent>>>
 }
 
+type EditorKeymapGroup = {
+  readonly node: FocusNode<KeyboardEvent>
+  readonly contexts: Set<() => KeyContextInit>
+  readonly detach: () => void
+}
+
 export class EditorHotkeys {
   readonly host: EditorHotkeysHost
   private readonly ownDispatcher: boolean
   private readonly detach: () => void
   private readonly handlers = new Map<EditorAnyCommandId, () => void>()
+  private readonly groups = new Map<Element, EditorKeymapGroup>()
   private signature = ''
 
   constructor(
@@ -89,28 +98,62 @@ export class EditorHotkeys {
   }
 
   registerNode(options: EditorKeymapNodeOptions): { dispose: () => void } {
-    const node = this.host.dispatcher.createNode({
-      parent: this.host.node,
-      ...(typeof options.context === 'string'
-        ? { context: options.context }
-        : { readContext: options.context }),
-      commands: options.commands,
-    })
-    const detach = this.host.dispatcher.attachElement(node, options.element)
+    const source = options.context
+    const context = typeof source === 'string' ? parseKeyContext(source) : source
+    const readContext = () => (typeof context === 'function' ? context() : context)
+    let group = this.groups.get(options.element)
+    if (!group) {
+      const contexts = new Set<() => KeyContextInit>()
+      const node = this.host.dispatcher.createNode({
+        parent: this.host.node,
+        readContext: () => combinedEditorKeymapContext(contexts),
+      })
+      group = {
+        node,
+        contexts,
+        detach: this.host.dispatcher.attachElement(node, options.element),
+      }
+      this.groups.set(options.element, group)
+    }
+    group.contexts.add(readContext)
+    const owned = group
+    const removeHandlers = Object.entries(options.commands).map(([command, handler]) =>
+      owned.node.handle(command, handler),
+    )
+    let disposed = false
     return {
       dispose: () => {
-        detach()
-        node.remove()
+        if (disposed) return
+        disposed = true
+        for (const remove of removeHandlers) remove()
+        owned.contexts.delete(readContext)
+        if (owned.contexts.size) return
+        owned.detach()
+        owned.node.remove()
+        if (this.groups.get(options.element) === owned) this.groups.delete(options.element)
       },
     }
   }
 
   dispose(): void {
+    for (const group of this.groups.values()) {
+      group.detach()
+      group.node.remove()
+    }
+    this.groups.clear()
     this.detach()
     this.host.node.remove()
     for (const remove of this.handlers.values()) remove()
     this.handlers.clear()
     if (this.ownDispatcher) this.host.dispatcher.dispose()
+  }
+}
+
+function combinedEditorKeymapContext(readers: ReadonlySet<() => KeyContextInit>): KeyContextInit {
+  const contexts = Array.from(readers, (read) => createKeyContext(read()))
+  return {
+    identifiers: contexts.flatMap((context) => [...context.identifiers]),
+    values: new Map(contexts.flatMap((context) => [...context.values])),
   }
 }
 

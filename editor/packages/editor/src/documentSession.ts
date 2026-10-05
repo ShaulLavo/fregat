@@ -290,6 +290,8 @@ export type EditorViewSession = {
   acceptBufferSelections(selections: SelectionSet<PieceTableAnchor>): void
   getScrollPosition(): EditorViewScrollPosition | undefined
   setScrollPosition(scrollPosition: EditorViewScrollPosition | undefined): void
+  getWordWrap(): boolean | undefined
+  setWordWrap(enabled: boolean): void
   getFoldState(): EditorViewFoldState
   setFoldState(state: EditorViewFoldState): void
   getMetadata(key: string): EditorViewMetadataValue | undefined
@@ -1791,6 +1793,7 @@ class PieceTableEditorViewSession implements EditorViewSession {
   private readonly metadata = new Map<string, EditorViewMetadataValue>()
   private readonly buffer: EditorTextBuffer
   private scrollPosition: EditorViewScrollPosition | undefined
+  private wordWrap: boolean | undefined
   private foldState: EditorViewFoldState = { collapsedRegions: [], manualFolds: [] }
   private selections: SelectionSet<PieceTableAnchor>
 
@@ -1867,6 +1870,14 @@ class PieceTableEditorViewSession implements EditorViewSession {
 
   public setScrollPosition(scrollPosition: EditorViewScrollPosition | undefined): void {
     this.scrollPosition = scrollPosition
+  }
+
+  public getWordWrap(): boolean | undefined {
+    return this.wordWrap
+  }
+
+  public setWordWrap(enabled: boolean): void {
+    this.wordWrap = enabled
   }
 
   public getMetadata(key: string): EditorViewMetadataValue | undefined {

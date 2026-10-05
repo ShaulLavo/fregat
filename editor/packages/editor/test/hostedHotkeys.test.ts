@@ -164,3 +164,53 @@ test('widget commands share the readonly mutation gate', () => {
   expect(escape.defaultPrevented).toBe(true)
   registration.dispose()
 })
+
+test('same-element plugin nodes share commands and live contexts until their own disposal', () => {
+  const dispatcher = createBrowserDispatcher({
+    root: document,
+    platform: 'linux',
+    keymap: [
+      ...baseEditorKeymap.linux,
+      { keys: 'Control+B', command: 'probe', context: 'Barrier && HoverVisible' },
+    ],
+  })
+  dispatchers.push(dispatcher)
+  const editor = create({ hotkeys: dispatcher })
+  const input = editor.getInputElement()
+  const notify = vi.fn(() => false)
+  const probe = vi.fn(() => true)
+  let hoverVisible = false
+  const barrier = editor.registerKeymapNode({
+    element: input,
+    context: 'Barrier',
+    commands: { undo: notify, probe },
+  })
+  const hover = editor.registerKeymapNode({
+    element: input,
+    context: () => ({ identifiers: hoverVisible ? ['HoverVisible'] : [] }),
+    commands: { 'tooltip.hide': () => true },
+  })
+  const before = editor.materializeFullText()
+  editor.dispatchCommand('insertNewlineAndIndent')
+  expect(press(editor, 'z', true).defaultPrevented).toBe(true)
+  expect(notify).toHaveBeenCalledOnce()
+  expect(editor.materializeFullText()).toBe(before)
+  expect(press(editor, 'b', true).defaultPrevented).toBe(false)
+  hoverVisible = true
+  expect(press(editor, 'b', true).defaultPrevented).toBe(true)
+  expect(probe).toHaveBeenCalledOnce()
+
+  barrier.dispose()
+  barrier.dispose()
+  expect(press(editor, 'b', true).defaultPrevented).toBe(false)
+  press(editor, 'z', true)
+  expect(notify).toHaveBeenCalledOnce()
+  expect(dispatcher.contextStack().some((context) => context.identifiers.has('HoverVisible'))).toBe(
+    true,
+  )
+  hover.dispose()
+  expect(dispatcher.hasNode(editor.getHotkeysHost().node)).toBe(true)
+  editor.dispatchCommand('insertNewlineAndIndent')
+  expect(press(editor, 'z', true).defaultPrevented).toBe(true)
+  expect(editor.materializeFullText()).toBe(before)
+})
