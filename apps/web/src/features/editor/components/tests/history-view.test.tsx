@@ -1,4 +1,4 @@
-import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
+import { fileDocumentKey, filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { createEditorBufferSession, type EditorTextBuffer } from '@singapore-editor/core/document'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -220,6 +220,30 @@ test('moving into a group with another history tab preserves the selected barrie
   rendered.rerender(body(false))
   expect(await destination.findByText('This is the current version.')).toBeInTheDocument()
   expect(await source.findByText('A multi-file edit blocks earlier versions.')).toBeInTheDocument()
+})
+
+test('replacing the actual live buffer clears the former logical history capture', async () => {
+  stubEditorViewport()
+  const user = userEvent.setup()
+  const rendered = await renderHistory({ edits: ['one', 'two'] })
+  await user.click((await screen.findAllByRole('option'))[1]!)
+  await waitFor(() => expect(rendered.store.getState().snapshotComparisons.size).toBe(2))
+  const old = rendered.store.getState().snapshotComparisonTabs.get(tabId('tab-history'))!
+  rendered.store
+    .getState()
+    .forceReplaceLiveEditorDocument({
+      path: FILE,
+      content: 'replacement\n',
+      version: 'v2',
+      mtimeMs: 2,
+      size: 12,
+    })
+  await screen.findByText('This is the current version.')
+  expect(old.read().kind).toBe('released')
+  expect(rendered.store.getState().snapshotComparisons.size).toBe(0)
+  expect(rendered.store.getState().getLiveEditorDocument(fileDocumentKey(FILE))?.buffer).not.toBe(
+    rendered.buffer,
+  )
 })
 
 async function renderHistory({ edits }: { edits: readonly string[] | null }) {

@@ -67,6 +67,10 @@ test('shares an exact ordered pair while actual buffers and amended snapshots re
   amendedLease.release()
   survivor.release()
   expect(f.store.getState().snapshotComparisons.size).toBe(0)
+  if (held.kind !== 'ready') throw new RangeError('held history capture required')
+  const reopened = acquire({ input: held.input, signal: new AbortController().signal })
+  expect(reopened.read()).not.toBe(held)
+  reopened.release()
   expect(f.store.getState().getLiveEditorDocument(f.document.key)?.buffer).toBe(f.buffer)
   expect(f.buffer.canUndo()).toBe(true)
   f.store.getState().disposeEditorDocuments()
@@ -108,7 +112,7 @@ test('holds the displayed source during pending requests, releases canceled requ
   )
   await Promise.resolve()
   await Promise.resolve()
-  expect(source.getSnapshot()!.state.comparison?.status).toBe('ready')
+  await expect.poll(() => source.getSnapshot()!.state.comparison?.status).toBe('ready')
   const displayed = [...f.store.getState().snapshotComparisons.values()][0]
   expect(
     displayed?.kind === 'ready' &&
@@ -228,4 +232,29 @@ test('pruned history is unavailable for restore while an external capture stays 
   held.release()
   expect(f.store.getState().snapshotComparisons.size).toBe(0)
   f.store.getState().disposeEditorDocuments()
+})
+
+test('owner disposal refuses a delayed selected result and keeps terminal source reads', async () => {
+  const f = historyComparisonFixture({ path, scope })
+  let resolve!: (value: HistoryComparisonResult) => void
+  const source = createHistoryViewerSource({
+    ...f,
+    documents: f.store,
+    presentation: createTabPresentation().history,
+    compare: () =>
+      new Promise((settle) => {
+        resolve = settle
+      }),
+  })
+  const stop = source.subscribe(() => undefined)
+  const viewer = source.getSnapshot()!.viewer
+  viewer.toggleSelection(0)
+  viewer.toggleSelection(1)
+  const requested = [...f.store.getState().snapshotComparisons.keys()][0]!
+  f.store.getState().disposeEditorDocuments()
+  expect(requested.read()).toEqual({ kind: 'released', reason: 'owner-disposed' })
+  resolve('too-large')
+  await expect.poll(() => source.getSnapshot()!.state.comparison?.status).toBe('failed')
+  expect(f.store.getState().snapshotComparisons.size).toBe(0)
+  stop()
 })

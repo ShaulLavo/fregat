@@ -5,6 +5,7 @@ import {
 } from '@/features/editor/utils/history-compare'
 import type { SnapshotComparisonScope } from '@/lib/documents/utils/snapshot-comparison'
 import type { HistoryComparisonInput, SnapshotComparisonLease } from '@/lib/snapshot-comparison'
+import { createClientInvariantError } from '@/lib/structured-errors'
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
 import {
   useEditorDocumentStoreApi,
@@ -97,7 +98,9 @@ export function createHistoryViewerSource({
   let snapshot: HistoryViewerSnapshot | null = null
   let subscribers = 0
   let displayed: SnapshotComparisonLease | null = null
-  let logical: SnapshotComparisonLease | null = null
+  let logical: SnapshotComparisonLease | null = tabId
+    ? (documents.getState().snapshotComparisonTabs.get(tabId) ?? null)
+    : null
   let requested: SnapshotComparisonLease | null = null
   let focusedComparison: HistoryComparisonResult | null = null
   const acquire = (input: HistoryComparisonInput, signal: AbortSignal) =>
@@ -184,8 +187,15 @@ export function createHistoryViewerSource({
         viewer = createHistoryViewer<HistoryComparisonResult>(buffer, {
           compare: async (left, right, signal) => {
             const input = historyComparisonInput(buffer, path, scope, left, right)
-            requested = acquire(input, signal)
-            return compare(input.old, input.new, input.path)
+            const lease = acquire(input, signal)
+            requested = lease
+            const result = await compare(input.old, input.new, input.path)
+            if (signal.aborted || lease.read().kind === 'released')
+              throw createClientInvariantError('History comparison source has ended', {
+                aborted: signal.aborted,
+                retained: lease.read().kind === 'ready',
+              })
+            return result
           },
         })
         if (presentation.focusedId !== null) viewer.focus(presentation.focusedId)
