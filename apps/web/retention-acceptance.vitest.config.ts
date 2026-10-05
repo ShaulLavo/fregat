@@ -260,7 +260,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
       output,
       screenshot,
     }
-    if (transport.failures.length > 0) throw transport.firstError
+    if (transport.hasFailure) throw transport.firstError
     await writeFile(join(output, 'raw.json'), JSON.stringify(result))
     return result
   })()
@@ -298,6 +298,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
             errors,
             failure: error instanceof Error ? error.message : String(error),
             transportFailures: transport.failures,
+            transportRequests: transport.requests,
           })),
         )
         return { kind: 'failure' as const, error }
@@ -305,12 +306,20 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
     )
     .finally(async () => {
       const cleanup = await settleRetentionReloadCleanup([
-        { stage: 'cancel-forwarding', run: () => isolated.request.dispose() },
         {
           stage: 'restore-syntax',
-          run: () => page.evaluate(() => window.__retentionAcceptanceEntry?.setSyntaxEnabled(true)),
+          run: async () => {
+            transport.beginRestoration()
+            await page.evaluate(() => window.__retentionAcceptanceEntry?.setSyntaxEnabled(true))
+          },
         },
-        { stage: 'unroute', run: () => page.unrouteAll({ behavior: 'default' }) },
+        {
+          stage: 'unroute',
+          run: async () => {
+            transport.stopAdmission()
+            await page.unrouteAll({ behavior: 'default' })
+          },
+        },
         {
           stage: 'archive-final-frames',
           run: async () => {
@@ -318,9 +327,17 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
               ...(await archiveFinalRetentionReloadFrames(page, output, {
                 phase,
                 transportFailures: transport.failures,
+                transportRequests: transport.requests,
                 requestFailures,
               })),
             )
+          },
+        },
+        {
+          stage: 'cancel-forwarding',
+          run: async () => {
+            await transport.cancelPending()
+            await isolated.request.dispose()
           },
         },
         { stage: 'close-context', run: () => isolated.close() },
@@ -331,6 +348,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
           phase,
           requestFailures,
           transportFailures: transport.failures,
+          transportRequests: transport.requests,
           artifactFailures: artifactFailures.map(errorMessage),
           cleanup: cleanup.map((outcome) => ({
             ...outcome,
@@ -343,7 +361,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
         .map((result) => result.error)
     })
   if (outcome.kind === 'failure') throw outcome.error
-  if (transport.failures.length > 0) throw transport.firstError
+  if (transport.hasFailure) throw transport.firstError
   if (cleanupFailures.length > 0) throw cleanupFailures[0]
   if (artifactFailures.length > 0) throw artifactFailures[0]
   return outcome.result

@@ -213,13 +213,16 @@ test.for([false, true])(
         aborted = true
       },
     )
-    const command = owner.race(new Promise<never>(() => {})).catch((error: unknown) => error)
+    const command = owner.race(Promise.resolve('successful operation'))
     try {
       await requestArrived
+      owner.beginRestoration()
+      owner.stopAdmission()
       const cleanup = await settleRetentionReloadCleanup([
         {
           stage: 'cancel-forwarding',
           run: async () => {
+            await owner.cancelPending()
             if (rejectCancellation) JSON.parse('controlled cancellation failure')
             await client.dispose()
           },
@@ -238,7 +241,10 @@ test.for([false, true])(
       ])
       await socketClosed
       await task
-      expect(await command).toBe(owner.firstError)
+      expect(await command).toBe('successful operation')
+      expect(owner.hasFailure).toBe(false)
+      expect(owner.requests[0]?.terminal?.kind).toBe('cancelled')
+      expect(owner.failures[0]?.stage).toBe('settled-after-owned-cancellation')
       expect(requests).toBe(1)
       expect(aborted).toBe(true)
       expect(cleanup.map((outcome) => outcome.stage)).toEqual([
@@ -279,3 +285,144 @@ test.for([false, true])(
     }
   },
 )
+
+test.for(['success', 'failure'] as const)(
+  'restoration forwards a new live request with outcome $0',
+  async (mode, { annotate }) => {
+    let requests = 0
+    const server = createServer((request, response) => {
+      requests += 1
+      if (mode === 'failure') {
+        request.socket.destroy()
+        return
+      }
+      response.end('controlled restoration reply')
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    expect(address).not.toBeNull()
+    if (!address || typeof address === 'string') return
+    const url = `http://127.0.0.1:${address.port}/restoration-request`
+    requestInterceptor.use(http.get(url, () => passthrough()))
+    const client = await playwrightRequest.newContext()
+    const owner = createRetentionReloadTransport()
+    expect(await owner.race(Promise.resolve('operation complete'))).toBe('operation complete')
+    try {
+      owner.beginRestoration()
+      await owner.run(
+        url,
+        async () => {
+          await client.get(url, { maxRetries: 0 })
+        },
+        async () => {},
+      )
+      expect(requests).toBe(1)
+      expect(owner.requests[0]?.phase).toBe('restoration')
+      expect(owner.hasFailure).toBe(mode === 'failure')
+      if (mode === 'failure') {
+        const error = await owner
+          .race(new Promise<never>(() => {}))
+          .catch((value: unknown) => value)
+        expect(error).toBe(owner.firstError)
+        expect(owner.requests[0]?.terminal?.kind).toBe('failed')
+      }
+      owner.stopAdmission()
+      await owner.cancelPending()
+      await client.dispose()
+      let invoked = false
+      await owner.run(
+        url,
+        async () => {
+          invoked = true
+          await client.get(url, { maxRetries: 0 })
+        },
+        async () => {},
+      )
+      await owner.drain()
+      expect(invoked).toBe(false)
+      expect(requests).toBe(1)
+      expect(owner.requests[1]).toMatchObject({
+        operationInvoked: false,
+        terminal: { kind: 'cancelled' },
+        settlement: { kind: 'not-started' },
+      })
+      await annotate(
+        JSON.stringify({
+          mode,
+          requests,
+          closedAdmissionInvokedFetch: invoked,
+          observations: owner.requests,
+          failures: owner.failures,
+          hasFailure: owner.hasFailure,
+        }),
+        'retention-restoration-owner-control',
+      )
+    } finally {
+      await client.dispose()
+      server.closeAllConnections()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  },
+)
+
+test('a genuine rejection wins its request before owned cancellation', async () => {
+  const owner = createRetentionReloadTransport()
+  const error = await Promise.resolve()
+    .then(() => JSON.parse('controlled genuine failure'))
+    .catch((value: unknown) => value)
+  const request = owner.run(
+    'controlled-preexisting-rejection',
+    () => Promise.reject(error),
+    async () => {},
+  )
+  owner.stopAdmission()
+  await owner.cancelPending()
+  await request
+  expect(owner.hasFailure).toBe(true)
+  expect(owner.firstError).toBe(error)
+  expect(owner.requests[0]?.terminal?.kind).toBe('failed')
+})
+
+test('a real fetch error after admission closes still wins before request cancellation', async () => {
+  let arrived: () => void = () => {}
+  let failRequest: () => void = () => {}
+  const accepted = new Promise<void>((resolve) => {
+    arrived = resolve
+  })
+  const server = createServer((request) => {
+    failRequest = () => request.socket.destroy()
+    arrived()
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  expect(address).not.toBeNull()
+  if (!address || typeof address === 'string') return
+  const url = `http://127.0.0.1:${address.port}/genuine-closing-failure`
+  requestInterceptor.use(http.get(url, () => passthrough()))
+  const client = await playwrightRequest.newContext()
+  const owner = createRetentionReloadTransport()
+  const task = owner.run(
+    url,
+    async () => {
+      await client.get(url, { maxRetries: 0 })
+    },
+    async () => {},
+  )
+  const command = owner.race(new Promise<never>(() => {})).catch((error: unknown) => error)
+  try {
+    await accepted
+    owner.stopAdmission()
+    failRequest()
+    const error = await command
+    await owner.cancelPending()
+    await task
+    expect(owner.hasFailure).toBe(true)
+    expect(owner.firstError).toBe(error)
+    expect(owner.requests[0]?.terminal?.kind).toBe('failed')
+    expect(owner.failures[0]?.stage).toBe('forward')
+  } finally {
+    await client.dispose()
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
