@@ -1,4 +1,4 @@
-import { expect, test, inject } from 'vitest'
+import { expect, test, inject, type TestContext } from 'vitest'
 import { page, commands } from 'vitest/browser'
 import { activeEnvironmentId, confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import { filesystemPath } from '@/lib/documents/utils/identity'
@@ -25,10 +25,68 @@ declare module 'vitest' {
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
-    retentionLayoutArchive(payload: string, label: string): Promise<string>
+    retentionLayoutArchive(
+      payload: string,
+      label: string,
+      annotationFailure?: {
+        readonly directory: string
+        readonly failures: readonly { stage: string; error: string }[]
+      },
+    ): Promise<string>
     proofContextClick: (input: { readonly selector: string }) => Promise<void>
     proofKeyPress: (input: { readonly key: string }) => Promise<void>
   }
+}
+
+type LayoutEvidenceFailure = { stage: string; error: string }
+
+async function archiveRetentionLayoutEvidence(
+  context: Pick<TestContext, 'annotate'>,
+  payload: { readonly evidenceFailures: LayoutEvidenceFailure[] },
+  label: string,
+  annotationLabel: string,
+) {
+  const directory = await commands.retentionLayoutArchive(JSON.stringify(payload), label)
+  try {
+    await context.annotate(directory, annotationLabel)
+  } catch (error) {
+    payload.evidenceFailures.push({
+      stage: 'annotation',
+      error: error instanceof Error ? error.message : String(error),
+    })
+    try {
+      await commands.retentionLayoutArchive(JSON.stringify(payload), label, {
+        directory,
+        failures: payload.evidenceFailures,
+      })
+    } catch (archiveError) {
+      payload.evidenceFailures.push({
+        stage: 'annotation-failure-archive',
+        error: archiveError instanceof Error ? archiveError.message : String(archiveError),
+      })
+    }
+    throw error
+  }
+}
+
+async function finalizeRetentionLayoutEvidence(
+  primaryFailed: boolean,
+  failures: LayoutEvidenceFailure[],
+  actions: readonly { stage: string; run: () => unknown | Promise<unknown> }[],
+) {
+  let firstFailure: { error: unknown } | null = null
+  for (const action of actions) {
+    try {
+      await action.run()
+    } catch (error) {
+      firstFailure ??= { error }
+      failures.push({
+        stage: action.stage,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+  if (!primaryFailed && firstFailure) throw firstFailure.error
 }
 
 test.for(['original', 'copy'] as const)(
@@ -37,12 +95,15 @@ test.for(['original', 'copy'] as const)(
   async (departing, context) => {
     let recording: ReturnType<typeof recordRetentionLayoutFrames> | null = null
     const reservationCaptures: ReturnType<typeof addLayoutReservation>['capture'][] = []
+    let primaryFailed = false
+    const evidenceFailures: LayoutEvidenceFailure[] = []
     const failureArchive: {
       departing: string
       stage: string
       frames: unknown
       points: Record<string, unknown>
-    } = { departing, stage: 'initial', frames: [], points: {} }
+      evidenceFailures: LayoutEvidenceFailure[]
+    } = { departing, evidenceFailures, stage: 'initial', frames: [], points: {} }
     try {
       const app = await mountRetentionLayoutApp()
       const path = filesystemPath('repo/src/retention-layout.ts')
@@ -401,17 +462,38 @@ test.for(['original', 'copy'] as const)(
         ),
         'layout-survivor',
       )
+    } catch (error) {
+      primaryFailed = true
+      throw error
     } finally {
-      recording?.stop()
-      failureArchive.frames = recording?.frames ?? []
-      failureArchive.points.finalReservations = reservationCaptures.map((capture) => capture())
-      await context.annotate(
-        await commands.retentionLayoutArchive(
-          JSON.stringify(failureArchive),
-          `layout-interval-${departing}`,
-        ),
-        'layout-interval-always',
-      )
+      const finalReservations: unknown[] = []
+      failureArchive.points.finalReservations = finalReservations
+      await finalizeRetentionLayoutEvidence(primaryFailed, evidenceFailures, [
+        { stage: 'stop-recorder', run: () => recording?.stop() },
+        {
+          stage: 'recorded-frames',
+          run: () => {
+            failureArchive.frames = recording?.frames ?? []
+          },
+        },
+        ...reservationCaptures.map((capture, index) => ({
+          stage: 'final-reservation-' + index,
+          run: () => {
+            finalReservations[index] = capture()
+          },
+        })),
+        {
+          stage: 'archive-and-annotate',
+          run: async () => {
+            await archiveRetentionLayoutEvidence(
+              context,
+              failureArchive,
+              `layout-interval-${departing}`,
+              'layout-interval-always',
+            )
+          },
+        },
+      ])
     }
   },
 )
@@ -424,13 +506,17 @@ test(
     const path = filesystemPath('repo/src/retention-layout.ts')
     const identity = app.identifyReference
     let captureFinal: (() => unknown) | null = null
+    let primaryFailed = false
+    const evidenceFailures: LayoutEvidenceFailure[] = []
     const payload: {
+      evidenceFailures: LayoutEvidenceFailure[]
       before: unknown
       after: unknown
       final: unknown
       frames: unknown
       stage: string
     } = {
+      evidenceFailures,
       before: null,
       after: null,
       final: null,
@@ -508,14 +594,36 @@ test(
           ?.getEditor()
           ?.isWordWrapEnabled(),
       ).toBe(true)
+    } catch (error) {
+      primaryFailed = true
+      throw error
     } finally {
-      recording?.stop()
-      payload.frames = recording?.frames ?? []
-      payload.final = captureFinal?.() ?? null
-      await context.annotate(
-        await commands.retentionLayoutArchive(JSON.stringify(payload), 'user-wrap-other-close'),
-        'user-wrap-other-close',
-      )
+      await finalizeRetentionLayoutEvidence(primaryFailed, evidenceFailures, [
+        { stage: 'stop-recorder', run: () => recording?.stop() },
+        {
+          stage: 'recorded-frames',
+          run: () => {
+            payload.frames = recording?.frames ?? []
+          },
+        },
+        {
+          stage: 'final-capture',
+          run: () => {
+            payload.final = captureFinal?.() ?? null
+          },
+        },
+        {
+          stage: 'archive-and-annotate',
+          run: async () => {
+            await archiveRetentionLayoutEvidence(
+              context,
+              payload,
+              'user-wrap-other-close',
+              'user-wrap-other-close',
+            )
+          },
+        },
+      ])
     }
   },
 )
