@@ -41,7 +41,10 @@ for (const kind of ['moving', 'historical', 'captured-review'] as const) {
     expect(v.parse(editorReferenceSchema, reference)).toEqual(reference)
     if (parsed?.kind !== 'snapshot') return
     expect(snapshotTargetForReference(parsed, '/repo')).toEqual(target)
-    for (const environmentId of [null, v.parse(environmentIdSchema, 'remote-machine')] as const) {
+    for (const environmentId of [
+      null,
+      v.parse(environmentIdSchema, '499c1da4-fd11-4701-a7d1-0d19381e8fd5'),
+    ] as const) {
       const address = {
         ...emptyAddress(),
         environmentId,

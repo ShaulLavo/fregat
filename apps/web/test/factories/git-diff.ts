@@ -1,7 +1,11 @@
 import { snapshotDocument } from '@/lib/documents/utils/comparisons'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { createClientInvariantError } from '@/lib/structured-errors'
-import { gitSnapshotTargetSchema, type GitFileDiff } from '@workspace/contracts'
+import {
+  gitSnapshotTargetSchema,
+  type GitFileDiff,
+  type GitSnapshotTarget,
+} from '@workspace/contracts'
 import type * as v from 'valibot'
 import { decodeTabContent } from '@/lib/documents/utils/storage-codec'
 
@@ -25,7 +29,9 @@ export function snapshotComparison(diff: GitFileDiff) {
   return document.source
 }
 
-export function snapshotTarget(target: v.InferInput<typeof gitSnapshotTargetSchema>) {
+export function snapshotTarget(
+  target: v.InferInput<typeof gitSnapshotTargetSchema> | GitSnapshotTarget,
+) {
   const content = decodeTabContent(
     { kind: 'document', document: { kind: 'git-diff', source: { kind: 'snapshot', target } } },
     filesystemPath(target.rootPath),

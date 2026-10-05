@@ -80,13 +80,17 @@ export const gitSnapshotTargetSchema = v.variant('kind', [
 ])
 export type ResolvedGitObjectId = v.InferOutput<typeof resolvedGitObjectIdSchema>
 export type ResolvedGitCommitId = v.InferOutput<typeof resolvedGitCommitIdSchema>
-export type GitRevisionSide = v.InferOutput<typeof gitRevisionSideSchema>
-export type GitInputRevision = v.InferOutput<typeof gitInputRevisionSchema>
+export type GitRevisionSide = Readonly<v.InferOutput<typeof gitRevisionSideSchema>>
+export type GitInputRevision = Readonly<
+  Omit<v.InferOutput<typeof gitInputRevisionSchema>, 'old' | 'new'>
+> & { readonly old: GitRevisionSide; readonly new: GitRevisionSide }
 export type GitCommitOrigin = Readonly<
   Omit<v.InferOutput<typeof gitCommitOriginSchema>, 'parents'>
 > & { readonly parents: readonly ResolvedGitCommitId[] }
-type GitSnapshotVariant<T> = T extends { origin: GitCommitOrigin }
-  ? Readonly<Omit<T, 'origin'>> & { readonly origin: GitCommitOrigin }
+type GitSnapshotVariant<T> = T extends { revision: unknown }
+  ? Readonly<Omit<T, 'origin' | 'revision'>> & {
+      readonly revision: GitInputRevision
+    } & (T extends { origin: unknown } ? { readonly origin: GitCommitOrigin } : object)
   : Readonly<T>
 export type GitSnapshotTarget = GitSnapshotVariant<v.InferOutput<typeof gitSnapshotTargetSchema>>
 

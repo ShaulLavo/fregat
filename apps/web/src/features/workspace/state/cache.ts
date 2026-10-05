@@ -80,6 +80,8 @@ import {
   filterGroupTabs,
   normalizedSelection,
   validEditorGroups,
+  validEditorGroupStructure,
+  normalizeEditorGroups,
 } from '@/lib/documents/utils/groups'
 
 const WORKSPACE_SLICE_KEY_PREFIX = workspaceCacheStorageKey('workspace:')
@@ -660,14 +662,17 @@ function restoredSliceForWorkspace(
   rootPath: string,
   slice: StoredWorkspaceSlice,
 ): CachedWorkspaceSlice | null {
+  if (!validEditorGroupStructure(slice.workbenchPanels.editorGroups)) return null
   const root = workspaceRoot(rootPath)
   const terminalNamespace = readTerminalNamespace()
   const terminalId = (id: string) =>
     id.startsWith(terminalNamespace) ? id : terminalNamespace + id
-  const editorGroups = {
+  const decodedGroups = {
     ...slice.workbenchPanels.editorGroups,
     root: restoredGroupNode(slice.workbenchPanels.editorGroups.root, root),
   }
+  if (!validEditorGroups(decodedGroups, { allowEmptyGroups: true })) return null
+  const editorGroups = normalizeEditorGroups(decodedGroups)
   if (!validEditorGroups(editorGroups)) return null
   const ids = new Set(allEditorTabs(editorGroups).map((tab) => tab.id))
   return {

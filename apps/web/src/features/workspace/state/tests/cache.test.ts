@@ -355,11 +355,12 @@ describe('workspace cache', () => {
                     kind: 'git-diff',
                     source: {
                       kind: 'snapshot',
-                      path: '/repo/src/a.ts',
-                      oldPath: '/repo/src/old.ts',
-                      oldObjectId: DOCUMENT_OLD_OBJECT_ID,
-                      newObjectId: DOCUMENT_NEW_OBJECT_ID,
-                      status: 'renamed',
+                      target: {
+                        kind: 'moving',
+                        rootPath: '/repo',
+                        path: '/repo/src/a.ts',
+                        changeSource: 'worktree',
+                      },
                     },
                   },
                 },

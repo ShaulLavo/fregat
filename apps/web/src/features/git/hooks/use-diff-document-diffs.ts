@@ -67,7 +67,7 @@ export function useDiffDocumentDiffs(info: GitComparison | null) {
   const failure = error ? errorMessage(error, 'Diff unavailable.') : null
   const relationshipFailure =
     historical && !details?.isPending && !admitted
-      ? 'The commit does not contain this change.'
+      ? 'The commit and Git comparison in this link differ.'
       : null
   return {
     diffs: admitted ? (diffs ?? []) : [],

@@ -146,7 +146,7 @@ async function applyCurrentView(
   if (admission.selectedRejected)
     return {
       status: 'unavailable',
-      reason: 'The commit in this link does not contain the requested change.',
+      reason: 'The commit and Git comparison in this link differ.',
     }
   options = { ...options, address: { ...intent, address: admission.address } }
   const opened = await openRoot(options, owner, environmentId, chat.rootPath, current, signal)
