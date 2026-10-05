@@ -1,7 +1,7 @@
-import { expect, test, vi } from 'vitest'
+import { expect, test, vi, type TestContext } from 'vitest'
 import { commands, page, userEvent } from 'vitest/browser'
 import { allEditorGroups, activeEditorTab } from '@/lib/documents/utils/groups'
-import { filesystemPath } from '@/lib/documents/utils/identity'
+import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { ensureFileSnapshotQuery } from '@/lib/file-snapshot-query-cache'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { useSettingValue } from '@/hooks/use-setting-value'
@@ -10,12 +10,151 @@ import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state
 import { previewEditorTheme } from '@/features/editor/state/color-theme-store'
 import { awaitEditorSyntaxWorkerIdleFences } from '@/features/editor/state/syntax-highlighting'
 import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-trace'
+import { editorPreparedDocumentTags } from '@/features/editor/utils/prepared-document'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { projectSettings } from '@workspace/client-core/settings/projection'
+import { settingsIntentStore } from '@workspace/client-core/settings/intent-store'
+import type { SettingsSnapshot } from '@workspace/contracts'
+import type { EditorViewSnapshot } from '@singapore-editor/core/editor'
 import { EditorGroup } from '@/features/workbench/components/editor-group'
 import { mountRetentionAcceptanceApp } from '../../../../test/factories/retention-acceptance-app'
+import type { RetentionAcceptanceApp } from '../../../../test/factories/retention-acceptance-app'
 import { captureRetentionAcceptancePaint } from '../../../../test/factories/retention-acceptance-paint'
 import { holdSyntaxWorkerReply } from '../../../../test/factories/syntax-settings-worker'
 
 const path = filesystemPath('repo/src/editor-tab-a.ts')
+
+declare module 'vitest' {
+  interface TaskMeta {
+    initialSyntaxReadiness?: unknown
+  }
+}
+
+type InitialSyntaxRead<T> = { kind: 'observed'; value: T } | { kind: 'UNKNOWN' }
+
+function initialSyntaxRead<T>(read: () => T): InitialSyntaxRead<T> {
+  try {
+    const value = read()
+    if (value === undefined) return { kind: 'UNKNOWN' }
+    return { kind: 'observed', value }
+  } catch {
+    return { kind: 'UNKNOWN' }
+  }
+}
+
+function cachedSyntaxRequest(entry: PerformanceEntry) {
+  if (!(entry instanceof PerformanceMark)) return { at: entry.startTime, kind: 'UNKNOWN' }
+  const detail: unknown = entry.detail
+  if (!detail || typeof detail !== 'object') return { at: entry.startTime, kind: 'UNKNOWN' }
+  return {
+    at: entry.startTime,
+    family: 'family' in detail && typeof detail.family === 'string' ? detail.family : null,
+    type: 'type' in detail && typeof detail.type === 'string' ? detail.type : null,
+    runtimeSessionId:
+      'runtimeSessionId' in detail && typeof detail.runtimeSessionId === 'string'
+        ? detail.runtimeSessionId
+        : null,
+  }
+}
+
+function initialSyntaxObservation(
+  app: RetentionAcceptanceApp,
+  snapshot: EditorViewSnapshot | null,
+  nativeSyntaxStatus: EditorViewSnapshot['syntaxStatus'] | undefined,
+  fence: { readonly startedAt: number; readonly settledAt: number },
+  gate?: ReturnType<typeof holdSyntaxWorkerReply>,
+) {
+  const confirmed = initialSyntaxRead(() =>
+    app.queryClient.getQueryData<SettingsSnapshot>(settingsKeys.document()),
+  )
+  const intents = initialSyntaxRead(() =>
+    settingsIntentStore.getState().active.filter((entry) => entry.patch.owner === app.queryClient),
+  )
+  const canonical = initialSyntaxRead(() =>
+    app.read().documents.getState().getLiveEditorDocument(fileDocumentKey(path)),
+  )
+  return {
+    at: performance.now(),
+    native: initialSyntaxRead(() => ({
+      nativeSyntaxStatus: nativeSyntaxStatus ?? 'UNKNOWN',
+      snapshotPresent: snapshot !== null,
+      documentId: snapshot?.documentId ?? null,
+      revision: snapshot?.documentSyncPoint.revision ?? null,
+      textVersion: snapshot?.textVersion ?? null,
+      language: snapshot?.languageId ?? null,
+      initialHighlightStatus: snapshot?.initialHighlightStatus ?? null,
+      paintAvailable: snapshot ? snapshot.paintLayers !== null : false,
+    })),
+    canonical:
+      canonical.kind === 'observed'
+        ? initialSyntaxRead(() => ({
+            documentId: canonical.value?.analysis.documentId ?? null,
+            revision: canonical.value?.buffer.getRevision() ?? null,
+          }))
+        : { kind: 'UNKNOWN' },
+    configuration: initialSyntaxRead(() => {
+      const theme = app.read().theme
+      return {
+        selectedTheme: theme.selectedThemeId,
+        appliedTheme: theme.appliedThemeId,
+        contentHash: theme.appliedThemeContentHash,
+        configuredTags: editorPreparedDocumentTags(
+          path,
+          {
+            selectedThemeId: theme.selectedThemeId,
+            appliedThemeId: theme.appliedThemeId,
+            appliedThemeContentHash: theme.appliedThemeContentHash,
+            syntaxHighlightingEnabled: readSettingsMirror()['editor.syntaxHighlighting.enabled'],
+          },
+          true,
+        ),
+      }
+    }),
+    settings: {
+      confirmed: initialSyntaxRead(() =>
+        confirmed.kind === 'observed'
+          ? confirmed.value?.values['editor.syntaxHighlighting.enabled']
+          : undefined,
+      ),
+      projected: initialSyntaxRead(() =>
+        confirmed.kind === 'observed' && confirmed.value && intents.kind === 'observed'
+          ? projectSettings(confirmed.value, intents.value).values[
+              'editor.syntaxHighlighting.enabled'
+            ]
+          : undefined,
+      ),
+      mirror: initialSyntaxRead(() => readSettingsMirror()['editor.syntaxHighlighting.enabled']),
+      queryStatus: initialSyntaxRead(
+        () => app.queryClient.getQueryState(settingsKeys.document())?.status,
+      ),
+      ownerIntents: initialSyntaxRead(() =>
+        intents.kind === 'observed' ? intents.value.map((entry) => entry.intentId) : undefined,
+      ),
+    },
+    fence,
+    transport: initialSyntaxRead(() => {
+      const requests = performance
+        .getEntriesByName('editor.worker.request')
+        .filter((entry) => entry.startTime >= fence.startedAt)
+      return {
+        cachedRequestsSinceFence: requests.length,
+        latest: requests.slice(-3).map(cachedSyntaxRequest),
+      }
+    }),
+    preArmHeld: initialSyntaxRead(() => gate?.held()),
+    sdkPending: 'UNKNOWN',
+    nativeCallbackDelivery: 'UNKNOWN',
+  }
+}
+
+async function recordInitialSyntaxReadiness(context: TestContext, packet: unknown) {
+  try {
+    context.task.meta.initialSyntaxReadiness = packet
+    const serialized = JSON.stringify(packet)
+    console.info(`syntax-initial-readiness ${serialized}`)
+    await context.annotate(serialized, 'syntax-initial-readiness')
+  } catch {}
+}
 
 test('calibrates the native worker delivery gate', async (context) => {
   const gate = holdSyntaxWorkerReply('shiki')
@@ -88,8 +227,26 @@ test.for(['dark-plus', 'tree-sitter-dark'] as const)(
     expect(controller).toBeDefined()
     if (!controller) return
     const paint = () => captureRetentionAcceptancePaint(app, path, tab.id)
+    const fenceStartedAt = performance.now()
     await awaitEditorSyntaxWorkerIdleFences()
-    await expect.poll(() => controller.getSnapshot()?.syntaxStatus).toBe('ready')
+    const fence = { startedAt: fenceStartedAt, settledAt: performance.now() }
+    let lastPoll: unknown = null
+    try {
+      await expect
+        .poll(() => {
+          const snapshot = controller.getSnapshot()
+          const nativeSyntaxStatus = snapshot?.syntaxStatus
+          lastPoll = initialSyntaxRead(() =>
+            initialSyntaxObservation(app, snapshot, nativeSyntaxStatus, fence),
+          )
+          return nativeSyntaxStatus
+        })
+        .toBe('ready')
+    } catch (error) {
+      await recordInitialSyntaxReadiness(context, { phase: 'mounted-initial', theme, lastPoll })
+      throw error
+    }
+    await recordInitialSyntaxReadiness(context, { phase: 'mounted-initial', theme, lastPoll })
     await expect.poll(() => controller.getSnapshot()?.initialHighlightStatus).toBe('painted')
     const colored = paint()
     expect(new Set(colored.frame.runs.map((run) => run.style.color)).size).toBeGreaterThan(1)
@@ -213,8 +370,26 @@ test.for(['shiki', 'tree-sitter'] as const)(
     expect(controller).toBeDefined()
     if (!controller) return
     const paint = () => captureRetentionAcceptancePaint(app, path, tab.id)
+    const fenceStartedAt = performance.now()
     await awaitEditorSyntaxWorkerIdleFences()
-    await expect.poll(() => controller.getSnapshot()?.syntaxStatus).toBe('ready')
+    const fence = { startedAt: fenceStartedAt, settledAt: performance.now() }
+    let lastPoll: unknown = null
+    try {
+      await expect
+        .poll(() => {
+          const snapshot = controller.getSnapshot()
+          const nativeSyntaxStatus = snapshot?.syntaxStatus
+          lastPoll = initialSyntaxRead(() =>
+            initialSyntaxObservation(app, snapshot, nativeSyntaxStatus, fence, gate),
+          )
+          return nativeSyntaxStatus
+        })
+        .toBe('ready')
+    } catch (error) {
+      await recordInitialSyntaxReadiness(context, { phase: 'late-reply-initial', family, lastPoll })
+      throw error
+    }
+    await recordInitialSyntaxReadiness(context, { phase: 'late-reply-initial', family, lastPoll })
     const originalSource = paint().source
     gate.arm()
     controller.commands.edit({ from: 0, to: 0, text: '// delayed syntax\n' })

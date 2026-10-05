@@ -6,7 +6,7 @@ import { useEditorDocumentStoreApi } from '@/features/editor/state/document-stat
 import { dirtySearchDocuments } from '@/features/search/state/dirty-documents'
 import type { WorkspaceSearchQueryOptions } from '@/features/search/utils/buffer-query'
 import { workspaceSearchQuery } from '@/features/search/utils/buffer-query'
-import { useSearchBufferStoreApi } from '@/features/search/state/buffer-state'
+import { useSearchBufferState, useSearchBufferStoreApi } from '@/features/search/state/buffer-state'
 import {
   runSearch,
   shouldDeferInitialOpenBufferMatches,
@@ -24,11 +24,14 @@ export function useRunSearchBuffer(
   const { caseSensitive, excludeGlobText, filtersVisible, includeGlobText, matchMode, wholeWord } =
     searchOptions
   const store = useSearchBufferStoreApi()
+  const currentQuery = useSearchBufferState((state) =>
+    state.active?.rootPath === rootPath ? state.active.query : '',
+  )
   const client = clientForQueryClient(useQueryClient())
   const documentStore = useEditorDocumentStoreApi()
 
   useEffect(() => {
-    if (!query) return
+    if (!query || query !== currentQuery) return
 
     const controller = new AbortController()
     const searchQuery = workspaceSearchQuery(rootPath, query, {
@@ -62,6 +65,7 @@ export function useRunSearchBuffer(
     return () => controller.abort()
   }, [
     client,
+    currentQuery,
     documentStore,
     query,
     rootPath,

@@ -20,6 +20,7 @@ import {
 import {
   createTabPresentation,
   type DiffPanePresentation,
+  type DiffPanePublicationSink,
 } from '@/features/editor/state/tab-presentation'
 import { onTestFinished, vi } from 'vitest'
 
@@ -214,13 +215,14 @@ export function mountDiffProjectionControl(
   initial: DiffAttachment,
   side: DiffGutterSide = 'stacked',
   presentation: DiffPanePresentation = createTabPresentation().diffPanes[side],
+  onPublication?: DiffPanePublicationSink,
 ) {
   const host = document.createElement('div')
   document.body.append(host)
   const regions = createDiffRegionStore()
   const plugin = createDiffPlugin({ mode: 'document', side, regions, syntaxHighlight: false })
   const releasePlugin = bindDiffPlugin(presentation, plugin)
-  const binding = createDiffPresentationBinding(presentation, side)
+  const binding = createDiffPresentationBinding(presentation, side, onPublication)
   const configuration = {
     backend: { kind: 'tree-sitter' as const, provider: null },
     theme: null,
@@ -274,6 +276,7 @@ export function mountDiffProjectionControl(
     host.remove()
   })
   return {
+    host,
     editor,
     plugin,
     regions,
