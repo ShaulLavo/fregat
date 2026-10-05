@@ -151,6 +151,7 @@ import { claudeManualCompaction, codexManualCompaction } from './manual-compacti
 import { claudeSessionTools, codexSessionTools } from './session-tools'
 import { claudeSessionFork, codexSessionFork } from './session-fork'
 import { searchFileActions } from './search-file-actions'
+import { searchReplaceRefresh } from './search-replace-refresh'
 import { settingsStaleDiagnostics } from './settings-stale-diagnostics'
 import { settingsEnumLabels } from './settings-enum-labels'
 import { settingsRawConflict } from './settings-raw-conflict'
@@ -623,6 +624,7 @@ export const scenarios: readonly Scenario[] = [
   claudeSessionFork,
   codexSessionFork,
   searchFileActions,
+  searchReplaceRefresh,
   chatFollowUp,
   chatDiffSyntax,
   chatMarkdownFence,

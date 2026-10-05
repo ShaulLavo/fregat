@@ -57,7 +57,7 @@ export type WorkspaceSearchFileGroup = {
 type SearchReplaceToken = Readonly<{
   rootPath: string
   incarnation: object
-  runId: number
+  options: Readonly<Required<SearchBufferOptionPatch>>
   query: WorkspaceSearchQuery | null
   replaceText: string
 }>
@@ -244,7 +244,14 @@ export function createSearchBufferStore({
         const token = Object.freeze({
           rootPath,
           incarnation: snapshot.incarnation,
-          runId: snapshot.runId,
+          options: {
+            caseSensitive: snapshot.caseSensitive,
+            excludeGlobText: snapshot.excludeGlobText,
+            filtersVisible: snapshot.filtersVisible,
+            includeGlobText: snapshot.includeGlobText,
+            matchMode: snapshot.matchMode,
+            wholeWord: snapshot.wholeWord,
+          },
           query: snapshot.resultsSearchQuery,
           replaceText: snapshot.replaceText,
         })
@@ -733,8 +740,12 @@ function settleReplace(
   if (!snapshot || snapshot.incarnation !== token.incarnation || snapshot.replaceRequest !== token)
     return {}
   const matches =
-    snapshot.runId === token.runId &&
-    snapshot.resultsSearchQuery === token.query &&
+    snapshot.query === token.query?.query &&
+    !searchOptionsChanged(snapshot, token.options) &&
+    sameWorkspaceSearchQuery(
+      snapshot.runningSearchQuery ?? snapshot.resultsSearchQuery,
+      token.query,
+    ) &&
     snapshot.replaceText === token.replaceText
   let next: SearchBufferSnapshot = {
     ...snapshot,
@@ -1047,7 +1058,10 @@ function isSearchResultMatchOrNameItem(
   return item.type === 'match' || item.type === 'name'
 }
 
-function searchOptionsChanged(current: SearchBufferSnapshot, next: SearchBufferSnapshot) {
+function searchOptionsChanged(
+  current: Required<SearchBufferOptionPatch>,
+  next: Required<SearchBufferOptionPatch>,
+) {
   if (current.caseSensitive !== next.caseSensitive) return true
   if (current.excludeGlobText !== next.excludeGlobText) return true
   if (current.filtersVisible !== next.filtersVisible) return true
@@ -1068,6 +1082,7 @@ export function sameWorkspaceSearchQuery(
 function sameWorkspaceSearchScope(left: WorkspaceSearchQuery, right: WorkspaceSearchQuery) {
   if (left.caseSensitive !== right.caseSensitive) return false
   if (left.entryType !== right.entryType) return false
+  if (left.fileLimit !== right.fileLimit) return false
   if (left.includeContent !== right.includeContent) return false
   if (left.includeNames !== right.includeNames) return false
   if (left.limit !== right.limit) return false
