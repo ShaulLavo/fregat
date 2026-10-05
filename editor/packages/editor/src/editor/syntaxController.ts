@@ -1,4 +1,4 @@
-import { setRetainedSyntaxDisplayDemand } from './documentAnalysis'
+import { retainedSyntaxCanWarm, setRetainedSyntaxDisplayDemand } from './documentAnalysis'
 import type {
   EditorDocumentAnalysis,
   EditorRetainedSyntaxSession,
@@ -294,10 +294,18 @@ export class EditorSyntaxController {
   constructor(private readonly options: EditorSyntaxControllerOptions) {}
 
   setDisplayDemand(demand: EditorAnalysisDisplayDemand): void {
-    const changed = this.trimRangeCache(demand)
-    if (this.retainedSyntax)
-      setRetainedSyntaxDisplayDemand(this.retainedSyntax, demand, this.rangeContributors(demand))
-    if (changed) this.options.adoptTokens(this.currentTokens)
+    const tokens = this.currentTokens
+    const discarded = this.trimRangeCache(demand)
+    if (this.retainedSyntax) {
+      setRetainedSyntaxDisplayDemand(
+        this.retainedSyntax,
+        demand,
+        this.rangeContributors(demand),
+        discarded,
+      )
+      if (this.pendingWarm && !retainedSyntaxCanWarm(this.retainedSyntax)) this.cancelOptionalWarm()
+    }
+    if (tokens !== this.currentTokens) this.options.adoptTokens(this.currentTokens)
   }
 
   private rangeContributors(
@@ -312,10 +320,12 @@ export class EditorSyntaxController {
     return contributors.filter((contributor) => contributor.snapshot === demand.snapshot)
   }
 
-  private trimRangeCache(demand: EditorAnalysisDisplayDemand): boolean {
-    if (demand.kind !== 'frame') return false
-    if (demand.snapshot !== this.options.getSession()?.getTextSnapshot()) return false
-    if (this.applyingRenderData) return false
+  private trimRangeCache(
+    demand: EditorAnalysisDisplayDemand,
+  ): readonly CachedSyntaxFoldRange[] | null {
+    if (demand.kind !== 'frame') return null
+    if (demand.snapshot !== this.options.getSession()?.getTextSnapshot()) return null
+    if (this.applyingRenderData) return null
     const visible = this.options.getVisibleSyntaxRange()
     const ranges = visible ? appendCachedSyntaxRange(demand.ranges, visible) : demand.ranges
     const previous = this.lastRangeTrim
@@ -325,7 +335,7 @@ export class EditorSyntaxController {
       previous.store === this.currentTokens &&
       sameSyntaxRanges(previous.ranges, ranges)
     )
-      return false
+      return null
     const oldCache = this.cachedSyntaxFoldRanges
     const rangeOwned =
       !this.highlighterSession &&
@@ -359,28 +369,27 @@ export class EditorSyntaxController {
     const coverage = rangeOwned
       ? completeRanges
       : intersectSyntaxRanges(this.cachedSyntaxRanges, completeRanges)
-    const discardedOffDemand = oldCache.some(
+    const discardedOffDemand = oldCache.filter(
       (cached) => !retained.has(cached) && !syntaxRangeListsIntersect([cached.range], ranges),
     )
     const removed =
       nextCache.length !== oldCache.length || !sameSyntaxRanges(this.cachedSyntaxRanges, coverage)
     this.cachedSyntaxFoldRanges = nextCache
     this.cachedSyntaxRanges = coverage
-    let changed = false
     if (removed && rangeOwned) {
       const tokens = compactSyntaxRangeTokens(this.currentTokens, coverage)
       this.currentTokens = tokens
       this.rangeTokenOwner = { store: tokens, snapshot: demand.snapshot }
-      changed = true
     }
-    if (discardedOffDemand) this.stopOptionalWarm(demand.snapshot)
+    if (discardedOffDemand.length > 0 && !this.retainedSyntax)
+      this.stopOptionalWarm(demand.snapshot)
     this.lastRangeTrim = {
       snapshot: demand.snapshot,
       ranges,
       cache: nextCache,
       store: this.currentTokens,
     }
-    return changed
+    return discardedOffDemand
   }
 
   private stopOptionalWarm(snapshot: DocumentTextSnapshot): void {
@@ -388,6 +397,10 @@ export class EditorSyntaxController {
       snapshot,
       configurationGeneration: this.initialHighlightConfigurationGeneration,
     }
+    this.cancelOptionalWarm()
+  }
+
+  private cancelOptionalWarm(): void {
     this.nextWarmGeneration()
     this.pendingWarm = null
     this.warmRangeRequests.cancel()
@@ -920,6 +933,7 @@ export class EditorSyntaxController {
     if (!this.options.getSession()) return
     if (!this.canQueryCurrentSyntaxRange()) return
     if (!seedRange) return
+    if (!this.canWarmSyntax()) return
     const snapshot = this.options.getSession()?.getTextSnapshot()
     if (
       this.stoppedWarm &&
@@ -1395,7 +1409,10 @@ export class EditorSyntaxController {
         updatesDocument: options.updatesDocument,
       })
     }
-    if (!this.canQuerySyntaxRangeForRequest(options.updatesDocument === true)) {
+    if (
+      !this.canQuerySyntaxRangeForRequest(options.updatesDocument === true) ||
+      (source === 'warm' && !this.canWarmSyntax())
+    ) {
       return Promise.resolve({
         contentVersion,
         range: null,
@@ -1662,8 +1679,13 @@ export class EditorSyntaxController {
     if (!this.syntaxSession?.queryRange) return false
     if (!this.options.getSession()) return false
     if (!this.canQueryCurrentSyntaxRange()) return false
+    if (!this.canWarmSyntax()) return false
     if (this.rangeRequests.isActive()) return false
     return !this.prefetchRangeRequests.isActive()
+  }
+
+  private canWarmSyntax(): boolean {
+    return !this.retainedSyntax || retainedSyntaxCanWarm(this.retainedSyntax)
   }
 
   private nextWarmRange(seedRange: EditorSyntaxRange): EditorSyntaxRange | null {
