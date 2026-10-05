@@ -1,23 +1,176 @@
-import type { DiffPlugin } from '@singapore-editor/diff'
+import type {
+  DiffPlugin,
+  DiffRenderRow,
+  DiffGutterSide,
+  DiffSyntaxBackend,
+} from '@singapore-editor/diff'
+import type { HighlightingThemeSource } from '@singapore-editor/highlighting'
+import { joinRenderLines } from '@singapore-editor/diff'
 import type { EditorPlugin, EditorViewContributionContext } from '@singapore-editor/core/extensions'
 import type { Editor } from '@singapore-editor/core/editor'
-import type { DiffPanePresentation } from '@/features/editor/state/tab-presentation'
+import type { EditorToken } from '@singapore-editor/core/syntax'
+import type {
+  DiffPanePresentation,
+  DiffInputClaim,
+  DiffPanePublication,
+  DiffPanePublicationSink,
+} from '@/features/editor/state/tab-presentation'
+import {
+  diffAttachmentRevision,
+  diffAttachmentReferences,
+  diffAttachmentLines,
+  diffAttachmentSubject,
+  sameDiffAttachmentSubject,
+  type DiffAttachment,
+} from '@/lib/diff-attachment'
+import { captureDiffAnchors, resolveDiffAnchors } from '@/features/editor/utils/diff-source-anchors'
 
-export function createDiffPresentationBinding(presentation: DiffPanePresentation) {
+type SyntaxConfiguration = {
+  readonly backend: DiffSyntaxBackend
+  readonly theme: HighlightingThemeSource | null
+  readonly enabled: boolean
+}
+
+export function createDiffPresentationBinding(
+  presentation: DiffPanePresentation,
+  side: DiffGutterSide = 'stacked',
+  onPublication?: DiffPanePublicationSink,
+) {
   let view: EditorViewContributionContext | null = null
   let restored = false
+  let publication: DiffPanePublication | null = null
+  let queued: { currentView: EditorViewContributionContext; entry: object } | null = null
+  let installed: {
+    editor: Editor
+    attachment: DiffAttachment
+    rows: readonly DiffRenderRow[]
+    tokens: readonly EditorToken[]
+    lines: ReturnType<typeof diffAttachmentLines>
+    configuration: SyntaxConfiguration
+    documentId: string | null
+    textVersion: number
+    projectionLength: number
+  } | null = null
+
+  function withdraw() {
+    if (!publication) return
+    const previous = publication
+    publication = null
+    onPublication?.({ kind: 'withdrawn', publication: previous })
+  }
+
+  function schedulePublication() {
+    if (!onPublication || !view || !installed || !restored) return
+    const currentView = view
+    const entry = installed
+    if (queued?.currentView === currentView && queued.entry === entry) return
+    const pending = { currentView, entry }
+    queued = pending
+    // Contribution updates run inside paint delivery; inspect the committed view after it returns.
+    queueMicrotask(() => {
+      if (queued !== pending || view !== currentView || installed !== entry || !restored) return
+      queued = null
+      const snapshot = currentView.getSnapshot()
+      if (
+        snapshot.documentId === null ||
+        snapshot.documentId !== entry.documentId ||
+        snapshot.textVersion !== entry.textVersion ||
+        snapshot.geometryCommitted !== true ||
+        snapshot.viewport.clientWidth <= 0 ||
+        snapshot.viewport.clientHeight <= 0 ||
+        (entry.projectionLength > 0 && snapshot.visibleRows.length === 0)
+      ) {
+        withdraw()
+        return
+      }
+      const next: DiffPanePublication = {
+        attachment: entry.attachment,
+        side,
+        editor: entry.editor,
+        documentId: snapshot.documentId,
+        textVersion: snapshot.textVersion,
+        geometryCommitted: true,
+        viewportWidth: snapshot.viewport.clientWidth,
+        viewportHeight: snapshot.viewport.clientHeight,
+        visibleRowCount: snapshot.visibleRows.length,
+        projectionLength: entry.projectionLength,
+      }
+      if (publication && samePublication(publication, next)) return
+      withdraw()
+      publication = next
+      onPublication({ kind: 'presented', publication: next })
+    })
+  }
+
+  function matchesInput(attachment: DiffAttachment, saved: DiffInputClaim) {
+    const subject = diffAttachmentSubject(attachment)
+    const references = diffAttachmentReferences(attachment)
+    if (
+      saved.revision !== diffAttachmentRevision(attachment) ||
+      (saved.buffer?.deref() ?? null) !== subject.buffer ||
+      saved.references.length !== references.length ||
+      !saved.references.every((reference, index) => reference.deref() === references[index])
+    )
+      return false
+    return true
+  }
+
+  function matchingView(attachment: DiffAttachment) {
+    const saved = presentation.views.get(diffAttachmentSubject(attachment).key)
+    return saved && matchesInput(attachment, saved) ? saved : null
+  }
+
+  function installedAnchors(
+    entry: NonNullable<typeof installed>,
+    snapshot: ReturnType<EditorViewContributionContext['getSnapshot']>,
+  ) {
+    const anchors = captureDiffAnchors(
+      entry.lines,
+      entry.rows,
+      side,
+      snapshot,
+      !entry.editor.isWordWrapEnabled(),
+    )
+    if (anchors.viewport || snapshot.viewport.clientHeight > 0) return anchors
+    const saved = matchingView(entry.attachment)
+    return saved ? { ...anchors, viewport: saved.anchors.viewport } : anchors
+  }
 
   function capture() {
+    schedulePublication()
     if (!view || !restored) return
+    if (presentation.reload?.file.deref()) return
     const snapshot = view.getSnapshot()
     presentation.selections = snapshot.selections
     presentation.scroll = { left: snapshot.viewport.scrollLeft, top: snapshot.viewport.scrollTop }
+    if (!installed) return
+    const subject = diffAttachmentSubject(installed.attachment)
+    presentation.views.set(subject.key, {
+      buffer: subject.buffer ? new WeakRef(subject.buffer) : null,
+      revision: diffAttachmentRevision(installed.attachment),
+      references: diffAttachmentReferences(installed.attachment).map(
+        (reference) => new WeakRef(reference),
+      ),
+      anchors: installedAnchors(installed, snapshot),
+    })
+  }
+
+  function detach() {
+    if (presentation.reload && !installed) {
+      presentation.scroll = null
+      presentation.selections = []
+    }
+    presentation.reload = null
+    capture()
+    restored = false
+    installed = null
+    queued = null
+    withdraw()
   }
 
   function dispose() {
-    capture()
+    detach()
     view = null
-    restored = false
   }
 
   function createContribution(current: EditorViewContributionContext) {
@@ -30,35 +183,183 @@ export function createDiffPresentationBinding(presentation: DiffPanePresentation
     activate: (context) => context.registerViewContribution({ createContribution }),
   }
 
-  return {
-    plugin,
-    detach() {
-      capture()
-      restored = false
-    },
-    restore(editor: Editor) {
-      if (restored || !view) return
-      const selections = presentation.selections
-      const scroll = presentation.scroll
-      const length = editor.getState().length
-      if (selections.length > 0) {
-        view.setSelections(
-          selections.map((selection) => ({
-            anchor: Math.min(selection.anchorOffset, length),
-            head: Math.min(selection.headOffset, length),
-          })),
-          'editor.restoreDiffSelection',
-        )
-      }
-      editor.setScrollPosition(scroll ?? { left: 0, top: 0 })
-      restored = true
-    },
+  function restore(editor: Editor) {
+    if (restored || !view) return
+    const length = editor.getState().length
+    const selections = presentation.selections.map((selection) => ({
+      anchor: Math.min(selection.anchorOffset, length),
+      head: Math.min(selection.headOffset, length),
+      affinity: selection.affinity,
+    }))
+    view.setSelections(
+      selections.length > 0 ? selections : [{ anchor: 0, head: 0 }],
+      'editor.restoreDiffSelection',
+    )
+    editor.setScrollPosition(presentation.scroll ?? { left: 0, top: 0 })
+    restored = true
   }
+
+  function publish(
+    editor: Editor,
+    attachment: DiffAttachment,
+    rows: readonly DiffRenderRow[],
+    tokens: readonly EditorToken[],
+    configuration: SyntaxConfiguration,
+  ) {
+    if (!view) return
+    const previous = installed
+    const pendingReload = presentation.reload
+    const reload =
+      pendingReload?.file.deref() === attachment.file &&
+      pendingReload.subject === diffAttachmentSubject(attachment).key &&
+      matchesInput(attachment, pendingReload)
+    if (
+      !pendingReload &&
+      previous?.editor === editor &&
+      sameAttachment(previous.attachment, attachment) &&
+      previous.rows === rows &&
+      previous.tokens === tokens &&
+      sameConfiguration(previous.configuration, configuration)
+    )
+      return
+    presentation.reload = null
+    const subject = diffAttachmentSubject(attachment)
+    const sameSubject =
+      previous?.editor === editor &&
+      sameDiffAttachmentSubject(diffAttachmentSubject(previous.attachment), subject)
+    const snapshot = view.getSnapshot()
+    const anchors = sameSubject && previous ? installedAnchors(previous, snapshot) : null
+    if (!reload) capture()
+    restored = false
+    const saved = matchingView(attachment)
+    const selected = anchors ?? saved?.anchors ?? null
+    const lines =
+      previous && sameAttachment(previous.attachment, attachment)
+        ? previous.lines
+        : diffAttachmentLines(attachment)
+    const sameInput =
+      !previous ||
+      diffAttachmentRevision(previous.attachment) === diffAttachmentRevision(attachment)
+    const mapped = selected
+      ? resolveDiffAnchors(
+          selected,
+          sameSubject ? (previous?.lines ?? null) : null,
+          lines,
+          rows,
+          snapshot.metrics.rowHeight,
+          sameInput,
+        )
+      : null
+    const text = joinRenderLines(rows)
+    if (sameSubject) {
+      editor.syncText(text, { documentMode: 'static', languageId: null, tokens })
+    } else {
+      editor.openDocument({
+        documentId: `projection:diff:${subject.key}:${side}`,
+        text,
+        documentMode: 'static',
+        languageId: null,
+        tokens,
+        scrollPosition: { left: 0, top: 0 },
+      })
+    }
+    const installedSnapshot = view.getSnapshot()
+    installed = {
+      editor,
+      attachment,
+      rows,
+      tokens,
+      lines,
+      configuration,
+      documentId: `projection:diff:${subject.key}:${side}`,
+      textVersion: installedSnapshot.textVersion,
+      projectionLength: text.length,
+    }
+    if (reload) {
+      restore(editor)
+    } else if (mapped) {
+      view.setSelections(mapped.selections, 'editor.restoreDiffAnchor')
+      if (snapshot.metrics.rowHeight > 0) editor.setScrollPosition(mapped.scroll)
+    } else if (!pendingReload && !previous && presentation.views.size === 0) {
+      restore(editor)
+    } else {
+      view.setSelections([{ anchor: 0, head: 0 }], 'editor.startDiffSubject')
+      editor.setScrollPosition({ left: 0, top: 0 })
+    }
+    restored = true
+    capture()
+  }
+
+  function publishTokens(
+    editor: Editor,
+    attachment: DiffAttachment,
+    rows: readonly DiffRenderRow[],
+    tokens: readonly EditorToken[],
+    configuration: SyntaxConfiguration,
+  ) {
+    if (
+      installed?.editor !== editor ||
+      !sameAttachment(installed.attachment, attachment) ||
+      installed.rows !== rows ||
+      !sameConfiguration(installed.configuration, configuration) ||
+      !restored
+    )
+      return
+    editor.setTokens(tokens)
+    installed = { ...installed, tokens }
+    schedulePublication()
+  }
+
+  return { plugin, detach, restore, publish, publishTokens, isRestoringProjection: () => !restored }
+}
+
+function sameAttachment(left: DiffAttachment, right: DiffAttachment): boolean {
+  if (left === right) return true
+  if (left.file !== right.file || left.kind !== right.kind) return false
+  switch (left.kind) {
+    case 'operation':
+      return right.kind === 'operation' && left.read === right.read
+    case 'snapshot':
+      return right.kind === 'snapshot' && left.read === right.read && left.child === right.child
+    case 'saved':
+      return right.kind === 'saved' && left.read === right.read
+    case 'history':
+      return right.kind === 'history' && left.read === right.read && left.meaning === right.meaning
+    case 'projection-control':
+      return (
+        right.kind === 'projection-control' &&
+        left.subject === right.subject &&
+        left.revision === right.revision
+      )
+  }
+}
+
+function samePublication(left: DiffPanePublication, right: DiffPanePublication): boolean {
+  return (
+    sameAttachment(left.attachment, right.attachment) &&
+    left.side === right.side &&
+    left.editor === right.editor &&
+    left.documentId === right.documentId &&
+    left.textVersion === right.textVersion &&
+    left.viewportWidth === right.viewportWidth &&
+    left.viewportHeight === right.viewportHeight &&
+    left.visibleRowCount === right.visibleRowCount &&
+    left.projectionLength === right.projectionLength
+  )
+}
+
+function sameConfiguration(left: SyntaxConfiguration, right: SyntaxConfiguration): boolean {
+  return (
+    left.backend.kind === right.backend.kind &&
+    left.backend.provider === right.backend.provider &&
+    left.theme === right.theme &&
+    left.enabled === right.enabled
+  )
 }
 
 export function bindDiffPlugin(presentation: DiffPanePresentation, plugin: DiffPlugin) {
   presentation.plugin = plugin
   return () => {
-    presentation.plugin = null
+    if (presentation.plugin === plugin) presentation.plugin = null
   }
 }

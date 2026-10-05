@@ -18,6 +18,7 @@ import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { useEffect, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 
+import { historyDiffAttachment, type DiffAttachment } from '@/lib/diff-attachment'
 import { DiffEditor } from '@/features/editor/components/diff-editor'
 import { HistoryClearDialog } from '@/features/editor/components/history-clear-dialog'
 import { HistoryGraphStrip } from '@/features/editor/components/history-graph-strip'
@@ -75,7 +76,8 @@ export function HistoryPane({
   const comparisonPending =
     nextState?.selectedIds.length === 2 &&
     (!nextState.comparison || nextState.comparison.status === 'pending')
-  const state = useHeldUntilReady(nextState, !comparisonPending || barrierFocused)
+  const shown = useHeldUntilReady(snapshot, !comparisonPending || barrierFocused)
+  const state = shown?.state ?? null
   const now = useClock()
   const workspaceEdits = useOptionalWorkspaceEditService()
   const barrierGroup = useSyncExternalStore(
@@ -88,11 +90,18 @@ export function HistoryPane({
   )
 
   const graph = state?.graph ?? null
-  const focused = state && viewer && state.focusedId !== null ? viewer.node(state.focusedId) : null
-  const focusedDiff = snapshot?.focusedComparison ?? null
+  const focused = graph?.nodes.find((node) => node.id === state?.focusedId) ?? null
+  const restoreTarget =
+    state && viewer && state.focusedId !== null ? viewer.node(state.focusedId) : null
+  const focusedDiff = shown?.focusedComparison ?? null
   const selectedComparison = state?.comparison?.status === 'ready' ? state.comparison.result : null
   const focusedComparison = state?.lostIds.length ? null : focusedDiff
   const displayedDiff = state?.selectedIds.length === 2 ? selectedComparison : focusedComparison
+  const attachment = historyDiffAttachment(
+    shown?.displayedRead ?? null,
+    displayedDiff === 'too-large' ? null : displayedDiff,
+    state?.selectedIds.length === 2 ? 'selected' : 'focused',
+  )
   const hasDiffEditor =
     !(barrierFocused && graph?.barrier) &&
     displayedDiff !== null &&
@@ -118,7 +127,8 @@ export function HistoryPane({
   const barrier = graph.barrier
   const barrierActive = barrierFocused && barrier !== null
   const barrierLabel = barrierAriaLabel(barrierGroup)
-  const canRestore = focused !== null && !focused.isCurrent && !restoring && !barrierActive
+  const canRestore =
+    restoreTarget !== null && !restoreTarget.isCurrent && !restoring && !barrierActive
   const twoSelected = state.selectedIds.length === 2
 
   function setBarrierFocused(value: boolean) {
@@ -147,7 +157,7 @@ export function HistoryPane({
     }
     const handled = historyKeyAction(event, viewer, {
       restore: () => {
-        if (canRestore && focused) restore.mutate(focused.id)
+        if (canRestore && restoreTarget) restore.mutate(restoreTarget.id)
       },
       leave: () => onLeave?.(),
       // Left from the root reaches the barrier, the state before the workspace edit.
@@ -207,7 +217,7 @@ export function HistoryPane({
                 size='sm'
                 type='button'
                 variant='outline'
-                onClick={() => focused && restore.mutate(focused.id)}
+                onClick={() => canRestore && restoreTarget && restore.mutate(restoreTarget.id)}
               >
                 {restoring ? <Spinner /> : <ArrowCounterClockwiseIcon data-icon='inline-start' />}
                 Use this version
@@ -235,6 +245,7 @@ export function HistoryPane({
           />
         ) : (
           <HistoryComparisonBody
+            attachment={attachment}
             comparison={twoSelected ? state.comparison : undefined}
             diff={focusedDiff}
             focused={focused}
@@ -340,6 +351,7 @@ function barrierKeyAction(
 }
 
 function HistoryComparisonBody({
+  attachment,
   comparison,
   diff,
   focused,
@@ -347,6 +359,7 @@ function HistoryComparisonBody({
   mode,
   tabId,
 }: {
+  attachment: DiffAttachment | null
   comparison: HistoryComparison<HistoryComparisonResult> | null | undefined
   diff: HistoryComparisonResult | null
   focused: EditorHistoryGraphNode | null
@@ -369,6 +382,7 @@ function HistoryComparisonBody({
   if (comparison?.status === 'ready') {
     return (
       <DiffBody
+        attachment={attachment}
         file={comparison.result}
         mode={mode}
         sameText='These versions have the same text.'
@@ -395,16 +409,24 @@ function HistoryComparisonBody({
     )
   }
   return (
-    <DiffBody file={diff} mode={mode} sameText='Same text as the current version.' tabId={tabId} />
+    <DiffBody
+      attachment={attachment}
+      file={diff}
+      mode={mode}
+      sameText='Same text as the current version.'
+      tabId={tabId}
+    />
   )
 }
 
 function DiffBody({
+  attachment,
   file,
   mode,
   sameText,
   tabId,
 }: {
+  attachment: DiffAttachment | null
   file: HistoryComparisonResult | null
   mode: 'split' | 'stacked'
   sameText: string
@@ -414,7 +436,7 @@ function DiffBody({
     return <EmptyState className='h-full' title='Too large to compare here.' />
   }
   if (file && file.hunks.length === 0) return <EmptyState className='h-full' title={sameText} />
-  return <DiffEditor file={file} mode={mode} tabId={tabId} />
+  return <DiffEditor attachment={attachment} mode={mode} tabId={tabId} />
 }
 
 function useClock(): number {
