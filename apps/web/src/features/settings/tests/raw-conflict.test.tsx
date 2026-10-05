@@ -18,6 +18,8 @@ import { Toaster } from '@workspace/ui/components/sonner'
 import { type EditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import { SettingsSyncService } from '@/features/settings/state/sync-service'
 import { fetchSettings, saveSettingsText } from '@/features/settings/utils/api'
+import { mkdir } from 'node:fs/promises'
+import { join } from 'node:path'
 
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
@@ -289,4 +291,110 @@ test('pending comparison keeps Hide available and two actual banner interests re
   second.unmount()
   expect(store.getState().snapshotComparisons.size).toBe(0)
   first.unmount()
+})
+
+test('supplied settings root admits matching comparison and withdraws ready or held pending on mismatch', async ({
+  client,
+  server,
+}) => {
+  const runtime = await createAddressTestRuntime(client)
+  const documents = runtime.editor.documentStore
+  const queryClient = runtime.application.getSnapshot().queryClient
+  const initial = await fetchSettings(undefined, client)
+  const file = initial.layers.find((layer) => layer.id === 'user')?.file
+  if (!file) throw new RangeError('Actual user settings file required')
+  const root = await statPath(filesystemPath(''), new AbortController().signal, client)
+  const workspaceAddress = await registerTestWorkspaceAddress(client, '')
+  runtime.editor.workspaceStore
+    .getState()
+    .switchWorkspace({ ...root, workspaceAddress, name: 'Root', type: 'directory' })
+  await mkdir(join(server.root, 'alternate'))
+  const alternate = await statPath(
+    filesystemPath('alternate'),
+    new AbortController().signal,
+    client,
+  )
+  await registerTestWorkspaceAddress(client, alternate.path)
+  const document = documents.getState().ensureSettingsDocument(settingsJsonDocument('user'), {
+    content: file.text,
+    revision: file.revision,
+  })
+  documents.getState().markSettingsDocumentConflict(DOCUMENT_ID, file.text, file.revision)
+  const id = tabId('settings-root-admission')
+  const view = documents.getState().ensureEditorViewForDocument(id, DOCUMENT_ID)
+  const current = documents.getState().getLiveEditorDocument(DOCUMENT_ID)
+  if (!current) throw new RangeError('Actual current settings document required')
+  const content = (suppliedRoot: typeof root.path) => (
+    <TestEditorStateProvider>
+      <SettingsJsonView
+        active
+        diagnostics={initial.diagnostics}
+        file={file}
+        liveDocument={{ ...current, editability: 'editable', view: view.view }}
+        rootPath={suppliedRoot}
+        scope='user'
+        tabId={id}
+      />
+    </TestEditorStateProvider>
+  )
+  const mounted = renderWithProviders(content(root.path), {
+    application: runtime.application,
+    queryClient,
+  })
+  const native = runtime.editor.uiStore.getState().controllersByTabId.get(id)?.getEditor()
+  if (!native) throw new RangeError('Actual native editable settings host required')
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: 'Compare' }))
+  await waitFor(() =>
+    expect(screen.getByRole('region', { name: 'Settings comparison' })).toBeDefined(),
+  )
+  const captured = Array.from(documents.getState().snapshotComparisons.values())[0]
+  if (captured?.kind !== 'ready' || captured.input.kind !== 'settings')
+    throw new RangeError('Actual captured settings comparison required')
+  expect(captured.input.scope.rootPath).toBe(root.path)
+  expect(documents.getState().snapshotComparisons.size).toBe(1)
+  expect(native.getState().documentId).toBe(document.key)
+  expect(alternate.path).not.toBe(root.path)
+
+  mounted.rerender(content(alternate.path))
+  expect(runtime.editor.workspaceStore.getState().rootFolder?.path).toBe(root.path)
+  expect(runtime.editor.uiStore.getState().controllersByTabId.get(id)?.getEditor()).toBe(native)
+  expect(screen.queryByRole('region', { name: 'Settings comparison' })).toBeNull()
+  expect(Array.from(documents.getState().snapshotComparisons.values())[0]).toBe(captured)
+  expect(documents.getState().snapshotComparisons.size).toBe(1)
+
+  mounted.rerender(content(root.path))
+  expect(screen.getByRole('region', { name: 'Settings comparison' })).toBeDefined()
+  act(() => documents.getState().markSettingsDocumentConflict(DOCUMENT_ID, file.text, null))
+  const pending = Array.from(documents.getState().snapshotComparisons.values())[0]
+  if (pending?.kind !== 'ready' || pending.input.kind !== 'settings')
+    throw new RangeError('Actual pending settings comparison required')
+  expect(pending.input.confirmed.kind).toBe('pending')
+  expect(pending.input.scope.rootPath).toBe(root.path)
+  expect(screen.getByRole('region', { name: 'Settings comparison' })).toBeDefined()
+  expect(screen.getAllByRole('textbox', { name: 'Editor input' })).toHaveLength(2)
+
+  mounted.rerender(content(alternate.path))
+  expect(screen.queryByRole('region', { name: 'Settings comparison' })).toBeNull()
+  expect(screen.getAllByRole('textbox', { name: 'Editor input' })).toHaveLength(1)
+  expect(runtime.editor.uiStore.getState().controllersByTabId.get(id)?.getEditor()).toBe(native)
+  expect(Array.from(documents.getState().snapshotComparisons.values())[0]).toBe(pending)
+  const editing = createEditorBufferSession(document.buffer, view.view)
+  act(() => editing.applyText(' '))
+  expect(document.buffer.materializeFullText()).not.toBe(file.text)
+  act(() => native.dispatchCommand('undo'))
+  expect(document.buffer.materializeFullText()).toBe(file.text)
+
+  mounted.rerender(content(root.path))
+  expect(screen.getByRole('region', { name: 'Settings comparison' })).toBeDefined()
+  expect(screen.getAllByRole('textbox', { name: 'Editor input' })).toHaveLength(1)
+  expect(screen.getByRole('status', { name: 'Loading comparison' })).toBeDefined()
+  expect(screen.getByRole('button', { name: 'Keep my changes' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Use the latest version' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Hide compare' })).not.toBeDisabled()
+  await user.click(screen.getByRole('button', { name: 'Hide compare' }))
+  expect(screen.queryByRole('region', { name: 'Settings comparison' })).toBeNull()
+  expect(documents.getState().snapshotComparisons.size).toBe(0)
+  expect(runtime.editor.uiStore.getState().controllersByTabId.get(id)?.getEditor()).toBe(native)
+  mounted.unmount()
 })

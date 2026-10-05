@@ -171,6 +171,7 @@ export function Editor({
     settingsInput.local.buffer === suppliedDocument.buffer &&
     settingsInput.scope.environmentId === environmentId &&
     workspaceRoot !== null &&
+    rootPath === workspaceRoot &&
     settingsInput.scope.rootPath === workspaceRoot &&
     (!settingsComparison?.attachment ||
       (settingsInput.confirmed.kind === 'confirmed' &&
