@@ -21,7 +21,6 @@ import { createHighlightingPlugin } from '@singapore-editor/highlighting'
 import {
   EDITOR_PALETTE_SOURCE,
   EDITOR_THEME_SOURCE,
-  editorSyntaxColors,
 } from '@/features/editor/state/syntax-highlighting'
 import { highlightingService } from '@/lib/highlighting/state/service'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
@@ -44,6 +43,7 @@ const PLATFORM_SEARCH_RESULT_EDITOR_LOGGING_PLUGIN = createEditorLoggingPlugin(
 
 export type CriticalEditorCorePluginOptions = {
   readonly analysisAllowed: boolean
+  readonly syntaxHighlightingEnabled: boolean
   /** Backs the "Compare Changes" lens on a merge conflict; absent hides it. */
   readonly compareMergeConflict?: () => void
   /** Markdown renders in place (live preview); false shows its source. */
@@ -63,7 +63,9 @@ export function createCriticalEditorCorePlugins(
     editorIndentationGuidesSupported(languageId) &&
     !editorPerformanceFeatureDisabled('scope-lines')
   return [
-    ...(options.analysisAllowed ? createEditorSyntaxHighlightingPlugins(languageId) : []),
+    ...(options.analysisAllowed && options.syntaxHighlightingEnabled
+      ? createEditorSyntaxHighlightingPlugins(languageId)
+      : []),
     ...(options.analysisAllowed && languageId === 'markdown'
       ? [createMarkdownAuthoringPlugin()]
       : []),
@@ -189,8 +191,7 @@ function disposeAll(disposables: readonly EditorDisposable[]) {
 function createEditorSyntaxHighlightingPlugins(
   languageId: EditorSyntaxLanguageId | null,
 ): readonly EditorPlugin[] {
-  const source = editorSyntaxColors(undefined, languageId)
-  if (source === 'disabled') return []
+  if (editorPerformanceFeatureDisabled('syntax')) return []
 
   return [
     createHighlightingPlugin({
