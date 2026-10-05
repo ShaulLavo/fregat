@@ -356,9 +356,11 @@ it('keeps brush colors independent of alpha and restored drawing state', async (
   target.fillRect(2, 0, 1, 1)
   target.restore()
   target.fillRect(3, 0, 1, 1)
-  expect(target.frame.getImage().data.slice(0, 16)).toEqual([
-    18, 101, 231, 255, 18, 101, 231, 128, 200, 19, 80, 255, 18, 101, 231, 255,
-  ])
+  expect(target.frame.getImage().data.slice(0, 16)).toEqual(
+    new Uint8ClampedArray([
+      18, 101, 231, 255, 18, 101, 231, 128, 200, 19, 80, 255, 18, 101, 231, 255,
+    ]),
+  )
   const paint = () => {
     target.clearRect(0, 0, 40, 20)
     target.fillStyle = 'rgb(18.4, 100.5, 230.6)'
@@ -409,5 +411,5 @@ it('defers invalid brush errors until a draw and retries every failed draw', asy
   }
   target.fillStyle = 'rgb(1, 2, 3)'
   target.fillRect(0, 0, 1, 1)
-  expect(target.frame.getImage().data.slice(0, 4)).toEqual([1, 2, 3, 255])
+  expect(target.frame.getImage().data.slice(0, 4)).toEqual(new Uint8ClampedArray([1, 2, 3, 255]))
 })
