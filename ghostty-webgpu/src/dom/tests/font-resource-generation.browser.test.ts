@@ -139,9 +139,12 @@ it.each(cases)(
       faces.push(await load(changedFamily, resources.changed))
       terminal.setFont({ family: changedFamily })
       await settle()
-      expect(
-        fitTerminalFont(document, terminal.appearance.font, devicePixelRatio).deviceCellWidth,
-      ).not.toBe(beforeFit.deviceCellWidth)
+      const changedFit = fitTerminalFont(document, terminal.appearance.font, devicePixelRatio)
+      expect(changedFit.deviceCellWidth).not.toBe(beforeFit.deviceCellWidth)
+      expect(terminal.appearance.grid.cellWidth).toBe(changedFit.cssCellWidth)
+      expect(terminal.canvas!.width).toBe(
+        terminal.appearance.grid.columns * changedFit.deviceCellWidth,
+      )
       terminal.dispose()
       const clearedBeforeDisposeEvent = resourceClears.mock.calls.length
       faces.push(await load(`${family}-AfterDispose`, resources.before))
