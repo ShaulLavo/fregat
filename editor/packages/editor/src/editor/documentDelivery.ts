@@ -5,7 +5,7 @@ import {
 } from '@singapore-editor/textbuffer'
 import type { EditorTextBuffer, EditorTextBufferChange } from '../documentSession'
 import type { DocumentTextSnapshot, TextReadSnapshot } from '../documentTextSnapshot'
-import type { DocumentSyncPoint, DocumentSyncSegment, DocumentChangesSinceSyncPoint } from './editChain'
+import type { DocumentSyncPoint, DocumentSyncSegment, DocumentChangesSinceSyncPoint, DocumentLogicalRevisionScope } from './editChain'
 import { createEditorRuntimeSessionId } from '../syntax/session'
 import { createError } from '../logging/errors'
 import type {
@@ -59,7 +59,10 @@ export type DocumentProjectionConnection = {
   admit(update: DocumentProjectionUpdate, signal: AbortSignal): Promise<DocumentProjectionReceipt>
   release(identity: DocumentWorkerIdentity): void
 }
-export type DocumentProjectionEndpoint = { connect(): Promise<DocumentProjectionConnection | null> }
+export type DocumentProjectionEndpoint = {
+  readonly logicalRevisionScope?: DocumentLogicalRevisionScope
+  connect(): Promise<DocumentProjectionConnection | null>
+}
 type SourceEndpoint = DocumentSourceEndpoint | DocumentProjectionEndpoint
 
 export type DocumentContributionSource = Pick<DocumentDelivery, 'read' | 'changesBetween'> & {
@@ -76,7 +79,7 @@ type ProgressState = {
   pending: Promise<void> | null
 }
 type ReaderProgress = ProgressState & { readonly kind: 'reader'; readonly connection: DocumentSourceConnection; registered: boolean }
-type ProjectionProgress = ProgressState & { readonly kind: 'projection'; readonly connection: DocumentProjectionConnection; receipt: DocumentProjectionReceipt | null; read: DocumentRead | null }
+type ProjectionProgress = ProgressState & { readonly kind: 'projection'; readonly connection: DocumentProjectionConnection; readonly logicalRevisionScope: DocumentLogicalRevisionScope | null; receipt: DocumentProjectionReceipt | null; read: DocumentRead | null }
 type SourceProgress = ReaderProgress | ProjectionProgress
 
 export type PreparedDocumentWorkerRead = {
@@ -127,9 +130,9 @@ export class DocumentDelivery {
     return issued?.read === read ? issued.snapshot : null
   }
 
-  public changesBetween(base: DocumentRevision, target: DocumentRevision) {
+  public changesBetween(base: DocumentRevision, target: DocumentRevision, scope: DocumentLogicalRevisionScope | null = null) {
     if (!this.read(base) || !this.read(target)) return null
-    return this.buffer.changesBetweenDocumentSyncPoints(base.point, target.point, null)
+    return this.buffer.changesBetweenDocumentSyncPoints(base.point, target.point, scope)
   }
 
   public createScope(): DocumentContributionScope {
@@ -137,7 +140,7 @@ export class DocumentDelivery {
     return {
       source: {
         read: revision => scope.cancellation.signal.aborted ? null : this.read(revision),
-        changesBetween: (base, target) => scope.cancellation.signal.aborted ? null : this.changesBetween(base, target),
+        changesBetween: (base, target, logicalScope) => scope.cancellation.signal.aborted ? null : this.changesBetween(base, target, logicalScope),
         prepareReader: (endpoint, read) => this.prepareReader(endpoint, read, scope),
         prepareProjection: (endpoint, read) => this.prepareProjection(endpoint, read, scope),
       },
@@ -214,7 +217,7 @@ export class DocumentDelivery {
       progress?.cancellation.abort()
       if (progress) progress.connection.release(progress.identity)
       progress = {
-        kind: 'projection', connection,
+        kind: 'projection', connection, logicalRevisionScope: endpoint.logicalRevisionScope ?? null,
         identity: { documentId: this.incarnation, documentGeneration: 1, endpointGeneration: connection.generation, registrationId: connection.nextRegistration() },
         cancellation: new AbortController(), point: null, pending: null, receipt: null, read: null,
       }
@@ -234,7 +237,7 @@ export class DocumentDelivery {
     if (progress.point && progress.point.revision > target.revision)
       throw new DOMException('Projected source demand was superseded', 'AbortError')
     const base = progress.point ? this.wirePoint(progress.point) : null
-    const changes = progress.point ? this.buffer.changesBetweenDocumentSyncPoints(progress.point, target, null) : null
+    const changes = progress.point ? this.buffer.changesBetweenDocumentSyncPoints(progress.point, target, progress.logicalRevisionScope) : null
     const receipt = await progress.connection.admit({ identity: progress.identity, base, baseRead: progress.read, target: this.wirePoint(target), read, changes }, progress.cancellation.signal)
     if (this.disposed || this.endpoints.get(endpoint) !== progress)
       throw new DOMException('Document source scope was released', 'AbortError')

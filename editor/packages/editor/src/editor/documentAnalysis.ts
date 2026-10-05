@@ -1,3 +1,4 @@
+import { EditorEventSource } from './emitter'
 import type {
   EditorTextBuffer,
 } from '../documentSession'
@@ -20,6 +21,7 @@ import {
 } from '../syntax/session'
 import { DocumentDelivery, type DocumentRead, type DocumentContributionScope } from './documentDelivery'
 import { EditorWorkScheduler } from './workScheduler'
+import type { DocumentSyncPoint } from './editChain'
 import { bindDocumentOperation, retainDocumentOperation, type DocumentOperation, type DocumentOperationHost, type DocumentOperationOptions, type DocumentContributionLease, type ContributionEntry } from './contributionOperation'
 import type { EditorStructuralOperation, EditorHighlighterOperation } from '../document/operations'
 
@@ -155,7 +157,8 @@ export class AnalysisEntry<T> {
   private readonly cancellation = new AbortController()
   private interests = 0
   private lastRelease: number | null = null
-  private queuedRevision = -1
+  private queuedPoint: DocumentSyncPoint | null = null
+  private requests = 0
   private generation = 0
   private pendingInterest = new AbortController()
   private running = false
@@ -176,10 +179,12 @@ export class AnalysisEntry<T> {
     readonly sourceScope: DocumentContributionScope,
     readonly scheduler: EditorWorkScheduler,
     runtimeSessionId: string,
+    private readonly scheduling: 'requested' | 'ordered' = 'requested',
   ) {
     this.runtimeSessionId = runtimeSessionId
     this.state = { kind: 'pending', revision: buffer.getRevision() }
-    this.synchronize()
+    const read = delivery.current()
+    if (read) this.enqueue(read)
   }
 
   get signal(): AbortSignal {
@@ -237,18 +242,18 @@ export class AnalysisEntry<T> {
   read(): EditorAnalysisRead<T> {
     const revision = this.buffer.getRevision()
     if (this.cancellation.signal.aborted) return { kind: 'failed', revision, error: cancelled() }
-    return this.state.revision === revision ? this.state : { kind: 'pending', revision }
+    return this.queuedPoint === this.buffer.getDocumentSyncPoint() ? this.state : { kind: 'pending', revision }
   }
 
   changed(read: DocumentRead): void {
-    if (read.revision.point.revision <= this.queuedRevision) return
+    if (read.revision.point === this.queuedPoint) return
     this.enqueue(read)
   }
 
   synchronize(): void {
     const read = this.delivery.current()
-    if (!read || read.revision.point.revision === this.queuedRevision) return
-    this.enqueue(read)
+    if (!read || read.revision.point === this.queuedPoint) return
+    this.changed(read)
   }
 
   refresh(): void {
@@ -257,30 +262,36 @@ export class AnalysisEntry<T> {
   }
 
   async current(): Promise<T> {
-    const revision = this.buffer.getRevision()
-    const expectedGeneration = this.queuedRevision === revision ? this.generation : null
-    // Synchronous publication must enqueue its captured changes before a read repairs the head.
+    const point = this.buffer.getDocumentSyncPoint()
+    const expectedGeneration = this.queuedPoint === point ? this.generation : null
+    // Publication finishes before demand captures the corresponding analysis generation.
     await Promise.resolve()
-    this.assertCurrent(revision, expectedGeneration ?? this.generation)
+    this.assertCurrent(point, expectedGeneration ?? this.generation)
     this.synchronize()
     const generation = this.generation
-    await interruptible(this.completion, this.pendingInterest.signal)
-    this.assertCurrent(revision, generation)
-    const state = this.read()
-    if (state.kind === 'ready') return state.result
-    if (state.kind === 'failed') throw state.error
-    throw cancelled()
+    this.requests++
+    this.schedulePending()
+    try {
+      await interruptible(this.completion, this.pendingInterest.signal)
+      this.assertCurrent(point, generation)
+      const state = this.read()
+      if (state.kind === 'ready') return state.result
+      if (state.kind === 'failed') throw state.error
+      throw cancelled()
+    } finally {
+      this.requests--
+    }
   }
 
   async query(run: () => Promise<T>): Promise<T> {
     await this.current()
-    const revision = this.buffer.getRevision()
+    const point = this.buffer.getDocumentSyncPoint()
     const generation = this.generation
     const interest = this.pendingInterest.signal
-    this.assertCurrent(revision, generation)
+    this.assertCurrent(point, generation)
     const result = run()
     const value = await interruptible(interruptible(result, this.cancellation.signal), interest)
-    this.assertCurrent(revision, generation)
+    this.assertCurrent(point, generation)
     return value
   }
 
@@ -300,7 +311,7 @@ export class AnalysisEntry<T> {
     this.pendingInterest.abort()
     this.pendingInterest = new AbortController()
     const revision = read.revision.point.revision
-    this.queuedRevision = revision
+    this.queuedPoint = read.revision.point
     const generation = ++this.generation
     this.state = { kind: 'pending', revision }
     this.pending?.settle()
@@ -314,6 +325,7 @@ export class AnalysisEntry<T> {
 
   private schedulePending(): void {
     if (this.running || !this.pending || this.cancellation.signal.aborted) return
+    if (this.scheduling === 'requested' && this.requests === 0) return
     this.scheduler.schedule({
       key: this.runtimeSessionId,
       taskClass: 'background-derived',
@@ -330,9 +342,9 @@ export class AnalysisEntry<T> {
     const { revision, generation, read, snapshot } = demand
     try {
       const result = await this.session.analyze(read)
-      this.publish(revision, generation, { kind: 'ready', revision, snapshot, result })
+      this.publish(read.revision.point, generation, { kind: 'ready', revision, snapshot, result })
     } catch (error) {
-      this.publish(revision, generation, { kind: 'failed', revision, error })
+      this.publish(read.revision.point, generation, { kind: 'failed', revision, error })
     } finally {
       this.running = false
       demand.settle()
@@ -340,20 +352,20 @@ export class AnalysisEntry<T> {
     }
   }
 
-  private publish(revision: number, generation: number, state: EditorAnalysisRead<T>): void {
+  private publish(point: DocumentSyncPoint, generation: number, state: EditorAnalysisRead<T>): void {
     if (
       this.cancellation.signal.aborted ||
-      revision !== this.buffer.getRevision() ||
+      point !== this.buffer.getDocumentSyncPoint() ||
       generation !== this.generation
     )
       return
     this.state = state
   }
 
-  private assertCurrent(revision: number, generation = this.generation): void {
+  private assertCurrent(point: DocumentSyncPoint, generation = this.generation): void {
     if (
       this.cancellation.signal.aborted ||
-      revision !== this.buffer.getRevision() ||
+      point !== this.buffer.getDocumentSyncPoint() ||
       generation !== this.generation
     )
       throw cancelled()
@@ -381,7 +393,7 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     scheduler: EditorWorkScheduler,
     runtimeSessionId: string,
   ) {
-    super(buffer, structuralSession, delivery, sourceScope, scheduler, runtimeSessionId)
+    super(buffer, structuralSession, delivery, sourceScope, scheduler, runtimeSessionId, 'ordered')
   }
 
   canQueryRange(): boolean {
@@ -538,8 +550,18 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
 }
 
 export class HighlighterEntry extends AnalysisEntry<EditorHighlightResult> {
+  private readonly themes = new EditorEventSource<void>({ action: 'document.highlighter.theme' })
   constructor(buffer: EditorTextBuffer, readonly highlighterSession: EditorHighlighterRuntime, delivery: DocumentDelivery, sourceScope: DocumentContributionScope, scheduler: EditorWorkScheduler, runtimeSessionId: string) {
-    super(buffer, highlighterSession, delivery, sourceScope, scheduler, runtimeSessionId)
+    super(buffer, highlighterSession, delivery, sourceScope, scheduler, runtimeSessionId, 'ordered')
+    const unsubscribe = highlighterSession.onDidChangeTheme?.(() => {
+      this.refresh()
+      this.themes.fire()
+    })
+    if (unsubscribe) this.signal.addEventListener('abort', unsubscribe, { once: true })
+  }
+  onDidChangeTheme(listener: () => void): () => void {
+    const subscription = this.themes.subscribe(listener)
+    return () => subscription.dispose()
   }
 }
 
@@ -775,7 +797,7 @@ function structuralLease(
 }
 
 function highlighterLease(
-  entry: AnalysisEntry<EditorHighlightResult>,
+  entry: HighlighterEntry,
   session: EditorHighlighterRuntime,
   signal?: AbortSignal,
 ): EditorRetainedHighlighterSession {
@@ -791,7 +813,7 @@ function highlighterLease(
     onDidChangeTheme: session.onDidChangeTheme
       ? (listener) => {
           if (lease.signal.aborted) return
-          const unsubscribe = session.onDidChangeTheme?.(listener)
+          const unsubscribe = entry.onDidChangeTheme(listener)
           if (!unsubscribe) return
           const release = () => {
             unsubscribe?.()

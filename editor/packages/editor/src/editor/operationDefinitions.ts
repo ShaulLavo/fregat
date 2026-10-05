@@ -43,8 +43,6 @@ export class HighlighterDefinition extends DocumentOperation<EditorHighlighterSe
     const runtime = this.openRuntime({ ...input, documentId: host.documentId, source: sourceScope.source, initialRead, runtimeSessionId })
     if (!runtime) return null
     const entry = new HighlighterEntry(host.buffer, runtime, host.delivery, sourceScope, host.scheduler, runtimeSessionId)
-    const unsubscribe = runtime.onDidChangeTheme?.(() => entry.refresh())
-    if (unsubscribe) entry.signal.addEventListener('abort', unsubscribe, { once: true })
     return entry
   }
   protected createRuntimeSessionId(): string { return createEditorRuntimeSessionId() }
@@ -67,7 +65,7 @@ export function createEditorHighlighterOperation(
 }
 
 function readSource(source: DocumentContributionSource): EditorStructuralOperationContext['source'] {
-  return { read: revision => source.read(revision), changesBetween: (base, target) => source.changesBetween(base, target) }
+  return { read: revision => source.read(revision), changesBetween: (base, target, scope) => source.changesBetween(base, target, scope) }
 }
 
 export type DocumentOperationRuntime<Result> = {

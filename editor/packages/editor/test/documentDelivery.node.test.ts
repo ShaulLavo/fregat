@@ -1,6 +1,7 @@
+import { createDocumentLogicalRevisionScope } from '../src/editor/editChain'
 import { expect, it } from 'vitest'
-import { createEditorBufferSession, createEditorTextBuffer } from '../src/documentSession'
-import { DocumentDelivery, type DocumentSourceConnection, type DocumentSourceEndpoint } from '../src/editor/documentDelivery'
+import { createEditorBufferSession, createEditorTextBuffer, commitPreparedDocumentTransaction, prepareDocumentTransaction } from '../src/documentSession'
+import { DocumentDelivery, type DocumentSourceConnection, type DocumentSourceEndpoint, type DocumentProjectionEndpoint, type DocumentProjectionUpdate } from '../src/editor/documentDelivery'
 import { DocumentWorkerReader, type DocumentWorkerSourceCommand } from '../src/document/workerReader'
 
 function endpoint() {
@@ -146,4 +147,50 @@ it.each(['waiting', 'admitting'] as const)('settles a disposed %s scope independ
   waiting.dispose()
   expect(external.reader.inspect()).toEqual({ documents: 0, reads: 0, pins: 0, sourceUnits: 0 })
   await delivery.dispose()
+})
+
+it.each(['atomic', 'deferred', 'logical-only'] as const)('preserves scoped logical counts for %s projected delivery', async mode => {
+  const buffer = createEditorTextBuffer('abc')
+  const delivery = new DocumentDelivery(buffer, 'scoped.ts')
+  const unsubscribe = buffer.subscribe(event => delivery.accept(event))
+  const scope = createDocumentLogicalRevisionScope()
+  const peerScope = createDocumentLogicalRevisionScope()
+  const first = delivery.createScope()
+  const peer = delivery.createScope()
+  function projected(logicalRevisionScope: typeof scope) {
+    const updates: DocumentProjectionUpdate[] = []
+    let registration = 0
+    const connection = {
+      generation: 1, nextRegistration: () => ++registration,
+      admit: async (update: DocumentProjectionUpdate) => { updates.push(update); return { kind: 'delivered' as const, identity: update.identity, base: update.base, target: update.target } },
+      release: () => {},
+    }
+    const endpoint: DocumentProjectionEndpoint = { logicalRevisionScope, connect: async () => connection }
+    return { updates, endpoint }
+  }
+  const own = projected(scope)
+  const other = projected(peerScope)
+  const base = delivery.current()!
+  await first.source.prepareProjection(own.endpoint, base)
+  await peer.source.prepareProjection(other.endpoint, base)
+  const count = mode === 'deferred' ? 3 : 4
+  const edits = mode === 'logical-only' ? [{ from: 1, to: 2, text: 'b' }] : [{ from: 3, to: 3, text: 'X' }]
+  const committed = commitPreparedDocumentTransaction({ buffer, sourceView: null }, prepareDocumentTransaction(buffer, edits, count, scope), { history: { kind: 'external-barrier', groupId: 'scope' } })
+  expect(committed.status).toBe(mode === 'logical-only' ? 'logical-only' : 'committed')
+  if (mode === 'deferred') createEditorBufferSession(buffer).applyEdits([{ from: 4, to: 4, text: 'Y' }])
+  const target = delivery.current()!
+  expect(first.source.changesBetween(base.revision, target.revision, scope)?.logicalRevisionCount).toBe(4)
+  await first.source.prepareProjection(own.endpoint, target)
+  await peer.source.prepareProjection(other.endpoint, target)
+  expect(own.updates[1].changes?.logicalRevisionCount).toBe(4)
+  expect(other.updates[1].changes?.logicalRevisionCount).toBe(mode === 'deferred' ? 2 : mode === 'logical-only' ? 0 : 1)
+  expect(own.updates[1].baseRead).toBe(base)
+  expect(own.updates[1].read).toBe(target)
+  if (mode === 'logical-only') {
+    expect(target.text.readRange(0, target.text.length)).toBe(base.text.readRange(0, base.text.length))
+    expect(target.revision.point.textVersion).toBe(base.revision.point.textVersion)
+    expect(target.revision.point.revision).toBe(base.revision.point.revision + 1)
+    expect(own.updates[1].changes?.edits).toEqual([])
+  }
+  first.dispose(); peer.dispose(); unsubscribe(); await delivery.dispose()
 })
