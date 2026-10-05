@@ -45,9 +45,10 @@ let ownedChild: ReturnType<typeof spawn> | null = null
 let childClosed = false
 let cancelled = false
 const cleanup = { signalSent: false, forced: false, closeObserved: false }
+let shutdown: Promise<void> | null = null
 const stop = () => {
   cancelled = true
-  signalOwned('SIGTERM')
+  shutdown ??= stopOwned()
 }
 process.once('SIGINT', stop)
 process.once('SIGTERM', stop)
@@ -80,7 +81,7 @@ try {
   )
   process.exitCode = 1
 } finally {
-  await stopOwned()
+  await (shutdown ?? stopOwned())
   cleanup.closeObserved = childClosed
   await writeFile(join(output, 'cleanup.json'), JSON.stringify(cleanup, null, 2))
   process.removeListener('SIGINT', stop)
@@ -205,6 +206,7 @@ async function run() {
     return 0
   }
   phase = 'ports-and-prerequisites'
+  if (cancelled) throw new TypeError('Verification was cancelled before runtime')
   await assertFree(port)
   await assertFree(filePort)
   const configPath = join(output, 'retention.vitest.config.mts')
@@ -256,6 +258,7 @@ export default {
   )
   const command = ['--bun', 'vitest', 'run', '--config', configPath]
   phase = 'browser-spawn'
+  if (cancelled) throw new TypeError('Verification was cancelled before child creation')
   const child = spawn('bun', command, {
     cwd: join(repo, 'apps/web'),
     env: {
@@ -285,6 +288,7 @@ export default {
     })
   })
   await Promise.all(writes)
+  if (cancelled) throw new TypeError('Verification runtime was cancelled')
   phase = 'sample-validation'
   const parsed = await parseSamples(samplePath, new Set(fixtures.map((fixture) => fixture.id)))
   const samples = parsed.samples

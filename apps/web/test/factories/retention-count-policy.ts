@@ -5,7 +5,11 @@ import {
   type EditorSecondaryScheduledWorkHandle,
 } from '@singapore-editor/core/secondary-views'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
-import { Editor, type EditorDocumentAnalysis } from '@singapore-editor/core/editor'
+import {
+  Editor,
+  createEditorPreparedDocument,
+  type EditorDocumentAnalysis,
+} from '@singapore-editor/core/editor'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import type { EditorHighlighterProvider } from '@singapore-editor/core/extensions'
 import { createShikiWorkerOwner } from '@singapore-editor/core/shiki'
@@ -48,7 +52,13 @@ function observeRetentionWork() {
     provenance: string
     scheduledKeys: string[]
   }[] = []
-  const reads: { fullTextReads: number; sourceBytesRead: number; provenance: string }[] = []
+  const reads: {
+    fullTextReads: number
+    sourceBytesRead: number
+    provenance: string
+    stack: string | null
+  }[] = []
+  const attachments: { prepared: boolean }[] = []
   let generation = 0
   let provenance = 'application'
   const previousTrace = Reflect.get(globalThis, '__editorPerfTrace')
@@ -56,6 +66,18 @@ function observeRetentionWork() {
   Reflect.set(globalThis, '__editorPerfTrace', {})
   Reflect.set(globalThis, '__EDITOR_PERFORMANCE_DIAGNOSTICS__', (input: unknown) => {
     if (typeof previousDiagnostics === 'function') previousDiagnostics(input)
+    if (
+      typeof input === 'object' &&
+      input !== null &&
+      'name' in input &&
+      input.name === 'editor.document.attach' &&
+      'detail' in input &&
+      typeof input.detail === 'object' &&
+      input.detail !== null &&
+      'prepared' in input.detail &&
+      typeof input.detail.prepared === 'boolean'
+    )
+      attachments.push({ prepared: input.detail.prepared })
     if (
       typeof input !== 'object' ||
       input === null ||
@@ -71,6 +93,10 @@ function observeRetentionWork() {
       fullTextReads: detail.fullTextReads,
       sourceBytesRead: detail.sourceBytesRead,
       provenance,
+      stack:
+        detail.fullTextReads > 0
+          ? (new TypeError('Full source read diagnostic').stack ?? null)
+          : null,
     })
   })
   const schedule = EditorSecondaryViewScheduler.prototype.schedule
@@ -152,7 +178,7 @@ function observeRetentionWork() {
   }
   return {
     snapshot,
-    receipt: () => ({ requests, reads, state: snapshot() }),
+    receipt: () => ({ requests, reads, attachments, state: snapshot() }),
     publication() {
       generation++
     },
@@ -169,6 +195,7 @@ function observeRetentionWork() {
     async interval<T>(run: () => T, settle: () => Promise<void>) {
       const requestStart = requests.length
       const readStart = reads.length
+      const attachmentStart = attachments.length
       provenance = 'attachment-causal-work'
       try {
         const value = run()
@@ -177,6 +204,7 @@ function observeRetentionWork() {
           value,
           requests: requests.slice(requestStart),
           reads: reads.slice(readStart),
+          attachments: attachments.slice(attachmentStart),
           observation: snapshot(),
         }
       } finally {
@@ -321,6 +349,37 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     analysis.subscribeRetention(() => observation.publication()),
   )
   const views = new Set<{ dispose(): void; geometry(): ReturnType<typeof viewGeometry> }>()
+  const preparedViews = new Map<Analysis, ReturnType<typeof createEditorPreparedDocument>>()
+
+  async function prepareViewMetadata() {
+    for (const document of [a, b]) {
+      if (preparedViews.has(document.analysis))
+        throw new TypeError('Cold metadata is already retained')
+      const prepared = createEditorPreparedDocument({
+        analysis: document.analysis,
+        buffer: document.buffer,
+        documentId: document.analysis.documentId,
+        languageId: fixture.language,
+        configuredTabSize: 4,
+        tabSizePolicy: 'detect-indentation',
+        documentConfigurationTag: ['actual-view'],
+      })
+      preparedViews.set(document.analysis, prepared)
+      await prepared.fallbackReady
+    }
+  }
+  function metadataReceipt() {
+    return Array.from(preparedViews, ([analysis, prepared]) => ({
+      documentId: analysis.documentId,
+      estimatedBytes: prepared.estimatedBytes,
+      runtimeSessionIds: prepared.runtimeSessionIds(),
+      entries: analysis.inspectRetention().entries,
+    }))
+  }
+  function releaseViewMetadata() {
+    for (const prepared of preparedViews.values()) prepared.dispose()
+    preparedViews.clear()
+  }
 
   function viewGeometry(container: HTMLElement, name: string) {
     const scroll = container.querySelector('.editor-virtualized')
@@ -373,6 +432,9 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     pair.highlighter.dispose()
   }
   function createView(name: string, document = a) {
+    const preparedDocument = preparedViews.get(document.analysis)
+    if (!preparedDocument)
+      throw new TypeError('The actual cold prepared metadata is required for this host mount')
     const wrapper = window.document.createElement('div')
     const container = window.document.createElement('div')
     wrapper.dataset.retentionView = name
@@ -401,6 +463,8 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     scroll.style.minWidth = '0'
     editor.attachSession(createEditorBufferSession(document.buffer), {
       analysis: document.analysis,
+      preparedDocument,
+      documentConfigurationTag: ['actual-view'],
       documentId: document.analysis.documentId,
       languageId: fixture.language,
       structuralConfigurationTag: ['actual-view'],
@@ -428,34 +492,22 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     ])
     await pair.structural.queryRange({ startIndex: 0, endIndex: 2048 })
   }
+  function hasPendingRetentionMutation() {
+    return queries
+      .getMutationCache()
+      .findAll({ mutationKey: editorMutationKeys.analysisRetention() })
+      .some((mutation) => mutation.state.status === 'pending')
+  }
   async function settle() {
     await observation.frame()
     await Promise.resolve()
-    await expect
-      .poll(() =>
-        queries
-          .getMutationCache()
-          .findAll({
-            mutationKey: editorMutationKeys.analysisRetention(),
-          })
-          .some((mutation) => mutation.state.status === 'pending'),
-      )
-      .toBe(false)
+    await expect.poll(hasPendingRetentionMutation).toBe(false)
     await expect
       .poll(() => tree.inspect().pendingRequests + shiki.inspect().pendingRequests)
       .toBe(0)
     await Promise.all([tree.awaitIdleFence(), shiki.awaitIdleFence()])
     await Promise.resolve()
-    await expect
-      .poll(() =>
-        queries
-          .getMutationCache()
-          .findAll({
-            mutationKey: editorMutationKeys.analysisRetention(),
-          })
-          .some((mutation) => mutation.state.status === 'pending'),
-      )
-      .toBe(false)
+    await expect.poll(hasPendingRetentionMutation).toBe(false)
     await expect
       .poll(() => {
         const state = observation.snapshot()
@@ -572,6 +624,9 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     borrow,
     release,
     createView,
+    prepareViewMetadata,
+    metadataReceipt,
+    releaseViewMetadata,
     assertGeometry,
     refresh,
     settle,
@@ -592,6 +647,7 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     async dispose() {
       try {
         for (const view of views) view.dispose()
+        releaseViewMetadata()
         application.dispose()
       } finally {
         for (const stop of stopPublications) stop()

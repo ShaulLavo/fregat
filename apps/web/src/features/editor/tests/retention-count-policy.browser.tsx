@@ -94,6 +94,12 @@ async function verifyFixture(fixture: RetentionRun['fixtures'][number], cycles: 
     await verifyText(host, host.a, `dirty ${host.expectedSource}`, 'canonical-a-ingested-dirty', 0)
     await verifyText(host, host.b, host.expectedSource, 'canonical-b-ingested', 0)
     await verifyIdleInspectors(host, b, fixture.id)
+    await host.prepareViewMetadata()
+    await record({
+      ...(await host.sample('cold-initial-prepared-metadata', 0, [b])),
+      metadata: host.metadataReceipt(),
+      coldWork: host.observation.receipt(),
+    })
     bView = host.createView('b', host.b)
     await verifyProviderBaseline(host, fixture)
     await host.refresh(b, host.b.analysis)
@@ -120,6 +126,15 @@ async function verifyFixture(fixture: RetentionRun['fixtures'][number], cycles: 
     await verifyGlobalEnvironments(host, b, cycles)
     await verifyPendingFailed(host, b, cycles)
     await verifyGrowthControl(host, b, cycles)
+    await record({
+      ...(await host.sample('late-metadata-before-release', cycles, [b])),
+      metadata: host.metadataReceipt(),
+    })
+    host.releaseViewMetadata()
+    await record({
+      ...(await host.sample('late-metadata-after-release', cycles, [b])),
+      metadata: host.metadataReceipt(),
+    })
     host.application.getSnapshot().editor.dispose()
     await host.settle()
     expect(
@@ -543,9 +558,11 @@ async function verifyActualViews(
         runtimeIds: reused,
         requests: interval.requests,
         sourceReads: interval.reads,
+        attachments: interval.attachments,
         completion: interval.observation,
       })
       expect(reused).toEqual(ids)
+      expect(interval.attachments).toEqual([{ prepared: true }])
       assertWarmInterval(interval)
       expect(bView.editor.getSelections()).toEqual(bSelection)
     } finally {
@@ -558,18 +575,9 @@ async function verifyActualViews(
 }
 
 function assertWarmInterval(interval: Awaited<ReturnType<Host['observation']['interval']>>) {
-  const mandatory = interval.requests
-    .filter((request) => request.provenance !== 'verifier-inspector')
-    .filter(
-      (request) =>
-        request.type !== 'queryRange' ||
-        !request.scheduledKeys.some(
-          (key) => key.includes('warmRange') || key.includes('prefetchRange'),
-        ) ||
-        request.scheduledKeys.some(
-          (key) => key.includes('visibleRange') || key.includes('.document'),
-        ),
-    )
+  const mandatory = interval.requests.filter(
+    (request) => request.provenance !== 'verifier-inspector',
+  )
   expect(mandatory).toEqual([])
   expect(
     interval.reads
