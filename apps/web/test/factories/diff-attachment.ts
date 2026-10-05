@@ -15,7 +15,7 @@ import {
   createTabPresentation,
   type DiffPanePresentation,
 } from '@/features/editor/state/tab-presentation'
-import { onTestFinished } from 'vitest'
+import { onTestFinished, vi } from 'vitest'
 
 export function projectionControl(
   file: DiffFile,
@@ -23,6 +23,53 @@ export function projectionControl(
   revision = 'initial',
 ): DiffAttachment {
   return { kind: 'projection-control', subject, revision, file }
+}
+
+export function observeDiffEditors() {
+  const editors = new Map<
+    DiffGutterSide,
+    { editor: Editor; context: EditorViewContributionContext | null }
+  >()
+  const openDocument = Editor.prototype.openDocument
+  const observed = vi.spyOn(Editor.prototype, 'openDocument').mockImplementation(function (
+    this: Editor,
+    ...args: Parameters<Editor['openDocument']>
+  ) {
+    const result = openDocument.apply(this, args)
+    const id = args[0].documentId
+    const side = observedSide(id)
+    if (!id?.startsWith('projection:diff:')) return result
+    if (editors.get(side)?.editor === this) return result
+    const entry: { editor: Editor; context: EditorViewContributionContext | null } = {
+      editor: this,
+      context: null,
+    }
+    editors.set(side, entry)
+    this.addPlugin({
+      name: 'diff-editor-observer',
+      activate: (owner) =>
+        owner.registerViewContribution({
+          createContribution(context) {
+            entry.context = context
+            return {
+              update() {},
+              dispose() {
+                entry.context = null
+              },
+            }
+          },
+        }),
+    })
+    return result
+  })
+  onTestFinished(() => observed.mockRestore())
+  return {
+    read(side: DiffGutterSide) {
+      const entry = editors.get(side)
+      if (!entry?.context) throw new RangeError('Actual diff editor observer is unavailable')
+      return { editor: entry.editor, snapshot: entry.context.getSnapshot() }
+    },
+  }
 }
 
 export function mountDiffProjectionControl(
@@ -113,4 +160,10 @@ export function mountDiffProjectionControl(
         .reduce((offset, entry) => offset + entry.text.length + 1, 0)
     },
   }
+}
+
+function observedSide(id: string | undefined): DiffGutterSide {
+  if (id?.endsWith(':old')) return 'old'
+  if (id?.endsWith(':new')) return 'new'
+  return 'stacked'
 }

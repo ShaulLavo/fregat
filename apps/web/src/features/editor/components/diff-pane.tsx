@@ -68,7 +68,11 @@ export function DiffPane({
   theme: EditorTheme
   onFocus?: (side: DiffGutterSide) => void
   onRegisterEditor?: (side: DiffGutterSide, editor: Editor | null) => void
-  onScroll?: (side: DiffGutterSide, position: DiffScrollPosition) => void
+  onScroll?: (
+    side: DiffGutterSide,
+    position: DiffScrollPosition,
+    kind: 'restoration' | 'scroll',
+  ) => void
 }) {
   const file = attachment.file
   const [localPresentation] = useState(() => createTabPresentation().diffPanes[side])
@@ -217,9 +221,11 @@ export function DiffPane({
     const editor = controller.getEditor()
     if (!editor || !onScroll) return
 
-    const subscription = editor.onDidScroll((position) => onScroll(side, position))
+    const subscription = editor.onDidScroll((position) =>
+      onScroll(side, position, persistence?.isRestoringProjection() ? 'restoration' : 'scroll'),
+    )
     return () => subscription.dispose()
-  }, [controller, onScroll, side])
+  }, [controller, onScroll, persistence, side])
 
   useLayoutEffect(() => {
     if (!onRegisterEditor) return

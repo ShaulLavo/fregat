@@ -193,7 +193,7 @@ export function createDiffPresentationBinding(
     installed = { ...installed, tokens }
   }
 
-  return { plugin, detach, restore, publish, publishTokens }
+  return { plugin, detach, restore, publish, publishTokens, isRestoringProjection: () => !restored }
 }
 
 function sameConfiguration(left: SyntaxConfiguration, right: SyntaxConfiguration): boolean {

@@ -1,3 +1,5 @@
+import { renderHook } from '@testing-library/react'
+import { useDiffPanes } from '@/features/editor/hooks/use-diff-panes'
 import { historyComparisonFixture } from '../../../../test/factories/history-document'
 import { testScopedStorage } from '../../../../test/factories/scoped-storage'
 import {
@@ -17,6 +19,7 @@ import { expect, test } from '../../../../test/fixtures'
 import {
   projectionControl,
   mountDiffProjectionControl,
+  observeDiffEditors,
 } from '../../../../test/factories/diff-attachment'
 import { createSnapshotComparisonFixture } from '../../../../test/factories/snapshot-comparison'
 import { stubEditorViewport } from '../../../../test/env/editor-viewport'
@@ -419,5 +422,151 @@ test('history revisit refuses different actual snapshots under equal node IDs an
     replacement.release()
     first.store.getState().disposeEditorDocuments()
     second.store.getState().disposeEditorDocuments()
+  }
+})
+
+test('split expansion retains the active pane selection and both source viewport positions', async () => {
+  const before = Array.from({ length: 70 }, (_, index) => `line${index + 1} ${'x'.repeat(100)}`)
+  const after = before.map((line, index) =>
+    index === 1 || index === 54 ? `${line} changed` : line,
+  )
+  const attachment = projectionControl(
+    createTextDiff({
+      oldFile: { path: 'source.txt', text: before.join('\n') },
+      newFile: { path: 'source.txt', text: after.join('\n') },
+    }),
+  )
+  const presentation = createTabPresentation()
+  const observed = observeDiffEditors()
+  renderWithProviders(
+    <DiffEditor attachment={attachment} mode='split' presentation={presentation} />,
+  )
+  await waitFor(() =>
+    expect(observed.read('new').snapshot.viewport.clientHeight).toBeGreaterThan(0),
+  )
+  const plugin = presentation.diffPanes.new.plugin
+  if (!plugin) throw new RangeError('Actual split plugin required')
+  const index = plugin.getRows().findIndex((row) => row.newLineNumber === 55)
+  const offset = plugin
+    .getRows()
+    .slice(0, index)
+    .reduce((sum, row) => sum + row.text.length + 1, 0)
+  const newSide = observed.read('new')
+  newSide.editor.setScrollPosition({
+    top: index * newSide.snapshot.metrics.rowHeight - 24,
+    left: 40,
+  })
+  newSide.editor.setSelection(offset, offset + 6, { reveal: false })
+  const oldScroll = newSide.editor.getScrollPosition()
+  expect(oldScroll.top).toBeGreaterThan(0)
+  const key = plugin.getRows().find((row) => row.expandKey)?.expandKey
+  if (!key) throw new RangeError('Actual split collapsed range required')
+  plugin.toggleRegion(key)
+  const next = observed.read('new')
+  const selected = next.snapshot.selections[0]!
+  expect(next.editor.materializeFullText().slice(selected.startOffset, selected.endOffset)).toBe(
+    'line55',
+  )
+  const row = plugin.getRows().findIndex((entry) => entry.newLineNumber === 55)
+  expect(row * next.snapshot.metrics.rowHeight - next.editor.getScrollPosition().top).toBe(
+    index * next.snapshot.metrics.rowHeight - oldScroll.top,
+  )
+  expect(observed.read('old').editor.getScrollPosition()).toEqual(next.editor.getScrollPosition())
+  expect(next.editor.getScrollPosition().left).toBe(oldScroll.left)
+})
+
+test('split restoration and a delayed identical notification preserve user axis deltas', () => {
+  const { result } = renderHook(() => useDiffPanes())
+  const controller = result.current
+  const file = createTextDiff({
+    oldFile: {
+      path: 'source.txt',
+      text: Array.from({ length: 100 }, () => 'old ' + 'x'.repeat(90)).join('\n'),
+    },
+    newFile: {
+      path: 'source.txt',
+      text: Array.from({ length: 100 }, () => 'new ' + 'x'.repeat(130)).join('\n'),
+    },
+    contextLines: 100,
+  })
+  const left = mountDiffProjectionControl(projectionControl(file), 'old')
+  const right = mountDiffProjectionControl(projectionControl(file), 'new')
+  controller.registerEditor('old', left.editor)
+  controller.registerEditor('new', right.editor)
+  const l = left.editor.onDidScroll((position) =>
+    controller.handleScroll(
+      'old',
+      position,
+      left.binding.isRestoringProjection() ? 'restoration' : 'scroll',
+    ),
+  )
+  const r = right.editor.onDidScroll((position) =>
+    controller.handleScroll(
+      'new',
+      position,
+      right.binding.isRestoringProjection() ? 'restoration' : 'scroll',
+    ),
+  )
+  const mirrored = vi.spyOn(right.editor, 'setScrollPosition')
+  try {
+    left.editor.setScrollPosition({ top: 120, left: 40 })
+    controller.handleScroll('old', left.editor.getScrollPosition(), 'restoration')
+    controller.handleScroll('new', right.editor.getScrollPosition(), 'restoration')
+    mirrored.mockClear()
+    controller.handleScroll('old', left.editor.getScrollPosition(), 'scroll')
+    expect(mirrored).not.toHaveBeenCalled()
+    left.editor.setScrollPosition({ top: 168 })
+    expect(mirrored).toHaveBeenCalledTimes(1)
+    expect(right.editor.getScrollPosition()).toEqual(left.editor.getScrollPosition())
+    mirrored.mockClear()
+    left.editor.setScrollPosition({ left: 64 })
+    expect(mirrored).toHaveBeenCalledTimes(1)
+    expect(right.editor.getScrollPosition()).toEqual(left.editor.getScrollPosition())
+  } finally {
+    l.dispose()
+    r.dispose()
+    mirrored.mockRestore()
+  }
+})
+
+test('a failing mirrored scroll listener releases the split interleaving guard', () => {
+  const { result } = renderHook(() => useDiffPanes())
+  const controller = result.current
+  const file = createTextDiff({
+    oldFile: {
+      path: 'source.txt',
+      text: Array.from({ length: 100 }, (_, index) => `old ${index}`).join('\n'),
+    },
+    newFile: {
+      path: 'source.txt',
+      text: Array.from({ length: 100 }, (_, index) => `new ${index}`).join('\n'),
+    },
+    contextLines: 100,
+  })
+  const left = mountDiffProjectionControl(projectionControl(file), 'old')
+  const right = mountDiffProjectionControl(projectionControl(file), 'new')
+  controller.registerEditor('old', left.editor)
+  controller.registerEditor('new', right.editor)
+  const l = left.editor.onDidScroll((position) =>
+    controller.handleScroll('old', position, 'scroll'),
+  )
+  const r = right.editor.onDidScroll((position) =>
+    controller.handleScroll('new', position, 'scroll'),
+  )
+  let reported = false
+  const failed = right.editor.onDidScroll(() => {
+    reported = true
+    throw new RangeError('Injected mirrored scroll callback failure')
+  })
+  try {
+    left.editor.setScrollPosition({ top: 120 })
+    expect(reported).toBe(true)
+    failed.dispose()
+    right.editor.setScrollPosition({ top: 168 })
+    expect(left.editor.getScrollPosition().top).toBe(168)
+  } finally {
+    failed.dispose()
+    l.dispose()
+    r.dispose()
   }
 })
