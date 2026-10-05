@@ -26,6 +26,7 @@ export function createForgeDiscussionBoundary() {
     failReview: false,
     beforePost: async () => {},
     beforeRead: async () => {},
+    beforeCommentsRead: async () => {},
     beforeActivityRead: async () => {},
   }
   const run: NonNullable<ForgeBoundaries['run']> = async ({ argv, input, cwd }) => {
@@ -68,6 +69,7 @@ export function createForgeDiscussionBoundary() {
       if (!argv.includes('POST')) {
         reads.push('comments')
         await control.beforeRead()
+        await control.beforeCommentsRead()
         return ok(JSON.stringify(comments))
       }
       const { body } = JSON.parse(input ?? '{}') as { body: string }
