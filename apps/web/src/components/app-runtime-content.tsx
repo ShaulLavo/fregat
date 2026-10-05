@@ -8,6 +8,7 @@ import { ComposerAttachProvider } from '@/providers/composer-attach-provider'
 import { DiagnosticFixProvider } from '@/providers/diagnostic-fix-provider'
 import { useDisplayedShell } from '@/features/workspace/hooks/use-displayed-shell'
 import { PresentationContext } from '@workspace/ui/patterns/sheet'
+import { WorkspaceEditPreviewDialog } from '@/features/editor/components/workspace-edit-preview-dialog'
 
 export function AppRuntimeContent() {
   const { dirtyTabCloseDialog, requestCloseTab, requestCloseTabs } = useDirtyTabCloseRequest()
@@ -25,6 +26,7 @@ export function AppRuntimeContent() {
         requestCloseTabs={requestCloseTabs}
       >
         <CommandProvider>
+          <WorkspaceEditPreviewDialog />
           <ComposerAttachProvider>
             <DiagnosticFixProvider>
               <AppShell

@@ -8,7 +8,7 @@ import {
   type DiffPlugin,
 } from '@singapore-editor/diff'
 import type { TabId } from '@/lib/documents/utils/types'
-import type { EditorScrollPosition } from '@singapore-editor/core/editor'
+import type { Editor, EditorScrollPosition } from '@singapore-editor/core/editor'
 import type { EditorTextBuffer } from '@singapore-editor/core/document'
 import type { DiffPaneAnchors } from '@/features/editor/utils/diff-source-anchors'
 import {
@@ -19,6 +19,26 @@ import {
 } from '@/lib/diff-attachment'
 
 export type DiffScrollPosition = Required<EditorScrollPosition>
+
+export type DiffPanePublication = {
+  readonly attachment: DiffAttachment
+  readonly side: DiffGutterSide
+  readonly editor: Editor
+  readonly documentId: string
+  readonly textVersion: number
+  readonly geometryCommitted: true
+  readonly viewportWidth: number
+  readonly viewportHeight: number
+  readonly visibleRowCount: number
+  readonly projectionLength: number
+}
+
+export type DiffPanePublicationEvent = {
+  readonly kind: 'presented' | 'withdrawn'
+  readonly publication: DiffPanePublication
+}
+
+export type DiffPanePublicationSink = (event: DiffPanePublicationEvent) => void
 
 export type DiffInputClaim = {
   readonly buffer: WeakRef<EditorTextBuffer> | null

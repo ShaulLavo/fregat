@@ -1,5 +1,10 @@
 import { sameGitInputRevision } from '@/lib/documents/utils/comparisons'
-import type { EditorTextBuffer, HistoryComparisonSide } from '@singapore-editor/core/document'
+import type {
+  DocumentTextSnapshot,
+  EditorTextBuffer,
+  HistoryComparisonSide,
+} from '@singapore-editor/core/document'
+import type { PreparedWorkspaceTextSegment } from '@singapore-editor/lsp-plugin/workspace-edit'
 import type { DiffFile } from '@singapore-editor/diff'
 import type {
   DocumentKey,
@@ -57,10 +62,29 @@ export type HistoryComparisonInput = {
   readonly new: HistoryComparisonSide
   readonly coverage: 'full' | 'too-large'
 }
+export type OperationComparisonInput = {
+  readonly kind: 'operation'
+  readonly subject: string
+  readonly scope: SnapshotComparisonScope
+  readonly root: {
+    readonly generation: number
+    readonly path: FilesystemPath
+    readonly uriPath: FilesystemPath
+    readonly workspacePath: FilesystemPath
+  }
+  readonly operationId: string
+  readonly operationIndex: number
+  readonly path: FilesystemPath
+  readonly segment: PreparedWorkspaceTextSegment
+  readonly old: DocumentTextSnapshot
+  readonly new: DocumentTextSnapshot
+  readonly display: DiffFile
+}
 export type SnapshotComparisonInput =
   | SnapshotGitComparisonInput
   | CheckpointComparisonInput
   | HistoryComparisonInput
+  | OperationComparisonInput
 export type SnapshotComparisonRead =
   | { readonly kind: 'ready'; readonly input: SnapshotComparisonInput }
   | { readonly kind: 'released'; readonly reason: 'interest-ended' | 'owner-disposed' }
@@ -127,5 +151,37 @@ export function sameHistoryCapture(
 function sameHistorySide(left: HistoryComparisonSide, right: HistoryComparisonSide): boolean {
   return (
     left.id === right.id && left.revision === right.revision && left.snapshot === right.snapshot
+  )
+}
+
+export function operationComparisonSubject(
+  input: Omit<OperationComparisonInput, 'subject'>,
+): string {
+  return JSON.stringify([
+    'operation',
+    input.scope.environmentId,
+    input.scope.rootPath,
+    input.root.generation,
+    input.root.uriPath,
+    input.root.workspacePath,
+    input.operationId,
+    input.operationIndex,
+    input.segment.segmentIndex,
+    input.segment.uri,
+  ])
+}
+
+export function sameOperationCapture(
+  left: OperationComparisonInput,
+  right: OperationComparisonInput,
+): boolean {
+  return (
+    operationComparisonSubject(left) === operationComparisonSubject(right) &&
+    left.root.path === right.root.path &&
+    left.path === right.path &&
+    left.segment === right.segment &&
+    left.old.snapshot === right.old.snapshot &&
+    left.new.snapshot === right.new.snapshot &&
+    left.display === right.display
   )
 }
