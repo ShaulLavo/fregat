@@ -21,17 +21,29 @@ document contributions. Prepared, diff, snippet and excerpt callers use that own
 provider factories, generic source cursors and duplicate delivery paths are removed. Unit 7 adds
 an AST ownership check with 29 adversarial probes to the normal gates, verification and CI.
 
-The integrated correctness evidence includes 3,444 core checks with one skipped case, real worker
-transport and mounted highlighting checks, and six retained Platform browser cases without
-unhandled errors. The draft's CI still needs caller-fixture and inventory reconciliation. These
-results establish the checked behavior; they do not close the performance or retention gates.
+Current delivery CI passes, including the reconciled caller fixtures, inventory, all 413 stress
+checks, real worker transport, and mounted highlighting. The app doctor, CRLF diff syntax, and
+typing/Undo scenarios pass with reviewed screenshots and an exactly restored Unicode fixture.
 
-Final qualification compares untouched pre-cutover main `03facb356` with candidate `806317781`,
-using matched external dependencies and the repaired measurement instrument `74b65e35`.
-Documentation and test-only follow-ups retain those product bytes. Fresh controls are being
-verified before default, full-matrix, loaded and reliability acceptance. Source-volume and E001
-retention coverage remain open. The historical instrument `341` Undo failure, 215 of 216 passing
-keys, remains preserved with its original identity and earns no final-candidate acceptance.
+Qualification uses untouched main `51d2a71ae` and candidate `9e773c8fa`, with equal external
+dependencies and measurement `b615d5ab` / validation `e76f680d`. Fresh input, frame, detection-floor,
+and native controls pass. The default Platform/native comparison passes all 216 blocking checks
+in 566.201 seconds within its 900-second budget, with exact raw replay and complete cleanup.
+The ten-configuration matrix, current loaded reliability, and qualifying multiple-consumer
+improvement remain open. Default budget agreement alone does not establish that improvement.
+
+The [bounded source and ownership proof](../docs/document-contributions/source-ownership-proof.md)
+passes the paired 605-check source workloads, candidate lifetime checks, separate fresh-owner
+tails, and actual public LSP serialization. It preserves the baseline's physical-restart failure
+and reports a higher candidate main-renderer heap. Complete allocated memory remains unavailable.
+Version-only delivery metadata retains the measured source, compiled bytes, export resolution,
+and external dependency closure; the original qualification identities remain unchanged.
+
+Calibrated app acceptance remains open. The corrected fixture prevents automatic adjacent-tab
+preparation from contaminating cold/query-only samples. Its first fresh calibration passes, while
+the second preserves a prepared-300 startup miss for root-cause work. Full host gates and delivery
+remain required. The historical instrument `341` Undo failure, 215 of 216 passing keys, stays
+archived under its original identity and supplies no final-candidate acceptance.
 
 The sections below retain the design, unit contracts and historical decisions. The current
 authorization is Approved; remaining gates require evidence and delivery, not another owner decision.
