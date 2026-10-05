@@ -57,14 +57,12 @@ test.for(['shiki', 'tree-sitter'] as const)(
         JSON.stringify({
           family,
           requests: gate.requests(),
-          marks: performance
-            .getEntriesByName('editor.worker.request')
-            .map((entry) => ({
-              name: entry.name,
-              startTime: entry.startTime,
-              duration: entry.duration,
-              detail: entry instanceof PerformanceMark ? entry.detail : null,
-            })),
+          marks: performance.getEntriesByName('editor.worker.request').map((entry) => ({
+            name: entry.name,
+            startTime: entry.startTime,
+            duration: entry.duration,
+            detail: entry instanceof PerformanceMark ? entry.detail : null,
+          })),
         }),
         'retention-acceptance-worker-gate-calibration',
       )
