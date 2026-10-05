@@ -3,7 +3,12 @@ import {
   type FilesystemConflict,
   type RetainedFilesystemComparison,
 } from '@/features/editor/state/conflict-state'
-import { filesystemDiffAttachment } from '@/lib/diff-attachment'
+import { useEditorDocumentState } from '@/features/editor/state/document-state'
+import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
+import {
+  filesystemDiffAttachment,
+  type SettingsComparisonPresentation,
+} from '@/lib/diff-attachment'
 import { DiffEditor } from '@/features/editor/components/diff-editor'
 import { Button } from '@workspace/ui/components/button'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
@@ -66,6 +71,7 @@ import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavaila
 const NO_ADDITIONAL_PLUGINS: readonly EditorPlugin[] = []
 
 type EditorProps = {
+  settingsComparison?: SettingsComparisonPresentation | null
   active: boolean
   document: EditorRenderDocument | null
   /** Omitted means "no snapshot"; a null key would detach the document inside useEditor. */
@@ -92,6 +98,7 @@ type EditorProps = {
 }
 
 export function Editor({
+  settingsComparison = null,
   active,
   additionalPlugins = NO_ADDITIONAL_PLUGINS,
   definitionTarget,
@@ -150,6 +157,41 @@ export function Editor({
     if (!seed || target.kind !== 'conflict') return
     setCaptureView({ conflictId: target.conflictId, seed, meaning: 'seed' })
   }, [seed, target])
+  const environmentId = useEditorDocumentState((state) => state.environmentId)
+  const workspaceRoot = useEditorWorkspaceState((state) => state.rootFolder?.path ?? null)
+  const settingsInput = settingsComparison?.read.input
+  const admittedSettings =
+    target.kind === 'settings-json' &&
+    suppliedDocument?.target.kind === 'settings-json' &&
+    suppliedDocument.target.target === target.target &&
+    settingsInput &&
+    settingsInput.key === documentKey(target) &&
+    suppliedDocument.key === settingsInput.key &&
+    settingsInput.target === target.target &&
+    settingsInput.local.buffer === suppliedDocument.buffer &&
+    settingsInput.scope.environmentId === environmentId &&
+    workspaceRoot !== null &&
+    settingsInput.scope.rootPath === workspaceRoot &&
+    (!settingsComparison?.attachment ||
+      (settingsInput.confirmed.kind === 'confirmed' &&
+        settingsComparison.attachment.read === settingsComparison.read))
+      ? settingsComparison
+      : null
+  const [shownSettings, setShownSettings] = useState<SettingsComparisonPresentation | null>(null)
+  if (admittedSettings?.attachment && shownSettings !== admittedSettings)
+    setShownSettings(admittedSettings)
+  const heldSettings =
+    shownSettings &&
+    admittedSettings &&
+    shownSettings.read.input.key === admittedSettings.read.input.key &&
+    shownSettings.read.input.local.buffer === admittedSettings.read.input.local.buffer &&
+    shownSettings.read.input.scope.environmentId ===
+      admittedSettings.read.input.scope.environmentId &&
+    shownSettings.read.input.scope.rootPath === admittedSettings.read.input.scope.rootPath
+      ? shownSettings
+      : null
+  if (shownSettings && !heldSettings && !admittedSettings?.attachment) setShownSettings(null)
+  const settingsDisplay = admittedSettings?.attachment ? admittedSettings : heldSettings
   const undoBarrierPlugin = useUndoBarrierPlugin(key)
   const resource = filesystemResource(currentTarget)
   const filePath = languageServerTarget?.matchPath ?? documentSourcePath(currentTarget) ?? ''
@@ -469,6 +511,30 @@ export function Editor({
   // The notice is a row under the frame, so it never covers the last lines of the document.
   return (
     <>
+      {admittedSettings ? (
+        <div
+          className='flex h-48 min-h-0 shrink-0 flex-col overflow-hidden'
+          role='region'
+          aria-label='Settings comparison'
+        >
+          <PaneBar>
+            <span className='text-xs font-medium'>Your edits</span>
+            <span className='text-xs font-medium'>Latest version</span>
+            {!admittedSettings.attachment ? (
+              <Spinner size='xs' label='Loading confirmed comparison' />
+            ) : null}
+          </PaneBar>
+          <div className='min-h-0 flex-1'>
+            {settingsDisplay?.attachment ? (
+              <DiffEditor attachment={settingsDisplay.attachment} mode='stacked' />
+            ) : (
+              <div className='flex h-full items-center justify-center'>
+                <Spinner size='sm' label='Loading comparison' />
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
       <EditorFrame
         active={active && focusTarget.focused}
         controller={controller}

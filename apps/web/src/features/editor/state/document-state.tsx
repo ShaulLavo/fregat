@@ -52,6 +52,7 @@ type EditorDocumentStoreActions = {
   acquireFilePreparation: WorkspaceDocumentService['acquireFilePreparation']
   enumerateEditorAnalyses: WorkspaceDocumentService['enumerateEditorAnalyses']
   subscribeEditorAnalyses: WorkspaceDocumentService['subscribeEditorAnalyses']
+  acquireSettingsComparison: WorkspaceDocumentService['acquireSettingsComparison']
   acquireSnapshotComparison: (
     request: import('@/lib/snapshot-comparison').SnapshotComparisonRequest,
   ) => import('@/lib/snapshot-comparison').SnapshotComparisonLease
@@ -226,6 +227,7 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
         },
         enumerateEditorAnalyses: () => service.enumerateEditorAnalyses(),
         subscribeEditorAnalyses: (listener) => service.subscribeEditorAnalyses(listener),
+        acquireSettingsComparison: (request) => service.acquireSettingsComparison(request),
         acquireSnapshotComparison: (request) => service.acquireSnapshotComparison(request),
         prepareSnapshotComparisonTab: (tabId, request) =>
           service.prepareSnapshotComparisonTab(tabId, request),

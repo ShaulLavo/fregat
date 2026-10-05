@@ -7,8 +7,13 @@ import type {
   HistoryComparisonInput,
   OperationComparisonInput,
   FilesystemComparisonInput,
+  SettingsComparisonInput,
 } from '@/lib/snapshot-comparison'
-import { operationComparisonSubject, filesystemComparisonSubject } from '@/lib/snapshot-comparison'
+import {
+  operationComparisonSubject,
+  filesystemComparisonSubject,
+  settingsComparisonSubject,
+} from '@/lib/snapshot-comparison'
 import { materializeFileSnapshotText } from '@/lib/file-snapshot'
 import { languageIdForFilePath } from '@/lib/file-language'
 
@@ -23,6 +28,11 @@ type TextChild = Exclude<SnapshotComparisonFile, { kind: 'no-text' }>
 type ReadySaved = Extract<SavedComparisonRead, { kind: 'ready' }>
 
 export type DiffAttachment =
+  | {
+      readonly kind: 'settings'
+      readonly read: ReadyComparison & { readonly input: SettingsComparisonInput }
+      readonly file: DiffFile
+    }
   | {
       readonly kind: 'filesystem'
       readonly read: ReadyFilesystem
@@ -147,6 +157,11 @@ export function diffAttachmentSubject(attachment: DiffAttachment): DiffAttachmen
         buffer: read.live.buffer,
       }
     }
+    case 'settings':
+      return {
+        key: settingsComparisonSubject(attachment.read.input),
+        buffer: attachment.read.input.local.buffer,
+      }
     case 'filesystem': {
       const capture = attachment.read.input.capture
       return {
@@ -204,6 +219,13 @@ export function diffAttachmentRevision(attachment: DiffAttachment): string {
       return attachment.revision
     case 'saved':
       return JSON.stringify([attachment.read.live.revision, attachment.read.saved.snapshot.version])
+    case 'settings':
+      return JSON.stringify([
+        attachment.read.input.local.revision,
+        attachment.read.input.confirmed.kind === 'confirmed'
+          ? attachment.read.input.confirmed.revision
+          : null,
+      ])
     case 'filesystem': {
       const { local, incoming, eventType } = attachment.read.input.capture
       return JSON.stringify([
@@ -243,6 +265,14 @@ export function diffAttachmentLines(
   attachment: DiffAttachment,
 ): Readonly<Record<'old' | 'new', readonly string[] | null>> {
   switch (attachment.kind) {
+    case 'settings':
+      return {
+        old:
+          attachment.read.input.confirmed.kind === 'confirmed'
+            ? splitTextLines(attachment.read.input.confirmed.reader.materializeFullText())
+            : null,
+        new: splitTextLines(attachment.read.input.local.snapshot.materializeFullText()),
+      }
     case 'filesystem': {
       const { local, incoming } = attachment.read.input.capture
       return {
@@ -285,6 +315,14 @@ export function diffAttachmentReferences(attachment: DiffAttachment): readonly o
       return [attachment.read.live.snapshot, attachment.read.saved.snapshot]
     case 'history':
       return [attachment.read.input.old.snapshot, attachment.read.input.new.snapshot]
+    case 'settings':
+      return [
+        attachment.read.input.local.buffer,
+        attachment.read.input.local.snapshot.snapshot,
+        ...(attachment.read.input.confirmed.kind === 'confirmed'
+          ? [attachment.read.input.confirmed.reader]
+          : []),
+      ]
     case 'filesystem': {
       const capture = attachment.read.input.capture
       const references: object[] = [capture, attachment.file]
@@ -301,4 +339,39 @@ export function diffAttachmentReferences(attachment: DiffAttachment): readonly o
   }
   const exhaustive: never = attachment
   return exhaustive
+}
+
+export type SettingsComparisonPresentation = {
+  readonly read: ReadyComparison & { readonly input: SettingsComparisonInput }
+  readonly attachment: Extract<DiffAttachment, { kind: 'settings' }> | null
+}
+export function settingsDiffAttachment(
+  read: SnapshotComparisonRead | null,
+): Extract<DiffAttachment, { kind: 'settings' }> | null {
+  if (
+    !read ||
+    read.kind !== 'ready' ||
+    !isSettingsRead(read) ||
+    read.input.confirmed.kind !== 'confirmed'
+  )
+    return null
+  const input = read.input
+  const file = createTextDiff({
+    oldFile: {
+      path: `settings.json (confirmed ${input.target})`,
+      languageId: 'json',
+      text: read.input.confirmed.reader.materializeFullText(),
+    },
+    newFile: {
+      path: `settings.json (current ${input.target})`,
+      languageId: 'json',
+      text: input.local.snapshot.materializeFullText(),
+    },
+  })
+  return { kind: 'settings', read, file }
+}
+export function isSettingsRead(
+  read: ReadyComparison,
+): read is ReadyComparison & { readonly input: SettingsComparisonInput } {
+  return read.input.kind === 'settings'
 }
