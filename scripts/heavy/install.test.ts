@@ -139,7 +139,8 @@ test.skipIf(!userScopes || !checkoutClean)(
   () => {
     const head = run('git', ['rev-parse', 'HEAD']).stdout.trim()
     const root = temp('heavy-install-root-')
-    expect(run('bun', [INSTALL, '--root', root, '--commit', head]).code).toBe(0)
+    const installed = run('bun', [INSTALL, '--root', root, '--commit', head])
+    expect(installed.code, installed.stderr).toBe(0)
     expect(readlinkSync(path.join(root, 'current'))).toBe(head)
     expect(readdirSync(path.join(root, head)).toSorted()).toEqual([
       'commit',
