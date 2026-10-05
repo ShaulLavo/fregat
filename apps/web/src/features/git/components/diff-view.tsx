@@ -86,7 +86,7 @@ export function DiffView({
     languageHost,
   )
 
-  if (!pending && !failure && diffs.length === 0) {
+  if (!pending && !failure && (source?.input.files.length ?? diffs.length) === 0) {
     return (
       <EditorTabPlaceholder tabId={tabId}>
         <DiffNotice message={emptyDiffNotice(comparison, rootPath)} />

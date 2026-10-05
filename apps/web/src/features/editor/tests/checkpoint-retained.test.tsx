@@ -25,7 +25,7 @@ import {
   writeWorkspaceSliceCache,
 } from '@/features/workspace/state/cache'
 import { snapshotComparisonQueryOptions } from '@/lib/snapshot-comparison-query'
-import { createObservedInProcessClient } from '../../../../test/client'
+import { createObservedInProcessClient, createCuttableEventsClient } from '../../../../test/client'
 import { createTestApplicationRuntime } from '../../../../test/factories/application-runtime'
 import { CheckpointOpen } from '../../../../test/factories/checkpoint-open'
 import { checkpointTurn } from '../../../../test/factories/checkpoint-turn'
@@ -168,8 +168,15 @@ test('counted hunks retain false policy through intent, real open and empty-orig
   queries.clear()
 })
 
-for (const kind of ['turn', 'session'] as const) {
-  test(`${kind} retains both captured files and hydrates only the displayed child`, async ({
+for (const [kind, response] of [
+  ['turn', 'full'],
+  ['session', 'full'],
+  ['turn', 'size'],
+  ['turn', 'foreign-path'],
+  ['turn', 'foreign-pair'],
+  ['turn', 'missing-identity'],
+] as const) {
+  test(`${kind} ${response} response retains captured files and hydrates only compatible displayed sources`, async ({
     client,
     server,
   }) => {
@@ -191,6 +198,23 @@ for (const kind of ['turn', 'session'] as const) {
         : checkpointSessionDocument(h.summary, root, true)
     const listed = await queries.query(snapshotComparisonQueryOptions(document.source))
     expect(listed).toHaveLength(2)
+    const controlled = createCuttableEventsClient(server, (request) => {
+      const url = new URL(request.url)
+      if (url.pathname !== '/git/diff/blob' || response === 'full') return
+      requests.push(url)
+      const original = listed[0]!
+      const answer = { ...original, oldText: 'before\n', newText: 'after\n' }
+      if (response === 'size')
+        return Response.json([
+          { ...original, omitted: 'size', oldText: undefined, newText: undefined },
+        ])
+      if (response === 'foreign-path') return Response.json([{ ...answer, path: 'foreign.txt' }])
+      if (response === 'foreign-pair')
+        return Response.json([{ ...answer, newObjectId: 'f'.repeat(40) }])
+      return Response.json([{ ...answer, oldFileMissing: true }])
+    })
+    if (response !== 'full')
+      registerEnvironmentQueryClient(queries, originForQueryClient(queries), controlled.client)
     const tab = tabId(`retained-${kind}`)
     runtime.editorActivation.activate(documentTab(document), tab)
     const lease = runtime.documentStore.getState().snapshotComparisonTabs.get(tab)!
@@ -209,7 +233,10 @@ for (const kind of ['turn', 'session'] as const) {
     )
     await waitFor(() => {
       const read = lease.read()
-      expect(read.kind === 'ready' && read.input.files[0]?.kind).toBe('full')
+      expect(requests.filter((url) => url.pathname === '/git/diff/blob')).toHaveLength(1)
+      expect(read.kind === 'ready' && read.input.files[0]?.kind).toBe(
+        response === 'full' ? 'full' : 'partial',
+      )
     })
     const read = lease.read()
     if (read.kind !== 'ready' || read.input.kind !== 'checkpoint')
@@ -221,9 +248,15 @@ for (const kind of ['turn', 'session'] as const) {
     expect(read.input.files[1]?.hunks).toBe(listed[1]!.hunks)
     expect(read.input.files[1]?.kind).toBe('partial')
     const full = read.input.files[0]
-    if (full?.kind !== 'full') throw new RangeError('full displayed child required')
-    expect(full.old).toMatchObject({ kind: 'blob', text: 'before\n' })
-    expect(full.new).toMatchObject({ kind: 'blob', text: 'after\n' })
+    if (response === 'full' && full?.kind === 'full') {
+      expect(full.old).toMatchObject({ kind: 'blob', text: 'before\n' })
+      expect(full.new).toMatchObject({ kind: 'blob', text: 'after\n' })
+    }
+    if (response !== 'full') {
+      expect(full?.kind === 'partial' && full.display[0]?.isPartial).toBe(true)
+      expect(full && 'old' in full).toBe(false)
+      expect(await screen.findByRole('status')).toHaveTextContent('Changed lines only.')
+    }
     const blobs = requests.filter((url) => url.pathname === '/git/diff/blob')
     expect(blobs).toHaveLength(1)
     expect(blobs[0]!.searchParams.get('path')).toBe(listed[0]!.path)
@@ -239,6 +272,7 @@ for (const kind of ['turn', 'session'] as const) {
     expect(lease.read()).toEqual({ kind: 'released', reason: 'interest-ended' })
     expect(external.read()).toEqual({ kind: 'released', reason: 'owner-disposed' })
     expect(runtime.documentStore.getState().snapshotComparisons.size).toBe(0)
+    controlled.endEventStreams()
     queries.clear()
   })
 }

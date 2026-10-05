@@ -92,7 +92,7 @@ function checkpointFile(
   source: GitFileDiff,
   revision: GitInputRevision,
 ): SnapshotComparisonFile {
-  if (diff.omitted || source.omitted) return { kind: 'no-text', reason: 'size' }
+  if (diff.omitted) return { kind: 'no-text', reason: 'size' }
   if (isBinaryGitDiff(diff)) return { kind: 'no-text', reason: 'binary' }
   if (
     source.path !== diff.path ||

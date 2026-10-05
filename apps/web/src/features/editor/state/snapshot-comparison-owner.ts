@@ -42,9 +42,10 @@ export function createSnapshotComparisonOwner(
   function settle(tabId: TabId, binding: Binding) {
     if (disposed || binding.controller.signal.aborted || bindings.get(tabId) !== binding) return
     if (!snapshotComparisonIsAdmitted(queries, binding.scope.rootPath, binding.comparison)) return
-    const data = queries.getQueryData<readonly GitFileDiff[]>(
+    const cached = queries.getQueryData<readonly GitFileDiff[]>(
       snapshotComparisonQueryOptions(binding.comparison).queryKey,
     )
+    const data = binding.comparison.kind === 'snapshot' ? cached : (binding.data ?? cached)
     if (!data) return
     const previous = documents.getState().snapshotComparisonTabs.get(tabId)?.read()
     const displayed = binding.comparison.kind === 'snapshot' ? null : displayedCheckpointEntry(data)

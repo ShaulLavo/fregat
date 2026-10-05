@@ -43,10 +43,7 @@ export function withCheckpointSources(
     Boolean(answer.newFileMissing) !== Boolean(displayed.newFileMissing)
   )
     return diffs
-  if (answer.omitted)
-    return diffs.map((entry) =>
-      entry === displayed ? { ...entry, omitted: answer.omitted } : entry,
-    )
+  if (answer.omitted) return diffs
   if (answer?.oldText === undefined || answer.newText === undefined) return diffs
 
   return diffs.map((entry) =>

@@ -23,9 +23,17 @@ test('same checkpoint range with changed actual refs has separate immutable capt
   const comparison = checkpointTurnDocument(h.summary, scope.rootPath, false).source
   const firstDiffs = await fetchCheckpointDiff(checkpointRequest(comparison), undefined, client)
   const firstInput = checkpointComparisonInput({ scope, comparison, diffs: firstDiffs })
+  const queries = runtime.queryClient
+  const key = snapshotComparisonQueryOptions(comparison).queryKey
+  queries.setQueryData(key, firstDiffs)
+  const owner = createSnapshotComparisonOwner(runtime.documentStore, queries)
+  const tab = tabId('captured-checkpoint')
+  owner.prepare(tab, scope, comparison)
+  const logical = runtime.documentStore.getState().snapshotComparisonTabs.get(tab)!
   const first = runtime.documentStore
     .getState()
     .acquireSnapshotComparison({ input: firstInput, signal: new AbortController().signal })
+  const held = logical.read()
   await writeFile(join(server.root, 'app.txt'), 'replacement\n')
   runGit(server.root, [
     '-c',
@@ -46,6 +54,10 @@ test('same checkpoint range with changed actual refs has separate immutable capt
   expect(first.read()).toEqual({ kind: 'ready', input: firstInput })
   expect(second.read()).toEqual({ kind: 'ready', input: secondInput })
   expect(first.refresh(secondInput, first.requestRefresh())).toBe(false)
+  queries.setQueryData(key, secondDiffs)
+  expect(runtime.documentStore.getState().snapshotComparisonTabs.get(tab)).toBe(logical)
+  expect(logical.read()).toBe(held)
+  owner.dispose()
   first.release()
   expect(second.read().kind).toBe('ready')
   second.release()
