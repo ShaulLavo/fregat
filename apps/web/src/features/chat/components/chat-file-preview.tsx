@@ -1,18 +1,20 @@
 import { isPdfFile } from '@/lib/pdf-viewer/format'
 import { PdfPresentation } from '@/components/pdf-viewer/presentation'
-import { useState } from 'react'
-import { useQuery, type QueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useMutation, useQuery, type QueryClient } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
 import { Dialog, DialogContent, DialogTitle } from '@workspace/ui/components/dialog'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { formatSize } from '@/lib/path-formatters'
 import {
+  acquireAttachmentText,
   attachmentFileUrl,
   attachmentTextOptions,
   canPreviewAttachmentText,
 } from '../utils/attachment-file'
 import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 import { errorMessage } from '@/lib/error-message'
+import { chatMutationKeys } from '../utils/mutation-keys'
 
 export function ChatFilePreview({
   input,
@@ -27,27 +29,47 @@ export function ChatFilePreview({
   const url = attachmentFileUrl(attachment, origin)
   const pdf = isPdfFile(attachment.name, attachment.mimeType)
   const previewable = !pdf && canPreviewAttachmentText(attachment)
+  const options = attachmentTextOptions(input)
+  const staged = input.provenance === 'staged'
   const preview = useQuery(
+    { ...options, enabled: previewable && !staged, subscribed: !staged },
+    queryClient,
+  )
+  const acquisition = useMutation(
     {
-      ...attachmentTextOptions(input),
-      enabled: previewable,
-      refetchOnMount: input.provenance === 'staged' ? 'always' : true,
+      mutationKey: chatMutationKeys.attachmentPreview(options.queryKey),
+      networkMode: 'always',
+      mutationFn: (request: {
+        input: typeof input
+        queryClient: QueryClient
+        signal: AbortSignal
+      }) => acquireAttachmentText(request.input, request.queryClient, request.signal),
     },
     queryClient,
   )
+  const { mutate } = acquisition
+  useEffect(() => {
+    if (!previewable || !staged) return
+    const controller = new AbortController()
+    mutate({ input, queryClient, signal: controller.signal })
+    return () => controller.abort()
+  }, [input, queryClient, previewable, staged, mutate])
   const [held, setHeld] = useState<{
     input: typeof input
     queryClient: QueryClient
     capture: NonNullable<typeof preview.data> | null
   }>({ input, queryClient, capture: null })
   const sameOwner = held.input === input && held.queryClient === queryClient
-  const capture = sameOwner ? held.capture : null
+  const currentAcquisition =
+    acquisition.variables?.input === input && acquisition.variables.queryClient === queryClient
+  const stagedCapture = currentAcquisition ? acquisition.data : null
+  const sentCapture = sameOwner ? held.capture : null
+  const capture = staged ? stagedCapture : sentCapture
   if (!sameOwner) setHeld({ input, queryClient, capture: null })
-  const acquired =
-    preview.isSuccess &&
-    (input.provenance === 'sent' || preview.isFetchedAfterMount) &&
-    !preview.isFetching
+  const acquired = preview.isSuccess && !staged && !preview.isFetching
   if (!capture && acquired) setHeld({ input, queryClient, capture: preview.data })
+  const failed = staged ? currentAcquisition && acquisition.isError : preview.isError
+  const failure = staged ? acquisition.error : preview.error
   return (
     <Dialog
       open
@@ -67,18 +89,26 @@ export function ChatFilePreview({
             <PdfPresentation source={{ kind: 'attachment', origin, attachment }} />
           </div>
         )}
-        {previewable && !capture && !preview.isError && (
-          <Spinner size='lg' label='Loading file preview' />
-        )}
-        {previewable && !capture && preview.isError && (
+        {previewable && !capture && !failed && <Spinner size='lg' label='Loading file preview' />}
+        {previewable && !capture && failed && (
           <div className='text-destructive text-xs' role='alert'>
             Could not load this file.{' '}
-            <Button size='xs' variant='ghost' onClick={() => void preview.refetch()}>
+            <Button
+              size='xs'
+              variant='ghost'
+              onClick={() => {
+                if (!staged) {
+                  void preview.refetch()
+                  return
+                }
+                if (currentAcquisition && acquisition.variables) mutate(acquisition.variables)
+              }}
+            >
               Retry
             </Button>
             <FixWithAgentButton
               error={{
-                message: errorMessage(preview.error, 'Could not load this file.'),
+                message: errorMessage(failure, 'Could not load this file.'),
                 title: `Preview of ${attachment.name}`,
               }}
             />

@@ -1,3 +1,4 @@
+import { gzipSync, brotliCompressSync } from 'node:zlib'
 import {
   createDraftSessionSubmission,
   createWorkspaceProjectCommand,
@@ -646,3 +647,201 @@ test('actual session admission seals sent bytes and Infinity reuses the exact ca
     owner.clear()
   }
 })
+
+test.each([
+  { encoding: 'gzip', compress: gzipSync },
+  { encoding: 'br', compress: brotliCompressSync },
+])('F2 decoded $encoding body accepts its encoded HTTP length', async ({ encoding, compress }) => {
+  const bytes = new TextEncoder().encode('a'.repeat(512))
+  const wireLength = compress(bytes).byteLength
+  expect(wireLength).not.toBe(bytes.byteLength)
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes)
+      controller.close()
+    },
+  })
+  const owner = new QueryClient()
+  try {
+    const capture = await owner.query(
+      attachmentTextOptions(
+        {
+          attachment: {
+            type: 'file',
+            id: 'encoded',
+            name: 'encoded.txt',
+            mimeType: 'text/plain',
+            sizeBytes: bytes.length,
+          },
+          environmentId: TEST_ENVIRONMENT_ID,
+          origin: 'http://external-transport.invalid',
+          provenance: 'staged',
+        },
+        async () =>
+          new Response(body, {
+            headers: {
+              'content-encoding': encoding,
+              'content-length': String(wireLength),
+              'content-type': 'text/plain; charset=utf-8',
+            },
+          }),
+      ),
+    )
+    expect(capture.kind).toBe('attachment')
+    if (capture.kind !== 'attachment') return expect.fail('Expected decoded text capture')
+    expect(capture.bytes).toEqual(bytes)
+    expect(capture.reader.readRange(0, capture.reader.length)).toBe('a'.repeat(512))
+    expect(capture.decoded).toMatchObject({ encoding: 'utf8', lossy: false })
+    expect(body.locked).toBe(false)
+  } finally {
+    owner.clear()
+  }
+})
+
+test('F2 identity transfer keeps MIME parameters and valid zero chunks', async () => {
+  const bytes = new TextEncoder().encode('valid')
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new Uint8Array())
+      controller.enqueue(bytes.subarray(0, 2))
+      controller.enqueue(new Uint8Array())
+      controller.enqueue(bytes.subarray(2))
+      controller.close()
+    },
+  })
+  const owner = new QueryClient()
+  try {
+    const capture = await owner.query(
+      attachmentTextOptions(
+        {
+          attachment: {
+            type: 'file',
+            id: 'identity',
+            name: 'identity.txt',
+            mimeType: 'text/plain',
+            sizeBytes: bytes.length,
+          },
+          environmentId: TEST_ENVIRONMENT_ID,
+          origin: 'http://external-transport.invalid',
+          provenance: 'staged',
+        },
+        async () =>
+          new Response(body, {
+            headers: {
+              'content-encoding': 'identity',
+              'content-length': String(bytes.length),
+              'content-type': 'text/plain; charset=utf-8',
+            },
+          }),
+      ),
+    )
+    expect(capture.kind).toBe('attachment')
+    if (capture.kind !== 'attachment') return expect.fail('Expected identity text')
+    expect(capture.bytes).toEqual(bytes)
+    expect(capture.reader.readRange(0, capture.reader.length)).toBe('valid')
+    expect(body.locked).toBe(false)
+  } finally {
+    owner.clear()
+  }
+})
+
+test('F2 mismatched identity length still refuses before reading and releases the body', async () => {
+  let canceled = false
+  const body = new ReadableStream<Uint8Array>({
+    cancel() {
+      canceled = true
+    },
+  })
+  const owner = new QueryClient()
+  try {
+    await expect(
+      owner.query(
+        attachmentTextOptions(
+          {
+            attachment: {
+              type: 'file',
+              id: 'identity-mismatch',
+              name: 'identity.txt',
+              mimeType: 'text/plain',
+              sizeBytes: 3,
+            },
+            environmentId: TEST_ENVIRONMENT_ID,
+            origin: 'http://external-transport.invalid',
+            provenance: 'staged',
+          },
+          async () =>
+            new Response(body, {
+              headers: {
+                'content-encoding': 'identity',
+                'content-length': '4',
+                'content-type': 'text/plain',
+              },
+            }),
+        ),
+      ),
+    ).rejects.toMatchObject({
+      internal: {
+        reason: 'advertised-length',
+        receivedBytes: 0,
+        expectedBytes: 3,
+        advertisedBytes: 4,
+      },
+    })
+    expect(canceled).toBe(true)
+    expect(body.locked).toBe(false)
+  } finally {
+    owner.clear()
+  }
+})
+
+test.each([
+  { bytes: new TextEncoder().encode('ab'), reason: 'length', receivedBytes: 2 },
+  { bytes: new TextEncoder().encode('abcd'), reason: 'excess', receivedBytes: 4 },
+])(
+  'F2 encoded transport still rejects actual-body $reason',
+  async ({ bytes, reason, receivedBytes }) => {
+    let canceled = false
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes)
+        if (reason === 'length') controller.close()
+      },
+      cancel() {
+        canceled = true
+      },
+    })
+    const owner = new QueryClient()
+    try {
+      await expect(
+        owner.query(
+          attachmentTextOptions(
+            {
+              attachment: {
+                type: 'file',
+                id: 'encoded-bound',
+                name: 'encoded.txt',
+                mimeType: 'text/plain',
+                sizeBytes: 3,
+              },
+              environmentId: TEST_ENVIRONMENT_ID,
+              origin: 'http://external-transport.invalid',
+              provenance: 'staged',
+            },
+            async () =>
+              new Response(body, {
+                headers: {
+                  'content-encoding': 'gzip',
+                  'content-length': String(gzipSync(bytes).byteLength),
+                  'content-type': 'text/plain',
+                },
+              }),
+          ),
+        ),
+      ).rejects.toMatchObject({ internal: { reason, receivedBytes, expectedBytes: 3 } })
+      expect(body.locked).toBe(false)
+      if (reason === 'excess') expect(canceled).toBe(true)
+    } finally {
+      owner.clear()
+    }
+  },
+)

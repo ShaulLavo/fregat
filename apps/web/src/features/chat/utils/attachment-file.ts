@@ -6,7 +6,7 @@ import {
   type EnvironmentId,
 } from '@workspace/contracts'
 import { createStringTextSnapshot } from '@singapore-editor/core'
-import { queryOptions } from '@tanstack/react-query'
+import { QueryObserver, queryOptions, type QueryClient } from '@tanstack/react-query'
 import { createStructuredError } from '@workspace/observability/errors'
 import { attachmentQueryKeys } from './query-keys'
 
@@ -85,6 +85,55 @@ export function attachmentTextOptions(
   })
 }
 
+export async function acquireAttachmentText(
+  input: Parameters<typeof attachmentTextOptions>[0],
+  queryClient: QueryClient,
+  signal: AbortSignal,
+) {
+  signal.throwIfAborted()
+  const options = attachmentTextOptions(input)
+  const earlier = queryClient.getQueryCache().find({ queryKey: options.queryKey })
+  if (earlier?.state.fetchStatus !== 'idle' && earlier?.promise) {
+    await waitForQuery(
+      earlier.promise.then(
+        () => undefined,
+        () => undefined,
+      ),
+      signal,
+    )
+  }
+  signal.throwIfAborted()
+  const current = queryClient.getQueryCache().find({ queryKey: options.queryKey })
+  const peerRead = current?.state.fetchStatus !== 'idle' && current?.promise
+  const read = queryClient.query(options)
+  const observer = peerRead ? null : new QueryObserver(queryClient, { ...options, enabled: false })
+  const unsubscribe = observer?.subscribe(() => undefined)
+  if (unsubscribe) signal.addEventListener('abort', unsubscribe, { once: true })
+  if (signal.aborted) unsubscribe?.()
+  try {
+    const capture = await waitForQuery(read, signal)
+    signal.throwIfAborted()
+    return capture
+  } finally {
+    if (unsubscribe) signal.removeEventListener('abort', unsubscribe)
+    unsubscribe?.()
+  }
+}
+
+async function waitForQuery<T>(read: Promise<T>, signal: AbortSignal) {
+  let abort: () => void = () => undefined
+  const canceled = new Promise<never>((_resolve, reject) => {
+    abort = () => reject(signal.reason)
+    if (signal.aborted) return abort()
+    signal.addEventListener('abort', abort, { once: true })
+  })
+  try {
+    return await Promise.race([read, canceled])
+  } finally {
+    signal.removeEventListener('abort', abort)
+  }
+}
+
 async function readAttachmentBytes(
   response: Response,
   attachment: Extract<ChatAttachment, { type: 'file' }>,
@@ -141,9 +190,13 @@ function validateResponseMetadata(
   attachment: Extract<ChatAttachment, { type: 'file' }>,
 ) {
   const advertisedLength = response.headers.get('content-length')
+  const encoding = response.headers.get('content-encoding')
+  const identityTransfer =
+    !encoding || encoding.split(',').every((coding) => coding.trim().toLowerCase() === 'identity')
   if (
     advertisedLength !== null &&
-    (!/^\d+$/u.test(advertisedLength) || Number(advertisedLength) !== attachment.sizeBytes)
+    (!/^\d+$/u.test(advertisedLength) ||
+      (identityTransfer && Number(advertisedLength) !== attachment.sizeBytes))
   ) {
     throw previewError('advertised-length', {
       expectedBytes: attachment.sizeBytes,

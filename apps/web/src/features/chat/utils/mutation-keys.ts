@@ -1,6 +1,9 @@
+import type { attachmentQueryKeys } from './query-keys'
 import type { ProviderInstanceId } from '@workspace/contracts'
 
 export const chatMutationKeys = {
+  attachmentPreview: (key: ReturnType<typeof attachmentQueryKeys.text>) =>
+    ['chat', 'attachment-preview', ...key] as const,
   mermaidRender: ['chat', 'mermaid-render'] as const,
   openReviewSource: (environmentId: string) =>
     ['chat', 'open-review-source', environmentId] as const,
