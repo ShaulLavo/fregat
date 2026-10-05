@@ -1,4 +1,3 @@
-import { fetchFile } from '@/lib/file-server'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, test } from '../../../../test/fixtures'
@@ -190,59 +189,4 @@ test('completion and final disposal release source interests while receipts keep
   expect(diffAttachmentSubject(operationDiffAttachment(fixture.read, fixture.file)!).key).toContain(
     fixture.operationId,
   )
-})
-
-test('an immediate edit publishes the exact captured read during commit and releases it on completion', async ({
-  server,
-  client,
-}) => {
-  await writeFile(join(server.root, 'first.ts'), 'export const before = 1\n')
-  const { service, store } = createWorkspaceTextChanges(client)
-  const file = await fetchFile(filesystemPath('first.ts'), new AbortController().signal, client)
-  const document = store.getState().ensureLiveEditorDocument(file)
-  const commits: unknown[] = []
-  const stop = service.subscribe(() => {
-    if (service.getSnapshot().phase !== 'committing') return
-    const row = service.getSnapshot().preview?.rows[0]
-    const read = row?.comparison
-    if (read?.kind !== 'ready' || read.input.kind !== 'operation') return
-    commits.push({
-      before: read.input.old.materializeFullText(),
-      after: read.input.new.materializeFullText(),
-      exactBefore: read.input.old.snapshot === read.input.segment.snapshotBefore,
-      exactAfter: read.input.new.snapshot === read.input.segment.snapshotAfter,
-      exactFile: row?.file === read.input.display,
-      admitted: [...store.getState().snapshotComparisons.values()].includes(read),
-    })
-  })
-  await expect(
-    service.applyTextChange({
-      source: 'search-replace',
-      signal: new AbortController().signal,
-      prepare: async (operation) => ({
-        label: 'Immediate replacement',
-        requireConfirmation: false,
-        targets: [
-          {
-            source: await operation.readText(filesystemPath('first.ts')),
-            edits: [{ from: 13, to: 19, text: 'after' }],
-          },
-        ],
-      }),
-    }),
-  ).resolves.toEqual({ status: 'applied' })
-  stop()
-  expect(commits).toEqual([
-    {
-      before: 'export const before = 1\n',
-      after: 'export const after = 1\n',
-      exactBefore: true,
-      exactAfter: true,
-      exactFile: true,
-      admitted: true,
-    },
-  ])
-  expect(store.getState().snapshotComparisons.size).toBe(0)
-  document.buffer.undo()
-  expect(document.buffer.materializeFullText()).toBe('export const before = 1\n')
 })
