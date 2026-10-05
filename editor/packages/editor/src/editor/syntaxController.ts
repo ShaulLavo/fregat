@@ -32,7 +32,6 @@ import type { TextEdit } from '../tokens'
 import { foldRangeKey } from './folds'
 import type { EditorSyntaxStatus } from './types'
 import { LatestAsyncRequest } from './latestAsyncRequest'
-import { getEditorSyntaxSessionFactory } from './runtime'
 import { syntaxRefreshDelay, SYNTAX_REFRESH_MAX_DELAY_MS } from './editorUtils'
 import type {
   EditorPreparedDocument,
@@ -304,9 +303,8 @@ export class EditorSyntaxController {
     }
   }
 
-  private structuralProviderKind(): 'plugin' | 'factory' | null {
+  private structuralProviderKind(): 'plugin' | null {
     if (this.options.pluginHost.hasSyntaxProviders()) return 'plugin'
-    if (getEditorSyntaxSessionFactory()) return 'factory'
     return null
   }
 
@@ -441,12 +439,7 @@ export class EditorSyntaxController {
     this.failedHighlightRefreshes = 0
     this.highlighterSession =
       prepared?.highlighter?.session ??
-      this.createHighlighterSession(
-        document.documentId,
-        document.languageId,
-        document.textSnapshot,
-        document.snapshot,
-      )
+      this.createHighlighterSession(document.languageId)
     if (prepared?.highlighter) this.retainedHighlighter = prepared.highlighter.session
     this.preparedHighlighterDisposer = prepared?.highlighter?.dispose ?? null
     this.observeHighlighterTheme()
@@ -814,12 +807,7 @@ export class EditorSyntaxController {
     const session = this.options.getSession()
     if (!session) return
 
-    this.highlighterSession = this.createHighlighterSession(
-      this.options.getCurrentSessionDocumentId(),
-      this.options.getLanguageId(),
-      session.getTextSnapshot(),
-      session.getSnapshot(),
-    )
+    this.highlighterSession = this.createHighlighterSession(this.options.getLanguageId())
     this.refreshHighlighterTheme()
     this.refreshHighlightTokens(this.options.getDocumentVersion(), null, options)
     this.observeHighlighterTheme()
@@ -838,8 +826,6 @@ export class EditorSyntaxController {
       includeHighlights: !this.highlighterSession,
       includeCaptures,
       syntaxMode: 'range' as const,
-      textSnapshot: document.textSnapshot,
-      snapshot: document.snapshot,
     }
     const provider = this.options.pluginHost.getSyntaxProvider()
     this.retainedSyntax =
@@ -851,11 +837,7 @@ export class EditorSyntaxController {
           })
         : null
     this.retainedSyntax?.setDisplayDemand({ kind: 'unknown' })
-    const session =
-      this.retainedSyntax ??
-      this.options.pluginHost.createSyntaxSession(sessionOptions) ??
-      getEditorSyntaxSessionFactory()?.(sessionOptions) ??
-      null
+    const session = this.retainedSyntax
     if (session) {
       recordEditorPerformanceDiagnostic('editor.syntax.session_created', {
         family: 'structural',
@@ -1001,12 +983,7 @@ export class EditorSyntaxController {
     this.disposeHighlighterSession()
     const session = this.options.getSession()
     if (!session) return
-    this.highlighterSession = this.createHighlighterSession(
-      this.options.getCurrentSessionDocumentId(),
-      this.options.getLanguageId(),
-      session.getTextSnapshot(),
-      session.getSnapshot(),
-    )
+    this.highlighterSession = this.createHighlighterSession(this.options.getLanguageId())
     this.refreshHighlightTokens(documentVersion, null)
     this.observeHighlighterTheme()
   }
@@ -1022,10 +999,7 @@ export class EditorSyntaxController {
   }
 
   private createHighlighterSession(
-    documentId: string,
     languageId: EditorSyntaxLanguageId | null,
-    textSnapshot: DocumentTextSnapshot,
-    snapshot: PieceTableSnapshot,
   ): EditorHighlighterSession | null {
     const provider = this.options.pluginHost.getHighlighterProvider()
     this.retainedHighlighter =
@@ -1036,14 +1010,7 @@ export class EditorSyntaxController {
             configurationTag: this.highlighterConfigurationTag,
           })
         : null
-    const session =
-      this.retainedHighlighter ??
-      this.options.pluginHost.createHighlighterSession({
-        documentId,
-        languageId,
-        textSnapshot,
-        snapshot,
-      })
+    const session = this.retainedHighlighter
     if (session) {
       recordEditorPerformanceDiagnostic('editor.syntax.session_created', {
         family: 'highlighter',

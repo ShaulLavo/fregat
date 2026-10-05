@@ -1,25 +1,17 @@
-import { documentSessionChangeTextSnapshot, type DocumentSessionChange } from '../documentSession'
-import type { DocumentTextSnapshot } from '../documentTextSnapshot'
-import {
-  applyBatchToPieceTable,
-  diffPieceTableSnapshots,
-  type PieceTableSnapshot,
-  pieceTableSnapshotsHaveSameText,
-} from '@singapore-editor/textbuffer'
-import type { TextEdit } from '../tokens'
+import type { DocumentRead, DocumentSourceConnection, DocumentSourceEndpoint } from '../editor/documentDelivery'
+import { decodeDocumentWorkerReply, type DocumentWorkerReadReference } from '../document/workerReader'
+import type { HighlighterOperationContext } from '../editor/operationDefinitions'
 
 import { EditorTokenStore } from '../syntax/tokenStore'
 import type {
   EditorHighlightResult,
-  EditorHighlighterSession,
-  EditorHighlighterSessionOptions,
+  EditorHighlighterRuntime,
 } from '../syntax/highlighter'
 import { createEditorRuntimeSessionId } from '../syntax/session'
 import type { EditorTheme } from '../theme'
 import type {
   ShikiWorkerDocumentOptions,
   ShikiWorkerEditRequest,
-  ShikiWorkerHighlightRequest,
   ShikiWorkerLanguageRegistration,
   ShikiWorkerRequest,
   ShikiWorkerRequestPayload,
@@ -45,7 +37,7 @@ type ShikiPreloadRegistrationSource =
   | Promise<ShikiPreloadRegistrations>
   | (() => Promise<ShikiPreloadRegistrations> | ShikiPreloadRegistrations)
 
-export type ShikiHighlighterSessionOptions = EditorHighlighterSessionOptions & {
+export type ShikiHighlighterSessionOptions = HighlighterOperationContext & {
   readonly lang: string
   readonly theme: string
   readonly registrations: Promise<ShikiResolvedRegistrations> | ShikiResolvedRegistrations
@@ -61,6 +53,7 @@ export type ShikiThemeOptions = {
 }
 
 type PendingRequest = {
+  readonly cleanup: () => void
   readonly resolve: (result: ShikiWorkerTransportResult | undefined) => void
   readonly reject: (error: Error) => void
 }
@@ -100,6 +93,10 @@ export function createShikiWorkerOwner(options: ShikiWorkerOwnerOptions = {}): S
   return new ShikiWorkerOwner(options)
 }
 
+const shikiOperationBinding = Symbol('shiki.operation')
+const shikiRequestBinding = Symbol('shiki.request')
+const shikiSourceBinding = Symbol('shiki.source')
+
 export class ShikiWorkerOwner {
   private worker: Worker | null = null
   private disposeTask: Promise<void> | null = null
@@ -112,6 +109,9 @@ export class ShikiWorkerOwner {
   private readonly runtimeTasks = new Map<string, Set<Promise<unknown>>>()
   private readonly themeRequests = new Map<string, Promise<EditorTheme | null | undefined>>()
   private readonly sessions = new Set<ShikiHighlighterSession>()
+  private connection: DocumentSourceConnection | null = null
+  private nextRegistration = 0
+  public readonly [shikiSourceBinding]: DocumentSourceEndpoint = { connect: () => this.connectSource() }
 
   public constructor(private readonly options: ShikiWorkerOwnerOptions = {}) {}
 
@@ -142,7 +142,7 @@ export class ShikiWorkerOwner {
     }
   }
 
-  public createSession(options: ShikiHighlighterSessionOptions): EditorHighlighterSession | null {
+  public [shikiOperationBinding](options: ShikiHighlighterSessionOptions): EditorHighlighterRuntime | null {
     if (!this.canUseWorker()) return null
     const session = new ShikiHighlighterSession(
       options,
@@ -152,6 +152,27 @@ export class ShikiWorkerOwner {
     )
     this.sessions.add(session)
     return session
+  }
+
+  private async connectSource(): Promise<DocumentSourceConnection | null> {
+    const worker = this.getWorker(true)
+    if (!worker) return null
+    if (this.connection) return this.connection
+    this.connection = {
+      generation: this.workerGeneration,
+      nextRegistration: () => ++this.nextRegistration,
+      send: async (command, signal) => {
+        if (this.worker !== worker)
+          return { kind: 'rejected', identity: command.identity, reason: 'generation' }
+        const result = await this.trackClientTask(this.postRequest({ type: 'source', command }, false, signal))
+        return decodeDocumentWorkerReply(command, result?.source)
+      },
+      release: (identity) => {
+        if (this.worker !== worker) return
+        worker.postMessage({ id: this.nextRequestId++, payload: { type: 'source', command: { kind: 'release', identity } } })
+      },
+    }
+    return this.connection
   }
 
   public loadTheme(options: ShikiThemeOptions): Promise<EditorTheme | null | undefined> {
@@ -181,7 +202,7 @@ export class ShikiWorkerOwner {
     return theme
   }
 
-  public request(
+  public [shikiRequestBinding](
     payload: ShikiWorkerRequestPayload,
   ): Promise<ShikiWorkerTransportResult | undefined> {
     const request = this.postRequest(payload, true)
@@ -189,18 +210,6 @@ export class ShikiWorkerOwner {
       return this.trackRuntimeTask(payload.runtimeSessionId, request)
     }
     return this.trackClientTask(request)
-  }
-
-  /** Tokenizes one snippet in the shared worker; the worker keeps no state for it. */
-  public highlight(
-    request: Omit<ShikiWorkerHighlightRequest, 'type' | 'maxLineLength'>,
-  ): Promise<ShikiWorkerTransportResult | undefined> {
-    return this.trackClientTask(
-      this.postRequest(
-        { type: 'highlight', ...request, maxLineLength: this.maxTokenizationLineLength() },
-        true,
-      ),
-    )
   }
 
   public preload(registrations: ShikiPreloadRegistrations): Promise<void> {
@@ -298,20 +307,28 @@ export class ShikiWorkerOwner {
   private postRequest(
     payload: ShikiWorkerRequestPayload,
     createIfMissing: boolean,
+    signal?: AbortSignal,
   ): Promise<ShikiWorkerTransportResult | undefined> {
     const handle = this.getWorker(createIfMissing)
     if (!handle) return Promise.resolve(undefined)
 
+    if (signal?.aborted) return Promise.reject(new DOMException('Document source was released', 'AbortError'))
     const id = this.nextRequestId
     this.nextRequestId += 1
     const request: ShikiWorkerRequest = { id, payload }
     markEditorWorkerRequest('shiki', payload.type, runtimeSessionIdForPayload(payload))
 
     return new Promise((resolve, reject) => {
-      this.pendingRequests.set(id, { resolve, reject })
+      const abort = () => {
+        this.pendingRequests.delete(id)
+        reject(new DOMException('Document source was released', 'AbortError'))
+      }
+      this.pendingRequests.set(id, { resolve, reject, cleanup: () => signal?.removeEventListener('abort', abort) })
+      signal?.addEventListener('abort', abort, { once: true })
       try {
         handle.postMessage(request)
       } catch (error) {
+        signal?.removeEventListener('abort', abort)
         this.pendingRequests.delete(id)
         reject(workerRequestError(error))
       }
@@ -323,6 +340,7 @@ export class ShikiWorkerOwner {
     const pending = this.pendingRequests.get(response.id)
     if (!pending) return
 
+    pending.cleanup()
     this.pendingRequests.delete(response.id)
     if (response.ok) {
       pending.resolve(response.result)
@@ -339,6 +357,8 @@ export class ShikiWorkerOwner {
     this.lastError = error
     this.lifecycle = 'crashed'
     this.themeRequests.clear()
+    this.connection = null
+    this.nextRegistration = 0
     this.rejectPendingRequests(error)
     failedWorker.terminate()
     this.worker = null
@@ -346,13 +366,18 @@ export class ShikiWorkerOwner {
   }
 
   private rejectPendingRequests(error: Error): void {
-    for (const request of this.pendingRequests.values()) request.reject(error)
+    for (const request of this.pendingRequests.values()) {
+      request.cleanup()
+      request.reject(error)
+    }
     this.pendingRequests.clear()
   }
 
   private clearRetainedState(lifecycle: ShikiWorkerLifecycleState): void {
     this.lifecycle = lifecycle
     this.themeRequests.clear()
+    this.connection = null
+    this.nextRegistration = 0
   }
 
   private trackClientTask<T>(task: Promise<T>): Promise<T> {
@@ -391,7 +416,7 @@ export class ShikiWorkerOwner {
   }
 }
 
-class ShikiHighlighterSession implements EditorHighlighterSession {
+class ShikiHighlighterSession implements EditorHighlighterRuntime {
   private readonly documentId: string
   private readonly runtimeSessionId: string
   private readonly lang: string
@@ -399,7 +424,7 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
   private registrations: Promise<ShikiResolvedRegistrations>
   public readonly onDidChangeTheme: ShikiHighlighterSessionOptions['onDidChangeTheme']
   private readonly preloadRegistrations: ShikiPreloadRegistrationSource | null
-  private snapshot: PieceTableSnapshot
+  private analysedRead: DocumentRead | null = null
   // The whole document's tokens, kept packed so an edit answer only has to splice its lines in.
   private store: EditorTokenStore | null = null
   private currentTheme: EditorTheme | null | undefined
@@ -425,66 +450,40 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
     this.onDidChangeTheme = options.onDidChangeTheme
     this.registrations = Promise.resolve(options.registrations)
     this.preloadRegistrations = options.preloadRegistrations ?? null
-    this.snapshot = options.snapshot
   }
 
-  public async refresh(textSnapshot: DocumentTextSnapshot): Promise<EditorHighlightResult> {
+  public async analyze(read: DocumentRead): Promise<EditorHighlightResult> {
     if (this.disposed) return emptyHighlightResult()
-
+    if (this.options.source.read(read.revision) !== read)
+      throw new DOMException('Document revision belongs to another source', 'InvalidStateError')
     return this.enqueueRequest(async () => {
       if (this.disposed) return emptyHighlightResult()
-
       await this.synchronizeTheme()
-      const snapshot = textSnapshot.snapshot
-      if (this.opened && pieceTableSnapshotsHaveSameText(this.snapshot, snapshot)) {
-        return { tokens: this.currentTokens(), theme: this.currentTheme }
-      }
-
-      const documentText = openPayloadText(textSnapshot)
       const documentOptions = await this.documentOptions()
       if (this.disposed) return emptyHighlightResult()
-
-      const result = await this.owner.request({
-        type: 'open',
-        ...documentOptions,
-        text: documentText,
-      })
-      if (this.disposed) return emptyHighlightResult()
-
-      this.schedulePreload()
-      this.snapshot = snapshot
-      this.opened = true
-      this.workerGeneration = this.owner.inspect().workerGeneration
-      this.disposed = false
-      this.store = result?.tokensPacked ? EditorTokenStore.fromPacked(result.tokensPacked) : null
-      this.untokenizedLines = result?.untokenizedLines ?? 0
-      this.currentTheme = result?.theme
-      return { tokens: this.currentTokens(), theme: result?.theme }
-    })
-  }
-
-  public async applyChange(change: DocumentSessionChange): Promise<EditorHighlightResult> {
-    if (this.disposed) return emptyHighlightResult()
-
-    return this.enqueueRequest(async () => {
-      if (this.disposed) return emptyHighlightResult()
-
-      await this.synchronizeTheme()
-
-      const nextTextSnapshot = documentSessionChangeTextSnapshot(change)
-      const payload = await this.editPayloadForChange(change, nextTextSnapshot)
-      if (this.disposed) return emptyHighlightResult()
-
-      const result = await this.owner.request(payload)
-      if (this.disposed) return emptyHighlightResult()
-
-      this.schedulePreload()
-      this.snapshot = change.snapshot
-      this.opened = true
-      this.workerGeneration = this.owner.inspect().workerGeneration
-      this.disposed = false
-      this.adoptEditResult(result)
-      return { tokens: this.currentTokens(), theme: result?.theme }
+      const prepared = await this.options.source.prepareReader(this.owner[shikiSourceBinding], read)
+      if (!prepared || this.disposed) {
+        await prepared?.dispose()
+        throw new DOMException('Document source was released', 'AbortError')
+      }
+      try {
+        const changes = this.analysedRead
+          ? this.options.source.changesBetween(this.analysedRead.revision, read.revision)
+          : null
+        const payload = this.opened && changes?.edits && this.analysedRead
+          ? this.editRequest(changes.edits, prepared.reference, this.analysedRead)
+          : { type: 'open', ...documentOptions, source: prepared.reference } satisfies ShikiWorkerRequestPayload
+        const result = await this.owner[shikiRequestBinding](payload)
+        if (this.disposed) return emptyHighlightResult()
+        this.schedulePreload()
+        this.analysedRead = read
+        this.opened = true
+        this.workerGeneration = this.owner.inspect().workerGeneration
+        this.adoptEditResult(result)
+        return { tokens: this.currentTokens(), theme: this.currentTheme }
+      } finally {
+        await prepared.dispose()
+      }
     })
   }
 
@@ -509,7 +508,7 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
   private enqueueRequest(
     run: () => Promise<EditorHighlightResult>,
   ): Promise<EditorHighlightResult> {
-    const result = this.task.then(run, run)
+    const result = run()
     this.task = result.then(
       () => undefined,
       () => undefined,
@@ -544,7 +543,7 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
       return
     }
 
-    const result = await this.owner.request({
+    const result = await this.owner[shikiRequestBinding]({
       type: 'recolor',
       runtimeSessionId: this.runtimeSessionId,
       theme: next.theme,
@@ -574,32 +573,19 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
     return this.store ?? EditorTokenStore.empty()
   }
 
-  private async editPayloadForChange(
-    change: DocumentSessionChange,
-    nextTextSnapshot: DocumentTextSnapshot,
-  ): Promise<ShikiWorkerRequestPayload> {
-    const edits = incrementalEditsForChange(this.snapshot, change)
-    if (edits && this.opened && !this.disposed) return this.editRequest(edits)
-
-    if (!this.opened) {
-      return {
-        type: 'open',
-        ...(await this.documentOptions()),
-        text: openPayloadText(nextTextSnapshot),
-      }
-    }
-
-    const fallbackEdit = diffPieceTableSnapshots(this.snapshot, change.snapshot)
-    return this.editRequest(fallbackEdit ? [fallbackEdit] : [])
-  }
-
-  private editRequest(edits: readonly TextEdit[]): ShikiWorkerEditRequest {
+  private editRequest(
+    edits: ShikiWorkerEditRequest['edits'],
+    source: DocumentWorkerReadReference,
+    previous: DocumentRead,
+  ): ShikiWorkerEditRequest {
     return {
       type: 'edit',
       documentId: this.documentId,
       runtimeSessionId: this.runtimeSessionId,
       lang: this.lang,
       theme: this.theme,
+      source,
+      previousPoint: { ...source.point, revision: previous.revision.point.revision, textVersion: previous.revision.point.textVersion },
       edits,
     }
   }
@@ -629,35 +615,8 @@ class ShikiHighlighterSession implements EditorHighlighterSession {
   }
 }
 
-// The worker's open message is a whole-document protocol payload; edits after it are incremental.
-function openPayloadText(textSnapshot: DocumentTextSnapshot): string {
-  return textSnapshot.materializeFullText()
-}
-
 function emptyHighlightResult(): EditorHighlightResult {
   return { tokens: EditorTokenStore.empty() }
-}
-
-const incrementalEditsForChange = (
-  snapshot: PieceTableSnapshot,
-  change: DocumentSessionChange,
-): readonly TextEdit[] | null => {
-  if (change.edits.length === 0) return null
-
-  try {
-    if (
-      !pieceTableSnapshotsHaveSameText(
-        applyBatchToPieceTable(snapshot, change.edits),
-        change.snapshot,
-      )
-    ) {
-      return null
-    }
-  } catch {
-    return null
-  }
-
-  return change.edits
 }
 
 async function requestShikiTheme(
@@ -665,7 +624,7 @@ async function requestShikiTheme(
   theme: string,
   registrations: ShikiResolvedRegistrations,
 ): Promise<EditorTheme | null | undefined> {
-  const result = await owner.request({
+  const result = await owner[shikiRequestBinding]({
     type: 'theme',
     theme,
     themeRegistration: registrations.themeRegistration,
@@ -722,4 +681,8 @@ function markEditorWorkerRequest(
   globalThis.performance?.mark('editor.worker.request', {
     detail: { family, runtimeSessionId, type },
   })
+}
+
+export function createShikiDocumentOperation(owner: ShikiWorkerOwner, context: ShikiHighlighterSessionOptions): EditorHighlighterRuntime | null {
+  return owner[shikiOperationBinding](context)
 }

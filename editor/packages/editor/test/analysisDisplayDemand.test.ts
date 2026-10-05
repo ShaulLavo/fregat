@@ -1,3 +1,4 @@
+import { createEditorStructuralOperation } from '../src/editor/operationDefinitions'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createEditorBufferSession,
@@ -11,7 +12,7 @@ import {
   createEmptySyntaxResult,
   createEmptySyntaxSession,
   type EditorSyntaxProvider,
-  type EditorSyntaxSession,
+  type EditorSyntaxRuntime,
   type FoldRange,
   type EditorSyntaxRange,
 } from '../src/syntax/session'
@@ -40,11 +41,12 @@ describe('analysis display demand', () => {
       const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'reentrant.ts' })
       const result = createEmptySyntaxResult()
       const provider: EditorSyntaxProvider = {
-        createSession: () => ({
+        operation: createEditorStructuralOperation(() => ({
+ analyze: async () => createEmptySyntaxResult(),
           ...createEmptySyntaxSession(),
           foldingSupport: 'supported',
           queryRange: async () => result,
-        }),
+        })),
       }
       const host = document.createElement('div')
       document.body.appendChild(host)
@@ -170,16 +172,16 @@ describe('analysis display demand', () => {
     const result = { ...createEmptySyntaxResult(), folds: [fold] }
     const queryRange = vi.fn(async () => result)
     const provider: EditorSyntaxProvider = {
-      createSession: vi.fn((): EditorSyntaxSession => ({
+      operation: createEditorStructuralOperation(vi.fn((): EditorSyntaxRuntime => ({
         foldingSupport: 'supported',
-        refresh: async () => result,
-        applyChange: async () => result,
+        analyze: async () => result,
+        
         queryRange,
         getResult: () => result,
         getTokens: () => result.tokens,
         getSnapshotVersion: () => 0,
         dispose: () => undefined,
-      })),
+      }))),
     }
     const warm = analysis.borrowStructural({
       provider,

@@ -3,7 +3,6 @@ import type { DocumentSessionChange } from '../documentSession'
 import type {
   EditorSyntaxLanguageId,
   EditorSyntaxSession,
-  EditorSyntaxSessionOptions,
 } from '../syntax/session'
 import type {
   EditorInitialHighlightStatus,
@@ -220,6 +219,3 @@ export type EditorEditOptions = {
 
 export type EditorEditInput = TextEdit | readonly TextEdit[]
 
-export type EditorSyntaxSessionFactory = (
-  options: EditorSyntaxSessionOptions,
-) => EditorSyntaxSession

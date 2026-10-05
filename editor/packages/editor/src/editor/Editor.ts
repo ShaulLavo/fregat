@@ -1,4 +1,4 @@
-import type { EditorDocumentAnalysis } from './documentAnalysis'
+import { acquireEditorDocumentAnalysis, type EditorDocumentAnalysis } from './documentAnalysis'
 import { normalizeGutterLeadingInset } from '../virtualization/virtualizedTextViewHelpers'
 import { captureJumpLocation, JumpHistory, type JumpLocation, type JumpCause } from './jumpHistory'
 import type { EditorPointHit, EditorMarkerHit } from '../pointQueries'
@@ -329,6 +329,7 @@ export class Editor {
   private readonly ambientPlugins: EditorAmbientPluginController
   private readonly commandRouter: EditorCommandRouter
   private analysis: EditorDocumentAnalysis | null = null
+  private analysisInterest: { dispose(): void } | null = null
   private readonly document: EditorDocumentController
   private readonly editorFeatures = new Map<EditorCapabilityToken<unknown>, unknown>()
   private readonly editorFeatureTokensById = new Map<string, EditorCapabilityToken<unknown>>()
@@ -3604,10 +3605,19 @@ export class Editor {
     const buffer = editorBufferSession(session)?.buffer
     if (analysis && analysis.buffer !== buffer)
       throw new TypeError('Document analysis must reference the attached buffer')
-    this.analysis = analysis ?? null
+    this.releaseAnalysis()
+    if (analysis || !buffer) {
+      this.analysis = analysis ?? null
+      return
+    }
+    const interest = acquireEditorDocumentAnalysis({ buffer, documentId: this.currentSessionDocumentId() })
+    this.analysisInterest = interest
+    this.analysis = interest.analysis
   }
 
   private releaseAnalysis(): void {
+    this.analysisInterest?.dispose()
+    this.analysisInterest = null
     this.analysis = null
   }
 

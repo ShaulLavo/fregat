@@ -45,6 +45,7 @@ import { TextStorageMaintenance, type TextStorageMaintenanceStats } from './text
 import {
   applyBatchToPieceTable,
   createPieceTableSnapshot,
+  retainPieceTableSnapshot,
   diffPieceTableSnapshots,
   normalizeDocumentText,
   normalizeLineEndings,
@@ -238,6 +239,11 @@ export type EditorTextBuffer = {
   getDocumentSyncPoint(): DocumentSyncPoint
   changesSinceDocumentSyncPoint(
     point: DocumentSyncPoint,
+    scope: DocumentLogicalRevisionScope | null,
+  ): DocumentChangesSinceSyncPoint | null
+  changesBetweenDocumentSyncPoints(
+    base: DocumentSyncPoint,
+    target: DocumentSyncPoint,
     scope: DocumentLogicalRevisionScope | null,
   ): DocumentChangesSinceSyncPoint | null
   // Whether materializing the whole document as one string is a heap hazard,
@@ -601,27 +607,16 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     () => this.history.current,
   )
 
-  public constructor(rawText: string, options: EditorTextBufferOptions = {}) {
+  public constructor(rawText: string | PieceTableSnapshot, options: EditorTextBufferOptions = {}) {
     this.retainedHistoryStates = options.retainedHistoryStates
     this.now = options.now ?? Date.now
-    // Ingested first so the retained copy below is the text the piece table
-    // actually holds. Folding U+2028/U+2029 to LF does not change the length,
-    // so handing the raw string to createDocumentTextSnapshot would sail past
-    // its length check and leave every reader — including the view's line-start
-    // scan — looking at characters the model does not have.
-    const ingested = normalizeDocumentText(rawText)
-    const text = ingested.text
-    const snapshot = createPieceTableSnapshot(text, {
-      normalized: true,
-      lineEnding: ingested.lineEnding,
-      byteOrderMark: ingested.byteOrderMark,
-      containsUnusualLineTerminators: ingested.containsUnusualLineTerminators,
-    })
+    const initial = initialBufferSource(rawText)
+    const snapshot = initial.snapshot
     const selections = createInitialSelectionSet(snapshot, createSelectionIdFactory())
     this.history = this.createHistory(snapshot, selections)
     this.cleanSnapshot = snapshot
     this.dirtyCacheSnapshot = snapshot
-    this.textSnapshot = createDocumentTextSnapshot(snapshot, text)
+    this.textSnapshot = createDocumentTextSnapshot(snapshot, initial.text)
     this.tooLargeForHeapOperation = exceedsHeapOperationBudget(snapshot.length)
   }
 
@@ -875,6 +870,14 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     scope: DocumentLogicalRevisionScope | null,
   ): DocumentChangesSinceSyncPoint | null {
     return this.editChain.changesSince(point, scope)
+  }
+
+  public changesBetweenDocumentSyncPoints(
+    base: DocumentSyncPoint,
+    target: DocumentSyncPoint,
+    scope: DocumentLogicalRevisionScope | null,
+  ): DocumentChangesSinceSyncPoint | null {
+    return this.editChain.changesSince(base, scope, target)
   }
 
   public isTooLargeForHeapOperation(): boolean {
@@ -2278,11 +2281,29 @@ class StaticDocumentSession implements DocumentSession {
   }
 }
 
+function initialBufferSource(source: string | PieceTableSnapshot): { readonly snapshot: PieceTableSnapshot; readonly text?: string } {
+  if (typeof source !== 'string') return { snapshot: retainPieceTableSnapshot(source) }
+  const ingested = normalizeDocumentText(source)
+  return {
+    text: ingested.text,
+    snapshot: createPieceTableSnapshot(ingested.text, {
+      normalized: true,
+      lineEnding: ingested.lineEnding,
+      byteOrderMark: ingested.byteOrderMark,
+      containsUnusualLineTerminators: ingested.containsUnusualLineTerminators,
+    }),
+  }
+}
+
 export function createEditorTextBuffer(
   text: string,
   options: EditorTextBufferOptions = {},
 ): EditorTextBuffer {
   return new PieceTableEditorTextBuffer(text, options)
+}
+
+export function createEditorSnapshotBuffer(snapshot: PieceTableSnapshot): EditorTextBuffer {
+  return new PieceTableEditorTextBuffer(snapshot)
 }
 
 export function createEditorViewSession(

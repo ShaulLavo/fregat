@@ -20,8 +20,6 @@ import type { EditorSyntaxThemeColor, EditorTheme, EditorThemeType } from './the
 import type { EditorTokenStore } from './syntax/tokenStore'
 import type { TextEdit } from './tokens'
 import type {
-  EditorHighlighterSessionOptions,
-  EditorHighlighterSession,
   EditorHighlighterProvider,
 } from './syntax/highlighter'
 import type { DisplayTextRowSource, InjectedTextRow } from './displayTransforms'
@@ -31,8 +29,6 @@ import {
   type EditorSyntaxRecords,
   type EditorSyntaxLanguageId,
   type EditorSyntaxProvider,
-  type EditorSyntaxSession,
-  type EditorSyntaxSessionOptions,
   type FoldRange,
 } from './syntax/session'
 import type { InlineReplacementSpec } from './inlineMap'
@@ -1390,19 +1386,12 @@ export class EditorPluginHost implements EditorDisposable {
     }
   }
 
-  public createHighlighterSession(
-    options: EditorHighlighterSessionOptions,
-  ): EditorHighlighterSession | null {
-    for (const provider of this.highlighters) {
-      const session = provider.createSession(options)
-      if (session) return session
-    }
-
-    return null
-  }
-
   public hasHighlighterProviders(): boolean {
     return this.highlighters.length > 0
+  }
+
+  public getHighlighterProviders(): readonly EditorHighlighterProvider[] {
+    return this.highlighters
   }
 
   public getHighlighterProvider(): EditorHighlighterProvider | null {
@@ -1420,17 +1409,12 @@ export class EditorPluginHost implements EditorDisposable {
     return undefined
   }
 
-  public createSyntaxSession(options: EditorSyntaxSessionOptions): EditorSyntaxSession | null {
-    for (const provider of this.syntaxProviders) {
-      const session = provider.createSession(options)
-      if (session) return session
-    }
-
-    return null
-  }
-
   public hasSyntaxProviders(): boolean {
     return this.syntaxProviders.length > 0
+  }
+
+  public getSyntaxProviders(): readonly EditorSyntaxProvider[] {
+    return this.syntaxProviders
   }
 
   public getSyntaxProvider(): EditorSyntaxProvider | null {
