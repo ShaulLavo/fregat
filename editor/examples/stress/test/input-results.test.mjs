@@ -1141,7 +1141,8 @@ describe('paired input latency', () => {
     const sources = [
       { path: 'examples/stress/src/inputLatency.ts', bytes: 'native capture and frame marks' },
       { path: 'examples/stress/input-output.mjs', bytes: 'assert rendered output' },
-      { path: 'examples/stress/src/input-output.ts', bytes: 'read rendered output' },
+      { path: 'examples/stress/src/input-output.ts', bytes: 'attest source for live admission' },
+      { path: 'examples/stress/input-source-current.mjs', bytes: 'poll live source admission' },
     ]
     const original = inputSourceIdentity(sources, 'a'.repeat(64))
     const stored = sensitivityCache()
@@ -1157,33 +1158,37 @@ describe('paired input latency', () => {
         run.environment.validationHash = original.validationHash
       }
     }
-    for (const path of [
-      'examples/stress/input-output.mjs',
-      'examples/stress/src/input-output.ts',
-    ]) {
-      const changed = inputSourceIdentity(
-        sources.map((source) =>
-          source.path === path ? { ...source, bytes: source.bytes + ' changed predicate' } : source,
-        ),
-        'a'.repeat(64),
-      )
-      expect(changed.validationHash).not.toBe(original.validationHash)
-      expect(changed.measurementHash).toBe(original.measurementHash)
-      expect(verifyInputSensitivity(stored, changed.measurementHash, 200)).toBe(stored)
-      expect(stored.validationHash).toBe(original.validationHash)
-    }
-    const timing = inputSourceIdentity(
+    const changed = inputSourceIdentity(
       sources.map((source) =>
-        source.path.endsWith('inputLatency.ts')
-          ? { ...source, bytes: source.bytes + ' changed delay' }
+        source.path === 'examples/stress/input-output.mjs'
+          ? { ...source, bytes: source.bytes + ' changed assertion' }
           : source,
       ),
       'a'.repeat(64),
     )
-    expect(timing.measurementHash).not.toBe(original.measurementHash)
-    expect(() => verifyInputSensitivity(stored, timing.measurementHash, 200)).toThrow(
-      /Invalid stored/,
-    )
+    expect(changed.validationHash).not.toBe(original.validationHash)
+    expect(changed.measurementHash).toBe(original.measurementHash)
+    expect(verifyInputSensitivity(stored, changed.measurementHash, 200)).toBe(stored)
+    expect(stored.validationHash).toBe(original.validationHash)
+    for (const path of [
+      'examples/stress/src/inputLatency.ts',
+      'examples/stress/src/input-output.ts',
+      'examples/stress/input-source-current.mjs',
+    ]) {
+      const timing = inputSourceIdentity(
+        sources.map((source) =>
+          source.path === path
+            ? { ...source, bytes: source.bytes + ' changed live behavior' }
+            : source,
+        ),
+        'a'.repeat(64),
+      )
+      expect(timing.measurementHash).not.toBe(original.measurementHash)
+      expect(timing.validationHash).toBe(original.validationHash)
+      expect(() => verifyInputSensitivity(stored, timing.measurementHash, 200)).toThrow(
+        /Invalid stored/,
+      )
+    }
   })
 
   it('recomputes raw stage controls and validates the first rejected floor', () => {

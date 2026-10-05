@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
+import { createEditorHighlighterOperation, type DocumentRead } from '@singapore-editor/core/editor'
 import {
   createDiffRegionStore,
   createDiffPlugin,
@@ -23,16 +24,17 @@ function providerBoundary(
   gate = Promise.resolve(),
   documentColor?: (documentId: string) => string,
 ) {
+  void gate.catch(() => undefined)
   const counts = { sessions: 0, refreshes: 0, disposed: 0 }
   const backend: DiffSyntaxBackend = {
     kind: 'highlighter',
     provider: {
-      createSession: (options) => {
+      operation: createEditorHighlighterOperation((options) => {
         counts.sessions += 1
-        const refresh = async () => {
+        const analyze = async (read: DocumentRead) => {
           counts.refreshes += 1
           await gate
-          const text = options.textSnapshot.readRange(0, options.textSnapshot.length)
+          const text = read.text.readRange(0, read.text.length)
           return {
             tokens: EditorTokenStore.fromTokens([
               {
@@ -47,13 +49,12 @@ function providerBoundary(
           }
         }
         return {
-          refresh,
-          applyChange: refresh,
+          analyze,
           dispose: () => {
             counts.disposed += 1
           },
         }
-      },
+      }),
     },
   }
   return { backend, counts }

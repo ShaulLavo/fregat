@@ -1,12 +1,9 @@
+import { createEditorHighlighterOperation } from '../src/editor/operationDefinitions'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { Editor } from '../src/editor/Editor'
 import { createVisibleEditor } from './factories/visibleEditor'
-import {
-  resetEditorInstanceCount,
-  setEditorSyntaxSessionFactory,
-  setHighlightRegistry,
-} from '../src/public/testing'
+import { resetEditorInstanceCount, setHighlightRegistry } from '../src/public/testing'
 import type { EditorPlugin } from '../src/plugins'
 import { EditorTokenStore } from '../src/syntax/tokenStore'
 
@@ -53,7 +50,6 @@ describe('token painting over inline replacements', () => {
     editor.dispose()
     container.remove()
     setHighlightRegistry(undefined)
-    setEditorSyntaxSessionFactory(undefined)
   })
 
   it('paints the full display text when the token covers the buffer line', async () => {
@@ -168,11 +164,10 @@ function highlighterPlugin(): EditorPlugin {
     name: 'test.highlighter',
     activate: (context) =>
       context.registerHighlighter({
-        createSession: () => ({
-          refresh: async () => ({ tokens: EditorTokenStore.fromTokens(tokens) }),
-          applyChange: async () => ({ tokens: EditorTokenStore.fromTokens(tokens) }),
+        operation: createEditorHighlighterOperation(() => ({
+          analyze: async () => ({ tokens: EditorTokenStore.fromTokens(tokens) }),
           dispose: () => undefined,
-        }),
+        })),
       }),
   }
 }

@@ -3,11 +3,8 @@ import type { EditorPlugin } from '@singapore-editor/core/extensions'
 import { createShikiHighlighterPlugin, createShikiWorkerOwner } from '@singapore-editor/core/shiki'
 import { createEditorFindPlugin } from '@singapore-editor/find'
 import { createMinimapPlugin } from '@singapore-editor/minimap'
-import {
-  createTreeSitterSyntaxProvider,
-  createTreeSitterSyntaxPlugin,
-  TreeSitterWorkerClient,
-} from '@singapore-editor/tree-sitter'
+import { createInputProductTree } from '../input-product-tree.mjs'
+import { minimapRenderAccepted } from '../input-worker-proof.mjs'
 import {
   TREE_SITTER_LANGUAGE_CONTRIBUTIONS,
   typeScript,
@@ -26,13 +23,13 @@ import {
 export function createInputConsumers(id: string, fixture: string, length: number) {
   const configuration = inputConsumerConfiguration(id, fixture, length)
   const plugins: EditorPlugin[] = []
-  const tree = configuration.treeSitter && id !== 'native' ? new TreeSitterWorkerClient() : null
+  const productTree = configuration.treeSitter && id !== 'native' ? createInputProductTree() : null
+  const tree = productTree?.owner ?? null
   const shiki = configuration.shiki ? createShikiWorkerOwner() : null
-  if (tree) {
-    const provider = createTreeSitterSyntaxProvider({ backend: tree })
+  if (productTree) {
     for (const contribution of TREE_SITTER_LANGUAGE_CONTRIBUTIONS)
-      provider.registerLanguage(contribution, { replace: true })
-    plugins.push(createTreeSitterSyntaxPlugin(provider))
+      productTree.registerLanguage(contribution, { replace: true })
+    plugins.push(productTree.plugin())
   }
   if (id === 'native' && configuration.treeSitter) plugins.push(typeScript())
   if (shiki)
@@ -143,26 +140,18 @@ export function inputConsumersForFixture(
   return createInputConsumers(configuration.id, fixture, length)
 }
 
-type WorkerProof = {
-  readonly terminated: boolean
-  readonly minimap: boolean
-  readonly sourceUpdates: number
-  readonly renderAfterSource: number
-  readonly latestRender: number
-  readonly acceptedRender: number
-}
+type WorkerProof = Parameters<typeof minimapRenderAccepted>[0]
 
 // Minimap renders arrive after the syntax fences; readiness checks the latest requested frame.
 function minimapRendersAccepted() {
-  return (
+  const workers =
     (globalThis as { __inputWorkerProof?: readonly WorkerProof[] }).__inputWorkerProof ?? []
-  ).every(
-    (worker) =>
-      worker.terminated ||
-      !worker.minimap ||
-      (worker.renderAfterSource === worker.sourceUpdates &&
-        worker.latestRender > 0 &&
-        worker.acceptedRender === worker.latestRender),
+  return workers.every((worker) =>
+    minimapRenderAccepted(
+      worker,
+      workers,
+      worker.viewId ? (document.getElementById(worker.viewId)?.checkVisibility() ?? null) : null,
+    ),
   )
 }
 

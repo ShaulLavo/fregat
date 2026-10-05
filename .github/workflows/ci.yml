@@ -181,6 +181,9 @@ jobs:
       - name: Query API
         run: bun run query:check
 
+      - name: Document contribution ownership
+        run: bun run documents:check
+
       - name: Structured errors census
         run: bun run errors:census
 

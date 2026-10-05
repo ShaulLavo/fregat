@@ -1,4 +1,4 @@
-import type { EditorDocumentAnalysis } from './documentAnalysis'
+import { acquireEditorDocumentAnalysis, type EditorDocumentAnalysis } from './documentAnalysis'
 import { normalizeGutterLeadingInset } from '../virtualization/virtualizedTextViewHelpers'
 import { captureJumpLocation, JumpHistory, type JumpLocation, type JumpCause } from './jumpHistory'
 import type { EditorPointHit, EditorMarkerHit } from '../pointQueries'
@@ -331,6 +331,7 @@ export class Editor {
   private readonly ambientPlugins: EditorAmbientPluginController
   private readonly commandRouter: EditorCommandRouter
   private analysis: EditorDocumentAnalysis | null = null
+  private analysisInterest: { dispose(): void } | null = null
   private readonly document: EditorDocumentController
   private readonly editorFeatures = new Map<EditorCapabilityToken<unknown>, unknown>()
   private readonly editorFeatureTokensById = new Map<string, EditorCapabilityToken<unknown>>()
@@ -601,7 +602,6 @@ export class Editor {
       getCurrentSessionDocumentId: () => this.currentSessionDocumentId(),
       getLanguageId: () => this.languageId,
       getSession: () => this.session,
-      getDocumentEditChain: () => this.currentDocumentEditChain(),
       getVisibleSyntaxRange: () => this.visibleSyntaxRange(),
       adoptTokens: (tokens) => {
         this.view.adoptTokens(tokens)
@@ -1187,7 +1187,7 @@ export class Editor {
   }
 
   setTokens(tokens: EditorTokenInput): void {
-    this.adoptTokens(toEditorTokenStore(tokens))
+    this.syntax.setExternalTokens(toEditorTokenStore(tokens))
   }
 
   /**
@@ -3363,6 +3363,7 @@ export class Editor {
       highlightPrefix: this.highlightPrefix,
       hasDocument: () => this.session !== null,
       getSnapshot: () => this.createViewSnapshot(),
+      getDocumentContributions: () => this.analysis?.contributions ?? null,
       requestViewUpdate: () => this.requestViewUpdate(owner()),
       onDidType: (listener) => this.claimedBy(claims, () => this.addTypedTextListener(listener)),
       registerPressParticipant: (participant) =>
@@ -3633,10 +3634,22 @@ export class Editor {
     const buffer = editorBufferSession(session)?.buffer
     if (analysis && analysis.buffer !== buffer)
       throw new TypeError('Document analysis must reference the attached buffer')
-    this.analysis = analysis ?? null
+    this.releaseAnalysis()
+    if (analysis || !buffer) {
+      this.analysis = analysis ?? null
+      return
+    }
+    const interest = acquireEditorDocumentAnalysis({
+      buffer,
+      documentId: this.currentSessionDocumentId(),
+    })
+    this.analysisInterest = interest
+    this.analysis = interest.analysis
   }
 
   private releaseAnalysis(): void {
+    this.analysisInterest?.dispose()
+    this.analysisInterest = null
     this.analysis = null
   }
 

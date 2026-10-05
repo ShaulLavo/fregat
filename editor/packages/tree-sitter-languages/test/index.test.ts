@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import {
-  createDocumentTextSnapshot,
-  createPieceTableSnapshot,
-} from '@singapore-editor/core/document'
+import { createEditorTextBuffer } from '@singapore-editor/core/document'
+import { createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
 import type { EditorPluginContext } from '@singapore-editor/core/extensions'
 import type {
   TreeSitterLanguageAssets,
@@ -78,18 +76,23 @@ describe('Tree-sitter language contributions', () => {
     ])
     expect(registerSyntaxProvider).toHaveBeenCalledTimes(1)
     expect(registerSyntaxProvider).toHaveBeenCalledWith(
-      expect.objectContaining({ createSession: expect.any(Function) }),
+      expect.objectContaining({ operation: expect.any(Object) }),
     )
-    const snapshot = createPieceTableSnapshot('const a = 1;')
-    expect(
-      registerSyntaxProvider.mock.calls[0]?.[0].createSession({
-        documentId: 'main.ts',
-        languageId: 'typescript',
-        includeHighlights: true,
-        snapshot,
-        textSnapshot: createDocumentTextSnapshot(snapshot),
-      }),
-    ).not.toBeNull()
+    const provider = registerSyntaxProvider.mock.calls[0]?.[0]
+    if (!provider)
+      throw new TypeError('The language plugins must register one typed structural provider')
+    const analysis = createEditorDocumentAnalysis({
+      buffer: createEditorTextBuffer('const a = 1;'),
+      documentId: 'main.ts',
+    })
+    const lease = analysis.borrowStructural({
+      provider,
+      languageId: 'typescript',
+      includeHighlights: true,
+    })
+    expect(lease).not.toBeNull()
+    lease?.dispose()
+    analysis.dispose()
   })
 
   it('loads JSX folds only for JSX-capable JavaScript and TypeScript assets', async () => {

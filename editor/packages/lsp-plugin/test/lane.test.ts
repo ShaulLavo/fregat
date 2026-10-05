@@ -122,7 +122,11 @@ describe('language-server lane acquisition', () => {
         ...laneOptions('ordered', harness.provider),
         onConnected: () => events.push('connected'),
       },
-      { onReady: () => events.push('ready') },
+      {
+        onReady: () => {
+          events.push('ready')
+        },
+      },
     )
 
     harness.connect()

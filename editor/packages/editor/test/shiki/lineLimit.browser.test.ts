@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createDocumentTextSnapshot, createPieceTableSnapshot } from '../../src'
+import { createEditorTextBuffer } from '../../src/documentSession'
+import { createEditorDocumentAnalysis } from '../../src/editor/documentAnalysis'
+import { createShikiHighlighterProvider } from '../../src/shiki/plugin'
+import type { ShikiWorkerRequest } from '../../src/shiki/workerTypes'
 import { createShikiWorkerOwner, type ShikiResolvedRegistrations } from '../../src/shiki'
 import { generateFixture } from '../../../../examples/stress/src/fixtures.ts'
 
@@ -16,17 +19,20 @@ function openSession(
   text: string,
   registrations: Promise<ShikiResolvedRegistrations>,
 ) {
-  const snapshot = createPieceTableSnapshot(text)
-  const session = owner.createSession({
-    documentId: 'line-limit.ts',
-    languageId: 'typescript',
-    lang: 'typescript',
+  const buffer = createEditorTextBuffer(text)
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'line-limit.ts' })
+  const provider = createShikiHighlighterProvider({
+    workerOwner: owner,
     theme: 'github-dark',
-    registrations,
-    snapshot,
-    textSnapshot: createDocumentTextSnapshot(snapshot, text),
-  })!
-  return { session, textSnapshot: createDocumentTextSnapshot(snapshot, text) }
+    resolveLanguage: async () => (await registrations).languageRegistrations,
+    resolveTheme: async () => {
+      const theme = (await registrations).themeRegistration
+      if (!theme) throw new TypeError('The line-limit fixture requires its theme registration')
+      return theme
+    },
+  })
+  const session = analysis.borrowHighlighter({ provider, languageId: 'typescript' })!
+  return { session, analysis, textSnapshot: buffer.getTextSnapshot() }
 }
 
 describe.skipIf(typeof Worker === 'undefined')('Shiki line limit in the worker', () => {
@@ -44,7 +50,7 @@ describe.skipIf(typeof Worker === 'undefined')('Shiki line limit in the worker',
       },
     })
     const terminate = vi.fn()
-    const { session, textSnapshot } = openSession(owner, text, resolveRegistrations())
+    const { session, analysis, textSnapshot } = openSession(owner, text, resolveRegistrations())
 
     const startedAt = performance.now()
     const result = await session.refresh(textSnapshot)
@@ -64,6 +70,7 @@ describe.skipIf(typeof Worker === 'undefined')('Shiki line limit in the worker',
 
     for (const worker of workers) worker.terminate = terminate.mockImplementation(worker.terminate)
     session.dispose()
+    analysis.dispose()
     await owner.dispose()
     expect(owner.inspect()).toMatchObject({ lifecycle: 'disposed', untokenizedLines: 0 })
     expect(terminate).toHaveBeenCalledTimes(workers.length)
@@ -71,26 +78,41 @@ describe.skipIf(typeof Worker === 'undefined')('Shiki line limit in the worker',
 
   it('reopens a document under a changed limit on its next request', async () => {
     let limit = 10
-    const owner = createShikiWorkerOwner({ maxTokenizationLineLength: () => limit })
+    const requests: ShikiWorkerRequest[] = []
+    const owner = createShikiWorkerOwner({
+      maxTokenizationLineLength: () => limit,
+      workerFactory: () => {
+        const worker = new Worker(new URL('../../src/shiki/shiki.worker.ts', import.meta.url), {
+          type: 'module',
+        })
+        const post = worker.postMessage.bind(worker)
+        vi.spyOn(worker, 'postMessage').mockImplementation((request: ShikiWorkerRequest) => {
+          if (request.payload.type === 'open') requests.push(request)
+          post(request)
+        })
+        return worker
+      },
+    })
     const text = 'const value = 1\nlet x'
-    const { session, textSnapshot } = openSession(owner, text, resolveRegistrations())
+    const { session, analysis, textSnapshot } = openSession(owner, text, resolveRegistrations())
 
     await session.refresh(textSnapshot)
     expect(owner.inspect().untokenizedLines).toBe(1)
 
-    const requests = vi.spyOn(owner, 'request')
+    requests.length = 0
     limit = 100
     const reopened = await session.refresh(textSnapshot)
-    expect(requests.mock.calls.map(([payload]) => payload.type)).toEqual(['open'])
-    expect(requests.mock.calls[0]![0]).toMatchObject({ maxLineLength: 100 })
+    expect(requests.map((request) => request.payload.type)).toEqual(['open'])
+    expect(requests[0]?.payload).toMatchObject({ maxLineLength: 100 })
     expect(owner.inspect().untokenizedLines).toBe(0)
     expect(reopened.tokens.toTokens().length).toBeGreaterThan(2)
 
-    requests.mockClear()
+    requests.length = 0
     await session.refresh(textSnapshot)
-    expect(requests).not.toHaveBeenCalled()
+    expect(requests).toEqual([])
 
     session.dispose()
+    analysis.dispose()
     await owner.dispose()
   })
 })

@@ -6,6 +6,9 @@ import {
   type LanguageServerDocumentEntry,
 } from '@/features/editor/state/language-server-documents'
 import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
+import { test } from '../../../../../test/fixtures'
+import { createLanguageServerSocket } from '../../../../../test/factories/language-server-socket'
+import { languageServerWebSocketConstructor } from '@/lib/server-sockets'
 
 function entry(buffer = createEditorTextBuffer('')): LanguageServerDocumentEntry {
   return {
@@ -96,4 +99,66 @@ it('drops a retained document synchronously when edits cross the budget and resu
   expect(secondDispose).toHaveBeenCalledOnce()
   expect(documents.accepts(buffer)).toBe(false)
   documents.dispose()
+})
+
+test('configured growth retires the real protocol lane before didChange and undo reopens current source', async ({
+  client,
+}) => {
+  const buffer = createEditorTextBuffer('1234')
+  const view = createEditorBufferSession(buffer)
+  const documents = new LanguageServerDocuments(4 / 1_048_576)
+  const sockets: ReturnType<typeof createLanguageServerSocket>[] = []
+  const create = () => {
+    const socket = createLanguageServerSocket()
+    sockets.push(socket)
+    return {
+      status: createEditorLanguageServerStatusSource(),
+      semanticControllers: new Map(),
+      document: createLanguageServerDocument({
+        buffer,
+        uri: 'file:///a.ts',
+        languageId: 'typescript',
+        lanes: [
+          {
+            id: 'typescript',
+            features: {},
+            webSocketRoute: 'ws://fixture/lsp',
+            webSocketTransportOptions: {
+              WebSocketCtor: languageServerWebSocketConstructor(
+                client,
+                new AbortController().signal,
+                () => socket.socket,
+              ),
+            },
+          },
+        ],
+      }),
+    }
+  }
+  try {
+    const first = documents.getOrCreate('environment-a:a', buffer, 'typescript-v1', create)!
+    sockets[0]!.open()
+    await expect.poll(() => sockets[0]!.sent.length).toBe(1)
+    sockets[0]!.respond(sockets[0]!.sent[0]?.id, { capabilities: { textDocumentSync: 2 } })
+    await first.document.lanes[0]!.connection.ready
+    expect(sockets[0]!.sent.at(-1)?.method).toBe('textDocument/didOpen')
+    view.applyEdits([{ from: 4, to: 4, text: '5' }])
+    expect(sockets[0]!.closed).toBe(true)
+    await Promise.resolve()
+    expect(sockets[0]!.sent.map((frame) => frame.method)).not.toContain('textDocument/didChange')
+    expect(documents.getOrCreate('environment-a:a', buffer, 'typescript-v1', create)).toBeNull()
+    buffer.undo()
+    const next = documents.getOrCreate('environment-a:a', buffer, 'typescript-v2', create)!
+    sockets[1]!.open()
+    await expect.poll(() => sockets[1]!.sent.length).toBe(1)
+    sockets[1]!.respond(sockets[1]!.sent[0]?.id, { capabilities: { textDocumentSync: 2 } })
+    await next.document.lanes[0]!.connection.ready
+    expect(sockets[1]!.sent.at(-1)?.params).toMatchObject({
+      textDocument: { text: '1234', version: 0 },
+    })
+    documents.setLimit(3 / 1_048_576)
+    expect(sockets[1]!.closed).toBe(true)
+  } finally {
+    documents.dispose()
+  }
 })

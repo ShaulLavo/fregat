@@ -1,4 +1,5 @@
 import type { DocumentTextSnapshot } from '@singapore-editor/core/document'
+import { createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
 import type {
   EditorHighlighterProvider,
   EditorHighlighterSession,
@@ -11,7 +12,6 @@ import {
   type EditorSyntaxProvider,
   type EditorSyntaxResult,
   type EditorSyntaxServiceRequest,
-  type EditorSyntaxSessionOptions,
   type EditorToken,
   type EditorTokenInput,
   type EditorTokenStore,
@@ -510,10 +510,23 @@ function highlighterDiffSyntaxSession(
   provider: EditorHighlighterProvider,
   document: DiffSyntaxDocument,
 ): DiffSyntaxServiceSession | null {
-  const session = provider.createSession(highlighterSessionOptions(document))
-  if (!session) return null
-
-  return tokenHighlighterDiffSyntaxSession(document, session)
+  const analysis = createEditorDocumentAnalysis({
+    buffer: document.snippet.buffer,
+    documentId: document.documentId,
+  })
+  const session = analysis.borrowHighlighter({ provider, languageId: document.languageId })
+  if (!session) {
+    analysis.dispose()
+    return null
+  }
+  const retained = tokenHighlighterDiffSyntaxSession(document, session)
+  return {
+    ...retained,
+    dispose() {
+      retained.dispose()
+      analysis.dispose()
+    },
+  }
 }
 
 function treeSitterDiffSyntaxService(
@@ -531,11 +544,27 @@ function treeSitterDiffSyntaxSession(
   provider: EditorSyntaxProvider,
   document: DiffSyntaxDocument,
 ): DiffSyntaxServiceSession | null {
-  const session = provider.createSession(syntaxSessionOptions(document))
-  if (!session) return null
+  const analysis = createEditorDocumentAnalysis({
+    buffer: document.snippet.buffer,
+    documentId: document.documentId,
+  })
+  const session = analysis.borrowStructural({
+    provider,
+    includeCaptures: document.request.language.includeCaptures,
+    includeHighlights: document.request.language.includeHighlights,
+    languageId: document.languageId,
+    syntaxMode: document.request.language.mode === 'range' ? 'range' : 'full',
+  })
+  if (!session) {
+    analysis.dispose()
+    return null
+  }
 
   return {
-    dispose: () => session.dispose(),
+    dispose: () => {
+      session.dispose()
+      analysis.dispose()
+    },
     refresh: async () => {
       const result = await session.refresh(document.textSnapshot)
       return { ...result, tokens: document.snippet.submittedTokens(result.tokens) }
@@ -554,29 +583,6 @@ function tokenHighlighterDiffSyntaxSession(
       const result = await session.refresh(document.textSnapshot)
       return syntaxResultFromTokens(document.request, result.tokens)
     },
-  }
-}
-
-function syntaxSessionOptions(document: DiffSyntaxDocument): EditorSyntaxSessionOptions {
-  return {
-    documentId: document.documentId,
-    includeCaptures: document.request.language.includeCaptures,
-    includeHighlights: document.request.language.includeHighlights,
-    languageId: document.languageId,
-    snapshot: document.request.snapshot,
-    syntaxMode: document.request.language.mode === 'range' ? 'range' : 'full',
-    textSnapshot: document.textSnapshot,
-  }
-}
-
-function highlighterSessionOptions(
-  document: DiffSyntaxDocument,
-): Omit<EditorSyntaxSessionOptions, 'includeCaptures' | 'includeHighlights' | 'syntaxMode'> {
-  return {
-    documentId: document.documentId,
-    languageId: document.languageId,
-    snapshot: document.request.snapshot,
-    textSnapshot: document.textSnapshot,
   }
 }
 
@@ -606,6 +612,7 @@ function syntaxDocumentsForFile(
   side: DiffSyntaxSide,
   lines: DiffSnippetLines,
 ): readonly DiffSyntaxDocument[] {
+  if (file.isPartial) return []
   return syntaxSourcesForSide(file, side).map((source) => syntaxDocument(file, source, lines))
 }
 

@@ -42,11 +42,13 @@ It writes [consumer-inventory.tsv](consumer-inventory.tsv), including source tex
 migration family and an explanatory note. Standard output without a flag supports comparison
 without writing. `--check` detects drift in the complete generated file.
 
-The current scan has 597 classified matches: 26 publication points, 26 subscriptions/view
+The preparation scan records 597 classified matches: 26 publication points, 26 subscriptions/view
 notifications, 106 factories/borrows/declarations, 65 worker/protocol messages, 252 source reads,
 33 cursor reads, 56 source-state declarations/recovery paths and 33 private/debug/built imports.
-These are source matches, including declarations and calibrated examples. They are separate from
-live session counts. The scan classifies every match by its owning family. The `unit` column records
+The regenerated delivery inventory has 610 matches. The dated preparation counts below retain
+their original scope. These are source matches, including declarations and calibrated examples.
+They are separate from live session counts. The scan classifies every match by its owning family.
+The `unit` column records
 the family's migration, and the deletion table below distinguishes generic source state from
 domain and presentation state. Agent-session factories, demo messages, file-watcher messages,
 spelling word messages and the TUI's independent text are explicitly outside Editor document delivery.

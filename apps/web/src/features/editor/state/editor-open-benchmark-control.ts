@@ -1,5 +1,10 @@
 import { sameItems as sameQueryKey } from '@workspace/utils/collections'
-import { groupForTab, openTabInGroups, selectEditorGroupTab } from '@/lib/documents/utils/groups'
+import {
+  filterGroupTabs,
+  groupForTab,
+  openTabInGroups,
+  selectEditorGroupTab,
+} from '@/lib/documents/utils/groups'
 import {
   activeEditorTabForWorkbenchPanels,
   editorTabRecordsForWorkbenchPanels,
@@ -35,16 +40,25 @@ import {
   filesystemPath,
   fileDocument,
   tabId,
+  workspaceRoot,
 } from '@/lib/documents/utils/identity'
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
-import { documentTab, sameTabContent } from '@/lib/documents/utils/tabs'
-import type { FilesystemPath } from '@/lib/documents/utils/types'
+import { documentTab, sameTabContent, settingsTab } from '@/lib/documents/utils/tabs'
+import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { closeEditorTabInWorkbenchPanels } from '@/features/workbench/utils/panels'
+import { editorHistoryForClosedContent } from '@/features/editor/utils/tab-history'
 
 type EditorOpenSampleTarget = { readonly path: FilesystemPath; readonly rootPath: FilesystemPath }
 type EditorOpenSampleResetRequest = EditorOpenSampleTarget & { readonly sampleId: string }
 
 const BENCHMARK_TARGET_TAB_PREFIX = 'editor-open-benchmark-target:'
+const BENCHMARK_GUARD_TAB_PREFIX = 'editor-open-benchmark-guard:'
+
+type EditorOpenSample = {
+  readonly sample: FileOpenIntentBenchmarkSample
+  readonly inertTabId: TabId
+  readonly guardTabIds: readonly TabId[]
+}
 
 export function createEditorOpenBenchmarkControl({
   storage,
@@ -76,7 +90,7 @@ export function createEditorOpenBenchmarkControl({
     uiStore,
     workspaceStore,
   })
-  const samples = new Map<string, FileOpenIntentBenchmarkSample>()
+  const samples = new Map<string, EditorOpenSample>()
   let resetRunning = false
 
   return {
@@ -91,9 +105,21 @@ export function createEditorOpenBenchmarkControl({
       if (samples.has(request.sampleId)) {
         throw createClientInvariantError('Editor-open benchmark sample id is already active')
       }
+      const layout = inactiveTargetLayout(request.path, workspaceStore)
       const sample = fileOpenIntentOwner.beginBenchmarkSample(request)
-      samples.set(request.sampleId, sample)
-      installInactiveTargetTab(request.path, workspaceStore)
+      samples.set(request.sampleId, {
+        sample,
+        inertTabId: layout.inertTabId,
+        guardTabIds: layout.guardTabIds,
+      })
+      const workspace = workspaceStore.getState()
+      workspace.setEditorHistory(
+        editorHistoryForClosedContent(workspace.editorHistory, documentTab(fileDocument(request))),
+      )
+      workspace.setWorkbenchPanels({
+        ...workspace.workbenchPanels,
+        editorGroups: layout.editorGroups,
+      })
     },
     prime: async (input) => {
       const request = {
@@ -118,10 +144,11 @@ export function createEditorOpenBenchmarkControl({
 
       resetRunning = true
       try {
-        const sample = samples.get(request.sampleId)
-        if (!sample) {
+        const ownedSample = samples.get(request.sampleId)
+        if (!ownedSample) {
           throw createClientInvariantError('Editor-open benchmark sample is not active')
         }
+        const { sample } = ownedSample
         assertSampleTarget(request, sample)
         const result = await resetEditorOpenSample({
           storage,
@@ -131,6 +158,8 @@ export function createEditorOpenBenchmarkControl({
           queryClient,
           request,
           sample,
+          inertTabId: ownedSample.inertTabId,
+          guardTabIds: ownedSample.guardTabIds,
           workspaceStore,
         })
         samples.delete(request.sampleId)
@@ -150,6 +179,8 @@ async function resetEditorOpenSample({
   queryClient,
   request,
   sample,
+  inertTabId,
+  guardTabIds,
   workspaceStore,
 }: {
   readonly commands: EditorApplyActions
@@ -159,12 +190,14 @@ async function resetEditorOpenSample({
   readonly queryClient: QueryClient
   readonly request: EditorOpenSampleResetRequest
   readonly sample: FileOpenIntentBenchmarkSample
+  readonly inertTabId: TabId
+  readonly guardTabIds: readonly TabId[]
   readonly workspaceStore: EditorWorkspaceStoreApi
 }) {
   assertTargetRoot(request, workspaceStore)
   sample.quarantine()
   assertTargetIsClean(request.path, documentStore)
-  activateInertAndCloseTarget(request.path, commands, workspaceStore)
+  activateInertAndCloseTarget(request.path, commands, workspaceStore, inertTabId, guardTabIds)
   await nextTaskAndFrame()
   if (mountedEditors.has(request.path)) {
     throw createClientInvariantError('Editor-open benchmark target remained mounted after close')
@@ -207,6 +240,8 @@ function activateInertAndCloseTarget(
   path: FilesystemPath,
   commands: EditorApplyActions,
   workspaceStore: EditorWorkspaceStoreApi,
+  inertTabId: TabId,
+  guardTabIds: readonly TabId[],
 ): void {
   const workspace = workspaceStore.getState()
   const targetTabs = editorTabRecordsForWorkbenchPanels(workspace.workbenchPanels).filter((tab) =>
@@ -222,7 +257,7 @@ function activateInertAndCloseTarget(
 
   const inertTab = editorTabRecordsForWorkbenchPanels(workspace.workbenchPanels).find(
     (tab) =>
-      tab.id !== targetTab.id &&
+      tab.id === inertTabId &&
       (tab.content.kind !== 'document' || !filesystemResource(tab.content.document)),
   )
   if (!inertTab) {
@@ -239,11 +274,13 @@ function activateInertAndCloseTarget(
     throw createClientInvariantError('Editor-open benchmark could not activate its inert surface')
   }
 
-  workspaceStore
-    .getState()
-    .setWorkbenchPanels(
-      closeEditorTabInWorkbenchPanels(workspaceStore.getState().workbenchPanels, targetTab.id),
-    )
+  const current = workspaceStore.getState()
+  const closed = closeEditorTabInWorkbenchPanels(current.workbenchPanels, targetTab.id)
+  current.setEditorHistory(editorHistoryForClosedContent(current.editorHistory, targetTab.content))
+  current.setWorkbenchPanels({
+    ...closed,
+    editorGroups: filterGroupTabs(closed.editorGroups, (tab) => !guardTabIds.includes(tab.id)),
+  })
 
   const activeTabId = activeEditorTabForWorkbenchPanels(
     workspaceStore.getState().workbenchPanels,
@@ -264,9 +301,9 @@ function assertSampleTarget(
 
 function assertActiveSampleTarget(
   target: EditorOpenSampleTarget,
-  samples: ReadonlyMap<string, FileOpenIntentBenchmarkSample>,
+  samples: ReadonlyMap<string, EditorOpenSample>,
 ): void {
-  for (const sample of samples.values()) {
+  for (const { sample } of samples.values()) {
     if (sample.target.path !== target.path) continue
     if (sample.target.rootPath === target.rootPath) return
   }
@@ -356,31 +393,49 @@ function assertTargetStateCleared(
   }
 }
 
-function installInactiveTargetTab(
-  path: FilesystemPath,
-  workspaceStore: EditorWorkspaceStoreApi,
-): void {
+function inactiveTargetLayout(path: FilesystemPath, workspaceStore: EditorWorkspaceStoreApi) {
   const workspace = workspaceStore.getState()
   const panels = workspace.workbenchPanels
+  const inert = activeEditorTabForWorkbenchPanels(panels)
+  if (!inert || (inert.content.kind === 'document' && filesystemResource(inert.content.document))) {
+    throw createClientInvariantError('Editor-open benchmark requires a selected inert surface')
+  }
+
+  const before = {
+    id: tabId(`${BENCHMARK_GUARD_TAB_PREFIX}${crypto.randomUUID()}`),
+    content: settingsTab(),
+  }
+  const after = {
+    id: tabId(`${BENCHMARK_GUARD_TAB_PREFIX}${crypto.randomUUID()}`),
+    content: documentTab({
+      kind: 'search',
+      root: workspaceRoot(
+        inert.content.kind === 'document' &&
+          inert.content.document.kind === 'search' &&
+          inert.content.document.root === ''
+          ? '/'
+          : '',
+      ),
+    }),
+  }
   if (
-    editorTabRecordsForWorkbenchPanels(panels).some((tab) =>
-      sameTabContent(tab.content, documentTab(fileDocument({ path }))),
+    editorTabRecordsForWorkbenchPanels(panels).some(
+      (tab) =>
+        sameTabContent(tab.content, before.content) || sameTabContent(tab.content, after.content),
     )
-  )
-    return
+  ) {
+    throw createClientInvariantError('Editor-open benchmark requires unused inert guard contents')
+  }
 
   const tab = {
     id: tabId(`${BENCHMARK_TARGET_TAB_PREFIX}${crypto.randomUUID()}`),
     content: documentTab(fileDocument({ path })),
   }
   const groupId = panels.editorGroups.activeGroupId
-  const selected = activeEditorTabForWorkbenchPanels(panels)?.id ?? null
-  const editorGroups = selectEditorGroupTab(
-    openTabInGroups(panels.editorGroups, tab),
-    groupId,
-    selected,
-  )
-  workspace.setWorkbenchPanels({ ...panels, editorGroups })
+  const withBefore = openTabInGroups(panels.editorGroups, before)
+  const withTarget = openTabInGroups(withBefore, tab)
+  const editorGroups = selectEditorGroupTab(openTabInGroups(withTarget, after), groupId, inert.id)
+  return { editorGroups, inertTabId: inert.id, guardTabIds: [before.id, after.id] }
 }
 
 async function nextTaskAndFrame(): Promise<void> {

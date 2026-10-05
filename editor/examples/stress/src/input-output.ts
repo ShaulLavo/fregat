@@ -4,6 +4,15 @@ import {
   replayMinimapLines,
   replayShikiSource,
   replayTreeSitterSource,
+  replayCanonicalSource,
+  minimapProofState,
+  canonicalSourcePoint,
+  canonicalSourceIdentity,
+  type InputPublicationPoint,
+  type InputWireIdentity,
+  type InputWirePoint,
+  type createInputSourceIdentity,
+  attestMinimapCurrentSource,
 } from '../input-worker-proof.mjs'
 
 type ConsumerSession = {
@@ -16,21 +25,27 @@ type ConsumerSession = {
   readonly requestedVersion: number | null
   readonly answeredVersion: number | null
   readonly disposed: boolean
+  readonly canonical?: unknown
 }
 
-type MinimapProof = {
-  readonly terminated: boolean
-  readonly minimap: boolean
+type MinimapProof = Parameters<typeof minimapProofState>[0] & {
   readonly minimapLog: readonly unknown[]
   readonly sourceUpdates: number
   readonly latestRender: number
   readonly acceptedRender: number
   readonly renderAfterSource: number
+  readonly minimapSource?: {
+    readonly receipt?: {
+      readonly target: InputWirePoint
+      readonly identity: InputWireIdentity
+    } | null
+  } | null
 }
+type SourceIdentity = ReturnType<typeof createInputSourceIdentity>
 
 // Each live consumer session's receipt, replayed after the measured interval: the source its
 // worker last received equals the current text, and that request was answered.
-function consumerSessions(text: string) {
+function consumerSessions(text: string, point: InputPublicationPoint, identity: SourceIdentity) {
   const sessions: Iterable<ConsumerSession> = globalThis.__inputWorkerSources?.values() ?? []
   return [...sessions]
     .filter(
@@ -40,13 +55,22 @@ function consumerSessions(text: string) {
         (session.kind === 'shiki' || session.kind === 'treeSitter'),
     )
     .map((session) => {
-      const source =
-        session.kind === 'shiki'
+      const source = session.canonical
+        ? replayCanonicalSource(session.canonical)
+        : session.kind === 'shiki'
           ? replayShikiSource(session.log)
           : replayTreeSitterSource(session.log)
       return {
         kind: session.kind,
-        current: source === text,
+        current:
+          source === text &&
+          (!session.canonical ||
+            identity.matches(
+              canonicalSourceIdentity(session.canonical),
+              canonicalSourcePoint(session.canonical),
+              point,
+            )),
+        sourcePoint: session.canonical ? canonicalSourcePoint(session.canonical) : null,
         answered: session.requested > 0 && session.answered === session.requested,
         failed: session.failed === session.requested && session.requested > 0,
         requestedVersion: session.requestedVersion,
@@ -57,17 +81,32 @@ function consumerSessions(text: string) {
 
 // Each live minimap worker, one per view: its replayed line summaries match the current text, and
 // its accepted render was requested after its last source update.
-function minimapReceipts(text: string) {
+function minimapReceipts(text: string, point: InputPublicationPoint, identity: SourceIdentity) {
   const workers = (globalThis.__inputWorkerProof ?? []) as readonly MinimapProof[]
   return workers
     .filter((worker) => worker.minimap && !worker.terminated)
-    .map((worker) => ({
-      current: minimapMatches(replayMinimapLines(worker.minimapLog), text),
-      renderedAfterSource:
-        worker.renderAfterSource === worker.sourceUpdates &&
-        worker.latestRender > 0 &&
-        worker.acceptedRender === worker.latestRender,
-    }))
+    .map((worker) => {
+      const visible = worker.viewId
+        ? (document.getElementById(worker.viewId)?.checkVisibility() ?? null)
+        : null
+      const state = minimapProofState(worker, workers, visible)
+      const current =
+        minimapMatches(replayMinimapLines(worker.minimapLog), text) &&
+        (worker.protocol !== 'canonical' ||
+          identity.matches(
+            worker.minimapSource?.receipt?.identity,
+            worker.minimapSource?.receipt?.target,
+            point,
+          ))
+      if (current && state.renderedAfterSource && worker.protocol === 'canonical')
+        attestMinimapCurrentSource(worker)
+      return {
+        ...minimapProofState(worker, workers, visible),
+        viewId: worker.viewId ?? null,
+        sourcePoint: worker.minimapSource?.receipt?.target ?? null,
+        current,
+      }
+    })
 }
 
 function tokenHighlights() {
@@ -163,6 +202,8 @@ declare global {
 export function readInputOutput(
   readiness: Awaited<ReturnType<ReturnType<typeof createInputConsumers>['settle']>>,
   text: string,
+  publicationPoint: InputPublicationPoint,
+  sourceIdentity: SourceIdentity,
 ) {
   if (globalThis.__inputReadinessNegative === 'drop-view-ranges')
     dropLastVisibleViewRanges(readiness.views.length)
@@ -181,8 +222,12 @@ export function readInputOutput(
       tokenRanges: viewTokenRanges(index),
       plainCoverage: readiness.shiki?.untokenizedLines ? plainChunkCoverage(index) : null,
     })),
-    sessions: consumerSessions(text),
-    minimaps: minimapReceipts(text),
+    publicationPoint: {
+      revision: publicationPoint.revision,
+      textVersion: publicationPoint.textVersion,
+    },
+    sessions: consumerSessions(text, publicationPoint, sourceIdentity),
+    minimaps: minimapReceipts(text, publicationPoint, sourceIdentity),
     highlights,
     lineCount: text.split('\n').length,
     overLimitLines: lineLimit === null ? null : linesLongerThan(text, lineLimit),

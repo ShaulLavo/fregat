@@ -39,7 +39,14 @@ import {
 } from '../../../../test/factories/retention-acceptance-paint'
 import { tokenPaintMismatch } from '../../../../../../scripts/agent/scenarios/editor-tab-hover-highlights-probe'
 import { createShikiWorkerOwner } from '@singapore-editor/core/shiki'
-import { TreeSitterWorkerClient } from '@singapore-editor/tree-sitter'
+import { createEditorTextBuffer } from '@singapore-editor/core/document'
+import { createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
+import {
+  createTreeSitterSyntaxProvider,
+  createTreeSitterWorkerOwner,
+  TreeSitterWorkerOwner,
+} from '@singapore-editor/tree-sitter'
+import { TYPESCRIPT_TREE_SITTER_LANGUAGE } from '@singapore-editor/tree-sitter-languages'
 import { highlightingService } from '@/lib/highlighting/state/service'
 
 const sourcePath = filesystemPath('repo/src/editor-tab-a.ts')
@@ -60,19 +67,20 @@ test.for(['shiki', 'tree-sitter'] as const)(
   async (family, context) => {
     installTrace(context)
     const gate = holdRetentionIdentityWorkerReply()
-    const sdk = family === 'shiki' ? createShikiWorkerOwner() : new TreeSitterWorkerClient()
+    const sdk = family === 'shiki' ? createShikiWorkerOwner() : createTreeSitterWorkerOwner()
     context.onTestFinished(async () => {
       gate.release()
       await sdk.dispose()
     })
-    if (sdk instanceof TreeSitterWorkerClient) await sdk.warmLanguages([])
+    if (sdk instanceof TreeSitterWorkerOwner) await warmIdentityTreeOwner(sdk)
     else
-      await sdk.highlight({
-        text: 'native SDK wire calibration',
-        lang: null,
+      await sdk.loadTheme({
         theme: 'identity-sdk-wire',
-        languageRegistrations: [],
-        themeRegistration: { name: 'identity-sdk-wire', fg: '#ffffff', bg: '#000000' },
+        registrations: {
+          languageRegistrations: [],
+          themeRegistration: { name: 'identity-sdk-wire', fg: '#ffffff', bg: '#000000' },
+          themeRegistrations: [],
+        },
       })
     await sdk.awaitIdleFence()
     const before = sdk.inspect()
@@ -107,6 +115,32 @@ test.for(['shiki', 'tree-sitter'] as const)(
     }
   },
 )
+
+async function warmIdentityTreeOwner(owner: TreeSitterWorkerOwner) {
+  const provider = createTreeSitterSyntaxProvider({ workerOwner: owner })
+  provider.registerLanguage(TYPESCRIPT_TREE_SITTER_LANGUAGE)
+  const buffer = createEditorTextBuffer('const identityCalibration = 1\n')
+  const analysis = createEditorDocumentAnalysis({
+    buffer,
+    documentId: 'identity-native-fence.ts',
+  })
+  const session = analysis.borrowStructural({
+    provider,
+    languageId: 'typescript',
+    syntaxMode: 'full',
+  })
+  try {
+    if (!session) throw createClientInvariantError('Identity fixture structural operation declined')
+    const result = await session.refresh(buffer.getTextSnapshot())
+    expect(result.tokens?.length).toBeGreaterThan(0)
+  } finally {
+    try {
+      session?.dispose()
+    } finally {
+      analysis.dispose()
+    }
+  }
+}
 
 test.for(cases)(
   '$family held native reply across application $axis change',

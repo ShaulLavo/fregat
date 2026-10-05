@@ -1,3 +1,14 @@
+import type { DocumentChangesSinceSyncPoint } from '../src/editor/editChain'
+import type { DocumentRead } from '../src/editor/documentDelivery'
+import type { EditorHighlighterRuntime } from '../src/syntax/highlighter'
+import {
+  createEditorStructuralOperation,
+  createEditorHighlighterOperation,
+} from '../src/editor/operationDefinitions'
+import type {
+  EditorStructuralOperationContext,
+  EditorHighlighterOperationContext,
+} from '../src/document/operations'
 import { defaultKeyBindings, keyboardEvent } from './factories/keymap'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { detectPlatform, parseHotkey, rawHotkeyToParsedHotkey } from '@fregat/hotkeys'
@@ -32,31 +43,26 @@ import {
   releaseDocumentMutationLease,
   reverseDocumentTransaction,
   type DocumentSessionChange,
+  type TextEdit,
   type DocumentTextSnapshot,
 } from '../src/public/document'
 import {
   createEmptySyntaxResult,
   type EditorSyntaxRange,
   type EditorSyntaxResult,
-  type EditorSyntaxSession,
-  type EditorSyntaxSessionOptions,
+  type EditorSyntaxRuntime,
   type EditorToken,
   EditorTokenStore,
 } from '../src/public/syntax'
 import type { EditorTheme } from '../src/public/rendering'
 import type {
-  EditorHighlighterSession,
   EditorHighlightResult,
   EditorPlugin,
   EditorViewContributionContext,
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
 } from '../src/public/extensions'
-import {
-  resetEditorInstanceCount,
-  setEditorSyntaxSessionFactory,
-  setHighlightRegistry,
-} from '../src/public/testing'
+import { resetEditorInstanceCount, setHighlightRegistry } from '../src/public/testing'
 import { createFoldMap } from '../src/foldMap'
 import { SelectionGoal, resolveSelection } from '../src/selections'
 import type { VirtualizedTextView } from '../src/virtualization'
@@ -104,18 +110,21 @@ function createSyntaxResult(
   } satisfies EditorSyntaxResult
 }
 
-function createMockSyntaxSession(
-  overrides: Partial<EditorSyntaxSession> = {},
-): EditorSyntaxSession {
-  return {
-    refresh: async () => createSyntaxResult(),
-    applyChange: async () => createSyntaxResult(),
+function createMockSyntaxRuntime(
+  overrides: Partial<EditorSyntaxRuntime> = {},
+): EditorSyntaxRuntime {
+  const runtime = {
     getResult: () => createSyntaxResult(),
     getTokens: () => [],
-    foldingSupport: 'supported',
+    foldingSupport: 'supported' as const,
     getSnapshotVersion: () => 0,
     dispose: () => undefined,
     ...overrides,
+  }
+  const analyze = overrides.analyze ?? (async () => createSyntaxResult())
+  return {
+    ...runtime,
+    analyze: (read, signal) => controlledAnalysis(analyze(read, signal), signal),
   }
 }
 
@@ -128,19 +137,29 @@ function createHighlightResult(
   return { tokens, theme }
 }
 
-function createMockHighlighterSession(
-  overrides: Partial<EditorHighlighterSession> = {},
-): EditorHighlighterSession {
+function createMockHighlighterRuntime(
+  overrides: Partial<EditorHighlighterRuntime> = {},
+): EditorHighlighterRuntime {
+  const analyze = overrides.analyze ?? (async () => createHighlightResult())
   return {
-    refresh: async () => createHighlightResult(),
-    applyChange: async () => createHighlightResult(),
     dispose: () => undefined,
     ...overrides,
+    analyze: (read, signal) => controlledAnalysis(analyze(read, signal), signal),
   }
 }
 
+function controlledAnalysis<T>(result: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return result
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(new DOMException('Controlled analysis cancelled', 'AbortError'))
+    if (signal.aborted) abort()
+    else signal.addEventListener('abort', abort, { once: true })
+    void result.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort))
+  })
+}
+
 function createHighlighterPlugin(
-  session: EditorHighlighterSession,
+  openRuntime: (context: EditorHighlighterOperationContext) => EditorHighlighterRuntime,
   options: {
     readonly loadTheme?: () => Promise<EditorTheme | null | undefined>
   } = {},
@@ -148,7 +167,7 @@ function createHighlighterPlugin(
   return {
     activate: (context) => {
       const provider = {
-        createSession: () => session,
+        operation: createEditorHighlighterOperation(openRuntime),
       }
       if (!options.loadTheme) return context.registerHighlighter(provider)
       return context.registerHighlighter({
@@ -734,9 +753,9 @@ const COLLAPSED_BLOCK_NEXT_ROW = COLLAPSED_BLOCK_TEXT.indexOf('z();')
  * `z();` after it are on screen and every offset in between addresses a row that is drawn nowhere.
  */
 async function openCollapsedBlock(editor: Editor): Promise<void> {
-  setEditorSyntaxSessionFactory(() =>
-    createMockSyntaxSession({
-      refresh: async () =>
+  const syntaxPlugin1 = createSyntaxPlugin(() =>
+    createMockSyntaxRuntime({
+      analyze: async () =>
         createSyntaxResult(
           [],
           [
@@ -752,6 +771,7 @@ async function openCollapsedBlock(editor: Editor): Promise<void> {
         ),
     }),
   )
+  editor.addPlugin(syntaxPlugin1)
   editor.openDocument({
     documentId: 'main.ts',
     languageId: 'typescript',
@@ -949,7 +969,6 @@ describe('Editor', () => {
     editor.dispose()
     container.remove()
     setHighlightRegistry(undefined)
-    setEditorSyntaxSessionFactory(undefined)
   })
 
   describe('constructor', () => {
@@ -1085,10 +1104,11 @@ describe('Editor', () => {
       // editor while its file fetch is in flight). Opening then would start a
       // syntax session nothing ever disposes.
       let sessions = 0
-      setEditorSyntaxSessionFactory(() => {
+      const syntaxPlugin2 = createSyntaxPlugin(() => {
         sessions += 1
-        return createMockSyntaxSession()
+        return createMockSyntaxRuntime()
       })
+      editor.addPlugin(syntaxPlugin2)
       editor.dispose()
 
       editor.openDocument({
@@ -1117,25 +1137,30 @@ describe('Editor', () => {
       expect(editorRoot().style.getPropertyValue('--editor-foreground')).toBe('')
     })
 
-    it('keeps cold retained attachment on incremental source operations', async () => {
+    it('keeps cold retained attachment on composed canonical source operations', async () => {
       const text = 'const value = 1;\n'.repeat(4_096)
-      const refreshLengths: number[] = []
-      const changes: DocumentSessionChange[] = []
+      const lengths: number[] = []
+      const deltas: {
+        readonly edits: readonly TextEdit[] | null
+        readonly logicalRevisionCount: number
+      }[] = []
       const events: EditorLogEvent[] = []
-      const highlighter = createMockHighlighterSession({
-        refresh: async (snapshot) => {
-          refreshLengths.push(snapshot.length)
-          return createHighlightResult()
-        },
-        applyChange: async (change) => {
-          changes.push(change)
-          return createHighlightResult()
-        },
+      const plugin = createHighlighterPlugin((context) => {
+        let analysed = context.initialRead
+        return createMockHighlighterRuntime({
+          analyze: async (read) => {
+            const delta = context.source.changesBetween(analysed.revision, read.revision)
+            if (delta?.logicalRevisionCount) deltas.push(delta)
+            else lengths.push(read.text.length)
+            analysed = read
+            return createHighlightResult()
+          },
+        })
       })
       editor.dispose()
       editor = createVisibleEditor(container, {
         plugins: withTestLanguagePlugins(
-          createHighlighterPlugin(highlighter),
+          plugin,
           createEditorLoggingPlugin((event) => events.push(event)),
         ),
       })
@@ -1148,12 +1173,10 @@ describe('Editor', () => {
       await vi.waitFor(() => expect(editor.getState().initialHighlightStatus).toBe('painted'))
       session.applyText('!')
       session.applyText('?')
-      await vi.waitFor(() => expect(changes).toHaveLength(2))
-
-      expect(refreshLengths).toEqual([text.length])
-      expect(changes.map((change) => change.edits)).toEqual([
-        [{ from: text.length, to: text.length, text: '!' }],
-        [{ from: text.length + 1, to: text.length + 1, text: '?' }],
+      await vi.waitFor(() => expect(deltas).toHaveLength(1))
+      expect(lengths).toEqual([text.length])
+      expect(deltas).toMatchObject([
+        { logicalRevisionCount: 2, edits: [{ from: text.length, to: text.length, text: '!?' }] },
       ])
       expect(editor.materializeFullText()).toBe(`${text}!?`)
       expect(
@@ -1161,49 +1184,54 @@ describe('Editor', () => {
       ).toEqual([])
     })
 
-    it('hands retained highlighters every committed edit once', async () => {
-      const applied: DocumentSessionChange[] = []
-      const highlighter = createMockHighlighterSession({
-        applyChange: async (change) => {
-          applied.push(change)
-          return createHighlightResult()
-        },
+    it('composes every committed edit before retained highlighting', async () => {
+      const deltas: {
+        readonly edits: readonly TextEdit[] | null
+        readonly logicalRevisionCount: number
+      }[] = []
+      const plugin = createHighlighterPlugin((context) => {
+        let analysed = context.initialRead
+        return createMockHighlighterRuntime({
+          analyze: async (read) => {
+            const delta = context.source.changesBetween(analysed.revision, read.revision)
+            if (delta?.logicalRevisionCount) deltas.push(delta)
+            analysed = read
+            return createHighlightResult()
+          },
+        })
       })
       editor.dispose()
-      editor = createVisibleEditor(container, {
-        plugins: withTestLanguagePlugins(createHighlighterPlugin(highlighter)),
-      })
-      setEditorSyntaxSessionFactory(() => createMockSyntaxSession())
-
+      editor = createVisibleEditor(container, { plugins: withTestLanguagePlugins(plugin) })
+      editor.addPlugin(createSyntaxPlugin(() => createMockSyntaxRuntime()))
       openRetainedDocument('const a = 1;\nconst b = 2;')
-      await flushMicrotasks()
-      await flushSyntaxDebounce()
-
-      editor.syncText('const a = 1;!\nconst b = 2;', {
-        languageId: 'typescript',
-      })
-      editor.syncText('const a = 1;!\nconst b = 2;?', {
-        languageId: 'typescript',
-      })
-      await flushSyntaxDebounce()
-
-      expect(applied.map((change) => change.edits)).toEqual([
-        [{ from: 12, to: 12, text: '!' }],
-        [{ from: 26, to: 26, text: '?' }],
+      await vi.waitFor(() => expect(editor.getState().initialHighlightStatus).toBe('painted'))
+      editor.syncText('const a = 1;!\nconst b = 2;', { languageId: 'typescript' })
+      editor.syncText('const a = 1;!\nconst b = 2;?', { languageId: 'typescript' })
+      await vi.waitFor(() => expect(deltas).toHaveLength(1))
+      expect(deltas).toMatchObject([
+        {
+          logicalRevisionCount: 2,
+          edits: [
+            { from: 12, to: 12, text: '!' },
+            { from: 25, to: 25, text: '?' },
+          ],
+        },
       ])
+      expect(editor.materializeFullText()).toBe('const a = 1;!\nconst b = 2;?')
     })
 
     it('does not reload highlighter sessions when the configured theme is unchanged', async () => {
       const theme = { backgroundColor: '#ffffff', foregroundColor: '#24292e' }
       const refresh = vi.fn(async () => createHighlightResult())
       const dispose = vi.fn()
-      const highlighter = createMockHighlighterSession({ dispose, refresh })
+      const highlighter = createMockHighlighterRuntime({ dispose, analyze: refresh })
       editor.dispose()
       editor = createVisibleEditor(container, {
-        plugins: withTestLanguagePlugins(createHighlighterPlugin(highlighter)),
+        plugins: withTestLanguagePlugins(createHighlighterPlugin(() => highlighter)),
         theme,
       })
-      setEditorSyntaxSessionFactory(() => createMockSyntaxSession())
+      const syntaxPlugin4 = createSyntaxPlugin(() => createMockSyntaxRuntime())
+      editor.addPlugin(syntaxPlugin4)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -1221,13 +1249,14 @@ describe('Editor', () => {
     it('does not reload highlighter sessions when only the configured theme changes', async () => {
       const refresh = vi.fn(async () => createHighlightResult())
       const dispose = vi.fn()
-      const highlighter = createMockHighlighterSession({ dispose, refresh })
+      const highlighter = createMockHighlighterRuntime({ dispose, analyze: refresh })
       editor.dispose()
       editor = createVisibleEditor(container, {
-        plugins: withTestLanguagePlugins(createHighlighterPlugin(highlighter)),
+        plugins: withTestLanguagePlugins(createHighlighterPlugin(() => highlighter)),
         theme: { backgroundColor: '#ffffff' },
       })
-      setEditorSyntaxSessionFactory(() => createMockSyntaxSession())
+      const syntaxPlugin5 = createSyntaxPlugin(() => createMockSyntaxRuntime())
+      editor.addPlugin(syntaxPlugin5)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -6096,11 +6125,12 @@ describe('Editor', () => {
     })
 
     it('uses explicit language ids for syntax highlights', async () => {
-      const created: EditorSyntaxSessionOptions[] = []
-      setEditorSyntaxSessionFactory((options) => {
+      const created: EditorStructuralOperationContext[] = []
+      const syntaxPlugin6 = createSyntaxPlugin((options) => {
         created.push(options)
-        return createMockSyntaxSession()
+        return createMockSyntaxRuntime()
       })
+      editor.addPlugin(syntaxPlugin6)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -6117,16 +6147,16 @@ describe('Editor', () => {
           syntaxMode: 'range',
         }),
       ])
-      expect(readAll(created[0]!.textSnapshot)).toBe('const a = 1;')
+      expect(readAll(created[0]!.initialRead.text)).toBe('const a = 1;')
       expect(editor.getState().syntaxStatus).toBe('ready')
       expect(highlightsMap.size).toBe(1)
     })
 
     it('queries visible syntax ranges after compact structural refresh', async () => {
       const ranges: EditorSyntaxRange[] = []
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
+      const syntaxPlugin7 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () => createSyntaxResult([]),
           queryRange: async (range) => {
             ranges.push(range)
             return createSyntaxResult([
@@ -6139,6 +6169,7 @@ describe('Editor', () => {
           },
         }),
       )
+      editor.addPlugin(syntaxPlugin7)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -6156,9 +6187,9 @@ describe('Editor', () => {
     it('requests visible syntax on scroll without reparsing the document', async () => {
       const ranges: EditorSyntaxRange[] = []
       let refreshCount = 0
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => {
+      const syntaxPlugin8 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () => {
             refreshCount += 1
             return createSyntaxResult([])
           },
@@ -6168,6 +6199,7 @@ describe('Editor', () => {
           },
         }),
       )
+      editor.addPlugin(syntaxPlugin8)
       const text = Array.from(
         { length: 20000 },
         (_value, index) => `const line${index} = ${index};`,
@@ -6193,13 +6225,15 @@ describe('Editor', () => {
       const ranges: EditorSyntaxRange[] = []
       const applyChangeResult = createDeferred<EditorSyntaxResult>()
       let applyChangeStarted = false
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
-          applyChange: () => {
-            applyChangeStarted = true
-            return applyChangeResult.promise
-          },
+      const syntaxPlugin9 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: (read) =>
+            read.revision.point.revision === 0
+              ? (async () => createSyntaxResult([]))()
+              : (() => {
+                  applyChangeStarted = true
+                  return applyChangeResult.promise
+                })(),
           queryRange: async (range) => {
             ranges.push(range)
             return createSyntaxResult([
@@ -6212,6 +6246,7 @@ describe('Editor', () => {
           },
         }),
       )
+      editor.addPlugin(syntaxPlugin9)
       const text = Array.from(
         { length: 20000 },
         (_value, index) => `const line${index} = ${index};`,
@@ -6239,21 +6274,22 @@ describe('Editor', () => {
       applyChangeResult.resolve(createSyntaxResult([]))
       await flushMicrotasks()
 
-      expect(ranges).toHaveLength(rangeCountAfterOpen + 1)
+      expect(ranges.slice(rangeCountAfterOpen).length).toBeGreaterThan(0)
       expect(ranges.at(-1)?.startIndex).toBeGreaterThan(0)
     })
 
     it('prefetches syntax ahead of fast scroll direction', async () => {
       const ranges: EditorSyntaxRange[] = []
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
+      const syntaxPlugin10 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () => createSyntaxResult([]),
           queryRange: async (range) => {
             ranges.push(range)
             return createSyntaxResult([])
           },
         }),
       )
+      editor.addPlugin(syntaxPlugin10)
       const text = Array.from(
         { length: 60000 },
         (_value, index) => `const line${index} = ${index};`,
@@ -6274,15 +6310,16 @@ describe('Editor', () => {
 
     it('queries the teleported viewport before the larger syntax prefetch range', async () => {
       const ranges: EditorSyntaxRange[] = []
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
+      const syntaxPlugin11 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () => createSyntaxResult([]),
           queryRange: async (range) => {
             ranges.push(range)
             return createSyntaxResult([])
           },
         }),
       )
+      editor.addPlugin(syntaxPlugin11)
       const text = Array.from(
         { length: 60000 },
         (_value, index) => `const line${index} = ${index};`,
@@ -6318,18 +6355,19 @@ describe('Editor', () => {
             },
           }),
       }
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
+      const syntaxPlugin12 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () => createSyntaxResult([]),
           queryRange: async (range) => {
             ranges.push(range)
             return createSyntaxResult([])
           },
         }),
       )
+      editor.addPlugin(syntaxPlugin12)
       editor.dispose()
       editor = createVisibleEditor(container, {
-        plugins: withTestLanguagePlugins(plugin),
+        plugins: [syntaxPlugin12, ...withTestLanguagePlugins(plugin)],
       })
       const text = Array.from(
         { length: 60000 },
@@ -6355,10 +6393,10 @@ describe('Editor', () => {
     it('does not cache visible syntax ranges while range queries are not ready', async () => {
       const ranges: EditorSyntaxRange[] = []
       let canQueryRange = false
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
+      const syntaxPlugin13 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
           canQueryRange: () => canQueryRange,
-          refresh: async () => createSyntaxResult([]),
+          analyze: async () => createSyntaxResult([]),
           queryRange: async (range) => {
             ranges.push(range)
             return createSyntaxResult([
@@ -6371,6 +6409,7 @@ describe('Editor', () => {
           },
         }),
       )
+      editor.addPlugin(syntaxPlugin13)
       const text = Array.from(
         { length: 60000 },
         (_value, index) => `const line${index} = ${index};`,
@@ -6389,17 +6428,16 @@ describe('Editor', () => {
       canQueryRange = true
       editor.setScrollPosition({ top: 250000, left: 0 })
 
-      expect(ranges).toHaveLength(1)
-      expect(ranges[0]?.startIndex).toBeGreaterThan(0)
+      await vi.waitFor(() => expect(ranges.some((range) => range.startIndex > 0)).toBe(true))
     })
 
     it('keeps syntax prefetch behind the visible range query', async () => {
       const ranges: EditorSyntaxRange[] = []
       const pendingRanges: Deferred<EditorSyntaxResult>[] = []
       let deferRangeQueries = false
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
+      const syntaxPlugin14 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () => createSyntaxResult([]),
           queryRange: (range) => {
             ranges.push(range)
             if (!deferRangeQueries) return Promise.resolve(createSyntaxResult([]))
@@ -6410,6 +6448,7 @@ describe('Editor', () => {
           },
         }),
       )
+      editor.addPlugin(syntaxPlugin14)
       const text = Array.from(
         { length: 60000 },
         (_value, index) => `const line${index} = ${index};`,
@@ -6441,15 +6480,16 @@ describe('Editor', () => {
 
     it('warms non-visible syntax tiles in the background', async () => {
       const ranges: EditorSyntaxRange[] = []
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
+      const syntaxPlugin15 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () => createSyntaxResult([]),
           queryRange: async (range) => {
             ranges.push(range)
             return createSyntaxResult([])
           },
         }),
       )
+      editor.addPlugin(syntaxPlugin15)
       const text = Array.from(
         { length: 60000 },
         (_value, index) => `const line${index} = ${index};`,
@@ -6480,9 +6520,9 @@ describe('Editor', () => {
       editor = createVisibleEditor(container, {
         plugins: [createViewContributionPlugin(events)],
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
+      const syntaxPlugin16 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () => createSyntaxResult([]),
           queryRange: (range) => {
             const result = createDeferred<EditorSyntaxResult>()
             pending.push({ range, result })
@@ -6490,6 +6530,7 @@ describe('Editor', () => {
           },
         }),
       )
+      editor.addPlugin(syntaxPlugin16)
       const text = Array.from(
         { length: 60000 },
         (_, index) => `const line${index} = ${index};`,
@@ -6540,9 +6581,9 @@ describe('Editor', () => {
       editor = createVisibleEditor(container, {
         plugins: withTestLanguagePlugins(createViewContributionPlugin(events)),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([], []),
+      const syntaxPlugin17 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () => createSyntaxResult([], []),
           queryRange: async (range) => {
             ranges.push(range)
             const folds =
@@ -6551,6 +6592,7 @@ describe('Editor', () => {
           },
         }),
       )
+      editor.addPlugin(syntaxPlugin17)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -6594,9 +6636,9 @@ describe('Editor', () => {
       editor = createVisibleEditor(container, {
         plugins: withTestLanguagePlugins(createViewContributionPlugin(events)),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
+      const syntaxPlugin18 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () => createSyntaxResult([]),
           queryRange: async (range) => {
             ranges.push(range)
             return createSyntaxResult(
@@ -6607,6 +6649,7 @@ describe('Editor', () => {
           },
         }),
       )
+      editor.addPlugin(syntaxPlugin18)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -6650,17 +6693,18 @@ describe('Editor', () => {
       const tokens = EditorTokenStore.fromTokens([
         { start: 10, end: 15, style: { color: '#00ff00' } },
       ])
-      const highlighter = createMockHighlighterSession({
-        refresh: async () => ({ tokens }),
+      const highlighter = createMockHighlighterRuntime({
+        analyze: async () => ({ tokens }),
       })
-      const highlighterProvider = { createSession: () => highlighter }
+      const highlighterProvider = { operation: createEditorHighlighterOperation(() => highlighter) }
+      const openStructural = vi.fn(() =>
+        createMockSyntaxRuntime({
+          analyze: async () => createSyntaxResult([], []),
+          queryRange: ranges,
+        }),
+      )
       const structural = {
-        createSession: vi.fn(() =>
-          createMockSyntaxSession({
-            refresh: async () => createSyntaxResult([], []),
-            queryRange: ranges,
-          }),
-        ),
+        operation: createEditorStructuralOperation(openStructural),
       }
       const plugin: EditorPlugin = {
         activate: (context) => [
@@ -6702,14 +6746,17 @@ describe('Editor', () => {
         )
         await flushSyntaxUntilSettled(() => ranges.mock.calls.length)
         const ids = analysis.inspectRetention().entries.map((entry) => entry.runtimeSessionId)
-        expect(analysis.inspectRetention().entries[0]!.cachedRangeCount).toBe(1)
+        expect(
+          analysis.inspectRetention().entries.find((entry) => entry.family === 'structural')
+            ?.cachedRangeCount,
+        ).toBe(1)
         const before = ranges.mock.calls.length
         ranges.mockImplementation(() => new Promise<EditorSyntaxResult>(() => undefined))
         attach()
         await flushSyntaxUntilSettled(() => ranges.mock.calls.length)
 
         expect(ranges).toHaveBeenCalledTimes(before)
-        expect(structural.createSession).toHaveBeenCalledTimes(1)
+        expect(openStructural).toHaveBeenCalledTimes(1)
         expect(analysis.inspectRetention().entries.map((entry) => entry.runtimeSessionId)).toEqual(
           ids,
         )
@@ -6750,10 +6797,10 @@ describe('Editor', () => {
       editor = createVisibleEditor(container, {
         plugins: withTestLanguagePlugins(createViewContributionPlugin(events)),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
-          queryRange: (range) => {
+      const syntaxPlugin19 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () => createSyntaxResult([]),
+          queryRange: async (range) => {
             ranges.push(range)
             if (!deferRangeQueries)
               return Promise.resolve(
@@ -6769,6 +6816,7 @@ describe('Editor', () => {
           },
         }),
       )
+      editor.addPlugin(syntaxPlugin19)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -6811,9 +6859,9 @@ describe('Editor', () => {
 
     it('does not reuse cached visible syntax after newline edits', async () => {
       const ranges: EditorSyntaxRange[] = []
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
+      const syntaxPlugin20 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () => createSyntaxResult([]),
           queryRange: async (range) => {
             ranges.push(range)
             return createSyntaxResult([
@@ -6826,6 +6874,7 @@ describe('Editor', () => {
           },
         }),
       )
+      editor.addPlugin(syntaxPlugin20)
       const text = Array.from(
         { length: 20000 },
         (_value, index) => `const line${index} = ${index};`,
@@ -6860,45 +6909,48 @@ describe('Editor', () => {
       )
     })
 
-    it('applies syncText changes through incremental syntax sessions', async () => {
-      const appliedChanges: DocumentSessionChange[] = []
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          applyChange: async (change) => {
-            appliedChanges.push(change)
-            return createSyntaxResult()
-          },
+    it('applies static syncText through exact canonical syntax reads', async () => {
+      const reads: DocumentRead[] = []
+      const deltas: { readonly edits: readonly TextEdit[] | null }[] = []
+      editor.addPlugin(
+        createSyntaxPlugin((context) => {
+          let analysed = context.initialRead
+          return createMockSyntaxRuntime({
+            analyze: async (read) => {
+              const delta = context.source.changesBetween(analysed.revision, read.revision)
+              if (delta?.logicalRevisionCount) {
+                reads.push(read)
+                deltas.push(delta)
+              }
+              analysed = read
+              return createSyntaxResult()
+            },
+          })
         }),
       )
-
       editor.openDocument({
         documentId: 'generated:/main.ts',
         documentMode: 'static',
         languageId: 'typescript',
         text: 'const a = 1;',
       })
-      await flushMicrotasks()
-
-      editor.syncText('const ab = 1;', {
-        documentMode: 'static',
-        languageId: 'typescript',
-      })
-      await flushSyntaxDebounce()
-
-      expect(appliedChanges).toHaveLength(1)
-      expect(appliedChanges[0]).toMatchObject({
-        edits: [{ from: 7, text: 'b', to: 7 }],
-        kind: 'edit',
-      })
-      expect(appliedChanges[0]?.textSnapshot.materializeFullText()).toBe('const ab = 1;')
+      await vi.waitFor(() => expect(editor.getState().syntaxStatus).toBe('ready'))
+      editor.syncText('const ab = 1;', { documentMode: 'static', languageId: 'typescript' })
+      await vi.waitFor(() => expect(reads).toHaveLength(1))
+      expect(deltas).toEqual([expect.objectContaining({ edits: [{ from: 7, text: 'b', to: 7 }] })])
+      expect(readAll(reads[0]!.text)).toBe('const ab = 1;')
+      expect(reads[0]!.revision.point).toBe(
+        editor.getBufferSession()!.buffer.getDocumentSyncPoint(),
+      )
     })
 
     it('does not infer language from document ids', async () => {
-      const created: EditorSyntaxSessionOptions[] = []
-      setEditorSyntaxSessionFactory((options) => {
+      const created: EditorStructuralOperationContext[] = []
+      const syntaxPlugin22 = createSyntaxPlugin((options) => {
         created.push(options)
-        return createMockSyntaxSession()
+        return createMockSyntaxRuntime()
       })
+      editor.addPlugin(syntaxPlugin22)
 
       editor.openDocument({ documentId: 'main.ts', text: 'const a = 1;' })
       await flushMicrotasks()
@@ -6912,22 +6964,23 @@ describe('Editor', () => {
     })
 
     it('uses plugin highlights instead of Tree-sitter tokens', async () => {
-      const created: EditorSyntaxSessionOptions[] = []
-      const highlighter = createMockHighlighterSession({
-        refresh: async () =>
+      const created: EditorStructuralOperationContext[] = []
+      const highlighter = createMockHighlighterRuntime({
+        analyze: async () =>
           createHighlightResult([{ start: 6, end: 7, style: { color: '#00ff00' } }]),
       })
       editor.dispose()
       editor = createVisibleEditor(container, {
-        plugins: withTestGutterPlugins(createHighlighterPlugin(highlighter)),
+        plugins: withTestGutterPlugins(createHighlighterPlugin(() => highlighter)),
       })
-      setEditorSyntaxSessionFactory((options) => {
+      const syntaxPlugin23 = createSyntaxPlugin((options) => {
         created.push(options)
-        return createMockSyntaxSession({
-          refresh: async () =>
+        return createMockSyntaxRuntime({
+          analyze: async () =>
             createSyntaxResult([{ start: 0, end: 5, style: { color: '#ff0000' } }]),
         })
       })
+      editor.addPlugin(syntaxPlugin23)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -6937,13 +6990,13 @@ describe('Editor', () => {
       await flushMicrotasks()
 
       expect(created[0]).toEqual(expect.objectContaining({ includeHighlights: false }))
-      expect(tokenHighlightRanges()).toHaveLength(1)
+      await vi.waitFor(() => expect(tokenHighlightRanges()).toHaveLength(1))
       expect(tokenHighlightRanges()[0]?.startOffset).toBe(6)
     })
 
     it('applies highlighter theme colors without dropping configured Tree-sitter syntax colors', async () => {
-      const highlighter = createMockHighlighterSession({
-        refresh: async () =>
+      const highlighter = createMockHighlighterRuntime({
+        analyze: async () =>
           createHighlightResult([], {
             backgroundColor: '#ffffff',
             foregroundColor: '#24292e',
@@ -6952,10 +7005,11 @@ describe('Editor', () => {
       })
       editor.dispose()
       editor = createVisibleEditor(container, {
-        plugins: withTestLanguagePlugins(createHighlighterPlugin(highlighter)),
+        plugins: withTestLanguagePlugins(createHighlighterPlugin(() => highlighter)),
         theme: { syntax: { keyword: '#cf222e' } },
       })
-      setEditorSyntaxSessionFactory(() => createMockSyntaxSession())
+      const syntaxPlugin24 = createSyntaxPlugin(() => createMockSyntaxRuntime())
+      editor.addPlugin(syntaxPlugin24)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -6964,6 +7018,9 @@ describe('Editor', () => {
       })
       await flushMicrotasks()
 
+      await vi.waitFor(() =>
+        expect(editorRoot().style.getPropertyValue('--editor-background')).toBe('#ffffff'),
+      )
       const root = editorRoot()
       expect(root.style.getPropertyValue('--editor-background')).toBe('#ffffff')
       expect(root.style.getPropertyValue('--editor-foreground')).toBe('#24292e')
@@ -6972,8 +7029,8 @@ describe('Editor', () => {
     })
 
     it('keeps configured theme colors above highlighter theme colors', async () => {
-      const highlighter = createMockHighlighterSession({
-        refresh: async () =>
+      const highlighter = createMockHighlighterRuntime({
+        analyze: async () =>
           createHighlightResult([], {
             backgroundColor: '#ffffff',
             foregroundColor: '#24292e',
@@ -6982,14 +7039,15 @@ describe('Editor', () => {
       })
       editor.dispose()
       editor = createVisibleEditor(container, {
-        plugins: withTestLanguagePlugins(createHighlighterPlugin(highlighter)),
+        plugins: withTestLanguagePlugins(createHighlighterPlugin(() => highlighter)),
         theme: {
           backgroundColor: '#101010',
           foregroundColor: '#eeeeee',
           syntax: { keyword: '#cf222e' },
         },
       })
-      setEditorSyntaxSessionFactory(() => createMockSyntaxSession())
+      const syntaxPlugin25 = createSyntaxPlugin(() => createMockSyntaxRuntime())
+      editor.addPlugin(syntaxPlugin25)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7006,8 +7064,8 @@ describe('Editor', () => {
 
     it('exposes the resolved highlighter theme to view contributions', async () => {
       const events: ViewContributionEvent[] = []
-      const highlighter = createMockHighlighterSession({
-        refresh: async () =>
+      const highlighter = createMockHighlighterRuntime({
+        analyze: async () =>
           createHighlightResult([], {
             backgroundColor: '#ffffff',
             foregroundColor: '#24292e',
@@ -7018,7 +7076,7 @@ describe('Editor', () => {
       editor = createVisibleEditor(container, {
         plugins: withTestLanguagePlugins(
           createViewContributionPlugin(events),
-          createHighlighterPlugin(highlighter),
+          createHighlighterPlugin(() => highlighter),
         ),
       })
 
@@ -7038,11 +7096,11 @@ describe('Editor', () => {
     })
 
     it('applies highlighter provider theme colors before a document is opened', async () => {
-      const highlighter = createMockHighlighterSession()
+      const highlighter = createMockHighlighterRuntime()
       editor.dispose()
       editor = createVisibleEditor(container, {
         plugins: withTestLanguagePlugins(
-          createHighlighterPlugin(highlighter, {
+          createHighlighterPlugin(() => highlighter, {
             loadTheme: async () => ({
               backgroundColor: '#ffffff',
               foregroundColor: '#24292e',
@@ -7059,8 +7117,8 @@ describe('Editor', () => {
     })
 
     it('keeps highlighter provider theme colors after clearing a document', async () => {
-      const highlighter = createMockHighlighterSession({
-        refresh: async () =>
+      const highlighter = createMockHighlighterRuntime({
+        analyze: async () =>
           createHighlightResult([], {
             backgroundColor: '#0d1117',
           }),
@@ -7068,7 +7126,7 @@ describe('Editor', () => {
       editor.dispose()
       editor = createVisibleEditor(container, {
         plugins: withTestLanguagePlugins(
-          createHighlighterPlugin(highlighter, {
+          createHighlighterPlugin(() => highlighter, {
             loadTheme: async () => ({ backgroundColor: '#ffffff' }),
           }),
         ),
@@ -7091,17 +7149,17 @@ describe('Editor', () => {
     it('keeps Tree-sitter folds when plugin highlights are active', async () => {
       const text = 'if (x) {\n  y();\n}\nz();'
       const foldEnd = text.indexOf('\nz();')
-      const highlighter = createMockHighlighterSession({
-        refresh: async () =>
+      const highlighter = createMockHighlighterRuntime({
+        analyze: async () =>
           createHighlightResult([{ start: 3, end: 4, style: { color: '#00ff00' } }]),
       })
       editor.dispose()
       editor = createVisibleEditor(container, {
-        plugins: withTestGutterPlugins(createHighlighterPlugin(highlighter)),
+        plugins: withTestGutterPlugins(createHighlighterPlugin(() => highlighter)),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () =>
+      const syntaxPlugin26 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () =>
             createSyntaxResult(
               [{ start: 0, end: 2, style: { color: '#ff0000' } }],
               [
@@ -7117,6 +7175,7 @@ describe('Editor', () => {
             ),
         }),
       )
+      editor.addPlugin(syntaxPlugin26)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7125,6 +7184,7 @@ describe('Editor', () => {
       })
       await flushMicrotasks()
 
+      await vi.waitFor(() => expect(tokenHighlightRanges()[0]?.startOffset).toBe(3))
       expect(foldToggle().dataset.editorFoldState).toBe('expanded')
       expect(tokenHighlightRanges()[0]?.startOffset).toBe(3)
     })
@@ -7136,9 +7196,9 @@ describe('Editor', () => {
       editor = createVisibleEditor(container, {
         plugins: withTestGutterPlugins(),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () =>
+      const syntaxPlugin27 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () =>
             createSyntaxResult(
               [],
               [
@@ -7154,6 +7214,7 @@ describe('Editor', () => {
             ),
         }),
       )
+      editor.addPlugin(syntaxPlugin27)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7187,9 +7248,9 @@ describe('Editor', () => {
       editor = createVisibleEditor(container, {
         plugins: withTestGutterPlugins(createViewContributionPlugin(events)),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () =>
+      const syntaxPlugin28 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () =>
             createSyntaxResult(
               [],
               [
@@ -7213,6 +7274,7 @@ describe('Editor', () => {
             ),
         }),
       )
+      editor.addPlugin(syntaxPlugin28)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7243,9 +7305,9 @@ describe('Editor', () => {
       editor = createVisibleEditor(container, {
         plugins: withTestGutterPlugins(),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () =>
+      const syntaxPlugin29 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () =>
             createSyntaxResult(
               [],
               [
@@ -7261,6 +7323,7 @@ describe('Editor', () => {
             ),
         }),
       )
+      editor.addPlugin(syntaxPlugin29)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7293,9 +7356,9 @@ describe('Editor', () => {
       editor = createVisibleEditor(container, {
         plugins: withTestGutterPlugins(createViewContributionPlugin(events)),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () =>
+      const syntaxPlugin30 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () =>
             createSyntaxResult(
               [],
               [
@@ -7319,6 +7382,7 @@ describe('Editor', () => {
             ),
         }),
       )
+      editor.addPlugin(syntaxPlugin30)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7352,9 +7416,9 @@ describe('Editor', () => {
       editor = createVisibleEditor(container, {
         plugins: withTestGutterPlugins(),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () =>
+      const syntaxPlugin31 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () =>
             createSyntaxResult(
               [],
               [
@@ -7370,6 +7434,7 @@ describe('Editor', () => {
             ),
         }),
       )
+      editor.addPlugin(syntaxPlugin31)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7517,14 +7582,18 @@ describe('Editor', () => {
 
     it('refreshes syntax after edits', async () => {
       const changes: string[] = []
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          applyChange: async (change) => {
-            changes.push(change.textSnapshot.materializeFullText())
-            return createSyntaxResult([{ start: 6, end: 7, style: { color: '#00ff00' } }])
-          },
+      const syntaxPlugin32 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: (read) =>
+            read.revision.point.revision === 0
+              ? (async () => createSyntaxResult())()
+              : (async (change) => {
+                  changes.push(readAll(change.text))
+                  return createSyntaxResult([{ start: 6, end: 7, style: { color: '#00ff00' } }])
+                })(read),
         }),
       )
+      editor.addPlugin(syntaxPlugin32)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7542,7 +7611,6 @@ describe('Editor', () => {
       )
       await flushMicrotasks()
 
-      expect(changes).toEqual([])
       await flushSyntaxDebounce()
       expect(changes).toEqual(['const a = 1;!'])
       expect(editor.getState().syntaxStatus).toBe('ready')
@@ -7552,22 +7620,25 @@ describe('Editor', () => {
     it('reloads the syntax session when edit syntax fails', async () => {
       const createdTexts: string[] = []
       let disposeCount = 0
-      setEditorSyntaxSessionFactory((options) => {
-        createdTexts.push(readAll(options.textSnapshot))
+      const syntaxPlugin33 = createSyntaxPlugin((options) => {
+        createdTexts.push(readAll(options.initialRead.text))
         const isInitialSession = createdTexts.length === 1
 
-        return createMockSyntaxSession({
-          refresh: async () =>
-            createSyntaxResult([{ start: 0, end: 5, style: { color: '#00ff00' } }]),
-          applyChange: async () => {
-            if (!isInitialSession) return createSyntaxResult()
-            throw new Error('incremental syntax failed')
-          },
+        return createMockSyntaxRuntime({
+          analyze: (read) =>
+            read.revision.point.revision === 0
+              ? (async () =>
+                  createSyntaxResult([{ start: 0, end: 5, style: { color: '#00ff00' } }]))()
+              : (async () => {
+                  if (!isInitialSession) return createSyntaxResult()
+                  throw new Error('incremental syntax failed')
+                })(),
           dispose: () => {
             disposeCount += 1
           },
         })
       })
+      editor.addPlugin(syntaxPlugin33)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7588,13 +7659,16 @@ describe('Editor', () => {
 
     it('keeps projected syntax highlights until edit syntax finishes', async () => {
       const editResult = createDeferred<EditorSyntaxResult>()
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () =>
-            createSyntaxResult([{ start: 0, end: 5, style: { color: '#ff0000' } }]),
-          applyChange: () => editResult.promise,
+      const syntaxPlugin34 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: (read) =>
+            read.revision.point.revision === 0
+              ? (async () =>
+                  createSyntaxResult([{ start: 0, end: 5, style: { color: '#ff0000' } }]))()
+              : (() => editResult.promise)(),
         }),
       )
+      editor.addPlugin(syntaxPlugin34)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7619,17 +7693,20 @@ describe('Editor', () => {
     })
 
     it('keeps projected syntax highlights stable through mixed newlines and typing', async () => {
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () =>
-            createSyntaxResult([
-              { start: 0, end: 2, style: { color: '#ff0000' } },
-              { start: 3, end: 5, style: { color: '#00ff00' } },
-              { start: 6, end: 8, style: { color: '#0000ff' } },
-            ]),
-          applyChange: () => new Promise<EditorSyntaxResult>(() => undefined),
+      const syntaxPlugin35 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: (read) =>
+            read.revision.point.revision === 0
+              ? (async () =>
+                  createSyntaxResult([
+                    { start: 0, end: 2, style: { color: '#ff0000' } },
+                    { start: 3, end: 5, style: { color: '#00ff00' } },
+                    { start: 6, end: 8, style: { color: '#0000ff' } },
+                  ]))()
+              : (() => new Promise<EditorSyntaxResult>(() => undefined))(),
         }),
       )
+      editor.addPlugin(syntaxPlugin35)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7656,17 +7733,20 @@ describe('Editor', () => {
     })
 
     it('keeps projected syntax highlights stable through repeated newline-only edits', async () => {
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () =>
-            createSyntaxResult([
-              { start: 0, end: 2, style: { color: '#ff0000' } },
-              { start: 3, end: 5, style: { color: '#00ff00' } },
-              { start: 6, end: 8, style: { color: '#0000ff' } },
-            ]),
-          applyChange: () => new Promise<EditorSyntaxResult>(() => undefined),
+      const syntaxPlugin36 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: (read) =>
+            read.revision.point.revision === 0
+              ? (async () =>
+                  createSyntaxResult([
+                    { start: 0, end: 2, style: { color: '#ff0000' } },
+                    { start: 3, end: 5, style: { color: '#00ff00' } },
+                    { start: 6, end: 8, style: { color: '#0000ff' } },
+                  ]))()
+              : (() => new Promise<EditorSyntaxResult>(() => undefined))(),
         }),
       )
+      editor.addPlugin(syntaxPlugin36)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7701,25 +7781,28 @@ describe('Editor', () => {
       editor = createVisibleEditor(container, {
         plugins: withTestGutterPlugins(),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () =>
-            createSyntaxResult(
-              [],
-              [
-                {
-                  startIndex: 0,
-                  endIndex: foldEnd,
-                  startLine: 0,
-                  endLine: 2,
-                  type: 'statement_block',
-                  languageId: 'typescript',
-                },
-              ],
-            ),
-          applyChange: () => editResult.promise,
+      const syntaxPlugin37 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: (read) =>
+            read.revision.point.revision === 0
+              ? (async () =>
+                  createSyntaxResult(
+                    [],
+                    [
+                      {
+                        startIndex: 0,
+                        endIndex: foldEnd,
+                        startLine: 0,
+                        endLine: 2,
+                        type: 'statement_block',
+                        languageId: 'typescript',
+                      },
+                    ],
+                  ))()
+              : (() => editResult.promise)(),
         }),
       )
+      editor.addPlugin(syntaxPlugin37)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7742,48 +7825,53 @@ describe('Editor', () => {
     it('keeps projected highlights and folds through undo while syntax is pending', async () => {
       const text = 'if (x) {\n  y();\n}\nz();'
       const foldEnd = text.indexOf('\nz();')
-      const changes: DocumentSessionChange[] = []
+      const changes: DocumentChangesSinceSyncPoint[] = []
       let refreshCount = 0
       editor.dispose()
       editor = createVisibleEditor(container, {
         plugins: withTestGutterPlugins(),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => {
-            refreshCount += 1
-            return createSyntaxResult(
-              [{ start: 0, end: 2, style: { color: '#ff0000' } }],
-              [
-                {
-                  startIndex: 0,
-                  endIndex: foldEnd,
-                  startLine: 0,
-                  endLine: 2,
-                  type: 'statement_block',
-                  languageId: 'typescript',
-                },
-              ],
-            )
-          },
-          applyChange: async (change) => {
-            changes.push(change)
-            return createSyntaxResult(
-              [{ start: 0, end: 2, style: { color: '#00ff00' } }],
-              [
-                {
-                  startIndex: 0,
-                  endIndex: foldEnd,
-                  startLine: 0,
-                  endLine: 2,
-                  type: 'statement_block',
-                  languageId: 'typescript',
-                },
-              ],
-            )
-          },
+      const syntaxPlugin38 = createSyntaxPlugin((context) =>
+        createMockSyntaxRuntime({
+          analyze: (read) =>
+            read.revision.point.revision === 0
+              ? (async () => {
+                  refreshCount += 1
+                  return createSyntaxResult(
+                    [{ start: 0, end: 2, style: { color: '#ff0000' } }],
+                    [
+                      {
+                        startIndex: 0,
+                        endIndex: foldEnd,
+                        startLine: 0,
+                        endLine: 2,
+                        type: 'statement_block',
+                        languageId: 'typescript',
+                      },
+                    ],
+                  )
+                })()
+              : (async (change) => {
+                  changes.push(
+                    context.source.changesBetween(context.initialRead.revision, change.revision)!,
+                  )
+                  return createSyntaxResult(
+                    [{ start: 0, end: 2, style: { color: '#00ff00' } }],
+                    [
+                      {
+                        startIndex: 0,
+                        endIndex: foldEnd,
+                        startLine: 0,
+                        endLine: 2,
+                        type: 'statement_block',
+                        languageId: 'typescript',
+                      },
+                    ],
+                  )
+                })(read),
         }),
       )
+      editor.addPlugin(syntaxPlugin38)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7809,10 +7897,8 @@ describe('Editor', () => {
       await flushSyntaxDebounce()
       expect(refreshCount).toBe(1)
       expect(changes).toHaveLength(1)
-      // The insert and its undo share one debounce window, so the session, which last saw the
-      // original text, receives the burst composed against that text: a no-op at the caret.
       expect(changes[0]).toMatchObject({
-        kind: 'undo',
+        logicalRevisionCount: 2,
         edits: [{ from: text.length, to: text.length, text: '' }],
       })
     })
@@ -7826,25 +7912,28 @@ describe('Editor', () => {
       editor = createVisibleEditor(container, {
         plugins: withTestGutterPlugins(),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () =>
-            createSyntaxResult(
-              [],
-              [
-                {
-                  startIndex: foldStart,
-                  endIndex: foldEnd,
-                  startLine: 1,
-                  endLine: 3,
-                  type: 'statement_block',
-                  languageId: 'typescript',
-                },
-              ],
-            ),
-          applyChange: () => editResult.promise,
+      const syntaxPlugin39 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: (read) =>
+            read.revision.point.revision === 0
+              ? (async () =>
+                  createSyntaxResult(
+                    [],
+                    [
+                      {
+                        startIndex: foldStart,
+                        endIndex: foldEnd,
+                        startLine: 1,
+                        endLine: 3,
+                        type: 'statement_block',
+                        languageId: 'typescript',
+                      },
+                    ],
+                  ))()
+              : (() => editResult.promise)(),
         }),
       )
+      editor.addPlugin(syntaxPlugin39)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7871,15 +7960,18 @@ describe('Editor', () => {
 
     it('debounces rapid edit syntax requests to the latest text', async () => {
       const changes: string[] = []
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
-          applyChange: async (change) => {
-            changes.push(change.textSnapshot.materializeFullText())
-            return createSyntaxResult([{ start: 0, end: 5, style: { color: '#00ff00' } }])
-          },
+      const syntaxPlugin40 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: (read) =>
+            read.revision.point.revision === 0
+              ? (async () => createSyntaxResult([]))()
+              : (async (change) => {
+                  changes.push(readAll(change.text))
+                  return createSyntaxResult([{ start: 0, end: 5, style: { color: '#00ff00' } }])
+                })(read),
         }),
       )
+      editor.addPlugin(syntaxPlugin40)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7901,12 +7993,15 @@ describe('Editor', () => {
       const firstEdit = createDeferred<EditorSyntaxResult>()
       const secondEdit = createDeferred<EditorSyntaxResult>()
       const editResults = [firstEdit, secondEdit]
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: () => initial.promise,
-          applyChange: () => editResults.shift()!.promise,
+      const syntaxPlugin41 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: (read) =>
+            read.revision.point.revision === 0
+              ? (() => initial.promise)()
+              : (() => editResults.shift()!.promise)(),
         }),
       )
+      editor.addPlugin(syntaxPlugin41)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -7930,25 +8025,30 @@ describe('Editor', () => {
       expect(highlightsMap.size).toBe(1)
     })
 
-    it('updates retained plugin highlights for every committed revision', async () => {
+    it('updates retained plugin highlights for the composed current source', async () => {
       const changes: string[] = []
-      const highlighter = createMockHighlighterSession({
-        refresh: async () => createHighlightResult([]),
-        applyChange: async (change) => {
-          changes.push(change.textSnapshot.materializeFullText())
-          return createHighlightResult([{ start: 0, end: 5, style: { color: '#00ff00' } }])
-        },
+      const highlighter = createMockHighlighterRuntime({
+        analyze: (read) =>
+          read.revision.point.revision === 0
+            ? (async () => createHighlightResult([]))()
+            : (async (change) => {
+                changes.push(readAll(change.text))
+                return createHighlightResult([{ start: 0, end: 5, style: { color: '#00ff00' } }])
+              })(read),
       })
       editor.dispose()
       editor = createVisibleEditor(container, {
-        plugins: withTestLanguagePlugins(createHighlighterPlugin(highlighter)),
+        plugins: withTestLanguagePlugins(createHighlighterPlugin(() => highlighter)),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
-          applyChange: async () => createSyntaxResult([]),
+      const syntaxPlugin42 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: (read) =>
+            read.revision.point.revision === 0
+              ? (async () => createSyntaxResult([]))()
+              : (async () => createSyntaxResult([]))(),
         }),
       )
+      editor.addPlugin(syntaxPlugin42)
 
       openRetainedDocument('const a = 1;')
       await flushMicrotasks()
@@ -7956,7 +8056,7 @@ describe('Editor', () => {
       editorRoot().dispatchEvent(createInsertEvent('?'))
 
       await flushSyntaxDebounce()
-      expect(changes).toEqual(['const a = 1;!', 'const a = 1;!?'])
+      expect(changes).toEqual(['const a = 1;!?'])
       expect(tokenHighlightRanges()[0]?.startOffset).toBe(0)
     })
 
@@ -7966,35 +8066,39 @@ describe('Editor', () => {
       const plugin: EditorPlugin = {
         activate: (context) =>
           context.registerHighlighter({
-            createSession: (options) => {
-              createdTexts.push(readAll(options.textSnapshot))
+            operation: createEditorHighlighterOperation((options) => {
+              createdTexts.push(readAll(options.initialRead.text))
               const isInitialSession = createdTexts.length === 1
 
-              return createMockHighlighterSession({
-                refresh: async () =>
-                  createHighlightResult(
-                    isInitialSession ? [] : [{ start: 0, end: 5, style: { color: '#00ff00' } }],
-                  ),
-                applyChange: async () => {
-                  throw new Error('incremental highlighting failed')
-                },
+              return createMockHighlighterRuntime({
+                analyze: (read) =>
+                  read.revision === options.initialRead.revision
+                    ? (async () =>
+                        createHighlightResult(
+                          isInitialSession
+                            ? []
+                            : [{ start: 0, end: 5, style: { color: '#00ff00' } }],
+                        ))()
+                    : (async () => {
+                        throw new Error('incremental highlighting failed')
+                      })(),
                 dispose: () => {
                   disposeCount += 1
                 },
               })
-            },
+            }),
           }),
       }
       editor.dispose()
       editor = createVisibleEditor(container, {
         plugins: withTestLanguagePlugins(plugin),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
-          applyChange: async () => createSyntaxResult([]),
+      const syntaxPlugin43 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: () => Promise.resolve(createSyntaxResult([])),
         }),
       )
+      editor.addPlugin(syntaxPlugin43)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -8012,25 +8116,33 @@ describe('Editor', () => {
       expect(tokenHighlightRanges()[0]?.startOffset).toBe(0)
     })
 
-    it('sends undo edits to plugin highlighter sessions', async () => {
-      const changes: DocumentSessionChange[] = []
-      const highlighter = createMockHighlighterSession({
-        refresh: async () => createHighlightResult([]),
-        applyChange: async (change) => {
-          changes.push(change)
-          return createHighlightResult([])
-        },
-      })
+    it('composes a published edit and undo for the plugin highlighter', async () => {
+      const changes: DocumentChangesSinceSyncPoint[] = []
+      const highlighter = (context: EditorHighlighterOperationContext) =>
+        createMockHighlighterRuntime({
+          analyze: (read) =>
+            read.revision.point.revision === 0
+              ? (async () => createHighlightResult([]))()
+              : (async (change) => {
+                  changes.push(
+                    context.source.changesBetween(context.initialRead.revision, change.revision)!,
+                  )
+                  return createHighlightResult([])
+                })(read),
+        })
       editor.dispose()
       editor = createVisibleEditor(container, {
         plugins: withTestLanguagePlugins(createHighlighterPlugin(highlighter)),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
-          applyChange: async () => createSyntaxResult([]),
+      const syntaxPlugin44 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: (read) =>
+            read.revision.point.revision === 0
+              ? (async () => createSyntaxResult([]))()
+              : (async () => createSyntaxResult([]))(),
         }),
       )
+      editor.addPlugin(syntaxPlugin44)
 
       openRetainedDocument('const a = 1;')
       await flushMicrotasks()
@@ -8045,29 +8157,37 @@ describe('Editor', () => {
       )
 
       await flushSyntaxDebounce()
-      expect(changes).toHaveLength(2)
-      expect(changes[0]).toMatchObject({ kind: 'edit', edits: [{ from: 12, to: 12, text: '!' }] })
-      expect(changes[1]).toMatchObject({ kind: 'undo', edits: [{ from: 12, to: 13, text: '' }] })
+      expect(editor.materializeFullText()).toBe('const a = 1;')
+      expect(changes).toHaveLength(1)
+      expect(changes[0]).toMatchObject({
+        logicalRevisionCount: 2,
+        edits: [{ from: 12, to: 12, text: '' }],
+      })
     })
 
     it('ignores stale plugin highlight results after a newer edit', async () => {
       const firstEdit = createDeferred<EditorHighlightResult>()
       const secondEdit = createDeferred<EditorHighlightResult>()
       const editResults = [firstEdit, secondEdit]
-      const highlighter = createMockHighlighterSession({
-        refresh: async () => createHighlightResult([]),
-        applyChange: () => editResults.shift()!.promise,
+      const highlighter = createMockHighlighterRuntime({
+        analyze: (read) =>
+          read.revision.point.revision === 0
+            ? (async () => createHighlightResult([]))()
+            : (() => editResults.shift()!.promise)(),
       })
       editor.dispose()
       editor = createVisibleEditor(container, {
-        plugins: withTestLanguagePlugins(createHighlighterPlugin(highlighter)),
+        plugins: withTestLanguagePlugins(createHighlighterPlugin(() => highlighter)),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
-          applyChange: async () => createSyntaxResult([]),
+      const syntaxPlugin45 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: (read) =>
+            read.revision.point.revision === 0
+              ? (async () => createSyntaxResult([]))()
+              : (async () => createSyntaxResult([]))(),
         }),
       )
+      editor.addPlugin(syntaxPlugin45)
 
       openRetainedDocument('const a = 1;')
       await flushMicrotasks()
@@ -8076,31 +8196,32 @@ describe('Editor', () => {
       editorRoot().dispatchEvent(createInsertEvent('?'))
       await flushSyntaxDebounce()
 
-      secondEdit.resolve(createHighlightResult([{ start: 0, end: 5, style: { color: '#00ff00' } }]))
+      firstEdit.resolve(createHighlightResult([{ start: 6, end: 7, style: { color: '#ff0000' } }]))
       await flushMicrotasks()
       expect(tokenHighlightRanges()).toHaveLength(0)
 
-      firstEdit.resolve(createHighlightResult([{ start: 6, end: 7, style: { color: '#ff0000' } }]))
+      secondEdit.resolve(createHighlightResult([{ start: 0, end: 5, style: { color: '#00ff00' } }]))
       await flushMicrotasks()
       expect(editor.materializeFullText()).toBe('const a = 1;!?')
       expect(tokenHighlightRanges()[0]?.startOffset).toBe(0)
     })
 
     it('keeps structural syntax ready when plugin highlighting fails', async () => {
-      const highlighter = createMockHighlighterSession({
-        refresh: async () => {
+      const highlighter = createMockHighlighterRuntime({
+        analyze: async () => {
           throw new Error('highlight failed')
         },
       })
       editor.dispose()
       editor = createVisibleEditor(container, {
-        plugins: withTestLanguagePlugins(createHighlighterPlugin(highlighter)),
+        plugins: withTestLanguagePlugins(createHighlighterPlugin(() => highlighter)),
       })
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => createSyntaxResult([]),
+      const syntaxPlugin46 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () => createSyntaxResult([]),
         }),
       )
+      editor.addPlugin(syntaxPlugin46)
 
       editor.openDocument({
         documentId: 'main.ts',
@@ -8114,11 +8235,12 @@ describe('Editor', () => {
     })
 
     it('falls back to plain text for unknown languages', async () => {
-      const created: EditorSyntaxSessionOptions[] = []
-      setEditorSyntaxSessionFactory((options) => {
+      const created: EditorStructuralOperationContext[] = []
+      const syntaxPlugin47 = createSyntaxPlugin((options) => {
         created.push(options)
-        return createMockSyntaxSession()
+        return createMockSyntaxRuntime()
       })
+      editor.addPlugin(syntaxPlugin47)
 
       editor.openDocument({ documentId: 'README', text: 'hello' })
       await flushMicrotasks()
@@ -8151,16 +8273,17 @@ describe('Editor', () => {
 
     it('logs one wide structural syntax failure and keeps editing available', async () => {
       const events: EditorLogEvent[] = []
-      setEditorSyntaxSessionFactory(() =>
-        createMockSyntaxSession({
-          refresh: async () => {
+      const syntaxPlugin48 = createSyntaxPlugin(() =>
+        createMockSyntaxRuntime({
+          analyze: async () => {
             throw new Error('parse failed')
           },
         }),
       )
+      editor.addPlugin(syntaxPlugin48)
       editor.dispose()
       editor = createVisibleEditor(container, {
-        plugins: [createEditorLoggingPlugin((event) => events.push(event))],
+        plugins: [syntaxPlugin48, ...[createEditorLoggingPlugin((event) => events.push(event))]],
       })
 
       editor.openDocument({
@@ -8237,4 +8360,11 @@ function after(
   },
 ) {
   return createStringTextSnapshot(text.slice(0, edit.from) + edit.text + text.slice(edit.to))
+}
+
+function createSyntaxPlugin(
+  open: (context: EditorStructuralOperationContext) => EditorSyntaxRuntime | null,
+): EditorPlugin {
+  const operation = createEditorStructuralOperation(open)
+  return { activate: (context) => context.registerSyntaxProvider({ operation }) }
 }

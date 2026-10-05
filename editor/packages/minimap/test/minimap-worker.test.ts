@@ -1,6 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { MinimapWorkerRequest, MinimapWorkerResponse } from '../src/types'
 
+const unadmittedSource = {
+  kind: 'applied',
+  identity: {
+    documentId: 'unadmitted',
+    documentGeneration: 1,
+    endpointGeneration: 1,
+    registrationId: 1,
+  },
+  base: null,
+  target: { segment: 'unadmitted', revision: 0, textVersion: 0 },
+} satisfies Extract<MinimapWorkerRequest, { type: 'render' }>['source']
+
 describe('minimap worker', () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -32,18 +44,22 @@ describe('minimap worker', () => {
     } satisfies MinimapWorkerResponse)
   })
 
-  it('does not post a render response before initialization', async () => {
+  it('rejects rendering before source admission', async () => {
     const postMessage = vi.spyOn(globalThis, 'postMessage').mockImplementation(() => undefined)
     await import('../src/minimap.worker')
 
     const onmessage = globalThis.onmessage as ((event: MessageEvent) => void) | null
     onmessage?.(
       new MessageEvent('message', {
-        data: { type: 'render', sequence: 7 } as MinimapWorkerRequest,
+        data: {
+          type: 'render',
+          sequence: 7,
+          source: unadmittedSource,
+        } satisfies MinimapWorkerRequest,
       }),
     )
 
-    expect(postMessage).not.toHaveBeenCalled()
+    expect(postMessage).toHaveBeenCalledWith({ type: 'renderSkipped', sequence: 7 })
   })
 
   it('records request diagnostics through the shared diagnostics sink', async () => {
@@ -62,7 +78,11 @@ describe('minimap worker', () => {
     const onmessage = globalThis.onmessage as ((event: MessageEvent) => void) | null
     onmessage?.(
       new MessageEvent('message', {
-        data: { type: 'render', sequence: 7 } as MinimapWorkerRequest,
+        data: {
+          type: 'render',
+          sequence: 7,
+          source: unadmittedSource,
+        } satisfies MinimapWorkerRequest,
       }),
     )
 

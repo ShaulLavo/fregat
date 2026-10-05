@@ -1,7 +1,6 @@
 import type { LanguageServerDocumentSnapshot } from './types'
-import type { DocumentSyncPoint, TextSnapshot } from '@singapore-editor/core/document'
+import type { DocumentSyncPoint } from '@singapore-editor/core/document'
 import type { EditorDisposable } from '@singapore-editor/core/extensions'
-import type { LspWorkspace } from '@singapore-editor/lsp'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 import type { DocumentSync } from './documentSync'
@@ -9,14 +8,13 @@ import type { DocumentSync } from './documentSync'
 export type LanguageServerDocumentUriTransition = {
   readonly fromUri: lsp.DocumentUri
   readonly toUri: lsp.DocumentUri
-  readonly textSnapshot: TextSnapshot
+  readonly previousSyncPoint: DocumentSyncPoint
   readonly syncPoint: DocumentSyncPoint
 }
 
 export type LanguageServerDocumentSyncControllerRegistration = {
   readonly getSnapshot: () => LanguageServerDocumentSnapshot
   readonly sync: DocumentSync
-  readonly workspace: LspWorkspace
 }
 
 /**
@@ -35,17 +33,8 @@ export class LanguageServerDocumentSyncController {
   }
 
   public transitionDocumentUri(transition: LanguageServerDocumentUriTransition): void {
-    const transitionedWorkspaces = new Set<LspWorkspace>()
     for (const registration of this.registrations) {
-      if (transitionedWorkspaces.has(registration.workspace)) continue
-
-      const handled = registration.sync.transitionDocumentUri(
-        registration.getSnapshot(),
-        transition,
-      )
-      if (!handled) continue
-      if (registration.sync.activeDocument?.uri !== transition.toUri) continue
-      transitionedWorkspaces.add(registration.workspace)
+      registration.sync.transitionDocumentUri(registration.getSnapshot(), transition)
     }
   }
 }

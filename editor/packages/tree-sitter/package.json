@@ -41,6 +41,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
+    "@shikijs/langs": "4.4.3",
+    "@shikijs/themes": "4.4.3",
     "@types/node": "^26.6.3",
     "@vitest/browser-playwright": "5.0.2",
     "happy-dom": "^20.14.5",
