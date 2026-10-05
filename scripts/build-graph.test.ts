@@ -97,6 +97,18 @@ test('a library source change invalidates the ghostty site build cache', () => {
   }
 })
 
+test('a ghostty site environment file change invalidates its build cache', () => {
+  const probe = path.join(root, 'ghostty-webgpu/site/.env.turbo-cache-probe')
+  writeFileSync(probe, '# before\n', { flag: 'wx' })
+  try {
+    const before = buildTask('ghostty-webgpu-site').hash
+    writeFileSync(probe, '# after\n')
+    expect(buildTask('ghostty-webgpu-site').hash).not.toBe(before)
+  } finally {
+    rmSync(probe)
+  }
+})
+
 test('React hotkeys builds after the core hotkeys package', () => {
   expect(buildTask('@fregat/react-hotkeys').dependencies).toContain('@fregat/hotkeys#build')
 })

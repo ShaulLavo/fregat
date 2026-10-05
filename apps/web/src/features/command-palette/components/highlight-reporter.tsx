@@ -7,17 +7,18 @@ import { useEffect, useEffectEvent } from 'react'
  */
 export function HighlightReporter({
   onHighlight,
+  identity,
 }: {
-  readonly onHighlight: (value: string) => void
+  readonly onHighlight: (value: string) => void | (() => void)
+  readonly identity?: unknown
 }) {
   const value = useCommandState((state) => state.value)
   const report = useEffectEvent((highlighted: string) => onHighlight(highlighted))
 
   useEffect(() => {
     if (!value) return
-
-    report(value)
-  }, [value])
+    return report(value)
+  }, [value, identity])
 
   return null
 }

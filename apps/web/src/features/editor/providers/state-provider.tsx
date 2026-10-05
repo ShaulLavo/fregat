@@ -1,4 +1,4 @@
-import { useLayoutEffect, type ReactNode } from 'react'
+import { useLayoutEffect, useSyncExternalStore, type ReactNode } from 'react'
 
 import { useLanguageCensus } from '@/features/editor/hooks/use-language-census'
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
@@ -31,6 +31,12 @@ export function EditorStateProvider({
   const tabSize = useSettingValue('editor.tabSize')
   const languageServerMatchConfiguration = useLanguageServerMatchConfiguration()
   const { fileOpenIntentOwner, queryClient } = runtime
+  const service = fileOpenIntentOwner.service
+  const preparationIdentity = useSyncExternalStore(
+    service.subscribePreparationIdentity,
+    service.getPreparationIdentity,
+  )
+  const fileOpenIntent = { service, preparationIdentity }
 
   useLayoutEffect(() => {
     runtime.languageServerDocuments.setLimit(analysisLimitMiCodeUnits)
@@ -72,7 +78,7 @@ export function EditorStateProvider({
           <EditorDocumentStateContext value={runtime.documentStore}>
             <SearchBufferStateContext value={runtime.searchBufferStore}>
               <EditorUiStateContext value={runtime.uiStore}>
-                <FileOpenIntentProvider value={runtime.fileOpenIntent}>
+                <FileOpenIntentProvider value={fileOpenIntent}>
                   <MountedEditorProvider registry={runtime.mountedEditors}>
                     <WorkspaceEditProvider
                       host={runtime.workspaceEditHost}

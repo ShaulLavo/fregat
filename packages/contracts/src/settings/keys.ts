@@ -486,6 +486,11 @@ export const SETTINGS_REGISTRY = {
     default: true,
     scope: 'window',
   }),
+  'editor.inactiveAnalysisEntryLimit': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(Number.MAX_SAFE_INTEGER)),
+    default: 2,
+    scope: 'machine',
+  }),
   'editor.retainedTextBudget': defineSetting({
     // Clamped at 1 GiB: an unbounded value is a memory leak with a settings key
     // in front of it. 0 retains only the active project, which is never trimmed.

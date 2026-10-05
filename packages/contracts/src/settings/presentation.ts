@@ -331,6 +331,11 @@ export const SETTINGS_PRESENTATION = {
     widget: 'boolean',
     category: 'Terminal',
   },
+  'editor.inactiveAnalysisEntryLimit': {
+    widget: 'number',
+    category: 'Editor',
+    visibility: 'advanced',
+  },
   'editor.retainedTextBudget': {
     widget: 'number',
     category: 'Editor',
