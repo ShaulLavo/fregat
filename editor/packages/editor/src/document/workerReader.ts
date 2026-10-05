@@ -491,3 +491,5 @@ export type {
   DocumentProjectionUpdate,
   DocumentProjectionReceipt,
 } from '../editor/documentDelivery'
+
+export { waitForDocumentWork } from '../editor/documentWork'

@@ -176,7 +176,7 @@ export function DiffPane({
     const editor = controller.getEditor()
     editor?.setTokens(tokens)
     if (file && rows === plugin.getRows()) {
-      if (!syntaxHighlight) notePressPaint('diffs', file.path, 'colour', { syntaxHighlight: 'off' })
+      if (!syntaxHighlight) notePressPaint('diffs', file.path, 'colour', { highlight: 'off' })
       else if (plugin.isSyntaxReady()) notePressPaint('diffs', file.path, 'colour')
     }
     log.debug({

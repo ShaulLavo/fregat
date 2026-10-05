@@ -1,5 +1,6 @@
+import { createSyntaxPlugin } from './factories/syntaxRuntime'
 import { detectPlatform } from '@fregat/hotkeys'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createFoldGutterContribution,
   createLineGutterContribution,
@@ -18,13 +19,9 @@ import type { EditorPlugin } from '../src/plugins'
 import {
   createEmptySyntaxResult,
   type EditorSyntaxResult,
-  type EditorSyntaxSession,
+  type EditorSyntaxRuntime,
 } from '../src/public/syntax'
-import {
-  resetEditorInstanceCount,
-  setEditorSyntaxSessionFactory,
-  setHighlightRegistry,
-} from '../src/public/testing'
+import { resetEditorInstanceCount, setHighlightRegistry } from '../src/public/testing'
 import type { FoldRange } from '../src/syntax'
 
 /**
@@ -148,7 +145,7 @@ const DEEP_FOLDS: readonly FoldRange[] = EDITOR_FOLD_LEVELS.map((level) =>
   blockFold(DEEP_TEXT, level - 1, DEEP_LINES.length - 1 - level),
 )
 
-function createFoldSyntaxSession(folds: readonly FoldRange[]): EditorSyntaxSession {
+function createFoldSyntaxSession(folds: readonly FoldRange[]): EditorSyntaxRuntime {
   const result = (): EditorSyntaxResult => ({
     ...createEmptySyntaxResult(),
     folds,
@@ -156,19 +153,13 @@ function createFoldSyntaxSession(folds: readonly FoldRange[]): EditorSyntaxSessi
   })
 
   return {
-    refresh: async () => result(),
-    applyChange: async () => result(),
+    analyze: async () => result(),
     getResult: () => result(),
     getTokens: () => [],
     foldingSupport: 'supported',
     getSnapshotVersion: () => 0,
     dispose: () => undefined,
   }
-}
-
-async function flushMicrotasks(): Promise<void> {
-  await Promise.resolve()
-  await Promise.resolve()
 }
 
 function editorRoot(): HTMLElement {
@@ -296,17 +287,18 @@ describe('fold commands', () => {
     editor.dispose()
     container.remove()
     setHighlightRegistry(undefined)
-    setEditorSyntaxSessionFactory(undefined)
   })
 
+  let syntaxRegistration: ReturnType<Editor['addPlugin']> | undefined
   async function open(
     text: string,
     folds: readonly FoldRange[],
     documentId = 'main.ts',
   ): Promise<void> {
-    setEditorSyntaxSessionFactory(() => createFoldSyntaxSession(folds))
+    syntaxRegistration?.dispose()
+    syntaxRegistration = editor.addPlugin(createSyntaxPlugin(() => createFoldSyntaxSession(folds)))
     editor.openDocument({ documentId, languageId: 'typescript', text })
-    await flushMicrotasks()
+    await vi.waitFor(() => expect(editor.getState().syntaxStatus).toBe('ready'))
   }
 
   async function openTree(caretRow = TREE_LINES.length - 1): Promise<void> {
@@ -511,7 +503,7 @@ describe('fold commands', () => {
     expect(editor.dispatchCommand('editor.createFoldingRangeFromSelection')).toBe(false)
 
     editor.openDocument({ documentId: 'plain', languageId: null, text: TREE_TEXT })
-    await flushMicrotasks()
+    expect(editor.getState().syntaxStatus).toBe('plain')
     expect(editor.dispatchCommand('editor.foldAll')).toBe(false)
     expect(visibleText()).toContain('    inner()')
   })

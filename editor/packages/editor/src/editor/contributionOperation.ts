@@ -23,6 +23,7 @@ export type ContributionEntry<Result> = {
   changed(read: DocumentRead): void
   current(): Promise<Result>
   at(read: DocumentRead): Promise<Result>
+  isConfigurationCurrent(): boolean
   read(): EditorAnalysisRead<Result>
   lease(signal?: AbortSignal): {
     readonly signal: AbortSignal

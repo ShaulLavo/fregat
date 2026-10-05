@@ -42,7 +42,7 @@ describe('analysis display demand', () => {
       const result = createEmptySyntaxResult()
       const provider: EditorSyntaxProvider = {
         operation: createEditorStructuralOperation(() => ({
- analyze: async () => createEmptySyntaxResult(),
+          analyze: async () => createEmptySyntaxResult(),
           ...createEmptySyntaxSession(),
           foldingSupport: 'supported',
           queryRange: async () => result,
@@ -171,17 +171,18 @@ describe('analysis display demand', () => {
     }
     const result = { ...createEmptySyntaxResult(), folds: [fold] }
     const queryRange = vi.fn(async () => result)
+    const providerOpenRuntime = vi.fn((): EditorSyntaxRuntime => ({
+      foldingSupport: 'supported',
+      analyze: async () => result,
+
+      queryRange,
+      getResult: () => result,
+      getTokens: () => result.tokens,
+      getSnapshotVersion: () => 0,
+      dispose: () => undefined,
+    }))
     const provider: EditorSyntaxProvider = {
-      operation: createEditorStructuralOperation(vi.fn((): EditorSyntaxRuntime => ({
-        foldingSupport: 'supported',
-        analyze: async () => result,
-        
-        queryRange,
-        getResult: () => result,
-        getTokens: () => result.tokens,
-        getSnapshotVersion: () => 0,
-        dispose: () => undefined,
-      }))),
+      operation: createEditorStructuralOperation(providerOpenRuntime),
     }
     const warm = analysis.borrowStructural({
       provider,
@@ -263,7 +264,7 @@ describe('analysis display demand', () => {
       editors[0]!.dispose()
       editors.shift()
       assertFrames()
-      expect(provider.createSession).toHaveBeenCalledTimes(1)
+      expect(providerOpenRuntime).toHaveBeenCalledTimes(1)
     } finally {
       editors.forEach((editor) => editor.dispose())
       hosts.forEach((host) => host.remove())

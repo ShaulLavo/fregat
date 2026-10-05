@@ -3,11 +3,7 @@ import type { EditorPlugin } from '@singapore-editor/core/extensions'
 import { createShikiHighlighterPlugin, createShikiWorkerOwner } from '@singapore-editor/core/shiki'
 import { createEditorFindPlugin } from '@singapore-editor/find'
 import { createMinimapPlugin } from '@singapore-editor/minimap'
-import {
-  createTreeSitterSyntaxProvider,
-  createTreeSitterSyntaxPlugin,
-  createTreeSitterWorkerOwner,
-} from '@singapore-editor/tree-sitter'
+import { createInputProductTree } from '../input-product-tree.mjs'
 import {
   TREE_SITTER_LANGUAGE_CONTRIBUTIONS,
   typeScript,
@@ -26,13 +22,13 @@ import {
 export function createInputConsumers(id: string, fixture: string, length: number) {
   const configuration = inputConsumerConfiguration(id, fixture, length)
   const plugins: EditorPlugin[] = []
-  const tree = configuration.treeSitter && id !== 'native' ? createTreeSitterWorkerOwner() : null
+  const productTree = configuration.treeSitter && id !== 'native' ? createInputProductTree() : null
+  const tree = productTree?.owner ?? null
   const shiki = configuration.shiki ? createShikiWorkerOwner() : null
-  if (tree) {
-    const provider = createTreeSitterSyntaxProvider({ workerOwner: tree })
+  if (productTree) {
     for (const contribution of TREE_SITTER_LANGUAGE_CONTRIBUTIONS)
-      provider.registerLanguage(contribution, { replace: true })
-    plugins.push(createTreeSitterSyntaxPlugin(provider))
+      productTree.registerLanguage(contribution, { replace: true })
+    plugins.push(productTree.plugin())
   }
   if (id === 'native' && configuration.treeSitter) plugins.push(typeScript())
   if (shiki)

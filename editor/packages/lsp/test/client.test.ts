@@ -68,6 +68,31 @@ afterEach(() => {
 })
 
 describe('LspClient', () => {
+  it.each([false, true])(
+    'rejects a retired initialization with transport reuse %s',
+    async (reuse) => {
+      const client = new LspClient()
+      const old = new TestTransport()
+      const first = client.connect(old)
+      const rejection = expect(first).rejects.toBeDefined()
+      old.receive(initializeResponse(old.message(0), { textDocumentSync: 2 }))
+      const replacement = reuse ? old : new TestTransport()
+      const from = replacement.sent.length
+      const second = client.connect(replacement)
+      await rejection
+      expect(client.initialized).toBe(false)
+      expect(replacement.sent.slice(from).map((frame) => frame.method)).toEqual(['initialize'])
+      replacement.receive(initializeResponse(replacement.message(from), { textDocumentSync: 1 }))
+      await second
+      expect(client.initialized).toBe(true)
+      expect(client.serverCapabilities?.textDocumentSync).toBe(1)
+      expect(replacement.sent.slice(from).map((frame) => frame.method)).toEqual([
+        'initialize',
+        'initialized',
+      ])
+      client.disconnect()
+    },
+  )
   it('sends initialize first, then initialized after the server responds', async () => {
     const transport = new TestTransport()
     const client = new LspClient({ rootUri: 'file:///repo', timeoutMs: 1000 })
@@ -300,7 +325,7 @@ describe('LspClient', () => {
     expect(didChangeContentChanges(didChange)).toEqual([{ text: 'abcX' }])
   })
 
-  it('does not throw from workspace sync when the transport send fails', async () => {
+  it('rejects a failed open before committing its attachment or protocol version', async () => {
     const { client, transport } = await initializedClient({ textDocumentSync: 1 })
     transport.failSend = true
 
@@ -310,9 +335,67 @@ describe('LspClient', () => {
         languageId: 'typescript',
         text: 'abc',
       }),
-    ).not.toThrow()
+    ).toThrow('transport send failed')
 
     expect(client.connected).toBe(false)
+    expect(client.workspace.documents).toEqual([])
+    const recovered = new TestTransport()
+    const initializing = client.connect(recovered)
+    recovered.receive(initializeResponse(recovered.message(0), { textDocumentSync: 1 }))
+    await initializing
+    openTestDocument(client.workspace, {
+      uri: 'file:///repo/a.ts',
+      languageId: 'typescript',
+      text: 'abc',
+    })
+    expect(didOpenTextDocument(recovered.lastMessage()).version).toBe(0)
+  })
+
+  it('keeps the accepted source and version after failed change until an exact resync', async () => {
+    const { client, transport } = await initializedClient({ textDocumentSync: 2 })
+    const document = openTestDocument(client.workspace, {
+      uri: 'file:///repo/a.ts',
+      languageId: 'typescript',
+      text: 'abc',
+    })
+    const accepted = client.workspace.getDocument(document.uri)
+    transport.failSend = true
+    expect(() =>
+      updateTestDocument(client.workspace, document, 'abcX', [{ from: 3, to: 3, text: 'X' }]),
+    ).toThrow('transport send failed')
+    expect(client.workspace.getDocument(document.uri)).toEqual(accepted)
+    const recovered = new TestTransport()
+    const initializing = client.connect(recovered)
+    recovered.receive(initializeResponse(recovered.message(0), { textDocumentSync: 2 }))
+    await initializing
+    expect(didOpenTextDocument(recovered.lastMessage())).toMatchObject({ text: 'abc', version: 0 })
+    client.workspace.updateDocumentSnapshot(document.uri, {
+      textSnapshot: stringTextSnapshot('abcX'),
+      lineStarts: arrayLspLineStarts([0]),
+      sourceRevision: 1,
+      sourceSegment: document.sourceSegment,
+      logicalRevisionCount: 1,
+      edits: [{ from: 3, to: 3, text: 'X' }],
+    })
+    expect(didChangeTextDocument(recovered.lastMessage()).version).toBe(1)
+    expect(didChangeContentChanges(recovered.lastMessage())).toEqual([
+      { range: { start: { line: 0, character: 3 }, end: { line: 0, character: 3 } }, text: 'X' },
+    ])
+  })
+
+  it('retires the final attachment even when its close notification fails', async () => {
+    const { client, transport } = await initializedClient({ textDocumentSync: 2 })
+    const document = openTestDocument(client.workspace, {
+      uri: 'file:///repo/a.ts',
+      languageId: 'typescript',
+      text: 'abc',
+    })
+    transport.failSend = true
+    expect(() => client.workspace.closeDocument(document.attachment)).toThrow(
+      'transport send failed',
+    )
+    expect(client.workspace.documents).toEqual([])
+    expect(() => client.workspace.closeDocument(document.attachment)).not.toThrow()
   })
 
   it('sends incremental document changes when the server requests incremental sync', async () => {

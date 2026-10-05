@@ -1,4 +1,12 @@
-import { createEditorStructuralOperation, createEditorHighlighterOperation } from '../src/editor/operationDefinitions'
+import {
+  createEditorStructuralOperation,
+  createEditorHighlighterOperation,
+} from '../src/editor/operationDefinitions'
+import type {
+  EditorStructuralOperationContext,
+  EditorHighlighterOperationContext,
+} from '../src/document/operations'
+import type { DocumentRead } from '../src/editor/documentDelivery'
 import { createEditorDocumentAnalysis } from '../src/editor/documentAnalysis'
 import { EditorSyntaxController } from '../src/editor/syntaxController'
 import { describe, expect, it, vi } from 'vitest'
@@ -10,15 +18,12 @@ import {
 import { createVisibleEditor } from './factories/visibleEditor'
 import { createEditorPreparedDocument } from '../src/editor/preparedDocument'
 import type { EditorPlugin } from '../src/plugins'
-import type {
-  EditorHighlightResult,
-  EditorHighlighterProvider,
-  EditorHighlighterRuntime,
-} from '../src/syntax/highlighter'
+import type { EditorHighlightResult, EditorHighlighterProvider } from '../src/syntax/highlighter'
 import { createPieceTableSnapshot } from '@singapore-editor/textbuffer'
 import {
   createEmptySyntaxResult,
   type EditorSyntaxProvider,
+  type EditorSyntaxRange,
   type EditorSyntaxRuntime,
 } from '../src/syntax/session'
 import { EditorTokenStore } from '../src/syntax/tokenStore'
@@ -38,15 +43,19 @@ describe('prepared editor documents', () => {
       const structuralSession = {
         ...syntaxSession(),
         analyze: refresh,
-        queryRange: vi.fn(async () => result),
+        queryRange: vi.fn(async (_range: EditorSyntaxRange) => result),
       }
       const highlighterSession = { ...highlightSession(), analyze: refresh }
-      const structuralProviderOpenRuntime = vi.fn(() => structuralSession)
-const structuralProvider: EditorSyntaxProvider = {
+      const structuralProviderOpenRuntime = vi.fn(
+        (_context: EditorStructuralOperationContext) => structuralSession,
+      )
+      const structuralProvider: EditorSyntaxProvider = {
         operation: createEditorStructuralOperation(structuralProviderOpenRuntime),
       }
-      const highlighterProviderOpenRuntime = vi.fn(() => highlighterSession)
-const highlighterProvider: EditorHighlighterProvider = {
+      const highlighterProviderOpenRuntime = vi.fn(
+        (_context: EditorHighlighterOperationContext) => highlighterSession,
+      )
+      const highlighterProvider: EditorHighlighterProvider = {
         operation: createEditorHighlighterOperation(highlighterProviderOpenRuntime),
       }
       const prepared = createEditorPreparedDocument({
@@ -188,7 +197,9 @@ const highlighterProvider: EditorHighlighterProvider = {
     const buffer = createEditorTextBuffer('alpha beta')
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
     const providerOpenRuntime = vi.fn(() => syntaxSession())
-const provider: EditorSyntaxProvider = { operation: createEditorStructuralOperation(providerOpenRuntime) }
+    const provider: EditorSyntaxProvider = {
+      operation: createEditorStructuralOperation(providerOpenRuntime),
+    }
     const prepared = createEditorPreparedDocument({
       buffer,
       analysis,
@@ -339,7 +350,9 @@ const provider: EditorSyntaxProvider = { operation: createEditorStructuralOperat
     const result = deferred<ReturnType<typeof createEmptySyntaxResult>>()
     const pendingSession = { ...syntaxSession(), foldingSupport: 'pending' as const }
     pendingSession.analyze = vi.fn(() => result.promise)
-    const provider: EditorSyntaxProvider = { operation: createEditorStructuralOperation(() => pendingSession) }
+    const provider: EditorSyntaxProvider = {
+      operation: createEditorStructuralOperation(() => pendingSession),
+    }
     const prepared = fixedPreparedDocument(buffer)
     try {
       prepared.startStage({
@@ -398,7 +411,9 @@ const provider: EditorSyntaxProvider = { operation: createEditorStructuralOperat
           return createEmptySyntaxResult()
         },
       }
-      const provider: EditorSyntaxProvider = { operation: createEditorStructuralOperation(() => session) }
+      const provider: EditorSyntaxProvider = {
+        operation: createEditorStructuralOperation(() => session),
+      }
       const prepared = fixedPreparedDocument(buffer)
       try {
         const outcome = prepared.startStage({
@@ -513,12 +528,16 @@ const provider: EditorSyntaxProvider = { operation: createEditorStructuralOperat
     const buffer = createEditorTextBuffer('const value = 1;\n')
     const structuralSession = syntaxSession()
     const highlighterSession = highlightSession()
-    const structuralProviderOpenRuntime = vi.fn(() => structuralSession)
-const structuralProvider: EditorSyntaxProvider = {
+    const structuralProviderOpenRuntime = vi.fn(
+      (_context: EditorStructuralOperationContext) => structuralSession,
+    )
+    const structuralProvider: EditorSyntaxProvider = {
       operation: createEditorStructuralOperation(structuralProviderOpenRuntime),
     }
-    const highlighterProviderOpenRuntime = vi.fn(() => highlighterSession)
-const highlighterProvider: EditorHighlighterProvider = {
+    const highlighterProviderOpenRuntime = vi.fn(
+      (_context: EditorHighlighterOperationContext) => highlighterSession,
+    )
+    const highlighterProvider: EditorHighlighterProvider = {
       operation: createEditorHighlighterOperation(highlighterProviderOpenRuntime),
     }
     const prepared = createEditorPreparedDocument({
@@ -563,12 +582,14 @@ const highlighterProvider: EditorHighlighterProvider = {
     for (const open of [structuralProviderOpenRuntime, highlighterProviderOpenRuntime]) {
       const context = open.mock.calls[0]?.[0]
       expect(context?.initialRead.revision.point).toBe(point)
-      expect(context?.initialRead.text.readRange(0, context.initialRead.text.length)).toBe('const value = 1;\n')
+      expect(context?.initialRead.text.readRange(0, context.initialRead.text.length)).toBe(
+        'const value = 1;\n',
+      )
       expect(context).not.toHaveProperty('snapshot')
       expect(context).not.toHaveProperty('textSnapshot')
     }
     for (const runtime of [structuralSession, highlighterSession]) {
-      const read = runtime.analyze.mock.calls[0]?.[0]
+      const read = vi.mocked(runtime.analyze).mock.calls[0]?.[0]
       expect(read?.revision.point).toBe(point)
       expect(read?.text.readRange(0, read.text.length)).toBe('const value = 1;\n')
     }
@@ -593,7 +614,9 @@ const highlighterProvider: EditorHighlighterProvider = {
   it('rejects a stale prepared snapshot while retaining document analysis', () => {
     const buffer = createEditorTextBuffer('alpha\n')
     const session = syntaxSession()
-    const provider: EditorSyntaxProvider = { operation: createEditorStructuralOperation(() => session) }
+    const provider: EditorSyntaxProvider = {
+      operation: createEditorStructuralOperation(() => session),
+    }
     const prepared = createEditorPreparedDocument({
       buffer,
       analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
@@ -681,12 +704,16 @@ const highlighterProvider: EditorHighlighterProvider = {
       const buffer = createEditorTextBuffer('const value = 1;\n')
       const structuralSession = syntaxSession()
       const highlighterSession = highlightSession()
-      const structuralProviderOpenRuntime = vi.fn(() => structuralSession)
-const structuralProvider: EditorSyntaxProvider = {
+      const structuralProviderOpenRuntime = vi.fn(
+        (_context: EditorStructuralOperationContext) => structuralSession,
+      )
+      const structuralProvider: EditorSyntaxProvider = {
         operation: createEditorStructuralOperation(structuralProviderOpenRuntime),
       }
-      const highlighterProviderOpenRuntime = vi.fn(() => highlighterSession)
-const highlighterProvider: EditorHighlighterProvider = {
+      const highlighterProviderOpenRuntime = vi.fn(
+        (_context: EditorHighlighterOperationContext) => highlighterSession,
+      )
+      const highlighterProvider: EditorHighlighterProvider = {
         operation: createEditorHighlighterOperation(highlighterProviderOpenRuntime),
       }
       const prepared = createEditorPreparedDocument({
@@ -779,8 +806,10 @@ const highlighterProvider: EditorHighlighterProvider = {
       ])
       const highlighterSession = highlightSession()
       highlighterSession.analyze = vi.fn(async () => ({ tokens: readyTokens }))
-      const highlighterProviderOpenRuntime = vi.fn(() => highlighterSession)
-const highlighterProvider: EditorHighlighterProvider = {
+      const highlighterProviderOpenRuntime = vi.fn(
+        (_context: EditorHighlighterOperationContext) => highlighterSession,
+      )
+      const highlighterProvider: EditorHighlighterProvider = {
         operation: createEditorHighlighterOperation(highlighterProviderOpenRuntime),
       }
       const observedTokenColors: Array<readonly (string | undefined)[]> = []
@@ -851,12 +880,14 @@ const highlighterProvider: EditorHighlighterProvider = {
     const session: EditorSyntaxRuntime = {
       ...syntaxSession(),
       canQueryRange: () => false,
-      analyze: vi.fn(async () => result),
+      analyze: vi.fn(async (_read: DocumentRead) => result),
       getResult: () => result,
       getTokens: () => result.tokens,
     }
     const providerOpenRuntime = vi.fn(() => session)
-const provider: EditorSyntaxProvider = { operation: createEditorStructuralOperation(providerOpenRuntime) }
+    const provider: EditorSyntaxProvider = {
+      operation: createEditorStructuralOperation(providerOpenRuntime),
+    }
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
     const warm = analysis.borrowStructural({
       provider,
@@ -1012,8 +1043,10 @@ const provider: EditorSyntaxProvider = { operation: createEditorStructuralOperat
     const structuralSession = syntaxSession()
     structuralSession.analyze = vi.fn(async () => structuralResult)
     structuralSession.queryRange = vi.fn(async () => structuralResult)
-    const structuralProviderOpenRuntime = vi.fn(() => structuralSession)
-const structuralProvider: EditorSyntaxProvider = {
+    const structuralProviderOpenRuntime = vi.fn(
+      (_context: EditorStructuralOperationContext) => structuralSession,
+    )
+    const structuralProvider: EditorSyntaxProvider = {
       operation: createEditorStructuralOperation(structuralProviderOpenRuntime),
     }
     const foldCounts: number[] = []
@@ -1075,8 +1108,10 @@ const structuralProvider: EditorSyntaxProvider = {
     )
     const buffer = createEditorTextBuffer(text)
     const structuralSession = syntaxSession()
-    const structuralProviderOpenRuntime = vi.fn(() => structuralSession)
-const structuralProvider: EditorSyntaxProvider = {
+    const structuralProviderOpenRuntime = vi.fn(
+      (_context: EditorStructuralOperationContext) => structuralSession,
+    )
+    const structuralProvider: EditorSyntaxProvider = {
       operation: createEditorStructuralOperation(structuralProviderOpenRuntime),
     }
     const prepared = createEditorPreparedDocument({
@@ -1135,6 +1170,7 @@ const structuralProvider: EditorSyntaxProvider = {
     await vi.waitFor(() => expect(structuralSession.queryRange).toHaveBeenCalledTimes(2))
     expect(structuralSession.queryRange).toHaveBeenLastCalledWith(
       expect.objectContaining({ endIndex: expect.any(Number) }),
+      expect.any(AbortSignal),
     )
     const uncoveredRange = vi.mocked(structuralSession.queryRange!).mock.calls.at(-1)?.[0]
     expect(uncoveredRange?.startIndex).toBe(5)
@@ -1149,8 +1185,10 @@ const structuralProvider: EditorSyntaxProvider = {
     const completion = deferred<ReturnType<typeof createEmptySyntaxResult>>()
     const structuralSession = syntaxSession()
     structuralSession.analyze = vi.fn(() => completion.promise)
-    const structuralProviderOpenRuntime = vi.fn(() => structuralSession)
-const structuralProvider: EditorSyntaxProvider = {
+    const structuralProviderOpenRuntime = vi.fn(
+      (_context: EditorStructuralOperationContext) => structuralSession,
+    )
+    const structuralProvider: EditorSyntaxProvider = {
       operation: createEditorStructuralOperation(structuralProviderOpenRuntime),
     }
     const prepared = createEditorPreparedDocument({
@@ -1204,8 +1242,10 @@ const structuralProvider: EditorSyntaxProvider = {
     const completion = deferred<EditorHighlightResult>()
     const highlighterSession = highlightSession()
     highlighterSession.analyze = vi.fn(() => completion.promise)
-    const highlighterProviderOpenRuntime = vi.fn(() => highlighterSession)
-const highlighterProvider: EditorHighlighterProvider = {
+    const highlighterProviderOpenRuntime = vi.fn(
+      (_context: EditorHighlighterOperationContext) => highlighterSession,
+    )
+    const highlighterProvider: EditorHighlighterProvider = {
       operation: createEditorHighlighterOperation(highlighterProviderOpenRuntime),
     }
     const observedTokenColors: Array<readonly (string | undefined)[]> = []
@@ -1273,7 +1313,9 @@ const highlighterProvider: EditorHighlighterProvider = {
     const completion = deferred<ReturnType<typeof createEmptySyntaxResult>>()
     const session = syntaxSession()
     session.analyze = vi.fn(() => completion.promise)
-    const provider: EditorSyntaxProvider = { operation: createEditorStructuralOperation(() => session) }
+    const provider: EditorSyntaxProvider = {
+      operation: createEditorStructuralOperation(() => session),
+    }
     const abortController = new AbortController()
     const prepared = createEditorPreparedDocument({
       buffer,
@@ -1307,7 +1349,7 @@ const highlighterProvider: EditorHighlighterProvider = {
     const buffer = createEditorTextBuffer('alpha\n')
     const session = highlightSession()
     const providerOpenRuntime = vi.fn(() => session)
-const provider: EditorHighlighterProvider = {
+    const provider: EditorHighlighterProvider = {
       operation: createEditorHighlighterOperation(providerOpenRuntime),
     }
     const abortController = new AbortController()
@@ -1416,23 +1458,23 @@ function fixedPreparedDocument(buffer: ReturnType<typeof createEditorTextBuffer>
   })
 }
 
-function syntaxSession(): EditorSyntaxRuntime {
+function syntaxSession() {
   const result = createEmptySyntaxResult()
   return {
     dispose: vi.fn(),
     getResult: () => result,
-    foldingSupport: 'supported',
+    foldingSupport: 'supported' as const,
     getSnapshotVersion: () => 0,
     getTokens: () => result.tokens,
-    queryRange: vi.fn(async () => result),
-    analyze: vi.fn(async () => result),
+    queryRange: vi.fn(async (_range: EditorSyntaxRange) => result),
+    analyze: vi.fn(async (_read: DocumentRead) => result),
   }
 }
 
-function highlightSession(): EditorHighlighterRuntime {
+function highlightSession() {
   return {
     dispose: vi.fn(),
-    analyze: vi.fn(async () => ({ tokens: EditorTokenStore.empty() })),
+    analyze: vi.fn(async (_read: DocumentRead) => ({ tokens: EditorTokenStore.empty() })),
   }
 }
 

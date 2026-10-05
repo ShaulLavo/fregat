@@ -101,6 +101,44 @@ function endpoint() {
   return { reader, commands, connection, transport }
 }
 
+it('cancels computation waits independently of a shared source ACK and releases a late pin', async () => {
+  const buffer = createEditorTextBuffer('stable')
+  const delivery = new DocumentDelivery(buffer, 'work-cancel')
+  const scope = delivery.createScope()
+  const external = endpoint()
+  const send = external.connection.send
+  let releaseRegister = () => {}
+  let registered = () => {}
+  const started = new Promise<void>((resolve) => {
+    registered = resolve
+  })
+  external.connection.send = (command, signal) => {
+    if (command.kind !== 'register') return send(command, signal)
+    const result = external.reader.apply(command)
+    registered()
+    return new Promise((resolve) => {
+      releaseRegister = () => resolve(result)
+    })
+  }
+  const work = new AbortController()
+  const first = scope.source.prepareReader(external.transport, delivery.current()!, work.signal)
+  await started
+  work.abort()
+  await expect(first).rejects.toMatchObject({ name: 'AbortError' })
+  createEditorBufferSession(buffer).applyText('!')
+  const latest = delivery.current()!
+  const peer = scope.source.prepareReader(external.transport, latest)
+  expect(external.commands.some((command) => command.kind === 'reset')).toBe(false)
+  releaseRegister()
+  const loan = await peer
+  expect(loan?.reference.point.revision).toBe(latest.revision.point.revision)
+  await loan?.dispose()
+  expect(external.reader.inspect().pins).toBe(0)
+  scope.dispose()
+  expect(external.reader.inspect()).toEqual({ documents: 0, reads: 0, pins: 0, sourceUnits: 0 })
+  delivery.dispose()
+})
+
 it.each(['scope', 'owner'] as const)(
   'retires every endpoint after one %s release callback fails',
   async (boundary) => {

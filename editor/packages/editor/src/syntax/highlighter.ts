@@ -28,5 +28,7 @@ export type EditorHighlighterProvider = {
 }
 
 export type EditorHighlighterRuntime = Omit<EditorHighlighterSession, 'refresh' | 'applyChange'> & {
-  analyze(read: DocumentRead): Promise<EditorHighlightResult>
+  analyze(read: DocumentRead, signal: AbortSignal): Promise<EditorHighlightResult>
+  /** Stable until inputs affecting the result change. */
+  configurationKey?(): unknown
 }

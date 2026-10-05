@@ -170,8 +170,12 @@ export type EditorSyntaxSession = {
   dispose(): void
 }
 
-export type EditorSyntaxRuntime = Omit<EditorSyntaxSession, 'refresh' | 'applyChange'> & {
-  analyze(read: DocumentRead): Promise<EditorSyntaxResult>
+export type EditorSyntaxRuntime = Omit<
+  EditorSyntaxSession,
+  'refresh' | 'applyChange' | 'queryRange'
+> & {
+  analyze(read: DocumentRead, signal: AbortSignal): Promise<EditorSyntaxResult>
+  queryRange?(range: EditorSyntaxRange, signal: AbortSignal): Promise<EditorSyntaxResult>
 }
 
 export type EditorSyntaxProvider = {

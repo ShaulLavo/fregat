@@ -301,6 +301,7 @@ type PreparedTarget = {
   readonly dirtyInitially: boolean
   readonly initialPath: FilesystemPath
   readonly initialSnapshot: DocumentTextSnapshot
+  readonly initialSyncPoint: ReturnType<EditorTextBuffer['getDocumentSyncPoint']>
   readonly kind: WorkspaceEditPreviewTargetKind
   readonly liveStamp: WorkspaceDocumentTargetStamp | null
   readonly segments: WorkspaceTextReplaySegmentInput[]
@@ -1946,6 +1947,7 @@ class WorkspaceEditPreparationBuilder {
       dirtyInitially: stamp.dirty,
       initialPath: document.target.resource.path,
       initialSnapshot: document.buffer.getTextSnapshot(),
+      initialSyncPoint: document.buffer.getDocumentSyncPoint(),
       kind: stamp.dirty ? 'dirty' : 'open',
       liveStamp: stamp,
       prepared: null,
@@ -2295,6 +2297,7 @@ function prepareTextTargets(
         buffer: target.buffer,
         expectedRevision: target.liveStamp?.bufferRevision ?? target.buffer.getRevision(),
         initialSnapshot: target.initialSnapshot,
+        initialSyncPoint: target.initialSyncPoint,
       },
     })
     if (!prepared.ok) {
@@ -2624,6 +2627,7 @@ function transientTarget(path: FilesystemPath, text: string): PreparedTarget {
     dirtyInitially: false,
     initialPath: path,
     initialSnapshot: buffer.getTextSnapshot(),
+    initialSyncPoint: buffer.getDocumentSyncPoint(),
     kind: 'unopened',
     liveStamp: null,
     prepared: null,
@@ -2664,7 +2668,10 @@ function currentExactProvenance(
   if (request.kind !== 'language-server' || !request.guard.isCurrent(uri)) return null
   return (
     request.guard.documents.find(
-      (entry) => entry.uri === uri && entry.textSnapshot === target.initialSnapshot,
+      (entry) =>
+        entry.uri === uri &&
+        entry.sourceRevision === target.initialSyncPoint.revision &&
+        entry.sourceSegment === target.initialSyncPoint.segment,
     ) ?? null
   )
 }
@@ -3007,7 +3014,7 @@ function transitionDocumentUri(
   options.documentSyncController?.transitionDocumentUri({
     fromUri: fileUriForPath(fromPath),
     syncPoint: rotated.syncPoint,
-    textSnapshot: target.buffer.getTextSnapshot(),
+    previousSyncPoint: expectedPoint,
     toUri: fileUriForPath(toPath),
   })
 }

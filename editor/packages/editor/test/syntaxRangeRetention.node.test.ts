@@ -14,7 +14,6 @@ import {
   retainedSyntaxCanWarm,
   type EditorDocumentAnalysis,
 } from '../src/editor/documentAnalysis'
-import { DocumentEditChain } from '../src/editor/editChain'
 import { EditorSyntaxController } from '../src/editor/syntaxController'
 import { EditorPluginHost } from '../src/plugins'
 import {
@@ -378,7 +377,6 @@ function createView(
   highlighter?: EditorHighlighterProvider,
 ) {
   const session = createEditorBufferSession(buffer)
-  const editChain = new DocumentEditChain(0, 0)
   const pluginHost = new EditorPluginHost([
     {
       activate: (context) => {
@@ -400,7 +398,6 @@ function createView(
     getDocumentId: () => 'retention.ts',
     getCurrentSessionDocumentId: () => 'retention.ts',
     getLanguageId: () => 'typescript',
-    getDocumentEditChain: () => editChain,
     getVisibleSyntaxRange: () => range,
     adoptTokens: () => {
       adoptions++

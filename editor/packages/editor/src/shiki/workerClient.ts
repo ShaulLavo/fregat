@@ -1,12 +1,17 @@
-import type { DocumentRead, DocumentSourceConnection, DocumentSourceEndpoint } from '../editor/documentDelivery'
-import { decodeDocumentWorkerReply, type DocumentWorkerReadReference } from '../document/workerReader'
+import { waitForDocumentWork } from '../editor/documentWork'
+import type {
+  DocumentRead,
+  DocumentSourceConnection,
+  DocumentSourceEndpoint,
+} from '../editor/documentDelivery'
+import {
+  decodeDocumentWorkerReply,
+  type DocumentWorkerReadReference,
+} from '../document/workerReader'
 import type { HighlighterOperationContext } from '../editor/operationDefinitions'
 
 import { EditorTokenStore } from '../syntax/tokenStore'
-import type {
-  EditorHighlightResult,
-  EditorHighlighterRuntime,
-} from '../syntax/highlighter'
+import type { EditorHighlightResult, EditorHighlighterRuntime } from '../syntax/highlighter'
 import { createEditorRuntimeSessionId } from '../syntax/session'
 import type { EditorTheme } from '../theme'
 import type {
@@ -96,6 +101,7 @@ export function createShikiWorkerOwner(options: ShikiWorkerOwnerOptions = {}): S
 const shikiOperationBinding = Symbol('shiki.operation')
 const shikiRequestBinding = Symbol('shiki.request')
 const shikiSourceBinding = Symbol('shiki.source')
+const shikiLifetimeBinding = Symbol('shiki.lifetime')
 
 export class ShikiWorkerOwner {
   private worker: Worker | null = null
@@ -109,9 +115,13 @@ export class ShikiWorkerOwner {
   private readonly runtimeTasks = new Map<string, Set<Promise<unknown>>>()
   private readonly themeRequests = new Map<string, Promise<EditorTheme | null | undefined>>()
   private readonly sessions = new Set<ShikiHighlighterSession>()
+  private readonly lifetime = new AbortController()
+  public readonly [shikiLifetimeBinding] = this.lifetime.signal
   private connection: DocumentSourceConnection | null = null
   private nextRegistration = 0
-  public readonly [shikiSourceBinding]: DocumentSourceEndpoint = { connect: () => this.connectSource() }
+  public readonly [shikiSourceBinding]: DocumentSourceEndpoint = {
+    connect: () => this.connectSource(),
+  }
 
   public constructor(private readonly options: ShikiWorkerOwnerOptions = {}) {}
 
@@ -142,7 +152,9 @@ export class ShikiWorkerOwner {
     }
   }
 
-  public [shikiOperationBinding](options: ShikiHighlighterSessionOptions): EditorHighlighterRuntime | null {
+  public [shikiOperationBinding](
+    options: ShikiHighlighterSessionOptions,
+  ): EditorHighlighterRuntime | null {
     if (!this.canUseWorker()) return null
     const session = new ShikiHighlighterSession(
       options,
@@ -164,12 +176,17 @@ export class ShikiWorkerOwner {
       send: async (command, signal) => {
         if (this.worker !== worker)
           return { kind: 'rejected', identity: command.identity, reason: 'generation' }
-        const result = await this.trackClientTask(this.postRequest({ type: 'source', command }, false, signal))
+        const result = await this.trackClientTask(
+          this.postRequest({ type: 'source', command }, false, signal),
+        )
         return decodeDocumentWorkerReply(command, result?.source)
       },
       release: (identity) => {
         if (this.worker !== worker) return
-        worker.postMessage({ id: this.nextRequestId++, payload: { type: 'source', command: { kind: 'release', identity } } })
+        worker.postMessage({
+          id: this.nextRequestId++,
+          payload: { type: 'source', command: { kind: 'release', identity } },
+        })
       },
     }
     return this.connection
@@ -184,7 +201,16 @@ export class ShikiWorkerOwner {
   private async finishLoadTheme(
     options: ShikiThemeOptions,
   ): Promise<EditorTheme | null | undefined> {
-    const registrations = await options.registrations
+    let registrations: ShikiResolvedRegistrations
+    try {
+      registrations = await waitForDocumentWork(
+        Promise.resolve(options.registrations),
+        this.lifetime.signal,
+      )
+    } catch (error) {
+      if (this.lifetime.signal.aborted) return undefined
+      throw error
+    }
     if (!this.canUseWorker()) return undefined
 
     const key = shikiThemeRequestKey(options.theme, registrations)
@@ -259,6 +285,7 @@ export class ShikiWorkerOwner {
     if (this.disposeTask) return this.disposeTask
 
     this.lifecycle = 'disposing'
+    this.lifetime.abort()
     this.disposeTask = this.finishDispose()
     return this.disposeTask
   }
@@ -267,6 +294,7 @@ export class ShikiWorkerOwner {
     const handle = this.worker
     this.worker = null
     try {
+      for (const session of this.sessions) session.dispose()
       if (handle) {
         handle.onmessage = null
         handle.onerror = null
@@ -277,6 +305,7 @@ export class ShikiWorkerOwner {
       this.clearRetainedState('disposed')
       this.rejectPendingRequests(new Error('Shiki worker disposed'))
     }
+    await this.awaitClientTasks()
   }
 
   private getWorker(createIfMissing: boolean): Worker | null {
@@ -312,7 +341,8 @@ export class ShikiWorkerOwner {
     const handle = this.getWorker(createIfMissing)
     if (!handle) return Promise.resolve(undefined)
 
-    if (signal?.aborted) return Promise.reject(new DOMException('Document source was released', 'AbortError'))
+    if (signal?.aborted)
+      return Promise.reject(new DOMException('Document source was released', 'AbortError'))
     const id = this.nextRequestId
     this.nextRequestId += 1
     const request: ShikiWorkerRequest = { id, payload }
@@ -323,7 +353,11 @@ export class ShikiWorkerOwner {
         this.pendingRequests.delete(id)
         reject(new DOMException('Document source was released', 'AbortError'))
       }
-      this.pendingRequests.set(id, { resolve, reject, cleanup: () => signal?.removeEventListener('abort', abort) })
+      this.pendingRequests.set(id, {
+        resolve,
+        reject,
+        cleanup: () => signal?.removeEventListener('abort', abort),
+      })
       signal?.addEventListener('abort', abort, { once: true })
       try {
         handle.postMessage(request)
@@ -432,6 +466,7 @@ class ShikiHighlighterSession implements EditorHighlighterRuntime {
   private opened = false
   private workerGeneration = 0
   private disposed = false
+  private readonly lifetime = new AbortController()
   private task: Promise<void> = Promise.resolve()
   // The limit the worker document was opened with; a different current limit reopens it.
   private openedLineLimit = 0
@@ -449,37 +484,54 @@ class ShikiHighlighterSession implements EditorHighlighterRuntime {
     this.theme = options.theme
     this.onDidChangeTheme = options.onDidChangeTheme
     this.registrations = Promise.resolve(options.registrations)
+    void this.registrations.catch(() => undefined)
     this.preloadRegistrations = options.preloadRegistrations ?? null
   }
 
-  public async analyze(read: DocumentRead): Promise<EditorHighlightResult> {
-    if (this.disposed) return emptyHighlightResult()
+  public configurationKey(): number | null {
+    return this.disposed ? null : this.owner.maxTokenizationLineLength()
+  }
+
+  public async analyze(read: DocumentRead, signal?: AbortSignal): Promise<EditorHighlightResult> {
+    const work = signal ? AbortSignal.any([this.lifetime.signal, signal]) : this.lifetime.signal
+    work.throwIfAborted()
     if (this.options.source.read(read.revision) !== read)
       throw new DOMException('Document revision belongs to another source', 'InvalidStateError')
     return this.enqueueRequest(async () => {
-      if (this.disposed) return emptyHighlightResult()
-      await this.synchronizeTheme()
-      const documentOptions = await this.documentOptions()
-      if (this.disposed) return emptyHighlightResult()
-      const prepared = await this.options.source.prepareReader(this.owner[shikiSourceBinding], read)
+      work.throwIfAborted()
+      await this.synchronizeTheme(work)
+      const documentOptions = await this.documentOptions(work)
+      work.throwIfAborted()
+      const prepared = await this.options.source.prepareReader(
+        this.owner[shikiSourceBinding],
+        read,
+        work,
+      )
       if (!prepared || this.disposed) {
         await prepared?.dispose()
         throw new DOMException('Document source was released', 'AbortError')
       }
       try {
+        work.throwIfAborted()
         const changes = this.analysedRead
           ? this.options.source.changesBetween(this.analysedRead.revision, read.revision)
           : null
-        const payload = this.opened && changes?.edits && this.analysedRead
-          ? this.editRequest(changes.edits, prepared.reference, this.analysedRead)
-          : { type: 'open', ...documentOptions, source: prepared.reference } satisfies ShikiWorkerRequestPayload
+        const payload =
+          this.opened && changes?.edits && this.analysedRead
+            ? this.editRequest(changes.edits, prepared.reference, this.analysedRead)
+            : ({
+                type: 'open',
+                ...documentOptions,
+                source: prepared.reference,
+              } satisfies ShikiWorkerRequestPayload)
         const result = await this.owner[shikiRequestBinding](payload)
-        if (this.disposed) return emptyHighlightResult()
+        this.lifetime.signal.throwIfAborted()
         this.schedulePreload()
         this.analysedRead = read
         this.opened = true
         this.workerGeneration = this.owner.inspect().workerGeneration
         this.adoptEditResult(result)
+        work.throwIfAborted()
         return { tokens: this.currentTokens(), theme: this.currentTheme }
       } finally {
         await prepared.dispose()
@@ -491,6 +543,7 @@ class ShikiHighlighterSession implements EditorHighlighterRuntime {
     if (this.disposed) return
 
     this.disposed = true
+    this.lifetime.abort()
     this.opened = false
     this.untokenizedLines = 0
     this.onDisposed()
@@ -508,7 +561,7 @@ class ShikiHighlighterSession implements EditorHighlighterRuntime {
   private enqueueRequest(
     run: () => Promise<EditorHighlightResult>,
   ): Promise<EditorHighlightResult> {
-    const result = run()
+    const result = this.task.then(run)
     this.task = result.then(
       () => undefined,
       () => undefined,
@@ -517,7 +570,8 @@ class ShikiHighlighterSession implements EditorHighlighterRuntime {
     return result
   }
 
-  private async synchronizeTheme(): Promise<void> {
+  private async synchronizeTheme(signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
     const worker = this.owner.inspect()
     if (worker.lifecycle !== 'ready' || worker.workerGeneration !== this.workerGeneration) {
       this.opened = false
@@ -526,11 +580,11 @@ class ShikiHighlighterSession implements EditorHighlighterRuntime {
     const next = this.options.resolveTheme?.(this.theme)
     if (!next || next.theme === this.theme) return
 
-    const registrations = await next.registrations
+    const registrations = await waitForDocumentWork(Promise.resolve(next.registrations), signal)
     if (this.disposed) return
     // A theme answer carries only theme registrations; the session keeps the grammar it opened
     // with, or the next reopen (worker restart, changed line limit) would load no language.
-    const current = await this.registrations
+    const current = await waitForDocumentWork(this.registrations, signal)
     const themed: ShikiResolvedRegistrations = {
       languageRegistrations: current.languageRegistrations,
       themeRegistration: registrations.themeRegistration,
@@ -554,6 +608,7 @@ class ShikiHighlighterSession implements EditorHighlighterRuntime {
     this.theme = next.theme
     this.registrations = Promise.resolve(themed)
     this.adoptEditResult(result)
+    signal?.throwIfAborted()
   }
 
   private adoptEditResult(result: ShikiWorkerTransportResult | undefined): void {
@@ -585,13 +640,17 @@ class ShikiHighlighterSession implements EditorHighlighterRuntime {
       lang: this.lang,
       theme: this.theme,
       source,
-      previousPoint: { ...source.point, revision: previous.revision.point.revision, textVersion: previous.revision.point.textVersion },
+      previousPoint: {
+        ...source.point,
+        revision: previous.revision.point.revision,
+        textVersion: previous.revision.point.textVersion,
+      },
       edits,
     }
   }
 
-  private async documentOptions(): Promise<ShikiWorkerDocumentOptions> {
-    const registrations = await this.registrations
+  private async documentOptions(signal?: AbortSignal): Promise<ShikiWorkerDocumentOptions> {
+    const registrations = await waitForDocumentWork(this.registrations, signal)
     this.openedLineLimit = this.owner.maxTokenizationLineLength()
     return {
       documentId: this.documentId,
@@ -613,10 +672,6 @@ class ShikiHighlighterSession implements EditorHighlighterRuntime {
     const preload = scheduleRegistrationPreload(this.owner, this.preloadRegistrations)
     if (preload) this.trackTask(this.runtimeSessionId, preload)
   }
-}
-
-function emptyHighlightResult(): EditorHighlightResult {
-  return { tokens: EditorTokenStore.empty() }
 }
 
 async function requestShikiTheme(
@@ -655,7 +710,7 @@ function scheduleRegistrationPreload(
   if (!registrations) return null
 
   const resolved = typeof registrations === 'function' ? registrations() : registrations
-  return Promise.resolve(resolved)
+  return waitForDocumentWork(Promise.resolve(resolved), owner[shikiLifetimeBinding])
     .then((resolved) => owner.preload(resolved))
     .catch(() => undefined)
 }
@@ -683,6 +738,9 @@ function markEditorWorkerRequest(
   })
 }
 
-export function createShikiDocumentOperation(owner: ShikiWorkerOwner, context: ShikiHighlighterSessionOptions): EditorHighlighterRuntime | null {
+export function createShikiDocumentOperation(
+  owner: ShikiWorkerOwner,
+  context: ShikiHighlighterSessionOptions,
+): EditorHighlighterRuntime | null {
   return owner[shikiOperationBinding](context)
 }

@@ -1031,7 +1031,6 @@ describe('retained document analysis', () => {
       let created = 0
       const structural: EditorSyntaxProvider = {
         operation: createEditorStructuralOperation(() => ({
-          analyze: async () => createEmptySyntaxResult(),
           ...emptyStructuralRuntime(),
           dispose: created++ === 0 ? disposeFirst : disposeSecond,
         })),
@@ -1505,7 +1504,7 @@ describe('retained document analysis', () => {
     expect(lease.canQueryRange?.()).toBe(true)
     expect(lease.read(range).kind).toBe('pending')
     await lease.queryRange!(range)
-    expect(parser.ranges).toHaveBeenCalledExactlyOnceWith(range)
+    expect(parser.ranges).toHaveBeenCalledExactlyOnceWith(range, expect.any(AbortSignal))
     expect(lease.read(range).kind).toBe('ready')
     analysis.dispose()
   })
@@ -1527,7 +1526,7 @@ describe('retained document analysis', () => {
     rangeReady = true
     expect(lease.read(range).kind).toBe('pending')
     await lease.queryRange!(range)
-    expect(parser.ranges).toHaveBeenCalledExactlyOnceWith(range)
+    expect(parser.ranges).toHaveBeenCalledExactlyOnceWith(range, expect.any(AbortSignal))
     analysis.dispose()
   })
 
@@ -1540,7 +1539,10 @@ describe('retained document analysis', () => {
     await lease.queryRange!({ startIndex: 0, endIndex: 16 })
     const change = view.applyEdits([{ from: 0, to: 16, text: 'docs' }])
     const result = await lease.applyChange(change)
-    expect(parser.ranges).toHaveBeenLastCalledWith({ startIndex: 0, endIndex: 4 })
+    expect(parser.ranges).toHaveBeenLastCalledWith(
+      { startIndex: 0, endIndex: 4 },
+      expect.any(AbortSignal),
+    )
     expect(await lease.queryRange!({ startIndex: 0, endIndex: 4 })).toBe(result)
     expect(lease.read({ startIndex: 0, endIndex: 16 })).toMatchObject({ kind: 'ready', result })
     analysis.dispose()

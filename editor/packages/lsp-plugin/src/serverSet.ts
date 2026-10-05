@@ -513,6 +513,8 @@ export function captureWorkspaceEditOriginGuard(workspace: LspWorkspace): Worksp
         textSnapshot: document.textSnapshot,
         uri: document.uri,
         version: document.version,
+        sourceRevision: document.sourceRevision,
+        sourceSegment: document.sourceSegment,
       }),
     ),
   )
@@ -529,7 +531,8 @@ export function captureWorkspaceEditOriginGuard(workspace: LspWorkspace): Worksp
       return (
         current.uri === captured.uri &&
         current.version === captured.version &&
-        current.textSnapshot === captured.textSnapshot
+        current.sourceRevision === captured.sourceRevision &&
+        current.sourceSegment === captured.sourceSegment
       )
     },
   })

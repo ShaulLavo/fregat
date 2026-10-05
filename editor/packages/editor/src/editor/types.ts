@@ -1,9 +1,6 @@
 import type { EditorDocumentAnalysis } from './documentAnalysis'
 import type { DocumentSessionChange } from '../documentSession'
-import type {
-  EditorSyntaxLanguageId,
-  EditorSyntaxSession,
-} from '../syntax/session'
+import type { EditorSyntaxLanguageId } from '../syntax/session'
 import type {
   EditorInitialHighlightStatus,
   EditorInitialPaintEvent,
@@ -218,4 +215,3 @@ export type EditorEditOptions = {
 }
 
 export type EditorEditInput = TextEdit | readonly TextEdit[]
-

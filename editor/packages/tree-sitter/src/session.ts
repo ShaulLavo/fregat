@@ -1,7 +1,5 @@
-import {
-  type TextEdit,
-  type TextReadSnapshot,
-} from '@singapore-editor/core/document'
+import { waitForDocumentWork } from '@singapore-editor/core/internal/document-worker'
+import { type TextEdit, type TextReadSnapshot } from '@singapore-editor/core/document'
 import {
   createEmptySyntaxResult,
   createEditorRuntimeSessionId,
@@ -13,7 +11,11 @@ import {
   treeSitterCapturesToEditorTokens,
   EditorTokenStore,
 } from '@singapore-editor/core/syntax'
-import type { DocumentContributionSource, DocumentRead, DocumentWorkerReadReference } from '@singapore-editor/core/internal/document-worker'
+import type {
+  DocumentContributionSource,
+  DocumentRead,
+  DocumentWorkerReadReference,
+} from '@singapore-editor/core/internal/document-worker'
 import type {
   TreeSitterDegradedState,
   TreeSitterInputEdit,
@@ -51,6 +53,14 @@ export type TreeSitterSyntaxSessionOptions = {
   readonly onFirstParse?: () => void
 }
 
+type LanguageRegistration =
+  | { readonly kind: 'pending'; readonly promise: Promise<boolean> }
+  | {
+      readonly kind: 'ready'
+      readonly promise: Promise<boolean>
+      readonly generation: number | null
+    }
+
 export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
   private readonly documentId: string
   private runtimeSessionId: string
@@ -63,11 +73,12 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
   private snapshotVersion = 0
   private parsedSnapshotVersion = 0
   private analysedRead: DocumentRead | null = null
+  private analysedSourceGeneration: number | null = null
   private readonly source: DocumentContributionSource
   private initialLength: number
   private result: EditorSyntaxResult
   private currentFoldingSupport: EditorSyntaxFoldingSupport
-  private languageRegistrationPromise: Promise<boolean> | null = null
+  private languageRegistration: LanguageRegistration | null = null
   private readonly pendingLanguages = new Map<
     string,
     Promise<readonly TreeSitterLanguageDescriptor[]>
@@ -97,52 +108,71 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
     return this.currentFoldingSupport
   }
 
-  public async analyze(read: DocumentRead): Promise<EditorSyntaxResult> {
+  public async analyze(read: DocumentRead, signal?: AbortSignal): Promise<EditorSyntaxResult> {
     if (this.disposed) return this.result
+    signal?.throwIfAborted()
     if (this.source.read(read.revision) !== read)
       throw new DOMException('Document revision belongs to another source', 'InvalidStateError')
-    if (!(await this.ensureLanguageRegistered()))
+    if (!(await waitForDocumentWork(this.ensureLanguageRegistered(), signal)))
       return this.updateFromUnavailableLanguage(read)
     if (this.disposed) return this.result
 
-    const prepared = await this.source.prepareReader(this.backend.sourceEndpoint, read)
+    const prepared = await this.source.prepareReader(this.backend.sourceEndpoint, read, signal)
     if (!prepared || this.disposed) {
       await prepared?.dispose()
       throw new DOMException('Document source was released', 'AbortError')
     }
     try {
-      const changed = this.analysedRead
-        ? this.source.changesBetween(this.analysedRead.revision, read.revision)
-        : null
-      if (this.parsedSnapshotVersion > 0 && changed?.edits?.length === 0) {
-        this.analysedRead = read
-        return this.result
-      }
-      if (this.parsedSnapshotVersion > 0 && changed?.edits && this.analysedRead) {
-        const payload = {
-          documentId: this.documentId,
-          runtimeSessionId: this.runtimeSessionId,
-          languageId: this.languageId,
-          previousSnapshotVersion: this.parsedSnapshotVersion,
-          snapshotVersion: ++this.snapshotVersion,
-          previousRead: this.analysedRead.text,
-          source: prepared.reference,
-          edits: changed.edits,
-          includeHighlights: this.includeHighlights,
-          includeCaptures: this.includeCaptures,
-        }
-        const edit = this.syntaxMode === 'range'
-          ? createTreeSitterEditPayload({ ...payload, resultMode: 'parseOnly' })
-          : createTreeSitterEditPayload({ ...payload, resultMode: 'full' })
-        if (edit) return await this.applyIncrementalEdit(edit, read)
-      }
-      return await this.parseRead(read, prepared.reference)
+      signal?.throwIfAborted()
+      if (this.analysedSourceGeneration !== prepared.reference.identity.endpointGeneration)
+        this.parsedSnapshotVersion = 0
+      const result = await this.analyzePrepared(read, prepared.reference, signal)
+      this.analysedSourceGeneration = prepared.reference.identity.endpointGeneration
+      return result
     } finally {
       await prepared.dispose()
     }
   }
 
-  private async parseRead(read: DocumentRead, source: DocumentWorkerReadReference): Promise<EditorSyntaxResult> {
+  private async analyzePrepared(
+    read: DocumentRead,
+    source: DocumentWorkerReadReference,
+    signal?: AbortSignal,
+  ): Promise<EditorSyntaxResult> {
+    const changed = this.analysedRead
+      ? this.source.changesBetween(this.analysedRead.revision, read.revision)
+      : null
+    if (this.parsedSnapshotVersion > 0 && changed?.edits?.length === 0) {
+      this.analysedRead = read
+      return this.result
+    }
+    if (this.parsedSnapshotVersion > 0 && changed?.edits && this.analysedRead) {
+      const payload = {
+        documentId: this.documentId,
+        runtimeSessionId: this.runtimeSessionId,
+        languageId: this.languageId,
+        previousSnapshotVersion: this.parsedSnapshotVersion,
+        snapshotVersion: ++this.snapshotVersion,
+        previousRead: this.analysedRead.text,
+        source,
+        edits: changed.edits,
+        includeHighlights: this.includeHighlights,
+        includeCaptures: this.includeCaptures,
+      }
+      const edit =
+        this.syntaxMode === 'range'
+          ? createTreeSitterEditPayload({ ...payload, resultMode: 'parseOnly' })
+          : createTreeSitterEditPayload({ ...payload, resultMode: 'full' })
+      if (edit) return await this.applyIncrementalEdit(edit, read, signal)
+    }
+    return await this.parseRead(read, source, signal)
+  }
+
+  private async parseRead(
+    read: DocumentRead,
+    source: DocumentWorkerReadReference,
+    signal?: AbortSignal,
+  ): Promise<EditorSyntaxResult> {
     const snapshotVersion = ++this.snapshotVersion
     const parsePayload = {
       documentId: this.documentId,
@@ -157,16 +187,25 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
       this.syntaxMode === 'range'
         ? { ...parsePayload, resultMode: 'parseOnly' }
         : { ...parsePayload, resultMode: 'full' },
+      signal,
     )
     for (let depth = 0; depth < 8 && result?.missingLanguages?.length; depth += 1) {
-      if (!(await this.registerMissingLanguages(result.missingLanguages, snapshotVersion))) break
+      if (
+        !(await waitForDocumentWork(
+          this.registerMissingLanguages(result.missingLanguages, snapshotVersion),
+          signal,
+        ))
+      )
+        break
       if (this.disposed || !this.isCurrentSnapshotVersion(snapshotVersion)) return this.result
       result = await this.backend.parse(
         this.syntaxMode === 'range'
           ? { ...parsePayload, resultMode: 'parseOnly' }
           : { ...parsePayload, resultMode: 'full' },
+        signal,
       )
     }
+    signal?.throwIfAborted()
     const next = this.updateFromTreeSitterResult(result, snapshotVersion, read)
     if (result && !this.disposed) this.notifyFirstParse()
     return next
@@ -178,24 +217,40 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
     onFirstParse?.()
   }
 
-  public async queryRange(range: EditorSyntaxRange): Promise<EditorSyntaxResult> {
+  public async queryRange(
+    range: EditorSyntaxRange,
+    signal?: AbortSignal,
+  ): Promise<EditorSyntaxResult> {
     if (this.disposed) return this.result
+    signal?.throwIfAborted()
     if (!this.backend.queryRange) {
       return this.createRangeUnavailableResult(range, 'Tree-sitter range queries are unavailable')
     }
+    if (this.backend.generation !== this.analysedSourceGeneration && this.analysedRead) {
+      const read = this.analysedRead
+      this.parsedSnapshotVersion = 0
+      await this.analyze(read, signal)
+      signal?.throwIfAborted()
+    }
+
     if (!this.canQueryRange()) {
       return this.createRangeUnavailableResult(range, 'Tree-sitter document has not been parsed')
     }
 
-    const result = await this.backend.queryRange({
-      documentId: this.documentId,
-      runtimeSessionId: this.runtimeSessionId,
-      snapshotVersion: this.parsedSnapshotVersion,
-      languageId: this.languageId,
-      includeHighlights: this.includeHighlights,
-      includeCaptures: this.includeCaptures,
-      range,
-    })
+    const result = await this.backend.queryRange(
+      {
+        documentId: this.documentId,
+        runtimeSessionId: this.runtimeSessionId,
+        snapshotVersion: this.parsedSnapshotVersion,
+        languageId: this.languageId,
+        includeHighlights: this.includeHighlights,
+        includeCaptures: this.includeCaptures,
+        range,
+      },
+      signal,
+    )
+
+    signal?.throwIfAborted()
 
     return this.updateFromTreeSitterRangeResult(result, range)
   }
@@ -226,20 +281,22 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
   private async applyIncrementalEdit(
     payload: TreeSitterBackendEditPayload,
     read: DocumentRead,
+    signal?: AbortSignal,
   ): Promise<EditorSyntaxResult> {
     try {
-      const result = await this.backend.edit(payload)
+      const result = await this.backend.edit(payload, signal)
+      signal?.throwIfAborted()
       if (this.disposed) return this.result
       if (!this.isCurrentSnapshotVersion(payload.snapshotVersion)) {
         return this.result
       }
 
       if (!result) {
-        return this.reparseAfterIncrementalFailure(read)
+        return this.reparseAfterIncrementalFailure(read, signal)
       }
 
       if (result.snapshotVersion !== payload.snapshotVersion) {
-        return this.reparseAfterIncrementalFailure(read)
+        return this.reparseAfterIncrementalFailure(read, signal)
       }
 
       if (
@@ -247,26 +304,24 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
       ) {
         if (this.disposed || !this.isCurrentSnapshotVersion(payload.snapshotVersion))
           return this.result
-        return this.parseRead(read, payload.source)
+        return this.parseRead(read, payload.source, signal)
       }
 
-      return this.updateFromTreeSitterResult(
-        result,
-        payload.snapshotVersion,
-        read,
-      )
+      return this.updateFromTreeSitterResult(result, payload.snapshotVersion, read)
     } catch {
+      signal?.throwIfAborted()
       if (this.disposed) return this.result
       if (!this.isCurrentSnapshotVersion(payload.snapshotVersion)) {
         return this.result
       }
 
-      return this.reparseAfterIncrementalFailure(read)
+      return this.reparseAfterIncrementalFailure(read, signal)
     }
   }
 
   private reparseAfterIncrementalFailure(
     read: DocumentRead,
+    signal?: AbortSignal,
   ): Promise<EditorSyntaxResult> {
     if (this.disposed) return Promise.resolve(this.result)
 
@@ -274,7 +329,7 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
     const disposedRuntimeSessionId = this.runtimeSessionId
     this.runtimeSessionId = createEditorRuntimeSessionId()
     this.backend.disposeDocument(disposedRuntimeSessionId)
-    return this.analyze(read)
+    return this.analyze(read, signal)
   }
 
   private isCurrentSnapshotVersion(snapshotVersion: number): boolean {
@@ -283,11 +338,34 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
 
   private ensureLanguageRegistered(): Promise<boolean> {
     if (!this.languageResolver) return Promise.resolve(true)
-    if (!this.languageRegistrationPromise) {
-      this.languageRegistrationPromise = this.registerResolvedLanguage()
+    const current = this.languageRegistration
+    if (current?.kind === 'pending') return current.promise
+    if (current?.kind === 'ready' && current.generation === this.backend.generation)
+      return current.promise
+    const pending: LanguageRegistration = {
+      kind: 'pending',
+      promise: this.registerResolvedLanguage(),
     }
-
-    return this.languageRegistrationPromise
+    this.languageRegistration = pending
+    void pending.promise.then(
+      (available) => {
+        if (this.languageRegistration !== pending) return
+        const generation = this.backend.generation
+        if (available && generation === null) {
+          this.languageRegistration = null
+          return
+        }
+        this.languageRegistration = {
+          kind: 'ready',
+          promise: pending.promise,
+          generation,
+        }
+      },
+      () => {
+        if (this.languageRegistration === pending) this.languageRegistration = null
+      },
+    )
+    return pending.promise
   }
 
   private async registerResolvedLanguage(): Promise<boolean> {
@@ -336,9 +414,7 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
     return resolveTreeSitterLanguageClosure(this.languageResolver, id, () => this.disposed)
   }
 
-  private updateFromUnavailableLanguage(
-    read: DocumentRead,
-  ): EditorSyntaxResult {
+  private updateFromUnavailableLanguage(read: DocumentRead): EditorSyntaxResult {
     if (this.disposed) return this.result
 
     this.analysedRead = read
@@ -546,7 +622,7 @@ const treeSitterParseResultToEditorSyntaxResultInner = (
   context: TreeSitterSyntaxResultContext,
 ): EditorSyntaxResult => ({
   captures: result.captures,
-  ...{ records: result.records },
+  records: result.records,
   degraded: treeSitterDegradedStateToEditorSyntaxState(result.degraded),
   folds: result.folds,
   brackets: result.brackets,
@@ -626,31 +702,38 @@ const sameSyntaxRange = (left: EditorSyntaxRange, right: EditorSyntaxRange): boo
 const createTreeSitterInputEdits = (
   read: TextReadSnapshot,
   edits: readonly TextEdit[],
-): TreeSitterInputEdit[] => edits
-  .toSorted((left, right) => right.from - left.from || right.to - left.to)
-  .map(edit => {
-    const startPosition = pointAt(read, edit.from)
-    return {
-      startIndex: edit.from,
-      oldEndIndex: edit.to,
-      newEndIndex: edit.from + edit.text.length,
-      startPosition,
-      oldEndPosition: pointAt(read, edit.to),
-      newEndPosition: insertedEndPosition(startPosition, edit.text),
-    }
-  })
+): TreeSitterInputEdit[] =>
+  edits
+    .toSorted((left, right) => right.from - left.from || right.to - left.to)
+    .map((edit) => {
+      const startPosition = pointAt(read, edit.from)
+      return {
+        startIndex: edit.from,
+        oldEndIndex: edit.to,
+        newEndIndex: edit.from + edit.text.length,
+        startPosition,
+        oldEndPosition: pointAt(read, edit.to),
+        newEndPosition: insertedEndPosition(startPosition, edit.text),
+      }
+    })
 
 function pointAt(read: TextReadSnapshot, offset: number): TreeSitterInputEdit['startPosition'] {
   const row = read.lineAt(offset)
   return { row, column: offset - read.lineStart(row) }
 }
 
-function insertedEndPosition(start: TreeSitterInputEdit['startPosition'], text: string): TreeSitterInputEdit['newEndPosition'] {
+function insertedEndPosition(
+  start: TreeSitterInputEdit['startPosition'],
+  text: string,
+): TreeSitterInputEdit['newEndPosition'] {
   let lines = 0
   let lastBreak = -1
   for (let index = text.indexOf('\n'); index !== -1; index = text.indexOf('\n', index + 1)) {
     lines++
     lastBreak = index
   }
-  return { row: start.row + lines, column: lines === 0 ? start.column + text.length : text.length - lastBreak - 1 }
+  return {
+    row: start.row + lines,
+    column: lines === 0 ? start.column + text.length : text.length - lastBreak - 1,
+  }
 }

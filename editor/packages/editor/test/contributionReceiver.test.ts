@@ -19,6 +19,173 @@ import type {
 import type { EditorViewContributionContext, EditorPlugin } from '../src/plugins'
 import { createVisibleEditor } from './factories/visibleEditor'
 
+it('reports a retained background failure before running an explicit highlighter retry', async () => {
+  const buffer = createEditorTextBuffer('failure')
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'failure' })
+  const failure = new TypeError('Controlled provider failure')
+  const analyze = vi.fn(async () => {
+    throw failure
+  })
+  const operation = createEditorHighlighterOperation(() => ({ analyze, dispose: () => {} }))
+  const lease = analysis.borrowHighlighter({ provider: { operation }, languageId: 'fixture' })!
+  try {
+    await vi.waitFor(() => expect(lease.read().kind).toBe('failed'))
+    expect(analyze).toHaveBeenCalledTimes(1)
+    await expect(lease.refresh(buffer.getTextSnapshot())).rejects.toBe(failure)
+    expect(analyze).toHaveBeenCalledTimes(1)
+    await expect(lease.refresh(buffer.getTextSnapshot())).rejects.toBe(failure)
+    expect(analyze).toHaveBeenCalledTimes(2)
+  } finally {
+    lease.dispose()
+    analysis.dispose()
+  }
+})
+
+it.each(['latest', 'pinned'] as const)(
+  'rejects a cached result whose configuration changes before %s acceptance',
+  async (kind) => {
+    const buffer = createEditorTextBuffer('same')
+    const analysis = createEditorDocumentAnalysis({
+      buffer,
+      documentId: 'configuration-acceptance',
+    })
+    let configuration = 'red'
+    const operation = defineDocumentOperation(
+      () => ({
+        configurationKey: () => configuration,
+        analyze: async () => configuration,
+        dispose: () => {},
+      }),
+      () => true,
+    )
+    const audience = analysis.contributions.createAudience()
+    const owner = analysis.contributions.pin()!
+    const demand = kind === 'latest' ? { kind, audience } : { kind, owner }
+    const lease = analysis.contributions.retain(operation, null)!
+    const accepted: string[] = []
+    try {
+      expect(await analysis.contributions.request(operation, null, demand).settled).toMatchObject({
+        kind: 'completed',
+        result: 'red',
+      })
+      const cached = analysis.contributions.request(operation, null, {
+        ...demand,
+        accept: (result) => accepted.push(result),
+      })
+      configuration = 'green'
+      expect(await cached.settled).toEqual({ kind: 'superseded' })
+      expect(accepted).toEqual([])
+      expect(await analysis.contributions.request(operation, null, demand).settled).toMatchObject({
+        kind: 'completed',
+        result: 'green',
+      })
+    } finally {
+      lease.dispose()
+      owner.dispose()
+      audience.dispose()
+      analysis.dispose()
+    }
+  },
+)
+
+it('recomputes the same revision after configuration changes and rejects a changed configuration in flight', async () => {
+  const buffer = createEditorTextBuffer('unchanged')
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'configuration' })
+  let configuration = 1
+  let complete = () => {}
+  let started = () => {}
+  const held = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  const seen: number[] = []
+  const operation = defineDocumentOperation(
+    () => ({
+      configurationKey: () => configuration,
+      analyze: async () => {
+        const captured = configuration
+        seen.push(captured)
+        if (captured !== 3) return captured
+        started()
+        await new Promise<void>((resolve) => {
+          complete = resolve
+        })
+        return captured
+      },
+      dispose: () => complete(),
+    }),
+    () => true,
+  )
+  const lease = analysis.contributions.retain(operation, null)!
+  try {
+    expect(await lease.request()).toBe(1)
+    expect(await lease.request()).toBe(1)
+    configuration = 2
+    expect(await lease.request()).toBe(2)
+    configuration = 3
+    const obsolete = expect(lease.request()).rejects.toMatchObject({ name: 'AbortError' })
+    await held
+    configuration = 4
+    complete()
+    await obsolete
+    expect(await lease.request()).toBe(4)
+    expect(seen).toEqual([1, 2, 3, 4])
+    expect(buffer.getRevision()).toBe(0)
+  } finally {
+    lease.dispose()
+    analysis.dispose()
+  }
+})
+
+it('cancels an obsolete computation before starting newest work on the same entry', async () => {
+  const buffer = createEditorTextBuffer('old')
+  const view = createEditorBufferSession(buffer)
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'cancel-work' })
+  let started = () => {}
+  const firstStarted = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  let cancelled = 0
+  let completeOld = () => {}
+  const reads: string[] = []
+  const operation = defineDocumentOperation(
+    () => ({
+      analyze: async (read, signal) => {
+        const text = read.text.readRange(0, read.text.length)
+        reads.push(text)
+        if (text !== 'old') return text
+        started()
+        return new Promise<string>((resolve, reject) => {
+          completeOld = () => resolve(text)
+          signal.addEventListener(
+            'abort',
+            () => {
+              cancelled++
+              reject(new DOMException('Cancelled work', 'AbortError'))
+            },
+            { once: true },
+          )
+        })
+      },
+      dispose: () => completeOld(),
+    }),
+    () => true,
+  )
+  const lease = analysis.contributions.retain(operation, null)!
+  const old = lease.request()
+  const rejected = expect(old).rejects.toMatchObject({ name: 'AbortError' })
+  try {
+    await firstStarted
+    view.applyEdits([{ from: 0, to: 3, text: 'new' }])
+    expect(await lease.request()).toBe('new')
+    await rejected
+    expect(reads).toEqual(['old', 'new'])
+    expect(cancelled).toBe(1)
+  } finally {
+    lease.dispose()
+    analysis.dispose()
+  }
+})
+
 it('keeps ordered retained lanes current without requests and retires peers independently', async () => {
   const buffer = createEditorTextBuffer('ordered')
   const view = createEditorBufferSession(buffer)

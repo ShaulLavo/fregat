@@ -1,5 +1,5 @@
 import type { DiffFile, DiffGutterSide } from '@singapore-editor/diff'
-import { createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
+import { createEditorDocumentAnalysis, type EditorDocumentAnalysis } from '@singapore-editor/core/editor'
 import type { EditorHighlighterProvider } from '@singapore-editor/core/extensions'
 import {
   effectiveEditorTheme,
@@ -372,7 +372,7 @@ class EditorHighlightingService implements HighlightingService {
     const provider = createShikiHighlighterProvider({
       workerOwner: this.shiki(),
       resolveLanguage: async () => languageRegistrations,
-      resolveTheme: async () => theme.registration,
+      resolveTheme: async () => ({ ...theme.registration, name: theme.revision }),
       theme: theme.revision,
       languages: lang ? { [lang]: lang } : {},
     })
@@ -399,8 +399,7 @@ class EditorHighlightingService implements HighlightingService {
       if (error instanceof HighlightingError) throw error
       throw new HighlightingError('failed', 'The highlighting worker failed', { cause: error })
     } finally {
-      analysis.dispose()
-      this.snippetSessions--
+      this.finishSnippet(analysis)
     }
   }
 
@@ -451,10 +450,21 @@ class EditorHighlightingService implements HighlightingService {
         background: palette.backgroundColor ?? DEFAULT_BACKGROUND,
       })
     } finally {
-      session.dispose()
-      analysis.dispose()
-      this.snippetSessions -= 1
+      this.finishSnippet(analysis, () => session.dispose())
     }
+  }
+
+  private finishSnippet(analysis: EditorDocumentAnalysis, releaseSession?: () => void): void {
+    let failed = false
+    let failure: unknown
+    try { releaseSession?.() }
+    catch (error) { failed = true; failure = error }
+    try { analysis.dispose() }
+    catch (error) {
+      if (!failed) { failed = true; failure = error }
+    }
+    this.snippetSessions--
+    if (failed) throw failure
   }
 
   /** `task` for one caller: rejects when that caller aborts or the service is disposed. */

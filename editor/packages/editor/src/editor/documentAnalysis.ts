@@ -1,3 +1,4 @@
+import { waitForDocumentWork as interruptible } from './documentWork'
 import {
   DocumentContributionAudience,
   DocumentContributionOwner,
@@ -183,7 +184,8 @@ export type EditorDocumentAnalysis = {
 }
 
 type AnalysisSession<T> = {
-  analyze(read: DocumentRead): Promise<T>
+  analyze(read: DocumentRead, signal: AbortSignal): Promise<T>
+  configurationKey?(): unknown
   dispose(): void
 }
 
@@ -253,6 +255,7 @@ export class AnalysisEntry<T> {
   private lastRelease: number | null = null
   protected queuedPoint: DocumentSyncPoint | null = null
   private queuedRead: DocumentRead | null = null
+  private queuedConfiguration: unknown
   private requests = 0
   protected generation = 0
   private pendingInterest = new AbortController()
@@ -262,6 +265,8 @@ export class AnalysisEntry<T> {
     readonly revision: number
     readonly generation: number
     readonly snapshot: DocumentTextSnapshot
+    readonly signal: AbortSignal
+    readonly configurationKey: unknown
     readonly settle: (result: T) => void
     readonly reject: (error: unknown) => void
   } | null = null
@@ -350,20 +355,20 @@ export class AnalysisEntry<T> {
   read(): EditorAnalysisRead<T> {
     const revision = this.buffer.getRevision()
     if (this.cancellation.signal.aborted) return { kind: 'failed', revision, error: cancelled() }
-    return this.queuedPoint === this.buffer.getDocumentSyncPoint()
+    return this.queuedPoint === this.buffer.getDocumentSyncPoint() && this.isConfigurationCurrent()
       ? this.state
       : { kind: 'pending', revision }
   }
 
   changed(read: DocumentRead): void {
     if (this.scheduling === 'pinned') return
-    if (read.revision.point === this.queuedPoint) return
+    if (read.revision.point === this.queuedPoint && this.isConfigurationCurrent()) return
     this.enqueue(read)
   }
 
   synchronize(): void {
     const read = this.delivery.current()
-    if (!read || read.revision.point === this.queuedPoint) return
+    if (!read || (read.revision.point === this.queuedPoint && this.isConfigurationCurrent())) return
     this.changed(read)
   }
 
@@ -386,6 +391,7 @@ export class AnalysisEntry<T> {
       if (!this.completion) throw cancelled()
       await interruptible(this.completion, this.pendingInterest.signal)
       this.assertCurrent(point, generation)
+      if (!this.isConfigurationCurrent()) throw cancelled()
       const state = this.read()
       if (state.kind === 'ready') return state.result
       if (state.kind === 'failed') throw state.error
@@ -398,7 +404,10 @@ export class AnalysisEntry<T> {
   async at(read: DocumentRead): Promise<T> {
     if (this.signal.aborted || this.delivery.read(read.revision) !== read) throw cancelled()
     const result =
-      this.queuedPoint === read.revision.point && this.completion && this.state.kind !== 'failed'
+      this.queuedPoint === read.revision.point &&
+      this.isConfigurationCurrent() &&
+      this.completion &&
+      this.state.kind !== 'failed'
         ? this.completion
         : this.enqueue(read)
     this.requests++
@@ -407,22 +416,24 @@ export class AnalysisEntry<T> {
     const interest = this.pendingInterest.signal
     try {
       const value = await interruptible(interruptible(result, this.signal), interest)
-      if (generation !== this.generation) throw cancelled()
+      if (generation !== this.generation || !this.isConfigurationCurrent()) throw cancelled()
       return value
     } finally {
       this.requests--
     }
   }
 
-  async query(run: () => Promise<T>): Promise<T> {
+  async query(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
     await this.current()
     const point = this.buffer.getDocumentSyncPoint()
     const generation = this.generation
     const interest = this.pendingInterest.signal
     this.assertCurrent(point, generation)
-    const result = run()
+    if (!this.isConfigurationCurrent()) throw cancelled()
+    const result = run(interest)
     const value = await interruptible(interruptible(result, this.cancellation.signal), interest)
     this.assertCurrent(point, generation)
+    if (!this.isConfigurationCurrent()) throw cancelled()
     return value
   }
 
@@ -458,6 +469,7 @@ export class AnalysisEntry<T> {
     const revision = read.revision.point.revision
     this.queuedPoint = read.revision.point
     this.queuedRead = read
+    this.queuedConfiguration = this.session.configurationKey?.()
     const generation = ++this.generation
     this.state = { kind: 'pending', revision }
     this.pending?.reject(cancelled())
@@ -474,7 +486,16 @@ export class AnalysisEntry<T> {
       reject(cancelled())
       return completion
     }
-    this.pending = { read, revision, generation, snapshot, settle, reject }
+    this.pending = {
+      read,
+      revision,
+      generation,
+      snapshot,
+      signal: this.pendingInterest.signal,
+      configurationKey: this.queuedConfiguration,
+      settle,
+      reject,
+    }
     this.schedulePending()
     if (this.active) this.retention.changed()
     return completion
@@ -498,7 +519,8 @@ export class AnalysisEntry<T> {
     this.running = true
     const { revision, generation, read, snapshot } = demand
     try {
-      const result = await this.session.analyze(read)
+      const result = await this.session.analyze(read, demand.signal)
+      if (demand.configurationKey !== this.session.configurationKey?.()) throw cancelled()
       this.publish(read.revision.point, generation, { kind: 'ready', revision, snapshot, result })
       if (this.signal.aborted) demand.reject(cancelled())
       else demand.settle(result)
@@ -534,6 +556,10 @@ export class AnalysisEntry<T> {
       generation !== this.generation
     )
       throw cancelled()
+  }
+
+  isConfigurationCurrent(): boolean {
+    return this.queuedConfiguration === this.session.configurationKey?.()
   }
 }
 
@@ -924,12 +950,12 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
       range,
       admission: 'cache',
       work: { kind: 'queued', generation },
-      promise: this.query(() => {
+      promise: this.query((signal) => {
         pending.work = { kind: 'running', generation: this.generation }
         const current = this.readRange(range)
         if (current.kind === 'ready') return Promise.resolve(current.result)
         queried = true
-        return this.structuralSession.queryRange?.(range) ?? this.current()
+        return this.structuralSession.queryRange?.(range, signal) ?? this.current()
       }).then((result) => {
         if (queried && this.canAdmitRange(key, pending)) {
           this.resultOrigins.set(result, {
@@ -1130,17 +1156,17 @@ function createAnalysis(options: {
   }
   function borrowStructural(request: EditorAnalysisStructuralRequest) {
     if (lifecycle.signal.aborted || request.signal?.aborted) return null
-    const entry = bindDocumentOperation(
-      request.provider.operation,
-      host,
-      {
-        languageId: request.languageId,
-        includeCaptures: request.includeCaptures,
-        includeHighlights: request.includeHighlights,
-        syntaxMode: request.syntaxMode,
-      },
-      request,
-    )
+    const input = {
+      languageId: request.languageId,
+      includeCaptures: request.includeCaptures,
+      includeHighlights: request.includeHighlights,
+      syntaxMode: request.syntaxMode,
+    }
+    let entry = bindDocumentOperation(request.provider.operation, host, input, request)
+    if (entry?.read().kind === 'failed' && entry.leaseCount === 0) {
+      entry.dispose()
+      entry = bindDocumentOperation(request.provider.operation, host, input, request)
+    }
     return entry ? structuralLease(entry, request.signal) : null
   }
   function borrowHighlighter(request: EditorAnalysisHighlighterRequest) {
@@ -1297,17 +1323,14 @@ function structuralLease(
   let demand: EditorSyntaxRange | undefined
   const result = () => (demand ? entry.range(demand) : entry.current())
   const current = () => lease.wait(result)
+  const refresh = refreshRetainedAnalysis(entry, result)
   const retained: EditorRetainedSyntaxSession = {
     runtimeSessionId: entry.runtimeSessionId,
     setDisplayDemand: (demand) => entry.setDisplayDemand(lease.signal, demand),
     get foldingSupport() {
       return entry.structuralSession.foldingSupport
     },
-    refresh: () =>
-      lease.wait(() => {
-        if (entry.read().kind === 'failed') entry.refresh()
-        return result()
-      }),
+    refresh: () => lease.wait(refresh),
     applyChange: current,
     canQueryRange: () => entry.read().kind === 'ready' && entry.canQueryRange(),
     queryRange(range, interest = {}) {
@@ -1345,13 +1368,10 @@ function highlighterLease(
   signal?: AbortSignal,
 ): EditorRetainedHighlighterSession {
   const lease = entry.lease(signal)
+  const refresh = refreshRetainedAnalysis(entry, () => entry.current())
   return {
     runtimeSessionId: entry.runtimeSessionId,
-    refresh: () =>
-      lease.wait(() => {
-        if (entry.read().kind === 'failed') entry.refresh()
-        return entry.current()
-      }),
+    refresh: () => lease.wait(refresh),
     applyChange: () => lease.wait(() => entry.current()),
     onDidChangeTheme: session.onDidChangeTheme
       ? (listener) => {
@@ -1371,6 +1391,26 @@ function highlighterLease(
         ? { kind: 'failed', revision: entry.buffer.getRevision(), error: cancelled() }
         : entry.read(),
     dispose: lease.dispose,
+  }
+}
+
+function refreshRetainedAnalysis<Result>(
+  entry: Pick<AnalysisEntry<Result>, 'read' | 'refresh' | 'synchronize' | 'analysisGeneration'>,
+  run: () => Promise<Result>,
+): () => Promise<Result> {
+  let failedGeneration: number | null =
+    entry.read().kind === 'failed' ? entry.analysisGeneration : null
+  return async () => {
+    entry.synchronize()
+    if (entry.read().kind === 'failed' && failedGeneration === entry.analysisGeneration)
+      entry.refresh()
+    const generation = entry.analysisGeneration
+    try {
+      return await run()
+    } catch (error) {
+      if (entry.analysisGeneration === generation) failedGeneration = generation
+      throw error
+    }
   }
 }
 
@@ -1397,18 +1437,6 @@ function leaseCancellation(
         ? Promise.reject<T>(cancelled())
         : interruptible(run(), controller.signal),
   }
-}
-
-function interruptible<T>(result: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) {
-    void result.catch(() => undefined)
-    return Promise.reject(cancelled())
-  }
-  return new Promise<T>((resolve, reject) => {
-    const abort = () => reject(cancelled())
-    signal.addEventListener('abort', abort, { once: true })
-    void result.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort))
-  })
 }
 
 function cancelled(): DOMException {

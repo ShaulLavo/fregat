@@ -165,7 +165,9 @@ function readSource(
 }
 
 export type DocumentOperationRuntime<Result> = {
-  analyze(read: DocumentRead): Promise<Result>
+  analyze(read: DocumentRead, signal: AbortSignal): Promise<Result>
+  /** Stable until inputs affecting the result change. */
+  configurationKey?(): unknown
   dispose(): void
 }
 

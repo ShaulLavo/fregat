@@ -473,6 +473,10 @@ class LanguageServerContribution implements EditorViewContribution {
       new LanguageServerDocument(
         {
           getSnapshot: () => context.getSnapshot(),
+          getSourceOwner: () => {
+            const contributions = context.getDocumentContributions()
+            return contributions ? { contributions } : null
+          },
         },
         { lanes: options.lanes, documentSync: options.documentSync },
       )
@@ -577,7 +581,7 @@ class LanguageServerContribution implements EditorViewContribution {
     this.abortRenameOnDocumentDrift()
     this.definitionLink.update(snapshot, kind)
     if (anchoredSurfaceFollowsUpdate(kind)) this.reanchorRenamePrompt()
-    if (!this.options.document) this.document.synchronize(change ?? null, kind)
+    if (!this.options.document) this.document.synchronize(kind)
     this.completion.update(snapshot, kind, change ?? null)
     this.signatureHelp?.update(snapshot, kind)
     this.documentHighlights.update(snapshot, kind)

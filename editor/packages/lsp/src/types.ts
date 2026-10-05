@@ -64,6 +64,8 @@ export type LspDocument = {
   readonly version: number
   readonly textSnapshot: LspTextSnapshot
   readonly lineStarts: LspLineStarts
+  readonly sourceRevision: number
+  readonly sourceSegment: object
 }
 
 declare const lspWorkspaceDocumentAttachmentBrand: unique symbol
@@ -120,6 +122,15 @@ export type LspWorkspaceSyncTarget = {
   didCloseDocument(document: LspDocument): void
 }
 
+export type LspPreparedDocumentSource = {
+  readonly document: LspDocument
+  isCurrent(): boolean
+}
+export type LspDocumentSourcePreparation =
+  | { readonly kind: 'unmanaged' }
+  | { readonly kind: 'ready'; readonly read: LspPreparedDocumentSource }
+  | { readonly kind: 'pending'; readonly ready: Promise<LspPreparedDocumentSource> }
+
 export type LspClientWorkspace = {
   readonly documents: readonly LspDocument[]
   attachClient(client: LspWorkspaceSyncTarget): void
@@ -137,7 +148,8 @@ export type LspClientWorkspace = {
     options: LspDocumentTransitionOptions,
   ): LspDocumentTransitionResult
   closeDocument(attachment: LspWorkspaceDocumentAttachment): void
-  saveDocument(uri: lsp.DocumentUri): void
+  saveDocument(uri: lsp.DocumentUri): Promise<void>
+  prepareDocumentRequest(uri: lsp.DocumentUri, signal?: AbortSignal): LspDocumentSourcePreparation
   getDocument(uri: lsp.DocumentUri): LspDocument | null
   connected(): void
   disconnected(): void

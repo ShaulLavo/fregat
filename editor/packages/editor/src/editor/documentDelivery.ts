@@ -78,6 +78,7 @@ export type DocumentContributionSource = Pick<DocumentDelivery, 'read' | 'change
   prepareReader(
     endpoint: DocumentSourceEndpoint,
     read: DocumentRead,
+    signal?: AbortSignal,
   ): Promise<PreparedDocumentWorkerRead | null>
   prepareProjection(
     endpoint: DocumentProjectionEndpoint,
@@ -182,7 +183,8 @@ export class DocumentDelivery {
           scope.cancellation.signal.aborted
             ? null
             : this.changesBetween(base, target, logicalScope),
-        prepareReader: (endpoint, read) => this.prepareReader(endpoint, read, scope),
+        prepareReader: (endpoint, read, signal) =>
+          this.prepareReader(endpoint, read, scope, signal),
         prepareProjection: (endpoint, read) => this.prepareProjection(endpoint, read, scope),
       },
       dispose: () => this.releaseScope(scope),
@@ -214,16 +216,20 @@ export class DocumentDelivery {
     endpoint: DocumentSourceEndpoint,
     read: DocumentRead,
     scope: SourceScope,
+    signal?: AbortSignal,
   ): Promise<PreparedDocumentWorkerRead | null> {
-    if (scope.cancellation.signal.aborted || this.disposed) return null
+    const waitSignal = signal
+      ? AbortSignal.any([scope.cancellation.signal, signal])
+      : scope.cancellation.signal
+    if (waitSignal.aborted || this.disposed) return null
     const scopes = this.sourceScopes.get(endpoint) ?? new Set<SourceScope>()
     scopes.add(scope)
     scope.endpoints.add(endpoint)
     this.sourceScopes.set(endpoint, scopes)
     const issued = this.read(read.revision)
     if (issued !== read) return null
-    const connection = await scopeWait(endpoint.connect(), scope.cancellation.signal)
-    if (!connection || this.disposed || scope.cancellation.signal.aborted) return null
+    const connection = await scopeWait(endpoint.connect(), waitSignal)
+    if (!connection || this.disposed || waitSignal.aborted) return null
     let progress = this.endpoints.get(endpoint)
     if (!progress || progress.kind !== 'reader' || progress.connection !== connection) {
       progress?.cancellation.abort()
@@ -244,12 +250,8 @@ export class DocumentDelivery {
       }
       this.endpoints.set(endpoint, progress)
     }
-    while (progress.pending) await scopeWait(progress.pending, scope.cancellation.signal)
-    if (
-      this.disposed ||
-      scope.cancellation.signal.aborted ||
-      this.endpoints.get(endpoint) !== progress
-    )
+    while (progress.pending) await scopeWait(progress.pending, waitSignal)
+    if (this.disposed || waitSignal.aborted || this.endpoints.get(endpoint) !== progress)
       return null
     let settle = () => {}
     progress.pending = new Promise<void>((resolve) => {
@@ -259,7 +261,7 @@ export class DocumentDelivery {
       progress.pending = null
       settle()
     })
-    return await scopeWait(admission, scope.cancellation.signal, (prepared) => prepared?.dispose())
+    return await scopeWait(admission, waitSignal, (prepared) => prepared?.dispose())
   }
 
   private async prepareProjection(

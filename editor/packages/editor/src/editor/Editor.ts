@@ -599,7 +599,6 @@ export class Editor {
       getCurrentSessionDocumentId: () => this.currentSessionDocumentId(),
       getLanguageId: () => this.languageId,
       getSession: () => this.session,
-      getDocumentEditChain: () => this.currentDocumentEditChain(),
       getVisibleSyntaxRange: () => this.visibleSyntaxRange(),
       adoptTokens: (tokens) => {
         this.view.adoptTokens(tokens)
@@ -3614,7 +3613,10 @@ export class Editor {
       this.analysis = analysis ?? null
       return
     }
-    const interest = acquireEditorDocumentAnalysis({ buffer, documentId: this.currentSessionDocumentId() })
+    const interest = acquireEditorDocumentAnalysis({
+      buffer,
+      documentId: this.currentSessionDocumentId(),
+    })
     this.analysisInterest = interest
     this.analysis = interest.analysis
   }
