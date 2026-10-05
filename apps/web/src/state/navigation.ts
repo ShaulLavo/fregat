@@ -27,7 +27,13 @@ import {
   filesystemPath,
 } from '@/lib/documents/utils/identity'
 import { documentTab, settingsTab } from '@/lib/documents/utils/tabs'
-import type { DocumentRef, FilesystemPath, TabContent, TabId } from '@/lib/documents/utils/types'
+import type {
+  DocumentRef,
+  FilesystemPath,
+  GitComparison,
+  TabContent,
+  TabId,
+} from '@/lib/documents/utils/types'
 import type { ChangeRow } from '@/features/git/utils/types'
 import { gitKeys } from '@/lib/query-keys'
 import { emptySearchBuffer, searchHistoryQuerySnapshot } from '@/features/search/state/buffer-state'
@@ -241,18 +247,17 @@ export function createNavigation(
     if (owner && coordinator.getApplication()?.getSnapshot().editor.workspaceStore !== owner)
       return Promise.resolve({ status: 'superseded' })
     const current = coordinator.currentAddress()
-    const capturedTarget =
-      content.kind === 'document' &&
-      content.document.kind === 'git-diff' &&
-      content.document.source.kind === 'snapshot'
-        ? content.document.source.target
+    const comparison =
+      content.kind === 'document' && content.document.kind === 'git-diff'
+        ? content.document.source
         : null
+    const capturedRoot = comparison === null ? null : comparisonRoot(comparison)
     const rootPath =
       owner?.getState().rootFolder?.path ??
       coordinator.getApplication()?.getSnapshot().editor.workspaceStore.getState().rootFolder
         ?.path ??
       null
-    if (capturedTarget && capturedTarget.rootPath !== rootPath)
+    if (capturedRoot !== null && capturedRoot !== rootPath)
       return Promise.resolve({ status: 'superseded' })
     if (owner && !addressWithContent(current, content, rootPath, focus)) {
       return coordinator.transient((application) => {
@@ -264,9 +269,9 @@ export function createNavigation(
           return
         }
         if (
-          capturedTarget &&
+          capturedRoot !== null &&
           application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path !==
-            capturedTarget.rootPath
+            capturedRoot
         )
           return
         apply.openTabContent(content)
@@ -294,7 +299,7 @@ export function createNavigation(
           },
         }
       },
-      capturedTarget?.rootPath,
+      capturedRoot ?? undefined,
     )
   }
 
@@ -1133,4 +1138,8 @@ function beginTabPress(owner: EditorWorkspaceStoreApi, groupId: GroupId, tabId: 
     target,
     createWideEventScope({ action: 'editor.command.select_tab', area: 'editor', groupId, tabId }),
   )
+}
+
+function comparisonRoot(comparison: GitComparison): FilesystemPath {
+  return comparison.kind === 'snapshot' ? comparison.target.rootPath : comparison.owner
 }

@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { checkpointIntentOptions } from '@/lib/checkpoint-intent'
 import { useDiffIntent } from '@/lib/intent-prefetch/hooks/use-diff-intent'
 import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'
@@ -32,8 +33,9 @@ import { AssistantChangedFilesTree } from './assistant-changed-files-tree'
 import { DiffStatLabel } from '@/components/diff-stat-label'
 
 export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDiffSummary }) {
+  const queryClient = useQueryClient()
   const { openCheckpointDiff, openSessionCheckpointDiff } = useChatTimelineActions()
-  const intent = useDiffIntent(checkpointIntentOptions(summary), summary.sessionId)
+  const intent = useDiffIntent(checkpointIntentOptions(summary, queryClient), summary.sessionId)
   const { environmentId } = useChatTransport()
   const expansionKey = chatChangedFilesExpansionKey(environmentId, summary)
   const expansion = useChatChangedFilesExpansionStore((state) => state.expansionByKey[expansionKey])

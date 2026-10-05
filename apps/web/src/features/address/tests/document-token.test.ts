@@ -84,6 +84,7 @@ test('refuses a checkpoint view owned by another workspace', () => {
     kind: 'git-diff',
     source: {
       kind: 'checkpoint-session',
+      ignoreWhitespace: true,
       owner: workspaceRoot('/other'),
       sessionId: TEST_SESSION_ID,
       fromTurnCount: 0,
@@ -177,7 +178,7 @@ describe('untrusted URL input', () => {
 
   test('does not promote arbitrary revision or status strings into checkpoint metadata', () => {
     expect(
-      contentForDocumentToken(ROOT, `k/${TEST_SESSION_ID}/1..2,s=notastatus,o=nothex/src/a.ts`),
+      contentForDocumentToken(ROOT, `k/${TEST_SESSION_ID}/1..2,w=1,s=notastatus,o=nothex/src/a.ts`),
     ).toMatchObject({
       kind: 'content',
       content: {
@@ -186,6 +187,7 @@ describe('untrusted URL input', () => {
           kind: 'git-diff',
           source: {
             kind: 'checkpoint-file',
+            ignoreWhitespace: true,
             oldObjectId: undefined,
             status: undefined,
           },

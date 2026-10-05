@@ -343,6 +343,7 @@ function firstWordSession(options: EditorSyntaxSessionOptions, tokens: readonly 
 
 function checkpointComparison(kind: Kind, file: string): GitComparison {
   const source = {
+    ignoreWhitespace: true,
     owner: filesystemPath('repo'),
     sessionId: TEST_SESSION_ID,
     fromTurnCount: 0,

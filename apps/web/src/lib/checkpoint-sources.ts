@@ -33,6 +33,17 @@ export function withCheckpointSources(
   if (blob.isPending) return undefined
 
   const answer = blob.data?.[0]
+  if (
+    !answer ||
+    answer.path !== displayed.path ||
+    (answer.oldPath ?? answer.path) !== (displayed.oldPath ?? displayed.path) ||
+    answer.oldObjectId !== displayed.oldObjectId ||
+    answer.newObjectId !== displayed.newObjectId ||
+    Boolean(answer.oldFileMissing) !== Boolean(displayed.oldFileMissing) ||
+    Boolean(answer.newFileMissing) !== Boolean(displayed.newFileMissing)
+  )
+    return diffs
+  if (answer.omitted) return diffs
   if (answer?.oldText === undefined || answer.newText === undefined) return diffs
 
   return diffs.map((entry) =>

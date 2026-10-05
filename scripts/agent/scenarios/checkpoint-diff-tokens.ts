@@ -11,6 +11,7 @@ import {
   sharedTokenHighlightPrefix,
 } from '../selectors'
 import { isolatedNativeScenario, writeSettings } from './native-provider-verification'
+import { readCaches } from '../cache-snapshot'
 
 const FILES = ['first', 'second'] as const
 const EDITED = new Set([5, 30])
@@ -28,20 +29,21 @@ function sourceLine(name: string, line: number) {
   return shapes[line % shapes.length]!
 }
 
-function fileText(name: string, edited: boolean) {
+function fileText(name: string, edited: boolean, large = false) {
   const lines = Array.from({ length: 40 }, (_, index) => {
     const line = index + 1
     if (edited && EDITED.has(line)) return `let edited${line} = 'y'`
     if (edited && line === REINDENTED) return `    ${sourceLine(name, line)}`
     return sourceLine(name, line)
   })
-  return `${lines.join('\n')}\n`
+  return `${lines.join('\n')}\n${large ? '// ' + 'padding'.repeat(160000) + '\n' : ''}`
 }
 
-async function prepareFixture() {
+async function prepareFixture(large: boolean) {
   const fixture = await createGitFixture('checkpoint-diff-tokens')
   await mkdir(join(fixture, 'src'), { recursive: true })
-  for (const name of FILES) await writeFile(join(fixture, `src/${name}.ts`), fileText(name, false))
+  for (const name of FILES)
+    await writeFile(join(fixture, `src/${name}.ts`), fileText(name, false, large))
   await fixtureGit(fixture, ['add', '--all'])
   await fixtureGit(fixture, ['commit', '--quiet', '-m', 'fixture'])
   return { path: fixture, release: () => releaseFixture(fixture) }
@@ -49,73 +51,105 @@ async function prepareFixture() {
 
 type RowCheck = { readonly row: string; readonly covered: readonly string[] }
 
-export const checkpointDiffTokens = isolatedNativeScenario({
-  name: 'checkpoint-diff-tokens',
-  description:
-    'A turn edits lines 5 and 30 of two files and re-indents line 3; the checkpoint diff of the second file colours every row from its own source line from its complete blob pair, stacked and then split under tree-sitter and Shiki. Run with FS_DEV_MAX_TEXT_FILE_BYTES=500 and the pair is over the text limit: the patch is drawn uncoloured under the partial notice.',
-  fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
-  prepareWorktree: prepareFixture,
-  async drive(page, { orchestration, root, step, worktreePath }) {
-    await writeFile(
-      join(root, 'checkpoint-control.json'),
-      JSON.stringify({
-        cwd: worktreePath,
-        hold: false,
-        turns: [
-          FILES.map((name) => ({
-            op: 'write',
-            path: `src/${name}.ts`,
-            text: fileText(name, true),
-          })),
-        ],
-      }),
-    )
-    await selectors.chatMessage(page).fill('Edit both files.')
-    await selectors.chatSend(page).click()
-    await selectors.chatMessages(page).getByText('CHECKPOINT_TURN_DONE').first().waitFor()
-    const git = selectors.chatToolTab(page, 'Git')
-    await git.waitFor({ timeout: 20_000 })
-    if (!(await selectors.gitPanel(page).isVisible())) await git.click()
-    await selectors.gitDiffScope(page, 'Turn').click()
-    const second = selectors.turnFiles(page).getByRole('treeitem', { name: /second\.ts/ })
-    await second.waitFor({ timeout: 15_000 })
-    await second.click()
-    await selectors.diffRows(page).first().waitFor({ timeout: 15_000 })
-    const partial = selectors.diffPartialNotice(page)
-    // The text limit is the only thing that may choose the partial patch; a fallback otherwise fails.
-    if (process.env.FS_DEV_MAX_TEXT_FILE_BYTES !== undefined) {
-      await partial.waitFor({ timeout: 15_000 })
-      await step('partial')
-      await assertUncoloured(page)
-      return
-    }
-    await waitForColouredRows(page)
-    ok(!(await partial.isVisible()), 'The complete blob pair fell back to the partial patch')
-    await step('second-file')
-    await assertAligned(page)
-    const base = orchestration.replace(/\/orchestration$/, '')
-    await writeSettings(page, base, [{ kind: 'set', key: 'editor.diff.viewMode', value: 'split' }])
-    await selectors.diffPanes(page).nth(1).waitFor({ timeout: 15_000 })
-    await waitForColouredRows(page)
-    await step('split-tree-sitter')
-    await assertAligned(page)
-    const lastStyle = await newestTokenStyle(page)
-    await writeSettings(page, base, [
-      { kind: 'set', key: 'editor.codeTheme.dark', value: 'github-dark' },
-      { kind: 'set', key: 'editor.codeTheme.light', value: 'github-light' },
-    ])
-    // Shiki paints with its own palette, and each new colour registers a newer token style.
-    await page.waitForFunction(
-      ({ last, source }) => (new Function(`return (${source})`)() as () => number)() > last,
-      { last: lastStyle, source: NEWEST_TOKEN_STYLE },
-      { timeout: 15_000 },
-    )
-    await page.waitForTimeout(500)
-    await waitForColouredRows(page)
-    await step('split-shiki')
-    await assertAligned(page)
-  },
-})
+export const checkpointDiffTokens = checkpointScenario(false)
+export const checkpointDiffSourceRefusal = checkpointScenario(true)
+
+function checkpointScenario(partial: boolean) {
+  return isolatedNativeScenario({
+    name: partial ? 'checkpoint-diff-source-refusal' : 'checkpoint-diff-tokens',
+    description: partial
+      ? 'A captured checkpoint patch survives a Git blob refusal at the registered one-MiB limit. Both source blobs exceed one MiB; the patch stays visible and uncoloured.'
+      : 'A two-file checkpoint draws only the selected source pair in stacked and split views under tree-sitter and Shiki. A 500-byte filesystem limit leaves Git comparisons complete under their registered Git limit.',
+    fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
+    prepareWorktree: () => prepareFixture(partial),
+    async drive(page, { orchestration, root, step, worktreePath }) {
+      await writeFile(
+        join(root, 'checkpoint-control.json'),
+        JSON.stringify({
+          cwd: worktreePath,
+          hold: false,
+          turns: [
+            FILES.map((name) => ({
+              op: 'write',
+              path: `src/${name}.ts`,
+              text: fileText(name, true, partial),
+            })),
+          ],
+        }),
+      )
+      await selectors.chatMessage(page).fill('Edit both files.')
+      await selectors.chatSend(page).click()
+      await selectors.chatMessages(page).getByText('CHECKPOINT_TURN_DONE').first().waitFor()
+      const git = selectors.chatToolTab(page, 'Git')
+      await git.waitFor({ timeout: 20_000 })
+      if (!(await selectors.gitPanel(page).isVisible())) await git.click()
+      await selectors.gitDiffScope(page, 'Turn').click()
+      const second = selectors.turnFiles(page).getByRole('treeitem', { name: /second\.ts/ })
+      await second.waitFor({ timeout: 15_000 })
+      if (partial) {
+        const base = orchestration.replace(/\/orchestration$/, '')
+        await writeSettings(page, base, [{ kind: 'set', key: 'git.maxDiffFileSizeMiB', value: 1 }])
+      }
+      const blobResponse = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname.endsWith('/git/diff/blob') && response.status() === 200,
+      )
+      await second.click()
+      const blob = await (await blobResponse).json()
+      await selectors.diffRows(page).first().waitFor({ timeout: 15_000 })
+      const notice = selectors.diffPartialNotice(page)
+      if (partial) {
+        await notice.waitFor({ timeout: 15_000 })
+        await step('partial')
+        await assertUncoloured(page)
+        ok(
+          Array.isArray(blob) &&
+            blob.length === 1 &&
+            blob[0].omitted === 'size' &&
+            blob[0].oldText === undefined &&
+            blob[0].newText === undefined,
+          'The actual Git blob route refuses both complete sources at the registered limit',
+        )
+        return { caches: await page.evaluate(readCaches), address: page.url(), blob }
+      }
+      await waitForColouredRows(page)
+      ok(!(await notice.isVisible()), 'The complete blob pair fell back to the partial patch')
+      await step('second-file')
+      await assertAligned(page)
+      const base = orchestration.replace(/\/orchestration$/, '')
+      await writeSettings(page, base, [
+        { kind: 'set', key: 'editor.diff.viewMode', value: 'split' },
+      ])
+      await selectors.diffPanes(page).nth(1).waitFor({ timeout: 15_000 })
+      await waitForColouredRows(page)
+      await step('split-tree-sitter')
+      await assertAligned(page)
+      const lastStyle = await newestTokenStyle(page)
+      await writeSettings(page, base, [
+        { kind: 'set', key: 'editor.codeTheme.dark', value: 'github-dark' },
+        { kind: 'set', key: 'editor.codeTheme.light', value: 'github-light' },
+      ])
+      // Shiki paints with its own palette, and each new colour registers a newer token style.
+      await page.waitForFunction(
+        ({ last, source }) => (new Function(`return (${source})`)() as () => number)() > last,
+        { last: lastStyle, source: NEWEST_TOKEN_STYLE },
+        { timeout: 15_000 },
+      )
+      await page.waitForTimeout(500)
+      await waitForColouredRows(page)
+      await step('split-shiki')
+      await assertAligned(page)
+      ok(
+        Array.isArray(blob) &&
+          blob.length === 1 &&
+          typeof blob[0].oldText === 'string' &&
+          typeof blob[0].newText === 'string',
+        'The actual Git blob route supplies complete sources',
+      )
+      return { caches: await page.evaluate(readCaches), address: page.url(), blob }
+    },
+  })
+}
 
 async function waitForColouredRows(page: Page) {
   await page.waitForFunction(

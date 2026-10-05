@@ -65,6 +65,7 @@ function comparisonFor(diff: GitFileDiff): GitComparison {
     file: fileResource(filesystemPath(diff.path)),
     fromTurnCount: 0,
     kind: 'checkpoint-file',
+    ignoreWhitespace: true,
     owner: filesystemPath('repo'),
     sessionId: TEST_SESSION_ID,
     toTurnCount: 1,
