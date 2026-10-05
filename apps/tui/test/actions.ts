@@ -3,7 +3,11 @@ import type { renderTui } from './render'
 
 type PaletteFrame = Pick<Awaited<ReturnType<typeof renderTui>>, 'mockInput'>
 
-export async function runPaletteCommand(frame: PaletteFrame, title: string) {
+export async function runPaletteCommand(
+  frame: PaletteFrame,
+  title: string,
+  settle?: () => Promise<void>,
+) {
   await act(async () => {
     frame.mockInput.pressKey('F1')
   })
@@ -12,5 +16,6 @@ export async function runPaletteCommand(frame: PaletteFrame, title: string) {
   })
   await act(async () => {
     frame.mockInput.pressEnter()
+    await settle?.()
   })
 }

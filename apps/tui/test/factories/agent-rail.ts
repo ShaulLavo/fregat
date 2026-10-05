@@ -27,15 +27,17 @@ export async function createRailSession(
   worktreeTarget: SessionWorktreeTarget = { kind: 'current', worktreeId },
 ) {
   const sessionId = v.parse(sessionIdSchema, crypto.randomUUID())
-  await chat.dispatch({
-    type: 'session.create',
-    commandId: v.parse(commandIdSchema, crypto.randomUUID()),
-    sessionId,
-    worktreeTarget,
-    title,
-    modelSelection: { providerInstanceId: DEFAULT_PROVIDER_INSTANCE_ID, model: 'gpt-5.5' },
-    runtimeMode: 'full-access',
-    interactionMode: 'default',
+  await act(async () => {
+    await chat.dispatch({
+      type: 'session.create',
+      commandId: v.parse(commandIdSchema, crypto.randomUUID()),
+      sessionId,
+      worktreeTarget,
+      title,
+      modelSelection: { providerInstanceId: DEFAULT_PROVIDER_INSTANCE_ID, model: 'gpt-5.5' },
+      runtimeMode: 'full-access',
+      interactionMode: 'default',
+    })
   })
   return sessionId
 }
@@ -99,16 +101,20 @@ export async function createPullRequestRailSession(
     baseWorktreeId,
   })
   const engine = orchestrationForApp(server.app)
-  await expect
-    .poll(async () => (await engine.readModelSnapshot()).worktrees.get(worktreeId)?.lifecycle.state)
-    .toBe('ready')
-  await engine.dispatch({
-    type: 'worktree.pull-request.sync',
-    commandId: v.parse(commandIdSchema, crypto.randomUUID()),
-    worktreeId,
-    branch: `worktree/${worktreeId}`,
-    pullRequest,
+  await act(async () => {
+    await expect
+      .poll(
+        async () => (await engine.readModelSnapshot()).worktrees.get(worktreeId)?.lifecycle.state,
+      )
+      .toBe('ready')
+    await engine.dispatch({
+      type: 'worktree.pull-request.sync',
+      commandId: v.parse(commandIdSchema, crypto.randomUUID()),
+      worktreeId,
+      branch: `worktree/${worktreeId}`,
+      pullRequest,
+    })
+    await chat.refresh()
   })
-  await chat.refresh()
   return worktreeId
 }
