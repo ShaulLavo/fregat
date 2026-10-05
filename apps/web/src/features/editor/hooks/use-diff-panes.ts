@@ -9,7 +9,11 @@ type DiffSplitSide = Exclude<DiffGutterSide, 'stacked'>
 export type DiffPanesController = {
   registerEditor(side: DiffGutterSide, editor: Editor | null): void
   handleFocus(side: DiffGutterSide): void
-  handleScroll(side: DiffGutterSide, position: DiffScrollPosition): void
+  handleScroll(
+    side: DiffGutterSide,
+    position: DiffScrollPosition,
+    kind: 'restoration' | 'scroll',
+  ): void
 }
 
 /**
@@ -38,7 +42,15 @@ export function useDiffPanes(): DiffPanesController {
     lastSeen.current.delete(side)
   }
 
-  const handleScroll = (side: DiffGutterSide, from: DiffScrollPosition) => {
+  const handleScroll = (
+    side: DiffGutterSide,
+    from: DiffScrollPosition,
+    kind: 'restoration' | 'scroll',
+  ) => {
+    if (kind === 'restoration') {
+      lastSeen.current.set(side, from)
+      return
+    }
     if (mirroring.current === side) {
       lastSeen.current.set(side, from)
       return

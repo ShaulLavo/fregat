@@ -4,7 +4,11 @@ import {
   type HistoryComparisonResult,
 } from '@/features/editor/utils/history-compare'
 import type { SnapshotComparisonScope } from '@/lib/documents/utils/snapshot-comparison'
-import type { HistoryComparisonInput, SnapshotComparisonLease } from '@/lib/snapshot-comparison'
+import type {
+  HistoryComparisonInput,
+  SnapshotComparisonLease,
+  SnapshotComparisonRead,
+} from '@/lib/snapshot-comparison'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
 import {
@@ -27,6 +31,7 @@ type Viewer = HistoryViewer<HistoryComparisonResult>
 export type HistoryViewerSnapshot = {
   readonly viewer: Viewer
   readonly state: HistoryViewerState<HistoryComparisonResult>
+  readonly displayedRead: SnapshotComparisonRead | null
   readonly focusedComparison: HistoryComparisonResult | null
 }
 
@@ -131,7 +136,7 @@ export function createHistoryViewerSource({
     } else {
       refreshFocused(state)
     }
-    snapshot = { viewer, state, focusedComparison }
+    snapshot = { viewer, state, focusedComparison, displayedRead: displayed?.read() ?? null }
   }
   const settleSelected = (state: HistoryViewerState<HistoryComparisonResult>) => {
     const comparison = state.comparison

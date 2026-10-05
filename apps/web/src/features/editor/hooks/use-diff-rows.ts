@@ -6,31 +6,17 @@ import {
   type DiffRenderRow,
 } from '@singapore-editor/diff'
 import type { HighlightingThemeSource } from '@singapore-editor/highlighting'
-import { useLayoutEffect, useState } from 'react'
+import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { highlightingService } from '@/lib/highlighting/state/service'
 
 export type DiffRowsState = {
   readonly rows: readonly DiffRenderRow[]
-  /** The plugin's syntax for these rows has landed, or there is none to wait for. */
   readonly syntaxReady: boolean
   readonly text: string
   readonly tokensRevision: number
+  readonly appliedFile: RefObject<DiffFile | null>
 }
 
-/**
- * The plugin owns the diff; the host owns the editor's document. No plugin context can mutate
- * document text, so the split is forced: the plugin publishes rows and this turns them into the
- * buffer text the host pushes in.
- *
- * Layout effects rather than passive ones throughout — a passive `setFile` would paint one frame of
- * an empty editor before the rows arrived. The rows array is the state, not a copy of it: the
- * plugin hands out a stable reference until it rebuilds, so React bails out on its own when a
- * notification changes nothing.
- *
- * With a `syntaxTheme`, the highlighting service shows the file with syntax prepared on intent or
- * kept from an earlier view, and takes the pane's parse back when it leaves, so a revisit paints
- * coloured at once.
- */
 export function useDiffRows(
   plugin: DiffPlugin,
   file: DiffFile | null,
@@ -40,13 +26,11 @@ export function useDiffRows(
   const [rows, setRows] = useState<readonly DiffRenderRow[]>(() => plugin.getRows())
   const [tokensRevision, setTokensRevision] = useState(0)
   const [syntaxReady, setSyntaxReady] = useState(() => plugin.isSyntaxReady())
+  const appliedFile = useRef<DiffFile | null>(null)
   useLayoutEffect(() => {
-    if (!file || syntaxTheme === null) {
-      plugin.setFile(file)
-      return
-    }
-    const shown = highlightingService().showDiff(plugin, file, side, syntaxTheme)
-    return () => shown.dispose()
+    const shown = applyFile(plugin, file, side, syntaxTheme)
+    appliedFile.current = file
+    return () => shown?.dispose()
   }, [file, plugin, side, syntaxTheme])
 
   useLayoutEffect(() => {
@@ -54,22 +38,30 @@ export function useDiffRows(
       setRows(plugin.getRows())
       setSyntaxReady(plugin.isSyntaxReady())
     }
-
-    // The file is pushed by the effect above, which runs first and notifies nobody yet.
-    pull()
-    const rowsSubscription = plugin.onDidChangeRows(pull)
-    const tokensSubscription = plugin.onDidChangeTokens(() => {
+    const pullTokens = () => {
       setTokensRevision((revision) => revision + 1)
       setSyntaxReady(plugin.isSyntaxReady())
-    })
-
+    }
+    pull()
+    const rowsSubscription = plugin.onDidChangeRows(pull)
+    const tokensSubscription = plugin.onDidChangeTokens(pullTokens)
     return () => {
       rowsSubscription.dispose()
       tokensSubscription.dispose()
     }
   }, [plugin])
 
-  const text = joinRenderLines(rows)
+  return { rows, syntaxReady, text: joinRenderLines(rows), tokensRevision, appliedFile }
+}
 
-  return { rows, syntaxReady, text, tokensRevision }
+function applyFile(
+  plugin: DiffPlugin,
+  file: DiffFile | null,
+  side: DiffGutterSide,
+  syntaxTheme: HighlightingThemeSource | null,
+) {
+  const shown =
+    file && syntaxTheme ? highlightingService().showDiff(plugin, file, side, syntaxTheme) : null
+  if (!shown) plugin.setFile(file)
+  return shown
 }

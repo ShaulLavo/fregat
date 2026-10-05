@@ -51,7 +51,7 @@ import type {
   SavedComparisonRequest,
   SavedComparisonScope,
   SavedComparisonRefresh,
-} from '@/features/editor/utils/saved-comparison'
+} from '@/lib/saved-comparison'
 import {
   createEditorViewSession,
   acquireDocumentMutationLease,
