@@ -371,6 +371,11 @@ jobs:
         timeout-minutes: 5
         run: bun run --cwd apps/web test:browser
 
+      - name: Browser test (syntax settings)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        run: bun run --cwd apps/web test:syntax-settings-browser
+
       - name: Browser test (tree)
         if: ${{ !cancelled() }}
         timeout-minutes: 5
