@@ -27,8 +27,43 @@ export function captureRetentionAcceptanceEntry() {
         ? owner.documents.getState().getLiveEditorDocument(view.documentKey)
         : null
       const path = tab ? tabFileResource(tab.content)?.path : null
+      const selector = `[data-editor-group-id="${group.id}"]`
+      const headerPath = tab
+        ? (document.querySelector<HTMLElement>(
+            `${selector} [data-editor-tab-id="${tab.id}"][aria-selected="true"]`,
+          )?.dataset.editorTabPath ?? null)
+        : null
       if (!tab || !snapshot || !canonical || !path)
-        return { kind: 'unready', groupId: group.id } as const
+        return {
+          kind: 'unready',
+          groupId: group.id,
+          path,
+          headerPath,
+          binding: {
+            selectedTabId: group.selectedTabId ?? null,
+            viewDocumentKey: view?.documentKey ?? null,
+            controllerRegistered: Boolean(controller),
+            nativePresentation: controller?.getEditor()?.getPresentationState() ?? null,
+            nativeInitialHighlightStatus:
+              controller?.getEditor()?.getState().initialHighlightStatus ?? null,
+            snapshot: snapshot
+              ? {
+                  documentId: snapshot.documentId,
+                  revision: snapshot.documentSyncPoint.revision,
+                  syntaxStatus: snapshot.syntaxStatus,
+                  initialHighlightStatus: snapshot.initialHighlightStatus,
+                  paintLayersAvailable: snapshot.paintLayers !== null,
+                }
+              : null,
+            canonical: canonical
+              ? {
+                  documentId: canonical.analysis.documentId,
+                  revision: canonical.buffer.getRevision(),
+                  source: canonical.buffer.materializeFullText(),
+                }
+              : null,
+          },
+        } as const
       const source = canonical.buffer.materializeFullText()
       const configuration = editorPreparedDocumentTags(
         path,
@@ -46,12 +81,7 @@ export function captureRetentionAcceptanceEntry() {
         configuration: 'unknown',
         paintedGeneration: 'unknown' as const,
       }
-      const selector = `[data-editor-group-id="${group.id}"]`
       const viewportSelector = `${selector} .editor-virtualized-viewport`
-      const headerPath =
-        document.querySelector<HTMLElement>(
-          `${selector} [data-editor-tab-id="${tab.id}"][aria-selected="true"]`,
-        )?.dataset.editorTabPath ?? null
       const raw = captureTokenPaint({
         source,
         viewportSelector,

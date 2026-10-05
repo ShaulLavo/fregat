@@ -57,7 +57,10 @@ for (const arm of [
           syntax: arm.syntax,
           currentReady,
         })
-        expect(outcome.kind, JSON.stringify({ at: frame.at, outcome })).not.toBe('mismatch')
+        expect(
+          outcome.kind,
+          JSON.stringify({ at: frame.at, outcome, currentReady, frame, settledReference }),
+        ).not.toBe('mismatch')
         if (outcome.kind === 'current') currentReady = true
       }
       expect(currentReady).toBe(true)
