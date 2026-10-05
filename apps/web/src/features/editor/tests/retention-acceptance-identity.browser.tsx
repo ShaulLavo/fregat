@@ -342,6 +342,9 @@ async function removeLanguageFixture(
     deletePath(destination, false, client),
   ])
   expect(outcomes.some((outcome) => outcome.status === 'fulfilled')).toBe(true)
+  for (const outcome of outcomes) {
+    if (outcome.status === 'rejected') expect(outcome.reason).toMatchObject({ status: 404 })
+  }
   return outcomes
 }
 
