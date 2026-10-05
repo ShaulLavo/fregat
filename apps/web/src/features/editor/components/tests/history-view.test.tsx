@@ -1,5 +1,5 @@
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
-import type { EditorTextBuffer } from '@singapore-editor/core/document'
+import { createEditorBufferSession, type EditorTextBuffer } from '@singapore-editor/core/document'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
@@ -18,6 +18,7 @@ import {
   commitHistoryBarrier,
   historyDocument,
 } from '../../../../../test/factories/history-document'
+import { testScopedStorage } from '../../../../../test/factories/scoped-storage'
 import { holdToConfirm } from '../../../../../test/hold'
 
 const FILE = filesystemPath('repo/a.ts')
@@ -43,6 +44,37 @@ test('lists every retained state and diffs a focused one against the current tex
   await waitFor(() => {
     expect(diffRowTexts()).toEqual(expect.arrayContaining(['alphaonetwo', 'alphaone']))
   })
+  const read = rendered.store.getState().snapshotComparisonTabs.get(tabId('tab-history'))?.read()
+  expect(read?.kind).toBe('ready')
+  if (read?.kind !== 'ready' || read.input.kind !== 'history')
+    throw new RangeError('retained history capture required')
+  const input = read.input
+  const graph = buffer.getHistoryGraph()
+  const current = graph.nodes.find((node) => node.id === graph.currentId)!
+  const focused = graph.nodes[1]!
+  expect(read.input.buffer).toBe(buffer)
+  expect(read.input.old.id).toBe(current.id)
+  expect(read.input.old.revision).toBe(current.revision)
+  expect(input.old.snapshot).toBe(current.snapshot)
+  expect(read.input.new.id).toBe(focused.id)
+  expect(read.input.new.snapshot).toBe(focused.snapshot)
+  const session = createEditorBufferSession(buffer)
+  session.setSelection(5)
+  session.applyText('A')
+  session.applyText('B')
+  await waitFor(() => {
+    const latest = rendered.store
+      .getState()
+      .snapshotComparisonTabs.get(tabId('tab-history'))
+      ?.read()
+    expect(latest?.kind).toBe('ready')
+    if (latest?.kind !== 'ready' || latest.input.kind !== 'history')
+      throw new RangeError('retained replacement history required')
+    expect(latest.input.old.snapshot).not.toBe(input.old.snapshot)
+  })
+  session.undo()
+  expect(input.old.snapshot).toBe(current.snapshot)
+  expect(read.input.new.snapshot).toBe(focused.snapshot)
   expect(states).toHaveAttribute('aria-activedescendant', options[1]!.id)
 
   await user.click(screen.getByRole('button', { name: 'Use this version' }))
@@ -142,7 +174,7 @@ test('the barrier before a workspace edit is a state of its own', async () => {
 test('moving into a group with another history tab preserves the selected barrier', async () => {
   stubEditorViewport()
   stubHighlightApi()
-  const store = createEditorDocumentStore()
+  const store = createEditorDocumentStore({ environmentId: testScopedStorage.environmentId })
   const uiStore = createEditorUiStore()
   const otherFile = filesystemPath('repo/b.ts')
   for (const path of [FILE, otherFile]) {
@@ -158,11 +190,15 @@ test('moving into a group with another history tab preserves the selected barrie
             {moved ? (
               <div>Another selected tab</div>
             ) : (
-              <HistoryView path={FILE} tabId={tabId('a')} />
+              <HistoryView rootPath={filesystemPath('repo')} path={FILE} tabId={tabId('a')} />
             )}
           </section>
           <section aria-label='Destination group'>
-            <HistoryView path={moved ? FILE : otherFile} tabId={tabId(moved ? 'a' : 'b')} />
+            <HistoryView
+              rootPath={filesystemPath('repo')}
+              path={moved ? FILE : otherFile}
+              tabId={tabId(moved ? 'a' : 'b')}
+            />
           </section>
         </EditorUiStateContext>
       </EditorDocumentStateContext>
@@ -188,7 +224,7 @@ test('moving into a group with another history tab preserves the selected barrie
 
 async function renderHistory({ edits }: { edits: readonly string[] | null }) {
   stubHighlightApi()
-  const store = createEditorDocumentStore()
+  const store = createEditorDocumentStore({ environmentId: testScopedStorage.environmentId })
   const uiStore = createEditorUiStore()
   const focus = new FocusService()
   const document =
@@ -208,7 +244,12 @@ async function renderHistory({ edits }: { edits: readonly string[] | null }) {
     return (
       <EditorDocumentStateContext.Provider value={store}>
         <EditorUiStateContext value={uiStore}>
-          <HistoryView key={key} path={FILE} tabId={tabId('tab-history')} />
+          <HistoryView
+            rootPath={filesystemPath('repo')}
+            key={key}
+            path={FILE}
+            tabId={tabId('tab-history')}
+          />
         </EditorUiStateContext>
       </EditorDocumentStateContext.Provider>
     )
@@ -217,6 +258,7 @@ async function renderHistory({ edits }: { edits: readonly string[] | null }) {
   return {
     ...rendered,
     buffer: document?.buffer ?? null,
+    store,
     focus,
     remount: () => rendered.rerender(body('after-move')),
   }

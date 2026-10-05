@@ -49,7 +49,8 @@ export function DiffView({
   // not keep a copy of which regions are open — the mirror it used to keep was
   // keyed by hunk ordinal, which a trailing-tail region does not have.
   const presentation = useTabPresentation(tabId)
-  const files = source?.input.display ?? []
+  const input = source?.input.kind !== 'history' ? source?.input : null
+  const files = input?.display ?? []
   // A file with hunks wins; a hunkless one is drawn only when it carries whole-file text, which is
   // what a pure rename looks like once the server sends the blob. A binary entry has neither and
   // still falls through to a notice — "we got diffs" is not the same as "there is something to
@@ -59,7 +60,7 @@ export function DiffView({
   // that have to agree and nothing made them. The file list is off either way for a multi-file
   // diff, so a checkpoint diff touching several files deliberately shows one.
   const file = renderableDiffFile(files)
-  const snapshotInput = source?.input.kind === 'snapshot' ? source.input : null
+  const snapshotInput = input?.kind === 'snapshot' ? input : null
   const reloadIdentity =
     comparison.kind === 'snapshot'
       ? snapshotInput && {
@@ -86,7 +87,7 @@ export function DiffView({
     languageHost,
   )
 
-  if (!pending && !failure && (source?.input.files.length ?? diffs.length) === 0) {
+  if (!pending && !failure && (input?.files.length ?? diffs.length) === 0) {
     return (
       <EditorTabPlaceholder tabId={tabId}>
         <DiffNotice message={emptyDiffNotice(comparison, rootPath)} />

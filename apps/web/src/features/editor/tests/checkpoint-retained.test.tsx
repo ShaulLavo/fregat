@@ -234,9 +234,9 @@ for (const [kind, response] of [
     await waitFor(() => {
       const read = lease.read()
       expect(requests.filter((url) => url.pathname === '/git/diff/blob')).toHaveLength(1)
-      expect(read.kind === 'ready' && read.input.files[0]?.kind).toBe(
-        response === 'full' ? 'full' : 'partial',
-      )
+      expect(
+        read.kind === 'ready' && read.input.kind === 'checkpoint' && read.input.files[0]?.kind,
+      ).toBe(response === 'full' ? 'full' : 'partial')
     })
     const read = lease.read()
     if (read.kind !== 'ready' || read.input.kind !== 'checkpoint')
@@ -262,7 +262,9 @@ for (const [kind, response] of [
     expect(blobs[0]!.searchParams.get('path')).toBe(listed[0]!.path)
     expect(blobs[0]!.searchParams.get('oldObjectId')).toBe(listed[0]!.oldObjectId)
     expect(blobs[0]!.searchParams.get('newObjectId')).toBe(listed[0]!.newObjectId)
-    expect(prior.kind === 'ready' && prior.input.files[0]?.kind).toBe('partial')
+    expect(
+      prior.kind === 'ready' && prior.input.kind === 'checkpoint' && prior.input.files[0]?.kind,
+    ).toBe('partial')
     const external = runtime.documentStore
       .getState()
       .acquireSnapshotComparison({ input: read.input, signal: new AbortController().signal })

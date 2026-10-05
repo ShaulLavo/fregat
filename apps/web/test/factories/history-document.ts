@@ -5,7 +5,10 @@ import {
   type EditorTextBuffer,
   type TextEdit,
 } from '@singapore-editor/core'
-import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
+import {
+  createEditorDocumentStore,
+  type EditorDocumentStoreApi,
+} from '@/features/editor/state/document-state'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 
 export function historyDocument({
@@ -43,4 +46,20 @@ export function commitHistoryBarrier(buffer: EditorTextBuffer, edits: readonly T
     prepareDocumentTransaction(buffer, edits, 2, null),
     { history: { groupId: 'rename', kind: 'external-barrier' } },
   )
+}
+
+export function historyComparisonFixture({
+  path,
+  scope,
+  content = 'alpha\nbeta\n',
+  insertions = ['one', 'two'],
+}: {
+  path: FilesystemPath
+  scope: import('@/lib/documents/utils/snapshot-comparison').SnapshotComparisonScope
+  content?: string
+  insertions?: readonly string[]
+}) {
+  const store = createEditorDocumentStore({ environmentId: scope.environmentId })
+  const document = historyDocument({ store, path, content, cursorOffset: 5, insertions })
+  return { store, document, buffer: document.buffer, path, scope }
 }

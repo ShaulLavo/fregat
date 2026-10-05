@@ -1,4 +1,8 @@
-import { sameCheckpointCapture, promoteCheckpointCapture } from '@/lib/snapshot-comparison'
+import {
+  sameCheckpointCapture,
+  promoteCheckpointCapture,
+  sameHistoryCapture,
+} from '@/lib/snapshot-comparison'
 import { isPdfFile } from '@/lib/pdf-viewer/format'
 import { pdfError } from '@/lib/pdf-viewer/structured-errors'
 import {
@@ -270,7 +274,7 @@ export class WorkspaceDocumentService {
   private snapshotComparisonTabs: ReadonlyMap<TabId, SnapshotComparisonLease> = new Map()
   private snapshotComparisons: ReadonlyMap<SnapshotComparisonLease, SnapshotComparisonRead> =
     new Map()
-  private readonly snapshotGroups = new Map<string, SnapshotComparisonGroup>()
+  private readonly snapshotGroups = new Map<string, Set<SnapshotComparisonGroup>>()
   private readonly snapshotInterests = new Map<
     SnapshotComparisonLease,
     SnapshotComparisonInterest
@@ -354,12 +358,18 @@ export class WorkspaceDocumentService {
     }
     if (this.sourceOwnerDisposed || signal.aborted) return lease
     const key = snapshotGroupKey(input)
-    const group = this.snapshotGroups.get(key) ?? {
+    const groups = this.snapshotGroups.get(key) ?? new Set<SnapshotComparisonGroup>()
+    const retained =
+      input.kind === 'history'
+        ? [...groups].find((candidate) => compatibleCapture(candidate.current.input, input))
+        : groups.values().next().value
+    const group = retained ?? {
       current: { kind: 'ready' as const, input },
       interests: new Map(),
       refresh: null,
     }
-    this.snapshotGroups.set(key, group)
+    groups.add(group)
+    this.snapshotGroups.set(key, groups)
     if (group.current.input !== input && compatibleCapture(group.current.input, input))
       this.publishSnapshotInput(group, input)
     entry.group = group
@@ -391,7 +401,8 @@ export class WorkspaceDocumentService {
     if (
       previous &&
       read?.kind === 'ready' &&
-      snapshotGroupKey(read.input) === snapshotGroupKey(request.input)
+      snapshotGroupKey(read.input) === snapshotGroupKey(request.input) &&
+      compatibleCapture(read.input, request.input)
     ) {
       if (read.input !== request.input) previous.refresh(request.input, previous.requestRefresh())
       return previous
@@ -1871,8 +1882,12 @@ export class WorkspaceDocumentService {
     const group = entry.group
     if (group.refresh?.lease === lease) group.refresh = null
     group.interests.delete(lease)
-    if (group.interests.size === 0)
-      this.snapshotGroups.delete(snapshotGroupKey(group.current.input))
+    if (group.interests.size === 0) {
+      const key = snapshotGroupKey(group.current.input)
+      const groups = this.snapshotGroups.get(key)
+      groups?.delete(group)
+      if (groups?.size === 0) this.snapshotGroups.delete(key)
+    }
     entry.group = null
     entry.refresh = null
     entry.current = { kind: 'released', reason }
@@ -2144,6 +2159,8 @@ function assertTextFile(file: FileSnapshot): void {
 }
 
 function snapshotGroupKey(input: SnapshotComparisonInput): string {
+  if (input.kind === 'history')
+    return JSON.stringify(['history', input.scope.rootPath, input.subject])
   if (input.kind === 'checkpoint')
     return JSON.stringify([
       input.scope.rootPath,
@@ -2154,6 +2171,8 @@ function snapshotGroupKey(input: SnapshotComparisonInput): string {
 }
 
 function validSnapshotCapture(input: SnapshotComparisonInput): boolean {
+  if (input.kind === 'history')
+    return input.subject === documentKey({ kind: 'history', file: { path: input.path } })
   if (input.kind === 'checkpoint')
     return (
       input.comparison.owner === input.scope.rootPath &&
@@ -2168,10 +2187,13 @@ function validSnapshotCapture(input: SnapshotComparisonInput): boolean {
 }
 
 function comparisonRoot(input: SnapshotComparisonInput): FilesystemPath {
+  if (input.kind === 'history') return input.scope.rootPath
   return input.kind === 'checkpoint' ? input.comparison.owner : input.comparison.target.rootPath
 }
 
 function compatibleCapture(left: SnapshotComparisonInput, right: SnapshotComparisonInput): boolean {
+  if (left.kind === 'history' || right.kind === 'history')
+    return left.kind === 'history' && right.kind === 'history' && sameHistoryCapture(left, right)
   if (left.kind !== 'checkpoint' || right.kind !== 'checkpoint') return left.kind === right.kind
   return sameCheckpointCapture(left, right)
 }

@@ -1,4 +1,5 @@
 import { sameGitInputRevision } from '@/lib/documents/utils/comparisons'
+import type { EditorTextBuffer, HistoryComparisonSide } from '@singapore-editor/core/document'
 import type { DiffFile } from '@singapore-editor/diff'
 import type {
   DocumentKey,
@@ -46,7 +47,20 @@ export type CheckpointComparisonInput = {
   readonly files: readonly CheckpointComparisonFile[]
   readonly display: readonly DiffFile[]
 }
-export type SnapshotComparisonInput = SnapshotGitComparisonInput | CheckpointComparisonInput
+export type HistoryComparisonInput = {
+  readonly kind: 'history'
+  readonly scope: SnapshotComparisonScope
+  readonly subject: DocumentKey
+  readonly path: FilesystemPath
+  readonly buffer: EditorTextBuffer
+  readonly old: HistoryComparisonSide
+  readonly new: HistoryComparisonSide
+  readonly coverage: 'full' | 'too-large'
+}
+export type SnapshotComparisonInput =
+  | SnapshotGitComparisonInput
+  | CheckpointComparisonInput
+  | HistoryComparisonInput
 export type SnapshotComparisonRead =
   | { readonly kind: 'ready'; readonly input: SnapshotComparisonInput }
   | { readonly kind: 'released'; readonly reason: 'interest-ended' | 'owner-disposed' }
@@ -97,4 +111,21 @@ export function promoteCheckpointCapture(
     files,
     display: files.flatMap((file) => (file.kind === 'no-text' ? [] : file.display)),
   }
+}
+
+export function sameHistoryCapture(
+  left: HistoryComparisonInput,
+  right: HistoryComparisonInput,
+): boolean {
+  return (
+    left.buffer === right.buffer &&
+    sameHistorySide(left.old, right.old) &&
+    sameHistorySide(left.new, right.new)
+  )
+}
+
+function sameHistorySide(left: HistoryComparisonSide, right: HistoryComparisonSide): boolean {
+  return (
+    left.id === right.id && left.revision === right.revision && left.snapshot === right.snapshot
+  )
 }
