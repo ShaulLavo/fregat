@@ -21,6 +21,7 @@ import { mountRetentionAcceptanceApp } from '../../../../test/factories/retentio
 import type { RetentionAcceptanceApp } from '../../../../test/factories/retention-acceptance-app'
 import {
   awaitRetentionAcceptanceReady,
+  type RetentionAcceptanceReadyDiagnostics,
   retentionAcceptanceSubject,
 } from '../../../../test/factories/retention-acceptance-paint'
 import {
@@ -44,9 +45,9 @@ function liveReadinessObservation(app: RetentionAcceptanceApp) {
     : null
   return {
     at: performance.now(),
-    enabled: readSettingsMirror()['editor.syntaxHighlighting.enabled'],
-    confirmedEnabled: settings?.values['editor.syntaxHighlighting.enabled'],
-    projectedEnabled: projection?.values['editor.syntaxHighlighting.enabled'],
+    bootMirrorEnabled: readSettingsMirror()['editor.syntaxHighlighting.enabled'],
+    confirmedQueryEnabled: settings?.values['editor.syntaxHighlighting.enabled'],
+    projectedQueryEnabled: projection?.values['editor.syntaxHighlighting.enabled'],
     pendingSettingsIntents: settingsIntentStore
       .getState()
       .active.filter((entry) => entry.patch.owner === app.queryClient)
@@ -236,20 +237,32 @@ test.for(['resolve', 'reject'] as const)(
     expect(await app.read().commands.openFileSurface(path)).toMatchObject({ status: 'applied' })
     const phases: unknown[] = []
     const waitForLive = async (phase: 'opened' | 'edited') => {
+      const diagnostics: RetentionAcceptanceReadyDiagnostics = {}
       phases.push({ phase, event: 'start', observation: liveReadinessObservation(app) })
       try {
-        await awaitRetentionAcceptanceReady(app, path)
+        await awaitRetentionAcceptanceReady(app, path, diagnostics)
         phases.push({ phase, event: 'ready', observation: liveReadinessObservation(app) })
       } catch (error) {
         try {
-          phases.push({ phase, event: 'failed', observation: liveReadinessObservation(app) })
+          phases.push({
+            phase,
+            event: 'failed',
+            lastPoll: diagnostics.last,
+            observation: liveReadinessObservation(app),
+          })
           context.task.meta.attachment200 = { outcome, phases }
           await context.annotate(
             JSON.stringify({ outcome, phases }),
             'actual-initial-live-readiness-failure',
           )
         } catch {
-          context.task.meta.attachment200 = { outcome, phases, diagnosticCaptureFailed: true }
+          context.task.meta.attachment200 = {
+            outcome,
+            phases,
+            failedPhase: phase,
+            lastPoll: diagnostics.last,
+            diagnosticCaptureFailed: true,
+          }
         }
         throw error
       }

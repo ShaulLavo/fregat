@@ -115,9 +115,33 @@ export function retentionAcceptanceBinding(
   }
 }
 
+export type RetentionAcceptanceReadyDiagnostics = {
+  last?: {
+    sourceDocumentId: EditorViewSnapshot['documentId']
+    sourceRevision: number
+    sourceConfiguration: ReturnType<typeof retentionAcceptanceSubject>['configuration']
+    mounted: readonly {
+      documentId: EditorViewSnapshot['documentId'] | undefined
+      revision: number | undefined
+      syntaxStatus: EditorViewSnapshot['syntaxStatus'] | undefined
+      initialHighlightStatus: EditorViewSnapshot['initialHighlightStatus'] | undefined
+      paintAvailable: boolean
+    }[]
+    request: {
+      languageId: string
+      configurationTag: ReturnType<typeof retentionAcceptanceSubject>['configuration']
+    } | null
+    lease:
+      | { kind: 'not-borrowed' | 'unavailable' | 'unread' }
+      | { kind: 'pending' | 'ready' | 'failed'; revision: number }
+    comparedRevision: number | null
+  }
+}
+
 export async function awaitRetentionAcceptanceReady(
   app: RetentionAcceptanceApp,
   path: FilesystemPath,
+  diagnostics?: RetentionAcceptanceReadyDiagnostics,
 ) {
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
   await expect
@@ -128,6 +152,24 @@ export async function awaitRetentionAcceptanceReady(
           .map((controller) => controller.getSnapshot())
           .filter((snapshot) => snapshot?.documentId === subject.document.analysis.documentId)
         const revision = subject.document.buffer.getRevision()
+        const poll: RetentionAcceptanceReadyDiagnostics['last'] = diagnostics
+          ? {
+              sourceDocumentId: subject.document.analysis.documentId,
+              sourceRevision: revision,
+              sourceConfiguration: subject.configuration,
+              mounted: mounted.map((snapshot) => ({
+                documentId: snapshot?.documentId,
+                revision: snapshot?.documentSyncPoint.revision,
+                syntaxStatus: snapshot?.syntaxStatus,
+                initialHighlightStatus: snapshot?.initialHighlightStatus,
+                paintAvailable: snapshot ? snapshot.paintLayers !== null : false,
+              })),
+              request: null,
+              lease: { kind: 'not-borrowed' },
+              comparedRevision: null,
+            }
+          : undefined
+        if (diagnostics) diagnostics.last = poll
         if (
           mounted.length === 0 ||
           !mounted.every(
@@ -139,19 +181,32 @@ export async function awaitRetentionAcceptanceReady(
           )
         )
           return false
-        const lease = subject.document.analysis.borrowHighlighter({
+        const request = {
           provider: editorHighlighterProvider(),
           languageId: 'typescript',
           configurationTag: subject.configuration,
-        })
+        }
+        if (poll)
+          poll.request = {
+            languageId: request.languageId,
+            configurationTag: request.configurationTag,
+          }
+        const lease = subject.document.analysis.borrowHighlighter(request)
+        if (poll) poll.lease = { kind: lease ? 'unread' : 'unavailable' }
         if (!lease) return false
+        let comparedRevision: number | null = null
         try {
           const read = lease.read()
-          if (read.kind !== 'ready' || read.revision !== subject.document.buffer.getRevision())
+          if (poll) poll.lease = { kind: read.kind, revision: read.revision }
+          if (
+            read.kind !== 'ready' ||
+            read.revision !== (comparedRevision = subject.document.buffer.getRevision())
+          )
             return false
           return true
         } finally {
           lease.dispose()
+          if (poll) poll.comparedRevision = comparedRevision
         }
       },
       { timeout: 10_000 },
