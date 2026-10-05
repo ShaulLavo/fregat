@@ -24,6 +24,7 @@ export const RETENTION_COUNT_PROTOCOL = {
   arms: [
     'idle-inspector-calibration',
     'cold-ready-preparation-start',
+    'cold-metadata-only-negative',
     'cold-ready-preparation-complete',
     'actual-b-synchronous-attachment',
     'actual-a-synchronous-attachments',

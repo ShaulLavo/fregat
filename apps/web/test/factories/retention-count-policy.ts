@@ -370,6 +370,10 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     readonly textSnapshot: ReturnType<typeof a.buffer.getTextSnapshot>
     readonly revision: number
     readonly range: { readonly startIndex: number; readonly endIndex: number }
+    readonly themeCohort: readonly {
+      readonly provider: EditorHighlighterProvider
+      readonly loadTheme: EditorHighlighterProvider['loadTheme']
+    }[]
     stages:
       | { readonly state: 'pending' }
       | {
@@ -409,6 +413,17 @@ export async function retentionCountHost(fixture: RetentionFixture) {
         structuralConfiguration: match.structuralConfiguration,
         matchesStructuralProvider: match.structuralProvider === structuralProvider,
         matchesHighlighterProvider: match.highlighterProvider === highlighterProvider,
+        themeCohort: (match.highlighterThemeProviders ?? []).map((provider) => ({
+          provider: referenceId(provider),
+          loader: provider.loadTheme ? referenceId(provider.loadTheme) : null,
+        })),
+        matchesColdThemeCohort:
+          match.highlighterThemeProviders?.length === owner.themeCohort.length &&
+          owner.themeCohort.every(
+            (member, index) =>
+              member.provider === match.highlighterThemeProviders?.[index] &&
+              member.loadTheme === match.highlighterThemeProviders?.[index]?.loadTheme,
+          ),
       },
       structural: structural
         ? {
@@ -435,6 +450,17 @@ export async function retentionCountHost(fixture: RetentionFixture) {
               highlighterRead?.kind === 'ready' &&
               highlighterRead.result === highlighter.readyResult,
             tokenCount: highlighter.readyResult?.tokens.length ?? 0,
+            providerTheme:
+              highlighterRead?.kind === 'ready'
+                ? {
+                    kind: highlighterRead.providerTheme.kind,
+                    theme:
+                      highlighterRead.providerTheme.kind === 'ready' &&
+                      highlighterRead.providerTheme.theme
+                        ? referenceId(highlighterRead.providerTheme.theme)
+                        : null,
+                  }
+                : null,
           }
         : null,
       fallbackTransferred: payload?.fallbackFoldIndex !== null && payload !== null,
@@ -460,6 +486,7 @@ export async function retentionCountHost(fixture: RetentionFixture) {
       textSnapshot,
       revision: document.buffer.getRevision(),
       range: { startIndex: 0, endIndex: Math.min(snapshot.length, 65_536) },
+      themeCohort: [{ provider: highlighterProvider, loadTheme: highlighterProvider.loadTheme }],
       stages: { state: 'pending' },
       acquisitions: [],
     }
@@ -470,6 +497,41 @@ export async function retentionCountHost(fixture: RetentionFixture) {
       return payload
     }
     return owner
+  }
+
+  async function metadataOnlyControl() {
+    const owner = createPreparedView(a)
+    try {
+      await owner.prepared.fallbackReady
+      const payload = owner.prepared.borrow({
+        configuredTabSize: 4,
+        tabSizePolicy: 'detect-indentation',
+        documentId: a.analysis.documentId,
+        languageId: fixture.language,
+        snapshot: owner.snapshot,
+        documentConfigurationTag: ['actual-view'],
+        structuralProvider,
+        highlighterProvider,
+        highlighterThemeProviders: [highlighterProvider],
+        structuralConfiguration: {
+          includeCaptures: false,
+          includeHighlights: false,
+          syntaxMode: 'range',
+        },
+        structuralConfigurationTag: ['actual-view'],
+        highlighterConfigurationTag: ['actual-view'],
+      })
+      return {
+        metadataMatched: payload !== null,
+        stages: owner.stages,
+        runtimeSessionIds: owner.prepared.runtimeSessionIds(),
+        acquisition: owner.acquisitions.at(-1) ?? null,
+        observation: observation.snapshot(),
+      }
+    } finally {
+      owner.abortController.abort()
+      owner.prepared.dispose()
+    }
   }
 
   async function prepareViewMetadata() {
@@ -489,6 +551,7 @@ export async function retentionCountHost(fixture: RetentionFixture) {
       const highlighter = owner.prepared.startStage({
         family: 'highlighter',
         provider: highlighterProvider,
+        themeProviders: owner.themeCohort.map((member) => member.provider),
         configurationTag: ['actual-view'],
         range: 'full',
         abortSignal: owner.abortController.signal,
@@ -528,6 +591,11 @@ export async function retentionCountHost(fixture: RetentionFixture) {
         tabSizePolicy: 'detect-indentation',
         structuralProvider: referenceId(structuralProvider),
         highlighterProvider: referenceId(highlighterProvider),
+        themeCohort: owner.themeCohort.map((member) => ({
+          provider: referenceId(member.provider),
+          loader: member.loadTheme ? referenceId(member.loadTheme) : null,
+        })),
+        loaderCount: owner.themeCohort.filter((member) => member.loadTheme).length,
       },
       stages: owner.stages,
       acquisitions: owner.acquisitions.slice(),
@@ -801,6 +869,7 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     borrow,
     release,
     createView,
+    metadataOnlyControl,
     prepareViewMetadata,
     metadataReceipt,
     releaseViewMetadata,

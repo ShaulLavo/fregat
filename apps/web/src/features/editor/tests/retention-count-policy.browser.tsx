@@ -100,6 +100,17 @@ async function verifyFixture(fixture: RetentionRun['fixtures'][number], cycles: 
       cycle: 0,
       observation: host.observation.snapshot(),
     })
+    const metadataOnly = await host.metadataOnlyControl()
+    await record({
+      fixture: fixture.id,
+      arm: 'cold-metadata-only-negative',
+      cycle: 0,
+      ...metadataOnly,
+    })
+    expect(metadataOnly.metadataMatched).toBe(true)
+    expect(metadataOnly.runtimeSessionIds).toEqual({ structural: [], highlighter: [] })
+    expect(metadataOnly.acquisition?.structural).toBeNull()
+    expect(metadataOnly.acquisition?.highlighter).toBeNull()
     await host.prepareViewMetadata()
     const metadata = host.metadataReceipt()
     await record({
@@ -111,6 +122,7 @@ async function verifyFixture(fixture: RetentionRun['fixtures'][number], cycles: 
       expect(owner.source.current).toBe(true)
       expect(owner.stages.state).toBe('settled')
       expect(owner.stages).toMatchObject({ structural: 'ready', highlighter: 'ready' })
+      expect(owner.configuration.loaderCount).toBe(0)
     }
     bView = host.createView('b', host.b)
     await record({
@@ -632,6 +644,7 @@ function assertReadyAttachment(attachment: ReturnType<Host['createView']>['attac
     },
     matchesStructuralProvider: true,
     matchesHighlighterProvider: true,
+    matchesColdThemeCohort: true,
   })
   for (const transfer of [acquisition.structural, acquisition.highlighter]) {
     expect(transfer).toMatchObject({
@@ -647,6 +660,9 @@ function assertReadyAttachment(attachment: ReturnType<Host['createView']>['attac
   expect([acquisition.highlighter?.runtimeSessionId]).toEqual(
     attachment.originalStageRuntimeIds?.highlighter,
   )
+  expect(acquisition.match.themeCohort).toHaveLength(1)
+  expect(acquisition.match.themeCohort[0]?.loader).toBeNull()
+  expect(acquisition.highlighter?.providerTheme).toEqual({ kind: 'ready', theme: null })
 }
 
 function assertWarmInterval(interval: Awaited<ReturnType<Host['observation']['interval']>>) {
