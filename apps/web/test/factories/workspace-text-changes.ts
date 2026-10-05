@@ -1,3 +1,4 @@
+import { testScopedStorage } from './scoped-storage'
 import { onTestFinished } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
@@ -13,7 +14,7 @@ import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { TextChangePreparation, TextChangeTarget } from '@/lib/workspace-edits/utils/types'
 
 export function createWorkspaceTextChanges(client: Client) {
-  const store = createEditorDocumentStore()
+  const store = createEditorDocumentStore({ environmentId: testScopedStorage.environmentId })
   const queryClient = new QueryClient()
   const fileSync = new FileSyncService(store, queryClient, createFileSyncPorts(client))
   let root: WorkspaceEditRoot = {

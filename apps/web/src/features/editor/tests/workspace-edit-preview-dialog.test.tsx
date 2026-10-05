@@ -1,3 +1,10 @@
+import { DiffEditor } from '@/features/editor/components/diff-editor'
+import { operationDiffAttachment } from '@/lib/diff-attachment'
+import { EditorDocumentStateContext } from '@/features/editor/state/document-state'
+import { createOperationComparisonFixture } from '../../../../test/factories/operation-comparison'
+import { observeDiffEditors } from '../../../../test/factories/diff-attachment'
+import { stubEditorViewport } from '../../../../test/env/editor-viewport'
+import { stubHighlightApi } from '../../../../test/env/highlight-api'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -25,7 +32,7 @@ const RECOVERY: WorkspaceEditRecovery = {
   unrecoveredPaths: ['src/remaining.ts', 'package.json'].map(filesystemPath),
 }
 
-test('shows ordered diffs and dirty open unopened and resource labels', () => {
+test('shows ordered text and resource labels', () => {
   const harness = new DialogServiceHarness(awaitingSnapshot())
   renderDialogs(harness)
 
@@ -55,12 +62,6 @@ test('shows ordered diffs and dirty open unopened and resource labels', () => {
     expect(rows[index]).toHaveTextContent(label)
     expect(rows[index]).toHaveTextContent(targetLabels[index]!)
   }
-  expect(rows[0]).toHaveTextContent('let count = 1')
-  expect(rows[0]).toHaveTextContent('let count = 2')
-  expect(rows[1]).toHaveTextContent('export const open = false')
-  expect(rows[1]).toHaveTextContent('export const open = true')
-  expect(rows[2]).toHaveTextContent('unopened before')
-  expect(rows[2]).toHaveTextContent('unopened after')
   expect(rows[4]).toHaveTextContent('/repo/src/old.ts → /repo/src/renamed.ts')
   expect(within(dialog).getByText('7 changes')).toHaveClass('tabular-nums')
   expect(dialog).toHaveTextContent(
@@ -407,9 +408,9 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
     operationId: '10000000-0000-4000-8000-000000000063',
     rows: [
       {
-        afterText: 'let count = 2',
+        comparison: null,
+        file: null,
         annotationIds: [],
-        beforeText: 'let count = 1',
         ignored: false,
         index: 0,
         kind: 'text-document',
@@ -417,9 +418,9 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         targetKind: 'dirty',
       },
       {
-        afterText: 'export const open = true',
+        comparison: null,
+        file: null,
         annotationIds: [],
-        beforeText: 'export const open = false',
         ignored: false,
         index: 1,
         kind: 'text-document',
@@ -427,9 +428,9 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         targetKind: 'open',
       },
       {
-        afterText: 'unopened after',
+        comparison: null,
+        file: null,
         annotationIds: [],
-        beforeText: 'unopened before',
         ignored: false,
         index: 2,
         kind: 'text-document',
@@ -437,6 +438,8 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         targetKind: 'unopened',
       },
       {
+        comparison: null,
+        file: null,
         annotationIds: [],
         ignored: false,
         index: 3,
@@ -444,6 +447,8 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         path: filesystemPath('/repo/src/new.ts'),
       },
       {
+        comparison: null,
+        file: null,
         annotationIds: [],
         fromPath: filesystemPath('/repo/src/old.ts'),
         ignored: false,
@@ -453,6 +458,8 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         toPath: filesystemPath('/repo/src/renamed.ts'),
       },
       {
+        comparison: null,
+        file: null,
         annotationIds: [],
         ignored: false,
         index: 5,
@@ -460,6 +467,8 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         path: filesystemPath('/repo/src/removed.ts'),
       },
       {
+        comparison: null,
+        file: null,
         annotationIds: [],
         ignored: true,
         index: 6,
@@ -471,3 +480,57 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
     ...overrides,
   }
 }
+
+test('actual operation preview installs its captured file and independently releases the mounted view', async ({
+  server,
+  client,
+}) => {
+  stubHighlightApi()
+  stubEditorViewport({ height: 160, width: 420 })
+  const fixture = await createOperationComparisonFixture(server.root, client)
+  const observation = observeDiffEditors()
+  const rendered = renderWithProviders(
+    <EditorDocumentStateContext value={fixture.store}>
+      <WorkspaceEditServiceContext value={fixture.service}>
+        <WorkspaceEditPreviewDialog />
+      </WorkspaceEditServiceContext>
+    </EditorDocumentStateContext>,
+  )
+  await waitFor(() => expect(observation.all().length).toBe(1))
+  await waitFor(() =>
+    expect(observation.read('stacked').editor.materializeFullText()).toContain('after'),
+  )
+  expect(fixture.store.getState().snapshotComparisons.size).toBe(2)
+  expect(observation.read('stacked').editor.materializeFullText()).toContain('before')
+  expect(fixture.row.file).toBe(fixture.input.display)
+  expect([...fixture.store.getState().snapshotComparisons.values()]).toContain(fixture.read)
+  const installed = observation.read('stacked')
+  expect(installed.snapshot.textSnapshot.readRange(0, installed.snapshot.textSnapshot.length)).toBe(
+    installed.editor.materializeFullText(),
+  )
+  const secondView = renderWithProviders(
+    <EditorDocumentStateContext value={fixture.store}>
+      <div style={{ height: 160 }}>
+        <DiffEditor
+          attachment={operationDiffAttachment(fixture.read, fixture.file)}
+          mode='stacked'
+        />
+      </div>
+    </EditorDocumentStateContext>,
+  )
+  await waitFor(() => expect(observation.all().length).toBe(2))
+  expect(fixture.store.getState().snapshotComparisons.size).toBe(3)
+  expect(observation.all()[0]!.editor).not.toBe(observation.all()[1]!.editor)
+  for (const view of observation.all()) expect(view.editor.materializeFullText()).toContain('after')
+  secondView.unmount()
+  expect(fixture.store.getState().snapshotComparisons.size).toBe(2)
+  await waitFor(() => expect(observation.all()).toHaveLength(1))
+  rendered.unmount()
+  expect(fixture.store.getState().snapshotComparisons.size).toBe(1)
+  expect(fixture.document.buffer.materializeFullText()).toBe(
+    fixture.input.old.materializeFullText(),
+  )
+  fixture.service.cancelPreview(fixture.operationId)
+  await fixture.pending
+  expect(fixture.store.getState().snapshotComparisons.size).toBe(0)
+})

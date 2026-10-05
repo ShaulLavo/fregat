@@ -8,7 +8,8 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@workspace/ui/components/resizable'
-import { useLayoutEffect, useRef } from 'react'
+import { use, useLayoutEffect, useRef } from 'react'
+import { EditorDocumentStateContext } from '@/features/editor/state/document-state'
 import { useTabPresentation } from '@/features/editor/hooks/use-tab-presentation'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 
@@ -42,6 +43,16 @@ export function DiffEditor({
   regions?: DiffRegionStore
   tabId?: TabId
 }) {
+  const documentStore = use(EditorDocumentStateContext)
+  const operation = attachment?.kind === 'operation' ? attachment.read.input : null
+  useLayoutEffect(() => {
+    if (!operation || !documentStore) return
+    const lease = documentStore.getState().acquireSnapshotComparison({
+      input: operation,
+      signal: new AbortController().signal,
+    })
+    return () => lease.release()
+  }, [documentStore, operation])
   const file = attachment?.file ?? null
   const { editorTheme, shikiTheme } = useEditorColorTheme()
   const colors = editorSyntaxColors(shikiTheme)

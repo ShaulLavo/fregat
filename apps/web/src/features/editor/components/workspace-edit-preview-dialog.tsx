@@ -19,6 +19,8 @@ import {
 } from '@workspace/ui/components/dialog'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { Spinner } from '@workspace/ui/components/spinner'
+import { DiffEditor } from '@/features/editor/components/diff-editor'
+import { operationDiffAttachment } from '@/lib/diff-attachment'
 import { useLayoutEffect, useRef } from 'react'
 
 import { useWorkspaceEditState } from '@/features/editor/hooks/use-workspace-edit-state'
@@ -137,14 +139,12 @@ export function WorkspaceEditPreviewDialog() {
                     <div className='text-muted-foreground text-2xs mt-1 truncate font-mono'>
                       {resourcePathLabel(row)}
                     </div>
-                    {row.beforeText !== undefined && row.afterText !== undefined ? (
-                      <div className='text-2xs mt-2 grid max-h-52 grid-cols-2 overflow-auto overscroll-contain rounded-lg font-mono leading-relaxed'>
-                        <pre className='bg-diff-removed/10 text-diff-removed min-w-0 overflow-visible p-2 whitespace-pre-wrap'>
-                          {row.beforeText}
-                        </pre>
-                        <pre className='bg-diff-added/10 text-diff-added min-w-0 overflow-visible p-2 whitespace-pre-wrap'>
-                          {row.afterText}
-                        </pre>
+                    {row.comparison && row.file ? (
+                      <div className='mt-2 h-52 min-w-0 overflow-hidden'>
+                        <DiffEditor
+                          attachment={operationDiffAttachment(row.comparison, row.file)}
+                          mode='stacked'
+                        />
                       </div>
                     ) : null}
                   </li>

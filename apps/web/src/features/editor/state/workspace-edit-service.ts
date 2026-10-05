@@ -24,6 +24,7 @@ import {
   completePreparedDocumentTransactionSequence,
   completeReverseDocumentTransactionSequence,
   createDocumentLogicalRevisionScope,
+  createDocumentTextSnapshot,
   offsetToPoint,
   documentTextRoundTripStatus,
   pieceTableDocumentText,
@@ -94,6 +95,15 @@ import {
   workspaceEditUriPath,
 } from '@/features/editor/utils/workspace-edit-paths'
 
+import { createTextDiff, type DiffFile } from '@singapore-editor/diff'
+import { languageIdForFilePath } from '@/lib/file-language'
+import { operationComparisonSubject } from '@/lib/snapshot-comparison'
+import type {
+  OperationComparisonInput,
+  SnapshotComparisonLease,
+  SnapshotComparisonRead,
+} from '@/lib/snapshot-comparison'
+
 type WorkspacePersistenceOperation = WorkspaceEditPrepareRequest['operations'][number]
 
 const MAX_WORKSPACE_EDIT_UNDO_GROUPS = 20
@@ -121,9 +131,9 @@ export type WorkspaceEditServicePhase =
 type WorkspaceEditPreviewTargetKind = 'dirty' | 'open' | 'unopened'
 
 export type WorkspaceEditPreviewRow = {
-  readonly afterText?: string
+  readonly comparison: SnapshotComparisonRead | null
+  readonly file: DiffFile | null
   readonly annotationIds: readonly string[]
-  readonly beforeText?: string
   readonly fromPath?: FilesystemPath
   readonly ignored: boolean
   readonly index: number
@@ -380,6 +390,7 @@ const IDLE_SNAPSHOT: WorkspaceEditServiceSnapshot = {
 
 export class WorkspaceEditService {
   private active: ActiveWorkspaceEdit | null = null
+  private previewComparisons: readonly SnapshotComparisonLease[] = []
   private readonly cleanupPending = new Map<string, WorkspaceEditResult>()
   private readonly createOperationEvent: (
     options: WorkspaceEditOperationEventOptions,
@@ -524,6 +535,7 @@ export class WorkspaceEditService {
         root,
       )
       assertPreparedRequestCurrent(this.options, prepared)
+      prepared = { ...prepared, preview: this.retainPreviewComparisons(prepared) }
     } catch (error) {
       const isCurrent = this.preparingController === controller
       if (isCurrent) {
@@ -899,6 +911,8 @@ export class WorkspaceEditService {
 
   dispose(): void {
     this.cancelPreCommitActive()
+    this.releasePreviewComparisons()
+    this.publish({ preview: null })
     this.clearHistory()
     this.releaseRecoveryLocks()
     this.recoveryGroup = null
@@ -1599,7 +1613,53 @@ export class WorkspaceEditService {
     active.settlement.resolve({ status: 'cancelled' })
   }
 
+  private retainPreviewComparisons(prepared: PreparedWorkspaceEdit): WorkspaceEditPreview {
+    if (!prepared.operations.some((operation) => operation.kind === 'text')) return prepared.preview
+    const state = this.options.documentStore.getState()
+    const environmentId = state.environmentId
+    if (!environmentId)
+      throw createClientInvariantError('Operation preview requires a captured document owner', {
+        ownerPresent: false,
+      })
+    const leases: SnapshotComparisonLease[] = []
+    try {
+      const rows = prepared.preview.rows.map((row, index) => {
+        const resolved = prepared.operations[index]
+        if (!resolved || resolved.kind !== 'text') return row
+        const input = operationComparisonInput(prepared, resolved, environmentId)
+        if (!input) return row
+        const lease = state.acquireSnapshotComparison({
+          input,
+          signal: new AbortController().signal,
+        })
+        leases.push(lease)
+        const comparison = lease.read()
+        if (comparison.kind === 'released')
+          throw createClientInvariantError('Operation comparison owner has ended', {
+            reason: comparison.reason,
+          })
+        return Object.freeze({ ...row, comparison, file: input.display })
+      })
+      this.previewComparisons = leases
+      return Object.freeze({ ...prepared.preview, rows: Object.freeze(rows) })
+    } catch (error) {
+      for (const lease of leases) lease.release()
+      throw error
+    }
+  }
+
+  private releasePreviewComparisons(): void {
+    for (const lease of this.previewComparisons) lease.release()
+    this.previewComparisons = []
+  }
+
   private publish(next: Partial<WorkspaceEditServiceSnapshot>): void {
+    if (
+      this.snapshot.preview &&
+      next.preview !== undefined &&
+      next.preview !== this.snapshot.preview
+    )
+      this.releasePreviewComparisons()
     const phase = next.phase ?? this.snapshot.phase
     const historyAvailable =
       !this.active &&
@@ -2579,12 +2639,8 @@ function workspaceEditPreviewRow(resolved: ResolvedOperation): WorkspaceEditPrev
   if (resolved.kind === 'text') {
     const segment = preparedSegment(resolved)
     return {
-      ...(segment
-        ? {
-            afterText: pieceTableDocumentText(segment.snapshotAfter),
-            beforeText: pieceTableDocumentText(segment.snapshotBefore),
-          }
-        : {}),
+      comparison: null,
+      file: null,
       annotationIds,
       ignored: segment?.logicalRevisionCount === 0,
       index: resolved.index,
@@ -2594,6 +2650,8 @@ function workspaceEditPreviewRow(resolved: ResolvedOperation): WorkspaceEditPrev
     }
   }
   return {
+    comparison: null,
+    file: null,
     annotationIds,
     ...(resolved.fromPath ? { fromPath: resolved.fromPath } : {}),
     ignored: resolved.ignored,
@@ -2602,6 +2660,40 @@ function workspaceEditPreviewRow(resolved: ResolvedOperation): WorkspaceEditPrev
     path: resolved.path,
     ...(resolved.toPath ? { toPath: resolved.toPath } : {}),
   }
+}
+
+function operationComparisonInput(
+  prepared: PreparedWorkspaceEdit,
+  resolved: ResolvedTextOperation,
+  environmentId: import('@workspace/contracts').EnvironmentId,
+): OperationComparisonInput | null {
+  const segment = preparedSegment(resolved)
+  if (!segment) return null
+  const old = createDocumentTextSnapshot(segment.snapshotBefore)
+  const next = createDocumentTextSnapshot(segment.snapshotAfter)
+  const path = resolved.path
+  const languageId = languageIdForFilePath(path)
+  const input: Omit<OperationComparisonInput, 'subject'> = {
+    kind: 'operation',
+    scope: { environmentId, rootPath: prepared.root.path },
+    root: {
+      generation: prepared.root.generation,
+      path: prepared.root.path,
+      uriPath: prepared.root.uriPath ?? prepared.root.path,
+      workspacePath: prepared.root.workspacePath ?? prepared.root.path,
+    },
+    operationId: prepared.operationId,
+    operationIndex: resolved.index,
+    path,
+    segment,
+    old,
+    new: next,
+    display: createTextDiff({
+      oldFile: { path, languageId, text: old.materializeFullText() },
+      newFile: { path, languageId, text: next.materializeFullText() },
+    }),
+  }
+  return { ...input, subject: operationComparisonSubject(input) }
 }
 
 function operationAnnotationIds(operation: WorkspaceEditOperation): readonly string[] {
