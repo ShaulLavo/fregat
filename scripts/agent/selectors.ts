@@ -1306,6 +1306,7 @@ export const selectors = {
   branchPush: (page: Page, count: number) =>
     page.getByRole('button', { name: `Push ${count}`, exact: true }),
   turnFiles: (page: Page) => page.getByRole('tree', { name: 'Turn changed files' }),
+  worktreeFileRowSelector: '[data-git-file]:not([data-history-file])',
   worktreeFiles: (page: Page) => page.locator('[data-git-file]:not([data-history-file])'),
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
   historyRowSelector: '[data-history-commit]',

@@ -13,11 +13,13 @@ import type { GitComparison } from '@/lib/documents/utils/types'
  * diff pane must never be a blank rectangle the reader has to interpret.
  */
 export function emptyDiffNotice(info: GitComparison, rootPath: string): string {
-  const oldPath = info.oldPath
+  const revision =
+    info.kind === 'snapshot' ? info.target.kind !== 'moving' && info.target.revision : info
+  const oldPath = revision ? revision.oldPath : undefined
   if (oldPath && oldPath !== comparisonDisplayPath(info)) {
     return `Renamed from ${toTreePath(oldPath, rootPath)}. No content changes.`
   }
-  if (info.status === 'renamed') return 'Renamed. No content changes.'
+  if (revision && revision.status === 'renamed') return 'Renamed. No content changes.'
 
   return 'No changes to show.'
 }

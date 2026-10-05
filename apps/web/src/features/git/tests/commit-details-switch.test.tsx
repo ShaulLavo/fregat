@@ -1,6 +1,8 @@
-import { act, screen, waitFor } from '@testing-library/react'
+import { join } from 'node:path'
+import type { HistoricalDiffOpen } from '@/lib/documents/utils/comparisons'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { CommitDetails } from '@/features/git/components/commit-details'
-import { commitDetailsQueryOptions } from '@/features/git/utils/history-query'
+import { commitDetailsQueryOptions } from '@/lib/git-commit-details-query'
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { historyRepository } from '../../../../test/factories/git-history'
 import { createRequestGate } from '../../../../test/factories/request-gate'
@@ -15,13 +17,15 @@ test('commit details retain their hash and files until the selected commit can p
   const repo = await historyRepository(server.root)
   await repo.write('first.txt', 'first\n')
   const first = repo.commit('First subject')
-  await repo.write('second.txt', 'second\n')
-  const second = repo.commit('Second subject')
+  const other = await historyRepository(join(server.root, 'other'))
+  await other.write('second.txt', 'second\n')
+  const second = other.commit('Second subject')
   const gate = createRequestGate(
     (request) => new URL(request.url).searchParams.get('commit') === second,
   )
   const restore = installTestClient(createObservedInProcessClient(server, gate.beforeRequest))
   const queryClient = createTestQueryClient()
+  const opens: HistoricalDiffOpen[] = []
   try {
     await queryClient.query(commitDetailsQueryOptions('history-repo', first))
     const rendered = renderWithProviders(
@@ -30,7 +34,7 @@ test('commit details retain their hash and files until the selected commit can p
           rootPath='history-repo'
           commit={first}
           onClose={() => {}}
-          onOpen={() => {}}
+          onOpen={(input) => opens.push(input)}
         />
       </TestEditorStateProvider>,
       { queryClient },
@@ -39,10 +43,10 @@ test('commit details retain their hash and files until the selected commit can p
     rendered.rerender(
       <TestEditorStateProvider>
         <CommitDetails
-          rootPath='history-repo'
+          rootPath='other/history-repo'
           commit={second}
           onClose={() => {}}
-          onOpen={() => {}}
+          onOpen={(input) => opens.push(input)}
         />
       </TestEditorStateProvider>,
     )
@@ -52,6 +56,16 @@ test('commit details retain their hash and files until the selected commit can p
       first,
     )
     expect(screen.getByText('first.txt')).toBeVisible()
+    fireEvent.click(screen.getByText('first.txt'))
+    fireEvent.keyDown(screen.getByRole('tree', { name: 'Commit files' }), { key: 'Enter' })
+    expect(opens).toHaveLength(2)
+    for (const input of opens) {
+      expect(input.rootPath).toBe('history-repo')
+      expect(input.details.id).toBe(first)
+      expect(input.details.parents).toEqual([])
+      expect(input.details.files).toContain(input.file)
+      expect(input.file.path).toBe('history-repo/first.txt')
+    }
     expect(screen.queryByRole('status', { name: 'Loading commit details' })).toBeNull()
     expect(screen.getByRole('status', { name: 'Loading selected commit' })).toBeVisible()
     await act(async () => gate.release())

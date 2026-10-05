@@ -1,8 +1,7 @@
 import type { EnvironmentId } from '@workspace/contracts'
 import type { FilesystemPath, GitComparison } from '@/lib/documents/utils/types'
 
-declare const resolvedGitObjectBrand: unique symbol
-export type ResolvedGitObjectId = string & { readonly [resolvedGitObjectBrand]: true }
+import type { ResolvedGitObjectId } from '@workspace/contracts'
 export type SnapshotComparison = Extract<GitComparison, { kind: 'snapshot' }>
 export type SnapshotComparisonScope = {
   readonly environmentId: EnvironmentId

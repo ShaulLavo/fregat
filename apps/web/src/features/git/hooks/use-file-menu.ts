@@ -18,7 +18,7 @@ export function useFileMenu(row: ChangeRow, rootPath: string) {
   const store = useGitStoreApi()
   const stage = useStagePathMutation(path, rootPath)
   const unstage = useUnstagePathMutation(path, rootPath)
-  const { openDiff } = useOpenDiffDocument()
+  const { openDiff } = useOpenDiffDocument(rootPath)
   const { selectFile } = useEditorCommands()
 
   return fileMenu({

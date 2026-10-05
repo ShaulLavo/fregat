@@ -36,9 +36,9 @@ const families = [
   '/workbench/f/src/a.ts',
   '/workbench/c/src/a.ts',
   '/workbench/r/refs%2Fheads%2Fmain/src/a.ts',
-  `/workbench/d/worktree/${oldObject}..${newObject}/src/a.ts`,
-  `/workbench/d/staged/_..${newObject}/src/a.ts`,
-  `/workbench/d/branch/${oldObject}..${newObject}/src/a.ts`,
+  '/workbench/d/worktree/live/src/a.ts',
+  '/workbench/d/staged/live/src/a.ts',
+  `/workbench/d/historical/${oldObject}..${newObject},s=modified,r=src%2Fa.ts,c=${oldObject},p=_/src/a.ts`,
   `/workbench/k/${sessionId}/0..2`,
   `/workbench/k/${sessionId}/0..2!turn`,
   `/workbench/k/${sessionId}/0..2/src/a.ts`,
@@ -100,7 +100,7 @@ test('round-trips path tokens, ordered tabs, ref slashes, and rename metadata th
     `f/${encodePath(path)}`,
     `c/${encodePath(path)}`,
     `r/${encodeSegment('refs/heads/a%~雪')}/${encodePath(path)}`,
-    `d/worktree/${oldObject}..${newObject},s=renamed,r=${renamed}/${encodePath(path)}`,
+    `d/captured-review/${oldObject}..${newObject},s=renamed,r=${renamed}/${encodePath(path)}`,
     `k/${sessionId}/0..2,s=renamed,r=${renamed},o=${oldObject},n=${newObject}/${encodePath(path)}`,
     `k/${sessionId}/0..2,o=${oldObject}!turn`,
   ]
@@ -231,7 +231,7 @@ test('pushes destinations immediately and replaces filter edits in the current e
 })
 
 test('keeps the deployment base path in public destinations and strips it for addressed views', async () => {
-  const document = `d/worktree/${oldObject}..${newObject},s=renamed,r=old%2Fa%2Cb%25.ts/new.ts`
+  const document = `d/captured-review/${oldObject}..${newObject},s=renamed,r=old%2Fa%2Cb%25.ts/new.ts`
   const address: Address = {
     ...emptyAddress(),
     workspace,
