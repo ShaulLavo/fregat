@@ -15,7 +15,7 @@ import type {
   SavedComparisonLease,
   SavedComparisonScope,
   SavedComparisonRefresh,
-} from '@/features/editor/utils/saved-comparison'
+} from '@/lib/saved-comparison'
 
 type ComparisonBinding = {
   readonly documents: EditorDocumentStoreApi
