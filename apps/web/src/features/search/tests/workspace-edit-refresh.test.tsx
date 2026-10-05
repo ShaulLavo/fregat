@@ -15,6 +15,8 @@ import { registerTestWorkspaceAddress } from '../../../../test/factories/workspa
 import { textChangePreview } from '../../../../test/factories/workspace-text-changes'
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
+import { createObservedInProcessClient } from '../../../../test/client'
+import { installTestClient } from '../../../../test/factories/client-binding'
 
 const initial = 'export const renameMe = 1\n'
 const dirtyComment = '// dirty\n'
@@ -24,6 +26,17 @@ test('invalidates Search before WorkspaceEdit Undo resolves and retains restored
   server,
   client,
 }) => {
+  const finalizationRequested = Promise.withResolvers<void>()
+  const releaseFinalization = Promise.withResolvers<void>()
+  let held = false
+  const restoreClient = installTestClient(
+    createObservedInProcessClient(server, async (request) => {
+      if (held || new URL(request.url).pathname !== '/fs/workspace-edit/finalize') return
+      held = true
+      finalizationRequested.resolve()
+      await releaseFinalization.promise
+    }),
+  )
   await Promise.all(paths.map((path) => writeFile(join(server.root, path), initial)))
   const signal = new AbortController().signal
   const root = await statPath(filesystemPath(''), signal, client)
@@ -54,9 +67,13 @@ test('invalidates Search before WorkspaceEdit Undo resolves and retains restored
     const replace = await view.findByRole('button', { name: 'Replace all' })
     await waitForMatches(search, 3)
     expect(replace).toBeEnabled()
+    const replacementRun = search.getState().active?.runId ?? 0
     act(() => replace.click())
     const operationId = await textChangePreview(editor.workspaceEditService)
     act(() => editor.workspaceEditService.confirmPreview(operationId))
+    await finalizationRequested.promise
+    await waitFor(() => expect(search.getState().active?.runId).toBeGreaterThan(replacementRun))
+    releaseFinalization.resolve()
     await waitFor(() => expect(search.getState().active?.replaceStatus).toBe('success'))
     await waitForMatches(search, 0)
     const replacedRevision = search.getState().active?.searchRevision ?? 0
@@ -102,7 +119,9 @@ test('invalidates Search before WorkspaceEdit Undo resolves and retains restored
     await act(async () => expect(await editor.workspaceEditService.undo()).toBe(false))
     expect(search.getState().active?.searchRevision).toBe(noOpRevision)
   } finally {
+    releaseFinalization.resolve()
     view.unmount()
+    restoreClient()
   }
 })
 
