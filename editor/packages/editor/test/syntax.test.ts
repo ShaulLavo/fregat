@@ -555,6 +555,8 @@ describe('authoritative initial paint', () => {
 
   it('waits to publish a terminal provider replacement until its deferred theme is adopted', async () => {
     const highlight = deferred<EditorHighlightResult>()
+    const editedHighlight = deferred<EditorHighlightResult>()
+    const logs: EditorLogEvent[] = []
     const theme = deferred<EditorTheme | null | undefined>()
     const events: EditorInitialPaintEvent[] = []
     const snapshots: Array<{
@@ -565,13 +567,24 @@ describe('authoritative initial paint', () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
     const editor = new Editor(container, {
-      plugins: [themeSnapshotPlugin(snapshots)],
+      plugins: [
+        themeSnapshotPlugin(snapshots),
+        createEditorLoggingPlugin((event) => logs.push(event)),
+      ],
       onInitialPaint: (event) => events.push(event),
     })
     editor.openDocument({ documentId: 'provider-theme.ts', languageId: 'typescript', text: TEXT })
     expect(events.filter(isHighlightSettled)).toHaveLength(1)
 
-    editor.addPlugin(highlighterPlugin(highlighterSession(highlight), () => theme.promise))
+    editor.addPlugin(
+      highlighterPlugin(
+        {
+          ...highlighterSession(highlight),
+          applyChange: () => editedHighlight.promise,
+        },
+        () => theme.promise,
+      ),
+    )
     await nextTask()
     expect(editor.getState().initialHighlightStatus).toBe('loading')
 
@@ -585,6 +598,16 @@ describe('authoritative initial paint', () => {
     editor.setTheme({ backgroundColor: '#abcdef' })
     editor.edit({ from: 0, to: 0, text: 'x' })
     editor.setTokens([{ start: 1, end: 6, style: { color: '#00ff00' } }])
+    const currentTokens = EditorTokenStore.fromTokens([
+      { start: 1, end: 6, style: { color: '#00ff00' } },
+    ])
+    editedHighlight.resolve({ tokens: currentTokens })
+    await expect
+      .poll(() => logs.filter((event) => event.action === 'editor.syntax.highlight_applied').length)
+      .toBe(2)
+    expect(editor.getState().initialHighlightStatus).toBe('loading')
+    expect(editor['syntax'].copyTokens.toTokens()).toEqual(currentTokens.toTokens())
+    expect(events.filter(isHighlightSettled)).toHaveLength(1)
 
     theme.resolve({ foregroundColor: '#123456' })
     await nextTask()
