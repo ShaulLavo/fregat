@@ -15,6 +15,7 @@ export type DocumentContributionLease<Result> = {
 }
 export type ContributionEntry<Result> = {
   readonly runtimeSessionId: string
+  readonly analysisGeneration: number
   readonly signal: AbortSignal
   readonly leaseCount: number
   readonly lastLeaseReleasedAt: number | null
@@ -40,7 +41,7 @@ export type BoundOperationContext = {
   readonly runtimeSessionId: string
   readonly initialRead: DocumentRead
   readonly sourceScope: DocumentContributionScope
-  readonly scheduling: 'requested' | 'ordered'
+  readonly scheduling: 'requested' | 'ordered' | 'pinned'
 }
 
 type Slot<Input, Entry> = {
@@ -60,17 +61,24 @@ export abstract class DocumentOperation<Input, Result, Entry extends Contributio
   protected abstract createRuntimeSessionId(): string
   protected get cacheInactive(): boolean { return false }
 
-  public [binding](host: DocumentOperationHost, input: Input, options: DocumentOperationOptions, owner: object | null = null): Entry | null {
+  public [binding](host: DocumentOperationHost, input: Input, options: DocumentOperationOptions, owner: object | null = null, capturedRead: DocumentRead | null = null): Entry | null {
     if (options.signal?.aborted || host.signal.aborted) return null
     host.subscribe()
     const tag = options.configurationTag ?? []
     const slots = this.slots.get(host) ?? []
     const found = slots.find(slot => !slot.entry.signal.aborted && slot.owner === owner && sameTag(slot.tag, tag) && this.matches(slot.input, input))
     if (found) return found.entry
-    const initialRead = host.delivery.current()
-    if (!initialRead) return null
+    const initialRead = capturedRead ?? host.delivery.current()
+    if (!initialRead || host.delivery.read(initialRead.revision) !== initialRead) return null
     const sourceScope = host.delivery.createScope()
-    const entry = this.create({ host, initialRead, sourceScope, runtimeSessionId: this.createRuntimeSessionId(), scheduling: owner ? 'requested' : 'ordered' }, input)
+    let entry: Entry | null
+    try {
+      entry = this.create({ host, initialRead, sourceScope, runtimeSessionId: this.createRuntimeSessionId(), scheduling: owner ? 'pinned' : 'ordered' }, input)
+    } catch (error) {
+      sourceScope.dispose()
+      host.releaseIdleSubscription()
+      throw error
+    }
     if (!entry) { sourceScope.dispose(); host.releaseIdleSubscription(); return null }
     const slot: Slot<Input, Entry> = { input, tag: [...tag], entry, owner }
     slots.push(slot)
@@ -94,9 +102,9 @@ export abstract class DocumentOperation<Input, Result, Entry extends Contributio
 }
 
 export function bindDocumentOperation<Input, Result, Entry extends ContributionEntry<Result>>(
-  operation: DocumentOperation<Input, Result, Entry>, host: DocumentOperationHost, input: Input, options: DocumentOperationOptions = {}, owner: object | null = null,
+  operation: DocumentOperation<Input, Result, Entry>, host: DocumentOperationHost, input: Input, options: DocumentOperationOptions = {}, owner: object | null = null, capturedRead: DocumentRead | null = null,
 ): Entry | null {
-  return operation[binding](host, input, options, owner)
+  return operation[binding](host, input, options, owner, capturedRead)
 }
 
 export function retainDocumentOperation<Input, Result, Entry extends ContributionEntry<Result>>(

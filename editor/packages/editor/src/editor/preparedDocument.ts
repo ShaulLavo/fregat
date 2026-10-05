@@ -187,6 +187,7 @@ export function createEditorPreparedDocument(
     },
     startStage(request) {
       if (disposed) return null
+      if (contributionOwner.revision.point !== options.buffer.getDocumentSyncPoint()) return Promise.resolve('stale')
       if (request.family === 'structural') {
         if (structural) return null
         structural = createStructuralStage(options, textSnapshot, request)
@@ -205,7 +206,7 @@ export function createEditorPreparedDocument(
     },
     borrow(expected) {
       if (disposed) return null
-      if (!matchesDocument(expected, options, snapshot, documentConfigurationTag)) {
+      if (contributionOwner.revision.point !== options.buffer.getDocumentSyncPoint() || !matchesDocument(expected, options, snapshot, documentConfigurationTag)) {
         dispose()
         return null
       }

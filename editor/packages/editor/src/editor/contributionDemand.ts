@@ -42,33 +42,39 @@ class ContributionLifetime {
 }
 
 export class DocumentContributionAudience {
-  private sequence = 0
-  private stop: ((reason: StopReason) => void) | null = null
-  private constructor(private readonly lifetime: ContributionLifetime) {}
+  readonly #issued = true
+  #sequence = 0
+  #stop: ((reason: StopReason) => void) | null = null
+  readonly #lifetime: ContributionLifetime
+  private constructor(lifetime: ContributionLifetime) { this.#lifetime = lifetime }
   static issue(host: DocumentOperationHost, signal?: AbortSignal): DocumentContributionAudience {
     return new DocumentContributionAudience(new ContributionLifetime(host, signal))
   }
   [authority](host: DocumentOperationHost, stop: (reason: StopReason) => void) {
-    if (host !== this.lifetime.host || this.lifetime.cancellation.signal.aborted) return null
-    this.stop?.('superseded')
-    this.stop = stop
-    const sequence = ++this.sequence
-    return { signal: this.lifetime.cancellation.signal, current: () => sequence === this.sequence, release: () => { if (sequence === this.sequence) this.stop = null } }
+    if (!(#issued in this)) return null
+    if (host !== this.#lifetime.host || this.#lifetime.cancellation.signal.aborted) return null
+    this.#stop?.('superseded')
+    this.#stop = stop
+    const sequence = ++this.#sequence
+    return { signal: this.#lifetime.cancellation.signal, current: () => sequence === this.#sequence, release: () => { if (sequence === this.#sequence) this.#stop = null } }
   }
-  dispose(): void { this.lifetime.dispose() }
+  dispose(): void { if (#issued in this) this.#lifetime.dispose() }
 }
 
 export class DocumentContributionOwner {
-  private read: DocumentRead | null
-  private readonly entries = new Set<Pick<ContributionEntry<unknown>, 'leaseCount' | 'dispose' | 'signal'>>()
+  readonly #issued = true
+  #read: DocumentRead | null
+  readonly #entries = new Set<Pick<ContributionEntry<unknown>, 'leaseCount' | 'dispose' | 'signal'>>()
   readonly revision: DocumentRevision
-  private constructor(private readonly lifetime: ContributionLifetime, read: DocumentRead) {
-    this.read = read
+  readonly #lifetime: ContributionLifetime
+  private constructor(lifetime: ContributionLifetime, read: DocumentRead) {
+    this.#lifetime = lifetime
+    this.#read = read
     this.revision = read.revision
     lifetime.cancellation.signal.addEventListener('abort', () => {
-      this.read = null
-      for (const entry of this.entries) if (entry.leaseCount === 0) entry.dispose()
-      this.entries.clear()
+      this.#read = null
+      for (const entry of this.#entries) if (entry.leaseCount === 0) entry.dispose()
+      this.#entries.clear()
     }, { once: true })
   }
   static issue(host: DocumentOperationHost, signal?: AbortSignal): DocumentContributionOwner | null {
@@ -77,14 +83,15 @@ export class DocumentContributionOwner {
     return read ? new DocumentContributionOwner(new ContributionLifetime(host, signal), read) : null
   }
   [authority](host: DocumentOperationHost) {
-    if (host !== this.lifetime.host || !this.read || this.lifetime.cancellation.signal.aborted) return null
-    return { signal: this.lifetime.cancellation.signal, read: this.read, retain: (entry: Pick<ContributionEntry<unknown>, 'leaseCount' | 'dispose' | 'signal'>) => {
-      if (this.entries.has(entry)) return
-      this.entries.add(entry)
-      entry.signal.addEventListener('abort', () => this.entries.delete(entry), { once: true })
+    if (!(#issued in this)) return null
+    if (host !== this.#lifetime.host || !this.#read || this.#lifetime.cancellation.signal.aborted) return null
+    return { signal: this.#lifetime.cancellation.signal, read: this.#read, retain: (entry: Pick<ContributionEntry<unknown>, 'leaseCount' | 'dispose' | 'signal'>) => {
+      if (this.#entries.has(entry)) return
+      this.#entries.add(entry)
+      entry.signal.addEventListener('abort', () => this.#entries.delete(entry), { once: true })
     } }
   }
-  dispose(): void { this.lifetime.dispose() }
+  dispose(): void { if (#issued in this) this.#lifetime.dispose() }
 }
 
 export function requestDocumentContribution<Input, Result, Entry extends ContributionEntry<Result>>(
@@ -104,8 +111,8 @@ export function requestDocumentContribution<Input, Result, Entry extends Contrib
     cancellation.abort()
   }
   const stop = (kind: StopReason) => finish({ kind })
-  const latest = demand.kind === 'latest' ? demand.audience[authority](host, stop) : null
-  const pinned = demand.kind === 'pinned' ? demand.owner[authority](host) : null
+  const latest = demand.kind === 'latest' && demand.audience instanceof DocumentContributionAudience ? DocumentContributionAudience.prototype[authority].call(demand.audience, host, stop) : null
+  const pinned = demand.kind === 'pinned' && demand.owner instanceof DocumentContributionOwner ? DocumentContributionOwner.prototype[authority].call(demand.owner, host) : null
   const lifetime = latest?.signal ?? pinned?.signal
   const read = pinned?.read ?? host.delivery.current()
   const task = { settled, cancel: () => stop('cancelled'), dispose: () => stop('disposed') }
@@ -120,14 +127,22 @@ export function requestDocumentContribution<Input, Result, Entry extends Contrib
     demand.signal?.removeEventListener('abort', cancel)
   }
   if (demand.signal?.aborted) { stop('cancelled'); cleanup(); return task }
-  const entry = bindDocumentOperation(operation, host, input, { ...demand, signal: cancellation.signal }, demand.kind === 'pinned' ? demand.owner : null)
+  let entry: Entry | null
+  try { entry = bindDocumentOperation(operation, host, input, { ...demand, signal: cancellation.signal }, demand.kind === 'pinned' ? demand.owner : null, read) }
+  catch (error) {
+    finish({ kind: 'failed', failure: contributionFailure(error, null, read) })
+    cleanup()
+    return task
+  }
   if (!entry) { finish({ kind: 'unavailable' }); cleanup(); return task }
-  pinned?.retain(entry)
-  const lease = leaseDocumentOperation(operation, entry, cancellation.signal)
-  const result = leaseWait(entry.at(read), cancellation.signal)
+  const bound = entry
+  pinned?.retain(bound)
+  const lease = leaseDocumentOperation(operation, bound, cancellation.signal)
+  const result = leaseWait(bound.at(read), cancellation.signal)
+  const generation = bound.analysisGeneration
   void result.then(value => {
     if (completed) return
-    if (!host.delivery.read(read.revision) || latest && (!latest.current() || host.buffer.getDocumentSyncPoint() !== read.revision.point)) {
+    if (generation !== bound.analysisGeneration || !host.delivery.read(read.revision) || latest && (!latest.current() || host.buffer.getDocumentSyncPoint() !== read.revision.point)) {
       finish({ kind: 'superseded' }); return
     }
     demand.accept?.(value)
@@ -135,18 +150,22 @@ export function requestDocumentContribution<Input, Result, Entry extends Contrib
   }).catch(error => {
     if (completed) return
     if (error instanceof DOMException && error.name === 'AbortError') { finish({ kind: 'superseded' }); return }
-    finish({ kind: 'failed', failure: createError({
-      message: 'Document contribution failed', code: 'DOCUMENT_CONTRIBUTION_FAILED', status: 500,
-      why: 'The contribution could not complete its captured request.', fix: 'Inspect the contribution diagnostics.',
-      cause: error instanceof Error ? error : undefined,
-      internal: { runtimeSessionId: entry.runtimeSessionId, revision: read.revision.point.revision },
-    }) })
+    finish({ kind: 'failed', failure: contributionFailure(error, bound.runtimeSessionId, read) })
   }).finally(() => {
     lease.dispose()
-    if (pinned && lifetime.aborted && entry.leaseCount === 0) entry.dispose()
+    if (pinned && lifetime.aborted && bound.leaseCount === 0) bound.dispose()
     cleanup()
   })
   return task
+}
+
+function contributionFailure(error: unknown, runtimeSessionId: string | null, read: DocumentRead): EditorEvlogError {
+  return createError({
+    message: 'Document contribution failed', code: 'DOCUMENT_CONTRIBUTION_FAILED', status: 500,
+    why: 'The contribution could not complete its captured request.', fix: 'Inspect the contribution diagnostics.',
+    cause: error instanceof Error ? error : undefined,
+    internal: { runtimeSessionId, revision: read.revision.point.revision },
+  })
 }
 
 function leaseWait<Result>(result: Promise<Result>, signal: AbortSignal): Promise<Result> {

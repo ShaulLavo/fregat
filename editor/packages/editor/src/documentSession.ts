@@ -2050,7 +2050,9 @@ class StaticTextBuffer extends PieceTableEditorTextBuffer {
     options: DocumentSessionApplyEditsOptions = {},
     sourceView: EditorViewSession | null = null,
   ): DocumentSessionChange {
-    return super.applyEdits(selections, edits, { ...options, history: 'skip' }, sourceView)
+    const change = super.applyEdits(selections, edits, { ...options, history: 'skip' }, sourceView)
+    this.markClean()
+    return change
   }
 
   public override canUndo(): boolean { return false }

@@ -1,7 +1,8 @@
+import { EditorTokenStore } from '../src/syntax/tokenStore'
 import { expect, it } from 'vitest'
 import { createEditorBufferSession, createEditorTextBuffer, acquireDocumentMutationLease, rotateDocumentSyncSegment, releaseDocumentMutationLease } from '../src/documentSession'
 import { createEditorDocumentAnalysis } from '../src/editor/documentAnalysis'
-import { defineDocumentOperation } from '../src/editor/operationDefinitions'
+import { defineDocumentOperation, createEditorHighlighterOperation } from '../src/editor/operationDefinitions'
 import type { DocumentProjectionEndpoint, DocumentProjectionUpdate } from '../src/editor/documentDelivery'
 import type { EditorViewContributionContext, EditorPlugin } from '../src/plugins'
 import { createVisibleEditor } from './factories/visibleEditor'
@@ -206,7 +207,11 @@ it('keeps independent pinned owners exact after head advances and settles invali
   const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'tasks' })
   const owner = analysis.contributions.pin()!
   const peerOwner = analysis.contributions.pin()!
-  const operation = defineDocumentOperation(() => ({ analyze: async read => read.text.readRange(0, read.text.length), dispose: () => {} }), () => true)
+  const initialSources: string[] = []
+  const operation = defineDocumentOperation(context => {
+    initialSources.push(context.initialRead.text.readRange(0, context.initialRead.text.length))
+    return { analyze: async read => read.text.readRange(0, read.text.length), dispose: () => {} }
+  }, () => true)
   createEditorBufferSession(buffer).applyEdits([{ from: 0, to: 3, text: 'new' }])
   const [first, peer] = await Promise.all([
     analysis.contributions.request(operation, null, { kind: 'pinned', owner }).settled,
@@ -214,6 +219,7 @@ it('keeps independent pinned owners exact after head advances and settles invali
   ])
   expect(first).toMatchObject({ kind: 'completed', result: 'old', revision: owner.revision })
   expect(peer).toMatchObject({ kind: 'completed', result: 'old', revision: peerOwner.revision })
+  expect(initialSources).toEqual(['old', 'old'])
   const audience = analysis.contributions.createAudience()
   expect(await analysis.contributions.request(operation, null, { kind: 'latest', audience }).settled).toMatchObject({ kind: 'completed', result: 'new' })
   const other = createEditorDocumentAnalysis({ buffer: createEditorTextBuffer('foreign'), documentId: 'foreign' })
@@ -254,4 +260,87 @@ it.each(['source', 'configuration'] as const)('rejects stale latest %s before ac
   expect(await old.settled).toEqual({ kind: 'superseded' })
   expect(accepts).toBe(0)
   audience.dispose(); analysis.dispose()
+})
+
+it('coalesces same-read work for two independent latest audiences', async () => {
+  const analysis = createEditorDocumentAnalysis({ buffer: createEditorTextBuffer('shared'), documentId: 'peer-audiences' })
+  const first = analysis.contributions.createAudience()
+  const second = analysis.contributions.createAudience()
+  let runs = 0
+  const operation = defineDocumentOperation(() => ({ analyze: async read => { runs++; return read.text.readRange(0, read.text.length) }, dispose: () => {} }), () => true)
+  const outcomes = await Promise.all([
+    analysis.contributions.request(operation, null, { kind: 'latest', audience: first }).settled,
+    analysis.contributions.request(operation, null, { kind: 'latest', audience: second }).settled,
+  ])
+  expect(outcomes.map(outcome => outcome.kind)).toEqual(['completed', 'completed'])
+  expect(runs).toBe(1)
+  first.dispose(); second.dispose(); analysis.dispose()
+})
+
+it('rejects inherited audience and owner handles without changing the issued lifetime', async () => {
+  const analysis = createEditorDocumentAnalysis({ buffer: createEditorTextBuffer('issued'), documentId: 'authority' })
+  const audience = analysis.contributions.createAudience()
+  const owner = analysis.contributions.pin()!
+  const inheritedAudience: typeof audience = Object.create(audience)
+  const inheritedOwner: typeof owner = Object.create(owner)
+  const operation = defineDocumentOperation(() => ({ analyze: async () => 'issued', dispose: () => {} }), () => true)
+  expect(await analysis.contributions.request(operation, null, { kind: 'latest', audience: inheritedAudience }).settled).toEqual({ kind: 'unavailable' })
+  expect(await analysis.contributions.request(operation, null, { kind: 'pinned', owner: inheritedOwner }).settled).toEqual({ kind: 'unavailable' })
+  inheritedAudience.dispose(); inheritedOwner.dispose()
+  expect(await analysis.contributions.request(operation, null, { kind: 'latest', audience }).settled).toMatchObject({ kind: 'completed', result: 'issued' })
+  owner.dispose(); audience.dispose(); analysis.dispose()
+})
+
+it('settles a synchronous operation initializer failure and leaves its audience reusable', async () => {
+  const analysis = createEditorDocumentAnalysis({ buffer: createEditorTextBuffer('source'), documentId: 'initializer' })
+  const audience = analysis.contributions.createAudience()
+  const broken = defineDocumentOperation(() => { throw new TypeError('Controlled initializer failure') }, () => true)
+  const task = analysis.contributions.request(broken, null, { kind: 'latest', audience })
+  expect(await task.settled).toMatchObject({ kind: 'failed', failure: { code: 'DOCUMENT_CONTRIBUTION_FAILED' } })
+  expect(analysis.inspectRetention().entries).toEqual([])
+  const working = defineDocumentOperation(() => ({ analyze: async () => 'ready', dispose: () => {} }), () => true)
+  expect(await analysis.contributions.request(working, null, { kind: 'latest', audience }).settled).toMatchObject({ kind: 'completed', result: 'ready' })
+  audience.dispose(); analysis.dispose()
+})
+
+it('keeps a queued pinned request independent of a later source publication', async () => {
+  const buffer = createEditorTextBuffer('old')
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'queued-pin' })
+  const owner = analysis.contributions.pin()!
+  const operation = defineDocumentOperation(() => ({ analyze: async read => read.text.readRange(0, read.text.length), dispose: () => {} }), () => true)
+  const task = analysis.contributions.request(operation, null, { kind: 'pinned', owner })
+  createEditorBufferSession(buffer).applyEdits([{ from: 0, to: 3, text: 'new' }])
+  expect(await task.settled).toMatchObject({ kind: 'completed', result: 'old', revision: owner.revision })
+  owner.dispose(); analysis.dispose()
+})
+
+it('rejects an old highlighter configuration before acceptance and reuses its green refresh', async () => {
+  const analysis = createEditorDocumentAnalysis({ buffer: createEditorTextBuffer('color'), documentId: 'theme' })
+  const audience = analysis.contributions.createAudience()
+  let color = 'red'
+  let finish = () => {}
+  let start = () => {}
+  const started = new Promise<void>(resolve => { start = resolve })
+  const listeners = new Set<() => void>()
+  const operation = createEditorHighlighterOperation(() => ({
+    analyze: async () => {
+      const captured = color
+      if (captured === 'red') { start(); await new Promise<void>(resolve => { finish = resolve }) }
+      return { tokens: EditorTokenStore.fromTokens([{ start: 0, end: 5, style: { color: captured } }]) }
+    },
+    onDidChangeTheme: listener => { listeners.add(listener); return () => { listeners.delete(listener) } },
+    dispose: () => {},
+  }))
+  const accepted: string[] = []
+  const first = analysis.contributions.request(operation, { languageId: 'typescript' }, { kind: 'latest', audience, accept: result => { accepted.push(result.tokens.toTokens()[0]!.style.color!) } })
+  await started
+  color = 'green'
+  for (const listener of listeners) listener()
+  finish()
+  expect(await first.settled).toEqual({ kind: 'superseded' })
+  expect(accepted).toEqual([])
+  expect(await analysis.contributions.request(operation, { languageId: 'typescript' }, { kind: 'latest', audience, accept: result => { accepted.push(result.tokens.toTokens()[0]!.style.color!) } }).settled).toMatchObject({ kind: 'completed' })
+  expect(accepted).toEqual(['green'])
+  audience.dispose(); analysis.dispose()
+  expect(listeners.size).toBe(0)
 })

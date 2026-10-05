@@ -161,6 +161,7 @@ export class AnalysisEntry<T> {
   private interests = 0
   private lastRelease: number | null = null
   private queuedPoint: DocumentSyncPoint | null = null
+  private queuedRead: DocumentRead | null = null
   private requests = 0
   private generation = 0
   private pendingInterest = new AbortController()
@@ -183,13 +184,15 @@ export class AnalysisEntry<T> {
     readonly sourceScope: DocumentContributionScope,
     readonly scheduler: EditorWorkScheduler,
     runtimeSessionId: string,
-    private readonly scheduling: 'requested' | 'ordered' = 'requested',
+    private readonly scheduling: 'requested' | 'ordered' | 'pinned' = 'requested',
   ) {
     this.runtimeSessionId = runtimeSessionId
     this.state = { kind: 'pending', revision: buffer.getRevision() }
     const read = delivery.current()
     if (read) this.enqueue(read)
   }
+
+  get analysisGeneration(): number { return this.generation }
 
   get signal(): AbortSignal {
     return this.cancellation.signal
@@ -250,6 +253,7 @@ export class AnalysisEntry<T> {
   }
 
   changed(read: DocumentRead): void {
+    if (this.scheduling === 'pinned') return
     if (read.revision.point === this.queuedPoint) return
     this.enqueue(read)
   }
@@ -261,7 +265,7 @@ export class AnalysisEntry<T> {
   }
 
   refresh(): void {
-    const read = this.delivery.current()
+    const read = this.scheduling === 'pinned' ? this.queuedRead : this.delivery.current()
     if (read) this.enqueue(read)
   }
 
@@ -290,11 +294,17 @@ export class AnalysisEntry<T> {
 
   async at(read: DocumentRead): Promise<T> {
     if (this.signal.aborted || this.delivery.read(read.revision) !== read) throw cancelled()
-    const result = this.enqueue(read)
+    const result = this.queuedPoint === read.revision.point && this.completion && this.state.kind !== 'failed'
+      ? this.completion : this.enqueue(read)
     this.requests++
     this.schedulePending()
-    try { return await interruptible(result, this.signal) }
-    finally { this.requests-- }
+    const generation = this.generation
+    const interest = this.pendingInterest.signal
+    try {
+      const value = await interruptible(interruptible(result, this.signal), interest)
+      if (generation !== this.generation) throw cancelled()
+      return value
+    } finally { this.requests-- }
   }
 
   async query(run: () => Promise<T>): Promise<T> {
@@ -316,6 +326,7 @@ export class AnalysisEntry<T> {
     this.scheduler.cancel(this.runtimeSessionId, 'scope-released')
     this.pending?.reject(cancelled())
     this.pending = null
+    this.queuedRead = null
     this.state = { kind: 'failed', revision: this.buffer.getRevision(), error: cancelled() }
     this.session.dispose()
     this.sourceScope.dispose()
@@ -326,6 +337,7 @@ export class AnalysisEntry<T> {
     this.pendingInterest = new AbortController()
     const revision = read.revision.point.revision
     this.queuedPoint = read.revision.point
+    this.queuedRead = read
     const generation = ++this.generation
     this.state = { kind: 'pending', revision }
     this.pending?.reject(cancelled())
@@ -343,7 +355,7 @@ export class AnalysisEntry<T> {
 
   private schedulePending(): void {
     if (this.running || !this.pending || this.cancellation.signal.aborted) return
-    if (this.scheduling === 'requested' && this.requests === 0) return
+    if (this.scheduling !== 'ordered' && this.requests === 0) return
     this.scheduler.schedule({
       key: this.runtimeSessionId,
       taskClass: 'background-derived',
@@ -376,7 +388,7 @@ export class AnalysisEntry<T> {
   private publish(point: DocumentSyncPoint, generation: number, state: EditorAnalysisRead<T>): void {
     if (
       this.cancellation.signal.aborted ||
-      point !== this.buffer.getDocumentSyncPoint() ||
+      point !== this.queuedPoint ||
       generation !== this.generation
     )
       return
@@ -413,7 +425,7 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     sourceScope: DocumentContributionScope,
     scheduler: EditorWorkScheduler,
     runtimeSessionId: string,
-    scheduling: 'requested' | 'ordered' = 'ordered',
+    scheduling: 'requested' | 'ordered' | 'pinned' = 'ordered',
   ) {
     super(buffer, structuralSession, delivery, sourceScope, scheduler, runtimeSessionId, scheduling)
   }
@@ -573,7 +585,7 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
 
 export class HighlighterEntry extends AnalysisEntry<EditorHighlightResult> {
   private readonly themes = new EditorEventSource<void>({ action: 'document.highlighter.theme' })
-  constructor(buffer: EditorTextBuffer, readonly highlighterSession: EditorHighlighterRuntime, delivery: DocumentDelivery, sourceScope: DocumentContributionScope, scheduler: EditorWorkScheduler, runtimeSessionId: string, scheduling: 'requested' | 'ordered' = 'ordered') {
+  constructor(buffer: EditorTextBuffer, readonly highlighterSession: EditorHighlighterRuntime, delivery: DocumentDelivery, sourceScope: DocumentContributionScope, scheduler: EditorWorkScheduler, runtimeSessionId: string, scheduling: 'requested' | 'ordered' | 'pinned' = 'ordered') {
     super(buffer, highlighterSession, delivery, sourceScope, scheduler, runtimeSessionId, scheduling)
     const unsubscribe = highlighterSession.onDidChangeTheme?.(() => {
       this.refresh()

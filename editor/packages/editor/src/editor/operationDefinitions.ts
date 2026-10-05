@@ -81,7 +81,7 @@ class GenericDefinition<Input, Result> extends DocumentOperation<Input, Result, 
   protected create(context: BoundOperationContext, input: Input): AnalysisEntry<Result> | null {
     const { host, sourceScope, initialRead, runtimeSessionId } = context
     const runtime = this.openRuntime({ documentId: host.documentId, runtimeSessionId, initialRead, source: sourceScope.source }, input)
-    return runtime ? new AnalysisEntry(host.buffer, runtime, host.delivery, sourceScope, host.scheduler, runtimeSessionId) : null
+    return runtime ? new AnalysisEntry(host.buffer, runtime, host.delivery, sourceScope, host.scheduler, runtimeSessionId, context.scheduling === 'pinned' ? 'pinned' : 'requested') : null
   }
   protected createRuntimeSessionId(): string { return createEditorRuntimeSessionId() }
   protected matches(left: Input, right: Input): boolean { return this.compatible(left, right) }
