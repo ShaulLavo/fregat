@@ -461,6 +461,18 @@ async function runBrowser(browserName, workspace, fixturePaths) {
       ...compatibilityCaptureResults,
       ...compatibilitySamples,
     ]
+    console.log(
+      `EDITOR_OPEN_BENCHMARK_CAPTURE ${JSON.stringify({
+        schemaVersion: 1,
+        browser: browserName,
+        identity: benchmarkIdentity,
+        summary,
+        warmupSamples,
+        samples,
+        compatibilityCaptureResults,
+        compatibilitySamples,
+      })}`,
+    )
     if (options.gate) validateGate(summary, samples, runtimeSessionSamples)
     console.log(`EDITOR_OPEN_BENCHMARK_SUMMARY ${JSON.stringify(summary, null, 2)}`)
     if (options.calibrate) {
@@ -732,6 +744,12 @@ function readMeasuredPipeline(page, path, activationAt, detectedAt) {
         workerParseRequests: workerCount('parse'),
         workerQueryRequests: workerCount('queryRange'),
         workerRefreshRequests: workerCount('edit'),
+        workerRequestEvents: workers.map((entry) => ({
+          family: entry.detail?.family ?? null,
+          runtimeSessionId: entry.detail?.runtimeSessionId ?? null,
+          type: entry.detail?.type ?? null,
+          afterActivationMs: entry.startTime - activatedAt,
+        })),
         workerRequests: workers.length,
       }
 
