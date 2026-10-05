@@ -337,6 +337,8 @@ function benchmarkOwner(sample: FileOpenIntentBenchmarkSample): FileOpenIntentSe
     disposeNow: () => undefined,
     scheduleDisconnect: () => undefined,
     service: {
+      getPreparationIdentity: () => sample,
+      subscribePreparationIdentity: () => () => undefined,
       claimLive: () => null,
       claimReadyClean: () => null,
       prepare: vi.fn(),

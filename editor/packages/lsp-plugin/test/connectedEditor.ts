@@ -98,6 +98,10 @@ export type ConnectedEditor = {
   /** The same anchor movement a scroll makes, reported as the view being laid out again. */
   relayout(by: number): void
   pointerMove(clientX: number, clientY: number, modifiers?: PointerEventInit): void
+  setPointerOffset(offset: number): void
+  pointerLeave(): void
+  releaseNavigationModifier(): void
+  replaceText(text: string): void
   editElsewhere(edit: TextEdit): void
   pressKey(key: string, modifiers?: KeyboardEventInit): KeyboardEvent
   breakAcceptance(): void
@@ -107,7 +111,7 @@ export type ConnectedEditor = {
   answerDefinition(definition: readonly lsp.Location[]): void
   answerSignatureHelp(help: lsp.SignatureHelp | null): void
   /** Waits for a request a lazily loaded controller only sends once its module has landed. */
-  awaitRequest(method: string): Promise<void>
+  awaitRequest(method: string, count?: number): Promise<void>
   answerCodeAction(actions: readonly (lsp.Command | lsp.CodeAction)[] | null): void
   answerCodeActionResolve(action: lsp.CodeAction): void
   answerRename(edit: unknown): void
@@ -168,6 +172,7 @@ export async function connectedEditor(
   const features = new Map<unknown, unknown>()
   const element = document.createElement('div')
   let snapshot = editorSnapshot(text, caretOffset, 1, options.affinity ?? 'after')
+  let pointerOffset = 0
   let anchorRect = new DOMRect(10, 20, 40, 18)
 
   const commands = new Map<EditorAnyCommandId, EditorCommandHandler>(options.commands)
@@ -193,6 +198,7 @@ export async function connectedEditor(
     registerKeymapContextKey: keymap.registerKeymapContextKey,
     registerKeymapNode: keymap.registerKeymapNode,
     getSnapshot: () => snapshot,
+    getPointerOffset: () => pointerOffset,
     getRangeClientRect: () => anchorRect,
     getFeature: (token) => features.get(token) ?? null,
     focusEditor,
@@ -239,9 +245,10 @@ export async function connectedEditor(
   })
   await flushPromises()
 
-  const awaitRequest = async (method: string): Promise<void> => {
+  const awaitRequest = async (method: string, count = 1): Promise<void> => {
     for (let turn = 0; turn < 100; turn++) {
-      if (transport.sent.map(jsonMessage).some((sent) => sent.method === method)) return
+      if (transport.sent.map(jsonMessage).filter((sent) => sent.method === method).length >= count)
+        return
       await new Promise((resolve) => setTimeout(resolve, 0))
     }
     throw new Error(`no ${method} request after waiting`)
@@ -331,6 +338,16 @@ export async function connectedEditor(
     // Takes the edit feature away, which is what an acceptance needs to apply an item at all — the
     // state a session can genuinely be in when the document stops being editable under it.
     breakAcceptance: () => features.clear(),
+    setPointerOffset: (offset) => {
+      pointerOffset = offset
+    },
+    pointerLeave: () => element.dispatchEvent(new PointerEvent('pointerleave')),
+    releaseNavigationModifier: () =>
+      document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta' })),
+    replaceText: (text) => {
+      snapshot = editorSnapshot(text, 0, snapshot.textVersion + 1, caretAffinityOf(snapshot))
+      contribution.update(snapshot, 'document', null)
+    },
     answerCompletion: (items, isIncomplete = false) =>
       answer('textDocument/completion', { isIncomplete, items }),
     answerResolve: (item) => answer('completionItem/resolve', item),
@@ -529,6 +546,7 @@ function providerRegistry(): Pick<
 function viewContributionContext(options: {
   element: HTMLDivElement
   getSnapshot(): EditorViewSnapshot
+  getPointerOffset(): number
   getRangeClientRect(): DOMRect
   getFeature(token: unknown): unknown
   focusEditor(): void
@@ -548,7 +566,7 @@ function viewContributionContext(options: {
     getSnapshot: options.getSnapshot,
     getFeature: options.getFeature as EditorViewContributionContext['getFeature'],
     focusEditor: options.focusEditor,
-    textOffsetFromPoint: vi.fn(() => 0),
+    textOffsetFromPoint: () => options.getPointerOffset(),
     getRangeClientRect: () => options.getRangeClientRect(),
   })
 }

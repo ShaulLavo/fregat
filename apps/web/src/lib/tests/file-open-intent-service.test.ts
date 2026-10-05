@@ -1,5 +1,7 @@
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { testDocumentKey } from '../../../test/factories/document-targets'
+import { preparationDocuments } from '../../../test/factories/file-preparation'
+import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import { QueryClient } from '@tanstack/react-query'
 import { describe, vi } from 'vitest'
 import { expect, test as it } from '../../../test/fixtures'
@@ -204,14 +206,15 @@ describe('file open intent service', () => {
 
   it('disposes stale live preparation but still claims the authoritative buffer', async () => {
     const queryClient = new QueryClient()
-    const buffer = createEditorTextBuffer('alpha\n')
+    const documents = preparationDocuments()
+    const buffer = documents.ensureLiveDocument({
+      ...fileResult('/repo/a.ts'),
+      content: 'alpha\n',
+    }).buffer
+    let liveDocument: FileOpenIntentLiveDocument = documents.getLiveDocument(
+      testDocumentKey('/repo/a.ts'),
+    )!
     const preparedDocument = preparedDocumentLease()
-    let liveDocument: FileOpenIntentLiveDocument | null = {
-      buffer,
-      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'live-test' }),
-      key: testDocumentKey('/repo/a.ts'),
-      localRevision: 1,
-    }
     const prepare = vi.fn((preparedBuffer) => ({
       buffer: preparedBuffer,
       preparedDocument,
@@ -223,19 +226,22 @@ describe('file open intent service', () => {
       () => false,
       () => false,
       () => undefined,
+      undefined,
+      undefined,
+      documents,
     )
     service.setRoot(filesystemPath('/repo'))
     service.prepare(intent('/repo/a.ts'))
     await vi.waitFor(() => expect(prepare).toHaveBeenCalledTimes(1))
 
     createEditorBufferSession(buffer).applyText('x')
-    liveDocument = { ...liveDocument, localRevision: 2 }
+    liveDocument = documents.getLiveDocument(testDocumentKey('/repo/a.ts'))!
 
     expect(service.claimLive(filesystemPath('/repo/a.ts'))).toMatchObject({
       buffer,
       documentKey: testDocumentKey('/repo/a.ts'),
       kind: 'live',
-      localRevision: 2,
+      localRevision: buffer.getRevision(),
       preparedDocument: null,
     })
     expect(preparedDocument.dispose).toHaveBeenCalledTimes(1)
@@ -296,8 +302,10 @@ describe('file open intent service', () => {
       buffer,
       preparedDocument: preparedDocumentLease(),
     }))
+    const documents = preparationDocuments()
     const owner = createFileOpenIntentServiceOwner({
-      getLiveDocument: () => null,
+      acquireFilePreparation: (input) => documents.acquireFilePreparation(input),
+      getLiveDocument: (path) => documents.getLiveDocument(fileDocumentKey(path)),
       getRetainedScrollPosition: () => null,
       isActive: () => false,
       mountedEditors: {
@@ -340,13 +348,12 @@ describe('file open intent service', () => {
   })
 
   it('proactively invalidates a live lease when its local snapshot identity advances', async () => {
-    const buffer = createEditorTextBuffer('alpha\n')
-    let liveDocument: FileOpenIntentLiveDocument = {
-      buffer,
-      analysis: createEditorDocumentAnalysis({ buffer, documentId: 'live-test' }),
-      key: testDocumentKey('/repo/a.ts'),
-      localRevision: buffer.getRevision(),
-    }
+    const documents = preparationDocuments()
+    const buffer = documents.ensureLiveDocument({
+      ...fileResult('/repo/a.ts'),
+      content: 'alpha\n',
+    }).buffer
+    let liveDocument = documents.getLiveDocument(testDocumentKey('/repo/a.ts'))!
     const liveDocuments = listenerChannel<[]>()
     const preparedDocument = preparedDocumentLease()
     const prepare = vi.fn((preparedBuffer) => ({
@@ -354,6 +361,7 @@ describe('file open intent service', () => {
       preparedDocument,
     }))
     const owner = createFileOpenIntentServiceOwner({
+      acquireFilePreparation: (input) => documents.acquireFilePreparation(input),
       getLiveDocument: () => liveDocument,
       getRetainedScrollPosition: () => null,
       isActive: () => false,
@@ -474,9 +482,11 @@ describe('file open intent service', () => {
         return rangePreparation(buffer, preparedDocument, structuralRange, highlighter, structural)
       },
     }
+    const documents = preparationDocuments()
     const owner = createFileOpenIntentServiceOwner({
+      acquireFilePreparation: (input) => documents.acquireFilePreparation(input),
       createEvent: events.factory,
-      getLiveDocument: () => null,
+      getLiveDocument: (path) => documents.getLiveDocument(fileDocumentKey(path)),
       getRetainedScrollPosition: () => ({ left: 0, top: 120_000 }),
       isActive: () => false,
       mountedEditors: inertMountedEditors(),
@@ -601,8 +611,10 @@ describe('file open intent service', () => {
       buffer,
       preparedDocument: preparedDocumentLease(),
     }))
+    const documents = preparationDocuments()
     const owner = createFileOpenIntentServiceOwner({
-      getLiveDocument: () => null,
+      acquireFilePreparation: (input) => documents.acquireFilePreparation(input),
+      getLiveDocument: (path) => documents.getLiveDocument(fileDocumentKey(path)),
       getRetainedScrollPosition: () => null,
       isActive: () => false,
       isEnabled: () => false,
@@ -969,7 +981,7 @@ describe('file open intent service', () => {
     expect(service.claimReadyClean(typescript.path)?.preparedDocument).toBe(typescriptDocument)
     expect(typescriptDocument.dispose).not.toHaveBeenCalled()
     expect(oldMarkdownDocument.dispose).toHaveBeenCalledOnce()
-    expect(service.claimReadyClean(markdown.path)?.preparedDocument).toBe(newMarkdownDocument)
+    expect(service.claimLive(markdown.path)?.preparedDocument).toBe(newMarkdownDocument)
   })
 
   it('rebuilds a record whose running family changes with the environment', async () => {
@@ -1051,7 +1063,7 @@ describe('file open intent service', () => {
 
     expect(startOldStructural).not.toHaveBeenCalled()
     expect(startNewStructural).toHaveBeenCalledOnce()
-    expect(service.claimReadyClean(file.path)?.preparedDocument).toBe(replacementDocument)
+    expect(service.claimLive(file.path)?.preparedDocument).toBe(replacementDocument)
   })
 
   it('compares environment fields without delimiter collisions', async () => {
@@ -1217,13 +1229,8 @@ describe('file open intent service', () => {
   it('attributes promotion paint only to the claimed document and its first text paint', async () => {
     const queryClient = new QueryClient()
     const file = fileResult('/repo/a.ts')
-    const buffer = createEditorTextBuffer(file.content)
-    const liveDocument: FileOpenIntentLiveDocument = {
-      buffer,
-      analysis: createEditorDocumentAnalysis({ buffer, documentId: file.path }),
-      key: testDocumentKey(file.path),
-      localRevision: 1,
-    }
+    const documents = preparationDocuments()
+    const liveDocument = documents.ensureLiveDocument(file)
     const runtime = manualRuntime()
     const events = recordingEvents()
     const service = createTestFileOpenIntentOwner(
@@ -1238,6 +1245,7 @@ describe('file open intent service', () => {
       () => undefined,
       runtime,
       events.factory,
+      documents,
     )
     service.setRoot(filesystemPath('/repo'))
     service.prepare(intent(file.path))
@@ -1476,10 +1484,13 @@ function createTestFileOpenIntentOwner(
   prefetchRelated: (rootPath: string, path: string) => Promise<unknown> | void,
   runtime?: FileOpenIntentRuntime,
   createEvent?: FileOpenIntentEventFactory,
+  documents = preparationDocuments(),
 ): FileOpenIntentServiceOwner & FileOpenIntentService {
   const owner = createFileOpenIntentServiceOwner({
     createEvent,
-    getLiveDocument,
+    acquireFilePreparation: (input) => documents.acquireFilePreparation(input),
+    getLiveDocument: (path) =>
+      getLiveDocument(path) ?? documents.getLiveDocument(fileDocumentKey(path)),
     getRetainedScrollPosition: () => null,
     isActive,
     mountedEditors: {
@@ -1507,8 +1518,10 @@ function createConnectedOwner({
     buffer,
     preparedDocument,
   }))
+  const documents = preparationDocuments()
   const owner = createFileOpenIntentServiceOwner({
-    getLiveDocument: () => null,
+    acquireFilePreparation: (input) => documents.acquireFilePreparation(input),
+    getLiveDocument: (path) => documents.getLiveDocument(fileDocumentKey(path)),
     getRetainedScrollPosition: () => null,
     isActive: () => false,
     mountedEditors: inertMountedEditors(),

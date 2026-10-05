@@ -186,6 +186,9 @@ test('publishes captured snapshot and revision pairs through a reentrant earlier
   const store = createEditorDocumentStore({ environmentId: fixture.scope.environmentId })
   store.getState().ensureLiveEditorDocument(fixture.saved, {
     kind: 'clean',
+    documentKey: key,
+    localRevision: buffer.getRevision(),
+    release: () => undefined,
     buffer,
     file: fixture.saved,
     fileVersion: fixture.saved.version,

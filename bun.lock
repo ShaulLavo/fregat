@@ -800,7 +800,7 @@
     },
     "packages/contracts": {
       "name": "@workspace/contracts",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "dependencies": {
         "@fregat/hotkeys": "catalog:",
         "@workspace/observability": "workspace:*",
