@@ -2,8 +2,8 @@
 
 Status: Approved. The owner approved units 2–7 on 2026-10-04, including benchmark repairs and
 acceptance proofs. Their implementation is integrated in [draft PR #787](https://github.com/ShaulLavo/fregat/pull/787).
-Production cutover waits for the final shared-observer host refresh and delivery. Performance,
-source-volume, retention, and the typed consumer implementation have reviewed evidence below.
+Implementation and qualification are complete, ready for current-source CI and delivery.
+Performance, source-volume, retention, and host evidence are reviewed below.
 Unit 1 publication implemented and focused proof delivered in the foundations wave,
 2026-09-30. Unit 0 is partial: 5/10 configurations calibrated; the remaining absolute-threshold matrix
 is superseded by Plan 282's paired A/B instrument. The session diff correction and
@@ -22,7 +22,7 @@ document contributions. Prepared, diff, snippet and excerpt callers use that own
 provider factories, generic source cursors and duplicate delivery paths are removed. Unit 7 adds
 an AST ownership check with 29 adversarial probes to the normal gates, verification and CI.
 
-Current delivery CI passes, including the reconciled caller fixtures, inventory, all 413 stress
+Reviewed revision `38902d606` passes every CI check, including the reconciled caller fixtures, inventory, all 413 stress
 checks, real worker transport, and mounted highlighting. The app doctor, CRLF diff syntax, and
 typing/Undo scenarios pass with reviewed screenshots and an exactly restored Unicode fixture.
 
@@ -70,7 +70,11 @@ each with 40 edits in steady and burst scenarios. Scroll timing limits pass; its
 rejects both the untouched baseline and candidate at exactly 354 matching current ranges, with
 no duplicated or detached ranges. The invalid count reference remains red in
 [issue #818](https://github.com/ShaulLavo/fregat/issues/818) as a tooling follow-up rather than
-a production blocker. The shared observer correction needs one fresh app-only open qualification.
+a production blocker. The final `b20cf82db` shared-observer refresh passes all three calibrations,
+the derived open gate, typing, and scroll timing limits. Its 120 measured prepared-300 samples
+start no transferable work after activation. Original count-cap failures remain preserved.
+A subsequent test-only Search correction prepares its dirty starting state before mount;
+the existing delayed-preview and stale-token checks pass without changing runtime code.
 Final current-source CI and delivery remain
 required. The historical instrument `341` Undo failure, 215 of 216 passing keys, stays
 archived under its original identity and supplies no final-candidate acceptance.
@@ -985,17 +989,18 @@ and complete validation. Writing the plan does not schedule production execution
 ## Completion checklist
 
 - [x] Every accepted buffer transition has one canonical publication path and preserved semantics.
-- [ ] Every first-party secondary document consumer enters through contribution registration.
-- [ ] Domain APIs remain typed; synchronous view/input behavior stays synchronous.
-- [ ] Source synchronization and result provenance have one owner, including prepared and diff callers.
-- [ ] Regular and checkpoint diffs share complete-source acquisition; partial patches cannot enter whole-document syntax, and browser spans match their displayed text.
-- [ ] Multiple views, endpoints, environments, logical revisions, and compensation pass focused proof.
-- [ ] Queues, mirrors, pinned snapshots, and disposal have measured bounded lifetimes.
-- [ ] Old source publishers, duplicate generic sync state, unused APIs, and compatibility paths are deleted.
-- [ ] Built exports and all affected framework/Platform consumers use the new contract.
-- [ ] Paired input browser gates pass, and the declared multiple-consumer improvement is measured.
-- [ ] SAB text transport is removed; separate workers, atomic cancellation, and packed-result transfers are preserved.
-- [ ] Permanent architecture/performance references and all overlapping plan links are reconciled.
+- [x] Every first-party secondary document consumer enters through contribution registration.
+- [x] Domain APIs remain typed; synchronous view/input behavior stays synchronous.
+- [x] Source synchronization and result provenance have one owner, including prepared and diff callers.
+- [x] Regular and checkpoint diffs share complete-source acquisition; partial patches cannot enter whole-document syntax, and browser spans match their displayed text.
+- [x] Multiple views, endpoints, environments, logical revisions, and compensation pass focused proof.
+- [x] Queues, mirrors, pinned snapshots, and disposal have measured bounded lifetimes.
+- [x] Old source publishers, duplicate generic sync state, unused APIs, and compatibility paths are deleted.
+- [x] Built exports and all affected framework/Platform consumers use the new contract.
+- [x] Paired input comparison budgets pass, and the declared multiple-consumer readiness improvement is measured. The original timing and control failures remain follow-ups.
+- [x] SAB text transport is removed; separate workers, atomic cancellation, and packed-result transfers are preserved.
+- [x] Permanent architecture/performance references and all overlapping plan links are reconciled.
+- [ ] Merge reviewed green source, install the owner's instance, and verify the served release and live UI.
 
 If two independent adapters need their own generic source cursor, reset policy, or revision check
 after migration, the proposed boundary has failed. Redesign it before migrating more consumers.

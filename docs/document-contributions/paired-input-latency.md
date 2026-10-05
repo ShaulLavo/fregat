@@ -39,8 +39,11 @@ App typing passes after complete summary accounting fixes early-event eviction f
 trace. Scroll timing limits pass, while its 270-range cap rejects the untouched baseline and
 candidate at exactly 354 matching current ranges. No detached, foreign, or duplicated ranges
 occur in the matched capture. [Issue #818](https://github.com/ShaulLavo/fregat/issues/818) preserves
-that invalid reference and original failure. The shared app observer needs one fresh open
-qualification before delivery. Broader loaded matrices and repeated historical negative
+that invalid reference and original failure. [Issue #820](https://github.com/ShaulLavo/fregat/issues/820)
+preserves the four identical-build control flags. Final app revision `b20cf82db` completes the
+shared-observer refresh: all three calibrations, derived open, typing, and scroll timing pass.
+Its 120 measured prepared-300 samples begin no transferable work after activation. The known
+range-count failure remains red. Broader loaded matrices and repeated historical negative
 matrices remain follow-ups, with no credit for uncollected results.
 
 ## Archived qualification
