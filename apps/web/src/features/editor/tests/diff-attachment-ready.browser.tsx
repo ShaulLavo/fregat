@@ -3,8 +3,12 @@ import { activeEditorTab, allEditorGroups } from '@/lib/documents/utils/groups'
 import { fileDocumentKey, fileResource, filesystemPath } from '@/lib/documents/utils/identity'
 import { documentTab } from '@/lib/documents/utils/tabs'
 import { activeEnvironmentId } from '@/lib/environments/state/domain'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { projectSettings } from '@workspace/client-core/settings/projection'
+import { settingsIntentStore } from '@workspace/client-core/settings/intent-store'
+import type { SettingsSnapshot } from '@workspace/contracts'
 import { ensureFileSnapshotQuery } from '@/lib/file-snapshot-query-cache'
-import { syncEditorThemeSelection } from '@/features/editor/state/color-theme-store'
 import {
   awaitEditorSyntaxWorkerIdleFences,
   EDITOR_THEME_SOURCE,
@@ -13,8 +17,12 @@ import { savedDiffAttachment, diffAttachmentSubject } from '@/lib/diff-attachmen
 import { joinRenderLines, projectDiffSyntaxTokens } from '@singapore-editor/diff'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { mountRetentionAcceptanceApp } from '../../../../test/factories/retention-acceptance-app'
+import type { RetentionAcceptanceApp } from '../../../../test/factories/retention-acceptance-app'
+import { settingsSnapshot } from '../../../../test/factories/settings'
 import {
   awaitRetentionAcceptanceReady,
+  configureRetentionAcceptanceSyntax,
+  type RetentionAcceptanceReadyDiagnostics,
   retentionAcceptanceSubject,
 } from '../../../../test/factories/retention-acceptance-paint'
 import {
@@ -24,6 +32,55 @@ import {
 } from '../../../../test/factories/diff-attachment'
 
 const path = filesystemPath('repo/src/editor-tab-a.ts')
+
+function liveReadinessObservation(app: RetentionAcceptanceApp) {
+  const subject = retentionAcceptanceSubject(app, path)
+  const settings = app.queryClient.getQueryData<SettingsSnapshot>(settingsKeys.document())
+  const projection = settings
+    ? projectSettings(
+        settings,
+        settingsIntentStore
+          .getState()
+          .active.filter((entry) => entry.patch.owner === app.queryClient),
+      )
+    : null
+  return {
+    at: performance.now(),
+    bootMirrorEnabled: readSettingsMirror()['editor.syntaxHighlighting.enabled'],
+    confirmedQueryEnabled: settings?.values['editor.syntaxHighlighting.enabled'],
+    projectedQueryEnabled: projection?.values['editor.syntaxHighlighting.enabled'],
+    pendingSettingsIntents: settingsIntentStore
+      .getState()
+      .active.filter((entry) => entry.patch.owner === app.queryClient)
+      .map((entry) => ({
+        target: entry.patch.request.target,
+        operations: entry.patch.request.operations.map((operation) => operation.kind),
+      })),
+    configuration: subject.configuration,
+    currentRevision: subject.document.buffer.getRevision(),
+    currentText: subject.document.buffer.materializeFullText(),
+    analysis: subject.document.analysis.inspectRetention(),
+    documentId: subject.document.analysis.documentId,
+    theme: {
+      selected: app.read().theme.selectedThemeId,
+      applied: app.read().theme.appliedThemeId,
+      hash: app.read().theme.appliedThemeContentHash,
+    },
+    controllers: [...app.read().ui.getState().controllersByTabId].map(([tab, controller]) => {
+      const snapshot = controller.getSnapshot()
+      return {
+        tab,
+        documentId: snapshot?.documentId,
+        revision: snapshot?.documentSyncPoint.revision,
+        syntax: snapshot?.syntaxStatus,
+        initial: snapshot?.initialHighlightStatus,
+        paintAvailable: snapshot ? snapshot.paintLayers !== null : false,
+        textVersion: snapshot?.textVersion,
+        tokenCount: snapshot?.tokens.length,
+      }
+    }),
+  }
+}
 
 declare module 'vitest' {
   interface TaskMeta {
@@ -36,6 +93,7 @@ test(
   { timeout: 30_000 },
   async (context) => {
     const app = await mountRetentionAcceptanceApp()
+    await configureRetentionAcceptanceSyntax(app, true)
     const saved = await ensureFileSnapshotQuery(app.queryClient, path)
     expect(await app.read().commands.openFileSurface(path)).toMatchObject({ status: 'applied' })
     await awaitRetentionAcceptanceReady(app, path)
@@ -177,14 +235,47 @@ test.for(['resolve', 'reject'] as const)(
   { timeout: 30_000 },
   async (outcome, context) => {
     const app = await mountRetentionAcceptanceApp()
+    await configureRetentionAcceptanceSyntax(app, true)
     await ensureFileSnapshotQuery(app.queryClient, path)
     expect(await app.read().commands.openFileSurface(path)).toMatchObject({ status: 'applied' })
-    await awaitRetentionAcceptanceReady(app, path)
+    const phases: unknown[] = []
+    const waitForLive = async (phase: 'opened' | 'edited') => {
+      const diagnostics: RetentionAcceptanceReadyDiagnostics = {}
+      phases.push({ phase, event: 'start', observation: liveReadinessObservation(app) })
+      try {
+        await awaitRetentionAcceptanceReady(app, path, diagnostics)
+        phases.push({ phase, event: 'ready', observation: liveReadinessObservation(app) })
+      } catch (error) {
+        try {
+          phases.push({
+            phase,
+            event: 'failed',
+            lastPoll: diagnostics.last,
+            observation: liveReadinessObservation(app),
+          })
+          context.task.meta.attachment200 = { outcome, phases }
+          await context.annotate(
+            JSON.stringify({ outcome, phases }),
+            'actual-initial-live-readiness-failure',
+          )
+        } catch {
+          context.task.meta.attachment200 = {
+            outcome,
+            phases,
+            failedPhase: phase,
+            lastPoll: diagnostics.last,
+            diagnosticCaptureFailed: true,
+          }
+        }
+        throw error
+      }
+    }
+    await waitForLive('opened')
     const document = retentionAcceptanceSubject(app, path).document
     const liveTab = activeEditorTab(app.read().workspace.getState().workbenchPanels.editorGroups)!
     const live = app.read().ui.getState().controllersByTabId.get(liveTab.id)!
     live.commands.edit({ from: 0, to: 0, text: 'export const oldLoan = 10\n' })
-    await awaitRetentionAcceptanceReady(app, path)
+    await waitForLive('edited')
     const loans = observeDiffSyntaxLoans()
     const observed = observeDiffEditors()
     loans.holdNext()
@@ -202,7 +293,15 @@ test.for(['resolve', 'reject'] as const)(
     const editing = createEditorBufferSession(document.buffer)
     editing.setSelection(0, 'export const oldLoan = 10\n'.length)
     editing.applyText('export const currentLoan = 20\n')
-    syncEditorThemeSelection('dark', 'tree-sitter-dark')
+    app.queryClient.setQueryData(
+      settingsKeys.document(),
+      settingsSnapshot({
+        values: {
+          'editor.syntaxHighlighting.enabled': true,
+          'editor.codeTheme.dark': 'tree-sitter-dark',
+        },
+      }),
+    )
     await expect.poll(() => app.read().theme.appliedThemeId).toBe('tree-sitter-dark')
     await expect
       .poll(() => app.container.querySelector('.editor-diff-pane')?.getAttribute('data-syntax'))
@@ -224,6 +323,7 @@ test.for(['resolve', 'reject'] as const)(
     expect(document.buffer.materializeFullText()).toContain('currentLoan')
     const evidence = {
       outcome,
+      phases,
       oldReaderCount: oldReaders.length,
       currentText: text,
       installed: captureDiffSnapshot(observed.read('stacked').delivered!),
