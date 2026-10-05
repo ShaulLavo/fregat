@@ -299,7 +299,7 @@
     },
     "editor/packages/editor": {
       "name": "@singapore-editor/core",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@fregat/hotkeys": "catalog:",
         "@shikijs/engine-oniguruma": "4.4.3",
