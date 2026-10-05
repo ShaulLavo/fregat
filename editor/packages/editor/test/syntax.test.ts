@@ -22,6 +22,167 @@ import {
 
 const TEXT = 'const value = 1'
 
+it('marks current highlighter work pending on the direct provider path while keeping rebased tokens', async () => {
+  const initial = deferred<EditorHighlightResult>()
+  const update = deferred<EditorHighlightResult>()
+  const structure = deferred<EditorSyntaxResult>()
+  const events: EditorInitialPaintEvent[] = []
+  const container = document.createElement('div')
+  document.body.append(container)
+  const editor = new Editor(container, {
+    plugins: [
+      highlighterPlugin({ ...highlighterSession(initial), applyChange: () => update.promise }),
+      syntaxPlugin(syntaxSession(structure)),
+    ],
+    onInitialPaint: (event) => events.push(event),
+  })
+  try {
+    editor.openDocument({ documentId: 'current.ts', languageId: 'typescript', text: TEXT })
+    initial.resolve({ tokens: EditorTokenStore.fromTokens([{ start: 0, end: 5, style: RED }]) })
+    structure.resolve(createEmptySyntaxResult())
+    await nextTask()
+    expect(editor.getState()).toMatchObject({
+      syntaxStatus: 'ready',
+      initialHighlightStatus: 'painted',
+    })
+    const settled = events.length
+    const prefix = '// pending\n'
+    editor.edit({ from: 0, to: 0, text: prefix })
+    expect(editor.getState().initialHighlightStatus).toBe('loading')
+    await vi.waitFor(() => expect(editor.getState().syntaxStatus).toBe('ready'))
+    expect(editor.getState()).toMatchObject({
+      syntaxStatus: 'ready',
+      initialHighlightStatus: 'loading',
+    })
+    expect(editor['syntax'].tokens.toTokens()).toEqual([
+      { start: prefix.length, end: prefix.length + 5, style: RED },
+    ])
+    expect(editor['syntax'].renderDataReady).toBe(false)
+    expect(editor['syntax'].copyTokens.length).toBe(0)
+    const current = EditorTokenStore.fromTokens([
+      { start: 0, end: prefix.length - 1, style: { color: '#008000' } },
+      { start: prefix.length, end: prefix.length + 5, style: RED },
+    ])
+    update.resolve({ tokens: current })
+    await nextTask()
+    expect(editor.getState().initialHighlightStatus).toBe('painted')
+    expect(editor['syntax'].tokens.toTokens()).toEqual(current.toTokens())
+    expect(editor['syntax'].renderDataReady).toBe(true)
+    expect(events).toHaveLength(settled)
+  } finally {
+    update.resolve({ tokens: EditorTokenStore.empty() })
+    editor.dispose()
+    container.remove()
+  }
+})
+
+it.each(['ready', 'error'] as const)(
+  'keeps the current edit pending when a prior structural replacement becomes %s',
+  async (outcome) => {
+    const update = deferred<EditorHighlightResult>()
+    const structure = deferred<EditorSyntaxResult>()
+    const initialTokens = EditorTokenStore.fromTokens([{ start: 0, end: 5, style: RED }])
+    let refreshes = 0
+    const events: EditorInitialPaintEvent[] = []
+    const host = document.createElement('div')
+    document.body.append(host)
+    const editor = new Editor(host, {
+      plugins: [
+        highlighterPlugin({
+          refresh: () =>
+            ++refreshes === 1 ? Promise.resolve({ tokens: initialTokens }) : update.promise,
+          applyChange: () => update.promise,
+          dispose: () => undefined,
+        }),
+      ],
+      onInitialPaint: (event) => events.push(event),
+    })
+    try {
+      editor.openDocument({ documentId: 'overlap.ts', languageId: 'typescript', text: TEXT })
+      await expect.poll(() => editor.getState().initialHighlightStatus).toBe('painted')
+      editor.addPlugin(syntaxPlugin(syntaxSession(structure)))
+      expect(editor.getState().initialHighlightStatus).toBe('loading')
+      editor.edit({ from: 0, to: 0, text: '// pending\n' })
+      expect(editor.materializeFullText()).toBe('// pending\n' + TEXT)
+      expect(editor.getState().initialHighlightStatus).toBe('loading')
+      if (outcome === 'ready') structure.resolve(createEmptySyntaxResult())
+      if (outcome === 'error') structure.reject(new TypeError('Held structural provider failed'))
+      await expect.poll(() => editor.getState().syntaxStatus).toBe(outcome)
+      expect(editor.getState().initialHighlightStatus).toBe('loading')
+      expect(editor['syntax'].renderDataReady).toBe(false)
+      expect(editor['syntax'].copyTokens.length).toBe(0)
+      expect(editor['syntax'].tokens.toTokens()).toEqual([{ start: 11, end: 16, style: RED }])
+      expect(events.filter(isHighlightSettled)).toHaveLength(1)
+      const current = EditorTokenStore.fromTokens([
+        { start: 0, end: 10, style: { color: '#008000' } },
+        { start: 11, end: 16, style: RED },
+      ])
+      update.resolve({ tokens: current })
+      await expect.poll(() => editor.getState().initialHighlightStatus).toBe('painted')
+      expect(editor['syntax'].tokens.toTokens()).toEqual(current.toTokens())
+      expect(editor['syntax'].copyTokens.toTokens()).toEqual(current.toTokens())
+      expect(editor['syntax'].renderDataReady).toBe(true)
+      expect(events.filter(isHighlightSettled)).toHaveLength(2)
+    } finally {
+      structure.resolve(createEmptySyntaxResult())
+      update.resolve({ tokens: EditorTokenStore.empty() })
+      editor.dispose()
+      host.remove()
+    }
+  },
+)
+
+it('keeps a current edit pending when a theme terminal captured before the edit settles', async () => {
+  const update = deferred<EditorHighlightResult>()
+  const theme = deferred<EditorTheme>()
+  const initialTokens = EditorTokenStore.fromTokens([{ start: 0, end: 5, style: RED }])
+  const events: EditorInitialPaintEvent[] = []
+  const host = document.createElement('div')
+  document.body.append(host)
+  const editor = new Editor(host, {
+    plugins: [
+      highlighterPlugin(
+        {
+          refresh: async () => ({ tokens: initialTokens }),
+          applyChange: () => update.promise,
+          dispose: () => undefined,
+        },
+        () => theme.promise,
+      ),
+    ],
+    onInitialPaint: (event) => events.push(event),
+  })
+  try {
+    editor.openDocument({ documentId: 'theme-overlap.ts', languageId: 'typescript', text: TEXT })
+    await expect.poll(() => editor['syntax'].tokens.length).toBe(1)
+    expect(editor.getState().initialHighlightStatus).toBe('loading')
+    expect(events.filter(isHighlightSettled)).toHaveLength(0)
+    editor.edit({ from: 0, to: 0, text: '// pending\n' })
+    const appearance = { foregroundColor: '#222222' }
+    theme.resolve(appearance)
+    await expect.poll(() => editor['syntax'].providerTheme).toEqual(appearance)
+    expect(editor.materializeFullText()).toBe('// pending\n' + TEXT)
+    expect(editor.getState().initialHighlightStatus).toBe('loading')
+    expect(editor['syntax'].renderDataReady).toBe(false)
+    expect(editor['syntax'].copyTokens.length).toBe(0)
+    expect(editor['syntax'].tokens.toTokens()).toEqual([{ start: 11, end: 16, style: RED }])
+    expect(events.filter(isHighlightSettled)).toHaveLength(0)
+    const current = EditorTokenStore.fromTokens([
+      { start: 0, end: 10, style: { color: '#008000' } },
+      { start: 11, end: 16, style: RED },
+    ])
+    update.resolve({ tokens: current })
+    await expect.poll(() => editor.getState().initialHighlightStatus).toBe('painted')
+    expect(editor['syntax'].copyTokens.toTokens()).toEqual(current.toTokens())
+    expect(events.filter(isHighlightSettled)).toHaveLength(1)
+  } finally {
+    theme.resolve({})
+    update.resolve({ tokens: EditorTokenStore.empty() })
+    editor.dispose()
+    host.remove()
+  }
+})
+
 describe('syntax capture conversion', () => {
   it('maps known capture names to editor token styles', () => {
     expect(styleForTreeSitterCapture('keyword.declaration')).toEqual({
@@ -394,6 +555,8 @@ describe('authoritative initial paint', () => {
 
   it('waits to publish a terminal provider replacement until its deferred theme is adopted', async () => {
     const highlight = deferred<EditorHighlightResult>()
+    const editedHighlight = deferred<EditorHighlightResult>()
+    const logs: EditorLogEvent[] = []
     const theme = deferred<EditorTheme | null | undefined>()
     const events: EditorInitialPaintEvent[] = []
     const snapshots: Array<{
@@ -404,13 +567,24 @@ describe('authoritative initial paint', () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
     const editor = new Editor(container, {
-      plugins: [themeSnapshotPlugin(snapshots)],
+      plugins: [
+        themeSnapshotPlugin(snapshots),
+        createEditorLoggingPlugin((event) => logs.push(event)),
+      ],
       onInitialPaint: (event) => events.push(event),
     })
     editor.openDocument({ documentId: 'provider-theme.ts', languageId: 'typescript', text: TEXT })
     expect(events.filter(isHighlightSettled)).toHaveLength(1)
 
-    editor.addPlugin(highlighterPlugin(highlighterSession(highlight), () => theme.promise))
+    editor.addPlugin(
+      highlighterPlugin(
+        {
+          ...highlighterSession(highlight),
+          applyChange: () => editedHighlight.promise,
+        },
+        () => theme.promise,
+      ),
+    )
     await nextTask()
     expect(editor.getState().initialHighlightStatus).toBe('loading')
 
@@ -424,6 +598,16 @@ describe('authoritative initial paint', () => {
     editor.setTheme({ backgroundColor: '#abcdef' })
     editor.edit({ from: 0, to: 0, text: 'x' })
     editor.setTokens([{ start: 1, end: 6, style: { color: '#00ff00' } }])
+    const currentTokens = EditorTokenStore.fromTokens([
+      { start: 1, end: 6, style: { color: '#00ff00' } },
+    ])
+    editedHighlight.resolve({ tokens: currentTokens })
+    await expect
+      .poll(() => logs.filter((event) => event.action === 'editor.syntax.highlight_applied').length)
+      .toBe(2)
+    expect(editor.getState().initialHighlightStatus).toBe('loading')
+    expect(editor['syntax'].copyTokens.toTokens()).toEqual(currentTokens.toTokens())
+    expect(events.filter(isHighlightSettled)).toHaveLength(1)
 
     theme.resolve({ foregroundColor: '#123456' })
     await nextTask()
