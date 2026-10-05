@@ -1,5 +1,6 @@
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { inspect } from 'node:util'
 
 export function createRetentionReloadTransport() {
   const tasks = new Set<Promise<void>>()
@@ -62,8 +63,36 @@ export function createRetentionReloadTransport() {
   }
 }
 
-export async function archiveRetentionReloadFailure(output: string, payload: unknown) {
-  await writeFile(join(output, 'failed-raw.json'), JSON.stringify(payload))
+export async function archiveRetentionReloadArtifact(
+  output: string,
+  name: string,
+  payload: unknown,
+) {
+  const failures: unknown[] = []
+  try {
+    await writeFile(join(output, name), JSON.stringify(payload))
+  } catch (error) {
+    failures.push(error)
+    try {
+      const diagnostic = inspect(
+        { artifact: name, failures, payload },
+        {
+          depth: null,
+          maxArrayLength: null,
+          maxStringLength: null,
+          customInspect: false,
+        },
+      )
+      await writeFile(join(output, name + '.fallback.txt'), diagnostic)
+    } catch (fallbackError) {
+      failures.push(fallbackError)
+    }
+  }
+  return failures
+}
+
+export function archiveRetentionReloadFailure(output: string, payload: unknown) {
+  return archiveRetentionReloadArtifact(output, 'failed-raw.json', payload)
 }
 
 export async function settleRetentionReloadCleanup(

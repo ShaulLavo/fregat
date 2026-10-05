@@ -9,6 +9,7 @@ import base from './vitest.browser.config.ts'
 import {
   createRetentionReloadTransport,
   archiveRetentionReloadFailure,
+  archiveRetentionReloadArtifact,
   settleRetentionReloadCleanup,
 } from './test/factories/retention-acceptance-reload-transport'
 import type {} from './test/factories/retention-acceptance-entry.tsx'
@@ -263,6 +264,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
     await writeFile(join(output, 'raw.json'), JSON.stringify(result))
     return result
   })()
+  const artifactFailures: unknown[] = []
   let cleanupFailures: unknown[] = []
   const outcome = await transport
     .race(operation)
@@ -283,52 +285,58 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
         await page
           .screenshot({ path: join(output, 'failure.png'), fullPage: true })
           .catch(() => undefined)
-        await archiveRetentionReloadFailure(output, {
-          arm,
-          phase,
-          pending: [...pending],
-          consoleMessages,
-          setup,
-          responses,
-          requestFailures,
-          frames,
-          errors,
-          failure: error instanceof Error ? error.message : String(error),
-          transportFailures: transport.failures,
-        })
+        artifactFailures.push(
+          ...(await archiveRetentionReloadFailure(output, {
+            arm,
+            phase,
+            pending: [...pending],
+            consoleMessages,
+            setup,
+            responses,
+            requestFailures,
+            frames,
+            errors,
+            failure: error instanceof Error ? error.message : String(error),
+            transportFailures: transport.failures,
+          })),
+        )
         return { kind: 'failure' as const, error }
       },
     )
     .finally(async () => {
       const cleanup = await settleRetentionReloadCleanup([
+        { stage: 'cancel-forwarding', run: () => isolated.request.dispose() },
         {
           stage: 'restore-syntax',
           run: () => page.evaluate(() => window.__retentionAcceptanceEntry?.setSyntaxEnabled(true)),
         },
-        { stage: 'drain-routes', run: () => transport.drain() },
-        { stage: 'unroute', run: () => page.unrouteAll({ behavior: 'wait' }) },
+        { stage: 'unroute', run: () => page.unrouteAll({ behavior: 'default' }) },
         {
           stage: 'archive-final-frames',
-          run: () =>
-            archiveFinalRetentionReloadFrames(page, output, {
-              phase,
-              transportFailures: transport.failures,
-              requestFailures,
-            }),
+          run: async () => {
+            artifactFailures.push(
+              ...(await archiveFinalRetentionReloadFrames(page, output, {
+                phase,
+                transportFailures: transport.failures,
+                requestFailures,
+              })),
+            )
+          },
         },
         { stage: 'close-context', run: () => isolated.close() },
+        { stage: 'drain-routes', run: () => transport.drain() },
       ])
-      await writeFile(
-        join(output, 'cleanup.json'),
-        JSON.stringify({
+      artifactFailures.push(
+        ...(await archiveRetentionReloadArtifact(output, 'cleanup.json', {
           phase,
           requestFailures,
           transportFailures: transport.failures,
+          artifactFailures: artifactFailures.map(errorMessage),
           cleanup: cleanup.map((outcome) => ({
             ...outcome,
             error: outcome.error === null ? null : errorMessage(outcome.error),
           })),
-        }),
+        })),
       )
       cleanupFailures = cleanup
         .filter((result) => result.error !== null)
@@ -337,6 +345,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
   if (outcome.kind === 'failure') throw outcome.error
   if (transport.failures.length > 0) throw transport.firstError
   if (cleanupFailures.length > 0) throw cleanupFailures[0]
+  if (artifactFailures.length > 0) throw artifactFailures[0]
   return outcome.result
 }
 
@@ -351,7 +360,7 @@ async function archiveFinalRetentionReloadFrames(
       observation: window.__retentionAcceptanceEntry?.capture() ?? null,
     }))
     .catch((error: unknown) => ({ failure: errorMessage(error) }))
-  await writeFile(join(output, 'final-raw.json'), JSON.stringify({ ...facts, final }))
+  return archiveRetentionReloadArtifact(output, 'final-raw.json', { ...facts, final })
 }
 
 function waitForRetentionAcceptanceEntry(page: BrowserCommandContext['page']) {
