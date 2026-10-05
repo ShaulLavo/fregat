@@ -1,3 +1,5 @@
+import { http, HttpResponse } from 'msw'
+import { server as transport } from '../../../../../test/msw/server'
 import { gzipSync, brotliCompressSync } from 'node:zlib'
 import {
   createDraftSessionSubmission,
@@ -13,7 +15,7 @@ import { TEST_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
 import { QueryClient } from '@tanstack/react-query'
 import { chatAttachmentSchema, attachmentUploadTicketSchema } from '@workspace/contracts'
 import * as v from 'valibot'
-import { attachmentFileUrl, attachmentTextOptions } from '../attachment-file'
+import { acquireAttachmentText, attachmentFileUrl, attachmentTextOptions } from '../attachment-file'
 import { expect, test } from '../../../../../test/fixtures'
 import { directInProcessFetcher } from '../../../../../test/client'
 
@@ -845,3 +847,160 @@ test.each([
     }
   },
 )
+
+test.each([false, true])(
+  'F1 later imperative peer keeps the actual shared request (local close: %s)',
+  async (closeView) => {
+    const input = {
+      attachment: {
+        type: 'file' as const,
+        id: 'later-imperative-peer',
+        name: 'peer.txt',
+        mimeType: 'text/plain',
+        sizeBytes: 4,
+      },
+      environmentId: TEST_ENVIRONMENT_ID,
+      origin: 'http://attachment-owner',
+      provenance: 'staged' as const,
+    }
+    const owner = new QueryClient()
+    const options = attachmentTextOptions(input)
+    const view = new AbortController()
+    let release: () => void = () => undefined
+    let entered: () => void = () => undefined
+    let requestSignal: AbortSignal | undefined
+    let requests = 0
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const started = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    transport.use(
+      http.get(attachmentFileUrl(input.attachment, input.origin), async ({ request }) => {
+        requests++
+        requestSignal = request.signal
+        entered()
+        await gate
+        return new HttpResponse('peer', {
+          headers: { 'content-length': '4', 'content-type': 'text/plain' },
+        })
+      }),
+    )
+    const local = acquireAttachmentText(input, owner, view.signal).then(
+      (value) => ({ status: 'success' as const, value }),
+      (cause: unknown) => ({ status: 'error' as const, cause }),
+    )
+    await started
+    const query = owner.getQueryCache().find({ queryKey: options.queryKey })
+    if (!query) return expect.fail('Expected the actual in-flight Query')
+    const events: string[] = []
+    const detach = owner.getQueryCache().subscribe((event) => {
+      events.push(event.type)
+    })
+    const originalPromise = query.promise
+    const originalOptions = query.options
+    try {
+      expect(query.getObserversCount()).toBe(0)
+      expect(query.isActive()).toBe(false)
+      expect(query.state.fetchStatus).toBe('fetching')
+      const peer = owner.query(options).then(
+        (value) => ({ status: 'success' as const, value }),
+        (cause: unknown) => ({ status: 'error' as const, cause }),
+      )
+      expect(requests).toBe(1)
+      expect(query.promise).toBe(originalPromise)
+      expect(query.options).toBe(originalOptions)
+      expect(query.getObserversCount()).toBe(0)
+      expect(query.state.fetchStatus).toBe('fetching')
+      expect(events).toEqual([])
+      if (closeView) view.abort()
+      release()
+      const [localResult, peerResult] = await Promise.all([local, peer])
+      expect({
+        requests,
+        aborted: requestSignal?.aborted,
+        localStatus: localResult.status,
+        peerStatus: peerResult.status,
+        observers: query.getObserversCount(),
+      }).toEqual({
+        requests: 1,
+        aborted: false,
+        localStatus: closeView ? 'error' : 'success',
+        peerStatus: 'success',
+        observers: 0,
+      })
+      if (peerResult.status !== 'success' || peerResult.value.kind !== 'attachment')
+        return expect.fail('Expected a real peer capture')
+      expect(peerResult.value.reader.readRange(0, peerResult.value.reader.length)).toBe('peer')
+      if (!closeView && localResult.status === 'success')
+        expect(localResult.value).toBe(peerResult.value)
+    } finally {
+      release()
+      detach()
+      owner.clear()
+    }
+  },
+)
+
+test('F1 explicit Query-owner cancellation aborts a shared acquisition and its later imperative peer', async () => {
+  const input = {
+    attachment: {
+      type: 'file' as const,
+      id: 'query-owner-cancel',
+      name: 'peer.txt',
+      mimeType: 'text/plain',
+      sizeBytes: 4,
+    },
+    environmentId: TEST_ENVIRONMENT_ID,
+    origin: 'http://attachment-owner',
+    provenance: 'staged' as const,
+  }
+  const owner = new QueryClient()
+  const options = attachmentTextOptions(input)
+  const view = new AbortController()
+  let release: () => void = () => undefined
+  let entered: () => void = () => undefined
+  let requestSignal: AbortSignal | undefined
+  let requests = 0
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const started = new Promise<void>((resolve) => {
+    entered = resolve
+  })
+  transport.use(
+    http.get(attachmentFileUrl(input.attachment, input.origin), async ({ request }) => {
+      requests++
+      requestSignal = request.signal
+      entered()
+      await gate
+      return new HttpResponse('peer', {
+        headers: { 'content-length': '4', 'content-type': 'text/plain' },
+      })
+    }),
+  )
+  const local = acquireAttachmentText(input, owner, view.signal).then(
+    (value) => ({ status: 'success' as const, value }),
+    (cause: unknown) => ({ status: 'error' as const, cause }),
+  )
+  await started
+  const peer = owner.query(options).then(
+    (value) => ({ status: 'success' as const, value }),
+    (cause: unknown) => ({ status: 'error' as const, cause }),
+  )
+  try {
+    await owner.cancelQueries({ queryKey: options.queryKey })
+    expect(requestSignal?.aborted).toBe(true)
+    expect(view.signal.aborted).toBe(false)
+    const [localResult, peerResult] = await Promise.all([local, peer])
+    expect(localResult.status).toBe('error')
+    expect(peerResult.status).toBe('error')
+    expect(requests).toBe(1)
+    expect(owner.getQueryData(options.queryKey)).toBeUndefined()
+    release()
+  } finally {
+    release()
+    owner.clear()
+  }
+})

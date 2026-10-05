@@ -162,7 +162,7 @@ test('a staged view waits for this completed acquisition, then holds it across a
   expect(document.querySelector('[data-chat-file-preview]')).toBeNull()
   expect(queryClient.getQueryState(options.queryKey)?.fetchStatus).toBe('fetching')
   const ownedRead = queryClient.getQueryCache().find({ queryKey: options.queryKey })
-  expect(ownedRead?.getObserversCount()).toBe(1)
+  expect(ownedRead?.getObserversCount()).toBe(0)
   expect(ownedRead?.isActive()).toBe(false)
   await act(async () => {
     complete()
@@ -201,7 +201,7 @@ test('a staged view waits for this completed acquisition, then holds it across a
   queryClient.clear()
 })
 
-test('unmount cancels a pending query interest and late transport cannot restore the view', async () => {
+test('unmount ends local acquisition wait and late Query transport cannot restore the view', async () => {
   const input = {
     attachment: {
       type: 'file' as const,
@@ -215,6 +215,8 @@ test('unmount cancels a pending query interest and late transport cannot restore
     provenance: 'staged' as const,
   }
   const queryClient = createTestQueryClient()
+  const options = attachmentTextOptions(input)
+  const mutationKey = chatMutationKeys.attachmentPreview(options.queryKey)
   let complete: () => void = () => undefined
   let requested: () => void = () => undefined
   let requestSignal: AbortSignal | undefined
@@ -236,18 +238,24 @@ test('unmount cancels a pending query interest and late transport cannot restore
     { queryClient },
   )
   await started
+  expect(queryClient.isMutating({ mutationKey })).toBe(1)
   view.unmount()
-  expect(requestSignal?.aborted).toBe(true)
+  await waitFor(() => expect(queryClient.isMutating({ mutationKey })).toBe(0))
+  expect(requestSignal?.aborted).toBe(false)
+  expect(queryClient.getQueryState(options.queryKey)?.fetchStatus).toBe('fetching')
   await act(async () => {
     complete()
     await reply
   })
+  await waitFor(() => expect(queryClient.getQueryState(options.queryKey)?.status).toBe('success'))
   expect(document.querySelector('[data-chat-file-preview]')).toBeNull()
+  expect(requestSignal?.aborted).toBe(false)
+  expect(queryClient.getMutationCache().findAll({ mutationKey, status: 'success' })).toHaveLength(0)
   const query = queryClient
     .getQueryCache()
     .find({ queryKey: attachmentTextOptions(input).queryKey })
   expect(query?.getObserversCount()).toBe(0)
-  expect(query?.state.data).toBeUndefined()
+  expect(queryClient.getQueryData(options.queryKey)?.kind).toBe('attachment')
   queryClient.clear()
 })
 

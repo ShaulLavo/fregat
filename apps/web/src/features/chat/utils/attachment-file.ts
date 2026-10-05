@@ -6,7 +6,7 @@ import {
   type EnvironmentId,
 } from '@workspace/contracts'
 import { createStringTextSnapshot } from '@singapore-editor/core'
-import { QueryObserver, queryOptions, type QueryClient } from '@tanstack/react-query'
+import { queryOptions, type QueryClient } from '@tanstack/react-query'
 import { createStructuredError } from '@workspace/observability/errors'
 import { attachmentQueryKeys } from './query-keys'
 
@@ -103,21 +103,9 @@ export async function acquireAttachmentText(
     )
   }
   signal.throwIfAborted()
-  const current = queryClient.getQueryCache().find({ queryKey: options.queryKey })
-  const peerRead = current?.state.fetchStatus !== 'idle' && current?.promise
-  const read = queryClient.query(options)
-  const observer = peerRead ? null : new QueryObserver(queryClient, { ...options, enabled: false })
-  const unsubscribe = observer?.subscribe(() => undefined)
-  if (unsubscribe) signal.addEventListener('abort', unsubscribe, { once: true })
-  if (signal.aborted) unsubscribe?.()
-  try {
-    const capture = await waitForQuery(read, signal)
-    signal.throwIfAborted()
-    return capture
-  } finally {
-    if (unsubscribe) signal.removeEventListener('abort', unsubscribe)
-    unsubscribe?.()
-  }
+  const capture = await waitForQuery(queryClient.query(options), signal)
+  signal.throwIfAborted()
+  return capture
 }
 
 async function waitForQuery<T>(read: Promise<T>, signal: AbortSignal) {
