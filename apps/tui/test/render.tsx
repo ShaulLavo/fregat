@@ -14,6 +14,11 @@ export async function renderTui(node: ReactNode, options: TestRendererOptions) {
   })
   return {
     ...frame,
+    async renderOnce() {
+      await act(async () => {
+        await frame.renderOnce()
+      })
+    },
     mockInput: {
       ...frame.mockInput,
       pressKey(...args: Parameters<typeof frame.mockInput.pressKey>) {

@@ -1014,7 +1014,6 @@ describe.skipIf(!userScopes)('quiet holds', () => {
     expect(runtime.stdout.toString().trim()).toBe('3s')
     quiet.child.kill('SIGSTOP')
     let next: ReturnType<typeof start> | undefined
-    let expired: ReturnType<typeof spawnSync> | undefined
     try {
       await expect
         .poll(() => readFileSync(`/proc/${quiet.child.pid}/status`, 'utf8'), {
@@ -1022,9 +1021,11 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         })
         .toMatch(/^State:\s+T/m)
       await expect.poll(bootSeconds, { timeout: 5_000 }).toBeGreaterThan(owner.quietDeadline!)
-      expired = spawnSync('systemctl', ['--user', 'stop', scope])
-      expect(expired.status).toBe(0)
-      await expect.poll(() => unitActive(scope), { timeout: 10_000 }).toBe(false)
+      await expect
+        .poll(() => unitActive(scope) || sliceState(box.sliceRoot, slice) === 'running', {
+          timeout: 10_000,
+        })
+        .toBe(false)
       writeFileSync(
         path.join(box.state, 'jobs', `${owner.id}.json`),
         JSON.stringify({
@@ -1047,7 +1048,6 @@ describe.skipIf(!userScopes)('quiet holds', () => {
             box,
             jobs: { quiet, next },
             units: [scope, slice],
-            manager: expired,
           }),
         ),
       )

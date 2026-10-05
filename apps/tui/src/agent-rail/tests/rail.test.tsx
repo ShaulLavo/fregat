@@ -1,4 +1,5 @@
 import type { SessionId } from '@workspace/contracts'
+import { vi } from 'vitest'
 import { failingCommandSocket } from '../../../test/client'
 import { submitPaletteSearch } from '../../../test/palette'
 import { Application } from '@/components/application'
@@ -25,6 +26,7 @@ import { traceFocus } from '../../../test/focus-trace'
 test('native session rail filters, marks, renames, archives, restores and deletes real sessions', async ({
   server,
 }) => {
+  using warnings = vi.spyOn(console, 'error')
   const harness = await renderAgentStage(server)
   const { frame, chat, worktreeId } = harness
   try {
@@ -83,6 +85,7 @@ test('native session rail filters, marks, renames, archives, restores and delete
     })
     await expect.poll(() => chat.getSnapshot().projection.sessionById[alpha]).toBeUndefined()
     expect(chat.getSnapshot().projection.sessionById[beta]?.title).toBe('Beta')
+    expect(unwrappedUpdates(warnings.mock.calls)).toEqual([])
   } finally {
     await harness.cleanup()
   }
@@ -106,7 +109,9 @@ test('native previous-session navigation from a draft selects the last visible s
     await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
     await runPaletteCommand(frame, 'Next tab or chat')
     await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(beta)
-    await chat.dispatch(createSessionArchiveCommand({ sessionId: beta }))
+    await act(async () => {
+      await chat.dispatch(createSessionArchiveCommand({ sessionId: beta }))
+    })
     await runPaletteCommand(frame, 'Previous tab or chat')
     await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
   } finally {
@@ -122,8 +127,10 @@ test('reordering keeps the moved session selected so the next action targets the
   try {
     const alpha = await createRailSession(chat, worktreeId, 'Alpha')
     const beta = await createRailSession(chat, worktreeId, 'Beta')
-    await chat.dispatch(createSessionPlaceCommand({ sessionId: beta, orderKey: 'b' }))
-    await chat.dispatch(createSessionPlaceCommand({ sessionId: alpha, orderKey: 'c' }))
+    await act(async () => {
+      await chat.dispatch(createSessionPlaceCommand({ sessionId: beta, orderKey: 'b' }))
+      await chat.dispatch(createSessionPlaceCommand({ sessionId: alpha, orderKey: 'c' }))
+    })
     await runPaletteCommand(frame, 'Filter sessions')
     await act(async () => {
       frame.mockInput.pressEnter()
@@ -329,6 +336,7 @@ test('native active reorder materializes visible keyless neighbors without pinni
 test('archiving the open session offers one U Undo that restores it and opens it again', async ({
   server,
 }) => {
+  using warnings = vi.spyOn(console, 'error')
   const harness = await renderAgentStage(server)
   const { frame, chat, worktreeId } = harness
   try {
@@ -337,15 +345,17 @@ test('archiving the open session offers one U Undo that restores it and opens it
     await focusRailSession(frame, 'Alpha')
     await act(async () => {
       frame.mockInput.pressEnter()
+      await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
     })
-    await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
-    await runPaletteCommand(frame, 'Archive selected sessions')
-    await expect
-      .poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt)
-      .not.toBeNull()
-    await expect.poll(() => chat.getSnapshot().selectedSessionId).not.toBe(alpha)
-    // The new draft focuses the composer on a timer; the rail refocus has to come after it.
-    await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
+    await runPaletteCommand(frame, 'Archive selected sessions', async () => {
+      await expect
+        .poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt)
+        .not.toBeNull()
+      await expect.poll(() => chat.getSnapshot().pendingCommands).toBe(0)
+      await expect.poll(() => chat.getSnapshot().selectedSessionId).not.toBe(alpha)
+      // The new draft focuses the composer on a timer; the rail refocus has to come after it.
+      await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
+    })
     await focusRailSession(frame, 'Beta')
     await frame.renderOnce()
     expect(frame.captureCharFrame(), 'undo notice expired before U').toContain(
@@ -353,22 +363,32 @@ test('archiving the open session offers one U Undo that restores it and opens it
     )
     await act(async () => {
       frame.mockInput.pressKey('u')
+      await expect
+        .poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt)
+        .toBeNull()
+      await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
+      await expect.poll(() => chat.getSnapshot().pendingCommands).toBe(0)
     })
-    await expect.poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt).toBeNull()
-    await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
     await frame.renderOnce()
     expect(frame.captureCharFrame()).not.toContain('to undo')
     await focusRailSession(frame, 'Alpha')
-    await runPaletteCommand(frame, 'Redo session action')
-    await expect
-      .poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt)
-      .not.toBeNull()
-    await expect.poll(() => chat.getSnapshot().selectedSessionId).not.toBe(alpha)
-    await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
+    await runPaletteCommand(frame, 'Redo session action', async () => {
+      await expect
+        .poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt)
+        .not.toBeNull()
+      await expect.poll(() => chat.getSnapshot().selectedSessionId).not.toBe(alpha)
+      await expect.poll(() => chat.getSnapshot().pendingCommands).toBe(0)
+      await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
+    })
     await focusRailSession(frame, 'Beta')
-    await runPaletteCommand(frame, 'Undo session action')
-    await expect.poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt).toBeNull()
-    await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
+    await runPaletteCommand(frame, 'Undo session action', async () => {
+      await expect
+        .poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt)
+        .toBeNull()
+      await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
+      await expect.poll(() => chat.getSnapshot().pendingCommands).toBe(0)
+    })
+    expect(unwrappedUpdates(warnings.mock.calls)).toEqual([])
   } finally {
     await harness.cleanup()
   }
@@ -438,3 +458,9 @@ test('a session row names its worktree pull request ahead of the branch', async 
     await h.cleanup()
   }
 })
+
+function unwrappedUpdates(calls: readonly (readonly unknown[])[]) {
+  return calls.filter((args) =>
+    args.some((value) => typeof value === 'string' && value.includes('not wrapped in act')),
+  )
+}

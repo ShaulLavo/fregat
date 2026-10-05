@@ -12,6 +12,7 @@ import {
 import { FsError, mapNodeError } from './errors'
 import { isIgnoredPath, resolveExistingPath, treeIgnoredNames, type WorkspacePaths } from './path'
 import { assertDirectory, statPath } from './stat'
+import { isWriteTemporaryPath } from './write'
 
 export type TreeReadOptions = {
   concurrency?: number
@@ -101,7 +102,7 @@ async function readEntryMetadata(
   name: string,
 ): Promise<FileTreeEntry | null> {
   const relativePath = joinRelative(relativeDirectory, name)
-  if (paths.isInternalPath(relativePath)) return null
+  if (paths.isInternalPath(relativePath) || isWriteTemporaryPath(relativePath)) return null
   if (isIgnoredPath(relativePath, treeIgnoredNames)) return null
 
   const entryStats = await safeEntryStats(paths, relativePath)
