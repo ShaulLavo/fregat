@@ -109,17 +109,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
       await owner.openFixture()
     }, arm.syntax)
     phase = 'baseline-ready'
-    await page.waitForFunction(
-      () => {
-        const observation = window.__retentionAcceptanceEntry?.capture()
-        return (
-          observation?.kind === 'mounted' &&
-          observation.views.some((view) => view.kind === 'observed' && view.mismatch === null)
-        )
-      },
-      undefined,
-      { timeout: 15_000 },
-    )
+    await waitForRetentionAcceptanceEntry(page)
     const before = await page.evaluate(() => window.__retentionAcceptanceEntry?.capture())
     await page.addInitScript((saved) => {
       const savedKeys = Object.keys(localStorage).filter((key) =>
@@ -199,17 +189,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
     phase = 'reload'
     reloading = true
     await page.reload()
-    await page.waitForFunction(
-      () => {
-        const observation = window.__retentionAcceptanceEntry?.capture()
-        return (
-          observation?.kind === 'mounted' &&
-          observation.views.some((view) => view.kind === 'observed' && view.mismatch === null)
-        )
-      },
-      undefined,
-      { timeout: 15_000 },
-    )
+    await waitForRetentionAcceptanceEntry(page)
     phase = 'code-font-loaded'
     const fontLoadReceipt = await page.evaluate(async () => {
       const font = '13px "JetBrains Mono Variable"'
@@ -293,6 +273,20 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
       await isolated.close()
     }
   }
+}
+
+function waitForRetentionAcceptanceEntry(page: BrowserCommandContext['page']) {
+  return page.waitForFunction(
+    () => {
+      const observation = window.__retentionAcceptanceEntry?.capture()
+      return (
+        observation?.kind === 'mounted' &&
+        observation.views.some((view) => view.kind === 'observed' && view.mismatch === null)
+      )
+    },
+    undefined,
+    { timeout: 15_000 },
+  )
 }
 
 declare global {
