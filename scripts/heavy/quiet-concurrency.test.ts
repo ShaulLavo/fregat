@@ -3,6 +3,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 
 import { live } from './queue'
+import { quietFailureReceipt } from './quiet-receipts'
 import {
   recordOf,
   removeSandboxes,
@@ -238,6 +239,12 @@ describe.skipIf(!userScopes)('quiet concurrent work', () => {
         machine: true,
       })
       let server: ReturnType<typeof start> | undefined
+      let cancellation: {
+        readonly at: string
+        readonly pid: number | undefined
+        readonly sent: boolean
+        readonly signal: 'SIGTERM'
+      } | null = null
       try {
         await expect.poll(quiet.stdout, { timeout: 10_000 }).toContain('started')
         server = start(
@@ -251,7 +258,14 @@ describe.skipIf(!userScopes)('quiet concurrent work', () => {
           },
         )
         await expect.poll(server.stdout, { timeout: 10_000 }).toContain('started')
-        if (mode === 'cancelled') quiet.child.kill('SIGTERM')
+        if (mode === 'cancelled') {
+          cancellation = {
+            at: new Date().toISOString(),
+            pid: quiet.child.pid,
+            signal: 'SIGTERM',
+            sent: quiet.child.kill('SIGTERM'),
+          }
+        }
         expect((await quiet.done).code).toBe(mode === 'expired' ? 75 : 143)
         const first = recordOf(box, 'expires')!
         expect(first.quietHoldExpired).toBe(mode === 'expired')
@@ -277,6 +291,16 @@ describe.skipIf(!userScopes)('quiet concurrent work', () => {
           server: true,
         })
         expect(live(box.state, 'jobs')).toEqual([])
+      } catch (error) {
+        console.error(
+          '[quiet-concurrency-failure]',
+          JSON.stringify({
+            mode,
+            cancellation,
+            receipt: quietFailureReceipt({ box, jobs: { measurement: quiet, server } }),
+          }),
+        )
+        throw error
       } finally {
         quiet.child.kill('SIGTERM')
         writeFileSync(releaseServer, '')

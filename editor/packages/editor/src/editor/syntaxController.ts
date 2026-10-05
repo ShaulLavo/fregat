@@ -896,6 +896,8 @@ export class EditorSyntaxController {
     }
     this.stoppedWarm = null
     this.syntaxContentVersion += 1
+    this.pendingInitialHighlightReplacement = null
+    this.pendingInitialHighlightThemeTerminal = null
     this.foldCoverage = null
     this.parsedSyntaxContentVersion = null
     this.projectSyntaxRangeCache(change)
@@ -1370,6 +1372,7 @@ export class EditorSyntaxController {
     const session = this.options.getSession()
     if (!this.highlighterSession || !session) return
 
+    if (change) this.initialHighlightState = 'loading'
     const configurationGeneration = this.initialHighlightConfigurationGeneration
     const delayMs = options.delayMs ?? syntaxRefreshDelay(change)
     this.highlightRequests.schedule({
