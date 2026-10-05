@@ -124,6 +124,20 @@ class FakeWorker implements LspWorkerLike {
 }
 
 describe('WebSocket LSP transport', () => {
+  it.each([2, 3])(
+    'reports physical state %i closed before the close event while sends remain failures',
+    async (state) => {
+      const pending = createWebSocketLspTransport('ws://fixture', { WebSocketCtor: FakeWebSocket })
+      const socket = FakeWebSocket.instances.at(-1)!
+      socket.open()
+      const transport = await pending
+      expect(transport.isClosed?.()).toBe(false)
+      socket.readyState = state
+      expect(transport.isClosed?.()).toBe(true)
+      expect(() => transport.send('{"method":"textDocument/didChange"}')).toThrow('closed')
+      transport.close()
+    },
+  )
   it('waits for the socket to open, then sends and receives JSON strings', async () => {
     FakeWebSocket.instances.length = 0
     const promise = createWebSocketLspTransport('ws://localhost:3000', {
@@ -246,6 +260,28 @@ describe('WebSocket LSP transport', () => {
 })
 
 describe('Worker LSP transport', () => {
+  it('reports typed closed-worker state with actual send and receive counts', () => {
+    const worker = new FakeWorker()
+    const transport = createWorkerLspTransport(worker)
+    transport.send('{"method":"initialize"}')
+    worker.receive('{"result":true}')
+    transport.close()
+    let failure: unknown
+    try {
+      transport.send('{"method":"textDocument/didChange"}')
+    } catch (error) {
+      failure = error
+    }
+    expect(failure).toBeInstanceOf(LspTransportClosedError)
+    expect(failure).toMatchObject({
+      code: null,
+      reason: 'worker transport closed',
+      wasClean: null,
+      sentCount: 1,
+      receivedCount: 1,
+    })
+    expect(worker.sent).toHaveLength(1)
+  })
   it('sends and receives JSON strings by default', () => {
     const worker = new FakeWorker()
     const transport = createWorkerLspTransport(worker)
@@ -280,6 +316,8 @@ describe('Worker LSP transport', () => {
 
     expect(worker.listenerCount('message')).toBe(0)
     expect(worker.terminated).toBe(true)
+    expect(transport.isClosed?.()).toBe(true)
+    expect(() => transport.send('{"method":"textDocument/didChange"}')).toThrow('closed')
   })
 
   it('signals the worker error that closed the transport', () => {

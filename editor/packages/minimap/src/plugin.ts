@@ -1,5 +1,4 @@
 import type {
-  EditorContributionChange,
   EditorDisposable,
   EditorCapabilityContribution,
   EditorCapabilityContributionContext,
@@ -103,6 +102,7 @@ class MinimapContribution implements EditorViewContribution {
       decorations: this.collectDecorations(),
       onLayoutWidth: this.reserveWidth,
       reservedLane: () => this.appliedReservedWidth,
+      contributions: context.getDocumentContributions(),
     })
     this.decorationSubscription = decorations.subscribe(this.handleDecorationsChanged)
     this.wheelScrollRegistration = registerWheelScrollTarget(context, this.host.root)
@@ -110,21 +110,29 @@ class MinimapContribution implements EditorViewContribution {
     this.client.update(this.latestSnapshot, 'document')
   }
 
-  public update(
-    snapshot: EditorViewSnapshot,
-    kind: EditorViewContributionUpdateKind,
-    change?: EditorContributionChange | null,
-  ): void {
+  public update(snapshot: EditorViewSnapshot, kind: EditorViewContributionUpdateKind): void {
     if (this.disposed) return
 
     this.latestSnapshot = snapshot
     this.latestViewport = snapshot.viewport
+    if (kind === 'document' || kind === 'clear') {
+      const contributions = this.context.getDocumentContributions()
+      this.client.setDocumentContributions(contributions, snapshot)
+      this.host.root.style.display = contributions ? '' : 'none'
+      if (!contributions) {
+        this.appliedReservedWidth = 0
+        this.layoutSignature = ''
+        this.scrollBox = null
+        this.context.reserveOverlayWidth(this.options.side, 0)
+        return
+      }
+    }
     if (snapshot.geometryCommitted === false) return
     if (kind === 'document' || kind === 'layout') this.scrollBox = null
     if (kind === 'document' || kind === 'layout' || kind === 'viewport') {
       this.synchronizeLayoutReservation()
     }
-    this.client.update(snapshot, kind, change)
+    this.client.update(snapshot, kind)
   }
 
   public updateViewport(viewport: EditorViewportSnapshot): void {

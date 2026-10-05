@@ -1,3 +1,8 @@
+import type {
+  DocumentProjectionReceipt,
+  DocumentWorkerIdentity,
+  DocumentWorkerPoint,
+} from '@singapore-editor/core/internal/document-worker'
 import type { TextEdit } from '@singapore-editor/core/document'
 import type {
   EditorMinimapDecoration as CoreEditorMinimapDecoration,
@@ -174,18 +179,6 @@ export type MinimapBaseStyles = {
 export type MinimapWorkerRequest =
   | MinimapWorkerInitRequest
   | { readonly type: 'updateBaseStyles'; readonly baseStyles: MinimapBaseStyles }
-  | { readonly type: 'openDocument'; readonly document: MinimapDocumentPayload }
-  | { readonly type: 'replaceDocument'; readonly document: MinimapDocumentPayload }
-  | {
-      readonly type: 'applyEdit'
-      readonly edit: TextEdit
-      readonly document: MinimapDocumentEditPayload
-    }
-  | {
-      readonly type: 'applyEdits'
-      readonly edits: readonly TextEdit[]
-      readonly document: MinimapDocumentEditPayload
-    }
   | { readonly type: 'updateTokens'; readonly tokens: readonly MinimapToken[] }
   | { readonly type: 'updateTokenRange'; readonly patch: MinimapTokenPatch }
   | { readonly type: 'updateSelection'; readonly selections: readonly MinimapSelection[] }
@@ -200,16 +193,44 @@ export type MinimapWorkerRequest =
       readonly viewport: MinimapViewport
     }
   | { readonly type: 'updateViewport'; readonly viewport: MinimapViewport }
-  | { readonly type: 'render'; readonly sequence: number }
+  | {
+      readonly type: 'render'
+      readonly sequence: number
+      readonly source: DocumentProjectionReceipt
+    }
+  | {
+      readonly type: 'projectSource'
+      readonly requestId: number
+      readonly identity: DocumentWorkerIdentity
+      readonly base: DocumentWorkerPoint | null
+      readonly target: DocumentWorkerPoint
+      readonly projection: MinimapSourceProjection
+    }
+  | { readonly type: 'releaseSource'; readonly identity: DocumentWorkerIdentity }
+
+export type MinimapSourceProjection =
+  | { readonly kind: 'reset'; readonly summary: MinimapDocumentSummaryPayload }
+  | {
+      readonly kind: 'patch'
+      readonly edits: readonly TextEdit[]
+      readonly summary: MinimapDocumentSummaryPatch
+    }
 
 export type MinimapWorkerResponse =
+  | {
+      readonly type: 'sourceApplied'
+      readonly requestId: number
+      readonly receipt: DocumentProjectionReceipt
+    }
   | { readonly type: 'layout'; readonly sequence: number; readonly layout: MinimapRenderLayout }
   | {
       readonly type: 'rendered'
       readonly sequence: number
+      readonly source: DocumentProjectionReceipt
       readonly sliderNeeded: boolean
       readonly sliderTop: number
       readonly sliderHeight: number
       readonly shadowVisible: boolean
     }
+  | { readonly type: 'renderSkipped'; readonly sequence: number }
   | { readonly type: 'error'; readonly sequence?: number; readonly message: string }

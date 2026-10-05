@@ -18,11 +18,11 @@ import {
   writeSessionSelectionCache,
   emptyWorkspaceSlice,
   readWorkspaceCache,
-  workspaceSliceStorageKey,
   writeRootFolderCache,
   writeWorkspaceIndexCache,
   writeWorkspaceSliceCache,
 } from '@/features/workspace/state/cache'
+import { workspaceSliceStorageKey } from '@/features/workspace/utils/cache-keys'
 import { TEST_PROJECT_ID, TEST_SESSION_ID, TEST_WORKTREE_ID } from '../../../../test/factories/chat'
 import {
   useChatChangedFilesExpansionStore,

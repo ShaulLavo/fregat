@@ -181,6 +181,9 @@ jobs:
       - name: Query API
         run: bun run query:check
 
+      - name: Document contribution ownership
+        run: bun run documents:check
+
       - name: Structured errors census
         run: bun run errors:census
 
@@ -370,6 +373,11 @@ jobs:
       - name: Browser test (web)
         timeout-minutes: 5
         run: bun run --cwd apps/web test:browser
+
+      - name: Browser test (syntax settings)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        run: bun run --cwd apps/web test:syntax-settings-browser
 
       - name: Browser test (tree)
         if: ${{ !cancelled() }}

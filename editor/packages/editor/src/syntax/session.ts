@@ -3,6 +3,8 @@ import type { DocumentTextSnapshot } from '../documentTextSnapshot'
 import type { PieceTableSnapshot } from '@singapore-editor/textbuffer'
 import type { TextEdit } from '../tokens'
 import type { EditorTokenInput } from './tokenStore'
+import type { DocumentRead } from '../editor/documentDelivery'
+import type { EditorStructuralOperation } from '../document/operations'
 
 export type EditorSyntaxLanguageId = string
 
@@ -136,14 +138,10 @@ export type EditorSyntaxResultOptions = {
 }
 
 export type EditorSyntaxSessionOptions = {
-  readonly documentId: string
-  readonly runtimeSessionId?: string
   readonly languageId: EditorSyntaxLanguageId | null
   readonly includeHighlights?: boolean
   readonly includeCaptures?: boolean
   readonly syntaxMode?: 'full' | 'range'
-  readonly textSnapshot: DocumentTextSnapshot
-  readonly snapshot: PieceTableSnapshot
 }
 
 let nextRuntimeSessionId = 1
@@ -172,8 +170,16 @@ export type EditorSyntaxSession = {
   dispose(): void
 }
 
+export type EditorSyntaxRuntime = Omit<
+  EditorSyntaxSession,
+  'refresh' | 'applyChange' | 'queryRange'
+> & {
+  analyze(read: DocumentRead, signal: AbortSignal): Promise<EditorSyntaxResult>
+  queryRange?(range: EditorSyntaxRange, signal: AbortSignal): Promise<EditorSyntaxResult>
+}
+
 export type EditorSyntaxProvider = {
-  createSession(options: EditorSyntaxSessionOptions): EditorSyntaxSession | null
+  readonly operation: EditorStructuralOperation
 }
 
 export const createEditorSyntaxSession = (): EditorSyntaxSession => createEmptySyntaxSession()

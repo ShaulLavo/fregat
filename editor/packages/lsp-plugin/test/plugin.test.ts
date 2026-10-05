@@ -2,6 +2,7 @@ import { LspConnectionPool } from '../src/lspConnectionPool'
 import type { LspReconnectOptions } from '../src/lspConnection'
 import { createLanguageServerDocument } from '../src/document'
 import { createEditorTextBuffer, createEditorBufferSession } from '@singapore-editor/core/document'
+import { acquireEditorDocumentAnalysis } from '@singapore-editor/core/internal/document-worker'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import type { EditorAnyCommandId } from '@singapore-editor/core/editor'
 import {
@@ -52,6 +53,13 @@ import {
 
 type JsonMessage = Record<string, unknown>
 type Listener = (event: Event) => void
+type OwnedView = { update(snapshot: EditorViewSnapshot): EditorViewSnapshot; dispose(): void }
+const ownedViews = new WeakMap<EditorViewContributionContext, OwnedView>()
+const ownedViewCleanups = new Set<() => void>()
+afterEach(() => {
+  for (const dispose of ownedViewCleanups) dispose()
+  ownedViewCleanups.clear()
+})
 
 class FakeTransport implements LspManagedTransport {
   public readonly sent: string[] = []
@@ -162,6 +170,10 @@ describe('createLanguageServerAdapterPlugin', () => {
       .mockReturnValue({ color: 'rgba(0, 0, 0, 0.25)' } as CSSStyleDeclaration)
     try {
       transport.receive(initializeResponse(jsonMessage(transport.sent[0])))
+      await vi.waitUntil(() => transport.sent.some(hasMethod('textDocument/didOpen')), {
+        interval: 1,
+        timeout: 1000,
+      })
       await flushPromises()
       transport.receive({
         jsonrpc: '2.0',
@@ -229,6 +241,10 @@ describe('createLanguageServerAdapterPlugin', () => {
     if (!contribution) throw new Error('missing contribution')
 
     transport.receive(initializeResponse(jsonMessage(transport.sent[0])))
+    await vi.waitUntil(() => transport.sent.some(hasMethod('textDocument/didOpen')), {
+      interval: 1,
+      timeout: 1000,
+    })
     await flushPromises()
 
     expect(textDocumentFor(transport.sent.find(hasMethod('textDocument/didOpen')))).toEqual({
@@ -303,7 +319,10 @@ describe('createLanguageServerAdapterPlugin', () => {
     )
     await flushPromises()
 
-    expect(command(commands, 'editor.action.formatDocument')({})).toBe(true)
+    await vi.waitUntil(() => command(commands, 'editor.action.formatDocument')({}), {
+      interval: 1,
+      timeout: 1000,
+    })
 
     const request = transport.sent.findLast(hasMethod('textDocument/formatting'))
     if (!request) throw new Error('missing formatting request')
@@ -350,6 +369,7 @@ describe('createLanguageServerAdapterPlugin', () => {
     socket.receive(initializeResponse(jsonMessage(socket.sent[0])))
     await flushPromises()
 
+    await vi.waitUntil(() => statuses.at(-1) === 'ready', { interval: 1, timeout: 1000 })
     expect(socket.url).toBe('ws://localhost/lsp/custom')
     expect(sentMethods(socket)).toEqual(['initialize', 'initialized', 'textDocument/didOpen'])
     expect(textDocumentFor(socket.sent[2])).toEqual({
@@ -358,6 +378,7 @@ describe('createLanguageServerAdapterPlugin', () => {
       version: 0,
       text: '# Notes',
     })
+    await vi.waitUntil(() => statuses.at(-1) === 'ready', { interval: 1, timeout: 1000 })
     expect(statuses).toEqual(['loading', 'ready'])
   })
 
@@ -423,7 +444,9 @@ describe('rename WorkspaceEdit routing', () => {
       source: 'rename',
     })
     expect(applied[0]?.guard.isCurrent(DOCUMENT_URI)).toBe(true)
-    expect(applied[0]?.guard.documents[0]?.textSnapshot).toBe(editor.textSnapshot())
+    expect(
+      applied[0]?.guard.documents[0]?.textSnapshot.readRange(0, editor.textSnapshot().length),
+    ).toBe(editor.textSnapshot().readRange(0, editor.textSnapshot().length))
     expect(editor.applyEdits).not.toHaveBeenCalled()
   })
 
@@ -435,6 +458,7 @@ describe('rename WorkspaceEdit routing', () => {
 
     expect(editor.runCommand('editor.action.rename')).toBe(true)
     await flushPromises()
+    await editor.awaitRequest('textDocument/rename')
     editor.answerRename({ changes: { [DOCUMENT_URI]: [] } })
     await flushPromises()
 
@@ -748,12 +772,20 @@ describe('connectionProvider', () => {
       viewContributionContext(editorSnapshot('# One', 'one.md'), { features: first.features }),
     )
     transport.receive(initializeResponse(jsonMessage(transport.sent[0])))
+    await vi.waitUntil(() => transport.sent.some(hasMethod('textDocument/didOpen')), {
+      interval: 1,
+      timeout: 1000,
+    })
     await flushPromises()
     second.provider.createContribution(
       viewContributionContext(editorSnapshot('# Two', 'two.md'), { features: second.features }),
     )
     await flushPromises()
 
+    await vi.waitUntil(
+      () => transport.sent.filter(hasMethod('textDocument/didOpen')).length === 2,
+      { interval: 1, timeout: 1000 },
+    )
     expect(counts.acquired).toBe(2)
     // One handshake, two documents. Before the seam existed this was two of
     // everything, because the connection died with the view that built it.
@@ -780,6 +812,10 @@ describe('connectionProvider', () => {
     )
     if (!contribution) throw new Error('missing contribution')
     transport.receive(initializeResponse(jsonMessage(transport.sent[0])))
+    await vi.waitUntil(() => transport.sent.some(hasMethod('textDocument/didOpen')), {
+      interval: 1,
+      timeout: 1000,
+    })
     await flushPromises()
 
     contribution.dispose()
@@ -799,6 +835,10 @@ describe('connectionProvider', () => {
       viewContributionContext(editorSnapshot('# One', 'one.md'), { features: first.features }),
     )
     transport.receive(initializeResponse(jsonMessage(transport.sent[0])))
+    await vi.waitUntil(() => transport.sent.some(hasMethod('textDocument/didOpen')), {
+      interval: 1,
+      timeout: 1000,
+    })
     await flushPromises()
 
     const onConnected = vi.fn()
@@ -817,6 +857,7 @@ describe('connectionProvider', () => {
     )
     await flushPromises()
 
+    await vi.waitUntil(() => onConnected.mock.calls.length === 1, { interval: 1, timeout: 1000 })
     expect(onConnected).toHaveBeenCalledTimes(1)
   })
 })
@@ -877,7 +918,10 @@ describe('shared language-server documents', () => {
     socket.open()
     await flushPromises()
     socket.receive(initializeResponse(jsonMessage(socket.sent[0])))
-    await document.lanes[0]!.connection.ready
+    await vi.waitUntil(() => document.lanes[0]!.connection.isReady(), {
+      interval: 1,
+      timeout: 1000,
+    })
     const mount = () => {
       const { provider, features } = activatePlugin(createLanguageServerPlugin({ document }), {
         applyEdits: vi.fn(),
@@ -900,7 +944,10 @@ describe('shared language-server documents', () => {
 
     const edit = createEditorBufferSession(buffer)
     edit.applyEdits([{ from: 7, to: 7, text: '!' }])
-    await flushPromises()
+    await vi.waitUntil(() => socket.sent.some(hasMethod('textDocument/didChange')), {
+      interval: 1,
+      timeout: 1000,
+    })
     expect(socket.sent.filter(hasMethod('textDocument/didChange'))).toHaveLength(1)
     const diagnostic = {
       ...publishDiagnosticsMessage(),
@@ -958,7 +1005,10 @@ describe('shared language-server documents', () => {
     socket.open()
     await flushPromises()
     socket.receive(initializeResponse(jsonMessage(socket.sent[0])))
-    await document.lanes[0]!.connection.ready
+    await vi.waitUntil(() => document.lanes[0]!.connection.isReady(), {
+      interval: 1,
+      timeout: 1000,
+    })
     socket.receive(publishDiagnosticsMessage())
     expect(document.lanes[0]!.sync.diagnostics).toHaveLength(1)
     socket.close()
@@ -979,7 +1029,10 @@ describe('shared language-server documents', () => {
     first.open()
     await flushPromises()
     first.receive(initializeResponse(jsonMessage(first.sent[0])))
-    await document.lanes[0]!.connection.ready
+    await vi.waitUntil(() => document.lanes[0]!.connection.isReady(), {
+      interval: 1,
+      timeout: 1000,
+    })
     first.receive(publishDiagnosticsMessage())
     expect(freshness.at(-1)).toBe('current')
 
@@ -998,7 +1051,7 @@ describe('shared language-server documents', () => {
     expect(sentMethods(second)).toContain('textDocument/didOpen')
     expect(document.lanes[0]!.status).toBe('ready')
     expect(freshness.at(-1)).toBe('silent')
-    second.receive(publishDiagnosticsMessage())
+    second.receive(publishDiagnosticsMessage(document.lanes[0]!.sync.activeDocument?.lspVersion))
     expect(freshness.at(-1)).toBe('current')
     document.dispose()
     pool.dispose()
@@ -1014,7 +1067,10 @@ describe('shared language-server documents', () => {
     first.open()
     await flushPromises()
     first.receive(initializeResponse(jsonMessage(first.sent[0])))
-    await document.lanes[0]!.connection.ready
+    await vi.waitUntil(() => document.lanes[0]!.connection.isReady(), {
+      interval: 1,
+      timeout: 1000,
+    })
 
     first.close()
     await vi.advanceTimersByTimeAsync(100)
@@ -1038,7 +1094,10 @@ describe('shared language-server documents', () => {
     socket.open()
     await flushPromises()
     socket.receive(initializeResponse(jsonMessage(socket.sent[0])))
-    await document.lanes[0]!.connection.ready
+    await vi.waitUntil(() => document.lanes[0]!.connection.isReady(), {
+      interval: 1,
+      timeout: 1000,
+    })
 
     expect(document.lanes[0]!.diagnosticsFreshness).toBe('silent')
     socket.receive(publishDiagnosticsMessage())
@@ -1063,7 +1122,10 @@ describe('shared language-server documents', () => {
         diagnosticProvider: { interFileDependencies: true, workspaceDiagnostics: false },
       }),
     )
-    await document.lanes[0]!.connection.ready
+    await vi.waitUntil(() => document.lanes[0]!.connection.isReady(), {
+      interval: 1,
+      timeout: 1000,
+    })
     await flushPromises()
 
     expect(summaries.at(-1)).toEqual({ freshness: 'awaiting', total: 0 })
@@ -1111,6 +1173,10 @@ describe('shared language-server documents', () => {
     )
     provider.createContribution(viewContributionContext(editorSnapshot(), { features }))
     transport.receive(initializeResponse(jsonMessage(transport.sent[0])))
+    await vi.waitUntil(() => transport.sent.some(hasMethod('textDocument/didOpen')), {
+      interval: 1,
+      timeout: 1000,
+    })
     await flushPromises()
 
     transport.receive(publishDiagnosticsMessage())
@@ -1165,13 +1231,13 @@ function activatePlugin(
   readonly commands: ReadonlyMap<EditorAnyCommandId, EditorCommandHandler>
   readonly features: ReadonlyMap<unknown, unknown>
 } {
-  let provider: EditorViewContributionProvider | null = null
+  const registered: { provider: EditorViewContributionProvider | null } = { provider: null }
   const commands = new Map<EditorAnyCommandId, EditorCommandHandler>()
   const features = new Map<unknown, unknown>()
   plugin.activate(
     createTestPluginContext({
       registerViewContribution: (value) => {
-        provider = value
+        registered.provider = value
         return { dispose: () => undefined }
       },
       registerCommandContribution: (value) => {
@@ -1185,8 +1251,28 @@ function activatePlugin(
     }),
   )
 
-  if (!provider) throw new Error('missing provider')
-  return { provider, commands, features }
+  const boundProvider = registered.provider
+  if (!boundProvider) throw new Error('missing provider')
+  return {
+    provider: {
+      createContribution(context) {
+        const contribution = boundProvider.createContribution(context)
+        const owned = ownedViews.get(context)
+        if (!contribution || !owned) return contribution
+        return {
+          update(snapshot, kind, change) {
+            contribution.update(owned.update(snapshot), kind, change)
+          },
+          dispose() {
+            contribution.dispose()
+            owned.dispose()
+          },
+        }
+      },
+    },
+    commands,
+    features,
+  }
 }
 
 function commandContributionContext(
@@ -1232,18 +1318,60 @@ function viewContributionContext(
     const feature = options.features.get(token)
     return feature === undefined ? null : feature
   }) as EditorViewContributionContext['getFeature']
-  return createTestViewContributionContext({
+  let display = snapshot
+  let buffer = createEditorTextBuffer(
+    snapshot.textSnapshot.readRange(0, snapshot.textSnapshot.length),
+  )
+  let session = createEditorBufferSession(buffer)
+  let owner = acquireEditorDocumentAnalysis({
+    buffer,
+    documentId: snapshot.documentId ?? 'fixture',
+  })
+  const getSnapshot = () => ({
+    ...display,
+    textSnapshot: buffer.getTextSnapshot(),
+    documentSyncPoint: buffer.getDocumentSyncPoint(),
+    changesSinceDocumentSyncPoint: (
+      point: Parameters<typeof buffer.changesSinceDocumentSyncPoint>[0],
+      scope: Parameters<typeof buffer.changesSinceDocumentSyncPoint>[1],
+    ) => buffer.changesSinceDocumentSyncPoint(point, scope),
+  })
+  const dispose = () => {
+    owner.dispose()
+    ownedViewCleanups.delete(dispose)
+  }
+  ownedViewCleanups.add(dispose)
+  const context = createTestViewContributionContext({
     container: element,
     scrollElement: element,
     contentElement: element,
     highlightPrefix: 'editor-test',
-    getSnapshot: () => snapshot,
+    getSnapshot,
+    getDocumentContributions: () => owner.analysis.contributions,
     getFeature,
     setSelection: vi.fn(),
     textOffsetFromPoint: vi.fn(() => 0),
     getRangeClientRect: vi.fn(() => new DOMRect(10, 20, 40, 18)),
     setRangeHighlight: vi.fn(),
   })
+  ownedViews.set(context, {
+    update(next) {
+      const text = next.textSnapshot.readRange(0, next.textSnapshot.length)
+      if (next.documentId !== display.documentId) {
+        const previous = owner
+        buffer = createEditorTextBuffer(text)
+        session = createEditorBufferSession(buffer)
+        owner = acquireEditorDocumentAnalysis({ buffer, documentId: next.documentId ?? 'fixture' })
+        previous.dispose()
+      } else if (text !== buffer.getTextSnapshot().readRange(0, buffer.getTextSnapshot().length)) {
+        session.applyEdits([{ from: 0, to: buffer.getTextSnapshot().length, text }])
+      }
+      display = next
+      return getSnapshot()
+    },
+    dispose,
+  })
+  return context
 }
 
 function editorSnapshot(fullText = '# Notes', documentId = 'README.md'): EditorViewSnapshot {
@@ -1302,13 +1430,13 @@ function initializeResponse(
   }
 }
 
-function publishDiagnosticsMessage(): JsonMessage {
+function publishDiagnosticsMessage(version = 0): JsonMessage {
   return {
     jsonrpc: '2.0',
     method: 'textDocument/publishDiagnostics',
     params: {
       uri: 'file:///README.md',
-      version: 0,
+      version,
       diagnostics: [
         {
           severity: 1,

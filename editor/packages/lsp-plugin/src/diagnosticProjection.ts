@@ -13,7 +13,7 @@ import type * as lsp from 'vscode-languageserver-protocol'
 export type SnapshotDocumentSession = {
   readonly previousDocument: LspTextDocumentSnapshot
   readonly nextDocument: LspTextDocumentSnapshot
-  readonly change: EditorContributionChange | null
+  readonly change: Pick<EditorContributionChange, 'edits'> | null
 }
 
 /**
@@ -41,7 +41,7 @@ export function projectDiagnosticsInSnapshot(
   )
 }
 
-function editsForChange(change: EditorContributionChange | null): readonly TextEdit[] {
+function editsForChange(change: SnapshotDocumentSession['change']): readonly TextEdit[] {
   if (!change) return []
   return change.edits
 }
@@ -94,7 +94,7 @@ function projectDiagnosticsThroughSnapshotChange(
   previousDocument: LspTextDocumentSnapshot,
   nextDocument: LspTextDocumentSnapshot,
   diagnostics: readonly lsp.Diagnostic[],
-  change: EditorContributionChange | null,
+  change: SnapshotDocumentSession['change'],
 ): readonly lsp.Diagnostic[] {
   if (diagnostics.length === 0) return diagnostics
 

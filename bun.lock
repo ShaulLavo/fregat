@@ -131,7 +131,7 @@
     },
     "apps/web": {
       "name": "web",
-      "version": "0.0.27",
+      "version": "0.0.30",
       "dependencies": {
         "@dnd-kit/core": "^6.3.1",
         "@dnd-kit/modifiers": "^9.0.0",
@@ -249,6 +249,7 @@
         "@singapore-editor/find": "workspace:*",
         "@singapore-editor/gutters": "workspace:*",
         "@singapore-editor/lsp": "workspace:*",
+        "@singapore-editor/lsp-plugin": "workspace:*",
         "@singapore-editor/markdown": "workspace:*",
         "@singapore-editor/minimap": "workspace:*",
         "@singapore-editor/paged": "workspace:*",
@@ -603,6 +604,8 @@
       },
       "devDependencies": {
         "@playwright/test": "^1.63.0",
+        "@shikijs/langs": "4.4.3",
+        "@shikijs/themes": "4.4.3",
         "@types/node": "^26.6.3",
         "@vitest/browser-playwright": "5.0.2",
         "happy-dom": "^20.14.5",
@@ -667,6 +670,7 @@
         "@singapore-editor/core": "workspace:*",
         "@singapore-editor/plugin-ui": "workspace:*",
         "@types/node": "^26.6.3",
+        "@vitest/browser-playwright": "5.0.2",
         "happy-dom": "^20.14.5",
         "oxfmt": "0.70.0",
         "oxlint": "1.85.0",
@@ -679,7 +683,7 @@
     },
     "ghostty-webgpu": {
       "name": "ghostty-webgpu",
-      "version": "0.3.15",
+      "version": "0.3.16",
       "dependencies": {
         "@fregat/hotkeys": "catalog:",
         "@webgpu/types": "0.1.74",
@@ -968,7 +972,7 @@
     },
     "scripts": {
       "name": "scripts",
-      "version": "0.0.28",
+      "version": "0.0.29",
       "dependencies": {
         "@workspace/utils": "workspace:*",
       },

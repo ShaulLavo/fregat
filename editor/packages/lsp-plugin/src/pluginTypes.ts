@@ -55,6 +55,8 @@ export type ActiveDocument = {
   readonly lineStarts: LspLineStarts
   readonly textVersion: number
   readonly lspVersion: number
+  readonly sourceRevision: number
+  readonly sourceSegment: object
 }
 
 export type DocumentDescriptor = {
@@ -63,4 +65,6 @@ export type DocumentDescriptor = {
   readonly textSnapshot: LspTextSnapshot
   readonly lineStarts: LspLineStarts
   readonly textVersion: number
+  readonly sourceRevision: number
+  readonly sourceSegment: object
 }

@@ -1496,6 +1496,65 @@ it('settles an earlier result generation without refreshing newer search inputs'
   })
 })
 
+it('settles replacement after an equivalent search refresh completes', () => {
+  const store = createSearchBufferStore()
+  store.getState().prepareBuffer('repo')
+  const query = searchQuery('needle')
+  const original = store.getState().startSearch(query)
+  store.getState().appendEvent(original, doneEvent('needle', 0))
+  const token = store.getState().startReplace('repo')!
+  const refreshed = store.getState().startSearch({ ...query })
+  store.getState().appendEvent(refreshed, doneEvent('needle', 0))
+  const revision = store.getState().active?.searchRevision ?? 0
+
+  store.getState().finishReplace(token, 'Done', true)
+
+  expect(store.getState().active?.replaceStatus).toBe('success')
+  expect(store.getState().active?.replaceMessage).toBe('Done')
+  expect(store.getState().active?.replaceRequest).toBeNull()
+  expect(store.getState().active?.searchRevision).toBeGreaterThan(revision)
+})
+
+it('settles replacement without refreshing changed search options', () => {
+  const store = createSearchBufferStore()
+  store.getState().prepareBuffer('repo')
+  const token = startReadyReplace(store, 'repo')!
+  store.getState().setSearchOptions('repo', { caseSensitive: true })
+  const revision = store.getState().active?.searchRevision
+
+  store.getState().finishReplace(token, 'Old result', true)
+
+  expect(store.getState().active).toMatchObject({
+    caseSensitive: true,
+    replaceStatus: 'idle',
+    replaceMessage: null,
+    replaceRequest: null,
+    searchRevision: revision,
+  })
+})
+
+it('settles replacement without refreshing a running search with a changed file limit', () => {
+  const store = createSearchBufferStore()
+  store.getState().prepareBuffer('repo')
+  const query = { ...searchQuery('needle'), fileLimit: 10 }
+  const original = store.getState().startSearch(query)
+  store.getState().appendEvent(original, doneEvent('needle', 0))
+  const token = store.getState().startReplace('repo')!
+  const runId = store.getState().startSearch({ ...query, fileLimit: 5 })
+  const revision = store.getState().active?.searchRevision
+
+  store.getState().finishReplace(token, 'Old result', true)
+
+  expect(store.getState().active).toMatchObject({
+    replaceStatus: 'idle',
+    replaceMessage: null,
+    replaceRequest: null,
+    runId,
+    searchRevision: revision,
+    status: 'loading',
+  })
+})
+
 it('an old replacement cannot settle a newer request in the same incarnation', () => {
   const store = createSearchBufferStore()
   store.getState().prepareBuffer('repo')

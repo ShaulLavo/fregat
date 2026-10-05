@@ -1,9 +1,8 @@
-import type { EditorSyntaxSessionFactory, HighlightRegistry } from './types'
+import type { HighlightRegistry } from './types'
 
 type EditorMountTimingObserver = (durationMs: number) => void
 
 let editorInstanceCount = 0
-let editorSyntaxSessionFactory: EditorSyntaxSessionFactory | undefined
 let highlightRegistry: HighlightRegistry | undefined
 const editorMountTimingObservers = new Set<EditorMountTimingObserver>()
 
@@ -40,14 +39,4 @@ export function setHighlightRegistry(registry: HighlightRegistry | undefined): v
 
 export function getHighlightRegistry(): HighlightRegistry | undefined {
   return highlightRegistry ?? globalThis.CSS?.highlights
-}
-
-export function setEditorSyntaxSessionFactory(
-  factory: EditorSyntaxSessionFactory | undefined,
-): void {
-  editorSyntaxSessionFactory = factory
-}
-
-export function getEditorSyntaxSessionFactory(): EditorSyntaxSessionFactory | undefined {
-  return editorSyntaxSessionFactory
 }

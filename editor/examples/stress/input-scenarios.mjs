@@ -6,6 +6,7 @@ import { inputScenarios, inputViewModes } from './input-results.mjs'
 import { inputPairOrder } from './input-paired.mjs'
 import { canStopInputPairs } from './input-pair-stopping.mjs'
 import { assertConsumerReadiness } from './input-output.mjs'
+import { consumerSourcesCurrent } from './input-source-current.mjs'
 import { inputReadinessTimeoutMs } from './src/inputReadiness.ts'
 
 export const operationsPerSample = {
@@ -485,10 +486,7 @@ export async function runSample(
             reset: {
               ...reset,
               fixtureHash: facts.sha256,
-              sourceCurrent:
-                !opened ||
-                (opened.sessions.every((source) => source.current && source.answered) &&
-                  opened.minimaps.every((source) => source.current)),
+              sourceCurrent: consumerSourcesCurrent(opened),
             },
           }
         : {}),
@@ -632,12 +630,7 @@ export async function waitForConsumerSource(page, pendingMinimapSource = false) 
     .poll(
       async () => {
         readiness = await readConsumerReadiness(page)
-        return (
-          readiness.sessions.every((session) => session.current && session.answered) &&
-          readiness.minimaps.every(
-            (minimap) => (minimap.current || pendingMinimapSource) && minimap.renderedAfterSource,
-          )
-        )
+        return consumerSourcesCurrent(readiness, pendingMinimapSource)
       },
       { timeout: inputReadinessTimeoutMs, intervals: [50] },
     )

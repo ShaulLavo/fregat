@@ -1,7 +1,11 @@
 import type { TextEdit } from '@singapore-editor/core/document'
 import type { EditorToken, PackedEditorTokens } from '@singapore-editor/core/syntax'
 import type { TreeSitterLanguageDescriptor, TreeSitterLanguageId } from './registry'
-import type { TreeSitterSourceDescriptor } from './source'
+import type {
+  DocumentWorkerReadReference,
+  DocumentWorkerSourceCommand,
+  DocumentWorkerSourceResult,
+} from '@singapore-editor/core/internal/document-worker'
 
 export type { TreeSitterLanguageId } from './registry'
 
@@ -128,7 +132,7 @@ export type TreeSitterParseRequest = {
   readonly includeHighlights: boolean
   readonly includeCaptures?: boolean
   readonly resultMode?: 'full' | 'parseOnly'
-  readonly source: TreeSitterSourceDescriptor
+  readonly source: DocumentWorkerReadReference
   readonly generation: number
   readonly cancellationBuffer?: SharedArrayBuffer
 }
@@ -143,7 +147,7 @@ export type TreeSitterEditRequest = {
   readonly includeHighlights: boolean
   readonly includeCaptures?: boolean
   readonly resultMode?: 'full' | 'parseOnly'
-  readonly source: TreeSitterSourceDescriptor
+  readonly source: DocumentWorkerReadReference
   readonly edits: readonly TextEdit[]
   readonly inputEdits: readonly TreeSitterInputEdit[]
   readonly generation: number
@@ -208,6 +212,7 @@ type TreeSitterDisposeRequest = {
 }
 
 export type TreeSitterWorkerRequestPayload =
+  | { readonly type: 'source'; readonly command: DocumentWorkerSourceCommand }
   | TreeSitterInitRequest
   | TreeSitterRegisterLanguagesRequest
   | TreeSitterWarmLanguagesRequest
@@ -221,6 +226,7 @@ export type TreeSitterWorkerRequestPayload =
   | TreeSitterDisposeRequest
 
 export type TreeSitterWorkerResult =
+  | DocumentWorkerSourceResult
   | TreeSitterParseResult
   | TreeSitterParseAckResult
   | TreeSitterRangeResult
@@ -250,13 +256,10 @@ export type TreeSitterWorkerRetentionSnapshot = {
   }[]
   readonly source: {
     readonly documentCount: number
-    readonly cacheEntries: number
-    readonly cacheChunkCount: number
-    readonly snapshotChunkCount: number
-    /** Unique chunk objects reachable from the cache or retained snapshots. */
-    readonly chunkCount: number
-    /** Sum of chunk UTF-16 lengths, without inferring string allocation bytes. */
-    readonly chunkUnits: number
+    readonly readCount: number
+    readonly pinCount: number
+    /** Logical UTF-16 units reachable from unique immutable source snapshots. */
+    readonly sourceUnits: number
   }
   readonly shared: {
     readonly registeredLanguages: number

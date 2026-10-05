@@ -1,6 +1,10 @@
+import {
+  createEditorHighlighterOperation,
+  createEditorStructuralOperation,
+} from '../src/editor/operationDefinitions'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DocumentEditChain } from '../src/editor/editChain'
-import { createDocumentSession } from '../src/documentSession'
+import { createEditorDocumentAnalysis } from '../src/editor/documentAnalysis'
+import { createEditorTextBuffer, createEditorBufferSession } from '../src/documentSession'
 import { EditorSyntaxController, fallbackFoldReason } from '../src/editor/syntaxController'
 import { EditorPluginHost, type EditorLogInput, type EditorPlugin } from '../src/plugins'
 import {
@@ -8,7 +12,7 @@ import {
   type EditorSyntaxFoldingSupport,
   type EditorSyntaxRange,
   type EditorSyntaxResult,
-  type EditorSyntaxSession,
+  type EditorSyntaxRuntime,
 } from '../src/syntax/session'
 import { EditorTokenStore } from '../src/syntax/tokenStore'
 
@@ -38,11 +42,10 @@ describe('fallback folding ownership', () => {
         {
           activate: (context) =>
             context.registerHighlighter({
-              createSession: () => ({
-                refresh: async () => ({ tokens: EditorTokenStore.empty() }),
-                applyChange: async () => ({ tokens: EditorTokenStore.empty() }),
+              operation: createEditorHighlighterOperation(() => ({
+                analyze: async () => ({ tokens: EditorTokenStore.empty() }),
                 dispose: () => undefined,
-              }),
+              })),
             }),
         },
       ],
@@ -124,10 +127,10 @@ describe('fallback folding ownership', () => {
   it('uses fallback after a terminal parser failure and suppresses it after recovery', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const providerSession = structuralSession('supported')
-    const refresh = vi.fn(providerSession.refresh)
+    const refresh = vi.fn(providerSession.analyze)
     refresh.mockRejectedValueOnce(new TypeError('Parser failed'))
     const fixture = controller({
-      plugins: [structuralPlugin({ ...providerSession, refresh })],
+      plugins: [structuralPlugin({ ...providerSession, analyze: refresh })],
     })
 
     fixture.syntax.refresh(1, null, { delayMs: 0 })
@@ -146,7 +149,9 @@ function controller(options: {
   readonly plugins?: readonly EditorPlugin[]
 }) {
   const languageId = options.languageId === undefined ? 'typescript' : options.languageId
-  const session = createDocumentSession('root\n  child\nnext\n')
+  const buffer = createEditorTextBuffer('root\n  child\nnext\n')
+  const session = createEditorBufferSession(buffer)
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'fold-policy' })
   const pluginHost = new EditorPluginHost(options.plugins)
   const logs: EditorLogInput[] = []
   let visibleRange: EditorSyntaxRange = { startIndex: 0, endIndex: session.getSnapshot().length }
@@ -158,7 +163,6 @@ function controller(options: {
     getCurrentSessionDocumentId: () => 'fold-policy',
     getLanguageId: () => languageId,
     getSession: () => session,
-    getDocumentEditChain: () => new DocumentEditChain(0, 0),
     getVisibleSyntaxRange: () => visibleRange,
     adoptTokens: () => undefined,
     clearSyntaxFolds: () => undefined,
@@ -169,6 +173,7 @@ function controller(options: {
     log: (event) => logs.push(event),
   })
   syntax.startDocument({
+    analysis,
     documentId: 'fold-policy',
     languageId,
     snapshot: session.getSnapshot(),
@@ -177,6 +182,7 @@ function controller(options: {
   disposers.push(() => {
     syntax.dispose()
     pluginHost.dispose()
+    analysis.dispose()
   })
   return {
     syntax,
@@ -187,18 +193,18 @@ function controller(options: {
   }
 }
 
-function structuralPlugin(session: EditorSyntaxSession | null): EditorPlugin {
+function structuralPlugin(session: EditorSyntaxRuntime | null): EditorPlugin {
   return {
-    activate: (context) => context.registerSyntaxProvider({ createSession: () => session }),
+    activate: (context) =>
+      context.registerSyntaxProvider({ operation: createEditorStructuralOperation(() => session) }),
   }
 }
 
-function structuralSession(foldingSupport: EditorSyntaxFoldingSupport): EditorSyntaxSession {
+function structuralSession(foldingSupport: EditorSyntaxFoldingSupport): EditorSyntaxRuntime {
   const result = createEmptySyntaxResult()
   return {
     foldingSupport,
-    refresh: async () => result,
-    applyChange: async () => result,
+    analyze: async () => result,
     getResult: () => result,
     getTokens: () => [],
     getSnapshotVersion: () => 0,

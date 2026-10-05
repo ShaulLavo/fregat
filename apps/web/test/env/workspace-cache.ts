@@ -1,5 +1,5 @@
 import { beforeEach } from 'vitest'
-import { WORKSPACE_CACHE_STORAGE_NAMESPACE } from '@/lib/workspace-cache-storage'
+import { WORKSPACE_CACHE_STORAGE_NAMESPACE } from '@/lib/workspace-cache-keys'
 
 // Every application runtime persists its workspace, so a test starts from the cache it seeds.
 beforeEach(() => {

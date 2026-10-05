@@ -57,6 +57,8 @@ export {
 export type {
   LspLineStarts,
   LspDocument,
+  LspPreparedDocumentSource,
+  LspDocumentSourcePreparation,
   LspDocumentChange,
   LspDocumentOpenSnapshotOptions,
   LspDocumentOpenSnapshotResult,
