@@ -835,3 +835,24 @@ statistics, workload, interception, package products or budgets. With minimap di
 predicate short-circuits and the prior readiness logic is unchanged. Any coordinator-approved reuse
 of unaffected reference evidence will retain its explicit old identity. No repaired-identity
 acceptance is claimed here.
+
+## Runtime qualification: effectful reader and live admission partition
+
+The new runtime instrument hashes live source admission in `input-source-current.mjs` as
+measurement. The frontend `src/input-output.ts` also belongs to measurement: after actual
+source-byte and opaque-buffer identity validation it records the bounded prior-current
+attestation used by subsequent live dormant admission. Only `input-output.mjs`, which checks
+postcapture receipts, remains validation-only. This is a new identity partition; archived
+controls, failures and earlier two-reader partitions retain their original hashes and scope.
+
+Warm resets physically hide the third view with explicit display state. A dormant canonical
+worker retains `current=false`; admission requires mapped physical invisibility, zero pending
+source/render/domain requests, valid source/render tuples and prior actual-current attestation.
+Reveal requires the latest actual source point and changed rendered output. Registered
+`renderSkipped` is terminal cancellation, retires its pending sequence and never counts as an
+accepted render. A later valid current frame can restore freshness after known cancellation.
+Unknown/stale responses and true errors fail closed for both active and dormant admission.
+
+Raw sides and schedule are archived after cleanup and before comparison. Capture or cleanup
+failures retain available receipts and explicitly incomplete schedule status. Every measurement
+change requires fresh controls and current-identity matrix, timing and reliability proofs.

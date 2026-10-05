@@ -76,6 +76,7 @@ export function installInputWorkerProof(negative = null) {
     session.canonical = null
     for (const [request, owner] of proof.requests)
       if (owner === session) proof.requests.delete(request)
+    proof.pendingWorkerRequests = proof.requests.size
     globalThis.__inputWorkerSources.delete(key)
     proof.disposedSessions++
   }
@@ -94,6 +95,7 @@ export function installInputWorkerProof(negative = null) {
       if (sameIdentity(pending.entry.command.identity, command.identity))
         proof.sourceRequests.delete(request)
     }
+    proof.pendingSourceRequests = proof.sourceRequests.size
     for (const session of globalThis.__inputWorkerSources.values()) {
       if (
         session.worker === proof &&
@@ -121,6 +123,7 @@ export function installInputWorkerProof(negative = null) {
         owner: source,
       }
     proof.sourceRequests.set(message.id, { source, entry })
+    proof.pendingSourceRequests = proof.sourceRequests.size
   }
   const observeSource = (proof, message) => {
     const payload = message?.payload
@@ -146,6 +149,7 @@ export function installInputWorkerProof(negative = null) {
     session.requested = message.id
     session.requestedVersion = payload.snapshotVersion ?? null
     proof.requests.set(message.id, session)
+    proof.pendingWorkerRequests = proof.requests.size
   }
   const observeMinimap = (proof, message) => {
     if (!message || typeof message !== 'object') return
@@ -154,6 +158,12 @@ export function installInputWorkerProof(negative = null) {
       proof.minimapLog.length = 0
       proof.minimapSource = null
       proof.sourceAcknowledged = false
+      for (const [id, pending] of proof.projectRequests)
+        if (sameIdentity(pending.message.identity, message.identity))
+          proof.projectRequests.delete(id)
+      proof.pendingSourceRequests = proof.projectRequests.size
+      proof.sourceReceipt = null
+      proof.attestedRenderedSource = null
       return
     }
     if (message.type === 'projectSource') {
@@ -168,6 +178,9 @@ export function installInputWorkerProof(negative = null) {
       proof.minimapLog.push(entry)
       proof.minimapSource = entry
       proof.sourceAcknowledged = false
+      proof.projectRequests.set(message.requestId, entry)
+      proof.pendingSourceRequests = proof.projectRequests.size
+      proof.sourceReceipt = null
     }
     if (['openDocument', 'replaceDocument', 'applyEdit', 'applyEdits'].includes(message.type)) {
       proof.protocol = 'legacy'
@@ -179,6 +192,9 @@ export function installInputWorkerProof(negative = null) {
     proof.latestRender = message.sequence
     proof.renderAfterSource = proof.sourceUpdates
     proof.renderSource = message.source ?? null
+    proof.requestedRenderSource = message.source ?? null
+    proof.renderRequests.set(message.sequence, message.source ?? null)
+    proof.pendingRenderRequests = proof.renderRequests.size
     proof.renderSourceMatched =
       proof.protocol === 'canonical' &&
       proof.sourceAcknowledged &&
@@ -189,6 +205,7 @@ export function installInputWorkerProof(negative = null) {
     const pending = proof.sourceRequests.get(data?.id)
     if (!pending) return
     proof.sourceRequests.delete(data.id)
+    proof.pendingSourceRequests = proof.sourceRequests.size
     const { source, entry } = pending
     const { command } = entry
     const receipt = data.ok ? (data.result?.source ?? data.result) : null
@@ -219,6 +236,7 @@ export function installInputWorkerProof(negative = null) {
     const session = proof.requests.get(data?.id)
     if (!session) return
     proof.requests.delete(data.id)
+    proof.pendingWorkerRequests = proof.requests.size
     if (data.id !== session.requested) return
     if (!data.ok) {
       session.failed = data.id
@@ -227,24 +245,57 @@ export function installInputWorkerProof(negative = null) {
     session.answered = data.id
     session.answeredVersion = data.result?.snapshotVersion ?? null
   }
+  const projectedResponse = (proof, data) => {
+    const entry = proof.projectRequests.get(data?.requestId)
+    if (!entry) {
+      proof.staleResponses++
+      return
+    }
+    const message = entry.message
+    const receipt = data.receipt
+    const valid =
+      receipt?.kind === 'applied' &&
+      sameIdentity(receipt.identity, message.identity) &&
+      samePoint(receipt.base, message.base) &&
+      samePoint(receipt.target, message.target)
+    if (!valid) {
+      proof.staleResponses++
+      return
+    }
+    entry.receipt = receipt
+    proof.projectRequests.delete(data.requestId)
+    proof.pendingSourceRequests = proof.projectRequests.size
+    if (entry !== proof.minimapSource) return
+    proof.sourceAcknowledged = true
+    proof.sourceReceipt = receipt
+  }
   const observeMinimapResponse = (proof, data) => {
-    const entry = proof.minimapSource
-    if (data?.type === 'sourceApplied' && entry?.message.requestId === data.requestId) {
-      const message = entry.message
-      const receipt = data.receipt
-      const valid =
-        receipt?.kind === 'applied' &&
-        sameIdentity(receipt.identity, message.identity) &&
-        samePoint(receipt.base, message.base) &&
-        samePoint(receipt.target, message.target)
-      if (valid) {
-        entry.receipt = receipt
-        proof.sourceAcknowledged = true
+    if (data?.type === 'error') proof.failedResponses++
+    if (data?.type === 'renderSkipped') {
+      if (!proof.renderRequests.has(data.sequence)) {
+        proof.staleResponses++
+        return
       }
+      proof.renderRequests.delete(data.sequence)
+      proof.pendingRenderRequests = proof.renderRequests.size
+      proof.canceledRenders++
+      return
+    }
+    if (data?.type === 'sourceApplied') projectedResponse(proof, data)
+    if (data?.type === 'rendered') {
+      const requested = proof.renderRequests.get(data.sequence)
+      const registered = proof.renderRequests.has(data.sequence)
+      const valid =
+        registered && (proof.protocol !== 'canonical' || sameReceipt(data.source, requested))
+      if (valid) {
+        proof.renderRequests.delete(data.sequence)
+        proof.pendingRenderRequests = proof.renderRequests.size
+      } else proof.staleResponses++
     }
     if (data?.type !== 'rendered' || data.sequence !== proof.latestRender) return
     if (proof.protocol === 'canonical')
       proof.acceptedSourceMatched = sameReceipt(data.source, proof.renderSource)
+    proof.acceptedRenderSource = data.source ?? null
     proof.acceptedRender = data.sequence
     proof.renders++
   }
@@ -328,8 +379,25 @@ export function installInputWorkerProof(negative = null) {
         sourceAcknowledged: false,
         renderSourceMatched: false,
         acceptedSourceMatched: false,
+        pendingSourceRequests: 0,
+        pendingWorkerRequests: 0,
+        pendingRenderRequests: 0,
+        failedResponses: 0,
+        canceledRenders: 0,
+        staleResponses: 0,
+        sourceReceipt: null,
+        requestedRenderSource: null,
+        acceptedRenderSource: null,
+        attestedRenderedSource: null,
       }
-      for (const name of ['requests', 'sourceRequests', 'documents', 'reads'])
+      for (const name of [
+        'requests',
+        'sourceRequests',
+        'documents',
+        'reads',
+        'projectRequests',
+        'renderRequests',
+      ])
         Object.defineProperty(this.proof, name, { value: new Map(), enumerable: false })
       Object.defineProperty(this.proof, 'minimapLog', { value: [], enumerable: false })
       Object.defineProperty(this.proof, 'minimapSource', {
@@ -360,8 +428,22 @@ export function installInputWorkerProof(negative = null) {
       for (const [key, session] of globalThis.__inputWorkerSources)
         if (session.worker === this.proof) releaseSession(this.proof, key, session)
       for (const source of this.proof.documents.values()) source.log.length = 0
-      for (const name of ['requests', 'sourceRequests', 'documents', 'reads'])
+      for (const name of [
+        'requests',
+        'sourceRequests',
+        'documents',
+        'reads',
+        'projectRequests',
+        'renderRequests',
+      ])
         this.proof[name].clear()
+      this.proof.pendingSourceRequests = 0
+      this.proof.pendingWorkerRequests = 0
+      this.proof.pendingRenderRequests = 0
+      this.proof.sourceReceipt = null
+      this.proof.requestedRenderSource = null
+      this.proof.acceptedRenderSource = null
+      this.proof.attestedRenderedSource = null
       this.proof.minimapLog.length = 0
       this.proof.minimapSource = null
       this.proof.renderSource = null
@@ -595,19 +677,85 @@ export function minimapProofState(worker, workers, visible) {
   const canonical =
     worker.protocol === 'canonical' ||
     workers.some((peer) => peer.url === worker.url && peer.protocol === 'canonical')
-  const dormant =
-    canonical &&
-    visible === false &&
-    typeof worker.viewId === 'string' &&
-    worker.sourceUpdates === 0 &&
-    worker.latestRender === 0
   const renderedAfterSource =
     worker.renderAfterSource === worker.sourceUpdates &&
     worker.latestRender > 0 &&
     worker.acceptedRender === worker.latestRender &&
     (!canonical ||
-      (worker.sourceAcknowledged && worker.renderSourceMatched && worker.acceptedSourceMatched))
+      (worker.sourceAcknowledged &&
+        worker.renderSourceMatched &&
+        worker.acceptedSourceMatched &&
+        worker.pendingSourceRequests === 0 &&
+        worker.pendingRenderRequests === 0 &&
+        validProjectionReceipt(worker.sourceReceipt) &&
+        receiptsEqual(worker.sourceReceipt, worker.requestedRenderSource) &&
+        receiptsEqual(worker.sourceReceipt, worker.acceptedRenderSource)))
+  const dormant =
+    canonical &&
+    visible === false &&
+    typeof worker.viewId === 'string' &&
+    worker.pendingSourceRequests === 0 &&
+    worker.pendingRenderRequests === 0 &&
+    worker.failedResponses === 0 &&
+    worker.staleResponses === 0 &&
+    ((worker.sourceUpdates === 0 && worker.latestRender === 0) ||
+      (renderedAfterSource && settledMinimapSource(worker)))
   return { protocol: canonical ? 'canonical' : 'legacy', dormant, renderedAfterSource }
+}
+
+function settledMinimapSource(worker) {
+  const receipt = worker.sourceReceipt
+  return (
+    validProjectionReceipt(receipt) &&
+    receiptsEqual(receipt, worker.requestedRenderSource) &&
+    receiptsEqual(receipt, worker.acceptedRenderSource) &&
+    receiptsEqual(receipt, worker.attestedRenderedSource)
+  )
+}
+
+function validProjectionReceipt(receipt) {
+  const identity = receipt?.identity
+  return (
+    receipt?.kind === 'applied' &&
+    typeof identity?.documentId === 'string' &&
+    identity.documentId.length > 0 &&
+    ['documentGeneration', 'endpointGeneration', 'registrationId'].every(
+      (key) => Number.isSafeInteger(identity[key]) && identity[key] > 0,
+    ) &&
+    validWirePoint(receipt.target) &&
+    (receipt.base === null || validWirePoint(receipt.base))
+  )
+}
+
+function validWirePoint(point) {
+  return (
+    typeof point?.segment === 'string' &&
+    point.segment.length > 0 &&
+    Number.isSafeInteger(point.revision) &&
+    point.revision >= 0 &&
+    Number.isSafeInteger(point.textVersion) &&
+    point.textVersion >= 0
+  )
+}
+
+function receiptsEqual(left, right) {
+  return (
+    validProjectionReceipt(left) &&
+    validProjectionReceipt(right) &&
+    identitiesEqual(left.identity, right.identity) &&
+    pointsEqual(left.base, right.base) &&
+    pointsEqual(left.target, right.target)
+  )
+}
+
+export function attestMinimapCurrentSource(worker) {
+  if (
+    !validProjectionReceipt(worker.sourceReceipt) ||
+    !receiptsEqual(worker.sourceReceipt, worker.requestedRenderSource) ||
+    !receiptsEqual(worker.sourceReceipt, worker.acceptedRenderSource)
+  )
+    return
+  worker.attestedRenderedSource = worker.sourceReceipt
 }
 
 export function minimapRenderAccepted(worker, workers, visible) {

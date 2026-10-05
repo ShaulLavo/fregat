@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
 
-// Only receipt readers and output predicates are validation-only. Unknown sources belong to
-// measurement, including launch, readiness fences, worker interception and identity partitioning.
-const validationSources = new Set(['input-output.mjs', 'src/input-output.ts'])
+// Postcapture predicates are validation-only. The frontend reader records attestation used by
+// live readiness, so its bytes and unknown sources belong to measurement.
+const validationSources = new Set(['input-output.mjs'])
 
 export function inputSourceIdentity(sources, externalHash, launch = {}) {
   const measurement = createHash('sha256').update(externalHash).update(JSON.stringify(launch))

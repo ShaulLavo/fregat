@@ -1,5 +1,6 @@
 import { fail } from './errors.mjs'
 import { inputConsumerConfiguration } from './input-configurations.mjs'
+import { admittedDormantMinimap } from './input-source-current.mjs'
 
 const syntaxHighlight = /^editor-shared-token-/
 
@@ -113,6 +114,10 @@ export function assertConsumerReadiness(
       check(viewIndex >= 0 && viewIndex < viewCount, `minimap ${index} has no live view identity`)
       if (receipt.dormant) {
         check(!readiness.views[viewIndex].visible, `minimap ${index} is dormant in a visible view`)
+        check(
+          admittedDormantMinimap(readiness, receipt),
+          `minimap ${index} has unsettled hidden source or render demand`,
+        )
         continue
       }
     }

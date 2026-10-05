@@ -12,6 +12,7 @@ import {
   type InputWireIdentity,
   type InputWirePoint,
   type createInputSourceIdentity,
+  attestMinimapCurrentSource,
 } from '../input-worker-proof.mjs'
 
 type ConsumerSession = {
@@ -84,23 +85,28 @@ function minimapReceipts(text: string, point: InputPublicationPoint, identity: S
   const workers = (globalThis.__inputWorkerProof ?? []) as readonly MinimapProof[]
   return workers
     .filter((worker) => worker.minimap && !worker.terminated)
-    .map((worker) => ({
-      ...minimapProofState(
-        worker,
-        workers,
-        worker.viewId ? (document.getElementById(worker.viewId)?.checkVisibility() ?? null) : null,
-      ),
-      viewId: worker.viewId ?? null,
-      sourcePoint: worker.minimapSource?.receipt?.target ?? null,
-      current:
+    .map((worker) => {
+      const visible = worker.viewId
+        ? (document.getElementById(worker.viewId)?.checkVisibility() ?? null)
+        : null
+      const state = minimapProofState(worker, workers, visible)
+      const current =
         minimapMatches(replayMinimapLines(worker.minimapLog), text) &&
         (worker.protocol !== 'canonical' ||
           identity.matches(
             worker.minimapSource?.receipt?.identity,
             worker.minimapSource?.receipt?.target,
             point,
-          )),
-    }))
+          ))
+      if (current && state.renderedAfterSource && worker.protocol === 'canonical')
+        attestMinimapCurrentSource(worker)
+      return {
+        ...minimapProofState(worker, workers, visible),
+        viewId: worker.viewId ?? null,
+        sourcePoint: worker.minimapSource?.receipt?.target ?? null,
+        current,
+      }
+    })
 }
 
 function tokenHighlights() {

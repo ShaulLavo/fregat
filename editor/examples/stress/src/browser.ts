@@ -131,7 +131,7 @@ function resetInput() {
   for (const [index, editor] of editors.entries()) {
     const host = document.querySelector<HTMLElement>(`#view-${index}`)!
     host.hidden = index === 2
-    if (index !== 2) host.style.display = 'flex'
+    host.style.display = index === 2 ? 'none' : 'flex'
     editor.setSelection(0, 0, { reveal: true })
   }
   paints = []

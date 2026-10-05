@@ -52,7 +52,24 @@ export type MinimapProofObservation = {
   readonly sourceAcknowledged?: boolean
   readonly renderSourceMatched?: boolean
   readonly acceptedSourceMatched?: boolean
+  readonly pendingSourceRequests?: number
+  readonly pendingWorkerRequests?: number
+  readonly pendingRenderRequests?: number
+  readonly failedResponses?: number
+  readonly canceledRenders?: number
+  readonly staleResponses?: number
+  readonly sourceReceipt?: InputProjectionReceipt | null
+  readonly requestedRenderSource?: InputProjectionReceipt | null
+  readonly acceptedRenderSource?: InputProjectionReceipt | null
+  readonly attestedRenderedSource?: InputProjectionReceipt | null
 }
+export type InputProjectionReceipt = {
+  readonly kind: 'applied'
+  readonly identity: InputWireIdentity
+  readonly base: InputWirePoint | null
+  readonly target: InputWirePoint
+}
+export function attestMinimapCurrentSource(worker: MinimapProofObservation): void
 export function minimapProofState(
   worker: MinimapProofObservation,
   workers: readonly MinimapProofObservation[],

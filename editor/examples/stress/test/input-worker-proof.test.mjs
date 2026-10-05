@@ -9,6 +9,7 @@ import {
   replayCanonicalSource,
   minimapProofState,
   minimapRenderAccepted,
+  attestMinimapCurrentSource,
 } from '../input-worker-proof.mjs'
 
 test('replays Shiki open text and edit batches against the text before each batch', () => {
@@ -412,6 +413,10 @@ test('dormant hidden minimap requires actual view identity and proven canonical 
     sourceAcknowledged: true,
     renderSourceMatched: true,
     acceptedSourceMatched: true,
+    pendingSourceRequests: 0,
+    pendingRenderRequests: 0,
+    failedResponses: 0,
+    staleResponses: 0,
   }
   const hidden = {
     ...visible,
@@ -432,6 +437,56 @@ test('dormant hidden minimap requires actual view identity and proven canonical 
   expect(minimapRenderAccepted({ ...hidden, url: 'other' }, [visible, hidden], false)).toBe(false)
   expect(minimapRenderAccepted(hidden, [hidden], false)).toBe(false)
 })
+
+test('registered render cancellation retires pending work and a later fully attested frame restores freshness', () => {
+  const { worker, receipt } = projectedMinimap()
+  worker.postMessage({ type: 'render', sequence: 1, source: receipt })
+  worker.emit({ type: 'renderSkipped', sequence: 1 })
+  expect(worker.proof.pendingRenderRequests).toBe(0)
+  expect(worker.proof.canceledRenders).toBe(1)
+  expect(worker.proof.failedResponses).toBe(0)
+  expect(worker.proof.acceptedRender).toBe(0)
+  expect(minimapRenderAccepted(worker.proof, [worker.proof], false)).toBe(false)
+  worker.postMessage({ type: 'render', sequence: 2, source: receipt })
+  worker.emit({ type: 'rendered', sequence: 2, source: receipt })
+  expect(minimapMatches(replayMinimapLines(worker.proof.minimapLog), 'abc')).toBe(true)
+  attestMinimapCurrentSource(worker.proof)
+  expect(worker.proof.pendingRenderRequests).toBe(0)
+  expect(minimapRenderAccepted(worker.proof, [worker.proof], true)).toBe(true)
+  expect(minimapProofState(worker.proof, [worker.proof], false).dormant).toBe(true)
+})
+
+test('unknown render cancellation stays stale and cannot retire a registered frame', () => {
+  const { worker, receipt } = projectedMinimap()
+  worker.postMessage({ type: 'render', sequence: 2, source: receipt })
+  worker.emit({ type: 'renderSkipped', sequence: 999 })
+  expect(worker.proof.pendingRenderRequests).toBe(1)
+  expect(worker.proof.canceledRenders).toBe(0)
+  expect(worker.proof.staleResponses).toBe(1)
+  expect(worker.proof.acceptedRender).toBe(0)
+  expect(minimapRenderAccepted(worker.proof, [worker.proof], false)).toBe(false)
+  worker.emit({ type: 'rendered', sequence: 2, source: receipt })
+  attestMinimapCurrentSource(worker.proof)
+  expect(worker.proof.staleResponses).toBe(1)
+  expect(minimapProofState(worker.proof, [worker.proof], false).dormant).toBe(false)
+})
+
+function projectedMinimap() {
+  const page = proofPage()
+  const worker = new page.Worker('minimap.worker.js')
+  worker.proof.viewId = 'view-2'
+  worker.postMessage({
+    type: 'projectSource',
+    requestId: 1,
+    identity,
+    base: null,
+    target: point,
+    projection: { kind: 'reset', summary: { lines: [{ text: 'abc', length: 3 }], textLength: 3 } },
+  })
+  const receipt = { kind: 'applied', identity, base: null, target: point }
+  worker.emit({ type: 'sourceApplied', requestId: 1, receipt })
+  return { worker, receipt }
+}
 
 test('Shiki wrapped ACKs and imported read loans preserve exact source and retire on release', () => {
   const page = proofPage()
