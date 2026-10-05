@@ -428,7 +428,7 @@ test('a refused review awaits independently blocked activity settlement before r
     submitted_at: '2026-10-01T10:00:00Z',
   })
   await userEvent.type(
-    screen.getByRole('textbox', { name: 'Review summary' }),
+    await screen.findByRole('textbox', { name: 'Review summary' }),
     'Keep this activity draft',
   )
   await userEvent.click(screen.getByRole('button', { name: 'Submit review' }))
