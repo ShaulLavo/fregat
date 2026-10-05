@@ -15,7 +15,6 @@ import { testWorkspaceAddress } from '../../../../../test/factories/workspace-ad
 import {
   documentTargets,
   DOCUMENT_TARGET_CASES,
-  DOCUMENT_OLD_OBJECT_ID,
   DOCUMENT_NEW_OBJECT_ID,
   testTabContent,
   testScrollPositions,

@@ -1,3 +1,4 @@
+import { snapshotComparisonQueryOptions } from '@/lib/snapshot-comparison-query'
 import { expect, test } from '../../../../test/fixtures'
 import { historyRepository } from '../../../../test/factories/git-history'
 import { createTestQueryClient } from '../../../../test/render'
@@ -57,6 +58,13 @@ test('real equal blob pairs retain distinct commit subjects and refuse spoofed r
       return
     expect(documentKey(one)).not.toBe(documentKey(two))
     expect(comparisonRequest(one.source)).toEqual(comparisonRequest(two.source))
+    if (two.source.kind !== 'snapshot')
+      return expect.unreachable('second historical fixture missing')
+    const [bytesOne, bytesTwo] = await Promise.all([
+      queries.query(snapshotComparisonQueryOptions(one.source)),
+      queries.query(snapshotComparisonQueryOptions(two.source)),
+    ])
+    expect(bytesOne).toBe(bytesTwo)
     const content = documentTab(one)
     const stored = encodeTabContent(content, rootPath)
     expect(decodeTabContent(stored, rootPath)).toEqual(content)
@@ -137,4 +145,96 @@ test('moving worktree and staged captures update input revisions under their sta
       documentTokenForContent(rootPath, documentTab(two)),
     )
   }
+})
+
+test('real root, rename, empty deletion, merge and submodule details retain actual provenance and sides', async ({
+  server,
+  client,
+}) => {
+  const repo = await historyRepository(server.root)
+  await repo.write('empty.ts', '')
+  await repo.write('a.ts', 'before\n')
+  const initial = repo.commit('Root')
+  const rootPath = filesystemPath('history-repo')
+  const scope = { environmentId: TEST_ENVIRONMENT_ID, rootPath }
+  const rootDetails = (
+    await client.git.history.commit.get({ query: { path: rootPath, commit: initial } })
+  ).data
+  if (!rootDetails) return expect.unreachable('root commit details missing')
+  const empty = rootDetails.files.find((file) => file.path.endsWith('/empty.ts'))
+  if (!empty) return expect.unreachable('empty root file missing')
+  const rootDocument = historicalDocument({ rootPath, details: rootDetails, file: empty })
+  if (!rootDocument || rootDocument.source.kind !== 'snapshot')
+    return expect.unreachable('empty root target missing')
+  expect(rootDocument.source.target).toMatchObject({
+    kind: 'historical',
+    origin: { id: initial, parents: [] },
+    revision: { old: { kind: 'missing' }, new: { kind: 'blob' }, status: 'added' },
+  })
+  const rootRequest = comparisonRequest(rootDocument.source)
+  if (rootRequest.kind !== 'snapshot') return expect.unreachable('root fixture is not fixed')
+  const rootDiff = (await client.git.diff.blob.get({ query: rootRequest.query })).data
+  const rootInput = snapshotComparisonInput({
+    scope,
+    comparison: rootDocument.source,
+    diffs: rootDiff ?? [],
+  })
+  expect(rootInput.files[0]).toMatchObject({
+    kind: 'full',
+    old: { kind: 'missing' },
+    new: { kind: 'blob', text: '' },
+  })
+  repo.git('mv', 'a.ts', 'renamed.ts')
+  repo.git('rm', 'empty.ts')
+  const changed = repo.commit('Rename and remove empty')
+  const details = (
+    await client.git.history.commit.get({ query: { path: rootPath, commit: changed } })
+  ).data
+  if (!details) return expect.unreachable('changed commit details missing')
+  for (const file of details.files) {
+    const document = historicalDocument({ rootPath, details, file })
+    if (
+      !document ||
+      document.source.kind !== 'snapshot' ||
+      document.source.target.kind !== 'historical'
+    )
+      return expect.unreachable('changed target missing')
+    expect(document.source.target.origin).toEqual({ id: changed, parents: [initial] })
+    expect(matchesHistoricalTarget(document.source.target, details)).toBe(true)
+    if (file.status === 'renamed')
+      expect(document.source.target.revision.oldPath).toBe('history-repo/a.ts')
+    if (file.status === 'deleted') {
+      const request = comparisonRequest(document.source)
+      if (request.kind !== 'snapshot') return expect.unreachable('deletion fixture is not fixed')
+      const diffs = (await client.git.diff.blob.get({ query: request.query })).data ?? []
+      expect(
+        snapshotComparisonInput({ scope, comparison: document.source, diffs }).files[0],
+      ).toMatchObject({ kind: 'full', old: { kind: 'blob', text: '' }, new: { kind: 'missing' } })
+    }
+  }
+  repo.git('checkout', '-b', 'side')
+  await repo.write('side.ts', 'side\n')
+  const side = repo.commit('Side')
+  repo.git('checkout', 'main')
+  await repo.write('main.ts', 'main\n')
+  const main = repo.commit('Main')
+  repo.git('merge', '--no-ff', 'side', '-m', 'Merge')
+  const merge = repo.git('rev-parse', 'HEAD')
+  const merged = (await client.git.history.commit.get({ query: { path: rootPath, commit: merge } }))
+    .data
+  if (!merged?.files[0]) return expect.unreachable('merge file missing')
+  const mergedDocument = historicalDocument({ rootPath, details: merged, file: merged.files[0] })
+  expect(mergedDocument?.source).toMatchObject({
+    target: { origin: { id: merge, parents: [main, side] } },
+  })
+  expect(merged.files.map((file) => file.path)).toEqual(['history-repo/side.ts'])
+  repo.git('update-index', '--add', '--cacheinfo', `160000,${initial},module`)
+  repo.git('commit', '-m', 'Submodule reference')
+  const submoduleId = repo.git('rev-parse', 'HEAD')
+  const submodule = (
+    await client.git.history.commit.get({ query: { path: rootPath, commit: submoduleId } })
+  ).data
+  const entry = submodule?.files.find((file) => file.kind === 'submodule')
+  if (!submodule || !entry) return expect.unreachable('submodule fixture missing')
+  expect(historicalDocument({ rootPath, details: submodule, file: entry })).toBeNull()
 })
