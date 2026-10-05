@@ -77,6 +77,9 @@ async function dragChangedLine(page: Page): Promise<void> {
   const row = selectors.diffRows(page).filter({ hasText: 'const changed = true' }).first()
   // `hover` waits for the row to stop moving; a box read while the pane is still scrolling is stale.
   await row.hover({ position: { x: 40, y: 8 } })
+  const box = await row.boundingBox()
+  if (!box) throw createScriptError('The changed diff row has no current viewport box')
+  await page.mouse.move(box.x + 40, box.y + 8)
   await page.mouse.down()
   await page.mouse.up()
 }
