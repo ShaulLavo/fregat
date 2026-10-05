@@ -1,3 +1,4 @@
+import { projectionControl } from '../../../../../test/factories/diff-attachment'
 import { waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { vi } from 'vitest'
@@ -26,11 +27,6 @@ import { stubHighlightApi } from '../../../../../test/env/highlight-api'
 import { renderWithProviders } from '../../../../../test/render'
 import { installSyntaxWorker } from '../../../../../test/factories/syntax-worker'
 
-// The plugin parses per side and publishes projected tokens; the host is what puts them on the
-// editor. `setText` clears tokens on its way through, and the parse lands after the first push —
-// so if the host does not re-apply them, every diff renders permanently uncoloured while the
-// plugin's own tests go on passing. This asserts the tokens reach the editor, not that they exist.
-
 test('the tokens the plugin projects are applied to the editor', async () => {
   stubHighlightApi()
   const setTokens = vi.spyOn(Editor.prototype, 'setTokens')
@@ -38,10 +34,12 @@ test('the tokens the plugin projects are applied to the editor', async () => {
     renderWithProviders(
       <StrictMode>
         <DiffPane
-          file={createTextDiff({
-            newFile: { languageId: 'typescript', path: 'repo/a.ts', text: 'const b = 2\n' },
-            oldFile: { languageId: 'typescript', path: 'repo/a.ts', text: 'const a = 1\n' },
-          })}
+          attachment={projectionControl(
+            createTextDiff({
+              newFile: { languageId: 'typescript', path: 'repo/a.ts', text: 'const b = 2\n' },
+              oldFile: { languageId: 'typescript', path: 'repo/a.ts', text: 'const a = 1\n' },
+            }),
+          )}
           regions={createDiffRegionStore()}
           side='stacked'
           syntaxBackend={tokenBackend()}
@@ -58,7 +56,7 @@ test('the tokens the plugin projects are applied to the editor', async () => {
 
 test('a prepared diff paints coloured with its first text, and a revisit reuses its parse', async () => {
   stubHighlightApi()
-  const setText = vi.spyOn(Editor.prototype, 'setText')
+  const setText = vi.spyOn(Editor.prototype, 'openDocument')
   const worker = installSyntaxWorker(firstConstTokens)
   const service = highlightingService()
   const backend = service.documentBackend(EDITOR_PALETTE_SOURCE)
@@ -70,7 +68,7 @@ test('a prepared diff paints coloured with its first text, and a revisit reuses 
   const pane = () => (
     <StrictMode>
       <DiffPane
-        file={diff()}
+        attachment={projectionControl(diff())}
         regions={createDiffRegionStore()}
         side='stacked'
         syntaxBackend={backend}
@@ -99,8 +97,8 @@ test('a prepared diff paints coloured with its first text, and a revisit reuses 
   }
 })
 
-function firstTextTokens(spy: { mock: { calls: readonly Parameters<Editor['setText']>[] } }) {
-  return toEditorTokenStore(spy.mock.calls[0]?.[1]?.tokens ?? []).toTokens()
+function firstTextTokens(spy: { mock: { calls: readonly Parameters<Editor['openDocument']>[] } }) {
+  return toEditorTokenStore(spy.mock.calls[0]?.[0]?.tokens ?? []).toTokens()
 }
 
 function appliedTokens(spy: { mock: { calls: readonly Parameters<Editor['setTokens']>[] } }) {

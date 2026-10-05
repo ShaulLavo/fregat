@@ -3,7 +3,6 @@ import { readReloadCache } from '@/lib/reload-cache'
 import { entryTypeSchema, workspaceSearchMatchSchema } from '@workspace/contracts'
 import {
   workspaceLocation,
-  workspaceLocationId,
   workspaceLocationSchema,
   locationWorktreeId,
   type WorkspaceLocation,
@@ -33,14 +32,20 @@ import {
 import { log } from '@/lib/client-logging'
 import { removeEditorVisibleSnapshotCacheForRoot } from '@/lib/editor-visible-snapshot-cache'
 import {
+  readWorkspaceCacheEntry as readCacheEntry,
+  removeWorkspaceCacheEntry as removeCacheEntry,
+  writeWorkspaceCacheEntry as writeCacheEntry,
+} from '@/lib/workspace-cache-storage'
+import {
+  WORKSPACE_CACHE_STORAGE_KEYS,
   WORKSPACE_CACHE_STORAGE_NAMESPACE as CACHE_KEY_NAMESPACE,
   WORKSPACE_CACHE_STORAGE_PREFIX as CACHE_KEY_PREFIX,
   WORKSPACE_CACHE_VERSION as CACHE_VERSION,
-  readWorkspaceCacheEntry as readCacheEntry,
-  removeWorkspaceCacheEntry as removeCacheEntry,
-  workspaceCacheStorageKey,
-  writeWorkspaceCacheEntry as writeCacheEntry,
-} from '@/lib/workspace-cache-storage'
+} from '@/lib/workspace-cache-keys'
+import {
+  searchBufferStorageKey,
+  workspaceSliceStorageKey,
+} from '@/features/workspace/utils/cache-keys'
 import { filesystemPath, tabId, workspaceRoot } from '@/lib/documents/utils/identity'
 import { tabContentKey } from '@/lib/documents/utils/tabs'
 import {
@@ -84,37 +89,12 @@ import {
   normalizeEditorGroups,
 } from '@/lib/documents/utils/groups'
 
-const WORKSPACE_SLICE_KEY_PREFIX = workspaceCacheStorageKey('workspace:')
-const SEARCH_BUFFER_KEY_PREFIX = workspaceCacheStorageKey('search:')
-
 /**
  * How many projects keep their tabs across restarts. Slices are small (paths and
  * ids), so the ceiling exists to bound localStorage growth over months of use,
  * not to protect any one write.
  */
 export const WORKSPACE_SLICE_LIMIT = 8
-
-export const WORKSPACE_CACHE_STORAGE_KEYS = {
-  chatModePanels: workspaceCacheStorageKey('chatModePanels'),
-  chatModeSelection: workspaceCacheStorageKey('chatModeSelection'),
-  rootFolder: workspaceCacheStorageKey('rootFolder'),
-  uiMode: workspaceCacheStorageKey('uiMode'),
-  workbenchLayout: workspaceCacheStorageKey('workbenchLayout'),
-  workspaceIndex: workspaceCacheStorageKey('workspaces'),
-} as const
-
-/** Per-project state lives under its own key so switching never rewrites another project's. */
-export function workspaceSliceStorageKey(rootPath: string, worktreeId: WorktreeId | null = null) {
-  return `${WORKSPACE_SLICE_KEY_PREFIX}${workspaceLocationId(rootPath, worktreeId)}`
-}
-
-/**
- * Search results are the one bulky entry — a full match list. Splitting them from the
- * slice keeps a quota failure on search from taking the project's open tabs with it.
- */
-export function searchBufferStorageKey(rootPath: string, worktreeId: WorktreeId | null = null) {
-  return `${SEARCH_BUFFER_KEY_PREFIX}${workspaceLocationId(rootPath, worktreeId)}`
-}
 
 export type CachedSearchBufferState = {
   activeResultId: string | null

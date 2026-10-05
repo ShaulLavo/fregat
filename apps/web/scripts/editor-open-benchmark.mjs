@@ -22,6 +22,9 @@ import {
   workspaceCacheEntries,
 } from './bench-workspace.mjs'
 import { createBenchmarkError } from './structured-errors.mjs'
+import { workspaceSliceStorageKey } from '../src/features/workspace/utils/cache-keys.ts'
+import { environmentStorageKey } from '../src/lib/environments/state/scoped-storage.ts'
+import { workspaceCacheStorageKey } from '../src/lib/workspace-cache-keys.ts'
 
 const defaultAppUrl = 'http://localhost:5173/'
 const defaultServerUrl = process.env.VITE_SERVER_URL ?? 'http://localhost:3001'
@@ -188,7 +191,8 @@ function implementationFingerprint(root, entries) {
 }
 
 function editorImplementationEntries(root) {
-  const entries = ['bun.lock', 'package.json']
+  const entries = ['package.json']
+  if (existsSync(resolve(root, 'bun.lock'))) entries.push('bun.lock')
   const packageDirectories = readdirSync(resolve(root, 'packages'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
@@ -387,14 +391,13 @@ async function runBrowser(browserName, workspace, fixturePaths) {
     colorScheme: benchmarkColorScheme,
     viewport: benchmarkViewport,
   })
-  const inertPath = `search-buffer:${encodeURIComponent(workspace.rootFolder.path)}`
-  await seedInertWorkspace(context, workspace, inertPath)
+  const inertTabId = await seedInertWorkspace(context, workspace)
 
   try {
     const page = await context.newPage()
     page.setDefaultTimeout(options.pageTimeoutMs)
     await page.goto(traceUrl(options.appUrl), { waitUntil: 'domcontentloaded' })
-    await waitForBenchmarkBridge(page, inertPath)
+    await waitForBenchmarkBridge(page, inertTabId)
 
     let fixtureIndex = 0
     const warmupOrder = randomizedModes(options.warmupsPerMode, options.seed ^ 0x0610)
@@ -469,31 +472,31 @@ async function runBrowser(browserName, workspace, fixturePaths) {
   }
 }
 
-async function seedInertWorkspace(context, workspace, inertPath) {
-  const entries = workspaceCacheEntries({ ...workspace, filePath: inertPath })
+async function seedInertWorkspace(context, workspace) {
+  const entries = workspaceCacheEntries(workspace, { inert: true })
   await context.addInitScript((cacheEntries) => {
     localStorage.clear()
     for (const [key, value] of Object.entries(cacheEntries)) {
       localStorage.setItem(key, JSON.stringify(value))
     }
   }, entries)
+  const key = environmentStorageKey(
+    workspace.environmentId,
+    workspaceSliceStorageKey(workspace.rootFolder.path),
+  )
+  return entries[key].workbenchPanels.editorGroups.root.selectedTabId
 }
 
-async function waitForBenchmarkBridge(page, inertPath) {
+async function waitForBenchmarkBridge(page, inertTabId) {
   await page.waitForFunction(
     () =>
       typeof window.__editorPerfTrace?.beginEditorOpenSample === 'function' &&
       typeof window.__editorPerfTrace?.primeEditorOpenQuery === 'function' &&
       typeof window.__editorPerfTrace?.resetEditorOpenSample === 'function',
   )
-  await page.locator(attributeSelector(inertPath)).waitFor({ state: 'visible' })
-  await page.waitForFunction(
-    (path) =>
-      Array.from(document.querySelectorAll('[data-editor-tab-path]'))
-        .find((tab) => tab.getAttribute('data-editor-tab-path') === path)
-        ?.getAttribute('aria-selected') === 'true',
-    inertPath,
-  )
+  await page
+    .locator(`[data-editor-tab-id=${JSON.stringify(inertTabId)}][aria-selected="true"]`)
+    .waitFor({ state: 'visible' })
   await page.evaluate(() => document.fonts?.ready ?? Promise.resolve())
   await nextFrames(page)
 }
@@ -560,30 +563,27 @@ async function captureCompatibilityRecord(page, workspace, path) {
   const activationAt = await activateTarget(page, path)
   await waitForAuthoritativePaint(page)
   await page.waitForTimeout(0)
-  await page.waitForFunction((targetPath) => {
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const key = localStorage.key(index)
-      if (!key?.endsWith('.editorVisibleSnapshot')) continue
-
-      const serialized = localStorage.getItem(key)
-      if (!serialized) continue
-      const value = JSON.parse(serialized)
-      if (value?.path === targetPath) return true
-    }
-    return false
-  }, path)
-  const record = await page.evaluate((targetPath) => {
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const key = localStorage.key(index)
-      if (!key?.endsWith('.editorVisibleSnapshot')) continue
-
-      const serialized = localStorage.getItem(key)
-      if (!serialized) continue
-      const value = JSON.parse(serialized)
-      if (value?.path === targetPath) return { key, value }
-    }
-    return null
-  }, path)
+  const cacheTarget = {
+    key: environmentStorageKey(
+      workspace.environmentId,
+      workspaceCacheStorageKey('editorVisibleSnapshot'),
+    ),
+    path,
+    rootPath: workspace.rootFolder.path,
+  }
+  await page.waitForFunction(({ key, path, rootPath }) => {
+    const records = JSON.parse(localStorage.getItem(key) ?? 'null')
+    return (
+      Array.isArray(records) &&
+      records.some((record) => record.path === path && record.rootPath === rootPath)
+    )
+  }, cacheTarget)
+  const record = await page.evaluate(({ key, path, rootPath }) => {
+    const records = JSON.parse(localStorage.getItem(key) ?? 'null')
+    if (!Array.isArray(records)) return null
+    const value = records.filter((record) => record.path === path && record.rootPath === rootPath)
+    return value.length > 0 ? { key, value } : null
+  }, cacheTarget)
   const measured = await readMeasuredPipeline(page, path, activationAt, null)
   const reset = await page.evaluate(
     (request) => window.__editorPerfTrace.resetEditorOpenSample(request),

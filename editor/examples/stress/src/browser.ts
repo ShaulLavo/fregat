@@ -214,7 +214,14 @@ async function reloadInputDocument(multiple = current().editors.length === 3) {
   const analysis = createEditorDocumentAnalysis({ buffer, documentId: fixture })
   const editors = [...previous.editors]
   check(editors.length <= (multiple ? 3 : 1), 'Warm view count must grow once')
-  active = { ...previous, buffer, analysis, editors, consumers }
+  active = {
+    ...previous,
+    buffer,
+    analysis,
+    editors,
+    consumers,
+    sourceIdentity: createInputSourceIdentity(buffer.getDocumentSyncPoint()),
+  }
   for (const editor of editors) {
     if (consumers && consumers !== previous.consumers) editor.setPlugins(consumers.plugins)
     if (!consumers)
