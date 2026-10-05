@@ -882,6 +882,12 @@ export const selectors = {
       .getByRole('button', { name: 'Ask the agent about these lines', exact: true })
       .locator('xpath=preceding-sibling::span'),
   editorRows: (page: Page) => page.locator('.editor-virtualized-row'),
+  conflictOriginalComparison: (page: Page) =>
+    page.getByRole('button', { name: 'Original comparison', exact: true }),
+  conflictLatestIncoming: (page: Page) =>
+    page.getByRole('button', { name: 'Latest incoming', exact: true }),
+  conflictReturnResolution: (page: Page) =>
+    page.getByRole('button', { name: 'Resolution', exact: true }),
   markdownRenderedPane: (page: Page) => page.locator('[data-markdown-preview]'),
   editorCursorLineRow: (page: Page) => page.locator('.editor-virtualized-cursor-line-row:visible'),
   editorTabNamed: (page: Page, label: RegExp) =>
