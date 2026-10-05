@@ -10,7 +10,8 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { existsSync } from 'node:fs'
+import { createReadStream, existsSync } from 'node:fs'
+import { createInterface } from 'node:readline'
 import { createServer } from 'node:net'
 import { resolve, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -70,7 +71,7 @@ try {
         outcome: 'incomplete-or-failed',
         failure,
         cancelled,
-        sampleCount: partial.samples.length,
+        sampleCount: partial.sampleCount,
         invalidSamples: partial.invalid,
         acceptance: 'hardware-and-full-required-matrix-unqualified',
         sourceQualification: 'unqualified-requires-independent-current-head-review-and-CI',
@@ -238,6 +239,10 @@ export default {
   ] },
   test: {
     ...base.test,
+    provide: { ...base.test.provide, retentionRun: run },
+    bail: 0,
+    retry: 0,
+    sequence: { ...base.test.sequence, shuffle: false, concurrent: false },
     include: ['src/features/editor/tests/retention-count-policy.browser.tsx'],
     browser: {
       ...base.test.browser,
@@ -297,14 +302,19 @@ export default {
   if (cancelled) throw new TypeError('Verification runtime was cancelled')
   phase = 'sample-validation'
   const parsed = await parseSamples(samplePath, new Set(fixtures.map((fixture) => fixture.id)))
-  const samples = parsed.samples
-  const endpoints = samples.filter((sample) =>
-    hasValue(sample, 'kind', RETENTION_COUNT_PROTOCOL.successfulCycleMarker),
-  )
+  const endpoints = parsed.endpoints
   const keys = new Set(endpoints.map(endpointKey))
-  const failures = samples.filter((sample) => hasValue(sample, 'kind', 'failure'))
+  const failures = parsed.failures
+  const cases = parsed.cases
+  const caseKeys = new Set(cases.map((sample) => Reflect.get(sample, 'fixture')))
+  const casesPass =
+    cases.length === fixtures.length &&
+    caseKeys.size === fixtures.length &&
+    fixtures.every((fixture) => caseKeys.has(fixture.id)) &&
+    cases.every((sample) => hasValue(sample, 'status', 'pass'))
   const outcome =
     exitCode === 0 &&
+    casesPass &&
     endpoints.length === cycles * fixtures.length &&
     keys.size === endpoints.length &&
     !keys.has(null) &&
@@ -318,10 +328,13 @@ export default {
       {
         outcome,
         exitCode,
-        sampleCount: samples.length,
+        sampleCount: parsed.sampleCount,
         completeCycles: endpoints.length,
         expectedCycles: cycles * fixtures.length,
         failures,
+        cases,
+        completeCases: cases.filter((sample) => hasValue(sample, 'status', 'pass')).length,
+        expectedCases: fixtures.length,
         invalidSamples: parsed.invalid,
         acceptance: 'hardware-and-full-required-matrix-unqualified',
         sourceQualification: 'unqualified-requires-independent-current-head-review-and-CI',
@@ -456,10 +469,15 @@ async function evidenceDirectory(argv: readonly string[]) {
 }
 
 async function parseSamples(path: string, fixtures: ReadonlySet<string> | null) {
-  const samples: unknown[] = []
+  let sampleCount = 0
+  const endpoints: object[] = []
+  const failures: object[] = []
+  const cases: object[] = []
   const invalid: { line: number; reason: string; raw: string }[] = []
-  const lines = (await readFile(path, 'utf8')).split('\n')
-  for (const [index, raw] of lines.entries()) {
+  const lines = createInterface({ input: createReadStream(path), crlfDelay: Infinity })
+  let index = 0
+  for await (const raw of lines) {
+    index++
     if (!raw) continue
     try {
       const sample: unknown = JSON.parse(raw)
@@ -471,12 +489,16 @@ async function parseSamples(path: string, fixtures: ReadonlySet<string> | null) 
         if (fixtures && !fixtures.has(sample.fixture))
           throw new TypeError('Sample fixture identity is absent from the manifest')
       }
-      samples.push(sample)
+      sampleCount++
+      if (!('kind' in sample)) continue
+      if (sample.kind === RETENTION_COUNT_PROTOCOL.successfulCycleMarker) endpoints.push(sample)
+      if (sample.kind === 'failure') failures.push(sample)
+      if (sample.kind === 'fixture-case-complete') cases.push(sample)
     } catch (error) {
-      invalid.push({ line: index + 1, reason: String(error), raw })
+      invalid.push({ line: index, reason: String(error), raw })
     }
   }
-  return { samples, invalid }
+  return { sampleCount, endpoints, failures, cases, invalid }
 }
 
 function signalOwned(signal: NodeJS.Signals) {

@@ -50,7 +50,8 @@ export function DiffView({
   // not keep a copy of which regions are open — the mirror it used to keep was
   // keyed by hunk ordinal, which a trailing-tail region does not have.
   const presentation = useTabPresentation(tabId)
-  const input = source?.input.kind !== 'history' ? source?.input : null
+  const input =
+    source?.input.kind === 'snapshot' || source?.input.kind === 'checkpoint' ? source.input : null
   const files = input?.display ?? []
   // A file with hunks wins; a hunkless one is drawn only when it carries whole-file text, which is
   // what a pure rename looks like once the server sends the blob. A binary entry has neither and
