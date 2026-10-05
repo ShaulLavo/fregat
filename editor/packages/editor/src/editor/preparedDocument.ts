@@ -3,9 +3,11 @@ import type {
   EditorRetainedSyntaxSession,
   EditorRetainedHighlighterSession,
 } from './documentAnalysis'
+import { readRetainedHighlighterResult } from './documentAnalysis'
 import type { EditorTextBuffer } from '../documentSession'
 import type { PieceTableSnapshot } from '@singapore-editor/textbuffer'
 import type { EditorHighlighterProvider, EditorHighlightResult } from '../syntax/highlighter'
+import { captureThemeCohort, sameThemeCohort } from '../syntax/providerTheme'
 import {
   type EditorSyntaxLanguageId,
   type EditorSyntaxProvider,
@@ -35,6 +37,7 @@ export type EditorPreparedDocumentMatch = {
   readonly documentConfigurationTag: readonly EditorPreparedTagValue[]
   readonly structuralProvider: EditorSyntaxProvider | null
   readonly highlighterProvider: EditorHighlighterProvider | null
+  readonly highlighterThemeProviders?: readonly EditorHighlighterProvider[]
   readonly structuralConfiguration: EditorPreparedStructuralConfiguration | null
   readonly structuralConfigurationTag: readonly EditorPreparedTagValue[]
   readonly highlighterConfigurationTag: readonly EditorPreparedTagValue[]
@@ -52,6 +55,7 @@ export type EditorPreparedStageRequest =
   | {
       readonly family: 'highlighter'
       readonly provider: EditorHighlighterProvider
+      readonly themeProviders?: readonly EditorHighlighterProvider[]
       readonly configurationTag: readonly EditorPreparedTagValue[]
       readonly range: 'full'
       readonly abortSignal: AbortSignal
@@ -430,8 +434,10 @@ function createHighlighterStage(
   }
 
   const configurationTag = checkedTag(request.configurationTag)
+  const cohort = captureThemeCohort(request.themeProviders ?? [request.provider])
   let session = options.analysis.borrowHighlighter({
     provider: request.provider,
+    themeProviders: cohort.map((item) => item.provider),
     configurationTag: request.configurationTag,
     languageId: options.languageId,
   })
@@ -443,9 +449,17 @@ function createHighlighterStage(
   }, request.abortSignal)
   if (stage.disposed()) return createMissingHighlighterStage(request.abortSignal, 'aborted')
 
-  const tracked = stage.track(session.refresh(textSnapshot))
+  const tracked = stage.track(
+    session.refresh(textSnapshot).then((result) => {
+      const read = session?.read()
+      if (read?.kind === 'ready' && read.providerTheme.kind === 'failed')
+        throw read.providerTheme.error
+      return result
+    }),
+  )
   return {
     ...stage,
+    cohort,
     configurationTag,
     outcome: outcomeFor(tracked, stage),
     provider: request.provider,
@@ -599,18 +613,22 @@ function borrowHighlighter(
   analysis: EditorDocumentAnalysis,
 ): EditorPreparedHighlighterBorrow | null {
   if (!stage?.provider) return null
+  if (stage.failed()) return disposeStage(stage)
   if (stage.provider !== expected.highlighterProvider) return disposeStage(stage)
+  const providers = expected.highlighterThemeProviders ?? [expected.highlighterProvider]
+  if (!sameThemeCohort(stage.cohort, captureThemeCohort(providers))) return disposeStage(stage)
   if (!sameTag(stage.configurationTag, expected.highlighterConfigurationTag)) {
     return disposeStage(stage)
   }
   const session = analysis.borrowHighlighter({
     provider: stage.provider,
+    themeProviders: providers,
     languageId: expected.languageId,
     configurationTag: stage.configurationTag,
   })
   if (!session) return null
   stage.dispose()
-  const result = session.refresh(analysis.buffer.getTextSnapshot())
+  const result = readRetainedHighlighterResult(session, analysis.buffer.getTextSnapshot())
   void result.catch(() => undefined)
   return borrowWithReadyResult(
     {
@@ -625,7 +643,7 @@ function borrowHighlighter(
     },
     () => {
       const state = session.read()
-      return state.kind === 'ready' ? state.result : null
+      return state.kind === 'ready' && state.providerTheme.kind === 'ready' ? state.result : null
     },
   )
 }
