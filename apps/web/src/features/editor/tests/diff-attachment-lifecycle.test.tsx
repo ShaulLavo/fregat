@@ -53,13 +53,11 @@ test('two attached Saved views survive independent copy, move, Save, Undo, disk 
   const firstPresentation = app.read().ui.getState().tabPresentation.get(originalTab.id)
   const groups = app.read().workspace.getState().workbenchPanels.editorGroups
   expect(
-    await app
-      .read()
-      .commands.placeTab({
-        tabId: originalTab.id,
-        mode: 'copy',
-        target: { kind: 'edge', groupId: groups.activeGroupId, edge: 'right' },
-      }),
+    await app.read().commands.placeTab({
+      tabId: originalTab.id,
+      mode: 'copy',
+      target: { kind: 'edge', groupId: groups.activeGroupId, edge: 'right' },
+    }),
   ).toMatchObject({ status: 'applied' })
   await waitFor(() => expect(observed.all()).toHaveLength(2))
   const copy = allEditorGroups(app.read().workspace.getState().workbenchPanels.editorGroups)
@@ -112,13 +110,11 @@ test('two attached Saved views survive independent copy, move, Save, Undo, disk 
 
   const currentGroups = app.read().workspace.getState().workbenchPanels.editorGroups
   expect(
-    await app
-      .read()
-      .commands.placeTab({
-        tabId: originalTab.id,
-        mode: 'move',
-        target: { kind: 'edge', groupId: currentGroups.activeGroupId, edge: 'bottom' },
-      }),
+    await app.read().commands.placeTab({
+      tabId: originalTab.id,
+      mode: 'move',
+      target: { kind: 'edge', groupId: currentGroups.activeGroupId, edge: 'bottom' },
+    }),
   ).toMatchObject({ status: 'applied' })
   await waitFor(() => expect(observed.all()).toHaveLength(1))
   const moved = observed.all()[0]!.editor

@@ -1,6 +1,7 @@
 import { waitFor } from '@testing-library/react'
 import { createTextDiff } from '@singapore-editor/diff'
 import { TabPresentations } from '@/features/editor/state/tab-presentation'
+import { createEditorBufferSession } from '@singapore-editor/core/document'
 import type { DiffReloadView } from '@/features/git/utils/reload-schema'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -12,6 +13,10 @@ import { checkpointTurnDocument } from '@/lib/checkpoint-diff-query'
 import { snapshotComparisonQueryOptions } from '@/lib/snapshot-comparison-query'
 import { documentTab } from '@/lib/documents/utils/tabs'
 import { tabId, workspaceRoot } from '@/lib/documents/utils/identity'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { fetchFile } from '@/lib/file-server'
+import { fetchDiff } from '@/lib/git-diff-query'
+import { snapshotDocument } from '@/lib/documents/utils/comparisons'
 import {
   writeRootFolderCache,
   writeWorkspaceSliceCache,
@@ -21,6 +26,7 @@ import { environmentWindowStorage } from '@/lib/environments/state/window-storag
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
 import { checkpointTurn } from '../../../../test/factories/checkpoint-turn'
+import { createSnapshotComparisonFixture } from '../../../../test/factories/snapshot-comparison'
 import { createTestApplicationRuntime } from '../../../../test/factories/application-runtime'
 import {
   observeDiffEditors,
@@ -286,4 +292,108 @@ test('an admitted reload is one shot, copied independently and withdrawn on sema
   unmatched.restoreDiffView(a, state)
   other.binding.detach()
   expect(unmatched.diffPanes.stacked.reload).toBeNull()
+})
+
+test('an attached moving pair restores from its actual cache while dirty Undo survives and a new pair refuses offsets', async ({
+  client,
+  server,
+}) => {
+  stubEditorViewport({ height: 120, width: 300 })
+  stubHighlightApi()
+  const f = await createSnapshotComparisonFixture(server.root, client)
+  const text =
+    Array.from(
+      { length: 80 },
+      (_, index) => `export const moving${index} = "${'x'.repeat(80)}"`,
+    ).join('\n') + '\n'
+  await writeFile(join(server.root, f.path), text)
+  const [diff] = await fetchDiff(f.path, false, undefined, client)
+  const document = snapshotDocument(diff!, f.scope.rootPath, 'worktree')!
+  const application = createTestApplicationRuntime()
+  expect(
+    await application.openEnvironmentWorkspaceRoot(f.scope.environmentId, f.scope.rootPath),
+  ).toBe('opened')
+  const runtime = application.getSnapshot().editor
+  const queries = runtime.queryClient
+  const storage = environmentWindowStorage(runtime.storage.environmentId)
+  const id = tabId('moving-reload')
+  const observed = observeDiffEditors()
+  const disk = await fetchFile(f.path, new AbortController().signal, client)
+  const live = runtime.documentStore.getState().ensureLiveEditorDocument(disk)
+  const editing = createEditorBufferSession(live.buffer)
+  editing.setSelection(0)
+  editing.applyText('// parked dirty\n')
+  editing.breakTypingRun()
+  const body = () => (
+    <EditorStateProvider runtime={runtime}>
+      <DiffView
+        comparison={document.source}
+        rootPath={f.scope.rootPath}
+        languageHost={testDiffLanguageHost}
+        tabId={id}
+      />
+    </EditorStateProvider>
+  )
+  await queries.query(snapshotComparisonQueryOptions(document.source))
+  runtime.editorActivation.activate(documentTab(document), id)
+  prepareGitReload(queries, storage, f.scope.rootPath)
+  captureGitView(queries, f.scope.rootPath, { activeId: 'worktree:source.ts', scrollTop: 320 })
+  const first = renderWithProviders(body(), { application, queryClient: queries })
+  await waitFor(() => expect(first.container.querySelector('[aria-busy="true"]')).toBeNull())
+  await waitFor(() =>
+    expect(observed.read('stacked').editor.materializeFullText()).toContain('moving79'),
+  )
+  observed.read('stacked').editor.setScrollPosition({ top: 240, left: 40 })
+  observed.read('stacked').editor.setSelection(100, 80, { reveal: false })
+  const position = observed.read('stacked').editor.getScrollPosition()
+  const selection = observed.read('stacked').editor.getSelections()
+  window.dispatchEvent(new Event('pagehide'))
+  first.unmount()
+  prepareGitReload(queries, storage, f.scope.rootPath)
+  const resumed = renderWithProviders(body(), { application, queryClient: queries })
+  await waitFor(() => expect(resumed.container.querySelector('[aria-busy="true"]')).toBeNull())
+  await waitFor(() =>
+    expect(observed.read('stacked').editor.materializeFullText()).toContain('moving79'),
+  )
+  expect(observed.read('stacked').editor.getScrollPosition()).toEqual(position)
+  expect(observed.read('stacked').editor.getSelections()).toEqual(selection)
+  expect(runtime.documentStore.getState().getLiveEditorDocument(live.key)?.buffer).toBe(live.buffer)
+  expect(live.buffer.materializeFullText()).toBe('// parked dirty\n' + text)
+  editing.undo()
+  expect(live.buffer.materializeFullText()).toBe(text)
+  expect(savedGitView(queries, f.scope.rootPath)).toEqual({
+    activeId: 'worktree:source.ts',
+    scrollTop: 320,
+  })
+  window.dispatchEvent(new Event('pagehide'))
+  resumed.unmount()
+  runtime.uiStore.getState().tabPresentation.retain(new Set())
+  await writeFile(join(server.root, f.path), '// actual new pair\n' + text)
+  queries.removeQueries({
+    queryKey: snapshotComparisonQueryOptions(document.source).queryKey,
+    exact: true,
+  })
+  await queries.query(snapshotComparisonQueryOptions(document.source))
+  runtime.editorActivation.activate(documentTab(document), id)
+  prepareGitReload(queries, storage, f.scope.rootPath)
+  const changed = renderWithProviders(body(), { application, queryClient: queries })
+  try {
+    await waitFor(() => expect(changed.container.querySelector('[aria-busy="true"]')).toBeNull())
+    await waitFor(() =>
+      expect(observed.read('stacked').editor.materializeFullText()).toContain('actual new pair'),
+    )
+    expect(observed.read('stacked').editor.getScrollPosition()).toEqual({ top: 0, left: 0 })
+    expect(observed.read('stacked').editor.getSelections()[0]).toMatchObject({
+      anchorOffset: 0,
+      headOffset: 0,
+    })
+    expect(savedGitView(queries, f.scope.rootPath)).toEqual({
+      activeId: 'worktree:source.ts',
+      scrollTop: 320,
+    })
+  } finally {
+    changed.unmount()
+    application.dispose()
+    queries.clear()
+  }
 })

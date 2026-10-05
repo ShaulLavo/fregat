@@ -1,4 +1,8 @@
 import { projectionControl } from '../../../../../test/factories/diff-attachment'
+import { observeDiffEditors } from '../../../../../test/factories/diff-attachment'
+import { createSnapshotComparisonFixture } from '../../../../../test/factories/snapshot-comparison'
+import { WorkspaceDocumentService } from '@/features/editor/state/workspace-document-service'
+import { snapshotDiffAttachment } from '@/lib/diff-attachment'
 import { waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import type { Editor } from '@singapore-editor/core/editor'
@@ -40,6 +44,51 @@ test('a caret that selects nothing copies its whole line, terminator and all', a
   editor.setSelection(deletion.start, deletion.start)
 
   expect(copyPlainText()).toBe('beta\n')
+})
+
+test('a mixed deletion and addition selection copies the actual admitted Git texts in displayed order', async ({
+  client,
+  server,
+}) => {
+  stubHighlightApi()
+  const f = await createSnapshotComparisonFixture(server.root, client)
+  const owner = new WorkspaceDocumentService(() => undefined, f.scope.environmentId)
+  const lease = owner.acquireSnapshotComparison({
+    input: f.input,
+    signal: new AbortController().signal,
+  })
+  const read = lease.read()
+  if (read.kind !== 'ready' || read.input.kind !== 'snapshot')
+    throw new RangeError('Actual retained Git source required')
+  const attachment = snapshotDiffAttachment(read, read.input.display[0]!)!
+  const observed = observeDiffEditors()
+  const rendered = renderWithProviders(
+    <DiffPane
+      attachment={attachment}
+      regions={createDiffRegionStore()}
+      side='stacked'
+      syntaxBackend={{ kind: 'tree-sitter', provider: null }}
+      syntaxHighlight={false}
+      theme={{}}
+    />,
+  )
+  try {
+    await waitFor(() =>
+      expect(observed.read('stacked').editor.materializeFullText()).toContain('DISK'),
+    )
+    const rows = createStackedProjection(attachment.file).rows
+    const deletion = rowOffsets(rows, 'deletion')
+    const addition = rowOffsets(rows, 'addition')
+    observed.read('stacked').editor.setSelection(deletion.start, addition.end)
+    expect(copyPlainText()).toBe(
+      'export const authority = "INDEX"\nexport const authority = "DISK"',
+    )
+    expect(lease.read()).toBe(read)
+  } finally {
+    rendered.unmount()
+    lease.release()
+    owner.dispose()
+  }
 })
 
 async function mountStackedDiff() {
