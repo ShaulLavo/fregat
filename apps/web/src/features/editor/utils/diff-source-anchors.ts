@@ -72,8 +72,14 @@ export function resolveDiffAnchors(
 ) {
   const starts = rowStarts(rows)
   const maps = {
-    old: oldLines?.old && nextLines.old ? sourceLineMap(oldLines.old, nextLines.old) : null,
-    new: oldLines?.new && nextLines.new ? sourceLineMap(oldLines.new, nextLines.new) : null,
+    old:
+      oldLines?.old && nextLines.old
+        ? sourceLineMap(oldLines.old, nextLines.old, anchoredLines(anchors, 'old'))
+        : null,
+    new:
+      oldLines?.new && nextLines.new
+        ? sourceLineMap(oldLines.new, nextLines.new, anchoredLines(anchors, 'new'))
+        : null,
   }
   const resolve = (anchor: Anchor, viewport = false) => {
     if (anchor.kind === 'display' && !sameInput) return { offset: 0, bufferRow: 0 }
@@ -93,6 +99,16 @@ export function resolveDiffAnchors(
         position && viewport ? Math.max(0, position.bufferRow * rowHeight - viewport.withinRow) : 0,
     },
   }
+}
+
+function anchoredLines(anchors: DiffPaneAnchors, side: Side): ReadonlySet<number> {
+  const positions = anchors.selections.flatMap((selection) => [selection.anchor, selection.head])
+  if (anchors.viewport) positions.push(anchors.viewport.anchor)
+  const lines = new Set<number>()
+  for (const position of positions) {
+    if (position.kind === 'source' && position.side === side) lines.add(position.line)
+  }
+  return lines
 }
 
 function rowStarts(rows: readonly DiffRenderRow[]): readonly number[] {
@@ -225,7 +241,9 @@ function projectedPosition(
 function sourceLineMap(
   previous: readonly string[],
   next: readonly string[],
+  anchored: ReadonlySet<number>,
 ): readonly number[] | null {
+  if (anchored.size === 0) return null
   if (sameLines(previous, next)) return null
   if (previous.some((line) => line.includes('\n')) || next.some((line) => line.includes('\n')))
     return previous.map(() => -1)
@@ -235,7 +253,7 @@ function sourceLineMap(
     contextLines: 0,
   })
   const mapped: number[] = []
-  const removed: { start: number; lines: readonly string[]; boundary: number }[] = []
+  const removed: { start: number; lines: readonly string[] }[] = []
   const added: { start: number; lines: readonly string[] }[] = []
   let oldCursor = 0
   let newCursor = 0
@@ -246,7 +264,6 @@ function sourceLineMap(
     removed.push({
       start: oldStart,
       lines: previous.slice(oldStart, oldStart + hunk.oldLines),
-      boundary: newStart,
     })
     added.push({ start: newStart, lines: next.slice(newStart, newStart + hunk.newLines) })
     for (let line = oldStart; line < oldStart + hunk.oldLines; line += 1)
@@ -255,8 +272,25 @@ function sourceLineMap(
     newCursor = newStart + hunk.newLines
   }
   while (oldCursor < previous.length) mapped[oldCursor++] = newCursor++
-  for (const block of removed) mapUniqueMove(block, added, previous, next, mapped)
+  const moves = new Map<number, Set<number>>()
+  for (const block of removed) {
+    if (
+      ![...anchored].some((line) => line >= block.start && line < block.start + block.lines.length)
+    )
+      continue
+    mapUniqueMove(block, added, previous, next, moves)
+  }
+  for (const [line, targets] of moves) {
+    const [target] = targets
+    if (targets.size === 1 && target !== undefined) mapped[line] = target
+  }
   return mapped
+}
+
+type MovedRun = {
+  readonly oldStart: number
+  readonly newStart: number
+  readonly lines: readonly string[]
 }
 
 function mapUniqueMove(
@@ -264,20 +298,81 @@ function mapUniqueMove(
   added: readonly { start: number; lines: readonly string[] }[],
   previous: readonly string[],
   next: readonly string[],
-  mapped: number[],
+  moves: Map<number, Set<number>>,
 ): void {
-  if (block.lines.length === 0) return
-  const candidates = added.flatMap((candidate) =>
-    blockStarts(candidate.lines, block.lines).map((offset) => candidate.start + offset),
-  )
+  for (const candidate of added) {
+    const runs = matchingMovedRuns(block.lines, candidate.lines)
+    for (const run of runs)
+      recordUniqueMove(run, block.start, candidate.start, previous, next, moves)
+  }
+}
+
+function recordUniqueMove(
+  run: MovedRun,
+  oldStart: number,
+  newStart: number,
+  previous: readonly string[],
+  next: readonly string[],
+  moves: Map<number, Set<number>>,
+): void {
   if (
-    candidates.length !== 1 ||
-    occurrences(previous, block.lines) !== 1 ||
-    occurrences(next, block.lines) !== 1
+    run.lines.length === 0 ||
+    occurrences(previous, run.lines) !== 1 ||
+    occurrences(next, run.lines) !== 1
   )
     return
-  const destination = candidates[0]!
-  for (const [index] of block.lines.entries()) mapped[block.start + index] = destination + index
+  for (const [index] of run.lines.entries()) {
+    const line = oldStart + run.oldStart + index
+    const targets = moves.get(line) ?? new Set<number>()
+    targets.add(newStart + run.newStart + index)
+    moves.set(line, targets)
+  }
+}
+
+function matchingMovedRuns(
+  previous: readonly string[],
+  next: readonly string[],
+): readonly MovedRun[] {
+  if (previous.length === 0 || next.length === 0) return []
+  if (sameLines(previous, next)) return [{ oldStart: 0, newStart: 0, lines: previous }]
+  const file = createTextDiff({
+    oldFile: { path: 'source', text: joinRenderLines(previous.map((text) => ({ text }))) },
+    newFile: { path: 'source', text: joinRenderLines(next.map((text) => ({ text }))) },
+    contextLines: Math.max(previous.length, next.length),
+  })
+  const runs: { oldStart: number; newStart: number; lines: string[] }[] = []
+  for (const hunk of file.hunks) {
+    for (const line of hunk.lines) appendMatchingLine(runs, line, previous, next)
+  }
+  return runs
+}
+
+function appendMatchingLine(
+  runs: { oldStart: number; newStart: number; lines: string[] }[],
+  line: import('@singapore-editor/diff').DiffHunkLine,
+  previous: readonly string[],
+  next: readonly string[],
+): void {
+  if (
+    line.type !== 'context' ||
+    line.oldLineNumber === undefined ||
+    line.newLineNumber === undefined
+  )
+    return
+  const oldStart = line.oldLineNumber - 1
+  const newStart = line.newLineNumber - 1
+  const text = previous[oldStart]
+  if (text === undefined || text !== next[newStart]) return
+  const last = runs.at(-1)
+  if (
+    last &&
+    last.oldStart + last.lines.length === oldStart &&
+    last.newStart + last.lines.length === newStart
+  ) {
+    last.lines.push(text)
+    return
+  }
+  runs.push({ oldStart, newStart, lines: [text] })
 }
 
 function sameLines(left: readonly string[], right: readonly string[]): boolean {

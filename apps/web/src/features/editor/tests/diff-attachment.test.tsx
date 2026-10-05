@@ -214,6 +214,13 @@ for (const control of [
     expected: 'anchor',
   },
   {
+    name: 'unique moved sub-block beside discarded text',
+    before: ['a', 'discard', 'anchor', 'unique', 'b', 'c', 'd'],
+    after: ['a', 'b', 'c', 'd', 'anchor', 'unique'],
+    line: 3,
+    expected: 'anchor',
+  },
+  {
     name: 'deleted anchor boundary',
     before: ['a', 'anchor', 'b', 'c'],
     after: ['a', 'b', 'c'],
@@ -247,11 +254,10 @@ for (const control of [
       'first',
     )
     const view = mountDiffProjectionControl(first)
-    view.editor.setSelection(
-      view.offset(control.line),
-      view.offset(control.line) + control.before[control.line - 1]!.length,
-      { reveal: false },
-    )
+    const start = view.offset(control.line)
+    const end = start + control.before[control.line - 1]!.length
+    const reversed = control.name === 'unique moved sub-block beside discarded text'
+    view.editor.setSelection(reversed ? end : start, reversed ? start : end, { reveal: false })
     const next = projectionControl(
       createTextDiff({
         oldFile,
@@ -266,6 +272,7 @@ for (const control of [
     expect(
       view.editor.materializeFullText().slice(selection.startOffset, selection.endOffset),
     ).toBe(control.expected)
+    if (reversed) expect(selection.anchorOffset).toBeGreaterThan(selection.headOffset)
   })
 }
 
