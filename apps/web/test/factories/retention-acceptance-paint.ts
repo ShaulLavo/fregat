@@ -12,9 +12,15 @@ import {
   sourceTokenPaintWindow,
   tokenPaintMismatch,
   type TokenPaintObservation,
-  type TokenPaintReference,
 } from '../../../../scripts/agent/scenarios/editor-tab-hover-highlights-probe'
 import type { RetentionAcceptanceApp } from './retention-acceptance-app'
+import type { EditorViewSnapshot } from '@singapore-editor/core/editor'
+import { languageIdForFilePath } from '@/lib/file-language'
+import {
+  retentionAcceptanceOwnerMismatch,
+  type RetentionAcceptanceBinding,
+  type RetentionAcceptanceReference,
+} from './retention-acceptance-projection'
 
 export function retentionAcceptanceSubject(app: RetentionAcceptanceApp, path: FilesystemPath) {
   const state = app.read()
@@ -46,7 +52,7 @@ export function retentionAcceptanceSubject(app: RetentionAcceptanceApp, path: Fi
 export function retentionAcceptanceReference(
   app: RetentionAcceptanceApp,
   path: FilesystemPath,
-): TokenPaintReference {
+): RetentionAcceptanceReference {
   const subject = retentionAcceptanceSubject(app, path)
   const lease = subject.document.analysis.borrowHighlighter({
     provider: editorHighlighterProvider(),
@@ -65,6 +71,10 @@ export function retentionAcceptanceReference(
     expect(source).toBe(subject.document.buffer.materializeFullText())
     return {
       identity: subject.identity,
+      configuredOwner: {
+        languageId: languageIdForFilePath(path),
+        theme: app.read().theme.editorTheme,
+      },
       source,
       expected: 'colored',
       runs: resolveTokenPaintRuns({
@@ -75,6 +85,30 @@ export function retentionAcceptanceReference(
     }
   } finally {
     lease.dispose()
+  }
+}
+
+export function retentionAcceptanceBinding(
+  app: RetentionAcceptanceApp,
+  path: FilesystemPath,
+  snapshot: EditorViewSnapshot,
+): RetentionAcceptanceBinding {
+  const subject = retentionAcceptanceSubject(app, path)
+  return {
+    identity: {
+      document: snapshot.documentId,
+      revision: snapshot.documentSyncPoint.revision,
+      configuration: JSON.stringify(subject.configuration),
+      paintedGeneration: 'unknown',
+    },
+    source: snapshot.textSnapshot.readRange(0, snapshot.textSnapshot.length),
+    editorTextVersion: snapshot.textVersion,
+    presentation: 'live',
+    languageId: snapshot.languageId,
+    theme: snapshot.theme,
+    syntaxStatus: snapshot.syntaxStatus,
+    initialHighlightStatus: snapshot.initialHighlightStatus,
+    paintLayers: snapshot.paintLayers,
   }
 }
 
@@ -95,7 +129,21 @@ export async function awaitRetentionAcceptanceReady(
         if (!lease) return false
         try {
           const read = lease.read()
-          return read.kind === 'ready' && read.revision === subject.document.buffer.getRevision()
+          if (read.kind !== 'ready' || read.revision !== subject.document.buffer.getRevision())
+            return false
+          const mounted = [...app.read().ui.getState().controllersByTabId.values()]
+            .map((controller) => controller.getSnapshot())
+            .filter((snapshot) => snapshot?.documentId === subject.document.analysis.documentId)
+          return (
+            mounted.length > 0 &&
+            mounted.every(
+              (snapshot) =>
+                snapshot?.documentSyncPoint.revision === read.revision &&
+                snapshot.syntaxStatus === 'ready' &&
+                snapshot.initialHighlightStatus === 'painted' &&
+                snapshot.paintLayers !== null,
+            )
+          )
         } finally {
           lease.dispose()
         }
@@ -121,6 +169,7 @@ export function captureRetentionAcceptancePaint(
       'Retention acceptance folded or wrapped mapping needs independent calibration',
     )
   const subject = retentionAcceptanceSubject(app, path)
+  const binding = retentionAcceptanceBinding(app, path, inspection)
   const source = subject.document.buffer.materializeFullText()
   const selector = `[data-editor-group-id="${group.id}"]`
   const raw = captureTokenPaint({
@@ -134,11 +183,7 @@ export function captureRetentionAcceptancePaint(
   const frame: TokenPaintObservation = {
     ...raw,
     window: sourceTokenPaintWindow({ source, geometryWindow: raw.window }),
-    identity: {
-      ...subject.identity,
-      document: inspection.documentId,
-      revision: inspection.documentSyncPoint.revision,
-    },
+    identity: binding.identity,
   }
   const header = document.querySelector<HTMLElement>(
     `${selector} [data-editor-tab-id="${tab}"][aria-selected="true"]`,
@@ -149,6 +194,7 @@ export function captureRetentionAcceptancePaint(
     tab,
     source,
     installed: {
+      ...binding,
       documentId: inspection.documentId,
       languageId: inspection.languageId,
       theme: inspection.theme,
@@ -163,10 +209,12 @@ export function captureRetentionAcceptancePaint(
 
 export function assertRetentionAcceptancePaint(
   sample: ReturnType<typeof captureRetentionAcceptancePaint>,
-  reference: TokenPaintReference,
+  reference: RetentionAcceptanceReference,
   path: FilesystemPath,
 ) {
   expect(sample.headerPath).toBe(path)
+  expect(retentionAcceptanceOwnerMismatch(sample.installed, reference)).toBeNull()
+  expect(sample.installed.source).toBe(reference.source)
   expect(tokenPaintMismatch(sample.frame, reference)).toBeNull()
   const incomplete = { ...sample.frame, runs: sample.frame.runs.slice(1) }
   expect(tokenPaintMismatch(incomplete, reference)).not.toBeNull()

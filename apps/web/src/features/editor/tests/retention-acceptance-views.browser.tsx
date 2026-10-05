@@ -37,6 +37,25 @@ test(
       'retention-acceptance-header-frame',
     )
     assertRetentionAcceptancePaint(sample, reference, path)
+    for (const installed of [
+      { ...sample.installed, languageId: 'python' },
+      {
+        ...sample.installed,
+        theme: {
+          ...sample.installed.theme,
+          type: 'light' as const,
+          backgroundColor: '#ffffff',
+          foregroundColor: '#000000',
+        },
+      },
+      { ...sample.installed, syntaxStatus: 'loading' as const },
+      { ...sample.installed, initialHighlightStatus: 'loading' as const },
+      { ...sample.installed, paintLayers: null },
+    ])
+      expect(() =>
+        assertRetentionAcceptancePaint({ ...sample, installed }, reference, path),
+      ).toThrow()
+
     if (typeof commands.retentionAcceptanceScreenshot === 'function')
       await commands.retentionAcceptanceScreenshot('header')
   },

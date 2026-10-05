@@ -1,4 +1,4 @@
-import type { EditorVisibleSnapshotJSON } from '@singapore-editor/core/editor'
+import type { EditorVisibleSnapshotJSON, EditorViewSnapshot } from '@singapore-editor/core/editor'
 import {
   captureTokenPaint,
   tokenPaintMismatch,
@@ -11,6 +11,60 @@ export type RetentionAcceptanceBinding = {
   readonly source: string
   readonly editorTextVersion: number
   readonly presentation: 'live' | 'saved'
+  readonly languageId: string | null
+  readonly theme: EditorVisibleSnapshotJSON['theme'] | undefined
+  readonly syntaxStatus: EditorViewSnapshot['syntaxStatus']
+  readonly initialHighlightStatus: EditorVisibleSnapshotJSON['initialHighlightStatus']
+  readonly paintLayers: EditorVisibleSnapshotJSON['paintLayers'] | null
+}
+
+export type RetentionAcceptanceReference = TokenPaintReference & {
+  readonly configuredOwner: {
+    readonly languageId: string | null
+    readonly theme: EditorVisibleSnapshotJSON['theme'] | undefined
+  }
+}
+
+export function retentionAcceptanceOwnerMismatch(
+  owner: Pick<
+    RetentionAcceptanceBinding,
+    'identity' | 'languageId' | 'theme' | 'syntaxStatus' | 'initialHighlightStatus' | 'paintLayers'
+  >,
+  reference: RetentionAcceptanceReference,
+) {
+  if (JSON.stringify(owner.identity) !== JSON.stringify(reference.identity)) return 'owner identity'
+  if (!reference.configuredOwner) return 'unknown configured owner'
+  if (owner.languageId !== reference.configuredOwner.languageId) return 'installed language'
+  if (themeValue(owner.theme) !== themeValue(reference.configuredOwner.theme))
+    return 'installed theme'
+  if (
+    owner.syntaxStatus !== 'ready' ||
+    owner.initialHighlightStatus !== 'painted' ||
+    owner.paintLayers === null
+  )
+    return 'pending owner paint'
+  return null
+}
+
+function themeValue(theme: EditorVisibleSnapshotJSON['theme'] | undefined) {
+  if (!theme) return stableValue(theme)
+  return stableValue({
+    type: theme.type,
+    backgroundColor: theme.backgroundColor,
+    foregroundColor: theme.foregroundColor,
+    gutterBackgroundColor: theme.gutterBackgroundColor,
+    gutterForegroundColor: theme.gutterForegroundColor,
+    caretColor: theme.caretColor,
+    minimapBackgroundColor: theme.minimapBackgroundColor,
+    syntax: theme.syntax,
+    colors: theme.colors,
+  })
+}
+
+function stableValue(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') return JSON.stringify(value)
+  const entries = Object.entries(value).toSorted(([left], [right]) => left.localeCompare(right))
+  return JSON.stringify(entries.map(([key, child]) => [key, stableValue(child)]))
 }
 
 type ProjectedChunk = {
@@ -20,9 +74,11 @@ type ProjectedChunk = {
 }
 
 export function retentionAcceptanceProjection(input: {
-  readonly metadata: EditorVisibleSnapshotJSON
+  readonly metadata: Omit<EditorVisibleSnapshotJSON, 'paintLayers'> & {
+    readonly paintLayers: EditorVisibleSnapshotJSON['paintLayers'] | null
+  }
   readonly binding: RetentionAcceptanceBinding
-  readonly reference: TokenPaintReference
+  readonly reference: RetentionAcceptanceReference
 }) {
   const { metadata, binding, reference } = input
   if (binding.presentation !== 'live')
@@ -33,6 +89,24 @@ export function retentionAcceptanceProjection(input: {
     return { kind: 'unsupported', why: 'canonical source document' } as const
   if (metadata.textVersion !== binding.editorTextVersion)
     return { kind: 'unsupported', why: 'captured editor text version' } as const
+  const ownerMismatch = retentionAcceptanceOwnerMismatch(
+    {
+      ...binding,
+      languageId: metadata.languageId,
+      theme: metadata.theme,
+      initialHighlightStatus: metadata.initialHighlightStatus,
+      paintLayers: metadata.paintLayers,
+    },
+    reference,
+  )
+  if (ownerMismatch) return { kind: 'unsupported', why: ownerMismatch } as const
+  if (
+    metadata.languageId !== binding.languageId ||
+    themeValue(metadata.theme) !== themeValue(binding.theme) ||
+    metadata.initialHighlightStatus !== binding.initialHighlightStatus ||
+    (metadata.paintLayers === null) !== (binding.paintLayers === null)
+  )
+    return { kind: 'unsupported', why: 'captured owner metadata drift' } as const
   const count = metadata.totalHeight / metadata.metrics.rowHeight
   if (!Number.isSafeInteger(count) || count <= 0)
     return { kind: 'unsupported', why: 'nonuniform display geometry' } as const
@@ -90,7 +164,7 @@ export function retentionAcceptanceProjection(input: {
       })
     }),
   )
-  const projectedReference: TokenPaintReference = { ...reference, source, runs }
+  const projectedReference: RetentionAcceptanceReference = { ...reference, source, runs }
   return { kind: 'mapped', binding, metadata, reference: projectedReference, chunks } as const
 }
 
@@ -120,7 +194,7 @@ export function captureRetentionAcceptanceProjection(input: {
     { readonly kind: 'mapped' }
   >
   readonly viewportSelector: string
-  readonly observedIdentity: TokenPaintReference['identity']
+  readonly observedOwner: RetentionAcceptanceBinding
 }) {
   const raw = captureTokenPaint({
     source: input.projection.reference.source,
@@ -136,9 +210,15 @@ export function captureRetentionAcceptanceProjection(input: {
     window: raw.window
       ? { start: Math.min(raw.window.start, count), end: Math.min(raw.window.end, count) }
       : null,
-    identity: input.observedIdentity,
+    identity: input.observedOwner.identity,
   }
-  return frame
+  return {
+    ...frame,
+    ownerMismatch: retentionAcceptanceOwnerMismatch(
+      input.observedOwner,
+      input.projection.reference,
+    ),
+  }
 }
 
 export function retentionAcceptanceFoldMismatch(
@@ -178,6 +258,11 @@ export function retentionAcceptanceProjectionMismatch(
     { readonly kind: 'mapped' }
   >,
 ) {
+  if ('ownerMismatch' in frame && frame.ownerMismatch) return String(frame.ownerMismatch)
+  if (!frame.window) return 'missing visible geometry'
+  for (let index = frame.window.start; index < frame.window.end; index++) {
+    if (!projection.chunks.has(index)) return 'missing visible row metadata'
+  }
   if (frame.rows.some((row) => row.presentation !== projection.binding.presentation))
     return 'presentation provenance'
   const normalized = {

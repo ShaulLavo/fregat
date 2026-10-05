@@ -8,7 +8,7 @@ import { mountRetentionAcceptanceApp } from '../../../../test/factories/retentio
 import {
   awaitRetentionAcceptanceReady,
   retentionAcceptanceReference,
-  retentionAcceptanceSubject,
+  retentionAcceptanceBinding,
 } from '../../../../test/factories/retention-acceptance-paint'
 import {
   captureRetentionAcceptanceProjection,
@@ -74,12 +74,7 @@ test.for(['folded', 'wrapped'] as const)(
     const reference = retentionAcceptanceReference(app, path)
     expect(snapshot.documentSyncPoint.revision).toBe(reference.identity.revision)
     expect(snapshot.textSnapshot.readRange(0, snapshot.textSnapshot.length)).toBe(reference.source)
-    const binding = {
-      identity: reference.identity,
-      source: reference.source,
-      editorTextVersion: snapshot.textVersion,
-      presentation: 'live' as const,
-    }
+    const binding = retentionAcceptanceBinding(app, path, snapshot)
     expect(
       retentionAcceptanceProjection({
         metadata,
@@ -102,12 +97,60 @@ test.for(['folded', 'wrapped'] as const)(
     const frame = captureRetentionAcceptanceProjection({
       projection,
       viewportSelector: `[data-editor-group-id="${group.id}"] .editor-virtualized-viewport`,
-      observedIdentity: retentionAcceptanceSubject(app, path).identity,
+      observedOwner: retentionAcceptanceBinding(app, path, controller.getSnapshot() ?? snapshot),
     })
     await context.annotate(JSON.stringify({ arm, frame }), 'retention-acceptance-projection-raw')
     if (typeof commands.retentionAcceptanceScreenshot === 'function')
       await commands.retentionAcceptanceScreenshot(arm)
     expect(retentionAcceptanceProjectionMismatch(frame, projection)).toBeNull()
+    const wrongTheme = {
+      ...metadata,
+      theme: {
+        ...metadata.theme,
+        type: 'light' as const,
+        backgroundColor: '#ffffff',
+        foregroundColor: '#000000',
+      },
+    }
+    const wrongLanguage = { ...metadata, languageId: 'python' }
+    const loading = { ...metadata, initialHighlightStatus: 'loading' as const }
+    const nullPaint = { ...metadata, paintLayers: null }
+    for (const changed of [wrongTheme, wrongLanguage, loading, nullPaint])
+      expect(retentionAcceptanceProjection({ metadata: changed, binding, reference }).kind).toBe(
+        'unsupported',
+      )
+    const missingVisibleBlank = {
+      ...metadata,
+      rows: metadata.rows.filter(
+        (row) =>
+          !frame.window ||
+          row.index < frame.window.start ||
+          row.index >= frame.window.end ||
+          row.chunks.some((chunk) => chunk.rowLocalEnd > chunk.rowLocalStart),
+      ),
+    }
+    const incompleteBlank = retentionAcceptanceProjection({
+      metadata: missingVisibleBlank,
+      binding,
+      reference,
+    })
+    if (incompleteBlank.kind === 'mapped' && missingVisibleBlank.rows.length < metadata.rows.length)
+      expect(retentionAcceptanceProjectionMismatch(frame, incompleteBlank)).toBe(
+        'missing visible row metadata',
+      )
+    if (arm === 'folded') expect(missingVisibleBlank.rows.length).toBeLessThan(metadata.rows.length)
+    await context.annotate(
+      JSON.stringify({
+        arm,
+        wrongTheme: wrongTheme.theme,
+        wrongLanguage: wrongLanguage.languageId,
+        loading: loading.initialHighlightStatus,
+        nullPaint: nullPaint.paintLayers,
+        visibleBlankRemoved: metadata.rows.length - missingVisibleBlank.rows.length,
+      }),
+      'retention-acceptance-owner-negatives',
+    )
+
     expect(
       retentionAcceptanceFoldMismatch(
         projection,
