@@ -26,6 +26,16 @@ import { createClientInvariantError } from '@/lib/structured-errors'
 import { disposeEditorSyntaxHighlighting } from '@/features/editor/state/syntax-highlighting'
 
 export async function mountRetentionLayoutApp() {
+  const referenceIds = new WeakMap<object, number>()
+  let nextReferenceId = 1
+  const identifyReference = (value: object | null | undefined) => {
+    if (!value) return null
+    const existing = referenceIds.get(value)
+    if (existing) return existing
+    const id = nextReferenceId++
+    referenceIds.set(value, id)
+    return id
+  }
   const history = createMemoryHistory({ initialEntries: ['/'] })
   const navigation = createNavigation(
     createApplicationRouter({ history, resources: resourceQueryClient }),
@@ -67,6 +77,7 @@ export async function mountRetentionLayoutApp() {
     await application.openEnvironmentWorkspaceRoot(activeEnvironmentId(), filesystemPath('repo')),
   ).toMatch(/opened|already-open/)
   return {
+    identifyReference,
     container,
     read,
     application,

@@ -1,3 +1,4 @@
+import { expect } from 'vitest'
 import {
   retentionAcceptanceBinding,
   retentionAcceptanceReference,
@@ -26,9 +27,17 @@ export function captureRetentionLayoutView(
   const controller = app.read().ui.getState().controllersByTabId.get(tabId)
   const snapshot = controller?.getSnapshot()
   const editor = controller?.getEditor()
+  const observedReferenceIdentity = {
+    controller: app.identifyReference(controller),
+    nativeEditor: app.identifyReference(editor),
+    logicalViewSession: app.identifyReference(
+      app.read().documents.getState().viewsByTabId[tabId]?.view,
+    ),
+  }
   if (!group || !snapshot || !editor)
     return {
       kind: 'unavailable',
+      observedReferenceIdentity,
       tabId,
       groupPresent: Boolean(group),
       controllerPresent: Boolean(controller),
@@ -48,6 +57,7 @@ export function captureRetentionLayoutView(
     revision: canonicalModel.buffer.getRevision(),
     source: canonicalModel.buffer.materializeFullText(),
     viewDocumentKey: app.read().documents.getState().viewsByTabId[tabId]?.documentKey ?? null,
+    observedReferenceIdentity,
     bufferMatchesCanonical: captured ? captured.buffer === canonicalModel.buffer : null,
     configuredReceipt: JSON.stringify(subject.configuration),
   }
@@ -177,4 +187,18 @@ export function recordRetentionLayoutFrames(
 
 export async function awaitRetentionLayoutCurrent(app: RetentionLayoutApp, path: FilesystemPath) {
   await awaitRetentionAcceptanceReady(app, path)
+}
+
+export function assertRecordedRetentionLayoutFrames(
+  frames: ReturnType<typeof recordRetentionLayoutFrames>['frames'],
+  path: FilesystemPath,
+) {
+  for (const frame of frames) {
+    for (const view of frame.views) {
+      if (view.kind !== 'current') continue
+      expect(view.headerPath).toBe(path)
+      expect(view.mismatch, JSON.stringify({ at: frame.at, view })).toBeNull()
+      expect(view.ownership.bufferMatchesCanonical).toBe(true)
+    }
+  }
 }
