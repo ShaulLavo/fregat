@@ -88,7 +88,7 @@ function referencesForTabs(tokens: readonly string[] | null) {
   for (const token of tokens) {
     const reference = editorReferenceForToken(token)
     if (reference) references.push(reference)
-    else if (!token.startsWith('d/')) return null
+    else if (!token.startsWith('d/') && !token.startsWith('k/')) return null
   }
   return references
 }

@@ -1,9 +1,14 @@
+import { fetchBlobDiff, blobDiffQueryOptions } from '@/lib/blob-diff-query'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { checkpointRefForSessionTurn } from 'server/testing'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { createSnapshotComparisonOwner } from '@/features/editor/state/snapshot-comparison-owner'
-import { checkpointTurnDocument, fetchCheckpointDiff } from '@/lib/checkpoint-diff-query'
+import {
+  checkpointTurnDocument,
+  checkpointFileDocument,
+  fetchCheckpointDiff,
+} from '@/lib/checkpoint-diff-query'
 import { checkpointRequest } from '@/lib/documents/utils/comparisons'
 import { checkpointComparisonInput } from '@/lib/snapshot-comparison-input'
 import { snapshotComparisonQueryOptions } from '@/lib/snapshot-comparison-query'
@@ -172,4 +177,92 @@ test('checkpoint domain admission preserves partial, binary, size and missing ou
     }),
   ).toThrow()
   expect(runtime.documentStore.getState().snapshotComparisons.size).toBe(0)
+})
+
+test('a provided checkpoint status must match the actual captured file while an optional fallback stays valid', async ({
+  client,
+  server,
+}) => {
+  const h = await checkpointTurn(client, server)
+  const runtime = h.application.getSnapshot().editor
+  const scope = { environmentId: runtime.storage.environmentId, rootPath: filesystemPath('') }
+  const turn = checkpointTurnDocument(h.summary, scope.rootPath, false).source
+  const diffs = await fetchCheckpointDiff(checkpointRequest(turn), undefined, client)
+  const diff = diffs[0]!
+  const target = checkpointFileDocument(
+    h.summary,
+    filesystemPath(diff.path),
+    diff,
+    scope.rootPath,
+    false,
+  ).source
+  const hydrated = await fetchBlobDiff(diff, undefined, client)
+  const actual = checkpointComparisonInput({ scope, comparison: target, diffs: [diff], hydrated })
+  expect(actual.files[0]).toMatchObject({ kind: 'full', revision: { status: 'modified' } })
+  const forged = checkpointComparisonInput({
+    scope,
+    comparison: { ...target, status: 'deleted' },
+    diffs: [diff],
+    hydrated,
+  })
+  expect(forged.files[0]).toMatchObject({
+    kind: 'no-text',
+    reason: 'unavailable',
+    revision: { status: 'modified' },
+  })
+  expect(forged.files[0] && 'old' in forged.files[0]).toBe(false)
+  const fallback = checkpointComparisonInput({
+    scope,
+    comparison: { ...target, status: undefined },
+    diffs: [diff],
+    hydrated,
+  })
+  expect(fallback.files[0]).toMatchObject({ kind: 'full', revision: { status: 'modified' } })
+  expect(actual.files[0]?.hunks).toBe(diff.hunks)
+  expect(fallback.files[0]?.hunks).toBe(diff.hunks)
+})
+
+test('a full checkpoint capture survives actual blob cache eviction, unrelated success and a new partial interest', async ({
+  client,
+  server,
+}) => {
+  const h = await checkpointTurn(client, server)
+  const runtime = h.application.getSnapshot().editor
+  const documents = runtime.documentStore
+  const queries = runtime.queryClient
+  const scope = { environmentId: runtime.storage.environmentId, rootPath: filesystemPath('') }
+  const comparison = checkpointTurnDocument(h.summary, scope.rootPath, false).source
+  const listed = await fetchCheckpointDiff(checkpointRequest(comparison), undefined, client)
+  queries.setQueryData(snapshotComparisonQueryOptions(comparison).queryKey, listed)
+  const owner = createSnapshotComparisonOwner(documents, queries)
+  const tab = tabId('full-capture')
+  owner.prepare(tab, scope, comparison)
+  const logical = documents.getState().snapshotComparisonTabs.get(tab)!
+  const partial = logical.read()
+  if (partial.kind !== 'ready') throw new RangeError('partial checkpoint capture required')
+  const external = documents
+    .getState()
+    .acquireSnapshotComparison({ input: partial.input, signal: new AbortController().signal })
+  const options = blobDiffQueryOptions(listed[0]!)
+  await queries.query(options)
+  const full = logical.read()
+  expect(full.kind === 'ready' && full.input.files[0]?.kind).toBe('full')
+  expect(external.read()).toBe(full)
+  queries.removeQueries({ queryKey: options.queryKey, exact: true })
+  expect(queries.getQueryData(options.queryKey)).toBeUndefined()
+  queries.setQueryData(['checkpoint-unrelated'], { success: true })
+  expect(logical.read()).toBe(full)
+  expect(external.read()).toBe(full)
+  const newcomer = documents
+    .getState()
+    .acquireSnapshotComparison({ input: partial.input, signal: new AbortController().signal })
+  expect(newcomer.read()).toBe(full)
+  owner.dispose()
+  expect(logical.read().kind).toBe('released')
+  expect(external.read()).toBe(full)
+  external.release()
+  expect(newcomer.read()).toBe(full)
+  newcomer.release()
+  expect(documents.getState().snapshotComparisons.size).toBe(0)
+  queries.clear()
 })

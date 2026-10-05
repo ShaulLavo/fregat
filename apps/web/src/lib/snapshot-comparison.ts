@@ -82,3 +82,19 @@ export function sameCheckpointCapture(
     })
   )
 }
+
+export function promoteCheckpointCapture(
+  current: CheckpointComparisonInput,
+  candidate: CheckpointComparisonInput,
+): CheckpointComparisonInput | null {
+  const files = current.files.map((file, index) => {
+    const next = candidate.files[index]
+    return file.kind === 'partial' && next?.kind === 'full' ? next : file
+  })
+  if (files.every((file, index) => file === current.files[index])) return null
+  return {
+    ...current,
+    files,
+    display: files.flatMap((file) => (file.kind === 'no-text' ? [] : file.display)),
+  }
+}

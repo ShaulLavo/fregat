@@ -1,4 +1,4 @@
-import { sameCheckpointCapture } from '@/lib/snapshot-comparison'
+import { sameCheckpointCapture, promoteCheckpointCapture } from '@/lib/snapshot-comparison'
 import { isPdfFile } from '@/lib/pdf-viewer/format'
 import { pdfError } from '@/lib/pdf-viewer/structured-errors'
 import {
@@ -1845,6 +1845,11 @@ export class WorkspaceDocumentService {
     group: SnapshotComparisonGroup,
     input: SnapshotComparisonInput,
   ): void {
+    if (group.current.input.kind === 'checkpoint' && input.kind === 'checkpoint') {
+      const promoted = promoteCheckpointCapture(group.current.input, input)
+      if (!promoted) return
+      input = promoted
+    }
     group.refresh = null
     const read = { kind: 'ready' as const, input }
     group.current = read

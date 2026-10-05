@@ -58,7 +58,7 @@ export function checkpointComparisonInput({
     const revision = gitInputRevisionForDiff(diff, 'historical')
     const source = hydrated[index] ?? diff
     return {
-      ...(matchesCheckpointFile(comparison, diff)
+      ...(matchesCheckpointFile(comparison, diff, revision)
         ? checkpointFile(diff, source, revision)
         : { kind: 'no-text' as const, reason: 'unavailable' as const }),
       path: filesystemPath(diff.path),
@@ -77,12 +77,17 @@ export function checkpointComparisonInput({
   }
 }
 
-function matchesCheckpointFile(comparison: CheckpointComparison, diff: GitFileDiff): boolean {
+function matchesCheckpointFile(
+  comparison: CheckpointComparison,
+  diff: GitFileDiff,
+  revision: GitInputRevision,
+): boolean {
   if (comparison.kind !== 'checkpoint-file') return true
   return (
     comparison.file.path === diff.path &&
     (comparison.oldObjectId === undefined || comparison.oldObjectId === diff.oldObjectId) &&
     (comparison.newObjectId === undefined || comparison.newObjectId === diff.newObjectId) &&
+    (comparison.status === undefined || comparison.status === revision.status) &&
     (comparison.oldPath === undefined || comparison.oldPath === (diff.oldPath ?? diff.path))
   )
 }
