@@ -389,9 +389,9 @@ async function runScenario(scenario: Scenario, options: Options) {
           ? evidence.file(screenshot.file)
           : `capture failed: ${screenshot.error}`
       captureLines.push(
-        'failure capture: after scenario rejection; scenario cleanup may have run',
+        'failure capture: after scenario execution; scenario cleanup may have run',
         `failure screenshot: ${captured}`,
-        `failure metadata: ${evidence.file('failure-after-scenario.json')}`,
+        `failure metadata: ${evidence.file('observed.json')}`,
       )
     }
     const lines = [
