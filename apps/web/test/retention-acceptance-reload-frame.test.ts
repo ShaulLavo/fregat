@@ -115,7 +115,10 @@ test.each([
     },
   },
 ] satisfies ReloadBinding[])('rejects partial binding evidence %#', (partial) => {
-  const observation = { kind: 'mounted', views: [{ ...view, binding: partial }] } as const
+  const observation = {
+    kind: 'mounted',
+    views: [{ ...view, binding: partial }],
+  } satisfies NonNullable<ReloadInput['frame']['observation']>
   expect(
     retentionAcceptanceReloadFrameOutcome({ ...input, frame: { ...frame, observation } }).kind,
   ).toBe('mismatch')
