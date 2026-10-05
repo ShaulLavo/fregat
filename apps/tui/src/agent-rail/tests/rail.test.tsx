@@ -345,17 +345,17 @@ test('archiving the open session offers one U Undo that restores it and opens it
     await focusRailSession(frame, 'Alpha')
     await act(async () => {
       frame.mockInput.pressEnter()
+      await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
     })
-    await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
     await runPaletteCommand(frame, 'Archive selected sessions', async () => {
       await expect
         .poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt)
         .not.toBeNull()
       await expect.poll(() => chat.getSnapshot().pendingCommands).toBe(0)
+      await expect.poll(() => chat.getSnapshot().selectedSessionId).not.toBe(alpha)
+      // The new draft focuses the composer on a timer; the rail refocus has to come after it.
+      await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
     })
-    await expect.poll(() => chat.getSnapshot().selectedSessionId).not.toBe(alpha)
-    // The new draft focuses the composer on a timer; the rail refocus has to come after it.
-    await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
     await focusRailSession(frame, 'Beta')
     await frame.renderOnce()
     expect(frame.captureCharFrame(), 'undo notice expired before U').toContain(
@@ -363,22 +363,31 @@ test('archiving the open session offers one U Undo that restores it and opens it
     )
     await act(async () => {
       frame.mockInput.pressKey('u')
+      await expect
+        .poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt)
+        .toBeNull()
+      await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
+      await expect.poll(() => chat.getSnapshot().pendingCommands).toBe(0)
     })
-    await expect.poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt).toBeNull()
-    await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
     await frame.renderOnce()
     expect(frame.captureCharFrame()).not.toContain('to undo')
     await focusRailSession(frame, 'Alpha')
-    await runPaletteCommand(frame, 'Redo session action')
-    await expect
-      .poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt)
-      .not.toBeNull()
-    await expect.poll(() => chat.getSnapshot().selectedSessionId).not.toBe(alpha)
-    await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
+    await runPaletteCommand(frame, 'Redo session action', async () => {
+      await expect
+        .poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt)
+        .not.toBeNull()
+      await expect.poll(() => chat.getSnapshot().selectedSessionId).not.toBe(alpha)
+      await expect.poll(() => chat.getSnapshot().pendingCommands).toBe(0)
+      await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
+    })
     await focusRailSession(frame, 'Beta')
-    await runPaletteCommand(frame, 'Undo session action')
-    await expect.poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt).toBeNull()
-    await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
+    await runPaletteCommand(frame, 'Undo session action', async () => {
+      await expect
+        .poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt)
+        .toBeNull()
+      await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
+      await expect.poll(() => chat.getSnapshot().pendingCommands).toBe(0)
+    })
     expect(unwrappedUpdates(warnings.mock.calls)).toEqual([])
   } finally {
     await harness.cleanup()
