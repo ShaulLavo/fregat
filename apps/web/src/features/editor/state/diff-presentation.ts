@@ -317,6 +317,10 @@ function sameAttachment(left: DiffAttachment, right: DiffAttachment): boolean {
   if (left === right) return true
   if (left.file !== right.file || left.kind !== right.kind) return false
   switch (left.kind) {
+    case 'filesystem':
+      return (
+        right.kind === 'filesystem' && left.read === right.read && left.meaning === right.meaning
+      )
     case 'operation':
       return right.kind === 'operation' && left.read === right.read
     case 'snapshot':

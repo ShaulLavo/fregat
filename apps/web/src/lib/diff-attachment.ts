@@ -6,8 +6,9 @@ import type {
   SnapshotComparisonFile,
   HistoryComparisonInput,
   OperationComparisonInput,
+  FilesystemComparisonInput,
 } from '@/lib/snapshot-comparison'
-import { operationComparisonSubject } from '@/lib/snapshot-comparison'
+import { operationComparisonSubject, filesystemComparisonSubject } from '@/lib/snapshot-comparison'
 import { materializeFileSnapshotText } from '@/lib/file-snapshot'
 import { languageIdForFilePath } from '@/lib/file-language'
 
@@ -15,12 +16,19 @@ type ReadyComparison = Extract<SnapshotComparisonRead, { kind: 'ready' }>
 type ReadySnapshot = ReadyComparison & {
   readonly input: Extract<ReadyComparison['input'], { kind: 'snapshot' | 'checkpoint' }>
 }
+type ReadyFilesystem = ReadyComparison & { readonly input: FilesystemComparisonInput }
 type ReadyOperation = ReadyComparison & { readonly input: OperationComparisonInput }
 type ReadyHistory = ReadyComparison & { readonly input: HistoryComparisonInput }
 type TextChild = Exclude<SnapshotComparisonFile, { kind: 'no-text' }>
 type ReadySaved = Extract<SavedComparisonRead, { kind: 'ready' }>
 
 export type DiffAttachment =
+  | {
+      readonly kind: 'filesystem'
+      readonly read: ReadyFilesystem
+      readonly file: DiffFile
+      readonly meaning: 'seed' | 'latest'
+    }
   | { readonly kind: 'operation'; readonly read: ReadyOperation; readonly file: DiffFile }
   | {
       readonly kind: 'snapshot'
@@ -94,6 +102,23 @@ export function operationDiffAttachment(
   return { kind: 'operation', read, file }
 }
 
+export function filesystemDiffAttachment(
+  read: SnapshotComparisonRead | null,
+  meaning: 'seed' | 'latest',
+): DiffAttachment | null {
+  if (
+    !read ||
+    read.kind !== 'ready' ||
+    !isFilesystemRead(read) ||
+    read.input.display.kind !== 'text'
+  )
+    return null
+  return { kind: 'filesystem', read, file: read.input.display.file, meaning }
+}
+function isFilesystemRead(read: ReadyComparison): read is ReadyFilesystem {
+  return read.input.kind === 'filesystem'
+}
+
 function isOperationRead(read: ReadyComparison): read is ReadyOperation {
   return read.input.kind === 'operation'
 }
@@ -120,6 +145,13 @@ export function diffAttachmentSubject(attachment: DiffAttachment): DiffAttachmen
           read.live.key,
         ]),
         buffer: read.live.buffer,
+      }
+    }
+    case 'filesystem': {
+      const capture = attachment.read.input.capture
+      return {
+        key: JSON.stringify([filesystemComparisonSubject(capture), attachment.meaning]),
+        buffer: capture.local.kind === 'text' ? capture.local.buffer : null,
       }
     }
     case 'operation':
@@ -172,6 +204,14 @@ export function diffAttachmentRevision(attachment: DiffAttachment): string {
       return attachment.revision
     case 'saved':
       return JSON.stringify([attachment.read.live.revision, attachment.read.saved.snapshot.version])
+    case 'filesystem': {
+      const { local, incoming, eventType } = attachment.read.input.capture
+      return JSON.stringify([
+        eventType,
+        local.kind === 'text' ? local.revision : local.kind,
+        incoming.kind === 'deleted' ? incoming.kind : incoming.file.version,
+      ])
+    }
     case 'operation': {
       const segment = attachment.read.input.segment
       return JSON.stringify([
@@ -203,6 +243,13 @@ export function diffAttachmentLines(
   attachment: DiffAttachment,
 ): Readonly<Record<'old' | 'new', readonly string[] | null>> {
   switch (attachment.kind) {
+    case 'filesystem': {
+      const { local, incoming } = attachment.read.input.capture
+      return {
+        old: local.kind === 'text' ? splitTextLines(local.snapshot.materializeFullText()) : null,
+        new: incoming.kind === 'text' ? splitTextLines(incoming.reader.materializeFullText()) : [],
+      }
+    }
     case 'operation':
       return {
         old: splitTextLines(attachment.read.input.old.materializeFullText()),
@@ -238,6 +285,15 @@ export function diffAttachmentReferences(attachment: DiffAttachment): readonly o
       return [attachment.read.live.snapshot, attachment.read.saved.snapshot]
     case 'history':
       return [attachment.read.input.old.snapshot, attachment.read.input.new.snapshot]
+    case 'filesystem': {
+      const capture = attachment.read.input.capture
+      const references: object[] = [capture, attachment.file]
+      if (capture.local.kind === 'text')
+        references.push(capture.local.buffer, capture.local.snapshot.snapshot)
+      if (capture.incoming.kind !== 'deleted') references.push(capture.incoming.file)
+      if (capture.incoming.kind === 'text') references.push(capture.incoming.reader)
+      return references
+    }
     case 'operation': {
       const input = attachment.read.input
       return [input.segment, input.old.snapshot, input.new.snapshot, input.display]

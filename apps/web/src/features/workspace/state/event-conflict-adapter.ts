@@ -1,3 +1,14 @@
+import {
+  captureFilesystemLocal,
+  filesystemIncomingText,
+  filesystemComparisonInput,
+  type FilesystemIncomingCapture,
+  type FilesystemLocalCapture,
+  type SnapshotComparisonRequest,
+  type SnapshotComparisonLease,
+} from '@/lib/snapshot-comparison'
+import type { SnapshotComparisonScope } from '@/lib/documents/utils/snapshot-comparison'
+import { isPdfFile } from '@/lib/pdf-viewer/format'
 import { log } from '@/lib/client-logging'
 import { parentFilesystemPath } from '@/lib/path-formatters'
 import { supportsTextFile } from '@/features/editor/state/workspace-document-service'
@@ -41,6 +52,10 @@ import { createElement } from 'react'
 import { toast } from 'sonner'
 
 export type WorkspaceConflictContext = {
+  comparisonScope: SnapshotComparisonScope
+  acquireSnapshotComparison: (request: SnapshotComparisonRequest) => SnapshotComparisonLease
+  signal: AbortSignal
+  localCaptures?: ReadonlyMap<FilesystemPath, FilesystemLocalCapture>
   client: Client
   conflictStore: EditorConflictStoreApi
   discardLiveEditorDocument: (document: DocumentRef) => { wasDirty: boolean }
@@ -90,7 +105,11 @@ export async function notifyRenamedFilesystemConflict(
   remotePath: FilesystemPath,
   context: WorkspaceConflictContext,
 ) {
-  const remoteFile = await context.fetchFile(remotePath, new AbortController().signal)
+  if (context.signal.aborted) return
+  const capturedContext = { ...context, comparisonScope: { ...context.comparisonScope } }
+  const local = conflictLocalCapture(localPath, capturedContext)
+  const remoteFile = await capturedContext.fetchFile(remotePath, capturedContext.signal)
+  if (context.signal.aborted) return
   notifyFilesystemConflict(
     {
       eventType: 'renamed',
@@ -101,7 +120,8 @@ export async function notifyRenamedFilesystemConflict(
       remotePath,
       remoteText: supportsTextFile(remoteFile) ? remoteFile.content : null,
     },
-    context,
+    capturedContext,
+    local,
   )
 }
 
@@ -117,7 +137,7 @@ function changedConflict(
   path: FilesystemPath,
   remoteFile: FileResult,
   context: WorkspaceConflictContext,
-): FilesystemConflict {
+): Omit<FilesystemConflict, 'latest' | 'seed'> {
   return {
     eventType: 'changed',
     id: createConflictId(),
@@ -129,9 +149,20 @@ function changedConflict(
   }
 }
 
-function notifyFilesystemConflict(conflict: FilesystemConflict, context: WorkspaceConflictContext) {
+function notifyFilesystemConflict(
+  conflict: Omit<FilesystemConflict, 'latest' | 'seed'>,
+  context: WorkspaceConflictContext,
+  local = conflictLocalCapture(conflict.localPath, context),
+) {
+  if (context.signal.aborted) return
   const current = matchingConflict(conflict, context)
-  const next = current ? refreshedConflict(current, conflict) : conflict
+  const adopted = retainFilesystemConflict(
+    current ? { ...conflict, id: current.id } : conflict,
+    context,
+    local,
+  )
+  if (adopted.latest.lease.read().kind !== 'ready') return
+  const next = current ? refreshedConflict(current, adopted) : adopted
   context.conflictStore.getState().addConflict(next)
 
   const toastId = toast(
@@ -157,7 +188,10 @@ function notifyFilesystemConflict(conflict: FilesystemConflict, context: Workspa
   })
 }
 
-function matchingConflict(conflict: FilesystemConflict, context: WorkspaceConflictContext) {
+function matchingConflict(
+  conflict: Pick<FilesystemConflict, 'localPath' | 'remotePath'>,
+  context: WorkspaceConflictContext,
+) {
   const conflicts = Object.values(context.conflictStore.getState().conflicts)
   return conflicts.find(
     (current) =>
@@ -171,6 +205,7 @@ function refreshedConflict(
 ): FilesystemConflict {
   return {
     ...next,
+    seed: current.seed,
     diffDocumentKey: current.diffDocumentKey,
     id: current.id,
     toastId: current.toastId,
@@ -203,8 +238,27 @@ function ensureConflictEditorDocument(
   context: WorkspaceConflictContext,
 ) {
   if (context.getLiveEditorDocument(documentKey(target))) return
-  const content = createMergeConflictDocumentText(conflict)
+  const capture = conflict.latest.input.capture
+  const content = createMergeConflictDocumentText({
+    ...conflict,
+    localText: capture.local.kind === 'text' ? capture.local.snapshot.materializeFullText() : '',
+    remoteText:
+      capture.incoming.kind === 'text' ? capture.incoming.reader.materializeFullText() : null,
+  })
   context.ensureUnsyncedEditorDocument({ content, target })
+  const document = context.getLiveEditorDocument(documentKey(target))
+  if (!document) return
+  const lease = context.acquireSnapshotComparison({
+    input: conflict.latest.input,
+    signal: context.signal,
+  })
+  context.conflictStore.getState().updateConflict(conflict.id, {
+    seed: {
+      resolutionKey: documentKey(target),
+      buffer: document.buffer,
+      comparison: { input: conflict.latest.input, lease },
+    },
+  })
 }
 
 function resolveConflict(
@@ -362,4 +416,47 @@ function localConflictText(path: FilesystemPath, context: WorkspaceConflictConte
 function createConflictId() {
   nextConflictId += 1
   return `${Date.now().toString(36)}-${nextConflictId.toString(36)}`
+}
+
+function conflictLocalCapture(
+  path: FilesystemPath,
+  context: Pick<WorkspaceConflictContext, 'getLiveEditorDocument' | 'localCaptures'>,
+): FilesystemLocalCapture {
+  return (
+    context.localCaptures?.get(path) ??
+    captureFilesystemLocal(
+      path,
+      context.getLiveEditorDocument(fileDocumentKey(path))?.buffer ?? null,
+    )
+  )
+}
+export function retainFilesystemConflict(
+  conflict: Omit<FilesystemConflict, 'latest' | 'seed'>,
+  context: Pick<
+    WorkspaceConflictContext,
+    'comparisonScope' | 'acquireSnapshotComparison' | 'signal'
+  >,
+  local: FilesystemLocalCapture,
+): FilesystemConflict {
+  const incoming = incomingFilesystemCapture(conflict.remoteFile, conflict.remotePath)
+  const capture = {
+    scope: context.comparisonScope,
+    conflictId: conflict.id,
+    eventType: conflict.eventType,
+    local,
+    incoming,
+  }
+  const input = filesystemComparisonInput(capture)
+  const lease = context.acquireSnapshotComparison({ input, signal: context.signal })
+  return { ...conflict, latest: { input, lease } }
+}
+
+function incomingFilesystemCapture(
+  file: FileResult | null,
+  path: FilesystemPath,
+): FilesystemIncomingCapture {
+  if (!file) return { kind: 'deleted', path }
+  if (file.seemsBinary) return { kind: 'binary', file }
+  if (isPdfFile(file.path)) return { kind: 'unsupported', file }
+  return filesystemIncomingText(file)
 }

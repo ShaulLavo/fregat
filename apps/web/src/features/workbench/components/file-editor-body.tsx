@@ -1,3 +1,9 @@
+import type { RetainedFilesystemComparison } from '@/features/editor/state/conflict-state'
+import { filesystemDiffAttachment } from '@/lib/diff-attachment'
+import { DiffEditor } from '@/features/editor/components/diff-editor'
+import { Button } from '@workspace/ui/components/button'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
+import { EmptyState } from '@workspace/ui/components/empty-state'
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { documentKey } from '@/lib/documents/utils/identity'
 import { MarkdownPreviewPane } from '@/features/workbench/components/markdown-preview-pane'
@@ -38,6 +44,7 @@ const PagedFileViewer = lazy(() =>
 )
 
 export function FileEditorBody({
+  conflictComparison = null,
   active,
   liveDocument,
   definitionTarget,
@@ -50,6 +57,12 @@ export function FileEditorBody({
   rootPath,
   tabId,
 }: {
+  conflictComparison?: {
+    readonly retained: RetainedFilesystemComparison
+    readonly meaning: 'seed' | 'latest'
+    readonly setMeaning: (meaning: 'seed' | 'latest') => void
+    readonly close: () => void
+  } | null
   active: boolean
   liveDocument: EditorRenderDocument | null
   definitionTarget: LanguageServerDefinitionTarget | null
@@ -115,6 +128,48 @@ export function FileEditorBody({
     fileOpenIntent.recordInitialPaint(resource.path, event)
     if (event.phase === 'text') notePressPaint('files', resource.path, 'text')
     else notePressPaint('files', resource.path, 'colour', { highlight: event.status })
+  }
+
+  if (conflictComparison) {
+    const attachment = filesystemDiffAttachment(
+      conflictComparison.retained.lease.read(),
+      conflictComparison.meaning,
+    )
+    return (
+      <div className='flex h-full min-h-0 min-w-0 flex-col'>
+        <PaneBar>
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={() => conflictComparison.setMeaning('seed')}
+            aria-pressed={conflictComparison.meaning === 'seed'}
+          >
+            Original comparison
+          </Button>
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={() => conflictComparison.setMeaning('latest')}
+            aria-pressed={conflictComparison.meaning === 'latest'}
+          >
+            Latest incoming
+          </Button>
+          <Button variant='ghost' size='sm' onClick={conflictComparison.close}>
+            Resolution
+          </Button>
+        </PaneBar>
+        <div className='min-h-0 min-w-0 flex-1'>
+          {attachment ? (
+            <DiffEditor attachment={attachment} mode='stacked' tabId={tabId} />
+          ) : (
+            <EmptyState
+              title='Capture unavailable'
+              description='Return to the resolution to continue editing.'
+            />
+          )}
+        </div>
+      </div>
+    )
   }
 
   if (comparison) {

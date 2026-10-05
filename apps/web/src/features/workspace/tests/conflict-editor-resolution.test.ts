@@ -1,3 +1,4 @@
+import type { FilesystemConflict } from '@/features/editor/state/conflict-state'
 import { readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { vi } from 'vitest'
@@ -103,12 +104,30 @@ test('newer resolution retries with the acknowledged base and finishes its secon
 }) => {
   const fixture = await createConflictResolutionFixture(server)
   const events = observeResolution()
+  const original = fixture.conflictStore.getState().conflicts[fixture.target.conflictId]!
+  const adopted = Promise.withResolvers<FilesystemConflict>()
+  const stop = fixture.conflictStore.subscribe((state) => {
+    const current = state.conflicts[fixture.target.conflictId]
+    if (current && current.remoteFile?.version !== original.remoteFile?.version)
+      adopted.resolve(current)
+  })
   try {
     fixture.schedule()
     await fixture.transport.entered
     fixture.editResolution()
     fixture.schedule()
     fixture.transport.release()
+    const acknowledged = await adopted.promise
+    expect(acknowledged.seed).toBe(original.seed)
+    expect(acknowledged.seed?.buffer).toBe(fixture.resolution.buffer)
+    expect(acknowledged.latest.input.capture).not.toBe(original.latest.input.capture)
+    const incoming = acknowledged.latest.input.capture.incoming
+    if (incoming.kind !== 'text') throw new RangeError('Actual acknowledged text required')
+    expect(incoming.file).toBe(acknowledged.remoteFile)
+    expect(incoming.reader.materializeFullText()).toBe('merged text')
+    expect(fixture.resolution.buffer.materializeFullText()).toBe('merged textnew ')
+    expect(original.latest.lease.read().kind).toBe('released')
+    expect(original.seed?.comparison.lease.read().kind).toBe('ready')
     await expect.poll(events.outcomes).toEqual(['retry', 'resolved'])
     expect(await readFile(join(server.root, fixture.path), 'utf8')).toBe('merged textnew ')
     expect(fixture.destinationText()).toBe('merged textnew ')
@@ -127,6 +146,7 @@ test('newer resolution retries with the acknowledged base and finishes its secon
     expect(bodies[0].baseVersion).not.toBe(bodies[1].baseVersion)
     expect(bodies.map((body) => body.content)).toEqual(['merged text', 'merged textnew '])
   } finally {
+    stop()
     events.restore()
     fixture.dispose()
   }

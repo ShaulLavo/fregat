@@ -2,7 +2,7 @@ import { documentKey, fileDocument, fileResource } from '@/lib/documents/utils/i
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import { documentTab } from '@/lib/documents/utils/tabs'
 import type { DocumentKey, FilesystemPath, TabContent, TabId } from '@/lib/documents/utils/types'
-import { useEffect, useLayoutEffect, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 
 import {
   joinedEditorRenderDocument,
@@ -127,12 +127,17 @@ export function EditorSurfaceTabBody({
   const setStatusBarSource = useEditorUiState((state) => state.setStatusBarSource)
   const uiStore = useEditorUiStoreApi()
   const { openDefinition, selectContent } = useEditorCommands()
-  // Only a file that is still on disk has a saved side to compare the buffer against.
-  const comparableConflictPath = useEditorConflictState((state) => {
-    if (!selectedConflict) return null
-    const conflict = state.conflicts[selectedConflict.conflictId]
-    return conflict?.eventType === 'changed' ? conflict.localPath : null
-  })
+  const [captureView, setCaptureView] = useState<{
+    conflictId: string
+    meaning: 'seed' | 'latest'
+  } | null>(null)
+  const filesystemConflict = useEditorConflictState((state) =>
+    selectedConflict ? (state.conflicts[selectedConflict.conflictId] ?? null) : null,
+  )
+  const comparisonView =
+    captureView?.conflictId === selectedConflict?.conflictId && filesystemConflict?.seed
+      ? captureView
+      : null
   const applyWorkspaceEdit = useWorkspaceEditHost()
   const resolveConflictEditorDocument = useConflictEditorResolution()
   const selectedFile = readyFile(fileState)
@@ -190,15 +195,10 @@ export function EditorSurfaceTabBody({
   const editorSurfaceActions: EditorSurfaceActions = {
     applyWorkspaceEdit,
     closeReferences: handleCloseReferences,
-    compareMergeConflict: comparableConflictPath
-      ? () =>
-          selectContent(
-            documentTab({
-              kind: 'compare-saved',
-              file: fileResource(comparableConflictPath),
-            }),
-          )
-      : null,
+    compareMergeConflict:
+      filesystemConflict?.seed && selectedConflict
+        ? () => setCaptureView({ conflictId: selectedConflict.conflictId, meaning: 'seed' })
+        : null,
     openDefinition: (target) => {
       void openDefinition(target)
     },
@@ -239,6 +239,19 @@ export function EditorSurfaceTabBody({
         fileVersion={fileVersion}
         readError={readError}
         languageServerReferences={languageServerReferences}
+        conflictComparison={
+          comparisonView && filesystemConflict?.seed
+            ? {
+                retained:
+                  comparisonView.meaning === 'seed'
+                    ? filesystemConflict.seed.comparison
+                    : filesystemConflict.latest,
+                meaning: comparisonView.meaning,
+                setMeaning: (meaning) => setCaptureView({ ...comparisonView, meaning }),
+                close: () => setCaptureView(null),
+              }
+            : null
+        }
         target={content.document}
         rootPath={rootPath}
         tabId={tabId}

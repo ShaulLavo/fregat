@@ -30,6 +30,9 @@ export async function createConflictCompletionFixture(server: TestServer) {
   const destination = documents.ensureLiveEditorDocument(remote)
   setFileSnapshotQueryData(queryClient, remote)
   const context: WorkspaceConflictContext = {
+    comparisonScope: { environmentId: runtime.environmentId, rootPath: filesystemPath('') },
+    acquireSnapshotComparison: documents.acquireSnapshotComparison,
+    signal: new AbortController().signal,
     client: transport,
     conflictStore,
     queryClient,

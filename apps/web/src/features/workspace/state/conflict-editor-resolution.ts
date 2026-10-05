@@ -1,3 +1,5 @@
+import { captureFilesystemLocal, type FilesystemLocalCapture } from '@/lib/snapshot-comparison'
+import { retainFilesystemConflict } from '@/features/workspace/state/event-conflict-adapter'
 import { supportsTextFile } from '@/features/editor/state/workspace-document-service'
 import { parentFilesystemPath } from '@/lib/path-formatters'
 import { type TextSnapshot } from '@singapore-editor/core/document'
@@ -48,6 +50,7 @@ type ResolutionContext = {
   ) => { wasDirty: boolean }
 }
 type CapturedResolution = {
+  readonly local: FilesystemLocalCapture
   readonly conflict: FilesystemConflict
   readonly target: ConflictTarget
   readonly root: WorkspaceEditRoot
@@ -109,6 +112,11 @@ export class ConflictEditorResolutionCoordinator {
     if (conflict.remoteFile && !supportsTextFile(conflict.remoteFile)) return null
     if (!textSnapshotEqualsText(resolution.buffer.getTextSnapshot(), text)) return null
     return {
+      local: captureFilesystemLocal(
+        conflict.localPath,
+        documentStore.getState().getLiveEditorDocument(fileDocumentKey(conflict.localPath))
+          ?.buffer ?? null,
+      ),
       conflict,
       target,
       resolution,
@@ -214,12 +222,23 @@ export class ConflictEditorResolutionCoordinator {
     setFileSnapshotQueryData(this.context.queryClient, file)
     if (!this.resolutionCurrent(capture)) {
       if (!this.rootCurrent(capture)) return 'unresolved'
-      this.context.conflictStore.getState().addConflict({
-        ...capture.conflict,
-        eventType: retryEventType(capture.conflict),
-        remoteFile: file,
-        remoteText: file.content,
-      })
+      this.context.conflictStore.getState().addConflict(
+        retainFilesystemConflict(
+          {
+            ...capture.conflict,
+            eventType: retryEventType(capture.conflict),
+            remoteFile: file,
+            remoteText: file.content,
+          },
+          {
+            comparisonScope: capture.conflict.latest.input.scope,
+            acquireSnapshotComparison:
+              this.context.documentStore.getState().acquireSnapshotComparison,
+            signal: new AbortController().signal,
+          },
+          capture.local,
+        ),
+      )
       return 'retry'
     }
     this.replaceDestination(capture.conflict, file)

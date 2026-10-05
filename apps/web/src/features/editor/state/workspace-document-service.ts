@@ -1,3 +1,4 @@
+import { filesystemComparisonSubject, sameFilesystemCapture } from '@/lib/snapshot-comparison'
 import {
   sameCheckpointCapture,
   promoteCheckpointCapture,
@@ -363,7 +364,7 @@ export class WorkspaceDocumentService {
     const key = snapshotGroupKey(input)
     const groups = this.snapshotGroups.get(key) ?? new Set<SnapshotComparisonGroup>()
     const retained =
-      input.kind === 'history' || input.kind === 'operation'
+      input.kind === 'history' || input.kind === 'operation' || input.kind === 'filesystem'
         ? [...groups].find((candidate) => compatibleCapture(candidate.current.input, input))
         : groups.values().next().value
     const group = retained ?? {
@@ -2164,6 +2165,8 @@ function assertTextFile(file: FileSnapshot): void {
 
 function snapshotGroupKey(input: SnapshotComparisonInput): string {
   switch (input.kind) {
+    case 'filesystem':
+      return filesystemComparisonSubject(input.capture)
     case 'operation':
       return operationComparisonSubject(input)
     case 'history':
@@ -2183,6 +2186,24 @@ function snapshotGroupKey(input: SnapshotComparisonInput): string {
 
 function validSnapshotCapture(input: SnapshotComparisonInput): boolean {
   switch (input.kind) {
+    case 'filesystem': {
+      const { capture, display } = input
+      if (
+        capture.scope.environmentId !== input.scope.environmentId ||
+        capture.scope.rootPath !== input.scope.rootPath
+      )
+        return false
+      const { local, incoming } = capture
+      if (display.kind === 'no-text') {
+        if (incoming.kind === 'binary' || incoming.kind === 'unsupported')
+          return display.reason === incoming.kind
+        return local.kind === 'missing' && display.reason === 'local-missing'
+      }
+      if (local.kind !== 'text' || (incoming.kind !== 'text' && incoming.kind !== 'deleted'))
+        return false
+      const path = incoming.kind === 'text' ? incoming.file.path : incoming.path
+      return display.file.oldPath === local.path && display.file.newPath === path
+    }
     case 'operation':
       return (
         input.subject === operationComparisonSubject(input) &&
@@ -2215,6 +2236,8 @@ function validSnapshotCapture(input: SnapshotComparisonInput): boolean {
 
 function comparisonRoot(input: SnapshotComparisonInput): FilesystemPath {
   switch (input.kind) {
+    case 'filesystem':
+      return input.capture.scope.rootPath
     case 'operation':
       return input.root.path
     case 'history':
@@ -2230,6 +2253,8 @@ function comparisonRoot(input: SnapshotComparisonInput): FilesystemPath {
 
 function compatibleCapture(left: SnapshotComparisonInput, right: SnapshotComparisonInput): boolean {
   switch (left.kind) {
+    case 'filesystem':
+      return right.kind === 'filesystem' && sameFilesystemCapture(left, right)
     case 'operation':
       return right.kind === 'operation' && sameOperationCapture(left, right)
     case 'history':

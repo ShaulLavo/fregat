@@ -49,7 +49,10 @@ export function DiffEditor({
   onPublication?: DiffPanePublicationSink
 }) {
   const documentStore = use(EditorDocumentStateContext)
-  const operation = attachment?.kind === 'operation' ? attachment.read.input : null
+  const operation =
+    attachment?.kind === 'operation' || attachment?.kind === 'filesystem'
+      ? attachment.read.input
+      : null
   useLayoutEffect(() => {
     if (!operation || !documentStore) return
     const lease = documentStore.getState().acquireSnapshotComparison({
