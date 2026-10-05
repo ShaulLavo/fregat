@@ -22,6 +22,59 @@ import {
 
 const TEXT = 'const value = 1'
 
+it('marks current highlighter work pending on the direct provider path while keeping rebased tokens', async () => {
+  const initial = deferred<EditorHighlightResult>()
+  const update = deferred<EditorHighlightResult>()
+  const structure = deferred<EditorSyntaxResult>()
+  const events: EditorInitialPaintEvent[] = []
+  const container = document.createElement('div')
+  document.body.append(container)
+  const editor = new Editor(container, {
+    plugins: [
+      highlighterPlugin({ ...highlighterSession(initial), applyChange: () => update.promise }),
+      syntaxPlugin(syntaxSession(structure)),
+    ],
+    onInitialPaint: (event) => events.push(event),
+  })
+  try {
+    editor.openDocument({ documentId: 'current.ts', languageId: 'typescript', text: TEXT })
+    initial.resolve({ tokens: EditorTokenStore.fromTokens([{ start: 0, end: 5, style: RED }]) })
+    structure.resolve(createEmptySyntaxResult())
+    await nextTask()
+    expect(editor.getState()).toMatchObject({
+      syntaxStatus: 'ready',
+      initialHighlightStatus: 'painted',
+    })
+    const settled = events.length
+    const prefix = '// pending\n'
+    editor.edit({ from: 0, to: 0, text: prefix })
+    await vi.waitFor(() => expect(editor.getState().syntaxStatus).toBe('ready'))
+    expect(editor.getState()).toMatchObject({
+      syntaxStatus: 'ready',
+      initialHighlightStatus: 'loading',
+    })
+    expect(editor['syntax'].tokens.toTokens()).toEqual([
+      { start: prefix.length, end: prefix.length + 5, style: RED },
+    ])
+    expect(editor['syntax'].renderDataReady).toBe(false)
+    expect(editor['syntax'].copyTokens.length).toBe(0)
+    const current = EditorTokenStore.fromTokens([
+      { start: 0, end: prefix.length - 1, style: { color: '#008000' } },
+      { start: prefix.length, end: prefix.length + 5, style: RED },
+    ])
+    update.resolve({ tokens: current })
+    await nextTask()
+    expect(editor.getState().initialHighlightStatus).toBe('painted')
+    expect(editor['syntax'].tokens.toTokens()).toEqual(current.toTokens())
+    expect(editor['syntax'].renderDataReady).toBe(true)
+    expect(events).toHaveLength(settled)
+  } finally {
+    update.resolve({ tokens: EditorTokenStore.empty() })
+    editor.dispose()
+    container.remove()
+  }
+})
+
 describe('syntax capture conversion', () => {
   it('maps known capture names to editor token styles', () => {
     expect(styleForTreeSitterCapture('keyword.declaration')).toEqual({
