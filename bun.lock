@@ -41,7 +41,7 @@
     },
     "apps/server": {
       "name": "server",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.283",
         "@elysiajs/cors": "^1.4.2",
@@ -98,7 +98,7 @@
     },
     "apps/tui": {
       "name": "tui",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@fregat/hotkeys": "catalog:",
         "@opentui/core": "catalog:",
