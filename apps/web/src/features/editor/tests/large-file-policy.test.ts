@@ -2,6 +2,7 @@ import { expect, test } from '../../../../test/fixtures'
 import { documentFeatureTier, MI_CODE_UNITS } from '@/features/editor/utils/large-file-policy'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { testDocumentKey } from '../../../../test/factories/document-targets'
+import { createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
 import { createEditorTextBuffer } from '@singapore-editor/core/document'
 import { createPlatformFileOpenPreparer } from '@/features/editor/utils/prepared-document'
 
@@ -33,6 +34,7 @@ test('preparation and reconfiguration remove full-document stages above the live
     filesystemPath('a.ts'),
     abort.signal,
     { startIndex: 0, endIndex: 11 },
+    createEditorDocumentAnalysis({ buffer, documentId: testDocumentKey('a') }),
   )
   expect(prepared.stages.length).toBeGreaterThan(0)
   const changed = limited.reconfigure(
@@ -52,6 +54,7 @@ test('preparation and reconfiguration remove full-document stages above the live
     filesystemPath('a.ts'),
     abort.signal,
     { startIndex: 0, endIndex: 11 },
+    createEditorDocumentAnalysis({ buffer, documentId: testDocumentKey('b') }),
   )
   expect(fresh.stages).toEqual([])
   expect(await fresh.preparedDocument.fallbackReady).toBe(false)

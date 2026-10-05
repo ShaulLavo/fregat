@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 import { readCaches } from './cache-snapshot'
-import { copyFile, readdir } from 'node:fs/promises'
-import path from 'node:path'
+import { readdir } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
 import type { Browser, Page } from 'playwright'
 
@@ -657,6 +656,7 @@ async function withPage(
   })
   let saveWallpaper: (() => Promise<string>) | undefined
   let disposeTerminals: (() => Promise<string>) | undefined
+  let code: number
   try {
     await captureBrowserRenderer(browser, evidence, options.headed)
     if (options.productCapture) disposeTerminals = await isolateProductTerminals(page, evidence)
@@ -679,13 +679,16 @@ async function withPage(
       productWallpaper: options.productWallpaper ?? null,
       userAgentOverride: options.productWallpaper ? PRODUCT_USER_AGENT : null,
     })
-    const code = await body(page, observed, browser)
-    if (!options.site) await appendLogs(evidence, options.server)
-    console.log(await Bun.file(evidence.file('summary.md')).text())
-    return code
+    code = await body(page, observed, browser)
   } finally {
-    await closeCapture(page, browser, saveWallpaper, disposeTerminals)
+    try {
+      await closeCapture(page, browser, saveWallpaper, disposeTerminals)
+    } finally {
+      if (!options.site) await appendLogs(evidence, options.server)
+    }
   }
+  console.log(await Bun.file(evidence.file('summary.md')).text())
+  return code
 }
 
 async function closeCapture(
@@ -774,27 +777,32 @@ function apiBase(url: string) {
 }
 
 async function appendLogs(evidence: Evidence, server: IsolatedServer | undefined) {
-  const events = await readLogs({ level: 'warn', since: evidence.startedAt })
+  const fullLog = server
+    ? await keepServerLogs(evidence, server)
+    : [`full window: bun run logs --since ${evidence.startedAt.toISOString()}`]
+  const events = await readLogs({
+    directory: server ? evidence.dir : undefined,
+    level: 'warn',
+    since: evidence.startedAt,
+  })
   await evidence.write('logs.txt', events.map(formatLogEvent).join('\n'))
   const summary = evidence.file('summary.md')
-  const existing = await Bun.file(summary).text()
+  const existing = await Bun.file(summary)
+    .text()
+    .catch(() => '')
   const window = `${evidence.startedAt.toISOString()}..now`
   const lines = [
     '',
     `logs (warn+, ${window}): ${events.length === 0 ? 'none' : `${events.length}, see logs.txt`}`,
-    ...(server
-      ? await keepServerLogs(evidence, server)
-      : [`full window: bun run logs --since ${evidence.startedAt.toISOString()}`]),
+    ...fullLog,
   ]
   await Bun.write(summary, `${existing}${lines.join('\n')}\n`)
 }
 
 // The run's state directory is deleted when it ends, so its log moves into the evidence.
 async function keepServerLogs(evidence: Evidence, server: IsolatedServer) {
-  const files = (await readdir(server.logs).catch(() => [] as string[])).filter((name) =>
-    name.endsWith('.jsonl'),
-  )
-  for (const name of files) await copyFile(path.join(server.logs, name), evidence.file(name))
+  await server.stop({ logs: evidence.dir })
+  const files = (await readdir(evidence.dir)).filter((name) => name.endsWith('.jsonl'))
   return [
     `api server: ${server.origin}, throwaway state ${server.directory} (removed after the run)`,
     `full log: ${files.map((name) => evidence.file(name)).join(', ') || 'none written'}`,

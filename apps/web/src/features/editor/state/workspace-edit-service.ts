@@ -493,7 +493,11 @@ export class WorkspaceEditService {
       event.end(workspaceOperationSettlement(result))
       return result
     }
-    if (this.active?.commitStarted) {
+    if (
+      this.active?.commitStarted ||
+      this.snapshot.phase === 'undoing' ||
+      this.snapshot.phase === 'redoing'
+    ) {
       const result = failedResult('workspace-edit-busy', 'Another multi-file edit is still running')
       event.end(workspaceOperationSettlement(result))
       return result

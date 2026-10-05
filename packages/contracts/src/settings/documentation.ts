@@ -503,6 +503,14 @@ export const SETTINGS_DOCUMENTATION = {
     description: 'Blink the terminal cursor while the terminal has focus.',
     keywords: ['terminal', 'cursor', 'blink'],
   },
+  'editor.inactiveAnalysisEntryLimit': {
+    title: 'Inactive analysis entry limit',
+    description:
+      'How many unused document syntax analysis entries the editor keeps across all retained environments. Structural analysis and highlighting each count as one entry.',
+    details:
+      "Each retained document's structural or highlighter session counts once, including each distinct configuration. Checked after analysis and document ownership changes settle. Views and preparation leases protect their entries until release. Obsolete and abandoned entries leave first, then the least recently released entries. The default of 2 can keep a previous document's structural analysis and highlighting warm while another document is active. Set 0 to reclaim every unused entry. Reclaimed analysis is recreated when needed; the document keeps its text and Undo history. This setting counts entries. Memory use depends on the retained documents and providers.",
+    keywords: ['memory', 'retention', 'analysis', 'syntax', 'warm', 'environments'],
+  },
   'editor.retainedTextBudget': {
     details:
       'Checked at a project switch and at a tab close, so opening two large projects can exceed it until the next switch or close. Counted in UTF-16 code units, which equals bytes for ASCII text. Files of other projects past the limit leave memory and are read from disk again when you switch back.',

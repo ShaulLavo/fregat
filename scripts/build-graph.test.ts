@@ -1,9 +1,45 @@
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import {
+  constants,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { expect, test } from 'vitest'
+import { afterAll, beforeAll, expect, test } from 'vitest'
 import * as v from 'valibot'
 
-const root = path.resolve(import.meta.dirname, '..')
+const repository = path.resolve(import.meta.dirname, '..')
+const root = mkdtempSync(path.join(tmpdir(), 'build-graph-'))
+
+beforeAll(() => {
+  const files = execFileSync(
+    'git',
+    ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+    {
+      cwd: repository,
+      encoding: 'utf8',
+    },
+  )
+    .split('\0')
+    .filter(Boolean)
+  for (const file of files) {
+    const source = path.join(repository, file)
+    if (!existsSync(source)) continue
+    const target = path.join(root, file)
+    mkdirSync(path.dirname(target), { recursive: true })
+    cpSync(source, target, { mode: constants.COPYFILE_FICLONE })
+  }
+  symlinkSync(path.join(repository, 'node_modules'), path.join(root, 'node_modules'), 'junction')
+})
+
+afterAll(() => rmSync(root, { recursive: true, force: true }))
 
 const buildGraphSchema = v.object({
   tasks: v.array(
@@ -91,6 +127,18 @@ test('a library source change invalidates the ghostty site build cache', () => {
   const probe = path.join(root, 'ghostty-webgpu/src/turbo-cache-probe.ts')
   writeFileSync(probe, 'export const cacheProbe = true\n', { flag: 'wx' })
   try {
+    expect(buildTask('ghostty-webgpu-site').hash).not.toBe(before)
+  } finally {
+    rmSync(probe)
+  }
+})
+
+test('a ghostty site environment file change invalidates its build cache', () => {
+  const probe = path.join(root, 'ghostty-webgpu/site/.env.turbo-cache-probe')
+  writeFileSync(probe, '# before\n', { flag: 'wx' })
+  try {
+    const before = buildTask('ghostty-webgpu-site').hash
+    writeFileSync(probe, '# after\n')
     expect(buildTask('ghostty-webgpu-site').hash).not.toBe(before)
   } finally {
     rmSync(probe)
