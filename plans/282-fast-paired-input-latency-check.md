@@ -80,6 +80,13 @@ Validation runs are measurements: run them when no other heavy work is on the ma
 
 ## Done when
 
+Owner steering, October 5: the default/full runtime targets measure tooling usability. They
+remain optimization goals and do not block Plan 099 delivery. The completed full run passes
+972 required comparisons and 1,080 raw comparisons in 2,798.161 seconds. Its 98.161-second
+target miss remains recorded. Preserve the valid evidence and verify affected changes with
+focused checks; a full rerun needs a concrete affected-scope reason. Latency, source, output,
+cleanup, and statistical thresholds retain their existing values.
+
 - The paired command exists, with its sensitivity self-check stored per instrument hash.
 - Steps 2 and 3 reproduce the old verdicts on all five accepted configurations, with and without
   background load.

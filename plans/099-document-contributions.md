@@ -29,8 +29,13 @@ Qualification uses untouched main `51d2a71ae` and candidate `9e773c8fa`, with eq
 dependencies and measurement `b615d5ab` / validation `e76f680d`. Fresh input, frame, detection-floor,
 and native controls pass. The default Platform/native comparison passes all 216 blocking checks
 in 566.201 seconds within its 900-second budget, with exact raw replay and complete cleanup.
-The ten-configuration matrix, current loaded reliability, and qualifying multiple-consumer
-improvement remain open. Default budget agreement alone does not establish that improvement.
+The complete ten-configuration matrix passes all 972 required comparisons and 1,080 raw
+comparisons, with exact replay and complete cleanup. Its public command takes 2,798.161 seconds,
+98.161 seconds beyond the 2,700-second tooling target. Following the owner's October 5 cost
+concern, that runtime target is a tooling follow-up and does not block this delivery. Preserve
+the measured miss and valid comparison evidence. A full rerun requires a concrete affected-scope
+reason; runtime chasing supplies none. Current loaded reliability and a qualifying
+multiple-consumer improvement remain open. Budget agreement alone does not establish that improvement.
 
 The [bounded source and ownership proof](../docs/document-contributions/source-ownership-proof.md)
 passes the paired 605-check source workloads, candidate lifetime checks, separate fresh-owner
