@@ -120,7 +120,7 @@ export function DiffView({
           "Ask" button would otherwise clear the selection before the click landed. */}
       <div className='min-h-0 w-full min-w-0 flex-1' ref={containerRef}>
         <DiffEditor
-          file={file}
+          attachment={source && file ? { kind: 'comparison', read: source, file } : null}
           failure={failure}
           languageServer={file ? languageServer : null}
           mode={mode}

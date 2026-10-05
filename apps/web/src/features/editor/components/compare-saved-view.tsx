@@ -1,17 +1,14 @@
-import { materializeFileSnapshotText } from '@/lib/file-snapshot'
+import { savedDiffAttachment } from '@/features/editor/utils/diff-attachment'
 import { CompareSavedLoading } from '@/features/editor/components/compare-saved-loading'
 import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
-import { createTextDiff } from '@singapore-editor/diff'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'
 import { EditorTabPlaceholder } from '@/features/editor/components/tab-placeholder'
 import { useDiffLanguageContext } from '@/features/editor/hooks/use-diff-language-context'
 import { useSavedComparison } from '@/features/editor/hooks/use-saved-comparison'
-import type { SavedComparisonRead } from '@/features/editor/utils/saved-comparison'
 import type { DiffLanguageHost } from '@/features/editor/utils/diff-language-context'
 import { useSelectedFile } from '@/features/workspace/hooks/use-selected-file'
-import { languageIdForFilePath } from '@/lib/file-language'
 import { useSettingValue } from '@/hooks/use-setting-value'
 
 export function CompareSavedView({
@@ -32,7 +29,8 @@ export function CompareSavedView({
   const sourcePath = read?.kind === 'ready' ? read.saved.snapshot.path : path
   const sourceRoot = read?.kind === 'ready' ? read.scope.rootPath : rootPath
   const languageServer = useDiffLanguageContext(sourcePath, sourceRoot, true, languageHost)
-  const file = read?.kind === 'ready' ? savedTextDiff(read) : null
+  const attachment = read?.kind === 'ready' ? savedDiffAttachment(read) : null
+  const file = attachment?.file ?? null
 
   // No retry: closing and reopening the compare tab re-reads the saved file.
   if (fileState.status === 'error') {
@@ -54,7 +52,7 @@ export function CompareSavedView({
       />
     )
   }
-  if (!file) {
+  if (!file || !attachment) {
     if (saved && !read) return <CompareSavedLoading />
 
     return (
@@ -70,14 +68,7 @@ export function CompareSavedView({
       </EditorTabPlaceholder>
     )
 
-  return <DiffEditor file={file} languageServer={languageServer} mode={mode} tabId={tabId} />
-}
-
-function savedTextDiff(read: Extract<SavedComparisonRead, { kind: 'ready' }>) {
-  const path = read.saved.snapshot.path
-  const languageId = languageIdForFilePath(path)
-  return createTextDiff({
-    newFile: { languageId, path, text: read.live.snapshot.materializeFullText() },
-    oldFile: { languageId, path, text: materializeFileSnapshotText(read.saved.snapshot) },
-  })
+  return (
+    <DiffEditor attachment={attachment} languageServer={languageServer} mode={mode} tabId={tabId} />
+  )
 }

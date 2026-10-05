@@ -1,3 +1,4 @@
+import { projectionControl } from '../../../../../test/factories/diff-attachment'
 import { waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import type { Editor } from '@singapore-editor/core/editor'
@@ -53,7 +54,7 @@ async function mountStackedDiff() {
     // what survives only the first mount is what breaks there.
     <StrictMode>
       <DiffPane
-        file={file}
+        attachment={projectionControl(file)}
         regions={createDiffRegionStore()}
         side='stacked'
         // No provider: a syntax pass would only colour rows this is not asking about.

@@ -9,6 +9,8 @@ import {
 } from '@singapore-editor/diff'
 import type { TabId } from '@/lib/documents/utils/types'
 import type { EditorScrollPosition } from '@singapore-editor/core/editor'
+import type { EditorTextBuffer } from '@singapore-editor/core/document'
+import type { DiffPaneAnchors } from '@/features/editor/utils/diff-source-anchors'
 
 export type DiffScrollPosition = Required<EditorScrollPosition>
 
@@ -16,6 +18,15 @@ export type DiffPanePresentation = {
   plugin: DiffPlugin | null
   scroll: DiffScrollPosition | null
   selections: readonly EditorResolvedSelection[]
+  views: Map<
+    string,
+    {
+      readonly buffer: WeakRef<EditorTextBuffer> | null
+      readonly references: readonly WeakRef<object>[]
+      readonly revision: string
+      readonly anchors: DiffPaneAnchors
+    }
+  >
 }
 
 export type HistoryPresentation = {
@@ -27,9 +38,9 @@ export type HistoryPresentation = {
 export class TabPresentation {
   readonly regions: DiffRegionStore = createDiffRegionStore()
   readonly diffPanes: Readonly<Record<DiffGutterSide, DiffPanePresentation>> = {
-    old: { scroll: null, selections: [], plugin: null },
-    new: { scroll: null, selections: [], plugin: null },
-    stacked: { scroll: null, selections: [], plugin: null },
+    old: { scroll: null, selections: [], plugin: null, views: new Map() },
+    new: { scroll: null, selections: [], plugin: null, views: new Map() },
+    stacked: { scroll: null, selections: [], plugin: null, views: new Map() },
   }
   readonly history: HistoryPresentation = {
     focusedId: null,
@@ -108,6 +119,7 @@ export class TabPresentations {
     for (const side of ['old', 'new', 'stacked'] as const) {
       target.diffPanes[side].scroll = source.diffPanes[side].scroll
       target.diffPanes[side].selections = source.diffPanes[side].selections
+      target.diffPanes[side].views = new Map(source.diffPanes[side].views)
     }
     Object.assign(target.history, source.history)
     this.tabs.set(toTabId, target)
