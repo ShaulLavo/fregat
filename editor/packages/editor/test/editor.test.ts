@@ -20,6 +20,7 @@ import {
 } from '../src/editor/documentAnalysis'
 import { EDITOR_OPTION_DESCRIPTORS } from '../src/editor/optionDescriptors'
 import { EditorSyntaxController } from '../src/editor/syntaxController'
+import { createEditorPreparedDocument } from '../src/editor/preparedDocument'
 import {
   acquireDocumentMutationLease,
   commitPreparedDocumentTransaction,
@@ -6635,6 +6636,94 @@ describe('Editor', () => {
         (range) => range.startContainer === rowTextNode(12500),
       )
       expect(currentPaint).toMatchObject({ startOffset: 10, endOffset: 15 })
+    })
+
+    it('reuses ready syntax and copy across a fresh view after optional warming was retired', async () => {
+      const ranges = vi.fn(async (range: EditorSyntaxRange): Promise<EditorSyntaxResult> =>
+        createSyntaxResult(
+          [],
+          range.startIndex === 0
+            ? [{ startIndex: 0, endIndex: 24, startLine: 0, endLine: 3, type: 'scope' }]
+            : [],
+        ),
+      )
+      const tokens = EditorTokenStore.fromTokens([
+        { start: 10, end: 15, style: { color: '#00ff00' } },
+      ])
+      const highlighter = createMockHighlighterSession({
+        refresh: async () => ({ tokens }),
+      })
+      const highlighterProvider = { createSession: () => highlighter }
+      const structural = {
+        createSession: vi.fn(() =>
+          createMockSyntaxSession({
+            refresh: async () => createSyntaxResult([], []),
+            queryRange: ranges,
+          }),
+        ),
+      }
+      const plugin: EditorPlugin = {
+        activate: (context) => [
+          context.registerSyntaxProvider(structural),
+          context.registerHighlighter(highlighterProvider),
+        ],
+      }
+      const text = '# Retained document\n\n**bold** and `code`\n\n'.repeat(25000)
+      const buffer = createEditorTextBuffer(text)
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'warm.md' })
+      const prepared = createEditorPreparedDocument({
+        analysis,
+        buffer,
+        documentId: 'warm.md',
+        languageId: 'markdown',
+        configuredTabSize: 4,
+        tabSizePolicy: 'detect-indentation',
+        documentConfigurationTag: ['warm-view'],
+      })
+      await prepared.fallbackReady
+      const attach = () => {
+        editor.dispose()
+        editor = createVisibleEditor(container, { plugins: [plugin] })
+        editor.attachSession(createEditorBufferSession(buffer), {
+          analysis,
+          preparedDocument: prepared,
+          documentId: 'warm.md',
+          languageId: 'markdown',
+          documentConfigurationTag: ['warm-view'],
+        })
+      }
+      try {
+        attach()
+        await vi.waitFor(() =>
+          expect(ranges.mock.calls.map(([range]) => range)).toContainEqual({
+            startIndex: 240000,
+            endIndex: 360000,
+          }),
+        )
+        await flushSyntaxUntilSettled(() => ranges.mock.calls.length)
+        const ids = analysis.inspectRetention().entries.map((entry) => entry.runtimeSessionId)
+        expect(analysis.inspectRetention().entries[0]!.cachedRangeCount).toBe(1)
+        const before = ranges.mock.calls.length
+        ranges.mockImplementation(() => new Promise<EditorSyntaxResult>(() => undefined))
+        attach()
+        await flushSyntaxUntilSettled(() => ranges.mock.calls.length)
+
+        expect(ranges).toHaveBeenCalledTimes(before)
+        expect(structural.createSession).toHaveBeenCalledTimes(1)
+        expect(analysis.inspectRetention().entries.map((entry) => entry.runtimeSessionId)).toEqual(
+          ids,
+        )
+        expect(editor.getState().syntaxStatus).toBe('ready')
+        const syntax = syntaxControllerFrom(editor)
+        expect(syntax.renderDataReady).toBe(true)
+        expect(syntax.tokens).toBe(tokens)
+        expect(syntax.copyTokens).toBe(tokens)
+        expect(tokenHighlightRanges()).toHaveLength(1)
+      } finally {
+        editor.dispose()
+        prepared.dispose()
+        analysis.dispose()
+      }
     })
 
     it('cold queries released syntax history before restoring ready paint and copy', async () => {
