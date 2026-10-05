@@ -22,6 +22,9 @@ export default defineConfig(({ mode }) =>
           globalSetup: ['./test/env/retention-acceptance-file-server.ts'],
           provide: { retentionAcceptanceEntryUrl: 'http://127.0.0.1:52865' },
           include: ['src/features/editor/tests/retention-acceptance-reload.browser.tsx'],
+          exclude: base.test?.exclude?.filter(
+            (path) => path !== 'src/features/editor/tests/retention-acceptance-reload.browser.tsx',
+          ),
           browser: {
             ...base.test?.browser,
             commands: { ...base.test?.browser?.commands, retentionAcceptanceReload },
@@ -49,24 +52,31 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
   await isolated.grantPermissions(['local-network-access'], { origin: runnerOrigin })
   let reloading = false
   const delayedFonts: { url: string; heldAt: number; releasedAt: number }[] = []
+  const routeTasks = new Set<Promise<void>>()
   await page.route(
     (url) => url.origin === runnerOrigin,
-    async (route) => {
-      const request = new URL(route.request().url())
-      if (
-        reloading &&
-        arm.font === 'slow' &&
-        request.pathname.includes('jetbrains-mono') &&
-        request.pathname.endsWith('.woff2')
-      ) {
-        const heldAt = Date.now()
-        await new Promise<void>((resolve) => setTimeout(resolve, 1000))
-        delayedFonts.push({ url: request.href, heldAt, releasedAt: Date.now() })
-      }
-      const response = await route.fetch({
-        url: new URL(request.pathname + request.search, entryOrigin).href,
+    (route) => {
+      const task = (async () => {
+        const request = new URL(route.request().url())
+        if (
+          reloading &&
+          arm.font === 'slow' &&
+          request.pathname.includes('jetbrains-mono') &&
+          request.pathname.endsWith('.woff2')
+        ) {
+          const heldAt = Date.now()
+          await new Promise<void>((resolve) => setTimeout(resolve, 1000))
+          delayedFonts.push({ url: request.href, heldAt, releasedAt: Date.now() })
+        }
+        const response = await route.fetch({
+          url: new URL(request.pathname + request.search, entryOrigin).href,
+        })
+        await route.fulfill({ response })
+      })()
+      routeTasks.add(task)
+      return task.finally(() => {
+        routeTasks.delete(task)
       })
-      await route.fulfill({ response })
     },
   )
   const output = await mkdtemp(join(tmpdir(), 'retention-acceptance-reload-'))
@@ -200,13 +210,25 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
       undefined,
       { timeout: 15_000 },
     )
-    const after = await page.evaluate(() => window.__retentionAcceptanceEntry?.capture())
-    await page.evaluate(async () => {
+    phase = 'code-font-loaded'
+    const fontLoadReceipt = await page.evaluate(async () => {
+      const font = '13px "JetBrains Mono Variable"'
+      const faces = await document.fonts.load(font)
       await document.fonts.ready
       await new Promise<void>((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
       )
+      return {
+        faceCount: faces.length,
+        families: faces.map((face) => face.family),
+        status: document.fonts.status,
+        codeLoaded:
+          faces.length > 0 &&
+          faces.every((face) => face.status === 'loaded') &&
+          document.fonts.check(font),
+      }
     })
+    const after = await page.evaluate(() => window.__retentionAcceptanceEntry?.capture())
     const frames = await page.evaluate(() => window.__retentionAcceptanceReloadFrames)
     const cacheReceipt = await page.evaluate(() => window.__retentionAcceptanceReloadCacheReceipt)
     const screenshot = join(output, 'page.png')
@@ -218,6 +240,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
       frames,
       cacheReceipt,
       delayedFonts,
+      fontLoadReceipt,
       setup: {
         entryOrigin,
         runnerOrigin,
@@ -265,6 +288,8 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
     try {
       await page.evaluate(() => window.__retentionAcceptanceEntry?.setSyntaxEnabled(true))
     } finally {
+      while (routeTasks.size > 0) await Promise.all(routeTasks)
+      await page.unrouteAll({ behavior: 'wait' })
       await isolated.close()
     }
   }

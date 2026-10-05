@@ -96,6 +96,17 @@ export function captureRetentionAcceptanceEntry() {
         languageId: languageIdForFilePath(path),
         theme: owner.theme.editorTheme,
       }
+      const captured = controller?.getEditor()?.captureSnapshot() ?? null
+      const publicCapture = captured
+        ? {
+            documentId: captured.documentId,
+            bufferRevision: captured.bufferRevision,
+            textVersion: captured.textVersion,
+            bufferMatchesCanonical: captured.buffer === canonical.buffer,
+            paintBytes: captured.paint.length,
+          }
+        : null
+      const metadata = snapshot.toVisibleSnapshot()?.toJSON() ?? null
       if (snapshot.syntaxStatus === 'plain') {
         const reference = {
           identity: {
@@ -118,7 +129,10 @@ export function captureRetentionAcceptanceEntry() {
             snapshot.initialHighlightStatus !== 'plain'
               ? 'pending plain paint'
               : tokenPaintMismatch(frame, reference),
-          metadata: snapshot.toVisibleSnapshot()?.toJSON() ?? null,
+          metadata,
+          publicCapture,
+          syntaxStatus: snapshot.syntaxStatus,
+          initialHighlightStatus: snapshot.initialHighlightStatus,
         } as const
       }
       if (snapshot.syntaxStatus !== 'ready')
@@ -167,7 +181,10 @@ export function captureRetentionAcceptanceEntry() {
               },
               reference,
             ) ?? tokenPaintMismatch(frame, reference),
-          metadata: snapshot.toVisibleSnapshot()?.toJSON() ?? null,
+          metadata,
+          publicCapture,
+          syntaxStatus: snapshot.syntaxStatus,
+          initialHighlightStatus: snapshot.initialHighlightStatus,
         } as const
       } finally {
         lease.dispose()

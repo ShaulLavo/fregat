@@ -376,6 +376,11 @@ jobs:
         timeout-minutes: 5
         run: bun run --cwd apps/web test:tree-browser
 
+      - name: Browser test (retention reload)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        run: bun run --cwd apps/web test:retention-reload-browser
+
   # The site's demo build bundles apps/web in a different mode than the app build, so it
   # pulls in packages (like MSW) the other CI jobs never touch and needs its own licence
   # check. Building it here is what site.yml's push-to-main build does, run before merge.

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { commands } from 'vitest/browser'
 import type { RetentionAcceptanceReloadResult } from '../../../../retention-acceptance.vitest.config'
-import { tokenPaintMismatch } from '../../../../../../scripts/agent/scenarios/editor-tab-hover-highlights-probe'
+import { retentionAcceptanceReloadFrameOutcome } from '../../../../test/factories/retention-acceptance-reload-frame'
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
@@ -50,45 +50,36 @@ for (const arm of [
       if (!settledReference) return
       let currentReady = false
       for (const frame of result.frames ?? []) {
-        if (!frame.editor || frame.rows.length === 0) continue
-        expect(frame.observation?.kind, `frame at ${frame.at}`).toBe('mounted')
-        if (frame.observation?.kind !== 'mounted') continue
-        const visible = frame.observation.views.find((view) => 'frame' in view)
-        if (
-          !currentReady &&
-          arm.syntax === 'colored' &&
-          visible?.kind === 'unready' &&
-          'syntaxStatus' in visible &&
-          visible.frame !== undefined &&
-          visible.currentIdentity !== undefined &&
-          visible.source !== undefined
-        ) {
-          expect(visible.syntaxStatus).toBe('loading')
-          expect(['loading', 'painted']).toContain(visible.initialHighlightStatus)
-          expect(visible.paintLayers).toBeNull()
-          expect(visible.frame.identity).toEqual(visible.currentIdentity)
-          expect(visible.headerPath).toBe('repo/src/editor-tab-a.ts')
-          expect(frame.input).toEqual({ mounted: true, readonly: false, disabled: false })
-          expect(visible.source).toBe(settledReference.source)
-          const reference =
-            visible.initialHighlightStatus === 'painted'
-              ? settledReference
-              : {
-                  identity: visible.currentIdentity,
-                  source: visible.source,
-                  runs: [],
-                  expected: 'plain' as const,
-                }
-          expect(tokenPaintMismatch(visible.frame, reference)).toBeNull()
-          continue
-        }
-        expect(visible?.kind, `presented frame at ${frame.at}`).toBe('observed')
-        if (visible?.kind !== 'observed') continue
-        currentReady = true
-        expect(visible.reference.expected).toBe(arm.syntax)
-        expect(visible.mismatch, `presented frame at ${frame.at}`).toBeNull()
+        const outcome = retentionAcceptanceReloadFrameOutcome({
+          frame,
+          settledReference,
+          expectedPath: 'repo/src/editor-tab-a.ts',
+          syntax: arm.syntax,
+          currentReady,
+        })
+        expect(outcome.kind, JSON.stringify({ at: frame.at, outcome })).not.toBe('mismatch')
+        if (outcome.kind === 'current') currentReady = true
       }
       expect(currentReady).toBe(true)
+      if (arm.font === 'slow') {
+        expect(result.fontLoadReceipt.faceCount).toBeGreaterThan(0)
+        expect(result.fontLoadReceipt.codeLoaded).toBe(true)
+        expect(result.fontLoadReceipt.status).toBe('loaded')
+        const endpoint = result.frames?.slice(-2)
+        expect(endpoint?.length).toBe(2)
+        for (const frame of endpoint ?? []) {
+          expect(frame.fonts).toEqual({ status: 'loaded', codeLoaded: true })
+          expect(
+            retentionAcceptanceReloadFrameOutcome({
+              frame,
+              settledReference,
+              expectedPath: 'repo/src/editor-tab-a.ts',
+              syntax: arm.syntax,
+              currentReady: true,
+            }).kind,
+          ).toBe('current')
+        }
+      }
       expect(result.before?.kind).toBe('mounted')
       expect(result.after?.kind).toBe('mounted')
       if (result.before?.kind !== 'mounted' || result.after?.kind !== 'mounted') return
