@@ -23,6 +23,13 @@ export const RETENTION_COUNT_PROTOCOL = {
   successfulCycleMarker: 'protocol-cycle-complete',
   arms: [
     'idle-inspector-calibration',
+    'cold-ready-preparation-start',
+    'cold-metadata-only-negative',
+    'cold-ready-preparation-complete',
+    'actual-b-synchronous-attachment',
+    'actual-a-synchronous-attachments',
+    'preparation-owner-release-before-pressure',
+    'post-pressure-preparation-ownership',
     'selected-provider-baseline',
     'baseline-active-b',
     'actual-two-editor-views',
