@@ -2,7 +2,8 @@
 
 Status: Approved. The owner approved units 2–7 on 2026-10-04, including benchmark repairs and
 acceptance proofs. Their implementation is integrated in [draft PR #787](https://github.com/ShaulLavo/fregat/pull/787).
-Production cutover waits for final performance, source-volume, retention and host qualification.
+Production cutover waits for the final shared-observer host refresh and delivery. Performance,
+source-volume, retention, and the typed consumer implementation have reviewed evidence below.
 Unit 1 publication implemented and focused proof delivered in the foundations wave,
 2026-09-30. Unit 0 is partial: 5/10 configurations calibrated; the remaining absolute-threshold matrix
 is superseded by Plan 282's paired A/B instrument. The session diff correction and
@@ -34,8 +35,22 @@ comparisons, with exact replay and complete cleanup. Its public command takes 2,
 98.161 seconds beyond the 2,700-second tooling target. Following the owner's October 5 cost
 concern, that runtime target is a tooling follow-up and does not block this delivery. Preserve
 the measured miss and valid comparison evidence. A full rerun requires a concrete affected-scope
-reason; runtime chasing supplies none. Current loaded reliability and a qualifying
-multiple-consumer improvement remain open. Budget agreement alone does not establish that improvement.
+reason; runtime chasing supplies none. Loaded native/disabled passes all 216 comparisons in
+231.822 seconds with actual CPU contention and complete cleanup. A separately reviewed
+Tree-sitter/Shiki multiple-view paste experiment measures about 8.3 seconds less current-result
+readiness delay in each counterbalanced pair. Its diagnostic identity stays separate; earliest
+token application, visible-paint speed, and total-memory improvement are not established.
+
+The bounded load smoke and selected cohort are complete. Three keys near their loaded budgets
+expand the ten archived keys to thirteen keys across eleven groups. All ten repetitions finish
+in 893.648 seconds: two selected and two auxiliary native Undo verdicts reject identical
+candidate bytes on both arms. The original zero-rejection predicate remains false. Matching
+source, compiled bytes, dependencies, source/output checks, CPU affinity, and cleanup establish
+these as benchmark reliability findings, not evidence of a code-change regression. They remain
+tooling follow-ups and do not block this delivery. Preserve every flag; do not retry to obtain zero.
+Actual baseline/candidate budgets stay unchanged and passing. Broader loaded matrices and
+historical negative matrices remain Plan 282 follow-ups with no credit for uncollected results.
+App-only changes require affected app checks; they do not restart unchanged SDK qualification.
 
 The [bounded source and ownership proof](../docs/document-contributions/source-ownership-proof.md)
 passes the paired 605-check source workloads, candidate lifetime checks, separate fresh-owner
@@ -44,10 +59,20 @@ and reports a higher candidate main-renderer heap. Complete allocated memory rem
 Version-only delivery metadata retains the measured source, compiled bytes, export resolution,
 and external dependency closure; the original qualification identities remain unchanged.
 
-Calibrated app acceptance remains open. The corrected fixture prevents automatic adjacent-tab
-preparation from contaminating cold/query-only samples. Its first fresh calibration passes, while
-the second preserves a prepared-300 startup miss for root-cause work. Full host gates and delivery
-remain required. The historical instrument `341` Undo failure, 215 of 216 passing keys, stays
+The final app revision `38902d606` passes all three 150-sample open calibrations and the derived
+open gate. Its real document-symbol caller shares the existing workspace-edit host, removing a
+duplicate TypeScript backend in the focused before/after proof. Earlier prepared-300 misses
+remain preserved. The typing check stops after recording 21 of 40 expected edit events. A
+source-neutral diagnostic proves all 40 characters and stable focus; its 5,000-event trace ring
+evicts early events that the summary then omits. Complete summary accounting is repaired while
+the ring bound, workload, and latency limits stay fixed. Three unchanged typing trials pass,
+each with 40 edits in steady and burst scenarios. Scroll timing limits pass; its 270-range cap
+rejects both the untouched baseline and candidate at exactly 354 matching current ranges, with
+no duplicated or detached ranges. The invalid count reference remains red in
+[issue #818](https://github.com/ShaulLavo/fregat/issues/818) as a tooling follow-up rather than
+a production blocker. The shared observer correction needs one fresh app-only open qualification.
+Final current-source CI and delivery remain
+required. The historical instrument `341` Undo failure, 215 of 216 passing keys, stays
 archived under its original identity and supplies no final-candidate acceptance.
 
 The sections below retain the design, unit contracts and historical decisions. The current
@@ -863,8 +888,10 @@ worker restart, delayed consumers, and long retention/disposal runs.
    adaptive groups cannot change a key's order. Conditional stopping has no sequential coverage
    guarantee; `--fixed-repetitions` uses complete even-sized blocks of at least four pairs. The
    matrix retains 108 blocking and 36 advisory measures per configuration. The new measurement
-   identity requires fresh controls, acceptance, matrix timings and zero selected loaded A/A
-   rejects across ten runs per key; units remain gated until those results are complete.
+   identity requires fresh controls, acceptance, matrix timings, and ten selected loaded A/A
+   runs per key. The October 5 delivery policy preserves identical-source control rejections as
+   benchmark reliability follow-ups after source/output/context verification. Actual changed-code
+   comparisons keep their original blocking budgets. No favorable repeat supplies acceptance.
 4. Prove exact text, accepted revisions, mounted coverage, visible changed pixels, and cleanup.
    Screenshot completion time is not a substitute for native input-to-frame measurements.
 5. Compare publication overhead, time to visible syntax, open/scroll latency, total source reads,
