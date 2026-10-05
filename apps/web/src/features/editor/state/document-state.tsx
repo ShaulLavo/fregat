@@ -61,11 +61,11 @@ type EditorDocumentStoreActions = {
   ) => import('@/lib/snapshot-comparison').SnapshotComparisonLease
   prepareSavedComparisonTab: (
     tabId: TabId,
-    request: import('@/features/editor/utils/saved-comparison').SavedComparisonRequest,
-  ) => import('@/features/editor/utils/saved-comparison').SavedComparisonLease
+    request: import('@/lib/saved-comparison').SavedComparisonRequest,
+  ) => import('@/lib/saved-comparison').SavedComparisonLease
   acquireSavedComparison: (
-    request: import('@/features/editor/utils/saved-comparison').SavedComparisonRequest,
-  ) => import('@/features/editor/utils/saved-comparison').SavedComparisonLease
+    request: import('@/lib/saved-comparison').SavedComparisonRequest,
+  ) => import('@/lib/saved-comparison').SavedComparisonLease
   disposeEditorDocuments: () => void
   deleteLiveEditorDocument: (documentKey: DocumentKey) => DeleteLiveEditorDocumentResult
   ensureEditorView: (

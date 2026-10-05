@@ -1,3 +1,4 @@
+import { projectionControl } from '../../../../../test/factories/diff-attachment'
 import { waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import userEvent from '@testing-library/user-event'
@@ -9,10 +10,6 @@ import { expect, test } from '../../../../../test/fixtures'
 import { stubHighlightApi } from '../../../../../test/env/highlight-api'
 import { editorRowPoint, stubEditorViewport } from '../../../../../test/env/editor-viewport'
 import { renderWithProviders } from '../../../../../test/render'
-
-// Expanding a collapsed region rewrites the whole buffer. The reader is somewhere in it, and the
-// two ways of pushing text back in do not agree about that: `openDocument` takes no scroll position
-// from the host and lands at the top, `setText` carries the current one across.
 
 const LINE_COUNT = 60
 
@@ -61,7 +58,7 @@ async function mountStackedDiff() {
     // survives the first mount is invisible without it.
     <StrictMode>
       <DiffPane
-        file={file}
+        attachment={projectionControl(file)}
         regions={createDiffRegionStore()}
         side='stacked'
         syntaxBackend={{ kind: 'tree-sitter', provider: null }}
