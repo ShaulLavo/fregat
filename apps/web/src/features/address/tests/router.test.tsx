@@ -21,6 +21,7 @@ import {
   parseRouteSearch,
   stringifyRouteSearch,
 } from '@/features/address/utils/route-options'
+import { intentForAddress } from '@/features/address/utils/intent'
 
 const workspace = testWorkspaceToken('/router-proof')
 const sessionId = v.parse(sessionIdSchema, '5f7f875d-6e41-5275-8927-06a9e5a4a2e1')
@@ -36,12 +37,12 @@ const families = [
   '/workbench/f/src/a.ts',
   '/workbench/c/src/a.ts',
   '/workbench/r/refs%2Fheads%2Fmain/src/a.ts',
-  `/workbench/d/worktree/${oldObject}..${newObject}/src/a.ts`,
-  `/workbench/d/staged/_..${newObject}/src/a.ts`,
-  `/workbench/d/branch/${oldObject}..${newObject}/src/a.ts`,
-  `/workbench/k/${sessionId}/0..2`,
-  `/workbench/k/${sessionId}/0..2!turn`,
-  `/workbench/k/${sessionId}/0..2/src/a.ts`,
+  '/workbench/d/worktree/live/src/a.ts',
+  '/workbench/d/staged/live/src/a.ts',
+  `/workbench/d/historical/${oldObject}..${newObject},s=modified,r=src%2Fa.ts,c=${oldObject},p=_/src/a.ts`,
+  `/workbench/k/${sessionId}/0..2,w=1`,
+  `/workbench/k/${sessionId}/0..2,w=1!turn`,
+  `/workbench/k/${sessionId}/0..2,w=1/src/a.ts`,
   '/chat',
   '/chat/t/new',
   `/chat/t/${sessionId}`,
@@ -100,9 +101,9 @@ test('round-trips path tokens, ordered tabs, ref slashes, and rename metadata th
     `f/${encodePath(path)}`,
     `c/${encodePath(path)}`,
     `r/${encodeSegment('refs/heads/a%~雪')}/${encodePath(path)}`,
-    `d/worktree/${oldObject}..${newObject},s=renamed,r=${renamed}/${encodePath(path)}`,
-    `k/${sessionId}/0..2,s=renamed,r=${renamed},o=${oldObject},n=${newObject}/${encodePath(path)}`,
-    `k/${sessionId}/0..2,o=${oldObject}!turn`,
+    `d/captured-review/${oldObject}..${newObject},s=renamed,r=${renamed}/${encodePath(path)}`,
+    `k/${sessionId}/0..2,w=1,s=renamed,r=${renamed},o=${oldObject},n=${newObject}/${encodePath(path)}`,
+    `k/${sessionId}/0..2,w=1,o=${oldObject}!turn`,
   ]
   const router = createApplicationRouter({
     resources: createResourceQueryClient(),
@@ -231,7 +232,7 @@ test('pushes destinations immediately and replaces filter edits in the current e
 })
 
 test('keeps the deployment base path in public destinations and strips it for addressed views', async () => {
-  const document = `d/worktree/${oldObject}..${newObject},s=renamed,r=old%2Fa%2Cb%25.ts/new.ts`
+  const document = `d/captured-review/${oldObject}..${newObject},s=renamed,r=old%2Fa%2Cb%25.ts/new.ts`
   const address: Address = {
     ...emptyAddress(),
     workspace,
@@ -254,4 +255,32 @@ test('keeps the deployment base path in public destinations and strips it for ad
     `/platform${formatAddress({ ...address, side: 'chat', chat: 't/new' })}`,
   )
   expect(acceptedAddressIntent(router).sidebarChat).toEqual({ kind: 'draft' })
+})
+
+test('mixed checkpoint URL restore preserves qualified siblings and rejects malformed outer collections', () => {
+  const legacy = `k/${sessionId}/0..1/src/old.ts`
+  const qualified = `k/${sessionId}/0..1,w=0,s=modified,o=${oldObject},n=${newObject}/src/checkpoint.ts`
+  const siblings = ['f/src/live.ts', 'h/src/history.ts', qualified]
+  const raw = {
+    ...emptyAddress(),
+    workspace,
+    mode: 'workbench' as const,
+    document: siblings[0]!,
+    tabs: [siblings[0]!, legacy, siblings[1]!, siblings[2]!],
+  }
+  const intent = intentForAddress(raw)
+  expect(intent.address.tabs).toEqual(siblings)
+  expect(intent.tabs?.map((tab) => tab.kind)).toEqual(['file', 'history', 'checkpoint'])
+  expect(intent.address.document).toBe(siblings[0])
+  const search = parseRouteSearch(
+    `?tabs=${raw.tabs.join('~')}&editor=${siblings[0]}&side=git&log.find=keep`,
+  )
+  expect(search.tabs?.map((tab) => tab.kind)).toEqual(['file', 'history', 'checkpoint'])
+  expect(search.editor).toEqual({ kind: 'file', path: 'src/live.ts' })
+  expect(search.side).toBe('git')
+  expect(search['log.find']).toBe('keep')
+  expect(stringifyRouteSearch(search)).toContain(qualified)
+  expect(parseRouteSearch(`?tabs=@~@~${legacy}`).tabs).toBeUndefined()
+  expect(parseRouteSearch(`?tabs=f/src/live.ts~invalid~${legacy}`).tabs).toBeUndefined()
+  expect(intentForAddress({ ...raw, tabs: ['f/src/live.ts', 'invalid', legacy] }).tabs).toBeNull()
 })

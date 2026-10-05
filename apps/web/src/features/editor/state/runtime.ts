@@ -128,7 +128,7 @@ export function createEditorRuntime({
     for (const workspace of workspaces) {
       for (const tab of allEditorTabs(workspace.panels.editorGroups)) {
         const target = tab.content.kind === 'document' ? tab.content.document : null
-        if (target?.kind !== 'git-diff' || target.source.kind !== 'snapshot') continue
+        if (target?.kind !== 'git-diff') continue
         keep.add(tab.id)
         snapshotComparisonOwner.prepare(
           tab.id,
@@ -159,7 +159,7 @@ export function createEditorRuntime({
     },
     (comparison, tabId) => {
       const rootPath = workspaceStore.getState().rootFolder?.path
-      if (rootPath)
+      if (rootPath !== undefined)
         snapshotComparisonOwner.prepare(
           tabId,
           { environmentId: storage.environmentId, rootPath },

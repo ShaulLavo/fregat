@@ -1,3 +1,4 @@
+import { sameSnapshotTarget } from '@/lib/documents/utils/comparisons'
 import {
   createTabId,
   documentKey,
@@ -82,4 +83,13 @@ export function rekeyTabFile(
   if (content.kind !== 'document') return content
   if (content.document.kind !== 'file' || content.document.resource.path !== from) return content
   return documentTab(fileDocument(fileResource(to)))
+}
+
+export function sameTabCapture(left: TabContent, right: TabContent): boolean {
+  if (!sameTabContent(left, right)) return false
+  if (left.kind !== 'document' || right.kind !== 'document') return true
+  if (left.document.kind !== 'git-diff' || right.document.kind !== 'git-diff') return true
+  if (left.document.source.kind !== 'snapshot' || right.document.source.kind !== 'snapshot')
+    return true
+  return sameSnapshotTarget(left.document.source.target, right.document.source.target)
 }

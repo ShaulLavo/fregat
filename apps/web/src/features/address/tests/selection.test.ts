@@ -211,3 +211,22 @@ test.each(PATHS)('chat selection %s survives omission of an oversized tab collec
     testNullableTabContent(path),
   )
 })
+
+test('legacy checkpoint URL entry preserves valid cached sibling IDs and panel metadata', () => {
+  const live = groupTab('held-live', `${ROOT}/live.ts`)
+  const history = groupTab('held-history', `history:${encodeURIComponent(`${ROOT}/history.ts`)}`)
+  const panels = {
+    ...createDefaultWorkbenchPanels(),
+    editorGroups: groupTree(groupLeaf('held-group', [live, history]), 'held-group'),
+  }
+  const legacy = 'k/f0000000-0000-4000-8000-000000000001/0..1/src/old.ts'
+  const address = parseAddress(
+    `/~${testWorkspaceToken(ROOT)}/workbench/f/live.ts?tabs=f/live.ts~${legacy}~h/history.ts&side=git`,
+  )
+  const restored = panelsForAddress(panels, ROOT, address)
+  expect(editorTabRecordsForWorkbenchPanels(restored)).toEqual([live, history])
+  expect(activeEditorTab(restored.editorGroups)?.id).toBe(live.id)
+  expect(restored.gitHistory).toBe(panels.gitHistory)
+  expect(restored.terminalTabs).toBe(panels.terminalTabs)
+  expect(restored.activeSidebarTab).toBe('git')
+})

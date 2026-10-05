@@ -17,12 +17,24 @@ import {
   selectors,
 } from '../selectors'
 
-type ComparisonFrame = { tab: string; body: string; busy: boolean }
-const comparisonFrame = `() => ({
-        tab: document.querySelector(${JSON.stringify(selectors.selectedComparisonTabSelector)})?.textContent ?? '',
+type ComparisonFrame = {
+  tab: string
+  body: string
+  source: string
+  busy: boolean
+  requesting: string | null
+}
+const comparisonFrame = `() => {
+      const tab = document.querySelector(${JSON.stringify(selectors.selectedComparisonTabSelector)});
+      const requesting = [...document.querySelectorAll(${JSON.stringify(selectors.worktreeFileRowSelector)})].find(row => row.getAttribute('data-git-file-loading') === 'true');
+      return {
+        tab: tab?.textContent ?? '',
         body: document.querySelector(${JSON.stringify(selectors.comparisonRowsSelector)})?.textContent ?? '',
-        busy: document.querySelector(${JSON.stringify(selectors.selectedComparisonTabSelector)})?.getAttribute('aria-busy') === 'true',
-      })`
+        source: location.pathname,
+        busy: tab?.getAttribute('aria-busy') === 'true' || requesting?.getAttribute('aria-busy') === 'true',
+        requesting: requesting?.getAttribute('data-git-file') ?? null,
+      };
+    }`
 
 export const diffNoFlicker: Scenario = {
   name: 'diff-no-flicker',
@@ -41,7 +53,7 @@ export const diffNoFlicker: Scenario = {
       }
       await openFixtureWorkspace(page, fixture)
       await openGitPanel(page)
-      await page.route('**/git/diff/blob?*', async (route) => {
+      await page.route(/\/git\/diff(?:\/blob)?\?/, async (route) => {
         await new Promise((resolve) => setTimeout(resolve, 350))
         await route.continue()
       })
@@ -50,6 +62,15 @@ export const diffNoFlicker: Scenario = {
       if ((await selectors.diffPanes(page).count()) === 1)
         await runPaletteCommand(page, 'Toggle diff view mode')
       await selectors.diffPanes(page).nth(1).waitFor()
+      strictEqual(
+        await selectors
+          .worktreeFiles(page)
+          .evaluateAll((rows) =>
+            rows.some((row) => row.getAttribute('data-git-file-loading') === 'true'),
+          ),
+        false,
+        'settled input has no pending row',
+      )
       await step('loaded')
       let blank = 0
       const frames = await recordFrames<ComparisonFrame>(page, comparisonFrame, async () => {
@@ -70,11 +91,23 @@ export const diffNoFlicker: Scenario = {
       strictEqual(blank, 0, 'switching comparisons blanked loaded rows')
       ok(
         frames.some((frame) => frame.busy),
-        'the held tab shows a loading indicator',
+        'the pending read shows a loading indicator while the comparison is held',
       )
       ok(
         frames.every(({ tab, body }) => !body || tab.includes(body.split(' ')[0]!)),
         'tab names the shown comparison in every frame',
+      )
+      ok(
+        frames.every(
+          ({ source, body }) =>
+            !body ||
+            (source.includes('d/worktree/live/') && source.includes(body.split(' ')[0]! + '.txt')),
+        ),
+        'address identifies the shown semantic source in every frame',
+      )
+      ok(
+        frames.some((frame) => frame.requesting !== null && frame.busy),
+        'delayed moving input reports the actual pending row',
       )
     } finally {
       await releaseFixture(fixture)

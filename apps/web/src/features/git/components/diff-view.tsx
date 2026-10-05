@@ -2,8 +2,7 @@ import { Alert } from '@workspace/ui/components/alert'
 import { useDiffReloadView } from '@/features/git/hooks/use-diff-reload-view'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { languageIdForFilePath } from '@/lib/file-language'
-import { useMemo, useRef } from 'react'
+import { useRef } from 'react'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'
 import { EditorTabPlaceholder } from '@/features/editor/components/tab-placeholder'
@@ -14,7 +13,7 @@ import type { FilesystemPath, GitComparison, TabId } from '@/lib/documents/utils
 import { useDiffDocumentDiffs } from '../hooks/use-diff-document-diffs'
 import { useSnapshotComparison } from '@/features/git/hooks/use-snapshot-comparison'
 import { diffFileNotice, emptyDiffNotice, unrenderableDiffNotice } from '../utils/diff-presentation'
-import { editorDiffFiles, renderableDiffFile } from '@workspace/client-core/git/diff-files'
+import { renderableDiffFile } from '@workspace/client-core/git/diff-files'
 import { DiffLineCommentAction } from './diff-line-comment-action'
 import { DiffNotice } from './diff-notice'
 import { DiffBanner } from './diff-banner'
@@ -40,34 +39,18 @@ export function DiffView({
 }) {
   const query = useDiffDocumentDiffs(comparison)
   const { diffs } = query
-  const adoption = useSnapshotComparison(
-    comparison.kind === 'snapshot' ? comparison : null,
-    rootPath,
-    diffs,
-    query.pending,
-    tabId,
-  )
+  const adoption = useSnapshotComparison(comparison, rootPath, diffs, query.pending, tabId)
   const source = adoption.read
   const failure = query.failure ?? adoption.failure
-  const pending = query.pending || (comparison.kind === 'snapshot' && !source && !failure)
+  const pending = query.pending || (!source && !failure)
   const mode = useSettingValue('editor.diff.viewMode')
   const containerRef = useRef<HTMLDivElement | null>(null)
   // One store, read by both split panes and by the comment layer. The layer does
   // not keep a copy of which regions are open — the mirror it used to keep was
   // keyed by hunk ordinal, which a trailing-tail region does not have.
   const presentation = useTabPresentation(tabId)
-  // A checkpoint keeps its own hunks over the loaded sources; they carry its whitespace policy.
-  const hunkSource = comparison.kind === 'snapshot' ? 'text' : 'patch'
-  // Stable identity is required: this is pushed into the plugin, and a fresh
-  // array each render would re-project the diff and throw away scroll position.
-  const checkpointFiles = useMemo(
-    () =>
-      comparison.kind === 'snapshot'
-        ? []
-        : editorDiffFiles(diffs, languageIdForFilePath, hunkSource),
-    [comparison.kind, diffs, hunkSource],
-  )
-  const files = comparison.kind === 'snapshot' ? (source?.input.display ?? []) : checkpointFiles
+  const input = source?.input.kind !== 'history' ? source?.input : null
+  const files = input?.display ?? []
   // A file with hunks wins; a hunkless one is drawn only when it carries whole-file text, which is
   // what a pure rename looks like once the server sends the blob. A binary entry has neither and
   // still falls through to a notice — "we got diffs" is not the same as "there is something to
@@ -77,7 +60,16 @@ export function DiffView({
   // that have to agree and nothing made them. The file list is off either way for a multi-file
   // diff, so a checkpoint diff touching several files deliberately shows one.
   const file = renderableDiffFile(files)
-  useDiffReloadView(JSON.stringify(diffDocumentQueryKey(comparison)), diffs, file, presentation)
+  const snapshotInput = input?.kind === 'snapshot' ? input : null
+  const reloadIdentity =
+    comparison.kind === 'snapshot'
+      ? snapshotInput && {
+          kind: 'snapshot' as const,
+          target: snapshotInput.comparison.target,
+          revision: snapshotInput.revision,
+        }
+      : { kind: 'checkpoint' as const, identity: JSON.stringify(diffDocumentQueryKey(comparison)) }
+  useDiffReloadView(reloadIdentity, diffs, file, presentation)
   // What an editor tab currently holds for this path, if anything. That is the only text a
   // language server can be asked about, and comparing it to the diff's new side is what makes an
   // answer true — see `diffQueryTargetAt`. Called before the early returns below: hooks are not
@@ -89,11 +81,13 @@ export function DiffView({
   const languageServer = useDiffLanguageContext(
     languagePath === null ? null : filesystemPath(languagePath),
     rootPath,
-    comparison.kind === 'snapshot' && comparison.source === 'worktree',
+    comparison.kind === 'snapshot' &&
+      comparison.target.kind === 'moving' &&
+      comparison.target.changeSource === 'worktree',
     languageHost,
   )
 
-  if (!pending && !failure && diffs.length === 0) {
+  if (!pending && !failure && (input?.files.length ?? diffs.length) === 0) {
     return (
       <EditorTabPlaceholder tabId={tabId}>
         <DiffNotice message={emptyDiffNotice(comparison, rootPath)} />

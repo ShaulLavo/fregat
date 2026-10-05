@@ -37,20 +37,37 @@ export function useScopeFiles(
       ? selected.document.source
       : null
 
-  if (source?.kind === 'snapshot' && source.source !== 'historical') {
+  if (source?.kind === 'snapshot' && source.target.kind === 'moving') {
     const { staged, worktree } = changeRows(files)
     const rows = [...staged, ...worktree]
     const found = neighbours(
       rows,
-      (row) => row.file.path === source.path && row.section === source.source,
+      (row) =>
+        source.target.kind === 'moving' &&
+        row.file.path === source.target.path &&
+        row.section === source.target.changeSource,
     )
     if (!found) return null
     const { next, previous } = found
     return {
       ...found,
-      next: next ? () => void navigation.openDiff({ owner, row: next, replace: true }) : null,
+      next: next
+        ? () =>
+            void navigation.openDiff({
+              owner,
+              rootPath: source.target.rootPath,
+              row: next,
+              replace: true,
+            })
+        : null,
       previous: previous
-        ? () => void navigation.openDiff({ owner, row: previous, replace: true })
+        ? () =>
+            void navigation.openDiff({
+              owner,
+              rootPath: source.target.rootPath,
+              row: previous,
+              replace: true,
+            })
         : null,
     }
   }

@@ -1,7 +1,12 @@
 import type { Scenario } from './index'
 import type { Page } from 'playwright'
+import * as v from 'valibot'
 import { openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
+
+const searchedHistorySchema = v.object({
+  commits: v.array(v.object({ id: v.string() })),
+})
 
 export const gitHistory: Scenario = {
   name: 'git-history',
@@ -37,6 +42,10 @@ export const gitHistory: Scenario = {
       throw createScriptError('Refresh lost the selected Git graph tab')
     await selectors.historyRows(page).first().waitFor({ timeout: 20_000 })
     const subject = await selectors.historyRows(page).first().getAttribute('aria-label')
+    const originalCommit = await selectors
+      .historyRows(page)
+      .first()
+      .getAttribute('data-history-commit')
     await selectors.historyRows(page).first().click()
     await selectors.historyFiles(page).first().waitFor({ timeout: 15_000 })
     const preview = await selectors.historyDetails(page).boundingBox()
@@ -76,11 +85,23 @@ export const gitHistory: Scenario = {
         response.request().postDataJSON()?.search === subject,
     )
     await selectors.historySearch(page).pressSequentially(subject ?? '', { delay: 10 })
-    await searched
+    const result = v.parse(searchedHistorySchema, await (await searched).json())
+    const matchingCommits = new Set(result.commits.map((commit) => commit.id))
     await selectors.historyRows(page).first().waitFor()
     await step('find-commit')
-    if ((await selectors.historyRows(page).count()) !== 1)
-      throw createScriptError('Searching an exact commit subject did not filter the history list')
+    const shownCommits = await selectors
+      .historyRows(page)
+      .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-history-commit')))
+    if (
+      !originalCommit ||
+      !matchingCommits.has(originalCommit) ||
+      !shownCommits.includes(originalCommit) ||
+      new Set(shownCommits).size !== shownCommits.length ||
+      shownCommits.some((commit) => !commit || !matchingCommits.has(commit))
+    )
+      throw createScriptError(
+        `History search rows differ from matching commits: ${shownCommits.length} shown, ${matchingCommits.size} returned`,
+      )
     await selectors.historyRows(page).first().click()
     const searchedCommit = await selectors.historyInformation(page).getAttribute('title')
     await page.reload({ waitUntil: 'domcontentloaded' })

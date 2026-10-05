@@ -14,7 +14,7 @@
     "apps/web/src/features/search": 43977,
     "packages/contracts": 43985,
     "apps/web/src/features/workbench": 43448,
-    "apps/web/src/features/git": 39461,
+    "apps/web/src/features/git": 41690,
     "packages/tree": 35779,
     "packages/ui": 33910,
     "apps/web/src/keymap": 34532,
@@ -139,6 +139,12 @@
       "scriptGzip": 1751287,
       "phoneScriptGzip": 1443558,
       "reason": "Accepted PR717 diagnostic caller lifetimes after deleting the redundant callback and grouping the existing event handlers. Actual matched main 518168b89c95b3a5d3da6693dfb756055b51025f and host 5f550c61e26968059ffc0c2c0d4dfd3f71838cfa include the full PR cost: desktop 1747365 -> 1751287 (+3922), phone conversation 1440385 -> 1443558 (+3173), Workbench weighted owner 43373 -> 43448 (+75), rendered bytes 273019 -> 273418 (+399), same 120 first-load modules. Module attribution is diagnostic-row 3195 -> 3592 (+397) and diagnostics-panel 6649 -> 6651 (+2); other Workbench modules retain their rendered bytes. Shared chunk compression also redistributes the weighted estimate. Re-pin only Workbench 41332 -> 43448 for this intended growth under the existing policy. Preserve desktop and phone total pins, all other owner pins, existing history and the 1% total and 5%/2 KiB owner margins. Original f6 CI gate FAIL is preserved in ci717-f6-first-load.log; the matched-source unchanged-gate FAIL is preserved in delivery717-unchanged-gate-receipt.log. Paired reports and module attribution are delivery717-bundle-actual-main518.json, delivery717-bundle-matched518.json and delivery717-workbench-attribution.json."
+    },
+    {
+      "at": "2026-10-05T01:18:00Z",
+      "scriptGzip": 1754239,
+      "phoneScriptGzip": 1446002,
+      "reason": "Accepted PR738 semantic Git provenance and selective restore with the complete consumed source. Actual matched main 097eee3731559491c5c50a2c7a02455ffcd19c13 and candidate 733be8fd57b77e527ef544cca0f211fb546cd1b2 include all intended cost: desktop 1751303 -> 1754239 (+2936), phone conversation 1443568 -> 1446002 (+2434), Git weighted owner 41505 -> 41690 (+185), Git rendered bytes 249449 -> 250572 (+1123), first-load modules 120 -> 119. Retained source also adds lib 8501, contracts 1495 and client-core 2665 rendered bytes; existing feature queries are deleted after genuine shared consumer migration. Re-pin only Git 39461 -> 41690 for this intended growth under the existing policy. Preserve Workbench 43448, all other owner pins, desktop and phone total pins, prior history, the 1% total and 5%/2 KiB owner margins, assertions and ceilings. Original CI failure remains in ci738-6e-types.log, and the matched-source unchanged-gate FAIL remains in provenance200-unchanged-bundle-gate.log/.json. Complete paired reports and stats are provenance200-bundle-main097 and provenance200-bundle-candidate733; module attribution is provenance200-bundle-comparison.json. This accepts source cost and makes no performance improvement claim."
     }
   ]
 }

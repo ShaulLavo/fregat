@@ -5,7 +5,12 @@ import {
   decodeSegment,
 } from '@workspace/client-core/address/path-token'
 import { SETTINGS_DOCUMENT_TOKEN } from '@workspace/client-core/address/grammar'
-import { editorReferenceForToken } from '@workspace/client-core/address/references'
+import {
+  editorReferenceForToken,
+  editorReferenceForSnapshotTarget,
+  snapshotTargetForReference,
+  tokenForEditorReference,
+} from '@workspace/client-core/address/references'
 import { toWorkspaceAbsolute, toWorkspaceRelative } from '@workspace/client-core/files/path'
 import { GIT_OBJECT_ID_PATTERN, isGitFileStatus, sessionIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
@@ -29,7 +34,6 @@ export type ParsedDocumentToken =
   | { readonly kind: 'unavailable'; readonly reason: string }
   | { readonly kind: 'rejected'; readonly reason: string }
 
-const MISSING_OBJECT_ID = '_'
 const TURN_SCOPE_SUFFIX = '!turn'
 
 export function documentTokenForContent(
@@ -102,23 +106,23 @@ function searchToken(rootPath: string, searchRootPath: string): DocumentTokenRes
 
 function diffToken(rootPath: string, source: GitComparison): DocumentTokenResult {
   if (source.kind === 'snapshot') {
-    const revision = revisionSegment(
-      source.oldObjectId,
-      source.newObjectId,
-      source.status,
-      relativeOrNull(rootPath, source.oldPath),
-    )
-    if (!revision) return { kind: 'unaddressable', reason: 'diff names no git object' }
-    return relativeToken('d', rootPath, source.path, [source.source ?? 'worktree', revision])
+    if (source.target.rootPath !== rootPath)
+      return { kind: 'unaddressable', reason: 'diff belongs to another workspace' }
+    const reference = editorReferenceForSnapshotTarget(source.target)
+    return reference
+      ? { kind: 'token', token: tokenForEditorReference(reference) }
+      : { kind: 'unaddressable', reason: 'diff is outside this workspace' }
   }
   if (source.owner !== rootPath)
     return { kind: 'unaddressable', reason: 'checkpoint belongs to another workspace' }
-  const extras = tokenExtras({
-    newObjectId: source.newObjectId,
-    oldObjectId: source.oldObjectId,
-    oldPath: relativeOrNull(rootPath, source.oldPath),
-    status: source.status,
-  })
+  const extras =
+    `,w=${source.ignoreWhitespace ? 1 : 0}` +
+    tokenExtras({
+      newObjectId: source.newObjectId,
+      oldObjectId: source.oldObjectId,
+      oldPath: relativeOrNull(rootPath, source.oldPath),
+      status: source.status,
+    })
   const head = `k/${encodeSegment(source.sessionId)}/${source.fromTurnCount}..${source.toTurnCount}${extras}`
   if (source.kind === 'checkpoint-session') return { kind: 'token', token: head }
   if (source.kind === 'checkpoint-turn')
@@ -139,26 +143,6 @@ function relativeToken(
   if (!relative) return { kind: 'unaddressable', reason: 'document is outside this workspace' }
 
   return { kind: 'token', token: [kind, ...leading, encodePath(relative)].join('/') }
-}
-
-/**
- * `<old>..<new>` plus the two fields the plan drops but the app cannot re-derive:
- * `status`, which the git status query only re-derives while the change is still
- * uncommitted, and `oldPath`, which decides `renamed` and keys the blob-diff query.
- * They ride in this segment because it is the one part of the token that can never
- * contain a `/`.
- */
-function revisionSegment(
-  oldObjectId: string | undefined,
-  newObjectId: string | undefined,
-  status: string | undefined,
-  oldPath: string | null,
-) {
-  if (!oldObjectId && !newObjectId) return null
-
-  const range = `${oldObjectId ?? MISSING_OBJECT_ID}..${newObjectId ?? MISSING_OBJECT_ID}`
-  // No `o=`/`n=` here: a `d/` token already spells both sides in its range segment.
-  return `${range}${tokenExtras({ oldPath, status })}`
 }
 
 function tokenExtras({
@@ -216,43 +200,23 @@ function refContent(rootPath: string, segments: readonly string[]): ParsedDocume
 }
 
 function snapshotDiffContent(rootPath: string, segments: readonly string[]): ParsedDocumentToken {
-  const source = segments[0]
-  if (source === 'branch')
-    return { kind: 'unavailable', reason: 'branch diffs are not rendered yet' }
-  if (source !== 'staged' && source !== 'worktree' && source !== 'historical')
-    return { kind: 'rejected', reason: 'diff source must be worktree, staged or historical' }
-  const revision = parseRevisionSegment(segments[1] ?? '')
-  if (!revision) return { kind: 'rejected', reason: 'diff names no usable git object' }
-
-  const path = decodePath(rootPath, segments.slice(2))
-  if (!path) return { kind: 'rejected', reason: 'diff token names no path' }
-
+  const reference = editorReferenceForToken(`d/${segments.join('/')}`)
+  if (reference?.kind !== 'snapshot') return { kind: 'rejected', reason: 'diff token is malformed' }
+  const parsed = snapshotTargetForReference(reference, rootPath)
+  if (!parsed) return { kind: 'rejected', reason: 'diff token is malformed' }
+  const paths = { rootPath: workspaceRoot(parsed.rootPath), path: filesystemPath(parsed.path) }
+  const target =
+    parsed.kind === 'moving'
+      ? { ...parsed, ...paths }
+      : {
+          ...parsed,
+          ...paths,
+          revision: { ...parsed.revision, oldPath: filesystemPath(parsed.revision.oldPath) },
+        }
   return {
     kind: 'content',
-    content: documentTab({
-      kind: 'git-diff',
-      source: {
-        kind: 'snapshot',
-        source,
-        newObjectId: revision.newObjectId,
-        oldObjectId: revision.oldObjectId,
-        oldPath: absoluteOrUndefined(rootPath, revision.oldPath),
-        path: filesystemPath(path),
-        status: snapshotStatus(revision.status, revision.oldObjectId, source),
-      },
-    }),
+    content: documentTab({ kind: 'git-diff', source: { kind: 'snapshot', target } }),
   }
-}
-
-function snapshotStatus(
-  status: string | undefined,
-  oldObjectId: string | undefined,
-  source: 'staged' | 'worktree' | 'historical',
-): GitChangeStatus {
-  const parsed = gitStatusOrUndefined(status)
-  if (parsed !== undefined) return parsed
-  if (oldObjectId) return 'modified'
-  return source === 'worktree' ? 'untracked' : 'added'
 }
 
 function checkpointDiffContent(rootPath: string, segments: readonly string[]): ParsedDocumentToken {
@@ -270,6 +234,7 @@ function checkpointDiffContent(rootPath: string, segments: readonly string[]): P
     return { kind: 'rejected', reason: 'checkpoint file is outside this workspace' }
   const range = {
     owner: workspaceRoot(rootPath),
+    ignoreWhitespace: turns.ignoreWhitespace,
     fromTurnCount: turns.from,
     newObjectId: turns.newObjectId,
     oldObjectId: turns.oldObjectId,
@@ -286,33 +251,18 @@ function checkpointDiffContent(rootPath: string, segments: readonly string[]): P
   return { kind: 'content', content: documentTab({ kind: 'git-diff', source }) }
 }
 
-function parseRevisionSegment(segment: string) {
-  const [range, ...extras] = segment.split(',')
-  const [oldRaw, newRaw] = range.split('..')
-  if (oldRaw === undefined || newRaw === undefined) return null
-
-  const oldObjectId = objectIdOrUndefined(oldRaw)
-  const newObjectId = objectIdOrUndefined(newRaw)
-  // At least one side must exist; `_.._` names nothing, and the payload check agrees.
-  if (oldRaw !== MISSING_OBJECT_ID && !oldObjectId) return null
-  if (newRaw !== MISSING_OBJECT_ID && !newObjectId) return null
-  if (!oldObjectId && !newObjectId) return null
-
-  // Range last: a `d/` token spells both object ids in its range segment, and the
-  // extras carry `o=`/`n=` only for `k/`. Spreading the extras over the range instead
-  // would overwrite both sides with `undefined`.
-  return { ...parseExtras(extras), newObjectId, oldObjectId }
-}
-
 function parseTurnRange(segment: string) {
   const [range, ...extras] = segment.split(',')
+  if (extras.filter((extra) => extra.startsWith('w=')).length !== 1) return null
   const [fromRaw, toRaw] = range.split('..')
   const from = Number(fromRaw)
   const to = Number(toRaw)
   if (!Number.isInteger(from) || !Number.isInteger(to)) return null
   if (from < 0 || to < from) return null
 
-  return { from, to, ...parseExtras(extras) }
+  const metadata = parseExtras(extras)
+  if (metadata.ignoreWhitespace === undefined) return null
+  return { from, to, ...metadata, ignoreWhitespace: metadata.ignoreWhitespace }
 }
 
 function parseExtras(extras: readonly string[]) {
@@ -324,6 +274,7 @@ function parseExtras(extras: readonly string[]) {
   )
 
   return {
+    ignoreWhitespace: whitespacePolicy(byKey.get('w')),
     // Validated, not trusted: an arbitrary URL string must not become a git object id.
     newObjectId: objectIdOrUndefined(byKey.get('n') ?? ''),
     oldObjectId: objectIdOrUndefined(byKey.get('o') ?? ''),
@@ -354,4 +305,10 @@ function absoluteOrUndefined(rootPath: string, relative: string | undefined) {
   if (!relative) return undefined
   const path = toWorkspaceAbsolute(rootPath, relative)
   return path === null ? undefined : filesystemPath(path)
+}
+
+function whitespacePolicy(value: string | null | undefined): boolean | undefined {
+  if (value === '0') return false
+  if (value === '1') return true
+  return undefined
 }

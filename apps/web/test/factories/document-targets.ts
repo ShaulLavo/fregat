@@ -5,7 +5,7 @@ import type { DocumentRef, ReopenScrollPosition, TabContent } from '@/lib/docume
 import { createClientError } from '@workspace/client-core/errors'
 import { TEST_SESSION_ID } from './chat'
 
-export const DOCUMENT_OLD_OBJECT_ID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+const DOCUMENT_OLD_OBJECT_ID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 export const DOCUMENT_NEW_OBJECT_ID = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 
 export const documentTargets = {
@@ -20,16 +20,12 @@ export const documentTargets = {
   }),
   savedComparison: 'compare-saved:%2Frepo%2Fsrc%2Fa.ts',
   history: 'history:%2Frepo%2Fsrc%2Fa.ts',
-  snapshot: encodedTarget('git-diff:v2:', {
-    newObjectId: DOCUMENT_NEW_OBJECT_ID,
-    oldObjectId: DOCUMENT_OLD_OBJECT_ID,
-    oldPath: '/repo/src/old.ts',
-    path: '/repo/src/a.ts',
-    source: 'worktree',
-    status: 'renamed',
-    version: 2,
+  snapshot: encodedTarget('git-diff:v3:', {
+    target: { kind: 'moving', rootPath: '/repo', path: '/repo/src/a.ts', changeSource: 'worktree' },
+    version: 3,
   }),
   checkpointFile: encodedTarget('git-diff:checkpoint-v1:', {
+    ignoreWhitespace: true,
     filePath: '/repo/src/a.ts',
     fromTurnCount: 1,
     newObjectId: DOCUMENT_NEW_OBJECT_ID,
@@ -43,6 +39,7 @@ export const documentTargets = {
     version: 1,
   }),
   checkpointSession: encodedTarget('git-diff:checkpoint-v1:', {
+    ignoreWhitespace: true,
     fromTurnCount: 0,
     path: 'checkpoint-session-2',
     scope: 'session',
@@ -51,6 +48,7 @@ export const documentTargets = {
     version: 1,
   }),
   checkpointTurn: encodedTarget('git-diff:checkpoint-v1:', {
+    ignoreWhitespace: true,
     fromTurnCount: 1,
     path: 'checkpoint-turn-2',
     scope: 'turn',
@@ -232,11 +230,11 @@ export const DOCUMENT_TARGET_CASES: readonly DocumentTargetCase[] = [
     path: documentTargets.snapshot,
     filePath: null,
     name: 'a.ts',
-    title: '/repo/src/a.ts diff at bbbbbbb',
+    title: '/repo/src/a.ts worktree diff',
     copyPath: '/repo/src/a.ts',
     copyRelativePath: 'src/a.ts',
     diffSource: { onDisk: true, path: '/repo/src/a.ts' },
-    token: `d/worktree/${DOCUMENT_OLD_OBJECT_ID}..${DOCUMENT_NEW_OBJECT_ID},s=renamed,r=src%2Fold.ts/src/a.ts`,
+    token: 'd/worktree/live/src/a.ts',
   },
   {
     kind: 'checkpointFile',
@@ -248,7 +246,7 @@ export const DOCUMENT_TARGET_CASES: readonly DocumentTargetCase[] = [
     copyPath: '/repo/src/a.ts',
     copyRelativePath: 'src/a.ts',
     diffSource: { onDisk: true, path: '/repo/src/a.ts' },
-    token: `k/${TEST_SESSION_ID}/1..2,s=renamed,r=src%2Fold.ts,o=${DOCUMENT_OLD_OBJECT_ID},n=${DOCUMENT_NEW_OBJECT_ID}/src/a.ts`,
+    token: `k/${TEST_SESSION_ID}/1..2,w=1,s=renamed,r=src%2Fold.ts,o=${DOCUMENT_OLD_OBJECT_ID},n=${DOCUMENT_NEW_OBJECT_ID}/src/a.ts`,
   },
   {
     kind: 'checkpointSession',
@@ -260,7 +258,7 @@ export const DOCUMENT_TARGET_CASES: readonly DocumentTargetCase[] = [
     copyPath: 'checkpoint-session-2',
     copyRelativePath: 'checkpoint-session-2',
     diffSource: null,
-    token: `k/${TEST_SESSION_ID}/0..2`,
+    token: `k/${TEST_SESSION_ID}/0..2,w=1`,
   },
   {
     kind: 'checkpointTurn',
@@ -272,7 +270,7 @@ export const DOCUMENT_TARGET_CASES: readonly DocumentTargetCase[] = [
     copyPath: 'checkpoint-turn-2',
     copyRelativePath: 'checkpoint-turn-2',
     diffSource: null,
-    token: `k/${TEST_SESSION_ID}/1..2!turn`,
+    token: `k/${TEST_SESSION_ID}/1..2,w=1!turn`,
   },
   {
     kind: 'search',

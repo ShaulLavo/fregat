@@ -13,7 +13,7 @@ export function useGroupMenu(rows: readonly ChangeRow[], section: PanelSection, 
   const store = useGitStoreApi()
   const stage = useStagePathsMutation(paths, rootPath)
   const unstage = useUnstagePathsMutation(paths, rootPath)
-  const { openDiffs } = useOpenDiffDocument()
+  const { openDiffs } = useOpenDiffDocument(rootPath)
 
   return groupMenu({
     writable: confirmed,
