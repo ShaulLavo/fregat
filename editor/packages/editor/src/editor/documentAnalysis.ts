@@ -200,8 +200,8 @@ class AnalysisEntry<T extends RetentionResult> {
   private readonly cancellation = new AbortController()
   private interests = 0
   private lastRelease: number | null = null
-  private queuedRevision = -1
-  private generation = 0
+  protected queuedRevision = -1
+  protected generation = 0
   private pendingInterest = new AbortController()
   private tail: Promise<void> = Promise.resolve()
   private state: EditorAnalysisRead<T>
@@ -383,17 +383,50 @@ class AnalysisEntry<T extends RetentionResult> {
   }
 }
 
+type RetainedRangeContributor = {
+  readonly range: EditorSyntaxRange
+  readonly result: EditorSyntaxResult
+}
+type ReadyRange = RetainedRangeContributor & { readonly revision: number }
+type PendingRangeQuery = {
+  readonly snapshot: DocumentTextSnapshot
+  readonly revision: number
+  readonly range: EditorSyntaxRange
+  readonly promise: Promise<EditorSyntaxResult>
+  admission: 'cache' | 'return-only'
+  work:
+    | { readonly kind: 'queued'; readonly generation: number | null }
+    | { readonly kind: 'running'; readonly generation: number }
+}
+
+const structuralLeaseOwners = new WeakMap<
+  EditorRetainedSyntaxSession,
+  { readonly entry: StructuralEntry; readonly signal: AbortSignal }
+>()
+
+export function setRetainedSyntaxDisplayDemand(
+  session: EditorRetainedSyntaxSession,
+  demand: EditorAnalysisDisplayDemand,
+  contributors: readonly RetainedRangeContributor[] | null,
+): void {
+  const owner = structuralLeaseOwners.get(session)
+  owner?.entry.setContributors(owner.signal, contributors)
+  session.setDisplayDemand(demand)
+}
+
 class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
   private readonly displayed = new Map<AbortSignal, EditorAnalysisDisplayDemand>()
   private readonly queryWaiters = new Map<
     AbortSignal,
     { snapshot: DocumentTextSnapshot; range: EditorSyntaxRange }
   >()
-  private ranges = new Map<
-    string,
-    { revision: number; range: EditorSyntaxRange; result: EditorSyntaxResult }
+  private readonly contributors = new Map<AbortSignal, readonly RetainedRangeContributor[]>()
+  private readonly resultOrigins = new WeakMap<
+    EditorSyntaxResult,
+    { readonly snapshot: DocumentTextSnapshot; readonly revision: number }
   >()
-  private queries = new Map<string, Promise<EditorSyntaxResult>>()
+  private ranges = new Map<string, ReadyRange>()
+  private queries = new Map<string, PendingRangeQuery>()
   private rangeRevision = -1
 
   constructor(
@@ -419,6 +452,8 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
       'abort',
       () => {
         this.displayed.delete(signal)
+        this.contributors.delete(signal)
+        this.trimOptionalRanges()
         this.retention.changed()
       },
       { once: true },
@@ -435,7 +470,110 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
           }
         : demand
     this.displayed.set(signal, stored)
+    this.trimOptionalRanges()
     this.retention.changed()
+  }
+
+  setContributors(
+    signal: AbortSignal,
+    contributors: readonly RetainedRangeContributor[] | null,
+  ): void {
+    if (signal.aborted) return
+    if (contributors) this.contributors.set(signal, contributors)
+    else this.contributors.delete(signal)
+  }
+
+  private trimOptionalRanges(): void {
+    const snapshot = this.buffer.getTextSnapshot()
+    const intervals: EditorSyntaxRange[] = []
+    const protectedSlots = new Set<ReadyRange>()
+    let fullyPinned = false
+    for (const [signal, demand] of this.displayed) {
+      if (
+        demand.kind === 'unknown' ||
+        demand.kind === 'unmanaged' ||
+        demand.snapshot !== snapshot
+      ) {
+        fullyPinned = true
+        break
+      }
+      intervals.push(...demand.ranges)
+      const contributors = this.contributors.get(signal)
+      if (contributors) this.protectContributors(contributors, protectedSlots)
+      if (!contributors || demand.kind === 'preparation')
+        this.protectIntersecting(demand.ranges, protectedSlots)
+      this.protectLookup(demand.ranges, protectedSlots)
+    }
+    for (const waiter of this.queryWaiters.values()) {
+      if (waiter.snapshot !== snapshot) continue
+      intervals.push(waiter.range)
+      this.protectLookup([waiter.range], protectedSlots)
+    }
+    for (const query of this.queries.values()) {
+      query.admission =
+        fullyPinned || intervals.some((range) => rangesIntersect(range, query.range))
+          ? 'cache'
+          : 'return-only'
+    }
+    if (fullyPinned || this.displayed.size === 0) return
+    for (const [key, cached] of this.ranges) {
+      if (!protectedSlots.has(cached)) this.ranges.delete(key)
+    }
+  }
+
+  private protectContributors(
+    contributors: readonly RetainedRangeContributor[],
+    protectedSlots: Set<ReadyRange>,
+  ): void {
+    for (const contributor of contributors) this.protectContributor(contributor, protectedSlots)
+  }
+
+  private protectContributor(
+    contributor: RetainedRangeContributor,
+    protectedSlots: Set<ReadyRange>,
+  ): void {
+    const snapshot = this.buffer.getTextSnapshot()
+    const origin = this.resultOrigins.get(contributor.result)
+    let cached = this.ranges.get(rangeKey(contributor.range))
+    if (cached?.result !== contributor.result) cached = undefined
+    cached ??= [...this.ranges.values()].find(
+      (candidate) =>
+        candidate.result === contributor.result &&
+        rangeContains(candidate.range, contributor.range),
+    )
+    if (!cached && origin?.snapshot === snapshot && origin.revision === this.buffer.getRevision()) {
+      cached = { ...contributor, revision: origin.revision }
+      this.ranges.set(rangeKey(contributor.range), cached)
+    }
+    if (cached) protectedSlots.add(cached)
+  }
+
+  private protectIntersecting(
+    ranges: readonly EditorSyntaxRange[],
+    protectedSlots: Set<ReadyRange>,
+  ): void {
+    for (const cached of this.ranges.values()) {
+      if (
+        ranges.some(
+          (range) =>
+            rangesIntersect(range, cached.range) || foldResultIntersects(cached.result, range),
+        )
+      )
+        protectedSlots.add(cached)
+    }
+  }
+
+  private protectLookup(
+    ranges: readonly EditorSyntaxRange[],
+    protectedSlots: Set<ReadyRange>,
+  ): void {
+    for (const range of ranges) {
+      if ([...protectedSlots].some((cached) => rangeContains(cached.range, range))) continue
+      const cached =
+        this.ranges.get(rangeKey(range)) ??
+        [...this.ranges.values()].find((candidate) => rangeContains(candidate.range, range))
+      if (cached) protectedSlots.add(cached)
+    }
   }
 
   override inspectDisplayDemand(): AnalysisDisplayInspection {
@@ -485,7 +623,9 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
       range: boundedRange(range, this.buffer.getTextSnapshot().length),
     })
     const release = () => {
-      if (this.queryWaiters.delete(signal)) this.retention.changed()
+      if (!this.queryWaiters.delete(signal)) return
+      this.trimOptionalRanges()
+      this.retention.changed()
     }
     signal.addEventListener('abort', release, { once: true })
     const pending = interruptible(this.range(range), signal)
@@ -515,6 +655,7 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
 
   override dispose(): void {
     this.displayed.clear()
+    this.contributors.clear()
     this.queryWaiters.clear()
     this.ranges.clear()
     this.queries.clear()
@@ -543,29 +684,73 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     const state = this.readRange(range)
     if (state.kind === 'ready') return Promise.resolve(state.result)
     const revision = this.buffer.getRevision()
-    const key = `${revision}:${rangeKey(range)}`
-    const existing = this.queries.get(key)
-    if (existing) return existing
+    const generation = this.queuedRevision === revision ? this.generation : null
+    const key = `${revision}:${generation ?? 'publication'}:${rangeKey(range)}`
+    const existing = [...this.queries.values()].find((query) =>
+      this.compatibleQuery(query, revision, range),
+    )
+    if (existing) {
+      this.trimOptionalRanges()
+      return existing.promise
+    }
     let queried = false
-    const pending = this.query(() => {
-      const current = this.readRange(range)
-      if (current.kind === 'ready') return Promise.resolve(current.result)
-      queried = true
-      return this.structuralSession.queryRange?.(range) ?? this.current()
-    }).then((result) => {
-      if (queried && this.buffer.getRevision() === revision)
-        this.ranges.set(rangeKey(range), { revision, range, result })
-      this.retention.changed()
-      return result
-    })
+    const pending: PendingRangeQuery = {
+      snapshot: this.buffer.getTextSnapshot(),
+      revision,
+      range,
+      admission: 'cache',
+      work: { kind: 'queued', generation },
+      promise: this.query(() => {
+        pending.work = { kind: 'running', generation: this.generation }
+        const current = this.readRange(range)
+        if (current.kind === 'ready') return Promise.resolve(current.result)
+        queried = true
+        return this.structuralSession.queryRange?.(range) ?? this.current()
+      }).then((result) => {
+        if (queried && this.canAdmitRange(key, pending)) {
+          this.resultOrigins.set(result, { snapshot: pending.snapshot, revision })
+          this.ranges.set(rangeKey(range), { revision, range, result })
+        }
+        this.retention.changed()
+        return result
+      }),
+    }
     this.queries.set(key, pending)
+    this.trimOptionalRanges()
     this.retention.changed()
-    void pending
+    void pending.promise
       .finally(() => {
-        if (this.queries.delete(key)) this.retention.changed()
+        if (this.queries.get(key) !== pending) return
+        this.queries.delete(key)
+        this.retention.changed()
       })
       .catch(() => undefined)
-    return pending
+    return pending.promise
+  }
+
+  private compatibleQuery(
+    query: PendingRangeQuery,
+    revision: number,
+    range: EditorSyntaxRange,
+  ): boolean {
+    return (
+      query.revision === revision &&
+      query.snapshot === this.buffer.getTextSnapshot() &&
+      rangeKey(query.range) === rangeKey(range) &&
+      (query.work.generation === null || query.work.generation === this.generation)
+    )
+  }
+
+  private canAdmitRange(key: string, query: PendingRangeQuery): boolean {
+    return (
+      !this.signal.aborted &&
+      this.queries.get(key) === query &&
+      query.admission === 'cache' &&
+      query.work.kind === 'running' &&
+      query.work.generation === this.generation &&
+      query.revision === this.buffer.getRevision() &&
+      query.snapshot === this.buffer.getTextSnapshot()
+    )
   }
 
   override changed(event: EditorTextBufferChange): void {
@@ -821,7 +1006,7 @@ function structuralLease(
   let demand: EditorSyntaxRange | undefined
   const result = () => (demand ? entry.range(demand) : entry.current())
   const current = () => lease.wait(result)
-  return {
+  const retained: EditorRetainedSyntaxSession = {
     runtimeSessionId: entry.runtimeSessionId,
     setDisplayDemand: (demand) => entry.setDisplayDemand(lease.signal, demand),
     get foldingSupport() {
@@ -854,6 +1039,13 @@ function structuralLease(
         : entry.readRange(range ?? demand),
     dispose: lease.dispose,
   }
+  if (!lease.signal.aborted) {
+    structuralLeaseOwners.set(retained, { entry, signal: lease.signal })
+    lease.signal.addEventListener('abort', () => structuralLeaseOwners.delete(retained), {
+      once: true,
+    })
+  }
+  return retained
 }
 
 function highlighterLease(
@@ -962,4 +1154,15 @@ function sameStructuralRequest(
 function boundedRange(range: EditorSyntaxRange, length: number): EditorSyntaxRange {
   const startIndex = Math.max(0, Math.min(length, range.startIndex))
   return { startIndex, endIndex: Math.max(startIndex, Math.min(length, range.endIndex)) }
+}
+
+function rangesIntersect(left: EditorSyntaxRange, right: EditorSyntaxRange): boolean {
+  return left.startIndex < right.endIndex && left.endIndex > right.startIndex
+}
+function rangeContains(outer: EditorSyntaxRange, inner: EditorSyntaxRange): boolean {
+  return outer.startIndex <= inner.startIndex && outer.endIndex >= inner.endIndex
+}
+
+function foldResultIntersects(result: EditorSyntaxResult, range: EditorSyntaxRange): boolean {
+  return result.folds.some((fold) => rangesIntersect(range, fold))
 }

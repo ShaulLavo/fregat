@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createEditorBufferSession, createEditorTextBuffer } from '../src/documentSession'
-import { createEditorDocumentAnalysis } from '../src/editor/documentAnalysis'
+import {
+  createEditorDocumentAnalysis,
+  setRetainedSyntaxDisplayDemand,
+} from '../src/editor/documentAnalysis'
 import { EditorTokenStore } from '../src/syntax/tokenStore'
 import type { EditorHighlighterProvider } from '../src/syntax/highlighter'
 import {
@@ -10,6 +13,203 @@ import {
   type EditorSyntaxRange,
   type EditorSyntaxResult,
 } from '../src/syntax/session'
+
+describe('active range retention', () => {
+  it('releases the actual private lease binding when its signal closes', () => {
+    const buffer = createEditorTextBuffer('alpha')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'lease-binding' })
+    const original = WeakMap.prototype.set
+    const observed: { map: WeakMap<WeakKey, unknown> | null } = { map: null }
+    const capture = (map: WeakMap<WeakKey, unknown>, value: unknown) => {
+      if (
+        typeof value !== 'object' ||
+        value === null ||
+        !('entry' in value) ||
+        !('signal' in value)
+      )
+        return
+      if (value.signal instanceof AbortSignal) observed.map = map
+    }
+    WeakMap.prototype.set = function (
+      this: WeakMap<WeakKey, unknown>,
+      key: WeakKey,
+      value: unknown,
+    ) {
+      capture(this, value)
+      return original.call(this, key, value)
+    }
+    let lease: ReturnType<typeof analysis.borrowStructural> = null
+    try {
+      lease = analysis.borrowStructural({
+        provider: { createSession: () => createEmptySyntaxSession() },
+        languageId: 'typescript',
+      })
+    } finally {
+      WeakMap.prototype.set = original
+    }
+    const binding = observed.map
+    if (!binding || !lease) throw new TypeError('Controlled lease binding observation unavailable')
+    try {
+      expect(binding.has(lease)).toBe(true)
+      lease.dispose()
+      expect(binding.has(lease)).toBe(false)
+      analysis.reclaimInactive({ reason: 'inactive-budget' })
+      expect(binding.has(lease)).toBe(false)
+      expect(analysis.inspectRetention().entries).toEqual([])
+    } finally {
+      analysis.dispose()
+    }
+  })
+
+  it('joins the current retry generation while the obsolete queued query settles', async () => {
+    const buffer = createEditorTextBuffer('alpha')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'retry-head' })
+    const result = createEmptySyntaxResult()
+    let refreshes = 0
+    const ranges = vi.fn(async () => result)
+    const provider = {
+      createSession: () => ({
+        ...createEmptySyntaxSession(),
+        refresh: async () => {
+          if (++refreshes === 1) throw new TypeError('Controlled first refresh failure')
+          return result
+        },
+        queryRange: ranges,
+      }),
+    }
+    const lease = analysis.borrowStructural({ provider, languageId: 'typescript' })!
+    await expect(lease.refresh(buffer.getTextSnapshot())).rejects.toBeInstanceOf(TypeError)
+    const obsolete = lease.queryRange({ startIndex: 0, endIndex: 5 })
+    const rejected = expect(obsolete).rejects.toMatchObject({ name: 'AbortError' })
+    const retry = lease.refresh(buffer.getTextSnapshot())
+    const current = lease.queryRange({ startIndex: 0, endIndex: 5 })
+    expect(await Promise.all([retry, current])).toEqual([result, result])
+    await rejected
+    expect(ranges).toHaveBeenCalledTimes(1)
+    expect(analysis.inspectRetention().entries[0]!.pendingRangeCount).toBe(0)
+    analysis.dispose()
+  })
+
+  it.each(['disjoint', 'overlap'] as const)(
+    'bounds forty %s ready ranges by both views actual contributors',
+    async (mode) => {
+      const buffer = createEditorTextBuffer('x'.repeat(100_000))
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: mode })
+      const parser = provider()
+      const request = { provider: parser.provider, languageId: 'typescript' }
+      const left = analysis.borrowStructural(request)!
+      const right = analysis.borrowStructural(request)!
+      const snapshot = buffer.getTextSnapshot()
+      const first = { startIndex: 0, endIndex: 512 }
+      const firstResult = await left.queryRange(first)
+      setRetainedSyntaxDisplayDemand(left, { kind: 'frame', snapshot, ranges: [first] }, [
+        { range: first, result: firstResult },
+      ])
+      const overlapFrame = { startIndex: 50_064, endIndex: 50_576 }
+      let finalRange = first
+      for (let step = 0; step < 40; step++) {
+        const range =
+          mode === 'overlap'
+            ? { startIndex: 50_000 - step, endIndex: 51_024 + step }
+            : { startIndex: (step + 1) * 1024, endIndex: (step + 1) * 1024 + 512 }
+        const frame = mode === 'overlap' ? overlapFrame : range
+        setRetainedSyntaxDisplayDemand(right, { kind: 'frame', snapshot, ranges: [frame] }, [])
+        const result = await right.queryRange(range)
+        setRetainedSyntaxDisplayDemand(right, { kind: 'frame', snapshot, ranges: [frame] }, [
+          { range, result },
+        ])
+        expect(left.read(first)).toMatchObject({ kind: 'ready', result: firstResult })
+        expect(right.read(frame)).toMatchObject({ kind: 'ready', result })
+        expect(analysis.inspectRetention().entries[0]!.cachedRangeCount).toBe(2)
+        finalRange = range
+      }
+      expect(left.runtimeSessionId).toBe(right.runtimeSessionId)
+      expect(parser.create).toHaveBeenCalledTimes(1)
+      left.dispose()
+      right.dispose()
+      const before = parser.ranges.mock.calls.length
+      const warm = analysis.borrowStructural(request)!
+      expect(warm.read(finalRange).kind).toBe('ready')
+      await warm.queryRange(finalRange)
+      expect(parser.ranges).toHaveBeenCalledTimes(before)
+      analysis.dispose()
+    },
+  )
+
+  it.each(['canceled-only', 'late-visible-survivor'] as const)(
+    'keeps one provider operation with %s and qualified cache admission',
+    async (mode) => {
+      const buffer = createEditorTextBuffer('x'.repeat(100))
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: mode })
+      const parser = provider()
+      const gate = deferred<EditorSyntaxResult>()
+      parser.ranges.mockImplementationOnce(() => gate.promise)
+      const request = { provider: parser.provider, languageId: 'typescript' }
+      const left = analysis.borrowStructural(request)!
+      const right = analysis.borrowStructural(request)!
+      const snapshot = buffer.getTextSnapshot()
+      const frame = { startIndex: 0, endIndex: 10 }
+      const range = { startIndex: 50, endIndex: 60 }
+      setRetainedSyntaxDisplayDemand(left, { kind: 'frame', snapshot, ranges: [frame] }, [])
+      setRetainedSyntaxDisplayDemand(right, { kind: 'frame', snapshot, ranges: [frame] }, [])
+      const abort = new AbortController()
+      const canceled = left.queryRange(range, { signal: abort.signal })
+      const rejected = expect(canceled).rejects.toMatchObject({ name: 'AbortError' })
+      await vi.waitFor(() => expect(parser.ranges).toHaveBeenCalledTimes(1))
+      abort.abort()
+      await rejected
+      expect(analysis.inspectRetention().entries[0]).toMatchObject({
+        pendingRangeCount: 1,
+        displayDemand: { queryWaiters: 0 },
+      })
+      let survivor: Promise<EditorSyntaxResult> | null = null
+      if (mode === 'late-visible-survivor') {
+        setRetainedSyntaxDisplayDemand(right, { kind: 'frame', snapshot, ranges: [range] }, [])
+        survivor = right.queryRange(range)
+      }
+      const result = createEmptySyntaxResult({ requestedRanges: [range] })
+      gate.resolve(result)
+      if (survivor) expect(await survivor).toBe(result)
+      await vi.waitFor(() =>
+        expect(analysis.inspectRetention().entries[0]!.pendingRangeCount).toBe(0),
+      )
+      expect(parser.ranges).toHaveBeenCalledTimes(1)
+      expect(analysis.inspectRetention().entries[0]!.cachedRangeCount).toBe(survivor ? 1 : 0)
+      analysis.dispose()
+    },
+  )
+
+  it.each(['unmanaged', 'unknown', 'foreign', 'stale', 'preparation'] as const)(
+    'preserves %s protection',
+    async (mode) => {
+      const buffer = createEditorTextBuffer('x'.repeat(100))
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: mode })
+      const parser = provider()
+      const lease = analysis.borrowStructural({
+        provider: parser.provider,
+        languageId: 'typescript',
+      })!
+      const snapshot = buffer.getTextSnapshot()
+      const range = { startIndex: 20, endIndex: 30 }
+      if (mode === 'unknown') lease.setDisplayDemand({ kind: 'unknown' })
+      if (mode === 'foreign')
+        lease.setDisplayDemand({
+          kind: 'frame',
+          snapshot: createEditorTextBuffer('foreign').getTextSnapshot(),
+          ranges: [],
+        })
+      if (mode === 'stale') {
+        lease.setDisplayDemand({ kind: 'frame', snapshot, ranges: [] })
+        createEditorBufferSession(buffer).applyText('!')
+      }
+      if (mode === 'preparation')
+        lease.setDisplayDemand({ kind: 'preparation', snapshot, ranges: [range] })
+      await lease.queryRange(range)
+      expect(analysis.inspectRetention().entries[0]!.cachedRangeCount).toBe(1)
+      analysis.dispose()
+    },
+  )
+})
 
 describe('analysis retention notifications', () => {
   it.each(['structural', 'highlighter'] as const)(
