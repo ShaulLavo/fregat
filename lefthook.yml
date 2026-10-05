@@ -1,3 +1,5 @@
+rc: scripts/lefthook-env.sh
+
 pre-commit:
   parallel: false
   jobs:
