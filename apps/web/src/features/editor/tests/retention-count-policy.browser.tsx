@@ -94,18 +94,48 @@ async function verifyFixture(fixture: RetentionRun['fixtures'][number], cycles: 
     await verifyText(host, host.a, `dirty ${host.expectedSource}`, 'canonical-a-ingested-dirty', 0)
     await verifyText(host, host.b, host.expectedSource, 'canonical-b-ingested', 0)
     await verifyIdleInspectors(host, b, fixture.id)
-    await host.prepareViewMetadata()
     await record({
-      ...(await host.sample('cold-initial-prepared-metadata', 0, [b])),
-      metadata: host.metadataReceipt(),
+      fixture: fixture.id,
+      arm: 'cold-ready-preparation-start',
+      cycle: 0,
+      observation: host.observation.snapshot(),
+    })
+    await host.prepareViewMetadata()
+    const metadata = host.metadataReceipt()
+    await record({
+      ...(await host.sample('cold-ready-preparation-complete', 0, [b])),
+      metadata,
       coldWork: host.observation.receipt(),
     })
+    for (const owner of metadata) {
+      expect(owner.source.current).toBe(true)
+      expect(owner.stages.state).toBe('settled')
+      expect(owner.stages).toMatchObject({ structural: 'ready', highlighter: 'ready' })
+    }
     bView = host.createView('b', host.b)
+    await record({
+      fixture: fixture.id,
+      arm: 'actual-b-synchronous-attachment',
+      ...bView.attachment,
+    })
+    assertReadyAttachment(bView.attachment)
     await verifyProviderBaseline(host, fixture)
     await host.refresh(b, host.b.analysis)
     const bIds = [b.structural.runtimeSessionId, b.highlighter.runtimeSessionId]
     await record(await host.sample('baseline-active-b', 0, [b]))
     await verifyActualViews(host, b, bView, fixture.id)
+    const acquiredMetadata = host.metadataReceipt()
+    host.releaseViewMetadata()
+    const releasedPreparation = await host.sample('preparation-owner-release-before-pressure', 0, [
+      b,
+    ])
+    await record({ ...releasedPreparation, acquiredMetadata, metadata: host.metadataReceipt() })
+    expect(host.metadataReceipt()).toEqual([])
+    expect(
+      releasedPreparation.inspections
+        .flatMap((inspection) => inspection.entries)
+        .reduce((total, entry) => total + entry.displayDemand.preparationLeases, 0),
+    ).toBe(0)
     await record({
       fixture: fixture.id,
       arm: 'actual-geometry-before-cycles',
@@ -127,12 +157,7 @@ async function verifyFixture(fixture: RetentionRun['fixtures'][number], cycles: 
     await verifyPendingFailed(host, b, cycles)
     await verifyGrowthControl(host, b, cycles)
     await record({
-      ...(await host.sample('late-metadata-before-release', cycles, [b])),
-      metadata: host.metadataReceipt(),
-    })
-    host.releaseViewMetadata()
-    await record({
-      ...(await host.sample('late-metadata-after-release', cycles, [b])),
+      ...(await host.sample('post-pressure-preparation-ownership', cycles, [b])),
       metadata: host.metadataReceipt(),
     })
     host.application.getSnapshot().editor.dispose()
@@ -516,6 +541,13 @@ async function verifyActualViews(
   const first = host.createView('a-first')
   const second = host.createView('a-second')
   try {
+    await record({
+      fixture,
+      arm: 'actual-a-synchronous-attachments',
+      attachments: [first.attachment, second.attachment],
+    })
+    assertReadyAttachment(first.attachment)
+    assertReadyAttachment(second.attachment)
     first.editor.setSelection(10)
     second.editor.setSelection(50)
     first.editor.setScrollPosition({ top: 48 })
@@ -559,8 +591,10 @@ async function verifyActualViews(
         requests: interval.requests,
         sourceReads: interval.reads,
         attachments: interval.attachments,
+        synchronousAttachment: warm.attachment,
         completion: interval.observation,
       })
+      assertReadyAttachment(warm.attachment)
       expect(reused).toEqual(ids)
       expect(interval.attachments).toEqual([{ prepared: true }])
       assertWarmInterval(interval)
@@ -572,6 +606,47 @@ async function verifyActualViews(
     first.dispose()
     second.dispose()
   }
+}
+
+function assertReadyAttachment(attachment: ReturnType<Host['createView']>['attachment']) {
+  expect(attachment.state.syntaxStatus).toBe('ready')
+  expect(attachment.state.initialHighlightStatus).toBe('painted')
+  expect(attachment.readyPaintCaptured).toBe(true)
+  expect(attachment.sourceMatchesColdSnapshot).toBe(true)
+  expect(attachment.paints.map((paint) => paint.phase)).toEqual(['text', 'highlight-settled'])
+  expect(attachment.paints.at(-1)).toMatchObject({ status: 'painted' })
+  const acquisition = attachment.acquisition
+  expect(acquisition).not.toBeNull()
+  if (!acquisition) throw new TypeError('Actual public prepared acquisition is required')
+  expect(acquisition.source.matchesColdSnapshot).toBe(true)
+  expect(acquisition.match).toMatchObject({
+    configuredTabSize: 4,
+    tabSizePolicy: 'detect-indentation',
+    documentConfigurationTag: ['actual-view'],
+    structuralConfigurationTag: ['actual-view'],
+    highlighterConfigurationTag: ['actual-view'],
+    structuralConfiguration: {
+      includeCaptures: false,
+      includeHighlights: false,
+      syntaxMode: 'range',
+    },
+    matchesStructuralProvider: true,
+    matchesHighlighterProvider: true,
+  })
+  for (const transfer of [acquisition.structural, acquisition.highlighter]) {
+    expect(transfer).toMatchObject({
+      ready: true,
+      sourceMatchesColdSnapshot: true,
+      resultMatchesRead: true,
+      configurationTag: ['actual-view'],
+    })
+  }
+  expect([acquisition.structural?.runtimeSessionId]).toEqual(
+    attachment.originalStageRuntimeIds?.structural,
+  )
+  expect([acquisition.highlighter?.runtimeSessionId]).toEqual(
+    attachment.originalStageRuntimeIds?.highlighter,
+  )
 }
 
 function assertWarmInterval(interval: Awaited<ReturnType<Host['observation']['interval']>>) {

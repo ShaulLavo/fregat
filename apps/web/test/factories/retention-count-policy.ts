@@ -9,6 +9,11 @@ import {
   Editor,
   createEditorPreparedDocument,
   type EditorDocumentAnalysis,
+  type EditorInitialPaintEvent,
+  type EditorPreparedDocument,
+  type EditorPreparedDocumentMatch,
+  type EditorPreparedDocumentPayload,
+  type EditorPreparedStageOutcome,
 } from '@singapore-editor/core/editor'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import type { EditorHighlighterProvider } from '@singapore-editor/core/extensions'
@@ -349,35 +354,193 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     analysis.subscribeRetention(() => observation.publication()),
   )
   const views = new Set<{ dispose(): void; geometry(): ReturnType<typeof viewGeometry> }>()
-  const preparedViews = new Map<Analysis, ReturnType<typeof createEditorPreparedDocument>>()
+  const referenceIds = new WeakMap<object, number>()
+  let nextReferenceId = 1
+  function referenceId(value: object) {
+    const existing = referenceIds.get(value)
+    if (existing !== undefined) return existing
+    const id = nextReferenceId++
+    referenceIds.set(value, id)
+    return id
+  }
+  type PreparedView = {
+    readonly prepared: EditorPreparedDocument
+    readonly abortController: AbortController
+    readonly snapshot: ReturnType<typeof a.buffer.getSnapshot>
+    readonly textSnapshot: ReturnType<typeof a.buffer.getTextSnapshot>
+    readonly revision: number
+    readonly range: { readonly startIndex: number; readonly endIndex: number }
+    stages:
+      | { readonly state: 'pending' }
+      | {
+          readonly state: 'settled'
+          readonly structural: EditorPreparedStageOutcome
+          readonly highlighter: EditorPreparedStageOutcome
+          readonly runtimeSessionIds: ReturnType<EditorPreparedDocument['runtimeSessionIds']>
+          readonly fallbackReady: boolean
+        }
+    readonly acquisitions: ReturnType<typeof preparedAcquisition>[]
+  }
+  const preparedViews = new Map<Analysis, PreparedView>()
+
+  function preparedAcquisition(
+    owner: PreparedView,
+    match: EditorPreparedDocumentMatch,
+    payload: EditorPreparedDocumentPayload | null,
+  ) {
+    const structural = payload?.structural
+    const highlighter = payload?.highlighter
+    const structuralRead = structural?.session.read(structural.range)
+    const highlighterRead = highlighter?.session.read()
+    return {
+      source: {
+        snapshot: referenceId(match.snapshot),
+        matchesColdSnapshot: match.snapshot === owner.snapshot,
+        revision: owner.revision,
+      },
+      match: {
+        documentId: match.documentId,
+        languageId: match.languageId,
+        configuredTabSize: match.configuredTabSize,
+        tabSizePolicy: match.tabSizePolicy,
+        documentConfigurationTag: match.documentConfigurationTag,
+        structuralConfigurationTag: match.structuralConfigurationTag,
+        highlighterConfigurationTag: match.highlighterConfigurationTag,
+        structuralConfiguration: match.structuralConfiguration,
+        matchesStructuralProvider: match.structuralProvider === structuralProvider,
+        matchesHighlighterProvider: match.highlighterProvider === highlighterProvider,
+      },
+      structural: structural
+        ? {
+            runtimeSessionId: structural.runtimeSessionId,
+            configuration: structural.configuration,
+            configurationTag: structural.configurationTag,
+            range: structural.range,
+            ready: structural.readyResult !== null,
+            sourceMatchesColdSnapshot:
+              structuralRead?.kind === 'ready' && structuralRead.snapshot === owner.textSnapshot,
+            resultMatchesRead:
+              structuralRead?.kind === 'ready' && structuralRead.result === structural.readyResult,
+          }
+        : null,
+      highlighter: highlighter
+        ? {
+            runtimeSessionId: highlighter.runtimeSessionId,
+            configurationTag: highlighter.configurationTag,
+            range: highlighter.range,
+            ready: highlighter.readyResult !== null,
+            sourceMatchesColdSnapshot:
+              highlighterRead?.kind === 'ready' && highlighterRead.snapshot === owner.textSnapshot,
+            resultMatchesRead:
+              highlighterRead?.kind === 'ready' &&
+              highlighterRead.result === highlighter.readyResult,
+            tokenCount: highlighter.readyResult?.tokens.length ?? 0,
+          }
+        : null,
+      fallbackTransferred: payload?.fallbackFoldIndex !== null && payload !== null,
+    }
+  }
+
+  function createPreparedView(document: typeof a) {
+    const snapshot = document.buffer.getSnapshot()
+    const textSnapshot = document.buffer.getTextSnapshot()
+    const prepared = createEditorPreparedDocument({
+      analysis: document.analysis,
+      buffer: document.buffer,
+      documentId: document.analysis.documentId,
+      languageId: fixture.language,
+      configuredTabSize: 4,
+      tabSizePolicy: 'detect-indentation',
+      documentConfigurationTag: ['actual-view'],
+    })
+    const owner: PreparedView = {
+      prepared,
+      abortController: new AbortController(),
+      snapshot,
+      textSnapshot,
+      revision: document.buffer.getRevision(),
+      range: { startIndex: 0, endIndex: Math.min(snapshot.length, 65_536) },
+      stages: { state: 'pending' },
+      acquisitions: [],
+    }
+    const borrow = prepared.borrow.bind(prepared)
+    prepared.borrow = (match) => {
+      const payload = borrow(match)
+      owner.acquisitions.push(preparedAcquisition(owner, match, payload))
+      return payload
+    }
+    return owner
+  }
 
   async function prepareViewMetadata() {
     for (const document of [a, b]) {
       if (preparedViews.has(document.analysis))
         throw new TypeError('Cold metadata is already retained')
-      const prepared = createEditorPreparedDocument({
-        analysis: document.analysis,
-        buffer: document.buffer,
-        documentId: document.analysis.documentId,
-        languageId: fixture.language,
-        configuredTabSize: 4,
-        tabSizePolicy: 'detect-indentation',
-        documentConfigurationTag: ['actual-view'],
+      const owner = createPreparedView(document)
+      preparedViews.set(document.analysis, owner)
+      const structural = owner.prepared.startStage({
+        family: 'structural',
+        provider: structuralProvider,
+        configuration: { includeCaptures: false, includeHighlights: false, syntaxMode: 'range' },
+        configurationTag: ['actual-view'],
+        range: owner.range,
+        abortSignal: owner.abortController.signal,
       })
-      preparedViews.set(document.analysis, prepared)
-      await prepared.fallbackReady
+      const highlighter = owner.prepared.startStage({
+        family: 'highlighter',
+        provider: highlighterProvider,
+        configurationTag: ['actual-view'],
+        range: 'full',
+        abortSignal: owner.abortController.signal,
+      })
+      if (!structural || !highlighter) throw new TypeError('Cold ready stages did not start')
+      const [structuralOutcome, highlighterOutcome, fallbackReady] = await Promise.all([
+        structural,
+        highlighter,
+        owner.prepared.fallbackReady,
+      ])
+      owner.stages = {
+        state: 'settled',
+        structural: structuralOutcome,
+        highlighter: highlighterOutcome,
+        runtimeSessionIds: owner.prepared.runtimeSessionIds(),
+        fallbackReady,
+      }
     }
   }
   function metadataReceipt() {
-    return Array.from(preparedViews, ([analysis, prepared]) => ({
+    return Array.from(preparedViews, ([analysis, owner]) => ({
       documentId: analysis.documentId,
-      estimatedBytes: prepared.estimatedBytes,
-      runtimeSessionIds: prepared.runtimeSessionIds(),
+      source: {
+        snapshot: referenceId(owner.snapshot),
+        textSnapshot: referenceId(owner.textSnapshot),
+        revision: owner.revision,
+        current: analysis.buffer.getSnapshot() === owner.snapshot,
+      },
+      configuration: {
+        documentConfigurationTag: ['actual-view'],
+        structuralConfigurationTag: ['actual-view'],
+        highlighterConfigurationTag: ['actual-view'],
+        structural: { includeCaptures: false, includeHighlights: false, syntaxMode: 'range' },
+        structuralRange: owner.range,
+        highlighterRange: 'full',
+        configuredTabSize: 4,
+        tabSizePolicy: 'detect-indentation',
+        structuralProvider: referenceId(structuralProvider),
+        highlighterProvider: referenceId(highlighterProvider),
+      },
+      stages: owner.stages,
+      acquisitions: owner.acquisitions.slice(),
+      estimatedBytes: owner.prepared.estimatedBytes,
+      runtimeSessionIds: owner.prepared.runtimeSessionIds(),
       entries: analysis.inspectRetention().entries,
     }))
   }
   function releaseViewMetadata() {
-    for (const prepared of preparedViews.values()) prepared.dispose()
+    for (const owner of preparedViews.values()) {
+      owner.abortController.abort()
+      owner.prepared.dispose()
+    }
     preparedViews.clear()
   }
 
@@ -432,8 +595,8 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     pair.highlighter.dispose()
   }
   function createView(name: string, document = a) {
-    const preparedDocument = preparedViews.get(document.analysis)
-    if (!preparedDocument)
+    const owner = preparedViews.get(document.analysis)
+    if (!owner)
       throw new TypeError('The actual cold prepared metadata is required for this host mount')
     const wrapper = window.document.createElement('div')
     const container = window.document.createElement('div')
@@ -444,7 +607,9 @@ export async function retentionCountHost(fixture: RetentionFixture) {
       'display: flex; height: 100%; min-height: 0; min-width: 0; overflow: hidden; width: 100%;'
     wrapper.append(container)
     window.document.body.append(wrapper)
+    const paints: EditorInitialPaintEvent[] = []
     const editor = new Editor(container, {
+      onInitialPaint: (event) => paints.push(event),
       plugins: [
         {
           activate(context) {
@@ -463,15 +628,27 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     scroll.style.minWidth = '0'
     editor.attachSession(createEditorBufferSession(document.buffer), {
       analysis: document.analysis,
-      preparedDocument,
+      preparedDocument: owner.prepared,
       documentConfigurationTag: ['actual-view'],
       documentId: document.analysis.documentId,
       languageId: fixture.language,
       structuralConfigurationTag: ['actual-view'],
       highlighterConfigurationTag: ['actual-view'],
     })
+    const attachment = {
+      name,
+      state: editor.getState(),
+      paints: paints.slice(),
+      readyPaintCaptured: editor.captureSnapshot() !== null,
+      sourceMatchesColdSnapshot: editor.getTextSnapshot() === owner.textSnapshot,
+      acquisition: owner.acquisitions.at(-1) ?? null,
+      originalStageRuntimeIds:
+        owner.stages.state === 'settled' ? owner.stages.runtimeSessionIds : null,
+      observationAtReturn: observation.snapshot(),
+    }
     const view = {
       editor,
+      attachment,
       geometry: () => viewGeometry(container, name),
       dispose() {
         views.delete(view)
