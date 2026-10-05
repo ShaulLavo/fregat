@@ -8,7 +8,10 @@ import { TestEditorStateProvider } from '../../../../test/factories/editor-state
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
 
-test('completes a query restored before the search debounce settles', async ({ server, client }) => {
+test('completes a query restored before the search debounce settles', async ({
+  server,
+  client,
+}) => {
   void client
   await writeFile(join(server.root, 'needle.ts'), 'export const needle = 1\n')
   const application = createTestApplicationRuntime()
