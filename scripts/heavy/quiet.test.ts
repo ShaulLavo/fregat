@@ -214,7 +214,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
     }
   }, 20_000)
 
-  test.each(['cancelled', 'expired admission', 'resumed admission'])(
+  test.each(['cancelled', 'expired admission', 'resumed admission', 'resumed expired admission'])(
     'runtime mutex contention leaves a %s request bounded while the mutex remains held',
     async (mode) => {
       const box = quietBox(600)
@@ -262,16 +262,20 @@ describe.skipIf(!userScopes)('quiet holds', () => {
             { timeout: 1_500 },
           )
           .toBe(true)
-        if (mode === 'resumed admission') {
+        if (mode === 'resumed admission' || mode === 'resumed expired admission') {
           const deadline = live(box.state, 'queue').find(
             (job) => job.pid === next!.child.pid,
           )!.quietAdmissionUntil!
           observed.push({ event: 'admission deadline', at: deadline })
+          expect(bootSeconds()).toBeLessThan(deadline)
+          expect(next.child.exitCode).toBeNull()
           next.child.kill('SIGSTOP')
           await expect
             .poll(() => bootSeconds(), { timeout: 3_000 })
-            .toBeGreaterThan(deadline - 0.25)
-          observed.push({ event: 'resumed', at: bootSeconds() })
+            .toBeGreaterThan(deadline + (mode === 'resumed admission' ? -0.25 : 0.05))
+          const resumedAt = bootSeconds()
+          observed.push({ event: 'resumed', at: resumedAt })
+          expect(resumedAt < deadline).toBe(mode === 'resumed admission')
           next.child.kill('SIGCONT')
           await expect.poll(() => bootSeconds(), { timeout: 1_500 }).toBeGreaterThan(deadline)
           observed.push({ event: 'expired', at: bootSeconds() })
