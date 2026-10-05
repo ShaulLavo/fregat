@@ -1,15 +1,39 @@
-import type { TabContent } from '@/lib/documents/utils/types'
-import { useIsFetching, type QueryKey } from '@tanstack/react-query'
+import type { TabContent, TabId } from '@/lib/documents/utils/types'
+import { useIsFetching, useQuery, type QueryKey } from '@tanstack/react-query'
 
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import { queryHasNoData } from '@/lib/query-state'
 import { fileSystemKeys } from '@/lib/query-keys'
+import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
+import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
+import { isPdfFile } from '@/lib/pdf-viewer/format'
+import { useEditorDocumentState } from '@/features/editor/state/document-state'
 
 const DISABLED_EDITOR_INPUT_QUERY = ['editor-input', 'disabled'] as const
 
-export function useEditorInputPending(content: TabContent | null | undefined): boolean {
+export function useEditorInputPending(
+  content: TabContent | null | undefined,
+  tabId: TabId | null,
+): boolean {
   const queryKey = editorInputQueryKey(content) ?? DISABLED_EDITOR_INPUT_QUERY
   const unresolvedFetches = useIsFetching({ exact: true, predicate: queryHasNoData, queryKey })
+  const target = content?.kind === 'document' ? content.document : null
+  const path =
+    target?.kind === 'file' && !isPdfFile(target.resource.path) ? target.resource.path : null
+  const snapshot = useQuery({
+    ...fileSnapshotQueryOptions(path ?? filesystemPath('')),
+    queryKey: path ? fileSystemKeys.fileSnapshot(path) : DISABLED_EDITOR_INPUT_QUERY,
+    enabled: false,
+  })
+  const bound = useEditorDocumentState(
+    (state) =>
+      tabId !== null &&
+      path !== null &&
+      state.viewsByTabId[tabId]?.documentKey === fileDocumentKey(path),
+  )
+
+  // A completed read can publish before the body binds its view in a separate React commit.
+  if (path) return !bound && !snapshot.isError && !snapshot.data?.seemsBinary
 
   return queryKey !== DISABLED_EDITOR_INPUT_QUERY && unresolvedFetches > 0
 }
