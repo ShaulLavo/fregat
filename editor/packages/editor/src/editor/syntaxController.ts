@@ -214,6 +214,7 @@ export class EditorSyntaxController {
   // Refresh failures since the last success or re-entry (document, provider or highlighter theme).
   private failedHighlightRefreshes = 0
   private unsubscribeHighlighterTheme: (() => void) | null = null
+  private unsubscribeProducedTokens: (() => void) | null = null
   private preparedSyntaxDisposer: (() => void) | null = null
   private preparedHighlighterDisposer: (() => void) | null = null
   private preparedInitialTokensInstalled = false
@@ -622,6 +623,7 @@ export class EditorSyntaxController {
     if (this.retainedHighlighter) {
       this.refreshHighlighterTheme(false)
     }
+    this.observeProducedHighlighterTokens()
     this.observePreparedResults(prepared)
     this.logSyntaxStatus('editor.syntax.document_started')
   }
@@ -838,7 +840,8 @@ export class EditorSyntaxController {
           if (retry && current.kind === 'ready')
             this.applyHighlightResult(current.result, documentVersion, nowMs(), generation)
         },
-        fail: () => {
+        fail: (error) => {
+          if (error instanceof DOMException && error.name === 'AbortError') return
           if (!this.preparedResultStillCurrent(retained, documentVersion, generation)) return
           this.completeProviderHighlighterTheme(null)
         },
@@ -901,6 +904,8 @@ export class EditorSyntaxController {
     }
     this.stoppedWarm = null
     this.syntaxContentVersion += 1
+    this.pendingInitialHighlightReplacement = null
+    this.pendingInitialHighlightThemeTerminal = null
     this.foldCoverage = null
     this.parsedSyntaxContentVersion = null
     this.projectSyntaxRangeCache(change)
@@ -1015,6 +1020,27 @@ export class EditorSyntaxController {
     this.refreshHighlighterTheme()
     this.refreshHighlightTokens(this.options.getDocumentVersion(), null, options)
     this.observeHighlighterTheme()
+    this.observeProducedHighlighterTokens()
+  }
+
+  private observeProducedHighlighterTokens(): void {
+    this.unsubscribeProducedTokens?.()
+    this.unsubscribeProducedTokens = null
+    const retained = this.retainedHighlighter
+    if (!retained) return
+    const apply = () => {
+      if (this.retainedHighlighter !== retained) return
+      const result = retained.readProducedTokens()
+      if (!result) return
+      this.applyHighlightResult(
+        result,
+        this.options.getDocumentVersion(),
+        nowMs(),
+        this.initialHighlightConfigurationGeneration,
+      )
+    }
+    this.unsubscribeProducedTokens = retained.onDidProduceTokens(apply)
+    apply()
   }
 
   private createSyntaxSession(
@@ -1194,6 +1220,7 @@ export class EditorSyntaxController {
     this.highlighterSession = this.createHighlighterSession(this.options.getLanguageId())
     this.refreshHighlightTokens(documentVersion, null)
     this.observeHighlighterTheme()
+    this.observeProducedHighlighterTokens()
   }
 
   private preparedResultStillCurrent(
@@ -1297,6 +1324,8 @@ export class EditorSyntaxController {
   }
 
   private disposeHighlighterSession(): void {
+    this.unsubscribeProducedTokens?.()
+    this.unsubscribeProducedTokens = null
     this.unsubscribeHighlighterTheme?.()
     this.unsubscribeHighlighterTheme = null
     this.highlightRequests.cancel()
@@ -1347,6 +1376,7 @@ export class EditorSyntaxController {
     const session = this.options.getSession()
     if (!this.highlighterSession || !session) return
 
+    if (change) this.initialHighlightState = 'loading'
     const configurationGeneration = this.initialHighlightConfigurationGeneration
     const delayMs = options.delayMs ?? syntaxRefreshDelay(change)
     this.highlightRequests.schedule({
@@ -1806,6 +1836,14 @@ export class EditorSyntaxController {
     this.failedHighlightRefreshes = 0
     this.consumeRetainedProviderTheme()
     if (result.theme !== undefined) this.setHighlighterTheme(result.theme)
+    if (
+      this.currentTokens === result.tokens &&
+      this.acceptedTokensDocumentVersion === documentVersion &&
+      this.acceptedTokensTextVersion === this.options.getTextVersion() &&
+      this.initialHighlightState === 'painted' &&
+      this.pendingInitialHighlightReplacement === null
+    )
+      return
     this.commitInitialHighlightStatus(
       'painted',
       () => this.setTokens(result.tokens),

@@ -249,7 +249,7 @@ export class LspClient {
   public didCloseDocument(document: LspDocument): void {
     if (this.state !== 'ready') return
     if (!this.syncedDocuments.has(document.uri)) return
-    if (!this.syncOpenClose) {
+    if (!this.syncOpenClose || this.transport?.isClosed?.()) {
       this.syncedDocuments.delete(document.uri)
       return
     }

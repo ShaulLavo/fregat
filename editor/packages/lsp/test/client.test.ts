@@ -6,6 +6,7 @@ import {
   LspRequestCancelledError,
   LspResponseError,
   LspWorkspace,
+  createWebSocketLspTransport,
   METHOD_NOT_FOUND,
   type LspClientWorkspace,
   type LspLineStarts,
@@ -15,6 +16,48 @@ import {
 } from '../src/index.ts'
 
 type JsonMessage = Record<string, unknown>
+
+class ClosingSocket extends EventTarget {
+  static instances: ClosingSocket[] = []
+  readyState = 1
+  readonly frames: unknown[] = []
+  constructor(_url: string | URL, _protocols?: string | readonly string[]) {
+    super()
+    ClosingSocket.instances.push(this)
+  }
+  send(value: string): void {
+    if (this.readyState !== 1) throw new Error('Native socket send while closing')
+    const frame: unknown = JSON.parse(value)
+    this.frames.push(frame)
+    if (
+      typeof frame !== 'object' ||
+      frame === null ||
+      !('method' in frame) ||
+      frame.method !== 'initialize' ||
+      !('id' in frame)
+    )
+      return
+    queueMicrotask(() =>
+      this.dispatchEvent(
+        new MessageEvent('message', {
+          data: JSON.stringify({
+            jsonrpc: '2.0',
+            id: frame.id,
+            result: {
+              capabilities: {
+                textDocumentSync: { openClose: true, change: 2, save: { includeText: true } },
+              },
+            },
+          }),
+        }),
+      ),
+    )
+  }
+  close(): void {
+    this.readyState = 3
+    this.dispatchEvent(new Event('close'))
+  }
+}
 
 class TestTransport implements LspTransport {
   public readonly sent: JsonMessage[] = []
@@ -68,6 +111,78 @@ afterEach(() => {
 })
 
 describe('LspClient', () => {
+  it.each([2, 3])(
+    'retires a ready document while physical socket state is %i before the close event',
+    async (state) => {
+      const transport = await createWebSocketLspTransport('ws://fixture', {
+        WebSocketCtor: ClosingSocket,
+      })
+      const socket = ClosingSocket.instances.at(-1)!
+      const client = new LspClient()
+      await client.connect(transport)
+      const document = openTestDocument(client.workspace, {
+        uri: 'file:///closing.ts',
+        languageId: 'typescript',
+        text: 'abc',
+      })
+      const frameCount = socket.frames.length
+      socket.readyState = state
+      expect(client.initialized).toBe(true)
+      try {
+        expect(() => client.workspace.closeDocument(document.attachment)).not.toThrow()
+        expect(client.workspace.documents).toEqual([])
+        expect(socket.frames).toHaveLength(frameCount)
+        expect(() => client.workspace.closeDocument(document.attachment)).not.toThrow()
+      } finally {
+        client.disconnect()
+        transport.close()
+      }
+    },
+  )
+  it('preserves physical open/change/save failures when a ready socket begins closing', async () => {
+    for (const action of ['open', 'change', 'save']) {
+      const transport = await createWebSocketLspTransport('ws://fixture', {
+        WebSocketCtor: ClosingSocket,
+      })
+      const socket = ClosingSocket.instances.at(-1)!
+      const client = new LspClient({
+        capabilities: { textDocument: { synchronization: { didSave: true } } },
+      })
+      await client.connect(transport)
+      const document =
+        action === 'open'
+          ? null
+          : openTestDocument(client.workspace, {
+              uri: 'file:///closing.ts',
+              languageId: 'typescript',
+              text: 'abc',
+            })
+      socket.readyState = 2
+      try {
+        if (action === 'open')
+          expect(() =>
+            openTestDocument(client.workspace, {
+              uri: 'file:///closing.ts',
+              languageId: 'typescript',
+              text: 'abc',
+            }),
+          ).toThrow('closed')
+        if (action === 'change')
+          expect(() =>
+            updateTestDocument(client.workspace, document!, 'abcX', [
+              { from: 3, to: 3, text: 'X' },
+            ]),
+          ).toThrow('closed')
+        if (action === 'save')
+          expect(() =>
+            client.didSaveDocument(client.workspace.getDocument(document!.uri)!),
+          ).toThrow('closed')
+      } finally {
+        client.disconnect()
+        transport.close()
+      }
+    }
+  })
   it.each([false, true])(
     'rejects a retired initialization with transport reuse %s',
     async (reuse) => {

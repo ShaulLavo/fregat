@@ -4,6 +4,7 @@ import type { LspRequestId } from './protocol'
 export type LspTransportHandler = (message: string) => void
 
 export type LspTransport = {
+  isClosed?(): boolean
   send(message: string): void
   subscribe(handler: LspTransportHandler): void
   unsubscribe(handler: LspTransportHandler): void

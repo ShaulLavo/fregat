@@ -12,6 +12,8 @@ const measurementPaths = [
   'paired.mjs',
   'src/inputReadiness.ts',
   'input-worker-proof.mjs',
+  'input-worker-proof.d.mts',
+  'input-product-tree.mjs',
   'input-configurations.mjs',
   'src/browser.ts',
   'input-identity.mjs',

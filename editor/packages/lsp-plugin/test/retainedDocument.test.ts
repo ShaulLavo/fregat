@@ -464,4 +464,22 @@ describe('retained public language-server documents', () => {
     expect(lane(document).connection.workspace.documents).toEqual([])
     expect(ProtocolSocket.instances.every((socket) => socket.readyState === 3)).toBe(true)
   })
+
+  it.each([2, 3])(
+    'releases the ready source after socket state %i before its delayed close event',
+    async (state) => {
+      const f = fixture()
+      const document = f.create('closing', false)
+      const lane = document.lanes[0]!
+      await lane.connection.ready
+      const socket = ProtocolSocket.instances.at(-1)!
+      const frames = socket.sent.length
+      socket.readyState = state
+      expect(() => document.dispose()).not.toThrow()
+      expect(lane.connection.workspace.documents).toEqual([])
+      expect(socket.sent).toHaveLength(frames)
+      socket.dispatchEvent(new Event('close'))
+      expect(() => document.dispose()).not.toThrow()
+    },
+  )
 })

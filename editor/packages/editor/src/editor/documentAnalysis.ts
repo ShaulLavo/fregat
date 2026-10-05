@@ -133,6 +133,8 @@ export type EditorRetainedHighlighterSession = EditorHighlighterSession & {
   readonly runtimeSessionId: string
   read(): HighlighterAnalysisRead
   waitForProviderTheme(signal: AbortSignal): Promise<ProviderThemeOutcome>
+  readProducedTokens(): EditorHighlightResult | null
+  onDidProduceTokens(listener: () => void): () => void
 }
 
 export function readRetainedHighlighterResult(
@@ -591,6 +593,13 @@ export class AnalysisEntry<T> {
 }
 
 class HighlighterAnalysisSession implements AnalysisSession<EditorHighlightResult> {
+  private readonly produced = new EditorEventSource<void>({ action: 'document.highlighter.tokens' })
+  private producedTokens: {
+    readonly point: DocumentSyncPoint
+    readonly configuration: unknown
+    readonly signal: AbortSignal
+    readonly result: EditorHighlightResult
+  } | null = null
   private readonly invalidCohort = {}
   private providerTheme: ProviderThemeOutcome | null = null
   private themeWork: Promise<ProviderThemeOutcome> | null = null
@@ -609,7 +618,32 @@ class HighlighterAnalysisSession implements AnalysisSession<EditorHighlightResul
   }
 
   analyze(read: DocumentRead, signal: AbortSignal): Promise<EditorHighlightResult> {
-    return this.combine(this.highlighter.analyze(read, signal), signal)
+    const configuration = this.configurationKey()
+    const tokens = this.highlighter.analyze(read, signal).then((result) => {
+      signal.throwIfAborted()
+      if (configuration !== this.configurationKey()) throw cancelled()
+      this.producedTokens = { point: read.revision.point, configuration, signal, result }
+      if (!this.providerTheme && this.cohort.some((provider) => provider.loadTheme))
+        this.produced.fire()
+      return result
+    })
+    return this.combine(tokens, signal)
+  }
+
+  readProducedTokens(point: DocumentSyncPoint | null): EditorHighlightResult | null {
+    const produced = this.producedTokens
+    if (!produced || this.lifetime.signal.aborted || produced.signal.aborted) return null
+    if (produced.point !== point || produced.configuration !== this.configurationKey()) return null
+    return produced.result
+  }
+
+  onDidProduceTokens(listener: () => void): () => void {
+    const subscription = this.produced.subscribe(listener)
+    return () => subscription.dispose()
+  }
+
+  retainedTokens(): EditorHighlightResult | null {
+    return this.producedTokens?.result ?? null
   }
 
   themeOutcome(): ProviderThemeOutcome {
@@ -634,6 +668,7 @@ class HighlighterAnalysisSession implements AnalysisSession<EditorHighlightResul
 
   dispose(): void {
     this.lifetime.abort()
+    this.producedTokens = null
     this.invalidateTheme()
     this.highlighter.dispose()
   }
@@ -1134,6 +1169,7 @@ export class HighlighterEntry extends AnalysisEntry<EditorHighlightResult> {
   private readonly highlighter: HighlighterAnalysisSession
   private readonly themes = new EditorEventSource<void>({ action: 'document.highlighter.theme' })
   private unsubscribeTheme: (() => void) | void
+  private readonly unsubscribeProduced: () => void
   constructor(
     buffer: EditorTextBuffer,
     readonly highlighterSession: EditorHighlighterRuntime,
@@ -1157,6 +1193,7 @@ export class HighlighterEntry extends AnalysisEntry<EditorHighlightResult> {
       scheduling,
     )
     this.highlighter = adapter
+    this.unsubscribeProduced = adapter.onDidProduceTokens(() => this.retention.changed())
     this.unsubscribeTheme = highlighterSession.onDidChangeTheme?.(() => {
       this.refresh()
       this.themes.fire()
@@ -1182,6 +1219,7 @@ export class HighlighterEntry extends AnalysisEntry<EditorHighlightResult> {
     this.unsubscribeTheme = undefined
     completeDocumentCleanup([
       () => unsubscribe?.(),
+      this.unsubscribeProduced,
       () => this.highlighter.dispose(),
       () => this.finishDispose(),
     ])
@@ -1193,6 +1231,22 @@ export class HighlighterEntry extends AnalysisEntry<EditorHighlightResult> {
 
   waitForProviderTheme(signal: AbortSignal): Promise<ProviderThemeOutcome> {
     return this.highlighter.waitForProviderTheme(signal)
+  }
+
+  readProducedTokens(): EditorHighlightResult | null {
+    if (this.signal.aborted || this.queuedPoint !== this.buffer.getDocumentSyncPoint()) return null
+    if (!this.isConfigurationCurrent()) return null
+    return this.highlighter.readProducedTokens(this.queuedPoint)
+  }
+
+  onDidProduceTokens(listener: () => void): () => void {
+    return this.highlighter.onDidProduceTokens(listener)
+  }
+
+  override retainedResults(): readonly EditorHighlightResult[] {
+    const produced = this.highlighter.retainedTokens()
+    const results = super.retainedResults()
+    return produced ? results.concat(produced) : results
   }
 }
 
@@ -1522,6 +1576,9 @@ function highlighterLease(
     runtimeSessionId: entry.runtimeSessionId,
     refresh: () => lease.wait(refresh),
     waitForProviderTheme: (signal) => lease.wait(() => entry.waitForProviderTheme(signal)),
+    readProducedTokens: () => (lease.signal.aborted ? null : entry.readProducedTokens()),
+    onDidProduceTokens: (listener) =>
+      observeRetainedEvent(lease.signal, entry.onDidProduceTokens.bind(entry), listener),
     applyChange: () => lease.wait(() => entry.current()),
     onDidChangeTheme: session.onDidChangeTheme
       ? (listener) => {
@@ -1549,6 +1606,21 @@ function highlighterLease(
     },
     dispose: lease.dispose,
   }
+}
+
+function observeRetainedEvent(
+  signal: AbortSignal,
+  subscribe: (listener: () => void) => () => void,
+  listener: () => void,
+): () => void {
+  if (signal.aborted) return () => undefined
+  const unsubscribe = subscribe(listener)
+  const release = () => {
+    unsubscribe()
+    signal.removeEventListener('abort', release)
+  }
+  signal.addEventListener('abort', release, { once: true })
+  return release
 }
 
 function refreshRetainedAnalysis<Result>(

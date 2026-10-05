@@ -18,6 +18,7 @@ import '@singapore-editor/find/style.css'
 import { createInputLatencyProbe } from './inputLatency.ts'
 import { createInputConsumers, inputConsumersForFixture } from './inputConsumers.ts'
 import { readInputOutput } from './input-output.ts'
+import { createInputSourceIdentity } from '../input-worker-proof.mjs'
 import { fixtureFacts, generateFixture, normalizedText, type FixtureId } from './fixtures.ts'
 
 type Diagnostic = {
@@ -40,6 +41,7 @@ type Active = {
   readonly editors: readonly Editor[]
   readonly inputAbort: AbortController
   readonly consumers: ReturnType<typeof createInputConsumers> | null
+  readonly sourceIdentity: ReturnType<typeof createInputSourceIdentity>
 }
 
 declare global {
@@ -159,11 +161,20 @@ function createHost(index: number): HTMLElement {
 function open(multiple: boolean, highlight: boolean, consumerId?: string) {
   start = performance.now()
   const buffer = createEditorTextBuffer(source)
+  const sourceIdentity = createInputSourceIdentity(buffer.getDocumentSyncPoint())
   const analysis = createEditorDocumentAnalysis({ buffer, documentId: fixture })
   const editors: Editor[] = []
   const inputAbort = new AbortController()
   const consumers = consumerId ? createInputConsumers(consumerId, fixture, source.length) : null
-  active = { buffer, analysis, editors, inputAbort, consumers, ownerIdentity: crypto.randomUUID() }
+  active = {
+    buffer,
+    analysis,
+    editors,
+    inputAbort,
+    consumers,
+    sourceIdentity,
+    ownerIdentity: crypto.randomUUID(),
+  }
   for (let index = 0; index < (multiple ? 3 : 1); index++)
     editors.push(createInputEditor(index, highlight))
   editors[0]!
@@ -415,10 +426,15 @@ async function dispose() {
 }
 
 async function settleConsumers() {
-  const { consumers, editors, buffer } = current()
+  const { consumers, editors, buffer, sourceIdentity } = current()
   if (!consumers) return null
   const readiness = await consumers.settle(editors)
-  return readInputOutput(readiness, buffer.materializeFullText())
+  return readInputOutput(
+    readiness,
+    buffer.materializeFullText(),
+    buffer.getDocumentSyncPoint(),
+    sourceIdentity,
+  )
 }
 
 function retention() {

@@ -12,6 +12,61 @@ import { EditorSyntaxController } from '../src/editor/syntaxController'
 import { EditorPluginHost } from '../src/plugins'
 
 describe('retained provider theme admission', () => {
+  it('keeps produced token ownership current while a shared theme is pending', async () => {
+    const buffer = createEditorTextBuffer('alpha')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'produced' })
+    let configuration = 0
+    let resolve!: (theme: null) => void
+    const theme = new Promise<null>((complete) => {
+      resolve = complete
+    })
+    const provider: EditorHighlighterProvider = {
+      loadTheme: () => theme,
+      operation: createEditorHighlighterOperation(() => ({
+        configurationKey: () => configuration,
+        analyze: async () => ({
+          tokens: EditorTokenStore.fromTokens([{ start: 0, end: 1, style: { color: 'red' } }]),
+        }),
+        dispose: () => undefined,
+      })),
+    }
+    const first = analysis.borrowHighlighter({ provider, languageId: 'typescript' })!
+    const peer = analysis.borrowHighlighter({ provider, languageId: 'typescript' })!
+    let notifications = 0
+    first.onDidProduceTokens(() => {
+      notifications++
+    })
+    const initial = first.refresh(buffer.getTextSnapshot())
+    const cancelledInitial = expect(initial).rejects.toMatchObject({ name: 'AbortError' })
+    try {
+      await vi.waitFor(() => expect(first.readProducedTokens()?.tokens.length).toBe(1))
+      expect(first.read().kind).toBe('pending')
+      expect(analysis.inspectRetention().entries[0]).toMatchObject({
+        status: 'pending',
+        tokenCount: 1,
+      })
+      expect(notifications).toBe(1)
+      configuration++
+      expect(first.readProducedTokens()).toBeNull()
+      first.dispose()
+      const next = peer.refresh(buffer.getTextSnapshot())
+      const cancelledNext = expect(next).rejects.toMatchObject({ name: 'AbortError' })
+      await cancelledInitial
+      await vi.waitFor(() => expect(peer.readProducedTokens()?.tokens.length).toBe(1))
+      expect(first.readProducedTokens()).toBeNull()
+      expect(notifications).toBe(1)
+      peer.dispose()
+      analysis.reclaimInactive({ reason: 'inactive-budget' })
+      await cancelledNext
+      expect(analysis.inspectRetention().entries).toEqual([])
+    } finally {
+      resolve(null)
+      first.dispose()
+      peer.dispose()
+      analysis.dispose()
+    }
+  })
+
   it('joins pending public controller retries and rejects a late replaced theme through the same owner', async () => {
     const buffer = createEditorTextBuffer('alpha')
     const session = createEditorBufferSession(buffer)

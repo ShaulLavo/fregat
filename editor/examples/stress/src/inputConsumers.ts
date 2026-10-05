@@ -4,6 +4,7 @@ import { createShikiHighlighterPlugin, createShikiWorkerOwner } from '@singapore
 import { createEditorFindPlugin } from '@singapore-editor/find'
 import { createMinimapPlugin } from '@singapore-editor/minimap'
 import { createInputProductTree } from '../input-product-tree.mjs'
+import { minimapRenderAccepted } from '../input-worker-proof.mjs'
 import {
   TREE_SITTER_LANGUAGE_CONTRIBUTIONS,
   typeScript,
@@ -139,26 +140,18 @@ export function inputConsumersForFixture(
   return createInputConsumers(configuration.id, fixture, length)
 }
 
-type WorkerProof = {
-  readonly terminated: boolean
-  readonly minimap: boolean
-  readonly sourceUpdates: number
-  readonly renderAfterSource: number
-  readonly latestRender: number
-  readonly acceptedRender: number
-}
+type WorkerProof = Parameters<typeof minimapRenderAccepted>[0]
 
 // Minimap renders arrive after the syntax fences; readiness checks the latest requested frame.
 function minimapRendersAccepted() {
-  return (
+  const workers =
     (globalThis as { __inputWorkerProof?: readonly WorkerProof[] }).__inputWorkerProof ?? []
-  ).every(
-    (worker) =>
-      worker.terminated ||
-      !worker.minimap ||
-      (worker.renderAfterSource === worker.sourceUpdates &&
-        worker.latestRender > 0 &&
-        worker.acceptedRender === worker.latestRender),
+  return workers.every((worker) =>
+    minimapRenderAccepted(
+      worker,
+      workers,
+      worker.viewId ? (document.getElementById(worker.viewId)?.checkVisibility() ?? null) : null,
+    ),
   )
 }
 

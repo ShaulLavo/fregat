@@ -635,7 +635,10 @@ export async function waitForConsumerSource(page, pendingMinimapSource = false) 
         return (
           readiness.sessions.every((session) => session.current && session.answered) &&
           readiness.minimaps.every(
-            (minimap) => (minimap.current || pendingMinimapSource) && minimap.renderedAfterSource,
+            (minimap) =>
+              minimap.dormant ||
+              ((minimap.current || (pendingMinimapSource && minimap.protocol !== 'canonical')) &&
+                minimap.renderedAfterSource),
           )
         )
       },
