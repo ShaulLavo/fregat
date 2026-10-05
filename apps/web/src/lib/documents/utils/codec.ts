@@ -37,6 +37,7 @@ function encodedComparison(source: GitComparison): string {
   const request = checkpointRequest(source)
   const payload = {
     filePath: source.kind === 'checkpoint-file' ? source.file.path : undefined,
+    ignoreWhitespace: source.ignoreWhitespace,
     fromTurnCount: source.fromTurnCount,
     newObjectId: source.newObjectId,
     oldObjectId: source.oldObjectId,

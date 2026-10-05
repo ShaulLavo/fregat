@@ -1,3 +1,4 @@
+import { sameCheckpointCapture, promoteCheckpointCapture } from '@/lib/snapshot-comparison'
 import { isPdfFile } from '@/lib/pdf-viewer/format'
 import { pdfError } from '@/lib/pdf-viewer/structured-errors'
 import {
@@ -327,7 +328,7 @@ export class WorkspaceDocumentService {
     this.assertComparisonOwner(input.scope)
     if (!validSnapshotCapture(input))
       throw createClientInvariantError('Comparison capture does not match its target', {
-        rootMatches: input.scope.rootPath === input.comparison.target.rootPath,
+        rootMatches: comparisonRoot(input) === input.scope.rootPath,
       })
     const entry: SnapshotComparisonInterest = {
       current: {
@@ -359,7 +360,8 @@ export class WorkspaceDocumentService {
       refresh: null,
     }
     this.snapshotGroups.set(key, group)
-    if (group.current.input !== input) this.publishSnapshotInput(group, input)
+    if (group.current.input !== input && compatibleCapture(group.current.input, input))
+      this.publishSnapshotInput(group, input)
     entry.group = group
     entry.current = group.current
     group.interests.set(lease, entry)
@@ -380,7 +382,7 @@ export class WorkspaceDocumentService {
     this.assertComparisonOwner(request.input.scope)
     if (!validSnapshotCapture(request.input))
       throw createClientInvariantError('Comparison capture does not match its target', {
-        rootMatches: request.input.scope.rootPath === request.input.comparison.target.rootPath,
+        rootMatches: comparisonRoot(request.input) === request.input.scope.rootPath,
       })
     if (this.sourceOwnerDisposed || request.signal.aborted)
       return this.acquireSnapshotComparison(request)
@@ -1828,6 +1830,7 @@ export class WorkspaceDocumentService {
     if (
       input.scope.environmentId !== this.environmentId ||
       !validSnapshotCapture(input) ||
+      !compatibleCapture(entry.group.current.input, input) ||
       snapshotGroupKey(input) !== snapshotGroupKey(entry.group.current.input)
     )
       return false
@@ -1842,6 +1845,11 @@ export class WorkspaceDocumentService {
     group: SnapshotComparisonGroup,
     input: SnapshotComparisonInput,
   ): void {
+    if (group.current.input.kind === 'checkpoint' && input.kind === 'checkpoint') {
+      const promoted = promoteCheckpointCapture(group.current.input, input)
+      if (!promoted) return
+      input = promoted
+    }
     group.refresh = null
     const read = { kind: 'ready' as const, input }
     group.current = read
@@ -2136,14 +2144,34 @@ function assertTextFile(file: FileSnapshot): void {
 }
 
 function snapshotGroupKey(input: SnapshotComparisonInput): string {
+  if (input.kind === 'checkpoint')
+    return JSON.stringify([
+      input.scope.rootPath,
+      input.subject,
+      input.files.map((file) => [file.path, file.revision, file.hunks.map((hunk) => hunk.id)]),
+    ])
   return JSON.stringify([input.scope.rootPath, input.subject])
 }
 
 function validSnapshotCapture(input: SnapshotComparisonInput): boolean {
+  if (input.kind === 'checkpoint')
+    return (
+      input.comparison.owner === input.scope.rootPath &&
+      input.subject === documentKey({ kind: 'git-diff', source: input.comparison })
+    )
   const target = input.comparison.target
   return (
     target.rootPath === input.scope.rootPath &&
     input.subject === documentKey({ kind: 'git-diff', source: input.comparison }) &&
     (target.kind === 'moving' || sameGitInputRevision(target.revision, input.revision))
   )
+}
+
+function comparisonRoot(input: SnapshotComparisonInput): FilesystemPath {
+  return input.kind === 'checkpoint' ? input.comparison.owner : input.comparison.target.rootPath
+}
+
+function compatibleCapture(left: SnapshotComparisonInput, right: SnapshotComparisonInput): boolean {
+  if (left.kind !== 'checkpoint' || right.kind !== 'checkpoint') return left.kind === right.kind
+  return sameCheckpointCapture(left, right)
 }

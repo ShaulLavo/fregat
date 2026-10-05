@@ -108,6 +108,7 @@ for (const kind of ['checkpoint-session', 'checkpoint-turn'] as const) {
       kind: 'git-diff',
       source: {
         kind,
+        ignoreWhitespace: true,
         owner: root,
         sessionId: TEST_SESSION_ID,
         fromTurnCount: 0,

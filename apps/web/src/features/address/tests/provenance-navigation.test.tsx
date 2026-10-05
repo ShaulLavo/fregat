@@ -161,10 +161,13 @@ test('the deleted review quote opener retains its fixed pair after the worktree 
       }),
     )
     const read = [...harness.documents.getState().snapshotComparisons.values()].find(
-      (entry) => entry.kind === 'ready' && entry.input.comparison.target.kind === 'captured-review',
+      (entry) =>
+        entry.kind === 'ready' &&
+        entry.input.kind === 'snapshot' &&
+        entry.input.comparison.target.kind === 'captured-review',
     )
     expect(read?.kind).toBe('ready')
-    if (read?.kind === 'ready') {
+    if (read?.kind === 'ready' && read.input.kind === 'snapshot') {
       const file = read.input.files[0]
       expect(file?.kind).toBe('full')
       if (file?.kind === 'full')

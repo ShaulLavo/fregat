@@ -16,12 +16,6 @@ import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 export type CheckpointDiffQueryInput = {
   filePath?: string
   fromTurnCount: number
-  /**
-   * Every client fetch is a *display* diff, so the builders pin `true`:
-   * whitespace-only hunks are noise to a reader. Stat counting is the server's
-   * own path (the checkpoint reactor pins `false` there). The flag rides the
-   * cache key because the two answers to the same range genuinely differ.
-   */
   ignoreWhitespace?: boolean
   path?: string
   scope?: 'file' | 'session' | 'turn'
@@ -85,6 +79,7 @@ export function checkpointFileDocument(
   path: FilesystemPath,
   diff: GitFileDiff | null,
   owner: WorkspaceRoot,
+  ignoreWhitespace: boolean,
 ): {
   readonly kind: 'git-diff'
   readonly source: Extract<GitComparison, { kind: 'checkpoint-file' }>
@@ -94,6 +89,7 @@ export function checkpointFileDocument(
     source: {
       kind: 'checkpoint-file',
       owner,
+      ignoreWhitespace,
       file: fileResource(path),
       fromTurnCount: Math.max(0, summary.checkpointTurnCount - 1),
       toTurnCount: summary.checkpointTurnCount,
@@ -109,6 +105,7 @@ export function checkpointFileDocument(
 export function checkpointTurnDocument(
   summary: ChatTurnDiffSummary,
   owner: WorkspaceRoot,
+  ignoreWhitespace: boolean,
 ): {
   readonly kind: 'git-diff'
   readonly source: Extract<GitComparison, { kind: 'checkpoint-turn' }>
@@ -118,6 +115,7 @@ export function checkpointTurnDocument(
     source: {
       kind: 'checkpoint-turn',
       owner,
+      ignoreWhitespace,
       fromTurnCount: Math.max(0, summary.checkpointTurnCount - 1),
       toTurnCount: summary.checkpointTurnCount,
       sessionId: summary.sessionId,
@@ -128,6 +126,7 @@ export function checkpointTurnDocument(
 export function checkpointSessionDocument(
   summary: ChatTurnDiffSummary,
   owner: WorkspaceRoot,
+  ignoreWhitespace: boolean,
 ): {
   readonly kind: 'git-diff'
   readonly source: Extract<GitComparison, { kind: 'checkpoint-session' }>
@@ -137,6 +136,7 @@ export function checkpointSessionDocument(
     source: {
       kind: 'checkpoint-session',
       owner,
+      ignoreWhitespace,
       fromTurnCount: 0,
       toTurnCount: summary.checkpointTurnCount,
       sessionId: summary.sessionId,

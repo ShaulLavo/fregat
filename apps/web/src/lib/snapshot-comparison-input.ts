@@ -11,7 +11,13 @@ import type {
   SnapshotComparison,
   SnapshotComparisonScope,
 } from '@/lib/documents/utils/snapshot-comparison'
-import type { SnapshotComparisonFile, SnapshotComparisonInput } from '@/lib/snapshot-comparison'
+import type {
+  CheckpointComparison,
+  CheckpointComparisonFile,
+  CheckpointComparisonInput,
+  SnapshotComparisonFile,
+  SnapshotGitComparisonInput,
+} from '@/lib/snapshot-comparison'
 
 export function snapshotComparisonInput({
   scope,
@@ -21,18 +27,118 @@ export function snapshotComparisonInput({
   readonly scope: SnapshotComparisonScope
   readonly comparison: SnapshotComparison
   readonly diffs: readonly GitFileDiff[]
-}): SnapshotComparisonInput {
+}): SnapshotGitComparisonInput {
   const target = comparison.target
   const captured = diffs.find((diff) => diff.path === target.path)
   const revision = capturedRevision(comparison, captured)
   const files = diffs.map((diff) => snapshotFile(diff, comparison, revision))
   return {
+    kind: 'snapshot',
     scope,
     subject: documentKey({ kind: 'git-diff', source: comparison }),
     comparison,
     revision,
     files,
     display: files.flatMap((file) => (file.kind === 'no-text' ? [] : file.display)),
+  }
+}
+
+export function checkpointComparisonInput({
+  scope,
+  comparison,
+  diffs,
+  hydrated = diffs,
+}: {
+  readonly scope: SnapshotComparisonScope
+  readonly comparison: CheckpointComparison
+  readonly diffs: readonly GitFileDiff[]
+  readonly hydrated?: readonly GitFileDiff[]
+}): CheckpointComparisonInput {
+  const files: CheckpointComparisonFile[] = diffs.map((diff, index) => {
+    const revision = gitInputRevisionForDiff(diff, 'historical')
+    const source = hydrated[index] ?? diff
+    return {
+      ...(matchesCheckpointFile(comparison, diff, revision)
+        ? checkpointFile(diff, source, revision)
+        : { kind: 'no-text' as const, reason: 'unavailable' as const }),
+      path: filesystemPath(diff.path),
+      revision,
+      patch: diff.patch,
+      hunks: diff.hunks,
+    }
+  })
+  return {
+    kind: 'checkpoint',
+    scope,
+    subject: documentKey({ kind: 'git-diff', source: comparison }),
+    comparison,
+    files,
+    display: files.flatMap((file) => (file.kind === 'no-text' ? [] : file.display)),
+  }
+}
+
+function matchesCheckpointFile(
+  comparison: CheckpointComparison,
+  diff: GitFileDiff,
+  revision: GitInputRevision,
+): boolean {
+  if (comparison.kind !== 'checkpoint-file') return true
+  return (
+    comparison.file.path === diff.path &&
+    (comparison.oldObjectId === undefined || comparison.oldObjectId === diff.oldObjectId) &&
+    (comparison.newObjectId === undefined || comparison.newObjectId === diff.newObjectId) &&
+    (comparison.status === undefined || comparison.status === revision.status) &&
+    (comparison.oldPath === undefined || comparison.oldPath === (diff.oldPath ?? diff.path))
+  )
+}
+
+function checkpointFile(
+  diff: GitFileDiff,
+  source: GitFileDiff,
+  revision: GitInputRevision,
+): SnapshotComparisonFile {
+  if (diff.omitted) return { kind: 'no-text', reason: 'size' }
+  if (isBinaryGitDiff(diff)) return { kind: 'no-text', reason: 'binary' }
+  if (
+    source.path !== diff.path ||
+    !sameGitInputRevision(gitInputRevisionForDiff(source, 'historical'), revision)
+  )
+    return {
+      kind: 'partial',
+      display: editorDiffFiles(
+        [{ ...diff, oldText: undefined, newText: undefined }],
+        languageIdForFilePath,
+        'patch',
+      ),
+    }
+  const old = gitSide(
+    diff.oldPath ?? diff.path,
+    source.oldObjectId,
+    source.oldText,
+    source.oldFileMissing,
+    revision.old,
+  )
+  const next = gitSide(
+    diff.path,
+    source.newObjectId,
+    source.newText,
+    source.newFileMissing,
+    revision.new,
+  )
+  if (old && next)
+    return {
+      kind: 'full',
+      old,
+      new: next,
+      display: editorDiffFiles([source], languageIdForFilePath, 'patch'),
+    }
+  return {
+    kind: 'partial',
+    display: editorDiffFiles(
+      [{ ...diff, oldText: undefined, newText: undefined }],
+      languageIdForFilePath,
+      'patch',
+    ),
   }
 }
 

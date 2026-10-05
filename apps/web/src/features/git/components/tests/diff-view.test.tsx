@@ -39,6 +39,7 @@ for (const kind of ['checkpoint-file', 'checkpoint-turn', 'checkpoint-session'] 
     await writeFile(path.join(repo, 'lines.ts'), twoEditFile())
     const patches = await fetchDiff('repo/lines.ts', false, undefined, client)
     const source = {
+      ignoreWhitespace: true,
       owner: filesystemPath('repo'),
       sessionId: TEST_SESSION_ID,
       fromTurnCount: 0,

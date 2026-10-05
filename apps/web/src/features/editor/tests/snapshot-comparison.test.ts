@@ -30,7 +30,7 @@ for (const kind of ['worktree', 'staged', 'historical'] as const) {
     const lease = service.acquireSnapshotComparison({ input, signal: new AbortController().signal })
     const read = lease.read()
     expect(read.kind).toBe('ready')
-    if (read.kind !== 'ready') return
+    if (read.kind !== 'ready' || read.input.kind !== 'snapshot') return
     expect(read.input).toBe(input)
     expect(
       read.input.comparison.target.kind === 'moving'

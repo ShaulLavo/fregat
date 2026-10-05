@@ -1,4 +1,4 @@
-import { gitSnapshotTargetSchema, environmentIdSchema } from '@workspace/contracts'
+import { gitSnapshotTargetSchema, environmentIdSchema, sessionIdSchema } from '@workspace/contracts'
 import { expect, test } from 'vitest'
 import * as v from 'valibot'
 import {
@@ -8,7 +8,7 @@ import {
   snapshotTargetForReference,
   tokenForEditorReference,
 } from './references'
-import { emptyAddress, formatAddress, parseAddress } from './grammar'
+import { emptyAddress, formatAddress, parseAddress, applicableTabs, expandTabs } from './grammar'
 
 const old = 'a'.repeat(40)
 const next = 'b'.repeat(40)
@@ -99,4 +99,40 @@ test('root commits keep the empty ordered parent list and distinguish missing fr
     origin: { id: commit, parents: [] },
     revision: { old: { kind: 'missing' }, new: { kind: 'blob', objectId: next } },
   })
+})
+
+for (const policy of ['0', '1'] as const) {
+  test(`checkpoint policy ${policy} survives shared route normalization`, () => {
+    const session = v.parse(sessionIdSchema, 'f0000000-0000-4000-8000-000000000001')
+    const token = `k/${session}/0..1,w=${policy}!turn`
+    const reference = editorReferenceForToken(token)
+    expect(reference).toEqual({
+      kind: 'checkpoint',
+      sessionId: session,
+      turnsToken: `0..1,w=${policy}!turn`,
+      path: null,
+    })
+    expect(reference && tokenForEditorReference(reference)).toBe(token)
+    for (const turns of ['0..1', '0..1,w=x', '0..1,w=0,w=1', '0..1,w=1,w=x']) {
+      expect(editorReferenceForToken(`k/${session}/${turns}`)).toBeNull()
+    }
+  })
+}
+
+test('legacy checkpoint entries drop independently while qualified policy and outer validity survive', () => {
+  const session = 'f0000000-0000-4000-8000-000000000001'
+  const legacy = `k/${session}/0..1/src/old.ts`
+  const qualified = `k/${session}/0..1,w=0,s=modified,o=${old},n=${next}/src/new.ts`
+  const valid = ['f/src/live.ts', 'h/src/history.ts', qualified]
+  expect(applicableTabs([valid[0]!, legacy, valid[1]!, valid[2]!])).toEqual(valid)
+  const address = parseAddress(
+    `/~project/workbench/f/src/live.ts?tabs=${[valid[0], legacy, valid[1], valid[2]].join('~')}&side=git`,
+  )
+  expect(address.tabs).toEqual(valid)
+  expect(address.document).toBe('f/src/live.ts')
+  expect(address.side).toBe('git')
+  expect(parseAddress(formatAddress(address))).toEqual(address)
+  expect(applicableTabs(['f/src/live.ts', 'invalid', legacy])).toBeNull()
+  expect(expandTabs(['@', '@', legacy], 'f/src/live.ts')).toBeNull()
+  expect(applicableTabs(Array.from({ length: 65 }, () => legacy))).toBeNull()
 })

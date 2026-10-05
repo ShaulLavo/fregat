@@ -50,7 +50,7 @@ test('query settlement adopts only the captured current subject and rejects late
   ])
   const read = documents.getState().snapshotComparisonTabs.get(tab)?.read()
   expect(read?.kind).toBe('ready')
-  if (read?.kind === 'ready')
+  if (read?.kind === 'ready' && read.input.kind === 'snapshot')
     expect(read.input.comparison.target).toMatchObject({ kind: 'moving', changeSource: 'staged' })
   owner.dispose()
   queries.setQueryData(snapshotComparisonQueryOptions(f.stagedInput.comparison).queryKey, [
@@ -81,7 +81,8 @@ test('a nested query publication during first adoption retains the latest captur
   owner.prepare(tabId('nested'), f.scope, f.comparison)
   const read = documents.getState().snapshotComparisonTabs.get(tabId('nested'))?.read()
   expect(read?.kind).toBe('ready')
-  if (read?.kind === 'ready') expect(read.input.files[0]?.kind).toBe('full')
+  if (read?.kind === 'ready' && read.input.kind === 'snapshot')
+    expect(read.input.files[0]?.kind).toBe('full')
   expect(documents.getState().snapshotComparisons.size).toBe(1)
   stop()
   owner.dispose()
