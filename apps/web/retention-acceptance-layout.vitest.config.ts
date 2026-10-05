@@ -10,6 +10,7 @@ export default defineConfig({
   root: import.meta.dirname,
   test: {
     ...base.test,
+    name: 'retention-layout',
     include: ['src/features/editor/tests/retention-acceptance-layout.proof.tsx'],
     globalSetup: ['./test/env/retention-acceptance-layout-server.ts'],
     provide: { layoutPeerOrigin: 'http://127.0.0.1:33974' },
