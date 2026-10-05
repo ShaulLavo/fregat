@@ -34,7 +34,7 @@ export async function writeTextFile(
     await writeFileAtomic(writePath, body.content, {
       durability: 'fsync-all',
       mode: existing?.mode,
-      temporary: temporaryPath(writePath),
+      temporary: temporaryWritePath(writePath),
     })
     return target.relativePath
   } catch (error) {
@@ -86,7 +86,7 @@ function targetVersion(bytes: Uint8Array, stats: Stats, baseVersion: string) {
   return textFileVersion(bytes)
 }
 
-function temporaryPath(absolutePath: string) {
+export function temporaryWritePath(absolutePath: string) {
   return path.join(
     path.dirname(absolutePath),
     `${temporaryFilePrefix}${++issuedTemporaryFileCount}.tmp`,
