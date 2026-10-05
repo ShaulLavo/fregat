@@ -229,15 +229,13 @@ test('replacing the actual live buffer clears the former logical history capture
   await user.click((await screen.findAllByRole('option'))[1]!)
   await waitFor(() => expect(rendered.store.getState().snapshotComparisons.size).toBe(2))
   const old = rendered.store.getState().snapshotComparisonTabs.get(tabId('tab-history'))!
-  rendered.store
-    .getState()
-    .forceReplaceLiveEditorDocument({
-      path: FILE,
-      content: 'replacement\n',
-      version: 'v2',
-      mtimeMs: 2,
-      size: 12,
-    })
+  rendered.store.getState().forceReplaceLiveEditorDocument({
+    path: FILE,
+    content: 'replacement\n',
+    version: 'v2',
+    mtimeMs: 2,
+    size: 12,
+  })
   await screen.findByText('This is the current version.')
   expect(old.read().kind).toBe('released')
   expect(rendered.store.getState().snapshotComparisons.size).toBe(0)
