@@ -315,6 +315,7 @@ export class EditorSyntaxController {
   private trimRangeCache(demand: EditorAnalysisDisplayDemand): boolean {
     if (demand.kind !== 'frame') return false
     if (demand.snapshot !== this.options.getSession()?.getTextSnapshot()) return false
+    if (this.applyingRenderData) return false
     const visible = this.options.getVisibleSyntaxRange()
     const ranges = visible ? appendCachedSyntaxRange(demand.ranges, visible) : demand.ranges
     const previous = this.lastRangeTrim
@@ -335,12 +336,31 @@ export class EditorSyntaxController {
       : []
     const foldContributors = activeFoldContributors(oldCache, ranges)
     const retained = new Set([...tokenContributors, ...foldContributors])
+    const scope = this.rangeScopeOwner
+    const copy =
+      this.rangeCopyOwner?.store === this.copyTokens ? this.rangeCopyOwner.contributor : null
+    const currentOwners = [scope, copy].filter(
+      (owner): owner is CachedSyntaxFoldRange =>
+        owner !== null && owner.snapshot === demand.snapshot,
+    )
+    for (const cached of oldCache) {
+      if (
+        currentOwners.some(
+          (owner) => owner.result === cached.result && sameSyntaxRange(owner.range, cached.range),
+        )
+      )
+        retained.add(cached)
+    }
     const nextCache = oldCache.filter((cached) => retained.has(cached))
-    const coverage = intersectSyntaxRanges(
-      rangeOwned
-        ? tokenContributors.flatMap((cached) => cached.tokenRanges)
-        : this.cachedSyntaxRanges,
-      ranges,
+    const completeRanges = nextCache.reduce<readonly EditorSyntaxRange[]>(
+      (coverage, cached) => appendCachedSyntaxRange(coverage, cached.range),
+      [],
+    )
+    const coverage = rangeOwned
+      ? completeRanges
+      : intersectSyntaxRanges(this.cachedSyntaxRanges, completeRanges)
+    const discardedOffDemand = oldCache.some(
+      (cached) => !retained.has(cached) && !syntaxRangeListsIntersect([cached.range], ranges),
     )
     const removed =
       nextCache.length !== oldCache.length || !sameSyntaxRanges(this.cachedSyntaxRanges, coverage)
@@ -353,7 +373,7 @@ export class EditorSyntaxController {
       this.rangeTokenOwner = { store: tokens, snapshot: demand.snapshot }
       changed = true
     }
-    if (removed) this.stopOptionalWarm(demand.snapshot)
+    if (discardedOffDemand) this.stopOptionalWarm(demand.snapshot)
     this.lastRangeTrim = {
       snapshot: demand.snapshot,
       ranges,
