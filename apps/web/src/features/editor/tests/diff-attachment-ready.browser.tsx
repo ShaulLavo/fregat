@@ -248,9 +248,10 @@ test.for(['resolve', 'reject'] as const)(
             JSON.stringify({ outcome, phases }),
             'actual-initial-live-readiness-failure',
           )
-        } finally {
-          throw error
+        } catch {
+          context.task.meta.attachment200 = { outcome, phases, diagnosticCaptureFailed: true }
         }
+        throw error
       }
     }
     await waitForLive('opened')
