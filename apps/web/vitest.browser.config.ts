@@ -145,7 +145,7 @@ type DelayRequestContext = {
       url: (url: URL) => boolean,
       handler: (route: { readonly continue: () => Promise<void> }) => Promise<void>,
       options: { readonly times: number },
-    ) => Promise<void>
+    ) => Promise<unknown>
   }
 }
 
