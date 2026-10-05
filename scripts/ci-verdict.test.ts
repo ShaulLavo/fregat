@@ -2,7 +2,7 @@ import { readFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
-import { ciVerdict } from './ci-verdict'
+import { ciVerdict, type RunIdentity } from './ci-verdict'
 
 const root = path.resolve(import.meta.dirname, '..')
 const read = (file: string): unknown => Bun.YAML.parse(readFileSync(path.join(root, file), 'utf8'))
@@ -20,6 +20,22 @@ function fixture() {
     hotkeys: 'true',
     docs: 'false',
     web_shards: '["1/4","2/4","3/4","4/4"]',
+  }
+  const identity: RunIdentity = {
+    runId: 42,
+    attempt: 1,
+    headSha: 'a'.repeat(40),
+    event: 'pull_request',
+    repository: 'fixture/repo',
+    workflowPath: '.github/workflows/ci.yml',
+  }
+  const metadata = {
+    id: identity.runId,
+    run_attempt: identity.attempt,
+    head_sha: identity.headSha,
+    event: identity.event,
+    path: identity.workflowPath,
+    repository: { full_name: identity.repository },
   }
   const changes = { result: 'success', outputs }
   const needs: Record<string, { result: string; outputs?: Record<string, string> }> = {
@@ -56,9 +72,24 @@ function fixture() {
     name,
     status: 'completed',
     conclusion: name === 'Docs format' ? 'skipped' : 'success',
+    run_id: identity.runId,
+    head_sha: identity.headSha,
+    run_attempt: identity.attempt,
+    runner_id: name === 'Docs format' ? 0 : 1,
+    started_at: '2026-01-01T00:00:00Z',
+    completed_at: '2026-01-01T00:00:01Z',
   }))
-  const run = () => ciVerdict(workflow(), needs, [{ jobs }], 'pull_request', read)
-  return { changes, needs, jobs, run }
+  const evaluate = (selected = jobs, event?: RunIdentity['event']) =>
+    ciVerdict({
+      workflow: workflow(),
+      needs,
+      pages: [{ jobs: selected }],
+      run: event ? { ...metadata, event } : metadata,
+      identity: event ? { ...identity, event } : identity,
+      readWorkflow: read,
+    })
+  const run = () => evaluate()
+  return { changes, needs, jobs, run, evaluate, identity, metadata }
 }
 
 test('actual required graph accepts completed successful jobs and its docs skip', () => {
@@ -107,7 +138,7 @@ test.each(['Test (web 3/4)', 'Libraries / Ghostty tests', 'Browser tests'])(
   (name) => {
     const value = fixture()
     const jobs = value.jobs.filter((job) => job.name !== name)
-    const verdict = ciVerdict(workflow(), value.needs, [{ jobs }], 'pull_request', read)
+    const verdict = value.evaluate(jobs)
     expect(verdict.passed).toBe(false)
     expect(verdict.issues).toContain(`Required job ${name} lacks one successful execution`)
   },
@@ -132,11 +163,10 @@ test('source-authorized docs-only selection permits skipped or absent disabled j
     value.needs[id] = { result: id === 'changes' || id === 'docs' ? 'success' : 'skipped' }
   }
   value.needs.changes = value.changes
-  const jobs = [
-    { name: 'Changes', status: 'completed', conclusion: 'success' },
-    { name: 'Docs format', status: 'completed', conclusion: 'success' },
-  ]
-  expect(ciVerdict(workflow(), value.needs, [{ jobs }], 'pull_request', read)).toEqual({
+  const jobs = value.jobs
+    .filter((job) => job.name === 'Changes' || job.name === 'Docs format')
+    .map((job) => ({ ...job, conclusion: 'success', runner_id: 1 }))
+  expect(value.evaluate(jobs)).toEqual({
     passed: true,
     issues: [],
   })
@@ -152,11 +182,11 @@ test('matrix expectations come from declared output values', () => {
   const value = fixture()
   value.changes.outputs.web_shards = '["1/2","2/2"]'
   const jobs = value.jobs.filter((job) => !job.name.startsWith('Test (web '))
-  jobs.push(
-    { name: 'Test (web 1/2)', status: 'completed', conclusion: 'success' },
-    { name: 'Test (web 2/2)', status: 'completed', conclusion: 'success' },
-  )
-  expect(ciVerdict(workflow(), value.needs, [{ jobs }], 'workflow_dispatch', read)).toEqual({
+  const sample = value.jobs[0]
+  expect(sample).toBeDefined()
+  if (!sample) return
+  jobs.push({ ...sample, name: 'Test (web 1/2)' }, { ...sample, name: 'Test (web 2/2)' })
+  expect(value.evaluate(jobs, 'workflow_dispatch')).toEqual({
     passed: true,
     issues: [],
   })
@@ -174,7 +204,9 @@ test.each(['neutral', 'timed_out', 'action_required', 'stale', 'startup_failure'
 
 test('nonterminal required API job rejects and current aggregate is excluded', () => {
   const value = fixture()
-  value.jobs.push({ name: 'CI', status: 'in_progress', conclusion: '' })
+  const sample = value.jobs[0]
+  if (!sample) return
+  value.jobs.push({ ...sample, name: 'CI', status: 'in_progress', conclusion: '' })
   expect(value.run().passed).toBe(true)
   const browser = value.jobs.find((job) => job.name === 'Browser tests')
   if (browser) browser.status = 'in_progress'
@@ -194,6 +226,8 @@ test('CLI reads needs metadata without evaluating output text', () => {
       )
     const records = path.join(directory, 'jobs.json')
     writeFileSync(records, JSON.stringify([{ jobs: value.jobs }]))
+    const runFile = path.join(directory, 'run.json')
+    writeFileSync(runFile, JSON.stringify(value.metadata))
     value.changes.outputs.docs_files = "'\nCI_NEEDS\n$(exit 99)"
     const result = Bun.spawnSync(
       [
@@ -201,6 +235,7 @@ test('CLI reads needs metadata without evaluating output text', () => {
         path.join(import.meta.dirname, 'ci-verdict.ts'),
         path.join(workflows, 'ci.yml'),
         records,
+        runFile,
       ],
       {
         cwd: directory,
@@ -208,6 +243,11 @@ test('CLI reads needs metadata without evaluating output text', () => {
           ...process.env,
           CI_NEEDS_JSON: JSON.stringify(value.needs),
           GITHUB_EVENT_NAME: 'pull_request',
+          GITHUB_SHA: 'b'.repeat(40),
+          CI_SOURCE_SHA: value.identity.headSha,
+          RUN_ID: String(value.identity.runId),
+          RUN_ATTEMPT: String(value.identity.attempt),
+          GH_REPO: value.identity.repository,
         },
       },
     )
@@ -217,3 +257,80 @@ test('CLI reads needs metadata without evaluating output text', () => {
     rmSync(directory, { recursive: true, force: true })
   }
 })
+
+test('aggregate-only retry accepts retained earlier-attempt success and skips', () => {
+  const value = fixture()
+  value.identity.attempt = 2
+  value.metadata.run_attempt = 2
+  expect(value.jobs.every((job) => job.run_attempt === 1)).toBe(true)
+  expect(value.run()).toEqual({ passed: true, issues: [] })
+})
+
+test('API relabelled retention keeps success and permits skip timestamp anomalies', () => {
+  const value = fixture()
+  value.identity.attempt = 2
+  value.metadata.run_attempt = 2
+  for (const job of value.jobs) job.run_attempt = 2
+  const docs = value.jobs.find((job) => job.name === 'Docs format')
+  if (docs) docs.started_at = '2030-01-01T00:00:00Z'
+  expect(value.run()).toEqual({ passed: true, issues: [] })
+})
+
+test('latest cancellation rejects even after an earlier successful execution', () => {
+  const value = fixture()
+  value.identity.attempt = 2
+  value.metadata.run_attempt = 2
+  const browser = value.jobs.find((job) => job.name === 'Browser tests')
+  if (browser) {
+    browser.run_attempt = 2
+    browser.conclusion = 'cancelled'
+  }
+  expect(value.run().passed).toBe(false)
+})
+
+test.each(['head', 'run', 'attempt', 'event', 'workflow', 'repository'])(
+  'stale workflow identity %s rejects',
+  (field) => {
+    const value = fixture()
+    if (field === 'head') value.metadata.head_sha = 'b'.repeat(40)
+    if (field === 'run') value.metadata.id += 1
+    if (field === 'attempt') value.metadata.run_attempt += 1
+    if (field === 'event') value.metadata.event = 'push'
+    if (field === 'workflow') value.metadata.path = '.github/workflows/other.yml'
+    if (field === 'repository') value.metadata.repository.full_name = 'fixture/other'
+    expect(value.run().passed).toBe(false)
+  },
+)
+
+test.each(['head', 'run', 'future-attempt'])('foreign job identity %s rejects', (field) => {
+  const value = fixture()
+  const browser = value.jobs.find((job) => job.name === 'Browser tests')
+  if (!browser) return
+  if (field === 'head') browser.head_sha = 'b'.repeat(40)
+  if (field === 'run') browser.run_id += 1
+  if (field === 'future-attempt') browser.run_attempt += 1
+  expect(value.run().passed).toBe(false)
+})
+
+test('unstarted successful job rejects', () => {
+  const value = fixture()
+  const browser = value.jobs.find((job) => job.name === 'Browser tests')
+  if (browser) browser.runner_id = 0
+  expect(value.run().passed).toBe(false)
+})
+
+test.each(['cancelled', 'success'])(
+  'cancelled Changes cannot authorize downstream skips with %s needs',
+  (result) => {
+    const value = fixture()
+    for (const key of Object.keys(value.changes.outputs))
+      if (key !== 'web_shards') value.changes.outputs[key] = 'false'
+    for (const id of Object.keys(value.needs)) value.needs[id] = { result: 'skipped' }
+    value.changes.result = result
+    value.needs.changes = value.changes
+    const changes = value.jobs.find((job) => job.name === 'Changes')
+    if (!changes) return
+    changes.conclusion = 'cancelled'
+    expect(value.evaluate([changes]).passed).toBe(false)
+  },
+)

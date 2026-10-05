@@ -2,6 +2,23 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 type Result<T> = { ok: true; value: T } | { ok: false; issue: string }
+type Event = 'pull_request' | 'push' | 'workflow_dispatch'
+export type RunIdentity = {
+  runId: number
+  attempt: number
+  headSha: string
+  event: Event
+  repository: string
+  workflowPath: string
+}
+export type CiVerdictInput = {
+  workflow: unknown
+  needs: unknown
+  pages: unknown
+  run: unknown
+  identity: RunIdentity
+  readWorkflow: (file: string) => unknown
+}
 type NeedResult = 'success' | 'failure' | 'cancelled' | 'skipped'
 type Predicate =
   | { kind: 'changes'; key: string }
@@ -327,33 +344,81 @@ function apiConclusion(value: unknown): Result<ApiConclusion> {
   }
 }
 
-function parseApiJob(value: unknown, aggregate: string): Result<ApiJob | null> {
+function positiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
+}
+
+function runIdentity(value: unknown, expected: RunIdentity): Result<RunIdentity> {
+  const run = record(value)
+  const repository = record(run?.repository)
+  if (
+    !run ||
+    run.id !== expected.runId ||
+    run.head_sha !== expected.headSha ||
+    run.run_attempt !== expected.attempt ||
+    run.event !== expected.event ||
+    typeof run.path !== 'string' ||
+    run.path.split('@')[0] !== expected.workflowPath ||
+    typeof repository?.full_name !== 'string' ||
+    repository.full_name.toLowerCase() !== expected.repository.toLowerCase()
+  )
+    return rejected('Workflow run identity differs from the current workflow context')
+  return { ok: true, value: expected }
+}
+
+function parseApiJob(
+  value: unknown,
+  aggregate: string,
+  identity: RunIdentity,
+): Result<ApiJob | null> {
   const job = record(value)
   if (!job || typeof job.name !== 'string') return rejected('Job API record needs a name')
+  if (
+    job.run_id !== identity.runId ||
+    job.head_sha !== identity.headSha ||
+    !positiveInteger(job.run_attempt) ||
+    job.run_attempt > identity.attempt
+  )
+    return rejected(`Job ${job.name} has stale or foreign run identity`)
   if (job.name === aggregate) return { ok: true, value: null }
   if (job.status !== 'completed') return rejected(`Job ${job.name} is not terminal`)
   const conclusion = apiConclusion(job.conclusion)
   if (!conclusion.ok) return rejected(`Job ${job.name} has an unknown or missing conclusion`)
+  if (
+    conclusion.value === 'success' &&
+    (!positiveInteger(job.runner_id) ||
+      typeof job.started_at !== 'string' ||
+      !Number.isFinite(Date.parse(job.started_at)))
+  )
+    return rejected(`Job ${job.name} lacks evidence of a started runner`)
   return { ok: true, value: { name: job.name, conclusion: conclusion.value } }
 }
 
-function parseJobPage(value: unknown, aggregate: string): Result<readonly ApiJob[]> {
+function parseJobPage(
+  value: unknown,
+  aggregate: string,
+  identity: RunIdentity,
+): Result<readonly ApiJob[]> {
   const rows = record(value)?.jobs
   if (!Array.isArray(rows)) return rejected('Job API page needs a jobs array')
   const jobs: ApiJob[] = []
   for (const row of rows) {
-    const parsed = parseApiJob(row, aggregate)
+    const parsed = parseApiJob(row, aggregate, identity)
     if (!parsed.ok) return parsed
     if (parsed.value) jobs.push(parsed.value)
   }
   return { ok: true, value: jobs }
 }
 
-function parseJobs(value: unknown, aggregate: string): Result<readonly ApiJob[]> {
+function parseJobs(
+  value: unknown,
+  aggregate: string,
+  identity: RunIdentity,
+): Result<readonly ApiJob[]> {
   if (!Array.isArray(value) || value.length === 0) return rejected('Job API pages are missing')
   const jobs: ApiJob[] = []
   for (const page of value) {
-    const parsed = parseJobPage(page, aggregate)
+    const parsed = parseJobPage(page, aggregate, identity)
     if (!parsed.ok) return parsed
     jobs.push(...parsed.value)
   }
@@ -379,48 +444,67 @@ function checkJobs(expected: readonly ExpectedJob[], actual: readonly ApiJob[]):
   return { passed: issues.length === 0, issues }
 }
 
-export function ciVerdict(
-  workflow: unknown,
-  needs: unknown,
-  pages: unknown,
-  event: string,
-  readWorkflow: (file: string) => unknown,
-): Verdict {
-  const graph = parseWorkflow(workflow, true)
+export function ciVerdict(input: CiVerdictInput): Verdict {
+  const identity = runIdentity(input.run, input.identity)
+  if (!identity.ok) return { passed: false, issues: [identity.issue] }
+  const graph = parseWorkflow(input.workflow, true)
   if (!graph.ok) return { passed: false, issues: [graph.issue] }
-  const context = parseContext(needs, graph.value, event)
+  const context = parseContext(input.needs, graph.value, identity.value.event)
   if (!context.ok) return { passed: false, issues: [context.issue] }
-  const actual = parseJobs(pages, graph.value.verdictName)
+  const actual = parseJobs(input.pages, graph.value.verdictName, identity.value)
   if (!actual.ok) return { passed: false, issues: [actual.issue] }
   const expected: ExpectedJob[] = []
   for (const job of graph.value.jobs.values()) {
-    const expanded = expectedJobs(job, context.value, readWorkflow)
+    const expanded = expectedJobs(job, context.value, input.readWorkflow)
     if (!expanded.ok) return { passed: false, issues: [expanded.issue] }
     expected.push(...expanded.value)
   }
   return checkJobs(expected, actual.value)
 }
 
+function contextIdentity(workflowPath: string): Result<RunIdentity> {
+  const runId = Number(process.env.RUN_ID)
+  const attempt = Number(process.env.RUN_ATTEMPT)
+  const headSha = process.env.CI_SOURCE_SHA
+  const repository = process.env.GH_REPO
+  const event = process.env.GITHUB_EVENT_NAME
+  if (
+    !positiveInteger(runId) ||
+    !positiveInteger(attempt) ||
+    !headSha ||
+    !/^[a-f0-9]{40}$/.test(headSha) ||
+    !repository ||
+    (event !== 'pull_request' && event !== 'push' && event !== 'workflow_dispatch')
+  )
+    return rejected('CI verdict workflow identity metadata is missing or invalid')
+  return { ok: true, value: { runId, attempt, headSha, repository, event, workflowPath } }
+}
+
+function main(): Verdict {
+  const [workflowFile, jobsFile, runFile] = process.argv.slice(2)
+  if (!workflowFile || !jobsFile || !runFile || !process.env.CI_NEEDS_JSON)
+    return { passed: false, issues: ['CI verdict needs workflow, jobs, run and needs metadata'] }
+  const root = path.resolve(path.dirname(workflowFile), '../..')
+  const workflowPath = path.relative(root, path.resolve(workflowFile)).split(path.sep).join('/')
+  const identity = contextIdentity(workflowPath)
+  if (!identity.ok) return { passed: false, issues: [identity.issue] }
+  const read = (file: string): unknown =>
+    Bun.YAML.parse(readFileSync(path.resolve(root, file), 'utf8'))
+  return ciVerdict({
+    workflow: Bun.YAML.parse(readFileSync(workflowFile, 'utf8')),
+    needs: JSON.parse(process.env.CI_NEEDS_JSON),
+    pages: JSON.parse(readFileSync(jobsFile, 'utf8')),
+    run: JSON.parse(readFileSync(runFile, 'utf8')),
+    identity: identity.value,
+    readWorkflow: read,
+  })
+}
+
 if (import.meta.main) {
   try {
-    const [workflowFile, jobsFile] = process.argv.slice(2)
-    if (!workflowFile || !jobsFile || !process.env.CI_NEEDS_JSON) {
-      console.error('::error::CI verdict needs workflow, job records and needs metadata')
-      process.exitCode = 1
-    } else {
-      const root = path.resolve(path.dirname(workflowFile), '../..')
-      const read = (file: string): unknown =>
-        Bun.YAML.parse(readFileSync(path.resolve(root, file), 'utf8'))
-      const verdict = ciVerdict(
-        Bun.YAML.parse(readFileSync(workflowFile, 'utf8')),
-        JSON.parse(process.env.CI_NEEDS_JSON),
-        JSON.parse(readFileSync(jobsFile, 'utf8')),
-        process.env.GITHUB_EVENT_NAME ?? '',
-        read,
-      )
-      for (const issue of verdict.issues) console.error(`::error::${issue}`)
-      process.exitCode = verdict.passed ? 0 : 1
-    }
+    const verdict = main()
+    for (const issue of verdict.issues) console.error(`::error::${issue}`)
+    process.exitCode = verdict.passed ? 0 : 1
   } catch {
     console.error('::error::CI verdict input could not be parsed')
     process.exitCode = 1

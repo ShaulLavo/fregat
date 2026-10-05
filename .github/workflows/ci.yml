@@ -453,13 +453,15 @@ jobs:
       - name: Verdict
         env:
           CI_NEEDS_JSON: ${{ toJSON(needs) }}
+          CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          gh api "repos/$GH_REPO/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT/jobs?per_page=100" --paginate --slurp > "$RUNNER_TEMP/ci-jobs.json"
-          bun scripts/ci-verdict.ts .github/workflows/ci.yml "$RUNNER_TEMP/ci-jobs.json"
+          gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?filter=latest&per_page=100" --paginate --slurp > "$RUNNER_TEMP/ci-jobs.json"
+          gh api "repos/$GH_REPO/actions/runs/$RUN_ID" > "$RUNNER_TEMP/ci-run.json"
+          bun scripts/ci-verdict.ts .github/workflows/ci.yml "$RUNNER_TEMP/ci-jobs.json" "$RUNNER_TEMP/ci-run.json"
       - name: Report queue and execution times
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -476,6 +478,6 @@ jobs:
             (.[].jobs[] | select(.started_at != null and .completed_at != null and .conclusion != "skipped") |
               "| \(.name) | \((.started_at | seconds) - (.created_at | seconds)) | \((.completed_at | seconds) - (.started_at | seconds)) |")
           ' "$RUNNER_TEMP/ci-jobs.json" >> "$GITHUB_STEP_SUMMARY"
-          created=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT" --jq '.created_at')
+          created=$(jq -r '.created_at' "$RUNNER_TEMP/ci-run.json")
           started=$(jq -r '.[].jobs[] | select(.name == "CI") | .started_at' "$RUNNER_TEMP/ci-jobs.json")
           echo "Run created to verdict runner started: $(( $(date -d "$started" +%s) - $(date -d "$created" +%s) )) seconds" >> "$GITHUB_STEP_SUMMARY"
