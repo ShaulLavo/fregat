@@ -325,6 +325,7 @@ export class Editor {
   private syntaxScrollDeltaPx = 0
   private syntaxScrollDirection: SyntaxScrollDirection = 0
   private readonly options: EditorOptions
+  private pendingWordWrapOverride: boolean | undefined
   private readonly pluginHost: EditorPluginHost
   private readonly ambientPlugins: EditorAmbientPluginController
   private readonly commandRouter: EditorCommandRouter
@@ -514,6 +515,7 @@ export class Editor {
     const mountStart = nowMs()
     this.container = container
     this.options = options
+    this.pendingWordWrapOverride = options.wordWrap
     this.presentationReady = options.presentationReady !== false
     this.configuredTabSize = normalizeTabSize(options.tabSize)
     this.detectIndentation = options.detectIndentation ?? true
@@ -1293,11 +1295,26 @@ export class Editor {
   /** Turns soft wrap on or off. Returns the state actually in effect afterwards. */
   setWordWrap(enabled: boolean): boolean {
     this.view.setWrapEnabled(enabled)
-    return this.isWordWrapEnabled()
+    const actual = this.isWordWrapEnabled()
+    const logicalView = editorBufferSession(this.session)?.view
+    if (logicalView) logicalView.setWordWrap(actual)
+    else this.pendingWordWrapOverride = actual
+    if (this.pendingWordWrapOverride !== undefined) this.pendingWordWrapOverride = actual
+    return actual
   }
 
   isWordWrapEnabled(): boolean {
     return this.view.isWrapEnabled()
+  }
+
+  private restoreViewWordWrap(): void {
+    const logicalView = editorBufferSession(this.session)?.view
+    if (!logicalView) return
+    const enabled =
+      this.pendingWordWrapOverride ?? logicalView.getWordWrap() ?? this.isWordWrapEnabled()
+    this.view.setWrapEnabled(enabled)
+    logicalView.setWordWrap(this.isWordWrapEnabled())
+    this.pendingWordWrapOverride = undefined
   }
 
   /**
@@ -2189,6 +2206,7 @@ export class Editor {
       const replacingDocument = this.session !== null
       this.disposeBufferSubscriptions()
       const attachment = this.document.attachSession(session, options)
+      this.restoreViewWordWrap()
       if (this.view.isProvisional) this.snapshotGeneration = attachment.documentVersion
       this.attachAnalysis(session, options.analysis ?? options.preparedDocument?.analysis)
       this.subscribeToBufferSession(session)
@@ -2340,6 +2358,7 @@ export class Editor {
     const replacingDocument = this.session !== null
     this.disposeBufferSubscriptions()
     const attachment = this.document.resetOwnedDocument(document, options)
+    editorBufferSession(attachment.session)?.view.setWordWrap(this.isWordWrapEnabled())
     this.attachAnalysis(attachment.session)
     this.subscribeToBufferSession(attachment.session)
     if (this.view.isProvisional) this.snapshotGeneration = attachment.documentVersion
