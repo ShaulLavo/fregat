@@ -1,4 +1,4 @@
-import { gitSnapshotTargetSchema, environmentIdSchema } from '@workspace/contracts'
+import { gitSnapshotTargetSchema, environmentIdSchema, sessionIdSchema } from '@workspace/contracts'
 import { expect, test } from 'vitest'
 import * as v from 'valibot'
 import {
@@ -100,3 +100,21 @@ test('root commits keep the empty ordered parent list and distinguish missing fr
     revision: { old: { kind: 'missing' }, new: { kind: 'blob', objectId: next } },
   })
 })
+
+for (const policy of ['0', '1'] as const) {
+  test(`checkpoint policy ${policy} survives shared route normalization`, () => {
+    const session = v.parse(sessionIdSchema, 'f0000000-0000-4000-8000-000000000001')
+    const token = `k/${session}/0..1,w=${policy}!turn`
+    const reference = editorReferenceForToken(token)
+    expect(reference).toEqual({
+      kind: 'checkpoint',
+      sessionId: session,
+      turnsToken: `0..1,w=${policy}!turn`,
+      path: null,
+    })
+    expect(reference && tokenForEditorReference(reference)).toBe(token)
+    for (const turns of ['0..1', '0..1,w=x', '0..1,w=0,w=1', '0..1,w=1,w=x']) {
+      expect(editorReferenceForToken(`k/${session}/${turns}`)).toBeNull()
+    }
+  })
+}

@@ -10,7 +10,7 @@ import { createObservedInProcessClient } from '../../../../../test/client'
 import { CheckpointOpen } from '../../../../../test/factories/checkpoint-open'
 import { checkpointTurn } from '../../../../../test/factories/checkpoint-turn'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
+import { renderWithProviders } from '../../../../../test/render'
 
 for (const { input, leave } of [
   { input: 'keyboard', leave: 'unmount' },
@@ -27,7 +27,7 @@ for (const { input, leave } of [
       if (new URL(request.url).pathname !== '/orchestration/turn-diff') return
       requests.push(request)
     })
-    const queryClient = createTestQueryClient()
+    const queryClient = h.application.getSnapshot().editor.queryClient
     registerEnvironmentQueryClient(queryClient, originForQueryClient(queryClient), observed)
     let result: Promise<unknown> | undefined
     const onOpen = (opening: Promise<boolean>) => {
@@ -48,7 +48,7 @@ for (const { input, leave } of [
       await screen.findByRole('treeitem', { name: /app.txt/ })
       act(() => tree.focus())
       await userEvent.keyboard('{Home}')
-      const options = checkpointIntentOptions(h.summary)!
+      const options = checkpointIntentOptions(h.summary, queryClient)!
       await waitFor(() =>
         expect(queryClient.getQueryState(options.queryKey)?.status).toBe('success'),
       )
@@ -62,6 +62,9 @@ for (const { input, leave } of [
         expect(await result).toBe(true)
       })
       expect(requests).toHaveLength(1)
+      expect(
+        h.application.getSnapshot().editor.documentStore.getState().snapshotComparisons.size,
+      ).toBeGreaterThan(0)
       expect(queryClient.getQueryData(options.queryKey)).toEqual(
         expect.arrayContaining([expect.objectContaining({ path: 'app.txt' })]),
       )

@@ -223,7 +223,12 @@ function tokenForSide(side: GitRevisionSide) {
 
 function validTurns(token: string) {
   const value = token.endsWith('!turn') ? token.slice(0, -5) : token
-  const [range] = value.split(',')
+  const [range, ...extras] = value.split(',')
+  if (
+    extras.filter((extra) => extra.startsWith('w=')).length !== 1 ||
+    !extras.some((extra) => /^w=[01]$/.test(extra))
+  )
+    return false
   if (!range || !/^\d+\.\.\d+$/.test(range)) return false
   const [from, to] = range.split('..').map(Number)
   if (
@@ -253,6 +258,7 @@ function normalizedMetadata(token: string) {
 function validExtra(key: string, raw: string) {
   const value = decodeSegment(raw)
   if (!value) return false
+  if (key === 'w') return value === '0' || value === '1'
   if (key === 'o' || key === 'n') return GIT_OBJECT_ID_PATTERN.test(value)
   if (key === 's') return isGitFileStatus(value)
   if (key === 'r') return decodePath('', [raw]) !== null

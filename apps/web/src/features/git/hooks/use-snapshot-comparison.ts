@@ -8,18 +8,15 @@ import {
   snapshotComparisonIsAdmitted,
 } from '@/lib/snapshot-comparison-query'
 import { documentKey } from '@/lib/documents/utils/identity'
-import { snapshotComparisonInput } from '@/lib/snapshot-comparison-input'
-import type {
-  SnapshotComparison,
-  SnapshotComparisonScope,
-} from '@/lib/documents/utils/snapshot-comparison'
+import { snapshotComparisonInput, checkpointComparisonInput } from '@/lib/snapshot-comparison-input'
+import type { SnapshotComparisonScope } from '@/lib/documents/utils/snapshot-comparison'
 import type { SnapshotComparisonLease } from '@/lib/snapshot-comparison'
-import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
+import type { FilesystemPath, GitComparison, TabId } from '@/lib/documents/utils/types'
 import { errorMessage } from '@/lib/error-message'
 import { mutationKeys } from '@/features/git/utils/mutation-keys'
 
 type SnapshotAdoption = {
-  readonly comparison: SnapshotComparison
+  readonly comparison: GitComparison
   readonly diffs: readonly GitFileDiff[]
   readonly controller: AbortController
   readonly documents: ReturnType<typeof useEditorRuntime>['documentStore']
@@ -28,7 +25,7 @@ type SnapshotAdoption = {
 }
 
 export function useSnapshotComparison(
-  comparison: SnapshotComparison | null,
+  comparison: GitComparison | null,
   rootPath: FilesystemPath,
   diffs: readonly GitFileDiff[],
   pending: boolean,
@@ -44,7 +41,7 @@ export function useSnapshotComparison(
     retry: false,
     mutationFn: async (request: SnapshotAdoption) => adoptSnapshotComparison(request),
   })
-  const adopt = useEffectEvent((subject: SnapshotComparison, controller: AbortController) =>
+  const adopt = useEffectEvent((subject: GitComparison, controller: AbortController) =>
     mutation.mutate({
       comparison: subject,
       diffs,
@@ -82,13 +79,26 @@ function adoptSnapshotComparison(request: SnapshotAdoption): SnapshotComparisonL
   const current = request.queries.getQueryData<readonly GitFileDiff[]>(
     snapshotComparisonQueryOptions(request.comparison).queryKey,
   )
-  if (request.controller.signal.aborted || current !== request.diffs) return null
+  if (
+    request.controller.signal.aborted ||
+    !current ||
+    (request.comparison.kind === 'snapshot' && current !== request.diffs)
+  )
+    return null
   return request.documents.getState().acquireSnapshotComparison({
-    input: snapshotComparisonInput({
-      scope: request.scope,
-      comparison: request.comparison,
-      diffs: request.diffs,
-    }),
+    input:
+      request.comparison.kind === 'snapshot'
+        ? snapshotComparisonInput({
+            scope: request.scope,
+            comparison: request.comparison,
+            diffs: request.diffs,
+          })
+        : checkpointComparisonInput({
+            scope: request.scope,
+            comparison: request.comparison,
+            diffs: current,
+            hydrated: request.diffs,
+          }),
     signal: request.controller.signal,
   })
 }

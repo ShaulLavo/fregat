@@ -542,7 +542,7 @@ test('normal four-project navigation retains three snapshot interests and explic
     const retained = [...runtime.documentStore.getState().snapshotComparisons.values()]
     expect(
       retained.flatMap((read) =>
-        read.kind === 'ready'
+        read.kind === 'ready' && read.input.kind === 'snapshot'
           ? [{ scope: read.input.scope, path: read.input.comparison.target.path }]
           : [],
       ),
@@ -565,7 +565,7 @@ test('normal four-project navigation retains three snapshot interests and explic
     const read =
       selected && runtime.documentStore.getState().snapshotComparisonTabs.get(selected.id)?.read()
     expect(read?.kind).toBe('ready')
-    if (read?.kind === 'ready') {
+    if (read?.kind === 'ready' && read.input.kind === 'snapshot') {
       expect(read.input.scope).toEqual(f.scope)
       expect(read.input.comparison).toEqual(f.comparison)
     }

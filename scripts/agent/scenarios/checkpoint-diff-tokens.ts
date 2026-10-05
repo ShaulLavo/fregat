@@ -11,6 +11,7 @@ import {
   sharedTokenHighlightPrefix,
 } from '../selectors'
 import { isolatedNativeScenario, writeSettings } from './native-provider-verification'
+import { readCaches } from '../cache-snapshot'
 
 const FILES = ['first', 'second'] as const
 const EDITED = new Set([5, 30])
@@ -87,7 +88,7 @@ export const checkpointDiffTokens = isolatedNativeScenario({
       await partial.waitFor({ timeout: 15_000 })
       await step('partial')
       await assertUncoloured(page)
-      return
+      return { caches: await page.evaluate(readCaches), address: page.url() }
     }
     await waitForColouredRows(page)
     ok(!(await partial.isVisible()), 'The complete blob pair fell back to the partial patch')
@@ -114,6 +115,7 @@ export const checkpointDiffTokens = isolatedNativeScenario({
     await waitForColouredRows(page)
     await step('split-shiki')
     await assertAligned(page)
+    return { caches: await page.evaluate(readCaches), address: page.url() }
   },
 })
 

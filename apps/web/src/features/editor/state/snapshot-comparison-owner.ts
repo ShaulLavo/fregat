@@ -7,19 +7,23 @@ import {
 } from '@/lib/snapshot-comparison-query'
 import { sameSnapshotTarget } from '@/lib/documents/utils/comparisons'
 import { documentKey } from '@/lib/documents/utils/identity'
-import { snapshotComparisonInput } from '@/lib/snapshot-comparison-input'
+import { snapshotComparisonInput, checkpointComparisonInput } from '@/lib/snapshot-comparison-input'
+import {
+  checkpointBlobRequest,
+  displayedCheckpointEntry,
+  withCheckpointSources,
+} from '@/lib/checkpoint-sources'
+import { blobDiffQueryKey } from '@/lib/blob-diff-query'
 import type { SnapshotComparisonLease } from '@/lib/snapshot-comparison'
-import type {
-  SnapshotComparison,
-  SnapshotComparisonScope,
-} from '@/lib/documents/utils/snapshot-comparison'
-import type { TabId } from '@/lib/documents/utils/types'
+import type { SnapshotComparisonScope } from '@/lib/documents/utils/snapshot-comparison'
+import type { GitComparison, TabId } from '@/lib/documents/utils/types'
 
 type Binding = {
-  readonly comparison: SnapshotComparison
+  readonly comparison: GitComparison
   readonly scope: SnapshotComparisonScope
   readonly controller: AbortController
   data: readonly GitFileDiff[] | undefined
+  blob: readonly GitFileDiff[] | undefined
   lease: SnapshotComparisonLease | null
 }
 
@@ -31,6 +35,7 @@ export function createSnapshotComparisonOwner(
   let disposed = false
   function suspend(binding: Binding) {
     binding.data = undefined
+    binding.blob = undefined
     binding.lease = null
     binding.controller.abort()
   }
@@ -42,17 +47,41 @@ export function createSnapshotComparisonOwner(
     )
     if (!data) return
     const previous = documents.getState().snapshotComparisonTabs.get(tabId)?.read()
-    if (binding.data === data && previous?.kind === 'ready') return
+    const displayed = binding.comparison.kind === 'snapshot' ? null : displayedCheckpointEntry(data)
+    const blobRequest = checkpointBlobRequest(displayed)
+    const blob = blobRequest
+      ? queries.getQueryData<readonly GitFileDiff[]>(blobDiffQueryKey(blobRequest))
+      : undefined
+    if (binding.data === data && binding.blob === blob && previous?.kind === 'ready') return
+    const hydrated =
+      displayed && blobRequest
+        ? withCheckpointSources(data, displayed, { data: blob, isPending: false })
+        : data
     const shared = [...bindings].find(
-      ([, other]) => other.data === data && sameSubject(other, binding.scope, binding.comparison),
+      ([, other]) =>
+        other.data === data &&
+        other.blob === blob &&
+        sameSubject(other, binding.scope, binding.comparison),
     )
     const sharedRead = shared
       ? documents.getState().snapshotComparisonTabs.get(shared[0])?.read()
       : null
     const input =
       (sharedRead?.kind === 'ready' ? sharedRead.input : null) ??
-      snapshotComparisonInput({ scope: binding.scope, comparison: binding.comparison, diffs: data })
+      (binding.comparison.kind === 'snapshot'
+        ? snapshotComparisonInput({
+            scope: binding.scope,
+            comparison: binding.comparison,
+            diffs: data,
+          })
+        : checkpointComparisonInput({
+            scope: binding.scope,
+            comparison: binding.comparison,
+            diffs: data,
+            hydrated,
+          }))
     binding.data = data
+    binding.blob = blob
     const lease = documents
       .getState()
       .prepareSnapshotComparisonTab(tabId, { input, signal: binding.controller.signal })
@@ -79,7 +108,7 @@ export function createSnapshotComparisonOwner(
     prepare(
       tabId: TabId,
       scope: SnapshotComparisonScope,
-      comparison: SnapshotComparison,
+      comparison: GitComparison,
       { activate = true }: { readonly activate?: boolean } = {},
     ) {
       if (disposed) return
@@ -87,7 +116,9 @@ export function createSnapshotComparisonOwner(
       if (
         previous &&
         sameSubject(previous, scope, comparison) &&
-        sameSnapshotTarget(previous.comparison.target, comparison.target) &&
+        (previous.comparison.kind !== 'snapshot' ||
+          comparison.kind !== 'snapshot' ||
+          sameSnapshotTarget(previous.comparison.target, comparison.target)) &&
         (!activate || !previous.controller.signal.aborted)
       ) {
         settle(tabId, previous)
@@ -99,6 +130,7 @@ export function createSnapshotComparisonOwner(
         comparison,
         controller: new AbortController(),
         data: undefined,
+        blob: undefined,
         lease: null,
       }
       bindings.set(tabId, binding)
@@ -125,11 +157,7 @@ export function createSnapshotComparisonOwner(
   }
 }
 
-function sameSubject(
-  binding: Binding,
-  scope: SnapshotComparisonScope,
-  comparison: SnapshotComparison,
-) {
+function sameSubject(binding: Binding, scope: SnapshotComparisonScope, comparison: GitComparison) {
   return (
     binding.scope.environmentId === scope.environmentId &&
     binding.scope.rootPath === scope.rootPath &&
