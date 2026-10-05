@@ -17,7 +17,7 @@ const fileParams = v.object({ _splat: relativePath })
 const refParams = v.object({ ref: v.pipe(v.string(), v.nonEmpty()), _splat: relativePath })
 const snapshotParams = v.pipe(
   v.object({
-    source: v.picklist(['worktree', 'staged', 'branch', 'historical']),
+    source: v.picklist(['worktree', 'staged', 'historical', 'captured-review']),
     revision: v.string(),
     _splat: relativePath,
   }),

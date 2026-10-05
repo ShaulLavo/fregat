@@ -53,7 +53,7 @@ export function editorTabModel({
     content,
     copyPath,
     copyRelativePath: tabRelativeCopyPath(copyPath, rootPath),
-    diffSource: tabDiffSource(content, conflicts, diffChange),
+    diffSource: tabDiffSource(content, conflicts, diffChange, gitFiles, rootPath),
     diffStatus,
     diffSuffix: tabDiffSuffix(diffHash, diffStatus?.label),
     id: tab.id,
@@ -105,25 +105,30 @@ function tabDiffChange(
   if (content.kind !== 'document' || content.document.kind !== 'git-diff') return null
   const diff = content.document.source
 
+  if (diff.kind === 'snapshot' && diff.target.kind !== 'moving')
+    return { source: 'historical', status: diff.target.revision.status }
   const file = files.find((file) => diffStatusMatchesFile(diff, file, rootPath))
   const live = file ? liveChangeForDiff(diff, file) : null
   if (live) return live
-  if (diff.kind !== 'snapshot' || !diff.status) return null
-
-  return { source: 'historical', status: diff.status }
+  return null
 }
 
 function tabDiffSource(
   content: TabContent,
   conflicts: EditorTabConflictMap,
   change: TabDiffChange | null,
+  files: readonly GitFileStatus[],
+  rootPath: string,
 ): EditorTabDiffSource | null {
   const conflict = conflictForTab(content, conflicts)
   if (conflict) return { onDisk: true, path: conflict.remotePath }
   if (content.kind !== 'document' || content.document.kind !== 'git-diff') return null
   const path = documentSourcePath(content.document)
   if (path === null) return null
-  return { onDisk: change?.status !== 'deleted', path }
+  const source = content.document.source
+  const file = files.find((entry) => diffStatusMatchesFile(source, entry, rootPath))
+  const current = file ? liveChangeForDiff(source, file) : null
+  return { onDisk: (current ?? change)?.status !== 'deleted', path }
 }
 
 function conflictForTab(content: TabContent, conflicts: EditorTabConflictMap) {
@@ -143,7 +148,8 @@ function diffStatusMatchesFile(diff: GitComparison, file: GitFileStatus, rootPat
 }
 
 function liveChangeForDiff(diff: GitComparison, file: GitFileStatus): TabDiffChange | null {
-  const preferred = diff.kind === 'snapshot' ? diff.source : undefined
+  const preferred =
+    diff.kind === 'snapshot' && diff.target.kind === 'moving' ? diff.target.changeSource : undefined
   const source = liveSymbolSource(file, preferred)
   if (!source) return null
 
@@ -170,7 +176,11 @@ function statusForSymbolSource(file: GitFileStatus, source: GitSymbolSource) {
 }
 
 function diffStatusPaths(diff: GitComparison) {
-  return [documentSourcePath({ kind: 'git-diff', source: diff }), diff.oldPath].filter(
+  const oldPath =
+    diff.kind === 'snapshot'
+      ? diff.target.kind !== 'moving' && diff.target.revision.oldPath
+      : diff.oldPath
+  return [documentSourcePath({ kind: 'git-diff', source: diff }), oldPath || undefined].filter(
     isPresentPath,
   )
 }

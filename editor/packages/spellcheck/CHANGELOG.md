@@ -1,5 +1,25 @@
 # @singapore-editor/spellcheck
 
+## 0.2.5
+
+### Patch Changes
+
+- Updated dependencies [832e149]
+- Updated dependencies [fd035f2]
+- Updated dependencies [51d2a71]
+  - @singapore-editor/core@0.2.5
+
+## 0.2.3
+
+### Patch Changes
+
+- Updated dependencies [9d726b3]
+- Updated dependencies [33e949e]
+- Updated dependencies [4e053fc]
+- Updated dependencies [d297a23]
+- Updated dependencies [5365760]
+  - @singapore-editor/core@0.2.3
+
 ## 0.2.2
 
 ### Patch Changes

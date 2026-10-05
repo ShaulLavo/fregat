@@ -41,7 +41,8 @@ export function TurnFiles({
   rootPath: string
   onOpenFile: (path: string) => void
 }) {
-  const client = clientForQueryClient(useQueryClient())
+  const queryClient = useQueryClient()
+  const client = clientForQueryClient(queryClient)
   const nextDiffs = useQuery(
     turnHunksQueryOptions(client, nextSummary.sessionId, nextSummary.checkpointTurnCount),
   )
@@ -187,7 +188,7 @@ export function TurnFiles({
                       <ArrowCounterClockwiseIcon className='size-(--icon-size-sm)' />
                     </Button>
                   }
-                  prefetch={checkpointIntentOptions(summary)}
+                  prefetch={checkpointIntentOptions(summary, queryClient)}
                   key={row.id}
                   path={row.file.path}
                   rootPath={rootPath}

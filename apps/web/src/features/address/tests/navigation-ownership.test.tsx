@@ -40,12 +40,20 @@ test('a delayed Git diff cannot replace a newer file destination', async ({ clie
     section: 'worktree',
     status: 'modified',
   } as const
-  expect(await navigation.openDiff({ owner: harness.workspace, row })).toEqual({
+  expect(
+    await navigation.openDiff({ owner: harness.workspace, rootPath: workspace.rootPath, row }),
+  ).toEqual({
     status: 'applied',
   })
   expect(harness.workspace.getState().selectedTabContent).toMatchObject({
     kind: 'document',
-    document: { kind: 'git-diff', source: { kind: 'snapshot', path: 'repo/a.ts' } },
+    document: {
+      kind: 'git-diff',
+      source: {
+        kind: 'snapshot',
+        target: { kind: 'moving', rootPath: 'repo', path: 'repo/a.ts', changeSource: 'worktree' },
+      },
+    },
   })
   await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/b.ts') })
   const reached = Promise.withResolvers<void>()
@@ -59,7 +67,11 @@ test('a delayed Git diff cannot replace a newer file destination', async ({ clie
   owner.queryClient.removeQueries({ queryKey: gitKeys.diff(row.file.path, false) })
   registerEnvironmentQueryClient(owner.queryClient, owner.origin, observed)
   try {
-    const pending = navigation.openDiff({ owner: harness.workspace, row })
+    const pending = navigation.openDiff({
+      owner: harness.workspace,
+      rootPath: workspace.rootPath,
+      row,
+    })
     await reached.promise
     expect(
       await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/c.ts') }),

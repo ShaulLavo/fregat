@@ -2,8 +2,8 @@ import { fixtureEnvironmentId } from '../../../../test/factories/chat'
 import { unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { runGit } from '../../../../test/factories/git'
-import { fetchDiff } from '@/features/git/utils/api'
-import { snapshotDocument } from '@/lib/documents/utils/comparisons'
+import { fetchDiff } from '@/lib/git-diff-query'
+import { snapshotDocument, capturedReviewDocument } from '@/lib/documents/utils/comparisons'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { expect, test } from '../../../../test/fixtures'
 import { createSnapshotComparisonFixture } from '../../../../test/factories/snapshot-comparison'
@@ -30,9 +30,13 @@ for (const kind of ['worktree', 'staged', 'historical'] as const) {
     const lease = service.acquireSnapshotComparison({ input, signal: new AbortController().signal })
     const read = lease.read()
     expect(read.kind).toBe('ready')
-    if (read.kind !== 'ready') return
+    if (read.kind !== 'ready' || read.input.kind !== 'snapshot') return
     expect(read.input).toBe(input)
-    expect(read.input.comparison.source).toBe(kind)
+    expect(
+      read.input.comparison.target.kind === 'moving'
+        ? read.input.comparison.target.changeSource
+        : read.input.comparison.target.kind,
+    ).toBe(kind)
     const side = input.files[0]
     expect(side?.kind).toBe('full')
     if (side?.kind !== 'full') return
@@ -144,7 +148,17 @@ test('patch, omitted, binary and unresolved inputs stay outside complete source 
     parse({ ...f.worktree, patch: '\nBinary files a/source.ts and b/source.ts differ\n' }),
   ).toEqual({ kind: 'no-text', reason: 'binary' })
   expect(parse({ ...f.worktree, oldObjectId: 'HEAD' })?.kind).toBe('partial')
-  expect(parse({ ...f.worktree, oldObjectId: 'e'.repeat(40) })?.kind).toBe('partial')
+  expect(parse({ ...f.worktree, oldObjectId: 'e'.repeat(40) })?.kind).toBe('full')
+  const fixed = capturedReviewDocument(f.worktree, f.scope.rootPath)
+  expect(fixed?.source.kind).toBe('snapshot')
+  if (fixed?.source.kind === 'snapshot')
+    expect(
+      snapshotComparisonInput({
+        scope: f.scope,
+        comparison: fixed.source,
+        diffs: [{ ...f.worktree, oldObjectId: 'e'.repeat(40) }],
+      }).files[0],
+    ).toEqual({ kind: 'no-text', reason: 'unavailable' })
   expect(parse({ ...f.worktree, path: 'other/source.ts' })).toEqual({
     kind: 'no-text',
     reason: 'unavailable',
@@ -195,7 +209,7 @@ for (const change of ['added', 'deleted', 'renamed'] as const) {
     let path = f.path
     let staged = false
     if (change === 'added') {
-      path = filesystemPath(f.comparison.path.replace('source.ts', 'added.ts'))
+      path = filesystemPath(f.comparison.target.path.replace('source.ts', 'added.ts'))
       await writeFile(join(repo, 'added.ts'), 'export const added = true\n')
     }
     if (change === 'deleted') await unlink(join(repo, 'source.ts'))
@@ -204,11 +218,13 @@ for (const change of ['added', 'deleted', 'renamed'] as const) {
       runGit(repo, ['add', 'rename-source.ts'])
       runGit(repo, ['commit', '-m', 'rename source'])
       runGit(repo, ['mv', 'rename-source.ts', 'renamed.ts'])
-      path = filesystemPath(f.comparison.path.replace('source.ts', 'renamed.ts'))
+      path = filesystemPath(f.comparison.target.path.replace('source.ts', 'renamed.ts'))
       staged = true
     }
     const [diff] = await fetchDiff(path, staged, undefined, client)
-    const target = diff ? snapshotDocument(diff) : null
+    const target = diff
+      ? snapshotDocument(diff, f.scope.rootPath, staged ? 'staged' : 'worktree')
+      : null
     expect(target?.source.kind).toBe('snapshot')
     if (!target || target.source.kind !== 'snapshot' || !diff) return
     const input = snapshotComparisonInput({
@@ -248,8 +264,12 @@ test('a newly admitted complete capture updates an earlier partial interest and 
   })
   expect(first.read()).toBe(second.read())
   const latest = first.read()
-  if (latest.kind === 'ready') expect(latest.input.files[0]?.kind).toBe('full')
-  if (oldRead.kind === 'ready') expect(oldRead.input.files[0]?.kind).toBe('partial')
+  expect(latest).toMatchObject({ kind: 'ready', input: { kind: 'snapshot' } })
+  if (latest.kind === 'ready' && latest.input.kind === 'snapshot')
+    expect(latest.input.files[0]?.kind).toBe('full')
+  expect(oldRead).toMatchObject({ kind: 'ready', input: { kind: 'snapshot' } })
+  if (oldRead.kind === 'ready' && oldRead.input.kind === 'snapshot')
+    expect(oldRead.input.files[0]?.kind).toBe('partial')
   expect(first.refresh(partial, oldRequest)).toBe(false)
   service.dispose()
 })
@@ -270,7 +290,16 @@ test('scope separates workspace interests and foreign or canceled adoption canno
     input: f.input,
     signal: new AbortController().signal,
   })
-  const scoped = { ...f.input, scope: { ...f.scope, rootPath: filesystemPath('other-workspace') } }
+  const otherRoot = filesystemPath('other-workspace')
+  const mismatched = { ...f.input, scope: { ...f.scope, rootPath: otherRoot } }
+  expect(() =>
+    service.acquireSnapshotComparison({ input: mismatched, signal: new AbortController().signal }),
+  ).toThrow('does not match')
+  const scoped = snapshotComparisonInput({
+    scope: { ...f.scope, rootPath: otherRoot },
+    comparison: { ...f.comparison, target: { ...f.comparison.target, rootPath: otherRoot } },
+    diffs: [f.worktree],
+  })
   const second = service.acquireSnapshotComparison({
     input: scoped,
     signal: new AbortController().signal,

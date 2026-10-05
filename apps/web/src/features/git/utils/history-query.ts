@@ -1,9 +1,5 @@
 import { historyKeys } from '@/features/git/utils/query-keys'
-import {
-  infiniteQueryOptions,
-  queryOptions,
-  type QueryFunctionContext,
-} from '@tanstack/react-query'
+import { infiniteQueryOptions, type QueryFunctionContext } from '@tanstack/react-query'
 import type { GitHistoryCursor } from '@workspace/contracts'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { clientLogContext } from '@/lib/environments/state/log-context'
@@ -53,31 +49,5 @@ export function historyQueryOptions(path: string, ref: string, search: string) {
     placeholderData: (previous, previousQuery) =>
       sameHistorySource(previousQuery?.queryKey, path, ref) ? previous : undefined,
     staleTime: 30_000,
-  })
-}
-
-export function commitDetailsQueryOptions(path: string, commit: string) {
-  return queryOptions({
-    queryKey: historyKeys.commit(path, commit),
-    queryFn: ({ client: queryClient, signal }) => {
-      const client = clientForQueryClient(queryClient)
-      return observeClientOperation(
-        {
-          ...clientLogContext(client),
-          area: 'git',
-          action: 'git.history_commit',
-          path,
-          commit,
-          signal,
-        },
-        async () =>
-          unwrapEdenResponse(
-            await client.git.history.commit.get({ query: { path, commit }, fetch: { signal } }),
-            { requireData: true, emptyMessage: 'Git returned no commit response' },
-          ),
-        (details) => ({ fileCount: details.files.length }),
-      )
-    },
-    staleTime: Infinity,
   })
 }

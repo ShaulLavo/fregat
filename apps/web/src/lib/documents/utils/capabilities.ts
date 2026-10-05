@@ -85,7 +85,7 @@ export function documentSourcePath(document: DocumentRef): FilesystemPath | null
       return document.root
     case 'git-diff': {
       const source = document.source
-      if (source.kind === 'snapshot') return source.path
+      if (source.kind === 'snapshot') return source.target.path
       if (source.kind === 'checkpoint-file') return source.file.path
       return null
     }
@@ -116,7 +116,10 @@ export function durableTab(content: TabContent, root: WorkspaceRoot): boolean {
     case 'git-diff': {
       const source = document.source
       return source.kind === 'snapshot'
-        ? isPathInWorkspace(source.path, root)
+        ? source.target.rootPath === root &&
+            isPathInWorkspace(source.target.path, root) &&
+            (source.target.kind === 'moving' ||
+              isPathInWorkspace(source.target.revision.oldPath, root))
         : source.owner === root
     }
     default: {

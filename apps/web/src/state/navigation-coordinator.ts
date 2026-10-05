@@ -413,7 +413,12 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
       op.href = location.publicHref
       op.historyIdentity = null
       op.writing = true
-      await navigateAddress(router, canonical, { replace: true })
+      if (location.href === router.latestLocation.href) {
+        // Router skips same-route commits after its search parser canonicalizes the href.
+        router.history.replace(location.publicHref, router.history.location.state)
+      } else {
+        await navigateAddress(router, canonical, { replace: true })
+      }
       if (!isCurrent(op, owner) || op.complete !== payload) return
     }
     accepted = canonical

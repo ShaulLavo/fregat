@@ -171,11 +171,10 @@ export function Editor({
       syntaxHighlightingEnabled,
     ],
   )
-  // Plugin identity controls native registration lifetime; the host keeps this callback stable
-  // per conflict, so it rebuilds the plugins only when the conflict behind the tab changes.
   const markdownView = useMarkdownView(key)
   const markdownPreview = documentLanguageId === 'markdown' && markdownView === 'preview'
   const openMarkdownLink = useMarkdownLinkOpener(filePath, rootPath)
+  // useEditor keys native registration lifetime on this plugin array.
   const criticalEditorCorePlugins = useMemo(
     () =>
       createCriticalEditorCorePlugins(
@@ -184,6 +183,7 @@ export function Editor({
         minimapEnabled,
         {
           analysisAllowed,
+          syntaxHighlightingEnabled,
           compareMergeConflict: onCompareMergeConflict,
           markdownPreview,
           openMarkdownLink,
@@ -197,6 +197,7 @@ export function Editor({
       openMarkdownLink,
       minimapEnabled,
       onCompareMergeConflict,
+      syntaxHighlightingEnabled,
     ],
   )
   const decodePlugin = useMemo(() => createDecodePluginLoader(decodeMode), [decodeMode])

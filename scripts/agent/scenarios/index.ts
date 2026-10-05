@@ -138,7 +138,7 @@ import { chatTimelinePattern } from './chat-timeline-pattern'
 import { copyFeedback } from './copy-feedback'
 import { fileLabelCohesion } from './file-label-cohesion'
 import { checkpointStates } from './checkpoint-states'
-import { checkpointDiffTokens } from './checkpoint-diff-tokens'
+import { checkpointDiffTokens, checkpointDiffSourceRefusal } from './checkpoint-diff-tokens'
 import { sessionRailMenu } from './session-rail-menu'
 import { sessionActionsSurfaces } from './session-actions-surfaces'
 import { exportTranscript } from './export-transcript'
@@ -213,6 +213,7 @@ import { terminalOfflineHost } from './terminal-offline-host'
 import { terminalBackground } from './terminal-background'
 import { terminalCancelledStartup } from './terminal-cancelled-startup'
 import { terminalWasmCancelledStartup } from './terminal-wasm-cancelled-startup'
+import { terminalWasmNavigationStartup } from './terminal-wasm-navigation-startup'
 import { terminalRenderer, terminalRendererDom, terminalRendererWebgl } from './terminal-renderer'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { sidebarToggle } from './sidebar-toggle'
@@ -606,6 +607,7 @@ export const scenarios: readonly Scenario[] = [
   fileLabelCohesion,
   checkpointStates,
   checkpointDiffTokens,
+  checkpointDiffSourceRefusal,
   sessionActionsSurfaces,
   sessionRailMenu,
   exportTranscript,
@@ -644,6 +646,7 @@ export const scenarios: readonly Scenario[] = [
   terminalBackground,
   terminalCancelledStartup,
   terminalWasmCancelledStartup,
+  terminalWasmNavigationStartup,
   terminalOfflineHost,
   terminalRenderer,
   terminalRendererDom,

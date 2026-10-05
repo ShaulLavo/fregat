@@ -1,6 +1,6 @@
 {
   "name": "fregat",
-  "version": "0.0.15",
+  "version": "0.0.20",
   "private": true,
   "workspaces": {
     "packages": [
@@ -48,6 +48,7 @@
     "pair": "bun scripts/pair.ts",
     "usage:import-proxy-key": "bun scripts/import-proxy-usage-key.ts",
     "agent:browser": "bun scripts/agent/browser.ts",
+    "agent:retention-count-policy": "bun scripts/agent/scenarios/editor-retention-count-policy-driver.ts",
     "logs": "bun scripts/agent/logs.ts",
     "logs:census": "bun scripts/lint/log-noise-census.ts --check",
     "dev": "bun --env-file=.env scripts/dev.ts",

@@ -1,6 +1,6 @@
 import { expect, test } from '../../../../../test/fixtures'
-import type { GitComparison } from '@/lib/documents/utils/types'
-import { filesystemPath } from '@/lib/documents/utils/identity'
+import { snapshotTarget } from '../../../../../test/factories/git-diff'
+import type { GitComparison, GitChangeStatus } from '@/lib/documents/utils/types'
 import { emptyDiffNotice } from '../diff-presentation'
 
 const ROOT = '/repo/platform'
@@ -26,12 +26,17 @@ function documentInfo({
   status,
 }: {
   oldPath?: string
-  status?: GitComparison['status']
+  status?: GitChangeStatus
 }): GitComparison {
-  return {
-    kind: 'snapshot',
-    path: filesystemPath(`${ROOT}/src/new-name.ts`),
-    oldPath: oldPath === undefined ? undefined : filesystemPath(oldPath),
-    status,
-  }
+  return snapshotTarget({
+    kind: 'captured-review',
+    rootPath: ROOT,
+    path: `${ROOT}/src/new-name.ts`,
+    revision: {
+      old: { kind: 'blob', objectId: 'a'.repeat(40) },
+      new: { kind: 'blob', objectId: 'b'.repeat(40) },
+      oldPath: oldPath ?? `${ROOT}/src/new-name.ts`,
+      status: status ?? 'modified',
+    },
+  })
 }

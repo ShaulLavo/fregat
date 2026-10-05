@@ -173,13 +173,21 @@ export function mountTerminal({
 
   let pageActive = true
   let retryOpen = false
+  let retryTimer: ReturnType<typeof setTimeout> | undefined
+  const recoverCancelledOpen = () => {
+    retryTimer = undefined
+    if (!retryOpen || !pageActive || cancelled || signal.aborted) return
+    startOpen()
+  }
   const startOpen = () => {
     retryOpen = false
+    clearTimeout(retryTimer)
     void open().catch((error: unknown) => {
       if (cancelled || signal.aborted) return
       if (isCancelledError(error)) {
         retryOpen = true
-        if (pageActive) startOpen()
+        // A native departure can run this rejection before the mount's departure handler.
+        retryTimer = setTimeout(recoverCancelledOpen, 0)
         return
       }
 
@@ -202,6 +210,7 @@ export function mountTerminal({
     removeFlush()
     frameDisposable?.dispose()
     cancelled = true
+    clearTimeout(retryTimer)
     stopPageSubscription()
     unregisterSession?.()
     dataDisposable?.dispose()

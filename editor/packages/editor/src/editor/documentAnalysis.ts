@@ -11,6 +11,14 @@ import type {
   EditorHighlightResult,
 } from '../syntax/highlighter'
 import type { EditorTokenInput } from '../syntax/tokenStore'
+import type { EditorTheme } from '../theme'
+import {
+  captureThemeCohort,
+  loadOrderedHighlighterTheme,
+  sameThemeCohort,
+  themeCohortIsCurrent,
+  type ThemeCohort,
+} from '../syntax/providerTheme'
 import {
   createEditorRuntimeSessionId,
   createEmptySyntaxResult,
@@ -101,7 +109,30 @@ export type EditorRetainedSyntaxSession = Omit<EditorSyntaxSession, 'queryRange'
 }
 export type EditorRetainedHighlighterSession = EditorHighlighterSession & {
   readonly runtimeSessionId: string
-  read(): EditorAnalysisRead<EditorHighlightResult>
+  read(): HighlighterAnalysisRead
+}
+
+export function readRetainedHighlighterResult(
+  session: EditorRetainedHighlighterSession,
+  snapshot: DocumentTextSnapshot,
+): Promise<EditorHighlightResult> {
+  const read = session.read()
+  if (read.kind === 'ready') return Promise.resolve(read.result)
+  if (read.kind === 'failed') return Promise.reject(read.error)
+  return session.refresh(snapshot)
+}
+type ProviderThemeOutcome =
+  | { readonly kind: 'ready'; readonly theme: EditorTheme | null }
+  | { readonly kind: 'failed'; readonly error: unknown }
+type HighlighterAnalysisRead =
+  | Extract<EditorAnalysisRead<EditorHighlightResult>, { kind: 'pending' | 'failed' }>
+  | (Extract<EditorAnalysisRead<EditorHighlightResult>, { kind: 'ready' }> & {
+      readonly providerTheme: ProviderThemeOutcome
+    })
+type HighlighterAnalysisResult = {
+  readonly tokens: EditorHighlightResult['tokens']
+  readonly highlightResult: EditorHighlightResult
+  readonly providerTheme: ProviderThemeOutcome
 }
 export type EditorAnalysisStructuralRequest = Omit<
   EditorSyntaxSessionOptions,
@@ -113,6 +144,7 @@ export type EditorAnalysisStructuralRequest = Omit<
 }
 export type EditorAnalysisHighlighterRequest = {
   readonly provider: EditorHighlighterProvider
+  readonly themeProviders?: readonly EditorHighlighterProvider[]
   readonly languageId: string | null
   readonly configurationTag?: EditorAnalysisConfigurationTag
   readonly signal?: AbortSignal
@@ -132,8 +164,8 @@ export type EditorDocumentAnalysis = {
 }
 
 type AnalysisSession<T> = {
-  refresh(snapshot: DocumentTextSnapshot): Promise<T>
-  applyChange(change: DocumentSessionChange): Promise<T>
+  refresh(snapshot: DocumentTextSnapshot, signal: AbortSignal, owner: AbortSignal): Promise<T>
+  applyChange(change: DocumentSessionChange, signal: AbortSignal, owner: AbortSignal): Promise<T>
   dispose(): void
 }
 
@@ -200,8 +232,8 @@ class AnalysisEntry<T extends RetentionResult> {
   private readonly cancellation = new AbortController()
   private interests = 0
   private lastRelease: number | null = null
-  private queuedRevision = -1
-  private generation = 0
+  protected queuedRevision = -1
+  protected generation = 0
   private pendingInterest = new AbortController()
   private tail: Promise<void> = Promise.resolve()
   private state: EditorAnalysisRead<T>
@@ -281,7 +313,7 @@ class AnalysisEntry<T extends RetentionResult> {
     if (event.revisionAfter <= this.queuedRevision) return
     this.enqueue(
       event.revisionAfter,
-      () => this.session.applyChange(event.change),
+      (signal) => this.session.applyChange(event.change, signal, this.signal),
       event.change.textSnapshot,
     )
   }
@@ -290,12 +322,14 @@ class AnalysisEntry<T extends RetentionResult> {
     const revision = this.buffer.getRevision()
     if (revision === this.queuedRevision) return
     const snapshot = this.buffer.getTextSnapshot()
-    this.enqueue(revision, () => this.session.refresh(snapshot))
+    this.enqueue(revision, (signal) => this.session.refresh(snapshot, signal, this.signal))
   }
 
   refresh(): void {
     const snapshot = this.buffer.getTextSnapshot()
-    this.enqueue(this.buffer.getRevision(), () => this.session.refresh(snapshot))
+    this.enqueue(this.buffer.getRevision(), (signal) =>
+      this.session.refresh(snapshot, signal, this.signal),
+    )
   }
 
   async current(): Promise<T> {
@@ -342,17 +376,18 @@ class AnalysisEntry<T extends RetentionResult> {
 
   private enqueue(
     revision: number,
-    run: () => Promise<T>,
+    run: (signal: AbortSignal) => Promise<T>,
     snapshot = this.buffer.getTextSnapshot(),
   ): void {
     this.pendingInterest.abort()
     this.pendingInterest = new AbortController()
+    const signal = this.pendingInterest.signal
     this.queuedRevision = revision
     const generation = ++this.generation
     this.state = { kind: 'pending', revision }
     const result = this.tail.then(() => {
       if (this.cancellation.signal.aborted) throw cancelled()
-      return run()
+      return run(signal)
     })
     this.tail = interruptible(result, this.cancellation.signal).then(
       (value) =>
@@ -383,18 +418,175 @@ class AnalysisEntry<T extends RetentionResult> {
   }
 }
 
+class HighlighterEntry extends AnalysisEntry<HighlighterAnalysisResult> {
+  private readonly highlighter: HighlighterAnalysisSession
+
+  constructor(
+    buffer: EditorTextBuffer,
+    session: EditorHighlighterSession,
+    readonly cohort: ThemeCohort,
+    runtimeSessionId: string,
+    retention: RetentionChanges,
+  ) {
+    const adapter = new HighlighterAnalysisSession(session, cohort)
+    super(buffer, adapter, runtimeSessionId, retention)
+    this.highlighter = adapter
+  }
+
+  override read(): EditorAnalysisRead<HighlighterAnalysisResult> {
+    if (!themeCohortIsCurrent(this.cohort)) {
+      this.highlighter.invalidateTheme()
+      return { kind: 'failed', revision: this.buffer.getRevision(), error: cancelled() }
+    }
+    return super.read()
+  }
+
+  override refresh(): void {
+    this.highlighter.invalidateTheme()
+    super.refresh()
+  }
+}
+
+class HighlighterAnalysisSession implements AnalysisSession<HighlighterAnalysisResult> {
+  private providerTheme: ProviderThemeOutcome | null = null
+  private configurationWork: AbortController | null = null
+
+  constructor(
+    private readonly highlighter: EditorHighlighterSession,
+    private readonly cohort: ThemeCohort,
+  ) {}
+
+  refresh(
+    snapshot: DocumentTextSnapshot,
+    signal: AbortSignal,
+    owner: AbortSignal,
+  ): Promise<HighlighterAnalysisResult> {
+    return this.combine(this.highlighter.refresh(snapshot), signal, owner)
+  }
+
+  applyChange(
+    change: DocumentSessionChange,
+    signal: AbortSignal,
+    owner: AbortSignal,
+  ): Promise<HighlighterAnalysisResult> {
+    return this.combine(this.highlighter.applyChange(change), signal, owner)
+  }
+
+  invalidateTheme(): void {
+    this.configurationWork?.abort()
+    this.providerTheme = null
+  }
+
+  dispose(): void {
+    this.invalidateTheme()
+    this.highlighter.dispose()
+  }
+
+  private async combine(
+    tokens: Promise<EditorHighlightResult>,
+    signal: AbortSignal,
+    owner: AbortSignal,
+  ): Promise<HighlighterAnalysisResult> {
+    const [highlight, theme] = await Promise.allSettled([
+      tokens,
+      this.providerTheme ?? this.loadTheme(owner),
+    ])
+    if (theme.status === 'rejected') throw theme.reason
+    if (highlight.status === 'rejected') throw highlight.reason
+    signal.throwIfAborted()
+    if (!themeCohortIsCurrent(this.cohort)) throw cancelled()
+    return {
+      tokens: highlight.value.tokens,
+      highlightResult: highlight.value,
+      providerTheme: theme.value,
+    }
+  }
+
+  private async loadTheme(owner: AbortSignal): Promise<ProviderThemeOutcome> {
+    const work = new AbortController()
+    this.configurationWork = work
+    const abort = () => work.abort(owner.reason)
+    owner.addEventListener('abort', abort, { once: true })
+    if (owner.aborted) abort()
+    try {
+      const theme = await interruptible(
+        loadOrderedHighlighterTheme(this.cohort, work.signal),
+        work.signal,
+      )
+      work.signal.throwIfAborted()
+      if (!themeCohortIsCurrent(this.cohort)) throw cancelled()
+      const outcome = { kind: 'ready' as const, theme: theme ?? null }
+      this.providerTheme = outcome
+      return outcome
+    } catch (error) {
+      work.signal.throwIfAborted()
+      const outcome = { kind: 'failed' as const, error }
+      this.providerTheme = outcome
+      return outcome
+    } finally {
+      owner.removeEventListener('abort', abort)
+      if (this.configurationWork === work) this.configurationWork = null
+    }
+  }
+}
+
+type RetainedRangeContributor = {
+  readonly range: EditorSyntaxRange
+  readonly result: EditorSyntaxResult
+}
+type ReadyRange = RetainedRangeContributor & { readonly revision: number }
+type PendingRangeQuery = {
+  readonly snapshot: DocumentTextSnapshot
+  readonly revision: number
+  readonly range: EditorSyntaxRange
+  readonly promise: Promise<EditorSyntaxResult>
+  admission: 'cache' | 'return-only'
+  work:
+    | { readonly kind: 'queued'; readonly generation: number | null }
+    | { readonly kind: 'running'; readonly generation: number }
+}
+
+const structuralLeaseOwners = new WeakMap<
+  EditorRetainedSyntaxSession,
+  { readonly entry: StructuralEntry; readonly signal: AbortSignal }
+>()
+
+export function setRetainedSyntaxDisplayDemand(
+  session: EditorRetainedSyntaxSession,
+  demand: EditorAnalysisDisplayDemand,
+  contributors: readonly RetainedRangeContributor[] | null,
+  discarded: readonly RetainedRangeContributor[] | null = null,
+): void {
+  const owner = structuralLeaseOwners.get(session)
+  owner?.entry.setContributors(owner.signal, contributors)
+  session.setDisplayDemand(demand)
+  if (discarded) owner?.entry.retireOptionalContributors(owner.signal, discarded)
+}
+
+export function retainedSyntaxCanWarm(session: EditorRetainedSyntaxSession): boolean {
+  const owner = structuralLeaseOwners.get(session)
+  return owner !== undefined && owner.entry.canWarm(owner.signal)
+}
+
 class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
   private readonly displayed = new Map<AbortSignal, EditorAnalysisDisplayDemand>()
   private readonly queryWaiters = new Map<
     AbortSignal,
     { snapshot: DocumentTextSnapshot; range: EditorSyntaxRange }
   >()
-  private ranges = new Map<
-    string,
-    { revision: number; range: EditorSyntaxRange; result: EditorSyntaxResult }
+  private readonly contributors = new Map<AbortSignal, readonly RetainedRangeContributor[]>()
+  private readonly resultOrigins = new WeakMap<
+    EditorSyntaxResult,
+    {
+      readonly snapshot: DocumentTextSnapshot
+      readonly revision: number
+      readonly generation: number
+    }
   >()
-  private queries = new Map<string, Promise<EditorSyntaxResult>>()
+  private ranges = new Map<string, ReadyRange>()
+  private queries = new Map<string, PendingRangeQuery>()
   private rangeRevision = -1
+  private stoppedWarmGeneration: number | null = null
 
   constructor(
     buffer: EditorTextBuffer,
@@ -402,7 +594,16 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     runtimeSessionId: string,
     retention: RetentionChanges,
   ) {
-    super(buffer, structuralSession, runtimeSessionId, retention)
+    super(
+      buffer,
+      {
+        refresh: (snapshot) => structuralSession.refresh(snapshot),
+        applyChange: (change) => structuralSession.applyChange(change),
+        dispose: () => structuralSession.dispose(),
+      },
+      runtimeSessionId,
+      retention,
+    )
   }
 
   canQueryRange(): boolean {
@@ -419,6 +620,8 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
       'abort',
       () => {
         this.displayed.delete(signal)
+        this.contributors.delete(signal)
+        this.trimOptionalRanges()
         this.retention.changed()
       },
       { once: true },
@@ -435,7 +638,152 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
           }
         : demand
     this.displayed.set(signal, stored)
+    this.trimOptionalRanges()
     this.retention.changed()
+  }
+
+  setContributors(
+    signal: AbortSignal,
+    contributors: readonly RetainedRangeContributor[] | null,
+  ): void {
+    if (signal.aborted) return
+    if (contributors) this.contributors.set(signal, contributors)
+    else this.contributors.delete(signal)
+  }
+
+  canWarm(signal: AbortSignal): boolean {
+    if (signal.aborted || this.signal.aborted) return false
+    return this.stoppedWarmGeneration !== this.generation
+  }
+
+  retireOptionalContributors(
+    signal: AbortSignal,
+    discarded: readonly RetainedRangeContributor[],
+  ): void {
+    if (signal.aborted || this.signal.aborted) return
+    const protection = this.rangeProtection()
+    if (protection.fullyPinned) return
+    const snapshot = this.buffer.getTextSnapshot()
+    const revision = this.buffer.getRevision()
+    const retired = discarded.some((contributor) => {
+      const origin = this.resultOrigins.get(contributor.result)
+      if (
+        origin?.snapshot !== snapshot ||
+        origin.revision !== revision ||
+        origin.generation !== this.generation
+      )
+        return false
+      if (protection.intervals.some((range) => rangesIntersect(range, contributor.range)))
+        return false
+      return ![...protection.protectedSlots].some(
+        (cached) =>
+          cached.result === contributor.result && rangeContains(cached.range, contributor.range),
+      )
+    })
+    if (retired) this.stoppedWarmGeneration = this.generation
+  }
+
+  private rangeProtection() {
+    const snapshot = this.buffer.getTextSnapshot()
+    const intervals: EditorSyntaxRange[] = []
+    const protectedSlots = new Set<ReadyRange>()
+    let fullyPinned = false
+    for (const [signal, demand] of this.displayed) {
+      if (
+        demand.kind === 'unknown' ||
+        demand.kind === 'unmanaged' ||
+        demand.snapshot !== snapshot
+      ) {
+        fullyPinned = true
+        break
+      }
+      intervals.push(...demand.ranges)
+      const contributors = this.contributors.get(signal)
+      if (contributors) this.protectContributors(contributors, protectedSlots)
+      if (!contributors || demand.kind === 'preparation')
+        this.protectIntersecting(demand.ranges, protectedSlots)
+      this.protectLookup(demand.ranges, protectedSlots)
+    }
+    for (const waiter of this.queryWaiters.values()) {
+      if (waiter.snapshot !== snapshot) continue
+      intervals.push(waiter.range)
+      this.protectLookup([waiter.range], protectedSlots)
+    }
+    return { intervals, protectedSlots, fullyPinned }
+  }
+
+  private trimOptionalRanges(): void {
+    const { intervals, protectedSlots, fullyPinned } = this.rangeProtection()
+    for (const query of this.queries.values()) {
+      query.admission =
+        fullyPinned || intervals.some((range) => rangesIntersect(range, query.range))
+          ? 'cache'
+          : 'return-only'
+    }
+    if (fullyPinned || this.displayed.size === 0) return
+    for (const [key, cached] of this.ranges) {
+      if (!protectedSlots.has(cached)) this.ranges.delete(key)
+    }
+  }
+
+  private protectContributors(
+    contributors: readonly RetainedRangeContributor[],
+    protectedSlots: Set<ReadyRange>,
+  ): void {
+    for (const contributor of contributors) this.protectContributor(contributor, protectedSlots)
+  }
+
+  private protectContributor(
+    contributor: RetainedRangeContributor,
+    protectedSlots: Set<ReadyRange>,
+  ): void {
+    const snapshot = this.buffer.getTextSnapshot()
+    const origin = this.resultOrigins.get(contributor.result)
+    let cached = this.ranges.get(rangeKey(contributor.range))
+    if (cached?.result !== contributor.result) cached = undefined
+    cached ??= [...this.ranges.values()].find(
+      (candidate) =>
+        candidate.result === contributor.result &&
+        rangeContains(candidate.range, contributor.range),
+    )
+    if (
+      !cached &&
+      origin?.snapshot === snapshot &&
+      origin.revision === this.buffer.getRevision() &&
+      origin.generation === this.generation
+    ) {
+      cached = { ...contributor, revision: origin.revision }
+      this.ranges.set(rangeKey(contributor.range), cached)
+    }
+    if (cached) protectedSlots.add(cached)
+  }
+
+  private protectIntersecting(
+    ranges: readonly EditorSyntaxRange[],
+    protectedSlots: Set<ReadyRange>,
+  ): void {
+    for (const cached of this.ranges.values()) {
+      if (
+        ranges.some(
+          (range) =>
+            rangesIntersect(range, cached.range) || foldResultIntersects(cached.result, range),
+        )
+      )
+        protectedSlots.add(cached)
+    }
+  }
+
+  private protectLookup(
+    ranges: readonly EditorSyntaxRange[],
+    protectedSlots: Set<ReadyRange>,
+  ): void {
+    for (const range of ranges) {
+      if ([...protectedSlots].some((cached) => rangeContains(cached.range, range))) continue
+      const cached =
+        this.ranges.get(rangeKey(range)) ??
+        [...this.ranges.values()].find((candidate) => rangeContains(candidate.range, range))
+      if (cached) protectedSlots.add(cached)
+    }
   }
 
   override inspectDisplayDemand(): AnalysisDisplayInspection {
@@ -485,7 +833,9 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
       range: boundedRange(range, this.buffer.getTextSnapshot().length),
     })
     const release = () => {
-      if (this.queryWaiters.delete(signal)) this.retention.changed()
+      if (!this.queryWaiters.delete(signal)) return
+      this.trimOptionalRanges()
+      this.retention.changed()
     }
     signal.addEventListener('abort', release, { once: true })
     const pending = interruptible(this.range(range), signal)
@@ -514,7 +864,9 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
   }
 
   override dispose(): void {
+    this.stoppedWarmGeneration = null
     this.displayed.clear()
+    this.contributors.clear()
     this.queryWaiters.clear()
     this.ranges.clear()
     this.queries.clear()
@@ -543,29 +895,77 @@ class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     const state = this.readRange(range)
     if (state.kind === 'ready') return Promise.resolve(state.result)
     const revision = this.buffer.getRevision()
-    const key = `${revision}:${rangeKey(range)}`
-    const existing = this.queries.get(key)
-    if (existing) return existing
+    const generation = this.queuedRevision === revision ? this.generation : null
+    const key = `${revision}:${generation ?? 'publication'}:${rangeKey(range)}`
+    const existing = [...this.queries.values()].find((query) =>
+      this.compatibleQuery(query, revision, range),
+    )
+    if (existing) {
+      this.trimOptionalRanges()
+      return existing.promise
+    }
     let queried = false
-    const pending = this.query(() => {
-      const current = this.readRange(range)
-      if (current.kind === 'ready') return Promise.resolve(current.result)
-      queried = true
-      return this.structuralSession.queryRange?.(range) ?? this.current()
-    }).then((result) => {
-      if (queried && this.buffer.getRevision() === revision)
-        this.ranges.set(rangeKey(range), { revision, range, result })
-      this.retention.changed()
-      return result
-    })
+    const pending: PendingRangeQuery = {
+      snapshot: this.buffer.getTextSnapshot(),
+      revision,
+      range,
+      admission: 'cache',
+      work: { kind: 'queued', generation },
+      promise: this.query(() => {
+        pending.work = { kind: 'running', generation: this.generation }
+        const current = this.readRange(range)
+        if (current.kind === 'ready') return Promise.resolve(current.result)
+        queried = true
+        return this.structuralSession.queryRange?.(range) ?? this.current()
+      }).then((result) => {
+        if (queried && this.canAdmitRange(key, pending)) {
+          this.resultOrigins.set(result, {
+            snapshot: pending.snapshot,
+            revision,
+            generation: this.generation,
+          })
+          this.ranges.set(rangeKey(range), { revision, range, result })
+        }
+        this.retention.changed()
+        return result
+      }),
+    }
     this.queries.set(key, pending)
+    this.trimOptionalRanges()
     this.retention.changed()
-    void pending
+    void pending.promise
       .finally(() => {
-        if (this.queries.delete(key)) this.retention.changed()
+        if (this.queries.get(key) !== pending) return
+        this.queries.delete(key)
+        this.retention.changed()
       })
       .catch(() => undefined)
-    return pending
+    return pending.promise
+  }
+
+  private compatibleQuery(
+    query: PendingRangeQuery,
+    revision: number,
+    range: EditorSyntaxRange,
+  ): boolean {
+    return (
+      query.revision === revision &&
+      query.snapshot === this.buffer.getTextSnapshot() &&
+      rangeKey(query.range) === rangeKey(range) &&
+      (query.work.generation === null || query.work.generation === this.generation)
+    )
+  }
+
+  private canAdmitRange(key: string, query: PendingRangeQuery): boolean {
+    return (
+      !this.signal.aborted &&
+      this.queries.get(key) === query &&
+      query.admission === 'cache' &&
+      query.work.kind === 'running' &&
+      query.work.generation === this.generation &&
+      query.revision === this.buffer.getRevision() &&
+      query.snapshot === this.buffer.getTextSnapshot()
+    )
   }
 
   override changed(event: EditorTextBufferChange): void {
@@ -584,7 +984,7 @@ export function createEditorDocumentAnalysis(options: {
   const structural: { request: EditorAnalysisStructuralRequest; entry: StructuralEntry }[] = []
   const highlighters: {
     request: EditorAnalysisHighlighterRequest
-    entry: AnalysisEntry<EditorHighlightResult>
+    entry: HighlighterEntry
     session: EditorHighlighterSession
     unsubscribeTheme: (() => void) | void
   }[] = []
@@ -640,7 +1040,10 @@ export function createEditorDocumentAnalysis(options: {
   }
   const borrowHighlighter = (request: EditorAnalysisHighlighterRequest) => {
     if (disposed || request.signal?.aborted) return null
-    let found = highlighters.find((candidate) => sameRequest(candidate.request, request))
+    const cohort = captureThemeCohort(request.themeProviders ?? [request.provider])
+    const matches = (candidate: (typeof highlighters)[number]) =>
+      sameRequest(candidate.request, request) && sameThemeCohort(candidate.entry.cohort, cohort)
+    let found = highlighters.find(matches)
     if (found?.entry.read().kind === 'failed' && found.entry.leaseCount === 0) {
       const failed = found
       highlighters.splice(highlighters.indexOf(failed), 1)
@@ -648,7 +1051,7 @@ export function createEditorDocumentAnalysis(options: {
       failed.unsubscribeTheme?.()
       failed.entry.dispose()
       if (disposed || request.signal?.aborted) return null
-      found = highlighters.find((candidate) => sameRequest(candidate.request, request))
+      found = highlighters.find(matches)
     }
     subscribe()
     if (!found) {
@@ -669,12 +1072,13 @@ export function createEditorDocumentAnalysis(options: {
         }
         return null
       }
-      const entry = new AnalysisEntry(buffer, session, runtimeSessionId, retention)
+      const entry = new HighlighterEntry(buffer, session, cohort, runtimeSessionId, retention)
       found = {
         request: {
           ...request,
           signal: undefined,
           configurationTag: [...(request.configurationTag ?? [])],
+          themeProviders: cohort.map((item) => item.provider),
         },
         session,
         entry,
@@ -821,7 +1225,7 @@ function structuralLease(
   let demand: EditorSyntaxRange | undefined
   const result = () => (demand ? entry.range(demand) : entry.current())
   const current = () => lease.wait(result)
-  return {
+  const retained: EditorRetainedSyntaxSession = {
     runtimeSessionId: entry.runtimeSessionId,
     setDisplayDemand: (demand) => entry.setDisplayDemand(lease.signal, demand),
     get foldingSupport() {
@@ -854,10 +1258,17 @@ function structuralLease(
         : entry.readRange(range ?? demand),
     dispose: lease.dispose,
   }
+  if (!lease.signal.aborted) {
+    structuralLeaseOwners.set(retained, { entry, signal: lease.signal })
+    lease.signal.addEventListener('abort', () => structuralLeaseOwners.delete(retained), {
+      once: true,
+    })
+  }
+  return retained
 }
 
 function highlighterLease(
-  entry: AnalysisEntry<EditorHighlightResult>,
+  entry: HighlighterEntry,
   session: EditorHighlighterSession,
   signal?: AbortSignal,
 ): EditorRetainedHighlighterSession {
@@ -866,10 +1277,15 @@ function highlighterLease(
     runtimeSessionId: entry.runtimeSessionId,
     refresh: () =>
       lease.wait(() => {
-        if (entry.read().kind === 'failed') entry.refresh()
-        return entry.current()
+        const read = entry.read()
+        if (
+          read.kind === 'failed' ||
+          (read.kind === 'ready' && read.result.providerTheme.kind === 'failed')
+        )
+          entry.refresh()
+        return entry.current().then((result) => result.highlightResult)
       }),
-    applyChange: () => lease.wait(() => entry.current()),
+    applyChange: () => lease.wait(() => entry.current().then((result) => result.highlightResult)),
     onDidChangeTheme: session.onDidChangeTheme
       ? (listener) => {
           if (lease.signal.aborted) return
@@ -883,10 +1299,17 @@ function highlighterLease(
           return release
         }
       : undefined,
-    read: () =>
-      lease.signal.aborted
-        ? { kind: 'failed', revision: entry.buffer.getRevision(), error: cancelled() }
-        : entry.read(),
+    read: () => {
+      if (lease.signal.aborted)
+        return { kind: 'failed', revision: entry.buffer.getRevision(), error: cancelled() }
+      const read = entry.read()
+      if (read.kind !== 'ready') return read
+      return {
+        ...read,
+        result: read.result.highlightResult,
+        providerTheme: read.result.providerTheme,
+      }
+    },
     dispose: lease.dispose,
   }
 }
@@ -962,4 +1385,15 @@ function sameStructuralRequest(
 function boundedRange(range: EditorSyntaxRange, length: number): EditorSyntaxRange {
   const startIndex = Math.max(0, Math.min(length, range.startIndex))
   return { startIndex, endIndex: Math.max(startIndex, Math.min(length, range.endIndex)) }
+}
+
+function rangesIntersect(left: EditorSyntaxRange, right: EditorSyntaxRange): boolean {
+  return left.startIndex < right.endIndex && left.endIndex > right.startIndex
+}
+function rangeContains(outer: EditorSyntaxRange, inner: EditorSyntaxRange): boolean {
+  return outer.startIndex <= inner.startIndex && outer.endIndex >= inner.endIndex
+}
+
+function foldResultIntersects(result: EditorSyntaxResult, range: EditorSyntaxRange): boolean {
+  return result.folds.some((fold) => rangesIntersect(range, fold))
 }

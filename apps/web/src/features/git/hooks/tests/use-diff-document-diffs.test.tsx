@@ -1,4 +1,4 @@
-import { diffQueryOptions } from '@/features/git/utils/diff-query'
+import { diffQueryOptions } from '@/lib/git-diff-query'
 import { blobDiffQueryOptions } from '@/lib/blob-diff-query'
 import { createObservedInProcessClient } from '../../../../../test/client'
 import {
@@ -12,7 +12,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import { useDiffDocumentDiffs } from '@/features/git/hooks/use-diff-document-diffs'
-import { fetchDiff } from '@/features/git/utils/api'
+import { fetchDiff } from '@/lib/git-diff-query'
 import { blobDiffQueryKey } from '@/lib/blob-diff-query'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import type { Client } from '@/lib/client'
@@ -65,6 +65,7 @@ function comparisonFor(diff: GitFileDiff): GitComparison {
     file: fileResource(filesystemPath(diff.path)),
     fromTurnCount: 0,
     kind: 'checkpoint-file',
+    ignoreWhitespace: true,
     owner: filesystemPath('repo'),
     sessionId: TEST_SESSION_ID,
     toTurnCount: 1,

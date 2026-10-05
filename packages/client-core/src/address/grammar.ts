@@ -186,8 +186,16 @@ export const TABS_BUDGET_BYTES = 1500
 
 export function applicableTabs(tabs: readonly string[] | null) {
   if (tabs === null || tabs.length > MAX_APPLIED_TABS) return null
-  if (tabs.some((token) => editorReferenceForToken(token) === null)) return null
-  return tabs
+  if (
+    tabs.some(
+      (token) =>
+        editorReferenceForToken(token) === null &&
+        !token.startsWith('d/') &&
+        !token.startsWith('k/'),
+    )
+  )
+    return null
+  return tabs.filter((token) => editorReferenceForToken(token) !== null)
 }
 
 export function expandTabs(tabs: readonly string[] | null, selected: string | null) {

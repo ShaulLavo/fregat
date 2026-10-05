@@ -32,21 +32,12 @@ export function encodedViewTarget(
 
 function encodedComparison(source: GitComparison): string {
   if (source.kind === 'snapshot') {
-    const { newObjectId, oldObjectId, oldPath, path, status } = source
-    const payload = {
-      newObjectId,
-      oldObjectId,
-      oldPath,
-      path,
-      source: source.source,
-      status,
-      version: 2,
-    }
-    return `git-diff:v2:${encodeURIComponent(JSON.stringify(payload))}`
+    return `git-diff:v3:${encodeURIComponent(JSON.stringify({ target: source.target, version: 3 }))}`
   }
   const request = checkpointRequest(source)
   const payload = {
     filePath: source.kind === 'checkpoint-file' ? source.file.path : undefined,
+    ignoreWhitespace: source.ignoreWhitespace,
     fromTurnCount: source.fromTurnCount,
     newObjectId: source.newObjectId,
     oldObjectId: source.oldObjectId,

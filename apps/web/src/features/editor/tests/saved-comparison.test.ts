@@ -8,7 +8,7 @@ import {
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { fileDocumentKey, filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { materializeFileSnapshotText } from '@/lib/file-snapshot'
-import type { SavedComparisonRead } from '@/features/editor/utils/saved-comparison'
+import type { SavedComparisonRead } from '@/lib/saved-comparison'
 import { vi } from 'vitest'
 
 test('keeps dirty live authority separate from the exact saved file revision', async ({

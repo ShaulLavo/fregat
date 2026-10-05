@@ -1,3 +1,4 @@
+import { snapshotTarget } from '../../../../test/factories/git-diff'
 import { describe } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
@@ -26,15 +27,18 @@ const NEW_OID = 'b'.repeat(40)
 test('historical diffs keep their immutable source and blob pair through URL reload', () => {
   const content = documentTab({
     kind: 'git-diff',
-    source: {
-      kind: 'snapshot',
-      source: 'historical',
-      path: filesystemPath('/repo/new.ts'),
-      oldPath: filesystemPath('/repo/old.ts'),
-      oldObjectId: OLD_OID,
-      newObjectId: NEW_OID,
-      status: 'renamed',
-    },
+    source: snapshotTarget({
+      kind: 'historical',
+      rootPath: ROOT,
+      path: '/repo/new.ts',
+      origin: { id: 'c'.repeat(40), parents: ['d'.repeat(40), 'e'.repeat(40)] },
+      revision: {
+        old: { kind: 'blob', objectId: OLD_OID },
+        new: { kind: 'blob', objectId: NEW_OID },
+        oldPath: '/repo/old.ts',
+        status: 'renamed',
+      },
+    }),
   })
   expect(throughUrl(ROOT, content)).toEqual(content)
   expect(
@@ -80,6 +84,7 @@ test('refuses a checkpoint view owned by another workspace', () => {
     kind: 'git-diff',
     source: {
       kind: 'checkpoint-session',
+      ignoreWhitespace: true,
       owner: workspaceRoot('/other'),
       sessionId: TEST_SESSION_ID,
       fromTurnCount: 0,
@@ -106,15 +111,17 @@ describe('snapshot metadata', () => {
     (status) => {
       const content = documentTab({
         kind: 'git-diff',
-        source: {
-          kind: 'snapshot',
-          path: filesystemPath('/repo/src/a.ts'),
-          source: 'worktree',
-          oldObjectId: status === 'untracked' ? undefined : OLD_OID,
-          newObjectId: status === 'deleted' ? undefined : NEW_OID,
-          oldPath: status === 'renamed' ? filesystemPath('/repo/src/old name.ts') : undefined,
-          status,
-        },
+        source: snapshotTarget({
+          kind: 'captured-review',
+          rootPath: ROOT,
+          path: '/repo/src/a.ts',
+          revision: {
+            old: status === 'untracked' ? { kind: 'missing' } : { kind: 'blob', objectId: OLD_OID },
+            new: status === 'deleted' ? { kind: 'missing' } : { kind: 'blob', objectId: NEW_OID },
+            oldPath: status === 'renamed' ? '/repo/src/old name.ts' : '/repo/src/a.ts',
+            status,
+          },
+        }),
       })
       expect(throughUrl(ROOT, content)).toEqual(content)
     },
@@ -122,7 +129,9 @@ describe('snapshot metadata', () => {
 
   test('accepts SHA-256 object ids', () => {
     const oid = 'c'.repeat(64)
-    expect(contentForDocumentToken(ROOT, `d/worktree/${oid}..${oid}/a.ts`).kind).toBe('content')
+    expect(
+      contentForDocumentToken(ROOT, `d/captured-review/${oid}..${oid},s=modified,r=a.ts/a.ts`).kind,
+    ).toBe('content')
   })
 
   test.each(['d/worktree/_.._/a.ts', 'd/worktree/zzz..zzz/a.ts', 'd/bogus/a..b/a.ts'])(
@@ -132,9 +141,9 @@ describe('snapshot metadata', () => {
     },
   )
 
-  test('reports branch diffs as unavailable', () => {
+  test('rejects old branch diff metadata', () => {
     expect(contentForDocumentToken(ROOT, `d/branch/${OLD_OID}..${NEW_OID}/src/a.ts`).kind).toBe(
-      'unavailable',
+      'rejected',
     )
   })
 })
@@ -169,7 +178,7 @@ describe('untrusted URL input', () => {
 
   test('does not promote arbitrary revision or status strings into checkpoint metadata', () => {
     expect(
-      contentForDocumentToken(ROOT, `k/${TEST_SESSION_ID}/1..2,s=notastatus,o=nothex/src/a.ts`),
+      contentForDocumentToken(ROOT, `k/${TEST_SESSION_ID}/1..2,w=1,s=notastatus,o=nothex/src/a.ts`),
     ).toMatchObject({
       kind: 'content',
       content: {
@@ -178,6 +187,7 @@ describe('untrusted URL input', () => {
           kind: 'git-diff',
           source: {
             kind: 'checkpoint-file',
+            ignoreWhitespace: true,
             oldObjectId: undefined,
             status: undefined,
           },

@@ -3,7 +3,7 @@
 // features/address/utils/document-token.ts, which uses a different, current encoding.
 
 import * as v from 'valibot'
-import { sessionIdSchema } from '@workspace/contracts'
+import { sessionIdSchema, gitSnapshotTargetSchema } from '@workspace/contracts'
 import {
   conflictId,
   fileDocument,
@@ -11,6 +11,7 @@ import {
   filesystemPath,
   settingsJsonDocument,
 } from '@/lib/documents/utils/identity'
+import { decodeTabContent } from '@/lib/documents/utils/storage-codec'
 import { documentTab, settingsTab } from '@/lib/documents/utils/tabs'
 import type {
   DocumentRef,
@@ -51,18 +52,11 @@ const refSchema = v.object({
   path: v.pipe(v.string(), v.minLength(1)),
   ref: v.pipe(v.string(), v.minLength(1)),
 })
-const snapshotSchema = v.pipe(
-  v.object({
-    ...revisionEntries,
-    version: v.literal(2),
-    path: v.string(),
-    source: v.optional(v.picklist(['staged', 'worktree'])),
-  }),
-  v.check((value) => Boolean(value.oldObjectId || value.newObjectId)),
-)
+const snapshotSchema = v.object({ version: v.literal(3), target: gitSnapshotTargetSchema })
 const checkpointSchema = v.pipe(
   v.object({
     ...revisionEntries,
+    ignoreWhitespace: v.boolean(),
     version: v.literal(1),
     path: v.string(),
     filePath: v.optional(v.string()),
@@ -114,29 +108,23 @@ function decodeReference(value: string): DecodedDocumentTarget {
 
 function decodeComparison(value: string, owner: WorkspaceRoot): DecodedDocumentTarget {
   const body = value.slice('git-diff:'.length)
-  if (body.startsWith('v2:')) return decodeSnapshot(body.slice(3))
+  if (body.startsWith('v3:')) return decodeSnapshot(body.slice(3), owner)
   if (body.startsWith('checkpoint-v1:'))
     return decodeCheckpoint(body.slice('checkpoint-v1:'.length), owner)
   return invalidTarget()
 }
 
-function decodeSnapshot(encoded: string): DecodedDocumentTarget {
+function decodeSnapshot(encoded: string, owner: WorkspaceRoot): DecodedDocumentTarget {
   const result = v.safeParse(snapshotSchema, jsonPayload(encoded))
   if (!result.success) return invalidTarget()
-  const value = result.output
-  if (invalidPaths(value.path, value.oldPath)) return invalidTarget()
-  return tabResult({
-    kind: 'git-diff',
-    source: {
-      kind: 'snapshot',
-      path: filesystemPath(value.path),
-      source: value.source,
-      newObjectId: value.newObjectId,
-      oldObjectId: value.oldObjectId,
-      oldPath: value.oldPath === undefined ? undefined : filesystemPath(value.oldPath),
-      status: value.status,
+  const content = decodeTabContent(
+    {
+      kind: 'document',
+      document: { kind: 'git-diff', source: { kind: 'snapshot', target: result.output.target } },
     },
-  })
+    owner,
+  )
+  return content ? { kind: 'tab', content } : invalidTarget()
 }
 
 function decodeCheckpoint(encoded: string, owner: WorkspaceRoot): DecodedDocumentTarget {
@@ -146,6 +134,7 @@ function decodeCheckpoint(encoded: string, owner: WorkspaceRoot): DecodedDocumen
   if (invalidPaths(value.path, value.filePath, value.oldPath)) return invalidTarget()
   const range = {
     owner,
+    ignoreWhitespace: value.ignoreWhitespace,
     sessionId: value.sessionId,
     fromTurnCount: value.fromTurnCount,
     toTurnCount: value.toTurnCount,

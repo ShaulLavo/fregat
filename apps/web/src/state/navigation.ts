@@ -1,4 +1,4 @@
-import { diffQueryOptions } from '@/features/git/utils/diff-query'
+import { diffQueryOptions } from '@/lib/git-diff-query'
 import { claimDiffIntent } from '@/lib/intent-prefetch/state/query-intent'
 import { workspacePathLeaf } from '@workspace/client-core/files/path'
 import { createComposerDraftNavigation } from '@/state/composer-draft-navigation'
@@ -18,6 +18,7 @@ import {
   workspaceAddressFor,
 } from '@/state/navigation-workspace'
 import { fetchGitFile } from '@/features/git/utils/api'
+import { blobDiffQueryKey } from '@/lib/blob-diff-query'
 import { snapshotDocument } from '@/lib/documents/utils/comparisons'
 import {
   createTabId,
@@ -26,7 +27,13 @@ import {
   filesystemPath,
 } from '@/lib/documents/utils/identity'
 import { documentTab, settingsTab } from '@/lib/documents/utils/tabs'
-import type { DocumentRef, FilesystemPath, TabContent, TabId } from '@/lib/documents/utils/types'
+import type {
+  DocumentRef,
+  FilesystemPath,
+  GitComparison,
+  TabContent,
+  TabId,
+} from '@/lib/documents/utils/types'
 import type { ChangeRow } from '@/features/git/utils/types'
 import { gitKeys } from '@/lib/query-keys'
 import { emptySearchBuffer, searchHistoryQuerySnapshot } from '@/features/search/state/buffer-state'
@@ -134,7 +141,6 @@ import {
 } from '@/features/editor/state/group-mutations'
 import { runMutation } from '@/lib/mutations/run'
 import { createWideEventScope } from '@/lib/wide-event-scope'
-import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import {
   beginPressPaint,
   endPressPaint,
@@ -241,7 +247,18 @@ export function createNavigation(
     if (owner && coordinator.getApplication()?.getSnapshot().editor.workspaceStore !== owner)
       return Promise.resolve({ status: 'superseded' })
     const current = coordinator.currentAddress()
-    const rootPath = owner?.getState().rootFolder?.path ?? null
+    const comparison =
+      content.kind === 'document' && content.document.kind === 'git-diff'
+        ? content.document.source
+        : null
+    const capturedRoot = comparison === null ? null : comparisonRoot(comparison)
+    const rootPath =
+      owner?.getState().rootFolder?.path ??
+      coordinator.getApplication()?.getSnapshot().editor.workspaceStore.getState().rootFolder
+        ?.path ??
+      null
+    if (capturedRoot !== null && capturedRoot !== rootPath)
+      return Promise.resolve({ status: 'superseded' })
     if (owner && !addressWithContent(current, content, rootPath, focus)) {
       return coordinator.transient((application) => {
         assertOwner(application, owner)
@@ -251,29 +268,39 @@ export function createNavigation(
           apply.openDefinition(definitionTargetFor(content.document.resource.path, focus))
           return
         }
+        if (
+          capturedRoot !== null &&
+          application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path !==
+            capturedRoot
+        )
+          return
         apply.openTabContent(content)
       })
     }
-    return ownedRequest(owner, ({ application, address }) => {
-      assertOwner(application, owner)
-      const root =
-        application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path ?? null
-      const next = addressWithContent(address, content, root, focus)
-      if (!next) throw createClientInvariantError('This document has no workspace address.')
-      const phone = withPhoneTab(application, address, next, root)
-      return {
-        address: {
-          ...phone.address,
-          settings: categoryForAddress(settingsCategory, next.settings),
-        },
-        replace: replace ?? editorDocumentToken(next) === editorDocumentToken(address),
-        historyTarget: { kind: 'editor' },
-        beforeApply: () => {
-          revealEditor(application)
-          phone.claim()
-        },
-      }
-    })
+    return ownedRequest(
+      owner,
+      ({ application, address }) => {
+        assertOwner(application, owner)
+        const root =
+          application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path ?? null
+        const next = addressWithContent(address, content, root, focus)
+        if (!next) throw createClientInvariantError('This document has no workspace address.')
+        const phone = withPhoneTab(application, address, next, root)
+        return {
+          address: {
+            ...phone.address,
+            settings: categoryForAddress(settingsCategory, next.settings),
+          },
+          replace: replace ?? editorDocumentToken(next) === editorDocumentToken(address),
+          historyTarget: { kind: 'editor' },
+          beforeApply: () => {
+            revealEditor(application)
+            phone.claim()
+          },
+        }
+      },
+      capturedRoot ?? undefined,
+    )
   }
 
   function openFile({
@@ -700,53 +727,65 @@ export function createNavigation(
     openDiff({
       owner,
       row,
+      rootPath,
       replace,
     }: {
       readonly owner: EditorWorkspaceStoreApi
+      readonly rootPath: string
       readonly row: ChangeRow
       /** Replaces the history entry: stepping between files is one place, not a trail. */
       readonly replace?: boolean
     }) {
       const staged = row.section === 'staged'
+      const capturedRoot = filesystemPath(rootPath)
+      if (owner.getState().rootFolder?.path !== capturedRoot)
+        return Promise.resolve({ status: 'superseded' } satisfies NavigationResult)
       const path = row.file.path
       beginPressPaint(
         'diffs',
         path,
         createWideEventScope({ action: 'editor.command.open_diff', area: 'git', path, staged }),
       )
-      const request = ownedRequest(owner, async ({ application, address }) => {
-        const queryClient = application.getSnapshot().queryClient
-        const listCached = queryClient.getQueryData(gitKeys.diff(path, staged)) !== undefined
-        // Query signal only: a fetch shared by key must not die with one caller's navigation.
-        claimDiffIntent(queryClient, gitKeys.diff(path, staged))
-        const diffs = await queryClient.query(diffQueryOptions(path, staged))
-        const diff = diffs.find((entry) => entry.path === path || entry.oldPath === path)
-        const document = diff ? snapshotDocument(diff) : null
-        // The row outlived its change (committed or discarded before status refreshed): drop the row, stay put.
-        if (!document) {
-          endPressPaint('diffs', path, 'change-gone')
-          void queryClient.invalidateQueries({ queryKey: gitKeys.statuses() })
-          return { address, replace: true, preserveTransient: true }
-        }
-        const blobCached =
-          listCached &&
-          queryClient.getQueryData(diffDocumentQueryKey(document.source)) !== undefined
-        notePressPrefetch('diffs', path, diffPrefetch(listCached, blobCached))
-        const root = owner.getState().rootFolder?.path ?? null
-        const next = addressWithContent(address, documentTab(document), root)
-        if (!next)
-          throw createClientInvariantError('The requested change has no workspace address.')
-        const phone = withPhoneTab(application, address, next, root)
-        return {
-          address: phone.address,
-          historyTarget: { kind: 'editor' },
-          replace: replace ?? editorDocumentToken(next) === editorDocumentToken(address),
-          beforeApply: () => {
-            revealEditor(application)
-            phone.claim()
-          },
-        }
-      })
+      const request = ownedRequest(
+        owner,
+        async ({ application, address }) => {
+          const queryClient = application.getSnapshot().queryClient
+          const listCached = queryClient.getQueryData(gitKeys.diff(path, staged)) !== undefined
+          // Query signal only: a fetch shared by key must not die with one caller's navigation.
+          claimDiffIntent(queryClient, gitKeys.diff(path, staged))
+          const diffs = await queryClient.query(diffQueryOptions(path, staged))
+          const diff = diffs.find((entry) => entry.path === path || entry.oldPath === path)
+          const document = diff
+            ? snapshotDocument(diff, capturedRoot, staged ? 'staged' : 'worktree')
+            : null
+          // The row outlived its change (committed or discarded before status refreshed): drop the row, stay put.
+          if (!document) {
+            endPressPaint('diffs', path, 'change-gone')
+            void queryClient.invalidateQueries({ queryKey: gitKeys.statuses() })
+            return { address, replace: true, preserveTransient: true }
+          }
+          const blobCached =
+            listCached &&
+            diff !== undefined &&
+            queryClient.getQueryData(blobDiffQueryKey(diff)) !== undefined
+          notePressPrefetch('diffs', path, diffPrefetch(listCached, blobCached))
+          const root = owner.getState().rootFolder?.path ?? null
+          const next = addressWithContent(address, documentTab(document), root)
+          if (!next)
+            throw createClientInvariantError('The requested change has no workspace address.')
+          const phone = withPhoneTab(application, address, next, root)
+          return {
+            address: phone.address,
+            historyTarget: { kind: 'editor' },
+            replace: replace ?? editorDocumentToken(next) === editorDocumentToken(address),
+            beforeApply: () => {
+              revealEditor(application)
+              phone.claim()
+            },
+          }
+        },
+        capturedRoot,
+      )
       void request.then(
         (result) => {
           if (result.status !== 'applied') endPressPaint('diffs', path, result.status)
@@ -1099,4 +1138,8 @@ function beginTabPress(owner: EditorWorkspaceStoreApi, groupId: GroupId, tabId: 
     target,
     createWideEventScope({ action: 'editor.command.select_tab', area: 'editor', groupId, tabId }),
   )
+}
+
+function comparisonRoot(comparison: GitComparison): FilesystemPath {
+  return comparison.kind === 'snapshot' ? comparison.target.rootPath : comparison.owner
 }

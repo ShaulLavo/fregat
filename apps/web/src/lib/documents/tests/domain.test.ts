@@ -84,8 +84,7 @@ test('every unsavable document remains distinct from a filesystem destination', 
       kind: 'git-diff',
       source: {
         kind: 'snapshot',
-        path: resource.path,
-        newObjectId: 'b'.repeat(40),
+        target: { kind: 'moving', rootPath: root, path: resource.path, changeSource: 'worktree' },
       },
     },
     { kind: 'compare-saved', file: resource },
@@ -109,6 +108,7 @@ for (const kind of ['checkpoint-session', 'checkpoint-turn'] as const) {
       kind: 'git-diff',
       source: {
         kind,
+        ignoreWhitespace: true,
         owner: root,
         sessionId: TEST_SESSION_ID,
         fromTurnCount: 0,

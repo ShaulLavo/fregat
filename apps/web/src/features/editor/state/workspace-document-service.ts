@@ -1,3 +1,10 @@
+import {
+  sameCheckpointCapture,
+  promoteCheckpointCapture,
+  sameHistoryCapture,
+  sameOperationCapture,
+  operationComparisonSubject,
+} from '@/lib/snapshot-comparison'
 import { isPdfFile } from '@/lib/pdf-viewer/format'
 import { pdfError } from '@/lib/pdf-viewer/structured-errors'
 import {
@@ -9,6 +16,7 @@ import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
 import { createBinaryFileError, createClientInvariantError } from '@/lib/structured-errors'
 
+import { sameGitInputRevision } from '@/lib/documents/utils/comparisons'
 import { contentRevisionForText, fileContentRevision } from '@/features/editor/utils/text-snapshot'
 import { textSnapshotEqualsText } from '@/lib/text-snapshot-equality'
 import type { PreparedFileOpenClaim } from '@/lib/file-open-intent/types'
@@ -45,7 +53,7 @@ import type {
   SavedComparisonRequest,
   SavedComparisonScope,
   SavedComparisonRefresh,
-} from '@/features/editor/utils/saved-comparison'
+} from '@/lib/saved-comparison'
 import {
   createEditorViewSession,
   acquireDocumentMutationLease,
@@ -243,6 +251,7 @@ type SnapshotComparisonInterest = {
 }
 
 export type WorkspaceDocumentServiceState = {
+  readonly environmentId: EnvironmentId | null
   snapshotComparisonTabs: ReadonlyMap<TabId, SnapshotComparisonLease>
   snapshotComparisons: ReadonlyMap<SnapshotComparisonLease, SnapshotComparisonRead>
   savedComparisonTabs: ReadonlyMap<TabId, SavedComparisonLease>
@@ -268,7 +277,7 @@ export class WorkspaceDocumentService {
   private snapshotComparisonTabs: ReadonlyMap<TabId, SnapshotComparisonLease> = new Map()
   private snapshotComparisons: ReadonlyMap<SnapshotComparisonLease, SnapshotComparisonRead> =
     new Map()
-  private readonly snapshotGroups = new Map<string, SnapshotComparisonGroup>()
+  private readonly snapshotGroups = new Map<string, Set<SnapshotComparisonGroup>>()
   private readonly snapshotInterests = new Map<
     SnapshotComparisonLease,
     SnapshotComparisonInterest
@@ -324,6 +333,10 @@ export class WorkspaceDocumentService {
     tabId?: TabId,
   ): SnapshotComparisonLease {
     this.assertComparisonOwner(input.scope)
+    if (!validSnapshotCapture(input))
+      throw createClientInvariantError('Comparison capture does not match its target', {
+        rootMatches: comparisonRoot(input) === input.scope.rootPath,
+      })
     const entry: SnapshotComparisonInterest = {
       current: {
         kind: 'released',
@@ -348,13 +361,20 @@ export class WorkspaceDocumentService {
     }
     if (this.sourceOwnerDisposed || signal.aborted) return lease
     const key = snapshotGroupKey(input)
-    const group = this.snapshotGroups.get(key) ?? {
+    const groups = this.snapshotGroups.get(key) ?? new Set<SnapshotComparisonGroup>()
+    const retained =
+      input.kind === 'history' || input.kind === 'operation'
+        ? [...groups].find((candidate) => compatibleCapture(candidate.current.input, input))
+        : groups.values().next().value
+    const group = retained ?? {
       current: { kind: 'ready' as const, input },
       interests: new Map(),
       refresh: null,
     }
-    this.snapshotGroups.set(key, group)
-    if (group.current.input !== input) this.publishSnapshotInput(group, input)
+    groups.add(group)
+    this.snapshotGroups.set(key, groups)
+    if (group.current.input !== input && compatibleCapture(group.current.input, input))
+      this.publishSnapshotInput(group, input)
     entry.group = group
     entry.current = group.current
     group.interests.set(lease, entry)
@@ -373,6 +393,10 @@ export class WorkspaceDocumentService {
     request: SnapshotComparisonRequest,
   ): SnapshotComparisonLease {
     this.assertComparisonOwner(request.input.scope)
+    if (!validSnapshotCapture(request.input))
+      throw createClientInvariantError('Comparison capture does not match its target', {
+        rootMatches: comparisonRoot(request.input) === request.input.scope.rootPath,
+      })
     if (this.sourceOwnerDisposed || request.signal.aborted)
       return this.acquireSnapshotComparison(request)
     const previous = this.snapshotComparisonTabs.get(tabId)
@@ -380,7 +404,8 @@ export class WorkspaceDocumentService {
     if (
       previous &&
       read?.kind === 'ready' &&
-      snapshotGroupKey(read.input) === snapshotGroupKey(request.input)
+      snapshotGroupKey(read.input) === snapshotGroupKey(request.input) &&
+      compatibleCapture(read.input, request.input)
     ) {
       if (read.input !== request.input) previous.refresh(request.input, previous.requestRefresh())
       return previous
@@ -1456,6 +1481,7 @@ export class WorkspaceDocumentService {
     const previous = this.cachedState
     const viewsByTabId = recordFromMap(this.viewsByTabId, previous?.viewsByTabId)
     const next: WorkspaceDocumentServiceState = {
+      environmentId: this.environmentId,
       snapshotComparisonTabs: this.snapshotComparisonTabs,
       snapshotComparisons: this.snapshotComparisons,
       savedComparisonTabs: this.savedComparisonTabs,
@@ -1818,6 +1844,8 @@ export class WorkspaceDocumentService {
       return false
     if (
       input.scope.environmentId !== this.environmentId ||
+      !validSnapshotCapture(input) ||
+      !compatibleCapture(entry.group.current.input, input) ||
       snapshotGroupKey(input) !== snapshotGroupKey(entry.group.current.input)
     )
       return false
@@ -1832,6 +1860,11 @@ export class WorkspaceDocumentService {
     group: SnapshotComparisonGroup,
     input: SnapshotComparisonInput,
   ): void {
+    if (group.current.input.kind === 'checkpoint' && input.kind === 'checkpoint') {
+      const promoted = promoteCheckpointCapture(group.current.input, input)
+      if (!promoted) return
+      input = promoted
+    }
     group.refresh = null
     const read = { kind: 'ready' as const, input }
     group.current = read
@@ -1853,8 +1886,12 @@ export class WorkspaceDocumentService {
     const group = entry.group
     if (group.refresh?.lease === lease) group.refresh = null
     group.interests.delete(lease)
-    if (group.interests.size === 0)
-      this.snapshotGroups.delete(snapshotGroupKey(group.current.input))
+    if (group.interests.size === 0) {
+      const key = snapshotGroupKey(group.current.input)
+      const groups = this.snapshotGroups.get(key)
+      groups?.delete(group)
+      if (groups?.size === 0) this.snapshotGroups.delete(key)
+    }
     entry.group = null
     entry.refresh = null
     entry.current = { kind: 'released', reason }
@@ -2126,5 +2163,82 @@ function assertTextFile(file: FileSnapshot): void {
 }
 
 function snapshotGroupKey(input: SnapshotComparisonInput): string {
-  return JSON.stringify([input.scope.rootPath, input.subject])
+  switch (input.kind) {
+    case 'operation':
+      return operationComparisonSubject(input)
+    case 'history':
+      return JSON.stringify(['history', input.scope.rootPath, input.subject])
+    case 'checkpoint':
+      return JSON.stringify([
+        input.scope.rootPath,
+        input.subject,
+        input.files.map((file) => [file.path, file.revision, file.hunks.map((hunk) => hunk.id)]),
+      ])
+    case 'snapshot':
+      return JSON.stringify([input.scope.rootPath, input.subject])
+  }
+  const exhaustive: never = input
+  return exhaustive
+}
+
+function validSnapshotCapture(input: SnapshotComparisonInput): boolean {
+  switch (input.kind) {
+    case 'operation':
+      return (
+        input.subject === operationComparisonSubject(input) &&
+        input.root.path === input.scope.rootPath &&
+        input.old.snapshot === input.segment.snapshotBefore &&
+        input.new.snapshot === input.segment.snapshotAfter &&
+        input.segment.steps.some((step) => step.operationIndex === input.operationIndex) &&
+        input.display.oldPath === input.path &&
+        input.display.newPath === input.path
+      )
+    case 'history':
+      return input.subject === documentKey({ kind: 'history', file: { path: input.path } })
+    case 'checkpoint':
+      return (
+        input.comparison.owner === input.scope.rootPath &&
+        input.subject === documentKey({ kind: 'git-diff', source: input.comparison })
+      )
+    case 'snapshot': {
+      const target = input.comparison.target
+      return (
+        target.rootPath === input.scope.rootPath &&
+        input.subject === documentKey({ kind: 'git-diff', source: input.comparison }) &&
+        (target.kind === 'moving' || sameGitInputRevision(target.revision, input.revision))
+      )
+    }
+  }
+  const exhaustive: never = input
+  return exhaustive
+}
+
+function comparisonRoot(input: SnapshotComparisonInput): FilesystemPath {
+  switch (input.kind) {
+    case 'operation':
+      return input.root.path
+    case 'history':
+      return input.scope.rootPath
+    case 'checkpoint':
+      return input.comparison.owner
+    case 'snapshot':
+      return input.comparison.target.rootPath
+  }
+  const exhaustive: never = input
+  return exhaustive
+}
+
+function compatibleCapture(left: SnapshotComparisonInput, right: SnapshotComparisonInput): boolean {
+  switch (left.kind) {
+    case 'operation':
+      return right.kind === 'operation' && sameOperationCapture(left, right)
+    case 'history':
+      return right.kind === 'history' && sameHistoryCapture(left, right)
+    case 'checkpoint':
+      return right.kind === 'checkpoint' && sameCheckpointCapture(left, right)
+    case 'snapshot':
+      return right.kind === 'snapshot'
+  }
+  const exhaustive: never = left
+  return exhaustive
 }

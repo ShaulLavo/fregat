@@ -1,5 +1,6 @@
-import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
-import type { EditorTextBuffer } from '@singapore-editor/core/document'
+import { Profiler, type ProfilerOnRenderCallback } from 'react'
+import { fileDocumentKey, filesystemPath, tabId } from '@/lib/documents/utils/identity'
+import { createEditorBufferSession, type EditorTextBuffer } from '@singapore-editor/core/document'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
@@ -18,6 +19,7 @@ import {
   commitHistoryBarrier,
   historyDocument,
 } from '../../../../../test/factories/history-document'
+import { testScopedStorage } from '../../../../../test/factories/scoped-storage'
 import { holdToConfirm } from '../../../../../test/hold'
 
 const FILE = filesystemPath('repo/a.ts')
@@ -43,6 +45,37 @@ test('lists every retained state and diffs a focused one against the current tex
   await waitFor(() => {
     expect(diffRowTexts()).toEqual(expect.arrayContaining(['alphaonetwo', 'alphaone']))
   })
+  const read = rendered.store.getState().snapshotComparisonTabs.get(tabId('tab-history'))?.read()
+  expect(read?.kind).toBe('ready')
+  if (read?.kind !== 'ready' || read.input.kind !== 'history')
+    throw new RangeError('retained history capture required')
+  const input = read.input
+  const graph = buffer.getHistoryGraph()
+  const current = graph.nodes.find((node) => node.id === graph.currentId)!
+  const focused = graph.nodes[1]!
+  expect(read.input.buffer).toBe(buffer)
+  expect(read.input.old.id).toBe(current.id)
+  expect(read.input.old.revision).toBe(current.revision)
+  expect(input.old.snapshot).toBe(current.snapshot)
+  expect(read.input.new.id).toBe(focused.id)
+  expect(read.input.new.snapshot).toBe(focused.snapshot)
+  const session = createEditorBufferSession(buffer)
+  session.setSelection(5)
+  session.applyText('A')
+  session.applyText('B')
+  await waitFor(() => {
+    const latest = rendered.store
+      .getState()
+      .snapshotComparisonTabs.get(tabId('tab-history'))
+      ?.read()
+    expect(latest?.kind).toBe('ready')
+    if (latest?.kind !== 'ready' || latest.input.kind !== 'history')
+      throw new RangeError('retained replacement history required')
+    expect(latest.input.old.snapshot).not.toBe(input.old.snapshot)
+  })
+  session.undo()
+  expect(input.old.snapshot).toBe(current.snapshot)
+  expect(read.input.new.snapshot).toBe(focused.snapshot)
   expect(states).toHaveAttribute('aria-activedescendant', options[1]!.id)
 
   await user.click(screen.getByRole('button', { name: 'Use this version' }))
@@ -142,7 +175,7 @@ test('the barrier before a workspace edit is a state of its own', async () => {
 test('moving into a group with another history tab preserves the selected barrier', async () => {
   stubEditorViewport()
   stubHighlightApi()
-  const store = createEditorDocumentStore()
+  const store = createEditorDocumentStore({ environmentId: testScopedStorage.environmentId })
   const uiStore = createEditorUiStore()
   const otherFile = filesystemPath('repo/b.ts')
   for (const path of [FILE, otherFile]) {
@@ -158,11 +191,15 @@ test('moving into a group with another history tab preserves the selected barrie
             {moved ? (
               <div>Another selected tab</div>
             ) : (
-              <HistoryView path={FILE} tabId={tabId('a')} />
+              <HistoryView rootPath={filesystemPath('repo')} path={FILE} tabId={tabId('a')} />
             )}
           </section>
           <section aria-label='Destination group'>
-            <HistoryView path={moved ? FILE : otherFile} tabId={tabId(moved ? 'a' : 'b')} />
+            <HistoryView
+              rootPath={filesystemPath('repo')}
+              path={moved ? FILE : otherFile}
+              tabId={tabId(moved ? 'a' : 'b')}
+            />
           </section>
         </EditorUiStateContext>
       </EditorDocumentStateContext>
@@ -186,9 +223,180 @@ test('moving into a group with another history tab preserves the selected barrie
   expect(await source.findByText('A multi-file edit blocks earlier versions.')).toBeInTheDocument()
 })
 
-async function renderHistory({ edits }: { edits: readonly string[] | null }) {
+test('replacing the actual live buffer clears the former logical history capture', async () => {
+  stubEditorViewport()
+  const user = userEvent.setup()
+  const rendered = await renderHistory({ edits: ['one', 'two'] })
+  await user.click((await screen.findAllByRole('option'))[1]!)
+  await waitFor(() => expect(rendered.store.getState().snapshotComparisons.size).toBe(2))
+  const old = rendered.store.getState().snapshotComparisonTabs.get(tabId('tab-history'))!
+  rendered.store.getState().forceReplaceLiveEditorDocument({
+    path: FILE,
+    content: 'replacement\n',
+    version: 'v2',
+    mtimeMs: 2,
+    size: 12,
+  })
+  await screen.findByText('This is the current version.')
+  expect(old.read().kind).toBe('released')
+  expect(rendered.store.getState().snapshotComparisons.size).toBe(0)
+  expect(rendered.store.getState().getLiveEditorDocument(fileDocumentKey(FILE))?.buffer).not.toBe(
+    rendered.buffer,
+  )
+})
+
+test('a held history header stays captured while current restore availability changes', async () => {
+  stubEditorViewport()
+  const user = userEvent.setup()
+  let live: EditorTextBuffer | null = null
+  let store: ReturnType<typeof createEditorDocumentStore> | null = null
+  let injected = false
+  let target: ReturnType<EditorTextBuffer['getHistoryGraph']>['currentId'] | null = null
+  let currentBefore: ReturnType<EditorTextBuffer['getHistoryGraph']>['currentId'] | null = null
+  let currentAfter: ReturnType<EditorTextBuffer['getHistoryGraph']>['currentId'] | null = null
+  const titles: string[] = []
+  const restoreStates: boolean[] = []
+  const rendered = await renderHistory({
+    edits: ['one', 'two', 'three'],
+    onRender() {
+      if (!live || !store || !screen.queryByRole('status', { name: 'Comparing versions' })) return
+      const button = screen.getByRole('button', { name: 'Use this version' })
+      restoreStates.push(button.hasAttribute('disabled'))
+      const header = button.closest('[data-slot="pane-bar"]')?.querySelector('[title]')
+      titles.push(header?.getAttribute('title') ?? 'MISSING')
+      if (injected) return
+      if (target === null) return
+      currentBefore = live.getHistoryGraph().currentId
+      injected = true
+      live.checkoutHistoryState(target)
+      currentAfter = live.getHistoryGraph().currentId
+    },
+  })
+  live = rendered.buffer
+  store = rendered.store
+  const options = await screen.findAllByRole('option')
+  await user.click(options[1]!)
+  await waitFor(() => expect(diffRowTexts()).toContain('alphaonetwothree'))
+  const read = store.getState().snapshotComparisonTabs.get(tabId('tab-history'))?.read()
+  if (read?.kind !== 'ready' || read.input.kind !== 'history')
+    throw new RangeError('Actual focused capture required')
+  target = read.input.new.id
+  expect(target).not.toBe(live!.getHistoryGraph().currentId)
+  expect(screen.getByRole('button', { name: 'Use this version' })).toBeEnabled()
+  const states = screen.getByRole('listbox', { name: 'Versions' })
+  states.focus()
+  await user.keyboard('{Shift>}{ArrowRight}{/Shift}')
+  expect(injected).toBe(true)
+  expect(currentBefore).not.toBe(target)
+  expect(currentAfter).toBe(target)
+  expect(live!.getHistoryGraph().currentId).toBe(target)
+  expect(titles.length).toBeGreaterThan(0)
+  expect(titles).not.toContain('MISSING')
+  expect(titles.every((title) => !title.includes(', current'))).toBe(true)
+  expect(restoreStates).toContain(false)
+  expect(restoreStates).toContain(true)
+})
+
+test('pruning actual pending history withdraws current Restore authority and the former attachment', async () => {
+  stubEditorViewport()
+  const user = userEvent.setup()
+  let buffer: EditorTextBuffer | null = null
+  let injected = false
+  let removed = false
+  let target: number | null = null
+  const rendered = await renderHistory({
+    edits: ['one', 'two', 'three'],
+    onRender() {
+      if (
+        !buffer ||
+        injected ||
+        target === null ||
+        !screen.queryByRole('status', { name: 'Comparing versions' })
+      )
+        return
+      expect(buffer.getHistoryGraph().nodes.some((node) => node.id === target)).toBe(true)
+      injected = true
+      buffer.clearHistory()
+      removed = !buffer.getHistoryGraph().nodes.some((node) => node.id === target)
+    },
+  })
+  buffer = requireBuffer(rendered.buffer)
+  const options = await screen.findAllByRole('option')
+  await user.click(options[1]!)
+  await waitFor(() => expect(diffRowTexts()).toContain('alphaonetwothree'))
+  const lease = rendered.store.getState().snapshotComparisonTabs.get(tabId('tab-history'))!
+  const read = lease.read()
+  if (read.kind !== 'ready' || read.input.kind !== 'history')
+    throw new RangeError('Actual focused source required')
+  target = read.input.new.id
+  expect(screen.getByRole('button', { name: 'Use this version' })).toBeEnabled()
+  screen.getByRole('listbox', { name: 'Versions' }).focus()
+  await user.keyboard('{Shift>}{ArrowRight}{/Shift}')
+  expect(injected).toBe(true)
+  expect(removed).toBe(true)
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Use this version' })).toBeDisabled(),
+  )
+  await waitFor(() => expect(rendered.store.getState().snapshotComparisons.size).toBe(0))
+  expect(document.querySelector('.editor-diff-pane')).toBeNull()
+})
+
+test('actual current amendments leave the pending displayed history source captured', async () => {
+  stubEditorViewport()
+  const user = userEvent.setup()
+  let buffer: EditorTextBuffer | null = null
+  let injected = false
+  let amended = false
+  const samples: string[][] = []
+  const rendered = await renderHistory({
+    edits: ['one', 'two', 'three'],
+    onRender() {
+      if (!buffer || !screen.queryByRole('status', { name: 'Comparing versions' })) return
+      samples.push(diffRowTexts())
+      if (injected) return
+      injected = true
+      const editing = createEditorBufferSession(buffer)
+      editing.setSelection(5)
+      editing.applyText('A')
+      const graph = buffer.getHistoryGraph()
+      const before = graph.nodes.find((node) => node.id === graph.currentId)!
+      editing.applyText('B')
+      const after = buffer
+        .getHistoryGraph()
+        .nodes.find((node) => node.id === buffer!.getHistoryGraph().currentId)!
+      amended =
+        before.id === after.id &&
+        before.revision < after.revision &&
+        before.snapshot !== after.snapshot
+    },
+  })
+  buffer = requireBuffer(rendered.buffer)
+  await user.click((await screen.findAllByRole('option'))[1]!)
+  await waitFor(() => expect(diffRowTexts()).toContain('alphaonetwothree'))
+  const read = rendered.store.getState().snapshotComparisonTabs.get(tabId('tab-history'))?.read()
+  if (read?.kind !== 'ready' || read.input.kind !== 'history')
+    throw new RangeError('Actual focused capture required')
+  const old = read.input.old.snapshot
+  screen.getByRole('listbox', { name: 'Versions' }).focus()
+  await user.keyboard('{Shift>}{ArrowRight}{/Shift}')
+  expect(injected).toBe(true)
+  expect(amended).toBe(true)
+  expect(samples.length).toBeGreaterThan(0)
+  expect(samples.every((sample) => sample.includes('alphaonetwothree'))).toBe(true)
+  expect(buffer.materializeFullText()).toContain('alphaAB')
+  expect(read.input.old.snapshot).toBe(old)
+  expect(samples.flat().some((line) => line.includes('alphaAB'))).toBe(false)
+})
+
+async function renderHistory({
+  edits,
+  onRender,
+}: {
+  edits: readonly string[] | null
+  onRender?: ProfilerOnRenderCallback
+}) {
   stubHighlightApi()
-  const store = createEditorDocumentStore()
+  const store = createEditorDocumentStore({ environmentId: testScopedStorage.environmentId })
   const uiStore = createEditorUiStore()
   const focus = new FocusService()
   const document =
@@ -208,7 +416,14 @@ async function renderHistory({ edits }: { edits: readonly string[] | null }) {
     return (
       <EditorDocumentStateContext.Provider value={store}>
         <EditorUiStateContext value={uiStore}>
-          <HistoryView key={key} path={FILE} tabId={tabId('tab-history')} />
+          <Profiler id='actual-history-control' onRender={onRender ?? (() => undefined)}>
+            <HistoryView
+              rootPath={filesystemPath('repo')}
+              key={key}
+              path={FILE}
+              tabId={tabId('tab-history')}
+            />
+          </Profiler>
         </EditorUiStateContext>
       </EditorDocumentStateContext.Provider>
     )
@@ -217,6 +432,7 @@ async function renderHistory({ edits }: { edits: readonly string[] | null }) {
   return {
     ...rendered,
     buffer: document?.buffer ?? null,
+    store,
     focus,
     remount: () => rendered.rerender(body('after-move')),
   }

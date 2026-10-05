@@ -1,3 +1,19 @@
+import { editorQueryKeys } from '@/features/editor/utils/query-keys'
+import {
+  createWorkspaceTextChanges,
+  createWorkspaceResourcePreview,
+  textChangePreview,
+} from '../../../../test/factories/workspace-text-changes'
+import { readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
+import { DiffEditor } from '@/features/editor/components/diff-editor'
+import { operationDiffAttachment } from '@/lib/diff-attachment'
+import { EditorDocumentStateContext } from '@/features/editor/state/document-state'
+import { createOperationComparisonFixture } from '../../../../test/factories/operation-comparison'
+import { observeDiffEditors } from '../../../../test/factories/diff-attachment'
+import { stubEditorViewport } from '../../../../test/env/editor-viewport'
+import { stubHighlightApi } from '../../../../test/env/highlight-api'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -25,7 +41,7 @@ const RECOVERY: WorkspaceEditRecovery = {
   unrecoveredPaths: ['src/remaining.ts', 'package.json'].map(filesystemPath),
 }
 
-test('shows ordered diffs and dirty open unopened and resource labels', () => {
+test('shows ordered text and resource labels', () => {
   const harness = new DialogServiceHarness(awaitingSnapshot())
   renderDialogs(harness)
 
@@ -55,12 +71,6 @@ test('shows ordered diffs and dirty open unopened and resource labels', () => {
     expect(rows[index]).toHaveTextContent(label)
     expect(rows[index]).toHaveTextContent(targetLabels[index]!)
   }
-  expect(rows[0]).toHaveTextContent('let count = 1')
-  expect(rows[0]).toHaveTextContent('let count = 2')
-  expect(rows[1]).toHaveTextContent('export const open = false')
-  expect(rows[1]).toHaveTextContent('export const open = true')
-  expect(rows[2]).toHaveTextContent('unopened before')
-  expect(rows[2]).toHaveTextContent('unopened after')
   expect(rows[4]).toHaveTextContent('/repo/src/old.ts → /repo/src/renamed.ts')
   expect(within(dialog).getByText('7 changes')).toHaveClass('tabular-nums')
   expect(dialog).toHaveTextContent(
@@ -152,19 +162,30 @@ test('cancel restores focus and settles the producer as cancelled', async () => 
   }
 })
 
-test('apply uses Spinner and disables cancel after commit begins', async () => {
-  const user = userEvent.setup()
-  const harness = new DialogServiceHarness(awaitingSnapshot())
-  renderDialogs(harness)
-
-  await user.click(screen.getByRole('button', { name: 'Make these changes' }))
-
-  const apply = screen.getByRole('button', { name: 'Make these changes' })
-  expect(harness.confirmPreview).toHaveBeenCalledWith('10000000-0000-4000-8000-000000000063')
-  expect(apply).toBeDisabled()
-  expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
-  expect(apply.querySelector('[data-slot="spinner"]')).not.toBeNull()
-  expect(screen.getByText('Changing files…')).toBeInTheDocument()
+test('apply uses Spinner and disables cancel after commit begins', async ({ client, server }) => {
+  const fixture = await createWorkspaceResourcePreview(client)
+  const rendered = renderWithProviders(
+    <WorkspaceEditServiceContext value={fixture.service}>
+      <WorkspaceEditPreviewDialog />
+    </WorkspaceEditServiceContext>,
+  )
+  try {
+    const apply = screen.getByRole('button', { name: 'Make these changes' })
+    expect(apply).toBeEnabled()
+    act(() => apply.click())
+    expect(fixture.service.getSnapshot().phase).toBe('committing')
+    expect(fixture.service.getSnapshot().preview?.operationId).toBe(fixture.operationId)
+    expect(apply).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+    expect(apply.querySelector('[data-slot="spinner"]')).not.toBeNull()
+    expect(screen.getByText('Changing files…')).toBeInTheDocument()
+    await expect(fixture.pending).resolves.toEqual({ status: 'applied' })
+    expect(await readFile(join(server.root, 'created.ts'), 'utf8')).toBe('')
+  } finally {
+    fixture.service.cancelPreview(fixture.operationId)
+    await fixture.pending
+    rendered.unmount()
+  }
 })
 
 test('a stale preview disables apply and explains rerun', () => {
@@ -407,9 +428,9 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
     operationId: '10000000-0000-4000-8000-000000000063',
     rows: [
       {
-        afterText: 'let count = 2',
+        comparison: null,
+        file: null,
         annotationIds: [],
-        beforeText: 'let count = 1',
         ignored: false,
         index: 0,
         kind: 'text-document',
@@ -417,9 +438,9 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         targetKind: 'dirty',
       },
       {
-        afterText: 'export const open = true',
+        comparison: null,
+        file: null,
         annotationIds: [],
-        beforeText: 'export const open = false',
         ignored: false,
         index: 1,
         kind: 'text-document',
@@ -427,9 +448,9 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         targetKind: 'open',
       },
       {
-        afterText: 'unopened after',
+        comparison: null,
+        file: null,
         annotationIds: [],
-        beforeText: 'unopened before',
         ignored: false,
         index: 2,
         kind: 'text-document',
@@ -437,6 +458,8 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         targetKind: 'unopened',
       },
       {
+        comparison: null,
+        file: null,
         annotationIds: [],
         ignored: false,
         index: 3,
@@ -444,6 +467,8 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         path: filesystemPath('/repo/src/new.ts'),
       },
       {
+        comparison: null,
+        file: null,
         annotationIds: [],
         fromPath: filesystemPath('/repo/src/old.ts'),
         ignored: false,
@@ -453,6 +478,8 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         toPath: filesystemPath('/repo/src/renamed.ts'),
       },
       {
+        comparison: null,
+        file: null,
         annotationIds: [],
         ignored: false,
         index: 5,
@@ -460,6 +487,8 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         path: filesystemPath('/repo/src/removed.ts'),
       },
       {
+        comparison: null,
+        file: null,
         annotationIds: [],
         ignored: true,
         index: 6,
@@ -471,3 +500,212 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
     ...overrides,
   }
 }
+
+test('actual operation preview installs its captured file and independently releases the mounted view', async ({
+  server,
+  client,
+}) => {
+  stubHighlightApi()
+  stubEditorViewport({ height: 160, width: 420 })
+  const fixture = await createOperationComparisonFixture(server.root, client)
+  const observation = observeDiffEditors()
+  const rendered = renderWithProviders(
+    <EditorDocumentStateContext value={fixture.store}>
+      <WorkspaceEditServiceContext value={fixture.service}>
+        <WorkspaceEditPreviewDialog />
+      </WorkspaceEditServiceContext>
+    </EditorDocumentStateContext>,
+  )
+  await waitFor(() => expect(observation.all().length).toBe(1))
+  await waitFor(() =>
+    expect(observation.read('stacked').editor.materializeFullText()).toContain('after'),
+  )
+  expect(fixture.store.getState().snapshotComparisons.size).toBe(2)
+  expect(observation.read('stacked').editor.materializeFullText()).toContain('before')
+  expect(fixture.row.file).toBe(fixture.input.display)
+  expect([...fixture.store.getState().snapshotComparisons.values()]).toContain(fixture.read)
+  const installed = observation.read('stacked')
+  expect(installed.snapshot.textSnapshot.readRange(0, installed.snapshot.textSnapshot.length)).toBe(
+    installed.editor.materializeFullText(),
+  )
+  const secondView = renderWithProviders(
+    <EditorDocumentStateContext value={fixture.store}>
+      <div style={{ height: 160 }}>
+        <DiffEditor
+          attachment={operationDiffAttachment(fixture.read, fixture.file)}
+          mode='stacked'
+        />
+      </div>
+    </EditorDocumentStateContext>,
+  )
+  await waitFor(() => expect(observation.all().length).toBe(2))
+  expect(fixture.store.getState().snapshotComparisons.size).toBe(3)
+  expect(observation.all()[0]!.editor).not.toBe(observation.all()[1]!.editor)
+  for (const view of observation.all()) expect(view.editor.materializeFullText()).toContain('after')
+  secondView.unmount()
+  expect(fixture.store.getState().snapshotComparisons.size).toBe(2)
+  await waitFor(() => expect(observation.all()).toHaveLength(1))
+  rendered.unmount()
+  expect(fixture.store.getState().snapshotComparisons.size).toBe(1)
+  expect(fixture.document.buffer.materializeFullText()).toBe(
+    fixture.input.old.materializeFullText(),
+  )
+  fixture.service.cancelPreview(fixture.operationId)
+  await fixture.pending
+  expect(fixture.store.getState().snapshotComparisons.size).toBe(0)
+})
+
+test('cold native import and installed zero geometry both refuse confirmation', async ({
+  client,
+  server,
+}) => {
+  stubHighlightApi()
+  const key = editorQueryKeys.previewDiffModule
+  resourceQueryClient.removeQueries({ queryKey: key })
+  const fixture = await createOperationComparisonFixture(server.root, client)
+  const rendered = renderWithProviders(
+    <EditorDocumentStateContext value={fixture.store}>
+      <WorkspaceEditServiceContext value={fixture.service}>
+        <WorkspaceEditPreviewDialog />
+      </WorkspaceEditServiceContext>
+    </EditorDocumentStateContext>,
+  )
+  try {
+    const button = screen.getByRole('button', { name: 'Make these changes' })
+    expect(resourceQueryClient.getQueryState(key)?.status).toBe('pending')
+    expect(resourceQueryClient.getQueryData(key)).toBeUndefined()
+    expect(screen.getByRole('status', { name: 'Loading comparison' })).toBeVisible()
+    expect(document.querySelectorAll('.editor-diff-pane')).toHaveLength(0)
+    expect(fixture.store.getState().snapshotComparisons.size).toBe(1)
+    expect(button).toBeDisabled()
+    act(() => button.click())
+    expect(fixture.service.getSnapshot().phase).toBe('awaiting-confirmation')
+    expect(fixture.document.buffer.materializeFullText()).toBe(
+      fixture.input.old.materializeFullText(),
+    )
+    await waitFor(() => expect(resourceQueryClient.getQueryState(key)?.status).toBe('success'))
+    await waitFor(() => expect(document.querySelectorAll('.editor-diff-pane')).toHaveLength(1))
+    expect(fixture.store.getState().snapshotComparisons.size).toBe(2)
+    expect(button).toBeDisabled()
+    act(() => button.click())
+    expect(fixture.service.getSnapshot().phase).toBe('awaiting-confirmation')
+    expect(fixture.document.buffer.materializeFullText()).toBe(
+      fixture.input.old.materializeFullText(),
+    )
+  } finally {
+    fixture.service.cancelPreview(fixture.operationId)
+    await fixture.pending
+    rendered.unmount()
+  }
+  expect(fixture.store.getState().snapshotComparisons.size).toBe(0)
+})
+
+test('cancel during native import pending returns focus and late import creates no presentation interest', async ({
+  client,
+  server,
+}) => {
+  stubHighlightApi()
+  stubEditorViewport({ height: 160, width: 420 })
+  resourceQueryClient.removeQueries({ queryKey: editorQueryKeys.previewDiffModule })
+  await writeFile(join(server.root, 'first.ts'), 'export const before = 1\n')
+  const fixture = createWorkspaceTextChanges(client)
+  const focus = new FocusService()
+  const opener = document.createElement('button')
+  document.body.append(opener)
+  const registration = focus.register({
+    area: 'global',
+    element: opener,
+    id: { kind: 'app-shell' },
+    onIntent: (_intent, element) => {
+      element.focus()
+      return true
+    },
+  })
+  const rendered = renderWithProviders(
+    <EditorDocumentStateContext value={fixture.store}>
+      <WorkspaceEditServiceContext value={fixture.service}>
+        <WorkspaceEditPreviewDialog />
+      </WorkspaceEditServiceContext>
+    </EditorDocumentStateContext>,
+    { focusService: focus },
+  )
+  let pending: Promise<unknown> | null = null
+  try {
+    act(() => opener.focus())
+    act(() => {
+      pending = fixture.service.applyTextChange({
+        source: 'search-replace',
+        signal: new AbortController().signal,
+        prepare: async (operation) => ({
+          label: 'Pending presentation',
+          requireConfirmation: true,
+          targets: [
+            {
+              source: await operation.readText(filesystemPath('first.ts')),
+              edits: [{ from: 13, to: 19, text: 'after' }],
+            },
+          ],
+        }),
+      })
+    })
+    await textChangePreview(fixture.service)
+    expect(screen.getByRole('status', { name: 'Loading comparison' })).toBeVisible()
+    expect(resourceQueryClient.getQueryState(editorQueryKeys.previewDiffModule)?.status).toBe(
+      'pending',
+    )
+    expect(screen.getByRole('button', { name: 'Make these changes' })).toBeDisabled()
+    expect(fixture.store.getState().snapshotComparisons.size).toBe(1)
+    act(() => screen.getByRole('button', { name: 'Cancel' }).click())
+    await expect(pending).resolves.toEqual({ status: 'cancelled' })
+    expect(fixture.store.getState().snapshotComparisons.size).toBe(0)
+    await waitFor(() => expect(document.activeElement).toBe(opener))
+    await waitFor(() =>
+      expect(resourceQueryClient.getQueryState(editorQueryKeys.previewDiffModule)?.status).toBe(
+        'success',
+      ),
+    )
+    expect(fixture.store.getState().snapshotComparisons.size).toBe(0)
+    expect(document.querySelectorAll('.editor-diff-pane')).toHaveLength(0)
+    expect(await readFile(join(server.root, 'first.ts'), 'utf8')).toBe('export const before = 1\n')
+  } finally {
+    fixture.service.cancelPreview(fixture.service.getSnapshot().preview?.operationId ?? '')
+    await pending
+    rendered.unmount()
+    registration.unregister()
+    opener.remove()
+  }
+})
+
+test('actual resource-only preview confirms without requesting the diff module', async ({
+  client,
+  server,
+}) => {
+  resourceQueryClient.removeQueries({ queryKey: editorQueryKeys.previewDiffModule })
+  const fixture = await createWorkspaceResourcePreview(client)
+  const pending = fixture.pending
+  const rendered = renderWithProviders(
+    <EditorDocumentStateContext value={fixture.store}>
+      <WorkspaceEditServiceContext value={fixture.service}>
+        <WorkspaceEditPreviewDialog />
+      </WorkspaceEditServiceContext>
+    </EditorDocumentStateContext>,
+  )
+  try {
+    expect(resourceQueryClient.getQueryData(editorQueryKeys.previewDiffModule)).toBeUndefined()
+    expect(resourceQueryClient.getQueryState(editorQueryKeys.previewDiffModule)?.fetchStatus).toBe(
+      'idle',
+    )
+    expect(document.querySelectorAll('.editor-diff-pane')).toHaveLength(0)
+    const button = screen.getByRole('button', { name: 'Make these changes' })
+    expect(button).toBeEnabled()
+    act(() => button.click())
+    await expect(pending).resolves.toEqual({ status: 'applied' })
+    expect(await readFile(join(server.root, 'created.ts'), 'utf8')).toBe('')
+    expect(resourceQueryClient.getQueryData(editorQueryKeys.previewDiffModule)).toBeUndefined()
+    expect(fixture.store.getState().snapshotComparisons.size).toBe(0)
+  } finally {
+    fixture.service.cancelPreview(fixture.service.getSnapshot().preview?.operationId ?? '')
+    rendered.unmount()
+    await pending
+  }
+})

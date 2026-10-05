@@ -43,12 +43,15 @@ export function useOpenCheckpointDiffDocument() {
     if (rootPath === null) return false
     const owner = filesystemPath(rootPath)
     const operation = navigation.getSnapshot()
-    const rangeInput = checkpointDiffInputForSummary(summary)
+    const displayInput = checkpointDiffInputForSummary(summary)
+    const counted = cachedCountedTurnDiff(queryClient, displayInput)
+    const ignoreWhitespace = counted === undefined
+    const rangeInput = { ...displayInput, ignoreWhitespace }
     claimDiffIntent(queryClient, checkpointDiffQueryKey(rangeInput))
-    const diffs = cachedCountedTurnDiff(queryClient, rangeInput) ?? (await rangeDiffs(rangeInput))
+    const diffs = counted ?? (await rangeDiffs(rangeInput))
     if (navigation.getSnapshot() !== operation) return false
     if (!path) {
-      const documentInput = checkpointTurnDocument(summary, owner)
+      const documentInput = checkpointTurnDocument(summary, owner, ignoreWhitespace)
       queryClient.setQueryData(
         checkpointDiffQueryKey(checkpointRequest(documentInput.source)),
         diffs,
@@ -64,7 +67,13 @@ export function useOpenCheckpointDiffDocument() {
     const documentPath = diff?.path ?? path ?? summary.files[0]?.path
     if (!documentPath) return false
 
-    const documentInput = checkpointFileDocument(summary, filesystemPath(documentPath), diff, owner)
+    const documentInput = checkpointFileDocument(
+      summary,
+      filesystemPath(documentPath),
+      diff,
+      owner,
+      ignoreWhitespace,
+    )
     // Seed only a diff we actually have: the viewer reads this key and treats a
     // seeded entry as final, so seeding an empty list for a file the range fetch
     // missed would pin the tab to "no changes" instead of letting it ask again.
@@ -108,7 +117,7 @@ export function useOpenCheckpointDiffDocument() {
       staleTime: Infinity,
     })
     if (navigation.getSnapshot() !== operation) return false
-    const documentInput = checkpointSessionDocument(summary, owner)
+    const documentInput = checkpointSessionDocument(summary, owner, true)
     queryClient.setQueryData(checkpointDiffQueryKey(checkpointRequest(documentInput.source)), diffs)
     return (await selectContent(documentTab(documentInput))).status === 'applied'
   }

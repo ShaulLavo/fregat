@@ -79,7 +79,7 @@ export function tabIconName(content: TabContent): string {
 export function comparisonDisplayPath(source: GitComparison): string {
   switch (source.kind) {
     case 'snapshot':
-      return source.path
+      return source.target.path
     case 'checkpoint-file':
       return source.file.path
     case 'checkpoint-session':
@@ -95,13 +95,13 @@ export function comparisonDisplayPath(source: GitComparison): string {
 
 export function comparisonShortHash(source: GitComparison): string {
   if (source.kind !== 'snapshot') return ''
-  return (source.newObjectId ?? source.oldObjectId)?.slice(0, 7) ?? ''
+  return source.target.kind === 'historical' ? source.target.origin.id.slice(0, 7) : ''
 }
 
 function comparisonLabel(source: GitComparison): string {
   switch (source.kind) {
     case 'snapshot':
-      return basename(source.path)
+      return basename(source.target.path)
     case 'checkpoint-file':
       return basename(source.file.path)
     case 'checkpoint-session':
@@ -119,8 +119,8 @@ function comparisonTitle(source: GitComparison): string {
   if (source.kind === 'snapshot') {
     const hash = comparisonShortHash(source)
     return hash
-      ? `${displayResourcePath(source.path)} diff at ${hash}`
-      : `${displayResourcePath(source.path)} diff`
+      ? `${displayResourcePath(source.target.path)} diff at ${hash}`
+      : `${displayResourcePath(source.target.path)} ${source.target.kind === 'moving' ? source.target.changeSource : 'review'} diff`
   }
   switch (source.kind) {
     case 'checkpoint-file':

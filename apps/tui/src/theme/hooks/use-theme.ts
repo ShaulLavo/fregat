@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 
 import { resolveTheme, type ThemePreferences } from '@/theme/utils/theme'
 import { terminalColorMode } from '@/host/utils/capabilities'
+import { useSystemColorMode } from '@/theme/hooks/use-system-color-mode'
 
 export function useTheme(
   mode: 'light' | 'dark' | 'system',
@@ -21,15 +22,7 @@ export function useTheme(
     },
     () => renderer.capabilities,
   )
-  const system = useSyncExternalStore(
-    (notify) => {
-      renderer.on('theme_mode', notify)
-      return () => {
-        renderer.off('theme_mode', notify)
-      }
-    },
-    () => renderer.themeMode ?? 'dark',
-  )
+  const system = useSystemColorMode()
   useEffect(() => {
     if (noColor) return
     let active = true
