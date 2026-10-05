@@ -4,7 +4,14 @@ import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createScriptError } from '../../scripts/structured-errors.ts'
+import { errorMessage } from '../../packages/contracts/src/error-fields'
 import base from './vitest.browser.config.ts'
+import {
+  createRetentionReloadTransport,
+  archiveRetentionReloadFailure,
+  archiveRetentionReloadArtifact,
+  settleRetentionReloadCleanup,
+} from './test/factories/retention-acceptance-reload-transport'
 import type {} from './test/factories/retention-acceptance-entry.tsx'
 
 export default defineConfig(({ mode }) =>
@@ -52,31 +59,31 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
   await isolated.grantPermissions(['local-network-access'], { origin: runnerOrigin })
   let reloading = false
   const delayedFonts: { url: string; heldAt: number; releasedAt: number }[] = []
-  const routeTasks = new Set<Promise<void>>()
+  const transport = createRetentionReloadTransport()
   await page.route(
     (url) => url.origin === runnerOrigin,
     (route) => {
-      const task = (async () => {
-        const request = new URL(route.request().url())
-        if (
-          reloading &&
-          arm.font === 'slow' &&
-          request.pathname.includes('jetbrains-mono') &&
-          request.pathname.endsWith('.woff2')
-        ) {
-          const heldAt = Date.now()
-          await new Promise<void>((resolve) => setTimeout(resolve, 1000))
-          delayedFonts.push({ url: request.href, heldAt, releasedAt: Date.now() })
-        }
-        const response = await route.fetch({
-          url: new URL(request.pathname + request.search, entryOrigin).href,
-        })
-        await route.fulfill({ response })
-      })()
-      routeTasks.add(task)
-      return task.finally(() => {
-        routeTasks.delete(task)
-      })
+      return transport.run(
+        route.request().url(),
+        async (fulfill) => {
+          const request = new URL(route.request().url())
+          if (
+            reloading &&
+            arm.font === 'slow' &&
+            request.pathname.includes('jetbrains-mono') &&
+            request.pathname.endsWith('.woff2')
+          ) {
+            const heldAt = Date.now()
+            await new Promise<void>((resolve) => setTimeout(resolve, 1000))
+            delayedFonts.push({ url: request.href, heldAt, releasedAt: Date.now() })
+          }
+          const response = await route.fetch({
+            url: new URL(request.pathname + request.search, entryOrigin).href,
+          })
+          await fulfill(() => route.fulfill({ response }))
+        },
+        () => route.abort('failed'),
+      )
     },
   )
   const output = await mkdtemp(join(tmpdir(), 'retention-acceptance-reload-'))
@@ -85,7 +92,15 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
   const consoleMessages: { readonly type: string; readonly text: string }[] = []
   page.on('request', (request) => pending.add(request.url()))
   page.on('requestfinished', (request) => pending.delete(request.url()))
-  page.on('requestfailed', (request) => pending.delete(request.url()))
+  const requestFailures: { url: string; at: number; error: string | null }[] = []
+  page.on('requestfailed', (request) => {
+    pending.delete(request.url())
+    requestFailures.push({
+      url: request.url(),
+      at: Date.now(),
+      error: request.failure()?.errorText ?? null,
+    })
+  })
   page.on('console', (message) =>
     consoleMessages.push({ type: message.type(), text: message.text() }),
   )
@@ -95,7 +110,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
     responses.push({ url: response.url(), status: response.status() }),
   )
   page.on('pageerror', (error) => errors.push(error.message))
-  try {
+  const operation = (async () => {
     await page.goto(new URL('/test/factories/retention-acceptance-entry.html', runnerOrigin).href)
     phase = 'entry-owner'
     await page.waitForFunction(() => Boolean(window.__retentionAcceptanceEntry), undefined, {
@@ -241,50 +256,159 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
       },
       errors,
       responses,
+      requestFailures,
       output,
       screenshot,
     }
+    if (transport.hasFailure) throw transport.firstError
     await writeFile(join(output, 'raw.json'), JSON.stringify(result))
     return result
-  } catch (error) {
-    const frames = await page
-      .evaluate(() => window.__retentionAcceptanceReloadFrames)
-      .catch(() => null)
-    const setup = await page
-      .evaluate(() => ({
-        bootstrap: window.__retentionAcceptanceBootstrap?.() ?? null,
-        owner: Boolean(window.__retentionAcceptanceEntry),
-        observation: window.__retentionAcceptanceEntry?.capture() ?? null,
-        dom: document.body.innerHTML,
-      }))
-      .catch(() => null)
-    await page
-      .screenshot({ path: join(output, 'failure.png'), fullPage: true })
-      .catch(() => undefined)
-    await writeFile(
-      join(output, 'failed-raw.json'),
-      JSON.stringify({
-        arm,
-        phase,
-        pending: [...pending],
-        consoleMessages,
-        setup,
-        responses,
-        frames,
-        errors,
-        failure: error instanceof Error ? error.message : String(error),
-      }),
+  })()
+  const artifactFailures: unknown[] = []
+  let cleanupFailures: unknown[] = []
+  let forwardContextDisposal: Promise<void> | null = null
+  let forwardContextDisposed = false
+  let contextClosedAsFallback = false
+  const outcome = await transport
+    .race(operation)
+    .then(
+      (result) => ({ kind: 'success' as const, result }),
+      async (error: unknown) => {
+        const frames = await page
+          .evaluate(() => window.__retentionAcceptanceReloadFrames)
+          .catch(() => null)
+        const setup = await page
+          .evaluate(() => ({
+            bootstrap: window.__retentionAcceptanceBootstrap?.() ?? null,
+            owner: Boolean(window.__retentionAcceptanceEntry),
+            observation: window.__retentionAcceptanceEntry?.capture() ?? null,
+            dom: document.body.innerHTML,
+          }))
+          .catch(() => null)
+        await page
+          .screenshot({ path: join(output, 'failure.png'), fullPage: true })
+          .catch(() => undefined)
+        artifactFailures.push(
+          ...(await archiveRetentionReloadFailure(output, {
+            arm,
+            phase,
+            pending: [...pending],
+            consoleMessages,
+            setup,
+            responses,
+            requestFailures,
+            frames,
+            errors,
+            failure: error instanceof Error ? error.message : String(error),
+            transportFailures: transport.failures,
+            transportRequests: transport.requests,
+          })),
+        )
+        return { kind: 'failure' as const, error }
+      },
     )
-    throw error
-  } finally {
-    try {
-      await page.evaluate(() => window.__retentionAcceptanceEntry?.setSyntaxEnabled(true))
-    } finally {
-      while (routeTasks.size > 0) await Promise.all(routeTasks)
-      await page.unrouteAll({ behavior: 'wait' })
-      await isolated.close()
-    }
-  }
+    .finally(async () => {
+      const cleanup = await settleRetentionReloadCleanup([
+        {
+          stage: 'restore-syntax',
+          run: async () => {
+            transport.beginRestoration()
+            await page.evaluate(() => window.__retentionAcceptanceEntry?.setSyntaxEnabled(true))
+          },
+        },
+        {
+          stage: 'stop-forward-admission',
+          run: async () => {
+            transport.stopAdmission()
+          },
+        },
+        {
+          stage: 'archive-final-frames',
+          run: async () => {
+            artifactFailures.push(
+              ...(await archiveFinalRetentionReloadFrames(page, output, {
+                phase,
+                transportFailures: transport.failures,
+                transportRequests: transport.requests,
+                requestFailures,
+              })),
+            )
+          },
+        },
+        {
+          stage: 'cancel-forwarding',
+          run: async () => {
+            await transport.cancelPending()
+          },
+        },
+        {
+          stage: 'dispose-forward-context',
+          run: async () => {
+            forwardContextDisposal = isolated.request.dispose().then(() => {
+              forwardContextDisposed = true
+            })
+            void forwardContextDisposal.catch(() => {})
+          },
+        },
+        {
+          stage: 'fallback-context-close',
+          run: async () => {
+            if (forwardContextDisposed && !transport.needsContextClose) return
+            await isolated.close()
+            contextClosedAsFallback = true
+          },
+        },
+        {
+          stage: 'join-forward-context-disposal',
+          run: async () => {
+            await forwardContextDisposal
+          },
+        },
+        { stage: 'drain-routes', run: () => transport.drain() },
+        {
+          stage: 'unroute',
+          run: async () => {
+            if (!contextClosedAsFallback) await page.unrouteAll({ behavior: 'default' })
+          },
+        },
+        { stage: 'close-context', run: () => isolated.close() },
+      ])
+      artifactFailures.push(
+        ...(await archiveRetentionReloadArtifact(output, 'cleanup.json', {
+          phase,
+          requestFailures,
+          transportFailures: transport.failures,
+          transportRequests: transport.requests,
+          artifactFailures: artifactFailures.map(errorMessage),
+          cleanup: cleanup.map((outcome) => ({
+            ...outcome,
+            error: outcome.error === null ? null : errorMessage(outcome.error),
+          })),
+        })),
+      )
+      cleanupFailures = cleanup
+        .filter((result) => result.error !== null)
+        .map((result) => result.error)
+    })
+  if (outcome.kind === 'failure') throw outcome.error
+  if (transport.hasFailure) throw transport.firstError
+  if (cleanupFailures.length > 0) throw cleanupFailures[0]
+  if (artifactFailures.length > 0) throw artifactFailures[0]
+  return outcome.result
+}
+
+async function archiveFinalRetentionReloadFrames(
+  page: BrowserCommandContext['page'],
+  output: string,
+  facts: Record<string, unknown>,
+) {
+  const final = await page
+    .evaluate(() => ({
+      frames: window.__retentionAcceptanceReloadFrames ?? null,
+      observation: window.__retentionAcceptanceEntry?.capture() ?? null,
+    }))
+    .catch((error: unknown) => ({ failure: errorMessage(error) }))
+  return archiveRetentionReloadArtifact(output, 'final-raw.json', { ...facts, final })
 }
 
 function waitForRetentionAcceptanceEntry(page: BrowserCommandContext['page']) {
