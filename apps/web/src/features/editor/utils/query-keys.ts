@@ -11,6 +11,7 @@ export type LanguageServerMatchConfigurationSnapshot = {
 }
 
 export const editorQueryKeys = {
+  previewDiffModule: ['editor', 'workspace-edit-preview', 'module'] as const,
   languageCensus: (root: string) => ['editor', 'language-census', root] as const,
   themes: ['editor', 'theme'] as const,
   theme: (id: string) => ['editor', 'theme', id] as const,
