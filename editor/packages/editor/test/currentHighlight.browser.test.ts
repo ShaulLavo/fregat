@@ -21,6 +21,7 @@ declare module 'vitest/browser' {
 
 test.for([false, true])(
   'keeps native current highlighting pending with structural replacement=%s',
+  { timeout: 15_000 },
   async (overlap, { annotate }) => {
     const language = await import('@shikijs/langs/typescript')
     const theme = await import('@shikijs/themes/dark-plus')
@@ -129,7 +130,7 @@ test.for([false, true])(
           JSON.stringify({
             state: editor.getState(),
             revision: buffer.getRevision(),
-            replacement: editor['syntax'].pendingInitialHighlightReplacement,
+            replacement: capturedReplacement(editor),
             produced: replacement.produced,
             tree: tree.inspect(),
             highlighter: worker.inspect(),
@@ -148,7 +149,7 @@ test.for([false, true])(
           JSON.stringify({
             state: editor.getState(),
             revision: buffer.getRevision(),
-            replacement: editor['syntax'].pendingInitialHighlightReplacement,
+            replacement: capturedReplacement(editor),
             produced: replacement.produced,
             tree: tree.inspect(),
             highlighter: worker.inspect(),
@@ -260,10 +261,9 @@ test.for([false, true])(
       host.remove()
       await worker.dispose()
       await referenceWorker.dispose()
-      tree.dispose()
+      await tree.dispose()
     }
   },
-  15_000,
 )
 
 function heldNativeShikiReplies() {
@@ -371,4 +371,8 @@ function holdNativeStructuralProvider(provider: EditorSyntaxProvider) {
       },
     } satisfies EditorSyntaxProvider,
   }
+}
+
+function capturedReplacement(editor: Editor): unknown {
+  return Reflect.get(editor['syntax'], 'pendingInitialHighlightReplacement')
 }

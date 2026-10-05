@@ -896,6 +896,8 @@ export class EditorSyntaxController {
     }
     this.stoppedWarm = null
     this.syntaxContentVersion += 1
+    this.pendingInitialHighlightReplacement = null
+    this.pendingInitialHighlightThemeTerminal = null
     this.foldCoverage = null
     this.parsedSyntaxContentVersion = null
     this.projectSyntaxRangeCache(change)

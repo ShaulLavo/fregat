@@ -2,4 +2,4 @@
 '@singapore-editor/core': patch
 ---
 
-Keep current highlight readiness pending while preserving rebased styles until the current result is accepted.
+Keep current highlight readiness pending across provider and theme replacement overlaps until the current result is accepted, while preserving rebased styles.
