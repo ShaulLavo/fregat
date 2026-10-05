@@ -76,7 +76,7 @@ export function WorkspaceEditPreviewDialog() {
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && close()}>
       <DialogContent
-        className='max-h-[min(760px,calc(100vh-2rem))] w-[min(760px,calc(100vw-2rem))] max-w-none overflow-hidden sm:max-w-none'
+        className='flex max-h-[min(760px,calc(100vh-2rem))] w-[min(760px,calc(100vw-2rem))] max-w-none flex-col overflow-hidden sm:max-w-none'
         finalFocus={false}
         showCloseButton={false}
       >
@@ -90,7 +90,7 @@ export function WorkspaceEditPreviewDialog() {
         {preparing ? <WorkspaceEditPreviewLoading /> : null}
 
         {preview ? (
-          <div className='min-h-0 overflow-y-auto pr-1'>
+          <div className='min-h-0 flex-1 overflow-y-auto pr-1'>
             <div className='text-muted-foreground mb-3 flex items-center justify-between text-xs'>
               <span className='tabular-nums'>
                 {preview.operationCount} {preview.operationCount === 1 ? 'change' : 'changes'}
