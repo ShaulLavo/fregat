@@ -1,5 +1,9 @@
 import { act, renderHook } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, vi } from 'vitest'
+import { test, expect } from '../../../../../test/fixtures'
+import { createWorkspaceTextChanges } from '../../../../../test/factories/workspace-text-changes'
+import { WorkspaceEditHostContext } from '@/lib/workspace-edits/providers/host-context'
+import { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
@@ -13,7 +17,6 @@ const dependencies = vi.hoisted(() => ({
   },
   configuration: { generation: 1 },
   fileOpenIntent: { service: { prepare: vi.fn() } },
-  controller: {},
   apply: vi.fn(),
   matches: [],
 }))
@@ -29,14 +32,13 @@ vi.mock('@/features/editor/hooks/use-language-server-matches', () => ({
 vi.mock('@/lib/file-open-intent/providers/context', () => ({
   useFileOpenIntent: () => dependencies.fileOpenIntent,
 }))
-vi.mock('@/features/editor/providers/workspace-edit-context', () => ({
-  useWorkspaceDocumentSyncController: () => dependencies.controller,
-  useWorkspaceEditHost: () => dependencies.apply,
-}))
 vi.mock('@/lib/diagnostic-ai/hooks/use-diagnostic-fix', () => ({
   useDiagnosticFix: () => ({ available: true, mutation: { mutateAsync: dependencies.apply } }),
 }))
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => null }))
+vi.mock('@tanstack/react-query', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@tanstack/react-query')>()),
+  useQueryClient: () => null,
+}))
 vi.mock('@/features/editor/hooks/use-document-feature-tier', () => ({
   useDocumentFeatureTier: () => ({
     analysisAllowed: true,
@@ -52,7 +54,15 @@ vi.mock('@/features/editor/utils/language-server-plugin', () => ({
 }))
 
 describe('useLanguageServerPlugin', () => {
-  it('replaces the plugin when its buffer is replaced, but retains it for edits and other files', () => {
+  test('replaces the plugin when its buffer is replaced, but retains it for edits and other files', ({
+    client,
+  }) => {
+    const { service } = createWorkspaceTextChanges(client)
+    const host = {
+      documentSyncController: new LanguageServerDocumentSyncController(),
+      isOwnEvent: service.isOwnEvent,
+      onApplyWorkspaceEdit: service.onApplyWorkspaceEdit,
+    }
     const store = createEditorDocumentStore()
     dependencies.runtime = { documentStore: store, languageServerDocuments: { setLimit: vi.fn() } }
     const path = filesystemPath('/repo/a.ts')
@@ -63,7 +73,11 @@ describe('useLanguageServerPlugin', () => {
       filePath: path,
       rootPath: '/repo',
     }
-    const { result, unmount } = renderHook(() => useLanguageServerPlugin(options))
+    const { result, unmount } = renderHook(() => useLanguageServerPlugin(options), {
+      wrapper: ({ children }) => (
+        <WorkspaceEditHostContext value={host}>{children}</WorkspaceEditHostContext>
+      ),
+    })
     const firstPlugin = result.current.languageServer
     act(() => {
       store

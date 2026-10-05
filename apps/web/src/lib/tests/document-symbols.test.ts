@@ -11,7 +11,12 @@ import {
 } from '@/lib/language-server-capabilities'
 import { test, expect } from '../../../test/fixtures'
 import { createLanguageServerSocket } from '../../../test/factories/language-server-socket'
-import { createEditorTextBuffer, createEditorBufferSession } from '@singapore-editor/core/document'
+import {
+  createEditorTextBuffer,
+  createEditorBufferSession,
+  pieceTableDocumentText,
+} from '@singapore-editor/core/document'
+import { createWorkspaceTextChanges } from '../../../test/factories/workspace-text-changes'
 
 const request = {
   path: '/repo/main.ts',
@@ -19,13 +24,66 @@ const request = {
   serverId: 'typescript',
 }
 
+test('live symbols preserve the real workspace host initialize contract', async ({ client }) => {
+  const connection = createLanguageServerSocket()
+  const { service } = createWorkspaceTextChanges(client)
+  const buffer = createEditorTextBuffer('export const current = 1')
+  const abort = new AbortController()
+  const withHost = {
+    ...request,
+    buffer,
+    signal: abort.signal,
+    onApplyWorkspaceEdit: service.onApplyWorkspaceEdit,
+  }
+  const result = fetchDocumentSymbolTree(withHost, client, () => connection.socket)
+  const canceled = expect(result).rejects.toThrow()
+  try {
+    connection.open()
+    await expect.poll(() => connection.sent.length).toBe(1)
+    expect(connection.sent[0]?.params).toMatchObject({
+      capabilities: mergeClientCapabilities(
+        defaultClientCapabilities(),
+        composeWorkspaceEditClientCapabilities(clientCapabilitiesForServer('typescript'), true),
+      ),
+    })
+    connection.respond(connection.sent[0]?.id, { capabilities: { textDocumentSync: 2 } })
+    await expect.poll(() => connection.sent.at(-1)?.method).toBe('textDocument/documentSymbol')
+    const beforeRequest = service.getSnapshot()
+    connection.request('unsolicited-edit', 'workspace/applyEdit', {
+      edit: {
+        changes: {
+          'file:///repo/main.ts': [
+            {
+              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+              newText: 'unexpected',
+            },
+          ],
+        },
+      },
+    })
+    await expect
+      .poll(() => connection.sent.some((frame) => frame.id === 'unsolicited-edit'))
+      .toBe(true)
+    expect(connection.sent.find((frame) => frame.id === 'unsolicited-edit')).toMatchObject({
+      error: { code: -32601 },
+    })
+    expect(service.getSnapshot()).toBe(beforeRequest)
+    expect(pieceTableDocumentText(buffer.getSnapshot())).toBe('export const current = 1')
+  } finally {
+    abort.abort()
+    await canceled
+    expect(connection.closed).toBe(true)
+  }
+})
+
 test('symbol requests await initialize and initialized with the editor pooled contract', async ({
   client,
 }) => {
+  const { service } = createWorkspaceTextChanges(client)
   const connection = createLanguageServerSocket()
   const abort = new AbortController()
   const result = fetchDocumentSymbolTree(
-    { ...request, signal: abort.signal },
+    { ...request, signal: abort.signal, onApplyWorkspaceEdit: service.onApplyWorkspaceEdit },
     client,
     () => connection.socket,
   )

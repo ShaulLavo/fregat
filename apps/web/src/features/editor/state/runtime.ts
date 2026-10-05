@@ -24,7 +24,7 @@ import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
 import type { QueryClient } from '@tanstack/react-query'
 
-import type { WorkspaceEditHost } from '@/features/editor/providers/workspace-edit-context'
+import type { WorkspaceEditHost } from '@/lib/workspace-edits/providers/host-context'
 import { createEditorConflictStore } from '@/features/editor/state/conflict-state'
 import { createEditorActivation } from '@/features/editor/state/apply-actions'
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'

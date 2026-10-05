@@ -2,7 +2,10 @@ import type { ServerSocket } from '@workspace/client-core/transport/socket'
 import { type LspTransportHandler } from '@singapore-editor/lsp/types'
 import { LspClient, composeWorkspaceEditClientCapabilities } from '@singapore-editor/lsp'
 import type { EditorTextBuffer } from '@singapore-editor/core/document'
-import { createLanguageServerDocument } from '@singapore-editor/lsp-plugin'
+import {
+  createLanguageServerDocument,
+  type OnApplyWorkspaceEdit,
+} from '@singapore-editor/lsp-plugin'
 import { fileUriForPath, type LspMatch } from '@workspace/contracts'
 
 import {
@@ -46,6 +49,7 @@ export type DocumentSymbolsRequest = {
   serverId: string
   signal: AbortSignal
   buffer?: EditorTextBuffer
+  onApplyWorkspaceEdit?: OnApplyWorkspaceEdit
 }
 
 // Ranks are ascending: lower wins.
@@ -109,7 +113,7 @@ function requestDocumentSymbols(
       timeoutMs: LANGUAGE_SERVER_REQUEST_TIMEOUT_MS,
       capabilities: composeWorkspaceEditClientCapabilities(
         clientCapabilitiesForServer(serverId),
-        true,
+        request.onApplyWorkspaceEdit !== undefined,
       ),
     })
     const handlers = new Set<LspTransportHandler>()
@@ -153,7 +157,7 @@ function requestDocumentSymbols(
 }
 
 async function requestRetainedSymbols(
-  { path, rootPath, serverId, signal }: DocumentSymbolsRequest,
+  { path, rootPath, serverId, signal, onApplyWorkspaceEdit }: DocumentSymbolsRequest,
   buffer: EditorTextBuffer,
   client: Client,
   connectSocket: typeof connectLanguageServerSocket,
@@ -166,6 +170,7 @@ async function requestRetainedSymbols(
   let socket: ServerSocket | null = null
   const document = createLanguageServerDocument({
     buffer,
+    onApplyWorkspaceEdit,
     uri: fileUriForPath(path),
     languageId: languageIdForPath(path),
     lanes: [
