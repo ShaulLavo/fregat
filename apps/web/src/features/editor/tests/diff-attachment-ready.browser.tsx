@@ -25,6 +25,12 @@ import {
 
 const path = filesystemPath('repo/src/editor-tab-a.ts')
 
+declare module 'vitest' {
+  interface TaskMeta {
+    attachment200?: unknown
+  }
+}
+
 test(
   'actual Saved attachments share compatible 197 loans and deliver exact finalized 198 projection paint',
   { timeout: 30_000 },
