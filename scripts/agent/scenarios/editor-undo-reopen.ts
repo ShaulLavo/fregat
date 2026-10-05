@@ -24,6 +24,10 @@ export const editorUndoReopen: Scenario = {
     try {
       await writeFile(diskPath, INITIAL)
       await fixtureGit(fixture, ['init', '--quiet'])
+      await fixtureGit(fixture, ['config', 'user.email', 'fregat@example.com'])
+      await fixtureGit(fixture, ['config', 'user.name', 'Fregat'])
+      await fixtureGit(fixture, ['add', 'a.ts'])
+      await fixtureGit(fixture, ['commit', '--quiet', '-m', 'fixture'])
       await openFixtureWorkspace(page, fixture)
       await openFileFromTree(page, 'a.ts')
       await focusEditor(page)
