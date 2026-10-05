@@ -28,6 +28,7 @@ import { providerAccessRefusal } from './provider-access'
 import { defaultDevStateHome } from '../state-home'
 import { checkoutRoot, evidenceRoot } from './paths'
 import { ENGINES, launchBrowser, type Engine } from './browser-launch'
+import { captureScenarioFailure } from './scenario-failure'
 
 const PRODUCT_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'
@@ -360,12 +361,13 @@ async function runScenario(scenario: Scenario, options: Options) {
     }
     const started = performance.now()
     let failure: string | null = null
+    let failureCapture: Awaited<ReturnType<typeof captureScenarioFailure>> | null = null
     try {
       await scenario.run(page, { evidence, file: options.file, server: options.server, step })
       if (scenario.inspect) await evidence.json('inspection.json', await scenario.inspect(page))
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error)
-      await page.screenshot({ path: evidence.file('failure.png') }).catch(() => undefined)
+      failureCapture = await captureScenarioFailure(page, evidence, 'after-scenario')
       if (scenario.inspect)
         await evidence.json('inspection.json', await scenario.inspect(page)).catch(() => undefined)
     }
@@ -374,10 +376,24 @@ async function runScenario(scenario: Scenario, options: Options) {
     await evidence.json('observed.json', {
       durationMs,
       failure,
+      failureCapture,
       problems,
       steps,
       ...serializable(observed),
     })
+    const captureLines: string[] = []
+    if (failureCapture) {
+      const screenshot = failureCapture.screenshot
+      const captured =
+        screenshot.status === 'captured'
+          ? evidence.file(screenshot.file)
+          : `capture failed: ${screenshot.error}`
+      captureLines.push(
+        'failure capture: after scenario execution; scenario cleanup may have run',
+        `failure screenshot: ${captured}`,
+        `failure metadata: ${evidence.file('observed.json')}`,
+      )
+    }
     const lines = [
       `# scenario ${scenario.name}`,
       '',
@@ -385,6 +401,7 @@ async function runScenario(scenario: Scenario, options: Options) {
       `duration: ${durationMs}ms`,
       `result: ${failure ? `failed: ${failure}` : 'completed'}`,
       `steps: ${steps.map((file) => evidence.file(file)).join(', ')}`,
+      ...captureLines,
       `problems: ${problems.length === 0 ? 'none' : ''}`,
       ...problems.map((problem) => `- ${problem}`),
     ]
