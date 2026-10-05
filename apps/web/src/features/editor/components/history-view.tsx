@@ -9,10 +9,12 @@ import { useEditorDocumentState } from '@/features/editor/state/document-state'
 /** The undo graph of one open file: browse states, compare two, restore one. */
 export function HistoryView({
   path,
+  rootPath,
   tabId,
   onLeave,
 }: {
   path: FilesystemPath
+  rootPath: FilesystemPath
   tabId: TabId
   onLeave?: () => void
 }) {
@@ -33,6 +35,7 @@ export function HistoryView({
       buffer={buffer}
       documentKey={key}
       path={path}
+      rootPath={rootPath}
       tabId={tabId}
       onLeave={onLeave}
     />

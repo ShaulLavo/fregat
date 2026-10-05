@@ -246,7 +246,9 @@ test('a full checkpoint capture survives actual blob cache eviction, unrelated s
   const options = blobDiffQueryOptions(listed[0]!)
   await queries.query(options)
   const full = logical.read()
-  expect(full.kind === 'ready' && full.input.files[0]?.kind).toBe('full')
+  expect(
+    full.kind === 'ready' && full.input.kind === 'checkpoint' && full.input.files[0]?.kind,
+  ).toBe('full')
   expect(external.read()).toBe(full)
   queries.removeQueries({ queryKey: options.queryKey, exact: true })
   expect(queries.getQueryData(options.queryKey)).toBeUndefined()
