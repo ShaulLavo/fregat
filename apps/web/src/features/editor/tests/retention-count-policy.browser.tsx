@@ -491,7 +491,9 @@ async function verifyIdleInspectors(host: Host, b: Pair, fixture: string) {
     host.shiki.inspectRetention(),
   ])
   const after = { tree: host.tree.inspect(), shiki: host.shiki.inspect() }
+  const beforeScheduledNegative = host.observation.snapshot().generation
   const scheduledNegative = host.observation.calibrate()
+  const scheduledNegativeEvents = host.observation.changesSince(beforeScheduledNegative)
   const readNegative = await host.observation.interval(() => {
     const snapshot = host.a.buffer.getTextSnapshot()
     snapshot.readRange(0, snapshot.length)
@@ -505,11 +507,17 @@ async function verifyIdleInspectors(host: Host, b: Pair, fixture: string) {
     treeWorker,
     shikiWorker,
     scheduledNegative,
+    scheduledNegativeEvents,
     fullRangeReadNegative: {
       requests: readNegative.requests,
       reads: readNegative.reads,
       observation: readNegative.observation,
     },
+  })
+  expect(scheduledNegativeEvents.truncated).toBe(false)
+  expect(scheduledNegativeEvents.events).toContainEqual({
+    generation: scheduledNegative.generation,
+    cause: { kind: 'schedule', key: 'verification-delayed-control' },
   })
   expect(before.tree.pendingRequests).toBe(0)
   expect(before.shiki.pendingRequests).toBe(0)
