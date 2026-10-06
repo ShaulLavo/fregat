@@ -31,11 +31,36 @@ import {
 } from './sandbox'
 
 const uptime = vi.hoisted(() => ({ unavailable: false }))
+const ioReads = vi.hoisted(() => {
+  const files = new Set<number>()
+  const bytes: number[] = []
+  return { enabled: false, files, bytes }
+})
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>()
   return {
     ...actual,
+    openSync: (...args: Parameters<typeof actual.openSync>) => {
+      const fd = actual.openSync(...args)
+      if (
+        ioReads.enabled &&
+        typeof args[0] === 'string' &&
+        /\/quiet-observer\/(events-\d+\.jsonl|counts-\d+\.json)$/.test(args[0])
+      )
+        ioReads.files.add(fd)
+      return fd
+    },
+    readSync: (...args: Parameters<typeof actual.readSync>) => {
+      const length = actual.readSync(...args)
+      if (ioReads.enabled && ioReads.files.has(args[0])) ioReads.bytes.push(length)
+      return length
+    },
+    closeSync: (...args: Parameters<typeof actual.closeSync>) => {
+      const result = actual.closeSync(...args)
+      ioReads.files.delete(args[0])
+      return result
+    },
     readFileSync: (...args: Parameters<typeof actual.readFileSync>) => {
       if (args[0] === '/proc/uptime' && uptime.unavailable) return actual.readFileSync(-1, args[1])
       return actual.readFileSync(...args)
@@ -338,7 +363,118 @@ describe.skipIf(!userScopes)('bounded observer real scope capture', () => {
 
 afterEach(() => {
   uptime.unavailable = false
+  ioReads.enabled = false
+  ioReads.files.clear()
+  ioReads.bytes.length = 0
   return removeSandboxes()
+})
+
+test.each(['oversize', 'malformed UTF8', 'schema refusal'])(
+  'cumulative observer read allowance includes %s input',
+  (kind) => {
+    const box = sandbox()
+    const observer = createQuietObserver(box)
+    if (observer.kind !== 'ready') expect.fail(observer.reason)
+    const oversized = kind === 'oversize'
+    const invalidRecord =
+      JSON.stringify({
+        kind: 'shell',
+        at: 1,
+        pid: 1,
+        role: 'shim',
+        phase: 'payload',
+        status: 0,
+        message: 'refused',
+      }).padEnd(4_095, ' ') + '\n'
+    const input =
+      kind === 'schema refusal'
+        ? Buffer.from(invalidRecord.repeat(2))
+        : Buffer.alloc(oversized ? 65_537 : 8_192, 0xff)
+    for (let index = 1; index <= (oversized ? 8 : 9); index++) {
+      writeFileSync(path.join(observer.directory, `events-${index}.jsonl`), input)
+    }
+    ioReads.enabled = true
+    const snapshot = freezeQuietObserver(observer, 'failure')
+    ioReads.enabled = false
+    if (!('events' in snapshot)) expect.fail(snapshot.unavailable)
+    const actualBytes = ioReads.bytes.reduce((sum, bytes) => sum + bytes, 0)
+    expect(actualBytes).toBeLessThanOrEqual(65_536)
+    expect(actualBytes).toBe(oversized ? 0 : 65_536)
+    expect(ioReads.bytes.length).toBe(oversized ? 0 : 8)
+    expect(snapshot.events).toEqual([])
+    expect(snapshot.truncated).toBe(true)
+    expect(snapshot.persisted).toBe(true)
+    expect(snapshot.unavailable).toBeGreaterThan(0)
+    if (kind !== 'malformed UTF8') expect(snapshot.refused).toBe(oversized ? 8 : 16)
+  },
+)
+
+test('cumulative observer preserves valid records, qualified counters and failure persistence', () => {
+  const box = sandbox()
+  const observer = createQuietObserver(box)
+  if (observer.kind !== 'ready') expect.fail(observer.reason)
+  const record =
+    JSON.stringify({
+      kind: 'shell',
+      at: 1,
+      pid: 1,
+      role: 'shim',
+      phase: 'payload-return',
+      status: 7,
+    }) + '\n'
+  const counters = JSON.stringify({ dropped: 3, unavailable: 4 })
+  writeFileSync(path.join(observer.directory, 'events-1.jsonl'), record)
+  writeFileSync(path.join(observer.directory, 'counts-1.json'), counters)
+  ioReads.enabled = true
+  const snapshot = freezeQuietObserver(observer, 'failure')
+  ioReads.enabled = false
+  if (!('events' in snapshot)) expect.fail(snapshot.unavailable)
+  expect(ioReads.bytes.reduce((sum, bytes) => sum + bytes, 0)).toBe(
+    Buffer.byteLength(record + counters),
+  )
+  expect(snapshot.events).toHaveLength(1)
+  expect(snapshot.events[0]).toMatchObject({ status: 7 })
+  expect(snapshot.dropped).toBe(3)
+  expect(snapshot.unavailable).toBe(4)
+  expect(snapshot.truncated).toBe(false)
+  expect(snapshot.persisted).toBe(true)
+  const first = readFileSync(path.join(observer.directory, 'failure.json'), 'utf8')
+  rmSync(path.join(observer.directory, 'events-1.jsonl'))
+  rmSync(path.join(observer.directory, 'counts-1.json'))
+  mkdirSync(path.join(observer.directory, 'cleanup.json'))
+  let primary: unknown
+  try {
+    readFileSync(path.join(box.root, 'absent-primary'))
+  } catch (error) {
+    primary = error
+  }
+  try {
+    throw primary
+  } catch (error) {
+    expect(freezeQuietObserver(observer, 'cleanup').persisted).toBe(false)
+    expect(error).toBe(primary)
+  }
+  expect(readFileSync(path.join(observer.directory, 'failure.json'), 'utf8')).toBe(first)
+})
+
+test('cumulative observer accepts an exact-budget qualified counter without an overflow read', () => {
+  const box = sandbox()
+  const observer = createQuietObserver(box)
+  if (observer.kind !== 'ready') expect.fail(observer.reason)
+  writeFileSync(
+    path.join(observer.directory, 'counts-1.json'),
+    JSON.stringify({ dropped: 3, unavailable: 4 }).padEnd(65_536, ' '),
+  )
+  ioReads.enabled = true
+  const snapshot = freezeQuietObserver(observer, 'failure')
+  ioReads.enabled = false
+  if (!('events' in snapshot)) expect.fail(snapshot.unavailable)
+  expect(ioReads.bytes).toEqual([65_536])
+  expect(snapshot.dropped).toBe(3)
+  expect(snapshot.unavailable).toBe(5)
+  expect(snapshot.refused).toBe(0)
+  expect(snapshot.truncated).toBe(false)
+  expect(snapshot.persisted).toBe(true)
 })
 
 test('unavailable uptime preserves launcher checkpoints, completion, and the primary outcome', () => {

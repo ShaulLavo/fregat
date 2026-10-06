@@ -241,13 +241,19 @@ function observerReason(error: unknown) {
   return 'io'
 }
 
-function boundedText(file: string, limit: number) {
+function boundedText(file: string, limit: number, budget?: Pick<ObservationRead, 'bytes'>) {
   const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
   try {
-    if (!fstatSync(fd).isFile()) return { kind: 'refused' as const }
-    const bytes = Buffer.alloc(limit + 1)
+    const stat = fstatSync(fd)
+    if (!stat.isFile()) return { kind: 'refused' as const }
+    if (budget && stat.size > limit) return { kind: 'truncated' as const }
+    const bytes = Buffer.alloc(limit + (budget ? 0 : 1))
+    // A throwing read cannot report its consumed bytes, so its attempted allowance stays spent.
+    if (budget) budget.bytes += bytes.length
     const length = readSync(fd, bytes, 0, bytes.length, null)
-    if (length > limit) return { kind: 'truncated' as const }
+    if (budget) budget.bytes -= bytes.length - length
+    if (length > limit || (budget && fstatSync(fd).size > limit))
+      return { kind: 'truncated' as const }
     return {
       kind: 'read' as const,
       text: new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, length)),
@@ -552,13 +558,12 @@ function parseObserverLines(text: string, result: ObservationRead) {
 
 function readObserverFile(directory: string, name: string, result: ObservationRead) {
   try {
-    const body = boundedText(path.join(directory, name), OBSERVER_BYTES - result.bytes)
+    const body = boundedText(path.join(directory, name), OBSERVER_BYTES - result.bytes, result)
     if (body.kind !== 'read') {
       result.refused++
       result.truncated ||= body.kind === 'truncated'
       return
     }
-    result.bytes += body.bytes
     if (name.startsWith('events-')) {
       parseObserverLines(body.text, result)
       return
@@ -598,6 +603,10 @@ function drainObserverDirectory(
     ) {
       result.refused++
       continue
+    }
+    if (result.bytes >= OBSERVER_BYTES) {
+      result.truncated = true
+      return
     }
     readObserverFile(directory, file.name, result)
   }
