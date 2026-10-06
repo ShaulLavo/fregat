@@ -101,6 +101,10 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
           }
           const response = await route.fetch({
             url: new URL(request.pathname + request.search, entryOrigin).href,
+            headers:
+              route.request().method() === 'GET'
+                ? { ...(await route.request().allHeaders()), connection: 'close' }
+                : undefined,
           })
           await fulfill(() => route.fulfill({ response }))
         },
