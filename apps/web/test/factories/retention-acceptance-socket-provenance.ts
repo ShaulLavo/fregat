@@ -137,21 +137,51 @@ function writeAll(fd: number, bytes: Buffer, position: number) {
     offset += written
   }
 }
+type EmitObserver = (event: string | symbol, args: readonly unknown[]) => void
+type EmitHook = {
+  emit: EventEmitter['emit']
+  descriptor: PropertyDescriptor | undefined
+  observers: EmitObserver[]
+}
+const provenanceEmitHooks = new Map<EventEmitter, EmitHook>()
+
+function installEmitHook(target: EventEmitter): EmitHook {
+  const original = target.emit
+  const descriptor = Object.getOwnPropertyDescriptor(target, 'emit')
+  const observers: EmitObserver[] = []
+  const emit = function (this: EventEmitter, event: string | symbol, ...args: unknown[]): boolean {
+    for (let index = observers.length - 1; index >= 0; index--) {
+      const observer = observers[index]
+      if (observer) guard(() => Reflect.apply(observer, this, [event, args]))
+    }
+    return Reflect.apply(original, this, [event, ...args])
+  }
+  const hook = { emit, descriptor, observers }
+  target.emit = emit
+  provenanceEmitHooks.set(target, hook)
+  return hook
+}
+
 function wrapEmit<T extends EventEmitter>(
   target: T,
   observe: (subject: T, event: string | symbol, args: readonly unknown[]) => void,
 ) {
-  const original = target.emit
-  const descriptor = Object.getOwnPropertyDescriptor(target, 'emit')
-  const emit = function (this: T, event: string | symbol, ...args: unknown[]): boolean {
-    guard(() => observe(this, event, args))
-    return Reflect.apply(original, this, [event, ...args])
+  const hook = provenanceEmitHooks.get(target) ?? installEmitHook(target)
+  const observer = function (this: T, event: string | symbol, args: readonly unknown[]) {
+    observe(this, event, args)
   }
-  target.emit = emit
+  hook.observers.push(observer)
+  let active = true
   return () => {
-    if (target.emit !== emit) return
-    if (descriptor) Object.defineProperty(target, 'emit', descriptor)
-    if (!descriptor) Reflect.deleteProperty(target, 'emit')
+    if (!active) return
+    active = false
+    const index = hook.observers.indexOf(observer)
+    if (index >= 0) hook.observers.splice(index, 1)
+    if (hook.observers.length) return
+    provenanceEmitHooks.delete(target)
+    if (target.emit !== hook.emit) return
+    if (hook.descriptor) Object.defineProperty(target, 'emit', hook.descriptor)
+    if (!hook.descriptor) Reflect.deleteProperty(target, 'emit')
   }
 }
 
@@ -235,6 +265,11 @@ function createJournal(side: Side) {
     unavailable = true
   }
   const position = (page: number, offset: number) => pageBytes * (page + 1) + offset
+  const incompleteRead = () => {
+    partial++
+    safePublish()
+    return null
+  }
   const readSlot = (slot: number): Record | null => {
     if (fd === null || !ids[slot]) return null
     const size = readSync(
@@ -244,10 +279,12 @@ function createJournal(side: Side) {
       frameHeaderBytes + capacities[slot],
       position(pages[slot], offsets[slot]),
     )
-    if (size < frameHeaderBytes || input.readUInt32LE(4) !== ids[slot]) return null
+    if (size < frameHeaderBytes) return incompleteRead()
+    if (input.readUInt32LE(4) !== ids[slot]) return null
     const length = input.readUInt16LE(0),
       version = input.readUInt32LE(8)
     if (version % 2 || length > capacities[slot]) return null
+    if (size < frameHeaderBytes + length) return incompleteRead()
     const body = input.subarray(frameHeaderBytes, frameHeaderBytes + length)
     if (checksum(body) !== input.readUInt32LE(12)) return null
     const parsed = v.safeParse(recordSchema, JSON.parse(body.toString('utf8')))
@@ -409,11 +446,10 @@ function createJournal(side: Side) {
     const slot = references.get(subject)
     if (slot === undefined || unavailable) return null
     try {
+      const previousPartial = partial
       const record = readSlot(slot)
-      if (!record) {
-        partial++
-        return null
-      }
+      if (!record && partial === previousPartial) partial++
+      if (!record) return null
       const edited = edit(record)
       return store(slot, edited) ? edited : null
     } catch {
@@ -648,6 +684,7 @@ export function createRetentionSocketProvenance(options: {
     close() {
       stopped = true
       for (const restore of restores.toReversed()) restore()
+      restores.length = 0
       journal.close()
     },
     remove: journal.remove,

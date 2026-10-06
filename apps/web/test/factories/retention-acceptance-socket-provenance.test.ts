@@ -7,6 +7,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { Socket } from 'node:net'
+import { ClientRequest } from 'node:http'
 import { test, expect } from '../fixtures'
 import {
   associateRetentionSocketFailure,
@@ -328,3 +329,122 @@ test('socket evidence shares the exact original aggregate record and byte allowa
   expect(retentionEntryBudget.producer).toEqual({ records: 70, bytes: 286745, factCells: 64 })
   expect(retentionEntryBudget.relay).toEqual({ records: 16698, bytes: 2858983 })
 })
+
+test.for(['earlier-first', 'later-first'] as const)(
+  'socket review F1 %s overlapping collectors restore native hooks and outcomes',
+  (order) => {
+    const targets = [Socket.prototype, ClientRequest.prototype]
+    const original = targets.map((target) => ({
+      target,
+      emit: target.emit,
+      descriptor: Object.getOwnPropertyDescriptor(target, 'emit'),
+    }))
+    const first = createRetentionSocketProvenance({
+      side: 'client',
+      entryPort: 52865,
+      normalizePath: (path) => path,
+    })
+    const second = createRetentionSocketProvenance({
+      side: 'client',
+      entryPort: 52865,
+      normalizePath: (path) => path,
+    })
+    const socket = new Socket()
+    const primary = (() => {
+      try {
+        JSON.parse('controlled primary')
+      } catch (error) {
+        return error
+      }
+    })()
+    try {
+      if (order === 'earlier-first') first.close()
+      if (order === 'later-first') second.close()
+      expect(socket.emit('no-subscriber', 1)).toBe(false)
+      let observed: unknown
+      try {
+        socket.emit('error', primary)
+      } catch (error) {
+        observed = error
+      }
+      expect(observed).toBe(primary)
+      expect(socket.listenerCount('error')).toBe(0)
+      first.close()
+      second.close()
+      for (const baseline of original) {
+        expect(baseline.target.emit).toBe(baseline.emit)
+        expect(Object.getOwnPropertyDescriptor(baseline.target, 'emit')).toEqual(
+          baseline.descriptor,
+        )
+      }
+    } finally {
+      first.close()
+      second.close()
+      first.remove()
+      second.remove()
+      original.forEach(({ target, descriptor }) => {
+        if (descriptor) Object.defineProperty(target, 'emit', descriptor)
+        if (!descriptor) Reflect.deleteProperty(target, 'emit')
+      })
+    }
+  },
+)
+
+test.for(['header-only', 'short-body'] as const)(
+  'socket review F2 %s live journal read refuses cached body bytes',
+  async (mode, { skip }) => {
+    const node = systemNode()
+    if (!node) {
+      skip('System Node is unavailable')
+      return
+    }
+    const source = pathToFileURL(
+      join(import.meta.dirname, 'retention-acceptance-socket-provenance.ts'),
+    ).href
+    const script = `import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';import {createServer,createConnection} from 'node:net';import {once} from 'node:events';import {tmpdir} from 'node:os';import {join} from 'node:path';
+const {createRetentionSocketProvenance}=await import(${JSON.stringify(source)});const mode=${JSON.stringify(mode)};
+const server=createServer();server.listen(0,'127.0.0.1');await once(server,'listening');const address=server.address();
+const collector=createRetentionSocketProvenance({side:'client',entryPort:address.port,normalizePath:path=>path});
+const accepted=once(server,'connection'),socket=createConnection({host:'127.0.0.1',port:address.port});await once(socket,'connect');const [peer]=await accepted;
+const inode=fs.statSync(join(tmpdir(),collector.basename)).ino,originalRead=fs.readSync;let shortened=false,warmedBytes=0,bodyBytes=0,retainedBytes=0;
+try{const before=collector.inspect();fs.readSync=function(...args){const read=Reflect.apply(originalRead,this,args);const [fd,buffer,offset,,position]=args;if(!shortened&&typeof position==='number'&&position>=4096&&read>=16&&fs.fstatSync(fd).ino===inode){bodyBytes=buffer.readUInt16LE(offset);if(read<16+bodyBytes)throw {code:'CONTROL_NOT_WARM'};warmedBytes=read;retainedBytes=mode==='header-only'?16:16+Math.max(1,Math.floor(bodyBytes/2));fs.ftruncateSync(fd,position+retainedBytes);shortened=true}return read};syncBuiltinESMExports();
+const returned=socket.emit('timeout');fs.readSync=originalRead;syncBuiltinESMExports();const after=collector.inspect();process.stdout.write(JSON.stringify({shortened,warmedBytes,bodyBytes,retainedBytes,returned,before,after,publicErrors:socket.listenerCount('error')}));
+}finally{fs.readSync=originalRead;syncBuiltinESMExports();collector.close();collector.remove();socket.destroy();peer.destroy();await new Promise(resolve=>server.close(resolve))}`
+    const child = spawn(
+      node,
+      [
+        '--experimental-strip-types',
+        '--disable-warning=ExperimentalWarning',
+        '--input-type=module',
+        '--eval',
+        script,
+      ],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    const closed = once(child, 'close')
+    let stdout = '',
+      stderr = ''
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString()
+    })
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+    })
+    const timer = setTimeout(() => child.kill('SIGKILL'), 15000)
+    try {
+      const [code, signal] = await closed
+      expect(code, stderr).toBe(0)
+      expect(signal).toBeNull()
+      const result = JSON.parse(stdout)
+      expect(result.shortened).toBe(true)
+      expect(result.warmedBytes).toBeGreaterThanOrEqual(16 + result.bodyBytes)
+      expect(result.retainedBytes).toBeLessThan(16 + result.bodyBytes)
+      expect(result.after.partial, stdout).toBeGreaterThan(result.before.partial)
+      expect(result.after.revision, stdout).toBe(result.before.revision)
+      expect(result.returned).toBe(false)
+      expect(result.publicErrors).toBe(0)
+    } finally {
+      clearTimeout(timer)
+    }
+  },
+)
