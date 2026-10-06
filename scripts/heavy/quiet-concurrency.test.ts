@@ -3,7 +3,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 
 import { live } from './queue'
-import { quietFailureReceipt } from './quiet-receipts'
+import { createQuietObserver, freezeQuietObserver, quietFailureReceipt } from './quiet-receipts'
 import {
   recordOf,
   removeSandboxes,
@@ -233,11 +233,14 @@ describe.skipIf(!userScopes)('quiet concurrent work', () => {
     async (mode) => {
       const box = concurrentBox(mode === 'expired' ? 2 : 600)
       const releaseServer = path.join(box.root, 'release-server')
+      const observer = createQuietObserver(box)
       const quiet = start(box, 'expires', ['bash', '-c', 'echo started; exec sleep 60'], {
         quiet: true,
         jobClass: 'bench',
         machine: true,
+        preload: observer.kind === 'ready' ? observer.preload : undefined,
       })
+      let failed = false
       let server: ReturnType<typeof start> | undefined
       let cancellation: {
         readonly at: string
@@ -292,11 +295,14 @@ describe.skipIf(!userScopes)('quiet concurrent work', () => {
         })
         expect(live(box.state, 'jobs')).toEqual([])
       } catch (error) {
+        failed = true
+        const observation = freezeQuietObserver(observer, 'failure')
         console.error(
           '[quiet-concurrency-failure]',
           JSON.stringify({
             mode,
             cancellation,
+            observation,
             receipt: quietFailureReceipt({ box, jobs: { measurement: quiet, server } }),
           }),
         )
@@ -305,6 +311,11 @@ describe.skipIf(!userScopes)('quiet concurrent work', () => {
         quiet.child.kill('SIGTERM')
         writeFileSync(releaseServer, '')
         await Promise.all([quiet.done, server?.done])
+        if (failed)
+          console.error(
+            '[quiet-observer-cleanup]',
+            JSON.stringify(freezeQuietObserver(observer, 'cleanup')),
+          )
       }
     },
     30_000,

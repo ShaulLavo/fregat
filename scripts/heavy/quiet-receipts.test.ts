@@ -1,11 +1,34 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import { live } from './queue'
-import { quietFailureReceipt, quietLauncherReceipt } from './quiet-receipts'
-import { alive, removeSandboxes, sandbox, start, until, userScopes, writeMachine } from './sandbox'
+import {
+  createQuietObserver,
+  freezeQuietObserver,
+  quietFailureReceipt,
+  quietLauncherReceipt,
+  quietRuntimeRecorder,
+} from './quiet-receipts'
+import {
+  alive,
+  recordOf,
+  removeSandboxes,
+  sandbox,
+  start,
+  until,
+  userScopes,
+  writeMachine,
+} from './sandbox'
 
 const uptime = vi.hoisted(() => ({ unavailable: false }))
 
@@ -18,6 +41,299 @@ vi.mock('node:fs', async (importOriginal) => {
       return actual.readFileSync(...args)
     },
   }
+})
+
+if (process.platform === 'win32')
+  console.info('Indirect files and Unix signal observation require a POSIX host.')
+if (!userScopes) console.info('Real scope observation requires systemd user scopes.')
+if (process.getuid?.() === 0)
+  console.info('Mode-bit observer I/O denial requires an unprivileged user.')
+
+test.skipIf(process.platform === 'win32')(
+  'bounded observer refuses malformed, private and indirect records without exposing contents',
+  () => {
+    const box = sandbox()
+    const observer = createQuietObserver(box)
+    if (observer.kind !== 'ready') expect.fail(observer.reason)
+    const privateText = 'private-content-λ'
+    const target = path.join(box.root, 'private')
+    writeFileSync(target, privateText)
+    writeFileSync(
+      path.join(observer.directory, 'events-1.jsonl'),
+      JSON.stringify({
+        kind: 'shell',
+        at: 1,
+        pid: 1,
+        role: 'shim',
+        phase: 'payload',
+        status: 0,
+        message: privateText,
+      }) + '\n',
+    )
+    writeFileSync(
+      path.join(observer.directory, 'events-5.jsonl'),
+      '{"kind":"shell","at":1e309,"pid":1,"role":"shim","phase":"payload","status":0}\n',
+    )
+    writeFileSync(path.join(observer.directory, 'events-2.jsonl'), Buffer.from([0xff]))
+    writeFileSync(path.join(observer.directory, 'events-3.jsonl'), privateText.repeat(400))
+    symlinkSync(target, path.join(observer.directory, 'events-4.jsonl'))
+    const snapshot = freezeQuietObserver(observer, 'failure')
+    if (!('events' in snapshot)) expect.fail(snapshot.unavailable)
+    expect(snapshot.events).toEqual([])
+    expect(snapshot.refused).toBeGreaterThanOrEqual(3)
+    expect(snapshot.unavailable).toBeGreaterThan(0)
+    expect(JSON.stringify(snapshot)).not.toContain(privateText)
+    expect(JSON.stringify(snapshot)).not.toContain(target)
+  },
+)
+
+test('bounded observer freezes before cleanup, refuses replacement and caps real file input', () => {
+  const box = sandbox()
+  const observer = createQuietObserver(box)
+  if (observer.kind !== 'ready') expect.fail(observer.reason)
+  const record =
+    JSON.stringify({
+      kind: 'shell',
+      at: 1,
+      pid: 1,
+      role: 'shim',
+      phase: 'payload-return',
+      status: 137,
+    }) + '\n'
+  const events = path.join(observer.directory, 'events-1.jsonl')
+  writeFileSync(events, record.repeat(200))
+  const failure = freezeQuietObserver(observer, 'failure')
+  if (!('events' in failure)) expect.fail(failure.unavailable)
+  expect(failure.persisted).toBe(true)
+  expect(failure.truncated).toBe(true)
+  expect(failure.events).toHaveLength(128)
+  expect(failure.events[0]).toMatchObject({ status: 137 })
+  const first = readFileSync(path.join(observer.directory, 'failure.json'), 'utf8')
+  rmSync(events)
+  const cleanup = freezeQuietObserver(observer, 'cleanup')
+  expect(cleanup.stage).toBe('cleanup')
+  expect(cleanup.persisted).toBe(true)
+  const replacement = freezeQuietObserver(observer, 'failure')
+  expect(replacement.persisted).toBe(false)
+  expect(readFileSync(path.join(observer.directory, 'failure.json'), 'utf8')).toBe(first)
+  expect(failure.events[0]).toMatchObject({ status: 137 })
+  expect(Buffer.byteLength(JSON.stringify(failure))).toBeLessThan(131_072)
+})
+
+test('bounded observer reports byte overflow and setup or persistence refusal', () => {
+  const box = sandbox()
+  const observer = createQuietObserver(box)
+  if (observer.kind !== 'ready') expect.fail(observer.reason)
+  writeFileSync(path.join(observer.directory, 'events-1.jsonl'), Buffer.alloc(65_537, 65))
+  mkdirSync(path.join(observer.directory, 'failure.json'))
+  const failure = freezeQuietObserver(observer, 'failure')
+  if (!('events' in failure)) expect.fail(failure.unavailable)
+  expect(failure.truncated).toBe(true)
+  expect(failure.refused).toBe(1)
+  expect(failure.persisted).toBe(false)
+  const unavailable = createQuietObserver(box)
+  expect(unavailable.kind).toBe('unavailable')
+  expect(freezeQuietObserver(unavailable, 'failure')).toMatchObject({ persisted: false })
+})
+
+test.skipIf(process.platform === 'win32')(
+  'bounded observer captures a genuine child signal and preserves an I/O-failed primary exit',
+  async () => {
+    const box = sandbox()
+    const observer = createQuietObserver(box)
+    if (observer.kind !== 'ready') expect.fail(observer.reason)
+    const child = Bun.spawn({
+      cmd: [process.execPath, '-e', "console.log('ready'); setInterval(() => {}, 1000)"],
+      stdout: 'pipe',
+      stderr: 'ignore',
+    })
+    const reader = child.stdout.getReader()
+    try {
+      expect(new TextDecoder().decode((await reader.read()).value)).toContain('ready')
+      reader.releaseLock()
+      quietRuntimeRecorder(observer.directory).observe(child, `${box.sliceRoot}-000000000001.scope`)
+      const returned = child.kill('SIGTERM')
+      expect(returned).toBeUndefined()
+      expect(await child.exited).toBe(143)
+      const snapshot = freezeQuietObserver(observer, 'failure')
+      if (!('events' in snapshot)) expect.fail(snapshot.unavailable)
+      expect(snapshot.events).toContainEqual(
+        expect.objectContaining({
+          kind: 'boundary',
+          operation: 'signal-attempt',
+          pid: child.pid,
+          signal: 'SIGTERM',
+        }),
+      )
+      expect(snapshot.events).toContainEqual(
+        expect.objectContaining({
+          kind: 'boundary',
+          operation: 'signal-return',
+          pid: child.pid,
+          result: 'returned-void',
+        }),
+      )
+      expect(snapshot.events).toContainEqual(
+        expect.objectContaining({
+          kind: 'boundary',
+          operation: 'supervisor-exit',
+          status: 143,
+          signal: 'SIGTERM',
+        }),
+      )
+    } finally {
+      if (child.exitCode === null) child.kill('SIGKILL')
+      await child.exited
+    }
+    const failed = createQuietObserver({ ...box, root: path.join(box.root, 'missing') })
+    expect(failed.kind).toBe('unavailable')
+    const primary = Bun.spawn({
+      cmd: [process.execPath, '-e', 'process.exit(7)'],
+      stdout: 'ignore',
+      stderr: 'ignore',
+    })
+    const io = path.join(box.root, 'io')
+    mkdirSync(io)
+    mkdirSync(path.join(io, `events-${process.pid}.jsonl`))
+    quietRuntimeRecorder(io).observe(primary, `${box.sliceRoot}-000000000002.scope`)
+    expect(await primary.exited).toBe(7)
+    const ioFailure = freezeQuietObserver({ ...observer, directory: io }, 'failure')
+    if (!('events' in ioFailure)) expect.fail(ioFailure.unavailable)
+    expect(ioFailure.unavailable).toBeGreaterThan(0)
+    expect(ioFailure.refused).toBeGreaterThan(0)
+    let original: unknown
+    try {
+      readFileSync(path.join(box.root, 'absent-primary'))
+    } catch (error) {
+      original = error
+    }
+    try {
+      throw original
+    } catch (error) {
+      freezeQuietObserver(failed, 'failure')
+      expect(error).toBe(original)
+    }
+  },
+)
+
+describe.skipIf(!userScopes)('bounded observer real scope capture', () => {
+  test('retains the real primary and watchdog process identities at a TERM boundary', async () => {
+    const box = sandbox()
+    writeMachine(box, { availableMiB: 65536 })
+    const observer = createQuietObserver(box)
+    if (observer.kind !== 'ready') expect.fail(observer.reason)
+    const job = start(box, 'observer-term-identities', ['bash', '-c', 'echo $$; exec sleep 60'], {
+      quiet: true,
+      jobClass: 'light',
+      machine: true,
+      preload: observer.preload,
+    })
+    try {
+      await expect.poll(job.stdout, { timeout: 5_000 }).toMatch(/^\d+\n$/)
+      const primaryPid = Number(job.stdout().trim())
+      expect(job.child.kill('SIGTERM')).toBe(true)
+      expect((await job.done).code).toBe(143)
+      const snapshot = freezeQuietObserver(observer, 'failure')
+      if (!('events' in snapshot)) expect.fail(snapshot.unavailable)
+      const attempt = snapshot.events.find(
+        (event) => event.kind === 'boundary' && event.operation === 'signal-attempt',
+      )
+      if (attempt?.kind !== 'boundary') expect.fail('TERM boundary is unavailable')
+      expect(attempt.scope.primaryPid).toBe(primaryPid)
+      expect(attempt.scope.processes).toContainEqual(expect.objectContaining({ pid: primaryPid }))
+      expect(attempt.scope.watchdog.length).toBeGreaterThan(0)
+      expect(snapshot.events).toContainEqual(
+        expect.objectContaining({ kind: 'shell', phase: 'payload-return', status: 143 }),
+      )
+    } finally {
+      job.child.kill('SIGTERM')
+      await job.done
+    }
+  }, 15_000)
+
+  test.skipIf(process.getuid?.() === 0)(
+    'denied observer writes preserve primary exit and watchdog readiness and cleanup',
+    async () => {
+      const box = sandbox()
+      writeMachine(box, { availableMiB: 65536 })
+      const observer = createQuietObserver(box)
+      if (observer.kind !== 'ready') expect.fail(observer.reason)
+      chmodSync(observer.directory, 0o555)
+      try {
+        const job = start(box, 'observer-denied-writes', ['bash', '-c', 'exit 7'], {
+          quiet: true,
+          jobClass: 'light',
+          machine: true,
+          preload: observer.preload,
+        })
+        expect((await job.done).code).toBe(7)
+        expect(recordOf(box, 'observer-denied-writes')).toMatchObject({
+          exitCode: 7,
+          leftoverProcesses: 0,
+          oomKills: 0,
+        })
+      } finally {
+        chmodSync(observer.directory, 0o755)
+      }
+      const snapshot = freezeQuietObserver(observer, 'failure')
+      if (!('events' in snapshot)) expect.fail(snapshot.unavailable)
+      expect(snapshot.unavailable).toBeGreaterThan(0)
+      expect(snapshot.events).toEqual([])
+    },
+    15_000,
+  )
+
+  test('captures actual primary rc, shim accounting and watchdog facts with quoted UTF8 paths', async () => {
+    const box = sandbox()
+    writeMachine(box, { availableMiB: 65536 })
+    const root = path.join(box.root, "observer ' λ")
+    mkdirSync(root)
+    const observer = createQuietObserver({ ...box, root })
+    if (observer.kind !== 'ready') expect.fail(observer.reason)
+    const job = start(box, 'observer-primary-seven', ['bash', '-c', 'exit 7'], {
+      quiet: true,
+      jobClass: 'light',
+      machine: true,
+      preload: observer.preload,
+    })
+    expect((await job.done).code).toBe(7)
+    const snapshot = freezeQuietObserver(observer, 'failure')
+    if (!('events' in snapshot)) expect.fail(snapshot.unavailable)
+    expect(snapshot.persisted).toBe(true)
+    expect(snapshot.events).toContainEqual(
+      expect.objectContaining({ kind: 'shell', role: 'shim', phase: 'payload-return', status: 7 }),
+    )
+    expect(snapshot.events).toContainEqual(
+      expect.objectContaining({ kind: 'shell', role: 'shim', phase: 'accounting-start' }),
+    )
+    expect(snapshot.events).toContainEqual(
+      expect.objectContaining({
+        kind: 'shell',
+        role: 'shim',
+        phase: 'accounting-return',
+        status: 0,
+      }),
+    )
+    expect(snapshot.events).toContainEqual(
+      expect.objectContaining({ kind: 'shell', role: 'watchdog', phase: 'watchdog-ready' }),
+    )
+    expect(snapshot.events).toContainEqual(
+      expect.objectContaining({
+        kind: 'boundary',
+        operation: 'supervisor-exit',
+        status: 7,
+        signal: null,
+      }),
+    )
+    expect(recordOf(box, 'observer-primary-seven')).toMatchObject({
+      exitCode: 7,
+      leftoverProcesses: 0,
+      oomKills: 0,
+    })
+    expect(snapshot.refused).toBe(0)
+    expect(snapshot.truncated).toBe(false)
+    expect(snapshot.dropped).toBe(0)
+  }, 15_000)
 })
 
 afterEach(() => {
