@@ -3,6 +3,7 @@ import path from 'node:path'
 import { tmpdir } from 'node:os'
 import { expect, test } from 'vitest'
 import { buildNative } from '../../../scripts/build-native'
+import { observeNativeBuild } from './native-build-observation'
 
 const desktopDir = path.resolve(import.meta.dirname, '../../..')
 
@@ -222,23 +223,27 @@ const macSdk =
 test.skipIf(!macSdk)(
   `builds the macOS native host (${macSdk ? 'Xcode SDK present' : 'skip reason: macOS clang and SDK required'})`,
   () => {
-    const desktopDir = path.resolve(import.meta.dirname, '../../..')
-    const host = buildNative(desktopDir)
-    expect(host).toBe(
-      path.join(desktopDir, 'native/build/Fregat Dev.app/Contents/MacOS/platform-webview'),
-    )
-    expect(existsSync(host!)).toBe(true)
-    const contents = path.dirname(path.dirname(host!))
-    const plist = Bun.spawnSync([
-      'plutil',
-      '-extract',
-      'CFBundleName',
-      'raw',
-      path.join(contents, 'Info.plist'),
-    ])
-    expect(plist.exitCode).toBe(0)
-    expect(new TextDecoder().decode(plist.stdout).trim()).toBe('Fregat Dev')
-    expect(existsSync(path.join(contents, 'Resources/Fregat.icns'))).toBe(true)
+    observeNativeBuild((phase) => {
+      const desktopDir = path.resolve(import.meta.dirname, '../../..')
+      phase('build', 'before')
+      const host = buildNative(desktopDir)
+      phase('build', 'after')
+      expect(host).toBe(
+        path.join(desktopDir, 'native/build/Fregat Dev.app/Contents/MacOS/platform-webview'),
+      )
+      expect(existsSync(host!)).toBe(true)
+      const contents = path.dirname(path.dirname(host!))
+      const plist = Bun.spawnSync([
+        'plutil',
+        '-extract',
+        'CFBundleName',
+        'raw',
+        path.join(contents, 'Info.plist'),
+      ])
+      expect(plist.exitCode).toBe(0)
+      expect(new TextDecoder().decode(plist.stdout).trim()).toBe('Fregat Dev')
+      expect(existsSync(path.join(contents, 'Resources/Fregat.icns'))).toBe(true)
+    })
   },
 )
 

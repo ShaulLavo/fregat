@@ -6,6 +6,16 @@ import { inspect } from 'node:util'
 import { StringDecoder } from 'node:string_decoder'
 import type { EventEmitter } from 'node:events'
 import * as v from 'valibot'
+import {
+  associateRetentionSocketFailure,
+  createRetentionSocketProvenance,
+  isRetentionSocketJournalName,
+  removeRetentionSocketJournal,
+  retentionSocketLimits,
+  snapshotRetentionSocketJournal,
+  type RetentionSocketAssociation,
+  type RetentionSocketSnapshot,
+} from './retention-acceptance-socket-provenance.ts'
 
 type ForwardOutcome =
   | { readonly kind: 'succeeded' }
@@ -152,7 +162,10 @@ async function completeRetentionForward(
   await routeAction.join().catch(() => {})
 }
 
-export function createRetentionReloadTransport() {
+export function createRetentionReloadTransport(observer?: {
+  run: (request: ForwardObservation, operation: () => Promise<void>) => Promise<void>
+  settled: (request: ForwardObservation) => void
+}) {
   const tasks = new Set<Promise<void>>()
   const routeActions: ReturnType<typeof createRetentionRouteAction>[] = []
   const pending = new Set<() => void>()
@@ -237,11 +250,21 @@ export function createRetentionReloadTransport() {
       routeActions.push(routeAction)
       const cancel = () => {
         if (!request.cancel()) return
+        guardRetentionEntryObservation(() => observer?.settled(observation))
         void routeAction.abort().catch(() => {})
       }
       pending.add(cancel)
       const actual = admitting
-        ? observeRetentionForward(() => operation(routeAction.fulfill), request.select)
+        ? observeRetentionForward(
+            () =>
+              observer?.run(observation, () => operation(routeAction.fulfill)) ??
+              operation(routeAction.fulfill),
+            (outcome) => {
+              const selected = request.select(outcome)
+              guardRetentionEntryObservation(() => observer?.settled(observation))
+              return selected
+            },
+          )
         : null
       if (!admitting) request.cancel()
       const task = completeRetentionForward(
@@ -435,6 +458,11 @@ const receiptBase = {
 const entryReceiptFactSchema = v.variant('kind', [
   v.strictObject({
     ...receiptBase,
+    kind: v.literal('socket-journal'),
+    basename: v.pipe(v.string(), v.check(isRetentionSocketJournalName)),
+  }),
+  v.strictObject({
+    ...receiptBase,
     kind: v.literal('installed'),
     port: receiptInteger,
     keepAliveTimeout: receiptInteger,
@@ -540,6 +568,7 @@ const wireRecordBytes =
   retentionEntryReceiptLimits.recordBytes + Buffer.byteLength(retentionEntryReceiptPrefix) + 1
 type FactualEntryEvent = v.InferOutput<typeof entryReceiptFactSchema>
 const factDropCounts = {
+  'socket-journal': 0,
   installed: 0,
   listening: 0,
   request: 0,
@@ -661,12 +690,22 @@ export const retentionEntryBudget = {
     factCells: producerFactCells,
   },
   relay: {
-    records: retentionEntryReceiptLimits.records - producerFactCells - producerFixedCells - 1,
+    records:
+      retentionEntryReceiptLimits.records -
+      producerFactCells -
+      producerFixedCells -
+      1 -
+      retentionSocketLimits.client.records -
+      retentionSocketLimits.serving.records,
     bytes:
       retentionEntryReceiptLimits.bytes -
       (producerFactCells + producerFixedCells) * retentionEntryReceiptLimits.recordBytes -
-      wireRecordBytes,
+      wireRecordBytes -
+      retentionSocketLimits.client.bytes -
+      retentionSocketLimits.serving.bytes,
   },
+  clientJournal: retentionSocketLimits.client,
+  servingJournal: retentionSocketLimits.serving,
 } as const
 let receiptWriter: ReturnType<typeof createRetentionEntryWriter> | undefined
 
@@ -925,6 +964,7 @@ const lifetimeKinds = new Set<RetentionEntryReceiptEvent['kind']>([
   'server-error',
   'full-reload',
   'writer-status',
+  'socket-journal',
 ])
 // Reserve both owned stop signals so a full frozen window can still retain teardown.
 const lifetimeSlots = lifetimeKinds.size + 1
@@ -999,7 +1039,11 @@ async function writeEntryPacketChunk(file: Awaited<ReturnType<typeof open>>, chu
 async function archiveEntryReceipt(
   output: string,
   payload: unknown,
-  name: 'entry-transport.json' | 'entry-transport.frozen.json' = 'entry-transport.json',
+  name:
+    | 'entry-transport.json'
+    | 'entry-transport.frozen.json'
+    | 'socket-provenance.json'
+    | 'socket-provenance.frozen.json' = 'entry-transport.json',
 ) {
   const codes: (string | null)[] = []
   try {
@@ -1020,7 +1064,21 @@ async function archiveEntryReceipt(
   return { status: 'unavailable' as const, codes }
 }
 
-export function createRetentionEntryCapture() {
+export function createRetentionEntryCapture(socketOptions?: { entryPort: number; root: string }) {
+  const clientJournal = socketOptions
+    ? createRetentionSocketProvenance({
+        side: 'client',
+        entryPort: socketOptions.entryPort,
+        normalizePath: (path) => retentionEntryModulePath(socketOptions.root, path),
+      })
+    : null
+  const caseRecords = clientJournal ? 10 : 3
+  const caseJournalBytes = clientJournal
+    ? 6 * retentionEntryReceiptLimits.recordBytes + wireRecordBytes
+    : 0
+  let servingJournal: string | null = null,
+    servingJournalAmbiguous = false,
+    socketCaseSequence = 0
   const records = new Map<number, ReceiptRecord>()
   const lifetime = new Map<string, ReceiptRecord>()
   const completions = new Map<string, ReceiptRecord>()
@@ -1031,6 +1089,14 @@ export function createRetentionEntryCapture() {
     immediate: Promise<Awaited<ReturnType<typeof archiveEntryReceipt>>> | null
     immediateStatus: Awaited<ReturnType<typeof archiveEntryReceipt>> | null
     immediateCompletedAt: number | null
+    socketCaseId: number
+    socketFrozen: {
+      client: RetentionSocketSnapshot | null
+      serving: RetentionSocketSnapshot | null
+      association: RetentionSocketAssociation
+    } | null
+    socketImmediate: Promise<Awaited<ReturnType<typeof archiveEntryReceipt>>> | null
+    socketImmediateStatus: Awaited<ReturnType<typeof archiveEntryReceipt>> | null
   }
   const cases = new Map<string, Owner>()
   const decoder = new StringDecoder('utf8')
@@ -1107,7 +1173,13 @@ export function createRetentionEntryCapture() {
   }
   const makeRoom = (count: number, size: number) => {
     while (
-      records.size + completions.size + pinnedRecords + lifetimeSlots + cases.size * 3 + 1 + count >
+      records.size +
+        completions.size +
+        pinnedRecords +
+        lifetimeSlots +
+        cases.size * caseRecords +
+        1 +
+        count >
         retentionEntryBudget.relay.records ||
       bytes +
         completionBytes +
@@ -1179,6 +1251,15 @@ export function createRetentionEntryCapture() {
       if (parsed.output.kind === 'writer-status') {
         writerDropped = Math.max(writerDropped, parsed.output.dropped)
         writerRefused = Math.max(writerRefused, parsed.output.refused)
+      }
+      if (parsed.output.kind === 'socket-journal') {
+        if (!parsed.output.basename.startsWith(`retention-socket-serving-${parsed.output.pid}-`)) {
+          refused = addRelayCounter(refused)
+          return
+        }
+        if (servingJournal && servingJournal !== parsed.output.basename)
+          servingJournalAmbiguous = true
+        servingJournal ??= parsed.output.basename
       }
       retain(parsed.output)
     } catch {
@@ -1328,9 +1409,12 @@ export function createRetentionEntryCapture() {
     if (!owner) return
     if (owner.failure) return owner.immediate
     const paths = new Set<string>()
+    let primaryForwardId: number | null = null
     for (const record of records.values())
-      if (record.sequence > owner.start && record.event.kind === 'route-failure')
+      if (record.sequence > owner.start && record.event.kind === 'route-failure') {
         paths.add(record.event.path)
+        primaryForwardId ??= record.event.transportRequestId
+      }
     const history = pin(lifetime.values())
     const prior = pin(
       [...paths].flatMap((path) => {
@@ -1371,10 +1455,59 @@ export function createRetentionEntryCapture() {
         owner.immediateCompletedAt = Date.now()
         return result
       })
+    guardRetentionEntryObservation(() => {
+      const client = clientJournal
+        ? snapshotRetentionSocketJournal(clientJournal.basename, output, 'frozen')
+        : null
+      const serving =
+        servingJournal && !servingJournalAmbiguous
+          ? snapshotRetentionSocketJournal(servingJournal, output, 'frozen')
+          : null
+      const association: RetentionSocketAssociation =
+        client && serving && primaryForwardId !== null
+          ? associateRetentionSocketFailure(
+              output,
+              client,
+              serving,
+              owner.socketCaseId,
+              primaryForwardId,
+            )
+          : {
+              status: 'unavailable',
+              why: servingJournalAmbiguous
+                ? 'serving-journal-ambiguous'
+                : 'journal-or-primary-unavailable',
+            }
+      owner.socketFrozen = { client, serving, association }
+      if (clientJournal || servingJournal)
+        owner.socketImmediate = archiveEntryReceipt(
+          output,
+          {
+            version: 1,
+            caseId: owner.socketCaseId,
+            primaryForwardId,
+            stage: 'failure-frozen',
+            observation: owner.socketFrozen,
+          },
+          'socket-provenance.frozen.json',
+        ).then((result) => {
+          owner.socketImmediateStatus = result
+          return result
+        })
+    })
     return owner.immediate
   }
   return {
     accept,
+    observeForward<T>(output: string, observation: { requestId: number }, operation: () => T): T {
+      const owner = cases.get(output)
+      return clientJournal && owner
+        ? clientJournal.runForward(owner.socketCaseId, observation, operation)
+        : operation()
+    },
+    endForward(observation: object) {
+      guardRetentionEntryObservation(() => clientJournal?.endForward(observation))
+    },
     read(chunk: Buffer, other?: (value: string) => void) {
       try {
         const ordinary: number[] = []
@@ -1399,8 +1532,9 @@ export function createRetentionEntryCapture() {
         const size =
           Buffer.byteLength(output) +
           wireRecordBytes * 2 +
-          retentionEntryReceiptLimits.recordBytes * 4
-        if (cases.has(output) || !makeRoom(3, size)) {
+          retentionEntryReceiptLimits.recordBytes * 4 +
+          caseJournalBytes
+        if (cases.has(output) || !makeRoom(caseRecords, size)) {
           refused = addRelayCounter(refused)
           return
         }
@@ -1411,6 +1545,10 @@ export function createRetentionEntryCapture() {
           immediate: null,
           immediateStatus: null,
           immediateCompletedAt: null,
+          socketCaseId: ++socketCaseSequence,
+          socketFrozen: null,
+          socketImmediate: null,
+          socketImmediateStatus: null,
         })
         caseBytes += size
       })
@@ -1444,21 +1582,26 @@ export function createRetentionEntryCapture() {
           pinnedBytes +
           caseBytes +
           wireRecordBytes +
-          retentionEntryBudget.producer.bytes,
+          retentionEntryBudget.producer.bytes +
+          retentionEntryBudget.clientJournal.bytes +
+          retentionEntryBudget.servingJournal.bytes,
         retainedRecords:
           records.size +
           lifetime.size +
           completions.size +
           pinnedRecords +
-          cases.size * 3 +
+          cases.size * caseRecords +
           1 +
-          retentionEntryBudget.producer.records,
+          retentionEntryBudget.producer.records +
+          retentionEntryBudget.clientJournal.records +
+          retentionEntryBudget.servingJournal.records,
         wireEndObserved,
         pendingWireBytes: pendingLength,
         producer: producerSample,
         observations: observations(),
         relayDropped: dropped,
         relayRefused: refused,
+        socketJournal: clientJournal?.inspect() ?? null,
       }
     },
     async persistFailures() {
@@ -1490,8 +1633,43 @@ export function createRetentionEntryCapture() {
             ),
           ),
         )
+        if (owner.socketImmediate) results.push(await owner.socketImmediate)
+        let socketFinal: {
+          client: RetentionSocketSnapshot | null
+          serving: RetentionSocketSnapshot | null
+        } | null = null
+        guardRetentionEntryObservation(() => {
+          const client = clientJournal
+            ? snapshotRetentionSocketJournal(clientJournal.basename, output, 'final')
+            : null
+          const serving =
+            servingJournal && !servingJournalAmbiguous
+              ? snapshotRetentionSocketJournal(servingJournal, output, 'final')
+              : null
+          socketFinal = { client, serving }
+        })
+        if (!clientJournal && !servingJournal) continue
+        results.push(
+          await archiveEntryReceipt(
+            output,
+            {
+              version: 1,
+              caseId: owner.socketCaseId,
+              frozen: owner.socketFrozen,
+              immediatePersistence: owner.socketImmediateStatus,
+              final: socketFinal ?? null,
+              finalWindowAfterFailureAt: owner.failure.at,
+            },
+            'socket-provenance.json',
+          ),
+        )
       }
       return results
+    },
+    dispose() {
+      guardRetentionEntryObservation(() => clientJournal?.close())
+      guardRetentionEntryObservation(() => clientJournal?.remove())
+      if (servingJournal) removeRetentionSocketJournal(servingJournal)
     },
   }
 }
@@ -1507,7 +1685,22 @@ export function registerRetentionEntryCapture(origin: string, capture: Retention
   guardRetentionEntryObservation(() => entryCaptures().set(origin, capture))
 }
 export function releaseRetentionEntryCapture(origin: string) {
-  guardRetentionEntryObservation(() => entryCaptures().delete(origin))
+  guardRetentionEntryObservation(() => {
+    entryCaptures().get(origin)?.dispose()
+    entryCaptures().delete(origin)
+  })
+}
+export function observeRetentionEntryForward<T>(
+  origin: string,
+  output: string,
+  observation: { requestId: number },
+  operation: () => T,
+): T {
+  const capture = entryCaptures().get(origin)
+  return capture ? capture.observeForward(output, observation, operation) : operation()
+}
+export function endRetentionEntryForward(origin: string, observation: object) {
+  guardRetentionEntryObservation(() => entryCaptures().get(origin)?.endForward(observation))
 }
 export function beginRetentionEntryCase(origin: string, output: string) {
   guardRetentionEntryObservation(() => entryCaptures().get(origin)?.begin(output))

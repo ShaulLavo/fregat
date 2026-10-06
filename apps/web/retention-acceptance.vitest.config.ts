@@ -24,8 +24,11 @@ import {
   retentionEntryErrorCode,
   retentionEntryReceiptTime,
   writeRetentionEntryReceipt,
+  observeRetentionEntryForward,
+  endRetentionEntryForward,
   type RetentionEntryPhase,
 } from './test/factories/retention-acceptance-reload-transport'
+import { createRetentionSocketProvenance } from './test/factories/retention-acceptance-socket-provenance'
 import type {} from './test/factories/retention-acceptance-entry.tsx'
 
 export default defineConfig(({ mode }) =>
@@ -74,7 +77,11 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
   await isolated.grantPermissions(['local-network-access'], { origin: runnerOrigin })
   let reloading = false
   const delayedFonts: { url: string; heldAt: number; releasedAt: number }[] = []
-  const transport = createRetentionReloadTransport()
+  const transport = createRetentionReloadTransport({
+    run: (observation, operation) =>
+      observeRetentionEntryForward(entryOrigin, output, observation, operation),
+    settled: (observation) => endRetentionEntryForward(entryOrigin, observation),
+  })
   await page.route(
     (url) => url.origin === runnerOrigin,
     (route) => {
@@ -525,6 +532,13 @@ function installRetentionEntryReceipt(server: ViteDevServer) {
     return
   const note = (event: object) =>
     writeRetentionEntryReceipt({ ...retentionEntryReceiptTime(), ...event })
+  const journal = createRetentionSocketProvenance({
+    side: 'serving',
+    entryPort: server.config.server.port ?? 0,
+    normalizePath: (path) => retentionEntryModulePath(join(import.meta.dirname, '../..'), path),
+    server: http,
+  })
+  note({ kind: 'socket-journal', basename: journal.basename })
   let requestId = 0
   let socketId = 0
   const sockets = new WeakMap<Socket, number>()

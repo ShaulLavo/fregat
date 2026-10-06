@@ -1,0 +1,724 @@
+import { spawn, spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
+import { once } from 'node:events'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { delimiter, dirname, join } from 'node:path'
+import { Socket } from 'node:net'
+import { ClientRequest } from 'node:http'
+import { test, expect } from '../fixtures'
+import {
+  associateRetentionSocketFailure,
+  createRetentionSocketProvenance,
+  isRetentionSocketJournalName,
+  retentionSocketLimits,
+  snapshotRetentionSocketJournal,
+} from './retention-acceptance-socket-provenance'
+import {
+  retentionEntryBudget,
+  retentionEntryReceiptLimits,
+} from './retention-acceptance-reload-transport'
+
+function systemNode() {
+  for (const directory of (process.env.PATH ?? '').split(delimiter)) {
+    const candidate = join(directory, process.platform === 'win32' ? 'node.exe' : 'node')
+    if (!existsSync(candidate)) continue
+    const result = spawnSync(
+      candidate,
+      ['--eval', 'process.stdout.write(process.versions.bun ? "bun" : "node")'],
+      { encoding: 'utf8' },
+    )
+    if (result.status === 0 && result.stdout === 'node') return candidate
+  }
+  return null
+}
+
+test('socket evidence public request context binds duplicate paths and preserves a real reset primary', async ({
+  skip,
+}) => {
+  const node = systemNode()
+  if (!node) {
+    skip('System Node is unavailable')
+    return
+  }
+  const output = await mkdtemp(join(tmpdir(), 'retention-socket-control-'))
+  const source = pathToFileURL(
+    join(import.meta.dirname, 'retention-acceptance-socket-provenance.ts'),
+  ).href
+  const transport = pathToFileURL(
+    join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
+  ).href
+  const playwright = pathToFileURL(
+    join(dirname(createRequire(import.meta.url).resolve('playwright/package.json')), 'index.mjs'),
+  ).href
+  const script = `import {createServer} from 'node:http';import {once} from 'node:events';
+const [output,source,transportSource,playwrightSource]=process.argv.slice(1);
+const {createRetentionSocketProvenance,snapshotRetentionSocketJournal,associateRetentionSocketFailure}=await import(source);
+const {createRetentionReloadTransport,createRetentionEntryCapture,retentionEntryReceiptTime,retentionEntryModulePath}=await import(transportSource);const {request}=await import(playwrightSource);
+const server=createServer((req,res)=>{if(req.url==='/reset'){req.socket.destroy();return}res.end('controlled response')});server.listen(0,'127.0.0.1');await once(server,'listening');const address=server.address();
+const serving=createRetentionSocketProvenance({side:'serving',entryPort:address.port,normalizePath:path=>retentionEntryModulePath(process.cwd(),path),server}),api=await request.newContext();
+const ordinary={requestId:17},duplicates=[{requestId:18},{requestId:19}];let primary,observed;
+const archive=createRetentionEntryCapture({entryPort:address.port,root:process.cwd()});archive.begin(output);archive.accept({...retentionEntryReceiptTime(),kind:'socket-journal',basename:serving.basename});
+try{await archive.observeForward(output,ordinary,()=>api.get('http://127.0.0.1:'+address.port+'/good?private-sentinel'));archive.endForward(ordinary);
+await Promise.all(duplicates.map(observation=>archive.observeForward(output,observation,()=>api.get('http://127.0.0.1:'+address.port+'/same')).finally(()=>archive.endForward(observation))));
+const transport=createRetentionReloadTransport({run:(observation,operation)=>archive.observeForward(output,observation,operation),settled:observation=>archive.endForward(observation)});
+const running=transport.run('http://127.0.0.1:'+address.port+'/reset',async fulfill=>{try{await api.get('http://127.0.0.1:'+address.port+'/reset')}catch(error){primary=error;throw error}await fulfill(async()=>{})},async()=>{});
+try{await transport.race(running)}catch(error){observed=error}await transport.drain();
+archive.accept({...retentionEntryReceiptTime(),kind:'route-failure',transportRequestId:1,path:'/apps/web/reset'});const immediate=await archive.fail(output,'reload');archive.end(output);await archive.persistFailures();const evidence=JSON.parse(await (await import('node:fs/promises')).readFile(output+'/socket-provenance.json','utf8'));const clientSnapshot=evidence.frozen.client,servingSnapshot=evidence.frozen.serving;
+process.stdout.write(JSON.stringify({identity:observed===primary&&transport.firstError===primary,clientSnapshot,servingSnapshot,association:associateRetentionSocketFailure(output,clientSnapshot,servingSnapshot,1,1),client:archive.inspect().socketJournal,serving:serving.inspect(),immediate,archivalAssociation:evidence.frozen.association}));
+}finally{archive.dispose();await api.dispose();await new Promise(resolve=>server.close(resolve));serving.close();serving.remove()}`
+  const child = spawn(
+    node,
+    [
+      '--experimental-strip-types',
+      '--disable-warning=ExperimentalWarning',
+      '--input-type=module',
+      '--eval',
+      script,
+      output,
+      source,
+      transport,
+      playwright,
+    ],
+    { stdio: ['ignore', 'pipe', 'pipe'] },
+  )
+  const closed = once(child, 'close')
+  let stdout = '',
+    stderr = ''
+  child.stdout.on('data', (chunk) => {
+    stdout += chunk.toString()
+  })
+  child.stderr.on('data', (chunk) => {
+    stderr += chunk.toString()
+  })
+  const timer = setTimeout(() => child.kill('SIGKILL'), 15000)
+  try {
+    const [code, signal] = await closed
+    clearTimeout(timer)
+    expect(code, stderr).toBe(0)
+    expect(signal).toBeNull()
+    const result = JSON.parse(stdout)
+    expect(result.identity).toBe(true)
+    expect(result.immediate.status).toBe('written')
+    expect(result.archivalAssociation.status).toBe('exact')
+    expect(result.clientSnapshot.status, stdout).toBe('written')
+    expect(result.servingSnapshot.status, stdout).toBe('written')
+    expect(result.clientSnapshot.partial + result.servingSnapshot.partial).toBe(0)
+    const association = result.association
+    expect(association).toMatchObject({
+      status: 'exact',
+      client: { forwardId: 1, association: 'context', path: '/apps/web/reset' },
+      serving: { path: '/apps/web/reset' },
+    })
+    expect(association.clientSocket.localPort).toBe(association.servingSocket.remotePort)
+    expect(association.clientSocket.remotePort).toBe(association.servingSocket.localPort)
+    expect(association.client.order).toBe(association.serving.order)
+    const clientText = await readFile(join(output, result.clientSnapshot.basename), 'utf8')
+    expect(clientText).not.toContain('private-sentinel')
+    expect(clientText).not.toContain('controlled response')
+    const rows = clientText
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+    expect(
+      rows
+        .filter((row) => row.kind === 'request' && row.path === '/apps/web/same')
+        .map((row) => row.forwardId)
+        .sort(),
+    ).toEqual([18, 19])
+    for (const side of ['client', 'serving'] as const) {
+      expect(result[side].retainedRecords).toBeLessThanOrEqual(retentionSocketLimits[side].records)
+      expect(result[side].retainedBytes).toBeLessThanOrEqual(retentionSocketLimits[side].bytes)
+    }
+    const servingText = await readFile(join(output, result.servingSnapshot.basename), 'utf8')
+    const servingRows = servingText
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'request',
+          forwardId: 17,
+          association: 'context',
+          path: '/apps/web/good',
+        }),
+      ]),
+    )
+    expect(servingRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'request',
+          path: '/apps/web/good',
+          status: 200,
+          complete: true,
+        }),
+      ]),
+    )
+    await writeFile(
+      join(output, result.servingSnapshot.basename),
+      servingText +
+        JSON.stringify({ ...association.servingSocket, id: association.servingSocket.id + 10000 }) +
+        '\n',
+    )
+    expect(
+      associateRetentionSocketFailure(output, result.clientSnapshot, result.servingSnapshot, 1, 1),
+    ).toMatchObject({ status: 'ambiguous', why: 'reversed-endpoint-incarnation' })
+    await writeFile(join(output, result.servingSnapshot.basename), servingText)
+    await writeFile(
+      join(output, result.clientSnapshot.basename),
+      clientText +
+        JSON.stringify({ ...association.client, id: association.client.id + 10000 }) +
+        '\n',
+    )
+    expect(
+      associateRetentionSocketFailure(output, result.clientSnapshot, result.servingSnapshot, 1, 1),
+    ).toMatchObject({ status: 'ambiguous', why: 'forward-request-identity' })
+    await writeFile(join(output, result.clientSnapshot.basename), clientText)
+    expect(
+      associateRetentionSocketFailure(
+        output,
+        { ...result.clientSnapshot, partial: 1 },
+        result.servingSnapshot,
+        1,
+        1,
+      ),
+    ).toMatchObject({ status: 'unavailable', why: 'journal-incomplete' })
+    expect(
+      associateRetentionSocketFailure(
+        output,
+        result.clientSnapshot,
+        {
+          ...result.servingSnapshot,
+          coverage: {
+            ...result.servingSnapshot.coverage,
+            evictedSocketThrough: association.clientSocket.opened[1],
+          },
+        },
+        1,
+        1,
+      ),
+    ).toMatchObject({ status: 'unavailable', why: 'peer-incarnation-history-evicted' })
+  } finally {
+    clearTimeout(timer)
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test('socket evidence emit return/arguments/default unhandled identity and cleanup remain original', () => {
+  const emit = Socket.prototype.emit
+  const descriptor = Object.getOwnPropertyDescriptor(Socket.prototype, 'emit')
+  const collector = createRetentionSocketProvenance({
+    side: 'client',
+    entryPort: 52865,
+    normalizePath: (path) => path,
+  })
+  const socket = new Socket()
+  const primary = (() => {
+    try {
+      JSON.parse('controlled primary')
+    } catch (error) {
+      return error
+    }
+  })()
+  try {
+    expect(socket.emit('no-subscriber', 1)).toBe(false)
+    const argument = { value: 1 }
+    let received: unknown
+    socket.on('control', function (this: Socket, value: unknown) {
+      expect(this).toBe(socket)
+      received = value
+    })
+    expect(socket.emit('control', argument)).toBe(true)
+    expect(received).toBe(argument)
+    let observed: unknown
+    try {
+      socket.emit('error', primary)
+    } catch (error) {
+      observed = error
+    }
+    expect(observed).toBe(primary)
+    expect(socket.listenerCount('error')).toBe(0)
+    expect(process.stdout.listenerCount('error')).toBe(0)
+    collector.close()
+    expect(Socket.prototype.emit).toBe(emit)
+    expect(Object.getOwnPropertyDescriptor(Socket.prototype, 'emit')).toEqual(descriptor)
+  } finally {
+    collector.close()
+    collector.remove()
+  }
+})
+
+test('socket evidence bounded active capsules refuse observation while returning original values', () => {
+  const collector = createRetentionSocketProvenance({
+    side: 'client',
+    entryPort: 52865,
+    normalizePath: (path) => path,
+  })
+  const value = Promise.resolve('original')
+  try {
+    for (let requestId = 1; requestId <= 10000; requestId++) {
+      expect(collector.runForward(1, { requestId }, () => value)).toBe(value)
+      expect(collector.inspect().retainedRecords).toBeLessThanOrEqual(
+        retentionSocketLimits.client.records,
+      )
+      expect(collector.inspect().retainedBytes).toBeLessThanOrEqual(
+        retentionSocketLimits.client.bytes,
+      )
+    }
+    expect(collector.inspect().referenceRefused).toBeGreaterThan(0)
+  } finally {
+    collector.close()
+    collector.remove()
+  }
+})
+
+test('socket evidence unavailable journal IO preserves an operation and default error', async () => {
+  const output = await mkdtemp(join(tmpdir(), 'retention-socket-io-'))
+  const collector = createRetentionSocketProvenance({
+    side: 'client',
+    entryPort: 52865,
+    normalizePath: (path) => path,
+  })
+  const primary = (() => {
+    try {
+      JSON.parse('controlled primary')
+    } catch (error) {
+      return error
+    }
+  })()
+  try {
+    collector.close()
+    collector.remove()
+    let observed: unknown
+    try {
+      collector.runForward(1, { requestId: 1 }, () => {
+        throw primary
+      })
+    } catch (error) {
+      observed = error
+    }
+    expect(observed).toBe(primary)
+    expect(snapshotRetentionSocketJournal(collector.basename, output, 'frozen')).toMatchObject({
+      status: 'unavailable',
+      code: 'ENOENT',
+    })
+    expect(isRetentionSocketJournalName('../private.json')).toBe(false)
+  } finally {
+    collector.close()
+    collector.remove()
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test('socket evidence shares the exact original aggregate record and byte allowance', () => {
+  const budgets = [
+    retentionEntryBudget.producer,
+    retentionEntryBudget.clientJournal,
+    retentionEntryBudget.servingJournal,
+    retentionEntryBudget.relay,
+  ]
+  expect(budgets.reduce((sum, budget) => sum + budget.records, 0)).toBe(
+    retentionEntryReceiptLimits.records,
+  )
+  expect(budgets.reduce((sum, budget) => sum + budget.bytes, 0)).toBe(
+    retentionEntryReceiptLimits.bytes,
+  )
+  expect(retentionEntryBudget.producer).toEqual({ records: 70, bytes: 286745, factCells: 64 })
+  expect(retentionEntryBudget.relay).toEqual({ records: 16698, bytes: 2858983 })
+})
+
+test.for(['earlier-first', 'later-first'] as const)(
+  'socket review F1 %s overlapping collectors restore native hooks and outcomes',
+  (order) => {
+    const targets = [Socket.prototype, ClientRequest.prototype]
+    const original = targets.map((target) => ({
+      target,
+      emit: target.emit,
+      descriptor: Object.getOwnPropertyDescriptor(target, 'emit'),
+    }))
+    const first = createRetentionSocketProvenance({
+      side: 'client',
+      entryPort: 52865,
+      normalizePath: (path) => path,
+    })
+    const second = createRetentionSocketProvenance({
+      side: 'client',
+      entryPort: 52865,
+      normalizePath: (path) => path,
+    })
+    const socket = new Socket()
+    const primary = (() => {
+      try {
+        JSON.parse('controlled primary')
+      } catch (error) {
+        return error
+      }
+    })()
+    try {
+      if (order === 'earlier-first') first.close()
+      if (order === 'later-first') second.close()
+      expect(socket.emit('no-subscriber', 1)).toBe(false)
+      let observed: unknown
+      try {
+        socket.emit('error', primary)
+      } catch (error) {
+        observed = error
+      }
+      expect(observed).toBe(primary)
+      expect(socket.listenerCount('error')).toBe(0)
+      first.close()
+      second.close()
+      for (const baseline of original) {
+        expect(baseline.target.emit).toBe(baseline.emit)
+        expect(Object.getOwnPropertyDescriptor(baseline.target, 'emit')).toEqual(
+          baseline.descriptor,
+        )
+      }
+    } finally {
+      first.close()
+      second.close()
+      first.remove()
+      second.remove()
+      original.forEach(({ target, descriptor }) => {
+        if (descriptor) Object.defineProperty(target, 'emit', descriptor)
+        if (!descriptor) Reflect.deleteProperty(target, 'emit')
+      })
+    }
+  },
+)
+
+test.for(['header-only', 'short-body'] as const)(
+  'socket review F2 %s live journal read refuses cached body bytes',
+  async (mode, { skip }) => {
+    const node = systemNode()
+    if (!node) {
+      skip('System Node is unavailable')
+      return
+    }
+    const source = pathToFileURL(
+      join(import.meta.dirname, 'retention-acceptance-socket-provenance.ts'),
+    ).href
+    const script = `import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';import {createServer,createConnection} from 'node:net';import {once} from 'node:events';import {tmpdir} from 'node:os';import {join} from 'node:path';
+const {createRetentionSocketProvenance}=await import(${JSON.stringify(source)});const mode=${JSON.stringify(mode)};
+const server=createServer();server.listen(0,'127.0.0.1');await once(server,'listening');const address=server.address();
+const collector=createRetentionSocketProvenance({side:'client',entryPort:address.port,normalizePath:path=>path});
+const accepted=once(server,'connection'),socket=createConnection({host:'127.0.0.1',port:address.port});await once(socket,'connect');const [peer]=await accepted;
+const inode=fs.statSync(join(tmpdir(),collector.basename)).ino,originalRead=fs.readSync;let shortened=false,warmedBytes=0,bodyBytes=0,retainedBytes=0;
+try{const before=collector.inspect();fs.readSync=function(...args){const read=Reflect.apply(originalRead,this,args);const [fd,buffer,offset,,position]=args;if(!shortened&&typeof position==='number'&&position>=4096&&read>=16&&fs.fstatSync(fd).ino===inode){bodyBytes=buffer.readUInt16LE(offset);if(read<16+bodyBytes)throw {code:'CONTROL_NOT_WARM'};warmedBytes=read;retainedBytes=mode==='header-only'?16:16+Math.max(1,Math.floor(bodyBytes/2));fs.ftruncateSync(fd,position+retainedBytes);shortened=true}return read};syncBuiltinESMExports();
+const returned=socket.emit('timeout');fs.readSync=originalRead;syncBuiltinESMExports();const after=collector.inspect();process.stdout.write(JSON.stringify({shortened,warmedBytes,bodyBytes,retainedBytes,returned,before,after,publicErrors:socket.listenerCount('error')}));
+}finally{fs.readSync=originalRead;syncBuiltinESMExports();collector.close();collector.remove();socket.destroy();peer.destroy();await new Promise(resolve=>server.close(resolve))}`
+    const child = spawn(
+      node,
+      [
+        '--experimental-strip-types',
+        '--disable-warning=ExperimentalWarning',
+        '--input-type=module',
+        '--eval',
+        script,
+      ],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    const closed = once(child, 'close')
+    let stdout = '',
+      stderr = ''
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString()
+    })
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+    })
+    const timer = setTimeout(() => child.kill('SIGKILL'), 15000)
+    try {
+      const [code, signal] = await closed
+      expect(code, stderr).toBe(0)
+      expect(signal).toBeNull()
+      const result = JSON.parse(stdout)
+      expect(result.shortened).toBe(true)
+      expect(result.warmedBytes).toBeGreaterThanOrEqual(16 + result.bodyBytes)
+      expect(result.retainedBytes).toBeLessThan(16 + result.bodyBytes)
+      expect(result.after.partial, stdout).toBeGreaterThan(result.before.partial)
+      expect(result.after.revision, stdout).toBe(result.before.revision)
+      expect(result.returned).toBe(false)
+      expect(result.publicErrors).toBe(0)
+    } finally {
+      clearTimeout(timer)
+    }
+  },
+)
+
+const destroyControls = [
+  { mode: 'timeout-listener', order: 'earlier-first' },
+  { mode: 'timeout-listener', order: 'later-first' },
+  { mode: 'external', order: 'earlier-first' },
+  { mode: 'external', order: 'later-first' },
+  { mode: 'deferred', order: 'earlier-first' },
+  { mode: 'deferred', order: 'later-first' },
+  { mode: 'throwing-timeout-listener', order: 'earlier-first' },
+  { mode: 'throwing-timeout-listener', order: 'later-first' },
+  { mode: 'unavailable-io', order: 'earlier-first' },
+] as const
+
+test.for(destroyControls)(
+  'socket timeout destroy $mode $order records only public invocation context',
+  async ({ mode, order }, { skip, annotate }) => {
+    const node = systemNode()
+    if (!node) {
+      skip('System Node is unavailable')
+      return
+    }
+    const output = await mkdtemp(join(tmpdir(), 'retention-socket-destroy-control-'))
+    const source = pathToFileURL(
+      join(import.meta.dirname, 'retention-acceptance-socket-provenance.ts'),
+    ).href
+    const script = `import {createServer,createConnection,Socket} from 'node:net';import {once} from 'node:events';import {readFileSync,truncateSync} from 'node:fs';import {tmpdir} from 'node:os';import {join} from 'node:path';import {ClientRequest,ServerResponse,IncomingMessage} from 'node:http';
+const [output,source,mode,order]=process.argv.slice(1);const {createRetentionSocketProvenance,snapshotRetentionSocketJournal}=await import(source);
+const server=createServer();const targets=[[Socket.prototype,'emit'],[Socket.prototype,'destroy'],[ClientRequest.prototype,'emit'],[ServerResponse.prototype,'emit'],[IncomingMessage.prototype,'emit'],[server,'emit']];
+const originals=targets.map(([target,key])=>({target,key,method:target[key],descriptor:Object.getOwnPropertyDescriptor(target,key)}));
+server.listen(0,'127.0.0.1');await once(server,'listening');const port=server.address().port;
+const first=createRetentionSocketProvenance({side:'serving',entryPort:port,normalizePath:path=>path,server}),second=createRetentionSocketProvenance({side:'serving',entryPort:port,normalizePath:path=>path,server});
+const accepted=once(server,'connection'),client=createConnection({host:'127.0.0.1',port});await once(client,'connect');const [socket]=await accepted;const clientPort=client.localPort;
+let returned,listenerReceiver=false,listenerArgs=0,primary,timeoutError;try{JSON.parse('controlled timeout primary')}catch(error){primary=error}if(mode==='throwing-timeout-listener')process.once('uncaughtException',error=>{timeoutError=error});const active=order==='earlier-first'?second:first;
+const snapshot=stage=>{const summary=snapshotRetentionSocketJournal(active.basename,output,stage);const rows=readFileSync(output+'/'+summary.basename,'utf8').trim().split('\\n').map(JSON.parse);return {summary,row:rows.find(row=>row.kind==='socket'&&row.remotePort===clientPort)}};
+try{const before=snapshot('frozen');if(order==='earlier-first')first.close();if(order==='later-first')second.close();const errorListeners=socket.listenerCount('error'),closed=once(socket,'close');
+if(mode==='external'||mode==='unavailable-io'){if(mode==='unavailable-io')truncateSync(join(tmpdir(),active.basename),0);returned=socket.destroy()}else{socket.once('timeout',function(...args){listenerReceiver=this===socket;listenerArgs=args.length;if(mode==='deferred'){setImmediate(()=>{returned=socket.destroy()});return}returned=socket.destroy();if(mode==='throwing-timeout-listener')throw primary});socket.setTimeout(25)}
+await closed;const after=snapshot('final');first.close();second.close();const restorations=originals.map(({target,key,method,descriptor})=>({key,method:target[key]===method,descriptor:JSON.stringify(Object.getOwnPropertyDescriptor(target,key))===JSON.stringify(descriptor)}));
+process.stdout.write(JSON.stringify({mode,order,before,after,returnedSame:returned===socket,timeoutErrorSame:timeoutError===primary,listenerReceiver,listenerArgs,errorListeners,afterErrorListeners:socket.listenerCount('error'),restorations,first:first.inspect(),second:second.inspect()}));
+}finally{first.close();second.close();first.remove();second.remove();client.destroy();socket.destroy();await new Promise(resolve=>server.close(resolve))}`
+    const child = spawn(
+      node,
+      [
+        '--experimental-strip-types',
+        '--disable-warning=ExperimentalWarning',
+        '--input-type=module',
+        '--eval',
+        script,
+        output,
+        source,
+        mode,
+        order,
+      ],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    const closed = once(child, 'close')
+    let stdout = '',
+      stderr = ''
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString()
+    })
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+    })
+    const timer = setTimeout(() => child.kill('SIGKILL'), 15000)
+    try {
+      const [code, signal] = await closed
+      expect(code, stderr).toBe(0)
+      expect(signal).toBeNull()
+      const result = JSON.parse(stdout)
+      await annotate('Public Socket observation', 'socket-provenance', {
+        body: stdout,
+        bodyEncoding: 'utf-8',
+        contentType: 'application/json',
+      })
+      expect(result.returnedSame, stdout).toBe(true)
+      expect(
+        result.restorations.every(
+          (row: { method: boolean; descriptor: boolean }) => row.method && row.descriptor,
+        ),
+        stdout,
+      ).toBe(true)
+      expect(result.errorListeners).toBe(0)
+      expect(result.afterErrorListeners).toBe(0)
+      expect(result.before.row.destroyInvokedAt, stdout).toBeNull()
+      expect(result.before.row.destroyContext, stdout).toBe('unobserved')
+      if (mode === 'unavailable-io') {
+        expect(result.after.row, stdout).toBeUndefined()
+        expect(
+          result.after.summary.partial + result.after.summary.coverage.partial,
+          stdout,
+        ).toBeGreaterThan(0)
+        return
+      }
+      expect(result.after.row.destroyInvokedAt, stdout).toEqual([
+        expect.any(Number),
+        expect.stringMatching(/^\d+$/),
+      ])
+      expect(result.after.row.destroyContext, stdout).toBe(
+        mode === 'timeout-listener' || mode === 'throwing-timeout-listener'
+          ? 'timeout-dispatch'
+          : 'other',
+      )
+      expect(result.after.row.timeoutDispatchDepth, stdout).toBe(0)
+      expect(result.timeoutErrorSame, stdout).toBe(mode === 'throwing-timeout-listener')
+      if (mode !== 'external') {
+        expect(result.listenerReceiver).toBe(true)
+        expect(result.listenerArgs).toBe(0)
+        expect(result.after.row.timeoutDispatchExitedAt, stdout).toEqual([
+          expect.any(Number),
+          expect.stringMatching(/^\d+$/),
+        ])
+        const destroyTick = BigInt(result.after.row.destroyInvokedAt[1])
+        const dispatchEnd = BigInt(result.after.row.timeoutDispatchExitedAt[1])
+        expect(destroyTick >= BigInt(result.after.row.timedOut[1]), stdout).toBe(true)
+        expect(
+          mode === 'timeout-listener' || mode === 'throwing-timeout-listener'
+            ? destroyTick <= dispatchEnd
+            : destroyTick > dispatchEnd,
+          stdout,
+        ).toBe(true)
+      }
+      expect(result.after.summary.partial, stdout).toBe(0)
+      expect(result.after.summary.raced, stdout).toBe(false)
+      expect(result.after.summary.coverage.unavailable, stdout).toBe(false)
+      expect(result.after.summary.coverage.refused, stdout).toBe(0)
+      expect(result.after.summary.coverage.retainedRecords).toBeLessThanOrEqual(8000)
+      expect(result.after.summary.coverage.retainedBytes).toBeLessThanOrEqual(2621440)
+    } finally {
+      clearTimeout(timer)
+      await rm(output, { recursive: true, force: true })
+    }
+  },
+)
+
+test('socket timeout destroy preserves native receiver arguments return throw and unhandled emit', async ({
+  skip,
+  annotate,
+}) => {
+  const node = systemNode()
+  if (!node) {
+    skip('System Node is unavailable')
+    return
+  }
+  const source = pathToFileURL(
+    join(import.meta.dirname, 'retention-acceptance-socket-provenance.ts'),
+  ).href
+  const script = `import {Socket} from 'node:net';const {createRetentionSocketProvenance}=await import(${JSON.stringify(source)});
+const original=Socket.prototype.destroy,descriptor=Object.getOwnPropertyDescriptor(Socket.prototype,'destroy');let primary;try{JSON.parse('controlled primary')}catch(error){primary=error}
+const collector=createRetentionSocketProvenance({side:'client',entryPort:52865,normalizePath:path=>path}),socket=new Socket(),argument={owned:1};let receiver=false,argumentSame=false,defaultError,thrown;
+try{socket.once('control',function(value){receiver=this===socket;argumentSame=value===argument});const emitted=socket.emit('control',argument),empty=socket.emit('no-subscriber');try{socket.emit('error',primary)}catch(error){defaultError=error}
+const proxy=new Proxy(new Socket(),{get(){throw primary}});try{Reflect.apply(Socket.prototype.destroy,proxy,[primary])}catch(error){thrown=error}
+const callback=await new Promise(resolve=>{const target=new Socket();target.on('error',()=>{});let returned;const observed=function(error){setImmediate(()=>resolve({errorSame:error===primary,returnedSame:returned===target}))};returned=Reflect.apply(Socket.prototype.destroy,target,[primary,observed])});
+collector.close();process.stdout.write(JSON.stringify({emitted,empty,receiver,argumentSame,defaultErrorSame:defaultError===primary,thrownSame:thrown===primary,errorListeners:socket.listenerCount('error'),callback,restored:Socket.prototype.destroy===original,descriptorRestored:JSON.stringify(Object.getOwnPropertyDescriptor(Socket.prototype,'destroy'))===JSON.stringify(descriptor)}));
+}finally{collector.close();collector.remove();socket.destroy()}`
+  const child = spawn(
+    node,
+    [
+      '--experimental-strip-types',
+      '--disable-warning=ExperimentalWarning',
+      '--input-type=module',
+      '--eval',
+      script,
+    ],
+    { stdio: ['ignore', 'pipe', 'pipe'] },
+  )
+  const closed = once(child, 'close')
+  let stdout = '',
+    stderr = ''
+  child.stdout.on('data', (chunk) => {
+    stdout += chunk.toString()
+  })
+  child.stderr.on('data', (chunk) => {
+    stderr += chunk.toString()
+  })
+  const timer = setTimeout(() => child.kill('SIGKILL'), 15000)
+  try {
+    const [code, signal] = await closed
+    expect(code, stderr).toBe(0)
+    expect(signal).toBeNull()
+    const result = JSON.parse(stdout)
+    await annotate('Public Socket observation', 'socket-provenance', {
+      body: stdout,
+      bodyEncoding: 'utf-8',
+      contentType: 'application/json',
+    })
+    expect(result, stdout).toMatchObject({
+      emitted: true,
+      empty: false,
+      receiver: true,
+      argumentSame: true,
+      defaultErrorSame: true,
+      thrownSame: true,
+      errorListeners: 0,
+      callback: { errorSame: true, returnedSame: true },
+      restored: true,
+      descriptorRestored: true,
+    })
+  } finally {
+    clearTimeout(timer)
+  }
+})
+
+test('socket association repeated public destroy keeps the first invocation and native lifecycle', async ({
+  skip,
+  annotate,
+}) => {
+  const node = systemNode()
+  if (!node) {
+    skip('System Node is unavailable')
+    return
+  }
+  const output = await mkdtemp(join(tmpdir(), 'retention-socket-repeat-control-'))
+  const source = pathToFileURL(
+    join(import.meta.dirname, 'retention-acceptance-socket-provenance.ts'),
+  ).href
+  const script = `import {createServer,createConnection,Socket} from 'node:net';import {once} from 'node:events';import {readFileSync} from 'node:fs';
+const [output,source]=process.argv.slice(1);const {createRetentionSocketProvenance,snapshotRetentionSocketJournal}=await import(source);
+const original=Socket.prototype.destroy,descriptor=Object.getOwnPropertyDescriptor(Socket.prototype,'destroy'),server=createServer();server.listen(0,'127.0.0.1');await once(server,'listening');const port=server.address().port;
+const collector=createRetentionSocketProvenance({side:'serving',entryPort:port,normalizePath:path=>path,server});const accepted=once(server,'connection'),client=createConnection({host:'127.0.0.1',port});await once(client,'connect');const [socket]=await accepted;const remotePort=socket.remotePort;
+const snapshot=stage=>{const summary=snapshotRetentionSocketJournal(collector.basename,output,stage);const rows=readFileSync(output+'/'+summary.basename,'utf8').trim().split('\\n').map(JSON.parse);return {summary,row:rows.find(row=>row.kind==='socket'&&row.remotePort===remotePort)}};
+let first,second,firstReturn=false,secondReturn=false,alreadyDestroyed=false;
+try{const closed=once(socket,'close');socket.once('timeout',function(){firstReturn=this.destroy()===socket;first=snapshot('frozen');alreadyDestroyed=this.destroyed;secondReturn=this.destroy()===socket;second=snapshot('frozen')});socket.setTimeout(25);await closed;const final=snapshot('final');collector.close();process.stdout.write(JSON.stringify({first,second,final,firstReturn,secondReturn,alreadyDestroyed,errorListeners:socket.listenerCount('error'),restored:Socket.prototype.destroy===original,descriptorRestored:JSON.stringify(Object.getOwnPropertyDescriptor(Socket.prototype,'destroy'))===JSON.stringify(descriptor)}));
+}finally{collector.close();collector.remove();client.destroy();socket.destroy();await new Promise(resolve=>server.close(resolve))}`
+  const child = spawn(
+    node,
+    [
+      '--experimental-strip-types',
+      '--disable-warning=ExperimentalWarning',
+      '--input-type=module',
+      '--eval',
+      script,
+      output,
+      source,
+    ],
+    { stdio: ['ignore', 'pipe', 'pipe'] },
+  )
+  const closed = once(child, 'close')
+  let stdout = '',
+    stderr = ''
+  child.stdout.on('data', (chunk) => {
+    stdout += chunk.toString()
+  })
+  child.stderr.on('data', (chunk) => {
+    stderr += chunk.toString()
+  })
+  const timer = setTimeout(() => child.kill('SIGKILL'), 15000)
+  try {
+    const [code, signal] = await closed
+    expect(code, stderr).toBe(0)
+    expect(signal).toBeNull()
+    await annotate('Repeated public destroy observation', 'socket-provenance', {
+      body: stdout,
+      bodyEncoding: 'utf-8',
+      contentType: 'application/json',
+    })
+    const result = JSON.parse(stdout)
+    expect(result.firstReturn, stdout).toBe(true)
+    expect(result.secondReturn, stdout).toBe(true)
+    expect(result.alreadyDestroyed, stdout).toBe(true)
+    expect(result.second.row.destroyInvokedAt, stdout).toEqual(result.first.row.destroyInvokedAt)
+    expect(result.second.row.destroyContext, stdout).toBe('timeout-dispatch')
+    expect(result.second.row.repeated, stdout).toBe(0)
+    expect(result.final.row.destroyInvokedAt, stdout).toEqual(result.first.row.destroyInvokedAt)
+    expect(result.final.row.timeoutDispatchDepth, stdout).toBe(0)
+    expect(result.final.summary.partial, stdout).toBe(0)
+    expect(result.final.summary.coverage.refused, stdout).toBe(0)
+    expect(result.errorListeners).toBe(0)
+    expect(result.restored).toBe(true)
+    expect(result.descriptorRestored).toBe(true)
+  } finally {
+    clearTimeout(timer)
+    await rm(output, { recursive: true, force: true })
+  }
+})
