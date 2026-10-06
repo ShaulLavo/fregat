@@ -4,7 +4,7 @@ import { LanguageServerDocuments } from '@/features/editor/state/language-server
 import { openLanguageServerBuffers } from '@/features/editor/utils/open-language-server-buffers'
 import { activeEditorTabForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import { clientLogContext } from '@/lib/environments/state/log-context'
-import { clientForQueryClient } from '@/lib/environments/state/query-clients'
+import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { documentTab, sameTabContent } from '@/lib/documents/utils/tabs'
@@ -268,6 +268,7 @@ export function createEditorRuntime({
       (rootPath) => {
         rootGeneration += 1
         fileOpenIntentOwner.setRoot(rootPath)
+        documentStore.getState().setPreviewScope(rootPath, originForQueryClient(queryClient))
         workspaceEditService.resetForRoot()
         if (active) discoverRecovery()
       },
@@ -282,6 +283,20 @@ export function createEditorRuntime({
     ),
   ]
   fileOpenIntentOwner.setRoot(workspaceStore.getState().rootFolder?.path ?? null)
+  documentStore
+    .getState()
+    .setPreviewScope(
+      workspaceStore.getState().rootFolder?.path ?? null,
+      originForQueryClient(queryClient),
+    )
+  const previewSource: import('@/lib/file-preview/utils/source').PreviewSourceCapability = {
+    environmentId: storage.environmentId,
+    queryClient,
+    origin: originForQueryClient(queryClient),
+    store: documentStore,
+    acquireLivePreview: (request) => documentStore.getState().acquireLivePreview(request),
+    adoptPreviewCapture: (request) => documentStore.getState().adoptPreviewCapture(request),
+  }
 
   const suspend = () => {
     if (!active) return
@@ -292,6 +307,7 @@ export function createEditorRuntime({
   }
 
   return {
+    previewSource,
     getOperationRoot: () => workspaceRoot(workspaceStore, rootGeneration),
     issueFileWriteId: fileSync.issueWriteId,
     storage,

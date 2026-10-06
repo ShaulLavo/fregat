@@ -46,9 +46,9 @@ import {
   operationDiffAttachment,
   snapshotDiffAttachment,
   diffAttachmentReferences,
-  diffAttachmentLines,
   diffAttachmentSubject,
 } from '@/lib/diff-attachment'
+import { diffAttachmentLines } from '@/features/editor/utils/attachment-presentation'
 import {
   createEditorBufferSession,
   createDocumentTextSnapshot,

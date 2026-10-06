@@ -9,6 +9,7 @@ export const settingsMutationKeys = {
     ['settings', 'session-import', providerInstanceId] as const,
   providerUpdate: (providerInstanceId: ProviderInstanceId) =>
     ['settings', 'provider-update', providerInstanceId] as const,
+  comparisonView: (key: DocumentKey) => ['settings', 'comparison-view', key] as const,
   rawSave: (key: DocumentKey) => ['settings', 'raw-save', key] as const,
   mcp: {
     add: (providerInstanceId: ProviderInstanceId) =>

@@ -1,14 +1,23 @@
+import type { PreviewViewRead } from '@/lib/file-preview/utils/source'
 import type { FsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 
 import { formatModified, formatSize, kindLabel } from '@/features/file-picker/utils/model'
 
-export function EntryFacts({ entry }: { entry: FsEntry }) {
+export function EntryFacts({ entry, read }: { entry: FsEntry; read: PreviewViewRead }) {
+  const diskSize = isDirectoryEntry(entry) ? [] : [['Size', formatSize(entry.size)]]
+  const sourceFacts =
+    read.kind === 'live'
+      ? [
+          ['Source', read.dirty ? 'Unsaved buffer' : 'Open buffer'],
+          ['Preview', formatSize(read.utf8Bytes)],
+        ]
+      : diskSize
   const facts = [
     ['Kind', kindLabel(entry)],
-    ...(isDirectoryEntry(entry) ? [] : [['Size', formatSize(entry.size)]]),
-    ['Modified', formatModified(entry.mtimeMs)],
-    ['Created', formatModified(entry.birthtimeMs)],
+    ...sourceFacts,
+    [read.kind === 'live' ? 'Disk modified' : 'Modified', formatModified(entry.mtimeMs)],
+    [read.kind === 'live' ? 'Disk created' : 'Created', formatModified(entry.birthtimeMs)],
   ]
   return (
     <dl className='text-2xs grid w-full grid-cols-[64px_minmax(0,1fr)] gap-(--density-control-gap) text-left'>

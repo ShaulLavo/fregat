@@ -1,9 +1,10 @@
+import { createAddressTestRuntime } from './address-runtime'
+import { captureFilesystemLocal } from '@/lib/snapshot-comparison'
+import { retainFilesystemConflict } from '@/features/workspace/state/event-conflict-adapter'
 import { streamWorkspaceEvents } from '@/features/workspace/state/event-stream'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { createEditorBufferSession } from '@singapore-editor/core'
-import { createEditorConflictStore } from '@/features/editor/state/conflict-state'
-import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { FileSyncService } from '@/features/editor/state/file-sync-service'
 import { applyWorkspaceEvents, type FilesystemEvent } from '@/features/workspace/hooks/use-events'
 import { createWideEventScope } from '@/lib/wide-event-scope'
@@ -14,12 +15,7 @@ import {
   fileDocumentKey,
   filesystemPath,
 } from '@/lib/documents/utils/identity'
-import {
-  registerEnvironmentQueryClient,
-  originForQueryClient,
-} from '@/lib/environments/state/query-clients'
 import { fetchFile } from '@/lib/file-server'
-import { createTestQueryClient } from '../render'
 import type { TestServer } from '../server'
 import { createGatedMutationClient } from './gated-mutation-client'
 
@@ -37,10 +33,10 @@ export async function createConflictResolutionFixture(
     gatePath ?? (deleted ? '/fs/create-file' : '/fs/write'),
   )
   const remote = await fetchFile(path, new AbortController().signal, transport.client)
-  const documentStore = createEditorDocumentStore()
-  const conflictStore = createEditorConflictStore()
-  const queryClient = createTestQueryClient()
-  registerEnvironmentQueryClient(queryClient, originForQueryClient(queryClient), transport.client)
+  const runtime = await createAddressTestRuntime(transport.client)
+  const { documentStore, conflictStore } = runtime.editor
+  const queryClient = runtime.application.getSnapshot().queryClient
+  const environmentId = runtime.environmentId
   const target = {
     kind: 'conflict',
     conflictId: conflictId('resolution-test'),
@@ -52,15 +48,35 @@ export async function createConflictResolutionFixture(
     .getState()
     .ensureUnsyncedEditorDocument({ target, content: 'merged text' })
   let generation = 1
+  const conflict = retainFilesystemConflict(
+    {
+      id: target.conflictId,
+      eventType: deleted ? 'deleted' : 'changed',
+      diffDocumentKey: key,
+      localPath: path,
+      localText: 'local text',
+      remotePath: path,
+      remoteFile: deleted ? null : remote,
+      remoteText: deleted ? null : remote.content,
+    },
+    {
+      comparisonScope: { environmentId, rootPath: filesystemPath('') },
+      acquireSnapshotComparison: documentStore.getState().acquireSnapshotComparison,
+      signal: new AbortController().signal,
+    },
+    captureFilesystemLocal(path, destination.buffer),
+  )
+  const seedLease = documentStore.getState().acquireSnapshotComparison({
+    input: conflict.latest.input,
+    signal: new AbortController().signal,
+  })
   conflictStore.getState().addConflict({
-    id: target.conflictId,
-    eventType: deleted ? 'deleted' : 'changed',
-    diffDocumentKey: key,
-    localPath: path,
-    localText: 'local text',
-    remotePath: path,
-    remoteFile: deleted ? null : remote,
-    remoteText: deleted ? null : remote.content,
+    ...conflict,
+    seed: {
+      resolutionKey: key,
+      buffer: resolution.buffer,
+      comparison: { input: conflict.latest.input, lease: seedLease },
+    },
   })
   const fileSync = new FileSyncService(documentStore, queryClient)
   const coordinator = new ConflictEditorResolutionCoordinator({
@@ -101,6 +117,8 @@ export async function createConflictResolutionFixture(
     dispose: () => {
       coordinator.dispose()
       transport.release()
+      conflictStore.getState().clearConflicts()
+      documentStore.getState().disposeEditorDocuments()
       queryClient.clear()
     },
   }
@@ -143,6 +161,7 @@ export async function watchConflictResolutionEvents(
       const documents = fixture.documentStore.getState()
       await applyWorkspaceEvents({
         conflictStore: fixture.conflictStore,
+        acquireSnapshotComparison: documents.acquireSnapshotComparison,
         discardLiveEditorDocument: (document) =>
           documents.deleteLiveEditorDocument(documentKey(document)),
         dirtyDocumentKeys: documents.dirtyDocumentKeys,

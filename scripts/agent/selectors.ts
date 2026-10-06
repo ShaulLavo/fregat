@@ -51,6 +51,8 @@ export const diffPaneSelector = '.editor-diff-pane'
 export const diffPaneSyntaxReadySelector = '.editor-diff-pane[data-syntax="ready"]'
 export const diffContentRowSelector = '.editor-diff-pane [data-editor-virtual-row]'
 export const editorViewportSelector = '.editor-virtualized-viewport'
+export const settingsComparisonSelector = '[role="region"][aria-label="Settings comparison"]'
+export const settingsNativeHostSelector = '.editor-virtualized'
 /** Rows the markdown live preview has decorated (headings, lists, emphasis). */
 export const markdownPreviewRowSelector = '[class*="editor-inline-"]'
 export const markdownEditorLinkSelector = '.editor-markdown-link'
@@ -800,6 +802,15 @@ export const selectors = {
       .locator('[data-slot="tabs-indicator"]'),
   settingsRawConflictBanner: (page: Page) =>
     page.getByText('settings.json changed somewhere else', { exact: true }),
+  settingsComparison: (page: Page) => page.locator(settingsComparisonSelector),
+  settingsCompare: (page: Page) => page.getByRole('button', { name: 'Compare', exact: true }),
+  settingsHideComparison: (page: Page) =>
+    page.getByRole('button', { name: 'Hide compare', exact: true }),
+  settingsKeepChanges: (page: Page) =>
+    page.getByRole('button', { name: 'Keep my changes', exact: true }),
+  settingsUseLatest: (page: Page) =>
+    page.getByRole('button', { name: 'Use the latest version', exact: true }),
+  settingsEditableViewport: (page: Page) => page.locator(editorViewportSelector).last(),
   gitSizeLimitNotice: (page: Page) =>
     page.getByText(
       'File exceeds the Git diff size limit. Adjust Diff file size limit in Settings to compare it.',
@@ -882,6 +893,12 @@ export const selectors = {
       .getByRole('button', { name: 'Ask the agent about these lines', exact: true })
       .locator('xpath=preceding-sibling::span'),
   editorRows: (page: Page) => page.locator('.editor-virtualized-row'),
+  conflictOriginalComparison: (page: Page) =>
+    page.getByRole('button', { name: 'Original comparison', exact: true }),
+  conflictLatestIncoming: (page: Page) =>
+    page.getByRole('button', { name: 'Latest incoming', exact: true }),
+  conflictReturnResolution: (page: Page) =>
+    page.getByRole('button', { name: 'Resolution', exact: true }),
   markdownRenderedPane: (page: Page) => page.locator('[data-markdown-preview]'),
   editorCursorLineRow: (page: Page) => page.locator('.editor-virtualized-cursor-line-row:visible'),
   editorTabNamed: (page: Page, label: RegExp) =>

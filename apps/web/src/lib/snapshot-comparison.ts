@@ -1,8 +1,14 @@
+import type { SettingsViewTarget } from '@workspace/contracts'
+import { createStringTextSnapshot } from '@singapore-editor/core/document'
+import { createTextDiff } from '@singapore-editor/diff'
+import type { FileResult } from '@/lib/file-system-types'
+import { languageIdForFilePath } from '@/lib/file-language'
 import { sameGitInputRevision } from '@/lib/documents/utils/comparisons'
 import type {
   DocumentTextSnapshot,
   EditorTextBuffer,
   HistoryComparisonSide,
+  TextSnapshot,
 } from '@singapore-editor/core/document'
 import type { PreparedWorkspaceTextSegment } from '@singapore-editor/lsp-plugin/workspace-edit'
 import type { DiffFile } from '@singapore-editor/diff'
@@ -85,6 +91,8 @@ export type SnapshotComparisonInput =
   | CheckpointComparisonInput
   | HistoryComparisonInput
   | OperationComparisonInput
+  | FilesystemComparisonInput
+  | SettingsComparisonInput
 export type SnapshotComparisonRead =
   | { readonly kind: 'ready'; readonly input: SnapshotComparisonInput }
   | { readonly kind: 'released'; readonly reason: 'interest-ended' | 'owner-disposed' }
@@ -184,4 +192,119 @@ export function sameOperationCapture(
     left.new.snapshot === right.new.snapshot &&
     left.display === right.display
   )
+}
+
+export type FilesystemLocalCapture =
+  | {
+      readonly kind: 'text'
+      readonly path: FilesystemPath
+      readonly buffer: EditorTextBuffer
+      readonly revision: number
+      readonly snapshot: DocumentTextSnapshot
+    }
+  | { readonly kind: 'missing'; readonly path: FilesystemPath }
+export type FilesystemIncomingCapture =
+  | { readonly kind: 'text'; readonly file: FileResult; readonly reader: TextSnapshot }
+  | { readonly kind: 'binary' | 'unsupported'; readonly file: FileResult }
+  | { readonly kind: 'deleted'; readonly path: FilesystemPath }
+export type FilesystemComparisonCapture = {
+  readonly scope: SnapshotComparisonScope
+  readonly conflictId: string
+  readonly eventType: 'changed' | 'deleted' | 'renamed'
+  readonly local: FilesystemLocalCapture
+  readonly incoming: FilesystemIncomingCapture
+}
+export type FilesystemComparisonInput = {
+  readonly kind: 'filesystem'
+  readonly scope: SnapshotComparisonScope
+  readonly capture: FilesystemComparisonCapture
+  readonly display:
+    | { readonly kind: 'text'; readonly file: DiffFile }
+    | { readonly kind: 'no-text'; readonly reason: 'binary' | 'unsupported' | 'local-missing' }
+}
+export function captureFilesystemLocal(
+  path: FilesystemPath,
+  buffer: EditorTextBuffer | null,
+): FilesystemLocalCapture {
+  if (!buffer) return { kind: 'missing', path }
+  return {
+    kind: 'text',
+    path,
+    buffer,
+    revision: buffer.getRevision(),
+    snapshot: buffer.getTextSnapshot(),
+  }
+}
+export function filesystemIncomingText(file: FileResult): FilesystemIncomingCapture {
+  return { kind: 'text', file, reader: createStringTextSnapshot(file.content) }
+}
+export function filesystemComparisonInput(
+  capture: FilesystemComparisonCapture,
+): FilesystemComparisonInput {
+  const { local, incoming } = capture
+  if (incoming.kind === 'binary' || incoming.kind === 'unsupported')
+    return {
+      kind: 'filesystem',
+      scope: capture.scope,
+      capture,
+      display: { kind: 'no-text', reason: incoming.kind },
+    }
+  if (local.kind === 'missing')
+    return {
+      kind: 'filesystem',
+      scope: capture.scope,
+      capture,
+      display: { kind: 'no-text', reason: 'local-missing' },
+    }
+  const newPath = incoming.kind === 'deleted' ? incoming.path : incoming.file.path
+  const file = createTextDiff({
+    oldFile: {
+      path: local.path,
+      languageId: languageIdForFilePath(local.path),
+      text: local.snapshot.materializeFullText(),
+    },
+    newFile: {
+      path: newPath,
+      languageId: languageIdForFilePath(newPath),
+      text: incoming.kind === 'text' ? incoming.reader.materializeFullText() : '',
+    },
+  })
+  return { kind: 'filesystem', scope: capture.scope, capture, display: { kind: 'text', file } }
+}
+export function filesystemComparisonSubject(capture: FilesystemComparisonCapture): string {
+  return JSON.stringify([
+    'filesystem',
+    capture.scope.environmentId,
+    capture.scope.rootPath,
+    capture.conflictId,
+  ])
+}
+export function sameFilesystemCapture(
+  left: FilesystemComparisonInput,
+  right: FilesystemComparisonInput,
+): boolean {
+  return left.capture === right.capture && left.display === right.display
+}
+
+export type SettingsComparisonRequest = {
+  readonly scope: SnapshotComparisonScope
+  readonly key: DocumentKey
+  readonly signal: AbortSignal
+}
+export type SettingsComparisonInput = {
+  readonly kind: 'settings'
+  readonly scope: SnapshotComparisonScope
+  readonly key: DocumentKey
+  readonly target: SettingsViewTarget
+  readonly local: {
+    readonly buffer: EditorTextBuffer
+    readonly revision: number
+    readonly snapshot: DocumentTextSnapshot
+  }
+  readonly confirmed:
+    | { readonly kind: 'confirmed'; readonly revision: string; readonly reader: TextSnapshot }
+    | { readonly kind: 'pending' }
+}
+export function settingsComparisonSubject(input: SettingsComparisonInput): string {
+  return JSON.stringify(['settings', input.scope.environmentId, input.scope.rootPath, input.key])
 }

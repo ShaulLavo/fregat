@@ -36,7 +36,7 @@ export function EditorStateProvider({
     service.subscribePreparationIdentity,
     service.getPreparationIdentity,
   )
-  const fileOpenIntent = { service, preparationIdentity }
+  const fileOpenIntent = { service, preparationIdentity, previewSource: runtime.previewSource }
 
   useLayoutEffect(() => {
     runtime.languageServerDocuments.setLimit(analysisLimitMiCodeUnits)
