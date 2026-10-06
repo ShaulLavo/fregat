@@ -47,7 +47,7 @@ export default defineConfig({
     },
     // SwiftShader can lose adapters when browser files churn WebGPU devices concurrently.
     fileParallelism: false,
-    include: ['src/**/*.browser.test.ts'],
+    include: ['src/**/*.browser.test.ts', 'bench/**/*.browser.test.ts'],
     name: 'browser',
   },
 })

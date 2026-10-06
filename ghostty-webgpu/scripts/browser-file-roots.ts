@@ -6,5 +6,6 @@ import { searchForWorkspaceRoot } from 'vite'
 export function browserFileRoots(packageDirectory: string): string[] {
   const require = createRequire(path.join(packageDirectory, 'package.json'))
   const stylesheet = realpathSync(require.resolve('@xterm/xterm/css/xterm.css'))
-  return [searchForWorkspaceRoot(packageDirectory), stylesheet]
+  const counterpart = realpathSync(require.resolve('ghostty-web/ghostty-vt.wasm'))
+  return [searchForWorkspaceRoot(packageDirectory), stylesheet, counterpart]
 }
