@@ -50,6 +50,21 @@ type Structural = NonNullable<ReturnType<Analysis['borrowStructural']>>
 type Highlighter = NonNullable<ReturnType<Analysis['borrowHighlighter']>>
 type Pair = { readonly structural: Structural; readonly highlighter: Highlighter }
 
+type RetentionGenerationCause =
+  | { readonly kind: 'schedule'; readonly key: string }
+  | {
+      readonly kind: 'frame'
+      readonly phase: 'scheduled' | 'start' | 'end' | 'cancel'
+      readonly id: number
+    }
+  | { readonly kind: 'worker-request'; readonly family: string; readonly type: string }
+  | { readonly kind: 'publication'; readonly documentId: string }
+
+type RetentionGenerationEvent = {
+  readonly generation: number
+  readonly cause: RetentionGenerationCause
+}
+
 function observeRetentionWork() {
   const handles = new Set<EditorSecondaryScheduledWorkHandle>()
   const frames = new Set<number>()
@@ -68,6 +83,21 @@ function observeRetentionWork() {
   }[] = []
   const attachments: { prepared: boolean }[] = []
   let generation = 0
+  const generationEvents: RetentionGenerationEvent[] = []
+  function advance(cause: RetentionGenerationCause) {
+    generation++
+    if (generationEvents.length === 64) generationEvents.shift()
+    generationEvents.push({ generation, cause })
+  }
+  function changesSince(before: number) {
+    const first = generationEvents[0]
+    return {
+      before,
+      through: generation,
+      truncated: first !== undefined && before < first.generation - 1,
+      events: generationEvents.filter((event) => event.generation > before),
+    }
+  }
   let provenance = 'application'
   const previousTrace = Reflect.get(globalThis, '__editorPerfTrace')
   const previousDiagnostics = Reflect.get(globalThis, '__EDITOR_PERFORMANCE_DIAGNOSTICS__')
@@ -116,7 +146,7 @@ function observeRetentionWork() {
     ) {
       const handle = schedule.bind(this)(options)
       handles.add(handle)
-      generation++
+      advance({ kind: 'schedule', key: options.key })
       return handle
     })
   const nativeFrame = globalThis.requestAnimationFrame.bind(globalThis)
@@ -125,19 +155,19 @@ function observeRetentionWork() {
     let id = 0
     id = nativeFrame((time) => {
       frames.delete(id)
-      generation++
+      advance({ kind: 'frame', phase: 'start', id })
       try {
         callback(time)
       } finally {
-        generation++
+        advance({ kind: 'frame', phase: 'end', id })
       }
     })
     frames.add(id)
-    generation++
+    advance({ kind: 'frame', phase: 'scheduled', id })
     return id
   })
   const cancelSpy = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation((id) => {
-    if (frames.delete(id)) generation++
+    if (frames.delete(id)) advance({ kind: 'frame', phase: 'cancel', id })
     nativeCancel(id)
   })
   const nativeMark = performance.mark.bind(performance)
@@ -167,7 +197,7 @@ function observeRetentionWork() {
         .filter((handle) => handle.isActive())
         .map((handle) => handle.key),
     })
-    if (!inspector) generation++
+    if (!inspector) advance({ kind: 'worker-request', family: detail.family, type: detail.type })
     return mark
   })
   function snapshot() {
@@ -187,8 +217,9 @@ function observeRetentionWork() {
   return {
     snapshot,
     receipt: () => ({ requests, reads, attachments, state: snapshot() }),
-    publication() {
-      generation++
+    changesSince,
+    publication(documentId: string) {
+      advance({ kind: 'publication', documentId })
     },
     frame: () => new Promise<void>((resolve) => nativeFrame(() => resolve())),
     verifierRead<T>(read: () => T) {
@@ -347,7 +378,7 @@ export async function retentionCountHost(fixture: RetentionFixture) {
   const dirtyRevision = a.buffer.getRevision()
   const dirtySnapshot = a.buffer.getSnapshot()
   const stopPublications = Array.from(application.enumerateRetainedEditorAnalyses(), (analysis) =>
-    analysis.subscribeRetention(() => observation.publication()),
+    analysis.subscribeRetention(() => observation.publication(analysis.documentId)),
   )
   const views = new Set<{ dispose(): void; geometry(): ReturnType<typeof viewGeometry> }>()
   const referenceIds = new WeakMap<object, number>()
@@ -786,7 +817,8 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     } catch (error) {
       settlementFailure = String(error)
     }
-    const consistentGeneration = observation.snapshot().generation
+    const observationBeforeInspectors = observation.snapshot()
+    const consistentGeneration = observationBeforeInspectors.generation
     const generationsBefore = [tree.inspect().workerGeneration, shiki.inspect().workerGeneration]
     const [treeWorker, shikiWorker] = await Promise.all([
       tree.inspectRetention(),
@@ -794,6 +826,7 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     ])
     const generationsAfter = [tree.inspect().workerGeneration, shiki.inspect().workerGeneration]
     const finalObservation = observation.snapshot()
+    const eventsDuringInspectors = observation.changesSince(consistentGeneration)
     const tokenStores = pairs.flatMap((pair) => {
       const read = pair.highlighter.read()
       return read.kind === 'ready' ? [read.result.tokens] : []
@@ -815,6 +848,8 @@ export async function retentionCountHost(fixture: RetentionFixture) {
           finalObservation.frames === 0 &&
           generationsAfter.every((generation, index) => generation === generationsBefore[index]),
         generationBeforeInspectors: consistentGeneration,
+        observationBeforeInspectors,
+        eventsDuringInspectors,
         generationAfterInspectors: finalObservation.generation,
         settlementFailure,
       },
