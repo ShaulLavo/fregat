@@ -1236,6 +1236,7 @@ test('review F5 owned stop intents still refuse SIGINT and private signal string
 })
 
 const wireControlCoverage = {
+  countersExact: true,
   observed: 1,
   dropped: 0,
   refused: 0,
@@ -1592,5 +1593,358 @@ test.for(['missing', 'EISDIR'] as const)(
     } finally {
       await rm(output, { recursive: true, force: true })
     }
+  },
+)
+
+test.for(['claimed-loss', 'observed-regression'] as const)(
+  'writer boundary R1 %s retains the prior valid producer digest',
+  async (mode) => {
+    const output = await mkdtemp(join(tmpdir(), 'writer-boundary-coverage-')),
+      capture = createRetentionEntryCapture(),
+      time = retentionEntryReceiptTime()
+    try {
+      capture.begin(output)
+      const good = entryControlFrame({ ...time, kind: 'socket-open', socketId: 1, port: 52865 })
+      capture.read(Buffer.from(retentionEntryReceiptPrefix + JSON.stringify(good) + '\n'))
+      const before = capture.inspect().producer
+      const summary = {
+        version: 2,
+        kind: 'summary',
+        pid: process.pid,
+        emittedAt: Date.now(),
+        emittedTick: '2',
+        coverage: {
+          ...wireControlCoverage,
+          inFlightRecords: 0,
+          inFlightBytes: 0,
+          observed: mode === 'observed-regression' ? 0 : 1,
+          dropped: mode === 'claimed-loss' ? 1 : 0,
+          droppedByKind: mode === 'claimed-loss' ? { 'socket-open': 1 } : {},
+        },
+      }
+      capture.read(Buffer.from(retentionEntryReceiptPrefix + JSON.stringify(summary) + '\n'))
+      expect(capture.inspect().relayRefused).toBe(1)
+      expect(capture.inspect().producer).toEqual(before)
+      expect(capture.inspect().dropped).toBe(0)
+      expect(capture.inspect().observations.lastReceived).toBe(1)
+      await capture.fail(output, 'reload')
+      const packet = JSON.parse(await readFile(join(output, 'entry-transport.frozen.json'), 'utf8'))
+      expect(packet).toMatchObject({
+        dropped: 0,
+        failureWindow: [{ kind: 'socket-open', socketId: 1 }],
+        producerAtFailure: before,
+      })
+    } finally {
+      await rm(output, { recursive: true, force: true })
+    }
+  },
+)
+
+test.for(['node', 'bun'] as const)(
+  'writer boundary R2 %s refusal arithmetic leaves later facts encodable',
+  async (runtime) => {
+    const source = pathToFileURL(
+      join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
+    ).href
+    const script = `import {writeRetentionEntryReceipt,retentionEntryReceiptTime} from ${JSON.stringify(source)};let writer;const until=Date.now()+15000;async function idle(){while(writer?.inspect().pendingBytes){if(Date.now()>until)throw {code:'CONTROL_TIMEOUT'};await new Promise(setImmediate)}}
+const primary=(()=>{try{JSON.parse('controlled primary')}catch(error){return error}})();let seen;try{throw primary}catch(error){seen=error}
+for(const count of [Number.MAX_SAFE_INTEGER,1]){writer=writeRetentionEntryReceipt({...retentionEntryReceiptTime(),kind:'refused',count});await idle()}
+for(const kind of ['socket-open','socket-close']){writer=writeRetentionEntryReceipt({...retentionEntryReceiptTime(),kind,socketId:73,...(kind==='socket-open'?{port:52865}:{})});await idle()}
+process.stderr.write(JSON.stringify({state:writer.inspect(),primaryIdentity:seen===primary,publicStdoutErrors:process.stdout.listenerCount('error')}));`
+    const args =
+      runtime === 'node'
+        ? [
+            '--experimental-strip-types',
+            '--disable-warning=ExperimentalWarning',
+            '--input-type=module',
+            '--eval',
+            script,
+          ]
+        : ['--eval', script]
+    const child = spawn(runtime, args, { stdio: ['ignore', 'pipe', 'pipe'] }),
+      closed = once(child, 'close'),
+      capture = createRetentionEntryCapture()
+    const chunks: Buffer[] = []
+    let stderr = ''
+    child.stdout.on('data', (chunk: Buffer) => {
+      chunks.push(chunk)
+      capture.read(chunk)
+    })
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+    })
+    child.stdout.once('end', () => capture.finishWire())
+    const timer = setTimeout(() => child.kill('SIGKILL'), 15000)
+    const [code, signal] = await closed
+    clearTimeout(timer)
+    expect(code).toBe(0)
+    expect(signal).toBeNull()
+    const facts = JSON.parse(stderr),
+      frames = Buffer.concat(chunks)
+        .toString('utf8')
+        .split('\n')
+        .filter((line) => line.startsWith(retentionEntryReceiptPrefix))
+        .map((line) => JSON.parse(line.slice(retentionEntryReceiptPrefix.length))),
+      delivered = frames.flatMap((frame) => (frame.kind === 'facts' ? frame.facts : []))
+    expect(facts).toMatchObject({
+      primaryIdentity: true,
+      publicStdoutErrors: 0,
+      state: {
+        refused: Number.MAX_SAFE_INTEGER,
+        dropped: 0,
+        unavailable: false,
+        code: null,
+        countersExact: false,
+      },
+    })
+    expect(facts.state.refusedByReason['record-bytes']).toBe(0)
+    expect(delivered.map((item) => item.event.kind)).toEqual(['socket-open', 'socket-close'])
+    expect(capture.inspect().relayRefused).toBe(0)
+    expect(capture.inspect().producer?.coverage).toMatchObject({
+      refused: Number.MAX_SAFE_INTEGER,
+      countersExact: false,
+      observed: 2,
+      dropped: 0,
+    })
+  },
+)
+
+test.for([
+  'observed',
+  'dropped',
+  'dropped-kind',
+  'removed-kind',
+  'refused',
+  'refused-reason',
+  'exactness',
+] as const)('writer boundary R1 %s cumulative regression preserves the last sample', (mode) => {
+  const capture = createRetentionEntryCapture()
+  const previous = {
+    ...wireControlCoverage,
+    countersExact: mode !== 'exactness',
+    observed: 6,
+    dropped: 2,
+    droppedByKind: { 'socket-open': 2 },
+    refused: 3,
+    refusedByReason: { 'input-schema': 0, 'record-bytes': 0, 'tap-path': 3 },
+    inFlightRecords: 0,
+    inFlightBytes: 0,
+  }
+  const summary = {
+    version: 2,
+    kind: 'summary',
+    pid: process.pid,
+    emittedAt: Date.now(),
+    emittedTick: '1',
+    coverage: previous,
+  }
+  capture.read(Buffer.from(retentionEntryReceiptPrefix + JSON.stringify(summary) + '\n'))
+  const before = capture.inspect().producer
+  expect(before?.coverage).toEqual(previous)
+  const changes = {
+    observed: { observed: 5 },
+    dropped: { dropped: 1, droppedByKind: { 'socket-open': 1 } },
+    'dropped-kind': { droppedByKind: { 'socket-open': 1, 'socket-close': 1 } },
+    'removed-kind': { droppedByKind: { 'socket-close': 2 } },
+    refused: {
+      refused: 2,
+      refusedByReason: { 'input-schema': 0, 'record-bytes': 0, 'tap-path': 2 },
+    },
+    'refused-reason': { refusedByReason: { 'input-schema': 1, 'record-bytes': 0, 'tap-path': 2 } },
+    exactness: { countersExact: true },
+  }
+  capture.read(
+    Buffer.from(
+      retentionEntryReceiptPrefix +
+        JSON.stringify({
+          ...summary,
+          coverage: { ...previous, ...changes[mode] },
+        }) +
+        '\n',
+    ),
+  )
+  expect(capture.inspect()).toMatchObject({ relayRefused: 1, dropped: 2, producer: before })
+})
+
+test('writer boundary R1 honest gaps and pending coverage survive without counting delivered facts twice', () => {
+  const capture = createRetentionEntryCapture(),
+    time = retentionEntryReceiptTime()
+  const event = { ...time, kind: 'socket-open', socketId: 1, port: 52865 }
+  capture.read(
+    Buffer.from(retentionEntryReceiptPrefix + JSON.stringify(entryControlFrame(event)) + '\n'),
+  )
+  const droppedCoverage = { dropped: 1, droppedByKind: { 'socket-close': 1 } }
+  const pending = {
+    ...entryControlFrame({ ...event, socketId: 3 }, 3),
+    coverage: {
+      ...wireControlCoverage,
+      ...droppedCoverage,
+      observed: 4,
+      queuedRecords: 1,
+      queuedBytes: 4096,
+    },
+  }
+  capture.read(Buffer.from(retentionEntryReceiptPrefix + JSON.stringify(pending) + '\n'))
+  const last = {
+    ...entryControlFrame({ ...event, socketId: 4 }, 4),
+    coverage: { ...wireControlCoverage, ...droppedCoverage, observed: 4 },
+  }
+  capture.read(Buffer.from(retentionEntryReceiptPrefix + JSON.stringify(last) + '\n'))
+  const summary = {
+    version: 2,
+    kind: 'summary',
+    pid: process.pid,
+    emittedAt: Date.now(),
+    emittedTick: '4',
+    coverage: { ...last.coverage, inFlightRecords: 0, inFlightBytes: 0 },
+  }
+  capture.read(Buffer.from(retentionEntryReceiptPrefix + JSON.stringify(summary) + '\n'))
+  expect(capture.inspect()).toMatchObject({
+    relayRefused: 0,
+    dropped: 1,
+    producer: { coverage: summary.coverage },
+    observations: { lastReceived: 4, gaps: 1, firstGap: { from: 2, to: 2 } },
+  })
+})
+
+test.for(['local', 'aggregate'] as const)(
+  'writer boundary R2 %s refusal totals remain bounded in the frozen packet',
+  async (mode) => {
+    const output = await mkdtemp(join(tmpdir(), 'writer-boundary-total-'))
+    const capture = createRetentionEntryCapture(),
+      time = retentionEntryReceiptTime()
+    try {
+      capture.begin(output)
+      capture.accept({
+        ...time,
+        kind: 'refused',
+        count: mode === 'local' ? Number.MAX_SAFE_INTEGER : 1,
+      })
+      if (mode === 'local') capture.accept({ ...time, kind: 'refused', count: 1 })
+      if (mode === 'aggregate')
+        capture.read(
+          Buffer.from(
+            retentionEntryReceiptPrefix +
+              JSON.stringify({
+                version: 2,
+                kind: 'summary',
+                pid: process.pid,
+                emittedAt: time.at,
+                emittedTick: time.tick,
+                coverage: {
+                  ...wireControlCoverage,
+                  observed: 0,
+                  inFlightRecords: 0,
+                  inFlightBytes: 0,
+                  refused: Number.MAX_SAFE_INTEGER,
+                  countersExact: false,
+                  refusedByReason: {
+                    'tap-path': Number.MAX_SAFE_INTEGER,
+                    'input-schema': 1,
+                    'record-bytes': 0,
+                  },
+                },
+              }) +
+              '\n',
+          ),
+        )
+      capture.accept({ ...time, kind: 'socket-close', socketId: 73 })
+      expect(capture.inspect()).toMatchObject({
+        refused: Number.MAX_SAFE_INTEGER,
+        countersExact: false,
+        dropped: 0,
+      })
+      await capture.fail(output, 'reload')
+      expect(
+        JSON.parse(await readFile(join(output, 'entry-transport.frozen.json'), 'utf8')),
+      ).toMatchObject({
+        refused: Number.MAX_SAFE_INTEGER,
+        countersExact: false,
+        dropped: 0,
+        failureWindow: [{ kind: 'socket-close', socketId: 73 }],
+      })
+    } finally {
+      await rm(output, { recursive: true, force: true })
+    }
+  },
+)
+
+test('writer boundary R2 exact category totals refuse arithmetic overflow', () => {
+  const capture = createRetentionEntryCapture(),
+    time = retentionEntryReceiptTime()
+  capture.read(
+    Buffer.from(
+      retentionEntryReceiptPrefix +
+        JSON.stringify({
+          version: 2,
+          kind: 'summary',
+          pid: process.pid,
+          emittedAt: time.at,
+          emittedTick: time.tick,
+          coverage: {
+            ...wireControlCoverage,
+            observed: 0,
+            inFlightRecords: 0,
+            inFlightBytes: 0,
+            refused: Number.MAX_SAFE_INTEGER,
+            refusedByReason: {
+              'tap-path': Number.MAX_SAFE_INTEGER,
+              'input-schema': 1,
+              'record-bytes': 0,
+            },
+          },
+        }) +
+        '\n',
+    ),
+  )
+  expect(capture.inspect()).toMatchObject({ relayRefused: 1, producer: null, dropped: 0 })
+})
+
+test.for(['node', 'bun'] as const)(
+  'writer boundary R2 %s schema faults report explicit unavailability',
+  async (runtime) => {
+    const source = pathToFileURL(
+      join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
+    ).href
+    const script = `import {writeRetentionEntryReceipt,retentionEntryReceiptTime} from ${JSON.stringify(source)};
+const writer=writeRetentionEntryReceipt({...retentionEntryReceiptTime(),pid:process.pid+1,kind:'socket-open',socketId:73,port:52865});
+writeRetentionEntryReceipt({...retentionEntryReceiptTime(),kind:'socket-close',socketId:73});
+process.stderr.write(JSON.stringify(writer.inspect()));`
+    const args =
+      runtime === 'node'
+        ? [
+            '--experimental-strip-types',
+            '--disable-warning=ExperimentalWarning',
+            '--input-type=module',
+            '--eval',
+            script,
+          ]
+        : ['--eval', script]
+    const child = spawn(runtime, args, { stdio: ['ignore', 'pipe', 'pipe'] }),
+      closed = once(child, 'close')
+    let stderr = '',
+      stdout = ''
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+    })
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString()
+    })
+    const timer = setTimeout(() => child.kill('SIGKILL'), 15000)
+    const [code, signal] = await closed
+    clearTimeout(timer)
+    expect(code).toBe(0)
+    expect(signal).toBeNull()
+    expect(stdout).toBe('')
+    expect(JSON.parse(stderr)).toMatchObject({
+      unavailable: true,
+      code: 'WIRE_SCHEMA',
+      refused: 0,
+      dropped: 2,
+      countersExact: true,
+      queuedRecords: 0,
+      pendingBytes: 0,
+      refusedByReason: { 'record-bytes': 0 },
+    })
   },
 )

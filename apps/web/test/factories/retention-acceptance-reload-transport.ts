@@ -565,11 +565,22 @@ const factDropCounts = {
   'process-exit': 0,
   'route-failure': 0,
 } satisfies Record<FactualEntryEvent['kind'], number>
+
+function receiptCounterTotal(counts: readonly number[]) {
+  let total = 0
+  for (const count of counts) {
+    if (count > Number.MAX_SAFE_INTEGER - total) return null
+    total += count
+  }
+  return total
+}
+
 const entryCoverageSchema = v.pipe(
   v.strictObject({
     observed: receiptInteger,
     dropped: receiptInteger,
     refused: receiptInteger,
+    countersExact: v.boolean(),
     droppedByKind: v.pipe(
       v.record(v.string(), receiptInteger),
       v.check((values) => Object.keys(values).every((kind) => Object.hasOwn(factDropCounts, kind))),
@@ -586,16 +597,19 @@ const entryCoverageSchema = v.pipe(
     unavailable: v.boolean(),
     code: receiptCode,
   }),
-  v.check(
-    (value) =>
+  v.check((value) => {
+    const droppedTotal = receiptCounterTotal(Object.values(value.droppedByKind))
+    const refusedTotal = receiptCounterTotal(Object.values(value.refusedByReason))
+    return (
       value.queuedRecords + value.inFlightRecords <= 64 &&
       value.queuedBytes === value.queuedRecords * retentionEntryReceiptLimits.recordBytes &&
       value.inFlightBytes === value.inFlightRecords * retentionEntryReceiptLimits.recordBytes &&
-      value.dropped === Object.values(value.droppedByKind).reduce((sum, count) => sum + count, 0) &&
-      value.refused ===
-        Object.values(value.refusedByReason).reduce((sum, count) => sum + count, 0) &&
-      value.observed >= value.dropped + value.queuedRecords + value.inFlightRecords,
-  ),
+      value.dropped === (droppedTotal ?? Number.MAX_SAFE_INTEGER) &&
+      value.refused === (refusedTotal ?? Number.MAX_SAFE_INTEGER) &&
+      (!value.countersExact || (droppedTotal !== null && refusedTotal !== null)) &&
+      value.observed - value.dropped >= value.queuedRecords + value.inFlightRecords
+    )
+  }),
 )
 const entryWireFactSchema = v.strictObject({
   observationSequence: receiptInteger,
@@ -661,18 +675,28 @@ function createRetentionEntryWriter() {
   const queue: PendingEntryFact[] = []
   const droppedByKind = { ...factDropCounts }
   const refusedByReason = { 'input-schema': 0, 'record-bytes': 0, 'tap-path': 0 }
-  type Flight = { readonly frame: EntryWire; readonly encoded: Buffer; readonly revision: number }
+  type Flight = { readonly frame: EntryWire; readonly encoded: Buffer }
+  type Encoding =
+    | { kind: 'encoded'; flight: Flight }
+    | { kind: 'record-bytes' }
+    | { kind: 'schema' }
   type WriterState =
     | { kind: 'idle' }
     | { kind: 'writing'; flight: Flight }
     | { kind: 'unavailable'; code: string | null }
   let state: WriterState = { kind: 'idle' }
-  let needsIdleSummary = false
+  let needsIdleSummary = false,
+    dirty = false,
+    countersExact = true
   let observed = 0,
     dropped = 0,
-    refused = 0,
-    revision = 0,
-    reportedRevision = 0
+    refused = 0
+  const addCounter = (previous: number, count: number) => {
+    const next = receiptCounterTotal([previous, count])
+    if (next !== null) return next
+    countersExact = false
+    return Number.MAX_SAFE_INTEGER
+  }
   const flightFacts = () =>
     state.kind === 'writing' && state.flight.frame.kind === 'facts'
       ? state.flight.frame.facts.length
@@ -681,6 +705,7 @@ function createRetentionEntryWriter() {
     observed,
     dropped,
     refused,
+    countersExact,
     droppedByKind: { ...droppedByKind },
     refusedByReason: { ...refusedByReason },
     queuedRecords: queued,
@@ -691,14 +716,14 @@ function createRetentionEntryWriter() {
     code: state.kind === 'unavailable' ? state.code : null,
   })
   const lose = (fact: PendingEntryFact) => {
-    dropped++
-    droppedByKind[fact.event.kind]++
-    revision++
+    dropped = addCounter(dropped, 1)
+    droppedByKind[fact.event.kind] = addCounter(droppedByKind[fact.event.kind], 1)
+    dirty = true
   }
   const reject = (reason: keyof typeof refusedByReason, count = 1) => {
-    refused += count
-    refusedByReason[reason] += count
-    revision++
+    refused = addCounter(refused, count)
+    refusedByReason[reason] = addCounter(refusedByReason[reason], count)
+    dirty = true
   }
   const failed = (error: unknown) => {
     if (state.kind === 'unavailable') return
@@ -710,7 +735,7 @@ function createRetentionEntryWriter() {
     state = { kind: 'unavailable', code }
   }
   output.on('error', failed)
-  const encode = (facts: readonly PendingEntryFact[]) => {
+  const encode = (facts: readonly PendingEntryFact[]): Encoding => {
     const time = retentionEntryReceiptTime()
     const base = {
       version: 2,
@@ -721,13 +746,16 @@ function createRetentionEntryWriter() {
     }
     const input = facts.length ? { ...base, kind: 'facts', facts } : { ...base, kind: 'summary' }
     const parsed = v.safeParse(entryWireSchema, input)
-    if (!parsed.success) return null
+    if (!parsed.success) return { kind: 'schema' }
     const body = JSON.stringify(parsed.output)
-    if (Buffer.byteLength(body) > retentionEntryReceiptLimits.recordBytes) return null
+    if (Buffer.byteLength(body) > retentionEntryReceiptLimits.recordBytes)
+      return { kind: 'record-bytes' }
     return {
-      frame: parsed.output,
-      encoded: Buffer.from(retentionEntryReceiptPrefix + body + '\n'),
-      revision,
+      kind: 'encoded',
+      flight: {
+        frame: parsed.output,
+        encoded: Buffer.from(retentionEntryReceiptPrefix + body + '\n'),
+      },
     }
   }
   const pump = () => {
@@ -736,9 +764,13 @@ function createRetentionEntryWriter() {
     let selected: Flight | null = null
     for (const fact of queue) {
       const next = encode([...facts, fact])
-      if (!next) break
+      if (next.kind === 'schema') {
+        failed({ code: 'WIRE_SCHEMA' })
+        return
+      }
+      if (next.kind === 'record-bytes') break
       facts.push(fact)
-      selected = next
+      selected = next.flight
     }
     if (!selected && queue.length) {
       const fact = queue.shift()
@@ -747,10 +779,18 @@ function createRetentionEntryWriter() {
       pump()
       return
     }
-    if (!selected && (needsIdleSummary || revision !== reportedRevision)) selected = encode([])
+    if (!selected && (needsIdleSummary || dirty)) {
+      const summary = encode([])
+      if (summary.kind !== 'encoded') {
+        failed({ code: summary.kind === 'schema' ? 'WIRE_SCHEMA' : 'WIRE_RECORD_BYTES' })
+        return
+      }
+      selected = summary.flight
+    }
     if (!selected) return
     queue.splice(0, facts.length)
     needsIdleSummary = false
+    dirty = false
     state = { kind: 'writing', flight: selected }
     try {
       output.write(selected.encoded, completed)
@@ -764,7 +804,6 @@ function createRetentionEntryWriter() {
       return
     }
     if (state.kind !== 'writing') return
-    reportedRevision = state.flight.revision
     needsIdleSummary = state.flight.frame.kind === 'facts' && queue.length === 0
     state = { kind: 'idle' }
     pump()
@@ -788,8 +827,16 @@ function createRetentionEntryWriter() {
           pump()
           return
         }
-        const fact = { observationSequence: ++observed, event: Object.freeze(parsed.output) }
-        revision++
+        const nextObserved = receiptCounterTotal([observed, 1])
+        if (nextObserved === null) {
+          countersExact = false
+          failed({ code: 'COUNTER_OVERFLOW' })
+          lose({ observationSequence: observed, event: parsed.output })
+          return
+        }
+        observed = nextObserved
+        const fact = { observationSequence: observed, event: Object.freeze(parsed.output) }
+        dirty = true
         if (state.kind === 'unavailable' || queue.length + flightFacts() >= producerFactCells) {
           lose(fact)
           return
@@ -814,6 +861,7 @@ function createRetentionEntryWriter() {
           wireRecordBytes,
         dropped,
         refused,
+        countersExact,
         droppedByKind: { ...droppedByKind },
         refusedByReason: { ...refusedByReason },
         unavailable: state.kind === 'unavailable',
@@ -1006,12 +1054,57 @@ export function createRetentionEntryCapture() {
     dropped = 0,
     writerDropped = 0,
     writerRefused = 0
+  let relayCountersExact = true
   let producerSample: ProducerSample | null = null
   let lastReceived = 0,
     gaps = 0
   let firstGap: ObservationCoverage['firstGap'] = null
   let lastGap: ObservationCoverage['lastGap'] = null
   const observations = (): ObservationCoverage => ({ lastReceived, gaps, firstGap, lastGap })
+  const addRelayCounter = (previous: number, count = 1) => {
+    const next = receiptCounterTotal([previous, count])
+    if (next !== null) return next
+    relayCountersExact = false
+    return Number.MAX_SAFE_INTEGER
+  }
+  const totals = () => {
+    const refusedTotal = receiptCounterTotal([refused, writerRefused])
+    const droppedTotal = receiptCounterTotal([dropped, writerDropped])
+    return {
+      refused: refusedTotal ?? Number.MAX_SAFE_INTEGER,
+      dropped: droppedTotal ?? Number.MAX_SAFE_INTEGER,
+      countersExact:
+        relayCountersExact &&
+        producerSample?.coverage.countersExact !== false &&
+        refusedTotal !== null &&
+        droppedTotal !== null,
+    }
+  }
+  const continuesCounters = (previous: Record<string, number>, next: Record<string, number>) =>
+    Object.entries(previous).every(([key, value]) => (next[key] ?? 0) >= value)
+  const continuesCoverage = (frame: EntryWire) => {
+    const current = frame.coverage
+    const accounted = receiptCounterTotal([
+      lastReceived - gaps,
+      current.queuedRecords,
+      current.inFlightRecords,
+      current.dropped,
+    ])
+    if (accounted === null && current.countersExact) return false
+    if ((accounted ?? Number.MAX_SAFE_INTEGER) > current.observed) return false
+    if (current.observed < lastReceived) return false
+    if (!producerSample) return true
+    const previous = producerSample.coverage
+    return (
+      frame.pid === producerSample.pid &&
+      current.observed >= previous.observed &&
+      current.dropped >= previous.dropped &&
+      current.refused >= previous.refused &&
+      (previous.countersExact || !current.countersExact) &&
+      continuesCounters(previous.droppedByKind, current.droppedByKind) &&
+      continuesCounters(previous.refusedByReason, current.refusedByReason)
+    )
+  }
   const makeRoom = (count: number, size: number) => {
     while (
       records.size + completions.size + pinnedRecords + lifetimeSlots + cases.size * 3 + 1 + count >
@@ -1029,21 +1122,21 @@ export function createRetentionEntryCapture() {
       if (first !== undefined) {
         bytes -= records.get(first)?.bytes ?? 0
         records.delete(first)
-        dropped++
+        dropped = addRelayCounter(dropped)
         continue
       }
       const path = completions.keys().next().value
       if (path === undefined) return false
       completionBytes -= completions.get(path)?.bytes ?? 0
       completions.delete(path)
-      dropped++
+      dropped = addRelayCounter(dropped)
     }
     return true
   }
   const retain = (event: RetentionEntryReceiptEvent) => {
     const size = Buffer.byteLength(JSON.stringify(event))
     if (size > retentionEntryReceiptLimits.recordBytes) {
-      refused++
+      refused = addRelayCounter(refused)
       return
     }
     counts.set(event.kind, (counts.get(event.kind) ?? 0) + 1)
@@ -1062,7 +1155,7 @@ export function createRetentionEntryCapture() {
       completions.delete(event.path)
     }
     if (!makeRoom(completed ? 2 : 1, completed ? size * 2 : size)) {
-      dropped++
+      dropped = addRelayCounter(dropped)
       return
     }
     if (completed) {
@@ -1076,11 +1169,11 @@ export function createRetentionEntryCapture() {
     try {
       const parsed = v.safeParse(entryReceiptSchema, input)
       if (!parsed.success) {
-        refused++
+        refused = addRelayCounter(refused)
         return
       }
       if (parsed.output.kind === 'refused') {
-        refused += parsed.output.count
+        refused = addRelayCounter(refused, parsed.output.count)
         return
       }
       if (parsed.output.kind === 'writer-status') {
@@ -1089,16 +1182,20 @@ export function createRetentionEntryCapture() {
       }
       retain(parsed.output)
     } catch {
-      refused++
+      refused = addRelayCounter(refused)
     }
   }
   const receive = (input: unknown) => {
     const parsed = v.safeParse(entryWireSchema, input)
     if (!parsed.success) {
-      refused++
+      refused = addRelayCounter(refused)
       return
     }
     const frame = parsed.output
+    if (!continuesCoverage(frame)) {
+      refused = addRelayCounter(refused)
+      return
+    }
     if (
       frame.kind === 'facts' &&
       frame.facts.some(
@@ -1107,7 +1204,7 @@ export function createRetentionEntryCapture() {
           (index ? (frame.facts[index - 1]?.observationSequence ?? 0) : lastReceived),
       )
     ) {
-      refused++
+      refused = addRelayCounter(refused)
       return
     }
     writerDropped = Math.max(writerDropped, frame.coverage.dropped)
@@ -1135,7 +1232,7 @@ export function createRetentionEntryCapture() {
     try {
       receive(JSON.parse(strictDecoder.decode(pending.subarray(prefix.length, pendingLength))))
     } catch {
-      refused++
+      refused = addRelayCounter(refused)
     }
   }
   const byte = (value: number, other: (value: number) => void) => {
@@ -1146,7 +1243,7 @@ export function createRetentionEntryCapture() {
     }
     if (value === 10) {
       if (!discardLine && pendingLength - prefix.length > retentionEntryReceiptLimits.recordBytes) {
-        refused++
+        refused = addRelayCounter(refused)
         discardLine = true
       }
       if (!discardLine && pendingLength >= prefix.length) receiveLine()
@@ -1161,7 +1258,7 @@ export function createRetentionEntryCapture() {
     if (pendingLength === pending.length) {
       pendingLength = 0
       discardLine = true
-      refused++
+      refused = addRelayCounter(refused)
       return
     }
     pending[pendingLength++] = value
@@ -1175,7 +1272,7 @@ export function createRetentionEntryCapture() {
     const selected: ReceiptRecord[] = []
     for (const record of values) {
       if (!makeRoom(1, record.bytes)) {
-        dropped++
+        dropped = addRelayCounter(dropped)
         continue
       }
       selected.push(record)
@@ -1205,14 +1302,13 @@ export function createRetentionEntryCapture() {
     phase: failure.phase,
     failedAt: failure.at,
     endedAt: failure.endedAt,
-    refused: refused + writerRefused,
-    dropped: dropped + writerDropped,
+    ...totals(),
     wireEndObserved,
     pendingWireBytes: pendingLength,
     optimizerCoverage: 'public-log-markers',
     lifetimeCounts: Object.fromEntries(counts),
     lifetimeStatusCounts: Object.fromEntries(statusCounts),
-    truncated: dropped + writerDropped > 0,
+    truncated: dropped > 0 || writerDropped > 0,
     immediatePersistence: immediateStatus ?? { status: 'pending', codes: [] },
     immediateArchiveCompletedAt: immediateCompletedAt,
     producerAtFailure: failure.producerAtFailure,
@@ -1286,14 +1382,14 @@ export function createRetentionEntryCapture() {
         const text = decoder.write(Buffer.from(ordinary))
         if (text) other?.(text)
       } catch {
-        refused++
+        refused = addRelayCounter(refused)
       }
     },
     finishWire() {
       guardRetentionEntryObservation(() => {
         decoder.end()
         wireEndObserved = true
-        if (pendingLength >= prefix.length || discardLine) refused++
+        if (pendingLength >= prefix.length || discardLine) refused = addRelayCounter(refused)
         pendingLength = 0
         discardLine = false
       })
@@ -1305,7 +1401,7 @@ export function createRetentionEntryCapture() {
           wireRecordBytes * 2 +
           retentionEntryReceiptLimits.recordBytes * 4
         if (cases.has(output) || !makeRoom(3, size)) {
-          refused++
+          refused = addRelayCounter(refused)
           return
         }
         cases.set(output, {
@@ -1323,7 +1419,7 @@ export function createRetentionEntryCapture() {
       try {
         return freeze(output, phase)
       } catch {
-        refused++
+        refused = addRelayCounter(refused)
         return undefined
       }
     },
@@ -1340,8 +1436,7 @@ export function createRetentionEntryCapture() {
     },
     inspect() {
       return {
-        refused: refused + writerRefused,
-        dropped: dropped + writerDropped,
+        ...totals(),
         retainedBytes:
           bytes +
           lifetimeBytes +
