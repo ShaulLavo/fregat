@@ -46,9 +46,10 @@ class EdenLanguageServerWebSocket implements ServerSocket {
     _protocols: string | readonly string[] | undefined,
     client: Client,
     signal: AbortSignal,
+    connectSocket: typeof connectLanguageServerSocket,
   ) {
     void _protocols
-    this.#socket = connectLanguageServerSocket(languageServerSocketOptions(url), client, signal)
+    this.#socket = connectSocket(languageServerSocketOptions(url), client, signal)
   }
 
   get readyState() {
@@ -80,10 +81,14 @@ class EdenLanguageServerWebSocket implements ServerSocket {
   }
 }
 
-export function languageServerWebSocketConstructor(client: Client, signal: AbortSignal) {
+export function languageServerWebSocketConstructor(
+  client: Client,
+  signal: AbortSignal,
+  connectSocket = connectLanguageServerSocket,
+) {
   return class extends EdenLanguageServerWebSocket {
     constructor(url: string | URL, protocols?: string | readonly string[]) {
-      super(url, protocols, client, signal)
+      super(url, protocols, client, signal, connectSocket)
     }
   }
 }

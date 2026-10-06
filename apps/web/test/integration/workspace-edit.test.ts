@@ -1277,12 +1277,22 @@ function deleteOperation(
 
 function currentProvenance(
   document: {
-    readonly buffer: { getTextSnapshot(): WorkspaceTextDocumentProvenance['textSnapshot'] }
+    readonly buffer: Pick<
+      ReturnType<typeof createEditorBufferSession>['buffer'],
+      'getTextSnapshot' | 'getDocumentSyncPoint'
+    >
   },
   uri: string,
   version: number,
 ): WorkspaceTextDocumentProvenance {
-  return { textSnapshot: document.buffer.getTextSnapshot(), uri, version }
+  const point = document.buffer.getDocumentSyncPoint()
+  return {
+    textSnapshot: document.buffer.getTextSnapshot(),
+    uri,
+    version,
+    sourceRevision: point.revision,
+    sourceSegment: point.segment,
+  }
 }
 
 async function writeWorkspaceFiles(

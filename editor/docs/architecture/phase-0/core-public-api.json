@@ -1054,12 +1054,6 @@
         },
         {
           "kind": "type",
-          "name": "EditorSyntaxSessionFactory",
-          "source": "packages/editor/src/editor.ts",
-          "via": "packages/editor/src/index.ts"
-        },
-        {
-          "kind": "type",
           "name": "EditorSyntaxSessionOptions",
           "source": "packages/editor/src/public/syntax.ts",
           "via": "packages/editor/src/index.ts"
@@ -3544,6 +3538,66 @@
         },
         {
           "kind": "type",
+          "name": "DocumentContributionAudience",
+          "source": "packages/editor/src/editor/contributionDemand.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentContributionDemand",
+          "source": "packages/editor/src/editor/contributionDemand.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentContributionLease",
+          "source": "packages/editor/src/editor/contributionOperation.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentContributionOutcome",
+          "source": "packages/editor/src/editor/contributionDemand.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentContributionOwner",
+          "source": "packages/editor/src/editor/contributionDemand.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentContributionTask",
+          "source": "packages/editor/src/editor/contributionDemand.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentOperation",
+          "source": "packages/editor/src/editor/contributionOperation.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentOperationOptions",
+          "source": "packages/editor/src/editor/contributionOperation.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentRead",
+          "source": "packages/editor/src/editor/documentDelivery.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentRevision",
+          "source": "packages/editor/src/editor/documentDelivery.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorAnalysisDisplayDemand",
           "source": "packages/editor/src/editor/documentAnalysis.ts",
           "via": "packages/editor/src/editor.ts"
@@ -3682,6 +3736,12 @@
         },
         {
           "kind": "type",
+          "name": "EditorDocumentContributions",
+          "source": "packages/editor/src/editor/documentAnalysis.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorDocumentLinkPluginOptions",
           "source": "packages/editor/src/documentLinkPlugin.ts",
           "via": "packages/editor/src/editor.ts"
@@ -3762,6 +3822,24 @@
           "kind": "type",
           "name": "EditorGutterWidthContext",
           "source": "packages/editor/src/plugins.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorHighlighterContributionRequest",
+          "source": "packages/editor/src/editor/documentAnalysis.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorHighlighterOperation",
+          "source": "packages/editor/src/document/operations.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorHighlighterOperationContext",
+          "source": "packages/editor/src/document/operations.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
@@ -4102,6 +4180,24 @@
         },
         {
           "kind": "type",
+          "name": "EditorStructuralContributionRequest",
+          "source": "packages/editor/src/editor/documentAnalysis.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorStructuralOperation",
+          "source": "packages/editor/src/document/operations.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorStructuralOperationContext",
+          "source": "packages/editor/src/document/operations.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorSuspiciousCharactersOptions",
           "source": "packages/editor/src/unicodeHighlight.ts",
           "via": "packages/editor/src/editor.ts"
@@ -4110,12 +4206,6 @@
           "kind": "type",
           "name": "EditorSyntaxProvider",
           "source": "packages/editor/src/syntax/index.ts",
-          "via": "packages/editor/src/editor.ts"
-        },
-        {
-          "kind": "type",
-          "name": "EditorSyntaxSessionFactory",
-          "source": "packages/editor/src/editor/types.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
@@ -4390,6 +4480,12 @@
         },
         {
           "kind": "unknown",
+          "name": "createEditorHighlighterOperation",
+          "source": "packages/editor/src/editor/operationDefinitions.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "createEditorLoggingPlugin",
           "source": "packages/editor/src/logging/index.ts",
           "via": "packages/editor/src/editor.ts"
@@ -4398,6 +4494,12 @@
           "kind": "unknown",
           "name": "createEditorPreparedDocument",
           "source": "packages/editor/src/editor/preparedDocument.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "createEditorStructuralOperation",
+          "source": "packages/editor/src/editor/operationDefinitions.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
@@ -4512,12 +4614,6 @@
           "kind": "unknown",
           "name": "resolveMergeConflict",
           "source": "packages/editor/src/mergeConflicts.ts",
-          "via": "packages/editor/src/editor.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "setEditorSyntaxSessionFactory",
-          "source": "packages/editor/src/editor/runtime.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {
@@ -5572,6 +5668,180 @@
       "exports": [
         {
           "kind": "type",
+          "name": "DocumentContributionSource",
+          "source": "packages/editor/src/editor/documentDelivery.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentOperationContext",
+          "source": "packages/editor/src/editor/operationDefinitions.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentOperationRuntime",
+          "source": "packages/editor/src/editor/operationDefinitions.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentProjectionConnection",
+          "source": "packages/editor/src/editor/documentDelivery.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentProjectionEndpoint",
+          "source": "packages/editor/src/editor/documentDelivery.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentProjectionReceipt",
+          "source": "packages/editor/src/editor/documentDelivery.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentProjectionUpdate",
+          "source": "packages/editor/src/editor/documentDelivery.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentRead",
+          "source": "packages/editor/src/editor/documentDelivery.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentRevision",
+          "source": "packages/editor/src/editor/documentDelivery.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentSourceConnection",
+          "source": "packages/editor/src/editor/documentDelivery.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentSourceEndpoint",
+          "source": "packages/editor/src/editor/documentDelivery.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentWorkerIdentity",
+          "source": "packages/editor/src/document/workerReader.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentWorkerPoint",
+          "source": "packages/editor/src/document/workerReader.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentWorkerRead",
+          "source": "packages/editor/src/document/workerReader.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentWorkerReadReference",
+          "source": "packages/editor/src/document/workerReader.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentWorkerSourceCommand",
+          "source": "packages/editor/src/document/workerReader.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentWorkerSourceResult",
+          "source": "packages/editor/src/document/workerReader.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "HighlighterOperationContext",
+          "source": "packages/editor/src/editor/operationDefinitions.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "PreparedDocumentWorkerRead",
+          "source": "packages/editor/src/editor/documentDelivery.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "type",
+          "name": "StructuralOperationContext",
+          "source": "packages/editor/src/editor/operationDefinitions.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "acquireEditorDocumentAnalysis",
+          "source": "packages/editor/src/editor/documentAnalysis.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "defineDocumentOperation",
+          "source": "packages/editor/src/editor/operationDefinitions.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "defineHighlighterOperation",
+          "source": "packages/editor/src/editor/operationDefinitions.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "defineStructuralOperation",
+          "source": "packages/editor/src/editor/operationDefinitions.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "unknown",
+          "name": "waitForDocumentWork",
+          "source": "packages/editor/src/editor/documentWork.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "value",
+          "name": "decodeDocumentWorkerReply",
+          "source": "packages/editor/src/document/workerReader.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "value",
+          "name": "documentWorkerPointsEqual",
+          "source": "packages/editor/src/document/workerReader.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        },
+        {
+          "kind": "value",
+          "name": "DocumentWorkerReader",
+          "source": "packages/editor/src/document/workerReader.ts",
+          "via": "packages/editor/src/document/workerReader.ts"
+        }
+      ],
+      "source": "packages/editor/src/document/workerReader.ts",
+      "specifier": "./internal/document-worker"
+    },
+    {
+      "exports": [
+        {
+          "kind": "type",
           "name": "EditorAnyCommandId",
           "source": "packages/editor/src/editor/commandCatalog.ts",
           "via": "packages/editor/src/public/keymap.ts"
@@ -6400,12 +6670,6 @@
         },
         {
           "kind": "type",
-          "name": "ShikiHighlighterSessionOptions",
-          "source": "packages/editor/src/shiki/workerClient.ts",
-          "via": "packages/editor/src/shiki/index.ts"
-        },
-        {
-          "kind": "type",
           "name": "ShikiLanguageMap",
           "source": "packages/editor/src/shiki/plugin.ts",
           "via": "packages/editor/src/shiki/index.ts"
@@ -6450,12 +6714,6 @@
           "kind": "type",
           "name": "ShikiWorkerCacheSnapshot",
           "source": "packages/editor/src/shiki/workerClient.ts",
-          "via": "packages/editor/src/shiki/index.ts"
-        },
-        {
-          "kind": "type",
-          "name": "ShikiWorkerHighlightRequest",
-          "source": "packages/editor/src/shiki/workerTypes.ts",
           "via": "packages/editor/src/shiki/index.ts"
         },
         {
@@ -6742,6 +7000,12 @@
         {
           "kind": "type",
           "name": "EditorSyntaxResultOptions",
+          "source": "packages/editor/src/syntax/index.ts",
+          "via": "packages/editor/src/public/syntax.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorSyntaxRuntime",
           "source": "packages/editor/src/syntax/index.ts",
           "via": "packages/editor/src/public/syntax.ts"
         },
@@ -7042,12 +7306,6 @@
         {
           "kind": "unknown",
           "name": "resetEditorInstanceCount",
-          "source": "packages/editor/src/editor.ts",
-          "via": "packages/editor/src/public/testing.ts"
-        },
-        {
-          "kind": "unknown",
-          "name": "setEditorSyntaxSessionFactory",
           "source": "packages/editor/src/editor.ts",
           "via": "packages/editor/src/public/testing.ts"
         },

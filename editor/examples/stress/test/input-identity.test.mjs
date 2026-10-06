@@ -6,14 +6,18 @@ const measurementPaths = [
   'input-paired.mjs',
   'input-budgets.json',
   'input-scenarios.mjs',
+  'input-source-current.mjs',
   'input-pair-stopping.mjs',
   'src/fixtures.ts',
   'input-runtime.mjs',
   'paired.mjs',
   'src/inputReadiness.ts',
   'input-worker-proof.mjs',
+  'input-worker-proof.d.mts',
+  'input-product-tree.mjs',
   'input-configurations.mjs',
   'src/browser.ts',
+  'src/input-output.ts',
   'input-identity.mjs',
   'unknown-source.ts',
 ]
@@ -25,6 +29,15 @@ test.each(measurementPaths)('%s is conservatively measurement-hashed', (path) =>
   expect(before.measurementHash).not.toBe(after.measurementHash)
   expect(before.validationHash).toBe(after.validationHash)
   expect(before.measurementFiles).toEqual([sources[0].path])
+})
+
+test('only postcapture output predicates remain validation-hashed', () => {
+  const sources = [{ path: 'examples/stress/input-output.mjs', bytes: 'before' }]
+  const before = inputSourceIdentity(sources, 'external')
+  const after = inputSourceIdentity([{ ...sources[0], bytes: 'after' }], 'external')
+  expect(after.measurementHash).toBe(before.measurementHash)
+  expect(after.validationHash).not.toBe(before.validationHash)
+  expect(after.validationFiles).toEqual(['examples/stress/input-output.mjs'])
 })
 
 test('external bytes invalidate controls and source ordering is stable', () => {

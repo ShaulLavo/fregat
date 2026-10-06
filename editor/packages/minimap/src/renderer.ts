@@ -115,6 +115,19 @@ export class MinimapWorkerRenderer {
     this.applyEdits([edit], document)
   }
 
+  public applySourceSummary(summary: MinimapDocumentSummaryPayload): void {
+    this.requireState()
+    this.setDocument({ ...summary, tokens: [], selections: [], decorations: [] })
+  }
+
+  public applySourcePatch(
+    edits: readonly TextEdit[],
+    summaryPatch: MinimapDocumentSummaryPatch,
+  ): void {
+    const state = this.requireState()
+    this.applyEdits(edits, { summaryPatch, selections: state.document.selections })
+  }
+
   public applyEdits(edits: readonly TextEdit[], document: MinimapDocumentEditPayload): void {
     if (!this.state) return
     if (edits.length === 0) {
@@ -935,7 +948,7 @@ function emptyRenderResult(): RenderResult {
   return { sliderNeeded: false, sliderTop: 0, sliderHeight: 0, shadowVisible: false }
 }
 
-function applyTextEditsToMinimapDocument(
+export function applyTextEditsToMinimapDocument(
   document: Pick<MinimapDocumentPayload, 'lineStarts' | 'lines' | 'textLength' | 'tokens'>,
   edits: readonly TextEdit[],
   summaryPatch: MinimapDocumentSummaryPatch,

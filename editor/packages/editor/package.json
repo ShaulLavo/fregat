@@ -17,6 +17,11 @@
     "./dist/style.css"
   ],
   "exports": {
+    "./internal/document-worker": {
+      "types": "./dist/document/workerReader.d.ts",
+      "import": "./dist/document/workerReader.js",
+      "default": "./dist/document/workerReader.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",

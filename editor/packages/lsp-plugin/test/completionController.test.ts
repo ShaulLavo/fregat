@@ -2,34 +2,26 @@ import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import type { DocumentSessionChange, TextEdit } from '@singapore-editor/core/document'
 import type {
   EditorCommandHandler,
-  EditorEditContributionContext,
   EditorViewContributionContext,
-  EditorViewContributionProvider,
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
-import type { LspManagedTransport, LspTransportHandler } from '@singapore-editor/lsp'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type * as lsp from 'vscode-languageserver-protocol'
 import type { EditorAnyCommandId } from '@singapore-editor/core/editor'
 
 import { LANGUAGE_SERVER_COMPLETION_EDIT_FEATURE } from '../src/completion'
 import { CompletionController } from '../src/completionController'
-import { createLanguageServerAdapterPlugin } from '../src/plugin'
 import { completionCommandHandlers } from './completionCommandHandlers'
 import { createTestKeymap, type TestKeymap } from '@singapore-editor/core/testing'
 import type { ActiveDocument } from '../src/pluginTypes'
 import {
   documentSyncSnapshotFields,
   viewSnapshotStructuralFields,
-  viewText,
   viewTextFields,
 } from './documentSyncSnapshot'
 import { textDocument } from './snapshotDocument'
-import {
-  createTestEditContributionContext,
-  createTestPluginContext,
-  createTestViewContributionContext,
-} from '@singapore-editor/core/testing'
+import { connectedEditor, COMPLETION_ACCEPT_TIMING_NAME } from './connectedEditor'
+import { createTestViewContributionContext } from '@singapore-editor/core/testing'
 
 // Each harness's keymap listens on the document too, so it goes with the test that made it.
 const keymaps: TestKeymap[] = []
@@ -44,39 +36,6 @@ function testKeymap(
   const keymap = createTestKeymap(root, commands)
   keymaps.push(keymap)
   return keymap
-}
-
-type JsonMessage = Record<string, unknown>
-
-const COMPLETION_ACCEPT_TIMING_NAME = 'testLsp.completion.accept'
-
-class FakeTransport implements LspManagedTransport {
-  public readonly sent: string[] = []
-  private readonly handlers = new Set<LspTransportHandler>()
-
-  public send(message: string): void {
-    this.sent.push(message)
-  }
-
-  public subscribe(handler: LspTransportHandler): void {
-    this.handlers.add(handler)
-  }
-
-  public unsubscribe(handler: LspTransportHandler): void {
-    this.handlers.delete(handler)
-  }
-
-  public onDidClose(): () => void {
-    return () => undefined
-  }
-
-  public close(): void {
-    this.handlers.clear()
-  }
-
-  public receive(message: unknown): void {
-    for (const handler of this.handlers) handler(JSON.stringify(message))
-  }
 }
 
 describe('accepting a completion', () => {
@@ -139,7 +98,7 @@ describe('accepting a completion', () => {
   it('keeps a resolved item anchored on the caret the user reached', async () => {
     vi.useFakeTimers()
     const editor = await connectedEditor('const va', 8, {
-      completionProvider: { resolveProvider: true },
+      capabilities: { completionProvider: { resolveProvider: true } },
     })
 
     editor.type('l')
@@ -174,7 +133,7 @@ describe('accepting a completion', () => {
   it('drops a resolved item when the document moved during the round trip', async () => {
     vi.useFakeTimers()
     const editor = await connectedEditor('const va', 8, {
-      completionProvider: { resolveProvider: true },
+      capabilities: { completionProvider: { resolveProvider: true } },
     })
 
     editor.type('l')
@@ -720,6 +679,8 @@ function openDocument(uri: string, fullText: string): ActiveDocument {
     ...textDocument(fullText),
     textVersion: 2,
     lspVersion: 1,
+    sourceRevision: 2,
+    sourceSegment: documentSyncSnapshotFields(2).documentSyncPoint.segment,
   }
 }
 
@@ -728,197 +689,6 @@ function completionMatchRuns(): readonly string[] {
     document.querySelectorAll<HTMLElement>('.editor-test-lsp-completion-match'),
     (element) => element.textContent ?? '',
   )
-}
-
-type ConnectedEditor = {
-  readonly applyEdits: ReturnType<typeof vi.fn<EditorEditContributionContext['applyEdits']>>
-  type(character: string): void
-  /** A delimiter the editor closed as it was typed: both halves in one edit, caret between them. */
-  typeClosedPair(open: string, close: string): void
-  backspace(): void
-  moveCaret(offset: number): void
-  selectRange(start: number, end: number): void
-  scroll(by: number): void
-  editElsewhere(edit: TextEdit): void
-  pressKey(key: string, modifiers?: KeyboardEventInit): KeyboardEvent
-  answerCompletion(items: readonly lsp.CompletionItem[], isIncomplete?: boolean): void
-  answerResolve(item: lsp.CompletionItem): void
-  completionElement(): HTMLElement
-  completionAnchorElement(): HTMLElement
-  completionLabels(): readonly string[]
-  focusedCompletionLabel(): string | null
-  completionRequests(): readonly lsp.CompletionParams[]
-}
-
-/**
- * The plugin driven the way the editor drives it: one coalesced content update per keystroke, a
- * live view snapshot, and the completion edit feature the edit contribution registers.
- */
-async function connectedEditor(
-  text: string,
-  caretOffset: number,
-  capabilities: lsp.ServerCapabilities = {},
-): Promise<ConnectedEditor> {
-  const transport = new FakeTransport()
-  const applyEdits = vi.fn<EditorEditContributionContext['applyEdits']>()
-  const features = new Map<unknown, unknown>()
-  const element = document.createElement('div')
-  let snapshot = editorSnapshot(text, caretOffset, 1)
-  let anchorRect = new DOMRect(10, 20, 40, 18)
-
-  const commands = new Map<EditorAnyCommandId, EditorCommandHandler>()
-  const provider = activateProvider(transport, features, applyEdits, commands)
-  const keymap = testKeymap(element, commands)
-  const contribution = provider.createContribution(
-    viewContributionContext({
-      element,
-      registerKeymapContextKey: keymap.registerKeymapContextKey,
-      getSnapshot: () => snapshot,
-      getRangeClientRect: () => anchorRect,
-      getFeature: (token) => features.get(token) ?? null,
-    }),
-  )
-  if (!contribution) throw new Error('missing contribution')
-
-  transport.receive({
-    jsonrpc: '2.0',
-    id: jsonMessage(transport.sent[0]).id,
-    result: {
-      capabilities: {
-        completionProvider: {},
-        textDocumentSync: { openClose: true, change: 2 },
-        ...capabilities,
-      },
-    },
-  })
-  await flushPromises()
-
-  const answer = (method: string, result: unknown): void => {
-    const request = transport.sent.map(jsonMessage).findLast((sent) => sent.method === method)
-    if (!request) throw new Error(`missing request ${method}`)
-    transport.receive({ jsonrpc: '2.0', id: request.id, result })
-  }
-
-  const applyChange = (edit: TextEdit, caretOffset: number): void => {
-    const next = `${viewText(snapshot).slice(0, edit.from)}${edit.text}${viewText(snapshot).slice(edit.to)}`
-    snapshot = editorSnapshot(next, caretOffset, snapshot.textVersion + 1)
-    contribution.update(snapshot, 'content', documentChange([edit]))
-  }
-
-  return {
-    applyEdits,
-    type: (character) => {
-      const at = caretOffsetOf(snapshot)
-      applyChange({ from: at, to: at, text: character }, at + character.length)
-    },
-    typeClosedPair: (open, close) => {
-      const at = caretOffsetOf(snapshot)
-      applyChange({ from: at, to: at, text: open + close }, at + open.length)
-    },
-    backspace: () => {
-      const at = caretOffsetOf(snapshot)
-      applyChange({ from: at - 1, to: at, text: '' }, at - 1)
-    },
-    editElsewhere: (edit) => applyChange(edit, caretOffsetOf(snapshot)),
-    moveCaret: (offset) => {
-      snapshot = editorSnapshot(viewText(snapshot), offset, snapshot.textVersion)
-      contribution.update(snapshot, 'selection', null)
-    },
-    selectRange: (start, end) => {
-      snapshot = editorSnapshot(viewText(snapshot), end, snapshot.textVersion, start)
-      contribution.update(snapshot, 'selection', null)
-    },
-    scroll: (by) => {
-      anchorRect = new DOMRect(anchorRect.x, anchorRect.y - by, anchorRect.width, anchorRect.height)
-      contribution.update(snapshot, 'viewport', null)
-    },
-    pressKey: (key, modifiers = {}) => {
-      const event = new KeyboardEvent('keydown', {
-        key,
-        bubbles: true,
-        cancelable: true,
-        ...modifiers,
-      })
-      element.dispatchEvent(event)
-      return event
-    },
-    answerCompletion: (items, isIncomplete = false) =>
-      answer('textDocument/completion', { isIncomplete, items }),
-    answerResolve: (item) => answer('completionItem/resolve', item),
-    completionElement: () => {
-      const widget = document.querySelector<HTMLElement>('.editor-test-lsp-completion')
-      if (!widget) throw new Error('missing completion widget')
-      return widget
-    },
-    completionAnchorElement: () => {
-      const anchor = document.querySelector<HTMLElement>('.editor-test-lsp-completion-anchor')
-      if (!anchor) throw new Error('missing completion anchor')
-      return anchor
-    },
-    completionLabels: () =>
-      Array.from(
-        document.querySelectorAll<HTMLElement>('.editor-test-lsp-completion [role="option"]'),
-        (row) => row.children[1]?.textContent ?? '',
-      ),
-    focusedCompletionLabel: () =>
-      document.querySelector<HTMLElement>('.editor-test-lsp-completion [aria-selected="true"]')
-        ?.children[1]?.textContent ?? null,
-    completionRequests: () =>
-      transport.sent
-        .map(jsonMessage)
-        .filter((sent) => sent.method === 'textDocument/completion')
-        .map((sent) => sent.params as lsp.CompletionParams),
-  }
-}
-
-function activateProvider(
-  transport: LspManagedTransport,
-  features: Map<unknown, unknown>,
-  applyEdits: EditorEditContributionContext['applyEdits'],
-  commands: Map<EditorAnyCommandId, EditorCommandHandler>,
-): EditorViewContributionProvider {
-  let provider: EditorViewContributionProvider | null = null
-  const disposable = { dispose: () => undefined }
-  createLanguageServerAdapterPlugin({
-    name: 'editor.test-lsp',
-    createTransport: () => transport,
-    completion: {
-      acceptTimingName: COMPLETION_ACCEPT_TIMING_NAME,
-      widgetClassNamespace: 'test-lsp',
-    },
-  }).activate(
-    createTestPluginContext({
-      registerViewContribution: (value) => {
-        provider = value
-        return disposable
-      },
-      registerCommandContribution: (value) => {
-        value.createContribution({
-          registerCommand: (commandId, handler) => {
-            commands.set(commandId, handler)
-            return { dispose: () => commands.delete(commandId) }
-          },
-        })
-        return disposable
-      },
-      registerEditContribution: (value) => {
-        value.createContribution(
-          createTestEditContributionContext({
-            materializeFullText: () => '',
-            applyEdits,
-            registerFeature: (id, feature) => {
-              features.set(id, feature)
-              return { dispose: () => features.delete(id) }
-            },
-          }),
-        )
-        return disposable
-      },
-    }),
-  )
-
-  if (!provider) throw new Error('missing provider')
-  return provider
 }
 
 function viewContributionContext(options: {
@@ -985,23 +755,12 @@ function editorSnapshot(
   }
 }
 
-function caretOffsetOf(snapshot: EditorViewSnapshot): number {
-  const selection = snapshot.selections[0]
-  if (!selection) throw new Error('missing selection')
-  return selection.headOffset
-}
-
 function singleLineRange(start: number, end: number): lsp.Range {
   return { start: { line: 0, character: start }, end: { line: 0, character: end } }
 }
 
 function documentChange(edits: readonly TextEdit[]): DocumentSessionChange {
   return { kind: 'edit', edits } as unknown as DocumentSessionChange
-}
-
-function jsonMessage(item: unknown): JsonMessage {
-  if (typeof item !== 'string') throw new Error('missing JSON message')
-  return JSON.parse(item) as JsonMessage
 }
 
 /**

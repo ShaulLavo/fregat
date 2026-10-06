@@ -115,9 +115,12 @@ export class LanguageServerSet {
       const lanes = this.ready('codeActions', method)
       const lane = lanes.length === 1 ? lanes[0] : undefined
       if (lane) {
-        const provenance = codeActionProvenance(lane)
-        return this.requestSingle(lane, method, params, options, [], (result) =>
-          this.mergeArrayResults('codeActions', [{ lane, provenance, result }]),
+        const capturedParams = captureRequestParams(params)
+        return prepareCodeActionProvenance(lane, capturedParams, options.signal).then(
+          (provenance) =>
+            this.requestSingle(lane, method, capturedParams, options, [], (result) =>
+              this.mergeArrayResults('codeActions', [{ lane, provenance, result }]),
+            ),
         ) as Promise<TResult>
       }
 
@@ -303,10 +306,14 @@ export class LanguageServerSet {
     params: TParams | undefined,
     options: LspRequestOptions,
   ): Promise<readonly LanguageServerLaneResult[]> {
+    const capturedParams = feature === 'codeActions' ? captureRequestParams(params) : params
     const requests = this.ready(feature, method).map(async (lane) => {
       try {
-        const provenance = feature === 'codeActions' ? codeActionProvenance(lane) : undefined
-        const result = await lane.connection.client.request(method, params, options)
+        const provenance =
+          feature === 'codeActions'
+            ? await prepareCodeActionProvenance(lane, capturedParams, options.signal)
+            : undefined
+        const result = await lane.connection.client.request(method, capturedParams, options)
         lane.onInteractiveReady?.()
         return { lane, provenance, result }
       } catch (error) {
@@ -499,6 +506,33 @@ function isAbortError(error: unknown): boolean {
   return isRecord(error) && error.name === 'LspRequestCancelledError'
 }
 
+async function prepareCodeActionProvenance(
+  lane: LanguageServerSetLane,
+  params: unknown,
+  signal?: AbortSignal,
+): Promise<LanguageServerCodeActionProvenance> {
+  const uri =
+    isRecord(params) && isRecord(params.textDocument) && typeof params.textDocument.uri === 'string'
+      ? params.textDocument.uri
+      : null
+  if (uri) {
+    const prepared = lane.connection.workspace.prepareDocumentRequest(uri, signal)
+    if (prepared.kind === 'pending') {
+      const read = await prepared.ready
+      if (!read.isCurrent())
+        throw new DOMException('Code action source was superseded', 'AbortError')
+    }
+    if (prepared.kind === 'ready' && !prepared.read.isCurrent())
+      throw new DOMException('Code action source was superseded', 'AbortError')
+  }
+  return codeActionProvenance(lane)
+}
+
+function captureRequestParams(params: unknown): unknown {
+  const captured: unknown = JSON.parse(JSON.stringify({ params }))
+  return isRecord(captured) ? captured.params : undefined
+}
+
 function codeActionProvenance(lane: LanguageServerSetLane): LanguageServerCodeActionProvenance {
   return {
     guard: captureWorkspaceEditOriginGuard(lane.connection.workspace),
@@ -513,6 +547,8 @@ export function captureWorkspaceEditOriginGuard(workspace: LspWorkspace): Worksp
         textSnapshot: document.textSnapshot,
         uri: document.uri,
         version: document.version,
+        sourceRevision: document.sourceRevision,
+        sourceSegment: document.sourceSegment,
       }),
     ),
   )
@@ -529,7 +565,8 @@ export function captureWorkspaceEditOriginGuard(workspace: LspWorkspace): Worksp
       return (
         current.uri === captured.uri &&
         current.version === captured.version &&
-        current.textSnapshot === captured.textSnapshot
+        current.sourceRevision === captured.sourceRevision &&
+        current.sourceSegment === captured.sourceSegment
       )
     },
   })

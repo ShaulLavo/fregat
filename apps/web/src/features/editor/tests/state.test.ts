@@ -1,3 +1,4 @@
+import { preparedDocumentLease } from '../../../../test/factories/prepared-document'
 import { testWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { allEditorTabs, activeEditorTab as selectedGroupTab } from '@/lib/documents/utils/groups'
 import {
@@ -14,15 +15,8 @@ import { filesystemPath, tabId as testTabId } from '@/lib/documents/utils/identi
 import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
 import { QueryClient } from '@tanstack/react-query'
-import {
-  createEditorBufferSession,
-  createEditorTextBuffer,
-  type EditorTextBuffer,
-} from '@singapore-editor/core/document'
-import {
-  createEditorDocumentAnalysis,
-  type EditorPreparedDocument,
-} from '@singapore-editor/core/editor'
+import { createEditorBufferSession, type EditorTextBuffer } from '@singapore-editor/core/document'
+import { type EditorPreparedDocument } from '@singapore-editor/core/editor'
 import { describe, vi } from 'vitest'
 import { expect, test } from '../../../../test/fixtures'
 import {
@@ -777,21 +771,6 @@ function fileOpenIntentService(
   owner.setRoot(filesystemPath('/repo'))
   owner.connect()
   return { owner, prepare, service: owner.service }
-}
-
-function preparedDocumentLease(): EditorPreparedDocument {
-  return {
-    dispose: vi.fn(),
-    estimatedBytes: 1,
-    fallbackReady: Promise.resolve(true),
-    runtimeSessionIds: () => ({ highlighter: [], structural: [] }),
-    startStage: vi.fn(() => null),
-    borrow: vi.fn(() => null),
-    analysis: createEditorDocumentAnalysis({
-      buffer: createEditorTextBuffer(''),
-      documentId: 'prepared-test',
-    }),
-  }
 }
 
 function pickedDirectory(path: string): WorkspaceRootFolder {

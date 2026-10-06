@@ -9,6 +9,7 @@ import {
   awaitRetentionAcceptanceReady,
   retentionAcceptanceReference,
   retentionAcceptanceBinding,
+  type RetentionAcceptanceReadyDiagnostics,
 } from '../../../../test/factories/retention-acceptance-paint'
 import {
   captureRetentionAcceptanceProjection,
@@ -25,6 +26,12 @@ const fixture =
   '0123456789abcdef'.repeat(30) +
   '"\n'
 
+declare module 'vitest' {
+  interface TaskMeta {
+    retentionMappingReadinessFailure?: unknown
+  }
+}
+
 test.for(['folded', 'wrapped'] as const)(
   '$0 mapping uses real source/view chunks and rejects offset, coverage, style and identity negatives',
   { timeout: 30_000 },
@@ -32,7 +39,19 @@ test.for(['folded', 'wrapped'] as const)(
     const app = await mountRetentionAcceptanceApp()
     await ensureFileSnapshotQuery(app.queryClient, path)
     expect(await app.read().commands.openFileSurface(path)).toMatchObject({ status: 'applied' })
-    await awaitRetentionAcceptanceReady(app, path)
+    const diagnostics: RetentionAcceptanceReadyDiagnostics = {}
+    try {
+      await awaitRetentionAcceptanceReady(app, path, diagnostics)
+    } catch (error) {
+      try {
+        const evidence = { arm, phase: 'opened', lastPoll: diagnostics.last ?? null }
+        context.task.meta.retentionMappingReadinessFailure = evidence
+        const packet = JSON.stringify(evidence)
+        console.info(`retention-mapping-readiness-failure ${packet}`)
+        await context.annotate(packet, 'retention-mapping-readiness-failure')
+      } catch {}
+      throw error
+    }
     const tab = activeEditorTab(app.read().workspace.getState().workbenchPanels.editorGroups)
     expect(tab).not.toBeNull()
     if (!tab) return

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -8,7 +8,7 @@ const output = resolve(root, 'docs/document-contributions/consumer-inventory.tsv
 const patterns = {
   publish: String.raw`this\.publish\(|private publish\(|\bemitChange\(|this\.changes\.fire\(|notifyChangeWithTiming\(|sessionOptions\.onChange\?\.\(`,
   subscribe: String.raw`[bB]uffer\)?\??\.subscribe\(|handleEditorChange\??\.?\(|viewContributions\.notify\(|subscribeDocumentChanges|onDidChangeContent`,
-  session: String.raw`\bcreateSession\b|\bcreateSyntaxSession\b|\bcreateHighlighterSession\b|borrow(Structural|Highlighter)\(|createEditorDocumentAnalysis\(|createEditorPreparedDocument\(|setEditorSyntaxSessionFactory|new (TreeSitterSyntaxSession|ShikiWorkerHighlighterSession|MinimapWorkerClient|Worker)\(|createLanguageServerDocument\(|new LanguageServerDocument\(|createTypeScriptLanguageServer`,
+  session: String.raw`\bcreateSession\b|\bcreateSyntaxSession\b|\bcreateHighlighterSession\b|borrow(Structural|Highlighter)\(|createEditorDocumentAnalysis\(|createEditorPreparedDocument\(|(?:createEditor(?:Structural|Highlighter)Operation|define(?:Document|Structural|Highlighter)Operation|create(?:TreeSitter|Shiki)WorkerOwner)\(|setEditorSyntaxSessionFactory|new (TreeSitterSyntaxSession|ShikiWorkerHighlighterSession|MinimapWorkerClient|Worker)\(|createLanguageServerDocument\(|new LanguageServerDocument\(|createTypeScriptLanguageServer`,
   message: String.raw`\.postMessage\(|type: '(open|edit|parse|queryRange|openDocument|replaceDocument|applyEdit|applyEdits|disposeDocument|runtimeBarrier)'|textDocument/did(Open|Change|Close|Save)`,
   materialize: String.raw`materialize(FullText|PieceTableFullText)\(|\.readRange\(|readPieceTableTextRange\(|forEachTextChunk\(|streamPieceTableTextChunks\(|forEachTextInRange\(|diffPieceTableSnapshots\(|createTextDiff\(|textSnapshotEqualsText\(|pieceTableSnapshotsHaveSameText\(|\.getText\(\)|debugPieceTable\(|forEachBufferSpan\(`,
   cursor: String.raw`changesSinceDocumentSyncPoint\(|getDocumentSyncPoint\(|getCurrentDocumentSnapshot\(|\.changesSince\(|changesBetween\(`,
@@ -19,14 +19,19 @@ const roots = ['editor/packages', 'editor/examples', 'apps', 'packages']
 const sources = readSources()
 
 function readSources() {
-  const files = execFileSync('git', ['ls-files', '--cached', '-z', '--', ...roots], {
-    cwd: root,
-    encoding: 'utf8',
-  })
+  const files = execFileSync(
+    'git',
+    ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', ...roots],
+    {
+      cwd: root,
+      encoding: 'utf8',
+    },
+  )
     .split('\0')
     .filter(isSource)
+    .filter((file) => existsSync(resolve(root, file)))
     .sort(sourceOrder)
-  return files.map((file) => ({
+  return [...new Set(files)].map((file) => ({
     file,
     lines: readFileSync(resolve(root, file), 'utf8').split('\n'),
   }))
@@ -59,6 +64,15 @@ function ownership(file) {
     )
   )
     return 'core mutation'
+  if (/editor\/packages\/editor\/src\/document\//.test(file)) return 'document contribution'
+  if (
+    /editor\/packages\/editor\/src\/editor\/(documentDelivery|contributionOperation|contributionDemand)/.test(
+      file,
+    )
+  )
+    return 'document contribution'
+  if (/editor\/packages\/editor\/src\/editor\/syntaxController/.test(file))
+    return 'view presentation'
   if (/editor\/packages\/(tree-sitter|lsp|lsp-plugin|typescript-lsp|diff)\//.test(file))
     return 'domain adapter'
   if (/editor\/packages\/editor\/src\/shiki\//.test(file)) return 'domain adapter'

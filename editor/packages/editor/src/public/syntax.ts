@@ -39,6 +39,7 @@ export type {
   EditorSyntaxResultOptions,
   EditorSyntaxServiceRequest,
   EditorSyntaxSession,
+  EditorSyntaxRuntime,
   EditorSyntaxFoldingSupport,
   EditorSyntaxSessionOptions,
   EditorSyntaxSnapshotTag,

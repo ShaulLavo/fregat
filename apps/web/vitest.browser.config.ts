@@ -77,6 +77,9 @@ export default defineConfig({
     // The tree's own browser tests run alone, in vitest.tree-browser.config.ts.
     exclude: [
       'src/features/editor/tests/retention-acceptance-reload.browser.tsx',
+      // Settings writers share one fixture server and run serially in their own project.
+      'src/features/editor/tests/syntax-settings.browser.tsx',
+      'src/features/editor/tests/retention-acceptance-identity.browser.tsx',
       'src/features/workspace/tests/tree-view*.browser.tsx',
       'src/features/workspace/tests/tree-parity-*.browser.tsx',
     ],

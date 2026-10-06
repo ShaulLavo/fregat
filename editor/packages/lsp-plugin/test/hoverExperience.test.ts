@@ -556,6 +556,8 @@ function activeDocument(text = 'const value = 1'): ActiveDocument {
     ...snapshotDocument(text),
     textVersion: 1,
     lspVersion: 1,
+    sourceRevision: 1,
+    sourceSegment: Object.freeze({}),
   }
 }
 

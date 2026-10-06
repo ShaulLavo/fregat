@@ -1,4 +1,4 @@
-import { WORKSPACE_CACHE_STORAGE_KEYS } from '@/features/workspace/state/cache'
+import { WORKSPACE_CACHE_STORAGE_KEYS } from '@/lib/workspace-cache-keys'
 import { BOOT_MIRROR_KEY, PALETTE_BOOT_KEY } from '@/lib/boot-keys'
 
 /**

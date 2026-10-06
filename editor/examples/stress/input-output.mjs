@@ -1,5 +1,6 @@
 import { fail } from './errors.mjs'
 import { inputConsumerConfiguration } from './input-configurations.mjs'
+import { admittedDormantMinimap } from './input-source-current.mjs'
 
 const syntaxHighlight = /^editor-shared-token-/
 
@@ -93,12 +94,42 @@ export function assertConsumerReadiness(
   // Every live minimap worker, one per view, holds the current text and rendered after its last
   // source update; a sum over workers could hide one stale view.
   const receipts = readiness.minimaps ?? []
+  const canonicalViews = new Set(
+    receipts.filter((receipt) => receipt.protocol === 'canonical').map((receipt) => receipt.viewId),
+  )
+  check(
+    canonicalViews.size === receipts.filter((receipt) => receipt.protocol === 'canonical').length,
+    'canonical minimap view identities collide',
+  )
   check(
     receipts.length === minimaps.length,
     `minimap receipts ${receipts.length} for ${minimaps.length} workers`,
   )
   for (const [index, receipt] of receipts.entries()) {
-    if (!(pendingMinimapSource && opened && fixture === 'short-lines' && scenario === 'undo'))
+    if (receipt.protocol === 'canonical') {
+      const viewIndex =
+        typeof receipt.viewId === 'string' && /^view-\d+$/.test(receipt.viewId)
+          ? Number(receipt.viewId.slice(5))
+          : -1
+      check(viewIndex >= 0 && viewIndex < viewCount, `minimap ${index} has no live view identity`)
+      if (receipt.dormant) {
+        check(!readiness.views[viewIndex].visible, `minimap ${index} is dormant in a visible view`)
+        check(
+          admittedDormantMinimap(readiness, receipt),
+          `minimap ${index} has unsettled hidden source or render demand`,
+        )
+        continue
+      }
+    }
+    if (
+      !(
+        receipt.protocol !== 'canonical' &&
+        pendingMinimapSource &&
+        opened &&
+        fixture === 'short-lines' &&
+        scenario === 'undo'
+      )
+    )
       check(receipt.current, `minimap ${index} holds text that differs from the document`)
     check(
       receipt.renderedAfterSource,

@@ -33,7 +33,7 @@
     "build": "bun ../../scripts/build-package.ts",
     "bench:update": "bun bench/update.ts",
     "bench:browser": "node bench/browser-runner.mjs",
-    "test": "vitest run && vitest run --browser.enabled --browser.headless test/workerClient.browser.test.ts test/renderer.browser.test.ts test/wheelScroll.browser.test.ts",
+    "test": "vitest run && vitest run --browser.enabled --browser.headless test/workerClient.browser.test.ts test/renderer.browser.test.ts test/wheelScroll.browser.test.ts test/documentSource.browser.test.ts test/documentIntegration.browser.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
     "format": "oxfmt --write .",

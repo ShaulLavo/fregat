@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest'
-import { TreeSitterWorkerClient, canUseTreeSitterWorker } from '../src'
+import { TreeSitterWorkerClient } from '../src/treeSitter/workerClient'
+import { canUseTreeSitterWorker } from '../src'
 
 it('reports null retention when workers are unsupported without starting one', async () => {
   expect(canUseTreeSitterWorker()).toBe(false)

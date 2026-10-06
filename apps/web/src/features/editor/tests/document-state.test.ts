@@ -1,6 +1,7 @@
+import { preparedDocumentLease } from '../../../../test/factories/prepared-document'
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { testDocumentKey, testScrollPositions } from '../../../../test/factories/document-targets'
-import { describe, vi } from 'vitest'
+import { describe } from 'vitest'
 
 import { expect, test as it } from '../../../../test/fixtures'
 
@@ -22,7 +23,6 @@ import {
 import {
   createEditorDocumentAnalysis,
   createEditorPreparedDocument,
-  type EditorPreparedDocument,
 } from '@singapore-editor/core/editor'
 
 describe('editor document store state identity', () => {
@@ -855,21 +855,6 @@ function fileResult(path: string): FileResult {
     path: filesystemPath(path),
     size: 20,
     version: `test:${path}`,
-  }
-}
-
-function preparedDocumentLease(): EditorPreparedDocument {
-  return {
-    dispose: vi.fn(),
-    estimatedBytes: 1,
-    fallbackReady: Promise.resolve(true),
-    runtimeSessionIds: () => ({ highlighter: [], structural: [] }),
-    startStage: vi.fn(() => null),
-    borrow: vi.fn(() => null),
-    analysis: createEditorDocumentAnalysis({
-      buffer: createEditorTextBuffer(''),
-      documentId: 'prepared-test',
-    }),
   }
 }
 

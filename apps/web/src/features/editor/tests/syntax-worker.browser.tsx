@@ -6,17 +6,13 @@ import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { fetchFile } from '@/lib/file-server'
 import { getClient } from '@/lib/client'
 import { createClientInvariantError } from '@/lib/structured-errors'
-import { createEditorRuntimeSessionId } from '@singapore-editor/core/syntax'
 import { createEditorLoggingPlugin, type EditorLogEvent } from '@singapore-editor/core/logging'
-import { Editor } from '@singapore-editor/core/editor'
-import {
-  createEditorBufferSession,
-  createPieceTableSnapshot,
-} from '@singapore-editor/core/document'
+import { Editor, createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
+import { createEditorBufferSession, createEditorTextBuffer } from '@singapore-editor/core/document'
 import { createHighlightingPlugin, createHighlightingService } from '@singapore-editor/highlighting'
 import {
-  resolveTreeSitterLanguageContribution,
-  TreeSitterWorkerClient,
+  createTreeSitterSyntaxProvider,
+  createTreeSitterWorkerOwner,
 } from '@singapore-editor/tree-sitter'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
 import { resolveEditorShikiThemeRegistration } from '@/features/editor/state/color-theme-store'
@@ -24,35 +20,30 @@ import { createPlatformEditorLoggingPlugin } from '@/features/editor/utils/plugi
 import { clientLoggingEnabled, initializeClientLogging } from '@/lib/client-logging'
 
 test('parses chat-model.ts through the editor Tree-sitter worker', async () => {
-  const workerClient = new TreeSitterWorkerClient()
+  const workerOwner = createTreeSitterWorkerOwner()
+  const provider = createTreeSitterSyntaxProvider({ workerOwner })
+  for (const language of TREE_SITTER_LANGUAGE_CONTRIBUTIONS) provider.registerLanguage(language)
+  const buffer = createEditorTextBuffer(chatModelSource)
+  const analysis = createEditorDocumentAnalysis({
+    buffer,
+    documentId: 'packages/contracts/src/chat-model.ts',
+  })
+  const lease = analysis.borrowStructural({
+    provider,
+    languageId: 'typescript',
+    includeHighlights: true,
+    includeCaptures: false,
+    syntaxMode: 'range',
+  })!
   try {
-    await registerDefaultLanguages(workerClient)
-    const snapshot = createPieceTableSnapshot(chatModelSource)
-    const runtimeSessionId = createEditorRuntimeSessionId()
-    const parsed = await workerClient.parse({
-      documentId: 'packages/contracts/src/chat-model.ts',
-      runtimeSessionId,
-      snapshotVersion: 1,
-      languageId: 'typescript',
-      resultMode: 'parseOnly',
-      snapshot,
-    })
-    const queried = await workerClient.queryRange({
-      documentId: 'packages/contracts/src/chat-model.ts',
-      runtimeSessionId,
-      snapshotVersion: 1,
-      languageId: 'typescript',
-      includeCaptures: false,
-      includeHighlights: true,
-      range: { startIndex: 0, endIndex: chatModelSource.length },
-    })
-
-    expect(parsed?.snapshotVersion).toBe(1)
-    // Range responses ship tokens as packed typed arrays (SoA transport);
-    // the plain tokens field is no longer populated on the wire.
-    expect(queried?.tokensPacked?.starts.length ?? 0).toBeGreaterThan(0)
+    const parsed = await lease.refresh(buffer.getTextSnapshot())
+    const queried = await lease.queryRange!({ startIndex: 0, endIndex: chatModelSource.length })
+    expect(parsed.projection.snapshot.version).toBeGreaterThan(0)
+    expect(queried.tokens.length).toBeGreaterThan(0)
   } finally {
-    await workerClient.dispose()
+    lease.dispose()
+    analysis.dispose()
+    await workerOwner.dispose()
   }
 })
 
@@ -157,13 +148,4 @@ function appliedHighlightTokenCount(events: readonly EditorLogEvent[]): number {
   const event = events.findLast((event) => event.action === 'editor.syntax.highlight_applied')
   const syntax = event?.syntax as { readonly tokenCount?: unknown } | undefined
   return typeof syntax?.tokenCount === 'number' ? syntax.tokenCount : 0
-}
-
-async function registerDefaultLanguages(workerClient: TreeSitterWorkerClient): Promise<void> {
-  const languages = await Promise.all(
-    TREE_SITTER_LANGUAGE_CONTRIBUTIONS.map((contribution) =>
-      resolveTreeSitterLanguageContribution(contribution),
-    ),
-  )
-  await workerClient.registerLanguages(languages)
 }

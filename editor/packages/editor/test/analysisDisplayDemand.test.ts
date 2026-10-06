@@ -1,3 +1,4 @@
+import { createEditorStructuralOperation } from '../src/editor/operationDefinitions'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createEditorBufferSession,
@@ -11,7 +12,7 @@ import {
   createEmptySyntaxResult,
   createEmptySyntaxSession,
   type EditorSyntaxProvider,
-  type EditorSyntaxSession,
+  type EditorSyntaxRuntime,
   type FoldRange,
   type EditorSyntaxRange,
 } from '../src/syntax/session'
@@ -40,11 +41,12 @@ describe('analysis display demand', () => {
       const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'reentrant.ts' })
       const result = createEmptySyntaxResult()
       const provider: EditorSyntaxProvider = {
-        createSession: () => ({
+        operation: createEditorStructuralOperation(() => ({
+          analyze: async () => createEmptySyntaxResult(),
           ...createEmptySyntaxSession(),
           foldingSupport: 'supported',
           queryRange: async () => result,
-        }),
+        })),
       }
       const host = document.createElement('div')
       document.body.appendChild(host)
@@ -169,17 +171,18 @@ describe('analysis display demand', () => {
     }
     const result = { ...createEmptySyntaxResult(), folds: [fold] }
     const queryRange = vi.fn(async () => result)
+    const providerOpenRuntime = vi.fn((): EditorSyntaxRuntime => ({
+      foldingSupport: 'supported',
+      analyze: async () => result,
+
+      queryRange,
+      getResult: () => result,
+      getTokens: () => result.tokens,
+      getSnapshotVersion: () => 0,
+      dispose: () => undefined,
+    }))
     const provider: EditorSyntaxProvider = {
-      createSession: vi.fn((): EditorSyntaxSession => ({
-        foldingSupport: 'supported',
-        refresh: async () => result,
-        applyChange: async () => result,
-        queryRange,
-        getResult: () => result,
-        getTokens: () => result.tokens,
-        getSnapshotVersion: () => 0,
-        dispose: () => undefined,
-      })),
+      operation: createEditorStructuralOperation(providerOpenRuntime),
     }
     const warm = analysis.borrowStructural({
       provider,
@@ -261,7 +264,7 @@ describe('analysis display demand', () => {
       editors[0]!.dispose()
       editors.shift()
       assertFrames()
-      expect(provider.createSession).toHaveBeenCalledTimes(1)
+      expect(providerOpenRuntime).toHaveBeenCalledTimes(1)
     } finally {
       editors.forEach((editor) => editor.dispose())
       hosts.forEach((host) => host.remove())

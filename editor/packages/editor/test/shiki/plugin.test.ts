@@ -1,358 +1,265 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestPluginContext } from '../../src/testContexts'
-
-import { createDocumentTextSnapshot, createPieceTableSnapshot } from '../../src'
-import type { EditorPlugin } from '../../src/plugins'
-import type { EditorDisposable } from '../../src/editor/disposables'
+import { createEditorTextBuffer } from '../../src/documentSession'
+import {
+  createEditorDocumentAnalysis,
+  type EditorDocumentAnalysis,
+} from '../../src/editor/documentAnalysis'
+import { DocumentWorkerReader } from '../../src/document/workerReader'
+import { packEditorTokens } from '../../src/syntax/packedTokens'
 import type { EditorHighlighterProvider } from '../../src/syntax/highlighter'
+import type { EditorPlugin } from '../../src/plugins'
 import {
   createShikiHighlighterPlugin,
   createShikiHighlighterProvider,
   shikiLanguageForDocument,
   type ShikiHighlighterPluginOptions,
-  type ShikiHighlighterSessionOptions,
-  type ShikiWorkerOwner,
 } from '../../src/shiki'
+import { createShikiWorkerOwner, ShikiWorkerOwner } from '../../src/shiki/workerClient'
+import type {
+  ShikiWorkerRequest,
+  ShikiWorkerResponse,
+  ShikiWorkerOpenRequest,
+} from '../../src/shiki/workerTypes'
 
-const workerOwner = vi.hoisted(() => ({
-  canUseWorker: vi.fn(() => true),
-  createSession: vi.fn(() => null),
-  dispose: vi.fn(async () => undefined),
-  loadTheme: vi.fn(),
-}))
-const createShikiWorkerOwner = vi.hoisted(() => vi.fn(() => workerOwner))
-const DEFAULT_SHIKI_WORKER_OWNER_KEY = Symbol.for(
-  '@singapore-editor/core/shiki/default-worker-owner',
-)
+const defaultOwnerKey = Symbol.for('@singapore-editor/core/shiki/default-worker-owner')
+const workers: ConfigurationWorker[] = []
+const analyses: EditorDocumentAnalysis[] = []
+const owners = new Set<ShikiWorkerOwner>()
 
-vi.mock('../../src/shiki/workerClient', () => ({
-  createShikiWorkerOwner,
-}))
+class ConfigurationWorker extends EventTarget implements Worker {
+  readonly reader = new DocumentWorkerReader()
+  readonly requests: ShikiWorkerRequest[] = []
+  onmessage: Worker['onmessage'] = null
+  onerror: Worker['onerror'] = null
+  onmessageerror: Worker['onmessageerror'] = null
+  constructor() {
+    super()
+    workers.push(this)
+  }
+  postMessage(request: ShikiWorkerRequest): void {
+    this.requests.push(request)
+    const payload = request.payload
+    const result =
+      payload.type === 'source'
+        ? { source: this.reader.apply(payload.command) }
+        : payload.type === 'open' || payload.type === 'edit'
+          ? { tokensPacked: packEditorTokens([]) }
+          : undefined
+    const reply: ShikiWorkerResponse = { id: request.id, ok: true, result }
+    queueMicrotask(() => this.onmessage?.call(this, new MessageEvent('message', { data: reply })))
+  }
+  terminate(): void {
+    this.reader.dispose()
+  }
+}
 
-describe('createShikiHighlighterPlugin', () => {
-  beforeEach(() => {
-    delete (globalThis as Record<PropertyKey, unknown>)[DEFAULT_SHIKI_WORKER_OWNER_KEY]
-    createShikiWorkerOwner.mockClear()
-    workerOwner.canUseWorker.mockClear()
-    workerOwner.canUseWorker.mockReturnValue(true)
-    workerOwner.createSession.mockClear()
-    workerOwner.dispose.mockClear()
-    workerOwner.loadTheme.mockClear()
+beforeEach(() => {
+  Reflect.deleteProperty(globalThis, defaultOwnerKey)
+  vi.stubGlobal('Worker', ConfigurationWorker)
+})
+afterEach(async () => {
+  for (const analysis of analyses.splice(0)) analysis.dispose()
+  const shared: unknown = Reflect.get(globalThis, defaultOwnerKey)
+  if (shared instanceof ShikiWorkerOwner) owners.add(shared)
+  for (const owner of owners) await owner.dispose()
+  owners.clear()
+  workers.length = 0
+  Reflect.deleteProperty(globalThis, defaultOwnerKey)
+  vi.unstubAllGlobals()
+})
+
+function options(
+  overrides: Partial<ShikiHighlighterPluginOptions> = {},
+): ShikiHighlighterPluginOptions {
+  return {
+    resolveLanguage: async (name) => [
+      { name, patterns: [], repository: {}, scopeName: `source.${name}` },
+    ],
+    resolveTheme: async (name) => ({ name }),
+    ...overrides,
+  }
+}
+function activate(overrides: Partial<ShikiHighlighterPluginOptions> = {}) {
+  const registered: EditorHighlighterProvider[] = []
+  const context = createTestPluginContext({
+    registerHighlighter: (next) => {
+      registered.push(next)
+      return { dispose: () => {} }
+    },
   })
+  createShikiHighlighterPlugin(options(overrides)).activate(context)
+  const provider = registered.at(-1)
+  if (!provider) throw new TypeError('The plugin must register its typed highlighter operation')
+  return provider
+}
+function defaultOwner(): ShikiWorkerOwner {
+  const owner: unknown = Reflect.get(globalThis, defaultOwnerKey)
+  if (!(owner instanceof ShikiWorkerOwner))
+    throw new TypeError('The activated plugin must retain its default owner')
+  return owner
+}
+function explicitOwner() {
+  const owner = createShikiWorkerOwner()
+  owners.add(owner)
+  return owner
+}
+function borrow(
+  provider: EditorHighlighterProvider,
+  documentId = 'index.ts',
+  languageId = 'typescript',
+) {
+  const buffer = createEditorTextBuffer('const value = 1')
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId })
+  analyses.push(analysis)
+  const session = analysis.borrowHighlighter({ provider, languageId })
+  if (!session) throw new TypeError('The configured worker must admit its highlighter')
+  return { session, buffer }
+}
+async function opened(
+  provider: EditorHighlighterProvider,
+  documentId?: string,
+  languageId?: string,
+): Promise<ShikiWorkerOpenRequest> {
+  const { session, buffer } = borrow(provider, documentId, languageId)
+  await session.refresh(buffer.getTextSnapshot())
+  const payload = workers
+    .flatMap((worker) => worker.requests)
+    .findLast((request) => request.payload.type === 'open')?.payload
+  if (payload?.type !== 'open')
+    throw new TypeError('The operation must dispatch an open to its external worker')
+  return payload
+}
+function disposables(result: ReturnType<EditorPlugin['activate']>) {
+  return !result ? [] : 'dispose' in result ? [result] : result
+}
 
-  it('maps .tsx TypeScript documents to Shiki TSX', () => {
-    const provider = activateHighlighterProvider()
-    const text = 'const el = <div className="x" />'
-
-    provider.createSession({
-      documentId: 'App.tsx',
-      languageId: 'typescript',
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
-      snapshot: createPieceTableSnapshot(text),
-    })
-
-    expect(workerOwner.createSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        lang: 'tsx',
-      }),
-    )
+describe('Shiki plugin contributions', () => {
+  it.each([
+    ['App.tsx', 'typescript', 'tsx'],
+    ['App.tsx#diff-old', 'typescript', 'tsx'],
+    ['App.jsx', 'javascript', 'jsx'],
+    ['index.ts', 'typescript', 'typescript'],
+  ])('routes %s / %s to %s through a retained operation', async (documentId, languageId, lang) => {
+    expect((await opened(activate(), documentId, languageId)).lang).toBe(lang)
   })
-
-  it('keeps the source extension when a secondary view adds a document fragment', () => {
-    const provider = createShikiHighlighterProvider(pluginOptions())
-    const text = 'const el = <div />'
-
-    provider.createSession({
-      documentId: 'App.tsx#diff-old',
-      languageId: 'typescript',
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
-      snapshot: createPieceTableSnapshot(text),
-    })
-
-    expect(workerOwner.createSession).toHaveBeenCalledWith(expect.objectContaining({ lang: 'tsx' }))
+  it('keeps an explicit language override ahead of extension inference', async () => {
+    expect(
+      (await opened(activate({ languages: { typescript: 'typescript' } }), 'App.tsx')).lang,
+    ).toBe('typescript')
   })
-
-  it('creates a provider that can be shared without activating an editor plugin', () => {
-    const provider = createShikiHighlighterProvider(pluginOptions())
-    const text = 'const value = 1'
-
-    provider.createSession({
-      documentId: 'index.ts',
-      languageId: 'typescript',
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
-      snapshot: createPieceTableSnapshot(text),
-    })
-
-    expect(workerOwner.createSession).toHaveBeenCalledTimes(1)
+  it('shares a provider without activating an editor plugin', async () => {
+    const owner = explicitOwner()
+    const provider = createShikiHighlighterProvider(options({ workerOwner: owner }))
+    expect((await opened(provider)).lang).toBe('typescript')
+    expect(owner.inspect().workerGeneration).toBe(1)
   })
-
-  it('maps .jsx JavaScript documents to Shiki JSX', () => {
-    const provider = activateHighlighterProvider()
-    const text = 'const el = <div className="x" />'
-
-    provider.createSession({
-      documentId: 'App.jsx',
-      languageId: 'javascript',
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
-      snapshot: createPieceTableSnapshot(text),
-    })
-
-    expect(workerOwner.createSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        lang: 'jsx',
-      }),
-    )
-  })
-
-  it('keeps explicit language overrides ahead of extension inference', () => {
-    const provider = activateHighlighterProvider({
-      languages: { typescript: 'typescript' },
-    })
-    const text = 'const el = <div className="x" />'
-
-    provider.createSession({
-      documentId: 'App.tsx',
-      languageId: 'typescript',
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
-      snapshot: createPieceTableSnapshot(text),
-    })
-
-    expect(workerOwner.createSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        lang: 'typescript',
-      }),
-    )
-  })
-
-  it('reuses one default worker owner across activations', () => {
-    const first = activateHighlighterProvider({
+  it('reuses the default owner across distinct plugin activations', () => {
+    const first = activate({
       preloadLanguages: ['typescript', 'tsx'],
       preloadThemes: ['github-dark'],
     })
-    const second = activateHighlighterProvider({
+    const owner = defaultOwner()
+    const second = activate({
       preloadLanguages: ['tsx', 'typescript'],
       preloadThemes: ['github-dark'],
     })
-
-    expect(createShikiWorkerOwner).toHaveBeenCalledTimes(1)
-    expect(second).not.toBe(first)
+    expect(defaultOwner()).toBe(owner)
+    expect(first.operation).not.toBe(second.operation)
   })
-
-  it('keeps the default worker owner alive when the plugin disposes', () => {
-    const disposables = activateWithDisposables()
-
-    for (const disposable of disposables) disposable.dispose()
-
-    expect(workerOwner.dispose).not.toHaveBeenCalled()
+  it.each(['default', 'provided'] as const)(
+    'keeps the %s owner alive after plugin disposal',
+    async (kind) => {
+      const owner = kind === 'provided' ? explicitOwner() : undefined
+      const result = createShikiHighlighterPlugin(options({ workerOwner: owner })).activate(
+        createTestPluginContext(),
+      )
+      const retained = owner ?? defaultOwner()
+      for (const disposable of disposables(result)) disposable.dispose()
+      expect(retained.inspect().lifecycle).not.toBe('disposed')
+      expect(
+        (await opened(createShikiHighlighterProvider(options({ workerOwner: retained })))).lang,
+      ).toBe('typescript')
+    },
+  )
+  it('uses a provided owner without creating a default one', async () => {
+    const owner = explicitOwner()
+    await opened(activate({ workerOwner: owner }))
+    expect(owner.inspect().workerGeneration).toBe(1)
+    expect(Reflect.has(globalThis, defaultOwnerKey)).toBe(false)
   })
-
-  it('uses a provided worker owner for sessions without disposing it', () => {
-    const sharedOwner = {
-      canUseWorker: vi.fn(() => true),
-      createSession: vi.fn(() => null),
-      dispose: vi.fn(async () => undefined),
-      loadTheme: vi.fn(),
-    }
-    const provider = activateHighlighterProvider({
-      workerOwner: sharedOwner as unknown as ShikiWorkerOwner,
-    })
-    const text = 'const value = 1'
-
-    provider.createSession({
-      documentId: 'index.ts',
-      languageId: 'typescript',
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
-      snapshot: createPieceTableSnapshot(text),
-    })
-
-    expect(sharedOwner.createSession).toHaveBeenCalledTimes(1)
-    expect(workerOwner.createSession).not.toHaveBeenCalled()
-    expect(createShikiWorkerOwner).not.toHaveBeenCalled()
+  it('delivers the resolved named theme registration', async () => {
+    const theme = { name: 'custom', colors: { 'editor.background': '#101010' }, tokenColors: [] }
+    const result = await opened(activate({ theme: 'custom', resolveTheme: async () => theme }))
+    expect(result).toMatchObject({ theme: 'custom', themeRegistration: theme })
   })
-
-  it('keeps a provided worker owner alive when the plugin disposes', () => {
-    const sharedOwner = {
-      canUseWorker: vi.fn(() => true),
-      createSession: vi.fn(() => null),
-      dispose: vi.fn(async () => undefined),
-      loadTheme: vi.fn(),
-    }
-    const disposables = activateWithDisposables({
-      workerOwner: sharedOwner as unknown as ShikiWorkerOwner,
-    })
-
-    for (const disposable of disposables) disposable.dispose()
-
-    expect(sharedOwner.dispose).not.toHaveBeenCalled()
-    expect(workerOwner.dispose).not.toHaveBeenCalled()
+  it('opens each document with its own grammar after preload completes', async () => {
+    const owner = explicitOwner()
+    const provider = activate({ workerOwner: owner, preloadLanguages: ['json', 'css'] })
+    await opened(provider)
+    await owner.awaitIdleFence()
+    await vi.waitFor(() =>
+      expect(
+        workers
+          .flatMap((worker) => worker.requests)
+          .some((request) => request.payload.type === 'preload'),
+      ).toBe(true),
+    )
+    expect(preloadedLanguageNames()).toEqual(['typescript', 'json', 'css'])
+    const second = await opened(provider, 'second.html', 'html')
+    expect(second.languageRegistrations).toMatchObject([{ name: 'html' }])
   })
-
-  it('passes resolved theme registrations through to worker sessions', async () => {
-    const themeRegistration = {
-      name: 'my-custom-theme',
-      colors: { 'editor.background': '#101010' },
-      tokenColors: [],
-    }
-    const provider = activateHighlighterProvider({
-      theme: 'my-custom-theme',
-      resolveTheme: async () => themeRegistration,
-    })
-    const text = 'const value = 1'
-
-    provider.createSession({
-      documentId: 'index.ts',
-      languageId: 'typescript',
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
-      snapshot: createPieceTableSnapshot(text),
-    })
-
-    const call = workerOwner.createSession.mock.calls.at(-1) as unknown as
-      | [ShikiHighlighterSessionOptions]
-      | undefined
-    const options = call?.[0]
-    expect(options?.theme).toBe('my-custom-theme')
-    await expect(options?.registrations).resolves.toMatchObject({
-      themeRegistration: { name: 'my-custom-theme' },
-    })
-  })
-
-  it('sends a session its own grammar only, even after the preload set has loaded', async () => {
-    const provider = activateHighlighterProvider({ preloadLanguages: ['json', 'css'] })
-    const text = 'const value = 1'
-    const openSession = (documentId: string, languageId: string) => {
-      provider.createSession({
-        documentId,
-        languageId,
-        textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
-        snapshot: createPieceTableSnapshot(text),
-      })
-      const call = workerOwner.createSession.mock.calls.at(-1) as unknown as [
-        ShikiHighlighterSessionOptions,
-      ]
-      return call[0]
-    }
-
-    const first = openSession('first.ts', 'typescript')
-    const preload = first.preloadRegistrations
-    if (typeof preload !== 'function') throw new Error('expected a lazy preload')
-    await expect(preload()).resolves.toMatchObject({
-      languageRegistrations: [{ name: 'typescript' }, { name: 'json' }, { name: 'css' }],
-    })
-
-    const second = openSession('second.html', 'html')
-    const registrations = await second.registrations
-    expect(registrations.languageRegistrations.map((registration) => registration.name)).toEqual([
-      'html',
-    ])
-  })
-
-  it('reads a preload getter when the preload runs, after the session opened', async () => {
+  it('reads the preload getter when warming runs after open', async () => {
     let wanted: readonly string[] = []
-    const provider = activateHighlighterProvider({ preloadLanguages: () => wanted })
-    const text = 'const value = 1'
-    provider.createSession({
-      documentId: 'first.ts',
-      languageId: 'typescript',
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
-      snapshot: createPieceTableSnapshot(text),
-    })
-    const [options] = workerOwner.createSession.mock.calls.at(-1) as unknown as [
-      ShikiHighlighterSessionOptions,
-    ]
+    const owner = explicitOwner()
+    const provider = activate({ workerOwner: owner, preloadLanguages: () => wanted })
+    const { session, buffer } = borrow(provider)
     wanted = ['json']
-
-    const preload = options.preloadRegistrations
-    if (typeof preload !== 'function') throw new Error('expected a lazy preload')
-    await expect(preload()).resolves.toMatchObject({
-      languageRegistrations: [{ name: 'typescript' }, { name: 'json' }],
-    })
+    await session.refresh(buffer.getTextSnapshot())
+    await owner.awaitIdleFence()
+    await vi.waitFor(() =>
+      expect(
+        workers
+          .flatMap((worker) => worker.requests)
+          .some((request) => request.payload.type === 'preload'),
+      ).toBe(true),
+    )
+    expect(preloadedLanguageNames()).toEqual(['typescript', 'json'])
   })
-
-  it('answers the grammar a document would use without opening it', () => {
+  it('answers document grammar selection without opening it', () => {
     expect(shikiLanguageForDocument({ documentId: 'App.tsx', languageId: 'typescript' }, {})).toBe(
       'tsx',
     )
     expect(
       shikiLanguageForDocument(
         { documentId: 'notes.md', languageId: 'markdown' },
-        {
-          markdown: 'mdc',
-        },
+        { markdown: 'mdc' },
       ),
     ).toBe('mdc')
     expect(shikiLanguageForDocument({ documentId: 'a.css', languageId: 'css' }, undefined)).toBe(
       'css',
     )
+    expect(workers).toEqual([])
   })
-
-  it('requires a non-empty name on resolved theme registrations', async () => {
-    const provider = activateHighlighterProvider({
-      resolveTheme: async () => ({ name: '' }),
-    })
-    const text = 'const value = 1'
-
-    provider.createSession({
-      documentId: 'index.ts',
-      languageId: 'typescript',
-      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
-      snapshot: createPieceTableSnapshot(text),
-    })
-
-    const call = workerOwner.createSession.mock.calls.at(-1) as unknown as
-      | [ShikiHighlighterSessionOptions]
-      | undefined
-    const options = call?.[0]
-    await expect(options?.registrations).rejects.toThrow(
+  it('rejects an unnamed resolved theme before worker open', async () => {
+    const { session, buffer } = borrow(activate({ resolveTheme: async () => ({ name: '' }) }))
+    await expect(session.refresh(buffer.getTextSnapshot())).rejects.toThrow(
       'Shiki theme registrations require a non-empty name',
     )
+    expect(
+      workers
+        .flatMap((worker) => worker.requests)
+        .some((request) => request.payload.type === 'open'),
+    ).toBe(false)
   })
 })
 
-function activateHighlighterProvider(
-  options: Partial<ShikiHighlighterPluginOptions> = {},
-): EditorHighlighterProvider {
-  let provider: EditorHighlighterProvider | null = null
-  const context = createTestPluginContext({
-    registerHighlighter: (nextProvider) => {
-      provider = nextProvider
-      return { dispose: () => undefined }
-    },
-  })
-
-  createShikiHighlighterPlugin(pluginOptions(options)).activate(context)
-  if (!provider) throw new Error('Expected Shiki plugin to register a highlighter')
-  return provider
-}
-
-function activateWithDisposables(
-  options: Partial<ShikiHighlighterPluginOptions> = {},
-): readonly EditorDisposable[] {
-  return toDisposables(
-    createShikiHighlighterPlugin(pluginOptions(options)).activate(createTestPluginContext()),
-  )
-}
-
-function pluginOptions(
-  overrides: Partial<ShikiHighlighterPluginOptions> = {},
-): ShikiHighlighterPluginOptions {
-  return {
-    resolveLanguage: async (language) => [languageRegistration(language)],
-    resolveTheme: async (theme) => ({ name: theme }),
-    ...overrides,
-  }
-}
-
-function languageRegistration(name: string) {
-  return {
-    name,
-    patterns: [],
-    repository: {},
-    scopeName: `source.${name}`,
-  }
-}
-
-function toDisposables(result: ReturnType<EditorPlugin['activate']>): readonly EditorDisposable[] {
-  if (!result) return []
-  // `dispose` only exists on the single-disposable arm of the activate() union.
-  return 'dispose' in result ? [result] : result
+function preloadedLanguageNames(): string[] {
+  return workers
+    .flatMap((worker) => worker.requests)
+    .flatMap(({ payload }) =>
+      payload.type === 'preload'
+        ? (payload.languageRegistrations?.map((language) => language.name) ?? [])
+        : [],
+    )
 }
