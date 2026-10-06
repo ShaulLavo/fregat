@@ -1,15 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { Editor } from '@singapore-editor/core/editor'
-import {
-  resetEditorInstanceCount,
-  setEditorSyntaxSessionFactory,
-  setHighlightRegistry,
-} from '@singapore-editor/core/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Editor, createEditorStructuralOperation } from '@singapore-editor/core/editor'
+import { resetEditorInstanceCount, setHighlightRegistry } from '@singapore-editor/core/testing'
 import { createEmptySyntaxResult } from '@singapore-editor/core/syntax'
 import type {
   BracketInfo,
   EditorSyntaxResult,
-  EditorSyntaxSession,
+  EditorSyntaxRuntime,
 } from '@singapore-editor/core/syntax'
 import { createBracketColorsPlugin } from '../src/index'
 
@@ -49,17 +45,25 @@ describe('bracket colours inside a real editor', () => {
     globalThis.Highlight = MockHighlight
     setHighlightRegistry(registry)
     resetEditorInstanceCount()
-    setEditorSyntaxSessionFactory(() => bracketSyntaxSession())
     container = document.createElement('div')
     document.body.appendChild(container)
-    editor = new Editor(container, { plugins: [createBracketColorsPlugin()] })
+    editor = new Editor(container, {
+      plugins: [
+        {
+          activate: (context) =>
+            context.registerSyntaxProvider({
+              operation: createEditorStructuralOperation(() => bracketSyntaxSession()),
+            }),
+        },
+        createBracketColorsPlugin(),
+      ],
+    })
   })
 
   afterEach(() => {
     editor.dispose()
     container.remove()
     setHighlightRegistry(undefined)
-    setEditorSyntaxSessionFactory(undefined)
     document.head.querySelectorAll('style').forEach((element) => element.remove())
   })
 
@@ -105,25 +109,18 @@ function highlightRules(): string {
     .join('\n')
 }
 
-function bracketSyntaxSession(): EditorSyntaxSession {
+function bracketSyntaxSession(): EditorSyntaxRuntime {
   const result: EditorSyntaxResult = { ...createEmptySyntaxResult(), brackets: BRACKETS }
   return {
     foldingSupport: 'supported',
-    applyChange: async () => result,
     dispose: () => undefined,
     getResult: () => result,
     getSnapshotVersion: () => 0,
     getTokens: () => [],
-    refresh: async () => result,
+    analyze: async () => result,
   }
 }
 
 async function flushSyntaxDebounce(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 160))
-  await flushMicrotasks()
-}
-
-async function flushMicrotasks(): Promise<void> {
-  await Promise.resolve()
-  await Promise.resolve()
+  await vi.waitFor(() => expect(levelHighlightNames()).toHaveLength(2))
 }

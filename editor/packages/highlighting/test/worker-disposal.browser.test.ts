@@ -1,5 +1,9 @@
 import { expect, test, vi } from 'vitest'
-import { createShikiWorkerOwner } from '@singapore-editor/core/shiki'
+import {
+  createShikiWorkerOwner,
+  createShikiHighlighterProvider,
+} from '@singapore-editor/core/shiki'
+import { retainHighlighter } from './fixtures/document'
 import { createHighlightingService } from '../src/index'
 
 function busyWorker() {
@@ -43,25 +47,31 @@ test('owner terminates a synchronously busy browser worker and settles its reque
   const { worker, started } = busyWorker()
   const terminate = vi.spyOn(worker, 'terminate')
   const owner = createShikiWorkerOwner({ workerFactory: () => worker })
+  const retained = retainHighlighter(
+    createShikiHighlighterProvider({
+      workerOwner: owner,
+      theme: 'fixture',
+      resolveTheme: async () => ({ name: 'fixture' }),
+      resolveLanguage: async () => [
+        { name: 'typescript', scopeName: 'source.typescript', patterns: [] },
+      ],
+    }),
+    'const a = 1',
+  )
   try {
-    const result = owner
-      .highlight({
-        text: 'const a = 1',
-        lang: 'typescript',
-        theme: 'fixture',
-        languageRegistrations: [],
-        themeRegistration: { name: 'fixture' },
-      })
+    const result = retained.session
+      .refresh(retained.buffer.getTextSnapshot())
       .catch((error: unknown) => error)
     await started
     const idle = owner.awaitIdleFence()
     const disposal = owner.dispose()
     expect(terminate).toHaveBeenCalledOnce()
     await disposal
-    expect(await result).toEqual(new Error('Shiki worker disposed'))
+    expect(await result).toMatchObject({ name: 'AbortError' })
     await idle
     expect(owner.inspect()).toMatchObject({ lifecycle: 'disposed', pendingRequests: 0 })
   } finally {
+    retained.dispose()
     worker.terminate()
   }
 })
@@ -72,8 +82,8 @@ test('service disposal settles callers and idle while its browser worker cannot 
   const service = createHighlightingService({ shikiWorker: () => worker })
   try {
     const result = service
-      .highlight('plain', {
-        language: 'unknown-language',
+      .highlight('const a = 1', {
+        language: 'typescript',
         theme: { format: 'vscode', definition: { name: 'fixture', colors: {}, tokenColors: [] } },
       })
       .catch((error: unknown) => error)

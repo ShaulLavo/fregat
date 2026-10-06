@@ -1,9 +1,11 @@
+import { normalizeDocumentText } from '@singapore-editor/textbuffer'
 import type { TextReadSnapshot } from '../documentTextSnapshot'
 import { forEachTextWindow, forEachTextWindowBackward } from '../textWindows'
 import type { TextEdit } from '../tokens'
 
 /** The one replacement turning `current` into `next`; empty (`from === to`, no text) when equal. */
-export function syncTextEdit(current: TextReadSnapshot, next: string): TextEdit {
+export function syncTextEdit(current: TextReadSnapshot, rawNext: string): TextEdit {
+  const next = normalizeDocumentText(rawNext).text
   const prefixLength = commonPrefixLength(current, next)
   const suffixLength = commonSuffixLength(current, next, prefixLength)
   const currentEnd = current.length - suffixLength

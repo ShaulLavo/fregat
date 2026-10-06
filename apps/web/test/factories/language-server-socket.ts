@@ -40,5 +40,12 @@ export function createLanguageServerSocket() {
         }),
       )
     },
+    request(id: string, method: string, params: unknown) {
+      events.dispatchEvent(
+        new MessageEvent('message', {
+          data: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+        }),
+      )
+    },
   }
 }

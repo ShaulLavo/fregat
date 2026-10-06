@@ -39,6 +39,7 @@ export type LanguageServerLaneCallbacks = {
   onDiagnosticRefresh?(): void
   onReconnecting?(): void
   onPublishDiagnostics?(params: unknown): void
+  beforeReady?(): void | Promise<void>
   onReady?(): void
   onUnavailable?(): void
 }
@@ -127,20 +128,23 @@ export function acquireResolvedLanguageServerLane(
 
   async function finishConnection(): Promise<void> {
     if (released) return
+    const initialization = connection.client.initialization
 
     try {
       for (const notification of options.readyNotifications ?? []) {
         await connection.client.notify(notification.method, notification.params)
-        if (released) return
+        if (released || connection.client.initialization !== initialization) return
       }
 
+      await callbacks.beforeReady?.()
+      if (released || connection.client.initialization !== initialization) return
       usable = true
       options.onStatusChange?.('ready')
       callbacks.onReady?.()
       options.onConnected?.(context)
       ready.resolve(context)
     } catch (error) {
-      if (released) return
+      if (released || connection.client.initialization !== initialization) return
 
       usable = false
       options.onStatusChange?.('error')
@@ -187,7 +191,7 @@ function resolveConnectionOptions(
   }
 }
 
-export function logicalRevisionScopeFor(workspace: LspWorkspace): DocumentLogicalRevisionScope {
+function logicalRevisionScopeFor(workspace: LspWorkspace): DocumentLogicalRevisionScope {
   const current = logicalRevisionScopes.get(workspace)
   if (current) return current
 

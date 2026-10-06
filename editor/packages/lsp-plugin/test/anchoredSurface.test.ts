@@ -56,6 +56,7 @@ describe('the surfaces the plugin puts on screen', () => {
     // The signature surface loads on the first '(' of a session, so the request follows its import.
     await editor.awaitRequest('textDocument/signatureHelp')
     editor.answerSignatureHelp({ signatures: [{ label: 'call(a: number)' }] })
+    await vi.waitUntil(() => openTooltips().length > 0, { interval: 1, timeout: 1000 })
     await flushPromises()
 
     expectAnchoredAt(visibleTooltip(), 20)
@@ -114,6 +115,7 @@ describe('the surfaces the plugin puts on screen', () => {
     // The signature surface loads on the first '(' of a session, so the request follows its import.
     await editor.awaitRequest('textDocument/signatureHelp')
     editor.answerSignatureHelp({ signatures: [{ label: 'call(a: number)' }] })
+    await vi.waitUntil(() => openTooltips().length > 0, { interval: 1, timeout: 1000 })
     await flushPromises()
 
     editor.scroll(30)

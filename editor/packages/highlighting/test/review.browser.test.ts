@@ -1,7 +1,4 @@
-import {
-  createDocumentTextSnapshot,
-  createPieceTableSnapshot,
-} from '@singapore-editor/core/document'
+import { retainHighlighter } from './fixtures/document'
 import type { VscodeThemeRegistration } from '@singapore-editor/core/shiki'
 import {
   createTextDiff,
@@ -67,17 +64,11 @@ describe('content revisions', () => {
     }
     const highlighting = service({ resolveTheme: async () => registration })
     const text = 'const a = 1'
-    const snapshot = createPieceTableSnapshot(text)
-    const textSnapshot = createDocumentTextSnapshot(snapshot, text)
-    const session = highlighting.highlighterProvider(source).createSession({
-      documentId: 'doc.ts',
-      languageId: 'typescript',
-      snapshot,
-      textSnapshot,
-    })!
+    const retained = retainHighlighter(highlighting.highlighterProvider(source), text)
+    const { session, buffer } = retained
     const changed = new Promise<void>((resolve) => session.onDidChangeTheme?.(resolve))
     const keyword = async () => {
-      const { tokens } = await session.refresh(textSnapshot)
+      const { tokens } = await session.refresh(buffer.getTextSnapshot())
       return tokens
         .toTokens()
         .find((token) => token.start === 0)
@@ -90,7 +81,7 @@ describe('content revisions', () => {
       await changed
       expect(await keyword()).toBe('#0000ff')
     } finally {
-      session.dispose()
+      retained.dispose()
     }
   })
 

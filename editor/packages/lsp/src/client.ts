@@ -85,6 +85,7 @@ export class LspClient {
   private state: LspClientState = 'disconnected'
   private nextRequestId = 1
   private initializePromise: Promise<void> | null = null
+  private connectionEpoch = 0
   private syncMode: LspDocumentSyncMode = 'none'
   private syncOpenClose = false
   private syncSave: LspDocumentSaveSync = { enabled: false, includeText: false }
@@ -120,11 +121,12 @@ export class LspClient {
     this.transport = transport
     this.state = 'initializing'
     transport.subscribe(this.receiveMessage)
-    this.initializePromise = this.initialize()
+    this.initializePromise = this.initialize(this.connectionEpoch)
     return this.initializePromise
   }
 
   public disconnect(): void {
+    this.connectionEpoch++
     const transport = this.transport
     if (transport) transport.unsubscribe(this.receiveMessage)
 
@@ -163,14 +165,23 @@ export class LspClient {
     options: RequestOptions = {},
   ): LspRequestHandle<TResult> {
     const id = this.allocateRequestId()
-    let cancelled = false
-    const response = this.sendHandledRequest<TResult>(id, method, params, options, () => cancelled)
+    const cancellation = new AbortController()
+    const signal = options.signal
+      ? AbortSignal.any([options.signal, cancellation.signal])
+      : cancellation.signal
+    const response = this.sendHandledRequest<TResult>(
+      id,
+      method,
+      params,
+      { ...options, signal },
+      () => signal.aborted,
+    )
 
     return {
       id,
       response,
       cancel: () => {
-        cancelled = true
+        cancellation.abort(new LspRequestCancelledError())
         this.abortRequest(id)
       },
     }
@@ -193,14 +204,16 @@ export class LspClient {
   }
 
   public didOpenDocument(document: LspDocument): void {
-    if (this.state !== 'ready') return
+    this.requireDocumentSyncReady()
     if (this.syncedDocuments.has(document.uri)) return
     if (!this.shouldTrackDocumentSync()) return
 
-    this.syncedDocuments.add(document.uri)
-    if (!this.syncOpenClose) return
+    if (!this.syncOpenClose) {
+      this.syncedDocuments.add(document.uri)
+      return
+    }
 
-    this.trySendNotification('textDocument/didOpen', {
+    this.sendNotification('textDocument/didOpen', {
       textDocument: {
         uri: document.uri,
         languageId: document.languageId,
@@ -208,25 +221,26 @@ export class LspClient {
         text: documentPayloadText(document),
       },
     })
+    this.syncedDocuments.add(document.uri)
   }
 
   public didChangeDocument(document: LspDocument, change: LspDocumentChange): void {
-    if (this.state !== 'ready') return
+    this.requireDocumentSyncReady()
     if (this.syncMode === 'none') return
     if (!this.syncedDocuments.has(document.uri)) return
 
-    this.trySendNotification('textDocument/didChange', {
+    this.sendNotification('textDocument/didChange', {
       textDocument: { uri: document.uri, version: document.version },
       contentChanges: this.contentChangesForDocumentChange(document, change),
     })
   }
 
   public didSaveDocument(document: LspDocument): void {
-    if (this.state !== 'ready') return
+    this.requireDocumentSyncReady()
     if (!this.syncSave.enabled) return
     if (!this.syncedDocuments.has(document.uri)) return
 
-    this.trySendNotification('textDocument/didSave', {
+    this.sendNotification('textDocument/didSave', {
       textDocument: { uri: document.uri },
       ...(this.syncSave.includeText ? { text: documentPayloadText(document) } : {}),
     })
@@ -234,25 +248,40 @@ export class LspClient {
 
   public didCloseDocument(document: LspDocument): void {
     if (this.state !== 'ready') return
-    if (!this.syncedDocuments.delete(document.uri)) return
-    if (!this.syncOpenClose) return
+    if (!this.syncedDocuments.has(document.uri)) return
+    if (!this.syncOpenClose || this.transport?.isClosed?.()) {
+      this.syncedDocuments.delete(document.uri)
+      return
+    }
 
-    this.trySendNotification('textDocument/didClose', {
+    this.sendNotification('textDocument/didClose', {
       textDocument: { uri: document.uri },
     })
+    this.syncedDocuments.delete(document.uri)
   }
 
-  private async initialize(): Promise<void> {
+  private requireDocumentSyncReady(): void {
+    if (this.state === 'ready') return
+    throw new DOMException(
+      'Language-server document synchronization requires readiness',
+      'InvalidStateError',
+    )
+  }
+
+  private async initialize(epoch: number): Promise<void> {
+    const transport = this.transport
     try {
       const result = await this.requestInner<lsp.InitializeResult>(
         'initialize',
         this.initializeParams(),
       )
+      if (this.connectionEpoch !== epoch || this.transport !== transport)
+        throw new LspRequestCancelledError()
       this.applyInitializeResult(result)
       this.sendNotification('initialized', {})
       this.workspace.connected()
     } catch (error) {
-      this.state = 'failed'
+      if (this.connectionEpoch === epoch && this.transport === transport) this.state = 'failed'
       throw error
     }
   }
@@ -326,22 +355,64 @@ export class LspClient {
     isCancelled: () => boolean,
   ): Promise<TResult> {
     if (!this.transport) return Promise.reject(new Error('LSP client is not connected'))
-    if (this.state === 'ready')
-      return this.sendReadyHandledRequest(id, method, params, options, isCancelled)
-    return this.awaitInitialization().then(() =>
-      this.sendReadyHandledRequest(id, method, params, options, isCancelled),
-    )
+    const transport = this.transport
+    const initialization = this.initializePromise
+    const epoch = this.connectionEpoch
+    let message: string
+    try {
+      message = JSON.stringify(createRequestMessage(id, method, params))
+    } catch (error) {
+      return Promise.reject(error)
+    }
+    const captured: unknown = JSON.parse(message)
+    const uri =
+      typeof captured === 'object' && captured !== null && 'params' in captured
+        ? textDocumentRequestUri(method, captured.params)
+        : null
+    const send = () => {
+      if (
+        this.connectionEpoch !== epoch ||
+        this.transport !== transport ||
+        this.initializePromise !== initialization
+      )
+        return Promise.reject(new LspRequestCancelledError())
+      return this.sendReadyHandledRequest<TResult>(id, method, message, uri, options, isCancelled)
+    }
+    if (this.state === 'ready') return send()
+    return this.awaitInitialization().then(send)
   }
 
   private sendReadyHandledRequest<TResult>(
     id: LspRequestId,
     method: string,
-    params: unknown,
+    message: string,
+    uri: string | null,
     options: RequestOptions,
     isCancelled: () => boolean,
   ): Promise<TResult> {
     if (isCancelled()) return Promise.reject(new LspRequestCancelledError())
-    return this.requestInnerWithId<TResult>(id, method, params, options)
+    const transport = this.transport
+    const initialization = this.initializePromise
+    const epoch = this.connectionEpoch
+    const prepared = uri ? this.workspace.prepareDocumentRequest(uri, options.signal) : undefined
+    const send = () => {
+      if (
+        isCancelled() ||
+        this.connectionEpoch !== epoch ||
+        this.transport !== transport ||
+        this.initializePromise !== initialization
+      )
+        return Promise.reject(new LspRequestCancelledError())
+      return this.sendEncodedRequest<TResult>(id, method, message, options)
+    }
+    if (prepared?.kind === 'pending')
+      return prepared.ready.then((read) => {
+        if (!read.isCurrent()) throw new LspRequestCancelledError()
+        return send()
+      })
+    if (prepared?.kind === 'ready' && !prepared.read.isCurrent())
+      return Promise.reject(new LspRequestCancelledError())
+    return send()
   }
 
   private requestInnerWithId<TResult>(
@@ -350,8 +421,17 @@ export class LspClient {
     params: unknown,
     options: RequestOptions,
   ): Promise<TResult> {
-    const transport = this.requireTransport()
     const message = createRequestMessage(id, method, params)
+    return this.sendEncodedRequest<TResult>(id, method, JSON.stringify(message), options)
+  }
+
+  private sendEncodedRequest<TResult>(
+    id: LspRequestId,
+    method: string,
+    message: string,
+    options: RequestOptions,
+  ): Promise<TResult> {
+    const transport = this.requireTransport()
 
     return new Promise<TResult>((resolve, reject) => {
       const pending = this.createPendingRequest(
@@ -388,13 +468,9 @@ export class LspClient {
     return { ...pending, abortCleanup: () => options.signal?.removeEventListener('abort', abort) }
   }
 
-  private sendMessage(
-    transport: LspTransport,
-    message: lsp.RequestMessage,
-    pending: PendingRequest,
-  ): void {
+  private sendMessage(transport: LspTransport, message: string, pending: PendingRequest): void {
     try {
-      transport.send(JSON.stringify(message))
+      transport.send(message)
     } catch (error) {
       this.deletePendingRequest(pending.id)
       this.handleTransportSendError(error)
@@ -565,6 +641,15 @@ export class LspClient {
     if (this.transport) return this.transport
     throw new Error('LSP client is not connected')
   }
+}
+
+function textDocumentRequestUri(method: string, params: unknown): string | null {
+  if (!method.startsWith('textDocument/') || typeof params !== 'object' || params === null)
+    return null
+  if (!('textDocument' in params)) return null
+  const document = params.textDocument
+  if (typeof document !== 'object' || document === null || !('uri' in document)) return null
+  return typeof document.uri === 'string' ? document.uri : null
 }
 
 // didOpen and didSave with text carry the whole document by protocol definition.

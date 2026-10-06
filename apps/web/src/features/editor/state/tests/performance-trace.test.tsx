@@ -21,6 +21,11 @@ type TraceHandle = {
     readonly sampleId: string
   }): Promise<EditorOpenSampleResetResult>
   report(): {
+    readonly topDiagnostics: readonly {
+      readonly name: string
+      readonly count: number
+      readonly totalMs: number
+    }[]
     readonly traceEvents: readonly {
       readonly at: number
       readonly durationMs?: number
@@ -29,6 +34,7 @@ type TraceHandle = {
     }[]
   }
   reset(): void
+  mark(name: string): void
   stop(): void
 }
 
@@ -79,6 +85,29 @@ test('report drains long tasks that overlap the activation boundary', () => {
       kind: 'long-task',
       name: 'activation-task',
     }),
+  ])
+})
+
+test('keeps complete diagnostic counts after raw eviction and honors reset and stop', () => {
+  installTraceFromUrl()
+  const handle = traceHandle()
+  for (let index = 0; index < 40; index++) handle?.mark('editor.view.applyEdit')
+  for (let index = 0; index < 5000; index++) handle?.mark('other-work')
+  const report = handle?.report()
+  expect(report?.traceEvents).toHaveLength(5000)
+  expect(
+    report?.topDiagnostics.find((summary) => summary.name === 'editor.view.applyEdit'),
+  ).toMatchObject({
+    count: 40,
+    totalMs: 0,
+  })
+  handle?.reset()
+  expect(handle?.report().topDiagnostics).toEqual([])
+  handle?.mark('next-scenario')
+  handle?.stop()
+  handle?.mark('after-stop')
+  expect(handle?.report().topDiagnostics.map((summary) => [summary.name, summary.count])).toEqual([
+    ['next-scenario', 1],
   ])
 })
 

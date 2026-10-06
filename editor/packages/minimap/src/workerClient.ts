@@ -1,26 +1,20 @@
 import { computeFrameLayout, computeRenderLayout, visibleDocumentLineRange } from './layout'
-import type { TextEdit } from '@singapore-editor/core/document'
+import { retainMinimapDocumentSource, type MinimapSourceResult } from './documentSource'
+import type { EditorDocumentContributions } from '@singapore-editor/core/editor'
+import type { DocumentProjectionReceipt } from '@singapore-editor/core/internal/document-worker'
+import { sourceIdentitiesEqual, sourcePointsEqual } from './sourceIdentity'
 import type { EditorTokenStore } from '@singapore-editor/core/syntax'
-import { createError } from '@singapore-editor/core/logging/evlog'
+import type { MinimapWorkerOwnerSnapshot } from './workerOwner'
 import type {
-  EditorContributionChange,
   EditorMinimapDecoration,
   EditorResolvedSelection,
   EditorViewportSnapshot,
   EditorViewSnapshot,
 } from '@singapore-editor/core/extensions'
-import {
-  createEditorSecondaryViewProjection,
-  EditorSecondaryViewScheduler,
-  type EditorSecondaryViewTextProjection,
-} from '@singapore-editor/core/secondary-views'
+import { EditorSecondaryViewScheduler } from '@singapore-editor/core/secondary-views'
 import { parseCssColor, RGBA_BLACK, RGBA_WHITE, transparent } from './color'
 import type {
   MinimapBaseStyles,
-  MinimapDocumentEditPayload,
-  MinimapDocumentPayload,
-  MinimapDocumentSummaryPatch,
-  MinimapDocumentSummaryPayload,
   MinimapMetrics,
   MinimapSelection,
   MinimapToken,
@@ -41,8 +35,8 @@ const MINIMAP_RENDER_KEY = 'minimap.render'
 export type MinimapHost = {
   readonly root: HTMLDivElement
   readonly colorScope: HTMLElement
-  readonly mainCanvas: HTMLCanvasElement
-  readonly decorationsCanvas: HTMLCanvasElement
+  mainCanvas: HTMLCanvasElement
+  decorationsCanvas: HTMLCanvasElement
   readonly slider: HTMLDivElement
   readonly sliderHorizontal: HTMLDivElement
   readonly shadow: HTMLDivElement
@@ -55,146 +49,22 @@ export type MinimapWorkerClientOptions = {
   readonly decorations: readonly EditorMinimapDecoration[]
   readonly onLayoutWidth: (width: number) => void
   readonly reservedLane: () => number
-}
-
-export type MinimapWorkerLifecycleState = 'ready' | 'disposed' | 'crashed'
-
-export type MinimapWorkerOwnerSnapshot = {
-  readonly lifecycle: MinimapWorkerLifecycleState
-  readonly postedRequests: number
-  readonly lastError: string | null
-}
-
-export type MinimapWorkerOwnerOptions = {
-  readonly onMessage: (response: MinimapWorkerResponse) => void
-  readonly onError?: (error: Error) => void
-  readonly workerFactory?: () => Worker
-}
-
-export class MinimapWorkerOwner {
-  private worker: Worker | null = null
-  private lifecycle: MinimapWorkerLifecycleState = 'ready'
-  private postedRequests = 0
-  private lastError: Error | null = null
-  private disposalPromise: Promise<void> | null = null
-  private terminationError: Error | null = null
-
-  public constructor(private readonly options: MinimapWorkerOwnerOptions) {
-    this.worker = this.createWorker()
-  }
-
-  public inspect(): MinimapWorkerOwnerSnapshot {
-    return {
-      lifecycle: this.lifecycle,
-      postedRequests: this.postedRequests,
-      lastError: this.lastError?.message ?? null,
-    }
-  }
-
-  public post(request: MinimapWorkerRequest, transfer?: Transferable[]): boolean {
-    const handle = this.worker
-    if (!this.canPost(handle)) return false
-
-    this.postedRequests += 1
-    try {
-      this.postToWorker(handle, request, transfer)
-      return true
-    } catch (error) {
-      this.fail(workerRequestError(error))
-      return false
-    }
-  }
-
-  public dispose(): Promise<void> {
-    if (this.disposalPromise) return this.disposalPromise
-
-    this.terminateWorker()
-    this.lifecycle = this.terminationError ? 'crashed' : 'disposed'
-    this.disposalPromise = this.terminationError
-      ? Promise.reject(this.terminationError)
-      : Promise.resolve()
-    return this.disposalPromise
-  }
-
-  private createWorker(): Worker {
-    const handle =
-      this.options.workerFactory?.() ??
-      new Worker(new URL('./minimap.worker.ts', import.meta.url), { type: 'module' })
-    handle.onmessage = this.handleWorkerMessage
-    handle.onerror = this.handleWorkerError
-    return handle
-  }
-
-  private canPost(handle: Worker | null): handle is Worker {
-    if (!handle) return false
-    if (this.lifecycle === 'disposed') return false
-    return this.lifecycle !== 'crashed'
-  }
-
-  private postToWorker(
-    handle: Worker,
-    request: MinimapWorkerRequest,
-    transfer?: Transferable[],
-  ): void {
-    if (transfer) {
-      handle.postMessage(request, transfer)
-      return
-    }
-
-    handle.postMessage(request)
-  }
-
-  private readonly handleWorkerMessage = (event: MessageEvent<MinimapWorkerResponse>): void => {
-    if (!this.worker) return
-    const response = event.data
-
-    if (response.type === 'error') {
-      this.recordError(createWorkerResponseError(response))
-      return
-    }
-
-    this.options.onMessage(response)
-  }
-
-  private readonly handleWorkerError = (event: ErrorEvent): void => {
-    if (!this.worker) return
-    this.fail(createNativeWorkerError(event))
-  }
-
-  private recordError(error: Error): void {
-    this.lastError = error
-    this.options.onError?.(error)
-  }
-
-  private fail(error: Error): void {
-    this.lastError = error
-    this.lifecycle = 'crashed'
-    this.terminateWorker()
-    this.options.onError?.(error)
-  }
-
-  private terminateWorker(): void {
-    const handle = this.worker
-    this.worker = null
-    if (!handle) return
-
-    try {
-      handle.onmessage = null
-      handle.onerror = null
-      // A busy worker cannot acknowledge disposal; termination releases its owned resources.
-      handle.terminate()
-    } catch (error) {
-      this.terminationError = workerRequestError(error)
-      this.lastError = this.terminationError
-      this.lifecycle = 'crashed'
-    }
-  }
+  readonly contributions: EditorDocumentContributions | null
 }
 
 export class MinimapWorkerClient {
   private readonly host: MinimapHost
   private readonly options: ResolvedMinimapOptions
-  private readonly workerOwner: MinimapWorkerOwner
+  private contributions: EditorDocumentContributions | null = null
+  private documentSource: ReturnType<typeof retainMinimapDocumentSource> = null
+  private sourceResult: MinimapSourceResult | null = null
+  private sourceWait = false
+  private canvasesTransferred = false
+  private lastWorker: MinimapWorkerOwnerSnapshot = {
+    lifecycle: 'disposed',
+    postedRequests: 0,
+    lastError: null,
+  }
   private readonly colorResolver: ColorResolver
   private readonly scheduler = new EditorSecondaryViewScheduler()
   private readonly onLayoutWidth: (width: number) => void
@@ -204,19 +74,15 @@ export class MinimapWorkerClient {
   private pendingUpdateReady = false
   private pendingRender = false
   private activeRenderToken = 0
+  private activeRenderSource: DocumentProjectionReceipt | null = null
   private renderInFlight = false
   private latestBaseStyles: MinimapBaseStyles | null = null
   private latestBaseStylesSignature = ''
   private latestLayoutSignature = ''
   private latestThemeSignature = ''
   private latestSnapshot: EditorViewSnapshot
-  private latestDocumentSummary: MinimapDocumentSummaryBaseline
   private latestViewport: EditorViewportSnapshot
   private postedViewport: MinimapViewport | null = null
-  private latestFullDocumentSnapshot: EditorViewSnapshot | null = null
-  // Mirror of the worker's current document summary; the authoritative
-  // pre-edit baseline for incremental patch accounting.
-  private workerDocumentState: WorkerDocumentState | null = null
   private latestTokenSource: EditorTokenStore | null
   private disposed = false
 
@@ -227,37 +93,38 @@ export class MinimapWorkerClient {
     this.reservedLane = options.reservedLane
     this.externalDecorations = options.decorations
     this.latestSnapshot = options.snapshot
-    this.latestDocumentSummary = snapshotSummaryBaseline(options.snapshot)
     this.latestViewport = options.snapshot.viewport
     this.latestTokenSource = options.snapshot.tokens
     this.colorResolver = new ColorResolver(options.host.colorScope)
-    this.workerOwner = new MinimapWorkerOwner({
-      onError: this.handleWorkerError,
-      onMessage: this.handleWorkerMessage,
-    })
-    this.init(options.snapshot)
+    this.setDocumentContributions(options.contributions, options.snapshot)
   }
 
   public inspectWorker(): MinimapWorkerOwnerSnapshot {
-    return this.workerOwner.inspect()
+    return this.documentSource?.source.inspect() ?? this.lastWorker
   }
 
-  public update(
+  public setDocumentContributions(
+    contributions: EditorDocumentContributions | null,
     snapshot: EditorViewSnapshot,
-    kind: string,
-    change?: EditorContributionChange | null,
   ): void {
-    if (this.disposed) return
-    if (this.shouldSkipDocumentUpdate(snapshot, kind)) {
-      this.latestSnapshot = snapshot
-      return
-    }
-
-    const previousSummary = this.latestDocumentSummary
+    if (this.disposed || this.contributions === contributions) return
+    this.releaseDocumentSource()
+    this.contributions = contributions
     this.latestSnapshot = snapshot
-    if (kind === 'content' || kind === 'document' || kind === 'clear') {
-      this.latestDocumentSummary = snapshotSummaryBaseline(snapshot)
-    }
+    this.replaceTransferredCanvases()
+    if (!contributions) return
+    this.documentSource = retainMinimapDocumentSource(contributions, {
+      maxColumn: this.options.maxColumn,
+      onError: this.handleWorkerError,
+      onMessage: this.handleWorkerMessage,
+    })
+    if (!this.documentSource) return
+    this.init(snapshot)
+  }
+
+  public update(snapshot: EditorViewSnapshot, kind: string): void {
+    if (this.disposed) return
+    this.latestSnapshot = snapshot
     if (kind === 'viewport') {
       this.latestViewport = snapshot.viewport
       const layoutUpdated = this.postLayoutIfNeeded(snapshot)
@@ -266,7 +133,7 @@ export class MinimapWorkerClient {
       return
     }
 
-    const update = createPendingUpdate(snapshot, kind, change, previousSummary)
+    const update = createPendingUpdate(snapshot, kind)
     this.latestViewport = snapshot.viewport
     this.applyImmediateViewport()
     this.queueUpdate(update)
@@ -316,9 +183,7 @@ export class MinimapWorkerClient {
     if (this.disposed) return
 
     this.externalDecorations = decorations
-    this.queueUpdate(
-      createPendingUpdate(this.latestSnapshot, 'decorations', null, this.latestDocumentSummary),
-    )
+    this.queueUpdate(createPendingUpdate(this.latestSnapshot, 'decorations'))
   }
 
   public dispose(): void {
@@ -327,8 +192,33 @@ export class MinimapWorkerClient {
     this.disposed = true
     this.cancelScheduledFlush()
     this.scheduler.dispose()
-    void this.workerOwner.dispose().catch(this.handleWorkerError)
+    this.releaseDocumentSource()
     this.colorResolver.dispose()
+  }
+
+  private releaseDocumentSource(): void {
+    const binding = this.documentSource
+    binding?.lease.dispose()
+    if (binding) this.lastWorker = binding.source.inspect()
+    this.documentSource = null
+    this.sourceResult = null
+    this.sourceWait = false
+    this.pendingUpdate = null
+    this.pendingUpdateReady = false
+    this.pendingRender = false
+    this.renderInFlight = false
+    this.activeRenderToken = 0
+    this.activeRenderSource = null
+    this.latestTokenSource = null
+    this.cancelScheduledFlush()
+    this.scheduler.cancel(MINIMAP_RENDER_KEY)
+  }
+
+  private replaceTransferredCanvases(): void {
+    if (!this.canvasesTransferred) return
+    this.host.mainCanvas = replaceCanvas(this.host.mainCanvas)
+    this.host.decorationsCanvas = replaceCanvas(this.host.decorationsCanvas)
+    this.canvasesTransferred = false
   }
 
   private init(snapshot: EditorViewSnapshot): void {
@@ -347,8 +237,6 @@ export class MinimapWorkerClient {
     }
 
     this.post(request, [mainCanvas, decorationsCanvas])
-    this.post({ type: 'openDocument', document: this.trackedDocumentPayload(snapshot) })
-    this.latestFullDocumentSnapshot = snapshot
     this.postedViewport = this.viewport(snapshot)
     this.post({
       type: 'updateLayout',
@@ -356,7 +244,8 @@ export class MinimapWorkerClient {
       viewport: this.postedViewport,
     })
     this.latestLayoutSignature = layoutSignature(snapshot, this.minimapHeight(snapshot))
-    this.postRender(snapshot)
+    this.canvasesTransferred = true
+    this.queueUpdate(createPendingUpdate(snapshot, 'document'))
   }
 
   private scheduleFlush(): void {
@@ -409,7 +298,7 @@ export class MinimapWorkerClient {
 
   private flushPendingUpdate(): void {
     if (this.disposed) return
-    if (this.renderInFlight) return
+    if (this.renderInFlight || this.sourceWait) return
 
     const pending = this.pendingUpdate
     if (!pending) return
@@ -421,17 +310,51 @@ export class MinimapWorkerClient {
     )
   }
 
-  private flushPendingUpdateNow(pending: PendingMinimapUpdate): void {
+  private async flushPendingUpdateNow(pending: PendingMinimapUpdate): Promise<void> {
+    const binding = this.documentSource
     this.pendingUpdate = null
     this.pendingUpdateReady = false
-    measureMinimapPerformance(
-      'minimap.postUpdate',
-      () => this.postUpdate(pending),
-      () => pendingUpdateDiagnostics(pending),
+    this.sourceWait = true
+    try {
+      const result = await this.sourceFor(pending.snapshot)
+      if (!result) return
+      this.postUpdate(pending, result)
+      const layoutUpdated = this.postLayoutIfNeeded(pending.snapshot)
+      this.postViewportIfNeeded(pending.snapshot, pending.syncViewport, layoutUpdated)
+      this.postRender(pending.snapshot)
+    } catch (error) {
+      this.reportSourceFailure(error)
+    } finally {
+      if (this.documentSource === binding) this.sourceWait = false
+      if (this.pendingUpdate && !this.renderInFlight) this.scheduleFlush()
+    }
+  }
+
+  private async sourceFor(snapshot: EditorViewSnapshot): Promise<MinimapSourceResult | null> {
+    if (
+      snapshot.geometryCommitted === false ||
+      snapshot.viewport.clientWidth <= 0 ||
+      snapshot.viewport.clientHeight <= 0
     )
-    const layoutUpdated = this.postLayoutIfNeeded(pending.snapshot)
-    this.postViewportIfNeeded(pending.snapshot, pending.syncViewport, layoutUpdated)
-    this.postRender(pending.snapshot)
+      return null
+    const binding = this.documentSource
+    if (!binding) return null
+    const result = await binding.lease.request()
+    if (this.disposed || this.documentSource !== binding) return null
+    if (!result) return null
+    const expected = snapshot.documentSyncPoint
+    if (
+      result.point.segment !== expected.segment ||
+      result.point.revision !== expected.revision ||
+      result.point.textVersion !== expected.textVersion
+    )
+      return null
+    return result
+  }
+
+  private reportSourceFailure(error: unknown): void {
+    if (error instanceof DOMException && error.name === 'AbortError') return
+    if (error instanceof Error) this.handleWorkerError(error)
   }
 
   private postLayoutIfNeeded(snapshot: EditorViewSnapshot): boolean {
@@ -460,64 +383,35 @@ export class MinimapWorkerClient {
     this.post({ type: 'updateViewport', viewport: this.postedViewport })
   }
 
-  private postUpdate(update: PendingMinimapUpdate): void {
+  private postUpdate(update: PendingMinimapUpdate, result: MinimapSourceResult): void {
     const snapshot = update.snapshot
-    let tokenColorsInvalidated = false
+    let colorsInvalidated = false
     if (update.syncBaseStyles) {
-      tokenColorsInvalidated = this.refreshThemeColorCache(snapshot)
-      tokenColorsInvalidated = this.syncBaseStyles() || tokenColorsInvalidated
+      colorsInvalidated = this.refreshThemeColorCache(snapshot)
+      colorsInvalidated = this.syncBaseStyles() || colorsInvalidated
     }
-
-    if (update.replaceDocument) {
-      this.post({ type: 'replaceDocument', document: this.trackedDocumentPayload(snapshot) })
-      this.latestFullDocumentSnapshot = snapshot
-      this.latestTokenSource = snapshot.tokens
-      return
+    const sourceAdvanced = this.sourceResult?.receipt !== result.receipt
+    if (sourceAdvanced) {
+      if (
+        result.tokensRebased &&
+        this.latestTokenSource &&
+        !update.syncTokens &&
+        !colorsInvalidated
+      ) {
+        this.latestTokenSource = snapshot.tokens
+      } else {
+        this.postFullTokenUpdate(snapshot)
+      }
+    } else if (update.syncTokens) {
+      this.postTokenUpdate(snapshot, colorsInvalidated)
     }
-
-    if (update.edits.length > 0) {
-      this.latestFullDocumentSnapshot = null
-      this.postEditUpdate(update)
-      this.latestTokenSource = update.tokenSourceAfterEdits
-    }
-    if (update.syncTokens) {
-      this.postTokenUpdate(snapshot, tokenColorsInvalidated)
-    }
-    if (update.syncSelection && update.edits.length === 0) {
+    this.sourceResult = result
+    if (sourceAdvanced || update.syncSelection) {
       this.post({ type: 'updateSelection', selections: selections(snapshot.selections) })
     }
-    if (update.syncExternalDecorations) {
-      this.post({
-        type: 'updateExternalDecorations',
-        decorations: this.externalDecorations,
-      })
+    if (sourceAdvanced || update.syncExternalDecorations) {
+      this.post({ type: 'updateExternalDecorations', decorations: this.externalDecorations })
     }
-  }
-
-  private postEditUpdate(update: PendingMinimapUpdate): void {
-    const document = this.documentEditPayload(update, this.workerDocumentState)
-    const patch = document.summaryPatch
-    if (this.workerDocumentState) {
-      this.workerDocumentState = {
-        textLength: patch.textLength,
-        lineCount: this.workerDocumentState.lineCount - patch.deleteCount + patch.lines.length,
-      }
-    }
-    if (update.edits.length === 1) {
-      this.post({ type: 'applyEdit', edit: update.edits[0]!, document })
-      return
-    }
-
-    this.post({ type: 'applyEdits', edits: update.edits, document })
-  }
-
-  private trackedDocumentPayload(snapshot: EditorViewSnapshot): MinimapDocumentPayload {
-    const document = this.documentPayload(snapshot)
-    this.workerDocumentState = {
-      textLength: document.textLength,
-      lineCount: document.lines.length,
-    }
-    return document
   }
 
   private postTokenUpdate(snapshot: EditorViewSnapshot, forceFullUpdate: boolean): void {
@@ -569,13 +463,6 @@ export class MinimapWorkerClient {
     return true
   }
 
-  private shouldSkipDocumentUpdate(snapshot: EditorViewSnapshot, kind: string): boolean {
-    if (kind !== 'document') return false
-    const latest = this.latestFullDocumentSnapshot
-    if (!latest) return false
-    return latest === snapshot
-  }
-
   private requestRender(): void {
     if (this.renderInFlight) {
       this.pendingRender = true
@@ -606,19 +493,43 @@ export class MinimapWorkerClient {
     this.renderInFlight = true
   }
 
-  private postScheduledRender(snapshot: EditorViewSnapshot, token: number): void {
-    if (token !== this.activeRenderToken) return
-
-    this.pendingRender = false
-    this.sizeCanvasElements(snapshot)
-    this.post({ type: 'render', sequence: token })
+  private async postScheduledRender(snapshot: EditorViewSnapshot, token: number): Promise<void> {
+    try {
+      const result = await this.sourceFor(snapshot)
+      if (token !== this.activeRenderToken) return
+      if (!result) {
+        this.finishSourceWait(token)
+        return
+      }
+      if (this.sourceResult?.receipt !== result.receipt) {
+        this.postUpdate(createPendingUpdate(snapshot, 'content'), result)
+      }
+      this.pendingRender = false
+      this.activeRenderSource = result.receipt
+      this.sizeCanvasElements(snapshot)
+      this.post({ type: 'render', sequence: token, source: result.receipt })
+    } catch (error) {
+      this.finishSourceWait(token)
+      this.reportSourceFailure(error)
+    }
   }
 
   private cancelScheduledRender(token: number): void {
     if (token !== this.activeRenderToken) return
 
     this.activeRenderToken = 0
+    this.activeRenderSource = null
     this.renderInFlight = false
+  }
+
+  private finishSourceWait(token: number): void {
+    this.cancelScheduledRender(token)
+    if (this.renderInFlight) return
+    if (this.pendingUpdate) {
+      this.scheduleFlush()
+      return
+    }
+    if (this.pendingRender) this.requestRender()
   }
 
   private applyImmediateViewport(): void {
@@ -632,51 +543,6 @@ export class MinimapWorkerClient {
       shadowVisible(this.latestViewport)
         ? 'editor-minimap-shadow editor-minimap-shadow-visible'
         : 'editor-minimap-shadow editor-minimap-shadow-hidden',
-    )
-  }
-
-  private documentPayload(snapshot: EditorViewSnapshot): MinimapDocumentPayload {
-    const projection = createEditorSecondaryViewProjection(snapshot)
-    let payload: MinimapDocumentPayload | null = null
-    return measureMinimapPerformance(
-      'minimap.documentPayload',
-      () => {
-        payload = {
-          ...documentSummaryPayload(projection.text, this.options.maxColumn),
-          tokens: this.tokens(projection.syntaxColors.tokens),
-          selections: selections(projection.selections),
-          decorations: this.externalDecorations,
-          externalDecorations: this.externalDecorations,
-        }
-        return payload
-      },
-      () => documentPayloadDiagnostics(payload),
-    )
-  }
-
-  private documentEditPayload(
-    update: PendingMinimapUpdate,
-    workerDocument: WorkerDocumentState | null,
-  ): MinimapDocumentEditPayload {
-    const snapshot = update.snapshot
-    const projection = createEditorSecondaryViewProjection(snapshot)
-    let payload: MinimapDocumentEditPayload | null = null
-    return measureMinimapPerformance(
-      'minimap.documentEditPayload',
-      () => {
-        payload = {
-          selections: selections(projection.selections),
-          summaryPatch: documentSummaryPatchPayload(
-            projection.text,
-            previousDocumentSummary(update),
-            update.edits,
-            this.options.maxColumn,
-            workerDocument,
-          ),
-        }
-        return payload
-      },
-      () => documentEditPayloadDiagnostics(payload),
     )
   }
 
@@ -794,12 +660,18 @@ export class MinimapWorkerClient {
       )
       return
     }
+    if (response.type === 'renderSkipped') {
+      this.cancelScheduledRender(response.sequence)
+      if (this.pendingUpdate) this.scheduleFlush()
+      return
+    }
     if (response.type === 'rendered') {
       if (!this.isCurrentRenderResponse(response)) return
 
       this.scheduler.cancel(MINIMAP_RENDER_KEY)
       this.renderInFlight = false
       this.activeRenderToken = 0
+      this.activeRenderSource = null
       if (this.pendingUpdate) this.scheduleFlush()
       if (this.renderInFlight) return
       if (this.pendingRender) this.requestRender()
@@ -826,7 +698,7 @@ export class MinimapWorkerClient {
     measureMinimapPerformance(
       'minimap.post',
       () => {
-        this.workerOwner.post(request, transfer)
+        this.documentSource?.source.post(request, transfer)
       },
       () => requestDiagnostics(request),
     )
@@ -848,27 +720,26 @@ export class MinimapWorkerClient {
   private isCurrentRenderResponse(
     response: Extract<MinimapWorkerResponse, { type: 'rendered' }>,
   ): boolean {
-    return response.sequence === this.activeRenderToken
+    const expected = this.activeRenderSource
+    const source = response.source
+    return Boolean(
+      response.sequence === this.activeRenderToken &&
+      expected &&
+      source &&
+      sourceIdentitiesEqual(source.identity, expected.identity) &&
+      sourcePointsEqual(source.target, expected.target),
+    )
   }
 }
 
 type PendingMinimapUpdate = {
   readonly snapshot: EditorViewSnapshot
-  readonly replaceDocument: boolean
-  readonly edits: readonly TextEdit[]
-  readonly previousDocumentSummary: MinimapDocumentSummaryBaseline | null
   readonly syncTokens: boolean
   readonly syncSelection: boolean
   readonly syncExternalDecorations: boolean
   readonly syncViewport: boolean
   readonly syncBaseStyles: boolean
-  readonly tokenSourceAfterEdits: EditorTokenStore | null
   readonly reason: string
-}
-
-type MinimapDocumentSummaryBaseline = {
-  readonly textLength: number
-  readonly lineStarts: MinimapLineStarts
 }
 
 export function canUseMinimapWorker(): boolean {
@@ -880,89 +751,16 @@ export function canUseMinimapWorker(): boolean {
   )
 }
 
-function workerRequestError(error: unknown): Error {
-  if (error instanceof Error) return error
-  return new Error(String(error))
-}
-
-function createWorkerResponseError(
-  response: Extract<MinimapWorkerResponse, { readonly type: 'error' }>,
-): Error {
-  const workerMessage = nonEmptyString(response.message)
-  return createError({
-    code: 'minimap.WORKER_REQUEST_FAILED',
-    message: messageWithDetail('Minimap worker request failed', workerMessage),
-    why: workerMessage ?? 'The minimap worker reported an error without details.',
-    fix: 'The editor keeps running; inspect the minimap worker request and renderer state if the minimap stops updating.',
-    internal: {
-      responseType: response.type,
-      sequence: response.sequence ?? null,
-      workerMessage: response.message,
-    },
-  })
-}
-
-function createNativeWorkerError(event: ErrorEvent): Error {
-  const browserMessage = nonEmptyString(event.message)
-  return createError({
-    code: 'minimap.WORKER_CRASHED',
-    message: messageWithDetail('Minimap worker crashed', browserMessage),
-    why: nativeWorkerFailureReason(browserMessage),
-    fix: 'The editor keeps running without the minimap for this worker generation. Check the worker script request, CSP, MIME type, and browser worker support.',
-    cause: event.error instanceof Error ? event.error : undefined,
-    internal: workerErrorEventInternal(event),
-  })
-}
-
-function nativeWorkerFailureReason(browserMessage: string | null): string {
-  if (browserMessage) return `The browser reported: ${browserMessage}`
-  return 'The browser reported a native worker failure without an error message. This usually means the worker script failed to load or crashed before its own error handler ran.'
-}
-
-function workerErrorEventInternal(event: ErrorEvent): Record<string, unknown> {
-  const error = event.error
-  return {
-    browserMessage: nonEmptyString(event.message),
-    filename: nonEmptyString(event.filename),
-    lineNumber: positiveNumberOrNull(event.lineno),
-    columnNumber: positiveNumberOrNull(event.colno),
-    errorName: error instanceof Error ? error.name : null,
-    errorMessage: errorMessage(error),
-    errorStack: error instanceof Error ? error.stack : null,
-    rawErrorType: rawErrorType(error),
-  }
-}
-
-function errorMessage(error: unknown): string | null {
-  if (error instanceof Error) return error.message
-  if (typeof error === 'string') return error
-  return null
-}
-
-function rawErrorType(error: unknown): string | null {
-  if (error === null || error === undefined) return null
-  if (error instanceof Error) return error.name
-  return Object.prototype.toString.call(error)
-}
-
-function messageWithDetail(summary: string, detail: string | null): string {
-  if (!detail) return summary
-  return `${summary}: ${detail}`
-}
-
-function nonEmptyString(value: string | undefined): string | null {
-  const trimmed = value?.trim() ?? ''
-  if (trimmed.length === 0) return null
-  return trimmed
-}
-
-function positiveNumberOrNull(value: number): number | null {
-  if (value > 0) return value
-  return null
-}
-
 function selections(selections: readonly EditorResolvedSelection[]): readonly MinimapSelection[] {
   return selections.map((selection) => minimapSelection(selection))
+}
+
+function replaceCanvas(previous: HTMLCanvasElement): HTMLCanvasElement {
+  const canvas = previous.ownerDocument.createElement('canvas')
+  canvas.className = previous.className
+  canvas.style.cssText = previous.style.cssText
+  previous.replaceWith(canvas)
+  return canvas
 }
 
 function minimapSelection(selection: EditorResolvedSelection): MinimapSelection {
@@ -970,374 +768,6 @@ function minimapSelection(selection: EditorResolvedSelection): MinimapSelection 
     startOffset: selection.startOffset,
     endOffset: selection.endOffset,
   }
-}
-
-// Structural match for EditorLineStartsView so plain arrays (tests, string
-// fallback paths) and snapshot views share one access surface.
-type MinimapLineStarts = {
-  readonly length: number
-  at(index: number): number | undefined
-  indexForOffset(offset: number): number
-  firstIndexAtOrAfter(offset: number): number
-  toArray(): readonly number[]
-}
-
-function arrayLineStarts(lineStarts: readonly number[]): MinimapLineStarts {
-  return {
-    length: lineStarts.length,
-    at: (index) => lineStarts[index],
-    indexForOffset: (offset) => arrayLineIndexForOffset(lineStarts, offset),
-    firstIndexAtOrAfter: (target) => arrayFirstLineStartAtOrAfter(lineStarts, target),
-    toArray: () => lineStarts,
-  }
-}
-
-function documentSummaryPayload(
-  text: EditorSecondaryViewTextProjection,
-  maxColumn: number,
-): MinimapDocumentSummaryPayload {
-  const textLength = text.length
-  const lineStarts = text.lineStartsView.toArray()
-  return {
-    textLength,
-    lineStarts,
-    lines: lineStarts.map((startOffset, index) =>
-      lineSummaryFromSnapshot(
-        text,
-        startOffset,
-        lineEndOffset(arrayLineStarts(lineStarts), index, textLength),
-        maxColumn,
-      ),
-    ),
-  }
-}
-
-type WorkerDocumentState = { readonly textLength: number; readonly lineCount: number }
-
-function documentSummaryPatchPayload(
-  text: EditorSecondaryViewTextProjection,
-  previous: MinimapDocumentSummaryBaseline,
-  edits: readonly TextEdit[],
-  maxColumn: number,
-  workerDocument: WorkerDocumentState | null,
-): MinimapDocumentSummaryPatch {
-  const textLength = text.length
-  const lineStarts = text.lineStartsView
-  const range = documentSummaryPatchRange(previous, lineStarts, textLength, edits, workerDocument)
-  const lines = []
-  for (let lineIndex = range.startLine; lineIndex < range.insertEndLine; lineIndex += 1) {
-    lines.push(
-      lineSummaryFromSnapshot(
-        text,
-        lineStarts.at(lineIndex) ?? textLength,
-        lineEndOffset(lineStarts, lineIndex, textLength),
-        maxColumn,
-      ),
-    )
-  }
-
-  return {
-    textLength,
-    startLine: range.startLine,
-    deleteCount: range.deleteCount,
-    lines,
-  }
-}
-
-function lineSummaryFromSnapshot(
-  text: EditorSecondaryViewTextProjection,
-  startOffset: number,
-  endOffset: number,
-  maxColumn: number,
-): MinimapDocumentSummaryPayload['lines'][number] {
-  const length = Math.max(0, endOffset - startOffset)
-  const clippedEnd = startOffset + Math.min(length, maxColumn)
-  return {
-    text: text.snapshot.readRange(startOffset, clippedEnd),
-    length,
-  }
-}
-
-function lineEndOffset(lineStarts: MinimapLineStarts, index: number, textLength: number): number {
-  const startOffset = lineStarts.at(index) ?? textLength
-  const nextStart = lineStarts.at(index + 1)
-  if (nextStart === undefined) return textLength
-  return Math.max(startOffset, nextStart - 1)
-}
-
-type SummaryLineChangeRange = {
-  readonly startLine: number
-  readonly previousEndLine: number
-  readonly nextEndLine: number
-}
-
-type DocumentSummaryPatchRange = {
-  readonly startLine: number
-  readonly deleteCount: number
-  readonly insertEndLine: number
-}
-
-function documentSummaryPatchRange(
-  previous: MinimapDocumentSummaryBaseline,
-  nextLineStarts: MinimapLineStarts,
-  nextTextLength: number,
-  edits: readonly TextEdit[],
-  workerDocument: WorkerDocumentState | null,
-): DocumentSummaryPatchRange {
-  const edited = editSummaryPatchRange(previous.lineStarts, nextLineStarts, edits)
-  // When line-break-free edits fully account for the worker document's
-  // length transition and the line count is unchanged, every boundary change
-  // lies inside the edited range and the O(lines) structural verification
-  // can be skipped. Newline edits and projection changes (e.g. fold toggles)
-  // fall through to the full scan.
-  if (
-    edited &&
-    workerDocument &&
-    editsExplainTransition(workerDocument, nextLineStarts, nextTextLength, edits)
-  ) {
-    return normalizeSummaryPatchRange(edited, previous.lineStarts.length, nextLineStarts.length)
-  }
-
-  const structural = lineStartSummaryPatchRange(
-    previous.lineStarts,
-    previous.textLength,
-    nextLineStarts,
-    nextTextLength,
-  )
-  const changed = mergeSummaryPatchRanges(structural, edited)
-  if (!changed) return { startLine: 0, deleteCount: 0, insertEndLine: 0 }
-
-  return normalizeSummaryPatchRange(changed, previous.lineStarts.length, nextLineStarts.length)
-}
-
-function editsExplainTransition(
-  workerDocument: WorkerDocumentState,
-  nextLineStarts: MinimapLineStarts,
-  nextTextLength: number,
-  edits: readonly TextEdit[],
-): boolean {
-  if (nextLineStarts.length !== workerDocument.lineCount) return false
-
-  let textDelta = 0
-  for (const edit of edits) {
-    // With no inserted breaks and an unchanged line count, no breaks were
-    // removed either; the math below is exact, not heuristic.
-    if (edit.text.includes('\n')) return false
-    textDelta += edit.text.length - (Math.max(edit.from, edit.to) - Math.min(edit.from, edit.to))
-  }
-
-  return workerDocument.textLength + textDelta === nextTextLength
-}
-
-function arrayFirstLineStartAtOrAfter(lineStarts: readonly number[], target: number): number {
-  let low = 0
-  let high = lineStarts.length
-  while (low < high) {
-    const middle = (low + high) >> 1
-    if (lineStarts[middle]! < target) low = middle + 1
-    else high = middle
-  }
-  return low
-}
-
-function lineStartSummaryPatchRange(
-  previousLineStarts: MinimapLineStarts,
-  previousTextLength: number,
-  nextLineStarts: MinimapLineStarts,
-  nextTextLength: number,
-): SummaryLineChangeRange | null {
-  const prefix = commonLineSummaryPrefix(
-    previousLineStarts,
-    previousTextLength,
-    nextLineStarts,
-    nextTextLength,
-  )
-  const suffix = commonLineSummarySuffix(
-    previousLineStarts,
-    previousTextLength,
-    nextLineStarts,
-    nextTextLength,
-    prefix,
-  )
-  if (prefix + suffix >= previousLineStarts.length && prefix + suffix >= nextLineStarts.length) {
-    return null
-  }
-
-  return {
-    startLine: prefix,
-    previousEndLine: previousLineStarts.length - suffix,
-    nextEndLine: nextLineStarts.length - suffix,
-  }
-}
-
-function commonLineSummaryPrefix(
-  previousLineStarts: MinimapLineStarts,
-  previousTextLength: number,
-  nextLineStarts: MinimapLineStarts,
-  nextTextLength: number,
-): number {
-  let count = 0
-  const limit = Math.min(previousLineStarts.length, nextLineStarts.length)
-  while (
-    count < limit &&
-    lineSummaryBoundariesMatch(
-      previousLineStarts,
-      previousTextLength,
-      count,
-      nextLineStarts,
-      nextTextLength,
-      count,
-      0,
-    )
-  ) {
-    count += 1
-  }
-
-  return count
-}
-
-function commonLineSummarySuffix(
-  previousLineStarts: MinimapLineStarts,
-  previousTextLength: number,
-  nextLineStarts: MinimapLineStarts,
-  nextTextLength: number,
-  prefix: number,
-): number {
-  let count = 0
-  const delta = nextTextLength - previousTextLength
-  const previousLimit = previousLineStarts.length - prefix
-  const nextLimit = nextLineStarts.length - prefix
-
-  while (count < previousLimit && count < nextLimit) {
-    const previousIndex = previousLineStarts.length - count - 1
-    const nextIndex = nextLineStarts.length - count - 1
-    if (
-      !lineSummaryBoundariesMatch(
-        previousLineStarts,
-        previousTextLength,
-        previousIndex,
-        nextLineStarts,
-        nextTextLength,
-        nextIndex,
-        delta,
-      )
-    ) {
-      return count
-    }
-    count += 1
-  }
-
-  return count
-}
-
-function lineSummaryBoundariesMatch(
-  previousLineStarts: MinimapLineStarts,
-  previousTextLength: number,
-  previousIndex: number,
-  nextLineStarts: MinimapLineStarts,
-  nextTextLength: number,
-  nextIndex: number,
-  offsetDelta: number,
-): boolean {
-  const previousStart = previousLineStarts.at(previousIndex) ?? previousTextLength
-  const nextStart = nextLineStarts.at(nextIndex) ?? nextTextLength
-  if (previousStart + offsetDelta !== nextStart) return false
-
-  return (
-    lineEndOffset(previousLineStarts, previousIndex, previousTextLength) + offsetDelta ===
-    lineEndOffset(nextLineStarts, nextIndex, nextTextLength)
-  )
-}
-
-function editSummaryPatchRange(
-  previousLineStarts: MinimapLineStarts,
-  nextLineStarts: MinimapLineStarts,
-  edits: readonly TextEdit[],
-): SummaryLineChangeRange | null {
-  let startOffset = Number.POSITIVE_INFINITY
-  let previousEndOffset = 0
-  let nextEndOffset = 0
-  let offsetDelta = 0
-
-  for (const edit of edits) {
-    if (editIsEmpty(edit)) continue
-    const from = Math.min(edit.from, edit.to)
-    const to = Math.max(edit.from, edit.to)
-    const editDelta = edit.text.length - (to - from)
-    startOffset = Math.min(startOffset, from)
-    // The unchanged suffix maps back by the accumulated delta; the changed end moves with each edit.
-    previousEndOffset = Math.max(previousEndOffset, to - offsetDelta)
-    nextEndOffset = Math.max(nextEndOffset, to) + editDelta
-    offsetDelta += editDelta
-  }
-
-  if (startOffset === Number.POSITIVE_INFINITY) return null
-  const previousRange = lineRangeForEdit(previousLineStarts, startOffset, previousEndOffset)
-  const nextRange = lineRangeForEdit(nextLineStarts, startOffset, nextEndOffset)
-  return {
-    startLine: Math.min(previousRange.startLine, nextRange.startLine),
-    previousEndLine: previousRange.endLine,
-    nextEndLine: nextRange.endLine,
-  }
-}
-
-function editIsEmpty(edit: TextEdit): boolean {
-  return edit.from === edit.to && edit.text.length === 0
-}
-
-function lineRangeForEdit(
-  lineStarts: MinimapLineStarts,
-  from: number,
-  to: number,
-): { readonly startLine: number; readonly endLine: number } {
-  const startOffset = Math.min(from, to)
-  const endOffset = Math.max(from, to)
-  const startLine = lineStarts.indexForOffset(startOffset)
-  const endLine = lineStarts.indexForOffset(endOffset) + 1
-  return { startLine, endLine }
-}
-
-function mergeSummaryPatchRanges(
-  left: SummaryLineChangeRange | null,
-  right: SummaryLineChangeRange | null,
-): SummaryLineChangeRange | null {
-  if (!left) return right
-  if (!right) return left
-
-  return {
-    startLine: Math.min(left.startLine, right.startLine),
-    previousEndLine: Math.max(left.previousEndLine, right.previousEndLine),
-    nextEndLine: Math.max(left.nextEndLine, right.nextEndLine),
-  }
-}
-
-function normalizeSummaryPatchRange(
-  range: SummaryLineChangeRange,
-  previousLineCount: number,
-  nextLineCount: number,
-): DocumentSummaryPatchRange {
-  const startLine = Math.min(
-    Math.max(0, range.startLine),
-    Math.max(previousLineCount, nextLineCount),
-  )
-  const previousEndLine = Math.min(Math.max(startLine, range.previousEndLine), previousLineCount)
-  const nextEndLine = Math.min(Math.max(startLine, range.nextEndLine), nextLineCount)
-  // Both range ends must preserve the same suffix of complete lines.
-  const suffixCount = Math.min(previousLineCount - previousEndLine, nextLineCount - nextEndLine)
-  return {
-    startLine,
-    deleteCount: previousLineCount - suffixCount - startLine,
-    insertEndLine: nextLineCount - suffixCount,
-  }
-}
-
-function incrementalTextEdits(
-  change: EditorContributionChange | null | undefined,
-): readonly TextEdit[] | null {
-  if (!change || change.edits.length === 0) return null
-
-  const sorted = change.edits.toSorted(compareTextEdits)
-  return sequentialTextEdits(sorted)
 }
 
 function sameViewport(previous: MinimapViewport | null, next: MinimapViewport): boolean {
@@ -1382,24 +812,17 @@ function layoutSignature(snapshot: EditorViewSnapshot, minimapHeight: number): s
   ].join(':')
 }
 
-function createPendingUpdate(
-  snapshot: EditorViewSnapshot,
-  kind: string,
-  change: EditorContributionChange | null | undefined,
-  previousSummary: MinimapDocumentSummaryBaseline,
-): PendingMinimapUpdate {
-  const base = basePendingUpdate(snapshot, kind)
-  if (kind === 'content') return contentPendingUpdate(base, change, previousSummary)
-  if (kind === 'document' || kind === 'clear') {
-    return { ...base, replaceDocument: true, reason: kind }
+function createPendingUpdate(snapshot: EditorViewSnapshot, kind: string): PendingMinimapUpdate {
+  const document = kind === 'document' || kind === 'clear'
+  return {
+    snapshot,
+    syncTokens: document || kind === 'tokens',
+    syncSelection: document || kind === 'selection' || kind === 'content',
+    syncExternalDecorations: document || kind === 'decorations',
+    syncViewport: shouldSyncViewport(kind),
+    syncBaseStyles: document || kind === 'tokens',
+    reason: kind,
   }
-  if (kind === 'tokens') return { ...base, syncTokens: true, reason: 'tokens' }
-  if (kind === 'selection') return { ...base, syncSelection: true, reason: 'selection' }
-  if (kind === 'decorations') {
-    return { ...base, syncExternalDecorations: true, reason: 'decorations' }
-  }
-
-  return { ...base, reason: kind }
 }
 
 function mergePendingUpdate(
@@ -1407,103 +830,14 @@ function mergePendingUpdate(
   next: PendingMinimapUpdate,
 ): PendingMinimapUpdate {
   if (!current) return next
-  if (current.replaceDocument || next.replaceDocument) return mergeReplacementUpdate(current, next)
-
-  const edits = current.edits.concat(next.edits)
-  const contentChangedAfterTokens = next.edits.length > 0
   return {
     snapshot: next.snapshot,
-    replaceDocument: false,
-    edits,
-    previousDocumentSummary: current.previousDocumentSummary ?? next.previousDocumentSummary,
-    syncTokens: contentChangedAfterTokens ? next.syncTokens : current.syncTokens || next.syncTokens,
+    syncTokens: current.syncTokens || next.syncTokens,
     syncSelection: current.syncSelection || next.syncSelection,
     syncExternalDecorations: current.syncExternalDecorations || next.syncExternalDecorations,
     syncViewport: current.syncViewport || next.syncViewport,
     syncBaseStyles: current.syncBaseStyles || next.syncBaseStyles,
-    tokenSourceAfterEdits: mergedTokenSourceAfterEdits(current, next),
     reason: mergeReasons(current.reason, next.reason),
-  }
-}
-
-function mergeReplacementUpdate(
-  current: PendingMinimapUpdate,
-  next: PendingMinimapUpdate,
-): PendingMinimapUpdate {
-  return {
-    snapshot: next.snapshot,
-    replaceDocument: true,
-    edits: [],
-    previousDocumentSummary: null,
-    syncTokens: false,
-    syncSelection: false,
-    syncExternalDecorations: false,
-    syncViewport: current.syncViewport || next.syncViewport,
-    syncBaseStyles: current.syncBaseStyles || next.syncBaseStyles,
-    tokenSourceAfterEdits: null,
-    reason: mergeReasons(current.reason, next.reason),
-  }
-}
-
-function mergedTokenSourceAfterEdits(
-  current: PendingMinimapUpdate,
-  next: PendingMinimapUpdate,
-): EditorTokenStore | null {
-  if (next.edits.length === 0) return current.tokenSourceAfterEdits
-  if (current.syncTokens) return null
-  return next.tokenSourceAfterEdits
-}
-
-function shouldSyncBaseStyles(kind: string): boolean {
-  if (kind === 'tokens') return true
-  if (kind === 'document') return true
-  return kind === 'clear'
-}
-
-function basePendingUpdate(snapshot: EditorViewSnapshot, kind: string): PendingMinimapUpdate {
-  return {
-    snapshot,
-    replaceDocument: false,
-    edits: [],
-    previousDocumentSummary: null,
-    syncTokens: false,
-    syncSelection: false,
-    syncExternalDecorations: false,
-    syncViewport: shouldSyncViewport(kind),
-    syncBaseStyles: shouldSyncBaseStyles(kind),
-    tokenSourceAfterEdits: null,
-    reason: 'metadata',
-  }
-}
-
-function contentPendingUpdate(
-  base: PendingMinimapUpdate,
-  change: EditorContributionChange | null | undefined,
-  previousSummary: MinimapDocumentSummaryBaseline,
-): PendingMinimapUpdate {
-  const edits = incrementalTextEdits(change)
-  if (!edits) {
-    return { ...base, replaceDocument: true, reason: 'content.replaceDocument' }
-  }
-
-  return {
-    ...base,
-    edits,
-    previousDocumentSummary: previousSummary,
-    syncSelection: true,
-    tokenSourceAfterEdits: tokenSourceAfterEdits(change, previousSummary.lineStarts, base.snapshot),
-    reason: edits.length === 1 ? 'content.edit' : 'content.edits',
-  }
-}
-
-function previousDocumentSummary(update: PendingMinimapUpdate): MinimapDocumentSummaryBaseline {
-  return update.previousDocumentSummary ?? snapshotSummaryBaseline(update.snapshot)
-}
-
-function snapshotSummaryBaseline(snapshot: EditorViewSnapshot): MinimapDocumentSummaryBaseline {
-  return {
-    textLength: snapshot.textSnapshot.length,
-    lineStarts: snapshot.lineStartsView,
   }
 }
 
@@ -1519,69 +853,6 @@ function shouldDeferMinimapUpdate(update: PendingMinimapUpdate): boolean {
   if (update.reason.includes('content')) return true
   if (update.syncTokens) return true
   return update.syncExternalDecorations
-}
-
-function sequentialTextEdits(edits: readonly TextEdit[]): readonly TextEdit[] {
-  let delta = 0
-  return edits.map((edit) => {
-    const from = edit.from + delta
-    const to = edit.to + delta
-    delta += edit.text.length - (edit.to - edit.from)
-    return { from, to, text: edit.text }
-  })
-}
-
-function compareTextEdits(left: TextEdit, right: TextEdit): number {
-  return left.from - right.from || left.to - right.to
-}
-
-function tokenSourceAfterEdits(
-  change: EditorContributionChange | null | undefined,
-  previousLineStarts: MinimapLineStarts,
-  nextSnapshot: EditorViewSnapshot,
-): EditorTokenStore | null {
-  if (!change) return null
-  if (!editsPreserveLineStructure(change.edits, previousLineStarts)) return null
-  return nextSnapshot.tokens
-}
-
-function editsPreserveLineStructure(
-  edits: readonly TextEdit[],
-  lineStarts: MinimapLineStarts,
-): boolean {
-  for (const edit of edits) {
-    if (edit.text.includes('\n')) return false
-    if (!editRangeIsSingleLine(lineStarts, edit)) return false
-  }
-
-  return true
-}
-
-function editRangeIsSingleLine(lineStarts: MinimapLineStarts, edit: TextEdit): boolean {
-  return lineStarts.indexForOffset(edit.from) === lineStarts.indexForOffset(edit.to)
-}
-
-function arrayLineIndexForOffset(lineStarts: readonly number[], offset: number): number {
-  let low = 0
-  let high = lineStarts.length - 1
-  const clamped = Math.max(0, offset)
-
-  while (low <= high) {
-    const middle = Math.floor((low + high) / 2)
-    const start = lineStarts[middle] ?? 0
-    const next = lineStarts[middle + 1] ?? Number.POSITIVE_INFINITY
-    if (clamped < start) {
-      high = middle - 1
-      continue
-    }
-    if (clamped >= next) {
-      low = middle + 1
-      continue
-    }
-    return middle
-  }
-
-  return Math.max(0, lineStarts.length - 1)
 }
 
 function mergeReasons(left: string, right: string): string {
@@ -1679,37 +950,27 @@ function minimapPerformanceDiagnosticGlobal(): MinimapPerformanceDiagnosticGloba
 
 function pendingUpdateDiagnostics(update: PendingMinimapUpdate): Readonly<Record<string, unknown>> {
   return {
-    editCount: update.edits.length,
-    incremental: !update.replaceDocument,
     reason: update.reason,
     syncBaseStyles: update.syncBaseStyles,
     syncExternalDecorations: update.syncExternalDecorations,
     syncSelection: update.syncSelection,
     syncTokens: update.syncTokens,
     syncViewport: update.syncViewport,
-    tokenSourceKnown: update.tokenSourceAfterEdits !== null || update.edits.length === 0,
-    type: update.replaceDocument ? 'replaceDocument' : 'incremental',
   }
 }
 
 function requestDiagnostics(request: MinimapWorkerRequest): Readonly<Record<string, unknown>> {
   switch (request.type) {
-    case 'openDocument':
-    case 'replaceDocument':
-      return { request: request.type, ...documentPayloadDiagnostics(request.document) }
-    case 'applyEdit':
+    case 'projectSource': {
+      const projection = request.projection
       return {
         request: request.type,
-        editTextLength: request.edit.text.length,
-        ...documentEditPayloadDiagnostics(request.document),
+        kind: projection.kind,
+        textLength: projection.summary.textLength,
+        lines: projection.summary.lines.length,
+        lineSummaryTextLength: lineSummaryTextLength(projection.summary.lines),
       }
-    case 'applyEdits':
-      return {
-        request: request.type,
-        editCount: request.edits.length,
-        editTextLength: textLengthForEdits(request.edits),
-        ...documentEditPayloadDiagnostics(request.document),
-      }
+    }
     case 'updateTokens':
       return { request: request.type, tokens: request.tokens.length }
     case 'updateTokenRange':
@@ -1729,47 +990,9 @@ function requestDiagnostics(request: MinimapWorkerRequest): Readonly<Record<stri
   }
 }
 
-function documentPayloadDiagnostics(
-  payload: MinimapDocumentPayload | null,
-): Readonly<Record<string, unknown>> {
-  return {
-    decorations: payload?.decorations.length ?? 0,
-    externalDecorations: payload?.externalDecorations?.length ?? 0,
-    lineSummaryTextLength: lineSummaryTextLength(payload?.lines ?? []),
-    lineStarts: payload?.lineStarts.length ?? 0,
-    lines: payload?.lines.length ?? 0,
-    selections: payload?.selections.length ?? 0,
-    textLength: payload?.textLength ?? 0,
-    tokens: payload?.tokens.length ?? 0,
-    type: 'document',
-  }
-}
-
-function documentEditPayloadDiagnostics(
-  payload: MinimapDocumentEditPayload | null,
-): Readonly<Record<string, unknown>> {
-  const patch = payload?.summaryPatch
-  return {
-    deleteCount: patch?.deleteCount ?? 0,
-    lineSummaryTextLength: lineSummaryTextLength(patch?.lines ?? []),
-    lineStarts: patch?.lineStarts?.length ?? 0,
-    lines: patch?.lines.length ?? 0,
-    selections: payload?.selections.length ?? 0,
-    startLine: patch?.startLine ?? 0,
-    textLength: patch?.textLength ?? 0,
-    type: 'edit',
-  }
-}
-
 function lineSummaryTextLength(lines: readonly { readonly text: string }[]): number {
   let length = 0
   for (const line of lines) length += line.text.length
-  return length
-}
-
-function textLengthForEdits(edits: readonly TextEdit[]): number {
-  let length = 0
-  for (const edit of edits) length += edit.text.length
   return length
 }
 
