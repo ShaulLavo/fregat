@@ -17,8 +17,32 @@ screenshot paths on one frozen view with counterbalanced order. Twenty pairs pro
 PNGs, with median elapsed capture 66.745 ms for the element path and 32.420 ms for the clipped
 path, and complete resource retirement. These are headless observer-overhead measurements,
 not SDK or physical display latency. Fractional clipping/no-scroll validation and all 415 stress
-tests pass. A fresh instrument control collection and one complete full public-command proof
-remain required before claiming the 45-minute target is fixed.
+tests pass.
+
+Fresh controls pass under measurement `dff708a4` and unchanged validation `e76f680d`: all
+72 input keys, 35 ordinary frame keys, the named frame key at a 25 ms detection floor, and
+108 native positive comparisons. Independent verification replays the saved raw comparisons
+and confirms the original frozen package hashes, source/output correctness, and cleanup.
+
+One complete cached-control full public command takes **2,601.851 seconds**, including output
+writing and process cleanup. This meets the 2,700-second target with 98.149 seconds to spare
+and saves 196.310 seconds against the archived 2,798.161-second command. All ten configurations
+pass their 1,080 raw blocking comparisons; all 972 required comparisons pass with the existing
+standalone-minimap timing exclusion preserved. All configurations retain strict source/output
+checks, exact saved-result replay, and closed contexts with no retained objects or live workers.
+
+Observed priming/screenshot time falls from 424.632 to 320.697 seconds, and input/paint time,
+which includes the final capture after native timing finishes, falls from 371.084 to 291.461.
+Worker settlement stays at 1,220.509 seconds versus 1,215.189 in the archive. The unchanged
+adaptive stopping rule collects 1,500 measured arm samples versus 1,512 previously; both runs
+include 720 warmup arm samples. These phase totals describe the captured commands and do not
+attribute every second of the difference to one change.
+
+The headless run measures benchmark-tooling elapsed time. One declared private Vite server
+is present at admission and ends during collection; the receipt preserves its snapshots.
+No finite job overlaps the measurement. No replacement run, budget increase, reduced coverage,
+or application deployment is used. [PR #853](https://github.com/ShaulLavo/fregat/pull/853)
+contains the repair. Historical identical-build Undo flags remain separate follow-ups.
 
 ## Current delivery checkpoint, 2026-10-05
 
