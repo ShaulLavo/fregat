@@ -1,3 +1,11 @@
+import {
+  captureFilesystemLocal,
+  type FilesystemLocalCapture,
+  type SnapshotComparisonRequest,
+  type SnapshotComparisonLease,
+} from '@/lib/snapshot-comparison'
+import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
+import type { SnapshotComparisonScope } from '@/lib/documents/utils/snapshot-comparison'
 import { isPdfFile } from '@/lib/pdf-viewer/format'
 import { supportsTextFile } from '@/features/editor/state/workspace-document-service'
 import { materializeFileSnapshot, type FileSnapshot } from '@/lib/file-snapshot'
@@ -114,6 +122,7 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
 
       void applyWorkspaceEvents({
         conflictStore,
+        acquireSnapshotComparison: documentState.acquireSnapshotComparison,
         discardLiveEditorDocument,
         dirtyDocumentKeys: documentState.dirtyDocumentKeys,
         ensureUnsyncedEditorDocument: documentState.ensureUnsyncedEditorDocument,
@@ -151,6 +160,7 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
 
       void applyWorkspaceReady({
         conflictStore,
+        acquireSnapshotComparison: documentState.acquireSnapshotComparison,
         discardLiveEditorDocument,
         dirtyDocumentKeys: documentState.dirtyDocumentKeys,
         ensureUnsyncedEditorDocument: documentState.ensureUnsyncedEditorDocument,
@@ -322,7 +332,7 @@ function workspaceEventsScopeHasWork(eventsScope: WideEventScope) {
 
 type WorkspaceEventContext = Omit<
   Parameters<typeof applyWorkspaceEventPlan>[0],
-  'plan' | 'ignoreOpenFileRefreshErrors'
+  'plan' | 'ignoreOpenFileRefreshErrors' | 'conflictSources'
 > & {
   openFilePaths: readonly string[]
   scope: WideEventScope
@@ -338,6 +348,7 @@ export async function applyWorkspaceEvents({
   events: FilesystemEvent[]
   isOwnWorkspaceEditEvent: (writeId: string) => boolean
 }) {
+  const conflictSources = captureWorkspaceConflictSources(context, openFilePaths)
   for (const path of openFilePaths) {
     if (!isPdfFile(path)) continue
     const affected = events.some(
@@ -361,7 +372,7 @@ export async function applyWorkspaceEvents({
   )
   logWorkspaceEventBatch(scope, events)
   logWorkspaceEventPlan(scope, 'workspace.events.plan', plan)
-  await applyWorkspaceEventPlan({ ...context, plan })
+  await applyWorkspaceEventPlan({ ...context, conflictSources, plan })
 }
 
 function invalidateGitState(queryClient: ReturnType<typeof useQueryClient>) {
@@ -434,6 +445,7 @@ export async function applyWorkspaceReady({
   scope,
   ...context
 }: WorkspaceEventContext) {
+  const conflictSources = captureWorkspaceConflictSources(context, openFilePaths)
   await Promise.all(
     openFilePaths
       .filter((path) => isPdfFile(path))
@@ -453,11 +465,18 @@ export async function applyWorkspaceReady({
     rootPath: context.rootPath,
   })
   logWorkspaceEventPlan(scope, 'workspace.events.ready_plan', plan)
-  await applyWorkspaceEventPlan({ ...context, ignoreOpenFileRefreshErrors: true, plan })
+  await applyWorkspaceEventPlan({
+    ...context,
+    conflictSources,
+    ignoreOpenFileRefreshErrors: true,
+    plan,
+  })
 }
 
 async function applyWorkspaceEventPlan({
   conflictStore,
+  acquireSnapshotComparison,
+  conflictSources,
   discardLiveEditorDocument,
   dirtyDocumentKeys,
   ensureUnsyncedEditorDocument,
@@ -473,6 +492,8 @@ async function applyWorkspaceEventPlan({
   selectContent,
   signal,
 }: {
+  acquireSnapshotComparison: (request: SnapshotComparisonRequest) => SnapshotComparisonLease
+  conflictSources: WorkspaceConflictSources
   conflictStore: EditorConflictStoreApi
   discardLiveEditorDocument: (document: DocumentRef) => { wasDirty: boolean }
   dirtyDocumentKeys: ReadonlySet<DocumentKey>
@@ -489,8 +510,12 @@ async function applyWorkspaceEventPlan({
   selectContent: (content: TabContent) => void
   signal: AbortSignal
 }) {
-  const client = clientForQueryClient(queryClient)
+  const client = conflictSources.client
   const conflictContext: WorkspaceConflictContext = {
+    comparisonScope: conflictSources.scope,
+    localCaptures: conflictSources.local,
+    acquireSnapshotComparison,
+    signal,
     client,
     conflictStore,
     discardLiveEditorDocument,
@@ -734,7 +759,7 @@ async function applyRefreshOpenFileOperation({
     .query({
       ...fileSnapshotQueryOptions(filesystemPath(path), {
         fetcher: (path, signal) => {
-          const client = clientForQueryClient(queryClient)
+          const client = conflictContext.client
           if (refresh.reason === 'deleted') return fetchFile(path, signal, client)
           return fetchFileWithRetry(path, signal, client)
         },
@@ -920,4 +945,42 @@ function delay(ms: number, signal: AbortSignal) {
     }, ms)
     signal.addEventListener('abort', onAbort, { once: true })
   })
+}
+
+type WorkspaceConflictSources = {
+  readonly scope: SnapshotComparisonScope
+  readonly client: Client
+  readonly local: ReadonlyMap<FilesystemPath, FilesystemLocalCapture>
+}
+function captureWorkspaceConflictSources(
+  context: Pick<
+    WorkspaceEventContext,
+    'queryClient' | 'rootPath' | 'getLiveEditorDocument' | 'conflictStore'
+  >,
+  paths: readonly string[],
+): WorkspaceConflictSources {
+  const scope = {
+    environmentId: confirmedEnvironmentId(originForQueryClient(context.queryClient)),
+    rootPath: filesystemPath(context.rootPath),
+  }
+  const client = clientForQueryClient(context.queryClient)
+  const local = new Map<FilesystemPath, FilesystemLocalCapture>()
+  const capturedPaths = [
+    ...paths,
+    ...Object.values(context.conflictStore.getState().conflicts).map(
+      (conflict) => conflict.localPath,
+    ),
+  ]
+  for (const rawPath of capturedPaths) {
+    const path = filesystemPath(rawPath)
+    if (local.has(path)) continue
+    local.set(
+      path,
+      captureFilesystemLocal(
+        path,
+        context.getLiveEditorDocument(fileDocumentKey(path))?.buffer ?? null,
+      ),
+    )
+  }
+  return { scope, client, local }
 }

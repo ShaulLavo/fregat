@@ -1,3 +1,4 @@
+import { createStringTextSnapshot } from '@singapore-editor/core/document'
 import { queryOptions } from '@tanstack/react-query'
 
 import { extractFsErrorCode } from '@/lib/client-error-taxonomy'
@@ -21,6 +22,16 @@ export function previewQueryOptions(path: string, maxBytes: number) {
         return {
           kind: 'text',
           text: head.content,
+          read: {
+            kind: 'disk',
+            input: {
+              kind: 'disk-head',
+              origin,
+              maxBytes,
+              head,
+              reader: createStringTextSnapshot(head.content),
+            },
+          },
           size: head.size,
           truncated: head.truncated,
           source: { origin, path: head.path, capture: head.capture },

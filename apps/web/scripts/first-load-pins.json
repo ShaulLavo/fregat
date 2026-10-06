@@ -1,12 +1,12 @@
 {
   "reading": "disk",
   "scriptGzip": 1772746,
-  "phoneScriptGzip": 1449825,
+  "phoneScriptGzip": 1470125,
   "owners": {
     "node_modules": 505079,
     "editor": 373737,
     "apps/web/src/features/chat": 183480,
-    "apps/web/src/features/editor": 99601,
+    "apps/web/src/features/editor": 105972,
     "apps/web/src/features/workspace": 64433,
     "apps/web/src/lib": 74095,
     "packages/client-core": 54773,
@@ -157,6 +157,12 @@
       "scriptGzip": 1772746,
       "phoneScriptGzip": 1459983,
       "reason": "Plan 099 retained document contribution delivery and migrated consumer APIs. Matched untouched main94684d6fd versus complete candidate95579ea41, with identical CI=1 bundle-report options and resolved dependencies: desktop 1763961 -> 1772746 (+8785); phone conversation 1452046 -> 1459983 (+7937); Editor weighted first-load owner 366233 -> 373737 (+7504). Accept this intended canonical source runtime, immutable worker reader and typed contribution cost. Update desktop total and Editor owner only; preserve phone total, all other owner pins, previous history, 1% total and 5%/2 KiB owner margins. Original CI75 unchanged-gate failure is preserved in ci75-111745903327.log; complete matched reports are bundle-main946.json and bundle-candidate955.json. Weighted owner gzip includes shared-chunk attribution and is separate from total gzip. This records source cost; final latency, retention and deployment qualification remain open."
+    },
+    {
+      "at": "2026-10-06T06:20:53.210Z",
+      "scriptGzip": 1785067,
+      "phoneScriptGzip": 1470125,
+      "reason": "Root preference 33 accepts the measured reference at independently approved PR851 source 10d087ec19f5d3abe0d733a665f26f4cda3f9123. Set only phoneScriptGzip 1449825 -> 1470125 and apps/web/src/features/editor 99601 -> 105972. Actual level9 disk gzip JS is desktop 1785067, phone home 1203579 and phone session maximum 1470125; phone CSS 38667 is separate. Editor 105972 is the canonical rounded approximate shared-chunk rendered-share attribution. Required filesystem, settings, preview and attachment semantics retain held immutable byte and reader references, synchronous capture and admission, source interests and release and current write authority; useful PR851 moves optional presentation behind actual Editor consumers. Raw report/measurement/gate receipts are track200/pr808-placement-implementation/candidate/report.json, measurement.receipt.json and gate-evaluation.json; independent 647-file disk, source and rounding proof is track200/pr808-placement-review/offline-cost-proof.json and APPROVE comment6009794865. Original failed phone limit1464323, exceeded by5802 bytes and Editor allowed104581.05, exceeded by1390.95 attributed bytes, plus original87/350 and66b/10d pair failures, remain preserved. Reading=disk, desktop pin1772746 and limit1790473, Workbench43448, Git41690, every other owner, prior history and the 1% total and 5%/2KiB owner margins are unchanged. Current assembly81eb3c2b548cce327cd0729b657bda0ba8a47697 has different Tailwind-scanned verification inputs; its bytes/finalC were not measured and equivalence is not claimed. Exact-head full CI evaluates current assembly against this named reference and still rejects unexplained growth or other failures. This records intended approved source cost; performance, functional, timeout and hardware qualification remain separate."
     }
   ]
 }

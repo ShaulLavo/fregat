@@ -1,4 +1,19 @@
 import {
+  boundedPreviewPrefix,
+  samePreviewScope,
+  type PreviewSourceRead,
+  type PreviewSourceLease,
+  type LivePreviewRequest,
+  type DiskHeadInput,
+  type AttachmentTextCapture,
+} from '@/lib/file-preview/utils/source'
+import { serverEndpoint } from '@/lib/client'
+import {
+  filesystemComparisonSubject,
+  sameFilesystemCapture,
+  settingsComparisonSubject,
+} from '@/lib/snapshot-comparison'
+import {
   sameCheckpointCapture,
   promoteCheckpointCapture,
   sameHistoryCapture,
@@ -44,6 +59,8 @@ import type {
   SnapshotComparisonRead,
   SnapshotComparisonRequest,
   SnapshotComparisonRefresh,
+  SettingsComparisonInput,
+  SettingsComparisonRequest,
 } from '@/lib/snapshot-comparison'
 import type { FileSnapshot } from '@/lib/file-snapshot'
 import type { EnvironmentId } from '@workspace/contracts'
@@ -55,6 +72,7 @@ import type {
   SavedComparisonRefresh,
 } from '@/lib/saved-comparison'
 import {
+  createStringTextSnapshot,
   createEditorViewSession,
   acquireDocumentMutationLease,
   releaseDocumentMutationLease,
@@ -252,6 +270,8 @@ type SnapshotComparisonInterest = {
 
 export type WorkspaceDocumentServiceState = {
   readonly environmentId: EnvironmentId | null
+  previewScope: import('@/lib/documents/utils/snapshot-comparison').SnapshotComparisonScope | null
+  previewSources: ReadonlyMap<PreviewSourceLease, PreviewSourceRead>
   snapshotComparisonTabs: ReadonlyMap<TabId, SnapshotComparisonLease>
   snapshotComparisons: ReadonlyMap<SnapshotComparisonLease, SnapshotComparisonRead>
   savedComparisonTabs: ReadonlyMap<TabId, SavedComparisonLease>
@@ -273,7 +293,23 @@ type SavedComparisonInterest = {
   stop: () => void
 }
 
+type PreviewInterest = {
+  current: PreviewSourceRead
+  readonly key: DocumentKey | null
+  readonly buffer: EditorTextBuffer | null
+  readonly maxBytes: number
+  readonly releasePin: () => void
+  stop: () => void
+}
+
 export class WorkspaceDocumentService {
+  private previewScope:
+    | import('@/lib/documents/utils/snapshot-comparison').SnapshotComparisonScope
+    | null = null
+  private previewOrigin: string | null = null
+  private previewSources: ReadonlyMap<PreviewSourceLease, PreviewSourceRead> = new Map()
+  private readonly previewInterests = new Map<PreviewSourceLease, PreviewInterest>()
+
   private snapshotComparisonTabs: ReadonlyMap<TabId, SnapshotComparisonLease> = new Map()
   private snapshotComparisons: ReadonlyMap<SnapshotComparisonLease, SnapshotComparisonRead> =
     new Map()
@@ -324,7 +360,228 @@ export class WorkspaceDocumentService {
     private readonly environmentId: EnvironmentId | null = null,
   ) {}
 
+  setPreviewScope(rootPath: FilesystemPath | null, origin: string): void {
+    if (this.sourceOwnerDisposed) return
+    const next =
+      rootPath !== null && this.environmentId !== null
+        ? { environmentId: this.environmentId, rootPath }
+        : null
+    if (samePreviewScope(next, this.previewScope) && origin === this.previewOrigin) return
+    this.previewScope = next
+    const originChanged = origin !== this.previewOrigin
+    this.previewOrigin = origin
+    for (const [lease, interest] of Array.from(this.previewInterests)) {
+      if (!originChanged && interest.current.kind === 'attachment') continue
+      this.endPreview(lease, { kind: 'released', reason: 'interest-ended' })
+    }
+    this.onStateChange()
+  }
+
+  acquireLivePreview({
+    scope,
+    key,
+    maxBytes,
+    signal,
+  }: LivePreviewRequest): PreviewSourceLease | null {
+    this.assertPreviewScope(scope)
+    if (this.sourceOwnerDisposed || signal.aborted)
+      return this.createPreviewInterest(
+        {
+          kind: 'released',
+          reason: this.sourceOwnerDisposed ? 'owner-disposed' : 'interest-ended',
+        },
+        signal,
+      )
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < 0)
+      throw createClientInvariantError('Preview budget must be bounded bytes', {
+        validBudget: false,
+      })
+    const document = this.liveDocumentsByKey.get(key)
+    if (!document || document.target.kind !== 'file') return null
+    const pin = this.acquireFilePreparation({ kind: 'live-document', documentKey: key })
+    if (!pin || pin.document.buffer !== document.buffer) {
+      pin?.release()
+      return null
+    }
+    const read: PreviewSourceRead = {
+      kind: 'live',
+      scope,
+      key,
+      buffer: document.buffer,
+      revision: document.buffer.getRevision(),
+      snapshot: document.buffer.getTextSnapshot(),
+      ...boundedPreviewPrefix(document.buffer.getTextSnapshot(), maxBytes),
+      maxBytes,
+      dirty: this.isDirtyDocument(key),
+    }
+    return this.createPreviewInterest(read, signal, {
+      key,
+      buffer: document.buffer,
+      maxBytes,
+      releasePin: pin.release,
+    })
+  }
+
+  adoptPreviewCapture({
+    input,
+    signal,
+  }: {
+    readonly input: DiskHeadInput | AttachmentTextCapture
+    readonly signal: AbortSignal
+  }): PreviewSourceLease {
+    if (input.kind === 'attachment') {
+      if (
+        input.environmentId !== this.environmentId ||
+        this.previewOrigin === null ||
+        input.origin !== serverEndpoint(this.previewOrigin)
+      )
+        throw createClientInvariantError('Attachment capture belongs to a different owner', {
+          environmentMatches: input.environmentId === this.environmentId,
+          originMatches:
+            this.previewOrigin !== null && input.origin === serverEndpoint(this.previewOrigin),
+        })
+      return this.createPreviewInterest({ kind: 'attachment', input }, signal)
+    }
+    this.assertPreviewScope(input.scope)
+    if (input.origin !== this.previewOrigin)
+      throw createClientInvariantError('Preview capture belongs to a different origin', {
+        originMatches: false,
+      })
+    return this.createPreviewInterest({ kind: 'disk', input }, signal)
+  }
+
+  private assertPreviewScope(
+    scope: import('@/lib/documents/utils/snapshot-comparison').SnapshotComparisonScope,
+  ): void {
+    if (samePreviewScope(scope, this.previewScope)) return
+    throw createClientInvariantError('Preview source belongs to a different namespace', {
+      environmentMatches: scope.environmentId === this.environmentId,
+      rootMatches: scope.rootPath === this.previewScope?.rootPath,
+    })
+  }
+
+  private createPreviewInterest(
+    read: PreviewSourceRead,
+    signal: AbortSignal,
+    live?: Pick<PreviewInterest, 'key' | 'buffer' | 'maxBytes' | 'releasePin'>,
+  ): PreviewSourceLease {
+    const entry: PreviewInterest = {
+      current: read,
+      key: live?.key ?? null,
+      buffer: live?.buffer ?? null,
+      maxBytes: live?.maxBytes ?? 0,
+      releasePin: live?.releasePin ?? (() => undefined),
+      stop: () => undefined,
+    }
+    const lease: PreviewSourceLease = {
+      read: () => entry.current,
+      release: () => this.endPreview(lease, { kind: 'released', reason: 'interest-ended' }),
+    }
+    if (this.sourceOwnerDisposed || signal.aborted) {
+      entry.releasePin()
+      entry.current = {
+        kind: 'released',
+        reason: this.sourceOwnerDisposed ? 'owner-disposed' : 'interest-ended',
+      }
+      return lease
+    }
+    const abort = () => lease.release()
+    signal.addEventListener('abort', abort, { once: true })
+    entry.stop = () => signal.removeEventListener('abort', abort)
+    this.previewInterests.set(lease, entry)
+    this.previewSources = new Map(this.previewSources).set(lease, read)
+    this.onStateChange()
+    return lease
+  }
+
+  private endPreview(
+    lease: PreviewSourceLease,
+    terminal: Extract<PreviewSourceRead, { kind: 'released' | 'unavailable' }>,
+  ): void {
+    const entry = this.previewInterests.get(lease)
+    if (!entry) return
+    this.previewInterests.delete(lease)
+    entry.stop()
+    entry.current = terminal
+    const reads = new Map(this.previewSources)
+    reads.delete(lease)
+    this.previewSources = reads
+    entry.releasePin()
+    if (!this.sourceOwnerDisposed) this.onStateChange()
+  }
+
+  private refreshPreviewSources(
+    key: DocumentKey,
+    committed?: { readonly revision: number; readonly snapshot: DocumentTextSnapshot },
+  ): void {
+    for (const [lease, entry] of Array.from(this.previewInterests)) {
+      if (
+        this.previewInterests.get(lease) !== entry ||
+        entry.key !== key ||
+        entry.current.kind !== 'live'
+      )
+        continue
+      const document = this.liveDocumentsByKey.get(key)
+      if (!document || document.buffer !== entry.buffer) {
+        this.endPreview(lease, { kind: 'unavailable', reason: 'live-ended' })
+        continue
+      }
+      if (committed && committed.revision < entry.current.revision) continue
+      const snapshot = committed?.snapshot ?? document.buffer.getTextSnapshot()
+      entry.current = {
+        ...entry.current,
+        revision: committed?.revision ?? document.buffer.getRevision(),
+        snapshot,
+        ...boundedPreviewPrefix(snapshot, entry.maxBytes),
+        dirty: document.buffer.isDirty(),
+      }
+      this.previewSources = new Map(this.previewSources).set(lease, entry.current)
+    }
+  }
+
+  acquireSettingsComparison({
+    scope,
+    key,
+    signal,
+  }: SettingsComparisonRequest): SnapshotComparisonLease {
+    this.assertComparisonOwner(scope)
+    if (this.sourceOwnerDisposed || signal.aborted)
+      return endedSettingsComparison(this.sourceOwnerDisposed ? 'owner-disposed' : 'interest-ended')
+    const document = this.liveDocumentsByKey.get(key)
+    if (!document || document.target.kind !== 'settings-json' || document.sync.kind !== 'settings')
+      throw createClientInvariantError(
+        'Settings comparison requires the current settings document',
+        {
+          documentAvailable: Boolean(document),
+          targetMatches: document?.target.kind === 'settings-json',
+        },
+      )
+    const groups = this.snapshotGroups.get(
+      JSON.stringify(['settings', scope.environmentId, scope.rootPath, key]),
+    )
+    const previous = [...(groups ?? [])].find(
+      (group) =>
+        group.current.input.kind === 'settings' &&
+        group.current.input.local.buffer === document.buffer,
+    )?.current.input
+    const input = this.settingsComparisonInput(
+      scope,
+      key,
+      undefined,
+      previous?.kind === 'settings' ? previous : undefined,
+    )
+    if (!input)
+      throw createClientInvariantError('Settings comparison document ended during acquisition', {
+        documentAvailable: this.liveDocumentsByKey.has(key),
+      })
+    return this.createSnapshotComparisonInterest({ input, signal })
+  }
+
   acquireSnapshotComparison(request: SnapshotComparisonRequest): SnapshotComparisonLease {
+    if (request.input.kind === 'settings')
+      throw createClientInvariantError('Settings comparison uses current owner acquisition', {
+        sourceKind: request.input.kind,
+      })
     return this.createSnapshotComparisonInterest(request)
   }
 
@@ -363,7 +620,10 @@ export class WorkspaceDocumentService {
     const key = snapshotGroupKey(input)
     const groups = this.snapshotGroups.get(key) ?? new Set<SnapshotComparisonGroup>()
     const retained =
-      input.kind === 'history' || input.kind === 'operation'
+      input.kind === 'history' ||
+      input.kind === 'operation' ||
+      input.kind === 'filesystem' ||
+      input.kind === 'settings'
         ? [...groups].find((candidate) => compatibleCapture(candidate.current.input, input))
         : groups.values().next().value
     const group = retained ?? {
@@ -392,6 +652,10 @@ export class WorkspaceDocumentService {
     tabId: TabId,
     request: SnapshotComparisonRequest,
   ): SnapshotComparisonLease {
+    if (request.input.kind === 'settings')
+      throw createClientInvariantError('Settings comparison uses current owner acquisition', {
+        sourceKind: request.input.kind,
+      })
     this.assertComparisonOwner(request.input.scope)
     if (!validSnapshotCapture(request.input))
       throw createClientInvariantError('Comparison capture does not match its target', {
@@ -474,6 +738,8 @@ export class WorkspaceDocumentService {
 
   dispose(): void {
     this.sourceOwnerDisposed = true
+    for (const lease of Array.from(this.previewInterests.keys()))
+      this.endPreview(lease, { kind: 'released', reason: 'owner-disposed' })
     for (const lease of this.snapshotInterests.keys())
       this.releaseSnapshotComparison(lease, 'owner-disposed')
     for (const lease of this.comparisonInterests.keys())
@@ -1482,6 +1748,8 @@ export class WorkspaceDocumentService {
     const viewsByTabId = recordFromMap(this.viewsByTabId, previous?.viewsByTabId)
     const next: WorkspaceDocumentServiceState = {
       environmentId: this.environmentId,
+      previewScope: this.previewScope,
+      previewSources: this.previewSources,
       snapshotComparisonTabs: this.snapshotComparisonTabs,
       snapshotComparisons: this.snapshotComparisons,
       savedComparisonTabs: this.savedComparisonTabs,
@@ -1849,6 +2117,7 @@ export class WorkspaceDocumentService {
       snapshotGroupKey(input) !== snapshotGroupKey(entry.group.current.input)
     )
       return false
+    if (input.kind === 'settings' && input !== entry.group.current.input) return false
     entry.refresh = null
     entry.group.refresh = null
     this.publishSnapshotInput(entry.group, input)
@@ -1942,10 +2211,80 @@ export class WorkspaceDocumentService {
     this.savedComparisons = new Map(this.savedComparisons).set(lease, read)
   }
 
+  private settingsComparisonInput(
+    scope: SettingsComparisonRequest['scope'],
+    key: DocumentKey,
+    committed?: { readonly revision: number; readonly snapshot: DocumentTextSnapshot },
+    previous?: SettingsComparisonInput,
+  ): SettingsComparisonInput | null {
+    const document = this.liveDocumentsByKey.get(key)
+    if (!document || document.target.kind !== 'settings-json' || document.sync.kind !== 'settings')
+      return null
+    const local = {
+      buffer: document.buffer,
+      revision: committed?.revision ?? document.buffer.getRevision(),
+      snapshot: committed?.snapshot ?? document.buffer.getTextSnapshot(),
+    }
+    const sync = document.sync
+    let confirmed: SettingsComparisonInput['confirmed'] = { kind: 'pending' }
+    if (sync.state === 'conflict' && sync.revision !== null && sync.confirmedText !== null) {
+      const retained = previous?.confirmed
+      confirmed =
+        retained?.kind === 'confirmed' &&
+        retained.revision === sync.revision &&
+        retained.reader.materializeFullText() === sync.confirmedText
+          ? retained
+          : {
+              kind: 'confirmed',
+              revision: sync.revision,
+              reader: createStringTextSnapshot(sync.confirmedText),
+            }
+    } else if (previous?.confirmed.kind === 'pending') confirmed = previous.confirmed
+    if (
+      previous &&
+      previous.local.buffer === local.buffer &&
+      previous.local.revision === local.revision &&
+      previous.local.snapshot === local.snapshot &&
+      previous.confirmed === confirmed
+    )
+      return previous
+    return { kind: 'settings', scope, key, target: document.target.target, local, confirmed }
+  }
+
+  private refreshSettingsComparisons(
+    key: DocumentKey,
+    committed?: { readonly revision: number; readonly snapshot: DocumentTextSnapshot },
+  ): void {
+    for (const groups of this.snapshotGroups.values()) {
+      for (const group of groups) this.refreshSettingsGroup(group, key, committed)
+    }
+  }
+
+  private refreshSettingsGroup(
+    group: SnapshotComparisonGroup,
+    key: DocumentKey,
+    committed?: { readonly revision: number; readonly snapshot: DocumentTextSnapshot },
+  ): void {
+    const previous = group.current.input
+    if (previous.kind !== 'settings' || previous.key !== key) return
+    const document = this.liveDocumentsByKey.get(key)
+    if (!document || document.buffer !== previous.local.buffer) {
+      // Release publishes and can mutate the group's interests.
+      for (const lease of Array.from(group.interests.keys()))
+        this.releaseSnapshotComparison(lease, 'interest-ended')
+      return
+    }
+    if (committed && committed.revision < previous.local.revision) return
+    const input = this.settingsComparisonInput(previous.scope, key, committed, previous)
+    if (input && input !== previous) this.publishSnapshotInput(group, input)
+  }
+
   private refreshLiveComparison(
     key: DocumentKey,
     committed?: { readonly revision: number; readonly snapshot: DocumentTextSnapshot },
   ): void {
+    this.refreshPreviewSources(key, committed)
+    this.refreshSettingsComparisons(key, committed)
     for (const [lease, entry] of this.comparisonInterests) {
       if (fileDocumentKey(entry.path) !== key || entry.current.kind === 'released') continue
       entry.current = {
@@ -2164,6 +2503,10 @@ function assertTextFile(file: FileSnapshot): void {
 
 function snapshotGroupKey(input: SnapshotComparisonInput): string {
   switch (input.kind) {
+    case 'settings':
+      return settingsComparisonSubject(input)
+    case 'filesystem':
+      return filesystemComparisonSubject(input.capture)
     case 'operation':
       return operationComparisonSubject(input)
     case 'history':
@@ -2183,6 +2526,26 @@ function snapshotGroupKey(input: SnapshotComparisonInput): string {
 
 function validSnapshotCapture(input: SnapshotComparisonInput): boolean {
   switch (input.kind) {
+    case 'settings':
+      return input.local.buffer !== null && input.local.snapshot !== null
+    case 'filesystem': {
+      const { capture, display } = input
+      if (
+        capture.scope.environmentId !== input.scope.environmentId ||
+        capture.scope.rootPath !== input.scope.rootPath
+      )
+        return false
+      const { local, incoming } = capture
+      if (display.kind === 'no-text') {
+        if (incoming.kind === 'binary' || incoming.kind === 'unsupported')
+          return display.reason === incoming.kind
+        return local.kind === 'missing' && display.reason === 'local-missing'
+      }
+      if (local.kind !== 'text' || (incoming.kind !== 'text' && incoming.kind !== 'deleted'))
+        return false
+      const path = incoming.kind === 'text' ? incoming.file.path : incoming.path
+      return display.file.oldPath === local.path && display.file.newPath === path
+    }
     case 'operation':
       return (
         input.subject === operationComparisonSubject(input) &&
@@ -2215,6 +2578,10 @@ function validSnapshotCapture(input: SnapshotComparisonInput): boolean {
 
 function comparisonRoot(input: SnapshotComparisonInput): FilesystemPath {
   switch (input.kind) {
+    case 'settings':
+      return input.scope.rootPath
+    case 'filesystem':
+      return input.capture.scope.rootPath
     case 'operation':
       return input.root.path
     case 'history':
@@ -2230,6 +2597,17 @@ function comparisonRoot(input: SnapshotComparisonInput): FilesystemPath {
 
 function compatibleCapture(left: SnapshotComparisonInput, right: SnapshotComparisonInput): boolean {
   switch (left.kind) {
+    case 'settings':
+      return (
+        right.kind === 'settings' &&
+        left.key === right.key &&
+        left.target === right.target &&
+        left.local.buffer === right.local.buffer &&
+        left.scope.environmentId === right.scope.environmentId &&
+        left.scope.rootPath === right.scope.rootPath
+      )
+    case 'filesystem':
+      return right.kind === 'filesystem' && sameFilesystemCapture(left, right)
     case 'operation':
       return right.kind === 'operation' && sameOperationCapture(left, right)
     case 'history':
@@ -2241,4 +2619,17 @@ function compatibleCapture(left: SnapshotComparisonInput, right: SnapshotCompari
   }
   const exhaustive: never = left
   return exhaustive
+}
+
+function endedSettingsComparison(
+  reason: 'interest-ended' | 'owner-disposed',
+): SnapshotComparisonLease {
+  const read: SnapshotComparisonRead = { kind: 'released', reason }
+  const lease: SnapshotComparisonLease = {
+    read: () => read,
+    requestRefresh: () => ({ lease }),
+    refresh: () => false,
+    release: () => undefined,
+  }
+  return lease
 }

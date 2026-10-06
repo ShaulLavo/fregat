@@ -18,11 +18,11 @@ import type {
 import {
   diffAttachmentRevision,
   diffAttachmentReferences,
-  diffAttachmentLines,
   diffAttachmentSubject,
   sameDiffAttachmentSubject,
   type DiffAttachment,
 } from '@/lib/diff-attachment'
+import { diffAttachmentLines } from '@/features/editor/utils/attachment-presentation'
 import { captureDiffAnchors, resolveDiffAnchors } from '@/features/editor/utils/diff-source-anchors'
 
 type SyntaxConfiguration = {
@@ -317,6 +317,12 @@ function sameAttachment(left: DiffAttachment, right: DiffAttachment): boolean {
   if (left === right) return true
   if (left.file !== right.file || left.kind !== right.kind) return false
   switch (left.kind) {
+    case 'settings':
+      return right.kind === 'settings' && left.read === right.read
+    case 'filesystem':
+      return (
+        right.kind === 'filesystem' && left.read === right.read && left.meaning === right.meaning
+      )
     case 'operation':
       return right.kind === 'operation' && left.read === right.read
     case 'snapshot':

@@ -1,3 +1,5 @@
+import { captureFilesystemLocal, type FilesystemLocalCapture } from '@/lib/snapshot-comparison'
+import { retainFilesystemConflict } from '@/features/workspace/state/event-conflict-adapter'
 import { supportsTextFile } from '@/features/editor/state/workspace-document-service'
 import { parentFilesystemPath } from '@/lib/path-formatters'
 import { type TextSnapshot } from '@singapore-editor/core/document'
@@ -48,6 +50,7 @@ type ResolutionContext = {
   ) => { wasDirty: boolean }
 }
 type CapturedResolution = {
+  readonly local: FilesystemLocalCapture
   readonly conflict: FilesystemConflict
   readonly target: ConflictTarget
   readonly root: WorkspaceEditRoot
@@ -109,6 +112,11 @@ export class ConflictEditorResolutionCoordinator {
     if (conflict.remoteFile && !supportsTextFile(conflict.remoteFile)) return null
     if (!textSnapshotEqualsText(resolution.buffer.getTextSnapshot(), text)) return null
     return {
+      local: captureFilesystemLocal(
+        conflict.localPath,
+        documentStore.getState().getLiveEditorDocument(fileDocumentKey(conflict.localPath))
+          ?.buffer ?? null,
+      ),
       conflict,
       target,
       resolution,
@@ -213,20 +221,50 @@ export class ConflictEditorResolutionCoordinator {
     if (!this.conflictCurrent(capture) || !this.destinationCurrent(capture)) return 'unresolved'
     setFileSnapshotQueryData(this.context.queryClient, file)
     if (!this.resolutionCurrent(capture)) {
-      if (!this.rootCurrent(capture)) return 'unresolved'
-      this.context.conflictStore.getState().addConflict({
-        ...capture.conflict,
-        eventType: retryEventType(capture.conflict),
-        remoteFile: file,
-        remoteText: file.content,
-      })
-      return 'retry'
+      if (!this.retryCaptureCurrent(capture)) return 'unresolved'
+      const candidate = retainFilesystemConflict(
+        {
+          ...capture.conflict,
+          eventType: retryEventType(capture.conflict),
+          remoteFile: file,
+          remoteText: file.content,
+        },
+        {
+          comparisonScope: capture.conflict.latest.input.scope,
+          acquireSnapshotComparison:
+            this.context.documentStore.getState().acquireSnapshotComparison,
+          signal: new AbortController().signal,
+        },
+        capture.local,
+      )
+      if (!this.retryCaptureCurrent(capture) || candidate.latest.lease.read().kind !== 'ready') {
+        candidate.latest.lease.release()
+        return 'unresolved'
+      }
+      this.context.conflictStore.getState().addConflict(candidate)
+      const stored = this.context.conflictStore.getState().conflicts[candidate.id]
+      if (stored?.latest !== candidate.latest) {
+        candidate.latest.lease.release()
+        return 'unresolved'
+      }
+      return !this.disposed && this.rootCurrent(capture) && this.destinationCurrent(capture)
+        ? 'retry'
+        : 'unresolved'
     }
     this.replaceDestination(capture.conflict, file)
     this.context.discardLiveEditorDocument(capture.target)
     if (capture.conflict.toastId) toast.dismiss(capture.conflict.toastId)
     this.context.conflictStore.getState().removeConflict(capture.conflict.id)
     return 'resolved'
+  }
+
+  private retryCaptureCurrent(capture: CapturedResolution): boolean {
+    return (
+      !this.disposed &&
+      this.rootCurrent(capture) &&
+      this.conflictCurrent(capture) &&
+      this.destinationCurrent(capture)
+    )
   }
 
   private isCurrent(capture: CapturedResolution): boolean {

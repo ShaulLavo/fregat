@@ -11,7 +11,6 @@ import {
 import { useConflictEditorResolution } from '@/features/workspace/hooks/use-conflict-editor-resolution'
 import { SearchPane } from '@/features/workspace/components/search-pane'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
-import { useEditorConflictState } from '@/features/editor/state/conflict-state'
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import { useWorkspaceEditHost } from '@/lib/workspace-edits/providers/host-context'
 import { useEditorUiState, useEditorUiStoreApi } from '@/features/editor/state/ui-state'
@@ -127,12 +126,6 @@ export function EditorSurfaceTabBody({
   const setStatusBarSource = useEditorUiState((state) => state.setStatusBarSource)
   const uiStore = useEditorUiStoreApi()
   const { openDefinition, selectContent } = useEditorCommands()
-  // Only a file that is still on disk has a saved side to compare the buffer against.
-  const comparableConflictPath = useEditorConflictState((state) => {
-    if (!selectedConflict) return null
-    const conflict = state.conflicts[selectedConflict.conflictId]
-    return conflict?.eventType === 'changed' ? conflict.localPath : null
-  })
   const applyWorkspaceEdit = useWorkspaceEditHost()
   const resolveConflictEditorDocument = useConflictEditorResolution()
   const selectedFile = readyFile(fileState)
@@ -190,15 +183,6 @@ export function EditorSurfaceTabBody({
   const editorSurfaceActions: EditorSurfaceActions = {
     applyWorkspaceEdit,
     closeReferences: handleCloseReferences,
-    compareMergeConflict: comparableConflictPath
-      ? () =>
-          selectContent(
-            documentTab({
-              kind: 'compare-saved',
-              file: fileResource(comparableConflictPath),
-            }),
-          )
-      : null,
     openDefinition: (target) => {
       void openDefinition(target)
     },

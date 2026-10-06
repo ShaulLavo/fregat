@@ -1,15 +1,13 @@
 import { LoadingState } from '@workspace/ui/components/loading-state'
-import { useQuery } from '@tanstack/react-query'
 import { HighlightedCode } from '@workspace/markdown/components/highlighted-code'
 import { CodeHighlighterContext } from '@workspace/markdown/providers/code-highlighter-context'
 
 import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
 import { useCodeHighlighter } from '@/lib/code-highlight/hooks/use-code-highlighter'
-import { useSettingValue } from '@/hooks/use-setting-value'
 import type { ReactNode } from 'react'
 import { formatSize } from '@/lib/path-formatters'
 import { lineNumbers, previewExtension } from '@/lib/file-preview/utils/preview'
-import { previewQueryOptions } from '@/lib/file-preview/utils/preview-query'
+import type { PreviewViewRead } from '@/lib/file-preview/utils/source'
 
 /**
  * The head of a file in the code theme's colours, up to the preview budget. It scrolls both ways,
@@ -18,38 +16,37 @@ import { previewQueryOptions } from '@/lib/file-preview/utils/preview-query'
 export function TextPreview({
   fallback,
   name,
-  path,
+  read,
 }: {
   /** Shown for binary files, and beside a failed read. */
   fallback: ReactNode
   name: string
-  path: string
+  read: PreviewViewRead
 }) {
-  const maxBytes = useSettingValue('files.previewKilobytes') * 1024
-  const query = useQuery({
-    ...previewQueryOptions(path, maxBytes),
-    // Both preview owners load before swapping; observing their result must not restart a failed read.
-    enabled: false,
-  })
   const highlighter = useCodeHighlighter()
 
-  if (query.isPending)
+  if (read.kind === 'pending')
     return (
       <LoadingState className='w-full p-2' label={`Loading ${name}`}>
         <div className='bg-content-well skeleton-sweep h-40 w-full rounded-md' />
       </LoadingState>
     )
-  if (query.isError)
+  if (read.kind === 'error')
     return (
       <div className='flex flex-col items-center gap-2'>
         {fallback}
         <p className='text-muted-foreground text-2xs text-center' role='status'>
-          {clientErrorDescription(toClientError(query.error))}
+          {clientErrorDescription(toClientError(read.error))}
         </p>
       </div>
     )
-  if (!query.data || query.data.kind === 'binary') return fallback
-  const { size, text, truncated } = query.data
+  if (read.kind !== 'live' && read.kind !== 'disk') return fallback
+  const text = read.kind === 'live' ? read.text : read.input.head.content
+  const truncated = read.kind === 'live' ? !read.complete : read.input.head.truncated
+  const note =
+    read.kind === 'live'
+      ? `First ${formatSize(read.utf8Bytes)} of the current buffer`
+      : `First ${formatSize(read.input.maxBytes)} of ${formatSize(read.input.head.size)}`
 
   return (
     <div
@@ -77,7 +74,7 @@ export function TextPreview({
       </div>
       {truncated ? (
         <p className='text-muted-foreground text-2xs px-2 pb-2' role='note'>
-          {`First ${formatSize(maxBytes)} of ${formatSize(size)}`}
+          {note}
         </p>
       ) : null}
     </div>
