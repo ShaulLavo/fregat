@@ -13,7 +13,8 @@ import {
   awaitEditorSyntaxWorkerIdleFences,
   EDITOR_THEME_SOURCE,
 } from '@/features/editor/state/syntax-highlighting'
-import { savedDiffAttachment, diffAttachmentSubject } from '@/lib/diff-attachment'
+import { diffAttachmentSubject } from '@/lib/diff-attachment'
+import { savedDiffAttachment } from '@/features/editor/utils/attachment-presentation'
 import { joinRenderLines, projectDiffSyntaxTokens } from '@singapore-editor/diff'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { mountRetentionAcceptanceApp } from '../../../../test/factories/retention-acceptance-app'

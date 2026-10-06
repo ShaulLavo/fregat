@@ -1,14 +1,11 @@
-import { decodedAsText } from '@workspace/contracts'
-import { QueryClient } from '@tanstack/react-query'
-import { expect, test, vi } from 'vitest'
+import { vi } from 'vitest'
+import { expect, test } from '../../../../test/fixtures'
+import { createConflictCompletionFixture } from '../../../../test/factories/conflict-completion'
 
-import { createEditorConflictStore } from '@/features/editor/state/conflict-state'
-import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
-import type { FileResult } from '@/lib/file-system-types'
+import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import {
   notifyChangedFilesystemConflict,
   markDeletedFilesystemDocument,
-  type WorkspaceConflictContext,
 } from '@/features/workspace/state/event-conflict-adapter'
 import { workspaceMutationKeys } from '@/features/workspace/utils/mutation-keys'
 
@@ -29,9 +26,11 @@ vi.mock('sonner', () => {
   }
 })
 
-test('a second override click while the first is writing issues one write', async () => {
+test('a second override click while the first is writing issues one write', async ({ server }) => {
   const sonner = (await import('sonner')) as unknown as { __handlers: Array<() => unknown> }
-  const { context, path, remote, conflictStore, queryClient } = createContext()
+  const fixture = await createConflictCompletionFixture(server)
+  const { context, path, remote, queryClient } = fixture
+  const conflictStore = fixture.editor.conflictStore
 
   notifyChangedFilesystemConflict(path, remote, context)
   const [conflict] = Object.values(conflictStore.getState().conflicts)
@@ -57,16 +56,22 @@ test('a second override click while the first is writing issues one write', asyn
   expect(conflictStore.getState().conflicts).toEqual({})
 })
 
-test('deletion marks the buffer without creating a conflict toast', () => {
-  const { context, path, conflictStore } = createContext()
+test('deletion marks the buffer without creating a conflict toast', async ({ server }) => {
+  const fixture = await createConflictCompletionFixture(server)
+  const { context, path } = fixture
+  const conflictStore = fixture.editor.conflictStore
   const mark = vi.spyOn(context, 'setFileOrphaned')
   markDeletedFilesystemDocument(path, context)
   expect(mark).toHaveBeenCalledWith(fileDocumentKey(path), true)
   expect(conflictStore.getState().conflicts).toEqual({})
 })
 
-test('deletion updates an existing conflict so resolving it can recreate the file', () => {
-  const { context, path, remote, conflictStore } = createContext()
+test('deletion updates an existing conflict so resolving it can recreate the file', async ({
+  server,
+}) => {
+  const fixture = await createConflictCompletionFixture(server)
+  const { context, path, remote } = fixture
+  const conflictStore = fixture.editor.conflictStore
   notifyChangedFilesystemConflict(path, remote, context)
   const original = Object.values(conflictStore.getState().conflicts)[0]!
   markDeletedFilesystemDocument(path, context)
@@ -78,32 +83,3 @@ test('deletion updates an existing conflict so resolving it can recreate the fil
     remoteFile: null,
   })
 })
-
-function createContext() {
-  const conflictStore = createEditorConflictStore()
-  const queryClient = new QueryClient()
-  const path = filesystemPath('repo/a.ts')
-  const remote: FileResult = {
-    ...decodedAsText,
-    content: 'remote',
-    mtimeMs: 1,
-    path,
-    size: 6,
-    version: 'sha256:remote',
-  }
-  const context: WorkspaceConflictContext = {
-    client: {} as WorkspaceConflictContext['client'],
-    conflictStore,
-    discardLiveEditorDocument: () => ({ wasDirty: false }),
-    ensureUnsyncedEditorDocument: () => undefined,
-    fetchFile: async () => remote,
-    forceReplaceLiveEditorDocument: () => ({ wasDirty: false }),
-    getLiveEditorDocument: () => null,
-    queryClient,
-    renameLiveEditorDocument: () => ({ wasDirty: false }),
-    selectContent: () => undefined,
-    setFileOrphaned: () => false,
-  }
-
-  return { context, path, remote, conflictStore, queryClient }
-}

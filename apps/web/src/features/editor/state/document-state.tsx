@@ -49,9 +49,13 @@ type CreateEditorDocumentStoreOptions = {
 }
 
 type EditorDocumentStoreActions = {
+  setPreviewScope: WorkspaceDocumentService['setPreviewScope']
+  acquireLivePreview: WorkspaceDocumentService['acquireLivePreview']
+  adoptPreviewCapture: WorkspaceDocumentService['adoptPreviewCapture']
   acquireFilePreparation: WorkspaceDocumentService['acquireFilePreparation']
   enumerateEditorAnalyses: WorkspaceDocumentService['enumerateEditorAnalyses']
   subscribeEditorAnalyses: WorkspaceDocumentService['subscribeEditorAnalyses']
+  acquireSettingsComparison: WorkspaceDocumentService['acquireSettingsComparison']
   acquireSnapshotComparison: (
     request: import('@/lib/snapshot-comparison').SnapshotComparisonRequest,
   ) => import('@/lib/snapshot-comparison').SnapshotComparisonLease
@@ -219,6 +223,9 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
 
       return {
         ...service.state(),
+        setPreviewScope: (root, origin) => service.setPreviewScope(root, origin),
+        acquireLivePreview: (request) => service.acquireLivePreview(request),
+        adoptPreviewCapture: (request) => service.adoptPreviewCapture(request),
         acquireFilePreparation: (input) => {
           const source = service.acquireFilePreparation(input)
           publish()
@@ -226,6 +233,7 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
         },
         enumerateEditorAnalyses: () => service.enumerateEditorAnalyses(),
         subscribeEditorAnalyses: (listener) => service.subscribeEditorAnalyses(listener),
+        acquireSettingsComparison: (request) => service.acquireSettingsComparison(request),
         acquireSnapshotComparison: (request) => service.acquireSnapshotComparison(request),
         prepareSnapshotComparisonTab: (tabId, request) =>
           service.prepareSnapshotComparisonTab(tabId, request),

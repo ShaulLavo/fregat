@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import type { SettingsComparisonPresentation } from '@/lib/diff-attachment'
 import { Editor } from '@/features/editor/components/editor'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
 import type { SettingsDiagnostic, SettingsLayerFile } from '@workspace/contracts'
@@ -37,6 +39,11 @@ export function SettingsJsonView({
   scope: SettingsScope
   tabId: TabId
 }) {
+  const [comparison, setComparison] = useState<SettingsComparisonPresentation | null>(null)
+  const updateComparison = (
+    next: SettingsComparisonPresentation | null,
+    previous: SettingsComparisonPresentation | null,
+  ) => setComparison((current) => next ?? (current === previous ? null : current))
   const diagnosticsPlugins = useSettingsDiagnosticsPlugin({ diagnostics, file, target: scope })
   const document =
     liveDocument?.key === documentKey(settingsJsonDocument(scope)) ? liveDocument : null
@@ -51,11 +58,15 @@ export function SettingsJsonView({
       {scope === 'default' ? (
         <DefaultsBanner />
       ) : (
-        <RawConflictBanner documentKey={documentKey(settingsJsonDocument(scope))} />
+        <RawConflictBanner
+          documentKey={documentKey(settingsJsonDocument(scope))}
+          onComparisonChange={updateComparison}
+        />
       )}
-      <div className='min-h-0 flex-1'>
+      <div className='flex min-h-0 flex-1 flex-col'>
         <Editor
           active={active}
+          settingsComparison={comparison}
           additionalPlugins={diagnosticsPlugins}
           document={document}
           target={settingsJsonDocument(scope)}

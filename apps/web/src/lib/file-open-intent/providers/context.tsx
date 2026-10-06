@@ -4,6 +4,7 @@ import { requireContext } from '@/lib/require-context'
 import type { FileOpenIntentService } from '@/lib/file-open-intent/state/service'
 
 export type FileOpenIntentContextValue = {
+  readonly previewSource?: import('@/lib/file-preview/utils/source').PreviewSourceCapability
   readonly preparationIdentity: object
   readonly service: FileOpenIntentService
 }
