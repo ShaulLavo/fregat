@@ -432,7 +432,7 @@ const receiptBase = {
   pid: receiptInteger,
   tick: v.pipe(v.string(), v.regex(/^\d{1,24}$/)),
 }
-const entryReceiptSchema = v.variant('kind', [
+const entryReceiptFactSchema = v.variant('kind', [
   v.strictObject({
     ...receiptBase,
     kind: v.literal('installed'),
@@ -522,6 +522,9 @@ const entryReceiptSchema = v.variant('kind', [
     transportRequestId: receiptInteger,
     path: receiptPath,
   }),
+])
+const entryReceiptSchema = v.variant('kind', [
+  ...entryReceiptFactSchema.options,
   v.strictObject({ ...receiptBase, kind: v.literal('refused'), count: receiptInteger }),
   v.strictObject({
     ...receiptBase,
@@ -535,35 +538,222 @@ const entryReceiptSchema = v.variant('kind', [
 type RetentionEntryReceiptEvent = v.InferOutput<typeof entryReceiptSchema>
 const wireRecordBytes =
   retentionEntryReceiptLimits.recordBytes + Buffer.byteLength(retentionEntryReceiptPrefix) + 1
+type FactualEntryEvent = v.InferOutput<typeof entryReceiptFactSchema>
+const factDropCounts = {
+  installed: 0,
+  listening: 0,
+  request: 0,
+  'response-finish': 0,
+  'response-close': 0,
+  'request-aborted': 0,
+  'request-error': 0,
+  'response-error': 0,
+  'socket-open': 0,
+  'socket-end': 0,
+  'socket-timeout': 0,
+  'socket-close': 0,
+  'socket-error': 0,
+  'server-close': 0,
+  'optimizer-bundling': 0,
+  'optimizer-optimized': 0,
+  'optimizer-reload': 0,
+  'optimizer-error': 0,
+  'full-reload': 0,
+  'server-error': 0,
+  'process-start': 0,
+  'process-stop': 0,
+  'process-exit': 0,
+  'route-failure': 0,
+} satisfies Record<FactualEntryEvent['kind'], number>
+const entryCoverageSchema = v.pipe(
+  v.strictObject({
+    observed: receiptInteger,
+    dropped: receiptInteger,
+    refused: receiptInteger,
+    droppedByKind: v.pipe(
+      v.record(v.string(), receiptInteger),
+      v.check((values) => Object.keys(values).every((kind) => Object.hasOwn(factDropCounts, kind))),
+    ),
+    refusedByReason: v.strictObject({
+      'input-schema': receiptInteger,
+      'record-bytes': receiptInteger,
+      'tap-path': receiptInteger,
+    }),
+    queuedRecords: v.pipe(receiptInteger, v.maxValue(64)),
+    queuedBytes: receiptInteger,
+    inFlightRecords: v.pipe(receiptInteger, v.maxValue(64)),
+    inFlightBytes: receiptInteger,
+    unavailable: v.boolean(),
+    code: receiptCode,
+  }),
+  v.check(
+    (value) =>
+      value.queuedRecords + value.inFlightRecords <= 64 &&
+      value.queuedBytes === value.queuedRecords * retentionEntryReceiptLimits.recordBytes &&
+      value.inFlightBytes === value.inFlightRecords * retentionEntryReceiptLimits.recordBytes &&
+      value.dropped === Object.values(value.droppedByKind).reduce((sum, count) => sum + count, 0) &&
+      value.refused ===
+        Object.values(value.refusedByReason).reduce((sum, count) => sum + count, 0) &&
+      value.observed >= value.dropped + value.queuedRecords + value.inFlightRecords,
+  ),
+)
+const entryWireFactSchema = v.strictObject({
+  observationSequence: receiptInteger,
+  event: entryReceiptFactSchema,
+})
+const entryWireSchema = v.pipe(
+  v.variant('kind', [
+    v.strictObject({
+      version: v.literal(2),
+      kind: v.literal('facts'),
+      pid: receiptInteger,
+      emittedAt: receiptInteger,
+      emittedTick: receiptBase.tick,
+      facts: v.pipe(v.array(entryWireFactSchema), v.minLength(1), v.maxLength(64)),
+      coverage: entryCoverageSchema,
+    }),
+    v.strictObject({
+      version: v.literal(2),
+      kind: v.literal('summary'),
+      pid: receiptInteger,
+      emittedAt: receiptInteger,
+      emittedTick: receiptBase.tick,
+      coverage: entryCoverageSchema,
+    }),
+  ]),
+  v.check((frame) =>
+    frame.kind === 'summary'
+      ? frame.coverage.queuedRecords === 0 && frame.coverage.inFlightRecords === 0
+      : frame.coverage.inFlightRecords === frame.facts.length &&
+        frame.facts.every(
+          (fact) =>
+            fact.event.pid === frame.pid &&
+            fact.observationSequence > 0 &&
+            fact.observationSequence <= frame.coverage.observed,
+        ),
+  ),
+)
+type EntryCoverage = v.InferOutput<typeof entryCoverageSchema>
+type EntryWire = v.InferOutput<typeof entryWireSchema>
+type PendingEntryFact = v.InferOutput<typeof entryWireFactSchema>
+const producerFactCells = 64
+const producerFixedCells = 5
+export const retentionEntryBudget = {
+  producer: {
+    records: producerFactCells + producerFixedCells + 1,
+    bytes:
+      (producerFactCells + producerFixedCells) * retentionEntryReceiptLimits.recordBytes +
+      wireRecordBytes,
+    factCells: producerFactCells,
+  },
+  relay: {
+    records: retentionEntryReceiptLimits.records - producerFactCells - producerFixedCells - 1,
+    bytes:
+      retentionEntryReceiptLimits.bytes -
+      (producerFactCells + producerFixedCells) * retentionEntryReceiptLimits.recordBytes -
+      wireRecordBytes,
+  },
+} as const
 let receiptWriter: ReturnType<typeof createRetentionEntryWriter> | undefined
 
 function createRetentionEntryWriter() {
-  // This stream owns diagnostic errors and never closes stdout's descriptor.
   const output = createWriteStream('', { fd: 1, autoClose: false })
-  let pendingBytes = 0
-  let dropped = 0
-  let refused = 0
-  let unavailable = false
-  let code: string | null = null
-  let reportedDropped = 0
-  let reportedRefused = 0
+  const queue: PendingEntryFact[] = []
+  const droppedByKind = { ...factDropCounts }
+  const refusedByReason = { 'input-schema': 0, 'record-bytes': 0, 'tap-path': 0 }
+  type Flight = { readonly frame: EntryWire; readonly encoded: Buffer; readonly revision: number }
+  type WriterState =
+    | { kind: 'idle' }
+    | { kind: 'writing'; flight: Flight }
+    | { kind: 'unavailable'; code: string | null }
+  let state: WriterState = { kind: 'idle' }
+  let needsIdleSummary = false
+  let observed = 0,
+    dropped = 0,
+    refused = 0,
+    revision = 0,
+    reportedRevision = 0
+  const flightFacts = () =>
+    state.kind === 'writing' && state.flight.frame.kind === 'facts'
+      ? state.flight.frame.facts.length
+      : 0
+  const coverage = (queued = queue.length, writing = flightFacts()): EntryCoverage => ({
+    observed,
+    dropped,
+    refused,
+    droppedByKind: { ...droppedByKind },
+    refusedByReason: { ...refusedByReason },
+    queuedRecords: queued,
+    queuedBytes: queued * retentionEntryReceiptLimits.recordBytes,
+    inFlightRecords: writing,
+    inFlightBytes: writing * retentionEntryReceiptLimits.recordBytes,
+    unavailable: state.kind === 'unavailable',
+    code: state.kind === 'unavailable' ? state.code : null,
+  })
+  const lose = (fact: PendingEntryFact) => {
+    dropped++
+    droppedByKind[fact.event.kind]++
+    revision++
+  }
+  const reject = (reason: keyof typeof refusedByReason, count = 1) => {
+    refused += count
+    refusedByReason[reason] += count
+    revision++
+  }
   const failed = (error: unknown) => {
-    if (unavailable) return
-    unavailable = true
-    code = retentionEntryErrorCode(error)
-    if (pendingBytes) dropped++
-    pendingBytes = 0
+    if (state.kind === 'unavailable') return
+    const code = retentionEntryErrorCode(error)
+    for (const fact of queue) lose(fact)
+    if (state.kind === 'writing' && state.flight.frame.kind === 'facts')
+      for (const fact of state.flight.frame.facts) lose(fact)
+    queue.length = 0
+    state = { kind: 'unavailable', code }
   }
   output.on('error', failed)
-  const send = (event: RetentionEntryReceiptEvent) => {
-    const frame = Buffer.from(retentionEntryReceiptPrefix + JSON.stringify(event) + '\n')
-    if (frame.length > wireRecordBytes) {
-      refused++
+  const encode = (facts: readonly PendingEntryFact[]) => {
+    const time = retentionEntryReceiptTime()
+    const base = {
+      version: 2,
+      pid: time.pid,
+      emittedAt: time.at,
+      emittedTick: time.tick,
+      coverage: coverage(queue.length - facts.length, facts.length),
+    }
+    const input = facts.length ? { ...base, kind: 'facts', facts } : { ...base, kind: 'summary' }
+    const parsed = v.safeParse(entryWireSchema, input)
+    if (!parsed.success) return null
+    const body = JSON.stringify(parsed.output)
+    if (Buffer.byteLength(body) > retentionEntryReceiptLimits.recordBytes) return null
+    return {
+      frame: parsed.output,
+      encoded: Buffer.from(retentionEntryReceiptPrefix + body + '\n'),
+      revision,
+    }
+  }
+  const pump = () => {
+    if (state.kind !== 'idle') return
+    const facts: PendingEntryFact[] = []
+    let selected: Flight | null = null
+    for (const fact of queue) {
+      const next = encode([...facts, fact])
+      if (!next) break
+      facts.push(fact)
+      selected = next
+    }
+    if (!selected && queue.length) {
+      const fact = queue.shift()
+      if (fact) lose(fact)
+      reject('record-bytes')
+      pump()
       return
     }
-    pendingBytes = frame.length
+    if (!selected && (needsIdleSummary || revision !== reportedRevision)) selected = encode([])
+    if (!selected) return
+    queue.splice(0, facts.length)
+    needsIdleSummary = false
+    state = { kind: 'writing', flight: selected }
     try {
-      output.write(frame, completed)
+      output.write(selected.encoded, completed)
     } catch (error) {
       failed(error)
     }
@@ -573,44 +763,61 @@ function createRetentionEntryWriter() {
       failed(error)
       return
     }
-    pendingBytes = 0
-    if (unavailable || (reportedDropped === dropped && reportedRefused === refused)) return
-    reportedDropped = dropped
-    reportedRefused = refused
-    send({
-      ...retentionEntryReceiptTime(),
-      kind: 'writer-status',
-      dropped,
-      refused,
-      unavailable,
-      code,
-    })
+    if (state.kind !== 'writing') return
+    reportedRevision = state.flight.revision
+    needsIdleSummary = state.flight.frame.kind === 'facts' && queue.length === 0
+    state = { kind: 'idle' }
+    pump()
   }
   return {
     write(input: unknown) {
       try {
         const parsed = v.safeParse(entryReceiptSchema, input)
         if (!parsed.success) {
-          refused++
+          reject('input-schema')
+          pump()
           return
         }
-        if (unavailable || pendingBytes) {
-          dropped++
+        if (parsed.output.kind === 'refused') {
+          reject('tap-path', parsed.output.count)
+          pump()
           return
         }
-        send(parsed.output)
+        if (parsed.output.kind === 'writer-status') {
+          reject('input-schema')
+          pump()
+          return
+        }
+        const fact = { observationSequence: ++observed, event: Object.freeze(parsed.output) }
+        revision++
+        if (state.kind === 'unavailable' || queue.length + flightFacts() >= producerFactCells) {
+          lose(fact)
+          return
+        }
+        queue.push(fact)
+        pump()
       } catch {
-        refused++
+        reject('input-schema')
+        pump()
       }
     },
     inspect() {
       return {
-        pendingBytes,
-        pendingRecords: pendingBytes ? 1 : 0,
+        pendingBytes: state.kind === 'writing' ? state.flight.encoded.length : 0,
+        pendingRecords: state.kind === 'writing' ? 1 : 0,
+        queuedRecords: queue.length,
+        inFlightFactRecords: flightFacts(),
+        retainedRecords: queue.length + flightFacts() + producerFixedCells + 1,
+        retainedBytes:
+          (queue.length + flightFacts() + producerFixedCells) *
+            retentionEntryReceiptLimits.recordBytes +
+          wireRecordBytes,
         dropped,
         refused,
-        unavailable,
-        code,
+        droppedByKind: { ...droppedByKind },
+        refusedByReason: { ...refusedByReason },
+        unavailable: state.kind === 'unavailable',
+        code: state.kind === 'unavailable' ? state.code : null,
       }
     },
   }
@@ -631,6 +838,19 @@ type ReceiptRecord = {
   readonly bytes: number
   readonly sequence: number
 }
+type ProducerSample = Readonly<{
+  pid: number
+  emittedAt: number
+  emittedTick: string
+  receivedAt: number
+  coverage: EntryCoverage
+}>
+type ObservationCoverage = Readonly<{
+  lastReceived: number
+  gaps: number
+  firstGap: Readonly<{ from: number; to: number }> | null
+  lastGap: Readonly<{ from: number; to: number }> | null
+}>
 type FailureReceipt = {
   readonly phase: RetentionEntryPhase
   readonly sequence: number
@@ -638,6 +858,8 @@ type FailureReceipt = {
   readonly records: readonly ReceiptRecord[]
   readonly predecessors: readonly ReceiptRecord[]
   readonly lifetime: readonly ReceiptRecord[]
+  readonly producerAtFailure: ProducerSample | null
+  readonly observationsAtFailure: ObservationCoverage
   endedAt: number | null
 }
 
@@ -784,18 +1006,24 @@ export function createRetentionEntryCapture() {
     dropped = 0,
     writerDropped = 0,
     writerRefused = 0
+  let producerSample: ProducerSample | null = null
+  let lastReceived = 0,
+    gaps = 0
+  let firstGap: ObservationCoverage['firstGap'] = null
+  let lastGap: ObservationCoverage['lastGap'] = null
+  const observations = (): ObservationCoverage => ({ lastReceived, gaps, firstGap, lastGap })
   const makeRoom = (count: number, size: number) => {
     while (
-      records.size + completions.size + pinnedRecords + lifetimeSlots + cases.size * 3 + 2 + count >
-        retentionEntryReceiptLimits.records ||
+      records.size + completions.size + pinnedRecords + lifetimeSlots + cases.size * 3 + 1 + count >
+        retentionEntryBudget.relay.records ||
       bytes +
         completionBytes +
         pinnedBytes +
         caseBytes +
         lifetimeSlots * retentionEntryReceiptLimits.recordBytes +
-        wireRecordBytes * 2 +
+        wireRecordBytes +
         size >
-        retentionEntryReceiptLimits.bytes
+        retentionEntryBudget.relay.bytes
     ) {
       const first = records.keys().next().value
       if (first !== undefined) {
@@ -864,9 +1092,48 @@ export function createRetentionEntryCapture() {
       refused++
     }
   }
+  const receive = (input: unknown) => {
+    const parsed = v.safeParse(entryWireSchema, input)
+    if (!parsed.success) {
+      refused++
+      return
+    }
+    const frame = parsed.output
+    if (
+      frame.kind === 'facts' &&
+      frame.facts.some(
+        (fact, index) =>
+          fact.observationSequence <=
+          (index ? (frame.facts[index - 1]?.observationSequence ?? 0) : lastReceived),
+      )
+    ) {
+      refused++
+      return
+    }
+    writerDropped = Math.max(writerDropped, frame.coverage.dropped)
+    writerRefused = Math.max(writerRefused, frame.coverage.refused)
+    producerSample = Object.freeze({
+      pid: frame.pid,
+      emittedAt: frame.emittedAt,
+      emittedTick: frame.emittedTick,
+      receivedAt: Date.now(),
+      coverage: frame.coverage,
+    })
+    if (frame.kind === 'summary') return
+    for (const fact of frame.facts) {
+      if (fact.observationSequence > lastReceived + 1) {
+        const gap = Object.freeze({ from: lastReceived + 1, to: fact.observationSequence - 1 })
+        gaps += gap.to - gap.from + 1
+        firstGap ??= gap
+        lastGap = gap
+      }
+      lastReceived = fact.observationSequence
+      accept(fact.event)
+    }
+  }
   const receiveLine = () => {
     try {
-      accept(JSON.parse(strictDecoder.decode(pending.subarray(prefix.length, pendingLength))))
+      receive(JSON.parse(strictDecoder.decode(pending.subarray(prefix.length, pendingLength))))
     } catch {
       refused++
     }
@@ -924,7 +1191,7 @@ export function createRetentionEntryCapture() {
     immediateStatus: Owner['immediateStatus'],
     immediateCompletedAt: number | null,
   ) => ({
-    version: 1,
+    version: 2,
     archiveStage: stage,
     archiveStartedAt: Date.now(),
     availability: ['installed', 'listening', 'process-start'].every((kind) =>
@@ -948,6 +1215,11 @@ export function createRetentionEntryCapture() {
     truncated: dropped + writerDropped > 0,
     immediatePersistence: immediateStatus ?? { status: 'pending', codes: [] },
     immediateArchiveCompletedAt: immediateCompletedAt,
+    producerAtFailure: failure.producerAtFailure,
+    observationsAtFailure: failure.observationsAtFailure,
+    producerAtArchive: producerSample,
+    observationsAtArchive: observations(),
+    budget: retentionEntryBudget,
     lifetimeBeforeFailure: failure.lifetime.map((record) => record.event),
     sameModulePredecessors: failure.predecessors.map((record) => record.event),
     failureWindow: failure.records.map((record) => record.event),
@@ -986,6 +1258,8 @@ export function createRetentionEntryCapture() {
       records: window,
       predecessors: prior,
       lifetime: history,
+      producerAtFailure: producerSample,
+      observationsAtFailure: observations(),
       endedAt: null,
     }
     const snapshot = packet(owner.failure, 'failure-frozen', [], null, null)
@@ -1069,11 +1343,27 @@ export function createRetentionEntryCapture() {
         refused: refused + writerRefused,
         dropped: dropped + writerDropped,
         retainedBytes:
-          bytes + lifetimeBytes + completionBytes + pinnedBytes + caseBytes + wireRecordBytes * 2,
+          bytes +
+          lifetimeBytes +
+          completionBytes +
+          pinnedBytes +
+          caseBytes +
+          wireRecordBytes +
+          retentionEntryBudget.producer.bytes,
         retainedRecords:
-          records.size + lifetime.size + completions.size + pinnedRecords + cases.size * 3 + 2,
+          records.size +
+          lifetime.size +
+          completions.size +
+          pinnedRecords +
+          cases.size * 3 +
+          1 +
+          retentionEntryBudget.producer.records,
         wireEndObserved,
         pendingWireBytes: pendingLength,
+        producer: producerSample,
+        observations: observations(),
+        relayDropped: dropped,
+        relayRefused: refused,
       }
     },
     async persistFailures() {
