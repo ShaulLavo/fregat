@@ -4,7 +4,7 @@
 
 an open cursor, built from scratch
 
-open a folder and get an editor, terminals, git, and language servers in panes, with claude code and codex beside them. agents use the subscriptions you already have
+open a folder and get an editor, terminals, git, and language servers in panes, with claude code and codex beside them. agents use the subscriptions you already have. move between projects and their editors, terminals, and agent sessions from one workspace
 
 everything runs on your machine. open the same workspace from a browser, the desktop app, a terminal, or a phone over tailscale
 
@@ -28,7 +28,7 @@ open the url it prints and pick a folder. for agents, install [claude code](http
 
 ## benchmarks
 
-[editor typing latency](editor/examples/stress/results/input-latency/README.md) · [terminal comparisons](ghostty-webgpu/docs/benchmarks.md)
+[terminal comparisons](ghostty-webgpu/docs/benchmarks.md)
 
 ## more
 

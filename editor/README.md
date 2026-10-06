@@ -4,7 +4,18 @@
 
 a code editor for the browser, written from scratch. same shelf as monaco and codemirror
 
-piece table storage, rendering through the css highlight api, and optional tree-sitter and lsp plugins. still moving
+the core is a persistent AVL piece table with copy-on-write. edits copy the changed tree path and share the rest, so old versions stay readable. snapshots and stable text anchors take inspiration from zed
+
+## how it differs
+
+| editor                                                                                            | text storage                                          |
+| ------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| [singapore](docs/storage/piece-table.md)                                                          | persistent AVL piece table, copy-on-write             |
+| [monaco and vs code](https://code.visualstudio.com/blogs/2018/03/23/text-buffer-reimplementation) | mutable red-black piece tree                          |
+| [codemirror 6](https://github.com/codemirror/state/blob/main/src/text.ts)                         | immutable tree of text lines, with structural sharing |
+| [zed](https://zed.dev/blog/zed-decoded-rope-sumtree)                                              | copy-on-write B+ tree rope, built on SumTree          |
+
+singapore paints syntax through the css highlight api. tree-sitter and language servers are optional plugins. still moving
 
 ## try it
 
@@ -33,17 +44,6 @@ call `editor.dispose()` when you're done
 - multi-cursor editing, undo, folding, and virtualized rows
 - gutters, find, minimap, diff, and markdown as [separate packages](packages/)
 - tree-sitter syntax, language servers, and react and solid adapters
-
-## benchmarks
-
-recorded typing dispatch p95 on an i7-14700K in chromium. this measures event handling; screen latency is measured separately
-
-| document            | single view | shared views |
-| ------------------- | ----------: | -----------: |
-| 500,000 short lines |      1.0 ms |       1.6 ms |
-| one-megabyte line   |      1.8 ms |       2.7 ms |
-
-[method and full results](examples/stress/results/input-latency/README.md) · [textbuffer comparison](packages/textbuffer/bench/README.md)
 
 ## more
 
