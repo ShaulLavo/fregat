@@ -1,3 +1,4 @@
+import { filePreviewMutationKeys } from '@/lib/file-preview/utils/mutation-keys'
 import { attachmentPreviewMutationOptions } from '@/lib/file-preview/utils/source'
 import { runMutation } from '@/lib/mutations/run'
 import { createAddressTestRuntime } from '../../../../../test/factories/address-runtime'
@@ -641,6 +642,15 @@ test.for(['sent', 'staged'] as const)(
     expect(document.querySelector('[data-chat-file-preview]')?.textContent).toBe('one')
     expect(peer.lease?.read()).toBe(peer.read)
     expect(shown.input.bytes).toEqual(new TextEncoder().encode('one'))
+    const viewLease = Array.from(f.editor.documentStore.getState().previewSources.keys()).find(
+      (lease) => lease !== peer.lease,
+    )
+    if (!viewLease) return expect.fail('Actual view interest required')
+    act(() => viewLease.release())
+    expect(document.querySelector('[data-chat-file-preview]')).toBeNull()
+    expect(peer.lease?.read()).toBe(peer.read)
+    view.rerender(<ChatFilePreview input={input} queryClient={queryClient} onClose={() => {}} />)
+    expect(document.querySelector('[data-chat-file-preview]')).toBeNull()
     view.unmount()
     expect(f.editor.documentStore.getState().previewSources.size).toBe(1)
     expect(peer.lease?.read()).toBe(peer.read)
@@ -648,3 +658,53 @@ test.for(['sent', 'staged'] as const)(
     expect(f.editor.documentStore.getState().previewSources.size).toBe(0)
   },
 )
+
+test('a disposed owner refuses queued admission without reviving the ready immutable capture', async ({
+  client,
+}) => {
+  const f = await createAddressTestRuntime(client)
+  const queryClient = f.application.getSnapshot().queryClient
+  const attachment = v.parse(chatAttachmentSchema, {
+    type: 'file',
+    id: 'queued-owner-end',
+    name: 'ended.txt',
+    mimeType: 'text/plain',
+    sizeBytes: 3,
+  })
+  if (attachment.type !== 'file') return expect.fail('File subject required')
+  const input = {
+    attachment,
+    environmentId: f.environmentId,
+    origin: serverEndpoint(originForQueryClient(queryClient)),
+    provenance: 'sent' as const,
+  }
+  const options = attachmentTextOptions(input)
+  const capture = await queryClient.query(
+    attachmentTextOptions(input, async () => new Response('end')),
+  )
+  if (capture.kind !== 'attachment') return expect.fail('Actual immutable reader required')
+  const view = renderWithProviders(
+    <ChatFilePreview input={input} queryClient={queryClient} onClose={() => {}} />,
+    { application: f.application, queryClient },
+  )
+  act(() => f.editor.dispose())
+  const admission = queryClient
+    .getMutationCache()
+    .find({ mutationKey: filePreviewMutationKeys.capture })
+  if (!admission) return expect.fail('Actual queued admission required')
+  await waitFor(() => expect(admission.state.status).toBe('success'))
+  expect(admission.state.data).toMatchObject({
+    read: { kind: 'released', reason: 'owner-disposed' },
+  })
+  expect(queryClient.getQueryData(options.queryKey)).toBe(capture)
+  expect(capture.reader.readRange(0, capture.reader.length)).toBe('end')
+  expect(f.editor.documentStore.getState().previewSources.size).toBe(0)
+  expect(document.querySelector('[data-chat-file-preview]')).toBeNull()
+  view.rerender(<ChatFilePreview input={input} queryClient={queryClient} onClose={() => {}} />)
+  expect(document.querySelector('[data-chat-file-preview]')).toBeNull()
+  expect(screen.getByRole('link', { name: 'Download ended.txt' })).toHaveAttribute(
+    'href',
+    capture.url,
+  )
+  view.unmount()
+})

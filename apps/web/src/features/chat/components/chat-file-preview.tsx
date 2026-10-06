@@ -76,17 +76,20 @@ export function ChatFilePreview({
   const stagedCapture = currentAcquisition ? acquisition.data : null
   const sentCapture = sameOwner ? held.capture : null
   const capture = staged ? stagedCapture : sentCapture
-  const binding =
+  const currentAdoption = Boolean(
     adoption.variables &&
     adoption.variables.input === capture &&
-    adoption.variables.expected.attachment === attachment
-      ? adoption.data
-      : null
+    adoption.variables.expected.attachment === attachment,
+  )
+  const binding = currentAdoption ? adoption.data : null
   const sourceRead = useStore(capability.store, (state) =>
     binding?.lease
       ? (state.previewSources.get(binding.lease) ?? binding.lease.read())
       : (binding?.read ?? null),
   )
+  let displayCapture = sourceRead?.kind === 'attachment' ? sourceRead.input : null
+  if (!sourceRead && capture?.kind === 'attachment' && (!currentAdoption || adoption.isPending))
+    displayCapture = capture
   const { mutate: adopt } = adoption
   useEffect(() => {
     if (capture?.kind !== 'attachment') return
@@ -97,8 +100,11 @@ export function ChatFilePreview({
   if (!sameOwner) setHeld({ input, queryClient, capture: null })
   const acquired = preview.isSuccess && !staged && !preview.isFetching
   if (!capture && acquired) setHeld({ input, queryClient, capture: preview.data })
-  const failed = staged ? currentAcquisition && acquisition.isError : preview.isError
-  const failure = staged ? acquisition.error : preview.error
+  const admissionFailed = currentAdoption && adoption.isError
+  const failed =
+    admissionFailed || (staged ? currentAcquisition && acquisition.isError : preview.isError)
+  const failure =
+    (admissionFailed ? adoption.error : null) ?? (staged ? acquisition.error : preview.error)
   return (
     <Dialog
       open
@@ -118,10 +124,11 @@ export function ChatFilePreview({
             <PdfPresentation source={{ kind: 'attachment', origin, attachment }} />
           </div>
         )}
-        {previewable && (!capture || (capture.kind === 'attachment' && !sourceRead)) && !failed && (
-          <Spinner size='lg' label='Loading file preview' />
-        )}
-        {previewable && !capture && failed && (
+        {previewable &&
+          !displayCapture &&
+          (!capture || (capture.kind === 'attachment' && !sourceRead)) &&
+          !failed && <Spinner size='lg' label='Loading file preview' />}
+        {previewable && !displayCapture && failed && (
           <div className='text-destructive text-xs' role='alert'>
             Could not load this file.{' '}
             <Button
@@ -145,12 +152,12 @@ export function ChatFilePreview({
             />
           </div>
         )}
-        {previewable && sourceRead?.kind === 'attachment' && (
+        {previewable && displayCapture && (
           <pre
             className='bg-muted max-h-96 overflow-auto overscroll-contain p-3 text-xs whitespace-pre-wrap'
             data-chat-file-preview
           >
-            {sourceRead.input.reader.readRange(0, sourceRead.input.reader.length)}
+            {displayCapture.reader.readRange(0, displayCapture.reader.length)}
           </pre>
         )}
         {!pdf &&
