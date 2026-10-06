@@ -162,14 +162,14 @@ if (!reportSupported)
 test.skipIf(!reportSupported)(
   'the verdict reports paginated queue timings without changing its gate',
   () => {
-    const step = readWorkflow('ci.yml').jobs.verdict!.steps.find(
-      (entry) => entry.name === 'Report queue and execution times',
-    )!
+    const steps = readWorkflow('ci.yml').jobs.verdict!.steps
+    const producer = steps.find((entry) => entry.name === 'Verdict')!
+    const step = steps.find((entry) => entry.name === 'Report queue and execution times')!
     expect(step['continue-on-error']).toBe(true)
     const root = mkdtempSync(path.join(tmpdir(), 'ci-timings-'))
     try {
       writeFileSync(
-        path.join(root, 'response.json'),
+        path.join(root, 'ci-jobs.json'),
         JSON.stringify([
           {
             jobs: [
@@ -190,41 +190,42 @@ test.skipIf(!reportSupported)(
           },
         ]),
       )
-      const result = Bun.spawnSync(
-        [
-          'bash',
-          '-e',
-          '-o',
-          'pipefail',
-          '-c',
-          `
-gh() {
-  case "$*" in
-    *'--paginate --slurp') cat "$RUNNER_TEMP/response.json" ;;
-    *'--jq .created_at') echo '2026-01-01T00:00:00Z' ;;
-    *) exit 64 ;;
-  esac
-}
-${step.run}
-`,
-        ],
-        {
-          env: {
-            ...process.env,
-            RUNNER_TEMP: root,
-            GITHUB_STEP_SUMMARY: path.join(root, 'summary.md'),
-            GH_REPO: 'fixture/repo',
-            RUN_ID: '1',
-            RUN_ATTEMPT: '2',
-          },
-        },
+      writeFileSync(
+        path.join(root, 'ci-run.json'),
+        JSON.stringify({
+          id: 1,
+          run_attempt: 2,
+          head_sha: 'a'.repeat(40),
+          event: 'workflow_dispatch',
+          path: '.github/workflows/ci.yml',
+          repository: { full_name: 'fixture/repo' },
+          created_at: '2026-01-01T00:00:00Z',
+        }),
       )
+      const result = Bun.spawnSync(['bash', '-e', '-o', 'pipefail', '-c', `${step.run}`], {
+        env: {
+          ...process.env,
+          RUNNER_TEMP: root,
+          GITHUB_STEP_SUMMARY: path.join(root, 'summary.md'),
+          GH_REPO: 'fixture/repo',
+          RUN_ID: '1',
+          RUN_ATTEMPT: '2',
+        },
+      })
       expect(result.exitCode, result.stderr.toString()).toBe(0)
       const summary = readFileSync(path.join(root, 'summary.md'), 'utf8')
       expect(summary).toContain('| Server | 420 | 120 |')
       expect(summary).toContain('Run created to verdict runner started: 720 seconds')
       expect(summary).not.toContain('| Skipped |')
-      expect(step.run).toContain('/attempts/$RUN_ATTEMPT/jobs?per_page=100')
+      expect(producer.run).toContain('/jobs?filter=latest&per_page=100')
+      expect(producer['continue-on-error']).not.toBe(true)
+      const jobFetches = steps.flatMap((entry) =>
+        (entry.run ?? '')
+          .split('\n')
+          .filter((line) => line.includes('gh api ') && line.includes('/jobs?')),
+      )
+      expect(jobFetches).toHaveLength(1)
+      expect(step.run).not.toContain('gh api ')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

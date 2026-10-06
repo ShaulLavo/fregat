@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, expect, it } from 'vitest'
 import { Kind } from 'tree-sitter-md'
-import { applyBatchToPieceTable, createPieceTableSnapshot } from '@singapore-editor/core/document'
+import { createEditorTextBuffer, createEditorBufferSession } from '../../editor/src/documentSession'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '../../tree-sitter-languages/src/index'
-import { TreeSitterWorkerClient, resolveTreeSitterLanguageContribution } from '../src'
+import { resolveTreeSitterLanguageContribution } from '../src'
+import { TreeSitterWorkerClient } from '../src/treeSitter/workerClient'
+import { DocumentDelivery, type DocumentRead } from '../../editor/src/editor/documentDelivery'
+import type { DocumentWorkerReadReference } from '@singapore-editor/core/internal/document-worker'
 import { createTreeSitterEditPayload } from '../src/session'
 import type { TreeSitterParseResult } from '../src/treeSitter/types'
 
+const disposers: Array<() => void> = []
 let client: TreeSitterWorkerClient
 beforeEach(async () => {
   client = new TreeSitterWorkerClient()
@@ -16,12 +20,40 @@ beforeEach(async () => {
   await client.warmLanguages(descriptors.filter((descriptor) => descriptor.id === 'markdown'))
 })
 afterEach(async () => {
+  for (const dispose of disposers.splice(0)) dispose()
   await client.dispose()
 })
 const identity = {
   documentId: 'records.md',
   runtimeSessionId: 'markdown-records',
   languageId: 'markdown',
+}
+
+function sourceDocument(text: string) {
+  const buffer = createEditorTextBuffer(text)
+  const view = createEditorBufferSession(buffer)
+  const delivery = new DocumentDelivery(buffer, 'markdown-fixture')
+  const unsubscribe = buffer.subscribe((event) => delivery.accept(event))
+  const scope = delivery.createScope()
+  const dispose = () => {
+    scope.dispose()
+    unsubscribe()
+    delivery.dispose()
+  }
+  disposers.push(dispose)
+  const withRead = async <T>(
+    run: (source: DocumentWorkerReadReference) => Promise<T>,
+    read: DocumentRead = delivery.current()!,
+  ): Promise<T> => {
+    const loan = await scope.source.prepareReader(client.sourceEndpoint, read)
+    if (!loan) throw new TypeError('The actual Markdown worker must admit its source')
+    try {
+      return await run(loan.reference)
+    } finally {
+      await loan.dispose()
+    }
+  }
+  return { buffer, view, delivery, withRead, dispose }
 }
 
 function spans(result: TreeSitterParseResult | undefined, kind: number) {
@@ -40,8 +72,10 @@ it('resolves tables, multiline spans, and EOF definitions beyond 300 paragraphs'
     Array.from({ length: 310 }, (_, index) => `Paragraph ${index} **bold**`).join('\n\n') +
     '\n\n' +
     tail
-  const snapshot = createPieceTableSnapshot(text)
-  await client.parse({ ...identity, snapshotVersion: 1, snapshot, resultMode: 'parseOnly' })
+  const document = sourceDocument(text)
+  await document.withRead((source) =>
+    client.parse({ ...identity, snapshotVersion: 1, source, resultMode: 'parseOnly' }),
+  )
   const from = text.indexOf('| a |')
   const result = await client.queryRange({
     ...identity,
@@ -67,12 +101,10 @@ it('resolves tables, multiline spans, and EOF definitions beyond 300 paragraphs'
 
 it('carries EOF reference definitions with visible link records', async () => {
   const text = '[label][ref]\n\n' + 'Paragraph\n\n'.repeat(310) + '[ref]: /destination\n'
-  await client.parse({
-    ...identity,
-    snapshotVersion: 1,
-    snapshot: createPieceTableSnapshot(text),
-    resultMode: 'parseOnly',
-  })
+  const document = sourceDocument(text)
+  await document.withRead((source) =>
+    client.parse({ ...identity, snapshotVersion: 1, source, resultMode: 'parseOnly' }),
+  )
   const result = await client.queryRange({
     ...identity,
     snapshotVersion: 1,
@@ -85,8 +117,9 @@ it('carries EOF reference definitions with visible link records', async () => {
 
 it('edits and undoes EOF definitions and moving fences with all outputs matching a fresh document', async () => {
   let text = '[label][ref]\n\n```javascript\nconst value = 1\n```\n\n[ref]: /url\n'
-  let snapshot = createPieceTableSnapshot(text)
-  await client.parse({ ...identity, snapshotVersion: 1, snapshot })
+  const document = sourceDocument(text)
+  const oldRead = document.delivery.current()!
+  await document.withRead((source) => client.parse({ ...identity, snapshotVersion: 1, source }))
   const operations = [
     { from: text.lastIndexOf('[ref]:'), to: text.length, text: '' },
     { from: text.lastIndexOf('[ref]:'), to: text.lastIndexOf('[ref]:'), text: '[ref]: /url\n' },
@@ -94,29 +127,36 @@ it('edits and undoes EOF definitions and moving fences with all outputs matching
     { from: 0, to: 4, text: '' },
   ]
   for (const [index, edit] of operations.entries()) {
-    const next = applyBatchToPieceTable(snapshot, [edit])
-    const payload = createTreeSitterEditPayload({
-      ...identity,
-      previousSnapshotVersion: index + 1,
-      snapshotVersion: index + 2,
-      previousSnapshot: snapshot,
-      nextSnapshot: next,
-      edits: [edit],
-    })!
-    const actual = await client.edit(payload)
-    const fresh = await client.parse({
-      ...identity,
-      runtimeSessionId: `fresh-${index}`,
-      snapshotVersion: index + 2,
-      snapshot: next,
+    const previous = document.delivery.current()!
+    document.view.applyEdits([edit])
+    const actual = await document.withRead(async (source) => {
+      const payload = createTreeSitterEditPayload({
+        ...identity,
+        previousSnapshotVersion: index + 1,
+        snapshotVersion: index + 2,
+        previousRead: previous.text,
+        source,
+        edits: [edit],
+      })
+      if (!payload) throw new TypeError('The canonical Markdown edit must have a bounded payload')
+      return client.edit(payload)
     })
+    const freshDocument = sourceDocument(document.buffer.materializeFullText())
+    const fresh = await freshDocument.withRead((source) =>
+      client.parse({
+        ...identity,
+        runtimeSessionId: `fresh-${index}`,
+        snapshotVersion: index + 2,
+        source,
+      }),
+    )
     expect(actual?.records).toEqual(fresh?.records)
     expect(actual?.captures).toEqual(fresh?.captures)
     expect(actual?.folds).toEqual(fresh?.folds)
     expect(actual?.injections).toEqual(fresh?.injections)
     expect(spans(actual, Kind.Link).length).toBe(index === 0 ? 0 : 1)
     client.disposeDocument(`fresh-${index}`)
-    snapshot = next
+    freshDocument.dispose()
     text = text.slice(0, edit.from) + edit.text + text.slice(edit.to)
   }
   const stale = await client.queryRange({
@@ -126,11 +166,10 @@ it('edits and undoes EOF definitions and moving fences with all outputs matching
     range: { startIndex: 0, endIndex: 10 },
   })
   expect(stale).toBeUndefined()
-  const staleParse = await client.parse({
-    ...identity,
-    snapshotVersion: 1,
-    snapshot: createPieceTableSnapshot('**stale**'),
-  })
+  const staleParse = await document.withRead(
+    (source) => client.parse({ ...identity, snapshotVersion: 1, source }),
+    oldRead,
+  )
   expect(staleParse).toBeUndefined()
   const current = await client.queryRange({
     ...identity,
@@ -143,8 +182,10 @@ it('edits and undoes EOF definitions and moving fences with all outputs matching
 
 it('bounds a giant paragraph result to visible constructs and keeps link text companions', async () => {
   const text = '[**target**](/url) ' + 'plain **strong** and `code` '.repeat(40_000)
-  const snapshot = createPieceTableSnapshot(text)
-  await client.parse({ ...identity, snapshotVersion: 1, snapshot, resultMode: 'parseOnly' })
+  const document = sourceDocument(text)
+  await document.withRead((source) =>
+    client.parse({ ...identity, snapshotVersion: 1, source, resultMode: 'parseOnly' }),
+  )
   const result = await client.queryRange({
     ...identity,
     snapshotVersion: 1,
@@ -157,17 +198,21 @@ it('bounds a giant paragraph result to visible constructs and keeps link text co
 })
 
 it('keeps a sibling document intact after disposal and initialization repeats', async () => {
-  const snapshot = createPieceTableSnapshot('**sibling**')
+  const document = sourceDocument('**sibling**')
+  const siblingDocument = sourceDocument('**sibling**')
   const sibling = { ...identity, runtimeSessionId: 'sibling' }
-  await client.parse({ ...identity, snapshotVersion: 1, snapshot })
-  const before = await client.parse({ ...sibling, snapshotVersion: 1, snapshot })
+  await document.withRead((source) => client.parse({ ...identity, snapshotVersion: 1, source }))
+  const before = await siblingDocument.withRead((source) =>
+    client.parse({ ...sibling, snapshotVersion: 1, source }),
+  )
   client.disposeDocument(identity.runtimeSessionId)
   await client.awaitRuntimeSessionIdle(identity.runtimeSessionId)
+  document.dispose()
   const after = await client.queryRange({
     ...sibling,
     snapshotVersion: 1,
     includeHighlights: true,
-    range: { startIndex: 0, endIndex: snapshot.length },
+    range: { startIndex: 0, endIndex: siblingDocument.buffer.getTextSnapshot().length },
   })
   expect(after?.records).toEqual(before?.records)
 })

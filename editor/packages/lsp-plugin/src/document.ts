@@ -1,10 +1,5 @@
+import type { EditorTextBuffer } from '@singapore-editor/core/document'
 import type {
-  DocumentSessionChange,
-  EditorTextBuffer,
-  EditorTextBufferChange,
-} from '@singapore-editor/core/document'
-import type {
-  EditorContributionChange,
   EditorDisposable,
   EditorViewContributionUpdateKind,
 } from '@singapore-editor/core/extensions'
@@ -28,6 +23,8 @@ import type {
   OnApplyWorkspaceEdit,
 } from './types'
 import { bufferDocumentSnapshot } from './documentSnapshot'
+import type { LanguageServerSourceOwner } from './retainedSource'
+import { languageServerSourceConnection } from './sourceConnection'
 
 /** A view's share of one lane's diagnostics for the document. */
 export type DocumentLaneDiagnosticsObserver = {
@@ -43,7 +40,7 @@ export type DocumentLaneDiagnosticsObserver = {
 
 type DocumentSource = {
   getSnapshot(): LanguageServerDocumentSnapshot
-  subscribe?(listener: (change: DocumentSessionChange) => void): () => void
+  getSourceOwner(): LanguageServerSourceOwner | null
 }
 
 export type LanguageServerDocumentOptions = {
@@ -60,7 +57,6 @@ export type LanguageServerDocumentOptions = {
 export class LanguageServerDocument {
   readonly lanes: readonly DocumentLanguageServerLane[]
   readonly syncOptions: LanguageServerDocumentSyncOptions
-  private readonly unsubscribe: (() => void) | undefined
   private disposed = false
 
   constructor(
@@ -74,21 +70,16 @@ export class LanguageServerDocument {
     this.lanes = options.lanes.map(
       (lane) => new DocumentLanguageServerLane(source, lane, options.documentSync),
     )
-    this.unsubscribe = source.subscribe?.((change) => this.synchronize(change))
   }
 
-  synchronize(
-    change: EditorContributionChange | null = null,
-    kind: EditorViewContributionUpdateKind = 'content',
-  ): void {
+  synchronize(kind: EditorViewContributionUpdateKind = 'content'): void {
     if (this.disposed) return
-    for (const lane of this.lanes) lane.synchronize(change, kind)
+    for (const lane of this.lanes) lane.synchronize(kind)
   }
 
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
-    this.unsubscribe?.()
     for (const lane of this.lanes) lane.dispose()
   }
 }
@@ -96,19 +87,13 @@ export class LanguageServerDocument {
 export function createLanguageServerDocument(
   options: LanguageServerDocumentOptions,
 ): LanguageServerDocument {
-  let publication: EditorTextBufferChange | undefined
   return new LanguageServerDocument(
     {
-      getSnapshot: () => bufferDocumentSnapshot({ ...options, publication }),
-      subscribe: (listener) =>
-        options.buffer.subscribe((event) => {
-          publication = event
-          try {
-            listener(event.change)
-          } finally {
-            publication = undefined
-          }
-        }),
+      getSnapshot: () => bufferDocumentSnapshot(options),
+      getSourceOwner: () => ({
+        buffer: options.buffer,
+        documentId: options.documentId ?? options.uri,
+      }),
     },
     {
       lanes: options.lanes.map((lane) =>
@@ -157,9 +142,9 @@ export class DocumentLanguageServerLane {
         },
       },
       {
+        beforeReady: () => this.synchronizeSource(),
         onReady: () => {
           this.unavailable = false
-          this.synchronize()
           // After a reconnect the document is the same one; only a new request can refresh it.
           if (!this.pullDiagnostics?.pending) this.pullDiagnostics?.synchronize()
           this.republishSummary()
@@ -167,6 +152,7 @@ export class DocumentLanguageServerLane {
         },
         onReconnecting: () => {
           this.unavailable = true
+          this.sync.close()
           this.pullDiagnostics?.cancel()
           this.sync.clearDiagnostics()
           this.notify()
@@ -178,6 +164,7 @@ export class DocumentLanguageServerLane {
         onUnavailable: () => {
           this.connectionStatus = 'error'
           this.unavailable = true
+          this.sync.close()
           this.pullDiagnostics?.cancel()
           this.sync.clearDiagnostics()
           this.notify()
@@ -202,7 +189,13 @@ export class DocumentLanguageServerLane {
       {
         ...syncOptions,
         logicalRevisionScope: this.connection.logicalRevisionScope,
+        getSourceOwner: () => this.source.getSourceOwner(),
+        getConnection: () => languageServerSourceConnection(this.connection.client),
         onDocumentClosed: () => this.notify(),
+        onDocumentChanged: () => {
+          this.pullDiagnostics?.synchronize()
+        },
+        onError: (error) => options.onError?.(error),
       },
     )
     this.pullDiagnostics =
@@ -222,7 +215,6 @@ export class DocumentLanguageServerLane {
     this.registration = syncOptions.controller?.register({
       getSnapshot: () => source.getSnapshot(),
       sync: this.sync,
-      workspace: this.connection.workspace,
     })
     void this.connection.ready.catch(() => undefined)
   }
@@ -258,16 +250,13 @@ export class DocumentLanguageServerLane {
     }
   }
 
-  synchronize(
-    change: EditorContributionChange | null = null,
-    kind: EditorViewContributionUpdateKind = 'content',
-  ): void {
+  synchronize(kind: EditorViewContributionUpdateKind = 'content'): void {
     if (this.disposed || !this.connection.isReady()) return
     const snapshot = this.source.getSnapshot()
     if (!this.sync.shouldSync(kind, snapshot)) return
-    const before = this.sync.activeDocument
-    this.sync.sync(snapshot, change)
-    if (before !== this.sync.activeDocument) this.pullDiagnostics?.synchronize()
+    void this.sync.sync(snapshot).catch((error) => {
+      if (!isCancellation(error)) this.options.onError?.(error)
+    })
   }
 
   dispose(): void {
@@ -275,10 +264,18 @@ export class DocumentLanguageServerLane {
     this.disposed = true
     this.registration?.dispose()
     this.pullDiagnostics?.dispose()
-    this.sync.close()
+    this.sync.dispose()
     this.connection.release()
     this.observers.clear()
     this.listeners.clear()
+  }
+
+  private async synchronizeSource(): Promise<void> {
+    try {
+      await this.sync.sync(this.source.getSnapshot())
+    } catch (error) {
+      if (!isCancellation(error)) throw error
+    }
   }
 
   private notify(): void {
@@ -303,4 +300,8 @@ export class DocumentLanguageServerLane {
     if (!active) return
     this.publishSummary(active.uri, this.diagnosticsVersion, this.sync.diagnostics)
   }
+}
+
+function isCancellation(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
 }

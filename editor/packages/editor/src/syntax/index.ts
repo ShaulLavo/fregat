@@ -23,6 +23,7 @@ export {
   type EditorSyntaxResultOptions,
   type EditorSyntaxServiceRequest,
   type EditorSyntaxSession,
+  type EditorSyntaxRuntime,
   type EditorSyntaxFoldingSupport,
   type EditorSyntaxSessionOptions,
   type EditorSyntaxSnapshotTag,

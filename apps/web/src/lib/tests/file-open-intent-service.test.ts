@@ -1,3 +1,4 @@
+import { preparedDocumentLease } from '../../../test/factories/prepared-document'
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { testDocumentKey } from '../../../test/factories/document-targets'
 import { preparationDocuments } from '../../../test/factories/file-preparation'
@@ -13,7 +14,6 @@ import {
 } from '@singapore-editor/core/document'
 import { type EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
 import {
-  createEditorDocumentAnalysis,
   type EditorDocumentAnalysis,
   type EditorPreparedDocument,
 } from '@singapore-editor/core/editor'
@@ -1732,23 +1732,6 @@ function setNumberAtPath(context: Record<string, unknown>, path: string, value: 
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function preparedDocumentLease(
-  runtimeSessionIds = { highlighter: [] as string[], structural: [] as string[] },
-): EditorPreparedDocument {
-  return {
-    dispose: vi.fn(),
-    estimatedBytes: 1,
-    fallbackReady: Promise.resolve(true),
-    runtimeSessionIds: () => runtimeSessionIds,
-    startStage: vi.fn(() => null),
-    borrow: vi.fn(() => null),
-    analysis: createEditorDocumentAnalysis({
-      buffer: createEditorTextBuffer(''),
-      documentId: 'prepared-test',
-    }),
-  }
 }
 
 function deferred<T>() {

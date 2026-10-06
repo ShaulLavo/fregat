@@ -26,7 +26,7 @@ import { createEditorLanguageServerStatusSource } from '@/features/editor/state/
 import {
   useWorkspaceDocumentSyncController,
   useWorkspaceEditHost,
-} from '@/features/editor/providers/workspace-edit-context'
+} from '@/lib/workspace-edits/providers/host-context'
 
 type UseLanguageServerPluginOptions = {
   document: LanguageServerDocument | null

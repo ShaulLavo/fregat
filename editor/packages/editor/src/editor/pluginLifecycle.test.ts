@@ -1,3 +1,4 @@
+import { defineStructuralOperation } from './operationDefinitions'
 import { Window } from 'happy-dom'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createEditorLoggingPlugin } from '../logging'
@@ -548,7 +549,9 @@ describe('editor plugin lifecycle', () => {
     let registration: EditorDisposable | null = null
     const plugin: EditorPlugin = {
       activate: (context) => {
-        registration = context.registerSyntaxProvider({ createSession: () => null })
+        registration = context.registerSyntaxProvider({
+          operation: defineStructuralOperation(() => null),
+        })
         return registration
       },
     }
@@ -585,7 +588,7 @@ describe('editor plugin lifecycle', () => {
     const context = requireContext(captured)
 
     // Stands in for a plugin registering from a resolved promise or a timer.
-    context.registerSyntaxProvider({ createSession: () => null })
+    context.registerSyntaxProvider({ operation: defineStructuralOperation(() => null) })
 
     expect(host.hasSyntaxProviders()).toBe(true)
     expect(changes).toBe(1)
@@ -673,7 +676,7 @@ describe('editor plugin lifecycle', () => {
     // Stands in for a plugin that registers and releases a provider per document or per view: the
     // host outlives every one of them, so nothing it still tracks is ever collected.
     for (let index = 0; index < 3; index += 1)
-      context.registerSyntaxProvider({ createSession: () => null }).dispose()
+      context.registerSyntaxProvider({ operation: defineStructuralOperation(() => null) }).dispose()
 
     expect(lateRegistrationCount(host)).toBe(0)
 

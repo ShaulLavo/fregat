@@ -1,3 +1,5 @@
+import { waitForDocumentWork } from '../src/editor/documentWork'
+import { createEditorHighlighterOperation } from '../src/editor/operationDefinitions'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import {
   createEditorBufferSession,
@@ -346,13 +348,15 @@ test('late highlighter results keep their origin and cannot apply after newer ed
   const pending: Array<(result: EditorHighlightResult) => void> = []
   const disposed = vi.fn()
   const applyChange = () => new Promise<EditorHighlightResult>((resolve) => pending.push(resolve))
-  const createSession = () => ({
-    refresh: async () => ({ tokens: EditorTokenStore.empty() }),
-    applyChange,
+  const operation = createEditorHighlighterOperation((context) => ({
+    analyze: (read, signal) =>
+      read.revision === context.initialRead.revision
+        ? Promise.resolve({ tokens: EditorTokenStore.empty() })
+        : waitForDocumentWork(applyChange(), signal),
     dispose: disposed,
-  })
+  }))
   const editor = mountEditor({
-    plugins: [{ activate: (context) => context.registerHighlighter({ createSession }) }],
+    plugins: [{ activate: (context) => context.registerHighlighter({ operation }) }],
   })
   editor.openDocument({ documentId: 'first.txt', text: 'abc' })
   await vi.runAllTimersAsync()

@@ -1,23 +1,24 @@
-import { createTestViewSnapshotSource } from '@singapore-editor/core/testing'
+import { createEditorTextBuffer } from '@singapore-editor/core/document'
+import { createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
+import { viewSnapshot } from './documentHarness'
 import { describe, expect, it } from 'vitest'
-import type { EditorViewSnapshot } from '@singapore-editor/core/extensions'
-import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import { resolveMinimapOptions } from '../src/options'
 import { MinimapWorkerRenderer } from '../src/renderer'
-import {
-  canUseMinimapWorker,
-  MinimapWorkerClient,
-  MinimapWorkerOwner,
-  type MinimapHost,
-} from '../src/workerClient'
+import { canUseMinimapWorker, MinimapWorkerClient, type MinimapHost } from '../src/workerClient'
+import { MinimapWorkerOwner } from '../src/workerOwner'
 
 describe.skipIf(!canUseMinimapWorker())('MinimapWorkerClient', () => {
   it('renders through OffscreenCanvas and updates host layout', async () => {
     const host = createHost()
+    const analysis = createEditorDocumentAnalysis({
+      buffer: createEditorTextBuffer('const value = 1;\nconsole.log(value);'),
+      documentId: 'browser-minimap',
+    })
     const client = new MinimapWorkerClient({
       host,
       options: resolveMinimapOptions(),
-      snapshot: snapshot('const value = 1;\nconsole.log(value);'),
+      snapshot: viewSnapshot(analysis),
+      contributions: analysis.contributions,
       decorations: [],
       onLayoutWidth: (width) => {
         host.root.dataset.width = String(width)
@@ -32,6 +33,7 @@ describe.skipIf(!canUseMinimapWorker())('MinimapWorkerClient', () => {
 
     client.dispose()
     expect(client.inspectWorker().lifecycle).toBe('disposed')
+    analysis.dispose()
     host.root.remove()
     host.colorScope.remove()
   })
@@ -119,8 +121,7 @@ describe.skipIf(typeof Worker === 'undefined')('MinimapWorkerOwner disposal', ()
         [
           `
       onmessage = () => {
-        postMessage({ type: 'rendered', sequence: 1, sliderNeeded: false,
-          sliderTop: 0, sliderHeight: 0, shadowVisible: false });
+        postMessage({ type: 'renderSkipped', sequence: 1 });
         ${mode === 'busy' ? 'while (true) {}' : ''}
       };
     `,
@@ -138,7 +139,7 @@ describe.skipIf(typeof Worker === 'undefined')('MinimapWorkerOwner disposal', ()
     })
 
     try {
-      owner.post({ type: 'render', sequence: 1 })
+      owner.post({ type: 'updateSelection', selections: [] })
       await waitFor(() => running)
       let settled = false
       const disposal = owner.dispose().then(() => {
@@ -180,66 +181,6 @@ function createHost(): MinimapHost {
   root.append(shadow, mainCanvas, decorationsCanvas, slider)
   document.body.append(colorScope, root)
   return { root, colorScope, shadow, mainCanvas, decorationsCanvas, slider, sliderHorizontal }
-}
-
-function snapshot(text: string): EditorViewSnapshot {
-  return {
-    documentId: 'test.ts',
-    languageId: 'typescript',
-    ...createTestViewSnapshotSource(text),
-    textVersion: 1,
-    initialHighlightStatus: 'painted',
-    syntaxStatus: 'ready',
-    paintLayers: [],
-    documentSyncPoint: {
-      revision: 1,
-      segment: Object.freeze({}) as EditorViewSnapshot['documentSyncPoint']['segment'],
-      textVersion: 1,
-    },
-    changesSinceDocumentSyncPoint: () => null,
-    lineStarts: lineStarts(text),
-    tokens: EditorTokenStore.fromTokens([
-      { start: 0, end: 5, style: { color: 'var(--editor-syntax-keyword)' } },
-    ]),
-    brackets: [],
-    selections: [
-      { anchorOffset: 0, headOffset: 5, startOffset: 0, endOffset: 5, affinity: 'after' },
-    ],
-    metrics: { rowHeight: 20, characterWidth: 8 },
-    lineCount: 2,
-    contentWidth: 160,
-    totalHeight: 40,
-    gutterWidth: 0,
-    gutterLayout: { leadingInset: 0, fixedWidth: 0, lanes: [] },
-    tabSize: 4,
-    foldMarkers: [],
-    visibleRows: [],
-    viewport: {
-      scrollTop: 0,
-      scrollRow: 0,
-      scrollLeft: 0,
-      scrollHeight: 40,
-      scrollWidth: 160,
-      clientHeight: 200,
-      clientWidth: 400,
-      borderBoxHeight: 200,
-      borderBoxWidth: 400,
-      visibleRange: { start: 0, end: 2 },
-    },
-    toVisibleSnapshot() {
-      return null
-    },
-  }
-}
-
-function lineStarts(text: string): readonly number[] {
-  const starts = [0]
-  let index = text.indexOf('\n')
-  while (index !== -1) {
-    starts.push(index + 1)
-    index = text.indexOf('\n', index + 1)
-  }
-  return starts
 }
 
 async function waitFor(predicate: () => boolean): Promise<void> {

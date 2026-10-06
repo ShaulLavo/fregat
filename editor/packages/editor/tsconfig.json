@@ -22,6 +22,7 @@
       "@singapore-editor/core/editor": ["./src/editor.ts"],
       "@singapore-editor/core/extensions": ["./src/public/extensions.ts"],
       "@singapore-editor/core/internal": ["./src/internal.ts"],
+      "@singapore-editor/core/internal/document-worker": ["./src/document/workerReader.ts"],
       "@singapore-editor/core/logging": ["./src/logging/index.ts"],
       "@singapore-editor/core/logging/evlog": ["./src/logging/evlog.ts"],
       "@singapore-editor/core/rendering": ["./src/public/rendering.ts"],

@@ -1,5 +1,53 @@
 # Paired native input latency
 
+## Current qualification, 2026-10-05
+
+Plan 099 units 2–7 are Approved and integrated in [PR #787](https://github.com/ShaulLavo/fregat/pull/787).
+The final comparison uses untouched main `51d2a71ae`, candidate `9e773c8fa`, measurement
+`b615d5ab`, and validation `e76f680d`, with equal external dependencies. Fresh input, frame,
+detection-floor, and native controls pass. The quiet default passes 216 blocking comparisons
+in 566.201 seconds. The complete matrix passes 972 required and 1,080 raw comparisons, with
+exact replay and complete cleanup.
+
+The full command takes 2,798.161 seconds, exceeding its 2,700-second tooling target by 98.161.
+The runtime miss remains a benchmark follow-up after the owner's cost concern. It does not
+invalidate the completed comparisons or require a full rerun. App-only changes use affected
+app checks while unchanged SDK evidence remains valid.
+
+A separately observed Tree-sitter/Shiki short-lines, multiple-view paste experiment preserves
+the production sampler, current-source checks, and complete cleanup. In its two counterbalanced
+pairs, consumer readiness falls from 10,157 and 10,090.6 ms to 1,813.7 and 1,787 ms. Actual latest
+Tree-sitter requests are sent about 8,868 ms after the last input in the baseline and about
+16 ms afterward in the candidate. Matching worker replies and final current output pass in
+both arms. Independent review accepts this bounded cross-domain readiness improvement.
+
+The experiment keeps its separate diagnostic identity `7e2a4be7`; it does not replace production
+input acceptance. Earliest source-tagged token application and visible-paint timing remain
+unavailable. No general SDK speed or total-memory improvement is claimed. The
+[source and ownership proof](source-ownership-proof.md) records measured payloads and lifetime
+bounds, including the baseline restart failure and higher candidate main-renderer heap.
+
+The load smoke passes, and the loaded native/disabled default passes all 216 keys in 231.822
+seconds. Thirteen selected keys across eleven groups complete ten identical-candidate runs
+each in 893.648 seconds. Two selected and two auxiliary native Undo verdicts reject identical
+source, compiled bytes, and dependencies on both arms. The original zero-rejection predicate
+remains false, with source/output, actual CPU-affinity, and cleanup checks passing. These are
+benchmark reliability findings. They remain follow-ups rather than a Plan 099 delivery blocker;
+the actual changed-code comparisons keep their original budgets and passing verdicts.
+
+App typing passes after complete summary accounting fixes early-event eviction from its bounded
+trace. Scroll timing limits pass, while its 270-range cap rejects the untouched baseline and
+candidate at exactly 354 matching current ranges. No detached, foreign, or duplicated ranges
+occur in the matched capture. [Issue #818](https://github.com/ShaulLavo/fregat/issues/818) preserves
+that invalid reference and original failure. [Issue #820](https://github.com/ShaulLavo/fregat/issues/820)
+preserves the four identical-build control flags. Final app revision `b20cf82db` completes the
+shared-observer refresh: all three calibrations, derived open, typing, and scroll timing pass.
+Its 120 measured prepared-300 samples begin no transferable work after activation. The known
+range-count failure remains red. Broader loaded matrices and repeated historical negative
+matrices remain follow-ups, with no credit for uncollected results.
+
+## Archived qualification
+
 Plan 282 implements the paired replacement for Plan 099 units 2–7. The follow-up uses historical budgets with a declared 5 ms loaded Tree-sitter blocking floor and temporarily excludes the known minimap undo source failure from acceptance, as directed by the owner. Corrected-identity controls pass; actual default completes in 855.026 seconds and passes 215/216 blocking keys. The one Platform applied-undo rejection remains unclassified: either a real #224 large-file undo cost or noise. The coordinator approves shipping this result with that open key and follow-ups recorded; the runner's failing verdict stays unchanged. Full timing and expanded loaded proofs remain follow-ups. The owner approved units 2–7 on 2026-10-04; their latency prerequisite remains pending. The runner compares two frozen Editor package sets in one Chromium session. Every complete two-pair block runs each side first once, with reproducible randomized order per key.
 
 ## Run the comparison
@@ -835,3 +883,24 @@ statistics, workload, interception, package products or budgets. With minimap di
 predicate short-circuits and the prior readiness logic is unchanged. Any coordinator-approved reuse
 of unaffected reference evidence will retain its explicit old identity. No repaired-identity
 acceptance is claimed here.
+
+## Runtime qualification: effectful reader and live admission partition
+
+The new runtime instrument hashes live source admission in `input-source-current.mjs` as
+measurement. The frontend `src/input-output.ts` also belongs to measurement: after actual
+source-byte and opaque-buffer identity validation it records the bounded prior-current
+attestation used by subsequent live dormant admission. Only `input-output.mjs`, which checks
+postcapture receipts, remains validation-only. This is a new identity partition; archived
+controls, failures and earlier two-reader partitions retain their original hashes and scope.
+
+Warm resets physically hide the third view with explicit display state. A dormant canonical
+worker retains `current=false`; admission requires mapped physical invisibility, zero pending
+source/render/domain requests, valid source/render tuples and prior actual-current attestation.
+Reveal requires the latest actual source point and changed rendered output. Registered
+`renderSkipped` is terminal cancellation, retires its pending sequence and never counts as an
+accepted render. A later valid current frame can restore freshness after known cancellation.
+Unknown/stale responses and true errors fail closed for both active and dormant admission.
+
+Raw sides and schedule are archived after cleanup and before comparison. Capture or cleanup
+failures retain available receipts and explicitly incomplete schedule status. Every measurement
+change requires fresh controls and current-identity matrix, timing and reliability proofs.

@@ -1,34 +1,25 @@
-import type { LanguageServerDocumentSnapshot } from './types'
-import {
-  type DocumentLogicalRevisionScope,
-  type DocumentSyncPoint,
-  type DocumentSyncSegment,
-  type TextEdit,
-} from '@singapore-editor/core/document'
+import type { LanguageServerDocumentSnapshot, LanguageServerDocumentSyncOptions } from './types'
 import type {
-  EditorContributionChange,
-  EditorViewContributionUpdateKind,
-} from '@singapore-editor/core/extensions'
-import {
-  recordLspPerformanceDiagnostic,
-  type LspDocumentTransitionNotification,
-  type LspTextDocumentSnapshot,
-  type LspTextSnapshot,
-  type LspWorkspaceDocumentAttachment,
-  type LspWorkspace,
-} from '@singapore-editor/lsp'
+  DocumentLogicalRevisionScope,
+  DocumentSyncSegment,
+} from '@singapore-editor/core/document'
+import type { EditorViewContributionUpdateKind } from '@singapore-editor/core/extensions'
+import type { LspTextDocumentSnapshot, LspWorkspace } from '@singapore-editor/lsp'
 import type * as lsp from 'vscode-languageserver-protocol'
-
 import { projectDiagnosticsInSnapshot } from './diagnosticProjection'
 import type { LanguageServerDocumentUriTransition } from './documentSyncController'
 import { pathOrUriToDocumentUri } from './paths'
 import type { ActiveDocument, DocumentDescriptor } from './pluginTypes'
-import type { LanguageServerDocumentSyncOptions } from './types'
 import { viewDocumentSnapshot } from './viewDocumentSnapshot'
+import {
+  observeLanguageServerSource,
+  retainLanguageServerSource,
+  type LanguageServerSourceConnection,
+  type LanguageServerSourceOwner,
+  type LanguageServerSourcePublication,
+} from './retainedSource'
 
-/** `result` came from the server; `reset` is the client emptying the list itself. */
 export type DocumentSyncSummaryKind = 'result' | 'reset'
-
 export type DocumentSyncDiagnosticsPresenter = {
   clear(): void
   render(document: LspTextDocumentSnapshot, diagnostics: readonly lsp.Diagnostic[]): void
@@ -39,191 +30,232 @@ export type DocumentSyncDiagnosticsPresenter = {
     kind: DocumentSyncSummaryKind,
   ): void
 }
-
 export type DocumentSyncOptions = LanguageServerDocumentSyncOptions & {
   readonly logicalRevisionScope: DocumentLogicalRevisionScope
+  getSourceOwner(): LanguageServerSourceOwner | null
+  getConnection(): LanguageServerSourceConnection | null
   onDocumentClosed(): void
+  onDocumentChanged(): void
+  onError(error: unknown): void
+}
+type SourceLease = NonNullable<ReturnType<typeof retainLanguageServerSource>>
+type Binding = {
+  readonly source: LanguageServerSourceOwner
+  readonly connection: LanguageServerSourceConnection
+  readonly uri: string
+  readonly languageId: string
+  readonly lease: SourceLease
+}
+type UriProjection = {
+  readonly fromUri: string
+  readonly toUri: string
+  readonly segment: DocumentSyncSegment
+  readonly previousSegment: DocumentSyncSegment
 }
 
 export class DocumentSync {
-  private attachment: LspWorkspaceDocumentAttachment | null = null
+  private binding: Binding | null = null
   private document: ActiveDocument | null = null
   private diagnosticItems: readonly lsp.Diagnostic[] = []
-  private readonly logicalRevisionScope: DocumentLogicalRevisionScope
-  private pendingUriProjection: PendingUriProjection | null = null
-  private syncPoint: DocumentSyncPoint | null = null
+  private pendingUriProjection: UriProjection | null = null
+  private readonly unsubscribe: () => void
 
-  public constructor(
+  constructor(
     private readonly workspace: LspWorkspace,
     private readonly presenter: DocumentSyncDiagnosticsPresenter,
     private readonly options: DocumentSyncOptions,
   ) {
-    this.logicalRevisionScope = options.logicalRevisionScope
+    this.unsubscribe = observeLanguageServerSource(workspace, {
+      deliver: this.adoptPublication,
+      onError: options.onError,
+    })
   }
-
-  public get activeDocument(): ActiveDocument | null {
+  get activeDocument(): ActiveDocument | null {
     return this.document
   }
-
-  public get diagnostics(): readonly lsp.Diagnostic[] {
+  get diagnostics(): readonly lsp.Diagnostic[] {
     return this.diagnosticItems
   }
 
-  public shouldSync(
+  shouldSync(
     kind: EditorViewContributionUpdateKind,
     snapshot: LanguageServerDocumentSnapshot,
   ): boolean {
     if (kind === 'document' || kind === 'content' || kind === 'clear') return true
-    if (!this.document) return false
-    return !sameSyncPoint(this.syncPoint, snapshot.documentSyncPoint)
+    const descriptor = this.descriptor(snapshot)
+    return (
+      descriptor?.uri !== this.binding?.uri || descriptor?.languageId !== this.binding?.languageId
+    )
   }
 
-  public sync(
-    snapshot: LanguageServerDocumentSnapshot,
-    change: EditorContributionChange | null,
-  ): void {
-    const projectedUri = this.projectedDocumentUri(snapshot)
-    const descriptor = documentDescriptor(snapshot, this.options, projectedUri)
-    if (!descriptor) {
-      this.detachDocument()
+  async sync(snapshot: LanguageServerDocumentSnapshot): Promise<void> {
+    const descriptor = this.descriptor(snapshot)
+    const source = this.options.getSourceOwner()
+    const connection = this.options.getConnection()
+    if (!descriptor || !source || !connection) {
+      this.detach()
       return
     }
-
-    this.openOrUpdateDocument(descriptor, change, snapshot)
+    const binding = this.bind(source, connection, descriptor)
+    await binding?.lease.request()
   }
 
-  public close(): void {
+  close(): void {
     this.pendingUriProjection = null
-    this.detachDocument()
+    this.detach()
+  }
+  dispose(): void {
+    this.unsubscribe()
+    this.close()
   }
 
-  public transitionDocumentUri(
+  transitionDocumentUri(
     snapshot: LanguageServerDocumentSnapshot,
     transition: LanguageServerDocumentUriTransition,
   ): boolean {
-    if (!this.matchesTransitionSource(snapshot, transition)) return false
-
-    const descriptor = documentDescriptor(
-      snapshot,
-      this.options,
-      transition.toUri,
-      transition.textSnapshot,
+    const active = this.document
+    const binding = this.binding
+    if (!active || !binding || active.uri !== transition.fromUri) return false
+    if (active.sourceSegment !== transition.previousSyncPoint.segment) return false
+    if (active.sourceRevision > transition.previousSyncPoint.revision) return false
+    if (
+      transition.previousSyncPoint.revision !== transition.syncPoint.revision ||
+      transition.previousSyncPoint.textVersion !== transition.syncPoint.textVersion
     )
+      return false
+    if (transition.previousSyncPoint.segment === transition.syncPoint.segment) return false
+    const descriptor = documentDescriptor(snapshot, this.options, transition.toUri)
     if (!descriptor) {
-      this.detachDocument()
-      this.pendingUriProjection = pendingUriProjection(transition)
+      this.close()
       return true
     }
-
-    this.transitionDocument(descriptor, transition.syncPoint)
+    this.pendingUriProjection = {
+      fromUri: documentUri(snapshot, this.options) ?? transition.fromUri,
+      toUri: transition.toUri,
+      segment: transition.syncPoint.segment,
+      previousSegment: transition.previousSyncPoint.segment,
+    }
+    const source = this.options.getSourceOwner()
+    const connection = this.options.getConnection()
+    if (!source || !connection) {
+      this.detach()
+      return true
+    }
+    const next = this.bind(source, connection, descriptor)
+    void next?.lease.request().catch(this.options.onError)
     return true
   }
 
-  private detachDocument(): void {
-    const active = this.document
-    const attachment = this.attachment
-    this.attachment = null
-    this.document = null
-    this.diagnosticItems = []
-    this.syncPoint = null
-    this.options.onDocumentClosed()
-    if (!active) return
-
-    this.presenter.clear()
-    if (attachment) this.workspace.closeDocument(attachment)
-    this.presenter.publishSummary(active.uri, active.lspVersion, [], 'reset')
-  }
-
-  private matchesTransitionSource(
-    snapshot: LanguageServerDocumentSnapshot,
-    transition: LanguageServerDocumentUriTransition,
-  ): boolean {
-    const active = this.document
-    const point = this.syncPoint
-    if (!active || !this.attachment || !point) return false
-    if (active.uri !== transition.fromUri) return false
-    if (active.textSnapshot !== transition.textSnapshot) return false
-    if (snapshot.textSnapshot !== transition.textSnapshot) return false
-    if (point.revision !== transition.syncPoint.revision) return false
-    if (point.textVersion !== transition.syncPoint.textVersion) return false
-    return point.segment !== transition.syncPoint.segment
-  }
-
-  private projectedDocumentUri(
-    snapshot: LanguageServerDocumentSnapshot,
-  ): lsp.DocumentUri | undefined {
-    const projection = this.pendingUriProjection
-    if (!projection) return undefined
-    if (snapshot.documentSyncPoint.segment !== projection.segment) {
-      this.pendingUriProjection = null
-      return undefined
-    }
-    const uri = documentUri(snapshot, this.options)
-    if (uri === null) {
-      this.pendingUriProjection = null
-      return undefined
-    }
-
-    if (uri === projection.fromUri) return projection.toUri
-    this.pendingUriProjection = null
-    return undefined
-  }
-
-  public publishDiagnostics(params: unknown): void {
+  publishDiagnostics(params: unknown): void {
     const diagnostics = publishDiagnosticsParams(params)
-    if (!diagnostics) return
-
     const active = this.document
-    if (!active) return
-    if (diagnostics.uri !== active.uri) return
+    if (!diagnostics || !active || diagnostics.uri !== active.uri) return
     if (diagnostics.version !== null && diagnostics.version !== active.lspVersion) return
-
     this.replaceDiagnostics(active, diagnostics.version, diagnostics.diagnostics)
   }
-
-  public pullDiagnostics(
+  pullDiagnostics(
     uri: lsp.DocumentUri,
     version: number,
     diagnostics: readonly lsp.Diagnostic[],
   ): void {
     const active = this.document
     if (!active || active.uri !== uri || active.lspVersion !== version) return
-
     this.replaceDiagnostics(active, version, diagnostics)
   }
-
-  public clearDiagnostics(): void {
+  clearDiagnostics(): void {
     const active = this.document
     this.diagnosticItems = []
     this.presenter.clear()
-    if (!active) return
-
-    this.presenter.publishSummary(active.uri, active.lspVersion, [], 'reset')
+    if (active) this.presenter.publishSummary(active.uri, active.lspVersion, [], 'reset')
   }
 
-  private openOrUpdateDocument(
+  private descriptor(snapshot: LanguageServerDocumentSnapshot): DocumentDescriptor | null {
+    const projection = this.pendingUriProjection
+    const uri = documentUri(snapshot, this.options)
+    if (
+      projection &&
+      uri === projection.fromUri &&
+      (snapshot.documentSyncPoint.segment === projection.segment ||
+        snapshot.documentSyncPoint.segment === projection.previousSegment)
+    )
+      return documentDescriptor(snapshot, this.options, projection.toUri)
+    this.pendingUriProjection = null
+    return documentDescriptor(snapshot, this.options)
+  }
+  private bind(
+    source: LanguageServerSourceOwner,
+    connection: LanguageServerSourceConnection,
     descriptor: DocumentDescriptor,
-    change: EditorContributionChange | null,
-    snapshot: LanguageServerDocumentSnapshot,
-  ): void {
-    const active = this.document
-    if (!active) {
-      this.openDocument(descriptor, snapshot.documentSyncPoint)
-      return
-    }
-
-    if (active.uri !== descriptor.uri) {
-      this.replaceOrTransitionDocument(descriptor, snapshot.documentSyncPoint)
-      return
-    }
-    if (active.languageId !== descriptor.languageId) {
-      this.openDocument(descriptor, snapshot.documentSyncPoint)
-      return
-    }
-    if (sameSyncPoint(this.syncPoint, snapshot.documentSyncPoint)) return
-    this.updateDocument(descriptor, change, snapshot)
+  ): Binding | null {
+    const previous = this.binding
+    if (
+      previous &&
+      sameOwner(previous.source, source) &&
+      previous.connection === connection &&
+      previous.uri === descriptor.uri &&
+      previous.languageId === descriptor.languageId
+    )
+      return previous
+    this.detach()
+    const lease = retainLanguageServerSource({
+      ...source,
+      workspace: this.workspace,
+      uri: descriptor.uri,
+      languageId: descriptor.languageId,
+      logicalRevisionScope: this.options.logicalRevisionScope,
+      connection,
+    })
+    this.binding = lease
+      ? { source, connection, uri: descriptor.uri, languageId: descriptor.languageId, lease }
+      : null
+    return this.binding
   }
-
+  private detach(): void {
+    const binding = this.binding
+    this.binding = null
+    try {
+      binding?.lease.dispose()
+    } finally {
+      this.clearDocument()
+    }
+  }
+  private clearDocument(): void {
+    const active = this.document
+    this.document = null
+    this.diagnosticItems = []
+    this.options.onDocumentClosed()
+    this.presenter.clear()
+    if (active) this.presenter.publishSummary(active.uri, active.lspVersion, [], 'reset')
+  }
+  private readonly adoptPublication = (publication: LanguageServerSourcePublication): void => {
+    if (publication.runtimeSessionId !== this.binding?.lease.runtimeSessionId) return
+    const next = publication.document
+    if (!next) {
+      this.clearDocument()
+      return
+    }
+    const previous = this.document
+    if (
+      previous?.sourceRevision === next.sourceRevision &&
+      previous.sourceSegment === next.sourceSegment &&
+      previous.lspVersion === next.version
+    )
+      return
+    if (previous && previous.textSnapshot !== next.textSnapshot) {
+      this.diagnosticItems = projectDiagnosticsInSnapshot(this.diagnosticItems, {
+        previousDocument: previous,
+        nextDocument: next,
+        change: publication.edits ? { edits: publication.edits } : null,
+      })
+    }
+    this.document = {
+      ...next,
+      textVersion: publication.point?.textVersion ?? 0,
+      lspVersion: next.version,
+    }
+    this.presenter.render(this.document, this.diagnosticItems)
+    this.options.onDocumentChanged()
+  }
   private replaceDiagnostics(
     active: ActiveDocument,
     version: number | null,
@@ -233,239 +265,13 @@ export class DocumentSync {
     this.presenter.render(active, diagnostics)
     this.presenter.publishSummary(active.uri, version, diagnostics, 'result')
   }
-
-  private openDocument(descriptor: DocumentDescriptor, syncPoint: DocumentSyncPoint): void {
-    this.close()
-    const result = this.workspace.openDocumentSnapshot({
-      uri: descriptor.uri,
-      languageId: descriptor.languageId,
-      textSnapshot: descriptor.textSnapshot,
-      lineStarts: descriptor.lineStarts,
-      sourceRevision: syncPoint.revision,
-      sourceSegment: syncPoint.segment,
-      onDocumentTransition: (transition) => this.adoptDocumentTransition(transition),
-    })
-    this.attachment = result.attachment
-    this.document = activeDocument(descriptor, result.document.version)
-    this.syncPoint = syncPoint
-  }
-
-  private replaceOrTransitionDocument(
-    descriptor: DocumentDescriptor,
-    syncPoint: DocumentSyncPoint,
-  ): void {
-    if (!isSharedUriTransition(this.document, this.syncPoint, descriptor, syncPoint)) {
-      this.openDocument(descriptor, syncPoint)
-      return
-    }
-    this.transitionDocument(descriptor, syncPoint)
-  }
-
-  private transitionDocument(descriptor: DocumentDescriptor, syncPoint: DocumentSyncPoint): void {
-    const attachment = this.attachment
-    if (!attachment) throw new Error('An active LSP document must retain its workspace attachment.')
-
-    const result = this.workspace.transitionDocumentUri(attachment, {
-      uri: descriptor.uri,
-      languageId: descriptor.languageId,
-      textSnapshot: descriptor.textSnapshot,
-      lineStarts: descriptor.lineStarts,
-      sourceRevision: syncPoint.revision,
-      sourceSegment: syncPoint.segment,
-      sourceTextVersion: syncPoint.textVersion,
-    })
-    this.document = activeDocument(descriptor, result.document.version)
-    this.syncPoint = syncPoint
-  }
-
-  private updateDocument(
-    descriptor: DocumentDescriptor,
-    change: EditorContributionChange | null,
-    snapshot: LanguageServerDocumentSnapshot,
-  ): void {
-    const active = this.document
-    const diagnostics = projectDiagnosticsInSnapshot(this.diagnosticItems, {
-      previousDocument: active ?? descriptor,
-      nextDocument: descriptor,
-      change,
-    })
-    const changes = changesSinceLastSync(
-      snapshot,
-      this.syncPoint,
-      this.logicalRevisionScope,
-      change,
-      active?.textSnapshot ?? descriptor.textSnapshot,
-      descriptor.textSnapshot,
-    )
-    recordLspPerformanceDiagnostic('lsp.documentSync.editChain', {
-      chained: changes.edits === null ? 'null' : changes.edits.length,
-      logicalRevisionCount: changes.logicalRevisionCount,
-      activeTextVersion: active?.textVersion ?? -1,
-      snapshotTextVersion: snapshot.textVersion,
-      changeEditCount: change?.edits.length ?? -1,
-    })
-    const document = this.synchronizeWorkspaceDocument(descriptor, changes)
-    this.document = activeDocument(descriptor, document.version)
-    this.syncPoint = changes.syncPointAfter
-    if (diagnostics === this.diagnosticItems) return
-
-    this.diagnosticItems = diagnostics
-    this.presenter.render(descriptor, diagnostics)
-  }
-
-  private synchronizeWorkspaceDocument(
-    descriptor: DocumentDescriptor,
-    changes: SyncChanges,
-  ): ReturnType<LspWorkspace['updateDocumentSnapshot']> {
-    const source = {
-      textSnapshot: descriptor.textSnapshot,
-      lineStarts: descriptor.lineStarts,
-      sourceRevision: changes.syncPointAfter.revision,
-      sourceSegment: changes.syncPointAfter.segment,
-    }
-    if (changes.logicalRevisionCount === 0) {
-      return this.workspace.adoptUnchangedDocumentSource(descriptor.uri, source)
-    }
-
-    return this.workspace.updateDocumentSnapshot(descriptor.uri, {
-      ...source,
-      edits: changes.edits,
-      logicalRevisionCount: changes.logicalRevisionCount,
-    })
-  }
-
-  private adoptDocumentTransition(transition: LspDocumentTransitionNotification): void {
-    const active = this.document
-    if (!active) return
-
-    this.diagnosticItems = []
-    this.presenter.clear()
-    this.presenter.publishSummary(active.uri, active.lspVersion, [], 'reset')
-    this.pendingUriProjection = {
-      fromUri: active.uri,
-      toUri: transition.document.uri,
-      segment: transition.sourceSegment as DocumentSyncSegment,
-    }
-    this.document = activeDocumentForTransition(active, transition)
-    this.syncPoint = {
-      revision: transition.sourceRevision,
-      segment: transition.sourceSegment as DocumentSyncSegment,
-      textVersion: transition.sourceTextVersion,
-    }
-  }
 }
 
-type PendingUriProjection = {
-  readonly fromUri: lsp.DocumentUri
-  readonly toUri: lsp.DocumentUri
-  readonly segment: DocumentSyncSegment
-}
-
-function pendingUriProjection(
-  transition: LanguageServerDocumentUriTransition,
-): PendingUriProjection {
-  return {
-    fromUri: transition.fromUri,
-    toUri: transition.toUri,
-    segment: transition.syncPoint.segment,
-  }
-}
-
-type SyncChanges = {
-  readonly edits: readonly TextEdit[] | null
-  readonly logicalRevisionCount: number
-  readonly syncPointAfter: DocumentSyncPoint
-}
-
-function changesSinceLastSync(
-  snapshot: LanguageServerDocumentSnapshot,
-  point: DocumentSyncPoint | null,
-  scope: DocumentLogicalRevisionScope,
-  change: EditorContributionChange | null,
-  previousTextSnapshot: LspTextSnapshot,
-  nextTextSnapshot: LspTextSnapshot,
-): SyncChanges {
-  if (!point) {
-    return fallbackSyncChanges(
-      snapshot,
-      null,
-      change,
-      scope,
-      previousTextSnapshot,
-      nextTextSnapshot,
-    )
-  }
-
-  const changes = snapshot.changesSinceDocumentSyncPoint(point, scope)
-  if (changes) {
-    return {
-      edits: changes.edits,
-      logicalRevisionCount: changes.logicalRevisionCount,
-      syncPointAfter: changes.syncPointAfter,
-    }
-  }
-  return fallbackSyncChanges(snapshot, point, change, scope, previousTextSnapshot, nextTextSnapshot)
-}
-
-function fallbackSyncChanges(
-  snapshot: LanguageServerDocumentSnapshot,
-  point: DocumentSyncPoint | null,
-  change: EditorContributionChange | null,
-  scope: DocumentLogicalRevisionScope,
-  previousTextSnapshot: LspTextSnapshot,
-  nextTextSnapshot: LspTextSnapshot,
-): SyncChanges {
-  const nextPoint = snapshot.documentSyncPoint
-  const textChanged =
-    previousTextSnapshot !== nextTextSnapshot ||
-    point === null ||
-    point.textVersion !== nextPoint.textVersion
-  return {
-    edits: null,
-    logicalRevisionCount: fallbackLogicalRevisionCount(
-      change,
-      scope,
-      textChanged,
-      point,
-      nextPoint,
-    ),
-    syncPointAfter: nextPoint,
-  }
-}
-
-function fallbackLogicalRevisionCount(
-  change: EditorContributionChange | null,
-  scope: DocumentLogicalRevisionScope,
-  textChanged: boolean,
-  point: DocumentSyncPoint | null,
-  nextPoint: DocumentSyncPoint,
-): number {
-  if (change?.logicalRevisionScope === scope) return change.logicalRevisionCount
-  if (!textChanged) return 0
-  if (!point) return 1
-  return Math.max(1, nextPoint.textVersion - point.textVersion)
-}
-
-function sameSyncPoint(left: DocumentSyncPoint | null, right: DocumentSyncPoint): boolean {
-  if (!left) return false
-  return (
-    left.revision === right.revision &&
-    left.segment === right.segment &&
-    left.textVersion === right.textVersion
-  )
-}
-
-function isSharedUriTransition(
-  active: ActiveDocument | null,
-  currentPoint: DocumentSyncPoint | null,
-  descriptor: DocumentDescriptor,
-  nextPoint: DocumentSyncPoint,
-): boolean {
-  if (!active || !currentPoint) return false
-  if (active.textSnapshot !== descriptor.textSnapshot) return false
-  if (currentPoint.revision !== nextPoint.revision) return false
-  if (currentPoint.textVersion !== nextPoint.textVersion) return false
-  return currentPoint.segment !== nextPoint.segment
+function sameOwner(left: LanguageServerSourceOwner, right: LanguageServerSourceOwner): boolean {
+  if ('buffer' in left && 'buffer' in right) return left.buffer === right.buffer
+  if ('contributions' in left && 'contributions' in right)
+    return left.contributions === right.contributions
+  return false
 }
 
 function activeDocument(descriptor: DocumentDescriptor, lspVersion: number): ActiveDocument {
@@ -476,21 +282,8 @@ function activeDocument(descriptor: DocumentDescriptor, lspVersion: number): Act
     lineStarts: descriptor.lineStarts,
     textVersion: descriptor.textVersion,
     lspVersion,
-  }
-}
-
-function activeDocumentForTransition(
-  active: ActiveDocument,
-  transition: LspDocumentTransitionNotification,
-): ActiveDocument {
-  const document = transition.document
-  return {
-    uri: document.uri,
-    languageId: document.languageId,
-    textSnapshot: document.textSnapshot,
-    lineStarts: document.lineStarts,
-    textVersion: active.textVersion,
-    lspVersion: document.version,
+    sourceRevision: descriptor.sourceRevision,
+    sourceSegment: descriptor.sourceSegment,
   }
 }
 
@@ -498,16 +291,14 @@ function documentUri(
   snapshot: LanguageServerDocumentSnapshot,
   options: LanguageServerDocumentSyncOptions,
 ): lsp.DocumentUri | null {
-  if (!snapshot.documentId) return null
   if (options.uriForDocument) return options.uriForDocument(snapshot)
-  return pathOrUriToDocumentUri(snapshot.documentId)
+  return snapshot.documentId ? pathOrUriToDocumentUri(snapshot.documentId) : null
 }
 
 function documentDescriptor(
   snapshot: LanguageServerDocumentSnapshot,
   options: LanguageServerDocumentSyncOptions,
   projectedUri?: lsp.DocumentUri,
-  projectedTextSnapshot?: LspTextSnapshot,
 ): DocumentDescriptor | null {
   if (!snapshot.languageId) return null
   if (options.shouldSyncLanguageId?.(snapshot.languageId, snapshot) === false) return null
@@ -522,9 +313,11 @@ function documentDescriptor(
     uri,
     // `shouldSyncLanguageId` above still filters on the view's id, not this one.
     languageId: options.languageIdForDocument?.(snapshot.languageId, uri) ?? snapshot.languageId,
-    textSnapshot: projectedTextSnapshot ?? document.textSnapshot,
+    textSnapshot: document.textSnapshot,
     lineStarts: document.lineStarts,
     textVersion: snapshot.textVersion,
+    sourceRevision: snapshot.documentSyncPoint.revision,
+    sourceSegment: snapshot.documentSyncPoint.segment,
   }
 }
 

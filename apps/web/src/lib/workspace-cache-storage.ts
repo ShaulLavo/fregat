@@ -8,11 +8,6 @@ import {
 import { reportClientError } from '@/lib/client-error-reporting'
 import * as v from 'valibot'
 
-// Local-only UI cache versions are dropped on mismatch, never migrated.
-export const WORKSPACE_CACHE_VERSION = 22
-export const WORKSPACE_CACHE_STORAGE_PREFIX = `platform.workspace-state.v${WORKSPACE_CACHE_VERSION}`
-export const WORKSPACE_CACHE_STORAGE_NAMESPACE = 'platform.workspace-state.v'
-
 export type WorkspaceCacheWriteResult = {
   readonly serializedBytes: number | null
   readonly status: StorageWriteStatus | 'serialization-failed' | 'oversized'
@@ -24,10 +19,6 @@ type WorkspaceCacheEntryOptions = {
 }
 
 type CacheReadFailure = 'invalid-json' | 'schema' | 'oversized' | 'read-failed'
-
-export function workspaceCacheStorageKey(suffix: string) {
-  return `${WORKSPACE_CACHE_STORAGE_PREFIX}.${suffix}`
-}
 
 export function workspaceCacheSerializedBytes(serialized: string) {
   return serialized.length * 2

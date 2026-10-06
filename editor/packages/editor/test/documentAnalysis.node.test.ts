@@ -1,3 +1,8 @@
+import type { DocumentRead } from '../src/editor/documentDelivery'
+import {
+  createEditorHighlighterOperation,
+  createEditorStructuralOperation,
+} from '../src/editor/operationDefinitions'
 import { describe, expect, it, vi } from 'vitest'
 import { createEditorBufferSession, createEditorTextBuffer } from '../src/documentSession'
 import {
@@ -9,8 +14,8 @@ import { EditorTokenStore } from '../src/syntax/tokenStore'
 import type { EditorHighlighterProvider } from '../src/syntax/highlighter'
 import {
   createEmptySyntaxResult,
-  createEmptySyntaxSession,
   type EditorSyntaxProvider,
+  type EditorSyntaxRuntime,
   type EditorSyntaxRange,
   type EditorSyntaxResult,
 } from '../src/syntax/session'
@@ -169,7 +174,7 @@ describe('active range retention', () => {
     let lease: ReturnType<typeof analysis.borrowStructural> = null
     try {
       lease = analysis.borrowStructural({
-        provider: { createSession: () => createEmptySyntaxSession() },
+        provider: { operation: createEditorStructuralOperation(() => emptyStructuralRuntime()) },
         languageId: 'typescript',
       })
     } finally {
@@ -196,14 +201,14 @@ describe('active range retention', () => {
     let refreshes = 0
     const ranges = vi.fn(async () => result)
     const provider = {
-      createSession: () => ({
-        ...createEmptySyntaxSession(),
-        refresh: async () => {
+      operation: createEditorStructuralOperation(() => ({
+        ...emptyStructuralRuntime(),
+        analyze: async () => {
           if (++refreshes === 1) throw new TypeError('Controlled first refresh failure')
           return result
         },
         queryRange: ranges,
-      }),
+      })),
     }
     const lease = analysis.borrowStructural({ provider, languageId: 'typescript' })!
     await expect(lease.refresh(buffer.getTextSnapshot())).rejects.toBeInstanceOf(TypeError)
@@ -362,17 +367,17 @@ describe('analysis retention notifications', () => {
         throw failure
       })
       const structural = {
-        createSession: () => {
+        operation: createEditorStructuralOperation(() => {
           abort.abort()
-          return { ...createEmptySyntaxSession(), dispose }
-        },
+          return { ...emptyStructuralRuntime(), dispose }
+        }),
       }
       const highlighter = {
-        createSession: () => {
+        operation: createEditorHighlighterOperation(() => {
           abort.abort()
           const refresh = async () => ({ tokens: EditorTokenStore.empty() })
-          return { refresh, applyChange: refresh, dispose }
-        },
+          return { analyze: refresh, dispose }
+        }),
       }
       const request = { languageId: null, signal: abort.signal }
       let observed: unknown
@@ -408,17 +413,17 @@ describe('analysis retention notifications', () => {
           if (action === 'abort-request') abort.abort()
         }
         const structural = {
-          createSession: () => {
+          operation: createEditorStructuralOperation(() => {
             construct()
-            return { ...createEmptySyntaxSession(), dispose }
-          },
+            return { ...emptyStructuralRuntime(), dispose }
+          }),
         }
         const highlighter = {
-          createSession: () => {
+          operation: createEditorHighlighterOperation(() => {
             construct()
             const refresh = async () => ({ tokens: EditorTokenStore.empty() })
-            return { refresh, applyChange: refresh, dispose }
-          },
+            return { analyze: refresh, dispose }
+          }),
         }
         const request = { languageId: null, signal: abort.signal }
         const lease =
@@ -455,15 +460,14 @@ describe('analysis retention notifications', () => {
     const lease = analysis.borrowHighlighter({
       languageId: null,
       provider: {
-        createSession: () => ({
-          refresh,
-          applyChange: refresh,
+        operation: createEditorHighlighterOperation(() => ({
+          analyze: refresh,
           dispose,
           onDidChangeTheme: () => {
             analysis.dispose()
             return unsubscribe
           },
-        }),
+        })),
       },
     })
     expect(lease).toBeNull()
@@ -489,17 +493,21 @@ describe('analysis retention notifications', () => {
       const lease = boundary.startsWith('structural')
         ? analysis.borrowStructural({
             languageId: null,
-            provider: { createSession: () => ({ ...createEmptySyntaxSession(), dispose }) },
+            provider: {
+              operation: createEditorStructuralOperation(() => ({
+                ...emptyStructuralRuntime(),
+                dispose,
+              })),
+            },
           })
         : analysis.borrowHighlighter({
             languageId: null,
             provider: {
-              createSession: () => ({
-                refresh,
-                applyChange: refresh,
+              operation: createEditorHighlighterOperation(() => ({
+                analyze: refresh,
                 dispose,
                 onDidChangeTheme: () => unsubscribe,
-              }),
+              })),
             },
           })
       lease!.dispose()
@@ -508,7 +516,7 @@ describe('analysis retention notifications', () => {
       expect(snapshots).toHaveLength(before + 1)
       expect(snapshots.at(-1)!.entries).toEqual([])
       expect(fail).toHaveBeenCalledTimes(1)
-      expect(dispose).toHaveBeenCalledTimes(boundary === 'highlighter-unsubscribe' ? 0 : 1)
+      expect(dispose).toHaveBeenCalledTimes(1)
       expect(unsubscribe).toHaveBeenCalledTimes(boundary === 'structural-dispose' ? 0 : 1)
       analysis.dispose()
     },
@@ -661,15 +669,14 @@ describe('analysis retention notifications', () => {
     let terminal = false
     const reentrantSnapshots: ReturnType<typeof analysis.inspectRetention>[] = []
     const highlighter: EditorHighlighterProvider = {
-      createSession: () => {
+      operation: createEditorHighlighterOperation(() => {
         const id = ++created
         const refresh = async () => {
           if (id === 1) throw new TypeError('Controlled external provider failure')
           return { tokens: EditorTokenStore.empty() }
         }
         return {
-          refresh,
-          applyChange: refresh,
+          analyze: refresh,
           onDidChangeTheme: () => () => {
             if (!terminal) return
             analysis.subscribeRetention(() => snapshots.push(analysis.inspectRetention()))
@@ -681,7 +688,7 @@ describe('analysis retention notifications', () => {
             createEditorBufferSession(buffer).applyText('!')
           },
         }
-      },
+      }),
     }
     const request = { provider: highlighter, languageId: null }
     const failed = analysis.borrowHighlighter(request)!
@@ -752,15 +759,15 @@ describe('retained document analysis', () => {
         survivor.current = analysis.borrowHighlighter({ provider, languageId: 'markdown' })
       }
       const provider: EditorHighlighterProvider = {
-        createSession: () => {
+        operation: createEditorHighlighterOperation(() => {
           const id = ++created
           const refresh = async () => {
             if (id === 1) throw new TypeError('Controlled external provider failure')
             return { tokens: EditorTokenStore.empty() }
           }
           return {
-            refresh,
-            applyChange: refresh,
+            analyze: refresh,
+
             onDidChangeTheme: () => () => {
               if (id === 1 && boundary.endsWith('unsubscribe')) reenter()
             },
@@ -769,7 +776,7 @@ describe('retained document analysis', () => {
               if (id === 1 && boundary === 'survivor-dispose') reenter()
             },
           }
-        },
+        }),
       }
       const first = analysis.borrowHighlighter({ provider, languageId: 'markdown' })!
       await expect(first.refresh(buffer.getTextSnapshot())).rejects.toBeInstanceOf(TypeError)
@@ -885,17 +892,14 @@ describe('retained document analysis', () => {
     })
     const calls: string[] = []
     const provider: EditorHighlighterProvider = {
-      createSession: () => ({
-        refresh: async (snapshot) => {
-          calls.push(`refresh:${snapshot.materializeFullText()}`)
+      operation: createEditorHighlighterOperation(() => ({
+        analyze: async (snapshot) => {
+          calls.push(`analyze:${snapshot.text.readRange(0, snapshot.text.length)}`)
           return { tokens: EditorTokenStore.empty() }
         },
-        applyChange: async (change) => {
-          calls.push(`edit:${change.textSnapshot.materializeFullText()}`)
-          return { tokens: EditorTokenStore.empty() }
-        },
+
         dispose: () => undefined,
-      }),
+      })),
     }
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'nested-eager.md' })
     lease = analysis.borrowHighlighter({ provider, languageId: 'markdown' })
@@ -903,7 +907,7 @@ describe('retained document analysis', () => {
     await lease!.refresh(buffer.getTextSnapshot())
     view.applyText('!')
     await Promise.all([...reads, lease!.refresh(buffer.getTextSnapshot())])
-    expect(calls).toEqual(['refresh:alpha', 'edit:alpha!', 'edit:alpha!?'])
+    expect(calls).toEqual(['analyze:alpha', 'analyze:alpha!?'])
     expect(lease!.read()).toMatchObject({ kind: 'ready', revision: 2 })
     analysis.dispose()
   })
@@ -916,8 +920,9 @@ describe('retained document analysis', () => {
       const gate = deferred<{ tokens: EditorTokenStore }>()
       const refresh = vi.fn(() => gate.promise)
       const dispose = vi.fn()
+      const create = vi.fn(() => ({ analyze: refresh, dispose }))
       const provider: EditorHighlighterProvider = {
-        createSession: vi.fn(() => ({ refresh, applyChange: refresh, dispose })),
+        operation: createEditorHighlighterOperation(create),
       }
       const interest = new AbortController()
       const lease = analysis.borrowHighlighter({
@@ -938,13 +943,13 @@ describe('retained document analysis', () => {
         survivor.dispose()
       }
       expect(lease.read().kind).toBe('failed')
-      expect(provider.createSession).toHaveBeenCalledTimes(1)
+      expect(create).toHaveBeenCalledTimes(1)
       analysis.dispose()
       expect(dispose).toHaveBeenCalledTimes(1)
     },
   )
 
-  it('cancels a queued-generation read when theme refresh supersedes it during publication', async () => {
+  it('cancels running-generation interest when theme refresh supersedes it', async () => {
     const buffer = createEditorTextBuffer('alpha')
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'microtask-theme.md' })
     const gate = deferred<{ tokens: EditorTokenStore }>()
@@ -952,11 +957,17 @@ describe('retained document analysis', () => {
     const current = {
       tokens: EditorTokenStore.fromTokens([{ start: 0, end: 5, style: { color: 'new' } }]),
     }
-    const refresh = vi.fn(() => Promise.resolve(current)).mockImplementationOnce(() => gate.promise)
+    const started = deferred<void>()
+    const refresh = vi
+      .fn(() => Promise.resolve(current))
+      .mockImplementationOnce(() => {
+        started.resolve()
+        return gate.promise
+      })
     const provider: EditorHighlighterProvider = {
-      createSession: () => ({
-        refresh,
-        applyChange: refresh,
+      operation: createEditorHighlighterOperation(() => ({
+        analyze: refresh,
+
         dispose: () => undefined,
         onDidChangeTheme: (listener) => {
           listeners.add(listener)
@@ -964,11 +975,12 @@ describe('retained document analysis', () => {
             listeners.delete(listener)
           }
         },
-      }),
+      })),
     }
     const lease = analysis.borrowHighlighter({ provider, languageId: 'markdown' })!
     const old = lease.refresh(buffer.getTextSnapshot())
     const rejected = expect(old).rejects.toMatchObject({ name: 'AbortError' })
+    await started.promise
     for (const listener of listeners) listener()
     await rejected
     gate.resolve({ tokens: EditorTokenStore.empty() })
@@ -1018,22 +1030,22 @@ describe('retained document analysis', () => {
       }
       let created = 0
       const structural: EditorSyntaxProvider = {
-        createSession: () => ({
-          ...createEmptySyntaxSession(),
+        operation: createEditorStructuralOperation(() => ({
+          ...emptyStructuralRuntime(),
           dispose: created++ === 0 ? disposeFirst : disposeSecond,
-        }),
+        })),
       }
       const refresh = async () => ({ tokens: EditorTokenStore.empty() })
       const highlighter: EditorHighlighterProvider = {
-        createSession: () => {
+        operation: createEditorHighlighterOperation(() => {
           const first = created++ === 0
           return {
-            refresh,
-            applyChange: refresh,
+            analyze: refresh,
+
             dispose: first ? disposeFirst : disposeSecond,
             onDidChangeTheme: first ? firstTheme : secondTheme,
           }
-        },
+        }),
       }
       const first =
         boundary === 'structural-session'
@@ -1306,9 +1318,9 @@ describe('retained document analysis', () => {
     const refresh = vi.fn(async () => ({ tokens: EditorTokenStore.empty() }))
     const dispose = vi.fn()
     const highlighter: EditorHighlighterProvider = {
-      createSession: () => ({
-        refresh,
-        applyChange: refresh,
+      operation: createEditorHighlighterOperation(() => ({
+        analyze: refresh,
+
         dispose,
         onDidChangeTheme: (listener) => {
           listeners.add(listener)
@@ -1316,7 +1328,7 @@ describe('retained document analysis', () => {
             listeners.delete(listener)
           }
         },
-      }),
+      })),
     }
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'subscriptions.md' })
     const request = { provider: highlighter, languageId: 'markdown' }
@@ -1340,7 +1352,7 @@ describe('retained document analysis', () => {
     expect(dispose).toHaveBeenCalledTimes(20)
   })
 
-  it('applies every captured event when a preceding listener commits a newer head', async () => {
+  it('coalesces computation while composing every captured edit to the committed target', async () => {
     const buffer = createEditorTextBuffer('a')
     const view = createEditorBufferSession(buffer)
     buffer.subscribe((event) => {
@@ -1353,8 +1365,9 @@ describe('retained document analysis', () => {
     view.applyText('b')
     await lease.refresh(buffer.getTextSnapshot())
     expect(
-      parser.edits.mock.calls.map(([change]) => change.textSnapshot.materializeFullText()),
-    ).toEqual(['ab', 'abc'])
+      parser.edits.mock.calls.map(([read]) => read.text.readRange(0, read.text.length)),
+    ).toEqual(['abc'])
+    expect(parser.transitions.mock.calls[0][0]?.edits).toEqual([{ from: 1, to: 1, text: 'bc' }])
     const state = lease.read()
     expect(state.kind).toBe('ready')
     if (state.kind === 'ready') expect(state.snapshot.materializeFullText()).toBe('abc')
@@ -1370,6 +1383,7 @@ describe('retained document analysis', () => {
     const lease = analysis.borrowStructural({ provider: parser.provider, languageId: 'markdown' })!
     const old = lease.refresh(buffer.getTextSnapshot())
     const rejected = expect(old).rejects.toMatchObject({ name: 'AbortError' })
+    await parser.started
     view.applyText('!')
     await rejected
     expect(lease.read()).toMatchObject({ kind: 'pending', revision: 1 })
@@ -1490,7 +1504,7 @@ describe('retained document analysis', () => {
     expect(lease.canQueryRange?.()).toBe(true)
     expect(lease.read(range).kind).toBe('pending')
     await lease.queryRange!(range)
-    expect(parser.ranges).toHaveBeenCalledExactlyOnceWith(range)
+    expect(parser.ranges).toHaveBeenCalledExactlyOnceWith(range, expect.any(AbortSignal))
     expect(lease.read(range).kind).toBe('ready')
     analysis.dispose()
   })
@@ -1512,7 +1526,7 @@ describe('retained document analysis', () => {
     rangeReady = true
     expect(lease.read(range).kind).toBe('pending')
     await lease.queryRange!(range)
-    expect(parser.ranges).toHaveBeenCalledExactlyOnceWith(range)
+    expect(parser.ranges).toHaveBeenCalledExactlyOnceWith(range, expect.any(AbortSignal))
     analysis.dispose()
   })
 
@@ -1525,7 +1539,10 @@ describe('retained document analysis', () => {
     await lease.queryRange!({ startIndex: 0, endIndex: 16 })
     const change = view.applyEdits([{ from: 0, to: 16, text: 'docs' }])
     const result = await lease.applyChange(change)
-    expect(parser.ranges).toHaveBeenLastCalledWith({ startIndex: 0, endIndex: 4 })
+    expect(parser.ranges).toHaveBeenLastCalledWith(
+      { startIndex: 0, endIndex: 4 },
+      expect.any(AbortSignal),
+    )
     expect(await lease.queryRange!({ startIndex: 0, endIndex: 4 })).toBe(result)
     expect(lease.read({ startIndex: 0, endIndex: 16 })).toMatchObject({ kind: 'ready', result })
     analysis.dispose()
@@ -1562,6 +1579,7 @@ describe('retained document analysis', () => {
     const parser = provider(ready.promise)
     const lease = analysis.borrowStructural({ provider: parser.provider, languageId: 'markdown' })!
     const old = lease.refresh(buffer.getTextSnapshot())
+    await parser.started
     view.applyEdits([{ from: 0, to: 5, text: 'beta' }])
     ready.resolve(createEmptySyntaxResult())
     await expect(old).rejects.toMatchObject({ name: 'AbortError' })
@@ -1645,12 +1663,15 @@ describe('retained document analysis', () => {
       return { tokens: EditorTokenStore.empty() }
     }
     const dispose = vi.fn()
-    const createSession = vi.fn(() => ({ refresh, applyChange: refresh, dispose }))
-    const request = { provider: { createSession }, languageId: 'markdown' }
+    const createOperation = vi.fn(() => ({ analyze: refresh, dispose }))
+    const request = {
+      provider: { operation: createEditorHighlighterOperation(createOperation) },
+      languageId: 'markdown',
+    }
     const first = analysis.borrowHighlighter(request)!
     await expect(first.refresh(buffer.getTextSnapshot())).rejects.toThrow('provider unavailable')
     const second = analysis.borrowHighlighter({ ...request, signal: abort.signal })!
-    expect(createSession).toHaveBeenCalledTimes(1)
+    expect(createOperation).toHaveBeenCalledTimes(1)
     expect(dispose).not.toHaveBeenCalled()
     failing = false
     await second.refresh(buffer.getTextSnapshot())
@@ -1671,9 +1692,9 @@ describe('retained document analysis', () => {
       tokens: EditorTokenStore.fromTokens([{ start: 0, end: 5, style: { color } }]),
     }))
     const highlighter: EditorHighlighterProvider = {
-      createSession: () => ({
-        refresh,
-        applyChange: refresh,
+      operation: createEditorHighlighterOperation(() => ({
+        analyze: refresh,
+
         dispose: () => undefined,
         onDidChangeTheme: (listener) => {
           listeners.add(listener)
@@ -1681,7 +1702,7 @@ describe('retained document analysis', () => {
             listeners.delete(listener)
           }
         },
-      }),
+      })),
     }
     const lease = analysis.borrowHighlighter({ provider: highlighter, languageId: 'markdown' })!
     await lease.refresh(buffer.getTextSnapshot())
@@ -1700,26 +1721,48 @@ describe('retained document analysis', () => {
 
 function provider(initial?: Promise<EditorSyntaxResult>, canQueryRange?: () => boolean) {
   const dispose = vi.fn()
-  const edits = vi.fn(async (_change: import('../src/documentSession').DocumentSessionChange) =>
-    createEmptySyntaxResult(),
-  )
+  const edits = vi.fn(async (_read: DocumentRead) => createEmptySyntaxResult())
   const ranges = vi.fn(async (range: EditorSyntaxRange) =>
     createEmptySyntaxResult({ requestedRanges: [range] }),
   )
-  const create = vi.fn(() => ({
-    foldingSupport: 'supported' as const,
-    refresh: () => initial ?? Promise.resolve(createEmptySyntaxResult()),
-    applyChange: edits,
-    queryRange: ranges,
-    canQueryRange,
-    getResult: () => createEmptySyntaxResult(),
-    getTokens: () => [],
-    getSnapshotVersion: () => 1,
-    dispose,
-  }))
+  const started = deferred<void>()
+  const transitions = vi.fn(
+    (_change: import('../src/editor/editChain').DocumentChangesSinceSyncPoint | null) => {},
+  )
+  const create = vi.fn(
+    (context: import('../src/document/operations').EditorStructuralOperationContext) => {
+      let initialized = false
+      let previous: DocumentRead | null = null
+      return {
+        foldingSupport: 'supported' as const,
+        analyze: (read: DocumentRead) => {
+          const changes = previous
+            ? context.source.changesBetween(previous.revision, read.revision)
+            : null
+          previous = read
+          if (initialized) {
+            transitions(changes)
+            return edits(read)
+          }
+          initialized = true
+          started.resolve()
+          return initial ?? Promise.resolve(createEmptySyntaxResult())
+        },
+
+        queryRange: ranges,
+        canQueryRange,
+        getResult: () => createEmptySyntaxResult(),
+        getTokens: () => [],
+        getSnapshotVersion: () => 1,
+        dispose,
+      }
+    },
+  )
   return {
-    provider: { createSession: create } satisfies EditorSyntaxProvider,
+    provider: { operation: createEditorStructuralOperation(create) } satisfies EditorSyntaxProvider,
     create,
+    started: started.promise,
+    transitions,
     edits,
     ranges,
     dispose,
@@ -1732,6 +1775,17 @@ function deferred<T>() {
     resolve = complete
   })
   return { promise, resolve }
+}
+
+function emptyStructuralRuntime(): EditorSyntaxRuntime {
+  return {
+    analyze: async () => createEmptySyntaxResult(),
+    foldingSupport: 'unsupported',
+    getResult: createEmptySyntaxResult,
+    getTokens: () => [],
+    getSnapshotVersion: () => 0,
+    dispose: () => {},
+  }
 }
 
 async function optionalRetirementFixture() {

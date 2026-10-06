@@ -2,7 +2,7 @@ import { createServer, type ServerResponse } from 'node:http'
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { expect, test } from 'vitest'
+import { expect, onTestFailed, test } from 'vitest'
 import { checkoutRoot } from './paths'
 import { chromiumUnavailable } from './browser-prerequisites'
 
@@ -27,8 +27,90 @@ const cases = [
   { mode: 'release503', code: 1, consoleCapture: true },
 ] as const
 
+type PipeFacts = { bytes: number; complete: boolean }
+type RequestFacts = { resource: string; status: number | null; complete: boolean }
+
+function fixtureResource(url: string | undefined) {
+  switch (url) {
+    case '/required.js':
+    case '/deferred.js':
+    case '/frame.js':
+    case '/frame-ready':
+    case '/required.css':
+    case '/failure-recorded':
+    case '/favicon.ico':
+      return url.slice(1)
+    case '/release':
+    case '/platform/release':
+      return 'release'
+    default:
+      return 'document'
+  }
+}
+
+function recordRequest(
+  url: string | undefined,
+  response: ServerResponse,
+  requests: RequestFacts[],
+) {
+  if (requests.length >= 16) return
+  const facts: RequestFacts = {
+    resource: fixtureResource(url),
+    status: null,
+    complete: false,
+  }
+  requests.push(facts)
+  response.once('finish', () => {
+    facts.status = response.statusCode
+    facts.complete = true
+  })
+}
+
+async function readPipe(stream: ReadableStream<Uint8Array>, facts: PipeFacts) {
+  const counted = stream.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        facts.bytes += chunk.byteLength
+        controller.enqueue(chunk)
+      },
+    }),
+  )
+  const text = await new Response(counted).text()
+  facts.complete = true
+  return text
+}
+
 it.each(cases)('doctor classifies $mode through the real CLI', async (fixture) => {
+  const started = performance.now()
+  let completed = 'started'
+  let failedAfter: string | undefined
+  let child: Pick<Bun.Subprocess, 'pid' | 'exitCode' | 'signalCode'> | undefined
+  const pipes = {
+    stdout: { bytes: 0, complete: false },
+    stderr: { bytes: 0, complete: false },
+  }
+  const requests: RequestFacts[] = []
+  let requestCount = 0
+  onTestFailed(() => {
+    console.error(
+      JSON.stringify({
+        event: 'doctor-fixture-failure',
+        mode: fixture.mode,
+        elapsedMs: Math.round(performance.now() - started),
+        completed,
+        failedAfter: failedAfter ?? completed,
+        child: child
+          ? { pid: child.pid, exitCode: child.exitCode, signalCode: child.signalCode }
+          : null,
+        pipes,
+        requestCount,
+        omittedRequests: requestCount - requests.length,
+        requests,
+      }),
+    )
+  })
   const scratch = await mkdtemp(path.join(tmpdir(), 'fregat-doctor-test-'))
+  completed = 'scratch-created'
   let releaseRequests = 0
   let startupCompleted = false
   let startupTimer: ReturnType<typeof setTimeout> | undefined
@@ -36,6 +118,8 @@ it.each(cases)('doctor classifies $mode through the real CLI', async (fixture) =
   let heldRelease: ServerResponse | undefined
   const frameReady = Promise.withResolvers<void>()
   const server = createServer((request, response) => {
+    requestCount += 1
+    recordRequest(request.url, response, requests)
     if (request.url === '/deferred.js') {
       startupTimer = setTimeout(() => {
         startupCompleted = true
@@ -135,6 +219,7 @@ it.each(cases)('doctor classifies $mode through the real CLI', async (fixture) =
   })
   try {
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    completed = 'fixture-listening'
     const address = server.address()
     if (!address || typeof address === 'string') expect.fail('Expected a private HTTP port')
     const base = `http://127.0.0.1:${address.port}`
@@ -142,7 +227,7 @@ it.each(cases)('doctor classifies $mode through the real CLI', async (fixture) =
     if (fixture.mode === 'nested-address')
       url = `${base}/platform/~fixture/workbench/f/file.ts?tabs=@`
     if (fixture.mode === 'nested-root-address') url = `${base}/~fixture/workbench/f/file.ts?tabs=@`
-    const child = Bun.spawn(
+    const spawned = Bun.spawn(
       [
         'bun',
         'scripts/agent/browser.ts',
@@ -165,14 +250,19 @@ it.each(cases)('doctor classifies $mode through the real CLI', async (fixture) =
         stderr: 'pipe',
       },
     )
+    child = spawned
+    completed = 'cli-spawned'
     const [code, stdout, stderr] = await Promise.all([
-      child.exited,
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
+      spawned.exited,
+      readPipe(spawned.stdout, pipes.stdout),
+      readPipe(spawned.stderr, pipes.stderr),
     ])
+    completed = 'child-and-pipes-settled'
     const [run] = await readdir(scratch)
+    completed = 'evidence-listed'
     if (!run) expect.fail(stdout + stderr)
     const observed = JSON.parse(await readFile(path.join(scratch, run, 'observed.json'), 'utf8'))
+    completed = 'observation-parsed'
     expect(releaseRequests).toBe(1)
     if (
       fixture.mode === 'delayed-startup' ||
@@ -243,11 +333,17 @@ it.each(cases)('doctor classifies $mode through the real CLI', async (fixture) =
       expect(observed.failedRequests).toEqual([])
       expect(observed.failedResponses).toEqual([])
     }
+    completed = 'assertions-complete'
+  } catch (error) {
+    failedAfter = completed
+    throw error
   } finally {
     clearTimeout(startupTimer)
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
     )
+    completed = 'fixture-closed'
     await rm(scratch, { recursive: true, force: true })
+    completed = 'scratch-removed'
   }
 })
