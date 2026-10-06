@@ -1,5 +1,12 @@
 # @singapore-editor/core
 
+## 0.2.6
+
+### Patch Changes
+
+- 5670c3d: Own source delivery and contribution lifetimes in document analysis. Use typed structural and highlighter operations with immutable worker reads, preserve exact pinned work, and reject partial diff sources before syntax preparation.
+- @singapore-editor/textbuffer@0.2.6
+
 ## 0.2.5
 
 ### Patch Changes
