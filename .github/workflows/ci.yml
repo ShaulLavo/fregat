@@ -411,7 +411,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: retention-layout-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/retention-acceptance-layout-*
+          path: |
+            ${{ runner.temp }}/retention-acceptance-layout-*
+            ${{ runner.temp }}/retention-layout-*-failed-start.json
+            ${{ runner.temp }}/retention-layout-*-server-evidence-*
           if-no-files-found: ignore
 
   # The site's demo build bundles apps/web in a different mode than the app build, so it
