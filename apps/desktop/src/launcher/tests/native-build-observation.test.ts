@@ -147,37 +147,34 @@ test('phase records are synchronous, closed and capped before primary callback c
   }
 })
 
-test.skipIf(process.platform === 'win32')(
-  'a genuine signal preserves its native result and available signal facts',
-  () => {
-    const io = fixture()
-    const original = Bun.spawnSync
-    let primary: unknown
-    const tap = new Proxy(original, {
-      apply(target, receiver: unknown, args: unknown[]) {
-        primary = Reflect.apply(target, receiver, args)
-        return primary
-      },
-    })
-    Bun.spawnSync = tap
-    try {
-      const result = observeNativeBuild(
-        () => Bun.spawnSync([process.execPath, '-e', "process.kill(process.pid, 'SIGTERM')"]),
-        io.sink,
-      )
-      expect(result).toBe(primary)
-      expect(Bun.spawnSync).toBe(tap)
-      const lines = readFileSync(io.file, 'utf8').trim().split('\n')
-      const after = lines.find((line) => line.includes('"boundary":"other","stage":"after"'))
-      expect(after).toBeDefined()
-      expect(after).toContain(`"exit":${result.exitCode}`)
-      const signal = Object.getOwnPropertyDescriptor(result, 'signalCode')?.value
-      if (typeof signal === 'string') expect(after).toContain(`"signal":"${signal}"`)
-      if (signal === undefined) expect(after).toContain('"signalAvailable":false')
-    } finally {
-      Bun.spawnSync = original
-      closeSync(io.fd)
-      rmSync(io.root, { recursive: true, force: true })
-    }
-  },
-)
+test('a genuine signal preserves its native result and available signal facts', () => {
+  const io = fixture()
+  const original = Bun.spawnSync
+  let primary: unknown
+  const tap = new Proxy(original, {
+    apply(target, receiver: unknown, args: unknown[]) {
+      primary = Reflect.apply(target, receiver, args)
+      return primary
+    },
+  })
+  Bun.spawnSync = tap
+  try {
+    const result = observeNativeBuild(
+      () => Bun.spawnSync([process.execPath, '-e', "process.kill(process.pid, 'SIGTERM')"]),
+      io.sink,
+    )
+    expect(result).toBe(primary)
+    expect(Bun.spawnSync).toBe(tap)
+    const lines = readFileSync(io.file, 'utf8').trim().split('\n')
+    const after = lines.find((line) => line.includes('"boundary":"other","stage":"after"'))
+    expect(after).toBeDefined()
+    expect(after).toContain(`"exit":${result.exitCode}`)
+    const signal = Object.getOwnPropertyDescriptor(result, 'signalCode')?.value
+    if (typeof signal === 'string') expect(after).toContain(`"signal":"${signal}"`)
+    if (signal === undefined) expect(after).toContain('"signalAvailable":false')
+  } finally {
+    Bun.spawnSync = original
+    closeSync(io.fd)
+    rmSync(io.root, { recursive: true, force: true })
+  }
+})
