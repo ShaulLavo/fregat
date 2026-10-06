@@ -61,6 +61,7 @@ export const searchReplaceRefresh: Scenario = {
       await undoFinalized
       await first.waitFor()
       await expectDisk(fixture, false)
+      await selectors.searchSummary(page, /^3 matches in 3 files(?: ·|$)/).waitFor()
       await step('undo-restored-matches')
       const redoFinalized = page.waitForResponse(
         (response) =>
@@ -70,6 +71,7 @@ export const searchReplaceRefresh: Scenario = {
       await redoFinalized
       await first.waitFor({ state: 'hidden' })
       await expectDisk(fixture, true)
+      await selectors.searchSummary(page, /^0 matches in 0 files(?: ·|$)/).waitFor()
       await step('redo-refreshed-matches')
     } finally {
       await page.unroute('**/fs/workspace-edit/finalize')
