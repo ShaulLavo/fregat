@@ -448,3 +448,204 @@ const returned=socket.emit('timeout');fs.readSync=originalRead;syncBuiltinESMExp
     }
   },
 )
+
+const destroyControls = [
+  { mode: 'timeout-listener', order: 'earlier-first' },
+  { mode: 'timeout-listener', order: 'later-first' },
+  { mode: 'external', order: 'earlier-first' },
+  { mode: 'external', order: 'later-first' },
+  { mode: 'deferred', order: 'earlier-first' },
+  { mode: 'deferred', order: 'later-first' },
+  { mode: 'throwing-timeout-listener', order: 'earlier-first' },
+  { mode: 'throwing-timeout-listener', order: 'later-first' },
+  { mode: 'unavailable-io', order: 'earlier-first' },
+] as const
+
+test.for(destroyControls)(
+  'socket timeout destroy $mode $order records only public invocation context',
+  async ({ mode, order }, { skip, annotate }) => {
+    const node = systemNode()
+    if (!node) {
+      skip('System Node is unavailable')
+      return
+    }
+    const output = await mkdtemp(join(tmpdir(), 'retention-socket-destroy-control-'))
+    const source = pathToFileURL(
+      join(import.meta.dirname, 'retention-acceptance-socket-provenance.ts'),
+    ).href
+    const script = `import {createServer,createConnection,Socket} from 'node:net';import {once} from 'node:events';import {readFileSync,truncateSync} from 'node:fs';import {tmpdir} from 'node:os';import {join} from 'node:path';import {ClientRequest,ServerResponse,IncomingMessage} from 'node:http';
+const [output,source,mode,order]=process.argv.slice(1);const {createRetentionSocketProvenance,snapshotRetentionSocketJournal}=await import(source);
+const server=createServer();const targets=[[Socket.prototype,'emit'],[Socket.prototype,'destroy'],[ClientRequest.prototype,'emit'],[ServerResponse.prototype,'emit'],[IncomingMessage.prototype,'emit'],[server,'emit']];
+const originals=targets.map(([target,key])=>({target,key,method:target[key],descriptor:Object.getOwnPropertyDescriptor(target,key)}));
+server.listen(0,'127.0.0.1');await once(server,'listening');const port=server.address().port;
+const first=createRetentionSocketProvenance({side:'serving',entryPort:port,normalizePath:path=>path,server}),second=createRetentionSocketProvenance({side:'serving',entryPort:port,normalizePath:path=>path,server});
+const accepted=once(server,'connection'),client=createConnection({host:'127.0.0.1',port});await once(client,'connect');const [socket]=await accepted;const clientPort=client.localPort;
+let returned,listenerReceiver=false,listenerArgs=0,primary,timeoutError;try{JSON.parse('controlled timeout primary')}catch(error){primary=error}if(mode==='throwing-timeout-listener')process.once('uncaughtException',error=>{timeoutError=error});const active=order==='earlier-first'?second:first;
+const snapshot=stage=>{const summary=snapshotRetentionSocketJournal(active.basename,output,stage);const rows=readFileSync(output+'/'+summary.basename,'utf8').trim().split('\\n').map(JSON.parse);return {summary,row:rows.find(row=>row.kind==='socket'&&row.remotePort===clientPort)}};
+try{const before=snapshot('frozen');if(order==='earlier-first')first.close();if(order==='later-first')second.close();const errorListeners=socket.listenerCount('error'),closed=once(socket,'close');
+if(mode==='external'||mode==='unavailable-io'){if(mode==='unavailable-io')truncateSync(join(tmpdir(),active.basename),0);returned=socket.destroy()}else{socket.once('timeout',function(...args){listenerReceiver=this===socket;listenerArgs=args.length;if(mode==='deferred'){setImmediate(()=>{returned=socket.destroy()});return}returned=socket.destroy();if(mode==='throwing-timeout-listener')throw primary});socket.setTimeout(25)}
+await closed;const after=snapshot('final');first.close();second.close();const restorations=originals.map(({target,key,method,descriptor})=>({key,method:target[key]===method,descriptor:JSON.stringify(Object.getOwnPropertyDescriptor(target,key))===JSON.stringify(descriptor)}));
+process.stdout.write(JSON.stringify({mode,order,before,after,returnedSame:returned===socket,timeoutErrorSame:timeoutError===primary,listenerReceiver,listenerArgs,errorListeners,afterErrorListeners:socket.listenerCount('error'),restorations,first:first.inspect(),second:second.inspect()}));
+}finally{first.close();second.close();first.remove();second.remove();client.destroy();socket.destroy();await new Promise(resolve=>server.close(resolve))}`
+    const child = spawn(
+      node,
+      [
+        '--experimental-strip-types',
+        '--disable-warning=ExperimentalWarning',
+        '--input-type=module',
+        '--eval',
+        script,
+        output,
+        source,
+        mode,
+        order,
+      ],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    const closed = once(child, 'close')
+    let stdout = '',
+      stderr = ''
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString()
+    })
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+    })
+    const timer = setTimeout(() => child.kill('SIGKILL'), 15000)
+    try {
+      const [code, signal] = await closed
+      expect(code, stderr).toBe(0)
+      expect(signal).toBeNull()
+      const result = JSON.parse(stdout)
+      await annotate('Public Socket observation', 'socket-provenance', {
+        body: stdout,
+        bodyEncoding: 'utf-8',
+        contentType: 'application/json',
+      })
+      expect(result.returnedSame, stdout).toBe(true)
+      expect(
+        result.restorations.every(
+          (row: { method: boolean; descriptor: boolean }) => row.method && row.descriptor,
+        ),
+        stdout,
+      ).toBe(true)
+      expect(result.errorListeners).toBe(0)
+      expect(result.afterErrorListeners).toBe(0)
+      expect(result.before.row.destroyInvokedAt, stdout).toBeNull()
+      expect(result.before.row.destroyContext, stdout).toBe('unobserved')
+      if (mode === 'unavailable-io') {
+        expect(result.after.row, stdout).toBeUndefined()
+        expect(
+          result.after.summary.partial + result.after.summary.coverage.partial,
+          stdout,
+        ).toBeGreaterThan(0)
+        return
+      }
+      expect(result.after.row.destroyInvokedAt, stdout).toEqual([
+        expect.any(Number),
+        expect.stringMatching(/^\d+$/),
+      ])
+      expect(result.after.row.destroyContext, stdout).toBe(
+        mode === 'timeout-listener' || mode === 'throwing-timeout-listener'
+          ? 'timeout-dispatch'
+          : 'other',
+      )
+      expect(result.after.row.timeoutDispatchDepth, stdout).toBe(0)
+      expect(result.timeoutErrorSame, stdout).toBe(mode === 'throwing-timeout-listener')
+      if (mode !== 'external') {
+        expect(result.listenerReceiver).toBe(true)
+        expect(result.listenerArgs).toBe(0)
+        expect(result.after.row.timeoutDispatchExitedAt, stdout).toEqual([
+          expect.any(Number),
+          expect.stringMatching(/^\d+$/),
+        ])
+        const destroyTick = BigInt(result.after.row.destroyInvokedAt[1])
+        const dispatchEnd = BigInt(result.after.row.timeoutDispatchExitedAt[1])
+        expect(destroyTick >= BigInt(result.after.row.timedOut[1]), stdout).toBe(true)
+        expect(
+          mode === 'timeout-listener' || mode === 'throwing-timeout-listener'
+            ? destroyTick <= dispatchEnd
+            : destroyTick > dispatchEnd,
+          stdout,
+        ).toBe(true)
+      }
+      expect(result.after.summary.partial, stdout).toBe(0)
+      expect(result.after.summary.raced, stdout).toBe(false)
+      expect(result.after.summary.coverage.unavailable, stdout).toBe(false)
+      expect(result.after.summary.coverage.refused, stdout).toBe(0)
+      expect(result.after.summary.coverage.retainedRecords).toBeLessThanOrEqual(8000)
+      expect(result.after.summary.coverage.retainedBytes).toBeLessThanOrEqual(2621440)
+    } finally {
+      clearTimeout(timer)
+      await rm(output, { recursive: true, force: true })
+    }
+  },
+)
+
+test('socket timeout destroy preserves native receiver arguments return throw and unhandled emit', async ({
+  skip,
+  annotate,
+}) => {
+  const node = systemNode()
+  if (!node) {
+    skip('System Node is unavailable')
+    return
+  }
+  const source = pathToFileURL(
+    join(import.meta.dirname, 'retention-acceptance-socket-provenance.ts'),
+  ).href
+  const script = `import {Socket} from 'node:net';const {createRetentionSocketProvenance}=await import(${JSON.stringify(source)});
+const original=Socket.prototype.destroy,descriptor=Object.getOwnPropertyDescriptor(Socket.prototype,'destroy');let primary;try{JSON.parse('controlled primary')}catch(error){primary=error}
+const collector=createRetentionSocketProvenance({side:'client',entryPort:52865,normalizePath:path=>path}),socket=new Socket(),argument={owned:1};let receiver=false,argumentSame=false,defaultError,thrown;
+try{socket.once('control',function(value){receiver=this===socket;argumentSame=value===argument});const emitted=socket.emit('control',argument),empty=socket.emit('no-subscriber');try{socket.emit('error',primary)}catch(error){defaultError=error}
+const proxy=new Proxy(new Socket(),{get(){throw primary}});try{Reflect.apply(Socket.prototype.destroy,proxy,[primary])}catch(error){thrown=error}
+const callback=await new Promise(resolve=>{const target=new Socket();target.on('error',()=>{});let returned;const observed=function(error){setImmediate(()=>resolve({errorSame:error===primary,returnedSame:returned===target}))};returned=Reflect.apply(Socket.prototype.destroy,target,[primary,observed])});
+collector.close();process.stdout.write(JSON.stringify({emitted,empty,receiver,argumentSame,defaultErrorSame:defaultError===primary,thrownSame:thrown===primary,errorListeners:socket.listenerCount('error'),callback,restored:Socket.prototype.destroy===original,descriptorRestored:JSON.stringify(Object.getOwnPropertyDescriptor(Socket.prototype,'destroy'))===JSON.stringify(descriptor)}));
+}finally{collector.close();collector.remove();socket.destroy()}`
+  const child = spawn(
+    node,
+    [
+      '--experimental-strip-types',
+      '--disable-warning=ExperimentalWarning',
+      '--input-type=module',
+      '--eval',
+      script,
+    ],
+    { stdio: ['ignore', 'pipe', 'pipe'] },
+  )
+  const closed = once(child, 'close')
+  let stdout = '',
+    stderr = ''
+  child.stdout.on('data', (chunk) => {
+    stdout += chunk.toString()
+  })
+  child.stderr.on('data', (chunk) => {
+    stderr += chunk.toString()
+  })
+  const timer = setTimeout(() => child.kill('SIGKILL'), 15000)
+  try {
+    const [code, signal] = await closed
+    expect(code, stderr).toBe(0)
+    expect(signal).toBeNull()
+    const result = JSON.parse(stdout)
+    await annotate('Public Socket observation', 'socket-provenance', {
+      body: stdout,
+      bodyEncoding: 'utf-8',
+      contentType: 'application/json',
+    })
+    expect(result, stdout).toMatchObject({
+      emitted: true,
+      empty: false,
+      receiver: true,
+      argumentSame: true,
+      defaultErrorSame: true,
+      thrownSame: true,
+      errorListeners: 0,
+      callback: { errorSame: true, returnedSame: true },
+      restored: true,
+      descriptorRestored: true,
+    })
+  } finally {
+    clearTimeout(timer)
+  }
+})

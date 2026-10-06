@@ -61,6 +61,10 @@ const recordSchema = v.variant('kind', [
     connected: nullableClock,
     ended: nullableClock,
     timedOut: nullableClock,
+    timeoutDispatchExitedAt: nullableClock,
+    timeoutDispatchDepth: integer,
+    destroyInvokedAt: nullableClock,
+    destroyContext: v.picklist(['unobserved', 'timeout-dispatch', 'other']),
     errored: nullableClock,
     closed: nullableClock,
     code: codeSchema,
@@ -137,26 +141,68 @@ function writeAll(fd: number, bytes: Buffer, position: number) {
     offset += written
   }
 }
-type EmitObserver = (event: string | symbol, args: readonly unknown[]) => void
-type EmitHook = {
-  emit: EventEmitter['emit']
+type EmitPhase = 'before' | 'returned' | 'threw'
+type EmitObserver = (event: string | symbol, args: readonly unknown[], phase: EmitPhase) => void
+type DestroyObserver = (args: readonly unknown[]) => void
+type MethodHook<Observer> = {
+  method: unknown
   descriptor: PropertyDescriptor | undefined
-  observers: EmitObserver[]
+  observers: Observer[]
 }
+type EmitHook = MethodHook<EmitObserver>
 const provenanceEmitHooks = new Map<EventEmitter, EmitHook>()
+const provenanceDestroyHooks = new Map<EventEmitter, MethodHook<DestroyObserver>>()
+
+function dispatchEmitObservers(
+  observers: readonly EmitObserver[],
+  subject: EventEmitter,
+  event: string | symbol,
+  args: readonly unknown[],
+  phase: EmitPhase,
+) {
+  for (let index = observers.length - 1; index >= 0; index--) {
+    const observer = observers[index]
+    if (observer) guard(() => Reflect.apply(observer, subject, [event, args, phase]))
+  }
+}
+
+function releaseMethodObserver<Observer>(
+  target: EventEmitter,
+  key: 'emit' | 'destroy',
+  registry: Map<EventEmitter, MethodHook<Observer>>,
+  hook: MethodHook<Observer>,
+  observer: Observer,
+) {
+  let active = true
+  return () => {
+    if (!active) return
+    active = false
+    const index = hook.observers.indexOf(observer)
+    if (index >= 0) hook.observers.splice(index, 1)
+    if (hook.observers.length) return
+    registry.delete(target)
+    if (Reflect.get(target, key) !== hook.method) return
+    if (hook.descriptor) Object.defineProperty(target, key, hook.descriptor)
+    if (!hook.descriptor) Reflect.deleteProperty(target, key)
+  }
+}
 
 function installEmitHook(target: EventEmitter): EmitHook {
   const original = target.emit
   const descriptor = Object.getOwnPropertyDescriptor(target, 'emit')
   const observers: EmitObserver[] = []
   const emit = function (this: EventEmitter, event: string | symbol, ...args: unknown[]): boolean {
-    for (let index = observers.length - 1; index >= 0; index--) {
-      const observer = observers[index]
-      if (observer) guard(() => Reflect.apply(observer, this, [event, args]))
+    dispatchEmitObservers(observers, this, event, args, 'before')
+    let returned = false
+    try {
+      const result = Reflect.apply(original, this, [event, ...args])
+      returned = true
+      return result
+    } finally {
+      dispatchEmitObservers(observers, this, event, args, returned ? 'returned' : 'threw')
     }
-    return Reflect.apply(original, this, [event, ...args])
   }
-  const hook = { emit, descriptor, observers }
+  const hook = { method: emit, descriptor, observers }
   target.emit = emit
   provenanceEmitHooks.set(target, hook)
   return hook
@@ -165,24 +211,54 @@ function installEmitHook(target: EventEmitter): EmitHook {
 function wrapEmit<T extends EventEmitter>(
   target: T,
   observe: (subject: T, event: string | symbol, args: readonly unknown[]) => void,
+  settled?: (
+    subject: T,
+    event: string | symbol,
+    args: readonly unknown[],
+    phase: Exclude<EmitPhase, 'before'>,
+  ) => void,
 ) {
   const hook = provenanceEmitHooks.get(target) ?? installEmitHook(target)
-  const observer = function (this: T, event: string | symbol, args: readonly unknown[]) {
-    observe(this, event, args)
+  const observer = function (
+    this: T,
+    event: string | symbol,
+    args: readonly unknown[],
+    phase: EmitPhase,
+  ) {
+    if (phase === 'before') {
+      observe(this, event, args)
+      return
+    }
+    settled?.(this, event, args, phase)
   }
   hook.observers.push(observer)
-  let active = true
-  return () => {
-    if (!active) return
-    active = false
-    const index = hook.observers.indexOf(observer)
-    if (index >= 0) hook.observers.splice(index, 1)
-    if (hook.observers.length) return
-    provenanceEmitHooks.delete(target)
-    if (target.emit !== hook.emit) return
-    if (hook.descriptor) Object.defineProperty(target, 'emit', hook.descriptor)
-    if (!hook.descriptor) Reflect.deleteProperty(target, 'emit')
+  return releaseMethodObserver(target, 'emit', provenanceEmitHooks, hook, observer)
+}
+
+function installDestroyHook(target: Socket): MethodHook<DestroyObserver> {
+  const original = target.destroy
+  const descriptor = Object.getOwnPropertyDescriptor(target, 'destroy')
+  const observers: DestroyObserver[] = []
+  const destroy: Socket['destroy'] = function (this: Socket, ...args) {
+    for (let index = observers.length - 1; index >= 0; index--) {
+      const observer = observers[index]
+      if (observer) guard(() => Reflect.apply(observer, this, [args]))
+    }
+    return Reflect.apply(original, this, args)
   }
+  const hook = { method: destroy, descriptor, observers }
+  target.destroy = destroy
+  provenanceDestroyHooks.set(target, hook)
+  return hook
+}
+
+function wrapDestroy(target: Socket, observe: (subject: Socket, args: readonly unknown[]) => void) {
+  const hook = provenanceDestroyHooks.get(target) ?? installDestroyHook(target)
+  const observer = function (this: Socket, args: readonly unknown[]) {
+    observe(this, args)
+  }
+  hook.observers.push(observer)
+  return releaseMethodObserver(target, 'destroy', provenanceDestroyHooks, hook, observer)
 }
 
 function createJournal(side: Side) {
@@ -380,7 +456,7 @@ function createJournal(side: Side) {
         return null
       }
       const capacity =
-        Buffer.byteLength(JSON.stringify(parsed.output)) + (record.kind === 'socket' ? 192 : 128)
+        Buffer.byteLength(JSON.stringify(parsed.output)) + (record.kind === 'socket' ? 320 : 128)
       if (capacity + frameHeaderBytes > pageBytes - pageHeaderBytes) {
         refused++
         publish()
@@ -520,6 +596,10 @@ export function createRetentionSocketProvenance(options: {
       connected: null,
       ended: null,
       timedOut: null,
+      timeoutDispatchExitedAt: null,
+      timeoutDispatchDepth: 0,
+      destroyInvokedAt: null,
+      destroyContext: 'unobserved',
       errored: null,
       closed: null,
       code: null,
@@ -547,7 +627,13 @@ export function createRetentionSocketProvenance(options: {
       if (event === 'end')
         return { ...base, repeated: base.repeated + (base.ended ? 1 : 0), ended: now() }
       if (event === 'timeout')
-        return { ...base, repeated: base.repeated + (base.timedOut ? 1 : 0), timedOut: now() }
+        return {
+          ...base,
+          repeated: base.repeated + (base.timedOut ? 1 : 0),
+          timedOut: now(),
+          timeoutDispatchExitedAt: null,
+          timeoutDispatchDepth: base.timeoutDispatchDepth + 1,
+        }
       if (event === 'error')
         return {
           ...base,
@@ -558,6 +644,34 @@ export function createRetentionSocketProvenance(options: {
       return { ...base, repeated: base.repeated + (base.closed ? 1 : 0), closed: now() }
     })
     if (event === 'close') journal.release(socket)
+  }
+  const socketDispatchSettled = (socket: Socket, event: string | symbol) => {
+    if (stopped || event !== 'timeout') return
+    journal.update(socket, (value) => {
+      if (value.kind !== 'socket' || !value.timeoutDispatchDepth) return value
+      return {
+        ...value,
+        timeoutDispatchDepth: value.timeoutDispatchDepth - 1,
+        timeoutDispatchExitedAt: now(),
+      }
+    })
+  }
+  const socketDestroy = (socket: Socket) => {
+    if (stopped || !getSocket(socket)) return
+    const coverage = journal.coverage()
+    const incomplete =
+      coverage.partial || coverage.refused || coverage.referenceRefused || coverage.unavailable
+    journal.update(socket, (value) => {
+      if (value.kind !== 'socket') return value
+      let destroyContext: SocketRecord['destroyContext'] = 'unobserved'
+      if (!incomplete) destroyContext = value.timeoutDispatchDepth ? 'timeout-dispatch' : 'other'
+      return {
+        ...value,
+        repeated: value.repeated + (value.destroyInvokedAt ? 1 : 0),
+        destroyInvokedAt: now(),
+        destroyContext,
+      }
+    })
   }
   const attachRequest = (subject: object, socket: Socket, path: string) => {
     let connection = getSocket(socket)
@@ -630,7 +744,8 @@ export function createRetentionSocketProvenance(options: {
     })
     if (event === 'close') journal.release(subject)
   }
-  restores.push(wrapEmit(Socket.prototype, socketEvent))
+  restores.push(wrapEmit(Socket.prototype, socketEvent, socketDispatchSettled))
+  restores.push(wrapDestroy(Socket.prototype, socketDestroy))
   if (options.side === 'client')
     restores.push(
       wrapEmit(ClientRequest.prototype, (request, event, args) => {
