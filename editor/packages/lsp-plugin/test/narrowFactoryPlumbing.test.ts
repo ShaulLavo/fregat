@@ -1,3 +1,5 @@
+import { createEditorTextBuffer } from '@singapore-editor/core/document'
+import { acquireEditorDocumentAnalysis } from '@singapore-editor/core/internal/document-worker'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import type {
   EditorViewContributionContext,
@@ -143,7 +145,10 @@ async function narrowPlugin(options: Partial<LanguageServerPluginOptions> = {}):
     client: connection.client,
     initializeParams: initialize.params as lsp.InitializeParams,
     diagnostics,
-    dispose: () => contribution.dispose(),
+    dispose: () => {
+      contribution.dispose()
+      ownedContexts.get(context)?.dispose()
+    },
     answerInitialize: async (capabilities = {}) => {
       socket.receive({
         jsonrpc: '2.0',
@@ -151,6 +156,10 @@ async function narrowPlugin(options: Partial<LanguageServerPluginOptions> = {}):
         result: {
           capabilities: { textDocumentSync: { openClose: true, change: 2 }, ...capabilities },
         },
+      })
+      await vi.waitUntil(() => socket.find('textDocument/didOpen') !== undefined, {
+        interval: 1,
+        timeout: 1000,
       })
       await flushPromises()
     },
@@ -493,17 +502,34 @@ function activate(
   return provider
 }
 
+const ownedContexts = new WeakMap<EditorViewContributionContext, { dispose(): void }>()
+
 function viewContributionContext(): EditorViewContributionContext {
   const element = document.createElement('div')
-  return createTestViewContributionContext({
+  const display = snapshot()
+  const buffer = createEditorTextBuffer(
+    display.textSnapshot.readRange(0, display.textSnapshot.length),
+  )
+  const owner = acquireEditorDocumentAnalysis({
+    buffer,
+    documentId: display.documentId ?? 'fixture',
+  })
+  const context = createTestViewContributionContext({
     container: element,
     scrollElement: element as unknown as HTMLDivElement,
     contentElement: element,
     highlightPrefix: 'editor-test',
-    getSnapshot: () => snapshot(),
+    getSnapshot: () => ({
+      ...display,
+      textSnapshot: buffer.getTextSnapshot(),
+      documentSyncPoint: buffer.getDocumentSyncPoint(),
+    }),
+    getDocumentContributions: () => owner.analysis.contributions,
     textOffsetFromPoint: vi.fn(() => 0),
     getRangeClientRect: () => new DOMRect(0, 0, 1, 1),
   })
+  ownedContexts.set(context, owner)
+  return context
 }
 
 function snapshot(): EditorViewSnapshot {

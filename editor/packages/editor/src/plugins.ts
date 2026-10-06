@@ -1,4 +1,5 @@
 import type { EditorKeymapNodeOptions } from './editor/hotkeys'
+import type { EditorDocumentContributions } from './editor/documentAnalysis'
 import type { EditorRowPresentation } from './rowPresentation'
 import type { EditorPointHit, EditorMarkerHit } from './pointQueries'
 import type { TextContent } from './textContent'
@@ -19,11 +20,7 @@ import type { SnippetMirrorRange, SnippetSessionStop } from './editor/snippetSes
 import type { EditorSyntaxThemeColor, EditorTheme, EditorThemeType } from './theme'
 import type { EditorTokenStore } from './syntax/tokenStore'
 import type { TextEdit } from './tokens'
-import type {
-  EditorHighlighterSessionOptions,
-  EditorHighlighterSession,
-  EditorHighlighterProvider,
-} from './syntax/highlighter'
+import type { EditorHighlighterProvider } from './syntax/highlighter'
 import { captureThemeCohort, loadOrderedHighlighterTheme } from './syntax/providerTheme'
 import type { DisplayTextRowSource, InjectedTextRow } from './displayTransforms'
 import {
@@ -32,8 +29,6 @@ import {
   type EditorSyntaxRecords,
   type EditorSyntaxLanguageId,
   type EditorSyntaxProvider,
-  type EditorSyntaxSession,
-  type EditorSyntaxSessionOptions,
   type FoldRange,
 } from './syntax/session'
 import type { InlineReplacementSpec } from './inlineMap'
@@ -542,6 +537,7 @@ export type EditorViewContributionContext = {
   readonly highlightPrefix: string
   hasDocument(): boolean
   getSnapshot(): EditorViewSnapshot
+  getDocumentContributions(): EditorDocumentContributions | null
   requestViewUpdate(): void
   /**
    * The character the user typed, after its edit has landed. A contribution that acts on a
@@ -1391,19 +1387,12 @@ export class EditorPluginHost implements EditorDisposable {
     }
   }
 
-  public createHighlighterSession(
-    options: EditorHighlighterSessionOptions,
-  ): EditorHighlighterSession | null {
-    for (const provider of this.highlighters) {
-      const session = provider.createSession(options)
-      if (session) return session
-    }
-
-    return null
-  }
-
   public hasHighlighterProviders(): boolean {
     return this.highlighters.length > 0
+  }
+
+  public getHighlighterProviders(): readonly EditorHighlighterProvider[] {
+    return this.highlighters
   }
 
   public getHighlighterProvider(): {
@@ -1418,17 +1407,12 @@ export class EditorPluginHost implements EditorDisposable {
     return loadOrderedHighlighterTheme(captureThemeCohort(this.highlighters), signal)
   }
 
-  public createSyntaxSession(options: EditorSyntaxSessionOptions): EditorSyntaxSession | null {
-    for (const provider of this.syntaxProviders) {
-      const session = provider.createSession(options)
-      if (session) return session
-    }
-
-    return null
-  }
-
   public hasSyntaxProviders(): boolean {
     return this.syntaxProviders.length > 0
+  }
+
+  public getSyntaxProviders(): readonly EditorSyntaxProvider[] {
+    return this.syntaxProviders
   }
 
   public getSyntaxProvider(): EditorSyntaxProvider | null {

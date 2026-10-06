@@ -1,6 +1,7 @@
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import { afterEach, expect, test } from 'vitest'
-import { Editor } from '@singapore-editor/core/editor'
+import { Editor, createEditorHighlighterOperation } from '@singapore-editor/core/editor'
+import { waitForDocumentWork } from '@singapore-editor/core/internal/document-worker'
 import type { EditorHighlightResult, EditorPlugin } from '@singapore-editor/core/extensions'
 import { createScopeLinesPlugin } from '../src/index'
 import '@singapore-editor/core/style.css'
@@ -31,7 +32,10 @@ test('native capture retains committed guide paint and replaces it synchronously
   const highlighter: EditorPlugin = {
     activate: (context) =>
       context.registerHighlighter({
-        createSession: () => ({ refresh: () => pending, applyChange: () => pending, dispose() {} }),
+        operation: createEditorHighlighterOperation(() => ({
+          analyze: (_read, signal) => waitForDocumentWork(pending, signal),
+          dispose() {},
+        })),
       }),
   }
   const restored = mount([createScopeLinesPlugin(), highlighter], capture.paint)
@@ -67,7 +71,10 @@ test('late admission hides already mounted guides until authoritative takeover',
   const highlighter: EditorPlugin = {
     activate: (context) =>
       context.registerHighlighter({
-        createSession: () => ({ refresh: () => pending, applyChange: () => pending, dispose() {} }),
+        operation: createEditorHighlighterOperation(() => ({
+          analyze: (_read, signal) => waitForDocumentWork(pending, signal),
+          dispose() {},
+        })),
       }),
   }
   const restored = mount([createScopeLinesPlugin(), highlighter])

@@ -8,7 +8,7 @@ import type { FoldRange, TreeSitterCapture, TreeSitterSyntaxRange } from './type
 let initialization: Promise<void> | undefined
 export const initializeMarkdown = (): Promise<void> => {
   initialization ??= Language.load(grammar)
-    .then((language) => init({ grammar: language, resolver }))
+    .then((language) => init({ grammar: language, resolver: new URL(resolver, import.meta.url) }))
     .catch((error) => {
       initialization = undefined
       throw error

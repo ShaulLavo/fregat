@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import { commands } from 'vitest/browser'
 import typescript from '@shikijs/langs/typescript'
 import darkPlus from '@shikijs/themes/dark-plus'
@@ -7,6 +7,7 @@ import { createEditorDocumentAnalysis } from '../src/editor/documentAnalysis'
 import { createEditorBufferSession, createEditorTextBuffer } from '../src/public/document'
 import { createShikiHighlighterProvider } from '../src/shiki/plugin'
 import { createShikiWorkerOwner } from '../src/shiki/workerClient'
+import type { ShikiWorkerRequest } from '../src/shiki/workerTypes'
 import type { EditorHighlighterProvider } from '../src/syntax/highlighter'
 import '../src/style.css'
 
@@ -26,22 +27,28 @@ const largeText = Array.from(
 ).join('')
 
 function shiki() {
-  const owner = createShikiWorkerOwner()
+  const sessions: string[] = []
+  const owner = createShikiWorkerOwner({
+    workerFactory: () => {
+      const worker = new Worker(new URL('../src/shiki/shiki.worker.ts', import.meta.url), {
+        type: 'module',
+      })
+      const post = worker.postMessage.bind(worker)
+      vi.spyOn(worker, 'postMessage').mockImplementation((request: ShikiWorkerRequest) => {
+        if (request.payload.type === 'open' && !sessions.includes(request.payload.runtimeSessionId))
+          sessions.push(request.payload.runtimeSessionId)
+        post(request)
+      })
+      return worker
+    },
+  })
   const shikiProvider = createShikiHighlighterProvider({
     workerOwner: owner,
     theme: 'dark-plus',
     resolveLanguage: async () => typescript,
     resolveTheme: async () => ({ ...darkPlus, name: 'dark-plus' }),
   })
-  const sessions: string[] = []
-  const provider: EditorHighlighterProvider = {
-    ...shikiProvider,
-    createSession: (options) => {
-      const session = shikiProvider.createSession(options)
-      if (session && options.runtimeSessionId) sessions.push(options.runtimeSessionId)
-      return session
-    },
-  }
+  const provider = shikiProvider
   cleanups.push(() => owner.dispose())
   return { owner, provider, sessions }
 }

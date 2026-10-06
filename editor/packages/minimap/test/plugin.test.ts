@@ -1,7 +1,13 @@
 import { documentRow } from './visibleRows'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import { createTestViewSnapshotSource } from '@singapore-editor/core/testing'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createEditorTextBuffer } from '@singapore-editor/core/document'
+import {
+  createEditorDocumentAnalysis,
+  type EditorDocumentAnalysis,
+} from '@singapore-editor/core/editor'
+import { installDocumentWorker, type ProjectionWorker } from './documentHarness'
 import type {
   EditorCapabilityContributionProvider,
   EditorMinimapDecoration,
@@ -16,12 +22,7 @@ import { MINIMAP_DECORATION_MERGE_LIMIT } from '../src/decorationMerge'
 import { createMinimapPlugin } from '../src/plugin'
 import { RenderMinimap } from '../src/types'
 import { minimapViewportGeometry } from '../src/viewportGeometry'
-import type {
-  EditorMinimapOptions,
-  MinimapDocumentPayload,
-  MinimapWorkerRequest,
-  MinimapWorkerResponse,
-} from '../src/types'
+import type { EditorMinimapOptions, MinimapWorkerRequest } from '../src/types'
 import {
   createTestCapabilityContributionContext,
   createTestPluginContext,
@@ -163,7 +164,7 @@ describe('createMinimapPlugin', () => {
       expect(testContext.scrollElement.style.clipPath).toBe('inset(8px)')
       expect(testContext.scrollElement.style.getPropertyPriority('clip-path')).toBe('important')
     } finally {
-      restoreRuntime()
+      restoreRuntime.restore()
     }
   })
 
@@ -219,7 +220,7 @@ describe('createMinimapPlugin', () => {
 
       contribution?.dispose()
     } finally {
-      restoreRuntime()
+      restoreRuntime.restore()
     }
   })
 
@@ -250,7 +251,7 @@ describe('createMinimapPlugin', () => {
       contribution?.dispose()
     } finally {
       computedStyle.mockRestore()
-      restoreRuntime()
+      restoreRuntime.restore()
     }
   })
 
@@ -314,11 +315,11 @@ describe('createMinimapPlugin', () => {
       expect(testContext.scrollElement.style.clipPath).toBe('')
       testContext.container.remove()
     } finally {
-      restoreRuntime()
+      restoreRuntime.restore()
     }
   })
 
-  it('resizes a hidden minimap when shown without accepting an old worker width', () => {
+  it('resizes a hidden minimap when shown without accepting an old worker width', async () => {
     const restoreRuntime = installMinimapRuntime()
     try {
       const providers = activateMinimap()
@@ -358,7 +359,7 @@ describe('createMinimapPlugin', () => {
 
       contribution?.dispose()
     } finally {
-      restoreRuntime()
+      restoreRuntime.restore()
     }
   })
 
@@ -404,7 +405,7 @@ describe('createMinimapPlugin', () => {
     } finally {
       computedStyle.mockRestore()
       testContext.container.remove()
-      restoreRuntime()
+      restoreRuntime.restore()
     }
   })
 
@@ -481,11 +482,11 @@ describe('createMinimapPlugin', () => {
       contribution?.dispose()
     } finally {
       animationFrames.restore()
-      restoreRuntime()
+      restoreRuntime.restore()
     }
   })
 
-  it('sends a dense source to the worker as row bands', () => {
+  it('sends a dense source to the worker as row bands', async () => {
     const restoreRuntime = installMinimapRuntime()
     try {
       const providers = activateMinimap()
@@ -496,11 +497,13 @@ describe('createMinimapPlugin', () => {
         context(documentSnapshot(DENSE_DOCUMENT_LINES, DENSE_DOCUMENT_HEIGHT)),
       )
 
-      expect(openedDocument()?.externalDecorations?.map(span)).toEqual(DENSE_SPANS)
+      await restoreRuntime.settle()
+      await restoreRuntime.settle()
+      expect(externalDecorations()?.map(span)).toEqual(DENSE_SPANS)
 
       contribution?.dispose()
     } finally {
-      restoreRuntime()
+      restoreRuntime.restore()
     }
   })
 
@@ -532,16 +535,17 @@ describe('createMinimapPlugin', () => {
       expect(testContext.reserveOverlayWidth).toHaveBeenCalled()
       contribution?.dispose()
     } finally {
-      restoreRuntime()
+      restoreRuntime.restore()
     }
   })
 
-  it('forwards continuous viewport updates without reading layout or document snapshots', () => {
+  it('forwards continuous viewport updates without reading layout or document snapshots', async () => {
     const restoreRuntime = installMinimapRuntime()
     try {
       const initial = documentSnapshot(200, 100)
       const testContext = context(initial)
       const contribution = activateMinimap().view?.createContribution(testContext)
+      await restoreRuntime.settle()
       const snapshots = vi.spyOn(testContext, 'getSnapshot')
       const measurements = vi.spyOn(window, 'getComputedStyle')
       const viewport = { ...initial.viewport, scrollTop: 15, visibleRange: { start: 0, end: 6 } }
@@ -560,13 +564,12 @@ describe('createMinimapPlugin', () => {
       snapshots.mockRestore()
       contribution?.dispose()
     } finally {
-      restoreRuntime()
+      restoreRuntime.restore()
     }
   })
 
-  it('merges the bands a source registers while the minimap is already open', () => {
+  it('merges the bands a source registers while the minimap is already open', async () => {
     const restoreRuntime = installMinimapRuntime()
-    const timers = installTimers()
     try {
       const providers = activateMinimap()
       const registry = registeredMinimapFeature(providers.capability)
@@ -576,18 +579,16 @@ describe('createMinimapPlugin', () => {
       const contribution = providers.view?.createContribution(
         context(documentSnapshot(DENSE_DOCUMENT_LINES, DENSE_DOCUMENT_HEIGHT)),
       )
-      timers.flush()
-      acknowledgeRender()
+      await restoreRuntime.settle()
 
       registry.setDecorations('find', DENSE_BANDS)
-      timers.flush()
 
+      await restoreRuntime.settle()
       expect(externalDecorations()?.map(span)).toEqual(DENSE_SPANS)
 
       contribution?.dispose()
     } finally {
-      timers.restore()
-      restoreRuntime()
+      restoreRuntime.restore()
     }
   })
 })
@@ -719,6 +720,17 @@ function documentSnapshot(lineCount: number, clientHeight: number): EditorViewSn
 }
 
 function context(viewSnapshot = snapshot()): EditorViewContributionContext {
+  const read = viewSnapshot.textSnapshot
+  const analysis = createEditorDocumentAnalysis({
+    buffer: createEditorTextBuffer(read.readRange(0, read.length)),
+    documentId: 'plugin-minimap',
+  })
+  analyses.push(analysis)
+  const canonical = {
+    ...viewSnapshot,
+    documentSyncPoint: analysis.buffer.getDocumentSyncPoint(),
+    textVersion: analysis.buffer.getDocumentSyncPoint().textVersion,
+  }
   const container = document.createElement('div')
   const scrollElement = document.createElement('div')
   scrollElement.style.setProperty('scrollbar-width', 'none')
@@ -727,7 +739,8 @@ function context(viewSnapshot = snapshot()): EditorViewContributionContext {
     container,
     scrollElement,
     contentElement: scrollElement,
-    getSnapshot: () => viewSnapshot,
+    getSnapshot: () => canonical,
+    getDocumentContributions: () => analysis.contributions,
     reserveOverlayWidth: vi.fn(),
     revealLine: vi.fn(),
     setScrollPosition: vi.fn(),
@@ -781,60 +794,16 @@ function snapshot(viewport: Partial<EditorViewSnapshot['viewport']> = {}): Edito
   }
 }
 
-function installMinimapRuntime(): () => void {
-  const worker = Object.getOwnPropertyDescriptor(globalThis, 'Worker')
-  const offscreenCanvas = Object.getOwnPropertyDescriptor(globalThis, 'OffscreenCanvas')
-  const transferControlToOffscreen = Object.getOwnPropertyDescriptor(
-    HTMLCanvasElement.prototype,
-    'transferControlToOffscreen',
-  )
+let mockWorkers: ProjectionWorker[] = []
+const analyses: EditorDocumentAnalysis[] = []
+afterEach(() => {
+  for (const analysis of analyses.splice(0)) analysis.dispose()
+})
 
-  Object.defineProperty(globalThis, 'Worker', {
-    configurable: true,
-    value: MockWorker,
-  })
-  Object.defineProperty(globalThis, 'OffscreenCanvas', {
-    configurable: true,
-    value: class MockOffscreenCanvas {},
-  })
-  Object.defineProperty(HTMLCanvasElement.prototype, 'transferControlToOffscreen', {
-    configurable: true,
-    value: () => ({}),
-  })
-
-  return () => {
-    restoreDescriptor(globalThis, 'Worker', worker)
-    restoreDescriptor(globalThis, 'OffscreenCanvas', offscreenCanvas)
-    restoreDescriptor(
-      HTMLCanvasElement.prototype,
-      'transferControlToOffscreen',
-      transferControlToOffscreen,
-    )
-  }
-}
-
-const mockWorkers: MockWorker[] = []
-
-class MockWorker {
-  public onmessage: ((event: MessageEvent) => void) | null = null
-  public onerror: ((event: ErrorEvent) => void) | null = null
-  public postMessage = vi.fn()
-  public terminate = vi.fn()
-
-  public constructor(_url: URL, _options?: WorkerOptions) {
-    mockWorkers.push(this)
-  }
-
-  public send(response: MinimapWorkerResponse): void {
-    this.onmessage?.({ data: response } as MessageEvent)
-  }
-}
-
-function openedDocument(): MinimapDocumentPayload | null {
-  for (const request of postedRequests()) {
-    if (request.type === 'openDocument') return request.document
-  }
-  return null
+function installMinimapRuntime() {
+  const runtime = installDocumentWorker()
+  mockWorkers = runtime.workers
+  return runtime
 }
 
 function externalDecorations(): readonly EditorMinimapDecoration[] | null {
@@ -871,29 +840,11 @@ function sendLayoutWidth(width: number): void {
   })
 }
 
-function acknowledgeRender(): void {
-  const worker = mockWorkers.at(-1)
-  const render = postedRequests().findLast(
-    (request): request is Extract<MinimapWorkerRequest, { type: 'render' }> =>
-      request.type === 'render',
-  )
-  if (!worker || !render) throw new Error('missing minimap render request')
-
-  worker.send({
-    type: 'rendered',
-    sequence: render.sequence,
-    sliderNeeded: true,
-    sliderTop: 0,
-    sliderHeight: 20,
-    shadowVisible: false,
-  })
-}
-
 function postedRequests(): readonly MinimapWorkerRequest[] {
   const worker = mockWorkers.at(-1)
   if (!worker) return []
 
-  return worker.postMessage.mock.calls.map(([request]) => request as MinimapWorkerRequest)
+  return worker.requests
 }
 
 function defineScrollBox(
@@ -1004,51 +955,6 @@ function installAnimationFrames(): {
     restore: () => {
       restoreDescriptor(globalThis, 'requestAnimationFrame', requestAnimationFrame)
       restoreDescriptor(globalThis, 'cancelAnimationFrame', cancelAnimationFrame)
-    },
-  }
-}
-
-// A decoration change is held back for a quiet moment before it is posted, and
-// waiting one out in real time would only make the case slower.
-function installTimers(): {
-  readonly flush: () => void
-  readonly restore: () => void
-} {
-  const setTimeoutDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'setTimeout')
-  const clearTimeoutDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'clearTimeout')
-  const timers = new Map<number, () => void>()
-  let nextTimer = 1
-
-  Object.defineProperty(globalThis, 'setTimeout', {
-    configurable: true,
-    value: (callback: () => void) => {
-      const timer = nextTimer
-      nextTimer += 1
-      timers.set(timer, callback)
-      return timer
-    },
-  })
-  Object.defineProperty(globalThis, 'clearTimeout', {
-    configurable: true,
-    value: (timer: number) => {
-      timers.delete(timer)
-    },
-  })
-
-  return {
-    // Drained rather than stepped: a posted message can schedule the next piece
-    // of work, and a case cares about where the run settles.
-    flush: () => {
-      while (timers.size > 0) {
-        for (const [timer, callback] of Array.from(timers)) {
-          timers.delete(timer)
-          callback()
-        }
-      }
-    },
-    restore: () => {
-      restoreDescriptor(globalThis, 'setTimeout', setTimeoutDescriptor)
-      restoreDescriptor(globalThis, 'clearTimeout', clearTimeoutDescriptor)
     },
   }
 }

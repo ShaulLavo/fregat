@@ -23,7 +23,7 @@
       "file": "examples/stress/src/boundary.ts",
       "id": "examples/stress/src/boundary.ts:setTimeout:e6eb9a6545",
       "justification": "Benchmark settle between phases: it only resolves the awaited promise, so deferred editor work finishes before reads are counted.",
-      "line": 192,
+      "line": 193,
       "snippet": "return new Promise<void>((resolve) => setTimeout(resolve, 300))"
     },
     {
@@ -31,7 +31,7 @@
       "file": "examples/stress/src/browser.ts",
       "id": "examples/stress/src/browser.ts:requestAnimationFrame:dffa87e548",
       "justification": "Benchmark observation of the first animation frame after an applied key; it records a timestamp only, tracks the frame handle, and cancels pending frames on disposal.",
-      "line": 258,
+      "line": 269,
       "snippet": "const frame = requestAnimationFrame(() => {"
     },
     {
@@ -39,7 +39,7 @@
       "file": "examples/stress/src/browser.ts",
       "id": "examples/stress/src/browser.ts:setTimeout:e5c148c176",
       "justification": "The bounded churn benchmark yields to the browser every ten iterations so cancellation and rendering can run. The timer only resolves the awaited promise; the next iteration checks cancellation before editing.",
-      "line": 327,
+      "line": 338,
       "snippet": "if (index % 10 === 0) await new Promise((resolve) => setTimeout(resolve, 0))"
     },
     {
@@ -71,7 +71,7 @@
       "file": "examples/stress/src/firstPaint.ts",
       "id": "examples/stress/src/firstPaint.ts:requestAnimationFrame:eb626b3f90",
       "justification": "Measures the next input frame; each benchmark burst waits for it before disposal.",
-      "line": 252,
+      "line": 254,
       "snippet": "requestAnimationFrame(() => {"
     },
     {
@@ -79,7 +79,7 @@
       "file": "examples/stress/src/geometry.ts",
       "id": "examples/stress/src/geometry.ts:requestAnimationFrame:0b57ecfd28",
       "justification": "Benchmark observation of the first animation frame after an applied key; it records a timestamp only and schedules no editor work.",
-      "line": 208,
+      "line": 209,
       "snippet": "requestAnimationFrame(() => {"
     },
     {
@@ -87,7 +87,7 @@
       "file": "examples/stress/src/geometry.ts",
       "id": "examples/stress/src/geometry.ts:setTimeout:213bc5132e",
       "justification": "Benchmark settle between phases: it only resolves the awaited promise, so deferred editor work finishes before counts are taken.",
-      "line": 369,
+      "line": 370,
       "snippet": "return new Promise<void>((resolve) => setTimeout(resolve, 200))"
     },
     {
@@ -121,6 +121,22 @@
       "justification": "Harness readiness only: polling yields for states without a completion event, outside captured input and within the caller's absolute deadline.",
       "line": 40,
       "snippet": "return new Promise((resolve) => setTimeout(resolve, ms))"
+    },
+    {
+      "api": "queueMicrotask",
+      "file": "examples/stress/src/lspConsumer.ts",
+      "id": "examples/stress/src/lspConsumer.ts:queueMicrotask:31495d7cba",
+      "justification": "Fixture socket open is delivered once after construction so the client can install listeners. The callback checks the connecting state and becomes inert after close; it schedules no further work.",
+      "line": 9,
+      "snippet": "queueMicrotask(() => {"
+    },
+    {
+      "api": "queueMicrotask",
+      "file": "examples/stress/src/lspConsumer.ts",
+      "id": "examples/stress/src/lspConsumer.ts:queueMicrotask:be75da8184",
+      "justification": "Fixture initialize response is delivered once after send so the RPC caller can register its pending request. The callback checks the open state and becomes inert after close; it schedules no further work.",
+      "line": 30,
+      "snippet": "queueMicrotask(() => {"
     },
     {
       "api": "setTimeout",
@@ -207,7 +223,7 @@
       "file": "packages/editor/src/shiki/shiki.worker.ts",
       "id": "packages/editor/src/shiki/shiki.worker.ts:setTimeout:7613cb083b",
       "justification": "Runs once per highlighter after a one-second delay so background grammar preload stays behind latency-sensitive tokenization and its first paint. `backgroundLoaded` prevents duplicate schedules, and worker-task tracking keeps idle fences and teardown behind the preload.",
-      "line": 250,
+      "line": 333,
       "snippet": "setTimeout(() => {"
     },
     {
@@ -239,7 +255,7 @@
       "file": "packages/editor/src/virtualization/virtualizedTextView.ts",
       "id": "packages/editor/src/virtualization/virtualizedTextView.ts:requestIdleCallback:14458bc40c",
       "justification": "Measuring every row's width is the work the horizontal scroll extent needs and nothing on screen is waiting for, so it is deliberately given whatever the frame has left rather than a place in the queue. `cancelContentWidthMeasurement` withdraws it when the content it would measure has already changed.",
-      "line": 1702,
+      "line": 1738,
       "snippet": "const handle = win.requestIdleCallback(run)"
     },
     {
@@ -247,7 +263,7 @@
       "file": "packages/editor/src/virtualization/virtualizedTextView.ts",
       "id": "packages/editor/src/virtualization/virtualizedTextView.ts:setTimeout:25021385fc",
       "justification": "The same deferral for an engine with no idle callback. Zero rather than a delay, because the point is only to leave the current frame, and the same cancel withdraws it.",
-      "line": 1711,
+      "line": 1747,
       "snippet": "const handle = win.setTimeout(run, 0)"
     },
     {
@@ -255,7 +271,7 @@
       "file": "packages/editor/src/virtualization/virtualizedTextViewRows.ts",
       "id": "packages/editor/src/virtualization/virtualizedTextViewRows.ts:setTimeout:3bd76fd727",
       "justification": "Leaving the current frame is the entire content of this delay: it is what keeps the repaint out of the resize delivery and out of the row paint that ask for it. The one outstanding handle per view makes a second request in the same frame a no-op, and `cancelInlineWidgetRepaint` withdraws it when the view goes away.",
-      "line": 1574,
+      "line": 1675,
       "snippet": "const handle = win.setTimeout(() => {"
     },
     {
@@ -319,7 +335,7 @@
       "file": "packages/lsp/src/client.ts",
       "id": "packages/lsp/src/client.ts:setTimeout:373e9c94c5",
       "justification": "Phase 0 legacy baseline; keep until Phase 3 scheduler migration or replace with a specific scheduler-owned justification.",
-      "line": 382,
+      "line": 462,
       "snippet": "const timeout = setTimeout(() => this.timeoutRequest(id), options.timeoutMs ?? this.timeoutMs)"
     },
     {
@@ -327,7 +343,7 @@
       "file": "packages/markdown/src/authoringPlugin.ts",
       "id": "packages/markdown/src/authoringPlugin.ts:queueMicrotask:2fd8ec60a7",
       "justification": "Applies after the contribution pass so the edit never runs inside a view update; the pending request, disposal and document are rechecked when it runs.",
-      "line": 104,
+      "line": 105,
       "snippet": "queueMicrotask(() => {"
     },
     {
@@ -335,7 +351,7 @@
       "file": "packages/minimap/src/plugin.ts",
       "id": "packages/minimap/src/plugin.ts:requestAnimationFrame:cac4e5564e",
       "justification": "Phase 0 legacy baseline; keep until Phase 3 scheduler migration or replace with a specific scheduler-owned justification.",
-      "line": 525,
+      "line": 533,
       "snippet": "if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(callback)"
     },
     {
@@ -343,7 +359,7 @@
       "file": "packages/minimap/src/plugin.ts",
       "id": "packages/minimap/src/plugin.ts:setTimeout:32fb906cca",
       "justification": "Phase 0 legacy baseline; keep until Phase 3 scheduler migration or replace with a specific scheduler-owned justification.",
-      "line": 526,
+      "line": 534,
       "snippet": "return setTimeout(callback, 16) as unknown as number"
     },
     {
@@ -439,7 +455,7 @@
       "file": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts",
       "id": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts:setTimeout:74252f76bf",
       "justification": "Runs once after the parse answer is posted; it re-checks that the document is still cached and idle, so a late or stale callback does nothing.",
-      "line": 729,
+      "line": 730,
       "snippet": "setTimeout(() => reparseIdleDocument(runtimeSessionId, document, runtime), 0)"
     },
     {

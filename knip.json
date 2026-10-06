@@ -151,6 +151,7 @@
     "editor/packages/editor": {
       "entry": [
         "src/debug.ts",
+        "src/document/workerReader.ts",
         "src/editor.ts",
         "src/index.ts",
         "src/logging/evlog.ts",

@@ -1,14 +1,15 @@
+import { createSyntaxPlugin } from './factories/syntaxRuntime'
+import type { EditorStructuralOperationContext } from '../src/document/operations'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { Editor } from '../src/editor/Editor'
-import { resetEditorInstanceCount, setEditorSyntaxSessionFactory } from '../src/public/testing'
+import { resetEditorInstanceCount } from '../src/public/testing'
 import type { EditorPlugin } from '../src/plugins'
 import { createEmptySyntaxResult } from '../src/syntax/session'
 import type {
   EditorSyntaxCapture,
   EditorSyntaxResult,
-  EditorSyntaxSession,
-  EditorSyntaxSessionOptions,
+  EditorSyntaxRuntime,
 } from '../src/syntax/session'
 
 /**
@@ -25,12 +26,13 @@ const CAPTURES: readonly EditorSyntaxCapture[] = [
 describe('syntax captures for inline replacement providers', () => {
   let container: HTMLElement
   let editor: Editor | null = null
-  let sessionOptions: EditorSyntaxSessionOptions[]
+  let syntaxPlugin: EditorPlugin
+  let sessionOptions: EditorStructuralOperationContext[]
 
   beforeEach(() => {
     sessionOptions = []
     resetEditorInstanceCount()
-    setEditorSyntaxSessionFactory((options) => {
+    syntaxPlugin = createSyntaxPlugin((options) => {
       sessionOptions.push(options)
       return captureSyntaxSession(options.includeCaptures ?? false)
     })
@@ -42,11 +44,10 @@ describe('syntax captures for inline replacement providers', () => {
     editor?.dispose()
     editor = null
     container.remove()
-    setEditorSyntaxSessionFactory(undefined)
   })
 
   it('leaves captures off while nothing consumes them', async () => {
-    editor = new Editor(container, {})
+    editor = new Editor(container, { plugins: [syntaxPlugin] })
 
     await openDocument()
 
@@ -55,7 +56,7 @@ describe('syntax captures for inline replacement providers', () => {
 
   it('requests captures for a provider registered before the document opens', async () => {
     const seen: (readonly EditorSyntaxCapture[])[] = []
-    editor = new Editor(container, { plugins: [inlineReplacementPlugin(seen)] })
+    editor = new Editor(container, { plugins: [syntaxPlugin, inlineReplacementPlugin(seen)] })
 
     await openDocument()
 
@@ -65,7 +66,7 @@ describe('syntax captures for inline replacement providers', () => {
 
   it('reparses when a provider registers after the document opened', async () => {
     const seen: (readonly EditorSyntaxCapture[])[] = []
-    editor = new Editor(container, {})
+    editor = new Editor(container, { plugins: [syntaxPlugin] })
     await openDocument()
     expect(sessionOptions.at(-1)?.includeCaptures).toBe(false)
 
@@ -83,6 +84,7 @@ describe('syntax captures for inline replacement providers', () => {
     let readCaptures: () => readonly EditorSyntaxCapture[] | null = () => null
     editor = new Editor(container, {
       plugins: [
+        syntaxPlugin,
         {
           name: 'test.capture-reader',
           activate: (context) =>
@@ -123,19 +125,18 @@ function inlineReplacementPlugin(seen: (readonly EditorSyntaxCapture[])[]): Edit
   }
 }
 
-function captureSyntaxSession(includeCaptures: boolean): EditorSyntaxSession {
+function captureSyntaxSession(includeCaptures: boolean): EditorSyntaxRuntime {
   const result: EditorSyntaxResult = {
     ...createEmptySyntaxResult(),
     captures: includeCaptures ? CAPTURES : [],
   }
   return {
-    applyChange: async () => result,
     dispose: () => undefined,
     getResult: () => result,
     foldingSupport: 'supported',
     getSnapshotVersion: () => 0,
     getTokens: () => [],
-    refresh: async () => result,
+    analyze: async () => result,
   }
 }
 

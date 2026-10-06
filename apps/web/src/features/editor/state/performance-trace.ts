@@ -158,6 +158,7 @@ function createEditorPerformanceTrace(): {
   let frame = 0
   let lastFrameTime = performance.now()
   const traceEvents = createTraceBuffer<EditorPerformanceTraceEvent>(MAX_TRACE_EVENTS)
+  const diagnosticSummaries = new Map<string, { count: number; maxMs: number; totalMs: number }>()
   let frames = emptyFrameStats()
   let startedAt = performance.now()
   const eventCounts = new Map<string, number>()
@@ -172,6 +173,16 @@ function createEditorPerformanceTrace(): {
     record: (diagnostic) => {
       if (stopped) return
 
+      const durationMs = diagnostic.durationMs ?? 0
+      const summary = diagnosticSummaries.get(diagnostic.name) ?? {
+        count: 0,
+        maxMs: 0,
+        totalMs: 0,
+      }
+      summary.count += 1
+      summary.maxMs = Math.max(summary.maxMs, durationMs)
+      summary.totalMs += durationMs
+      diagnosticSummaries.set(diagnostic.name, summary)
       traceEvents.push({
         at: performance.now(),
         diagnostic,
@@ -238,6 +249,7 @@ function createEditorPerformanceTrace(): {
     reset: () => {
       observer?.takeRecords()
       traceEvents.clear()
+      diagnosticSummaries.clear()
       frames = emptyFrameStats()
       eventCounts.clear()
       targetCounts.clear()
@@ -277,7 +289,7 @@ function createEditorPerformanceTrace(): {
         slowFrames: frames.slowFrames,
       },
       layoutVariant: editorPerformanceLayoutVariant(),
-      topDiagnostics: summarizeDiagnostics(currentTraceEvents),
+      topDiagnostics: summarizeDiagnostics(diagnosticSummaries),
       topTargets: summarizeTargets(targetCounts),
       traceEvents: currentTraceEvents,
       url: location.href,
@@ -320,24 +332,11 @@ function longTaskTraceEvent(entry: PerformanceEntry): EditorPerformanceTraceEven
 }
 
 function summarizeDiagnostics(
-  events: readonly EditorPerformanceTraceEvent[],
+  summaries: ReadonlyMap<
+    string,
+    { readonly count: number; readonly maxMs: number; readonly totalMs: number }
+  >,
 ): readonly EditorPerformanceTraceSummary[] {
-  const summaries = new Map<string, { count: number; maxMs: number; totalMs: number }>()
-  for (const event of events) {
-    if (event.kind !== 'diagnostic') continue
-
-    const durationMs = event.diagnostic.durationMs ?? 0
-    const current = summaries.get(event.diagnostic.name) ?? {
-      count: 0,
-      maxMs: 0,
-      totalMs: 0,
-    }
-    current.count += 1
-    current.maxMs = Math.max(current.maxMs, durationMs)
-    current.totalMs += durationMs
-    summaries.set(event.diagnostic.name, current)
-  }
-
   return Array.from(summaries, ([name, summary]) => ({
     count: summary.count,
     maxMs: round(summary.maxMs),

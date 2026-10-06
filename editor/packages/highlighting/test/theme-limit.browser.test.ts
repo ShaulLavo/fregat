@@ -1,8 +1,6 @@
+import { createEditorTextBuffer } from '@singapore-editor/core/document'
+import { createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
 import { expect, test } from 'vitest'
-import {
-  createDocumentTextSnapshot,
-  createPieceTableSnapshot,
-} from '@singapore-editor/core/document'
 import { createHighlightingService, type HighlightingThemeSource } from '../src/index'
 
 test.each(['cap only', 'theme only', 'theme then cap', 'cap and theme'] as const)(
@@ -28,11 +26,13 @@ test.each(['cap only', 'theme only', 'theme then cap', 'cap and theme'] as const
       }),
     })
     const text = 'const longer = 1'
-    const snapshot = createPieceTableSnapshot(text)
-    const textSnapshot = createDocumentTextSnapshot(snapshot, text)
-    const session = service
-      .highlighterProvider(source)
-      .createSession({ documentId: 'review.ts', languageId: 'typescript', snapshot, textSnapshot })!
+    const buffer = createEditorTextBuffer(text)
+    const textSnapshot = buffer.getTextSnapshot()
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'review.ts' })
+    const session = analysis.borrowHighlighter({
+      provider: service.highlighterProvider(source),
+      languageId: 'typescript',
+    })!
     let unsubscribe: (() => void) | undefined
     try {
       const initial = await session.refresh(textSnapshot)
@@ -60,6 +60,7 @@ test.each(['cap only', 'theme only', 'theme then cap', 'cap and theme'] as const
     } finally {
       unsubscribe?.()
       session.dispose()
+      analysis.dispose()
       await service.dispose()
     }
   },

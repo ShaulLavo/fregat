@@ -26,7 +26,7 @@ import {
   inputMemory,
   inputPage,
 } from './input-runtime.mjs'
-import { writeInputArtifact } from './input-artifacts.mjs'
+import { writeInputArtifact, preserveInputCapture } from './input-artifacts.mjs'
 import { frameDetectionFloorKey } from './input-paired.mjs'
 import { frameFloorRejected, verifyInputSensitivity } from './input-sensitivity.mjs'
 import { fail } from './errors.mjs'
@@ -297,14 +297,19 @@ async function collect(
       samples: [],
     }
   }
-  const schedule = await runPairedInputSuite(
-    browser,
+  const schedule = await preserveInputCapture(
+    `${resolve(values.output)}.${consumers}.${delay}input-${frameDelay}frame.raw.json.gz`,
     results,
-    {
-      newPage: (browser, side) => inputPage(browser, runtimes[side], consumers),
-      readMemory: inputMemory,
-    },
-    seed,
+    () =>
+      runPairedInputSuite(
+        browser,
+        results,
+        {
+          newPage: (browser, side) => inputPage(browser, runtimes[side], consumers),
+          readMemory: inputMemory,
+        },
+        seed,
+      ),
   )
   const comparison = comparePairedInput(results.baseline, results.candidate, schedule, seed)
   return {

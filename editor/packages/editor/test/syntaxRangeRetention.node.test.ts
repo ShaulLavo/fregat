@@ -1,3 +1,8 @@
+import { createEmptySyntaxRuntime } from './factories/syntaxRuntime'
+import {
+  createEditorStructuralOperation,
+  createEditorHighlighterOperation,
+} from '../src/editor/operationDefinitions'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createEditorBufferSession,
@@ -9,12 +14,10 @@ import {
   retainedSyntaxCanWarm,
   type EditorDocumentAnalysis,
 } from '../src/editor/documentAnalysis'
-import { DocumentEditChain } from '../src/editor/editChain'
 import { EditorSyntaxController } from '../src/editor/syntaxController'
 import { EditorPluginHost } from '../src/plugins'
 import {
   createEmptySyntaxResult,
-  createEmptySyntaxSession,
   type EditorSyntaxProvider,
   type EditorSyntaxRange,
   type EditorSyntaxResult,
@@ -53,11 +56,13 @@ describe('syntax range contributor lifetime', () => {
         }
       })
       const create = vi.fn(() => ({
-        ...createEmptySyntaxSession(),
+        ...createEmptySyntaxRuntime(),
         foldingSupport: 'supported' as const,
         queryRange: ranges,
       }))
-      const provider = { createSession: create } satisfies EditorSyntaxProvider
+      const provider = {
+        operation: createEditorStructuralOperation(create),
+      } satisfies EditorSyntaxProvider
       const left = createView(buffer, analysis, provider, { startIndex: 0, endIndex: 512 })
       const right = createView(buffer, analysis, provider, { startIndex: 1024, endIndex: 1536 })
       try {
@@ -95,7 +100,9 @@ describe('syntax range contributor lifetime', () => {
   it('keeps explicitly installed tokens and their accepted copy authority', () => {
     const buffer = createEditorTextBuffer('x\n'.repeat(100))
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'manual' })
-    const provider = { createSession: () => createEmptySyntaxSession() }
+    const provider = {
+      operation: createEditorStructuralOperation(() => createEmptySyntaxRuntime()),
+    }
     const view = createView(buffer, analysis, provider, { startIndex: 0, endIndex: 20 })
     try {
       const tokens = EditorTokenStore.fromTokens([
@@ -121,13 +128,19 @@ describe('syntax range contributor lifetime', () => {
     const tokens = EditorTokenStore.fromTokens([{ start: 100, end: 110, style: { color: 'full' } }])
     const refresh = async () => ({ tokens })
     const highlighter = {
-      createSession: () => ({ refresh, applyChange: refresh, dispose: () => undefined }),
+      operation: createEditorHighlighterOperation(() => ({
+        analyze: refresh,
+        dispose: () => undefined,
+      })),
     }
     const ranges = vi.fn(async (range: EditorSyntaxRange) =>
       createEmptySyntaxResult({ requestedRanges: [range] }),
     )
     const provider = {
-      createSession: () => ({ ...createEmptySyntaxSession(), queryRange: ranges }),
+      operation: createEditorStructuralOperation(() => ({
+        ...createEmptySyntaxRuntime(),
+        queryRange: ranges,
+      })),
     }
     const view = createView(
       buffer,
@@ -171,11 +184,11 @@ describe('syntax range contributor lifetime', () => {
     const buffer = createEditorTextBuffer('x\n'.repeat(100))
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'mixed-origin' })
     const provider = {
-      createSession: () => ({
-        ...createEmptySyntaxSession(),
+      operation: createEditorStructuralOperation(() => ({
+        ...createEmptySyntaxRuntime(),
         queryRange: async (range: EditorSyntaxRange) =>
           createEmptySyntaxResult({ requestedRanges: [range] }),
-      }),
+      })),
     }
     const view = createView(buffer, analysis, provider, { startIndex: 0, endIndex: 20 })
     try {
@@ -198,8 +211,8 @@ describe('syntax range contributor lifetime', () => {
     const buffer = createEditorTextBuffer('x\n'.repeat(250))
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'crossing' })
     const provider = {
-      createSession: () => ({
-        ...createEmptySyntaxSession(),
+      operation: createEditorStructuralOperation(() => ({
+        ...createEmptySyntaxRuntime(),
         foldingSupport: 'supported' as const,
         queryRange: async (range: EditorSyntaxRange) => ({
           ...createEmptySyntaxResult({ requestedRanges: [range] }),
@@ -207,7 +220,7 @@ describe('syntax range contributor lifetime', () => {
           tokens: EditorTokenStore.fromTokens([{ start: 0, end: 1, style: { color: 'crossing' } }]),
           folds: [{ startIndex: 0, endIndex: 300, startLine: 0, endLine: 149, type: 'scope' }],
         }),
-      }),
+      })),
     }
     const view = createView(buffer, analysis, provider, { startIndex: 0, endIndex: 100 })
     try {
@@ -246,7 +259,10 @@ describe('syntax range contributor lifetime', () => {
       })
     })
     const provider = {
-      createSession: () => ({ ...createEmptySyntaxSession(), queryRange: ranges }),
+      operation: createEditorStructuralOperation(() => ({
+        ...createEmptySyntaxRuntime(),
+        queryRange: ranges,
+      })),
     }
     const frame = { startIndex: 0, endIndex: 512 }
     const view = createView(buffer, analysis, provider, frame)
@@ -293,20 +309,20 @@ describe('syntax range contributor lifetime', () => {
   })
 
   it.each(['clear', 'replace', 'dispose', 'configuration', 'text-change'] as const)(
-    'releases the unretained stopped-warm snapshot on %s',
+    'retires outgoing view warming through %s with canonical analysis',
     async (boundary) => {
       const buffer = createEditorTextBuffer('x\n'.repeat(250_000))
       const analysis = createEditorDocumentAnalysis({ buffer, documentId: boundary })
       const provider = {
-        createSession: () => ({
-          ...createEmptySyntaxSession(),
+        operation: createEditorStructuralOperation(() => ({
+          ...createEmptySyntaxRuntime(),
           queryRange: async (range: EditorSyntaxRange) => ({
             ...createEmptySyntaxResult({ requestedRanges: [range] }),
             tokens: EditorTokenStore.fromTokens([
               { start: range.startIndex, end: range.startIndex + 1, style: { color: 'warm' } },
             ]),
           }),
-        }),
+        })),
       }
       const view = createView(
         buffer,
@@ -314,12 +330,12 @@ describe('syntax range contributor lifetime', () => {
         provider,
         { startIndex: 0, endIndex: 512 },
         undefined,
-        false,
       )
       try {
         view.syntax.refresh(1, null, { delayMs: 0 })
         await vi.waitFor(() => expect(view.syntax.copyTokens.startAt(0)).toBe(240_000))
-        expect(Reflect.get(view.syntax, 'stoppedWarm')).not.toBeNull()
+        const outgoing = Reflect.get(view.syntax, 'retainedSyntax')
+        expect(retainedSyntaxCanWarm(outgoing)).toBe(false)
         if (boundary === 'clear') view.syntax.clearDocument()
         if (boundary === 'dispose') view.syntax.dispose()
         if (boundary === 'configuration') view.syntax.reloadSyntaxSession()
@@ -338,6 +354,13 @@ describe('syntax range contributor lifetime', () => {
           view.syntax.acceptChange(change)
         }
         expect(Reflect.get(view.syntax, 'stoppedWarm')).toBeNull()
+        if (boundary === 'text-change') {
+          expect(Reflect.get(view.syntax, 'retainedSyntax')).toBe(outgoing)
+          expect(retainedSyntaxCanWarm(outgoing)).toBe(true)
+        } else {
+          expect(Reflect.get(view.syntax, 'retainedSyntax')).not.toBe(outgoing)
+          expect(retainedSyntaxCanWarm(outgoing)).toBe(false)
+        }
       } finally {
         view.dispose()
         analysis.dispose()
@@ -352,10 +375,8 @@ function createView(
   provider: EditorSyntaxProvider,
   initialRange: EditorSyntaxRange,
   highlighter?: EditorHighlighterProvider,
-  retainAnalysis = true,
 ) {
   const session = createEditorBufferSession(buffer)
-  const editChain = new DocumentEditChain(0, 0)
   const pluginHost = new EditorPluginHost([
     {
       activate: (context) => {
@@ -377,7 +398,6 @@ function createView(
     getDocumentId: () => 'retention.ts',
     getCurrentSessionDocumentId: () => 'retention.ts',
     getLanguageId: () => 'typescript',
-    getDocumentEditChain: () => editChain,
     getVisibleSyntaxRange: () => range,
     adoptTokens: () => {
       adoptions++
@@ -394,7 +414,7 @@ function createView(
     notifyThemeChanged: () => undefined,
   })
   syntax.startDocument({
-    analysis: retainAnalysis ? analysis : undefined,
+    analysis,
     documentId: 'retention.ts',
     languageId: 'typescript',
     snapshot: session.getSnapshot(),

@@ -1,13 +1,14 @@
+import { createSyntaxPlugin } from './factories/syntaxRuntime'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { Editor } from '../src/editor/Editor'
 import { createDocumentSession } from '../src/public/document'
-import { resetEditorInstanceCount, setEditorSyntaxSessionFactory } from '../src/public/testing'
+import { resetEditorInstanceCount } from '../src/public/testing'
 import { createEmptySyntaxResult } from '../src/public/syntax'
 import type {
   EditorSyntaxInjection,
   EditorSyntaxResult,
-  EditorSyntaxSession,
+  EditorSyntaxRuntime,
 } from '../src/public/syntax'
 
 /**
@@ -34,7 +35,6 @@ describe('commenting inside a fenced block of a real editor', () => {
   afterEach(() => {
     mounted?.dispose()
     mounted = null
-    setEditorSyntaxSessionFactory(undefined)
   })
 
   it('comments the fenced row the way the fenced language does', async () => {
@@ -66,10 +66,10 @@ type Mounted = {
 
 async function mount(injections: readonly EditorSyntaxInjection[]): Promise<Mounted> {
   resetEditorInstanceCount()
-  setEditorSyntaxSessionFactory(() => injectedSyntaxSession(injections))
+  const syntaxPlugin = createSyntaxPlugin(() => injectedSyntaxSession(injections))
   const container = document.createElement('div')
   document.body.appendChild(container)
-  const editor = new Editor(container)
+  const editor = new Editor(container, { plugins: [syntaxPlugin] })
   const session = createDocumentSession(TEXT)
   editor.attachSession(session, { documentId: 'notes.md', languageId: 'markdown' })
   // The parse lands after the attach resolves, so the injections reach the chord only once it has.
@@ -89,15 +89,14 @@ async function mount(injections: readonly EditorSyntaxInjection[]): Promise<Moun
   }
 }
 
-function injectedSyntaxSession(injections: readonly EditorSyntaxInjection[]): EditorSyntaxSession {
+function injectedSyntaxSession(injections: readonly EditorSyntaxInjection[]): EditorSyntaxRuntime {
   const result: EditorSyntaxResult = { ...createEmptySyntaxResult(), injections }
   return {
-    applyChange: async () => result,
     dispose: () => undefined,
     getResult: () => result,
     foldingSupport: 'supported',
     getSnapshotVersion: () => 0,
     getTokens: () => [],
-    refresh: async () => result,
+    analyze: async () => result,
   }
 }
