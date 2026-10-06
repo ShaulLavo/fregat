@@ -37,11 +37,13 @@ interface PaintedImage {
   readonly cursor: CursorState | undefined
 }
 
-function requireContext(canvas: HTMLCanvasElement | OffscreenCanvas): Canvas2dContext {
-  // Explicit false avoids Chromium's automatic software fallback after incidental pixel reads.
+function requireContext(
+  canvas: HTMLCanvasElement | OffscreenCanvas,
+  pixels: boolean,
+): Canvas2dContext {
   const context = canvas.getContext('2d', {
     alpha: true,
-    willReadFrequently: false,
+    willReadFrequently: pixels,
   }) as Canvas2dContext | null
   if (context) return context
   throw new CanvasUnavailableError()
@@ -91,7 +93,7 @@ class CanvasSurface implements RowRendererSurface {
     targetFactory?: PixelTargetFactory,
   ) {
     this.font = options.font
-    this.context = requireContext(canvas)
+    this.context = requireContext(canvas, options.rendererMode === 'canvas2d-pixels')
     this.pixelTarget = targetFactory?.(canvas, this.context)
     this.painter = new CanvasRowPainter(
       this.pixelTarget?.context ?? this.context,
