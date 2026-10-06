@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/textbuffer",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Persistent balanced-tree text buffer with snapshots, stable anchors, and line mapping",
   "repository": {
     "type": "git",
