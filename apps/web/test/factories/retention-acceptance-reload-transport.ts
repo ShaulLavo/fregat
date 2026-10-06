@@ -1474,7 +1474,7 @@ export function createRetentionEntryCapture(socketOptions?: { entryPort: number;
       (kind) => !failure.lifetime.some((record) => record.event.kind === kind),
     ),
     phase: failure.phase,
-    timings: failure.timings,
+    ...(failure.timings && { timings: failure.timings }),
     failedAt: failure.at,
     endedAt: failure.endedAt,
     ...totals(),

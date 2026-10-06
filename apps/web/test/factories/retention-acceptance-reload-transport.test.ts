@@ -304,6 +304,41 @@ test('normal caller completion closes once and timing stays in the existing case
   capture.dispose()
 })
 
+test.for([false, true])('entry archives preserve optional timing facts $0', async (withTimings) => {
+  const output = await mkdtemp(join(tmpdir(), 'retention-entry-timing-'))
+  const capture = createRetentionEntryCapture()
+  const timings = withTimings ? createRetentionReloadTimings() : undefined
+  if (timings) {
+    timings.headersCompleted = { requestId: 7, at: 13 }
+    timings.baselineReadyAt = 17
+    timings.reloadReadyAt = 19
+    timings.fontReadyAt = 23
+    timings.screenshotCompleteAt = 29
+    timings.browserTimeOrigin = 31
+  }
+  const frozenTimings = timings && { ...timings }
+  try {
+    capture.begin(output, timings)
+    expect(await capture.fail(output, 'reload')).toEqual({ status: 'written', codes: [] })
+    if (timings) timings.screenshotCompleteAt = 37
+    capture.end(output)
+    expect(await capture.persistFailures()).toEqual([{ status: 'written', codes: [] }])
+    for (const name of ['entry-transport.frozen.json', 'entry-transport.json']) {
+      const packet: unknown = JSON.parse(await readFile(join(output, name), 'utf8'))
+      expect(packet).toMatchObject({ version: 2, phase: 'reload' })
+      if (withTimings) expect(packet).toHaveProperty('timings', frozenTimings)
+      if (!withTimings) expect(packet).not.toHaveProperty('timings')
+    }
+    expect((await readdir(output)).sort()).toEqual([
+      'entry-transport.frozen.json',
+      'entry-transport.json',
+    ])
+  } finally {
+    capture.dispose()
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
 test('socket reset fails the owning reload command, retains raw evidence, and attempts every cleanup', async ({
   annotate,
 }) => {
