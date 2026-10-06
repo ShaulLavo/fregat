@@ -318,6 +318,7 @@ async function performRetentionAcceptanceReload(
     phase = 'reload'
     reloading = true
     await page.reload()
+    timings.reloadLoadedAt = Date.now()
     timings.browserTimeOrigin = await page.evaluate(() => performance.timeOrigin)
     await waitForRetentionAcceptanceEntry(page)
     timings.reloadReadyAt = Date.now()

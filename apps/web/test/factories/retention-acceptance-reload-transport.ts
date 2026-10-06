@@ -29,6 +29,7 @@ type ForwardSettlement = Exclude<ForwardOutcome, { readonly kind: 'cancelled' }>
 export type RetentionReloadTimings = {
   headersCompleted: { requestId: number; at: number } | null
   baselineReadyAt: number | null
+  reloadLoadedAt: number | null
   reloadReadyAt: number | null
   fontReadyAt: number | null
   screenshotCompleteAt: number | null
@@ -39,6 +40,7 @@ export function createRetentionReloadTimings(): RetentionReloadTimings {
   return {
     headersCompleted: null,
     baselineReadyAt: null,
+    reloadLoadedAt: null,
     reloadReadyAt: null,
     fontReadyAt: null,
     screenshotCompleteAt: null,

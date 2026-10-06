@@ -289,6 +289,7 @@ test('normal caller completion closes once and timing stays in the existing case
   await cases.finish(owner, id)
   expect(closes).toBe(1)
   const timings = createRetentionReloadTimings()
+  expect(timings.reloadLoadedAt).toBeNull()
   const capture = createRetentionEntryCapture()
   capture.begin('/timing-cell', timings)
   const initial = capture.inspect()
@@ -308,11 +309,16 @@ test('normal caller completion closes once and timing stays in the existing case
     async () => {},
   )
   timings.baselineReadyAt = Number.MAX_SAFE_INTEGER
+  timings.reloadLoadedAt = Number.MAX_SAFE_INTEGER
   timings.reloadReadyAt = Number.MAX_SAFE_INTEGER
   timings.fontReadyAt = Number.MAX_SAFE_INTEGER
   timings.screenshotCompleteAt = Number.MAX_SAFE_INTEGER
   timings.browserTimeOrigin = Number.MAX_SAFE_INTEGER
   expect(timings.headersCompleted?.requestId).toBe(2)
+  timings.headersCompleted = {
+    requestId: Number.MAX_SAFE_INTEGER,
+    at: Number.MAX_SAFE_INTEGER,
+  }
   expect(Buffer.byteLength(JSON.stringify(timings))).toBeLessThan(
     retentionEntryReceiptLimits.recordBytes,
   )
@@ -330,6 +336,7 @@ test.for([false, true])('entry archives preserve optional timing facts $0', asyn
   if (timings) {
     timings.headersCompleted = { requestId: 7, at: 13 }
     timings.baselineReadyAt = 17
+    timings.reloadLoadedAt = 18
     timings.reloadReadyAt = 19
     timings.fontReadyAt = 23
     timings.screenshotCompleteAt = 29
@@ -339,7 +346,10 @@ test.for([false, true])('entry archives preserve optional timing facts $0', asyn
   try {
     capture.begin(output, timings)
     expect(await capture.fail(output, 'reload')).toEqual({ status: 'written', codes: [] })
-    if (timings) timings.screenshotCompleteAt = 37
+    if (timings) {
+      timings.reloadLoadedAt = 41
+      timings.screenshotCompleteAt = 37
+    }
     capture.end(output)
     expect(await capture.persistFailures()).toEqual([{ status: 'written', codes: [] }])
     for (const name of ['entry-transport.frozen.json', 'entry-transport.json']) {
