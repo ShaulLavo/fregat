@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises'
+import { mkdir, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { createProjectRegistrationCommand } from '@workspace/client-core/chat/registration'
 import { orchestrationDispatchResultSchema } from '@workspace/contracts'
@@ -69,3 +69,42 @@ for (const kind of ['directory', 'unborn-git'] as const) {
     expect(retry).toEqual({ ...second, deduped: true })
   })
 }
+
+test('repeated registration retains its identity after cached checkout metadata is removed', async ({
+  client,
+  server,
+}) => {
+  const checkout = path.join(server.root, 'checkout')
+  await mkdir(checkout)
+  await runGit(checkout, ['init', '-b', 'main'], { cwdMode: 'option' })
+  await runGit(checkout, ['remote', 'add', 'origin', 'https://github.com/acme/platform.git'], {
+    cwdMode: 'option',
+  })
+  const command = createProjectRegistrationCommand({ workspaceRoot: checkout, title: 'Fixture' })
+  const first = v.parse(
+    orchestrationDispatchResultSchema,
+    unwrapEdenResponse(await client.orchestration.commands.post(command), { requireData: true }),
+  )
+  const registration = first.result
+  if (!registration) expect.fail('Registration must return its project and worktree')
+  const engine = orchestrationForApp(server.app)
+  await engine.providerRuntimeIdle()
+  const original = (await engine.readModelSnapshot()).projects.get(registration.projectId)
+
+  await rm(path.join(checkout, '.git'), { recursive: true })
+  const repeatedCommand = createProjectRegistrationCommand({
+    workspaceRoot: checkout,
+    title: 'Fixture',
+  })
+  const response = await client.orchestration.commands.post(repeatedCommand)
+  expect(response.status).toBe(200)
+  const second = v.parse(
+    orchestrationDispatchResultSchema,
+    unwrapEdenResponse(response, { requireData: true }),
+  )
+  expect(second).toMatchObject({
+    sequence: first.sequence,
+    result: { ...registration, disposition: 'existing-worktree' },
+  })
+  expect((await engine.readModelSnapshot()).projects.get(registration.projectId)).toEqual(original)
+})

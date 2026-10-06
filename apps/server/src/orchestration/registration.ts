@@ -27,7 +27,7 @@ export async function prepareProjectRegistration(
   intentFingerprint: string,
 ): Promise<PreparedProjectCreateCommand> {
   const inputPath = await canonicalRegistrationPath(input, boundary.paths)
-  const repository = await boundary.git.repo(inputPath)
+  const repository = await boundary.git.repo(inputPath, true)
   const canonicalPath = repository.repository
     ? await realpath(boundary.paths.resolve(repository.repository.path).absolutePath)
     : inputPath
