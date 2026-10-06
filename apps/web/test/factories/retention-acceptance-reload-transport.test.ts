@@ -2124,7 +2124,12 @@ test.for(['claimed-loss', 'observed-regression'] as const)(
 
 test.for(['node', 'bun'] as const)(
   'writer boundary R2 %s refusal arithmetic leaves later facts encodable',
-  async (runtime) => {
+  async (runtime, { skip }) => {
+    const executable = controlRuntime(runtime)
+    if (!executable) {
+      skip(`System ${runtime} is unavailable`)
+      return
+    }
     const source = pathToFileURL(
       join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
     ).href
@@ -2143,7 +2148,7 @@ process.stderr.write(JSON.stringify({state:writer.inspect(),primaryIdentity:seen
             script,
           ]
         : ['--eval', script]
-    const child = spawn(runtime, args, { stdio: ['ignore', 'pipe', 'pipe'] }),
+    const child = spawn(executable, args, { stdio: ['ignore', 'pipe', 'pipe'] }),
       closed = once(child, 'close'),
       capture = createRetentionEntryCapture()
     const chunks: Buffer[] = []
@@ -2384,7 +2389,12 @@ test('writer boundary R2 exact category totals refuse arithmetic overflow', () =
 
 test.for(['node', 'bun'] as const)(
   'writer boundary R2 %s schema faults report explicit unavailability',
-  async (runtime) => {
+  async (runtime, { skip }) => {
+    const executable = controlRuntime(runtime)
+    if (!executable) {
+      skip(`System ${runtime} is unavailable`)
+      return
+    }
     const source = pathToFileURL(
       join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
     ).href
@@ -2402,7 +2412,7 @@ process.stderr.write(JSON.stringify(writer.inspect()));`
             script,
           ]
         : ['--eval', script]
-    const child = spawn(runtime, args, { stdio: ['ignore', 'pipe', 'pipe'] }),
+    const child = spawn(executable, args, { stdio: ['ignore', 'pipe', 'pipe'] }),
       closed = once(child, 'close')
     let stderr = '',
       stdout = ''
