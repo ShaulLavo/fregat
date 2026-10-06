@@ -196,7 +196,7 @@ export function createSearchBufferStore({
       resetBuffer: (rootPath) => set({ active: emptySearchBuffer(rootPath) }),
       requestSearchRefresh: (rootPath) =>
         set((state) => ({
-          active: refreshSearchBuffer(state.active, rootPath),
+          active: refreshSearchBuffer(state.active, rootPath, 'history'),
         })),
       setSearchOptions: (rootPath, options) =>
         set((state) => ({
@@ -753,22 +753,29 @@ function settleReplace(
     replaceStatus: matches ? status : 'idle',
     replaceMessage: matches ? message : null,
   }
-  if (matches && refresh) next = refreshSearchBuffer(next, token.rootPath) ?? next
+  if (matches && refresh) next = refreshSearchBuffer(next, token.rootPath, 'replacement') ?? next
   if (active) return { active: next }
   const parked = new Map(state.parked)
   parked.set(token.rootPath, next)
   return { parked }
 }
 
-function refreshSearchBuffer(snapshot: SearchBufferSnapshot | null, rootPath: string) {
+function refreshSearchBuffer(
+  snapshot: SearchBufferSnapshot | null,
+  rootPath: string,
+  reason: 'history' | 'replacement',
+): SearchBufferSnapshot | null {
   if (!snapshot) return null
   if (snapshot.rootPath !== rootPath) return snapshot
   if (!snapshot.query) return snapshot
 
+  const keepReplacement = reason === 'replacement' || snapshot.replaceStatus === 'running'
   return {
     ...snapshot,
     error: null,
     pendingResultIds: [],
+    replaceMessage: keepReplacement ? snapshot.replaceMessage : null,
+    replaceStatus: keepReplacement ? snapshot.replaceStatus : 'idle',
     runId: snapshot.runId + 1,
     runningMatches: [],
     runningQuery: null,
