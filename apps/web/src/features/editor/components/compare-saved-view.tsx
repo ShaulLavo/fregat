@@ -1,4 +1,4 @@
-import { savedDiffAttachment } from '@/lib/diff-attachment'
+import { savedDiffAttachment } from '@/features/editor/utils/attachment-presentation'
 import { CompareSavedLoading } from '@/features/editor/components/compare-saved-loading'
 import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { EmptyState } from '@workspace/ui/components/empty-state'

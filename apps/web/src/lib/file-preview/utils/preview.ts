@@ -1,3 +1,4 @@
+import type { PreviewSourceRead } from '@/lib/file-preview/utils/source'
 import type { fetchFileHead } from '@/lib/file-server'
 
 /** Moving through a list reads nothing until the selection rests this long. */
@@ -22,6 +23,7 @@ export type PreviewContent =
   | (Readonly<Pick<FileHead, 'size' | 'truncated'>> & {
       readonly kind: 'text'
       readonly text: string
+      readonly read: Extract<PreviewSourceRead, { kind: 'disk' }>
       readonly source: {
         readonly origin: string
         readonly path: FileHead['path']

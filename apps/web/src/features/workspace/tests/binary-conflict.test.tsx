@@ -1,3 +1,5 @@
+import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
+import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { act, fireEvent, waitFor } from '@testing-library/react'
@@ -58,6 +60,12 @@ for (const event of ['changed', 'renamed'] as const) {
       const storedView = state.viewsByTabId[tabId('local')]
       expect(storedView?.view).toBe(view.view)
       const context = {
+        comparisonScope: {
+          environmentId: confirmedEnvironmentId(originForQueryClient(queryClient)),
+          rootPath: filesystemPath(''),
+        },
+        acquireSnapshotComparison: state.acquireSnapshotComparison,
+        signal: new AbortController().signal,
         client,
         conflictStore,
         queryClient,
@@ -142,6 +150,7 @@ test('a clean text document refreshed from binary disk bytes retires its text ow
   try {
     await act(async () => {
       await applyWorkspaceEvents({
+        acquireSnapshotComparison: state.acquireSnapshotComparison,
         conflictStore,
         discardLiveEditorDocument: commands.discardLiveEditorDocument,
         dirtyDocumentKeys: state.dirtyDocumentKeys,

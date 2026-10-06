@@ -13,6 +13,7 @@ import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
 import { createInProcessClient, installInProcessSocketBridge } from '../client'
 import { installTestClient } from '../factories/client-binding'
 import { makeTestServer, type TestServer } from '../server'
+import { cleanupObservation } from './cleanup-observation'
 import './jest-dom'
 import './workspace-cache'
 
@@ -40,12 +41,19 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  const observation = cleanupObservation(server?.app)
+  observation.point('bridge', 'before', restoreSocketBridge ? 'available' : 'absent')
   restoreSocketBridge?.()
   restoreSocketBridge = undefined
+  observation.point('bridge', 'after', 'absent')
+  observation.point('client', 'before', restoreClient ? 'available' : 'absent')
   restoreClient?.()
   restoreClient = undefined
+  observation.point('client', 'after', 'absent')
+  observation.point('server', 'before', server ? 'available' : 'absent')
   await server?.cleanup()
   server = undefined
+  observation.point('server', 'after', 'absent')
 })
 
 /** sonner removes a closing toast this long later, on a timer nothing clears. */

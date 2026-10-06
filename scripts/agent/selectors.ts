@@ -1,4 +1,10 @@
 import type { Locator, Page } from 'playwright'
+import type { Editor } from '../../editor/packages/editor/dist/editor'
+import type {
+  EditorTextBuffer,
+  DocumentTextSnapshot,
+  TextSnapshot,
+} from '../../editor/packages/editor/dist/public/document'
 import { createScriptError } from '../structured-errors'
 import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 
@@ -51,6 +57,8 @@ export const diffPaneSelector = '.editor-diff-pane'
 export const diffPaneSyntaxReadySelector = '.editor-diff-pane[data-syntax="ready"]'
 export const diffContentRowSelector = '.editor-diff-pane [data-editor-virtual-row]'
 export const editorViewportSelector = '.editor-virtualized-viewport'
+export const settingsComparisonSelector = '[role="region"][aria-label="Settings comparison"]'
+export const settingsNativeHostSelector = '.editor-virtualized'
 /** Rows the markdown live preview has decorated (headings, lists, emphasis). */
 export const markdownPreviewRowSelector = '[class*="editor-inline-"]'
 export const markdownEditorLinkSelector = '.editor-markdown-link'
@@ -446,6 +454,11 @@ export const selectors = {
   paletteImportText: (page: Page) =>
     page.getByRole('textbox', { name: 'Palette JSON', exact: true }),
   pickerPreview: (page: Page) => page.locator('[data-file-preview]'),
+  pickerPreviewText: (page: Page) =>
+    selectors.pickerDialog(page).locator('[data-file-preview-text]'),
+  pickerPreviewFacts: (page: Page) => selectors.pickerPreview(page).locator('dl'),
+  palettePreviewText: (page: Page) =>
+    selectors.quickOpenPreview(page).locator('[data-file-preview-text]'),
   themeStudio: (page: Page) => page.getByRole('region', { name: 'Theme studio', exact: true }),
   themeStudioTab: (page: Page, name: string) =>
     page
@@ -695,6 +708,8 @@ export const selectors = {
   mcpSettings: (page: Page) => page.locator('[data-mcp-section]'),
   mcpSettingsRow: (page: Page, name: string) => page.locator(`[data-mcp-server="${name}"]`),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
+  quickOpenPreviewToggle: (page: Page) =>
+    selectors.settingsRow(page, 'search.quickOpenPreview').getByRole('switch'),
   settingsShowAll: (page: Page) => page.getByRole('button', { name: 'Show all settings' }),
   settingsCategoryFilter: (page: Page, category: string) =>
     page.getByRole('button', {
@@ -800,6 +815,15 @@ export const selectors = {
       .locator('[data-slot="tabs-indicator"]'),
   settingsRawConflictBanner: (page: Page) =>
     page.getByText('settings.json changed somewhere else', { exact: true }),
+  settingsComparison: (page: Page) => page.locator(settingsComparisonSelector),
+  settingsCompare: (page: Page) => page.getByRole('button', { name: 'Compare', exact: true }),
+  settingsHideComparison: (page: Page) =>
+    page.getByRole('button', { name: 'Hide compare', exact: true }),
+  settingsKeepChanges: (page: Page) =>
+    page.getByRole('button', { name: 'Keep my changes', exact: true }),
+  settingsUseLatest: (page: Page) =>
+    page.getByRole('button', { name: 'Use the latest version', exact: true }),
+  settingsEditableViewport: (page: Page) => page.locator(editorViewportSelector).last(),
   gitSizeLimitNotice: (page: Page) =>
     page.getByText(
       'File exceeds the Git diff size limit. Adjust Diff file size limit in Settings to compare it.',
@@ -882,6 +906,12 @@ export const selectors = {
       .getByRole('button', { name: 'Ask the agent about these lines', exact: true })
       .locator('xpath=preceding-sibling::span'),
   editorRows: (page: Page) => page.locator('.editor-virtualized-row'),
+  conflictOriginalComparison: (page: Page) =>
+    page.getByRole('button', { name: 'Original comparison', exact: true }),
+  conflictLatestIncoming: (page: Page) =>
+    page.getByRole('button', { name: 'Latest incoming', exact: true }),
+  conflictReturnResolution: (page: Page) =>
+    page.getByRole('button', { name: 'Resolution', exact: true }),
   markdownRenderedPane: (page: Page) => page.locator('[data-markdown-preview]'),
   editorCursorLineRow: (page: Page) => page.locator('.editor-virtualized-cursor-line-row:visible'),
   editorTabNamed: (page: Page, label: RegExp) =>
@@ -1839,3 +1869,292 @@ export const nativeHostSelectors = {
   bridgeFacts: `({picker:typeof globalThis.platformBridge?.pickEntry,capture:globalThis.platformBridge?.capabilities?.displayCapture,titlebar:globalThis.platformBridge?.titlebar})`,
   readiness: `({ready:Boolean(document.querySelector('[aria-label="Window toolbar"]') && document.querySelector('[aria-label="Folder tree"] [role="treeitem"][aria-label="a.txt"]')),picker:typeof globalThis.platformBridge?.pickEntry,capture:globalThis.platformBridge?.capabilities?.displayCapture})`,
 } as const
+
+type FilePreviewFiber = {
+  return: FilePreviewFiber | null
+  memoizedProps: Record<string, unknown>
+  child: FilePreviewFiber | null
+  sibling: FilePreviewFiber | null
+  stateNode?: { current: FilePreviewFiber } | Element
+}
+type FilePreviewRead =
+  | {
+      kind: 'live'
+      scope: { environmentId: string; rootPath: string }
+      key: string
+      buffer: EditorTextBuffer
+      revision: number
+      snapshot: DocumentTextSnapshot
+      text: string
+      maxBytes: number
+      utf8Bytes: number
+      complete: boolean
+    }
+  | {
+      kind: 'disk'
+      input: {
+        origin: string
+        maxBytes: number
+        reader: TextSnapshot
+        head: { content: string; path: string; truncated: boolean }
+      }
+    }
+  | { kind: 'released' | 'unavailable'; reason: string }
+type FilePreviewLease = { read(): FilePreviewRead }
+type FilePreviewController = {
+  getEditor(): Editor | null
+  getSnapshot(): { geometryCommitted?: boolean } | null
+}
+type FilePreviewDocument = {
+  key: string
+  buffer: EditorTextBuffer
+  target: { kind: string; resource?: { path: string } }
+  sync: { kind: string }
+}
+export type FilePreviewFrame = {
+  element: Element
+  ownerDocument: Document
+  root: { current: FilePreviewFiber }
+  runtime: {
+    documentStore: {
+      getState(): {
+        previewScope: { environmentId: string; rootPath: string } | null
+        previewSources: ReadonlyMap<FilePreviewLease, FilePreviewRead>
+        liveDocumentsByKey: Readonly<Record<string, FilePreviewDocument>>
+        viewsByTabId: Readonly<Record<string, { tabId: string; documentKey: string; view: object }>>
+      }
+    }
+    uiStore: { getState(): { controllersByTabId: ReadonlyMap<string, FilePreviewController> } }
+    previewSource: { queryClient: object; store: object; origin: string }
+    queryClient: object
+    storage: { environmentId: string }
+  }
+  read: Extract<FilePreviewRead, { kind: 'live' | 'disk' }>
+  lease: FilePreviewLease | null
+  name: string
+  controller: FilePreviewController | null
+  native: Editor | null
+  view: object | null
+}
+
+export function captureFilePreviewFrame(element: Element): FilePreviewFrame | null {
+  const isRuntime = (value: unknown): value is FilePreviewFrame['runtime'] => {
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      !('documentStore' in value) ||
+      !('uiStore' in value) ||
+      !('previewSource' in value)
+    )
+      return false
+    const docs = value.documentStore
+    const ui = value.uiStore
+    if (
+      !docs ||
+      typeof docs !== 'object' ||
+      !('getState' in docs) ||
+      typeof docs.getState !== 'function'
+    )
+      return false
+    if (!ui || typeof ui !== 'object' || !('getState' in ui) || typeof ui.getState !== 'function')
+      return false
+    const state: unknown = docs.getState()
+    const views: unknown = ui.getState()
+    return Boolean(
+      state &&
+      typeof state === 'object' &&
+      'previewSources' in state &&
+      state.previewSources instanceof Map &&
+      views &&
+      typeof views === 'object' &&
+      'controllersByTabId' in views &&
+      views.controllersByTabId instanceof Map,
+    )
+  }
+  const isRead = (value: unknown): value is FilePreviewFrame['read'] => {
+    if (!value || typeof value !== 'object' || !('kind' in value)) return false
+    if (value.kind === 'live')
+      return (
+        'buffer' in value &&
+        'snapshot' in value &&
+        'scope' in value &&
+        'text' in value &&
+        typeof value.text === 'string'
+      )
+    return (
+      value.kind === 'disk' &&
+      'input' in value &&
+      Boolean(
+        value.input &&
+        typeof value.input === 'object' &&
+        'reader' in value.input &&
+        'head' in value.input,
+      )
+    )
+  }
+  let host: Element | null = element
+  let anchor: Element | null = null
+  let cursor: FilePreviewFiber | null = null
+  for (; host && !cursor; host = host.parentElement) {
+    const key = Object.getOwnPropertyNames(host).find((name) => name.startsWith('__reactFiber$'))
+    if (key) {
+      cursor = Reflect.get(host, key)
+      anchor = host
+    }
+  }
+  let top = cursor
+  while (top?.return) top = top.return
+  const root = top?.stateNode
+  if (!root || !('current' in root)) return null
+  const pending = [root.current]
+  cursor = null
+  while (pending.length) {
+    const current = pending.pop()
+    if (!current) continue
+    if (current.stateNode === anchor) {
+      cursor = current
+      break
+    }
+    if (current.child) pending.push(current.child)
+    if (current.sibling) pending.push(current.sibling)
+  }
+  let runtime: FilePreviewFrame['runtime'] | null = null
+  let read: FilePreviewFrame['read'] | null = null
+  let name = ''
+  while (cursor) {
+    const props = cursor.memoizedProps
+    if (isRead(props?.read) && typeof props.name === 'string') {
+      read = props.read
+      name = props.name
+    }
+    if (isRuntime(props?.runtime)) runtime = props.runtime
+    if (!cursor.return) break
+    cursor = cursor.return
+  }
+  if (!runtime || !read) return null
+  const state = runtime.documentStore.getState()
+  const lease =
+    Array.from(state.previewSources).find(([, candidate]) => candidate === read)?.[0] ?? null
+  const view =
+    read.kind === 'live'
+      ? Object.values(state.viewsByTabId).find((candidate) => candidate.documentKey === read.key)
+      : null
+  const controller = view
+    ? (runtime.uiStore.getState().controllersByTabId.get(view.tabId) ?? null)
+    : null
+  return {
+    element,
+    ownerDocument: element.ownerDocument,
+    root,
+    runtime,
+    read,
+    lease,
+    name,
+    controller,
+    native: controller?.getEditor() ?? null,
+    view: view?.view ?? null,
+  }
+}
+
+export function filePreviewFrameFacts(frame: FilePreviewFrame | null) {
+  if (!frame) return null
+  const current = frame.lease?.read() ?? frame.read
+  const state = frame.runtime.documentStore.getState()
+  const native = frame.native
+  const input = native?.getInputElement() ?? null
+  const captured = native?.captureSnapshot() ?? null
+  const paint = captured ? JSON.parse(captured.paint) : null
+  const box = frame.element.closest('[data-file-preview]')?.getBoundingClientRect()
+  const nativeBox = input?.closest('.editor-virtualized')?.getBoundingClientRect()
+  return {
+    name: frame.name,
+    kind: current.kind,
+    capturedKind: frame.read.kind,
+    interestCount: state.previewSources.size,
+    leasePresent: frame.lease !== null && state.previewSources.has(frame.lease),
+    exactReadInStore: frame.lease !== null && state.previewSources.get(frame.lease) === current,
+    scope: state.previewScope,
+    environmentId: frame.runtime.storage.environmentId,
+    sourceClientMatches: frame.runtime.previewSource.queryClient === frame.runtime.queryClient,
+    sourceStoreMatches: frame.runtime.previewSource.store === frame.runtime.documentStore,
+    origin: frame.runtime.previewSource.origin,
+    projectionHasNativeInput:
+      frame.element.closest('[data-file-preview]')?.querySelector('[aria-label="Editor input"]') !==
+      null,
+    prefix:
+      current.kind === 'live'
+        ? current.text.slice(0, 128)
+        : current.kind === 'disk'
+          ? current.input.head.content.slice(0, 128)
+          : null,
+    capturedPrefix:
+      frame.read.kind === 'live'
+        ? frame.read.text.slice(0, 128)
+        : frame.read.input.head.content.slice(0, 128),
+    capturedSnapshotPrefix:
+      frame.read.kind === 'live'
+        ? frame.read.snapshot.readRange(0, Math.min(128, frame.read.snapshot.length))
+        : frame.read.input.reader.readRange(0, Math.min(128, frame.read.input.reader.length)),
+    revision: current.kind === 'live' ? current.revision : null,
+    currentBufferRevision: frame.read.kind === 'live' ? frame.read.buffer.getRevision() : null,
+    currentSnapshotMatches:
+      current.kind === 'live' ? current.snapshot === current.buffer.getTextSnapshot() : null,
+    currentBufferMatches:
+      current.kind === 'live' && frame.read.kind === 'live'
+        ? current.buffer === frame.read.buffer
+        : null,
+    maxBytes:
+      current.kind === 'live'
+        ? current.maxBytes
+        : current.kind === 'disk'
+          ? current.input.maxBytes
+          : null,
+    utf8Bytes: current.kind === 'live' ? current.utf8Bytes : null,
+    complete:
+      current.kind === 'live'
+        ? current.complete
+        : current.kind === 'disk'
+          ? !current.input.head.truncated
+          : null,
+    snapshotLength:
+      frame.read.kind === 'live' ? frame.read.snapshot.length : frame.read.input.reader.length,
+    dirty: frame.read.kind === 'live' ? frame.read.buffer.isDirty() : null,
+    canUndo: frame.read.kind === 'live' ? frame.read.buffer.canUndo() : null,
+    nativeBufferMatches:
+      frame.read.kind === 'live' ? native?.getBufferSession()?.buffer === frame.read.buffer : null,
+    editability: native?.getState().editability ?? null,
+    nativeInputConnected: input?.isConnected ?? null,
+    sameDocument: input ? input.ownerDocument === frame.ownerDocument : null,
+    geometryCommitted: frame.controller?.getSnapshot()?.geometryCommitted ?? null,
+    selections: native?.getSelections() ?? null,
+    scroll: native?.getScrollPosition() ?? null,
+    nativeCapture: captured,
+    paintWidth: paint?.viewportWidth ?? null,
+    paintHeight: paint?.viewportHeight ?? null,
+    paintRows: paint?.rows?.length ?? null,
+    box: box ? { width: box.width, height: box.height } : null,
+    nativeBox: nativeBox ? { width: nativeBox.width, height: nativeBox.height } : null,
+  }
+}
+
+export function filePreviewIdentityFacts(
+  current: FilePreviewFrame | null,
+  initial: FilePreviewFrame | null,
+) {
+  if (!current || !initial || current.read.kind !== 'live' || initial.read.kind !== 'live')
+    return null
+  return {
+    sameBuffer: current.read.buffer === initial.read.buffer,
+    sameNative: initial.native !== null && current.native === initial.native,
+    sameView: initial.view !== null && current.view === initial.view,
+    sameController: initial.controller !== null && current.controller === initial.controller,
+    sameRuntime: current.runtime === initial.runtime,
+    sameRoot: current.root === initial.root,
+    sameDocument: current.ownerDocument === initial.ownerDocument,
+    sameKey: current.read.key === initial.read.key,
+    initialNativeBufferMatches: initial.native?.getBufferSession()?.buffer === initial.read.buffer,
+    currentNativeBufferMatches: current.native?.getBufferSession()?.buffer === initial.read.buffer,
+    controllerRetainsInitialNative: initial.controller?.getEditor() === initial.native,
+    controllerRetainsCurrentNative: current.controller?.getEditor() === current.native,
+  }
+}

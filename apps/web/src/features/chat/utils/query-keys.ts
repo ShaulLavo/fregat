@@ -1,7 +1,29 @@
-import type { EnvironmentId, ProviderInstanceId, SessionId } from '@workspace/contracts'
+import type {
+  ChatAttachment,
+  EnvironmentId,
+  ProviderInstanceId,
+  SessionId,
+} from '@workspace/contracts'
 
 export const attachmentQueryKeys = {
-  text: (url: string) => ['chat-attachment-text', url] as const,
+  text: (input: {
+    environmentId: EnvironmentId
+    origin: string
+    provenance: 'staged' | 'sent'
+    url: string
+    attachment: Extract<ChatAttachment, { type: 'file' }>
+  }) =>
+    [
+      'chat-attachment-text',
+      input.environmentId,
+      input.origin,
+      input.url,
+      input.provenance,
+      input.attachment.id,
+      input.attachment.name,
+      input.attachment.mimeType,
+      input.attachment.sizeBytes,
+    ] as const,
   capabilities: (environmentId: string) =>
     ['chat', 'attachment-capabilities', environmentId] as const,
 }

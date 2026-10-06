@@ -8,6 +8,7 @@ import { canStopInputPairs } from './input-pair-stopping.mjs'
 import { assertConsumerReadiness } from './input-output.mjs'
 import { consumerSourcesCurrent } from './input-source-current.mjs'
 import { inputReadinessTimeoutMs } from './src/inputReadiness.ts'
+import { captureInputView } from './input-capture.mjs'
 
 export const operationsPerSample = {
   typing: 24,
@@ -390,7 +391,7 @@ export async function runSample(
   } else if (config.readiness !== 'receipt-poll' || scenario === 'undo') {
     await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 450)))
   }
-  const before = await page.locator('#view-0').screenshot({ animations: 'disabled' })
+  const before = await captureInputView(page)
   phase('primeAndScreenshot')
   let completed
   try {
@@ -585,7 +586,7 @@ async function observePaint(page, scenario, before, observation) {
   if (scenario === 'composition-update')
     await expect(row).toHaveText('日'.repeat(observation.events.length))
   const startedAt = await page.evaluate(() => performance.now())
-  const screenshot = await page.locator('#view-0').screenshot({ animations: 'disabled' })
+  const screenshot = await captureInputView(page)
   const completedAt = await page.evaluate(() => performance.now())
   const imageChanged = !before.equals(screenshot)
   if (!imageChanged) fail(`No changed pixels after ${scenario}`)

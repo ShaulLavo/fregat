@@ -3,6 +3,10 @@ import type { BrowserCommandContext } from 'vitest/node'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { Socket } from 'node:net'
+import type { HotPayload, Plugin, ViteDevServer } from 'vite'
+import { stripVTControlCharacters } from 'node:util'
 import { createScriptError } from '../../scripts/structured-errors.ts'
 import { errorMessage } from '../../packages/contracts/src/error-fields'
 import base from './vitest.browser.config.ts'
@@ -11,6 +15,16 @@ import {
   archiveRetentionReloadFailure,
   archiveRetentionReloadArtifact,
   settleRetentionReloadCleanup,
+  beginRetentionEntryCase,
+  failRetentionEntryCase,
+  endRetentionEntryCase,
+  guardRetentionEntryObservation,
+  observeRetentionEntryEvents,
+  retentionEntryModulePath,
+  retentionEntryErrorCode,
+  retentionEntryReceiptTime,
+  writeRetentionEntryReceipt,
+  type RetentionEntryPhase,
 } from './test/factories/retention-acceptance-reload-transport'
 import type {} from './test/factories/retention-acceptance-entry.tsx'
 
@@ -20,6 +34,7 @@ export default defineConfig(({ mode }) =>
         ...base,
         root: import.meta.dirname,
         test: undefined,
+        plugins: [...(base.plugins ?? []), retentionEntryReceiptPlugin()],
       }
     : {
         ...base,
@@ -87,6 +102,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
     },
   )
   const output = await mkdtemp(join(tmpdir(), 'retention-acceptance-reload-'))
+  beginRetentionEntryCase(entryOrigin, output)
   const errors: string[] = []
   const pending = new Set<string>()
   const consoleMessages: { readonly type: string; readonly text: string }[] = []
@@ -105,7 +121,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
     consoleMessages.push({ type: message.type(), text: message.text() }),
   )
   const responses: { readonly url: string; readonly status: number }[] = []
-  let phase = 'entry'
+  let phase: RetentionEntryPhase = 'entry'
   page.on('response', (response) =>
     responses.push({ url: response.url(), status: response.status() }),
   )
@@ -274,6 +290,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
     .then(
       (result) => ({ kind: 'success' as const, result }),
       async (error: unknown) => {
+        failRetentionEntryCase(entryOrigin, output, phase, transport.failures)
         const frames = await page
           .evaluate(() => window.__retentionAcceptanceReloadFrames)
           .catch(() => null)
@@ -390,7 +407,13 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
         .filter((result) => result.error !== null)
         .map((result) => result.error)
     })
-  if (outcome.kind === 'failure') throw outcome.error
+  if (outcome.kind === 'failure') {
+    endRetentionEntryCase(entryOrigin, output)
+    throw outcome.error
+  }
+  if (transport.hasFailure || cleanupFailures.length > 0 || artifactFailures.length > 0)
+    failRetentionEntryCase(entryOrigin, output, phase, transport.failures)
+  endRetentionEntryCase(entryOrigin, output)
   if (transport.hasFailure) throw transport.firstError
   if (cleanupFailures.length > 0) throw cleanupFailures[0]
   if (artifactFailures.length > 0) throw artifactFailures[0]
@@ -478,5 +501,134 @@ export type RetentionAcceptanceReloadResult = Awaited<ReturnType<typeof retentio
 declare module 'vitest' {
   interface ProvidedContext {
     retentionAcceptanceEntryUrl: string
+  }
+}
+
+function retentionEntryReceiptPlugin(): Plugin {
+  return {
+    name: 'retention-entry-receipt',
+    configureServer(server) {
+      guardRetentionEntryObservation(() => installRetentionEntryReceipt(server))
+    },
+  }
+}
+
+function installRetentionEntryReceipt(server: ViteDevServer) {
+  const http = server.httpServer
+  if (
+    !http ||
+    !('keepAliveTimeout' in http) ||
+    !('headersTimeout' in http) ||
+    !('requestTimeout' in http) ||
+    !('maxRequestsPerSocket' in http)
+  )
+    return
+  const note = (event: object) =>
+    writeRetentionEntryReceipt({ ...retentionEntryReceiptTime(), ...event })
+  let requestId = 0
+  let socketId = 0
+  const sockets = new WeakMap<Socket, number>()
+  const observeSocket = (socket: Socket) => {
+    const existing = sockets.get(socket)
+    if (existing !== undefined) return existing
+    const id = ++socketId
+    sockets.set(socket, id)
+    note({ kind: 'socket-open', socketId: id, port: socket.localPort ?? 0 })
+    observeRetentionEntryEvents(socket, (event, args) => {
+      if (event === 'end' || event === 'timeout' || event === 'close')
+        note({ kind: 'socket-' + event, socketId: id })
+      if (event === 'error')
+        note({ kind: 'socket-error', socketId: id, code: retentionEntryErrorCode(args[0]) })
+    })
+    return id
+  }
+  const observeRequest = (request: IncomingMessage, response: ServerResponse) => {
+    const id = ++requestId
+    const connection = observeSocket(request.socket)
+    const path = retentionEntryModulePath(join(import.meta.dirname, '../..'), request.url ?? '')
+    if (!path) {
+      note({ kind: 'refused', count: 1 })
+      return
+    }
+    note({ kind: 'request', requestId: id, socketId: connection, path, method: request.method })
+    observeRetentionEntryEvents(request, (event, args) => {
+      if (event === 'aborted')
+        note({ kind: 'request-aborted', requestId: id, socketId: connection })
+      if (event === 'error')
+        note({
+          kind: 'request-error',
+          requestId: id,
+          socketId: connection,
+          code: retentionEntryErrorCode(args[0]),
+        })
+    })
+    observeRetentionEntryEvents(response, (event, args) => {
+      if (event === 'finish' || event === 'close')
+        note({
+          kind: 'response-' + event,
+          requestId: id,
+          socketId: connection,
+          path,
+          status: response.statusCode,
+          complete: response.writableFinished,
+        })
+      if (event === 'error')
+        note({
+          kind: 'response-error',
+          requestId: id,
+          socketId: connection,
+          code: retentionEntryErrorCode(args[0]),
+        })
+    })
+  }
+  http.prependListener('connection', (socket: Socket) =>
+    guardRetentionEntryObservation(() => {
+      observeSocket(socket)
+    }),
+  )
+  http.prependListener('request', (request: IncomingMessage, response: ServerResponse) =>
+    guardRetentionEntryObservation(() => observeRequest(request, response)),
+  )
+  observeRetentionEntryEvents(http, (event, args) => {
+    if (event === 'close') note({ kind: 'server-close' })
+    if (event === 'error') note({ kind: 'server-error', code: retentionEntryErrorCode(args[0]) })
+    if (event !== 'listening') return
+    const address = http.address()
+    if (address && typeof address !== 'string') note({ kind: 'listening', port: address.port })
+  })
+  note({
+    kind: 'installed',
+    port: server.config.server.port ?? 0,
+    keepAliveTimeout: http.keepAliveTimeout,
+    headersTimeout: http.headersTimeout,
+    requestTimeout: http.requestTimeout,
+    maxRequestsPerSocket: http.maxRequestsPerSocket,
+  })
+  observeRetentionEntryOptimizer(server, note)
+}
+
+function observeRetentionEntryOptimizer(server: ViteDevServer, note: (event: object) => void) {
+  const logger = server.config.logger
+  for (const method of ['info', 'error'] as const) {
+    const original = logger[method]
+    logger[method] = function (message, options) {
+      guardRetentionEntryObservation(() => {
+        const text = stripVTControlCharacters(message)
+        if (text === '[optimizer] bundling dependencies...') note({ kind: 'optimizer-bundling' })
+        if (/^dependenc(?:y|ies) optimized: /.test(text)) note({ kind: 'optimizer-optimized' })
+        if (text === 'optimized dependencies changed. reloading') note({ kind: 'optimizer-reload' })
+        if (text.startsWith('error while updating dependencies:\n'))
+          note({ kind: 'optimizer-error' })
+      })
+      return Reflect.apply(original, this, [message, options])
+    }
+  }
+  const send = server.ws.send
+  server.ws.send = function (payload: HotPayload | string, ...rest: unknown[]) {
+    guardRetentionEntryObservation(() => {
+      if (typeof payload === 'object' && payload.type === 'full-reload')
+        note({ kind: 'full-reload' })
+    })
+    return Reflect.apply(send, this, [payload, ...rest])
   }
 }

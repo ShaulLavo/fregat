@@ -1,3 +1,16 @@
+import {
+  useEditorConflictState,
+  type FilesystemConflict,
+  type RetainedFilesystemComparison,
+} from '@/features/editor/state/conflict-state'
+import { useEditorDocumentState } from '@/features/editor/state/document-state'
+import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
+import type { SettingsComparisonPresentation } from '@/lib/diff-attachment'
+import { filesystemDiffAttachment } from '@/features/editor/utils/attachment-presentation'
+import { DiffEditor } from '@/features/editor/components/diff-editor'
+import { Button } from '@workspace/ui/components/button'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
+import { EmptyState } from '@workspace/ui/components/empty-state'
 import { useDocumentFeatureTier } from '@/features/editor/hooks/use-document-feature-tier'
 import { useUndoBarrierPlugin } from '@/features/editor/hooks/use-undo-barrier-plugin'
 import { fileExtension } from '@/lib/path-formatters'
@@ -9,7 +22,7 @@ import { useCommand } from '@/keymap/hooks/use-command'
 import { useEditor } from '@singapore-editor/react'
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type { LanguageServerReferencesResult } from '@singapore-editor/lsp-plugin'
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Spinner } from '@workspace/ui/components/spinner'
 
 import { EditorFrame } from '@/features/editor/components/frame'
@@ -56,6 +69,7 @@ import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavaila
 const NO_ADDITIONAL_PLUGINS: readonly EditorPlugin[] = []
 
 type EditorProps = {
+  settingsComparison?: SettingsComparisonPresentation | null
   active: boolean
   document: EditorRenderDocument | null
   /** Omitted means "no snapshot"; a null key would detach the document inside useEditor. */
@@ -71,8 +85,6 @@ type EditorProps = {
   definitionTarget?: LanguageServerDefinitionTarget | null
   onOpenDefinition?: (target: LanguageServerDefinitionTarget) => void | boolean
   onOpenReferences?: (result: LanguageServerReferencesResult) => void | boolean
-  /** Opens the side-by-side view behind a merge conflict's "Compare Changes". */
-  onCompareMergeConflict?: () => void
   onInitialPaint?: (event: EditorInitialPaintEvent) => void
   onScrollPositionChange?: (
     key: DocumentKey,
@@ -84,10 +96,11 @@ type EditorProps = {
 }
 
 export function Editor({
+  settingsComparison = null,
   active,
   additionalPlugins = NO_ADDITIONAL_PLUGINS,
   definitionTarget,
-  document: liveDocument,
+  document: suppliedDocument,
   paintKey,
   target,
   snapshot,
@@ -98,7 +111,6 @@ export function Editor({
   tabId,
   onOpenDefinition,
   onOpenReferences,
-  onCompareMergeConflict,
   onInitialPaint,
   onScrollPositionChange,
   onStatusSourceChange,
@@ -108,8 +120,77 @@ export function Editor({
   const [provisional, setProvisional] = useState(false)
   const [formattedDocument, setFormattedDocument] = useState<string | null>(null)
   const unavailable = useUnavailableEnvironment()
-  const currentTarget = liveDocument?.target ?? target
-  const key = liveDocument?.key ?? documentKey(target)
+  const currentTarget = suppliedDocument?.target ?? target
+  const key = suppliedDocument?.key ?? documentKey(target)
+  const conflict = useEditorConflictState((state) =>
+    target.kind === 'conflict' ? (state.conflicts[target.conflictId] ?? null) : null,
+  )
+  const seed =
+    target.kind === 'conflict' &&
+    suppliedDocument?.target.kind === 'conflict' &&
+    suppliedDocument.target.conflictId === target.conflictId &&
+    suppliedDocument.key === documentKey(target) &&
+    conflict?.seed?.resolutionKey === suppliedDocument.key &&
+    conflict.seed.buffer === suppliedDocument.buffer
+      ? conflict.seed
+      : null
+  const [captureView, setCaptureView] = useState<{
+    conflictId: string
+    seed: NonNullable<FilesystemConflict['seed']>
+    meaning: 'seed' | 'latest'
+  } | null>(null)
+  const comparison =
+    captureView &&
+    target.kind === 'conflict' &&
+    captureView.conflictId === target.conflictId &&
+    captureView.seed === seed &&
+    conflict
+      ? captureView
+      : null
+  if (captureView && !comparison) setCaptureView(null)
+  const liveDocument = comparison ? null : suppliedDocument
+  const restoreResolutionFocus = useRef<EditorRenderDocument | null>(null)
+  // The native plugin registration keys its lifetime on this callback.
+  const compareMergeConflict = useCallback(() => {
+    if (!seed || target.kind !== 'conflict') return
+    setCaptureView({ conflictId: target.conflictId, seed, meaning: 'seed' })
+  }, [seed, target])
+  const environmentId = useEditorDocumentState((state) => state.environmentId)
+  const workspaceRoot = useEditorWorkspaceState((state) => state.rootFolder?.path ?? null)
+  const settingsInput = settingsComparison?.read.input
+  const admittedSettings =
+    target.kind === 'settings-json' &&
+    suppliedDocument?.target.kind === 'settings-json' &&
+    suppliedDocument.target.target === target.target &&
+    settingsInput &&
+    settingsInput.key === documentKey(target) &&
+    suppliedDocument.key === settingsInput.key &&
+    settingsInput.target === target.target &&
+    settingsInput.local.buffer === suppliedDocument.buffer &&
+    settingsInput.scope.environmentId === environmentId &&
+    workspaceRoot !== null &&
+    rootPath === workspaceRoot &&
+    settingsInput.scope.rootPath === workspaceRoot &&
+    (!settingsComparison?.attachment ||
+      (settingsInput.confirmed.kind === 'confirmed' &&
+        settingsComparison.attachment.read === settingsComparison.read))
+      ? settingsComparison
+      : null
+  const [shownSettings, setShownSettings] = useState<SettingsComparisonPresentation | null>(null)
+  if (admittedSettings?.attachment && shownSettings !== admittedSettings)
+    setShownSettings(admittedSettings)
+  const heldSettings =
+    shownSettings &&
+    admittedSettings &&
+    shownSettings.read.input.key === admittedSettings.read.input.key &&
+    shownSettings.read.input.local.buffer === admittedSettings.read.input.local.buffer &&
+    shownSettings.read.input.scope.environmentId ===
+      admittedSettings.read.input.scope.environmentId &&
+    shownSettings.read.input.scope.rootPath === admittedSettings.read.input.scope.rootPath
+      ? shownSettings
+      : null
+  if (shownSettings && !heldSettings && !admittedSettings?.attachment) setShownSettings(null)
+  const settingsDisplay = admittedSettings?.attachment ? admittedSettings : heldSettings
   const undoBarrierPlugin = useUndoBarrierPlugin(key)
   const resource = filesystemResource(currentTarget)
   const filePath = languageServerTarget?.matchPath ?? documentSourcePath(currentTarget) ?? ''
@@ -127,7 +208,8 @@ export function Editor({
     ? effectiveDecodeMode(decodeSetting, typeof window === 'undefined' ? '' : location.search)
     : null
   const mountedEditors = useMountedEditorRegistry()
-  const diagnosticPeek = useDiagnosticPeek({ active, filePath })
+  const clearStatusBarSource = useEditorUiState((state) => state.clearStatusBarSource)
+  const diagnosticPeek = useDiagnosticPeek({ active: active && !comparison, filePath })
   const { languageServer, languageServerStatusSource } = useLanguageServerPlugin({
     document: languageServerDocument(currentTarget),
     enabled:
@@ -184,7 +266,7 @@ export function Editor({
         {
           analysisAllowed,
           syntaxHighlightingEnabled,
-          compareMergeConflict: onCompareMergeConflict,
+          compareMergeConflict: seed ? compareMergeConflict : undefined,
           markdownPreview,
           openMarkdownLink,
         },
@@ -196,8 +278,9 @@ export function Editor({
       markdownPreview,
       openMarkdownLink,
       minimapEnabled,
-      onCompareMergeConflict,
       syntaxHighlightingEnabled,
+      seed,
+      compareMergeConflict,
     ],
   )
   const decodePlugin = useMemo(() => createDecodePluginLoader(decodeMode), [decodeMode])
@@ -241,8 +324,8 @@ export function Editor({
     document,
     folding: analysisAllowed,
     detectIndentation: analysisAllowed,
-    documentKey: paintKey,
-    snapshot: decodeMode ? null : snapshot,
+    documentKey: comparison ? null : paintKey,
+    snapshot: !comparison && !decodeMode ? snapshot : null,
     editability,
     ...typography,
     gutterLeadingInset: gutterInset,
@@ -256,6 +339,7 @@ export function Editor({
       onTextChange?.(tabId, key, change)
     },
     onInitialPaint: (event) => {
+      if (comparison) return
       if (event.phase === 'highlight-settled') setFormattedDocument(event.documentId)
       onInitialPaint?.(event)
     },
@@ -268,10 +352,10 @@ export function Editor({
   useLayoutEffect(() => {
     // Decode changes visible text during its animation and has no replay contract.
     onCaptureSourceChange?.(
-      decodeMode ? null : () => controller.getEditor()?.captureSnapshot() ?? null,
+      comparison || decodeMode ? null : () => controller.getEditor()?.captureSnapshot() ?? null,
     )
     return () => onCaptureSourceChange?.(null)
-  }, [controller, decodeMode, onCaptureSourceChange])
+  }, [comparison, controller, decodeMode, onCaptureSourceChange])
   const mountedPath = liveDocument ? resource?.path : undefined
   useRegisterEditorController(tabId, liveDocument ? controller : null)
   useLayoutEffect(
@@ -288,7 +372,7 @@ export function Editor({
     !provisional
   const focusTarget = useEditorFocusTarget({
     controller,
-    enabled: !preparingMarkdown,
+    enabled: !comparison && !preparingMarkdown,
     writable: editability === 'editable',
     id: {
       key,
@@ -308,6 +392,10 @@ export function Editor({
   )
 
   useEffect(() => {
+    if (comparison) {
+      clearStatusBarSource(controller)
+      return
+    }
     if (!active || !liveDocument) return
 
     onStatusSourceChange?.({
@@ -315,7 +403,16 @@ export function Editor({
       filePath,
       languageServerStatusSource,
     })
-  }, [active, controller, languageServerStatusSource, filePath, liveDocument, onStatusSourceChange])
+  }, [
+    active,
+    comparison,
+    clearStatusBarSource,
+    controller,
+    languageServerStatusSource,
+    filePath,
+    liveDocument,
+    onStatusSourceChange,
+  ])
 
   useLayoutEffect(() => {
     if (!liveDocument) return
@@ -348,9 +445,95 @@ export function Editor({
     document: liveDocument,
   })
 
+  useEffect(() => {
+    const requested = restoreResolutionFocus.current
+    if (!requested || !liveDocument || !active) return
+    restoreResolutionFocus.current = null
+    if (
+      requested.key !== documentKey(target) ||
+      requested.key !== liveDocument.key ||
+      requested.buffer !== liveDocument.buffer ||
+      requested.view !== liveDocument.view
+    )
+      return
+    controller.commands.focus()
+  }, [active, controller, liveDocument, target])
+
+  if (comparison && conflict) {
+    const retained: RetainedFilesystemComparison =
+      comparison.meaning === 'seed' ? comparison.seed.comparison : conflict.latest
+    const attachment = filesystemDiffAttachment(retained.lease.read(), comparison.meaning)
+    return (
+      <div className='flex h-full min-h-0 min-w-0 flex-col'>
+        <PaneBar>
+          <Button
+            variant='ghost'
+            size='sm'
+            aria-pressed={comparison.meaning === 'seed'}
+            onClick={() => setCaptureView({ ...comparison, meaning: 'seed' })}
+          >
+            Original comparison
+          </Button>
+          <Button
+            variant='ghost'
+            size='sm'
+            aria-pressed={comparison.meaning === 'latest'}
+            onClick={() => setCaptureView({ ...comparison, meaning: 'latest' })}
+          >
+            Latest incoming
+          </Button>
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={() => {
+              restoreResolutionFocus.current = suppliedDocument
+              setCaptureView(null)
+            }}
+          >
+            Resolution
+          </Button>
+        </PaneBar>
+        <div className='min-h-0 min-w-0 flex-1'>
+          {attachment ? (
+            <DiffEditor attachment={attachment} mode='stacked' tabId={tabId} />
+          ) : (
+            <EmptyState
+              title='Capture unavailable'
+              description='Return to the resolution to continue editing.'
+            />
+          )}
+        </div>
+      </div>
+    )
+  }
+
   // The notice is a row under the frame, so it never covers the last lines of the document.
   return (
     <>
+      {admittedSettings ? (
+        <div
+          className='flex h-48 min-h-0 shrink-0 flex-col overflow-hidden'
+          role='region'
+          aria-label='Settings comparison'
+        >
+          <PaneBar>
+            <span className='text-xs font-medium'>Your edits</span>
+            <span className='text-xs font-medium'>Latest version</span>
+            {!admittedSettings.attachment ? (
+              <Spinner size='xs' label='Loading confirmed comparison' />
+            ) : null}
+          </PaneBar>
+          <div className='min-h-0 flex-1'>
+            {settingsDisplay?.attachment ? (
+              <DiffEditor attachment={settingsDisplay.attachment} mode='stacked' />
+            ) : (
+              <div className='flex h-full items-center justify-center'>
+                <Spinner size='sm' label='Loading comparison' />
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
       <EditorFrame
         active={active && focusTarget.focused}
         controller={controller}
