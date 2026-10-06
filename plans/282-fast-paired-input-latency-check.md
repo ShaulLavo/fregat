@@ -1,5 +1,25 @@
 # Plan 282: Fast paired input-latency check
 
+## Runtime optimization, 2026-10-06
+
+Status: Approved. The owner requested fixing the full-run runtime after Plan 099 delivery.
+The original 2,798.161-second run and its 98.161-second target miss remain preserved.
+
+The archived phase analysis records 1,215.189 seconds of settlement, 521.184 of opening/reset,
+424.632 of priming/screenshots, and 371.084 of input/paint. Actual baseline consumer work stays
+required. The current change captures the same fixed view through an integer-aligned page clip,
+avoiding element-screenshot stability/scroll waits. It also removes the follow-up pause only
+from the disabled configuration, which has no worker or minimap jobs. Worker-backed settlement,
+all source/output/lifetime checks, sampling counts, pair order, and latency budgets stay intact.
+
+The rerunnable `editor/examples/stress/test/profile-input-capture.mjs` experiment compares both
+screenshot paths on one frozen view with counterbalanced order. Twenty pairs produce identical
+PNGs, with median elapsed capture 66.745 ms for the element path and 32.420 ms for the clipped
+path, and complete resource retirement. These are headless observer-overhead measurements,
+not SDK or physical display latency. Fractional clipping/no-scroll validation and all 415 stress
+tests pass. A fresh instrument control collection and one complete full public-command proof
+remain required before claiming the 45-minute target is fixed.
+
 ## Current delivery checkpoint, 2026-10-05
 
 Plan 099 units 2–7 are Approved. The final `b615d5ab` measurement and `e76f680d` validation

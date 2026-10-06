@@ -122,3 +122,15 @@ test.each(['native', 'disabled'])('%s readiness does not read minimap receipts',
     vi.useRealTimers()
   }
 })
+
+test('disabled consumers finish without a follow-up timer', async () => {
+  vi.useFakeTimers()
+  const owner = consumers.createInputConsumers('disabled', 'ordinary', 100)
+  try {
+    await expect(owner.settle([])).resolves.toMatchObject({ configuration: { id: 'disabled' } })
+    expect(vi.getTimerCount()).toBe(0)
+  } finally {
+    await owner.dispose()
+    vi.useRealTimers()
+  }
+})

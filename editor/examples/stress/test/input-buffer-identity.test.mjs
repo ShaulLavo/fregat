@@ -10,6 +10,7 @@ import { inputMemory } from '../input-runtime.mjs'
 import { validateWarmInputLifecycle } from '../input-results.mjs'
 import { fixtureFacts } from '../src/fixtures.ts'
 import { createHash } from 'node:crypto'
+import { captureInputView } from '../input-capture.mjs'
 
 let browser
 let directory
@@ -32,6 +33,29 @@ afterAll(async () => {
   await browser?.close()
   if (directory) await rm(directory, { recursive: true, force: true })
 })
+
+test('clipped capture preserves the complete native view pixels without scrolling', async () => {
+  const { context, page } = await inputSession()
+  try {
+    await page.evaluate(() =>
+      __stress.warmInputSubject('ordinary', 1, false, true, false, 'native'),
+    )
+    await page.waitForFunction(() => __stress.observe().state.initialHighlightStatus === 'painted')
+    await page.locator('#view-0').evaluate((host) => {
+      host.style.left = '0.5px'
+      host.style.top = '0.5px'
+    })
+    const position = await page.evaluate(() => ({ x: scrollX, y: scrollY }))
+    const original = await page.locator('#view-0').screenshot({ animations: 'disabled' })
+    expect(await captureInputView(page)).toEqual(original)
+    expect(await page.evaluate(() => ({ x: scrollX, y: scrollY }))).toEqual(position)
+    await page.locator('#view-0').evaluate((host) => (host.style.left = '-100px'))
+    await expect(captureInputView(page)).rejects.toThrow('complete view inside the viewport')
+  } finally {
+    await page.evaluate(() => __stress.dispose())
+    await context.close()
+  }
+}, 20000)
 
 test.each(['ordinary', 'short-lines'])(
   'replacement into %s gets its own observed source identity',
