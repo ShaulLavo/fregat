@@ -1,3 +1,4 @@
+import { createEditorHighlighterOperation } from '../src/editor/operationDefinitions'
 import { describe, expect, it, vi } from 'vitest'
 import { createEditorBufferSession, createEditorTextBuffer } from '../src/documentSession'
 import {
@@ -9,9 +10,63 @@ import type { EditorHighlighterProvider } from '../src/syntax/highlighter'
 import { EditorTokenStore } from '../src/syntax/tokenStore'
 import { EditorSyntaxController } from '../src/editor/syntaxController'
 import { EditorPluginHost } from '../src/plugins'
-import { DocumentEditChain } from '../src/editor/editChain'
 
 describe('retained provider theme admission', () => {
+  it('keeps produced token ownership current while a shared theme is pending', async () => {
+    const buffer = createEditorTextBuffer('alpha')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'produced' })
+    let configuration = 0
+    let resolve!: (theme: null) => void
+    const theme = new Promise<null>((complete) => {
+      resolve = complete
+    })
+    const provider: EditorHighlighterProvider = {
+      loadTheme: () => theme,
+      operation: createEditorHighlighterOperation(() => ({
+        configurationKey: () => configuration,
+        analyze: async () => ({
+          tokens: EditorTokenStore.fromTokens([{ start: 0, end: 1, style: { color: 'red' } }]),
+        }),
+        dispose: () => undefined,
+      })),
+    }
+    const first = analysis.borrowHighlighter({ provider, languageId: 'typescript' })!
+    const peer = analysis.borrowHighlighter({ provider, languageId: 'typescript' })!
+    let notifications = 0
+    first.onDidProduceTokens(() => {
+      notifications++
+    })
+    const initial = first.refresh(buffer.getTextSnapshot())
+    const cancelledInitial = expect(initial).rejects.toMatchObject({ name: 'AbortError' })
+    try {
+      await vi.waitFor(() => expect(first.readProducedTokens()?.tokens.length).toBe(1))
+      expect(first.read().kind).toBe('pending')
+      expect(analysis.inspectRetention().entries[0]).toMatchObject({
+        status: 'pending',
+        tokenCount: 1,
+      })
+      expect(notifications).toBe(1)
+      configuration++
+      expect(first.readProducedTokens()).toBeNull()
+      first.dispose()
+      const next = peer.refresh(buffer.getTextSnapshot())
+      const cancelledNext = expect(next).rejects.toMatchObject({ name: 'AbortError' })
+      await cancelledInitial
+      await vi.waitFor(() => expect(peer.readProducedTokens()?.tokens.length).toBe(1))
+      expect(first.readProducedTokens()).toBeNull()
+      expect(notifications).toBe(1)
+      peer.dispose()
+      analysis.reclaimInactive({ reason: 'inactive-budget' })
+      await cancelledNext
+      expect(analysis.inspectRetention().entries).toEqual([])
+    } finally {
+      resolve(null)
+      first.dispose()
+      peer.dispose()
+      analysis.dispose()
+    }
+  })
+
   it('joins pending public controller retries and rejects a late replaced theme through the same owner', async () => {
     const buffer = createEditorTextBuffer('alpha')
     const session = createEditorBufferSession(buffer)
@@ -29,20 +84,18 @@ describe('retained provider theme admission', () => {
     })
     const provider: EditorHighlighterProvider = {
       loadTheme: loader,
-      createSession: () => ({
-        refresh: async () => ({ tokens: EditorTokenStore.empty() }),
-        applyChange: async () => ({ tokens: EditorTokenStore.empty() }),
+      operation: createEditorHighlighterOperation(() => ({
+        analyze: async () => ({ tokens: EditorTokenStore.empty() }),
         onDidChangeTheme: (listener) => {
           listeners.add(listener)
           return () => listeners.delete(listener)
         },
         dispose: () => undefined,
-      }),
+      })),
     }
     const plugins = new EditorPluginHost([
       { activate: (context) => context.registerHighlighter(provider) },
     ])
-    const chain = new DocumentEditChain(0, 0)
     const syntax = new EditorSyntaxController({
       pluginHost: plugins,
       getSession: () => session,
@@ -51,7 +104,6 @@ describe('retained provider theme admission', () => {
       getDocumentId: () => 'controller-retry',
       getCurrentSessionDocumentId: () => 'controller-retry',
       getLanguageId: () => 'typescript',
-      getDocumentEditChain: () => chain,
       getVisibleSyntaxRange: () => ({ startIndex: 0, endIndex: buffer.getSnapshot().length }),
       adoptTokens: () => undefined,
       setSyntaxFolds: () => undefined,
@@ -207,15 +259,14 @@ describe('retained provider theme admission', () => {
     let themeChanged: () => void = () => undefined
     const provider: EditorHighlighterProvider = {
       ...themeProvider(loadTheme),
-      createSession: () => ({
-        refresh: async () => ({ tokens: EditorTokenStore.empty() }),
-        applyChange: async () => ({ tokens: EditorTokenStore.empty() }),
+      operation: createEditorHighlighterOperation(() => ({
+        analyze: async () => ({ tokens: EditorTokenStore.empty() }),
         onDidChangeTheme: (listener) => {
           themeChanged = listener
           return () => undefined
         },
         dispose: () => undefined,
-      }),
+      })),
     }
     const request = { provider, languageId: 'typescript', configurationTag: ['dark'] }
     const lease = analysis.borrowHighlighter(request)!
@@ -368,15 +419,14 @@ describe('retained provider theme admission', () => {
     let retry: () => void = () => undefined
     const provider: EditorHighlighterProvider = {
       ...themeProvider(loader),
-      createSession: () => ({
-        refresh: async () => ({ tokens: EditorTokenStore.empty() }),
-        applyChange: async () => ({ tokens: EditorTokenStore.empty() }),
+      operation: createEditorHighlighterOperation(() => ({
+        analyze: async () => ({ tokens: EditorTokenStore.empty() }),
         onDidChangeTheme: (listener) => {
           retry = listener
           return () => undefined
         },
         dispose: () => undefined,
-      }),
+      })),
     }
     const lease = analysis.borrowHighlighter({ provider, languageId: 'typescript' })!
     const initial = lease.refresh(buffer.getTextSnapshot())
@@ -414,13 +464,12 @@ describe('retained provider theme admission', () => {
     const loader = vi.fn(() => pending)
     const provider: EditorHighlighterProvider = {
       loadTheme: loader,
-      createSession: () => ({
-        refresh: async () => {
+      operation: createEditorHighlighterOperation(() => ({
+        analyze: async () => {
           throw new TypeError('external token provider failed')
         },
-        applyChange: async () => ({ tokens: EditorTokenStore.empty() }),
         dispose: () => undefined,
-      }),
+      })),
     }
     const lease = analysis.borrowHighlighter({ provider, languageId: 'typescript' })!
     const result = lease.refresh(buffer.getTextSnapshot())
@@ -442,10 +491,9 @@ function themeProvider(
 ): EditorHighlighterProvider {
   return {
     loadTheme,
-    createSession: () => ({
-      refresh: async () => ({ tokens: EditorTokenStore.empty() }),
-      applyChange: async () => ({ tokens: EditorTokenStore.empty() }),
+    operation: createEditorHighlighterOperation(() => ({
+      analyze: async () => ({ tokens: EditorTokenStore.empty() }),
       dispose: () => undefined,
-    }),
+    })),
   }
 }

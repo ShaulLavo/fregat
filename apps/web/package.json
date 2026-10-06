@@ -1,6 +1,6 @@
 {
   "name": "web",
-  "version": "0.0.27",
+  "version": "0.0.31",
   "private": true,
   "type": "module",
   "scripts": {
@@ -31,6 +31,7 @@
     "test": "bun --bun vitest run --project node --project dom",
     "test:watch": "bun --bun vitest --project node --project dom",
     "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:syntax-settings-browser": "vitest run --config vitest.syntax-settings-browser.config.ts",
     "test:retention-reload-browser": "vitest run --config retention-acceptance.vitest.config.ts",
     "test:tree-browser": "vitest run --config vitest.tree-browser.config.ts",
     "test:durations": "bun --bun vitest run --project node --project dom --reporter=json --outputFile=node_modules/.cache/shard-durations-report.json && bun scripts/shard-durations.ts node_modules/.cache/shard-durations-report.json",

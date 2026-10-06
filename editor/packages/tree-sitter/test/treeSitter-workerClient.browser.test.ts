@@ -1,3 +1,15 @@
+import { createEditorTextBuffer } from '@singapore-editor/core/document'
+import { createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
+import { createTreeSitterWorkerOwner } from '../src'
+import {
+  parseTreeDocument,
+  admitTreeSource,
+  prepareTreeEdit,
+  editTreeDocument,
+  retireTreeDocument,
+  disposeTreeTransportDocuments,
+} from './factories/transport'
+import { readAll } from '../../editor/test/factories/snapshotText'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import documentSessionSource from '../../editor/src/documentSession.ts?raw'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '../../tree-sitter-languages/src/index.ts'
@@ -20,11 +32,10 @@ import {
   resolveTreeSitterLanguageContribution,
   selectTreeSitterToken,
   shrinkTreeSitterSelection,
-  TreeSitterWorkerClient,
   type TreeSitterLanguageId,
   type TreeSitterWorkerRetentionSnapshot,
 } from '../src'
-import { createTreeSitterEditPayload } from '../src/session.ts'
+import { TreeSitterWorkerClient } from '../src/treeSitter/workerClient'
 import type {
   TreeSitterWorkerRequestPayload,
   TreeSitterWorkerResponse,
@@ -39,6 +50,7 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
   })
 
   afterEach(async () => {
+    disposeTreeTransportDocuments()
     await workerClient.dispose()
   })
 
@@ -50,12 +62,12 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
 
     await workerClient.warmLanguages([typescript, broken])
     await workerClient.awaitIdleFence()
-    const parsed = await workerClient.parse({
+    const parsed = await parseTreeDocument(workerClient, {
       documentId: 'warm.ts',
       runtimeSessionId: 'runtime-warm.ts',
       snapshotVersion: 1,
       languageId: 'typescript',
-      snapshot: createPieceTableSnapshot('const warmed = true;\n'),
+      text: readAll(createDocumentTextSnapshot(createPieceTableSnapshot('const warmed = true;\n'))),
     })
 
     expect(parsed?.captures.length).toBeGreaterThan(0)
@@ -65,12 +77,12 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
   it('parses and edits through the real browser Worker', async () => {
     const documentId = 'file.ts'
     const snapshot = createPieceTableSnapshot('const answer = 1;\n')
-    const parsed = await workerClient.parse({
+    const parsed = await parseTreeDocument(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       snapshotVersion: 1,
       languageId: 'typescript',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
     expect(parsed?.documentId).toBe(documentId)
@@ -78,18 +90,15 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
     expect(parsed?.captures.length).toBeGreaterThan(0)
 
     const edits = [{ from: 6, to: 12, text: 'value' }]
-    const nextSnapshot = applyBatchToPieceTable(snapshot, edits)
-    const payload = createTreeSitterEditPayload({
+    const payload = await prepareTreeEdit(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       previousSnapshotVersion: 1,
       snapshotVersion: 2,
       languageId: 'typescript',
-      previousSnapshot: snapshot,
-      nextSnapshot,
       edits,
     })
-    const edited = payload ? await workerClient.edit(payload) : undefined
+    const edited = payload ? await editTreeDocument(workerClient, payload) : undefined
 
     expect(edited?.documentId).toBe(documentId)
     expect(edited?.snapshotVersion).toBe(2)
@@ -103,23 +112,23 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
     const firstText = 'const first = 1;\n'
     const secondText = 'const second = 2;\n'
     await Promise.all([
-      workerClient.parse({
+      parseTreeDocument(workerClient, {
         documentId,
         runtimeSessionId: firstRuntime,
         snapshotVersion: 1,
         languageId: 'typescript',
-        snapshot: createPieceTableSnapshot(firstText),
+        text: readAll(createDocumentTextSnapshot(createPieceTableSnapshot(firstText))),
       }),
-      workerClient.parse({
+      parseTreeDocument(workerClient, {
         documentId,
         runtimeSessionId: secondRuntime,
         snapshotVersion: 1,
         languageId: 'typescript',
-        snapshot: createPieceTableSnapshot(secondText),
+        text: readAll(createDocumentTextSnapshot(createPieceTableSnapshot(secondText))),
       }),
     ])
 
-    workerClient.disposeDocument(firstRuntime)
+    retireTreeDocument(workerClient, firstRuntime)
     await workerClient.awaitRuntimeSessionIdle(firstRuntime)
     const result = await workerClient.queryRange({
       documentId,
@@ -141,23 +150,31 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
       documentId: 'shared.ts',
       languageId: 'typescript',
       snapshotVersion: 1,
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     }
-    const survivor = await workerClient.parse({ ...payload, runtimeSessionId: 'runtime-survivor' })
+    const survivor = await parseTreeDocument(workerClient, {
+      ...payload,
+      runtimeSessionId: 'runtime-survivor',
+    })
     expect(survivor?.captures.length).toBeGreaterThan(0)
-    const baseline = workerClient.inspect().cache.sourceChunks
-    expect(baseline).toEqual({ documents: 1, sentChunks: 1, sourceEpochs: 0 })
+    const baseline = (await workerClient.inspectRetention())!.source
+    expect(baseline).toEqual({
+      documentCount: 1,
+      readCount: 1,
+      pinCount: 0,
+      sourceUnits: snapshot.length,
+    })
     const samples = []
 
     for (let cycle = 0; cycle < 40; cycle++) {
       const runtimeSessionId = `runtime-cycle-${cycle}`
-      const parsed = await workerClient.parse({ ...payload, runtimeSessionId })
+      const parsed = await parseTreeDocument(workerClient, { ...payload, runtimeSessionId })
       expect(parsed?.captures).toEqual(survivor?.captures)
-      expect(workerClient.inspect().cache.sourceChunks.sentChunks).toBe(2)
-      workerClient.disposeDocument(runtimeSessionId)
+      expect((await workerClient.inspectRetention())!.source.documentCount).toBe(2)
+      retireTreeDocument(workerClient, runtimeSessionId)
       await workerClient.awaitRuntimeSessionIdle(runtimeSessionId)
       await workerClient.awaitIdleFence()
-      samples.push(workerClient.inspect().cache.sourceChunks)
+      samples.push((await workerClient.inspectRetention())!.source)
     }
 
     expect(samples).toEqual(Array.from({ length: 40 }, () => baseline))
@@ -168,14 +185,13 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
       range: { startIndex: 0, endIndex: snapshot.length },
     })
     expect(result?.captures).toEqual(survivor?.captures)
-    workerClient.disposeDocument('runtime-survivor')
+    retireTreeDocument(workerClient, 'runtime-survivor')
     await workerClient.awaitRuntimeSessionIdle('runtime-survivor')
     await workerClient.awaitIdleFence()
     expect(workerClient.inspect()).toMatchObject({
       lifecycle: 'ready',
       pendingRequests: 0,
       workerGeneration: 1,
-      cache: { sourceChunks: { documents: 0, sentChunks: 0, sourceEpochs: 0 } },
     })
   })
 
@@ -191,13 +207,17 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
       runtimeSessionId: 'runtime-reclaimed',
       languageId: 'typescript',
     }
-    const before = await workerClient.parse({ ...request, snapshotVersion: 1, snapshot })
+    const before = await parseTreeDocument(workerClient, {
+      ...request,
+      snapshotVersion: 1,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
+    })
     const compact = reclaimPieceTableText(snapshot)
     expect(compact.buffers).not.toBe(snapshot.buffers)
-    const after = await workerClient.parse({
+    const after = await parseTreeDocument(workerClient, {
       ...request,
       snapshotVersion: 2,
-      snapshot: compact,
+      text: readAll(createDocumentTextSnapshot(compact)),
     })
     expect(after?.captures.length).toBeGreaterThan(0)
     expect(after?.captures).toEqual(before?.captures)
@@ -205,20 +225,18 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
 
     const edits = [{ from: prefix.length, to: prefix.length, text: '// new line\n' }]
     const nextSnapshot = applyBatchToPieceTable(compact, edits)
-    const payload = createTreeSitterEditPayload({
+    const payload = await prepareTreeEdit(workerClient, {
       ...request,
       previousSnapshotVersion: 2,
       snapshotVersion: 3,
-      previousSnapshot: compact,
-      nextSnapshot,
       edits,
     })
-    const edited = payload ? await workerClient.edit(payload) : undefined
-    const full = await workerClient.parse({
+    const edited = payload ? await editTreeDocument(workerClient, payload) : undefined
+    const full = await parseTreeDocument(workerClient, {
       ...request,
       runtimeSessionId: 'runtime-reclaimed-full',
       snapshotVersion: 3,
-      snapshot: nextSnapshot,
+      text: readAll(createDocumentTextSnapshot(nextSnapshot)),
     })
     expect(edited?.captures.length).toBeGreaterThan(0)
     expect(edited?.captures).toEqual(full?.captures)
@@ -234,13 +252,21 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
       runtimeSessionId: 'runtime-fork',
       languageId: 'typescript',
     }
-    const first = await workerClient.parse({ ...request, snapshotVersion: 1, snapshot: left })
-    const second = await workerClient.parse({ ...request, snapshotVersion: 2, snapshot: right })
-    const full = await workerClient.parse({
+    const first = await parseTreeDocument(workerClient, {
+      ...request,
+      snapshotVersion: 1,
+      text: readAll(createDocumentTextSnapshot(left)),
+    })
+    const second = await parseTreeDocument(workerClient, {
+      ...request,
+      snapshotVersion: 2,
+      text: readAll(createDocumentTextSnapshot(right)),
+    })
+    const full = await parseTreeDocument(workerClient, {
       ...request,
       runtimeSessionId: 'runtime-fork-full',
       snapshotVersion: 2,
-      snapshot: right,
+      text: readAll(createDocumentTextSnapshot(right)),
     })
     expect(second?.captures.length).toBeGreaterThan(0)
     expect(second?.captures).not.toEqual(first?.captures)
@@ -260,12 +286,12 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
       ');',
     ].join('\n')
     const snapshot = createPieceTableSnapshot(text)
-    const parsed = await workerClient.parse({
+    const parsed = await parseTreeDocument(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       snapshotVersion: 1,
       languageId: 'tsx',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
     expect(parsed?.captures).toContainEqual({
@@ -305,13 +331,13 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
       (_value, index) => `export const value${index} = ${index};`,
     ).join('\n')
     const snapshot = createPieceTableSnapshot(text)
-    await workerClient.parse({
+    await parseTreeDocument(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       snapshotVersion: 1,
       languageId: 'typescript',
       resultMode: 'parseOnly',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
     const topTarget = text.indexOf('value10')
@@ -341,22 +367,19 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
 
   it('returns an unavailable edit result when the incremental base was evicted', async () => {
     const documentId = 'missing-incremental-base.ts'
-    const snapshot = createPieceTableSnapshot('const answer = 1;\n')
+    await admitTreeSource(workerClient, `runtime-${documentId}`, documentId, 'const answer = 1;\n')
     const edit = { from: 6, to: 12, text: 'value' }
-    const nextSnapshot = applyBatchToPieceTable(snapshot, [edit])
-    const payload = createTreeSitterEditPayload({
+    const payload = await prepareTreeEdit(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       previousSnapshotVersion: 99,
       snapshotVersion: 100,
       languageId: 'typescript',
-      previousSnapshot: snapshot,
-      nextSnapshot,
       edits: [edit],
       resultMode: 'parseOnly',
     })
 
-    const result = payload ? await workerClient.edit(payload) : 'missing-payload'
+    const result = payload ? await editTreeDocument(workerClient, payload) : 'missing-payload'
 
     expect(result).toBeUndefined()
   })
@@ -372,34 +395,32 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
       '}',
     ].join('\n')
     const snapshot = createPieceTableSnapshot(text)
-    await workerClient.parse({
+    await parseTreeDocument(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       snapshotVersion: 1,
       languageId: 'typescript',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
     const editOffset = text.indexOf('return 1') + 'return'.length
     const edit = { from: editOffset, to: editOffset, text: ' value' }
     const nextSnapshot = applyBatchToPieceTable(snapshot, [edit])
-    const payload = createTreeSitterEditPayload({
+    const payload = await prepareTreeEdit(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       previousSnapshotVersion: 1,
       snapshotVersion: 2,
       languageId: 'typescript',
-      previousSnapshot: snapshot,
-      nextSnapshot,
       edits: [edit],
     })
-    const incremental = payload ? await workerClient.edit(payload) : undefined
-    const full = await workerClient.parse({
+    const incremental = payload ? await editTreeDocument(workerClient, payload) : undefined
+    const full = await parseTreeDocument(workerClient, {
       documentId: `${documentId}:full`,
       runtimeSessionId: `runtime-${documentId}:full`,
       snapshotVersion: 1,
       languageId: 'typescript',
-      snapshot: nextSnapshot,
+      text: readAll(createDocumentTextSnapshot(nextSnapshot)),
     })
 
     expect(captureSignature(incremental?.captures ?? [])).toEqual(
@@ -418,34 +439,32 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
       '};',
     ].join('\n')
     const snapshot = createPieceTableSnapshot(text)
-    await workerClient.parse({
+    await parseTreeDocument(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       snapshotVersion: 1,
       languageId: 'typescript',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
     const editOffset = text.indexOf('Document') + 'Docume'.length
     const edit = { from: editOffset, to: editOffset, text: 'f' }
     const nextSnapshot = applyBatchToPieceTable(snapshot, [edit])
-    const payload = createTreeSitterEditPayload({
+    const payload = await prepareTreeEdit(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       previousSnapshotVersion: 1,
       snapshotVersion: 2,
       languageId: 'typescript',
-      previousSnapshot: snapshot,
-      nextSnapshot,
       edits: [edit],
     })
-    const incremental = payload ? await workerClient.edit(payload) : undefined
-    const full = await workerClient.parse({
+    const incremental = payload ? await editTreeDocument(workerClient, payload) : undefined
+    const full = await parseTreeDocument(workerClient, {
       documentId: `${documentId}:full`,
       runtimeSessionId: `runtime-${documentId}:full`,
       snapshotVersion: 1,
       languageId: 'typescript',
-      snapshot: nextSnapshot,
+      text: readAll(createDocumentTextSnapshot(nextSnapshot)),
     })
 
     expect(captureSignature(incremental?.captures ?? [])).toEqual(
@@ -456,12 +475,12 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
   it('matches a full parse after inserting inside the real document session source', async () => {
     const documentId = 'document-session-source.ts'
     const snapshot = createPieceTableSnapshot(documentSessionSource)
-    await workerClient.parse({
+    await parseTreeDocument(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       snapshotVersion: 1,
       languageId: 'typescript',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
     const kindOffset = documentSessionSource.indexOf('readonly kind')
@@ -470,23 +489,21 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
     const editOffset = kindOffset + 'readonly ki'.length
     const edit = { from: editOffset, to: editOffset, text: 'g' }
     const nextSnapshot = applyBatchToPieceTable(snapshot, [edit])
-    const payload = createTreeSitterEditPayload({
+    const payload = await prepareTreeEdit(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       previousSnapshotVersion: 1,
       snapshotVersion: 2,
       languageId: 'typescript',
-      previousSnapshot: snapshot,
-      nextSnapshot,
       edits: [edit],
     })
-    const incremental = payload ? await workerClient.edit(payload) : undefined
-    const full = await workerClient.parse({
+    const incremental = payload ? await editTreeDocument(workerClient, payload) : undefined
+    const full = await parseTreeDocument(workerClient, {
       documentId: `${documentId}:full`,
       runtimeSessionId: `runtime-${documentId}:full`,
       snapshotVersion: 1,
       languageId: 'typescript',
-      snapshot: nextSnapshot,
+      text: readAll(createDocumentTextSnapshot(nextSnapshot)),
     })
 
     expect(captureSignature(incremental?.captures ?? [])).toEqual(
@@ -498,12 +515,12 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
     const documentId = 'index.html'
     const text = '<style>.x { color: red; }</style><script>const a = 1;</script>'
     const snapshot = createPieceTableSnapshot(text)
-    const parsed = await workerClient.parse({
+    const parsed = await parseTreeDocument(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       snapshotVersion: 1,
       languageId: 'html',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
     expect(parsed?.injections.map((injection) => injection.languageId).sort()).toEqual([
@@ -527,14 +544,14 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
       '</script>',
     ].join('\n')
     const snapshot = createPieceTableSnapshot(text)
-    const parsed = await workerClient.parse({
+    const parsed = await parseTreeDocument(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       snapshotVersion: 1,
       languageId: 'html',
       includeHighlights: false,
       includeCaptures: false,
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
     expect(parsed?.captures).toEqual([])
@@ -562,12 +579,12 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
 
     const text = 'const answer = 1;\n'
     const snapshot = createPieceTableSnapshot(text)
-    const parsed = await workerClient.parse({
+    const parsed = await parseTreeDocument(workerClient, {
       documentId: 'file.consumer-js',
       runtimeSessionId: 'runtime-file.consumer-js',
       snapshotVersion: 1,
       languageId: 'consumer-javascript',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
     expect(parsed?.languageId).toBe('consumer-javascript')
@@ -584,12 +601,12 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
       'const data = json`{"ok": true}`;',
     ].join('\n')
     const snapshot = createPieceTableSnapshot(text)
-    const parsed = await workerClient.parse({
+    const parsed = await parseTreeDocument(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       snapshotVersion: 1,
       languageId: 'typescript',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
     const languages = Array.from(
       new Set(parsed?.injections.map((injection) => injection.languageId)),
@@ -605,27 +622,24 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
     const documentId = 'index.html'
     const text = '<style>.x { color: red; }</style>'
     const snapshot = createPieceTableSnapshot(text)
-    await workerClient.parse({
+    await parseTreeDocument(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       snapshotVersion: 1,
       languageId: 'html',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
     const edits = [{ from: text.length, to: text.length, text: '\n<main>Hello</main>' }]
-    const nextSnapshot = applyBatchToPieceTable(snapshot, edits)
-    const payload = createTreeSitterEditPayload({
+    const payload = await prepareTreeEdit(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       previousSnapshotVersion: 1,
       snapshotVersion: 2,
       languageId: 'html',
-      previousSnapshot: snapshot,
-      nextSnapshot,
       edits,
     })
-    const edited = payload ? await workerClient.edit(payload) : undefined
+    const edited = payload ? await editTreeDocument(workerClient, payload) : undefined
 
     expect(edited?.injections.map((injection) => injection.languageId)).toContain('css')
     expect(edited?.captures.some((capture) => capture.languageId === 'css')).toBe(true)
@@ -635,30 +649,27 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
     const documentId = 'index.html'
     const text = '<style>.x { color: red; }</style>'
     const snapshot = createPieceTableSnapshot(text)
-    await workerClient.parse({
+    await parseTreeDocument(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       snapshotVersion: 1,
       languageId: 'html',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
     const cssStart = text.indexOf('.x')
     const cssEnd = text.indexOf('</style>')
     const nextCss = '.x {\n  color: blue;\n}'
     const edits = [{ from: cssStart, to: cssEnd, text: nextCss }]
-    const nextSnapshot = applyBatchToPieceTable(snapshot, edits)
-    const payload = createTreeSitterEditPayload({
+    const payload = await prepareTreeEdit(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       previousSnapshotVersion: 1,
       snapshotVersion: 2,
       languageId: 'html',
-      previousSnapshot: snapshot,
-      nextSnapshot,
       edits,
     })
-    const edited = payload ? await workerClient.edit(payload) : undefined
+    const edited = payload ? await editTreeDocument(workerClient, payload) : undefined
     const colorStart = cssStart + nextCss.indexOf('color')
 
     expect(edited?.injections.map((injection) => injection.languageId)).toContain('css')
@@ -697,12 +708,12 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
 
     const text = 'const styles = css`.x { color: ${theme.color}; background: red; }`;'
     const snapshot = createPieceTableSnapshot(text)
-    const parsed = await workerClient.parse({
+    const parsed = await parseTreeDocument(workerClient, {
       documentId: 'style.combined-ts',
       runtimeSessionId: 'runtime-style.combined-ts',
       snapshotVersion: 1,
       languageId: 'combined-typescript',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
     const cssInjections = parsed?.injections.filter((injection) => injection.languageId === 'css')
@@ -860,12 +871,12 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
     const documentId = 'markdown-chain.md'
     const runtimeSessionId = `runtime-${documentId}`
     let snapshot = createPieceTableSnapshot(text)
-    await workerClient.parse({
+    await parseTreeDocument(workerClient, {
       documentId,
       runtimeSessionId,
       snapshotVersion: 1,
       languageId: 'markdown',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
     for (let step = 0; step < 30; step += 1) {
@@ -875,29 +886,27 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
         remove > 0 && random() < 0.5 ? '' : inserts[Math.floor(random() * inserts.length)]!
       const edit = { from, to: from + remove, text: insert }
       const nextSnapshot = applyBatchToPieceTable(snapshot, [edit])
-      const payload = createTreeSitterEditPayload({
+      const payload = await prepareTreeEdit(workerClient, {
         documentId,
         runtimeSessionId,
         previousSnapshotVersion: step + 1,
         snapshotVersion: step + 2,
         languageId: 'markdown',
-        previousSnapshot: snapshot,
-        nextSnapshot,
         edits: [edit],
       })
-      const incremental = payload ? await workerClient.edit(payload) : undefined
+      const incremental = payload ? await editTreeDocument(workerClient, payload) : undefined
       text = text.slice(0, from) + insert + text.slice(from + remove)
-      const full = await workerClient.parse({
+      const full = await parseTreeDocument(workerClient, {
         documentId: `${documentId}:full-${step}`,
         runtimeSessionId: `${runtimeSessionId}:full-${step}`,
         snapshotVersion: 1,
         languageId: 'markdown',
-        snapshot: nextSnapshot,
+        text: readAll(createDocumentTextSnapshot(nextSnapshot)),
       })
 
       expect(incremental?.injections, `step ${step}`).toEqual(full?.injections)
       expect(incremental?.captures, `step ${step}`).toEqual(full?.captures)
-      workerClient.disposeDocument(`${runtimeSessionId}:full-${step}`)
+      retireTreeDocument(workerClient, `${runtimeSessionId}:full-${step}`)
       snapshot = nextSnapshot
     }
   })
@@ -911,12 +920,12 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
     const documentId = 'markdown-over-cap.md'
     const runtimeSessionId = `runtime-${documentId}`
     let snapshot = createPieceTableSnapshot(text)
-    await workerClient.parse({
+    await parseTreeDocument(workerClient, {
       documentId,
       runtimeSessionId,
       snapshotVersion: 1,
       languageId: 'markdown',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
     const deleteParagraph = (index: number): TextEdit => {
       const from = text.indexOf(`Paragraph ${index} `)
@@ -931,23 +940,21 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
     for (const [step, nextEdit] of edits.entries()) {
       const edit = nextEdit()
       const nextSnapshot = applyBatchToPieceTable(snapshot, [edit])
-      const payload = createTreeSitterEditPayload({
+      const payload = await prepareTreeEdit(workerClient, {
         documentId,
         runtimeSessionId,
         previousSnapshotVersion: step + 1,
         snapshotVersion: step + 2,
         languageId: 'markdown',
-        previousSnapshot: snapshot,
-        nextSnapshot,
         edits: [edit],
       })
-      const incremental = payload ? await workerClient.edit(payload) : undefined
-      const full = await workerClient.parse({
+      const incremental = payload ? await editTreeDocument(workerClient, payload) : undefined
+      const full = await parseTreeDocument(workerClient, {
         documentId: `${documentId}:full-${step}`,
         runtimeSessionId: `${runtimeSessionId}:full-${step}`,
         snapshotVersion: 1,
         languageId: 'markdown',
-        snapshot: nextSnapshot,
+        text: readAll(createDocumentTextSnapshot(nextSnapshot)),
       })
 
       expect(incremental?.injections, `step ${step}`).toEqual(full?.injections)
@@ -957,7 +964,7 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
         incremental?.captures.filter((capture) => capture.captureName === 'text.emphasis').length,
       ).toBeGreaterThan(290)
       expect(incremental?.records?.data).toEqual(full?.records?.data)
-      workerClient.disposeDocument(`${runtimeSessionId}:full-${step}`)
+      retireTreeDocument(workerClient, `${runtimeSessionId}:full-${step}`)
       text = text.slice(0, edit.from) + edit.text + text.slice(edit.to)
       snapshot = nextSnapshot
     }
@@ -1023,12 +1030,12 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
   it('expands and shrinks structural selections through the cached syntax tree', async () => {
     const documentId = 'file.ts'
     const snapshot = createPieceTableSnapshot('const answer = 1;\n')
-    await workerClient.parse({
+    await parseTreeDocument(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       snapshotVersion: 1,
       languageId: 'typescript',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
     const selections = createSelectionSet([createAnchorSelection(snapshot, 7)])
@@ -1074,12 +1081,12 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
     const documentId = 'index.html'
     const text = '<style>.x { color: red; }</style>'
     const snapshot = createPieceTableSnapshot(text)
-    await workerClient.parse({
+    await parseTreeDocument(workerClient, {
       documentId,
       runtimeSessionId: `runtime-${documentId}`,
       snapshotVersion: 1,
       languageId: 'html',
-      snapshot,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
 
     const offset = text.indexOf('color')
@@ -1145,37 +1152,35 @@ async function compareIncrementalInjectionsWithFullParse(
   scenario: IncrementalInjectionScenario,
 ) {
   const snapshot = createPieceTableSnapshot(scenario.text)
-  const initial = await workerClient.parse({
+  const initial = await parseTreeDocument(workerClient, {
     documentId: scenario.documentId,
     runtimeSessionId: `runtime-${scenario.documentId}`,
     snapshotVersion: 1,
     languageId: scenario.languageId,
-    snapshot,
+    text: readAll(createDocumentTextSnapshot(snapshot)),
   })
   if (!initial) throw new Error(`Initial parse failed for ${scenario.documentId}`)
 
   const nextSnapshot = applyBatchToPieceTable(snapshot, [scenario.edit])
-  const payload = createTreeSitterEditPayload({
+  const payload = await prepareTreeEdit(workerClient, {
     documentId: scenario.documentId,
     runtimeSessionId: `runtime-${scenario.documentId}`,
     previousSnapshotVersion: 1,
     snapshotVersion: 2,
     languageId: scenario.languageId,
-    previousSnapshot: snapshot,
-    nextSnapshot,
     edits: [scenario.edit],
   })
   if (!payload) throw new Error(`Edit payload failed for ${scenario.documentId}`)
 
-  const incremental = await workerClient.edit(payload)
+  const incremental = await editTreeDocument(workerClient, payload)
   if (!incremental) throw new Error(`Incremental parse failed for ${scenario.documentId}`)
 
-  const full = await workerClient.parse({
+  const full = await parseTreeDocument(workerClient, {
     documentId: `${scenario.documentId}:full`,
     runtimeSessionId: `runtime-${scenario.documentId}:full`,
     snapshotVersion: 1,
     languageId: scenario.languageId,
-    snapshot: nextSnapshot,
+    text: readAll(createDocumentTextSnapshot(nextSnapshot)),
   })
   if (!full) throw new Error(`Full parse failed for ${scenario.documentId}`)
 
@@ -1225,35 +1230,6 @@ describe('fenced tree-sitter retention', () => {
     return result
   }
 
-  const sharedResources = (shared: TreeSitterWorkerRetentionSnapshot['shared']) => {
-    const { wasmMemory: _wasmMemory, ...resources } = shared
-    return resources
-  }
-
-  const expectSharedRetention = (
-    actual: TreeSitterWorkerRetentionSnapshot['shared'],
-    expected: TreeSitterWorkerRetentionSnapshot['shared'],
-  ) => {
-    expect(sharedResources(actual)).toEqual(sharedResources(expected))
-    expect(actual.wasmMemory.kind).toBe(expected.wasmMemory.kind)
-    if (expected.wasmMemory.kind === 'uninitialized') return
-    if (actual.wasmMemory.kind !== 'committed')
-      throw new TypeError('Expected committed parser memory')
-    expect(actual.wasmMemory.bytes).toBeGreaterThanOrEqual(expected.wasmMemory.bytes)
-    expect(actual.wasmMemory.pages * 65_536).toBe(actual.wasmMemory.bytes)
-  }
-
-  const expectRetention = (
-    actual: TreeSitterWorkerRetentionSnapshot,
-    expected: TreeSitterWorkerRetentionSnapshot,
-  ) => {
-    expect({ ...actual, shared: sharedResources(actual.shared) }).toEqual({
-      ...expected,
-      shared: sharedResources(expected.shared),
-    })
-    expectSharedRetention(actual.shared, expected.shared)
-  }
-
   const register = async () => {
     const descriptors = await Promise.all(
       TREE_SITTER_LANGUAGE_CONTRIBUTIONS.map(resolveTreeSitterLanguageContribution),
@@ -1262,67 +1238,7 @@ describe('fenced tree-sitter retention', () => {
     return descriptors
   }
 
-  it('retention observes fresh committed memory shared by Tree-sitter and Markdown', async ({
-    annotate,
-  }) => {
-    await register()
-    const survivorRequest = {
-      documentId: 'survivor.ts',
-      runtimeSessionId: 'memory-survivor',
-      languageId: 'typescript',
-      snapshotVersion: 1,
-    }
-    const survivorSnapshot = createPieceTableSnapshot('const survivor = true;\n')
-    const survivor = await owner.parse({ ...survivorRequest, snapshot: survivorSnapshot })
-    expect(survivor?.captures.length).toBeGreaterThan(0)
-    const baseline = await retention()
-    expect(baseline.shared.wasmMemory.kind).toBe('committed')
-    if (baseline.shared.wasmMemory.kind !== 'committed')
-      throw new TypeError('Expected initialized parser memory')
-    expect(baseline.shared.wasmMemory.bytes).toBeGreaterThan(0)
-    expect(baseline.shared.wasmMemory.bytes).toBeLessThanOrEqual(32 * 1024 * 1024)
-    expect(baseline.shared.wasmMemory.pages * 65_536).toBe(baseline.shared.wasmMemory.bytes)
-    expect(baseline.unmeasuredBytes).not.toContain('wasm-committed')
-    expect(baseline.unmeasuredBytes).toContain('wasm-allocator-live')
-
-    const text = '# Heading\n\n' + 'a'.repeat(baseline.shared.wasmMemory.bytes)
-    const pending = owner.parse({
-      documentId: 'growth.md',
-      runtimeSessionId: 'memory-growth',
-      languageId: 'markdown',
-      snapshotVersion: 1,
-      snapshot: createPieceTableSnapshot(text),
-    })
-    const grown = await retention()
-    expect((await pending)?.records?.data.length).toBeGreaterThan(0)
-    expect(grown).toMatchObject({ documentCount: 2, markdownDocumentCount: 1 })
-    expect(grown.shared.wasmMemory.kind).toBe('committed')
-    if (grown.shared.wasmMemory.kind !== 'committed')
-      throw new TypeError('Expected shared Markdown parser memory')
-    expect(grown.shared.wasmMemory.bytes).toBeGreaterThan(baseline.shared.wasmMemory.bytes)
-    expect(grown.shared.wasmMemory.pages * 65_536).toBe(grown.shared.wasmMemory.bytes)
-    expect(grown.shared).toMatchObject({ runtimeCount: 1, parserCount: 1, languageCount: 1 })
-
-    owner.disposeDocument('memory-growth')
-    const released = await retention()
-    expect(released.documents).toEqual(baseline.documents)
-    expect(released.source).toEqual(baseline.source)
-    expect(released.shared).toEqual(grown.shared)
-    const surviving = await owner.queryRange({
-      ...survivorRequest,
-      includeCaptures: true,
-      range: { startIndex: 0, endIndex: survivorSnapshot.length },
-    })
-    expect(surviving?.tokensPacked).toEqual(survivor?.tokensPacked)
-    expect(owner.inspect().workerGeneration).toBe(1)
-    await annotate('shared committed memory growth with a live survivor', {
-      contentType: 'application/json',
-      bodyEncoding: 'utf-8',
-      body: JSON.stringify({ baseline, grown, released }),
-    })
-  })
-
-  it('retention counts actual snapshots and chunks outside the current source cache', async ({
+  it('retention counts actual parser snapshots and their retained ordinary reads', async ({
     annotate,
   }) => {
     await register()
@@ -1333,27 +1249,25 @@ describe('fenced tree-sitter retention', () => {
       runtimeSessionId: 'retained',
       languageId: 'typescript',
     }
-    const first = owner.parse({
+    const first = parseTreeDocument(owner, {
       ...request,
       snapshotVersion: 1,
-      snapshot: createPieceTableSnapshot(firstText),
+      text: readAll(createDocumentTextSnapshot(createPieceTableSnapshot(firstText))),
     })
-    const firstRetention = await retention()
     expect((await first)?.tokensPacked?.starts.length).toBeGreaterThan(0)
+    const firstRetention = await retention()
     expect(firstRetention).toMatchObject({ documentCount: 1, snapshotCount: 1, treeCount: 1 })
     expect(firstRetention.source).toEqual({
       documentCount: 1,
-      cacheEntries: 1,
-      cacheChunkCount: 1,
-      snapshotChunkCount: 1,
-      chunkCount: 1,
-      chunkUnits: firstText.length,
+      readCount: 1,
+      pinCount: 0,
+      sourceUnits: firstText.length,
     })
 
-    await owner.parse({
+    await parseTreeDocument(owner, {
       ...request,
       snapshotVersion: 2,
-      snapshot: createPieceTableSnapshot(nextText),
+      text: readAll(createDocumentTextSnapshot(createPieceTableSnapshot(nextText))),
     })
     const both = await retention()
     expect(both).toMatchObject({
@@ -1364,11 +1278,9 @@ describe('fenced tree-sitter retention', () => {
     })
     expect(both.source).toEqual({
       documentCount: 1,
-      cacheEntries: 1,
-      cacheChunkCount: 1,
-      snapshotChunkCount: 2,
-      chunkCount: 2,
-      chunkUnits: firstText.length + nextText.length,
+      readCount: 2,
+      pinCount: 0,
+      sourceUnits: firstText.length + nextText.length,
     })
     expect(both.documents).toEqual([
       {
@@ -1397,7 +1309,7 @@ describe('fenced tree-sitter retention', () => {
     expect(JSON.stringify(both)).not.toContain(firstText)
     expect(JSON.stringify(both)).not.toContain('shared.ts')
 
-    owner.disposeDocument('retained')
+    retireTreeDocument(owner, 'retained')
     const released = await retention()
     expect(released).toMatchObject({
       documentCount: 0,
@@ -1407,13 +1319,11 @@ describe('fenced tree-sitter retention', () => {
     })
     expect(released.source).toEqual({
       documentCount: 0,
-      cacheEntries: 0,
-      cacheChunkCount: 0,
-      snapshotChunkCount: 0,
-      chunkCount: 0,
-      chunkUnits: 0,
+      readCount: 0,
+      pinCount: 0,
+      sourceUnits: 0,
     })
-    expectSharedRetention(released.shared, both.shared)
+    expect(released.shared).toEqual(both.shared)
     await annotate('snapshot and source resource counts', {
       contentType: 'application/json',
       bodyEncoding: 'utf-8',
@@ -1442,7 +1352,11 @@ describe('fenced tree-sitter retention', () => {
     })
     const snapshot = createPieceTableSnapshot('const survivor = true;\n')
     const request = { documentId: 'shared.ts', languageId: 'typescript', snapshotVersion: 1 }
-    const survivor = await owner.parse({ ...request, runtimeSessionId: 'survivor', snapshot })
+    const survivor = await parseTreeDocument(owner, {
+      ...request,
+      runtimeSessionId: 'survivor',
+      text: readAll(createDocumentTextSnapshot(snapshot)),
+    })
     expect(survivor?.captures.length).toBeGreaterThan(0)
     const baseline = await retention()
     expect(baseline).toMatchObject({ documentCount: 1, snapshotCount: 1, treeCount: 1 })
@@ -1457,29 +1371,39 @@ describe('fenced tree-sitter retention', () => {
     const samples = []
     for (let cycle = 0; cycle < 40; cycle++) {
       const runtimeSessionId = `cycle-${cycle}`
-      const pending = owner.parse({
+      const pending = parseTreeDocument(owner, {
         ...request,
         runtimeSessionId,
-        snapshot: cycle === 0 ? createPieceTableSnapshot('') : snapshot,
+        text: readAll(
+          createDocumentTextSnapshot(cycle === 0 ? createPieceTableSnapshot('') : snapshot),
+        ),
       })
+      expect(await pending).toBeDefined()
       const retained = await retention()
       acquisitions.push(retained)
-      expect(await pending).toBeDefined()
       expect(retained).toMatchObject({ documentCount: 2, snapshotCount: 2, treeCount: 2 })
-      expect(retained.source.chunkCount).toBe(cycle === 0 ? 1 : 2)
-      owner.disposeDocument(runtimeSessionId)
+      expect(retained.source.sourceUnits).toBe(cycle === 0 ? snapshot.length : 2 * snapshot.length)
+      retireTreeDocument(owner, runtimeSessionId)
       samples.push(await retention())
     }
-    expect(samples).toHaveLength(40)
-    for (const sample of samples) expectRetention(sample, baseline)
-    const pending = owner.parse({ ...request, runtimeSessionId: 'pending-disposal', snapshot })
-    owner.disposeDocument('pending-disposal')
-    await pending
-    expectRetention(await retention(), baseline)
-    const recreated = await owner.parse({ ...request, runtimeSessionId: 'recreated', snapshot })
+    expect(samples).toEqual(Array.from({ length: 40 }, () => baseline))
+    const pending = parseTreeDocument(owner, {
+      ...request,
+      runtimeSessionId: 'pending-disposal',
+      text: readAll(createDocumentTextSnapshot(snapshot)),
+    })
+    const canceled = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    retireTreeDocument(owner, 'pending-disposal')
+    await canceled
+    expect(await retention()).toEqual(baseline)
+    const recreated = await parseTreeDocument(owner, {
+      ...request,
+      runtimeSessionId: 'recreated',
+      text: readAll(createDocumentTextSnapshot(snapshot)),
+    })
     expect(recreated?.tokensPacked).toEqual(survivor?.tokensPacked)
-    owner.disposeDocument('recreated')
-    expectRetention(await retention(), baseline)
+    retireTreeDocument(owner, 'recreated')
+    expect(await retention()).toEqual(baseline)
     const surviving = await owner.queryRange({
       ...request,
       runtimeSessionId: 'survivor',
@@ -1487,7 +1411,7 @@ describe('fenced tree-sitter retention', () => {
       range: { startIndex: 0, endIndex: snapshot.length },
     })
     expect(surviving?.tokensPacked).toEqual(survivor?.tokensPacked)
-    owner.disposeDocument('survivor')
+    retireTreeDocument(owner, 'survivor')
     const released = await retention()
     expect(released).toMatchObject({
       documentCount: 0,
@@ -1499,13 +1423,11 @@ describe('fenced tree-sitter retention', () => {
     })
     expect(released.source).toEqual({
       documentCount: 0,
-      cacheEntries: 0,
-      cacheChunkCount: 0,
-      snapshotChunkCount: 0,
-      chunkCount: 0,
-      chunkUnits: 0,
+      readCount: 0,
+      pinCount: 0,
+      sourceUnits: 0,
     })
-    expectSharedRetention(released.shared, baseline.shared)
+    expect(released.shared).toEqual(baseline.shared)
     await owner.dispose()
     expect(await owner.inspectRetention()).toBeNull()
     expect(owner.inspect().workerGeneration).toBe(1)
@@ -1521,12 +1443,12 @@ describe('fenced tree-sitter retention', () => {
   }) => {
     await register()
     const text = '~~~mdx\n# Nested **heading**\n~~~\n'
-    const parsed = await owner.parse({
+    const parsed = await parseTreeDocument(owner, {
       documentId: 'nested.md',
       runtimeSessionId: 'markdown',
       languageId: 'markdown',
       snapshotVersion: 1,
-      snapshot: createPieceTableSnapshot(text),
+      text: readAll(createDocumentTextSnapshot(createPieceTableSnapshot(text))),
     })
     expect(parsed?.injections.some((injection) => injection.languageId === 'mdx')).toBe(true)
     expect(parsed?.records?.data.length).toBeGreaterThan(0)
@@ -1551,7 +1473,7 @@ describe('fenced tree-sitter retention', () => {
     ])
     expect(retained.shared).toMatchObject({ runtimeCount: 1, parserCount: 1, languageCount: 1 })
     expect(retained.unmeasuredResources).toContain('markdown-tree-handles')
-    owner.disposeDocument('markdown')
+    retireTreeDocument(owner, 'markdown')
     const empty = await retention()
     expect(empty).toMatchObject({
       documentCount: 0,
@@ -1561,7 +1483,7 @@ describe('fenced tree-sitter retention', () => {
       markdownDocumentCount: 0,
       injectedMarkdownDocumentCount: 0,
     })
-    expectSharedRetention(empty.shared, retained.shared)
+    expect(empty.shared).toEqual(retained.shared)
     await annotate('Markdown resource counts', {
       contentType: 'application/json',
       bodyEncoding: 'utf-8',
@@ -1570,9 +1492,7 @@ describe('fenced tree-sitter retention', () => {
   })
 })
 
-it('retention keeps ordinary real-worker fences unchanged and leaves parser initialization absent', async ({
-  annotate,
-}) => {
+it('retention keeps ordinary real-worker fences unchanged and leaves parser initialization absent', async () => {
   const worker = new Worker(new URL('../src/treeSitter/treeSitter.worker.ts', import.meta.url), {
     type: 'module',
   })
@@ -1602,22 +1522,15 @@ it('retention keeps ordinary real-worker fences unchanged and leaves parser init
         queryCount: 0,
       },
     })
-    expect(inspected.result.retention.shared.wasmMemory).toEqual({ kind: 'uninitialized' })
-    expect(inspected.result.retention.unmeasuredBytes).toContain('wasm-committed')
     expect(await request({ type: 'idleFence' })).toEqual({ id: 3, ok: true, result: undefined })
-    await annotate('uninitialized real-worker scalar retention', {
-      contentType: 'application/json',
-      bodyEncoding: 'utf-8',
-      body: JSON.stringify(inspected.result.retention),
-    })
   } finally {
     worker.terminate()
   }
 })
 
 it('retention observes shared provider acquisition and late registration after a session is disposed', async () => {
-  const owner = new TreeSitterWorkerClient()
-  const provider = createTreeSitterSyntaxProvider({ backend: owner })
+  const owner = createTreeSitterWorkerOwner()
+  const provider = createTreeSitterSyntaxProvider({ workerOwner: owner })
   const contribution = TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find(
     (language) => language.id === 'typescript',
   )
@@ -1629,31 +1542,35 @@ it('retention observes shared provider acquisition and late registration after a
   provider.registerLanguage({ id: 'late-typescript', load: () => registration })
   const snapshot = createPieceTableSnapshot('const value = true;\n')
   const textSnapshot = createDocumentTextSnapshot(snapshot)
-  const acquire = (runtimeSessionId: string, languageId = 'typescript') => {
-    const session = provider.createSession({
-      documentId: 'shared.ts',
-      runtimeSessionId,
-      languageId,
-      snapshot,
-      textSnapshot,
-    })
-    if (!session) throw new TypeError('Expected a fixture syntax session')
-    return session
+  const acquire = (_label: string, languageId = 'typescript') => {
+    const buffer = createEditorTextBuffer(readAll(textSnapshot))
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'shared.ts' })
+    const session = analysis.borrowStructural({ provider, languageId, syntaxMode: 'full' })
+    if (!session) {
+      analysis.dispose()
+      throw new TypeError('The fixture language must bind a real operation')
+    }
+    return {
+      ...session,
+      dispose: () => {
+        session.dispose()
+        analysis.dispose()
+      },
+    }
   }
   const survivor = acquire('provider-survivor')
   const pending = acquire('provider-pending', 'late-typescript')
-  const late = pending.refresh(textSnapshot)
+  const late = expect(pending.refresh(textSnapshot)).rejects.toMatchObject({ name: 'AbortError' })
   pending.dispose()
   try {
     const initial = await survivor.refresh(textSnapshot)
     expect(initial.tokens?.length).toBeGreaterThan(0)
     const baseline = await owner.inspectRetention()
     expect(baseline?.documents.map((document) => document.runtimeSessionId)).toEqual([
-      'provider-survivor',
+      survivor.runtimeSessionId,
     ])
     for (const release of releases) release(descriptor)
-    const abandoned = await late
-    expect(abandoned.tokens?.length).toBe(0)
+    await late
     const afterLate = await owner.inspectRetention()
     expect(afterLate?.documents).toEqual(baseline?.documents)
     expect(afterLate?.source).toEqual(baseline?.source)

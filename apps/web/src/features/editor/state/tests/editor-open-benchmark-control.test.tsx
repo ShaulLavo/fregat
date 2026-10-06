@@ -23,8 +23,88 @@ import type {
 import { MountedEditorRegistry } from '@/features/editor/state/mounted-editor-registry'
 import type { EditorActivation } from '@/features/editor/state/apply-actions'
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
+import { adjacentTabIntents } from '@/features/editor/utils/adjacent-tab-intents'
 
 describe('editor-open benchmark control', () => {
+  test('isolates an inactive target from wrapped neighbors and prior-open history across reset', async () => {
+    const path = '/repo/a.ts'
+    const workspaceStore = workspaceWithInertTab()
+    const inert = allEditorTabs(workspaceStore.getState().workbenchPanels.editorGroups)[0]!
+    workspaceStore.getState().setEditorHistory([testTabContent(path), inert.content])
+    const sample = benchmarkSample({
+      path: filesystemPath(path),
+      rootPath: filesystemPath('/repo'),
+    })
+    const control = createEditorOpenBenchmarkControl({
+      storage: testScopedStorage,
+      activation: inertActivation,
+      documentStore: createEditorDocumentStore(),
+      fileOpenIntentOwner: benchmarkOwner(sample),
+      mountedEditors: new MountedEditorRegistry(),
+      queryClient: new QueryClient(),
+      searchStore: createSearchBufferStore(),
+      uiStore: createEditorUiStore(),
+      workspaceStore,
+    })
+
+    for (const sampleId of ['first', 'second']) {
+      control.begin({ path, rootPath: '/repo', sampleId })
+      const state = workspaceStore.getState()
+      expect(state.selectedTabContent).toEqual(inert.content)
+      expect(adjacentTabIntents(state)).toEqual([])
+      const target = allEditorTabs(state.workbenchPanels.editorGroups).find((tab) =>
+        sameTabContent(tab.content, testTabContent(path)),
+      )!
+      workspaceStore.getState().setEditorHistory([target.content, inert.content])
+      await control.reset({ path, rootPath: '/repo', sampleId })
+      expect(allEditorTabs(workspaceStore.getState().workbenchPanels.editorGroups)).toEqual([inert])
+      expect(workspaceStore.getState().editorHistory).toEqual([inert.content])
+    }
+  })
+
+  test('retires only its own guards and reselects the original inert tab', async () => {
+    const path = '/repo/a.ts'
+    const workspaceStore = workspaceWithInertTab()
+    const inert = allEditorTabs(workspaceStore.getState().workbenchPanels.editorGroups)[0]!
+    const sample = benchmarkSample({
+      path: filesystemPath(path),
+      rootPath: filesystemPath('/repo'),
+    })
+    const control = createEditorOpenBenchmarkControl({
+      storage: testScopedStorage,
+      activation: inertActivation,
+      documentStore: createEditorDocumentStore(),
+      fileOpenIntentOwner: benchmarkOwner(sample),
+      mountedEditors: new MountedEditorRegistry(),
+      queryClient: new QueryClient(),
+      searchStore: createSearchBufferStore(),
+      uiStore: createEditorUiStore(),
+      workspaceStore,
+    })
+    control.begin({ path, rootPath: '/repo', sampleId: 'owned-guards' })
+    const unrelated = createEditorTabRecord({ kind: 'settings' })
+    const panels = workspaceStore.getState().workbenchPanels
+    workspaceStore.getState().setWorkbenchPanels({
+      ...panels,
+      editorGroups: groupTree(
+        groupLeaf('benchmark', [...allEditorTabs(panels.editorGroups), unrelated], unrelated.id),
+        'benchmark',
+      ),
+    })
+    workspaceStore
+      .getState()
+      .setEditorHistory([testTabContent(path), unrelated.content, inert.content])
+
+    await control.reset({ path, rootPath: '/repo', sampleId: 'owned-guards' })
+
+    expect(allEditorTabs(workspaceStore.getState().workbenchPanels.editorGroups)).toEqual([
+      inert,
+      unrelated,
+    ])
+    expect(workspaceStore.getState().selectedTabContent).toEqual(inert.content)
+    expect(workspaceStore.getState().editorHistory).toEqual([inert.content, unrelated.content])
+  })
+
   test('rejects a target shared by multiple tabs before closing either tab', async () => {
     const path = '/repo/a.ts'
     const inert = createEditorTabRecord(testTabContent('search-buffer:%2Frepo'))

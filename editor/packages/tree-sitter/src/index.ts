@@ -24,31 +24,12 @@ export type {
 } from './treeSitter/types'
 export {
   canUseTreeSitterWorker,
-  createTreeSitterWorkerBackend,
-  TreeSitterWorkerClient,
-  type TreeSitterBackend,
-  type TreeSitterEditPayload,
-  type TreeSitterParsePayload,
-  type TreeSitterSelectionPayload,
+  createTreeSitterWorkerOwner,
+  TreeSitterWorkerOwner,
   type TreeSitterWorkerCacheSnapshot,
   type TreeSitterWorkerLifecycleState,
   type TreeSitterWorkerOwnerSnapshot,
 } from './treeSitter/workerClient'
-export {
-  createTreeSitterSourceDescriptor,
-  readTreeSitterInputRange,
-  readTreeSitterPieceTableInput,
-  resolveTreeSitterSourceDescriptor,
-  type TreeSitterSourceCache,
-  type TreeSitterSourceDescriptor,
-} from './treeSitter/source'
-export type { TreeSitterSourceChunkRetentionSnapshot } from './treeSitter/sourceChunkRetention'
-export {
-  TreeSitterSyntaxSession,
-  createTextDiffEdit,
-  createTreeSitterEditPayload,
-  type TreeSitterSyntaxSessionOptions,
-} from './session'
 export {
   expandTreeSitterSelection,
   selectTreeSitterToken,
@@ -58,6 +39,7 @@ export {
   type TreeSitterSelectionExpansionState,
 } from './structuralSelection'
 import type { EditorSyntaxProvider } from '@singapore-editor/core/syntax'
+import { defineStructuralOperation } from '@singapore-editor/core/internal/document-worker'
 import type {
   EditorDisposable,
   EditorPlugin,
@@ -75,10 +57,15 @@ import type {
 import { TreeSitterLanguageRegistry, resolveTreeSitterLanguageClosure } from './treeSitter/registry'
 import { TreeSitterSyntaxSession } from './session'
 import { treeSitterSelectionRanges } from './structuralSelection'
-import { createTreeSitterWorkerBackend, type TreeSitterBackend } from './treeSitter/workerClient'
+import {
+  createTreeSitterWorkerOwner,
+  treeSitterBackendForOwner,
+  type TreeSitterBackend,
+  type TreeSitterWorkerOwner,
+} from './treeSitter/workerClient'
 
 export type TreeSitterSyntaxProviderOptions = {
-  readonly backend?: TreeSitterBackend
+  readonly workerOwner?: TreeSitterWorkerOwner
   /**
    * Languages to compile ahead of their first document, read each time a document's first parse
    * answers, so the host's set can change (a workspace switch) and paint is never delayed. Each is
@@ -127,7 +114,8 @@ export const createTreeSitterSyntaxProvider = (
   options: TreeSitterSyntaxProviderOptions = {},
 ): TreeSitterSyntaxProvider => {
   const registry = new TreeSitterLanguageRegistry()
-  const backend = options.backend ?? createTreeSitterWorkerBackend()
+  const owner = options.workerOwner ?? createTreeSitterWorkerOwner()
+  const backend = treeSitterBackendForOwner(owner)
   let warmedKey: string | null = null
   const warm = () => {
     const languageIds = options.warmLanguages?.() ?? []
@@ -138,7 +126,7 @@ export const createTreeSitterSyntaxProvider = (
   }
 
   return {
-    createSession: (sessionOptions) => {
+    operation: defineStructuralOperation((sessionOptions) => {
       if (!sessionOptions.languageId) return null
       return new TreeSitterSyntaxSession({
         ...sessionOptions,
@@ -147,7 +135,7 @@ export const createTreeSitterSyntaxProvider = (
         backend,
         onFirstParse: warm,
       })
-    },
+    }),
     registerLanguage: (contribution, registrationOptions) => {
       const registration = registry.registerLanguage(contribution, registrationOptions)
       warmedKey = null

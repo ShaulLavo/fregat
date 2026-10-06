@@ -75,6 +75,7 @@ async function openHint(editor: Awaited<ReturnType<typeof connectedEditor>>) {
     signatures: [{ label: 'call(a: number)' }, { label: 'call(a: string, b: string)' }],
   })
   await flushPromises()
+  await vi.waitUntil(visibleSignature, { interval: 1, timeout: 1000 })
   expect(visibleSignature()).toBe(true)
 }
 

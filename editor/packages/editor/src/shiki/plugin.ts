@@ -1,11 +1,13 @@
 import type { EditorPlugin } from '../plugins'
-import type {
-  EditorHighlighterProvider,
-  EditorHighlighterSessionOptions,
-} from '../syntax/highlighter'
+import type { EditorHighlighterProvider } from '../syntax/highlighter'
 import type { EditorSyntaxLanguageId } from '../syntax/session'
 import {
+  defineHighlighterOperation,
+  type HighlighterOperationContext,
+} from '../editor/operationDefinitions'
+import {
   createShikiWorkerOwner,
+  createShikiDocumentOperation,
   type ShikiHighlighterSessionOptions,
   type ShikiPreloadRegistrations,
   type ShikiResolvedRegistrations,
@@ -72,7 +74,9 @@ export function createShikiHighlighterProvider(
   const registrations = createRegistrationCache(options)
   return {
     loadTheme: () => loadConfiguredTheme(options, registrations, owner),
-    createSession: (sessionOptions) => createSession(sessionOptions, options, registrations, owner),
+    operation: defineHighlighterOperation((context) =>
+      createSession(context, options, registrations, owner),
+    ),
   }
 }
 
@@ -87,7 +91,7 @@ const defaultShikiWorkerOwner = (): ShikiWorkerOwner => {
 }
 
 const createSession = (
-  sessionOptions: EditorHighlighterSessionOptions,
+  sessionOptions: HighlighterOperationContext,
   pluginOptions: ShikiHighlighterPluginOptions,
   registrations: ShikiRegistrationCache,
   owner: ShikiWorkerOwner,
@@ -99,7 +103,7 @@ const createSession = (
 
   const theme = shikiThemeName(pluginOptions)
 
-  return owner.createSession({
+  return createShikiDocumentOperation(owner, {
     ...sessionOptions,
     lang,
     theme,
@@ -151,7 +155,7 @@ const shikiThemeName = (options: ShikiHighlighterPluginOptions): string => {
  * then the default map. Hosts that choose grammars ahead of a document use the same answer.
  */
 export const shikiLanguageForDocument = (
-  options: Pick<EditorHighlighterSessionOptions, 'documentId' | 'languageId'>,
+  options: Pick<HighlighterOperationContext, 'documentId' | 'languageId'>,
   languages: ShikiLanguageMap | undefined,
 ): string | null => {
   if (!options.languageId) return null

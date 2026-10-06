@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { MinimapWorkerOwner } from '../src/workerClient'
+import { MinimapWorkerOwner } from '../src/workerOwner'
 import type { MinimapWorkerResponse } from '../src/types'
 
 describe('MinimapWorkerOwner disposal', () => {
@@ -33,7 +33,7 @@ describe('MinimapWorkerOwner disposal', () => {
     expect(owner.dispose()).toBe(disposal)
     await disposal
     expect(owner.dispose()).toBe(disposal)
-    expect(owner.post({ type: 'render', sequence: 1 })).toBe(false)
+    expect(owner.post({ type: 'updateSelection', selections: [] })).toBe(false)
     expect(worker.postMessage).not.toHaveBeenCalled()
     expect(worker.terminate).toHaveBeenCalledTimes(1)
     expect(worker.onmessage).toBeNull()
@@ -98,7 +98,7 @@ describe('MinimapWorkerOwner disposal', () => {
       workerFactory: () => worker as unknown as Worker,
     })
 
-    expect(owner.post({ type: 'render', sequence: 1 })).toBe(false)
+    expect(owner.post({ type: 'updateSelection', selections: [] })).toBe(false)
     expect(onError).toHaveBeenCalledWith(failure)
     expect(worker.onmessage).toBeNull()
     expect(worker.onerror).toBeNull()
@@ -125,7 +125,7 @@ describe('MinimapWorkerOwner disposal', () => {
 
     const trigger = () => {
       if (mode === 'native') worker.onerror!({ message: 'native failure' } as ErrorEvent)
-      else expect(owner.post({ type: 'render', sequence: 1 })).toBe(false)
+      else expect(owner.post({ type: 'updateSelection', selections: [] })).toBe(false)
     }
     expect(trigger).not.toThrow()
     expect(onError).toHaveBeenCalledTimes(1)
@@ -157,7 +157,7 @@ describe('MinimapWorkerOwner disposal', () => {
       const error = worker.onerror!
       try {
         if (mode === 'native') error({ message: 'native failure' } as ErrorEvent)
-        else owner.post({ type: 'render', sequence: 1 })
+        else owner.post({ type: 'updateSelection', selections: [] })
       } catch {}
 
       const disposal = owner.dispose()
@@ -174,7 +174,7 @@ describe('MinimapWorkerOwner disposal', () => {
       error({ message: 'late native failure' } as ErrorEvent)
       expect(owner.inspect().lastError).toBe(termination.message)
       expect(worker.terminate).toHaveBeenCalledTimes(1)
-      expect(owner.post({ type: 'render', sequence: 2 })).toBe(false)
+      expect(owner.post({ type: 'updateSelection', selections: [] })).toBe(false)
     },
   )
 
@@ -196,7 +196,7 @@ describe('MinimapWorkerOwner disposal', () => {
     expect(owner.inspect()).toMatchObject({ lifecycle: 'crashed', lastError: failure.message })
     expect(worker.onmessage).toBeNull()
     expect(worker.onerror).toBeNull()
-    expect(owner.post({ type: 'render', sequence: 1 })).toBe(false)
+    expect(owner.post({ type: 'updateSelection', selections: [] })).toBe(false)
     expect(worker.terminate).toHaveBeenCalledTimes(1)
   })
 })

@@ -13,6 +13,8 @@ import type {
   LspWorkspaceSnapshotEditOptions,
   LspWorkspaceSyncTarget,
   LspWorkspaceUnchangedSourceOptions,
+  LspPreparedDocumentSource,
+  LspDocumentSourcePreparation,
 } from './types'
 import { registerDefaultLspWorkspaceFactory } from './workspaceFactory'
 
@@ -31,6 +33,11 @@ type WorkspaceDocumentAttachmentRecord = {
   readonly document: MutableLspDocument
   readonly onDocumentTransition?: (transition: LspDocumentTransitionNotification) => void
 }
+type DocumentSourceRegistration = {
+  readonly uri: string
+  readonly runtimeSessionId: string
+  prepare(): LspPreparedDocumentSource | Promise<LspPreparedDocumentSource>
+}
 
 export class LspWorkspace {
   private readonly attachments = new Map<
@@ -40,6 +47,41 @@ export class LspWorkspace {
   private readonly documentsByUri = new Map<lsp.DocumentUri, MutableLspDocument>()
   private readonly versionsByUri = new Map<lsp.DocumentUri, number>()
   private client: LspWorkspaceSyncTarget | null = null
+  private readonly sourceReadiness = new Map<string, Set<DocumentSourceRegistration>>()
+
+  public registerDocumentSource(registration: DocumentSourceRegistration): () => void {
+    const entries =
+      this.sourceReadiness.get(registration.uri) ?? new Set<DocumentSourceRegistration>()
+    entries.add(registration)
+    this.sourceReadiness.set(registration.uri, entries)
+    return () => {
+      entries.delete(registration)
+      if (entries.size === 0) this.sourceReadiness.delete(registration.uri)
+    }
+  }
+
+  public prepareDocumentRequest(uri: string, signal?: AbortSignal): LspDocumentSourcePreparation {
+    const entries = this.sourceReadiness.get(uri)
+    if (!entries?.size) return { kind: 'unmanaged' }
+    const groups = new Map<
+      string,
+      (LspPreparedDocumentSource | Promise<LspPreparedDocumentSource>)[]
+    >()
+    for (const entry of entries) {
+      const prepared = entry.prepare()
+      if (prepared instanceof Promise) void prepared.catch(() => undefined)
+      const peers = groups.get(entry.runtimeSessionId) ?? []
+      peers.push(prepared)
+      groups.set(entry.runtimeSessionId, peers)
+    }
+    const reads = Array.from(groups.values(), currentSourcePeer)
+    if (reads.every((read) => read !== null))
+      return { kind: 'ready', read: requireCurrentSource(reads) }
+    const ready = Promise.all(Array.from(groups.values(), waitForSourcePeer)).then(
+      requireCurrentSource,
+    )
+    return { kind: 'pending', ready: signal ? waitForSourceSignal(ready, signal) : ready }
+  }
 
   public get documents(): readonly LspDocument[] {
     return Array.from(this.documentsByUri.values()).map(cloneDocument)
@@ -64,11 +106,12 @@ export class LspWorkspace {
       sourceSegment: options.sourceSegment,
       textSnapshot: options.textSnapshot,
       uri: options.uri,
-      version: this.advanceVersion(options.uri, 1),
+      version: this.nextVersion(options.uri, 1),
     }
+    this.client?.didOpenDocument(cloneDocument(document))
+    this.versionsByUri.set(options.uri, document.version)
     this.documentsByUri.set(options.uri, document)
     const result = this.attachDocument(document, options.onDocumentTransition)
-    this.client?.didOpenDocument(cloneDocument(document))
     return result
   }
 
@@ -85,18 +128,23 @@ export class LspWorkspace {
     }
     assertForwardSourcePoint(document, options)
 
-    const nextVersion = this.advanceVersion(uri, options.logicalRevisionCount)
+    const nextVersion = this.nextVersion(uri, options.logicalRevisionCount)
     const previousSnapshot = documentSnapshot(document)
-    document.textSnapshot = options.textSnapshot
-    document.lineStarts = options.lineStarts
-    document.sourceLogicalRevisionCount = options.logicalRevisionCount
-    document.sourceRevision = options.sourceRevision
-    document.sourceSegment = options.sourceSegment
-    document.version = nextVersion
-    this.client?.didChangeDocument(cloneDocument(document), {
+    const nextDocument: MutableLspDocument = {
+      ...document,
+      textSnapshot: options.textSnapshot,
+      lineStarts: options.lineStarts,
+      sourceLogicalRevisionCount: options.logicalRevisionCount,
+      sourceRevision: options.sourceRevision,
+      sourceSegment: options.sourceSegment,
+      version: nextVersion,
+    }
+    this.client?.didChangeDocument(cloneDocument(nextDocument), {
       edits: options.edits ?? [],
       previousSnapshot,
     })
+    Object.assign(document, nextDocument)
+    this.versionsByUri.set(uri, nextVersion)
     return cloneDocument(document)
   }
 
@@ -134,22 +182,25 @@ export class LspWorkspace {
       throw new Error('An LSP document URI transition requires a rotated source segment.')
     }
 
-    const nextVersion = this.advanceVersion(options.uri, 1)
+    const nextVersion = this.nextVersion(options.uri, 1)
     const previousDocument = cloneDocument(document)
+    const nextState: MutableLspDocument = {
+      uri: options.uri,
+      languageId: options.languageId,
+      textSnapshot: options.textSnapshot,
+      lineStarts: options.lineStarts,
+      sourceLogicalRevisionCount: 0,
+      sourceRevision: options.sourceRevision,
+      sourceSegment: options.sourceSegment,
+      version: nextVersion,
+    }
+    const nextDocument = cloneDocument(nextState)
     this.client?.didCloseDocument(previousDocument)
-    this.documentsByUri.delete(document.uri)
-    document.uri = options.uri
-    document.languageId = options.languageId
-    document.textSnapshot = options.textSnapshot
-    document.lineStarts = options.lineStarts
-    document.sourceLogicalRevisionCount = 0
-    document.sourceRevision = options.sourceRevision
-    document.sourceSegment = options.sourceSegment
-    document.version = nextVersion
-    this.documentsByUri.set(options.uri, document)
-
-    const nextDocument = cloneDocument(document)
     this.client?.didOpenDocument(nextDocument)
+    this.documentsByUri.delete(document.uri)
+    Object.assign(document, nextState)
+    this.versionsByUri.set(options.uri, nextVersion)
+    this.documentsByUri.set(options.uri, document)
     this.notifyTransitionedAttachments(document, options.sourceTextVersion)
     return { document: nextDocument, previousDocument }
   }
@@ -165,7 +216,21 @@ export class LspWorkspace {
     this.client?.didCloseDocument(cloneDocument(record.document))
   }
 
-  public saveDocument(uri: lsp.DocumentUri): void {
+  public saveDocument(uri: lsp.DocumentUri): Promise<void> {
+    const ready = this.prepareDocumentRequest(uri)
+    if (ready.kind === 'pending') return ready.ready.then((read) => this.savePreparedDocument(read))
+    if (ready.kind === 'ready') this.savePreparedDocument(ready.read)
+    else this.saveAcceptedDocument(uri)
+    return Promise.resolve()
+  }
+
+  private savePreparedDocument(read: LspPreparedDocumentSource): void {
+    if (!read.isCurrent())
+      throw new DOMException('Language-server save source was retired', 'AbortError')
+    this.client?.didSaveDocument(read.document)
+  }
+
+  private saveAcceptedDocument(uri: lsp.DocumentUri): void {
     const document = this.documentsByUri.get(uri)
     if (!document) return
     this.client?.didSaveDocument(cloneDocument(document))
@@ -247,12 +312,11 @@ export class LspWorkspace {
     return false
   }
 
-  private advanceVersion(uri: lsp.DocumentUri, count: number): number {
+  private nextVersion(uri: lsp.DocumentUri, count: number): number {
     const version = (this.versionsByUri.get(uri) ?? -1) + count
     if (!Number.isSafeInteger(version) || version < 0) {
       throw new RangeError(`LSP document version exceeds the safe integer range: ${uri}`)
     }
-    this.versionsByUri.set(uri, version)
     return version
   }
 
@@ -271,6 +335,52 @@ export class LspWorkspace {
   }
 }
 
+function currentSourcePeer(
+  peers: readonly (LspPreparedDocumentSource | Promise<LspPreparedDocumentSource>)[],
+): LspPreparedDocumentSource | null {
+  return (
+    peers.find(
+      (read): read is LspPreparedDocumentSource => !(read instanceof Promise) && read.isCurrent(),
+    ) ?? null
+  )
+}
+
+async function waitForSourcePeer(
+  peers: readonly (LspPreparedDocumentSource | Promise<LspPreparedDocumentSource>)[],
+): Promise<LspPreparedDocumentSource> {
+  const results = await Promise.allSettled(peers)
+  const accepted = results.find(
+    (result): result is PromiseFulfilledResult<LspPreparedDocumentSource> =>
+      result.status === 'fulfilled' && result.value.isCurrent(),
+  )
+  if (accepted) return accepted.value
+  const rejected = results.find((result) => result.status === 'rejected')
+  if (rejected?.status === 'rejected') throw rejected.reason
+  throw new DOMException('Language-server source interest was retired', 'AbortError')
+}
+
+function requireCurrentSource(
+  reads: readonly (LspPreparedDocumentSource | null)[],
+): LspPreparedDocumentSource {
+  const first = reads[0]
+  const isCurrent = () => reads.every((read) => read !== null && read.isCurrent())
+  if (!first || !isCurrent())
+    throw new DOMException('Language-server source was superseded', 'AbortError')
+  return { document: first.document, isCurrent }
+}
+
+function waitForSourceSignal(
+  ready: Promise<LspPreparedDocumentSource>,
+  signal: AbortSignal,
+): Promise<LspPreparedDocumentSource> {
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(signal.reason)
+    if (signal.aborted) abort()
+    else signal.addEventListener('abort', abort, { once: true })
+    void ready.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort))
+  })
+}
+
 function cloneDocument(document: MutableLspDocument): LspDocument {
   return {
     uri: document.uri,
@@ -278,6 +388,8 @@ function cloneDocument(document: MutableLspDocument): LspDocument {
     version: document.version,
     textSnapshot: document.textSnapshot,
     lineStarts: document.lineStarts,
+    sourceRevision: document.sourceRevision,
+    sourceSegment: document.sourceSegment,
   }
 }
 

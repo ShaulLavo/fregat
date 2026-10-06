@@ -1,17 +1,9 @@
 import { createEditorCapabilityToken, type EditorPluginHost } from '../plugins'
 import { type EditorDisposable } from './disposables'
-import {
-  type EditorHighlighterProvider,
-  type EditorHighlighterSession,
-  type EditorHighlighterSessionOptions,
-} from '../syntax/highlighter'
-import { createSnippetDocument, type SnippetDocument } from '../syntax/snippetDocument'
-import type {
-  EditorSyntaxLanguageId,
-  EditorSyntaxProvider,
-  EditorSyntaxSession,
-  EditorSyntaxSessionOptions,
-} from '../syntax/session'
+import type { EditorHighlighterProvider } from '../syntax/highlighter'
+import { createSnippetDocument } from '../syntax/snippetDocument'
+import type { EditorSyntaxLanguageId, EditorSyntaxProvider } from '../syntax/session'
+import { createEditorDocumentAnalysis } from './documentAnalysis'
 import type { EditorToken } from '../tokens'
 
 export const EDITOR_SNIPPET_TOKENS_FEATURE_ID = 'editor.snippetTokens'
@@ -61,82 +53,52 @@ async function tokenizeSnippet(
 ): Promise<readonly EditorToken[]> {
   if (text.length === 0) return []
 
-  const opener = new SnippetSessionOpener(text, `editor-snippet-${nextSnippetId}`, languageId)
-  nextSnippetId += 1
-  const opened = openSnippetSession(pluginHost, sources, opener)
-  if (!opened) return []
-
+  const documentId = `editor-snippet-${nextSnippetId++}`
+  const highlighters = [
+    ...sources.flatMap((source) => (source.highlighter ? [source.highlighter] : [])),
+    ...pluginHost.getHighlighterProviders(),
+  ]
+  const structural = [
+    ...sources.flatMap((source) => (source.syntax ? [source.syntax] : [])),
+    ...pluginHost.getSyntaxProviders(),
+  ]
+  if (highlighters.length > 0) {
+    const submitted = createSnippetDocument(text, 'as-submitted')
+    const analysis = createEditorDocumentAnalysis({ buffer: submitted.buffer, documentId })
+    try {
+      for (const provider of highlighters) {
+        const audience = analysis.contributions.createAudience()
+        const task = analysis.contributions.request(
+          provider.operation,
+          { languageId },
+          { kind: 'latest', audience },
+        )
+        const outcome = await task.settled
+        audience.dispose()
+        if (outcome.kind === 'failed') throw outcome.failure
+        if (outcome.kind === 'completed') return submitted.submittedTokens(outcome.result.tokens)
+      }
+    } finally {
+      analysis.dispose()
+    }
+  }
+  const folded = createSnippetDocument(text, 'as-document')
+  const analysis = createEditorDocumentAnalysis({ buffer: folded.buffer, documentId })
   try {
-    const result = await opened.session.refresh(opened.snippet.textSnapshot)
-    return opened.snippet.submittedTokens(result.tokens)
+    for (const provider of structural) {
+      const audience = analysis.contributions.createAudience()
+      const task = analysis.contributions.request(
+        provider.operation,
+        { languageId, includeHighlights: true, syntaxMode: 'full' },
+        { kind: 'latest', audience },
+      )
+      const outcome = await task.settled
+      audience.dispose()
+      if (outcome.kind === 'failed') throw outcome.failure
+      if (outcome.kind === 'completed') return folded.submittedTokens(outcome.result.tokens)
+    }
+    return []
   } finally {
-    opened.session.dispose()
-  }
-}
-
-type OpenedSnippet = {
-  readonly session: EditorHighlighterSession | EditorSyntaxSession
-  readonly snippet: SnippetDocument
-}
-
-// A highlighter, when one takes the language, paints the document instead of the structural
-// captures, so it is asked first here too.
-function openSnippetSession(
-  pluginHost: EditorPluginHost,
-  sources: readonly EditorSnippetTokenSource[],
-  opener: SnippetSessionOpener,
-): OpenedSnippet | null {
-  for (const source of sources) {
-    const { highlighter, syntax } = source
-    const lent =
-      (highlighter && opener.highlight((document) => highlighter.createSession(document))) ??
-      (syntax && opener.parse((options) => syntax.createSession(options)))
-    if (lent) return lent
-  }
-  return (
-    opener.highlight((document) => pluginHost.createHighlighterSession(document)) ??
-    opener.parse((options) => pluginHost.createSyntaxSession(options))
-  )
-}
-
-/** Opens sessions over the snippet, each engine reading the lines it splits by. */
-class SnippetSessionOpener {
-  #submitted: SnippetDocument | null = null
-  #folded: SnippetDocument | null = null
-
-  constructor(
-    private readonly text: string,
-    private readonly documentId: string,
-    private readonly languageId: EditorSyntaxLanguageId,
-  ) {}
-
-  highlight(
-    open: (document: EditorHighlighterSessionOptions) => EditorHighlighterSession | null,
-  ): OpenedSnippet | null {
-    this.#submitted ??= createSnippetDocument(this.text, 'as-submitted')
-    const session = open(this.options(this.#submitted))
-    return session ? { session, snippet: this.#submitted } : null
-  }
-
-  parse(
-    open: (options: EditorSyntaxSessionOptions) => EditorSyntaxSession | null,
-  ): OpenedSnippet | null {
-    this.#folded ??= createSnippetDocument(this.text, 'as-document')
-    const options = {
-      ...this.options(this.#folded),
-      includeHighlights: true,
-      syntaxMode: 'full' as const,
-    }
-    const session = open(options)
-    return session ? { session, snippet: this.#folded } : null
-  }
-
-  private options(snippet: SnippetDocument): EditorHighlighterSessionOptions {
-    return {
-      documentId: this.documentId,
-      languageId: this.languageId,
-      snapshot: snippet.snapshot,
-      textSnapshot: snippet.textSnapshot,
-    }
+    analysis.dispose()
   }
 }
