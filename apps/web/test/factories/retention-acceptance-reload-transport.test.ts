@@ -2,7 +2,9 @@ import { http, passthrough } from 'msw'
 import { server as requestInterceptor } from '../msw/server'
 import { request as playwrightRequest } from 'playwright'
 import { createServer } from 'node:http'
-import { EventEmitter } from 'node:events'
+import { EventEmitter, once } from 'node:events'
+import { spawn } from 'node:child_process'
+import { pathToFileURL } from 'node:url'
 import { mkdtemp, readFile, rm, mkdir, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -605,7 +607,10 @@ test('failed entry receipt reads back its linked request, predecessor, lifetime 
       ],
     })
     expect(text).not.toMatch(/private-query|secret|private-fragment|localhost/)
-    expect(await readdir(output)).toEqual(['entry-transport.json'])
+    expect((await readdir(output)).sort()).toEqual([
+      'entry-transport.frozen.json',
+      'entry-transport.json',
+    ])
   } finally {
     releaseRetentionEntryCapture(origin)
     await rm(output, { recursive: true, force: true })
@@ -655,7 +660,7 @@ test('stdout fragments retain valid metadata and pass ordinary output without re
   for (let index = 0; index < input.length; index++)
     capture.read(input.subarray(index, index + 1), (value) => ordinary.push(value))
   expect(ordinary.join('')).toBe('ordinary startup\nordinary tail\n')
-  expect(capture.inspect()).toMatchObject({ refused: 0, retainedRecords: 1 })
+  expect(capture.inspect()).toMatchObject({ refused: 0, retainedRecords: 3 })
   capture.read(Buffer.from(retentionEntryReceiptPrefix + '{broken}\n'))
   capture.read(
     Buffer.from(
@@ -669,7 +674,7 @@ test('stdout fragments retain valid metadata and pass ordinary output without re
         '\n',
     ),
   )
-  expect(capture.inspect()).toMatchObject({ refused: 2, retainedRecords: 2 })
+  expect(capture.inspect()).toMatchObject({ refused: 2, retainedRecords: 4 })
   capture.read(Buffer.from(retentionEntryReceiptPrefix + '{'))
   capture.finishWire()
   expect(capture.inspect()).toMatchObject({
@@ -937,4 +942,285 @@ test('entry callbacks preserve handled and unhandled public error identity when 
   expect(retentionEntryErrorCode({ code: 'ECONNRESET', message: 'private-sentinel' })).toBe(
     'ECONNRESET',
   )
+})
+
+test.for(
+  ['node', 'bun'].flatMap((runtime) =>
+    ['closed', 'stalled', 'reporting'].map((mode) => ({ runtime, mode })),
+  ),
+)(
+  'review F1 $runtime diagnostic writer $mode preserves primary and bounds queued metadata',
+  async ({ runtime, mode }) => {
+    const source = pathToFileURL(
+      join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
+    ).href
+    const script = `import {writeRetentionEntryReceipt} from ${JSON.stringify(source)};let writer;for(let n=0;n<${mode === 'closed' ? 1 : 10000};n++)writer=writeRetentionEntryReceipt({at:1,pid:process.pid,tick:'1',kind:'request',requestId:n,socketId:1,path:'/'+ 'x'.repeat(1000),method:'GET'});const peakBytes=process.stdout.writableLength;const peakPending=writer?.inspect?.().pendingBytes??null;setTimeout(()=>{process.stderr.write(JSON.stringify({primary:true,peakBytes,peakPending,stdoutBytes:process.stdout.writableLength,listeners:process.stdout.listenerCount('error'),writer:writer?.inspect?.()??null}));process.exit(0)},30)`
+    const args =
+      runtime === 'node'
+        ? [
+            '--experimental-strip-types',
+            '--disable-warning=ExperimentalWarning',
+            '--input-type=module',
+            '--eval',
+            script,
+          ]
+        : ['--eval', script]
+    const child = spawn(runtime, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    const closed = once(child, 'close')
+    const capture = createRetentionEntryCapture()
+    if (mode === 'reporting') child.stdout.on('data', (data: Buffer) => capture.read(data))
+    let stderr = ''
+    child.stderr.on('data', (data) => {
+      stderr += data.toString()
+    })
+    if (mode === 'closed') child.stdout.destroy()
+    const [code] = await closed
+    child.stdout.destroy()
+    expect(code).toBe(0)
+    const facts = JSON.parse(stderr)
+    expect(facts).toMatchObject({ primary: true, listeners: 0 })
+    expect(facts.peakBytes).toBeLessThanOrEqual(retentionEntryReceiptLimits.recordBytes)
+    expect(facts.peakPending).toBeLessThanOrEqual(
+      retentionEntryReceiptLimits.recordBytes + retentionEntryReceiptPrefix.length + 1,
+    )
+    expect(facts.stdoutBytes).toBeLessThanOrEqual(retentionEntryReceiptLimits.recordBytes)
+    expect(facts.writer.pendingBytes).toBeLessThanOrEqual(
+      retentionEntryReceiptLimits.recordBytes + retentionEntryReceiptPrefix.length + 1,
+    )
+    if (mode === 'stalled' || mode === 'reporting') expect(facts.writer.dropped).toBeGreaterThan(0)
+    if (mode === 'closed') expect(facts.writer).toMatchObject({ unavailable: true, code: 'EPIPE' })
+    if (mode === 'reporting') expect(capture.inspect().dropped).toBe(facts.writer.dropped)
+  },
+)
+
+test('review F2 original and decoded traversal cannot lose the FS discriminator', () => {
+  const root = join(tmpdir(), 'receipt-root')
+  for (const target of [
+    '/@fs/../../outside-private.ts',
+    '/@fs/%2e%2e/%2e%2e/outside-private.ts',
+    '/@fs/..\\outside-private.ts',
+    '/@fs/%5coutside-private.ts',
+    'http://localhost/@fs/../../outside-private.ts',
+    '/src/../outside-private.ts',
+  ])
+    expect(retentionEntryModulePath(root, target)).toBeNull()
+  expect(retentionEntryModulePath(root, '/@fs' + join(root, 'module.ts'))).toBe('/module.ts')
+})
+
+test('review F3 known completion survives serial frozen cases and ordinary overflow', async () => {
+  const output = await mkdtemp(join(tmpdir(), 'receipt-shared-'))
+  const first = join(output, 'first'),
+    second = join(output, 'second')
+  await mkdir(first)
+  await mkdir(second)
+  const capture = createRetentionEntryCapture(),
+    time = retentionEntryReceiptTime()
+  const completion = {
+    ...time,
+    kind: 'response-finish',
+    requestId: 73,
+    socketId: 1,
+    path: '/module.ts',
+    status: 200,
+    complete: true,
+  }
+  try {
+    capture.accept(completion)
+    for (const path of [first, second]) {
+      capture.begin(path)
+      capture.accept({ ...time, kind: 'route-failure', transportRequestId: 1, path: '/module.ts' })
+      await capture.fail(path, 'reload')
+      capture.end(path)
+      for (let n = 0; n < retentionEntryReceiptLimits.records; n++)
+        capture.accept({ ...time, kind: 'socket-close', socketId: n })
+    }
+    await capture.persistFailures()
+    for (const path of [first, second])
+      expect(JSON.parse(await readFile(join(path, 'entry-transport.json'), 'utf8'))).toMatchObject({
+        sameModulePredecessors: [completion],
+        truncated: true,
+      })
+    expect(capture.inspect().retainedBytes).toBeLessThanOrEqual(retentionEntryReceiptLimits.bytes)
+    expect(capture.inspect().retainedRecords).toBeLessThanOrEqual(
+      retentionEntryReceiptLimits.records,
+    )
+  } finally {
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test('review F4 malformed UTF8 is refused while fragmented valid Unicode survives', async () => {
+  const output = await mkdtemp(join(tmpdir(), 'receipt-utf8-')),
+    capture = createRetentionEntryCapture()
+  const packet =
+    retentionEntryReceiptPrefix +
+    JSON.stringify({
+      ...retentionEntryReceiptTime(),
+      kind: 'request',
+      requestId: 1,
+      socketId: 1,
+      path: '/x.ts',
+      method: 'GET',
+    }) +
+    '\n'
+  const invalid = Buffer.from(packet)
+  invalid[invalid.indexOf('/x.ts') + 1] = 255
+  try {
+    capture.begin(output)
+    capture.read(invalid)
+    const valid = Buffer.from(packet.replace('/x.ts', '/שלום.ts'))
+    for (let n = 0; n < valid.length; n++) capture.read(valid.subarray(n, n + 1))
+    capture.finishWire()
+    await capture.fail(output, 'entry')
+    await capture.persistFailures()
+    const text = await readFile(join(output, 'entry-transport.json'), 'utf8')
+    expect(text).not.toContain('\uFFFD')
+    expect(JSON.parse(text)).toMatchObject({
+      refused: 1,
+      failureWindow: [{ kind: 'request', path: '/שלום.ts' }],
+    })
+  } finally {
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test.skipIf(process.platform === 'win32')(
+  'review F5 actual owned child SIGINT is retained',
+  async () => {
+    const output = await mkdtemp(join(tmpdir(), 'receipt-signal-')),
+      capture = createRetentionEntryCapture()
+    const child = spawn(
+      'node',
+      ['--eval', "process.stdout.write('ready');setInterval(()=>{},1000)"],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    const exited = once(child, 'exit')
+    try {
+      capture.begin(output)
+      await once(child.stdout, 'data')
+      child.kill('SIGINT')
+      const [exitCode, signal] = await exited
+      capture.accept({
+        ...retentionEntryReceiptTime(),
+        kind: 'process-exit',
+        childPid: child.pid,
+        exitCode,
+        signal,
+      })
+      await capture.fail(output, 'entry')
+      await capture.persistFailures()
+      expect(
+        JSON.parse(await readFile(join(output, 'entry-transport.json'), 'utf8')),
+      ).toMatchObject({ refused: 0, failureWindow: [{ kind: 'process-exit', signal: 'SIGINT' }] })
+    } finally {
+      child.kill('SIGKILL')
+      await rm(output, { recursive: true, force: true })
+    }
+  },
+)
+
+test('review F6 frozen receipt persists before later cleanup or teardown', async () => {
+  const output = await mkdtemp(join(tmpdir(), 'receipt-immediate-')),
+    capture = createRetentionEntryCapture()
+  try {
+    capture.begin(output)
+    capture.accept({ ...retentionEntryReceiptTime(), kind: 'socket-close', socketId: 73 })
+    await capture.fail(output, 'reload')
+    expect(
+      JSON.parse(await readFile(join(output, 'entry-transport.frozen.json'), 'utf8')),
+    ).toMatchObject({
+      archiveStage: 'failure-frozen',
+      endedAt: null,
+      postFailureTail: [],
+      failureWindow: [{ kind: 'socket-close', socketId: 73 }],
+    })
+    capture.end(output)
+    await capture.persistFailures()
+    expect(JSON.parse(await readFile(join(output, 'entry-transport.json'), 'utf8'))).toMatchObject({
+      archiveStage: 'entry-teardown',
+      endedAt: expect.any(Number),
+    })
+  } finally {
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test.for(['missing', 'EISDIR'] as const)(
+  'review F6 immediate %s IO stays secondary while every original cleanup runs',
+  async (mode) => {
+    const output = await mkdtemp(join(tmpdir(), 'receipt-frozen-io-'))
+    const target = mode === 'missing' ? join(output, 'absent') : output
+    const capture = createRetentionEntryCapture()
+    const primary = (() => {
+      try {
+        JSON.parse('external primary')
+      } catch (error) {
+        return error
+      }
+    })()
+    const attempts: string[] = []
+    try {
+      if (mode === 'EISDIR') {
+        await mkdir(join(target, 'entry-transport.frozen.json'))
+        await mkdir(join(target, 'entry-transport.frozen.json.fallback.txt'))
+      }
+      capture.begin(target)
+      capture.accept({ ...retentionEntryReceiptTime(), kind: 'socket-close', socketId: 73 })
+      const snapshot = capture.fail(target, 'reload')
+      const cleanup = await settleRetentionReloadCleanup([
+        {
+          stage: 'original-primary',
+          run: async () => {
+            attempts.push('original-primary')
+            throw primary
+          },
+        },
+        {
+          stage: 'raw',
+          run: async () => {
+            attempts.push('raw')
+            await archiveRetentionReloadFailure(output, { frames: [{ at: 73 }] })
+          },
+        },
+        {
+          stage: 'close',
+          run: async () => {
+            attempts.push('close')
+          },
+        },
+      ])
+      expect(cleanup[0]?.error).toBe(primary)
+      expect(cleanup.slice(1).map((item) => item.error)).toEqual([null, null])
+      expect(attempts).toEqual(['original-primary', 'raw', 'close'])
+      expect(await snapshot).toEqual({
+        status: 'unavailable',
+        codes: mode === 'missing' ? ['ENOENT', 'ENOENT'] : ['EISDIR', 'EISDIR'],
+      })
+      expect(JSON.parse(await readFile(join(output, 'failed-raw.json'), 'utf8'))).toEqual({
+        frames: [{ at: 73 }],
+      })
+    } finally {
+      await rm(output, { recursive: true, force: true })
+    }
+  },
+)
+
+test('review F5 owned stop intents still refuse SIGINT and private signal strings', () => {
+  const capture = createRetentionEntryCapture()
+  capture.accept({
+    ...retentionEntryReceiptTime(),
+    kind: 'process-stop',
+    childPid: 73,
+    signal: 'SIGINT',
+  })
+  capture.accept({
+    ...retentionEntryReceiptTime(),
+    kind: 'process-exit',
+    childPid: 73,
+    exitCode: null,
+    signal: 'private-signal',
+  })
+  expect(capture.inspect().refused).toBe(2)
 })

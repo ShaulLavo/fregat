@@ -1,4 +1,6 @@
-import { writeFile } from 'node:fs/promises'
+import { open, writeFile } from 'node:fs/promises'
+import { createWriteStream } from 'node:fs'
+import { constants } from 'node:os'
 import { isAbsolute, join, relative } from 'node:path'
 import { inspect } from 'node:util'
 import { StringDecoder } from 'node:string_decoder'
@@ -321,10 +323,10 @@ export const retentionEntryReceiptLimits = {
 
 export const retentionEntryReceiptPrefix = 'retention-entry-receipt '
 
-function isReceiptPath(path: string) {
+function isReceiptPath(path: string, maximumBytes: number = retentionEntryReceiptLimits.pathBytes) {
   if (
     !path.startsWith('/') ||
-    Buffer.byteLength(path) > retentionEntryReceiptLimits.pathBytes ||
+    Buffer.byteLength(path) > maximumBytes ||
     /[?#\\]/.test(path) ||
     path.split('/').includes('..')
   )
@@ -336,11 +338,26 @@ function isReceiptPath(path: string) {
   return true
 }
 
+function originalReceiptPath(target: string) {
+  const raw = target.split(/[?#]/, 1)[0] ?? ''
+  if (raw.startsWith('/')) return raw
+  return /^[a-z][a-z0-9+.-]*:\/\/[^/]*(\/.*)?$/i.exec(raw)?.[1] ?? null
+}
+
+function isOriginalReceiptPath(path: string) {
+  return (
+    isReceiptPath(path, retentionEntryReceiptLimits.recordBytes) && !path.split('/').includes('.')
+  )
+}
+
 export function retentionEntryModulePath(root: string, target: string) {
   try {
+    const original = originalReceiptPath(target)
+    if (!original || !isOriginalReceiptPath(original)) return null
+    const pathname = decodeURIComponent(original)
+    if (!isOriginalReceiptPath(pathname)) return null
     const url = new URL(target, 'http://localhost')
-    if (url.username || url.password) return null
-    const pathname = decodeURIComponent(url.pathname)
+    if (url.username || url.password || !['http:', 'https:'].includes(url.protocol)) return null
     if (!pathname.startsWith('/@fs/')) {
       const path = '/apps/web' + pathname
       return isReceiptPath(path) ? path : null
@@ -396,6 +413,10 @@ const receiptInteger = v.pipe(
 )
 const receiptStatus = v.pipe(v.number(), v.integer(), v.minValue(100), v.maxValue(599))
 const receiptCode = v.nullable(v.pipe(v.string(), v.regex(/^[A-Z][A-Z0-9_]{0,63}$/)))
+const receiptSignal = v.pipe(
+  v.string(),
+  v.check((value) => Object.hasOwn(constants.signals, value)),
+)
 const receiptPath = v.pipe(v.string(), v.check(isReceiptPath))
 const receiptPhase = v.picklist([
   'entry',
@@ -493,7 +514,7 @@ const entryReceiptSchema = v.variant('kind', [
     kind: v.literal('process-exit'),
     childPid: receiptInteger,
     exitCode: v.nullable(receiptInteger),
-    signal: v.nullable(v.picklist(['SIGTERM', 'SIGKILL'])),
+    signal: v.nullable(receiptSignal),
   }),
   v.strictObject({
     ...receiptBase,
@@ -502,16 +523,107 @@ const entryReceiptSchema = v.variant('kind', [
     path: receiptPath,
   }),
   v.strictObject({ ...receiptBase, kind: v.literal('refused'), count: receiptInteger }),
+  v.strictObject({
+    ...receiptBase,
+    kind: v.literal('writer-status'),
+    dropped: receiptInteger,
+    refused: receiptInteger,
+    unavailable: v.boolean(),
+    code: receiptCode,
+  }),
 ])
 type RetentionEntryReceiptEvent = v.InferOutput<typeof entryReceiptSchema>
+const wireRecordBytes =
+  retentionEntryReceiptLimits.recordBytes + Buffer.byteLength(retentionEntryReceiptPrefix) + 1
+let receiptWriter: ReturnType<typeof createRetentionEntryWriter> | undefined
+
+function createRetentionEntryWriter() {
+  // This stream owns diagnostic errors and never closes stdout's descriptor.
+  const output = createWriteStream('', { fd: 1, autoClose: false })
+  let pendingBytes = 0
+  let dropped = 0
+  let refused = 0
+  let unavailable = false
+  let code: string | null = null
+  let reportedDropped = 0
+  let reportedRefused = 0
+  const failed = (error: unknown) => {
+    if (unavailable) return
+    unavailable = true
+    code = retentionEntryErrorCode(error)
+    if (pendingBytes) dropped++
+    pendingBytes = 0
+  }
+  output.on('error', failed)
+  const send = (event: RetentionEntryReceiptEvent) => {
+    const frame = Buffer.from(retentionEntryReceiptPrefix + JSON.stringify(event) + '\n')
+    if (frame.length > wireRecordBytes) {
+      refused++
+      return
+    }
+    pendingBytes = frame.length
+    try {
+      output.write(frame, completed)
+    } catch (error) {
+      failed(error)
+    }
+  }
+  const completed = (error?: Error | null) => {
+    if (error) {
+      failed(error)
+      return
+    }
+    pendingBytes = 0
+    if (unavailable || (reportedDropped === dropped && reportedRefused === refused)) return
+    reportedDropped = dropped
+    reportedRefused = refused
+    send({
+      ...retentionEntryReceiptTime(),
+      kind: 'writer-status',
+      dropped,
+      refused,
+      unavailable,
+      code,
+    })
+  }
+  return {
+    write(input: unknown) {
+      try {
+        const parsed = v.safeParse(entryReceiptSchema, input)
+        if (!parsed.success) {
+          refused++
+          return
+        }
+        if (unavailable || pendingBytes) {
+          dropped++
+          return
+        }
+        send(parsed.output)
+      } catch {
+        refused++
+      }
+    },
+    inspect() {
+      return {
+        pendingBytes,
+        pendingRecords: pendingBytes ? 1 : 0,
+        dropped,
+        refused,
+        unavailable,
+        code,
+      }
+    },
+  }
+}
+
 export function writeRetentionEntryReceipt(input: unknown) {
-  guardRetentionEntryObservation(() => {
-    const parsed = v.safeParse(entryReceiptSchema, input)
-    const event = parsed.success
-      ? parsed.output
-      : { ...retentionEntryReceiptTime(), kind: 'refused', count: 1 }
-    process.stdout.write(retentionEntryReceiptPrefix + JSON.stringify(event) + '\n')
-  })
+  try {
+    receiptWriter ??= createRetentionEntryWriter()
+    receiptWriter.write(input)
+    return receiptWriter
+  } catch {
+    return undefined
+  }
 }
 
 type ReceiptRecord = {
@@ -542,6 +654,7 @@ const lifetimeKinds = new Set<RetentionEntryReceiptEvent['kind']>([
   'server-close',
   'server-error',
   'full-reload',
+  'writer-status',
 ])
 // Reserve both owned stop signals so a full frozen window can still retain teardown.
 const lifetimeSlots = lifetimeKinds.size + 1
@@ -551,19 +664,85 @@ function lifetimeKey(event: RetentionEntryReceiptEvent) {
   return event.kind
 }
 
-async function archiveEntryReceipt(output: string, payload: unknown) {
+function* entryJsonChunks(value: unknown): Generator<Buffer> {
+  if (Array.isArray(value)) {
+    yield Buffer.from('[')
+    for (let index = 0; index < value.length; index++) {
+      yield Buffer.from(index ? ',' : '')
+      yield* entryJsonChunks(value[index])
+    }
+    yield Buffer.from(']')
+    return
+  }
+  if (value && typeof value === 'object' && 'kind' in value) {
+    yield Buffer.from(JSON.stringify(value))
+    return
+  }
+  if (value && typeof value === 'object') {
+    yield Buffer.from('{')
+    let separator = ''
+    for (const [key, item] of Object.entries(value)) {
+      yield Buffer.from(separator + JSON.stringify(key) + ':')
+      yield* entryJsonChunks(item)
+      separator = ','
+    }
+    yield Buffer.from('}')
+    return
+  }
+  const encoded = Buffer.from(JSON.stringify(value))
+  for (let offset = 0; offset < encoded.length; offset += retentionEntryReceiptLimits.recordBytes)
+    yield encoded.subarray(offset, offset + retentionEntryReceiptLimits.recordBytes)
+}
+
+function* entryPacketBuffers(payload: unknown) {
+  const pending = Buffer.alloc(wireRecordBytes)
+  let size = 0
+  for (const chunk of entryJsonChunks(payload)) {
+    if (size + chunk.length > pending.length) {
+      yield pending.subarray(0, size)
+      size = 0
+    }
+    chunk.copy(pending, size)
+    size += chunk.length
+  }
+  if (size) yield pending.subarray(0, size)
+}
+
+async function writeEntryPacketFile(path: string, payload: unknown) {
+  const file = await open(path, 'w')
+  try {
+    for (const chunk of entryPacketBuffers(payload)) await writeEntryPacketChunk(file, chunk)
+  } finally {
+    await file.close()
+  }
+}
+
+async function writeEntryPacketChunk(file: Awaited<ReturnType<typeof open>>, chunk: Buffer) {
+  let offset = 0
+  while (offset < chunk.length) {
+    const { bytesWritten } = await file.write(chunk.subarray(offset))
+    if (!bytesWritten) throw { code: 'EIO' }
+    offset += bytesWritten
+  }
+}
+
+async function archiveEntryReceipt(
+  output: string,
+  payload: unknown,
+  name: 'entry-transport.json' | 'entry-transport.frozen.json' = 'entry-transport.json',
+) {
   const codes: (string | null)[] = []
   try {
-    await writeFile(join(output, 'entry-transport.json'), JSON.stringify(payload))
+    await writeEntryPacketFile(join(output, name), payload)
     return { status: 'written' as const, codes }
   } catch (error) {
     codes.push(retentionEntryErrorCode(error))
   }
   try {
-    await writeFile(
-      join(output, 'entry-transport.json.fallback.txt'),
-      JSON.stringify({ persistence: { status: 'fallback-written', codes }, receipt: payload }),
-    )
+    await writeEntryPacketFile(join(output, name + '.fallback.txt'), {
+      persistence: { status: 'fallback-written', codes },
+      receipt: payload,
+    })
     return { status: 'fallback-written' as const, codes }
   } catch (error) {
     codes.push(retentionEntryErrorCode(error))
@@ -574,31 +753,61 @@ async function archiveEntryReceipt(output: string, payload: unknown) {
 export function createRetentionEntryCapture() {
   const records = new Map<number, ReceiptRecord>()
   const lifetime = new Map<string, ReceiptRecord>()
-  const cases = new Map<string, { readonly start: number; failure: FailureReceipt | null }>()
+  const completions = new Map<string, ReceiptRecord>()
+  type Owner = {
+    readonly start: number
+    readonly bytes: number
+    failure: FailureReceipt | null
+    immediate: Promise<Awaited<ReturnType<typeof archiveEntryReceipt>>> | null
+    immediateStatus: Awaited<ReturnType<typeof archiveEntryReceipt>> | null
+    immediateCompletedAt: number | null
+  }
+  const cases = new Map<string, Owner>()
   const decoder = new StringDecoder('utf8')
+  const strictDecoder = new TextDecoder('utf-8', { fatal: true })
+  const prefix = Buffer.from(retentionEntryReceiptPrefix)
+  const pending = Buffer.alloc(wireRecordBytes)
   const counts = new Map<RetentionEntryReceiptEvent['kind'], number>()
   const statusCounts = new Map<number, number>()
-  let sequence = 0
-  let bytes = 0
-  let lifetimeBytes = 0
-  let pinnedBytes = 0
-  let pinnedRecords = 0
-  let pending = ''
-  let discardLine = false
-  let ordinaryLine = false
-  let wireEndObserved = false
-  let refused = 0
-  let dropped = 0
+  let sequence = 0,
+    bytes = 0,
+    lifetimeBytes = 0,
+    completionBytes = 0,
+    caseBytes = 0,
+    pinnedBytes = 0,
+    pinnedRecords = 0
+  let pendingLength = 0,
+    discardLine = false,
+    ordinaryLine = false,
+    wireEndObserved = false
+  let refused = 0,
+    dropped = 0,
+    writerDropped = 0,
+    writerRefused = 0
   const makeRoom = (count: number, size: number) => {
     while (
-      records.size + lifetimeSlots + pinnedRecords + count > retentionEntryReceiptLimits.records ||
-      bytes + lifetimeSlots * retentionEntryReceiptLimits.recordBytes + pinnedBytes + size >
+      records.size + completions.size + pinnedRecords + lifetimeSlots + cases.size * 3 + 2 + count >
+        retentionEntryReceiptLimits.records ||
+      bytes +
+        completionBytes +
+        pinnedBytes +
+        caseBytes +
+        lifetimeSlots * retentionEntryReceiptLimits.recordBytes +
+        wireRecordBytes * 2 +
+        size >
         retentionEntryReceiptLimits.bytes
     ) {
       const first = records.keys().next().value
-      if (first === undefined) return false
-      bytes -= records.get(first)?.bytes ?? 0
-      records.delete(first)
+      if (first !== undefined) {
+        bytes -= records.get(first)?.bytes ?? 0
+        records.delete(first)
+        dropped++
+        continue
+      }
+      const path = completions.keys().next().value
+      if (path === undefined) return false
+      completionBytes -= completions.get(path)?.bytes ?? 0
+      completions.delete(path)
       dropped++
     }
     return true
@@ -615,14 +824,22 @@ export function createRetentionEntryCapture() {
     const record = Object.freeze({ event: Object.freeze(event), bytes: size, sequence: ++sequence })
     if (lifetimeKinds.has(event.kind)) {
       const key = lifetimeKey(event)
-      const previous = lifetime.get(key)
-      lifetimeBytes -= previous?.bytes ?? 0
+      lifetimeBytes -= lifetime.get(key)?.bytes ?? 0
       lifetime.set(key, record)
       lifetimeBytes += size
     }
-    if (!makeRoom(1, size)) {
+    const completed = event.kind === 'response-finish' && event.complete
+    if (completed) {
+      completionBytes -= completions.get(event.path)?.bytes ?? 0
+      completions.delete(event.path)
+    }
+    if (!makeRoom(completed ? 2 : 1, completed ? size * 2 : size)) {
       dropped++
       return
+    }
+    if (completed) {
+      completions.set(event.path, record)
+      completionBytes += size
     }
     records.set(record.sequence, record)
     bytes += size
@@ -638,89 +855,130 @@ export function createRetentionEntryCapture() {
         refused += parsed.output.count
         return
       }
+      if (parsed.output.kind === 'writer-status') {
+        writerDropped = Math.max(writerDropped, parsed.output.dropped)
+        writerRefused = Math.max(writerRefused, parsed.output.refused)
+      }
       retain(parsed.output)
     } catch {
       refused++
     }
   }
-  const line = (value: string) => {
-    if (!value.startsWith(retentionEntryReceiptPrefix)) return
+  const receiveLine = () => {
     try {
-      accept(JSON.parse(value.slice(retentionEntryReceiptPrefix.length)))
+      accept(JSON.parse(strictDecoder.decode(pending.subarray(prefix.length, pendingLength))))
     } catch {
       refused++
     }
   }
-  const character = (value: string, other: (value: string) => void) => {
+  const byte = (value: number, other: (value: number) => void) => {
     if (ordinaryLine) {
       other(value)
-      if (value === '\n') ordinaryLine = false
+      if (value === 10) ordinaryLine = false
       return
     }
-    if (value === '\n') {
-      if (!discardLine && pending.startsWith(retentionEntryReceiptPrefix)) line(pending)
-      if (!discardLine && !pending.startsWith(retentionEntryReceiptPrefix)) other(pending + value)
-      pending = ''
+    if (value === 10) {
+      if (!discardLine && pendingLength - prefix.length > retentionEntryReceiptLimits.recordBytes) {
+        refused++
+        discardLine = true
+      }
+      if (!discardLine && pendingLength >= prefix.length) receiveLine()
+      if (!discardLine && pendingLength < prefix.length)
+        for (const item of pending.subarray(0, pendingLength)) other(item)
+      if (!discardLine && pendingLength < prefix.length) other(value)
+      pendingLength = 0
       discardLine = false
       return
     }
     if (discardLine) return
-    pending += value
-    if (
-      pending.length <= retentionEntryReceiptPrefix.length &&
-      !retentionEntryReceiptPrefix.startsWith(pending)
-    ) {
-      other(pending)
-      pending = ''
-      ordinaryLine = true
+    if (pendingLength === pending.length) {
+      pendingLength = 0
+      discardLine = true
+      refused++
       return
     }
-    if (
-      Buffer.byteLength(pending) <=
-      retentionEntryReceiptLimits.recordBytes + retentionEntryReceiptPrefix.length
-    )
-      return
-    pending = ''
-    discardLine = true
-    refused++
+    pending[pendingLength++] = value
+    if (pendingLength <= prefix.length && prefix[pendingLength - 1] !== value) {
+      for (const item of pending.subarray(0, pendingLength)) other(item)
+      pendingLength = 0
+      ordinaryLine = true
+    }
   }
+  const pin = (values: Iterable<ReceiptRecord>) => {
+    const selected: ReceiptRecord[] = []
+    for (const record of values) {
+      if (!makeRoom(1, record.bytes)) {
+        dropped++
+        continue
+      }
+      selected.push(record)
+      pinnedBytes += record.bytes
+      pinnedRecords++
+    }
+    return selected
+  }
+  const packet = (
+    failure: FailureReceipt,
+    stage: 'failure-frozen' | 'entry-teardown',
+    tail: readonly ReceiptRecord[],
+    immediateStatus: Owner['immediateStatus'],
+    immediateCompletedAt: number | null,
+  ) => ({
+    version: 1,
+    archiveStage: stage,
+    archiveStartedAt: Date.now(),
+    availability: ['installed', 'listening', 'process-start'].every((kind) =>
+      failure.lifetime.some((record) => record.event.kind === kind),
+    )
+      ? 'observed'
+      : 'partial',
+    missingFacts: ['installed', 'listening', 'process-start'].filter(
+      (kind) => !failure.lifetime.some((record) => record.event.kind === kind),
+    ),
+    phase: failure.phase,
+    failedAt: failure.at,
+    endedAt: failure.endedAt,
+    refused: refused + writerRefused,
+    dropped: dropped + writerDropped,
+    wireEndObserved,
+    pendingWireBytes: pendingLength,
+    optimizerCoverage: 'public-log-markers',
+    lifetimeCounts: Object.fromEntries(counts),
+    lifetimeStatusCounts: Object.fromEntries(statusCounts),
+    truncated: dropped + writerDropped > 0,
+    immediatePersistence: immediateStatus ?? { status: 'pending', codes: [] },
+    immediateArchiveCompletedAt: immediateCompletedAt,
+    lifetimeBeforeFailure: failure.lifetime.map((record) => record.event),
+    sameModulePredecessors: failure.predecessors.map((record) => record.event),
+    failureWindow: failure.records.map((record) => record.event),
+    postFailureTail: tail
+      .filter((record) => record.sequence > failure.sequence)
+      .map((record) => record.event),
+  })
   const freeze = (output: string, phase: RetentionEntryPhase) => {
     const owner = cases.get(output)
-    if (!owner || owner.failure) return
-    const history = [...lifetime.values()]
-    const historyBytes = history.reduce((total, record) => total + record.bytes, 0)
-    if (!makeRoom(history.length, historyBytes)) {
-      dropped += history.length
-      history.length = 0
-    }
-    const window = [...records.values()].filter((record) => record.sequence > owner.start)
-    const paths = new Set(
-      window.flatMap((record) =>
-        record.event.kind === 'route-failure' ? [record.event.path] : [],
-      ),
+    if (!owner) return
+    if (owner.failure) return owner.immediate
+    const paths = new Set<string>()
+    for (const record of records.values())
+      if (record.sequence > owner.start && record.event.kind === 'route-failure')
+        paths.add(record.event.path)
+    const history = pin(lifetime.values())
+    const prior = pin(
+      [...paths].flatMap((path) => {
+        const record = completions.get(path)
+        return record ? [record] : []
+      }),
     )
-    const predecessors = new Map<string, ReceiptRecord>()
+    const window: ReceiptRecord[] = []
     for (const record of records.values()) {
-      const event = record.event
-      if (
-        record.sequence > owner.start ||
-        event.kind !== 'response-finish' ||
-        !event.complete ||
-        !paths.has(event.path)
-      )
-        continue
-      predecessors.set(event.path, record)
-    }
-    const prior = [...predecessors.values()]
-    for (const record of [...window, ...prior]) {
+      if (record.sequence <= owner.start) continue
       records.delete(record.sequence)
       bytes -= record.bytes
+      window.push(record)
+      pinnedBytes += record.bytes
+      pinnedRecords++
     }
-    pinnedBytes +=
-      window.reduce((total, record) => total + record.bytes, 0) +
-      prior.reduce((total, record) => total + record.bytes, 0) +
-      history.reduce((total, record) => total + record.bytes, 0)
-    pinnedRecords += window.length + prior.length + history.length
     owner.failure = {
       phase,
       sequence,
@@ -730,36 +988,70 @@ export function createRetentionEntryCapture() {
       lifetime: history,
       endedAt: null,
     }
+    const snapshot = packet(owner.failure, 'failure-frozen', [], null, null)
+    owner.immediate = archiveEntryReceipt(output, snapshot, 'entry-transport.frozen.json')
+      .then((result) => {
+        owner.immediateStatus = result
+        owner.immediateCompletedAt = Date.now()
+        return result
+      })
+      .catch(() => {
+        const result = { status: 'unavailable' as const, codes: [null] }
+        owner.immediateStatus = result
+        owner.immediateCompletedAt = Date.now()
+        return result
+      })
+    return owner.immediate
   }
   return {
     accept,
     read(chunk: Buffer, other?: (value: string) => void) {
       try {
-        let ordinary = ''
-        for (const value of decoder.write(chunk))
-          character(value, (value) => {
-            ordinary += value
-          })
-        if (ordinary) other?.(ordinary)
+        const ordinary: number[] = []
+        for (const value of chunk) byte(value, (value) => ordinary.push(value))
+        const text = decoder.write(Buffer.from(ordinary))
+        if (text) other?.(text)
       } catch {
         refused++
       }
     },
     finishWire() {
       guardRetentionEntryObservation(() => {
-        const final = decoder.end()
-        for (const value of final) character(value, () => {})
+        decoder.end()
         wireEndObserved = true
-        if (pending.startsWith(retentionEntryReceiptPrefix) || discardLine) refused++
-        pending = ''
+        if (pendingLength >= prefix.length || discardLine) refused++
+        pendingLength = 0
         discardLine = false
       })
     },
     begin(output: string) {
-      guardRetentionEntryObservation(() => cases.set(output, { start: sequence, failure: null }))
+      guardRetentionEntryObservation(() => {
+        const size =
+          Buffer.byteLength(output) +
+          wireRecordBytes * 2 +
+          retentionEntryReceiptLimits.recordBytes * 4
+        if (cases.has(output) || !makeRoom(3, size)) {
+          refused++
+          return
+        }
+        cases.set(output, {
+          start: sequence,
+          bytes: size,
+          failure: null,
+          immediate: null,
+          immediateStatus: null,
+          immediateCompletedAt: null,
+        })
+        caseBytes += size
+      })
     },
     fail(output: string, phase: RetentionEntryPhase) {
-      guardRetentionEntryObservation(() => freeze(output, phase))
+      try {
+        return freeze(output, phase)
+      } catch {
+        refused++
+        return undefined
+      }
     },
     end(output: string) {
       guardRetentionEntryObservation(() => {
@@ -768,22 +1060,26 @@ export function createRetentionEntryCapture() {
           owner.failure.endedAt = Date.now()
           return
         }
+        caseBytes -= owner?.bytes ?? 0
         cases.delete(output)
       })
     },
     inspect() {
       return {
-        refused,
-        dropped,
-        retainedBytes: bytes + lifetimeBytes + pinnedBytes,
-        retainedRecords: records.size + lifetime.size + pinnedRecords,
+        refused: refused + writerRefused,
+        dropped: dropped + writerDropped,
+        retainedBytes:
+          bytes + lifetimeBytes + completionBytes + pinnedBytes + caseBytes + wireRecordBytes * 2,
+        retainedRecords:
+          records.size + lifetime.size + completions.size + pinnedRecords + cases.size * 3 + 2,
         wireEndObserved,
-        pendingWireBytes: Buffer.byteLength(pending),
+        pendingWireBytes: pendingLength,
       }
     },
     async persistFailures() {
       const tailRecords = new Map(records)
       for (const record of lifetime.values()) tailRecords.set(record.sequence, record)
+      for (const record of completions.values()) tailRecords.set(record.sequence, record)
       for (const owner of cases.values()) {
         if (!owner.failure) continue
         for (const record of [
@@ -797,33 +1093,18 @@ export function createRetentionEntryCapture() {
       const results: Awaited<ReturnType<typeof archiveEntryReceipt>>[] = []
       for (const [output, owner] of cases) {
         if (!owner.failure) continue
-        const failure = owner.failure
-        const missingFacts = ['installed', 'listening', 'process-start'].filter(
-          (kind) => !failure.lifetime.some((record) => record.event.kind === kind),
+        results.push(
+          await archiveEntryReceipt(
+            output,
+            packet(
+              owner.failure,
+              'entry-teardown',
+              tail,
+              owner.immediateStatus,
+              owner.immediateCompletedAt,
+            ),
+          ),
         )
-        const result = await archiveEntryReceipt(output, {
-          version: 1,
-          availability: missingFacts.length === 0 ? 'observed' : 'partial',
-          missingFacts,
-          phase: failure.phase,
-          failedAt: failure.at,
-          endedAt: failure.endedAt,
-          refused,
-          dropped,
-          wireEndObserved,
-          pendingWireBytes: Buffer.byteLength(pending),
-          optimizerCoverage: 'public-log-markers',
-          lifetimeCounts: Object.fromEntries(counts),
-          lifetimeStatusCounts: Object.fromEntries(statusCounts),
-          truncated: dropped > 0,
-          lifetimeBeforeFailure: failure.lifetime.map((record) => record.event),
-          sameModulePredecessors: failure.predecessors.map((record) => record.event),
-          failureWindow: failure.records.map((record) => record.event),
-          postFailureTail: tail
-            .filter((record) => record.sequence > failure.sequence)
-            .map((record) => record.event),
-        })
-        results.push(result)
       }
       return results
     },
