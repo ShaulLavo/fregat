@@ -1,5 +1,6 @@
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
-import { attachmentFileUrl, type attachmentTextOptions } from '../utils/attachment-file'
+import { attachmentFileUrl, captureAttachmentPreview } from '@/features/chat/utils/attachment-file'
+import { useAttachmentPreviewSelection } from '@/features/chat/hooks/use-attachment-preview-selection'
 import { useQueryClient } from '@tanstack/react-query'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { serverEndpoint } from '@/lib/client'
@@ -31,17 +32,11 @@ export function ChatInputAttachmentList({
   const environmentId = useEnvironmentId()
   const origin = serverEndpoint(originForQueryClient(queryClient))
   const [openIndex, setOpenIndex] = useState<number | null>(null)
-  const [openFile, setOpenFile] = useState<{
-    input: Parameters<typeof attachmentTextOptions>[0]
-    queryClient: typeof queryClient
-  } | null>(null)
-  if (
-    openFile &&
-    (openFile.queryClient !== queryClient ||
-      openFile.input.environmentId !== environmentId ||
-      openFile.input.origin !== origin)
-  )
-    setOpenFile(null)
+  const [openFile, setOpenFile] = useAttachmentPreviewSelection({
+    queryClient,
+    environmentId,
+    origin,
+  })
   if (attachments.length === 0) return null
 
   const images = stagedAttachmentImages(
@@ -88,15 +83,17 @@ export function ChatInputAttachmentList({
                       attachmentFileUrl(attachment.upload.attachment, origin)
                     )
                       return
-                    setOpenFile({
-                      input: Object.freeze({
-                        attachment: Object.freeze({ ...attachment.upload.attachment }),
-                        environmentId,
-                        origin,
-                        provenance: 'staged' as const,
-                      }),
-                      queryClient,
-                    })
+                    setOpenFile(
+                      captureAttachmentPreview(
+                        {
+                          attachment: attachment.upload.attachment,
+                          environmentId,
+                          origin,
+                          provenance: 'staged',
+                        },
+                        queryClient,
+                      ),
+                    )
                   }}
                 />
               }

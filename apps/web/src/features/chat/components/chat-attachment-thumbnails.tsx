@@ -1,6 +1,7 @@
 import type { ChatAttachment } from '@workspace/contracts'
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
-import type { attachmentTextOptions } from '../utils/attachment-file'
+import { captureAttachmentPreview } from '@/features/chat/utils/attachment-file'
+import { useAttachmentPreviewSelection } from '@/features/chat/hooks/use-attachment-preview-selection'
 import { FileIcon } from '@phosphor-icons/react'
 import { ChatFilePreview } from './chat-file-preview'
 import { useQueryClient } from '@tanstack/react-query'
@@ -33,17 +34,11 @@ export function ChatAttachmentThumbnails({
   const environment = useEnvironmentsStore((state) => state.entries[owner])
   const origin = serverEndpoint(environment?.origin ?? owner)
   const [openIndex, setOpenIndex] = useState<number | null>(null)
-  const [openFile, setOpenFile] = useState<{
-    input: Parameters<typeof attachmentTextOptions>[0]
-    queryClient: typeof queryClient
-  } | null>(null)
-  if (
-    openFile &&
-    (openFile.queryClient !== queryClient ||
-      openFile.input.environmentId !== environmentId ||
-      openFile.input.origin !== origin)
-  )
-    setOpenFile(null)
+  const [openFile, setOpenFile] = useAttachmentPreviewSelection({
+    queryClient,
+    environmentId,
+    origin,
+  })
   if (attachments.length === 0) return null
 
   const images = chatAttachmentImages(attachments, origin)
@@ -86,15 +81,12 @@ export function ChatAttachmentThumbnails({
             variant='outline'
             title={attachment.name}
             onClick={() =>
-              setOpenFile({
-                input: Object.freeze({
-                  attachment: Object.freeze({ ...attachment }),
-                  environmentId,
-                  origin,
-                  provenance: 'sent' as const,
-                }),
-                queryClient,
-              })
+              setOpenFile(
+                captureAttachmentPreview(
+                  { attachment, environmentId, origin, provenance: 'sent' },
+                  queryClient,
+                ),
+              )
             }
           >
             <FileIcon className='size-(--icon-size-sm)' />

@@ -85,6 +85,29 @@ export function attachmentTextOptions(
   })
 }
 
+export function captureAttachmentPreview(
+  input: Parameters<typeof attachmentTextOptions>[0],
+  queryClient: QueryClient,
+) {
+  return Object.freeze({
+    input: Object.freeze({ ...input, attachment: Object.freeze({ ...input.attachment }) }),
+    queryClient,
+  })
+}
+
+export type AttachmentPreviewSelection = ReturnType<typeof captureAttachmentPreview>
+
+export function attachmentPreviewMatchesOwner(
+  preview: AttachmentPreviewSelection,
+  owner: { queryClient: QueryClient; environmentId: EnvironmentId; origin: string },
+) {
+  return (
+    preview.queryClient === owner.queryClient &&
+    preview.input.environmentId === owner.environmentId &&
+    preview.input.origin === owner.origin
+  )
+}
+
 export async function acquireAttachmentText(
   input: Parameters<typeof attachmentTextOptions>[0],
   queryClient: QueryClient,
