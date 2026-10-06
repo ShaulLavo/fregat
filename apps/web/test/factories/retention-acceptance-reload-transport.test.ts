@@ -663,7 +663,7 @@ test('stdout fragments retain valid metadata and pass ordinary output without re
   for (let index = 0; index < input.length; index++)
     capture.read(input.subarray(index, index + 1), (value) => ordinary.push(value))
   expect(ordinary.join('')).toBe('ordinary startup\nordinary tail\n')
-  expect(capture.inspect()).toMatchObject({ refused: 0, retainedRecords: 72 })
+  expect(capture.inspect()).toMatchObject({ refused: 0, retainedRecords: 16072 })
   capture.read(Buffer.from(retentionEntryReceiptPrefix + '{broken}\n'))
   capture.read(
     Buffer.from(
@@ -682,7 +682,7 @@ test('stdout fragments retain valid metadata and pass ordinary output without re
         '\n',
     ),
   )
-  expect(capture.inspect()).toMatchObject({ refused: 2, retainedRecords: 73 })
+  expect(capture.inspect()).toMatchObject({ refused: 2, retainedRecords: 16073 })
   capture.read(Buffer.from(retentionEntryReceiptPrefix + '{'))
   capture.finishWire()
   expect(capture.inspect()).toMatchObject({
@@ -1472,12 +1472,18 @@ test.for(['records', 'bytes'] as const)(
     const capture = createRetentionEntryCapture(),
       time = retentionEntryReceiptTime()
     try {
-      expect(retentionEntryBudget.producer.records + retentionEntryBudget.relay.records).toBe(
-        retentionEntryReceiptLimits.records,
-      )
-      expect(retentionEntryBudget.producer.bytes + retentionEntryBudget.relay.bytes).toBe(
-        retentionEntryReceiptLimits.bytes,
-      )
+      expect(
+        retentionEntryBudget.producer.records +
+          retentionEntryBudget.clientJournal.records +
+          retentionEntryBudget.servingJournal.records +
+          retentionEntryBudget.relay.records,
+      ).toBe(retentionEntryReceiptLimits.records)
+      expect(
+        retentionEntryBudget.producer.bytes +
+          retentionEntryBudget.clientJournal.bytes +
+          retentionEntryBudget.servingJournal.bytes +
+          retentionEntryBudget.relay.bytes,
+      ).toBe(retentionEntryReceiptLimits.bytes)
       const completion = {
         ...time,
         kind: 'response-finish',
