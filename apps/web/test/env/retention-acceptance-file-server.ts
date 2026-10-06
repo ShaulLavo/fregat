@@ -54,7 +54,10 @@ async function startRetentionAcceptanceFileServer(project: TestProject) {
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   )
-  const capture = createRetentionEntryCapture()
+  const capture = createRetentionEntryCapture({
+    entryPort: Number(entry.port),
+    root: fileURLToPath(new URL('../../../../', import.meta.url)),
+  })
   registerRetentionEntryCapture(entry.origin, capture)
   const note = (event: object) =>
     capture.accept({ ...retentionEntryReceiptTime(), childPid: server.pid, ...event })
