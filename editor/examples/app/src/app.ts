@@ -91,6 +91,7 @@ export function mountApp(): void {
   const liveDiff = createDiffPlugin({ mode: 'overlay' })
   const languagePlugins: readonly EditorPlugin[] = [
     javaScript({ jsx: true }),
+    typeScript(),
     typeScript({ tsx: true }),
     html(),
     css(),
