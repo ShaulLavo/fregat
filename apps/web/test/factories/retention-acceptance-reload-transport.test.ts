@@ -173,6 +173,88 @@ test('caller lifecycle preserves primary failure and qualifies secondary cleanup
   await cases.finish(owner, id)
 })
 
+test.each(['fulfilled', 'rejected'])(
+  'caller finish joins an independent %s main body after a separate fatal forward',
+  async (settlement) => {
+    const cases = createRetentionReloadCases()
+    const owner = { sessionId: 'independent-main', testPath: 'reload' }
+    const id = crypto.randomUUID()
+    const transport = createRetentionReloadTransport()
+    const primary = createScriptError('Controlled separate forward failed', {
+      internal: { phase: 'forward' },
+    })
+    const secondary = createScriptError('Controlled independent main failed', {
+      internal: { phase: 'main-body' },
+    })
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let mainSettled = false
+    let finished = false
+    let lateWork = 0
+    let closes = 0
+    let closed: Promise<void> | null = null
+    const close = () =>
+      (closed ??= Promise.resolve().then(() => {
+        closes++
+      }))
+    let cleanup: Awaited<ReturnType<typeof settleRetentionReloadCleanup>> = []
+    const result = cases.run(owner, id, () => {
+      const main = gate.then(() => {
+        if (finished) lateWork++
+        mainSettled = true
+        if (settlement === 'rejected') throw secondary
+      })
+      void transport.run(
+        '/fatal-forward',
+        async () => {
+          throw primary
+        },
+        async () => {},
+      )
+      const performed = (async () => {
+        let failure: unknown
+        try {
+          await transport.race(main)
+        } catch (error) {
+          failure = error
+        }
+        cleanup = await settleRetentionReloadCleanup(
+          [
+            { stage: 'stop', run: async () => transport.stopAdmission() },
+            { stage: 'cancel', run: () => transport.cancelPending() },
+            { stage: 'close-context', run: close },
+            { stage: 'drain-routes', run: () => transport.drain() },
+          ],
+          main,
+        )
+        throw failure
+      })()
+      return { result: performed, close }
+    })
+    const observedPrimary = result.catch((error: unknown) => error)
+    const finishing = cases.finish(owner, id).then(() => {
+      finished = true
+    })
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(finished).toBe(false)
+    expect(mainSettled).toBe(false)
+    expect(cases.activeCount).toBe(1)
+    expect(closes).toBe(1)
+    release()
+    await finishing
+    expect(await observedPrimary).toBe(primary)
+    expect(mainSettled).toBe(true)
+    expect(lateWork).toBe(0)
+    expect(cases.activeCount).toBe(0)
+    expect(closes).toBe(1)
+    expect(cleanup.find((outcome) => outcome.stage === 'join-main-operation')?.error).toBe(
+      settlement === 'rejected' ? secondary : null,
+    )
+  },
+)
+
 test('normal caller completion closes once and timing stays in the existing case cell', async () => {
   const cases = createRetentionReloadCases()
   const owner = { sessionId: 'normal', testPath: 'reload' }

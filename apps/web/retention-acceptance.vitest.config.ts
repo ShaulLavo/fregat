@@ -417,73 +417,76 @@ async function performRetentionAcceptanceReload(
       },
     )
     .finally(async () => {
-      const cleanup = await settleRetentionReloadCleanup([
-        {
-          stage: 'restore-syntax',
-          run: async () => {
-            if (signal.aborted) return
-            transport.beginRestoration()
-            await page.evaluate(() => window.__retentionAcceptanceEntry?.setSyntaxEnabled(true))
+      const cleanup = await settleRetentionReloadCleanup(
+        [
+          {
+            stage: 'restore-syntax',
+            run: async () => {
+              if (signal.aborted) return
+              transport.beginRestoration()
+              await page.evaluate(() => window.__retentionAcceptanceEntry?.setSyntaxEnabled(true))
+            },
           },
-        },
-        {
-          stage: 'stop-forward-admission',
-          run: async () => {
-            transport.stopAdmission()
+          {
+            stage: 'stop-forward-admission',
+            run: async () => {
+              transport.stopAdmission()
+            },
           },
-        },
-        {
-          stage: 'archive-final-frames',
-          run: async () => {
-            artifactFailures.push(
-              ...(await archiveFinalRetentionReloadFrames(page, output, {
-                phase,
-                timings,
-                transportFailures: transport.failures,
-                transportRequests: transport.requests,
-                requestFailures,
-              })),
-            )
+          {
+            stage: 'archive-final-frames',
+            run: async () => {
+              artifactFailures.push(
+                ...(await archiveFinalRetentionReloadFrames(page, output, {
+                  phase,
+                  timings,
+                  transportFailures: transport.failures,
+                  transportRequests: transport.requests,
+                  requestFailures,
+                })),
+              )
+            },
           },
-        },
-        {
-          stage: 'cancel-forwarding',
-          run: async () => {
-            await transport.cancelPending()
+          {
+            stage: 'cancel-forwarding',
+            run: async () => {
+              await transport.cancelPending()
+            },
           },
-        },
-        {
-          stage: 'dispose-forward-context',
-          run: async () => {
-            forwardContextDisposal = disposeRequests().then(() => {
-              forwardContextDisposed = true
-            })
-            void forwardContextDisposal.catch(() => {})
+          {
+            stage: 'dispose-forward-context',
+            run: async () => {
+              forwardContextDisposal = disposeRequests().then(() => {
+                forwardContextDisposed = true
+              })
+              void forwardContextDisposal.catch(() => {})
+            },
           },
-        },
-        {
-          stage: 'fallback-context-close',
-          run: async () => {
-            if (forwardContextDisposed && !transport.needsContextClose) return
-            await closeContext()
-            contextClosedAsFallback = true
+          {
+            stage: 'fallback-context-close',
+            run: async () => {
+              if (forwardContextDisposed && !transport.needsContextClose) return
+              await closeContext()
+              contextClosedAsFallback = true
+            },
           },
-        },
-        {
-          stage: 'join-forward-context-disposal',
-          run: async () => {
-            await forwardContextDisposal
+          {
+            stage: 'join-forward-context-disposal',
+            run: async () => {
+              await forwardContextDisposal
+            },
           },
-        },
-        { stage: 'drain-routes', run: () => transport.drain() },
-        {
-          stage: 'unroute',
-          run: async () => {
-            if (!contextClosedAsFallback) await page.unrouteAll({ behavior: 'default' })
+          { stage: 'drain-routes', run: () => transport.drain() },
+          {
+            stage: 'unroute',
+            run: async () => {
+              if (!contextClosedAsFallback) await page.unrouteAll({ behavior: 'default' })
+            },
           },
-        },
-        { stage: 'close-context', run: closeContext },
-      ])
+          { stage: 'close-context', run: closeContext },
+        ],
+        operation,
+      )
       artifactFailures.push(
         ...(await archiveRetentionReloadArtifact(output, 'cleanup.json', {
           phase,

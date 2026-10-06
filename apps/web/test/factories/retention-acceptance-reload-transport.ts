@@ -411,9 +411,13 @@ export async function settleRetentionReloadCleanup(
     readonly stage: string
     readonly run: () => Promise<unknown>
   }[],
+  mainOperation?: Promise<unknown>,
 ) {
   const outcomes: { stage: string; at: number; error: unknown }[] = []
-  for (const action of actions) {
+  const complete = mainOperation
+    ? [...actions, { stage: 'join-main-operation', run: () => mainOperation }]
+    : actions
+  for (const action of complete) {
     try {
       await action.run()
       outcomes.push({ stage: action.stage, at: Date.now(), error: null })
