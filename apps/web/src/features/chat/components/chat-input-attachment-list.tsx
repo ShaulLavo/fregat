@@ -1,3 +1,9 @@
+import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
+import { attachmentFileUrl, captureAttachmentPreview } from '@/features/chat/utils/attachment-file'
+import { useAttachmentPreviewSelection } from '@/features/chat/hooks/use-attachment-preview-selection'
+import { useQueryClient } from '@tanstack/react-query'
+import { originForQueryClient } from '@/lib/environments/state/query-clients'
+import { serverEndpoint } from '@/lib/client'
 import { ArrowClockwiseIcon, FileIcon, XIcon } from '@phosphor-icons/react'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { Button } from '@workspace/ui/components/button'
@@ -10,7 +16,6 @@ import type { ChatInputAttachment } from '../state/chat-input-draft-store'
 import { stagedAttachmentImages } from '../utils/attachment-image'
 import { ChatImageLightbox } from './chat-image-lightbox'
 import { ChatFilePreview } from './chat-file-preview'
-import type { ChatAttachment } from '@workspace/contracts'
 
 export function ChatInputAttachmentList({
   attachments,
@@ -23,11 +28,15 @@ export function ChatInputAttachmentList({
   onRemove: (attachmentId: string) => void
   onRetry?: (attachmentId: string) => void
 }) {
+  const queryClient = useQueryClient()
+  const environmentId = useEnvironmentId()
+  const origin = serverEndpoint(originForQueryClient(queryClient))
   const [openIndex, setOpenIndex] = useState<number | null>(null)
-  const [openFile, setOpenFile] = useState<{
-    attachment: Extract<ChatAttachment, { type: 'file' }>
-    origin: string
-  } | null>(null)
+  const [openFile, setOpenFile] = useAttachmentPreviewSelection({
+    queryClient,
+    environmentId,
+    origin,
+  })
   if (attachments.length === 0) return null
 
   const images = stagedAttachmentImages(
@@ -69,13 +78,22 @@ export function ChatInputAttachmentList({
                       attachment.upload.attachment.type !== 'file'
                     )
                       return
-                    setOpenFile({
-                      attachment: attachment.upload.attachment,
-                      origin: attachment.previewUrl.slice(
-                        0,
-                        attachment.previewUrl.lastIndexOf('/attachments/'),
+                    if (
+                      attachment.previewUrl !==
+                      attachmentFileUrl(attachment.upload.attachment, origin)
+                    )
+                      return
+                    setOpenFile(
+                      captureAttachmentPreview(
+                        {
+                          attachment: attachment.upload.attachment,
+                          environmentId,
+                          origin,
+                          provenance: 'staged',
+                        },
+                        queryClient,
                       ),
-                    })
+                    )
                   }}
                 />
               }
@@ -158,8 +176,8 @@ export function ChatInputAttachmentList({
       <ChatImageLightbox images={images} openIndex={openIndex} onOpenIndexChange={setOpenIndex} />
       {openFile && (
         <ChatFilePreview
-          attachment={openFile.attachment}
-          origin={openFile.origin}
+          input={openFile.input}
+          queryClient={openFile.queryClient}
           onClose={() => setOpenFile(null)}
         />
       )}
