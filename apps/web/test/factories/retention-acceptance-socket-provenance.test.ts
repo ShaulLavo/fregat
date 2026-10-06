@@ -649,3 +649,76 @@ collector.close();process.stdout.write(JSON.stringify({emitted,empty,receiver,ar
     clearTimeout(timer)
   }
 })
+
+test('socket association repeated public destroy keeps the first invocation and native lifecycle', async ({
+  skip,
+  annotate,
+}) => {
+  const node = systemNode()
+  if (!node) {
+    skip('System Node is unavailable')
+    return
+  }
+  const output = await mkdtemp(join(tmpdir(), 'retention-socket-repeat-control-'))
+  const source = pathToFileURL(
+    join(import.meta.dirname, 'retention-acceptance-socket-provenance.ts'),
+  ).href
+  const script = `import {createServer,createConnection,Socket} from 'node:net';import {once} from 'node:events';import {readFileSync} from 'node:fs';
+const [output,source]=process.argv.slice(1);const {createRetentionSocketProvenance,snapshotRetentionSocketJournal}=await import(source);
+const original=Socket.prototype.destroy,descriptor=Object.getOwnPropertyDescriptor(Socket.prototype,'destroy'),server=createServer();server.listen(0,'127.0.0.1');await once(server,'listening');const port=server.address().port;
+const collector=createRetentionSocketProvenance({side:'serving',entryPort:port,normalizePath:path=>path,server});const accepted=once(server,'connection'),client=createConnection({host:'127.0.0.1',port});await once(client,'connect');const [socket]=await accepted;const remotePort=socket.remotePort;
+const snapshot=stage=>{const summary=snapshotRetentionSocketJournal(collector.basename,output,stage);const rows=readFileSync(output+'/'+summary.basename,'utf8').trim().split('\\n').map(JSON.parse);return {summary,row:rows.find(row=>row.kind==='socket'&&row.remotePort===remotePort)}};
+let first,second,firstReturn=false,secondReturn=false,alreadyDestroyed=false;
+try{const closed=once(socket,'close');socket.once('timeout',function(){firstReturn=this.destroy()===socket;first=snapshot('frozen');alreadyDestroyed=this.destroyed;secondReturn=this.destroy()===socket;second=snapshot('frozen')});socket.setTimeout(25);await closed;const final=snapshot('final');collector.close();process.stdout.write(JSON.stringify({first,second,final,firstReturn,secondReturn,alreadyDestroyed,errorListeners:socket.listenerCount('error'),restored:Socket.prototype.destroy===original,descriptorRestored:JSON.stringify(Object.getOwnPropertyDescriptor(Socket.prototype,'destroy'))===JSON.stringify(descriptor)}));
+}finally{collector.close();collector.remove();client.destroy();socket.destroy();await new Promise(resolve=>server.close(resolve))}`
+  const child = spawn(
+    node,
+    [
+      '--experimental-strip-types',
+      '--disable-warning=ExperimentalWarning',
+      '--input-type=module',
+      '--eval',
+      script,
+      output,
+      source,
+    ],
+    { stdio: ['ignore', 'pipe', 'pipe'] },
+  )
+  const closed = once(child, 'close')
+  let stdout = '',
+    stderr = ''
+  child.stdout.on('data', (chunk) => {
+    stdout += chunk.toString()
+  })
+  child.stderr.on('data', (chunk) => {
+    stderr += chunk.toString()
+  })
+  const timer = setTimeout(() => child.kill('SIGKILL'), 15000)
+  try {
+    const [code, signal] = await closed
+    expect(code, stderr).toBe(0)
+    expect(signal).toBeNull()
+    await annotate('Repeated public destroy observation', 'socket-provenance', {
+      body: stdout,
+      bodyEncoding: 'utf-8',
+      contentType: 'application/json',
+    })
+    const result = JSON.parse(stdout)
+    expect(result.firstReturn, stdout).toBe(true)
+    expect(result.secondReturn, stdout).toBe(true)
+    expect(result.alreadyDestroyed, stdout).toBe(true)
+    expect(result.second.row.destroyInvokedAt, stdout).toEqual(result.first.row.destroyInvokedAt)
+    expect(result.second.row.destroyContext, stdout).toBe('timeout-dispatch')
+    expect(result.second.row.repeated, stdout).toBe(0)
+    expect(result.final.row.destroyInvokedAt, stdout).toEqual(result.first.row.destroyInvokedAt)
+    expect(result.final.row.timeoutDispatchDepth, stdout).toBe(0)
+    expect(result.final.summary.partial, stdout).toBe(0)
+    expect(result.final.summary.coverage.refused, stdout).toBe(0)
+    expect(result.errorListeners).toBe(0)
+    expect(result.restored).toBe(true)
+    expect(result.descriptorRestored).toBe(true)
+  } finally {
+    clearTimeout(timer)
+    await rm(output, { recursive: true, force: true })
+  }
+})

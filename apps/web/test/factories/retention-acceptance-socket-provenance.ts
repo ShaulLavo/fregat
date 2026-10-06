@@ -657,7 +657,9 @@ export function createRetentionSocketProvenance(options: {
     })
   }
   const socketDestroy = (socket: Socket) => {
-    if (stopped || !getSocket(socket)) return
+    if (stopped) return
+    const first = getSocket(socket)
+    if (!first || first.destroyInvokedAt) return
     const coverage = journal.coverage()
     const incomplete =
       coverage.partial || coverage.refused || coverage.referenceRefused || coverage.unavailable
@@ -667,7 +669,6 @@ export function createRetentionSocketProvenance(options: {
       if (!incomplete) destroyContext = value.timeoutDispatchDepth ? 'timeout-dispatch' : 'other'
       return {
         ...value,
-        repeated: value.repeated + (value.destroyInvokedAt ? 1 : 0),
         destroyInvokedAt: now(),
         destroyContext,
       }
