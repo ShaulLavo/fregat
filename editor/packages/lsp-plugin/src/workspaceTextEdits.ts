@@ -10,6 +10,7 @@ import {
 } from '@singapore-editor/core/document'
 import type {
   DocumentLogicalRevisionScope,
+  DocumentSyncPoint,
   DocumentTextSnapshot,
   EditorTextBuffer,
   PieceTableSnapshot,
@@ -32,6 +33,8 @@ export type WorkspaceTextDocumentProvenance = {
   readonly textSnapshot: LspTextSnapshot
   readonly uri: string
   readonly version: number
+  readonly sourceRevision: number
+  readonly sourceSegment: object
 }
 
 export type WorkspaceTextReplaySegmentInput = {
@@ -47,6 +50,7 @@ export type WorkspaceTextReplayTarget = {
   readonly buffer: EditorTextBuffer
   readonly expectedRevision: number
   readonly initialSnapshot: DocumentTextSnapshot
+  readonly initialSyncPoint: DocumentSyncPoint
 }
 
 export type WorkspaceTextReplayInput = {
@@ -94,6 +98,7 @@ type ReplayState = {
   uri: string | null
   version: number | null
   versionUri: string | null
+  sourcePoint: Pick<DocumentSyncPoint, 'revision' | 'segment'> | null
 }
 
 type SimulatedWorkspaceTextSegment = Omit<PreparedWorkspaceTextSegment, 'sequenceSegmentIndex'>
@@ -178,13 +183,22 @@ function targetGuardFailure(target: WorkspaceTextReplayTarget): WorkspaceEditFai
   if (target.buffer.getSnapshot() !== target.initialSnapshot.snapshot) {
     return failure('snapshot-drift', 'Target buffer snapshot does not match the replay guard')
   }
+  const point = target.buffer.getDocumentSyncPoint()
+  const captured = target.initialSyncPoint
+  if (
+    point.segment !== captured.segment ||
+    point.revision !== captured.revision ||
+    point.textVersion !== captured.textVersion
+  ) {
+    return failure('snapshot-drift', 'Target source point does not match the replay guard')
+  }
   return null
 }
 
 function initialReplayState(input: WorkspaceTextReplayInput): ReplayState {
   const uri = input.segments[0]?.uri ?? null
   const provenance = uri
-    ? exactProvenance(input.provenance, uri, input.target.initialSnapshot)
+    ? exactProvenance(input.provenance, uri, input.target.initialSyncPoint)
     : null
   const version = validProvenanceVersion(provenance) ? provenance.version : null
   return {
@@ -193,6 +207,7 @@ function initialReplayState(input: WorkspaceTextReplayInput): ReplayState {
     uri,
     version,
     versionUri: version === null ? null : uri,
+    sourcePoint: input.target.initialSyncPoint,
   }
 }
 
@@ -204,6 +219,7 @@ function simulateSegment(
   enterSegmentUri(input.provenance, state, segment.uri)
   const snapshotBefore = state.snapshot
   const textSnapshotBefore = state.textSnapshot
+  const sourcePointBefore = state.sourcePoint
   const simulatedVersionBefore = state.version
   const steps: PreparedWorkspaceTextStep[] = []
   let logicalRevisionCount = 0
@@ -215,7 +231,7 @@ function simulateSegment(
     steps.push(result.step)
   }
 
-  canonicalizeSegmentSnapshot(state, steps, snapshotBefore, textSnapshotBefore)
+  canonicalizeSegmentSnapshot(state, steps, snapshotBefore, textSnapshotBefore, sourcePointBefore)
   return {
     ok: true,
     segment: Object.freeze({
@@ -240,7 +256,7 @@ function enterSegmentUri(
   state.uri = uri
   state.versionUri = null
 
-  const mapped = exactProvenance(provenance, uri, state.textSnapshot)
+  const mapped = exactProvenance(provenance, uri, state.sourcePoint)
   if (!validProvenanceVersion(mapped)) return
   if (state.version !== null && state.version !== mapped.version) return
   state.version = mapped.version
@@ -274,7 +290,10 @@ function simulateStep(
   const candidate = applyBatchToPieceTable(snapshotBefore, converted.value.applicationEdits)
   const effective = !pieceTableSnapshotsHaveSameText(snapshotBefore, candidate)
   state.snapshot = effective ? candidate : snapshotBefore
-  if (effective) state.textSnapshot = createDocumentTextSnapshot(state.snapshot)
+  if (effective) {
+    state.textSnapshot = createDocumentTextSnapshot(state.snapshot)
+    state.sourcePoint = null
+  }
 
   const versionAdvanceFailure = advanceSimulatedVersion(state, effective, entry.operationIndex)
   if (versionAdvanceFailure) return { error: versionAdvanceFailure, ok: false }
@@ -319,7 +338,7 @@ function establishVersionLineage(
 ): WorkspaceEditFailure | null {
   if (state.versionUri === entry.operation.uri && state.version !== null) return null
 
-  const mapped = exactProvenance(provenance, entry.operation.uri, state.textSnapshot)
+  const mapped = exactProvenance(provenance, entry.operation.uri, state.sourcePoint)
   if (!validProvenanceVersion(mapped)) {
     return failure('version-mismatch', 'No exact lane provenance exists for this text snapshot', {
       operationIndex: entry.operationIndex,
@@ -557,10 +576,12 @@ function canonicalizeSegmentSnapshot(
   steps: PreparedWorkspaceTextStep[],
   snapshotBefore: PieceTableSnapshot,
   textSnapshotBefore: TextSnapshot,
+  sourcePointBefore: ReplayState['sourcePoint'],
 ): void {
   if (!pieceTableSnapshotsHaveSameText(snapshotBefore, state.snapshot)) return
   state.snapshot = snapshotBefore
   state.textSnapshot = textSnapshotBefore
+  state.sourcePoint = sourcePointBefore
 
   const last = steps.at(-1)
   if (!last) return
@@ -655,10 +676,16 @@ function bindStepBoundaries(
 function exactProvenance(
   provenance: readonly WorkspaceTextDocumentProvenance[],
   uri: string,
-  textSnapshot: TextSnapshot,
+  point: ReplayState['sourcePoint'],
 ): WorkspaceTextDocumentProvenance | null {
+  if (!point) return null
   return (
-    provenance.find((entry) => entry.uri === uri && entry.textSnapshot === textSnapshot) ?? null
+    provenance.find(
+      (entry) =>
+        entry.uri === uri &&
+        entry.sourceRevision === point.revision &&
+        entry.sourceSegment === point.segment,
+    ) ?? null
   )
 }
 

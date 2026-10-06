@@ -3,9 +3,9 @@ import type { ReactNode } from 'react'
 
 import {
   WorkspaceEditHostContext,
-  WorkspaceEditServiceContext,
   type WorkspaceEditHost,
-} from '@/features/editor/providers/workspace-edit-context'
+} from '@/lib/workspace-edits/providers/host-context'
+import { WorkspaceEditServiceContext } from '@/features/editor/providers/workspace-edit-context'
 import type { WorkspaceEditService } from '@/features/editor/state/workspace-edit-service'
 
 export function WorkspaceEditProvider({

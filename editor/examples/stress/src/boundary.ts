@@ -1,3 +1,4 @@
+import { createEditorStructuralOperation } from '@singapore-editor/core/editor'
 import {
   createEditorBufferSession,
   createEditorTextBuffer,
@@ -10,7 +11,7 @@ import {
   createEmptySyntaxResult,
   type EditorSyntaxCapture,
   type EditorSyntaxResult,
-  type EditorSyntaxSession,
+  type EditorSyntaxRuntime,
 } from '@singapore-editor/core/syntax'
 import { createDecodePlugin } from '@singapore-editor/decode'
 import { createMinimapPlugin } from '@singapore-editor/minimap'
@@ -105,9 +106,8 @@ function markdownCaptures(): EditorPlugin {
     { captureName: 'punctuation.delimiter', startIndex: BOLD + 6, endIndex: BOLD + 8 },
   ]
   const result = (): EditorSyntaxResult => ({ ...createEmptySyntaxResult(), captures })
-  const session: EditorSyntaxSession = {
-    refresh: async () => result(),
-    applyChange: async () => result(),
+  const session: EditorSyntaxRuntime = {
+    analyze: async () => result(),
     foldingSupport: 'supported',
     getResult: result,
     getTokens: () => [],
@@ -115,7 +115,8 @@ function markdownCaptures(): EditorPlugin {
     dispose() {},
   }
   return {
-    activate: (context) => context.registerSyntaxProvider({ createSession: () => session }),
+    activate: (context) =>
+      context.registerSyntaxProvider({ operation: createEditorStructuralOperation(() => session) }),
   }
 }
 

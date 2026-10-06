@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  createEditorHighlighterOperation,
+  createEditorStructuralOperation,
+  type EditorStructuralOperationContext,
+  type DocumentRead,
+} from '@singapore-editor/core/editor'
+import {
   createEmptySyntaxResult,
   EditorTokenStore,
-  type EditorSyntaxSessionOptions,
   type EditorToken,
 } from '@singapore-editor/core/syntax'
 import {
@@ -215,21 +220,25 @@ function countingBackend() {
   const backend: DiffSyntaxBackend = {
     kind: 'tree-sitter',
     provider: {
-      createSession(options) {
+      operation: createEditorStructuralOperation((options) => {
         counts.sessions += 1
-        const result = () => syntaxResultForOptions(options)
+        let currentRead = options.initialRead
+        let current = syntaxResultForOptions(options, currentRead)
         return {
           foldingSupport: 'supported',
-          applyChange: async () => result(),
           dispose: () => {
             counts.disposed += 1
           },
-          getResult: result,
-          getSnapshotVersion: () => 0,
-          getTokens: () => result().tokens,
-          refresh: async () => result(),
+          getResult: () => current,
+          getTokens: () => current.tokens,
+          getSnapshotVersion: () => currentRead.revision.point.textVersion,
+          analyze: async (read) => {
+            currentRead = read
+            current = syntaxResultForOptions(options, read)
+            return current
+          },
         }
-      },
+      }),
     },
   }
   return {
@@ -252,9 +261,8 @@ function themedBackend() {
   const backend: DiffSyntaxBackend = {
     kind: 'highlighter',
     provider: {
-      createSession: () => ({
-        refresh,
-        applyChange: refresh,
+      operation: createEditorHighlighterOperation(() => ({
+        analyze: refresh,
         dispose: () => undefined,
         onDidChangeTheme: (listener: () => void) => {
           listeners.add(listener)
@@ -262,7 +270,7 @@ function themedBackend() {
             listeners.delete(listener)
           }
         },
-      }),
+      })),
     },
   }
   return {
@@ -275,9 +283,9 @@ function themedBackend() {
   }
 }
 
-function syntaxResultForOptions(options: EditorSyntaxSessionOptions) {
+function syntaxResultForOptions(options: EditorStructuralOperationContext, read: DocumentRead) {
   const target = options.documentId.endsWith('#diff-old') ? 'old' : 'new'
-  const start = options.textSnapshot.materializeFullText().indexOf(target)
+  const start = read.text.readRange(0, read.text.length).indexOf(target)
   const tokens: EditorToken[] =
     start === -1 ? [] : [{ end: start + target.length, start, style: { color: 'rgb(1, 2, 3)' } }]
   return { ...createEmptySyntaxResult(), tokens }

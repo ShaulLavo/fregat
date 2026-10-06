@@ -1,9 +1,17 @@
 import type { ServerSocket } from '@workspace/client-core/transport/socket'
 import { type LspTransportHandler } from '@singapore-editor/lsp/types'
 import { LspClient, composeWorkspaceEditClientCapabilities } from '@singapore-editor/lsp'
+import type { EditorTextBuffer } from '@singapore-editor/core/document'
+import {
+  createLanguageServerDocument,
+  type OnApplyWorkspaceEdit,
+} from '@singapore-editor/lsp-plugin'
 import { fileUriForPath, type LspMatch } from '@workspace/contracts'
 
-import { connectLanguageServerSocket } from '@/lib/server-sockets'
+import {
+  connectLanguageServerSocket,
+  languageServerWebSocketConstructor,
+} from '@/lib/server-sockets'
 import { clientErrors } from '@/lib/structured-errors'
 import type { Client } from '@/lib/client'
 import { log } from '@/lib/client-logging'
@@ -40,7 +48,8 @@ export type DocumentSymbolsRequest = {
   /** The language server to ask; the socket route refuses to guess one. */
   serverId: string
   signal: AbortSignal
-  text?: string | null
+  buffer?: EditorTextBuffer
+  onApplyWorkspaceEdit?: OnApplyWorkspaceEdit
 }
 
 // Ranks are ascending: lower wins.
@@ -85,10 +94,12 @@ export async function fetchDocumentSymbols(
 }
 
 function requestDocumentSymbols(
-  { path, rootPath, serverId, signal, text }: DocumentSymbolsRequest,
+  request: DocumentSymbolsRequest,
   client: Client,
   connectSocket: typeof connectLanguageServerSocket,
 ) {
+  if (request.buffer) return requestRetainedSymbols(request, request.buffer, client, connectSocket)
+  const { path, rootPath, serverId, signal } = request
   return new Promise<readonly DocumentSymbol[]>((resolve, reject) => {
     if (signal?.aborted) {
       reject(clientErrors.DOCUMENT_SYMBOL_ABORTED({ internal: { at: 'before-connect', serverId } }))
@@ -102,7 +113,7 @@ function requestDocumentSymbols(
       timeoutMs: LANGUAGE_SERVER_REQUEST_TIMEOUT_MS,
       capabilities: composeWorkspaceEditClientCapabilities(
         clientCapabilitiesForServer(serverId),
-        true,
+        request.onApplyWorkspaceEdit !== undefined,
       ),
     })
     const handlers = new Set<LspTransportHandler>()
@@ -126,7 +137,7 @@ function requestDocumentSymbols(
     const succeed = (result: unknown) => finish(() => resolve(documentSymbolsFromResult(result)))
     const fail = (error: unknown) => finish(() => reject(error))
     socket.addEventListener('open', () => {
-      void readConnectedSymbols(languageClient, socket, handlers, { path, text, signal }).then(
+      void readConnectedSymbols(languageClient, socket, handlers, { path, signal }).then(
         succeed,
         fail,
       )
@@ -145,6 +156,71 @@ function requestDocumentSymbols(
   })
 }
 
+async function requestRetainedSymbols(
+  { path, rootPath, serverId, signal, onApplyWorkspaceEdit }: DocumentSymbolsRequest,
+  buffer: EditorTextBuffer,
+  client: Client,
+  connectSocket: typeof connectLanguageServerSocket,
+): Promise<readonly DocumentSymbol[]> {
+  signal.throwIfAborted()
+  const route = new URL('/lsp', 'ws://localhost')
+  route.searchParams.set('root', rootPath)
+  route.searchParams.set('path', path)
+  route.searchParams.set('server', serverId)
+  let socket: ServerSocket | null = null
+  const document = createLanguageServerDocument({
+    buffer,
+    onApplyWorkspaceEdit,
+    uri: fileUriForPath(path),
+    languageId: languageIdForPath(path),
+    lanes: [
+      {
+        id: serverId,
+        features: { navigation: 0 },
+        rootUri: fileUriForPath(rootPath),
+        clientInfo: LANGUAGE_SERVER_CLIENT_INFO,
+        timeoutMs: LANGUAGE_SERVER_REQUEST_TIMEOUT_MS,
+        capabilities: composeWorkspaceEditClientCapabilities(
+          clientCapabilitiesForServer(serverId),
+          true,
+        ),
+        webSocketRoute: route,
+        webSocketTransportOptions: {
+          WebSocketCtor: languageServerWebSocketConstructor(client, signal, (...input) => {
+            socket = connectSocket(...input)
+            return socket
+          }),
+        },
+      },
+    ],
+  })
+  const abort = () => {
+    socket?.close()
+    document.dispose()
+  }
+  signal.addEventListener('abort', abort, { once: true })
+  try {
+    const lane = document.lanes[0]!
+    await lane.connection.ready
+    signal.throwIfAborted()
+    const point = buffer.getDocumentSyncPoint()
+    const result = await lane.connection.client.request(
+      'textDocument/documentSymbol',
+      {
+        textDocument: { uri: fileUriForPath(path) },
+      },
+      { signal },
+    )
+    const current = buffer.getDocumentSyncPoint()
+    if (point.segment !== current.segment || point.revision !== current.revision)
+      throw clientErrors.DOCUMENT_SYMBOL_ABORTED({ internal: { at: 'superseded', serverId } })
+    return documentSymbolsFromResult(result)
+  } finally {
+    signal.removeEventListener('abort', abort)
+    document.dispose()
+  }
+}
+
 function dispatchSocketMessage(handlers: ReadonlySet<LspTransportHandler>, event: Event) {
   if (!(event instanceof MessageEvent)) return
   const data: unknown = event.data
@@ -156,7 +232,7 @@ async function readConnectedSymbols(
   languageClient: LspClient,
   socket: ServerSocket,
   handlers: Set<LspTransportHandler>,
-  { path, text, signal }: Pick<DocumentSymbolsRequest, 'path' | 'text' | 'signal'>,
+  { path, signal }: Pick<DocumentSymbolsRequest, 'path' | 'signal'>,
 ) {
   await languageClient.connect({
     send: (message) => socket.send(message),
@@ -168,32 +244,12 @@ async function readConnectedSymbols(
     },
   })
   signal.throwIfAborted()
-  sendOpenDocument(socket, path, text)
   return languageClient.request(
     'textDocument/documentSymbol',
     {
       textDocument: { uri: fileUriForPath(path) },
     },
     { signal },
-  )
-}
-
-function sendOpenDocument(socket: ServerSocket, path: string, text: string | null | undefined) {
-  if (text === null || text === undefined) return
-
-  socket.send(
-    JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'textDocument/didOpen',
-      params: {
-        textDocument: {
-          languageId: languageIdForPath(path),
-          text,
-          uri: fileUriForPath(path),
-          version: 1,
-        },
-      },
-    }),
   )
 }
 

@@ -10,11 +10,15 @@ import { createIncrementalTokenizer, type CreateIncrementalTokenizerResult } fro
 import { packTokenLines, snapshotToPackedEditorTokens } from './editor-tokens'
 import type { EditorTheme } from '../theme'
 import { packedEditorTokenTransfers } from '../syntax/packedTokens'
+import {
+  DocumentWorkerReader,
+  documentWorkerPointsEqual,
+  type DocumentWorkerRead,
+} from '../document/workerReader'
 import { editorThemeFromShikiTheme, type ShikiThemeLike } from './theme-extract'
 import type {
   ShikiWorkerDocumentOptions,
   ShikiWorkerEditRequest,
-  ShikiWorkerHighlightRequest,
   ShikiWorkerLanguageRegistration,
   ShikiWorkerOpenRequest,
   ShikiWorkerPreloadRequest,
@@ -35,8 +39,10 @@ type DocumentState = {
   themeRegistration: ShikiWorkerThemeRegistration
   readonly highlighter: HighlighterGeneric<string, string>
   readonly tokenizer: CreateIncrementalTokenizerResult['tokenizer']
+  source: DocumentWorkerRead
 }
 
+const sourceReader = new DocumentWorkerReader()
 const documents = new Map<string, DocumentState>()
 const documentTasks = new Map<string, Promise<ShikiWorkerTransportResult | undefined>>()
 const disposedRuntimeSessions = new Set<string>()
@@ -69,11 +75,15 @@ const handleRequest = async (request: ShikiWorkerRequest): Promise<void> => {
 const runRequest = (
   payload: ShikiWorkerRequest['payload'],
 ): Promise<ShikiWorkerTransportResult | undefined> => {
-  if (payload.type === 'open') {
-    return runDocumentTask(payload.runtimeSessionId, () => openDocument(payload))
-  }
-  if (payload.type === 'edit') {
-    return runDocumentTask(payload.runtimeSessionId, () => editDocument(payload))
+  if (payload.type === 'source')
+    return Promise.resolve({ source: sourceReader.apply(payload.command) })
+  if (payload.type === 'open' || payload.type === 'edit') {
+    const source = sourceReader.acquire(payload.source)
+    if (!source)
+      return Promise.reject(new DOMException('Document source read is unavailable', 'AbortError'))
+    return runDocumentTask(payload.runtimeSessionId, () =>
+      payload.type === 'open' ? openDocument(payload, source) : editDocument(payload, source),
+    ).finally(() => source.dispose())
   }
   if (payload.type === 'recolor') {
     return runDocumentTask(payload.runtimeSessionId, () => recolorDocument(payload))
@@ -97,9 +107,6 @@ const runRequest = (
   }
   if (payload.type === 'preload') {
     return preloadRegistrations(payload)
-  }
-  if (payload.type === 'highlight') {
-    return highlightSnippet(payload)
   }
 
   return Promise.allSettled(Array.from(activeWorkerTasks)).then(() => {
@@ -128,6 +135,7 @@ const inspectRetention = async (): Promise<ShikiWorkerTransportResult> => {
     }
   })
   const retention: ShikiWorkerRetentionSnapshot = {
+    source: sourceReader.inspect(),
     documentCount: documents.size,
     tokenizerCount: new Set(Array.from(documents.values(), (state) => state.tokenizer)).size,
     retiredRuntimeCount: disposedRuntimeSessions.size,
@@ -177,21 +185,27 @@ const clearDocumentTask = (
 
 const openDocument = async (
   payload: ShikiWorkerOpenRequest,
+  source: DocumentWorkerRead,
 ): Promise<ShikiWorkerTransportResult> => {
   if (disposedRuntimeSessions.has(payload.runtimeSessionId)) {
     return { documentId: payload.documentId }
   }
 
   const highlighter = await ensureHighlighter(payload)
+  assertSource(source)
   const { tokenizer } = await createIncrementalTokenizer({
     lang: payload.lang,
     theme: payload.theme,
-    code: payload.text,
+    code: source.text.materializeFullText(),
     highlighter,
     maxLineLength: payload.maxLineLength,
   })
 
+  assertSource(source)
+  const retained = source.retain()
+  if (!retained) throw new DOMException('Document source scope was released', 'AbortError')
   const state = {
+    source: retained,
     documentId: payload.documentId,
     runtimeSessionId: payload.runtimeSessionId,
     lang: payload.lang,
@@ -201,13 +215,15 @@ const openDocument = async (
     tokenizer,
   }
   if (!disposedRuntimeSessions.has(payload.runtimeSessionId)) {
+    documents.get(payload.runtimeSessionId)?.source.dispose()
     documents.set(payload.runtimeSessionId, state)
-  }
+  } else retained.dispose()
   return resultFromState(state)
 }
 
 const editDocument = async (
   payload: ShikiWorkerEditRequest,
+  source: DocumentWorkerRead,
 ): Promise<ShikiWorkerTransportResult> => {
   const existing = documents.get(payload.runtimeSessionId)
   if (!existing) throw new Error('Unable to edit unopened Shiki document without text')
@@ -215,7 +231,23 @@ const editDocument = async (
     throw new Error('Unable to reopen Shiki document without text')
   }
 
-  const patches = existing.tokenizer.applyEdits(payload.edits)
+  assertSource(source)
+  if (
+    !existing.source.isValid() ||
+    !documentWorkerPointsEqual(existing.source.point, payload.previousPoint)
+  )
+    throw new DOMException('Shiki analysed source base is stale', 'InvalidStateError')
+  const retained = source.retain()
+  if (!retained) throw new DOMException('Document source scope was released', 'AbortError')
+  let patches: ReturnType<DocumentState['tokenizer']['applyEdits']>
+  try {
+    patches = existing.tokenizer.applyEdits(payload.edits)
+  } catch (error) {
+    retained.dispose()
+    throw error
+  }
+  existing.source.dispose()
+  existing.source = retained
   return {
     documentId: existing.documentId,
     patchesPacked: patches.map((patch) => ({
@@ -338,34 +370,6 @@ const loadTheme = async (payload: ShikiWorkerThemeRequest): Promise<ShikiWorkerT
  * Snippets share one highlighter keyed by no theme set, so a preview of forty themes loads forty
  * themes into one engine instead of building forty engines.
  */
-const highlightSnippet = async (
-  payload: ShikiWorkerHighlightRequest,
-): Promise<ShikiWorkerTransportResult> => {
-  const highlighter = await ensureHighlighterFor([], [])
-  if (!highlighter.getLoadedThemes().includes(payload.theme)) {
-    await highlighter.loadTheme({
-      ...payload.themeRegistration,
-      name: payload.theme,
-    } as unknown as ThemeRegistrationAny)
-  }
-  const theme = editorThemeFromHighlighter(highlighter, payload.theme, payload.themeRegistration)
-  if (!payload.lang || payload.text.length === 0) return { theme }
-
-  await ensureLanguages(highlighter, uniqueLanguageRegistrations(payload.languageRegistrations))
-  const { tokenizer } = await createIncrementalTokenizer({
-    lang: payload.lang,
-    theme: payload.theme,
-    code: payload.text,
-    highlighter,
-    maxLineLength: payload.maxLineLength,
-  })
-  return {
-    tokensPacked: snapshotToPackedEditorTokens(tokenizer.getSnapshot()),
-    theme,
-    untokenizedLines: tokenizer.untokenizedLineCount(),
-  }
-}
-
 const preloadRegistrations = async (payload: ShikiWorkerPreloadRequest): Promise<undefined> => {
   const themes = uniqueThemeRegistrations(payload.themeRegistrations)
   const highlighter = await ensureHighlighterFor([], themes)
@@ -388,6 +392,7 @@ const documentMatches = (state: DocumentState, payload: ShikiWorkerEditRequest):
 
 const disposeDocument = (runtimeSessionId: string): void => {
   markRuntimeSessionDisposed(runtimeSessionId)
+  documents.get(runtimeSessionId)?.source.dispose()
   documents.delete(runtimeSessionId)
 }
 
@@ -400,7 +405,9 @@ const markRuntimeSessionDisposed = (runtimeSessionId: string): void => {
 }
 
 const disposeAll = (): void => {
+  for (const state of documents.values()) state.source.dispose()
   documents.clear()
+  sourceReader.dispose()
   documentTasks.clear()
   activeWorkerTasks.clear()
   disposedRuntimeSessions.clear()
@@ -484,4 +491,8 @@ function editorThemeFromHighlighter(
     return editorThemeFromShikiTheme(registration)
   }
   return undefined
+}
+
+function assertSource(source: DocumentWorkerRead): void {
+  if (!source.isValid()) throw new DOMException('Document source scope was released', 'AbortError')
 }

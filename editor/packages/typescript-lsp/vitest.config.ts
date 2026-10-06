@@ -5,5 +5,6 @@ export default defineConfig({
   server: { fs: { allow: [workspaceRoot] } },
   test: {
     environment: 'happy-dom',
+    exclude: ['**/*.browser.test.ts', '**/node_modules/**'],
   },
 })

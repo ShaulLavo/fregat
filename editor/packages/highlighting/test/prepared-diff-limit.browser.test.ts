@@ -49,6 +49,8 @@ test('prepared diff sessions use the configured cap and recolor under the next r
   })
   let sources: readonly DiffSyntaxSourceReader[] = []
   let shown: { dispose(): void } | null = null
+  const unsubscribe: (() => void)[] = []
+  const changed = new Set<DiffSyntaxSourceReader>()
   try {
     expect(await service.prepareDiff(file, source)).toBe(true)
     expect(service.inspect().shiki?.untokenizedLines).toBe(2)
@@ -68,6 +70,7 @@ test('prepared diff sessions use the configured cap and recolor under the next r
     expect(sources).toHaveLength(2)
     for (const value of sources)
       expect(value.tokens.toTokens()).toEqual([{ start: 0, end: 16, style: { color: '#EEEEEE' } }])
+    for (const value of sources) unsubscribe.push(value.onDidChangeTokens(() => changed.add(value)))
     expect(listeners.size).toBe(2)
     limit = 100
     foreground = '#dddddd'
@@ -82,8 +85,27 @@ test('prepared diff sessions use the configured cap and recolor under the next r
         { message: 'two prepared sessions reopen under cap 100' },
       )
       .toEqual({ count: 0, requests: 2, errors: [] })
+    await expect
+      .poll(() =>
+        sources.map((value) => {
+          const tokens = value.tokens.toTokens()
+          return {
+            changed: changed.has(value),
+            split: tokens.length > 1,
+            keyword: tokens.some(
+              (token) => token.start === 0 && token.end === 5 && token.style.color === '#FF0000',
+            ),
+            foreground: tokens.some((token) => token.start >= 5 && token.style.color === '#DDDDDD'),
+          }
+        }),
+      )
+      .toEqual([
+        { changed: true, split: true, keyword: true, foreground: true },
+        { changed: true, split: true, keyword: true, foreground: true },
+      ])
     for (const value of sources) expect(value.tokens.toTokens().length).toBeGreaterThan(1)
   } finally {
+    for (const stop of unsubscribe) stop()
     shown?.dispose()
     await service.dispose()
     expect(service.inspect().pendingHighlights).toBe(0)

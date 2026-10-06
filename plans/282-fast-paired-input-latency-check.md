@@ -1,5 +1,29 @@
 # Plan 282: Fast paired input-latency check
 
+## Current delivery checkpoint, 2026-10-05
+
+Plan 099 units 2–7 are Approved. The final `b615d5ab` measurement and `e76f680d` validation
+compare untouched main `51d2a71ae` with candidate `9e773c8fa`. Fresh controls pass; the quiet
+Platform/native default passes 216 blocking checks in 566.201 seconds. The complete matrix
+passes 972 required and 1,080 raw comparisons with exact replay and complete cleanup.
+
+The full command takes 2,798.161 seconds, exceeding the 2,700-second tooling target by 98.161.
+That miss remains recorded as a tooling follow-up after the owner's cost concern. It does not
+block Plan 099 delivery or justify repeating a valid full matrix.
+
+The actual-affinity smoke passes, and loaded native/disabled passes all 216 keys in 231.822
+seconds. Three loaded keys at 75% of their budgets expand the selected cohort to thirteen keys
+across eleven groups. All ten candidate/candidate runs per key finish in 893.648 seconds, with
+two selected and two auxiliary native Undo flags on identical package bytes. The original
+zero-rejection predicate remains false. Source/output/context checks pass and all owned
+processes retire. These flags remain instrument reliability follow-ups, not a Plan 099 shipping
+blocker or a claim of a code-change regression. Do not retry to obtain zero. Actual changed-code
+comparisons retain every budget and pass. Broader loaded matrices and historical negative
+matrices stay open follow-ups with no acceptance credit for uncollected results.
+
+The sections below preserve the original design and archived decisions. Their earlier failed
+Undo verdicts keep their original identities and do not describe the final candidate.
+
 ## Status and authorization
 
 - Status: Approved; implementation ready for independent review with one unclassified undo key.
@@ -79,6 +103,13 @@ One worker (Opus or Sol, high) in its own worktree off Fregat main, one independ
 Validation runs are measurements: run them when no other heavy work is on the machine.
 
 ## Done when
+
+Owner steering, October 5: the default/full runtime targets measure tooling usability. They
+remain optimization goals and do not block Plan 099 delivery. The completed full run passes
+972 required comparisons and 1,080 raw comparisons in 2,798.161 seconds. Its 98.161-second
+target miss remains recorded. Preserve the valid evidence and verify affected changes with
+focused checks; a full rerun needs a concrete affected-scope reason. Latency, source, output,
+cleanup, and statistical thresholds retain their existing values.
 
 - The paired command exists, with its sensitivity self-check stored per instrument hash.
 - Steps 2 and 3 reproduce the old verdicts on all five accepted configurations, with and without
