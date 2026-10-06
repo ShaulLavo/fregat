@@ -60,6 +60,41 @@ export const filePickerSelection: Scenario = {
   },
 }
 
+export async function finishPreviewScenario(
+  primary: { error: unknown } | null,
+  stages: readonly { name: string; run(): unknown | Promise<unknown> }[],
+  report: (failures: readonly { stage: string; error: string }[]) => Promise<unknown>,
+) {
+  const failures: { stage: string; error: unknown }[] = []
+  for (const stage of stages) {
+    try {
+      await stage.run()
+    } catch (error) {
+      failures.push({ stage: stage.name, error })
+    }
+  }
+  const describe = () =>
+    failures.map(({ stage, error }) => ({
+      stage,
+      error: error instanceof Error ? error.message : String(error),
+    }))
+  try {
+    await report(describe())
+  } catch (error) {
+    failures.push({ stage: 'cleanup-evidence', error })
+  }
+  if (failures.length) {
+    try {
+      process.stderr.write(`${JSON.stringify({ previewSecondaryFailures: describe() })}\n`)
+    } catch {
+      // A broken evidence sink cannot replace the scenario or cleanup failure.
+    }
+  }
+  if (primary) throw primary.error
+  const first = failures[0]
+  if (first) throw first.error
+}
+
 export async function pickerLivePreview(
   page: Parameters<Scenario['run']>[0],
   { step, evidence }: Parameters<Scenario['run']>[1],
@@ -103,8 +138,8 @@ export async function rootlessPickerPreview(
   const browser = page.context().browser()
   ok(browser && server, 'A fixture-only browser/API pair is required')
   const context = await browser.newContext({ viewport: page.viewportSize() })
-  await context.addInitScript(`window.platformDevServerUrl = ${JSON.stringify(server.origin)}`)
-  const fresh = await context.newPage()
+  let ownedPage: Parameters<Scenario['run']>[0] | null = null
+  let primary: { error: unknown } | null = null
   const requests: { route: string; target: string }[] = []
   const request = (item: import('playwright').Request) => {
     const url = new URL(item.url())
@@ -115,9 +150,12 @@ export async function rootlessPickerPreview(
     )
       requests.push({ route: url.pathname, target })
   }
-  fresh.on('request', request)
   let frame: JSHandle<FilePreviewFrame | null> | null = null
   try {
+    await context.addInitScript(`window.platformDevServerUrl = ${JSON.stringify(server.origin)}`)
+    const fresh = await context.newPage()
+    ownedPage = fresh
+    fresh.on('request', request)
     await fresh.goto(new URL('/', page.url()).href)
     await waitForApp(fresh)
     await fresh.keyboard.press('Control+o')
@@ -145,11 +183,25 @@ export async function rootlessPickerPreview(
     await fresh.keyboard.press('Escape')
     strictEqual((await captured.evaluate(filePreviewFrameFacts))?.interestCount, 0)
   } catch (error) {
-    await captureScenarioFailure(fresh, evidence, 'before-cleanup')
-    throw error
+    primary = { error }
   } finally {
-    fresh.off('request', request)
-    await frame?.dispose()
-    await context.close()
+    const failedPage = ownedPage
+    await finishPreviewScenario(
+      primary,
+      [
+        ...(primary && failedPage
+          ? [
+              {
+                name: 'failure-capture',
+                run: () => captureScenarioFailure(failedPage, evidence, 'before-cleanup'),
+              },
+            ]
+          : []),
+        { name: 'request-listener', run: () => ownedPage?.off('request', request) },
+        { name: 'rootless-handle', run: () => frame?.dispose() },
+        { name: 'rootless-context', run: () => context.close() },
+      ],
+      (failures) => evidence.json('rootless-cleanup.json', { failures, requests }),
+    )
   }
 }

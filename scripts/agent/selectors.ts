@@ -1933,6 +1933,7 @@ export type FilePreviewFrame = {
   lease: FilePreviewLease | null
   name: string
   controller: FilePreviewController | null
+  native: Editor | null
   view: object | null
 }
 
@@ -2050,6 +2051,7 @@ export function captureFilePreviewFrame(element: Element): FilePreviewFrame | nu
     lease,
     name,
     controller,
+    native: controller?.getEditor() ?? null,
     view: view?.view ?? null,
   }
 }
@@ -2058,7 +2060,7 @@ export function filePreviewFrameFacts(frame: FilePreviewFrame | null) {
   if (!frame) return null
   const current = frame.lease?.read() ?? frame.read
   const state = frame.runtime.documentStore.getState()
-  const native = frame.controller?.getEditor() ?? null
+  const native = frame.native
   const input = native?.getInputElement() ?? null
   const captured = native?.captureSnapshot() ?? null
   const paint = captured ? JSON.parse(captured.paint) : null
@@ -2132,5 +2134,27 @@ export function filePreviewFrameFacts(frame: FilePreviewFrame | null) {
     paintRows: paint?.rows?.length ?? null,
     box: box ? { width: box.width, height: box.height } : null,
     nativeBox: nativeBox ? { width: nativeBox.width, height: nativeBox.height } : null,
+  }
+}
+
+export function filePreviewIdentityFacts(
+  current: FilePreviewFrame | null,
+  initial: FilePreviewFrame | null,
+) {
+  if (!current || !initial || current.read.kind !== 'live' || initial.read.kind !== 'live')
+    return null
+  return {
+    sameBuffer: current.read.buffer === initial.read.buffer,
+    sameNative: initial.native !== null && current.native === initial.native,
+    sameView: initial.view !== null && current.view === initial.view,
+    sameController: initial.controller !== null && current.controller === initial.controller,
+    sameRuntime: current.runtime === initial.runtime,
+    sameRoot: current.root === initial.root,
+    sameDocument: current.ownerDocument === initial.ownerDocument,
+    sameKey: current.read.key === initial.read.key,
+    initialNativeBufferMatches: initial.native?.getBufferSession()?.buffer === initial.read.buffer,
+    currentNativeBufferMatches: current.native?.getBufferSession()?.buffer === initial.read.buffer,
+    controllerRetainsInitialNative: initial.controller?.getEditor() === initial.native,
+    controllerRetainsCurrentNative: current.controller?.getEditor() === current.native,
   }
 }

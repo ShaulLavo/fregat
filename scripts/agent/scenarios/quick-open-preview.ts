@@ -9,10 +9,15 @@ import {
   fixtureGit,
 } from '../fixture-workspace'
 import { captureScenarioFailure } from '../scenario-failure'
-import { pickerLivePreview, rootlessPickerPreview } from './file-picker-selection'
+import {
+  pickerLivePreview,
+  rootlessPickerPreview,
+  finishPreviewScenario,
+} from './file-picker-selection'
 import {
   captureFilePreviewFrame,
   filePreviewFrameFacts,
+  filePreviewIdentityFacts,
   focusEditor,
   chords,
   selectors,
@@ -22,6 +27,11 @@ import type { Scenario } from './index'
 
 const liveName = 'native-preview-live.txt'
 const diskName = 'native-preview-disk.txt'
+
+export function assertPreviewIdentity(facts: ReturnType<typeof filePreviewIdentityFacts>) {
+  ok(facts, 'Actual longitudinal live references were captured')
+  for (const [name, matches] of Object.entries(facts)) strictEqual(matches, true, name)
+}
 
 export const quickOpenPreview: Scenario = {
   name: 'quick-open-preview',
@@ -38,6 +48,8 @@ export const quickOpenPreview: Scenario = {
     const counts = { liveHead: 0, liveFull: 0, diskHead: 0, diskFull: 0 }
     const requests: { url: string; route: string; target: string; phase: string }[] = []
     const handles: JSHandle<FilePreviewFrame | null>[] = []
+    let primary: { error: unknown } | null = null
+    let fixtureReleased = false
     let phase = 'initial-full-open'
     let releaseHead = () => {}
     const request = (item: import('playwright').Request) => {
@@ -52,8 +64,8 @@ export const quickOpenPreview: Scenario = {
       if (target === diskPath && route.endsWith('/fs/head')) counts.diskHead++
       if (target === diskPath && route.endsWith('/fs/read')) counts.diskFull++
     }
-    page.on('request', request)
     try {
+      page.on('request', request)
       await writeFile(path.join(fixture, liveName), original)
       await mkdir(path.join(fixture, 'cold'))
       await writeFile(path.join(fixture, 'cold', diskName), disk)
@@ -148,11 +160,15 @@ export const quickOpenPreview: Scenario = {
       )
       throws(() => strictEqual(actual.prefix?.startsWith('DISK_A'), true))
       throws(() => strictEqual(actual.scope?.rootPath, path.join(fixture, 'wrong-owner').slice(1)))
+      const initialIdentity = await palette.evaluate(filePreviewIdentityFacts, picker)
+      assertPreviewIdentity(initialIdentity)
       await evidence.json('live-peer-calibration.json', {
+        initialIdentity,
         actual,
         picker: await picker.evaluate(filePreviewFrameFacts),
-        wrongDiskRefused: true,
-        wrongOwnerRefused: true,
+        wrongDiskExpectationRejected: true,
+        wrongRootExpectationRejected: true,
+        controlKind: 'observation assertion discrimination; no live owner injection',
         counts,
         requests,
       })
@@ -234,12 +250,15 @@ export const quickOpenPreview: Scenario = {
           editedFacts.revision > actual.revision,
       )
       strictEqual(editedFacts.nativeBufferMatches, true)
+      const editedIdentity = await edited.evaluate(filePreviewIdentityFacts, palette)
+      assertPreviewIdentity(editedIdentity)
       strictEqual(
         (await picker.evaluate(filePreviewFrameFacts))?.capturedSnapshotPrefix,
         actual.capturedSnapshotPrefix,
       )
       await evidence.json('committed-edit-new-source-read.json', {
         editedFacts,
+        editedIdentity,
         originalEnded: await palette.evaluate(filePreviewFrameFacts),
         counts,
         requests,
@@ -259,6 +278,27 @@ export const quickOpenPreview: Scenario = {
         undefined,
         { timeout: 8000 },
       )
+      const undone = await selectors
+        .palettePreviewText(page)
+        .evaluateHandle(captureFilePreviewFrame)
+      handles.push(undone)
+      const undoFacts = await undone.evaluate(filePreviewFrameFacts)
+      const undoIdentity = await undone.evaluate(filePreviewIdentityFacts, palette)
+      assertPreviewIdentity(undoIdentity)
+      ok(undoFacts && undoFacts.revision !== null && undoFacts.revision > editedFacts.revision)
+      strictEqual(undoFacts.dirty, true)
+      strictEqual(undoFacts.nativeBufferMatches, true)
+      strictEqual(undoFacts.capturedPrefix, actual.capturedPrefix)
+      strictEqual(
+        (await palette.evaluate(filePreviewFrameFacts))?.capturedSnapshotPrefix,
+        actual.capturedSnapshotPrefix,
+      )
+      await evidence.json('undo-source-identity.json', {
+        undoFacts,
+        undoIdentity,
+        counts,
+        requests,
+      })
       await step('undo-retains-dirty-bounded-source')
       strictEqual(counts.liveHead, headBaseline)
       strictEqual(counts.liveFull, fullBaseline)
@@ -366,18 +406,44 @@ export const quickOpenPreview: Scenario = {
         ).length,
       })
     } catch (error) {
-      await evidence.json('failed-native-request-facts.json', { phase, counts, requests })
-      await captureScenarioFailure(page, evidence, 'before-cleanup')
-      throw error
+      primary = { error }
     } finally {
-      releaseHead()
-      page.off('request', request)
-      await page.unroute('**/fs/head?*').catch(() => {})
-      await page.unroute('**/fs/read?*').catch(() => {})
-      await Promise.all(handles.map((handle) => handle.dispose()))
-      await page.goto('about:blank')
-      await releaseFixture(fixture)
-      await evidence.json('fixture-cleanup.json', { released: true, fixture })
+      await finishPreviewScenario(
+        primary,
+        [
+          ...(primary
+            ? [
+                {
+                  name: 'failed-request-evidence',
+                  run: () =>
+                    evidence.json('failed-native-request-facts.json', { phase, counts, requests }),
+                },
+                {
+                  name: 'failure-capture',
+                  run: () => captureScenarioFailure(page, evidence, 'before-cleanup'),
+                },
+              ]
+            : []),
+          { name: 'release-head', run: () => releaseHead() },
+          { name: 'request-listener', run: () => page.off('request', request) },
+          { name: 'head-route', run: () => page.unroute('**/fs/head?*') },
+          { name: 'read-route', run: () => page.unroute('**/fs/read?*') },
+          ...handles.map((handle, index) => ({
+            name: `handle-${index}`,
+            run: () => handle.dispose(),
+          })),
+          { name: 'navigate-blank', run: () => page.goto('about:blank') },
+          {
+            name: 'release-fixture',
+            run: async () => {
+              await releaseFixture(fixture)
+              fixtureReleased = true
+            },
+          },
+        ],
+        (failures) =>
+          evidence.json('fixture-cleanup.json', { released: fixtureReleased, fixture, failures }),
+      )
     }
   },
 }
