@@ -6,6 +6,7 @@ import { inspect } from 'node:util'
 import { StringDecoder } from 'node:string_decoder'
 import type { EventEmitter } from 'node:events'
 import * as v from 'valibot'
+import { createScriptError } from '../../../../scripts/structured-errors.ts'
 import {
   associateRetentionSocketFailure,
   createRetentionSocketProvenance,
@@ -23,6 +24,86 @@ type ForwardOutcome =
   | { readonly kind: 'cancelled' }
 
 type ForwardSettlement = Exclude<ForwardOutcome, { readonly kind: 'cancelled' }>
+
+export type RetentionReloadTimings = {
+  headersCompleted: { requestId: number; at: number } | null
+  baselineReadyAt: number | null
+  reloadReadyAt: number | null
+  fontReadyAt: number | null
+  screenshotCompleteAt: number | null
+  browserTimeOrigin: number | null
+}
+
+export function createRetentionReloadTimings(): RetentionReloadTimings {
+  return {
+    headersCompleted: null,
+    baselineReadyAt: null,
+    reloadReadyAt: null,
+    fontReadyAt: null,
+    screenshotCompleteAt: null,
+    browserTimeOrigin: null,
+  }
+}
+
+type ReloadOwner = Readonly<{ sessionId: string; testPath: string | undefined }>
+type OwnedReload<T> = Readonly<{ result: Promise<T>; close: () => Promise<void> }>
+
+export function createRetentionReloadCases() {
+  const cases = new Map<string, { owner: ReloadOwner; finish: () => Promise<void> }>()
+  return {
+    run<T>(owner: ReloadOwner, id: string, start: (signal: AbortSignal) => OwnedReload<T>) {
+      const valid = v.safeParse(v.pipe(v.string(), v.uuid()), id).success
+      if (!valid || cases.has(id))
+        throw createScriptError('Reload operation identity is unavailable', {
+          internal: { valid, active: cases.has(id) },
+        })
+      const controller = new AbortController()
+      const { result: pending, close: release } = start(controller.signal)
+      let closed: Promise<unknown[]> | null = null
+      const close = () =>
+        (closed ??= Promise.resolve()
+          .then(release)
+          .then(
+            () => [],
+            (error: unknown) => [error],
+          ))
+      const result = pending.finally(close)
+      const settled = result.then(
+        () => undefined,
+        () => undefined,
+      )
+      let finished: Promise<void> | null = null
+      const finish = () =>
+        (finished ??= (async () => {
+          controller.abort()
+          const errors = await close()
+          await settled
+          cases.delete(id)
+          if (errors.length)
+            throw createScriptError('Reload operation cleanup failed', {
+              internal: { count: errors.length },
+            })
+        })())
+      cases.set(id, { owner, finish })
+      return result
+    },
+    finish(owner: ReloadOwner, id: string) {
+      const operation = cases.get(id)
+      if (!operation) return Promise.resolve()
+      if (
+        operation.owner.sessionId !== owner.sessionId ||
+        operation.owner.testPath !== owner.testPath
+      )
+        throw createScriptError('Reload operation belongs to another caller', {
+          internal: { matched: false },
+        })
+      return operation.finish()
+    },
+    get activeCount() {
+      return cases.size
+    },
+  }
+}
 
 type ForwardObservation = {
   readonly requestId: number
@@ -162,10 +243,13 @@ async function completeRetentionForward(
   await routeAction.join().catch(() => {})
 }
 
-export function createRetentionReloadTransport(observer?: {
-  run: (request: ForwardObservation, operation: () => Promise<void>) => Promise<void>
-  settled: (request: ForwardObservation) => void
-}) {
+export function createRetentionReloadTransport(
+  observer?: {
+    run: (request: ForwardObservation, operation: () => Promise<void>) => Promise<void>
+    settled: (request: ForwardObservation) => void
+  },
+  timings?: RetentionReloadTimings,
+) {
   const tasks = new Set<Promise<void>>()
   const routeActions: ReturnType<typeof createRetentionRouteAction>[] = []
   const pending = new Set<() => void>()
@@ -230,7 +314,7 @@ export function createRetentionReloadTransport(observer?: {
     },
     run(
       url: string,
-      operation: (fulfill: FulfillForward) => Promise<void>,
+      operation: (fulfill: FulfillForward, headersCompleted: () => void) => Promise<void>,
       abort: () => Promise<void>,
     ) {
       const observation: ForwardObservation = {
@@ -245,6 +329,9 @@ export function createRetentionReloadTransport(observer?: {
         settlement: null,
       }
       requests.push(observation)
+      const headersCompleted = () => {
+        if (timings) timings.headersCompleted = { requestId: observation.requestId, at: Date.now() }
+      }
       const request = createRetentionForward(observation, record, failed)
       const routeAction = createRetentionRouteAction(observation, abort, record)
       routeActions.push(routeAction)
@@ -257,8 +344,8 @@ export function createRetentionReloadTransport(observer?: {
       const actual = admitting
         ? observeRetentionForward(
             () =>
-              observer?.run(observation, () => operation(routeAction.fulfill)) ??
-              operation(routeAction.fulfill),
+              observer?.run(observation, () => operation(routeAction.fulfill, headersCompleted)) ??
+              operation(routeAction.fulfill, headersCompleted),
             (outcome) => {
               const selected = request.select(outcome)
               guardRetentionEntryObservation(() => observer?.settled(observation))
@@ -939,6 +1026,7 @@ type ObservationCoverage = Readonly<{
   lastGap: Readonly<{ from: number; to: number }> | null
 }>
 type FailureReceipt = {
+  readonly timings: RetentionReloadTimings | undefined
   readonly phase: RetentionEntryPhase
   readonly sequence: number
   readonly at: number
@@ -1083,6 +1171,7 @@ export function createRetentionEntryCapture(socketOptions?: { entryPort: number;
   const lifetime = new Map<string, ReceiptRecord>()
   const completions = new Map<string, ReceiptRecord>()
   type Owner = {
+    readonly timings: RetentionReloadTimings | undefined
     readonly start: number
     readonly bytes: number
     failure: FailureReceipt | null
@@ -1381,6 +1470,7 @@ export function createRetentionEntryCapture(socketOptions?: { entryPort: number;
       (kind) => !failure.lifetime.some((record) => record.event.kind === kind),
     ),
     phase: failure.phase,
+    timings: failure.timings,
     failedAt: failure.at,
     endedAt: failure.endedAt,
     ...totals(),
@@ -1432,6 +1522,7 @@ export function createRetentionEntryCapture(socketOptions?: { entryPort: number;
       pinnedRecords++
     }
     owner.failure = {
+      timings: owner.timings && { ...owner.timings },
       phase,
       sequence,
       at: Date.now(),
@@ -1527,8 +1618,15 @@ export function createRetentionEntryCapture(socketOptions?: { entryPort: number;
         discardLine = false
       })
     },
-    begin(output: string) {
+    begin(output: string, timings?: RetentionReloadTimings) {
       guardRetentionEntryObservation(() => {
+        if (
+          timings &&
+          Buffer.byteLength(JSON.stringify(timings)) > retentionEntryReceiptLimits.recordBytes
+        ) {
+          refused = addRelayCounter(refused)
+          return
+        }
         const size =
           Buffer.byteLength(output) +
           wireRecordBytes * 2 +
@@ -1539,6 +1637,7 @@ export function createRetentionEntryCapture(socketOptions?: { entryPort: number;
           return
         }
         cases.set(output, {
+          timings,
           start: sequence,
           bytes: size,
           failure: null,
@@ -1702,8 +1801,12 @@ export function observeRetentionEntryForward<T>(
 export function endRetentionEntryForward(origin: string, observation: object) {
   guardRetentionEntryObservation(() => entryCaptures().get(origin)?.endForward(observation))
 }
-export function beginRetentionEntryCase(origin: string, output: string) {
-  guardRetentionEntryObservation(() => entryCaptures().get(origin)?.begin(output))
+export function beginRetentionEntryCase(
+  origin: string,
+  output: string,
+  timings?: RetentionReloadTimings,
+) {
+  guardRetentionEntryObservation(() => entryCaptures().get(origin)?.begin(output, timings))
 }
 export function failRetentionEntryCase(
   origin: string,

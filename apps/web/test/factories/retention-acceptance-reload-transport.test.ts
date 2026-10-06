@@ -9,8 +9,11 @@ import { mkdtemp, readFile, rm, mkdir, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test, expect } from '../fixtures'
+import { createScriptError } from '../../../../scripts/structured-errors'
 import {
   createRetentionReloadTransport,
+  createRetentionReloadCases,
+  createRetentionReloadTimings,
   archiveRetentionReloadFailure,
   archiveRetentionReloadArtifact,
   settleRetentionReloadCleanup,
@@ -28,6 +31,196 @@ import {
   failRetentionEntryCase,
   endRetentionEntryCase,
 } from './retention-acceptance-reload-transport'
+
+test('caller cancellation alone leaves an old pending forward unsettled', async () => {
+  const owner = createRetentionReloadTransport()
+  let release = () => {}
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let settled = false
+  const operation = owner.run(
+    '/pending-source',
+    () => waiting,
+    async () => {},
+  )
+  void operation.then(() => {
+    settled = true
+  })
+  await owner.cancelPending()
+  await Promise.resolve()
+  expect(settled).toBe(false)
+  release()
+  await owner.drain()
+  expect(settled).toBe(true)
+})
+
+test.each(['headers', 'source', 'font', 'fulfillment', 'screenshot'])(
+  'caller finish closes and settles only its pending %s operation',
+  async (phase) => {
+    const cases = createRetentionReloadCases()
+    const consumer = { sessionId: 'owned-consumer', testPath: 'reload' }
+    const id = crypto.randomUUID()
+    const owner = createRetentionReloadTransport()
+    const primary = createScriptError('Controlled external wait closed', { internal: { phase } })
+    let rejectWait = (_error: unknown) => {}
+    const waiting = new Promise<void>((_resolve, reject) => {
+      rejectWait = reject
+    })
+    let closes = 0
+    let lateWork = 0
+    const operation = cases.run(consumer, id, (signal) => {
+      signal.addEventListener(
+        'abort',
+        () => {
+          owner.stopAdmission()
+          void owner.cancelPending()
+        },
+        { once: true },
+      )
+      const forward = owner.run(
+        '/controlled-wait',
+        async (fulfill) => {
+          if (phase === 'fulfillment') await fulfill(() => waiting)
+          else await waiting
+          lateWork++
+        },
+        async () => {},
+      )
+      return {
+        result: owner.race(forward).finally(() => owner.drain()),
+        close: async () => {
+          closes++
+          rejectWait(primary)
+        },
+      }
+    })
+    const observed = operation.catch((error: unknown) => error)
+    await Promise.all([cases.finish(consumer, id), cases.finish(consumer, id)])
+    expect(closes).toBe(1)
+    expect(lateWork).toBe(0)
+    expect(owner.requests[0]?.terminal?.kind).toBe('cancelled')
+    expect(owner.requests[0]?.settlement?.kind).toBe('failed')
+    expect(cases.activeCount).toBe(0)
+    await cases.finish(consumer, id)
+    expect(closes).toBe(1)
+    await observed
+  },
+)
+
+test('caller finish preserves a live peer and rejects foreign ownership', async () => {
+  const cases = createRetentionReloadCases()
+  const owner = { sessionId: 'one', testPath: 'reload' }
+  const peer = { sessionId: 'two', testPath: 'reload' }
+  const id = crypto.randomUUID()
+  const peerId = crypto.randomUUID()
+  let release = () => {}
+  let peerRelease = () => {}
+  let closed = 0
+  let peerClosed = 0
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const peerWaiting = new Promise<void>((resolve) => {
+    peerRelease = resolve
+  })
+  const operation = cases.run(owner, id, () => ({
+    result: waiting,
+    close: async () => {
+      closed++
+      release()
+    },
+  }))
+  const other = cases.run(peer, peerId, () => ({
+    result: peerWaiting,
+    close: async () => {
+      peerClosed++
+      peerRelease()
+    },
+  }))
+  expect(() => cases.finish(peer, id)).toThrow()
+  await cases.finish(owner, id)
+  await operation
+  expect(closed).toBe(1)
+  expect(peerClosed).toBe(0)
+  expect(cases.activeCount).toBe(1)
+  await cases.finish(peer, peerId)
+  await other
+  expect(peerClosed).toBe(1)
+  expect(cases.activeCount).toBe(0)
+})
+
+test('caller lifecycle preserves primary failure and qualifies secondary cleanup', async () => {
+  const cases = createRetentionReloadCases()
+  const owner = { sessionId: 'failure', testPath: 'reload' }
+  const id = crypto.randomUUID()
+  const primary = createScriptError('Controlled reload failed', {
+    internal: { phase: 'operation' },
+  })
+  const secondary = createScriptError('Controlled close failed', { internal: { phase: 'close' } })
+  let closes = 0
+  const operation = cases.run(owner, id, () => ({
+    result: Promise.reject(primary),
+    close: async () => {
+      closes++
+      throw secondary
+    },
+  }))
+  await expect(operation).rejects.toBe(primary)
+  await expect(cases.finish(owner, id)).rejects.toBeDefined()
+  expect(closes).toBe(1)
+  expect(cases.activeCount).toBe(0)
+  await cases.finish(owner, id)
+})
+
+test('normal caller completion closes once and timing stays in the existing case cell', async () => {
+  const cases = createRetentionReloadCases()
+  const owner = { sessionId: 'normal', testPath: 'reload' }
+  const id = crypto.randomUUID()
+  let closes = 0
+  const operation = cases.run(owner, id, () => ({
+    result: Promise.resolve('ready'),
+    close: async () => {
+      closes++
+    },
+  }))
+  await expect(operation).resolves.toBe('ready')
+  await cases.finish(owner, id)
+  expect(closes).toBe(1)
+  const timings = createRetentionReloadTimings()
+  const capture = createRetentionEntryCapture()
+  capture.begin('/timing-cell', timings)
+  const initial = capture.inspect()
+  const transport = createRetentionReloadTransport(undefined, timings)
+  await transport.run(
+    '/first',
+    async (_fulfill, headersCompleted) => {
+      headersCompleted()
+    },
+    async () => {},
+  )
+  await transport.run(
+    '/second',
+    async (_fulfill, headersCompleted) => {
+      headersCompleted()
+    },
+    async () => {},
+  )
+  timings.baselineReadyAt = Number.MAX_SAFE_INTEGER
+  timings.reloadReadyAt = Number.MAX_SAFE_INTEGER
+  timings.fontReadyAt = Number.MAX_SAFE_INTEGER
+  timings.screenshotCompleteAt = Number.MAX_SAFE_INTEGER
+  timings.browserTimeOrigin = Number.MAX_SAFE_INTEGER
+  expect(timings.headersCompleted?.requestId).toBe(2)
+  expect(Buffer.byteLength(JSON.stringify(timings))).toBeLessThan(
+    retentionEntryReceiptLimits.recordBytes,
+  )
+  expect(capture.inspect().retainedBytes).toBe(initial.retainedBytes)
+  expect(capture.inspect().retainedRecords).toBe(initial.retainedRecords)
+  expect(initial.retainedBytes).toBeLessThanOrEqual(retentionEntryReceiptLimits.bytes)
+  capture.end('/timing-cell')
+  capture.dispose()
+})
 
 test('socket reset fails the owning reload command, retains raw evidence, and attempts every cleanup', async ({
   annotate,
