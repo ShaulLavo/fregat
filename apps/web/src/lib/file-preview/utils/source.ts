@@ -14,6 +14,9 @@ import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { previewQueryOptions } from '@/lib/file-preview/utils/preview-query'
 import { filePreviewMutationKeys } from '@/lib/file-preview/utils/mutation-keys'
+import type { ChatAttachment, EnvironmentId } from '@workspace/contracts'
+import type { DecodedText } from '@workspace/contracts/text-encoding'
+import { serverEndpoint } from '@/lib/client'
 
 type DiskPreviewCapture = {
   readonly kind: 'disk-head'
@@ -23,6 +26,17 @@ type DiskPreviewCapture = {
   readonly reader: TextSnapshot
 }
 export type DiskHeadInput = DiskPreviewCapture & { readonly scope: SnapshotComparisonScope }
+export type AttachmentTextCapture = {
+  readonly kind: 'attachment'
+  readonly environmentId: EnvironmentId
+  readonly origin: string
+  readonly attachment: Extract<ChatAttachment, { type: 'file' }>
+  readonly provenance: 'staged' | 'sent'
+  readonly url: string
+  readonly bytes: Uint8Array
+  readonly decoded: DecodedText
+  readonly reader: TextSnapshot
+}
 export type PreviewSourceRead =
   | {
       readonly kind: 'live'
@@ -39,6 +53,7 @@ export type PreviewSourceRead =
       readonly dirty: boolean
     }
   | { readonly kind: 'disk'; readonly input: DiskPreviewCapture }
+  | { readonly kind: 'attachment'; readonly input: AttachmentTextCapture }
   | { readonly kind: 'no-text'; readonly reason: 'binary' }
   | { readonly kind: 'unavailable'; readonly reason: 'live-ended' }
   | { readonly kind: 'released'; readonly reason: 'interest-ended' | 'owner-disposed' }
@@ -54,12 +69,13 @@ type PreviewSourceState = {
   readonly previewSources: ReadonlyMap<PreviewSourceLease, PreviewSourceRead>
 }
 export type PreviewSourceCapability = {
+  readonly environmentId: EnvironmentId
   readonly origin: string
   readonly queryClient: QueryClient
   readonly store: Pick<StoreApi<PreviewSourceState>, 'getState' | 'getInitialState' | 'subscribe'>
   acquireLivePreview(request: LivePreviewRequest): PreviewSourceLease | null
   adoptPreviewCapture(request: {
-    readonly input: DiskHeadInput
+    readonly input: DiskHeadInput | AttachmentTextCapture
     readonly signal: AbortSignal
   }): PreviewSourceLease
 }
@@ -77,6 +93,50 @@ export type PreviewViewRequest = {
   readonly maxBytes: number
   readonly scope: SnapshotComparisonScope | null
   readonly signal: AbortSignal
+}
+
+export function attachmentPreviewMutationOptions(
+  capability: PreviewSourceCapability | null,
+  queryClient: QueryClient,
+) {
+  return mutationOptions({
+    mutationKey: filePreviewMutationKeys.capture,
+    networkMode: 'always',
+    gcTime: 0,
+    mutationFn: async (request: {
+      readonly input: AttachmentTextCapture
+      readonly expected: Pick<
+        AttachmentTextCapture,
+        'attachment' | 'environmentId' | 'origin' | 'provenance' | 'url'
+      >
+      readonly signal: AbortSignal
+    }): Promise<PreviewBinding> => {
+      request.signal.throwIfAborted()
+      const { input, expected } = request
+      if (
+        input.environmentId !== expected.environmentId ||
+        input.origin !== expected.origin ||
+        input.provenance !== expected.provenance ||
+        input.url !== expected.url ||
+        input.attachment.id !== expected.attachment.id ||
+        input.attachment.name !== expected.attachment.name ||
+        input.attachment.mimeType !== expected.attachment.mimeType ||
+        input.attachment.sizeBytes !== expected.attachment.sizeBytes
+      )
+        throw createClientInvariantError('Attachment capture belongs to a different selection', {
+          selectionMatches: false,
+        })
+      if (
+        !capability ||
+        capability.queryClient !== queryClient ||
+        capability.environmentId !== input.environmentId ||
+        serverEndpoint(capability.origin) !== input.origin
+      )
+        return { read: { kind: 'attachment', input }, lease: null }
+      const lease = capability.adoptPreviewCapture({ input, signal: request.signal })
+      return { read: lease.read(), lease }
+    },
+  })
 }
 
 export function boundedPreviewPrefix(snapshot: TextReadSnapshot, maxBytes: number) {

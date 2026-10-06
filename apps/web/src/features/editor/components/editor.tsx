@@ -5,10 +5,8 @@ import {
 } from '@/features/editor/state/conflict-state'
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
-import {
-  filesystemDiffAttachment,
-  type SettingsComparisonPresentation,
-} from '@/lib/diff-attachment'
+import type { SettingsComparisonPresentation } from '@/lib/diff-attachment'
+import { filesystemDiffAttachment } from '@/features/editor/utils/attachment-presentation'
 import { DiffEditor } from '@/features/editor/components/diff-editor'
 import { Button } from '@workspace/ui/components/button'
 import { PaneBar } from '@workspace/ui/components/pane-bar'

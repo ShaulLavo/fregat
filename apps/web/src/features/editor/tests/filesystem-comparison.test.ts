@@ -6,7 +6,7 @@ import { fetchFile } from '@/lib/file-server'
 import { rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { captureFilesystemLocal, filesystemComparisonInput } from '@/lib/snapshot-comparison'
-import { filesystemDiffAttachment } from '@/lib/diff-attachment'
+import { filesystemDiffAttachment } from '@/features/editor/utils/attachment-presentation'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
 import {

@@ -89,9 +89,16 @@ function executing(observation: ReturnType<typeof processObservation>, start: st
 }
 
 const processObservationUnavailable =
-  process.platform !== 'linux' || !existsSync('/proc/self/stat') || !Bun.which('bash')
+  process.platform !== 'linux' ||
+  !existsSync('/proc/self/stat') ||
+  !Bun.which('bash') ||
+  !Bun.which('mv')
 if (processObservationUnavailable)
-  console.info('Process execution calibration requires Linux procfs and Bash.')
+  console.info('Process execution calibration requires Linux procfs, Bash, and mv.')
+
+function publishChildPid(gate = '') {
+  return `{ ${gate}printf '%s\\n' "$!"; } > "$2.pending" && mv -- "$2.pending" "$2"`
+}
 
 test.skipIf(processObservationUnavailable)(
   'process execution observation distinguishes an unreaped child from its live owner',
@@ -103,7 +110,7 @@ test.skipIf(processObservationUnavailable)(
       [
         'bash',
         '-c',
-        'bash -c \'until [ -e "$1" ]; do sleep 0.02; done\' _ "$1" & echo $! > "$2"; kill -STOP $$; wait',
+        `bash -c 'until [ -e "$1" ]; do sleep 0.02; done' _ "$1" & ${publishChildPid()}; kill -STOP $$; wait`,
         '_',
         release,
         nestedPid,
@@ -131,6 +138,56 @@ test.skipIf(processObservationUnavailable)(
     } finally {
       writeFileSync(release, '')
       parent.kill('SIGCONT')
+      await parent.exited
+    }
+  },
+)
+
+test.skipIf(processObservationUnavailable)(
+  'child PID readiness is published after its complete payload',
+  async () => {
+    const box = sandbox()
+    const nestedPid = path.join(box.root, 'child.pid')
+    const release = path.join(box.root, 'release')
+    const opened = path.join(box.root, 'opened.pid')
+    const gate = 'printf "%s\\n" "$!" > "$3.pending" && mv -- "$3.pending" "$3"; read -r gate; '
+    const parent = Bun.spawn(
+      [
+        'bash',
+        '-c',
+        `bash -c 'until [ -e "$1" ]; do sleep 0.02; done' _ "$1" & ${publishChildPid(gate)}; wait`,
+        '_',
+        release,
+        nestedPid,
+        opened,
+      ],
+      { stdin: 'pipe', stdout: 'ignore', stderr: 'pipe' },
+    )
+    try {
+      await expect.poll(() => existsSync(opened), { timeout: 2_000 }).toBe(true)
+      const child = processObservation(pidIn(opened))
+      expect(executing(child, child.start)).toBe(true)
+      const published = existsSync(nestedPid)
+      const observation = {
+        event: 'child-pid-publication-boundary',
+        published,
+        payload: published ? readFileSync(nestedPid, 'utf8') : null,
+        observed: published ? processObservation(pidIn(nestedPid)) : null,
+        child,
+        owner: processObservation(parent.pid),
+      }
+      expect(published, JSON.stringify(observation)).toBe(false)
+      parent.stdin.write('publish\n')
+      await parent.stdin.flush()
+      await expect.poll(() => existsSync(nestedPid), { timeout: 2_000 }).toBe(true)
+      const original = processObservation(pidIn(nestedPid))
+      expect(executing(original, original.start)).toBe(true)
+      expect(original.pid).toBe(child.pid)
+      expect(original.start).toBe(child.start)
+      console.log(JSON.stringify({ ...observation, original }))
+    } finally {
+      parent.stdin.end()
+      writeFileSync(release, '')
       await parent.exited
     }
   },

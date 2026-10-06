@@ -91,9 +91,10 @@ export function createInputConsumers(id: string, fixture: string, length: number
             observe,
           )
         // Fences resolve before follow-up syntax requests start; readiness yields and checks again.
-        await awaitInputStage('follow-up syntax readiness', deadline, observe, () =>
-          inputReadyDelay(50),
-        )
+        if (configuration.id !== 'disabled')
+          await awaitInputStage('follow-up syntax readiness', deadline, observe, () =>
+            inputReadyDelay(50),
+          )
       } while (!quiet())
       return {
         configuration,

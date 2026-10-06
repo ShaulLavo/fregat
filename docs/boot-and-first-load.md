@@ -88,3 +88,20 @@ increase an owner's estimate while reducing its rendered bytes. The pin history 
 for every owner whose estimate rises above the historical pin, including those redistributions.
 The picker falls from 24,536 to 81 B and the palette from 17,277 to 1,781 B attributed gzip.
 Shared component code falls from 28,888 to 21,588 B.
+
+## October 6 accepted measured reference
+
+Root preference 33 accepts the independently reviewed PR851 source
+`10d087ec19f5d3abe0d733a665f26f4cda3f9123` as the measured reference. The phone JavaScript baseline
+changes from 1449825 to 1470125 B gzip, with phone home 1203579 B and phone CSS 38667 B counted separately.
+The Editor baseline changes from 99601 to 105972 B, a canonical rounded approximate shared-chunk
+share. The reference retains admitted filesystem, settings, preview and attachment source meaning,
+held immutable byte and reader references, capture, admission, release and current write authority,
+including the useful PR851 optional-presentation split. Raw receipts are in
+`track200/pr808-placement-implementation/candidate`; independent proof and comment6009794865 are
+in `track200/pr808-placement-review`. Original phone and Editor gate failures remain preserved.
+Current assembly `81eb3c2b548cce327cd0729b657bda0ba8a47697` has changed verification inputs scanned by
+Tailwind, so its bytes remain unmeasured here and byte equivalence is not claimed. Exact-head full
+CI checks the current assembly against this reference with the existing 1% total and 5%/2 KiB owner
+margins. Reading, desktop 1772746 and every other owner baseline remain unchanged. Performance,
+functional, timeout and hardware qualification remain separate.
