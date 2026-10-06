@@ -683,7 +683,7 @@
     },
     "ghostty-webgpu": {
       "name": "ghostty-webgpu",
-      "version": "0.3.17",
+      "version": "0.3.18",
       "dependencies": {
         "@fregat/hotkeys": "catalog:",
         "@webgpu/types": "0.1.74",
