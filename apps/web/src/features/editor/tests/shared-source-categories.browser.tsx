@@ -6,7 +6,12 @@ import {
   chatAttachmentSchema,
   DEFAULT_SETTING_VALUES,
 } from '@workspace/contracts'
-import { expect, inject, test } from 'vitest'
+import { expect, inject, test, vi } from 'vitest'
+import {
+  Editor,
+  type EditorPreparedDocumentMatch,
+  type EditorPreparedDocumentPayload,
+} from '@singapore-editor/core/editor'
 import { commands } from 'vitest/browser'
 import * as v from 'valibot'
 import { ChatFilePreview } from '@/features/chat/components/chat-file-preview'
@@ -28,6 +33,13 @@ import {
 
 type Host = Awaited<ReturnType<typeof retentionCountHost>>
 type Pair = ReturnType<Host['borrow']>
+type ConsumerWitness = {
+  readonly editor: Editor
+  readonly analysis: Host['b']['analysis']
+  readonly match: EditorPreparedDocumentMatch
+  readonly payload: EditorPreparedDocumentPayload
+}
+
 type Sample = Awaited<ReturnType<Host['sample']>>
 type Point = 'baseline' | 'active' | 'released'
 type Run = {
@@ -75,6 +87,7 @@ type PointInput =
       >
       readonly source: SourceFacts
       readonly heldRuntimeIds: readonly string[]
+      readonly heldConsumerReferencesVerified: boolean
       readonly nativeBufferMatches: boolean
       readonly differentSurvivorOwner: boolean
     }
@@ -154,11 +167,11 @@ async function sharedCategories(run: Run, fixture: RetentionFixture, signal: Abo
     host.bSession.breakTypingRun()
     host.bSession.applyText('survivor ')
     const dirtyB = host.b.buffer.getSnapshot()
-    // The workload holds this pair; category observation only receives existing references.
-    pair = host.borrow(host.b.analysis)
-    await host.refresh(pair, host.b.analysis)
     await host.prepareViewMetadata()
-    native = host.createView('b', host.b)
+    const consumer = captureNativeConsumer(host)
+    native = consumer.view
+    pair = consumer.pair
+    const witness = consumer.witness
     expect(native.editor.getBufferSession()?.buffer).toBe(host.b.buffer)
     expect(native.attachment.state.syntaxStatus).toBe('ready')
     expect(native.attachment.state.initialHighlightStatus).toBe('painted')
@@ -172,10 +185,19 @@ async function sharedCategories(run: Run, fixture: RetentionFixture, signal: Abo
       signal.throwIfAborted()
       if (!host || !pair || !native)
         return expect.fail('Setup-owned survivor references are required')
+      const beforeOwners = Array.from(host.application.enumerateRetainedEditorAnalyses())
+      const beforeBuffer = host.b.buffer
+      const beforeInterests = Array.from(initial.editor.documentStore.getState().previewSources)
       const heldRead = pair.highlighter.read()
       expect(heldRead.kind).toBe('ready')
       const sample = await host.sample(`shared-source-${point}`, cycle, [pair])
       expect(sample.point.consistent).toBe(true)
+      const beforePoint = scalarPoint(host)
+      expect(witness.editor).toBe(native.editor)
+      expect(witness.analysis).toBe(host.b.analysis)
+      expect(witness.payload.structural?.session).toBe(pair.structural)
+      expect(witness.payload.highlighter?.session).toBe(pair.highlighter)
+      const readyTokens = heldRead.kind === 'ready' ? heldRead.result.tokens : null
       expect(sample.workerGenerations.afterFrameAndWorkerFences).toEqual(
         sample.workerGenerations.beforeInspectors,
       )
@@ -219,6 +241,11 @@ async function sharedCategories(run: Run, fixture: RetentionFixture, signal: Abo
         },
         source,
         heldRuntimeIds: heldIds,
+        heldConsumerReferencesVerified:
+          witness.editor === native.editor &&
+          witness.analysis === host.b.analysis &&
+          witness.payload.structural?.session === pair.structural &&
+          witness.payload.highlighter?.session === pair.highlighter,
         nativeBufferMatches: native.editor.getBufferSession()?.buffer === host.b.buffer,
         differentSurvivorOwner: initial.editor !== host.survivorEditor,
       })
@@ -230,6 +257,24 @@ async function sharedCategories(run: Run, fixture: RetentionFixture, signal: Abo
       expect([host.tree.inspect().workerGeneration, host.shiki.inspect().workerGeneration]).toEqual(
         sample.workerGenerations.afterFrameAndWorkerFences,
       )
+      assertStablePoint(beforePoint, scalarPoint(host))
+      expect(host.b.buffer).toBe(beforeBuffer)
+      expect(native.editor.getBufferSession()?.buffer).toBe(beforeBuffer)
+      const afterInterests = Array.from(initial.editor.documentStore.getState().previewSources)
+      expect(afterInterests).toHaveLength(beforeInterests.length)
+      beforeInterests.forEach(([lease, read], index) => {
+        expect(afterInterests[index]?.[0]).toBe(lease)
+        expect(afterInterests[index]?.[1]).toBe(read)
+      })
+      const afterOwners = Array.from(host.application.enumerateRetainedEditorAnalyses())
+      expect(afterOwners).toHaveLength(beforeOwners.length)
+      beforeOwners.forEach((owner, index) => expect(afterOwners[index]).toBe(owner))
+      expect(witness.editor).toBe(native.editor)
+      expect(witness.analysis).toBe(host.b.analysis)
+      expect(witness.payload.structural?.session).toBe(pair.structural)
+      expect(witness.payload.highlighter?.session).toBe(pair.highlighter)
+      const afterRead = pair.highlighter.read()
+      expect(afterRead.kind === 'ready' ? afterRead.result.tokens : null).toBe(readyTokens)
       reached.push({ point, cycle })
     }
     const facts = (
@@ -358,7 +403,7 @@ async function sharedCategories(run: Run, fixture: RetentionFixture, signal: Abo
         pieceTableSnapshotsHaveSameText(survivor.buffer.getSnapshot(), dirtyB),
       ),
     ).toBe(true)
-    await host.refresh(pair, host.b.analysis)
+    await host.settle()
     expect(host.b.buffer.isDirty()).toBe(true)
     expect(native.editor.getBufferSession()?.buffer).toBe(host.b.buffer)
     expect([pair.structural.runtimeSessionId, pair.highlighter.runtimeSessionId]).toEqual(heldIds)
@@ -379,13 +424,8 @@ async function sharedCategories(run: Run, fixture: RetentionFixture, signal: Abo
     signal.removeEventListener('abort', abort)
     await attempt(secondary, 'preview-unmount', () => view?.unmount())
     await attempt(secondary, 'peer-release', () => peer?.release())
-    await attempt(secondary, 'upload-delete', () =>
-      upload ? upload.client.attachments.uploads({ id: upload.id }).delete() : undefined,
-    )
+    await attempt(secondary, 'upload-delete', () => (upload ? deleteUpload(upload) : undefined))
     await attempt(secondary, 'native-view-dispose', () => native?.dispose())
-    await attempt(secondary, 'held-pair-release', () =>
-      host && pair ? host.release(pair) : undefined,
-    )
     await abortCleanup
     await attempt(secondary, 'host-dispose', () => host?.dispose())
     await attempt(secondary, 'tree-worker-dispose', () => host?.tree.dispose())
@@ -416,4 +456,101 @@ async function attempt(
   } catch (error) {
     failures.push({ stage, error: String(error) })
   }
+}
+
+function captureNativeConsumer(host: Host) {
+  const captured: { witness: ConsumerWitness | null } = { witness: null }
+  const attach = Editor.prototype.attachSession
+  const spy = vi.spyOn(Editor.prototype, 'attachSession').mockImplementation(function (
+    this: Editor,
+    session,
+    options,
+  ) {
+    const prepared = options?.preparedDocument
+    if (!prepared || options?.analysis !== host.b.analysis)
+      return attach.call(this, session, options)
+    const borrow = prepared.borrow
+    prepared.borrow = (match) => {
+      const payload = borrow.call(prepared, match)
+      if (payload) captured.witness = { editor: this, analysis: host.b.analysis, match, payload }
+      return payload
+    }
+    try {
+      return attach.call(this, session, options)
+    } finally {
+      prepared.borrow = borrow
+    }
+  })
+  let view: ReturnType<Host['createView']>
+  try {
+    view = host.createView('b', host.b)
+  } finally {
+    spy.mockRestore()
+  }
+  // The actual native attach consumed this public payload; observing it retains no lease.
+  const witness = captured.witness
+  if (!witness) return expect.fail('Native consumer did not expose its actual prepared transfer')
+  const actual: ConsumerWitness = witness
+  expect(actual.editor).toBe(view.editor)
+  expect(actual.analysis).toBe(host.b.analysis)
+  expect(actual.match.documentId).toBe(host.b.analysis.documentId)
+  expect(actual.match.structuralConfigurationTag).toEqual(['actual-view'])
+  expect(actual.match.highlighterConfigurationTag).toEqual(['actual-view'])
+  expect(actual.match.structuralProvider).toBe(host.structuralProvider)
+  expect(actual.match.highlighterProvider).toBe(host.highlighterProvider)
+  const structural = actual.payload.structural
+  const highlighter = actual.payload.highlighter
+  if (!structural || !highlighter)
+    return expect.fail('Both actual consumer transfer references are required')
+  expect(structural.configurationTag).toEqual(actual.match.structuralConfigurationTag)
+  expect(highlighter.configurationTag).toEqual(actual.match.highlighterConfigurationTag)
+  const entries = host.b.analysis.inspectRetention().entries
+  for (const held of [structural, highlighter]) {
+    expect(
+      entries.some(
+        (entry) => entry.runtimeSessionId === held.runtimeSessionId && entry.leaseCount > 0,
+      ),
+    ).toBe(true)
+    expect(held.session.runtimeSessionId).toBe(held.runtimeSessionId)
+  }
+  return {
+    view,
+    witness: actual,
+    pair: { structural: structural.session, highlighter: highlighter.session },
+  }
+}
+
+function scalarPoint(host: Host) {
+  return {
+    observationGeneration: host.observation.snapshot().generation,
+    aRevision: host.a.buffer.getRevision(),
+    bRevision: host.b.buffer.getRevision(),
+    ownerGraph: Array.from(host.application.enumerateRetainedEditorAnalyses(), (analysis) => ({
+      documentId: analysis.documentId,
+      entries: analysis.inspectRetention().entries.map((entry) => ({
+        family: entry.family,
+        runtimeSessionId: entry.runtimeSessionId,
+        leaseCount: entry.leaseCount,
+        revision: entry.revision,
+        status: entry.status,
+        resultCount: entry.resultCount,
+        tokenCount: entry.tokenCount,
+      })),
+    })),
+  }
+}
+function assertStablePoint(
+  before: ReturnType<typeof scalarPoint>,
+  after: ReturnType<typeof scalarPoint>,
+) {
+  expect(after).toEqual(before)
+}
+async function deleteUpload(upload: { client: ReturnType<typeof getClient>; id: string }) {
+  const response = await upload.client.attachments.uploads({ id: upload.id }).delete()
+  assertDeleteResult(response)
+}
+function assertDeleteResult(response: { error?: unknown; status: number }) {
+  if (response.error != null) throw response.error
+  expect(response.status).toBeGreaterThanOrEqual(200)
+  expect(response.status).toBeLessThan(300)
 }
