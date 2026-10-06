@@ -1,9 +1,13 @@
+import {
+  createEditorStructuralOperation,
+  createEditorHighlighterOperation,
+} from '@singapore-editor/core/editor'
+import { createRetentionSyntaxRuntime } from '../../../../../test/factories/retention-provider'
 import { vi } from 'vitest'
 import { createEditorBufferSession, createEditorTextBuffer } from '@singapore-editor/core/document'
 import { createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
 import type { EditorHighlighterProvider } from '@singapore-editor/core'
 import {
-  createEmptySyntaxSession,
   EditorTokenStore,
   type EditorSyntaxProvider,
   type EditorSyntaxResult,
@@ -16,15 +20,18 @@ import { writeBootMirror } from '@/lib/settings-boot-mirror'
 import { inactiveAnalysisEntryLimitFromSettings } from '../../utils/inactive-analysis-budget'
 import { reconcileInactiveAnalysis } from '../inactive-analysis-policy'
 
-const structural: EditorSyntaxProvider = { createSession: createEmptySyntaxSession }
-const highlighter: EditorHighlighterProvider = {
-  createSession: () => ({
-    refresh: async () => ({
-      tokens: EditorTokenStore.fromTokens([{ start: 0, end: 1, style: { color: 'red' } }]),
-    }),
-    applyChange: async () => ({ tokens: EditorTokenStore.empty() }),
-    dispose: () => undefined,
+const structuralOpen = vi.fn(createRetentionSyntaxRuntime)
+const structural: EditorSyntaxProvider = {
+  operation: createEditorStructuralOperation(structuralOpen),
+}
+const highlighterOpen = vi.fn(() => ({
+  analyze: async () => ({
+    tokens: EditorTokenStore.fromTokens([{ start: 0, end: 1, style: { color: 'red' } }]),
   }),
+  dispose: () => undefined,
+}))
+const highlighter: EditorHighlighterProvider = {
+  operation: createEditorHighlighterOperation(highlighterOpen),
 }
 
 test('the machine setting accepts every nonnegative safe integer and reads confirmed values', () => {
@@ -136,37 +143,36 @@ test('pending and failed configurations in both families count toward the same l
   const pending = Promise.withResolvers<EditorSyntaxResult>()
   const pendingHighlight = Promise.withResolvers<{ tokens: EditorTokenStore }>()
   const pendingStructural: EditorSyntaxProvider = {
-    createSession: () => ({ ...createEmptySyntaxSession(), refresh: () => pending.promise }),
+    operation: createEditorStructuralOperation(() => ({
+      ...createRetentionSyntaxRuntime(),
+      analyze: () => pending.promise,
+    })),
   }
   const failedStructural: EditorSyntaxProvider = {
-    createSession: () => ({
-      ...createEmptySyntaxSession(),
-      refresh: async () => {
+    operation: createEditorStructuralOperation(() => ({
+      ...createRetentionSyntaxRuntime(),
+      analyze: async () => {
         throw 'fixture structural failure'
       },
-    }),
+    })),
   }
   const pendingHighlighter: EditorHighlighterProvider = {
-    createSession: () => ({
-      refresh: () => pendingHighlight.promise,
-      applyChange: () => pendingHighlight.promise,
+    operation: createEditorHighlighterOperation(() => ({
+      analyze: () => pendingHighlight.promise,
       dispose: () => undefined,
-    }),
+    })),
   }
   const failedHighlighter: EditorHighlighterProvider = {
-    createSession: () => ({
-      refresh: async () => {
-        throw 'fixture highlighter failure'
-      },
-      applyChange: async () => {
+    operation: createEditorHighlighterOperation(() => ({
+      analyze: async () => {
         throw 'fixture highlighter failure'
       },
       dispose: () => undefined,
-    }),
+    })),
   }
   onTestFinished(() => {
     analysis.dispose()
-    pending.resolve(createEmptySyntaxSession().getResult())
+    pending.resolve(createRetentionSyntaxRuntime().getResult())
     pendingHighlight.resolve({ tokens: EditorTokenStore.empty() })
   })
   const leases = [
@@ -363,8 +369,8 @@ test('default two keeps both actual prior resources warm on A to B to A', async 
   })
   expect(result.after).toMatchObject({ inactiveEntryCount: 2, protectedEntryCount: 2 })
   expect(result.reclaimed).toHaveLength(0)
-  const createSyntax = vi.spyOn(structural, 'createSession')
-  const createHighlight = vi.spyOn(highlighter, 'createSession')
+  const createSyntax = structuralOpen.mockClear()
+  const createHighlight = highlighterOpen.mockClear()
   const fullTextRead = vi.spyOn(bufferA.getTextSnapshot(), 'materializeFullText')
   try {
     const revisitSyntax = a.borrowStructural(syntaxRequest)!
@@ -383,8 +389,8 @@ test('default two keeps both actual prior resources warm on A to B to A', async 
     revisitSyntax.dispose()
     revisitHighlight.dispose()
   } finally {
-    createSyntax.mockRestore()
-    createHighlight.mockRestore()
+    createSyntax.mockClear()
+    createHighlight.mockClear()
     fullTextRead.mockRestore()
   }
   bSyntax.dispose()
@@ -446,12 +452,12 @@ test('a reentrant disposer can borrow a later candidate and the refreshed census
   const request = { provider: structural, languageId: 'typescript' }
   const survivor: { lease: ReturnType<typeof second.borrowStructural> } = { lease: null }
   const disposer: EditorSyntaxProvider = {
-    createSession: () => ({
-      ...createEmptySyntaxSession(),
+    operation: createEditorStructuralOperation(() => ({
+      ...createRetentionSyntaxRuntime(),
       dispose: () => {
         survivor.lease = second.borrowStructural(request)
       },
-    }),
+    })),
   }
   first.borrowStructural({ provider: disposer, languageId: 'typescript' })!.dispose()
   const later = second.borrowStructural(request)!
@@ -484,13 +490,13 @@ test('reentrant owner disposal changes membership before the next count is repor
     second.dispose()
   })
   const disposer: EditorSyntaxProvider = {
-    createSession: () => ({
-      ...createEmptySyntaxSession(),
+    operation: createEditorStructuralOperation(() => ({
+      ...createRetentionSyntaxRuntime(),
       dispose: () => {
         owners.delete(second)
         second.dispose()
       },
-    }),
+    })),
   }
   first.borrowStructural({ provider: disposer, languageId: 'typescript' })!.dispose()
   second.borrowHighlighter({ provider: highlighter, languageId: 'typescript' })!.dispose()
@@ -543,14 +549,14 @@ test('entries created by disposal appear in truthful final counts and keep the p
   onTestFinished(() => analysis.dispose())
   let disposed = 0
   const provider: EditorSyntaxProvider = {
-    createSession: () => ({
-      ...createEmptySyntaxSession(),
+    operation: createEditorStructuralOperation(() => ({
+      ...createRetentionSyntaxRuntime(),
       dispose: () => {
         disposed++
         if (disposed > 1) return
         analysis.borrowHighlighter({ provider: highlighter, languageId: 'typescript' })!.dispose()
       },
-    }),
+    })),
   }
   analysis.borrowStructural({ provider, languageId: 'typescript' })!.dispose()
   const result = reconcileInactiveAnalysis({

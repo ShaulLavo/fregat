@@ -5,12 +5,11 @@ import {
   type TextReadSnapshot,
   type TextSnapshot,
 } from '@singapore-editor/core/document'
-import type { Editor } from '@singapore-editor/core/editor'
+import type { Editor, EditorHighlighterOperationContext } from '@singapore-editor/core/editor'
 import {
   serializeEditorViewSnapshot,
   type EditorContributionChange,
   type EditorDecorationContributionContext,
-  type EditorHighlighterSessionOptions,
   type EditorInjectedTextRowProviderContext,
   type EditorInlineReplacementContext,
   type EditorSelectionRangeContext,
@@ -24,7 +23,7 @@ declare const injected: EditorInjectedTextRowProviderContext
 declare const selectionRange: EditorSelectionRangeContext
 declare const change: EditorContributionChange
 declare const decorations: EditorDecorationContributionContext
-declare const highlighter: EditorHighlighterSessionOptions
+declare const highlighter: EditorHighlighterOperationContext
 
 export function explicitExtractionCompiles(): readonly string[] {
   const source: TextSnapshot = editor.getTextSnapshot()
@@ -33,7 +32,7 @@ export function explicitExtractionCompiles(): readonly string[] {
     source.materializeFullText(),
     serializeEditorViewSnapshot(snapshot).fullText,
     decorations.materializeFullText(),
-    highlighter.textSnapshot.materializeFullText(),
+    highlighter.initialRead.text.readRange(0, highlighter.initialRead.text.length),
   ]
 }
 
@@ -43,6 +42,8 @@ export function readTypeAnswersLines(source: TextReadSnapshot): number {
 }
 
 export function implicitTextIsGone(): void {
+  // @ts-expect-error contribution reads expose bounded methods and no materializer
+  void highlighter.initialRead.text.materializeFullText()
   // @ts-expect-error runtime snapshots carry no whole-text getter
   void snapshot.fullText
   // @ts-expect-error full-view JSON is the named serializer, not an implicit toJSON

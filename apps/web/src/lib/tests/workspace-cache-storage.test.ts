@@ -9,10 +9,12 @@ import {
   readWorkspaceCacheEntry,
   removeWorkspaceCacheEntry,
   workspaceCacheSerializedBytes,
-  WORKSPACE_CACHE_STORAGE_PREFIX,
-  workspaceCacheStorageKey,
   writeWorkspaceCacheEntry,
 } from '@/lib/workspace-cache-storage'
+import {
+  WORKSPACE_CACHE_STORAGE_PREFIX,
+  workspaceCacheStorageKey,
+} from '@/lib/workspace-cache-keys'
 
 const STORE = new Map<string, string>()
 const TEST_KEY = workspaceCacheStorageKey('test')

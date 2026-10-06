@@ -48,14 +48,12 @@ export type {
 export type { ShikiThemeLike } from './theme-extract'
 export type { VscodeThemeDefinition, VscodeThemeRegistration } from './vscode-themes'
 export type {
-  ShikiWorkerHighlightRequest,
   ShikiWorkerLanguageRegistration,
   ShikiWorkerThemeRegistration,
   ShikiWorkerTransportResult,
   ShikiWorkerRetentionSnapshot,
 } from './workerTypes'
 export type {
-  ShikiHighlighterSessionOptions,
   ShikiPreloadRegistrations,
   ShikiResolvedRegistrations,
   ShikiThemeOptions,

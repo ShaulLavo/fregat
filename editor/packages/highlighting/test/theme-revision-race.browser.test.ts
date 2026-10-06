@@ -1,7 +1,4 @@
-import {
-  createDocumentTextSnapshot,
-  createPieceTableSnapshot,
-} from '@singapore-editor/core/document'
+import { retainHighlighter } from './fixtures/document'
 import type { VscodeThemeRegistration } from '@singapore-editor/core/shiki'
 import { createTextDiff, type DiffSyntaxSourceReader } from '@singapore-editor/diff'
 import { expect, test, vi } from 'vitest'
@@ -42,15 +39,12 @@ async function fixture() {
     },
   })
   const text = 'const a = 1'
-  const snapshot = createPieceTableSnapshot(text)
-  const textSnapshot = createDocumentTextSnapshot(snapshot, text)
-  const session = highlighting
-    .highlighterProvider(source)
-    .createSession({ documentId: 'doc.ts', languageId: 'typescript', snapshot, textSnapshot })!
+  const retained = retainHighlighter(highlighting.highlighterProvider(source), text)
+  const { session, buffer } = retained
   let events = 0
   const unsubscribe = session.onDidChangeTheme?.(() => events++)
   const documentColor = async () =>
-    (await session.refresh(textSnapshot)).tokens
+    (await session.refresh(buffer.getTextSnapshot())).tokens
       .toTokens()
       .find((token) => token.start === 0)
       ?.style.color?.toLowerCase()
@@ -100,7 +94,7 @@ async function fixture() {
       blue.resolve(theme('#0000ff'))
       shown.dispose()
       unsubscribe?.()
-      session.dispose()
+      retained.dispose()
       await highlighting.dispose()
     },
   }

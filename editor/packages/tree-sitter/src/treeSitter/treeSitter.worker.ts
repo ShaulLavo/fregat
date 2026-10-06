@@ -29,14 +29,12 @@ import {
 } from './markdown'
 import type { TreeSitterLanguageDescriptor } from './registry'
 import {
-  clearTreeSitterSourceCache,
-  disposeTreeSitterSourceDocument,
+  createTreeSitterInput,
   readTreeSitterInputRange,
   readTreeSitterPieceTableInput,
-  resolveTreeSitterSourceDescriptor,
-  type TreeSitterSourceCache,
   type TreeSitterPieceTableInput,
 } from './source'
+import { DocumentWorkerReader } from '@singapore-editor/core/internal/document-worker'
 import type {
   BracketInfo,
   FoldRange,
@@ -169,7 +167,7 @@ const languageDescriptors = new Map<TreeSitterLanguageId, TreeSitterLanguageDesc
 const languageDescriptorOrder: TreeSitterLanguageId[] = []
 const runtimePromises = new Map<TreeSitterLanguageId, Promise<Runtime>>()
 const documentCaches = new Map<string, DocumentCache>()
-const sourceCache: TreeSitterSourceCache = new Map()
+const sourceReader = new DocumentWorkerReader()
 const injectedMarkdown = new WeakMap<
   Tree,
   { document: MarkdownDocument; offset: number; row: number }
@@ -315,13 +313,14 @@ const ensureInjectionQuery = (runtime: Runtime): Query | null => {
   return runtime.injectionQuery
 }
 
-// Resolved on receipt, in message order: the client's sent-chunk ledger assumes that order.
+// Capture before any parser await; later source deliveries may advance the same document.
 const resolveRequestSource = (
   request: TreeSitterParseRequest | TreeSitterEditRequest,
-): TreeSitterPieceTableInput =>
-  runWorkerPhase('resolve source', () =>
-    resolveTreeSitterSourceDescriptor(sourceCache, request.runtimeSessionId, request.source),
-  )
+): TreeSitterPieceTableInput => {
+  const read = sourceReader.acquire(request.source)
+  if (!read) throw new DOMException('Document source read is unavailable', 'AbortError')
+  return createTreeSitterInput(read)
+}
 
 const parseMarkdownDocument = async (
   request: TreeSitterParseRequest | TreeSitterEditRequest,
@@ -358,7 +357,7 @@ const parseMarkdownDocument = async (
     markdown: document,
     snapshotVersion: request.snapshotVersion,
     languageId: request.languageId,
-    source,
+    source: source.retain(),
     layers: [],
     degraded: [],
     missingLanguages: [],
@@ -1180,7 +1179,7 @@ const parseParsedDocument = async (
       markdown: options.markdown,
       snapshotVersion: options.snapshotVersion,
       languageId: options.languageId,
-      source: options.source,
+      source: options.source.retain(),
       layers,
       degraded: options.degraded,
       missingLanguages: [...context.missingLanguages],
@@ -2725,7 +2724,7 @@ const cachedDocumentForVersion = (
   const snapshot = cache.snapshots.find((item) => {
     return item.languageId === languageId && item.snapshotVersion === snapshotVersion
   })
-  if (!snapshot) return null
+  if (!snapshot || !snapshot.source.read.isValid()) return null
   if (snapshot.markdown && markdownDocuments.get(documentId)?.snapshotVersion !== snapshotVersion)
     return null
 
@@ -2808,6 +2807,7 @@ const disposeLayer = (layer: ParsedLayer): void => {
 
 const disposeCachedSnapshot = (snapshot: ParsedDocument): void => {
   for (const layer of snapshot.layers) disposeLayer(layer)
+  snapshot.source.dispose()
 }
 
 const disposeDocument = (runtimeSessionId: string): void => {
@@ -2815,7 +2815,6 @@ const disposeDocument = (runtimeSessionId: string): void => {
   markdownDocuments.get(runtimeSessionId)?.document.dispose()
   markdownDocuments.delete(runtimeSessionId)
   const cache = documentCaches.get(runtimeSessionId)
-  disposeTreeSitterSourceDocument(sourceCache, runtimeSessionId)
   if (!cache) return
 
   for (const snapshot of cache.snapshots) disposeCachedSnapshot(snapshot)
@@ -2863,7 +2862,7 @@ const disposeAll = (): void => {
   documentCaches.clear()
   for (const state of markdownDocuments.values()) state.document.dispose()
   markdownDocuments.clear()
-  clearTreeSitterSourceCache(sourceCache)
+  sourceReader.dispose()
   languageDescriptors.clear()
   languageDescriptorOrder.length = 0
   for (const promise of runtimePromises.values()) {
@@ -3019,8 +3018,11 @@ const handleRequest = async (
   return undefined
 }
 
-const executeRequest = (request: TreeSitterWorkerRequest): Promise<TreeSitterWorkerResult> => {
+const executeRequest = async (
+  request: TreeSitterWorkerRequest,
+): Promise<TreeSitterWorkerResult> => {
   const { payload } = request
+  if (payload.type === 'source') return Promise.resolve(sourceReader.apply(payload.command))
   if (payload.type === 'runtimeBarrier') {
     return awaitRuntimeTasks(payload.runtimeSessionId)
   }
@@ -3049,9 +3051,10 @@ const executeRequest = (request: TreeSitterWorkerRequest): Promise<TreeSitterWor
     markdown && runtimeSessionId
       ? awaitRuntimeTasks(runtimeSessionId).then(() => handleRequest(request, source))
       : handleRequest(request, source)
-  trackWorkerTask(task)
-  if (runtimeSessionId) trackRuntimeTask(runtimeSessionId, task)
-  return task
+  const completed = task.finally(() => source?.dispose())
+  trackWorkerTask(completed)
+  if (runtimeSessionId) trackRuntimeTask(runtimeSessionId, completed)
+  return completed
 }
 
 const trackWorkerTask = (task: Promise<TreeSitterWorkerResult>): void => {
@@ -3093,14 +3096,11 @@ const awaitRuntimeTasks = (runtimeSessionId: string): Promise<TreeSitterWorkerRe
 const awaitAllWorkerTasks = (): Promise<TreeSitterWorkerResult> =>
   Promise.allSettled(Array.from(activeWorkerTasks)).then(() => undefined)
 
-type SourceChunk = TreeSitterPieceTableInput['chunks'][number]['source']
-
 type RetentionResources = {
   readonly snapshots: Set<ParsedDocument>
   readonly trees: Set<Tree>
   readonly markdown: Set<MarkdownDocument>
   readonly injectedMarkdown: Set<MarkdownDocument>
-  readonly sourceChunks: Set<SourceChunk>
 }
 
 const inspectSnapshotRetention = (
@@ -3111,7 +3111,6 @@ const inspectSnapshotRetention = (
   const trees = new Set<Tree>()
   const markdown = new Set<MarkdownDocument>()
   if (snapshot.markdown) markdown.add(snapshot.markdown)
-  for (const chunk of snapshot.source.chunks) resources.sourceChunks.add(chunk.source)
   for (const layer of snapshot.layers) {
     trees.add(layer.tree)
     resources.trees.add(layer.tree)
@@ -3131,26 +3130,13 @@ const inspectSnapshotRetention = (
   }
 }
 
-const inspectSourceRetention = (
-  snapshotChunks: ReadonlySet<SourceChunk>,
-): TreeSitterWorkerRetentionSnapshot['source'] => {
-  const cachedChunks = new Set<SourceChunk>()
-  let cacheEntries = 0
-  for (const cache of sourceCache.values()) {
-    cacheEntries += cache.size
-    for (const chunk of cache.values()) cachedChunks.add(chunk)
-  }
-  const chunks = new Set(snapshotChunks)
-  for (const chunk of cachedChunks) chunks.add(chunk)
-  let chunkUnits = 0
-  for (const chunk of chunks) chunkUnits += chunk.length
+const inspectSourceRetention = (): TreeSitterWorkerRetentionSnapshot['source'] => {
+  const retention = sourceReader.inspect()
   return {
-    documentCount: sourceCache.size,
-    cacheEntries,
-    cacheChunkCount: cachedChunks.size,
-    snapshotChunkCount: snapshotChunks.size,
-    chunkCount: chunks.size,
-    chunkUnits,
+    documentCount: retention.documents,
+    readCount: retention.reads,
+    pinCount: retention.pins,
+    sourceUnits: retention.sourceUnits,
   }
 }
 
@@ -3201,7 +3187,6 @@ const inspectRetention = async (): Promise<{
     trees: new Set(),
     markdown: new Set(),
     injectedMarkdown: new Set(),
-    sourceChunks: new Set(),
   }
   for (const state of markdownDocuments.values()) resources.markdown.add(state.document)
   const documents = Array.from(documentCaches, ([runtimeSessionId, cache]) => ({
@@ -3219,7 +3204,7 @@ const inspectRetention = async (): Promise<{
       markdownDocumentCount: resources.markdown.size,
       injectedMarkdownDocumentCount: resources.injectedMarkdown.size,
       documents,
-      source: inspectSourceRetention(resources.sourceChunks),
+      source: inspectSourceRetention(),
       shared,
       unmeasuredResources: ['markdown-parser-language-query-handles', 'markdown-tree-handles'],
       unmeasuredBytes: [
@@ -3267,7 +3252,6 @@ export const __treeSitterWorkerInternalsForTests = {
   collectTreeData,
   appendItems,
   rangeSpan,
-  resolveTreeSitterSourceDescriptor,
   readTreeSitterPieceTableInput,
   replaceCachedDocument,
   reusableParsedDocument,

@@ -1,9 +1,12 @@
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import {
   Editor,
+  createEditorHighlighterOperation,
   observeEditorMountTiming,
   type EditorHighlightResult,
+  type DocumentRead,
 } from '@singapore-editor/core/editor'
+import { waitForDocumentWork } from '@singapore-editor/core/internal/document-worker'
 import type { EditorInitialPaintEvent, EditorPlugin } from '@singapore-editor/core/extensions'
 import {
   createDocumentSession,
@@ -1223,14 +1226,13 @@ function delayedHighlighter() {
     resolve = complete
   })
   const session = {
-    refresh: () => completion,
-    applyChange: () => completion,
+    analyze: (_read: DocumentRead, signal: AbortSignal) => waitForDocumentWork(completion, signal),
     dispose: () => undefined,
   }
   const plugin: EditorPlugin = {
     activate: (context) =>
       context.registerHighlighter({
-        createSession: () => session,
+        operation: createEditorHighlighterOperation(() => session),
       }),
   }
 

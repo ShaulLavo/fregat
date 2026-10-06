@@ -10,7 +10,6 @@ import type {
   EditorAnalysisDisplayDemand,
 } from './documentAnalysis'
 import type { DocumentSession, DocumentSessionChange } from '../documentSession'
-import type { DocumentEditChain, DocumentSyncPoint } from './editChain'
 import type { DocumentTextSnapshot } from '../documentTextSnapshot'
 import type { PieceTableSnapshot } from '@singapore-editor/textbuffer'
 import type {
@@ -37,7 +36,6 @@ import type { TextEdit } from '../tokens'
 import { foldRangeKey } from './folds'
 import type { EditorSyntaxStatus } from './types'
 import { LatestAsyncRequest } from './latestAsyncRequest'
-import { getEditorSyntaxSessionFactory } from './runtime'
 import { syntaxRefreshDelay, SYNTAX_REFRESH_MAX_DELAY_MS } from './editorUtils'
 import type {
   EditorPreparedDocument,
@@ -81,7 +79,6 @@ export type EditorSyntaxControllerOptions = {
   getCurrentSessionDocumentId(): string
   getLanguageId(): EditorSyntaxLanguageId | null
   getSession(): DocumentSession | null
-  getDocumentEditChain(): Pick<DocumentEditChain, 'changesSince' | 'point'>
   getVisibleSyntaxRange(): EditorSyntaxRange | null
   adoptTokens(tokens: EditorTokenStore): void
   clearSyntaxFolds(): void
@@ -217,13 +214,12 @@ export class EditorSyntaxController {
   // Refresh failures since the last success or re-entry (document, provider or highlighter theme).
   private failedHighlightRefreshes = 0
   private unsubscribeHighlighterTheme: (() => void) | null = null
+  private unsubscribeProducedTokens: (() => void) | null = null
   private preparedSyntaxDisposer: (() => void) | null = null
   private preparedHighlighterDisposer: (() => void) | null = null
   private preparedInitialTokensInstalled = false
   private preparedStructuralContentVersion: number | null = null
   private preparedHighlighterContentVersion: number | null = null
-  private highlightDispatchPoint: DocumentSyncPoint | null = null
-  private structuralDispatchPoint: DocumentSyncPoint | null = null
   private providerHighlighterTheme: EditorTheme | null = null
   private highlighterTheme: EditorTheme | null = null
   private foldCoverage:
@@ -440,9 +436,8 @@ export class EditorSyntaxController {
     }
   }
 
-  private structuralProviderKind(): 'plugin' | 'factory' | null {
+  private structuralProviderKind(): 'plugin' | null {
     if (this.options.pluginHost.hasSyntaxProviders()) return 'plugin'
-    if (getEditorSyntaxSessionFactory()) return 'factory'
     return null
   }
 
@@ -521,6 +516,18 @@ export class EditorSyntaxController {
     this.options.adoptTokens(tokens)
   }
 
+  setExternalTokens(tokens: EditorTokenStore): void {
+    if (!this.highlighterSession) {
+      this.setTokens(tokens)
+      return
+    }
+    this.commitInitialHighlightStatus(
+      'painted',
+      () => this.setTokens(tokens),
+      this.initialHighlightConfigurationGeneration,
+    )
+  }
+
   stagePreparedReadyTokens(prepared: EditorPreparedDocumentPayload | null): EditorTokenStore {
     const highlighterResult = prepared?.highlighter?.readyResult
     const structuralResult = prepared?.structural?.readyResult
@@ -585,13 +592,7 @@ export class EditorSyntaxController {
     this.highlighterConfigurationTag = document.highlighterConfigurationTag ?? []
     this.failedHighlightRefreshes = 0
     this.highlighterSession =
-      prepared?.highlighter?.session ??
-      this.createHighlighterSession(
-        document.documentId,
-        document.languageId,
-        document.textSnapshot,
-        document.snapshot,
-      )
+      prepared?.highlighter?.session ?? this.createHighlighterSession(document.languageId)
     if (prepared?.highlighter) this.retainedHighlighter = prepared.highlighter.session
     this.preparedHighlighterDisposer = prepared?.highlighter?.dispose ?? null
     this.observeHighlighterTheme()
@@ -620,10 +621,9 @@ export class EditorSyntaxController {
     this.lastInitialHighlightTerminalStatus =
       this.initialHighlightState === 'plain' ? 'plain' : null
     if (this.retainedHighlighter) {
-      this.highlighterThemeRequests.cancel()
-      this.highlighterThemePending = true
-      this.consumeRetainedProviderTheme()
+      this.refreshHighlighterTheme(false)
     }
+    this.observeProducedHighlighterTokens()
     this.observePreparedResults(prepared)
     this.logSyntaxStatus('editor.syntax.document_started')
   }
@@ -811,10 +811,9 @@ export class EditorSyntaxController {
     return true
   }
 
-  refreshHighlighterTheme(): void {
+  refreshHighlighterTheme(retryFailed = true): void {
     if (this.retainedHighlighter) {
       const retained = this.retainedHighlighter
-      const session = this.options.getSession()
       this.highlighterThemeRequests.cancel()
       this.highlighterThemePending = true
       const read = retained.read()
@@ -822,22 +821,31 @@ export class EditorSyntaxController {
         this.consumeRetainedProviderTheme()
         return
       }
+      const session = this.options.getSession()
       if (!session) return
       const documentVersion = this.options.getDocumentVersion()
       const generation = this.beginInitialHighlightReplacement('theme')
-      const settle = () => {
-        if (!this.preparedResultStillCurrent(retained, documentVersion, generation)) return
-        const current = retained.read()
-        if (current.kind === 'pending') return
-        if (current.kind === 'failed') {
+      const retry = retryFailed && read.kind === 'ready' && read.providerTheme.kind === 'failed'
+      this.highlighterThemeRequests.schedule({
+        tags: { configuration: 'highlighterTheme' },
+        run: async (signal) => {
+          if (retry) await retained.refresh(session.getTextSnapshot())
+          const outcome = await retained.waitForProviderTheme(signal)
+          return outcome.kind === 'ready' ? outcome.theme : null
+        },
+        apply: (theme) => {
+          if (!this.preparedResultStillCurrent(retained, documentVersion, generation)) return
+          this.completeProviderHighlighterTheme(theme)
+          const current = retained.read()
+          if (retry && current.kind === 'ready')
+            this.applyHighlightResult(current.result, documentVersion, nowMs(), generation)
+        },
+        fail: (error) => {
+          if (error instanceof DOMException && error.name === 'AbortError') return
+          if (!this.preparedResultStillCurrent(retained, documentVersion, generation)) return
           this.completeProviderHighlighterTheme(null)
-          this.commitInitialHighlightError(generation)
-          return
-        }
-        this.consumeRetainedProviderTheme()
-        this.applyHighlightResult(current.result, documentVersion, nowMs(), generation)
-      }
-      void retained.refresh(session.getTextSnapshot()).then(settle, settle)
+        },
+      })
       return
     }
     const context = this.options.pluginHost.getHighlighterProvider()
@@ -1008,15 +1016,31 @@ export class EditorSyntaxController {
     const session = this.options.getSession()
     if (!session) return
 
-    this.highlighterSession = this.createHighlighterSession(
-      this.options.getCurrentSessionDocumentId(),
-      this.options.getLanguageId(),
-      session.getTextSnapshot(),
-      session.getSnapshot(),
-    )
+    this.highlighterSession = this.createHighlighterSession(this.options.getLanguageId())
     this.refreshHighlighterTheme()
     this.refreshHighlightTokens(this.options.getDocumentVersion(), null, options)
     this.observeHighlighterTheme()
+    this.observeProducedHighlighterTokens()
+  }
+
+  private observeProducedHighlighterTokens(): void {
+    this.unsubscribeProducedTokens?.()
+    this.unsubscribeProducedTokens = null
+    const retained = this.retainedHighlighter
+    if (!retained) return
+    const apply = () => {
+      if (this.retainedHighlighter !== retained) return
+      const result = retained.readProducedTokens()
+      if (!result) return
+      this.applyHighlightResult(
+        result,
+        this.options.getDocumentVersion(),
+        nowMs(),
+        this.initialHighlightConfigurationGeneration,
+      )
+    }
+    this.unsubscribeProducedTokens = retained.onDidProduceTokens(apply)
+    apply()
   }
 
   private createSyntaxSession(
@@ -1032,8 +1056,6 @@ export class EditorSyntaxController {
       includeHighlights: !this.highlighterSession,
       includeCaptures,
       syntaxMode: 'range' as const,
-      textSnapshot: document.textSnapshot,
-      snapshot: document.snapshot,
     }
     const provider = this.options.pluginHost.getSyntaxProvider()
     this.retainedSyntax =
@@ -1045,11 +1067,7 @@ export class EditorSyntaxController {
           })
         : null
     this.retainedSyntax?.setDisplayDemand({ kind: 'unknown' })
-    const session =
-      this.retainedSyntax ??
-      this.options.pluginHost.createSyntaxSession(sessionOptions) ??
-      getEditorSyntaxSessionFactory()?.(sessionOptions) ??
-      null
+    const session = this.retainedSyntax
     if (session) {
       recordEditorPerformanceDiagnostic('editor.syntax.session_created', {
         family: 'structural',
@@ -1065,7 +1083,7 @@ export class EditorSyntaxController {
         this.failedHighlightRefreshes = 0
         if (this.retainedHighlighter) {
           this.beginInitialHighlightReplacement('theme')
-          this.highlighterThemePending = true
+          this.refreshHighlighterTheme()
         }
         this.refreshHighlightTokens(this.options.getDocumentVersion(), null, { delayMs: 0 })
       }) ?? null
@@ -1199,14 +1217,10 @@ export class EditorSyntaxController {
     this.disposeHighlighterSession()
     const session = this.options.getSession()
     if (!session) return
-    this.highlighterSession = this.createHighlighterSession(
-      this.options.getCurrentSessionDocumentId(),
-      this.options.getLanguageId(),
-      session.getTextSnapshot(),
-      session.getSnapshot(),
-    )
+    this.highlighterSession = this.createHighlighterSession(this.options.getLanguageId())
     this.refreshHighlightTokens(documentVersion, null)
     this.observeHighlighterTheme()
+    this.observeProducedHighlighterTokens()
   }
 
   private preparedResultStillCurrent(
@@ -1220,10 +1234,7 @@ export class EditorSyntaxController {
   }
 
   private createHighlighterSession(
-    documentId: string,
     languageId: EditorSyntaxLanguageId | null,
-    textSnapshot: DocumentTextSnapshot,
-    snapshot: PieceTableSnapshot,
   ): EditorHighlighterSession | null {
     const context = this.options.pluginHost.getHighlighterProvider()
     this.retainedHighlighter =
@@ -1235,14 +1246,7 @@ export class EditorSyntaxController {
             configurationTag: this.highlighterConfigurationTag,
           })
         : null
-    const session =
-      this.retainedHighlighter ??
-      this.options.pluginHost.createHighlighterSession({
-        documentId,
-        languageId,
-        textSnapshot,
-        snapshot,
-      })
+    const session = this.retainedHighlighter
     if (session) {
       recordEditorPerformanceDiagnostic('editor.syntax.session_created', {
         family: 'highlighter',
@@ -1268,7 +1272,6 @@ export class EditorSyntaxController {
     this.preparedStructuralContentVersion = null
     this.syntaxSession = null
     this.retainedSyntax = null
-    this.structuralDispatchPoint = null
     this.syntaxSessionIncludesCaptures = false
   }
 
@@ -1321,10 +1324,11 @@ export class EditorSyntaxController {
   }
 
   private disposeHighlighterSession(): void {
+    this.unsubscribeProducedTokens?.()
+    this.unsubscribeProducedTokens = null
     this.unsubscribeHighlighterTheme?.()
     this.unsubscribeHighlighterTheme = null
     this.highlightRequests.cancel()
-    this.highlightDispatchPoint = null
     if (this.preparedHighlighterDisposer) this.preparedHighlighterDisposer()
     else this.highlighterSession?.dispose()
     this.preparedHighlighterDisposer = null
@@ -1353,7 +1357,7 @@ export class EditorSyntaxController {
       maxDelayMs: SYNTAX_REFRESH_MAX_DELAY_MS,
       tags: syntaxWorkTags(documentVersion, contentVersion, 'full'),
       run: traceEditorPerformanceTask('editor.syntax.structural.request', () =>
-        this.loadSyntaxResult(change, contentVersion),
+        this.loadSyntaxResult(contentVersion),
       ),
       apply: traceEditorPerformanceTask('editor.syntax.structural.apply', (result, startedAt) =>
         this.applySyntaxResult(result, documentVersion, startedAt, configurationGeneration),
@@ -1380,7 +1384,7 @@ export class EditorSyntaxController {
       maxDelayMs: SYNTAX_REFRESH_MAX_DELAY_MS,
       tags: { version: documentVersion, configuration: 'highlight' },
       run: traceEditorPerformanceTask('editor.syntax.highlight.request', () =>
-        this.loadHighlightResult(change),
+        this.loadHighlightResult(),
       ),
       apply: traceEditorPerformanceTask('editor.syntax.highlight.apply', (result, startedAt) =>
         this.applyHighlightResult(result, documentVersion, startedAt, configurationGeneration),
@@ -1397,12 +1401,9 @@ export class EditorSyntaxController {
     })
   }
 
-  private loadSyntaxResult(
-    change: DocumentSessionChange | null,
-    contentVersion: number,
-  ): Promise<EditorSyntaxLoadResult> {
+  private loadSyntaxResult(contentVersion: number): Promise<EditorSyntaxLoadResult> {
     if (!this.syntaxSession) return Promise.reject(new Error('No syntax session'))
-    return this.loadSyntaxBaseResult(change).then((result) => {
+    return this.loadSyntaxBaseResult().then((result) => {
       if (this.syntaxSession?.queryRange && this.canProviderQuerySyntaxRange()) {
         return this.loadCurrentSyntaxRangeResult({ contentVersion, updatesDocument: true })
       }
@@ -1411,17 +1412,12 @@ export class EditorSyntaxController {
     })
   }
 
-  private loadSyntaxBaseResult(change: DocumentSessionChange | null): Promise<EditorSyntaxResult> {
+  private loadSyntaxBaseResult(): Promise<EditorSyntaxResult> {
     if (!this.syntaxSession) return Promise.reject(new Error('No syntax session'))
     const session = this.options.getSession()
     if (!session) return Promise.reject(new Error('No document snapshot'))
 
-    const chain = this.options.getDocumentEditChain()
-    const point = this.structuralDispatchPoint
-    this.structuralDispatchPoint = chain.point
-    if (!change) return this.syntaxSession.refresh(session.getTextSnapshot())
-
-    return this.syntaxSession.applyChange(composeSkippedChanges(chain, point, change))
+    return this.syntaxSession.refresh(session.getTextSnapshot())
   }
 
   private loadCurrentSyntaxRangeResult(options: {
@@ -1486,22 +1482,14 @@ export class EditorSyntaxController {
     }))
   }
 
-  private loadHighlightResult(
-    change: DocumentSessionChange | null,
-  ): Promise<EditorHighlightResult> {
+  private loadHighlightResult(): Promise<EditorHighlightResult> {
     if (!this.highlighterSession) return Promise.reject(new Error('No highlighter session'))
     const session = this.options.getSession()
     if (!session) return Promise.reject(new Error('No document snapshot'))
 
-    const chain = this.options.getDocumentEditChain()
-    const point = this.highlightDispatchPoint
-    this.highlightDispatchPoint = chain.point
-    if (!change)
-      return this.retainedHighlighter
-        ? readRetainedHighlighterResult(this.retainedHighlighter, session.getTextSnapshot())
-        : this.highlighterSession.refresh(session.getTextSnapshot())
-
-    return this.highlighterSession.applyChange(composeSkippedChanges(chain, point, change))
+    return this.retainedHighlighter?.read().kind === 'ready'
+      ? readRetainedHighlighterResult(this.retainedHighlighter, session.getTextSnapshot())
+      : this.highlighterSession.refresh(session.getTextSnapshot())
   }
 
   private applySyntaxResult(
@@ -1848,6 +1836,14 @@ export class EditorSyntaxController {
     this.failedHighlightRefreshes = 0
     this.consumeRetainedProviderTheme()
     if (result.theme !== undefined) this.setHighlighterTheme(result.theme)
+    if (
+      this.currentTokens === result.tokens &&
+      this.acceptedTokensDocumentVersion === documentVersion &&
+      this.acceptedTokensTextVersion === this.options.getTextVersion() &&
+      this.initialHighlightState === 'painted' &&
+      this.pendingInitialHighlightReplacement === null
+    )
+      return
     this.commitInitialHighlightStatus(
       'painted',
       () => this.setTokens(result.tokens),
@@ -2593,23 +2589,6 @@ const isUncachedSyntaxWarmRange = (
 
 const boundedIndex = (index: number, documentLength: number): number =>
   Math.max(0, Math.min(index, Math.max(0, documentLength - 1)))
-/**
- * Syntax and highlight requests are latest-wins, so the changes between two dispatches never reach
- * a session. Without their edits it can only diff whole texts, and that span covers everything
- * between two distant edits. The edit chain returns the skipped edits in the session's coordinates.
- */
-function composeSkippedChanges(
-  chain: Pick<DocumentEditChain, 'changesSince' | 'point'>,
-  point: DocumentSyncPoint | null,
-  change: DocumentSessionChange,
-): DocumentSessionChange {
-  if (!point) return change
-
-  const composed = chain.changesSince(point, null)
-  if (!composed?.edits || composed.syncPointAfter !== chain.point) return change
-  return { ...change, edits: composed.edits }
-}
-
 function sameSyntaxRanges(
   left: readonly EditorSyntaxRange[],
   right: readonly EditorSyntaxRange[],

@@ -1,3 +1,10 @@
+import { createEditorStructuralOperation } from '../src/editor/operationDefinitions'
+import {
+  TreeSitterWorkerClient,
+  type TreeSitterBackend,
+} from '../../tree-sitter/src/treeSitter/workerClient'
+import { TreeSitterSyntaxSession } from '../../tree-sitter/src/session'
+import { defineStructuralOperation } from '../src/editor/operationDefinitions'
 import { afterEach, expect, test, vi } from 'vitest'
 import { commands, page } from 'vitest/browser'
 import { Editor } from '../src/editor/Editor'
@@ -7,16 +14,15 @@ import type { EditorInitialPaintEvent } from '../src/plugins'
 import {
   createEmptySyntaxResult,
   type EditorSyntaxProvider,
-  type EditorSyntaxSession,
+  type EditorSyntaxRuntime,
 } from '../src/syntax/session'
 import { EditorTokenStore } from '../src/syntax/tokenStore'
 import { createError } from '../src/logging/evlog'
 import {
   createTreeSitterSyntaxPlugin,
-  createTreeSitterSyntaxProvider,
+  TreeSitterLanguageRegistry,
+  type TreeSitterSyntaxProvider,
   resolveTreeSitterLanguageContribution,
-  TreeSitterWorkerClient,
-  type TreeSitterBackend,
 } from '../../tree-sitter/src/index'
 import { TYPESCRIPT_TREE_SITTER_LANGUAGE } from '../../tree-sitter-languages/src/index'
 import '../src/style.css'
@@ -52,20 +58,39 @@ function delayedGrammar() {
   const parsedSessions: string[] = []
   let loadStarted = false
   const backend = {
-    registerLanguages: (languages) => worker.registerLanguages(languages),
-    parse: (payload) => {
-      parsedSessions.push(payload.runtimeSessionId)
-      return worker.parse(payload)
+    get generation() {
+      return worker.generation
     },
-    edit: (payload) => worker.edit(payload),
-    queryRange: (payload) => worker.queryRange(payload),
+    sourceEndpoint: worker.sourceEndpoint,
+    registerLanguages: (languages) => worker.registerLanguages(languages),
+    parse: (payload, signal) => {
+      parsedSessions.push(payload.runtimeSessionId)
+      return worker.parse(payload, signal)
+    },
+    edit: (payload, signal) => worker.edit(payload, signal),
+    queryRange: (payload, signal) => worker.queryRange(payload, signal),
     select: (payload) => worker.select(payload),
     disposeDocument: (runtimeSessionId) => {
       disposedSessions.push(runtimeSessionId)
       worker.disposeDocument(runtimeSessionId)
     },
   } satisfies TreeSitterBackend
-  const provider = createTreeSitterSyntaxProvider({ backend })
+  const languageProvider = new TreeSitterLanguageRegistry()
+  const provider: TreeSitterSyntaxProvider = {
+    registerLanguage: (contribution, options) =>
+      languageProvider.registerLanguage(contribution, options),
+    resolveTreeSitterLanguage: (languageId) =>
+      languageProvider.resolveTreeSitterLanguage(languageId),
+    operation: defineStructuralOperation((context) => {
+      if (!context.languageId) return null
+      return new TreeSitterSyntaxSession({
+        ...context,
+        languageId: context.languageId,
+        languageResolver: languageProvider,
+        backend,
+      })
+    }),
+  }
   provider.registerLanguage({
     id: 'typescript',
     load: async () => {
@@ -244,21 +269,21 @@ test('paints retained full tokens immediately when the provider cannot query ran
     tokens: EditorTokenStore.fromTokens([{ start: 0, end: 5, style: { color: '#ff0000' } }]),
   }
   const queryRange = vi.fn(async () => createEmptySyntaxResult())
+  const providerOpenRuntime = vi.fn(
+    () =>
+      ({
+        foldingSupport: 'supported',
+        analyze: async () => result,
+        canQueryRange: () => false,
+        queryRange,
+        getResult: () => result,
+        getTokens: () => result.tokens,
+        getSnapshotVersion: () => 1,
+        dispose: () => undefined,
+      }) satisfies EditorSyntaxRuntime,
+  )
   const provider: EditorSyntaxProvider = {
-    createSession: vi.fn(
-      () =>
-        ({
-          foldingSupport: 'supported',
-          refresh: async () => result,
-          applyChange: async () => result,
-          canQueryRange: () => false,
-          queryRange,
-          getResult: () => result,
-          getTokens: () => result.tokens,
-          getSnapshotVersion: () => 1,
-          dispose: () => undefined,
-        }) satisfies EditorSyntaxSession,
-    ),
+    operation: createEditorStructuralOperation(providerOpenRuntime),
   }
   const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'retained.ts' })
   releases.push(() => analysis.dispose())
@@ -291,7 +316,7 @@ test('paints retained full tokens immediately when the provider cannot query ran
   expect(editor.getState().initialHighlightStatus).toBe('painted')
   expect(highlightedText(host)).toContain('const')
   expect((await rowPixels(host)).red).toBeGreaterThan(20)
-  expect(provider.createSession).toHaveBeenCalledTimes(1)
+  expect(providerOpenRuntime).toHaveBeenCalledTimes(1)
   expect(queryRange).not.toHaveBeenCalled()
   await page.elementLocator(host).screenshot()
 })
@@ -332,7 +357,7 @@ test('reclaims inactive real parser sessions while the shared provider remains u
   await grammar.worker.awaitIdleFence()
 
   for (let cycle = 0; cycle < 10; cycle++) {
-    const survivorChunks = grammar.worker.inspect().cache.sourceChunks.sentChunks
+    const survivorUnits = (await grammar.worker.inspectRetention())!.source.sourceUnits
     const lease = analysis.borrowStructural(request)!
     const result = await lease.queryRange!(range)
     expect(result.tokens.length).toBeGreaterThan(0)
@@ -342,7 +367,7 @@ test('reclaims inactive real parser sessions while the shared provider remains u
     ])
     await grammar.worker.awaitIdleFence()
     expect(analysis.inspectRetention().entries).toEqual([])
-    expect(grammar.worker.inspect().cache.sourceChunks.sentChunks).toBe(survivorChunks)
+    expect((await grammar.worker.inspectRetention())?.source.sourceUnits).toBe(survivorUnits)
     expect(grammar.worker.inspect().pendingRequests).toBe(0)
     survivorView.applyText(' ')
     await survivor.refresh(survivorBuffer.getTextSnapshot())
@@ -353,7 +378,12 @@ test('reclaims inactive real parser sessions while the shared provider remains u
   analysis.dispose()
   survivorAnalysis.dispose()
   await grammar.worker.awaitIdleFence()
-  expect(grammar.worker.inspect().cache.sourceChunks.sentChunks).toBe(0)
+  expect((await grammar.worker.inspectRetention())?.source).toEqual({
+    documentCount: 0,
+    readCount: 0,
+    pinCount: 0,
+    sourceUnits: 0,
+  })
   expect(grammar.worker.inspect().pendingRequests).toBe(0)
 })
 
@@ -373,14 +403,18 @@ test('disposes a waiting session without parsing it and preserves the simultaneo
   await grammar.worker.awaitIdleFence()
   expect(grammar.parsedSessions.every((session) => !disposed.includes(session))).toBe(true)
   expect(first.paints).toEqual(paints)
-  expect(grammar.worker.inspect().cache.sourceChunks.documents).toBe(1)
+  expect((await grammar.worker.inspectRetention())?.source.documentCount).toBe(1)
   expect(second.editor.materializeFullText()).toBe('const second = 222;')
   second.editor.dispose()
   await grammar.worker.awaitIdleFence()
-  expect(grammar.worker.inspect().cache.sourceChunks.sentChunks).toBe(0)
+  expect((await grammar.worker.inspectRetention())?.source).toEqual({
+    documentCount: 0,
+    readCount: 0,
+    pinCount: 0,
+    sourceUnits: 0,
+  })
   expect(grammar.worker.inspect().pendingRequests).toBe(0)
   await grammar.worker.dispose()
-  expect(grammar.worker.inspect().cache.sourceChunks.documents).toBe(0)
   expect(grammar.worker.inspect().lifecycle).toBe('disposed')
 })
 
@@ -416,6 +450,6 @@ test.each([0, 1200])(
       }),
     ])
     await grammar.worker.awaitIdleFence()
-    expect(grammar.worker.inspect().cache.sourceChunks.documents).toBe(1)
+    expect((await grammar.worker.inspectRetention())?.source.documentCount).toBe(1)
   },
 )

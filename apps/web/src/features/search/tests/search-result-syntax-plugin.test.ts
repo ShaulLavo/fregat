@@ -1,4 +1,12 @@
 import {
+  createEditorStructuralOperation,
+  type EditorStructuralOperationContext,
+} from '@singapore-editor/core/editor'
+import {
+  createSyntaxDocument,
+  disposeSyntaxDocuments,
+} from '../../../../test/factories/syntax-document'
+import {
   createDocumentTextSnapshot,
   createPieceTableSnapshot,
   type PieceTableSnapshot,
@@ -7,11 +15,10 @@ import {
   createEmptySyntaxResult,
   type EditorSyntaxProvider,
   type EditorSyntaxResult,
-  type EditorSyntaxSession,
-  type EditorSyntaxSessionOptions,
+  type EditorSyntaxRuntime,
   type EditorToken,
 } from '@singapore-editor/core/syntax'
-import { describe, vi } from 'vitest'
+import { afterEach, describe, vi } from 'vitest'
 
 import { expect, test as it } from '../../../../test/fixtures'
 
@@ -23,6 +30,8 @@ type RecordingSyntaxState = {
   parsedTexts: string[]
   sessionCount: number
 }
+
+afterEach(disposeSyntaxDocuments)
 
 describe('search result syntax provider', () => {
   it('parses search result excerpts independently and offsets their tokens', async () => {
@@ -55,10 +64,10 @@ describe('search result syntax provider', () => {
     const provider = createSearchResultSyntaxProvider(recordingSyntaxProvider(recording))
     const text = 'const first = 1\n\nconst last = 2\n'
     const snapshot = createPieceTableSnapshot(text)
-    const source = createDocumentTextSnapshot(snapshot)
+    const session = searchResultSession(provider, snapshot, text)
+    const source = session.buffer.getTextSnapshot()
     const materialize = vi.spyOn(source, 'materializeFullText')
     const read = vi.spyOn(source, 'readRange')
-    const session = searchResultSession(provider, snapshot, text)
 
     const result = await session.refresh(source)
 
@@ -78,16 +87,7 @@ describe('search result syntax provider', () => {
     const provider = createSearchResultSyntaxProvider(
       recordingSyntaxProvider(recordingSyntaxState()),
     )
-    const snapshot = createPieceTableSnapshot('const value = 1')
-
-    expect(
-      provider.createSession({
-        documentId: 'workspace-file:test.ts',
-        languageId: 'typescript',
-        snapshot,
-        textSnapshot: createDocumentTextSnapshot(snapshot, 'const value = 1'),
-      }),
-    ).toBeNull()
+    expect(createSyntaxDocument(provider, 'const value = 1', 'workspace-file:test.ts')).toBeNull()
   })
 
   it('keeps provider token ranges unchanged after line-local offsets are applied', async () => {
@@ -141,10 +141,12 @@ describe('search result syntax provider', () => {
     const session = searchResultSession(provider, snapshot, text)
     const pending = session.refresh(createDocumentTextSnapshot(snapshot, text))
 
+    const canceled = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.waitFor(() => expect(recording.parsedTexts).toEqual(['const first = 1']))
     session.dispose()
     expect(recording.disposedTexts).toEqual(['const first = 1'])
     recording.finish('const first = 1')
-    await pending
+    await canceled
 
     expect(recording.parsedTexts).toEqual(['const first = 1'])
   })
@@ -156,14 +158,17 @@ describe('search result syntax provider', () => {
     const previousSnapshot = createPieceTableSnapshot(previousText)
     const session = searchResultSession(provider, previousSnapshot, previousText)
     const previous = session.refresh(createDocumentTextSnapshot(previousSnapshot, previousText))
+    const canceled = expect(previous).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.waitFor(() => expect(recording.parsedTexts).toEqual(['const old = 1']))
     const nextText = 'const current = 3\nconst next = 4'
     const next = session.refresh(
       createDocumentTextSnapshot(createPieceTableSnapshot(nextText), nextText),
     )
 
-    expect(recording.disposedTexts).toEqual(['const old = 1'])
+    await vi.waitFor(() => expect(recording.disposedTexts).toEqual(['const old = 1']))
     recording.finish('const old = 1')
-    await previous
+    await canceled
+    await vi.waitFor(() => expect(recording.parsedTexts).toContain('const current = 3'))
     recording.finish('const current = 3')
     await expect.poll(() => recording.parsedTexts).toContain('const next = 4')
     recording.finish('const next = 4')
@@ -187,11 +192,13 @@ describe('search result syntax provider', () => {
     const firstRefresh = first.refresh(createDocumentTextSnapshot(snapshot, text))
     const secondRefresh = second.refresh(createDocumentTextSnapshot(snapshot, text))
 
+    const canceled = expect(firstRefresh).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.waitFor(() => expect(recording.parsedTexts).toEqual([text]))
     first.dispose()
     expect(recording.disposedTexts).toEqual([])
     expect(recording.parsedTexts).toEqual([text])
     recording.finish(text)
-    await firstRefresh
+    await canceled
     expect((await secondRefresh).tokens).toEqual([syntaxToken(0, 5)])
     expect(recording.disposedTexts).toEqual([text])
     second.dispose()
@@ -268,19 +275,22 @@ function controlledSyntaxState(): ControlledSyntaxState {
 
 function controlledSyntaxProvider(recording: ControlledSyntaxState): EditorSyntaxProvider {
   return {
-    createSession: (options) => controlledSyntaxSession(options, recording),
+    operation: createEditorStructuralOperation((options) =>
+      controlledSyntaxSession(options, recording),
+    ),
   }
 }
 
 function controlledSyntaxSession(
-  options: EditorSyntaxSessionOptions,
+  options: EditorStructuralOperationContext,
   recording: ControlledSyntaxState,
-): EditorSyntaxSession {
+): EditorSyntaxRuntime {
   let parsedText = ''
-  let result = createLineSyntaxResult(options.textSnapshot)
+  let result = createLineSyntaxResult(options.initialRead.text)
   return {
     foldingSupport: 'unsupported',
-    refresh: (snapshot) => {
+    analyze: (read, signal) => {
+      const snapshot = read.text
       const text = snapshot.readRange(0, snapshot.length)
       parsedText = text
       recording.parsedTexts.push(text)
@@ -289,9 +299,12 @@ function controlledSyntaxSession(
         result = createLineSyntaxResult(snapshot)
         pending.resolve(result)
       })
-      return pending.promise
+      signal.throwIfAborted()
+      const abort = () =>
+        pending.reject(new DOMException('The external parser was canceled', 'AbortError'))
+      signal.addEventListener('abort', abort, { once: true })
+      return pending.promise.finally(() => signal.removeEventListener('abort', abort))
     },
-    applyChange: async () => result,
     dispose: () => recording.disposedTexts.push(parsedText),
     getResult: () => result,
     getSnapshotVersion: () => 0,
@@ -301,11 +314,11 @@ function controlledSyntaxSession(
 
 function recordingSyntaxProvider(recording: RecordingSyntaxState): EditorSyntaxProvider {
   return {
-    createSession: (options) => {
+    operation: createEditorStructuralOperation((options) => {
       recording.sessionCount += 1
       recording.documentIds.push(options.documentId)
       return recordingSyntaxSession(options, recording)
-    },
+    }),
   }
 }
 
@@ -319,37 +332,27 @@ function recordingSyntaxState(): RecordingSyntaxState {
 
 function searchResultSession(
   provider: EditorSyntaxProvider,
-  snapshot: PieceTableSnapshot,
+  _snapshot: PieceTableSnapshot,
   text: string,
-): EditorSyntaxSession {
-  const session = provider.createSession({
-    documentId: 'search-result-file:test.ts',
-    languageId: 'typescript',
-    snapshot,
-    textSnapshot: createDocumentTextSnapshot(snapshot, text),
-  })
-
-  if (!session) throw new Error('Expected search result syntax session')
-
+) {
+  const session = createSyntaxDocument(provider, text, 'search-result-file:test.ts')
+  if (!session) throw new TypeError('The excerpt provider must admit a search document')
   return session
 }
 
 function recordingSyntaxSession(
-  options: EditorSyntaxSessionOptions,
+  options: EditorStructuralOperationContext,
   recording: RecordingSyntaxState,
-): EditorSyntaxSession {
-  let result = createLineSyntaxResult(options.textSnapshot)
+): EditorSyntaxRuntime {
+  let result = createLineSyntaxResult(options.initialRead.text)
 
   return {
     foldingSupport: 'supported',
-    refresh: async (snapshot) => {
+    analyze: async (read) => {
+      const snapshot = read.text
       const text = snapshot.readRange(0, snapshot.length)
       recordingText(recording, text)
       result = createLineSyntaxResult(snapshot)
-      return result
-    },
-    applyChange: async (change) => {
-      result = createLineSyntaxResult(change.textSnapshot)
       return result
     },
     dispose: () => undefined,
@@ -367,24 +370,21 @@ function recordingText(recording: RecordingSyntaxState, text: string): void {
 
 function tokenSyntaxProvider(tokens: readonly EditorToken[]): EditorSyntaxProvider {
   return {
-    createSession: (options) => tokenSyntaxSession(options, tokens),
+    operation: createEditorStructuralOperation((options) => tokenSyntaxSession(options, tokens)),
   }
 }
 
 function tokenSyntaxSession(
-  options: EditorSyntaxSessionOptions,
+  options: EditorStructuralOperationContext,
   tokens: readonly EditorToken[],
-): EditorSyntaxSession {
-  let result = createTokenSyntaxResult(options.snapshot, tokens)
+): EditorSyntaxRuntime {
+  let result = createTokenSyntaxResult(options.initialRead.text, tokens)
 
   return {
     foldingSupport: 'supported',
-    refresh: async (snapshot) => {
+    analyze: async (read) => {
+      const snapshot = read.text
       result = createTokenSyntaxResult(snapshot, tokens)
-      return result
-    },
-    applyChange: async (change) => {
-      result = createTokenSyntaxResult(change.snapshot, tokens)
       return result
     },
     dispose: () => undefined,

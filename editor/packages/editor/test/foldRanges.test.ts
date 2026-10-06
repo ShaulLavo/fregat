@@ -1,3 +1,4 @@
+import { createSyntaxPlugin, createEmptySyntaxRuntime } from './factories/syntaxRuntime'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createFoldGutterContribution,
@@ -9,16 +10,8 @@ import type { EditorPerformanceDiagnostic } from '../src/editor/performanceDiagn
 import { IndentationFoldIndex } from '../src/editor/indentationFoldIndex'
 import { createVisibleEditor } from './factories/visibleEditor'
 import type { EditorPlugin, EditorViewSnapshot } from '../src/plugins'
-import {
-  createEmptySyntaxResult,
-  createEmptySyntaxSession,
-  type EditorSyntaxResult,
-} from '../src/public/syntax'
-import {
-  resetEditorInstanceCount,
-  setHighlightRegistry,
-  setEditorSyntaxSessionFactory,
-} from '../src/public/testing'
+import { createEmptySyntaxResult, type EditorSyntaxResult } from '../src/public/syntax'
+import { resetEditorInstanceCount, setHighlightRegistry } from '../src/public/testing'
 
 /**
  * The gutter package types itself against the published `@singapore-editor/core` facade, so the plugin
@@ -169,7 +162,7 @@ describe('fold ranges without a grammar', () => {
     editor.dispose()
     container.remove()
     setHighlightRegistry(undefined)
-    setEditorSyntaxSessionFactory(undefined)
+
     vi.useRealTimers()
     vi.unstubAllGlobals()
   })
@@ -183,13 +176,15 @@ describe('fold ranges without a grammar', () => {
       })
       const snapshots: EditorViewSnapshot[] = []
       let support = foldingSupport
-      setEditorSyntaxSessionFactory(() => ({
-        ...createEmptySyntaxSession(),
-        get foldingSupport() {
-          return support
-        },
-        refresh: () => pending,
-      }))
+      editor.addPlugin(
+        createSyntaxPlugin(() => ({
+          ...createEmptySyntaxRuntime(),
+          get foldingSupport() {
+            return support
+          },
+          analyze: () => pending,
+        })),
+      )
       editor.addPlugin({
         activate: (context) =>
           context.registerViewContribution({
@@ -237,23 +232,27 @@ describe('fold ranges without a grammar', () => {
   )
 
   it('treats a supported empty fold result as authoritative', async () => {
-    setEditorSyntaxSessionFactory(() => ({
-      ...createEmptySyntaxSession(),
-      foldingSupport: 'supported',
-    }))
+    editor.addPlugin(
+      createSyntaxPlugin(() => ({
+        ...createEmptySyntaxRuntime(),
+        foldingSupport: 'supported',
+      })),
+    )
     editor.openDocument({ documentId: 'config.js', languageId: 'javascript', text: INDENTED_TEXT })
     await vi.waitFor(() => expect(editor.getState().syntaxStatus).toBe('ready'))
     expect(foldKeys()).toEqual([])
   })
 
   it('restores indentation folding if the pending structural provider fails', async () => {
-    setEditorSyntaxSessionFactory(() => ({
-      ...createEmptySyntaxSession(),
-      foldingSupport: 'pending',
-      refresh: async () => {
-        throw new RangeError('Parser unavailable')
-      },
-    }))
+    editor.addPlugin(
+      createSyntaxPlugin(() => ({
+        ...createEmptySyntaxRuntime(),
+        foldingSupport: 'pending',
+        analyze: async () => {
+          throw new RangeError('Parser unavailable')
+        },
+      })),
+    )
     editor.openDocument({ documentId: 'config.js', languageId: 'javascript', text: INDENTED_TEXT })
     expect(foldKeys()).toEqual([])
     await vi.waitFor(() => expect(editor.getState().syntaxStatus).toBe('error'))
@@ -261,7 +260,7 @@ describe('fold ranges without a grammar', () => {
   })
 
   it('keeps indentation folding when the syntax provider has no folding support', async () => {
-    setEditorSyntaxSessionFactory(() => createEmptySyntaxSession())
+    editor.addPlugin(createSyntaxPlugin(() => createEmptySyntaxRuntime()))
     editor.openDocument({ documentId: 'config.js', languageId: 'javascript', text: INDENTED_TEXT })
     expect(foldKeys()).toHaveLength(0)
     await vi.waitFor(() => expect(editor.getState().syntaxStatus).toBe('ready'))
@@ -416,10 +415,12 @@ describe('fold ranges without a grammar', () => {
       const scans = recordFallbackScans()
       const complete = vi.spyOn(IndentationFoldIndex.prototype, 'complete')
       const step = vi.spyOn(IndentationFoldIndex.prototype, 'step')
-      setEditorSyntaxSessionFactory(() => ({
-        ...createEmptySyntaxSession(),
-        foldingSupport: 'unsupported',
-      }))
+      editor.addPlugin(
+        createSyntaxPlugin(() => ({
+          ...createEmptySyntaxRuntime(),
+          foldingSupport: 'unsupported',
+        })),
+      )
       try {
         editor.openDocument({
           documentId: 'unsupported.txt',

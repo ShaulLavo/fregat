@@ -1,15 +1,12 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { Editor } from '@singapore-editor/core/editor'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Editor, createEditorStructuralOperation } from '@singapore-editor/core/editor'
+import type { EditorPlugin } from '@singapore-editor/core/extensions'
 import { markdownPack } from '@singapore-editor/core/keymap'
-import {
-  setEditorSyntaxSessionFactory,
-  setHighlightRegistry,
-  VirtualizedTextView,
-} from '@singapore-editor/core/testing'
+import { setHighlightRegistry, VirtualizedTextView } from '@singapore-editor/core/testing'
 import {
   createEmptySyntaxResult,
   type EditorSyntaxResult,
-  type EditorSyntaxSession,
+  type EditorSyntaxRuntime,
 } from '@singapore-editor/core/syntax'
 import { init, MarkdownDocument } from 'tree-sitter-md'
 import { createMarkdownAuthoringPlugin, createMarkdownPreviewPlugin } from '../src/index'
@@ -18,7 +15,7 @@ const DOCUMENT = '# Title\na **bold** b'
 
 beforeAll(() => init())
 
-const markdownSyntaxSession = (): EditorSyntaxSession => {
+const markdownSyntaxSession = (): EditorSyntaxRuntime => {
   const doc = new MarkdownDocument({ frontmatter: true })
   let result = createEmptySyntaxResult()
   const parse = (text: string): EditorSyntaxResult => {
@@ -31,9 +28,7 @@ const markdownSyntaxSession = (): EditorSyntaxSession => {
   }
   return {
     foldingSupport: 'supported',
-    refresh: async (snapshot) => parse(snapshot.readRange(0, snapshot.length)),
-    applyChange: async (change) =>
-      parse(change.textSnapshot.readRange(0, change.textSnapshot.length)),
+    analyze: async (read) => parse(read.text.readRange(0, read.text.length)),
     getResult: () => result,
     getTokens: () => [],
     getSnapshotVersion: () => 0,
@@ -41,16 +36,23 @@ const markdownSyntaxSession = (): EditorSyntaxSession => {
   }
 }
 
+const markdownSyntaxPlugin: EditorPlugin = {
+  activate: (context) =>
+    context.registerSyntaxProvider({
+      operation: createEditorStructuralOperation(() => markdownSyntaxSession()),
+    }),
+}
+
 const highlights = new Map<string, Highlight>()
 class MockHighlight extends Set<Range> {}
-
-const flush = async (): Promise<void> => {
-  for (let index = 0; index < 8; index += 1) await Promise.resolve()
-}
 
 describe('markdown preview plugin', () => {
   let container: HTMLElement
   let editor: Editor
+
+  const flush = async (): Promise<void> => {
+    await vi.waitFor(() => expect(editor.getState().syntaxStatus).toBe('ready'))
+  }
 
   // Read the mounted DOM rather than editor state: what the user actually sees is the assertion.
   const rowTexts = (): readonly string[] =>
@@ -68,11 +70,14 @@ describe('markdown preview plugin', () => {
       set: (name: string, highlight: Highlight) => highlights.set(name, highlight),
       delete: (name: string) => highlights.delete(name),
     })
-    setEditorSyntaxSessionFactory(() => markdownSyntaxSession())
     container = document.createElement('div')
     document.body.appendChild(container)
     editor = new Editor(container, {
-      plugins: [createMarkdownPreviewPlugin(), createMarkdownAuthoringPlugin()],
+      plugins: [
+        markdownSyntaxPlugin,
+        createMarkdownPreviewPlugin(),
+        createMarkdownAuthoringPlugin(),
+      ],
     })
     const view: unknown = Reflect.get(editor, 'view')
     // happy-dom has no layout, so deliver the first visible viewport measurement explicitly.
@@ -83,7 +88,6 @@ describe('markdown preview plugin', () => {
     editor.dispose()
     container.remove()
     highlights.clear()
-    setEditorSyntaxSessionFactory(undefined)
     setHighlightRegistry(undefined)
     Reflect.deleteProperty(globalThis, 'Highlight')
   })
@@ -233,7 +237,10 @@ describe('markdown preview plugin', () => {
 
   it('opens link labels by click or Enter with their resolved destination and unchanged source', async () => {
     const opened: string[] = []
-    editor.setPlugins([createMarkdownPreviewPlugin({ openLink: (href) => opened.push(href) })])
+    editor.setPlugins([
+      markdownSyntaxPlugin,
+      createMarkdownPreviewPlugin({ openLink: (href) => opened.push(href) }),
+    ])
     const source =
       'start\n\n[**docs**](https://example.com/a(b)?x=1&amp;y=2 "Docs")\n\n[reference][ref]\n\n[ref]: /guide.md\n'
     editor.setText(source, { languageId: 'markdown' })

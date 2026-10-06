@@ -1,7 +1,9 @@
 import { MinimapWorkerRenderer } from './renderer'
+import { MinimapSourceProtocol } from './sourceProtocol'
 import type { MinimapWorkerRequest, MinimapWorkerResponse } from './types'
 
 const renderer = new MinimapWorkerRenderer()
+const source = new MinimapSourceProtocol(renderer)
 
 globalThis.onmessage = (event: MessageEvent<MinimapWorkerRequest>): void => {
   const request = event.data
@@ -24,16 +26,6 @@ function handleRequest(request: MinimapWorkerRequest): void {
       return
     case 'updateBaseStyles':
       renderer.setBaseStyles(request.baseStyles)
-      return
-    case 'openDocument':
-    case 'replaceDocument':
-      renderer.setDocument(request.document)
-      return
-    case 'applyEdit':
-      renderer.applyEdit(request.edit, request.document)
-      return
-    case 'applyEdits':
-      renderer.applyEdits(request.edits, request.document)
       return
     case 'updateTokens':
       renderer.setTokens(request.tokens)
@@ -61,18 +53,31 @@ function handleRequest(request: MinimapWorkerRequest): void {
       return
     }
     case 'render':
+      if (!source.accepts(request.source)) {
+        post({ type: 'renderSkipped', sequence: request.sequence })
+        return
+      }
       postRender(request.sequence)
+      return
+    case 'projectSource':
+      post({ type: 'sourceApplied', requestId: request.requestId, receipt: source.apply(request) })
+      return
+    case 'releaseSource':
+      source.release(request.identity)
       return
   }
 }
 
 function postRender(sequence: number): void {
+  const receipt = source.current()
+  if (!receipt) return
   const result = renderer.render()
   if (!result) return
 
   post({
     type: 'rendered',
     sequence,
+    source: receipt,
     sliderNeeded: result.sliderNeeded,
     sliderTop: result.sliderTop,
     sliderHeight: result.sliderHeight,

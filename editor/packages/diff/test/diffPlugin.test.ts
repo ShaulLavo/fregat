@@ -1,13 +1,19 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 // NOT-PORTABLE: Direct tests require built sibling workspace packages.
 import { VirtualizedTextView } from '@singapore-editor/core/testing'
-import { Editor } from '@singapore-editor/core/editor'
+import {
+  Editor,
+  createEditorHighlighterOperation,
+  createEditorStructuralOperation,
+  type EditorStructuralOperationContext,
+  type EditorHighlighterOperationContext,
+  type DocumentRead,
+} from '@singapore-editor/core/editor'
 import { createVisibleEditor } from './support/visibleEditor'
 import {
   createEmptySyntaxResult,
   EditorTokenStore,
   toEditorTokenStore,
-  type EditorSyntaxSessionOptions,
   type EditorToken,
   type EditorTokenInput,
 } from '@singapore-editor/core/syntax'
@@ -390,7 +396,7 @@ describe('diff plugin — syntax (§C10, §C11)', () => {
   })
 
   it('creates tree-sitter sessions from diff syntax service requests', async () => {
-    const sessionOptions: EditorSyntaxSessionOptions[] = []
+    const sessionOptions: EditorStructuralOperationContext[] = []
     mountDiff({
       file: typescriptDiff(),
       syntaxBackend: createRecordingSyntaxBackend([], sessionOptions),
@@ -408,20 +414,23 @@ describe('diff plugin — syntax (§C10, §C11)', () => {
         syntaxMode: 'full',
       }),
     )
-    expect(sessionOptions[0]?.textSnapshot.materializeFullText()).toBe('keep\nold\nskip\n')
+    const read = sessionOptions[0]?.initialRead
+    expect(read?.text.readRange(0, read.text.length)).toBe('keep\nold\nskip\n')
   })
 
   it('uses a host-owned highlighter provider instead of constructing a diff worker', async () => {
-    const createSession = vi.fn(() => ({
-      applyChange: vi.fn(async () => ({ tokens: EditorTokenStore.empty() })),
+    const createSession = vi.fn((_context: EditorHighlighterOperationContext) => ({
       dispose: vi.fn(),
-      refresh: vi.fn(async () => ({
+      analyze: vi.fn(async () => ({
         tokens: EditorTokenStore.fromTokens([{ start: 0, end: 4, style: { color: 'gold' } }]),
       })),
     }))
     mountDiff({
       file: typescriptDiff(),
-      syntaxBackend: { kind: 'highlighter', provider: { createSession } },
+      syntaxBackend: {
+        kind: 'highlighter',
+        provider: { operation: createEditorHighlighterOperation(createSession) },
+      },
       syntaxHighlight: true,
     })
 
@@ -430,9 +439,11 @@ describe('diff plugin — syntax (§C10, §C11)', () => {
     expect(createSession).toHaveBeenCalledWith(
       expect.objectContaining({ documentId: 'note.ts#diff-old', languageId: 'typescript' }),
     )
-    const calls = createSession.mock.calls as unknown as [EditorSyntaxSessionOptions][]
+    const calls = createSession.mock.calls
     const old = calls.find(([options]) => options.documentId === 'note.ts#diff-old')?.[0]
-    expect(old?.textSnapshot.materializeFullText()).toBe('keep\nold\nskip\n')
+    expect(old?.initialRead.text.readRange(0, old.initialRead.text.length)).toBe(
+      'keep\nold\nskip\n',
+    )
   })
 
   it('recolors existing diff sessions and releases theme subscriptions on close', async () => {
@@ -442,8 +453,7 @@ describe('diff plugin — syntax (§C10, §C11)', () => {
       tokens: EditorTokenStore.fromTokens([{ start: 5, end: 8, style: { color } }]),
     })
     const createSession = vi.fn(() => ({
-      refresh,
-      applyChange: refresh,
+      analyze: refresh,
       dispose: vi.fn(),
       onDidChangeTheme: (listener: () => void) => {
         listeners.add(listener)
@@ -454,7 +464,10 @@ describe('diff plugin — syntax (§C10, §C11)', () => {
     }))
     const { plugin } = mountDiff({
       file: typescriptDiff(),
-      syntaxBackend: { kind: 'highlighter', provider: { createSession } },
+      syntaxBackend: {
+        kind: 'highlighter',
+        provider: { operation: createEditorHighlighterOperation(createSession) },
+      },
       syntaxHighlight: true,
     })
     await flushUntil(() => plugin.getTokens().length > 0)
@@ -748,24 +761,29 @@ function pointerEvent(type: string, clientY: number): MouseEvent {
 
 function createRecordingSyntaxBackend(
   parsedTexts: string[],
-  sessionOptions: EditorSyntaxSessionOptions[] = [],
+  sessionOptions: EditorStructuralOperationContext[] = [],
 ): DiffSyntaxBackend {
   return {
     kind: 'tree-sitter',
     provider: {
-      createSession(options) {
+      operation: createEditorStructuralOperation((options) => {
         sessionOptions.push(options)
-        parsedTexts.push(options.textSnapshot.materializeFullText())
+        let currentRead = options.initialRead
+        let current = createEmptySyntaxResult()
         return {
           foldingSupport: 'supported',
-          applyChange: async () => createEmptySyntaxResult(),
           dispose: () => undefined,
-          getResult: () => createEmptySyntaxResult(),
-          getSnapshotVersion: () => 0,
-          getTokens: () => [],
-          refresh: async () => createEmptySyntaxResult(),
+          getResult: () => current,
+          getTokens: () => current.tokens,
+          getSnapshotVersion: () => currentRead.revision.point.textVersion,
+          analyze: async (read) => {
+            currentRead = read
+            parsedTexts.push(read.text.readRange(0, read.text.length))
+            current = createEmptySyntaxResult()
+            return current
+          },
         }
-      },
+      }),
     },
   }
 }
@@ -774,24 +792,29 @@ function createTokenSyntaxBackend(): DiffSyntaxBackend {
   return {
     kind: 'tree-sitter',
     provider: {
-      createSession(options) {
+      operation: createEditorStructuralOperation((options) => {
+        let currentRead = options.initialRead
+        let current = syntaxResultForOptions(options, currentRead)
         return {
           foldingSupport: 'supported',
-          applyChange: async () => syntaxResultForOptions(options),
           dispose: () => undefined,
-          getResult: () => syntaxResultForOptions(options),
-          getSnapshotVersion: () => 0,
-          getTokens: () => syntaxResultForOptions(options).tokens,
-          refresh: async () => syntaxResultForOptions(options),
+          getResult: () => current,
+          getTokens: () => current.tokens,
+          getSnapshotVersion: () => currentRead.revision.point.textVersion,
+          analyze: async (read) => {
+            currentRead = read
+            current = syntaxResultForOptions(options, read)
+            return current
+          },
         }
-      },
+      }),
     },
   }
 }
 
-function syntaxResultForOptions(options: EditorSyntaxSessionOptions) {
+function syntaxResultForOptions(options: EditorStructuralOperationContext, read: DocumentRead) {
   const target = options.documentId.endsWith('#diff-old') ? 'old' : 'new'
-  const start = options.textSnapshot.materializeFullText().indexOf(target)
+  const start = read.text.readRange(0, read.text.length).indexOf(target)
   const tokens: EditorToken[] =
     start === -1 ? [] : [{ end: start + target.length, start, style: { color: 'rgb(1, 2, 3)' } }]
 
@@ -803,11 +826,11 @@ function syntaxResultForOptions(options: EditorSyntaxSessionOptions) {
         languageId: options.languageId,
         mode: 'full',
       },
-      requestedRanges: [{ startIndex: 0, endIndex: options.snapshot.length }],
+      requestedRanges: [{ startIndex: 0, endIndex: read.text.length }],
       snapshot: {
         documentId: options.documentId,
-        length: options.snapshot.length,
-        version: 1,
+        length: read.text.length,
+        version: read.revision.point.textVersion,
       },
     }),
     tokens,

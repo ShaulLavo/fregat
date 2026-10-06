@@ -1,4 +1,10 @@
 import type { EditorTheme } from '../theme'
+import type {
+  DocumentWorkerPoint,
+  DocumentWorkerReadReference,
+  DocumentWorkerSourceCommand,
+  DocumentWorkerSourceResult,
+} from '../document/workerReader'
 import type { TextEdit } from '../tokens'
 import type { PackedEditorTokenPatch, PackedEditorTokens } from '../syntax/packedTokens'
 import type { EditorShikiThemeSettingLike } from './theme'
@@ -34,13 +40,15 @@ export type ShikiWorkerDocumentOptions = {
 
 export type ShikiWorkerOpenRequest = ShikiWorkerDocumentOptions & {
   readonly type: 'open'
-  readonly text: string
+  readonly source: DocumentWorkerReadReference
 }
 
 // The worker already holds an edited document's grammar and theme; an edit names them and nothing
 // more, so a keystroke clones no registrations.
 export type ShikiWorkerEditRequest = {
   readonly type: 'edit'
+  readonly source: DocumentWorkerReadReference
+  readonly previousPoint: DocumentWorkerPoint
   readonly documentId: string
   readonly runtimeSessionId: string
   readonly lang: string
@@ -81,18 +89,6 @@ export type ShikiWorkerThemeRequest = {
   readonly themeRegistrations: readonly ShikiWorkerThemeRegistration[]
 }
 
-// A standalone snippet: tokenized whole and forgotten, so no document state outlives the reply. The
-// theme name is revision-qualified by the caller, so same-name themes with other content never meet.
-export type ShikiWorkerHighlightRequest = {
-  readonly type: 'highlight'
-  readonly text: string
-  readonly lang: string | null
-  readonly theme: string
-  readonly languageRegistrations: readonly ShikiWorkerLanguageRegistration[]
-  readonly themeRegistration: ShikiWorkerThemeRegistration
-  readonly maxLineLength: number
-}
-
 export type ShikiWorkerPreloadRequest = {
   readonly type: 'preload'
   readonly languageRegistrations: readonly ShikiWorkerLanguageRegistration[]
@@ -100,6 +96,7 @@ export type ShikiWorkerPreloadRequest = {
 }
 
 export type ShikiWorkerRequestPayload =
+  | { readonly type: 'source'; readonly command: DocumentWorkerSourceCommand }
   | ShikiWorkerOpenRequest
   | ShikiWorkerEditRequest
   | ShikiWorkerRecolorRequest
@@ -109,9 +106,14 @@ export type ShikiWorkerRequestPayload =
   | ShikiWorkerDisposeRequest
   | ShikiWorkerPreloadRequest
   | ShikiWorkerThemeRequest
-  | ShikiWorkerHighlightRequest
 
 export type ShikiWorkerRetentionSnapshot = {
+  readonly source: {
+    readonly documents: number
+    readonly reads: number
+    readonly pins: number
+    readonly sourceUnits: number
+  }
   readonly documentCount: number
   readonly tokenizerCount: number
   /** Session identifiers retained after document disposal. */
@@ -151,6 +153,7 @@ export type ShikiWorkerRetentionSnapshot = {
 // An edit answers with the re-tokenized lines only; the client splices them into the full
 // packed tokens it kept from the last open, so a keystroke never ships the whole document back.
 export type ShikiWorkerTransportResult = {
+  readonly source?: DocumentWorkerSourceResult
   readonly documentId?: string
   readonly tokensPacked?: PackedEditorTokens
   readonly patchesPacked?: readonly PackedEditorTokenPatch[]

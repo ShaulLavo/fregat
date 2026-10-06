@@ -1,3 +1,4 @@
+import { observeWorkerTransport } from './workerObservation'
 import { createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
 import {
   Editor,
@@ -14,8 +15,8 @@ import { createError } from '@singapore-editor/core/logging/evlog'
 import {
   createTreeSitterSyntaxPlugin,
   createTreeSitterSyntaxProvider,
-  TreeSitterWorkerClient,
-  type TreeSitterBackend,
+  createTreeSitterWorkerOwner,
+  type TreeSitterWorkerOwner,
   type TreeSitterSyntaxProvider,
 } from '@singapore-editor/tree-sitter'
 import { TYPESCRIPT_TREE_SITTER_LANGUAGE } from '@singapore-editor/tree-sitter-languages'
@@ -48,9 +49,10 @@ let buffer: EditorTextBuffer | null = null
 let editor: Editor | null = null
 let prepared: EditorPreparedDocument | null = null
 let provider: TreeSitterSyntaxProvider | null = null
-let worker: TreeSitterWorkerClient | null = null
+let worker: TreeSitterWorkerOwner | null = null
 let paints: Paint[] = []
 let diagnostics: (Diagnostic & { readonly at: number })[] = []
+let stopWorkerObservation: (() => void) | null = null
 let droppedDiagnostics = 0
 let preparationMs = 0
 let bufferMs = 0
@@ -82,22 +84,8 @@ async function phase<T>(name: string, run: () => Promise<T>): Promise<T> {
 
 function syntaxProvider(): TreeSitterSyntaxProvider {
   if (provider) return provider
-  worker = new TreeSitterWorkerClient()
-  const backend: TreeSitterBackend = worker
-  provider = createTreeSitterSyntaxProvider({
-    backend: {
-      registerLanguages: (languages) =>
-        phase('startup.worker.registerLanguages', () => backend.registerLanguages(languages)),
-      parse: (payload) => phase('startup.worker.parse', () => backend.parse(payload)),
-      edit: (payload) => phase('startup.worker.edit', () => backend.edit(payload)),
-      queryRange: (payload) =>
-        phase('startup.worker.queryRange', () => worker!.queryRange(payload)),
-      select: (payload) => backend.select(payload),
-      disposeDocument: (id) => backend.disposeDocument(id),
-      awaitRuntimeSessionIdle: (id) => worker!.awaitRuntimeSessionIdle(id),
-      awaitIdleFence: () => worker!.awaitIdleFence(),
-    },
-  })
+  worker = createTreeSitterWorkerOwner()
+  provider = createTreeSitterSyntaxProvider({ workerOwner: worker })
   const load = TYPESCRIPT_TREE_SITTER_LANGUAGE.load
   check(load, 'The TypeScript contribution must load real language assets')
   provider.registerLanguage({
@@ -122,6 +110,20 @@ async function configure(options: Configuration) {
     : generateFixture(options.fixture, options.seed)
   paints = []
   diagnostics = []
+  if (!stopWorkerObservation) {
+    stopWorkerObservation = observeWorkerTransport(
+      (event) => {
+        if (event.durationMs === undefined || !configuration.diagnostics) return
+        recordDiagnostic({
+          name: `startup.worker.transport.${event.type}`,
+          durationMs: event.durationMs,
+          detail: { boundary: 'postMessage-to-reply' },
+        })
+      },
+      () => configuration.diagnostics,
+    )
+    globalThis.addEventListener('pagehide', () => stopWorkerObservation?.(), { once: true })
+  }
   droppedDiagnostics = 0
   globalThis.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = options.diagnostics ? recordDiagnostic : null
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source))

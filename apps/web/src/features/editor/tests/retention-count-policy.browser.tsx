@@ -1,3 +1,4 @@
+import { createEditorStructuralOperation } from '@singapore-editor/core/editor'
 import { afterAll, afterEach, expect, inject, test } from 'vitest'
 import { commands } from 'vitest/browser'
 import '@singapore-editor/core/style.css'
@@ -249,7 +250,7 @@ async function verifyFixture(
     await host.settle()
     expect(
       host.a.analysis.borrowStructural({
-        provider: { createSession: () => null },
+        provider: { operation: createEditorStructuralOperation(() => null) },
         languageId: fixture.language,
       }),
     ).toBeNull()

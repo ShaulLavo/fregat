@@ -54,8 +54,12 @@ export const globalChromeStorage: StorageAccess = {
   },
 }
 
+export function environmentStorageKey(environmentId: string, key: string) {
+  return `env:${environmentId}|${key}`
+}
+
 export function environmentScopedStorage(environmentId: EnvironmentId): ScopedStorage {
-  const namespace = `env:${environmentId}|`
+  const namespace = environmentStorageKey(environmentId, '')
   return {
     environmentId,
     getItem: (key) => globalChromeStorage.getItem(`${namespace}${key}`),
@@ -80,7 +84,7 @@ export function storedEnvironmentScopes(key: string): readonly ScopedStorage[] {
 }
 
 export function forgetEnvironmentStorage(environmentId: string): boolean {
-  const namespace = `env:${environmentId}|`
+  const namespace = environmentStorageKey(environmentId, '')
   for (const key of globalChromeStorage.keys(namespace)) globalChromeStorage.removeItem(key)
   forgetWindowEntries(namespace)
   return globalChromeStorage.keys(namespace).length === 0

@@ -15,15 +15,9 @@
  * files are the worker's bundled ones, so nothing reaches the network.
  */
 
-import { createStringTextSnapshot } from '@singapore-editor/core/document'
+import { createEditorTextBuffer, createEditorBufferSession } from '@singapore-editor/core/document'
+import { acquireEditorDocumentAnalysis } from '@singapore-editor/core/internal/document-worker'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
-import type {
-  DocumentChangesSinceSyncPoint,
-  DocumentLogicalRevisionScope,
-  DocumentSyncPoint,
-  DocumentSyncSegment,
-  TextEdit,
-} from '@singapore-editor/core/document'
 import type {
   EditorViewContribution,
   EditorViewContributionContext,
@@ -226,60 +220,6 @@ type PaintedGroup = {
   readonly ranges: readonly { readonly start: number; readonly end: number }[]
 }
 
-/**
- * A stand-in for `DocumentEditChain`, bounded exactly as the real one is.
- *
- * `MAX_ENTRIES = 128` in `packages/editor/src/editor/editChain.ts` is what makes §C5's third branch
- * reachable rather than hypothetical, and the class is internal to that package, so the bound is
- * reproduced here rather than imported. Every edit this fixture makes is one character inserted at
- * offset zero, and any number of those compose to a single insertion in base coordinates — the
- * general composition the real chain performs is not needed here and is not imitated.
- */
-class FixtureEditChain {
-  readonly #entries: { readonly fromVersion: number; readonly text: string }[] = []
-  readonly #segment = Object.freeze({}) as DocumentSyncSegment
-
-  public record(fromVersion: number, text: string): void {
-    this.#entries.push({ fromVersion, text })
-    if (this.#entries.length > EDIT_CHAIN_MAX_ENTRIES) {
-      this.#entries.splice(0, this.#entries.length - EDIT_CHAIN_MAX_ENTRIES)
-    }
-  }
-
-  public editsSince(fromVersion: number): readonly TextEdit[] | null {
-    const start = this.#entries.findIndex((entry) => entry.fromVersion === fromVersion)
-    if (start === -1) return this.#entries.at(-1)?.fromVersion === fromVersion - 1 ? [] : null
-
-    const text = this.#entries
-      .slice(start)
-      .map((entry) => entry.text)
-      .join('')
-    return [{ from: 0, to: 0, text }]
-  }
-
-  public point(textVersion: number): DocumentSyncPoint {
-    return { revision: textVersion, segment: this.#segment, textVersion }
-  }
-
-  public changesSince(
-    point: DocumentSyncPoint,
-    _scope: DocumentLogicalRevisionScope | null,
-    textVersion: number,
-  ): DocumentChangesSinceSyncPoint | null {
-    if (point.segment !== this.#segment) return null
-    const edits = this.editsSince(point.textVersion)
-    if (edits === null) return null
-
-    const syncPointAfter = this.point(textVersion)
-    return {
-      edits,
-      logicalRevisionCount: textVersion - point.textVersion,
-      revisionAfter: syncPointAfter.revision,
-      syncPointAfter,
-    }
-  }
-}
-
 /** The editor half of the harness: a document, its snapshots, and where the layer's paint lands. */
 class EditorFixture {
   public text = FIXTURE
@@ -288,7 +228,9 @@ class EditorFixture {
   public readonly painted = new Map<string, PaintedGroup>()
   public readonly context: EditorViewContributionContext
 
-  readonly #chain = new FixtureEditChain()
+  readonly #buffer = createEditorTextBuffer(FIXTURE)
+  readonly #session = createEditorBufferSession(this.#buffer)
+  readonly #owner = acquireEditorDocumentAnalysis({ buffer: this.#buffer, documentId: DOCUMENT_ID })
   readonly #textNode: Text
 
   public constructor() {
@@ -302,6 +244,7 @@ class EditorFixture {
       contentElement: container,
       highlightPrefix: 'editor-test-',
       getSnapshot: () => this.snapshot(),
+      getDocumentContributions: () => this.#owner.analysis.contributions,
       textOffsetFromPoint: vi.fn(() => 0),
       getRangeClientRect: () => new DOMRect(0, 0, 1, 1),
       // Every edit this fixture makes is an insertion at offset zero, so a tracked set follows the
@@ -330,11 +273,15 @@ class EditorFixture {
     })
   }
 
+  public dispose(): void {
+    this.#owner.dispose()
+  }
+
   /** One character typed at the top of the file, which moves every span in it. */
   public type(character: string): void {
-    this.#chain.record(this.textVersion, character)
-    this.text = `${character}${this.text}`
-    this.textVersion += 1
+    this.#session.applyEdits([{ from: 0, to: 0, text: character }])
+    this.text = this.#buffer.getTextSnapshot().readRange(0, this.#buffer.getTextSnapshot().length)
+    this.textVersion = this.#buffer.getDocumentSyncPoint().textVersion
     this.#textNode.data = this.text
   }
 
@@ -352,7 +299,7 @@ class EditorFixture {
 
   public snapshot(): EditorViewSnapshot {
     const lineStarts = this.lineStarts()
-    const textSnapshot = createStringTextSnapshot(this.text)
+    const textSnapshot = this.#buffer.getTextSnapshot()
     const rows: EditorVisibleRowSnapshot[] = lineStarts.map((startOffset, index) => ({
       index,
       bufferRow: index,
@@ -393,9 +340,9 @@ class EditorFixture {
         },
         toArray: () => lineStarts,
       },
-      documentSyncPoint: this.#chain.point(this.textVersion),
+      documentSyncPoint: this.#buffer.getDocumentSyncPoint(),
       changesSinceDocumentSyncPoint: (point, scope) =>
-        this.#chain.changesSince(point, scope, this.textVersion),
+        this.#buffer.changesSinceDocumentSyncPoint(point, scope),
       tokens: EditorTokenStore.empty(),
       brackets: [],
       selections: [
@@ -591,6 +538,7 @@ describe('the TypeScript worker and the semantic token layer, end to end', () =>
       },
       dispose: () => {
         contribution.dispose()
+        editor.dispose()
       },
     }
 

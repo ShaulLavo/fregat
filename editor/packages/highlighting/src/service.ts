@@ -1,4 +1,8 @@
 import type { DiffFile, DiffGutterSide } from '@singapore-editor/diff'
+import {
+  createEditorDocumentAnalysis,
+  type EditorDocumentAnalysis,
+} from '@singapore-editor/core/editor'
 import type { EditorHighlighterProvider } from '@singapore-editor/core/extensions'
 import {
   effectiveEditorTheme,
@@ -16,11 +20,10 @@ import {
   type ShikiWorkerThemeRegistration,
   type VscodeThemeRegistration,
 } from '@singapore-editor/core/shiki'
-import { unpackEditorTokens } from '@singapore-editor/core/syntax'
 import {
   createTreeSitterSyntaxProvider,
-  createTreeSitterWorkerBackend,
-  type TreeSitterBackend,
+  createTreeSitterWorkerOwner,
+  type TreeSitterWorkerOwner,
   type TreeSitterSyntaxProvider,
 } from '@singapore-editor/tree-sitter'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
@@ -62,7 +65,7 @@ export type HighlightingServiceOptions = {
   /** Languages to prepare after first paint; `null` prepares Editor's default grammar set. */
   readonly preloadLanguages?: () => readonly HighlightingLanguage[] | null
   readonly shikiWorker?: () => Worker
-  readonly treeSitterBackend?: () => TreeSitterBackend
+  readonly treeSitterWorker?: () => Worker
   /** Read on every Shiki document open and snippet; documents pick up a change on their next request. */
   readonly maxTokenizationLineLength?: () => number
 }
@@ -91,7 +94,7 @@ export type HighlightingDocumentBackend =
 export type HighlightingServiceSnapshot = {
   readonly disposed: boolean
   readonly pendingHighlights: number
-  /** Tree-sitter sessions opened for snippets and not yet disposed. */
+  /** Contributions retained by standalone snippets until their request ends. */
   readonly snippetSessions: number
   readonly diffs: DiffSyntaxSnapshot
   readonly shiki: ShikiWorkerOwnerSnapshot | null
@@ -179,7 +182,7 @@ export function createHighlightingService(
 
 class EditorHighlightingService implements HighlightingService {
   private shikiOwner: ShikiWorkerOwner | null = null
-  private treeSitterBackend: TreeSitterBackend | null = null
+  private treeSitterBackend: TreeSitterWorkerOwner | null = null
   private treeSitterProvider: TreeSitterSyntaxProvider | null = null
   private readonly highlighterProviders = new WeakMap<
     HighlightingThemeSource,
@@ -227,9 +230,9 @@ class EditorHighlightingService implements HighlightingService {
     this.assertLive()
     if (this.treeSitterProvider) return this.treeSitterProvider
 
-    const backend = this.options.treeSitterBackend?.() ?? createTreeSitterWorkerBackend()
+    const backend = createTreeSitterWorkerOwner({ workerFactory: this.options.treeSitterWorker })
     const provider = createTreeSitterSyntaxProvider({
-      backend,
+      workerOwner: backend,
       warmLanguages: () => this.treeSitterPreload(),
     })
     for (const contribution of TREE_SITTER_LANGUAGE_CONTRIBUTIONS) {
@@ -367,35 +370,63 @@ class EditorHighlightingService implements HighlightingService {
       : []
     const lang = grammar
     this.assertLive()
-    const reply = await this.live(
-      this.shiki().highlight({
-        text,
-        lang,
-        theme: theme.revision,
-        languageRegistrations,
-        themeRegistration: theme.registration,
-      }),
-      signal,
-    ).catch((error: unknown) => {
+    const snippet = createSnippetDocument(text, 'as-submitted')
+    const analysis = createEditorDocumentAnalysis({
+      buffer: snippet.buffer,
+      documentId: `highlight-snippet-${this.nextSnippetId++}`,
+    })
+    const provider = createShikiHighlighterProvider({
+      workerOwner: this.shiki(),
+      resolveLanguage: async () => languageRegistrations,
+      resolveTheme: async () => ({ ...theme.registration, name: theme.revision }),
+      theme: theme.revision,
+      languages: lang ? { [lang]: lang } : {},
+    })
+    this.snippetSessions++
+    try {
+      const result = lang
+        ? await this.live(
+            analysis.contributions
+              .request(
+                provider.operation,
+                { languageId: lang },
+                {
+                  kind: 'latest',
+                  audience: analysis.contributions.createAudience({ signal }),
+                  signal,
+                },
+              )
+              .settled.then((outcome) => {
+                if (outcome.kind === 'completed') return outcome.result
+                if (outcome.kind === 'failed') throw outcome.failure
+                throw new HighlightingError(
+                  'unavailable',
+                  'This environment cannot complete a highlighting request',
+                )
+              }),
+            signal,
+          )
+        : { tokens: [], theme: await this.live(provider.loadTheme!(), signal) }
+      this.assertLive()
+      if (!result)
+        throw new HighlightingError(
+          'unavailable',
+          'This environment cannot start a highlighting worker',
+        )
+      const tokens = snippet.submittedTokens(result.tokens).map(freezeToken)
+      return Object.freeze({
+        language: lang ?? PLAIN_TEXT,
+        themeRevision: theme.revision,
+        tokens: Object.freeze(tokens),
+        foreground: result.theme?.foregroundColor ?? theme.registration.fg ?? DEFAULT_FOREGROUND,
+        background: result.theme?.backgroundColor ?? theme.registration.bg ?? DEFAULT_BACKGROUND,
+      })
+    } catch (error) {
       if (error instanceof HighlightingError) throw error
       throw new HighlightingError('failed', 'The highlighting worker failed', { cause: error })
-    })
-    this.assertLive()
-    if (!reply) {
-      throw new HighlightingError(
-        'unavailable',
-        'This environment cannot start a highlighting worker',
-      )
+    } finally {
+      this.finishSnippet(analysis)
     }
-
-    const tokens = reply.tokensPacked ? unpackEditorTokens(reply.tokensPacked).map(freezeToken) : []
-    return Object.freeze({
-      language: lang ?? PLAIN_TEXT,
-      themeRevision: theme.revision,
-      tokens: Object.freeze(tokens),
-      foreground: reply.theme?.foregroundColor ?? theme.registration.fg ?? DEFAULT_FOREGROUND,
-      background: reply.theme?.backgroundColor ?? theme.registration.bg ?? DEFAULT_BACKGROUND,
-    })
   }
 
   /**
@@ -414,14 +445,19 @@ class EditorHighlightingService implements HighlightingService {
     const palette = effectiveEditorTheme(theme.definition)
     const foreground = palette.foregroundColor ?? DEFAULT_FOREGROUND
     const snippet = createSnippetDocument(text, 'as-document')
-    const session = this.syntaxProvider().createSession({
+    const analysis = createEditorDocumentAnalysis({
+      buffer: snippet.buffer,
       documentId: `highlight-snippet-${this.nextSnippetId++}`,
+    })
+    const session = analysis.borrowStructural({
+      provider: this.syntaxProvider(),
       languageId,
       includeHighlights: true,
-      textSnapshot: snippet.textSnapshot,
-      snapshot: snippet.snapshot,
     })
-    if (!session) throw new HighlightingError('failed', `No syntax session for ${languageId}`)
+    if (!session) {
+      analysis.dispose()
+      throw new HighlightingError('failed', `No syntax operation for ${languageId}`)
+    }
 
     this.snippetSessions += 1
     try {
@@ -443,9 +479,29 @@ class EditorHighlightingService implements HighlightingService {
         background: palette.backgroundColor ?? DEFAULT_BACKGROUND,
       })
     } finally {
-      session.dispose()
-      this.snippetSessions -= 1
+      this.finishSnippet(analysis, () => session.dispose())
     }
+  }
+
+  private finishSnippet(analysis: EditorDocumentAnalysis, releaseSession?: () => void): void {
+    let failed = false
+    let failure: unknown
+    try {
+      releaseSession?.()
+    } catch (error) {
+      failed = true
+      failure = error
+    }
+    try {
+      analysis.dispose()
+    } catch (error) {
+      if (!failed) {
+        failed = true
+        failure = error
+      }
+    }
+    this.snippetSessions--
+    if (failed) throw failure
   }
 
   /** `task` for one caller: rejects when that caller aborts or the service is disposed. */
