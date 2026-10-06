@@ -1,17 +1,23 @@
 import { expect, test } from 'vitest'
 import { commands } from 'vitest/browser'
-import { Editor, createEditorDocumentAnalysis, createEditorPreparedDocument } from '../src/editor'
-import { createEditorTextBuffer, createEditorBufferSession } from '../src/public/document'
-import { createShikiHighlighterProvider, createShikiWorkerOwner } from '../src/shiki/index'
-import { createTreeSitterSyntaxProvider, TreeSitterWorkerClient } from '../../tree-sitter/src/index'
-import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '../../tree-sitter-languages/src/index'
+import {
+  Editor,
+  createEditorDocumentAnalysis,
+  createEditorPreparedDocument,
+} from '@singapore-editor/core/editor'
+import { createEditorTextBuffer, createEditorBufferSession } from '@singapore-editor/core/document'
+import {
+  createShikiHighlighterProvider,
+  createShikiWorkerOwner,
+} from '@singapore-editor/core/shiki'
+import {
+  createTreeSitterSyntaxProvider,
+  createTreeSitterWorkerOwner,
+} from '../../tree-sitter/dist/index.js'
+import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '../../tree-sitter-languages/dist/index.js'
 import type { EditorInitialPaintEvent } from '../src/plugins'
-import type {
-  EditorSyntaxProvider,
-  EditorSyntaxResult,
-  EditorSyntaxSession,
-} from '../src/syntax/session'
-import '../src/style.css'
+import { heldNativeWorkerReplies } from './factories/heldWorker'
+import '@singapore-editor/core/style.css'
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
@@ -25,7 +31,9 @@ test.for([false, true])(
   async (overlap, { annotate }) => {
     const language = await import('@shikijs/langs/typescript')
     const theme = await import('@shikijs/themes/dark-plus')
-    const gate = heldNativeShikiReplies()
+    const gate = heldNativeWorkerReplies(new URL('../src/shiki/shiki.worker.ts', import.meta.url), [
+      'edit',
+    ])
     const worker = createShikiWorkerOwner({ workerFactory: gate.createWorker })
     const referenceWorker = createShikiWorkerOwner()
     const options = {
@@ -39,11 +47,14 @@ test.for([false, true])(
       ...options,
       workerOwner: referenceWorker,
     })
-    const tree = new TreeSitterWorkerClient()
-    const structural = createTreeSitterSyntaxProvider({ backend: tree })
+    const replacement = heldNativeWorkerReplies(
+      new URL('../../tree-sitter/src/treeSitter/treeSitter.worker.ts', import.meta.url),
+      ['parse', 'edit', 'queryRange'],
+    )
+    const tree = createTreeSitterWorkerOwner({ workerFactory: replacement.createWorker })
+    const structural = createTreeSitterSyntaxProvider({ workerOwner: tree })
     for (const contribution of TREE_SITTER_LANGUAGE_CONTRIBUTIONS)
       structural.registerLanguage(contribution)
-    const replacement = holdNativeStructuralProvider(structural)
     const source = "export const editorTabA = 'real browser fixture A'\n"
     const prefix = '// held identity response\n'
     const buffer = createEditorTextBuffer(source)
@@ -64,6 +75,10 @@ test.for([false, true])(
     document.body.append(host)
     const paints: EditorInitialPaintEvent[] = []
     let editor: Editor | null = null
+    let referenceAnalysis: ReturnType<typeof createEditorDocumentAnalysis> | null = null
+    let reference: ReturnType<
+      ReturnType<typeof createEditorDocumentAnalysis>['borrowHighlighter']
+    > = null
     try {
       if (!overlap) {
         expect(
@@ -121,8 +136,9 @@ test.for([false, true])(
       expect(paints.map((event) => event.phase)).toEqual(['text', 'highlight-settled'])
       const settledPaints = paints.length
       if (overlap) {
+        replacement.arm()
         editor.addPlugin({
-          activate: (context) => context.registerSyntaxProvider(replacement.provider),
+          activate: (context) => context.registerSyntaxProvider(structural),
         })
         await expect.poll(() => replacement.produced.length).toBeGreaterThan(0)
         expect(editor.getState().initialHighlightStatus).toBe('loading')
@@ -157,15 +173,17 @@ test.for([false, true])(
           }),
           'current-ready198-content-before-structure-release',
         )
-        replacement.release()
+        replacement.releaseAll()
       }
       await expect.poll(() => editor!.getState().syntaxStatus).toBe('ready')
       const referenceBuffer = createEditorTextBuffer(prefix + source)
-      const reference = referenceProvider.createSession({
+      referenceAnalysis = createEditorDocumentAnalysis({
+        buffer: referenceBuffer,
         documentId: 'independent-current.ts',
+      })
+      reference = referenceAnalysis.borrowHighlighter({
+        provider: referenceProvider,
         languageId: 'typescript',
-        textSnapshot: referenceBuffer.getTextSnapshot(),
-        snapshot: referenceBuffer.getSnapshot(),
       })
       expect(reference).not.toBeNull()
       const exact = await reference!.refresh(referenceBuffer.getTextSnapshot())
@@ -229,8 +247,8 @@ test.for([false, true])(
       expect(editor.captureSnapshot()).toBeNull()
       gate.releaseAll()
       await expect.poll(() => editor!.getState().initialHighlightStatus).toBe('painted')
-      const finalBuffer = createEditorTextBuffer('x' + prefix + source)
-      const finalReference = await reference!.refresh(finalBuffer.getTextSnapshot())
+      createEditorBufferSession(referenceBuffer).applyEdits([{ from: 0, to: 0, text: 'x' }])
+      const finalReference = await reference!.refresh(referenceBuffer.getTextSnapshot())
       expect(editor['syntax'].tokens.toTokens()).toEqual(finalReference.tokens.toTokens())
       expect(editor['syntax'].copyTokens.toTokens()).toEqual(finalReference.tokens.toTokens())
       expect(editor.captureSnapshot()).not.toBeNull()
@@ -253,8 +271,10 @@ test.for([false, true])(
       )
       reference!.dispose()
     } finally {
-      replacement.release()
+      replacement.releaseAll()
       gate.releaseAll()
+      reference?.dispose()
+      referenceAnalysis?.dispose()
       editor?.dispose()
       prepared.dispose()
       analysis.dispose()
@@ -265,113 +285,6 @@ test.for([false, true])(
     }
   },
 )
-
-function heldNativeShikiReplies() {
-  const requests: unknown[] = []
-  const edits: number[] = []
-  const held: MessageEvent<unknown>[] = []
-  let armed = false
-  let deliver: ((event: MessageEvent<unknown>) => void) | null = null
-  const releaseFirst = () => {
-    const event = held.shift()
-    if (event) deliver?.(event)
-  }
-  return {
-    requests,
-    held,
-    releaseFirst,
-    arm: () => {
-      armed = true
-    },
-    releaseAll: () => {
-      armed = false
-      while (held.length) releaseFirst()
-    },
-    createWorker: () => {
-      const worker = new Worker(new URL('../src/shiki/shiki.worker.ts', import.meta.url), {
-        type: 'module',
-      })
-      const post = worker.postMessage
-      worker.postMessage = (
-        value: unknown,
-        transferOrOptions?: Transferable[] | StructuredSerializeOptions,
-      ) => {
-        requests.push(value)
-        const id = nativeEditId(value)
-        if (id !== null) edits.push(id)
-        Reflect.apply(post, worker, [value, transferOrOptions])
-      }
-      const descriptor = Object.getOwnPropertyDescriptor(Worker.prototype, 'onmessage')
-      if (!descriptor?.set) expect.fail('Native worker message descriptor unavailable')
-      Object.defineProperty(worker, 'onmessage', {
-        configurable: true,
-        set: (listener: Worker['onmessage']) => {
-          deliver = (event) => listener?.call(worker, event)
-          descriptor.set?.call(worker, (event: MessageEvent<unknown>) => {
-            if (armed && edits.includes(nativeMessageId(event.data) ?? -1)) {
-              held.push(event)
-              return
-            }
-            deliver?.(event)
-          })
-        },
-      })
-      return worker
-    },
-  }
-}
-
-function nativeMessageId(value: unknown): number | null {
-  if (!value || typeof value !== 'object' || !('id' in value)) return null
-  return typeof value.id === 'number' ? value.id : null
-}
-
-function nativeEditId(value: unknown): number | null {
-  if (!value || typeof value !== 'object' || !('payload' in value)) return null
-  const payload = value.payload
-  if (!payload || typeof payload !== 'object' || !('type' in payload) || payload.type !== 'edit')
-    return null
-  return nativeMessageId(value)
-}
-
-function holdNativeStructuralProvider(provider: EditorSyntaxProvider) {
-  let release!: () => void
-  const released = new Promise<void>((resolve) => {
-    release = resolve
-  })
-  const produced: EditorSyntaxResult[] = []
-  const hold = async (result: Promise<EditorSyntaxResult>) => {
-    const value = await result
-    produced.push(value)
-    await released
-    return value
-  }
-  return {
-    produced,
-    release,
-    provider: {
-      createSession: (options) => {
-        const session = provider.createSession(options)
-        if (!session) return null
-        const query = session.queryRange?.bind(session)
-        const gated: EditorSyntaxSession = {
-          get foldingSupport() {
-            return session.foldingSupport
-          },
-          refresh: (snapshot) => hold(session.refresh(snapshot)),
-          applyChange: (change) => hold(session.applyChange(change)),
-          canQueryRange: () => session.canQueryRange?.() ?? Boolean(query),
-          queryRange: query ? (range) => hold(query(range)) : undefined,
-          getResult: () => session.getResult(),
-          getTokens: () => session.getTokens(),
-          getSnapshotVersion: () => session.getSnapshotVersion(),
-          dispose: () => session.dispose(),
-        }
-        return gated
-      },
-    } satisfies EditorSyntaxProvider,
-  }
-}
 
 function capturedReplacement(editor: Editor): unknown {
   return Reflect.get(editor['syntax'], 'pendingInitialHighlightReplacement')

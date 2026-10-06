@@ -10,6 +10,7 @@ import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { FilesystemPath, TabContent } from '@/lib/documents/utils/types'
 import { documentSymbolKeys } from '@/lib/query-keys'
 import { useQuery } from '@tanstack/react-query'
+import { useWorkspaceEditHost } from '@/lib/workspace-edits/providers/host-context'
 
 import type { QuickAccessMode } from '@/features/command-palette/utils/types'
 
@@ -25,6 +26,7 @@ export function useSymbols({
   selectedTabContent,
 }: UseCommandPaletteSymbolsOptions) {
   const documentStore = useEditorDocumentStoreApi()
+  const onApplyWorkspaceEdit = useWorkspaceEditHost()
   const selectedFileBackedPath = selectedTabContent
     ? (tabFileResource(selectedTabContent)?.path ?? null)
     : null
@@ -54,9 +56,8 @@ export function useSymbols({
           rootPath: rootPath ?? '',
           serverId: serverId ?? '',
           signal,
-          text: selectedDocument?.buffer.isDirty()
-            ? selectedDocument.buffer.materializeFullText()
-            : null,
+          buffer: selectedDocument?.buffer,
+          onApplyWorkspaceEdit,
         },
         clientForQueryClient(client),
       )

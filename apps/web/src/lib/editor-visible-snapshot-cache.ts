@@ -3,11 +3,11 @@ import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import {
   readWorkspaceCacheEntry,
   removeWorkspaceCacheEntry,
-  workspaceCacheStorageKey,
   workspaceCacheSerializedBytes,
   writeWorkspaceCacheEntry,
   type WorkspaceCacheWriteResult,
 } from '@/lib/workspace-cache-storage'
+import { workspaceCacheStorageKey } from '@/lib/workspace-cache-keys'
 import { log } from '@/lib/client-logging'
 import * as v from 'valibot'
 

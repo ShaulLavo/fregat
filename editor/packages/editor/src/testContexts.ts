@@ -97,6 +97,7 @@ export function createTestViewContributionContext(
     highlightPrefix: 'editor-test',
     hasDocument: () => true,
     getSnapshot: () => missing('getSnapshot'),
+    getDocumentContributions: () => null,
     requestViewUpdate: () => undefined,
     onDidType: () => noDisposal,
     registerPressParticipant: () => noDisposal,

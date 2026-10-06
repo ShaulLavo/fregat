@@ -126,6 +126,10 @@ class WebSocketLspTransport implements LspManagedTransport {
     this.sentCount += 1
   }
 
+  public isClosed(): boolean {
+    return this.closed || isWebSocketClosingOrClosed(this.socket)
+  }
+
   public subscribe(handler: LspTransportHandler): void {
     this.handlers.add(handler)
   }
@@ -181,6 +185,8 @@ class WorkerLspTransport implements LspManagedTransport {
   private readonly messageFormat: LspWorkerMessageFormat
   private readonly terminateOnClose: boolean
   private closed = false
+  private sentCount = 0
+  private receivedCount = 0
 
   public constructor(
     private readonly worker: LspWorkerLike,
@@ -193,7 +199,21 @@ class WorkerLspTransport implements LspManagedTransport {
   }
 
   public send(message: string): void {
+    if (this.closed) {
+      throw new LspTransportClosedError({
+        code: null,
+        reason: 'worker transport closed',
+        wasClean: null,
+        sentCount: this.sentCount,
+        receivedCount: this.receivedCount,
+      })
+    }
     this.worker.postMessage(this.encodeMessage(message))
+    this.sentCount += 1
+  }
+
+  public isClosed(): boolean {
+    return this.closed
   }
 
   public subscribe(handler: LspTransportHandler): void {
@@ -228,6 +248,7 @@ class WorkerLspTransport implements LspManagedTransport {
   private readonly handleMessage = (event: Event): void => {
     const message = messageEventData(event)
     if (message === null) return
+    this.receivedCount += 1
     for (const handler of this.handlers) handler(message)
   }
 

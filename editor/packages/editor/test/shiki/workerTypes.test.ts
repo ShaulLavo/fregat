@@ -9,7 +9,16 @@ describe('Shiki worker message types', () => {
         type: 'open',
         documentId: 'doc',
         runtimeSessionId: 'runtime-doc',
-        text: 'const value = 1;',
+        source: {
+          identity: {
+            documentId: 'doc',
+            documentGeneration: 1,
+            endpointGeneration: 1,
+            registrationId: 1,
+          },
+          point: { segment: 'issued', revision: 0, textVersion: 0 },
+          readId: 'loan',
+        },
         maxLineLength: 20_000,
         lang: 'typescript',
         theme: 'github-dark',

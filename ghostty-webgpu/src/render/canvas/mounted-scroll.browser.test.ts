@@ -92,7 +92,8 @@ it.each(['canvas2d-fill-text', 'canvas2d-pixels'] as const)(
         terminal.write(`\r\n${row} alpha 界 é 😀`)
         expect(scroll).toHaveBeenCalledOnce()
         clock.flushFrame()
-        expect(read).toHaveBeenCalledExactlyOnceWith(undefined)
+        expect(read).toHaveBeenCalledOnce()
+        expect(read.mock.calls[0]?.[0] ?? {}).toEqual({})
         expectScrollReuse(renderer, before)
         await expectFullRepaint(renderer, options)
       }

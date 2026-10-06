@@ -45,6 +45,7 @@ import { TextStorageMaintenance, type TextStorageMaintenanceStats } from './text
 import {
   applyBatchToPieceTable,
   createPieceTableSnapshot,
+  retainPieceTableSnapshot,
   diffPieceTableSnapshots,
   normalizeDocumentText,
   normalizeLineEndings,
@@ -238,6 +239,11 @@ export type EditorTextBuffer = {
   getDocumentSyncPoint(): DocumentSyncPoint
   changesSinceDocumentSyncPoint(
     point: DocumentSyncPoint,
+    scope: DocumentLogicalRevisionScope | null,
+  ): DocumentChangesSinceSyncPoint | null
+  changesBetweenDocumentSyncPoints(
+    base: DocumentSyncPoint,
+    target: DocumentSyncPoint,
     scope: DocumentLogicalRevisionScope | null,
   ): DocumentChangesSinceSyncPoint | null
   // Whether materializing the whole document as one string is a heap hazard,
@@ -603,27 +609,16 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     () => this.history.current,
   )
 
-  public constructor(rawText: string, options: EditorTextBufferOptions = {}) {
+  public constructor(rawText: string | PieceTableSnapshot, options: EditorTextBufferOptions = {}) {
     this.retainedHistoryStates = options.retainedHistoryStates
     this.now = options.now ?? Date.now
-    // Ingested first so the retained copy below is the text the piece table
-    // actually holds. Folding U+2028/U+2029 to LF does not change the length,
-    // so handing the raw string to createDocumentTextSnapshot would sail past
-    // its length check and leave every reader — including the view's line-start
-    // scan — looking at characters the model does not have.
-    const ingested = normalizeDocumentText(rawText)
-    const text = ingested.text
-    const snapshot = createPieceTableSnapshot(text, {
-      normalized: true,
-      lineEnding: ingested.lineEnding,
-      byteOrderMark: ingested.byteOrderMark,
-      containsUnusualLineTerminators: ingested.containsUnusualLineTerminators,
-    })
+    const initial = initialBufferSource(rawText)
+    const snapshot = initial.snapshot
     const selections = createInitialSelectionSet(snapshot, createSelectionIdFactory())
     this.history = this.createHistory(snapshot, selections)
     this.cleanSnapshot = snapshot
     this.dirtyCacheSnapshot = snapshot
-    this.textSnapshot = createDocumentTextSnapshot(snapshot, text)
+    this.textSnapshot = createDocumentTextSnapshot(snapshot, initial.text)
     this.tooLargeForHeapOperation = exceedsHeapOperationBudget(snapshot.length)
   }
 
@@ -877,6 +872,14 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     scope: DocumentLogicalRevisionScope | null,
   ): DocumentChangesSinceSyncPoint | null {
     return this.editChain.changesSince(point, scope)
+  }
+
+  public changesBetweenDocumentSyncPoints(
+    base: DocumentSyncPoint,
+    target: DocumentSyncPoint,
+    scope: DocumentLogicalRevisionScope | null,
+  ): DocumentChangesSinceSyncPoint | null {
+    return this.editChain.changesSince(base, scope, target)
   }
 
   public isTooLargeForHeapOperation(): boolean {
@@ -2051,241 +2054,89 @@ class EditorBufferDocumentSession implements EditorBufferSession {
   }
 }
 
-class StaticDocumentSession implements DocumentSession {
-  private readonly createSelectionId: SelectionIdFactory = createSelectionIdFactory()
-  private snapshot: PieceTableSnapshot
-  private textSnapshot: DocumentTextSnapshot
-  private selections: SelectionSet<PieceTableAnchor>
-
-  public constructor(rawText: string) {
-    // Same ingestion-before-retention rule as PieceTableEditorTextBuffer.
-    const ingested = normalizeDocumentText(rawText)
-    this.snapshot = createPieceTableSnapshot(ingested.text, {
-      normalized: true,
-      lineEnding: ingested.lineEnding,
-      byteOrderMark: ingested.byteOrderMark,
-      containsUnusualLineTerminators: ingested.containsUnusualLineTerminators,
-    })
-    this.textSnapshot = createDocumentTextSnapshot(this.snapshot, ingested.text)
-    this.selections = createSelectionSet(
-      [
-        createAnchorSelection(this.snapshot, this.snapshot.length, this.snapshot.length, {
-          idFactory: this.createSelectionId,
-        }),
-      ],
-      true,
-      this.snapshot,
-    )
-  }
-
-  public applyText(_text: string): DocumentSessionChange {
-    return this.createChange('none', [])
-  }
-
-  public indentSelection(_text: string): DocumentSessionChange {
-    return this.createChange('none', [])
-  }
-
-  public outdentSelection(_tabSize: number): DocumentSessionChange {
-    return this.createChange('none', [])
-  }
-
-  public applyEdits(
+class StaticTextBuffer extends PieceTableEditorTextBuffer {
+  public override applyEdits(
+    selections: SelectionSet<PieceTableAnchor>,
     edits: readonly TextEdit[],
     options: DocumentSessionApplyEditsOptions = {},
+    sourceView: EditorViewSession | null = null,
   ): DocumentSessionChange {
-    const start = nowMs()
-    const normalizedEdits = normalizeTextEdits(edits)
-    if (normalizedEdits.length === 0) {
-      return appendTiming(this.createChange('none', []), 'session.applyEdits', start)
-    }
-
-    const appliedEdits = snapBatchEditRanges(this.snapshot, normalizedEdits)
-    const nextSnapshot = applyBatchToPieceTable(this.snapshot, appliedEdits)
-    const effectiveEdits = appliedEdits.filter(isEffectiveTextEdit)
-    if (effectiveEdits.length === 0) {
-      return appendTiming(this.createChange('none', []), 'session.applyEdits', start)
-    }
-
-    this.snapshot = nextSnapshot
-    this.textSnapshot = createDocumentTextSnapshot(nextSnapshot)
-    this.selections = this.selectionsAfterProgrammaticEdit(nextSnapshot, options)
-    return appendTiming(this.createChange('edit', effectiveEdits), 'session.applyEdits', start)
+    const change = super.applyEdits(selections, edits, { ...options, history: 'skip' }, sourceView)
+    this.markClean()
+    return change
   }
 
-  public backspace(_tabSize?: number): DocumentSessionChange {
-    return this.createChange('none', [])
-  }
-
-  public deleteSelection(): DocumentSessionChange {
-    return this.createChange('none', [])
-  }
-
-  public undo(): DocumentSessionChange {
-    return this.createChange('none', [])
-  }
-
-  public redo(): DocumentSessionChange {
-    return this.createChange('none', [])
-  }
-
-  public setSelection(
-    anchorOffset: number,
-    headOffset = anchorOffset,
-    options: DocumentSessionSelectionOptions = {},
-  ): DocumentSessionChange {
-    return this.setSelections([{ anchor: anchorOffset, head: headOffset }], options)
-  }
-
-  public setSelections(
-    selections: readonly DocumentSessionSelectionRange[],
-    options: DocumentSessionSelectionOptions = {},
-  ): DocumentSessionChange {
-    const start = nowMs()
-    this.selections = this.createNormalizedSelectionSet(selections, options)
-    return appendTiming(this.createChange('selection', []), 'session.selection', start)
-  }
-
-  public addSelection(
-    anchorOffset: number,
-    headOffset = anchorOffset,
-    options: DocumentSessionSelectionOptions = {},
-  ): DocumentSessionChange {
-    const start = nowMs()
-    const nextSelection = this.createSelection(anchorOffset, headOffset, options)
-    this.selections = normalizeSelectionSet(
-      this.snapshot,
-      createSelectionSet([...this.selections.selections, nextSelection]),
-    )
-    return appendTiming(this.createChange('selection', []), 'session.addSelection', start)
-  }
-
-  public clearSecondarySelections(): DocumentSessionChange {
-    const start = nowMs()
-    const normalized = normalizeSelectionSet(this.snapshot, this.selections)
-    const primary = normalized.selections[0]
-    if (!primary || normalized.selections.length <= 1) {
-      return appendTiming(this.createChange('none', []), 'session.clearSecondarySelections', start)
-    }
-
-    this.selections = createSelectionSet([primary], true, this.snapshot)
-    return appendTiming(
-      this.createChange('selection', []),
-      'session.clearSecondarySelections',
-      start,
-    )
-  }
-
-  public materializeFullText(): string {
-    return this.textSnapshot.materializeFullText()
-  }
-
-  public getTextSnapshot(): DocumentTextSnapshot {
-    return this.textSnapshot
-  }
-
-  public getSelections(): SelectionSet<PieceTableAnchor> {
-    return this.selections
-  }
-
-  public getSnapshot(): PieceTableSnapshot {
-    return this.snapshot
-  }
-
-  public canUndo(): boolean {
+  public override canUndo(): boolean {
     return false
   }
-
-  public canRedo(): boolean {
+  public override canRedo(): boolean {
     return false
   }
-
-  public isDirty(): boolean {
+  public override isDirty(): boolean {
     return false
   }
+}
 
-  public markClean(): void {
-    return
+class StaticDocumentSession extends EditorBufferDocumentSession {
+  public constructor(rawText: string) {
+    const buffer = new StaticTextBuffer(rawText, { retainedHistoryStates: 0 })
+    super(buffer, createEditorViewSession(buffer))
   }
 
-  public breakTypingRun(): void {
-    return
+  public override applyText(_text: string): DocumentSessionChange {
+    return this.unchanged()
+  }
+  public override indentSelection(_text: string): DocumentSessionChange {
+    return this.unchanged()
+  }
+  public override outdentSelection(_tabSize: number): DocumentSessionChange {
+    return this.unchanged()
+  }
+  public override backspace(_tabSize?: number): DocumentSessionChange {
+    return this.unchanged()
+  }
+  public override deleteSelection(): DocumentSessionChange {
+    return this.unchanged()
+  }
+  public override undo(): DocumentSessionChange {
+    return this.unchanged()
+  }
+  public override redo(): DocumentSessionChange {
+    return this.unchanged()
   }
 
-  private createNormalizedSelectionSet(
-    selections: readonly DocumentSessionSelectionRange[],
-    options: DocumentSessionSelectionOptions,
-  ): SelectionSet<PieceTableAnchor> {
-    const anchorSelections = selections.map((selection) => {
-      const head = selection.head ?? selection.anchor
-      return this.createSelection(selection.anchor, head, {
-        goal: selection.goal ?? options.goal,
-        affinity: selection.affinity ?? options.affinity,
-      })
-    })
-    return normalizeSelectionSet(this.snapshot, createSelectionSet(anchorSelections))
-  }
-
-  private createSelection(
-    anchorOffset: number,
-    headOffset: number,
-    options: DocumentSessionSelectionOptions,
-  ): AnchorSelection {
-    return createAnchorSelection(this.snapshot, anchorOffset, headOffset, {
-      goal: options.goal,
-      affinity: options.affinity,
-      idFactory: this.createSelectionId,
-    })
-  }
-
-  private selectionsAfterProgrammaticEdit(
-    snapshot: PieceTableSnapshot,
-    options: DocumentSessionApplyEditsOptions,
-  ): SelectionSet<PieceTableAnchor> {
-    if (options.selections) {
-      return this.createNormalizedSelectionSetForSnapshot(snapshot, options.selections, {})
-    }
-    if (options.selection) {
-      return this.createNormalizedSelectionSetForSnapshot(snapshot, [options.selection], {})
-    }
-
-    return markSelectionSetDirty(this.selections)
-  }
-
-  private createNormalizedSelectionSetForSnapshot(
-    snapshot: PieceTableSnapshot,
-    selections: readonly DocumentSessionSelectionRange[],
-    options: DocumentSessionSelectionOptions,
-  ): SelectionSet<PieceTableAnchor> {
-    const anchorSelections = selections.map((selection) => {
-      const head = selection.head ?? selection.anchor
-      return createAnchorSelection(snapshot, selection.anchor, head, {
-        goal: selection.goal ?? options.goal,
-        affinity: selection.affinity ?? options.affinity,
-        idFactory: this.createSelectionId,
-      })
-    })
-    return normalizeSelectionSet(snapshot, createSelectionSet(anchorSelections))
-  }
-
-  private createChange(
-    kind: DocumentSessionChangeKind,
-    edits: readonly TextEdit[],
-  ): DocumentSessionChange {
+  private unchanged(): DocumentSessionChange {
     return createDocumentSessionChange({
-      kind,
-      edits,
+      kind: 'none',
+      edits: [],
       transaction: null,
-      snapshot: this.snapshot,
-      selections: this.selections,
-      textSnapshot: this.textSnapshot,
+      snapshot: this.getSnapshot(),
+      selections: this.getSelections(),
+      textSnapshot: this.getTextSnapshot(),
       timings: [],
       canUndo: false,
       canRedo: false,
       isDirty: false,
-      logicalRevisionCount: kind === 'edit' ? 1 : 0,
+      logicalRevisionCount: 0,
       logicalRevisionScope: null,
     })
+  }
+}
+
+function initialBufferSource(source: string | PieceTableSnapshot): {
+  readonly snapshot: PieceTableSnapshot
+  readonly text?: string
+} {
+  if (typeof source !== 'string') return { snapshot: retainPieceTableSnapshot(source) }
+  const ingested = normalizeDocumentText(source)
+  return {
+    text: ingested.text,
+    snapshot: createPieceTableSnapshot(ingested.text, {
+      normalized: true,
+      lineEnding: ingested.lineEnding,
+      byteOrderMark: ingested.byteOrderMark,
+      containsUnusualLineTerminators: ingested.containsUnusualLineTerminators,
+    }),
   }
 }
 
@@ -2294,6 +2145,10 @@ export function createEditorTextBuffer(
   options: EditorTextBufferOptions = {},
 ): EditorTextBuffer {
   return new PieceTableEditorTextBuffer(text, options)
+}
+
+export function createEditorSnapshotBuffer(snapshot: PieceTableSnapshot): EditorTextBuffer {
+  return new PieceTableEditorTextBuffer(snapshot)
 }
 
 export function createEditorViewSession(

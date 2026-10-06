@@ -1,3 +1,4 @@
+import { createEditorStructuralOperation } from '@singapore-editor/core/editor'
 import { createEditorBufferSession, createEditorTextBuffer } from '@singapore-editor/core/document'
 import { createMarkdownPreviewPlugin } from '@singapore-editor/markdown'
 import '@singapore-editor/markdown/style.css'
@@ -8,7 +9,7 @@ import {
   createEmptySyntaxResult,
   type EditorSyntaxCapture,
   type EditorSyntaxResult,
-  type EditorSyntaxSession,
+  type EditorSyntaxRuntime,
 } from '@singapore-editor/core/syntax'
 import '@singapore-editor/core/style.css'
 
@@ -144,9 +145,8 @@ function markdownCaptures(text: string): EditorPlugin {
     )
   }
   const result = (): EditorSyntaxResult => ({ ...createEmptySyntaxResult(), captures })
-  const session: EditorSyntaxSession = {
-    refresh: async () => result(),
-    applyChange: async () => result(),
+  const session: EditorSyntaxRuntime = {
+    analyze: async () => result(),
     foldingSupport: 'supported',
     getResult: result,
     getTokens: () => [],
@@ -154,7 +154,8 @@ function markdownCaptures(text: string): EditorPlugin {
     dispose() {},
   }
   return {
-    activate: (context) => context.registerSyntaxProvider({ createSession: () => session }),
+    activate: (context) =>
+      context.registerSyntaxProvider({ operation: createEditorStructuralOperation(() => session) }),
   }
 }
 

@@ -17,6 +17,7 @@ import type {
   LspClient,
   LspNotificationHandler,
   LspServerRequestHandler,
+  LspPreparedDocumentSource,
 } from '@singapore-editor/lsp'
 import type * as lsp from 'vscode-languageserver-protocol'
 
@@ -473,6 +474,10 @@ class LanguageServerContribution implements EditorViewContribution {
       new LanguageServerDocument(
         {
           getSnapshot: () => context.getSnapshot(),
+          getSourceOwner: () => {
+            const contributions = context.getDocumentContributions()
+            return contributions ? { contributions } : null
+          },
         },
         { lanes: options.lanes, documentSync: options.documentSync },
       )
@@ -577,7 +582,7 @@ class LanguageServerContribution implements EditorViewContribution {
     this.abortRenameOnDocumentDrift()
     this.definitionLink.update(snapshot, kind)
     if (anchoredSurfaceFollowsUpdate(kind)) this.reanchorRenamePrompt()
-    if (!this.options.document) this.document.synchronize(change ?? null, kind)
+    if (!this.options.document) this.document.synchronize(kind)
     this.completion.update(snapshot, kind, change ?? null)
     this.signatureHelp?.update(snapshot, kind)
     this.documentHighlights.update(snapshot, kind)
@@ -817,6 +822,18 @@ class LanguageServerContribution implements EditorViewContribution {
       if (nextName === null || nextName === currentName) return
       if (!this.renameIsCurrent(active, abort)) return
 
+      const source = owner.connection.workspace.prepareDocumentRequest(active.uri, abort.signal)
+      let prepared: LspPreparedDocumentSource | null = null
+      if (source.kind === 'pending') prepared = await source.ready
+      if (source.kind === 'ready') prepared = source.read
+      if (
+        prepared &&
+        (!prepared.isCurrent() ||
+          prepared.document.sourceRevision !== active.sourceRevision ||
+          prepared.document.sourceSegment !== active.sourceSegment)
+      )
+        return
+      if (!this.renameIsCurrent(active, abort)) return
       const guard = captureWorkspaceEditOriginGuard(owner.connection.workspace)
       const edit = await this.servers.requestSingle(
         owner,

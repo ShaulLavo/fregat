@@ -1,7 +1,8 @@
-import { createPieceTableSnapshot } from '@singapore-editor/core/document'
+import { createEditorTextBuffer } from '@singapore-editor/core/document'
+import { createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
 import {
-  TreeSitterWorkerClient,
-  resolveTreeSitterLanguageContribution,
+  createTreeSitterSyntaxProvider,
+  createTreeSitterWorkerOwner,
 } from '@singapore-editor/tree-sitter'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
 import { expect, test } from '../fixtures'
@@ -11,22 +12,23 @@ test.skipIf(typeof Worker === 'undefined')(
   async () => {
     const contribution = TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((entry) => entry.id === 'json')
     if (!contribution) return expect.fail('JSON language contribution is missing')
-    const descriptor = await resolveTreeSitterLanguageContribution(contribution)
-    const backend = new TreeSitterWorkerClient()
+    const worker = createTreeSitterWorkerOwner()
+    const provider = createTreeSitterSyntaxProvider({ workerOwner: worker })
+    provider.registerLanguage(contribution)
+    const buffer = createEditorTextBuffer('{"answer": 42}')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'worker-observation.json' })
+    const lease = analysis.borrowStructural({ provider, languageId: 'json', syntaxMode: 'full' })
     try {
-      await backend.registerLanguages([descriptor])
-      const result = await backend.parse({
-        documentId: 'worker-observation.json',
-        runtimeSessionId: 'worker-observation',
-        snapshotVersion: 1,
-        languageId: 'json',
-        snapshot: createPieceTableSnapshot('{"answer": 42}'),
-      })
-      expect(result?.documentId).toBe('worker-observation.json')
-      expect(result?.languageId).toBe('json')
-      expect(result?.captures.length).toBeGreaterThan(0)
+      expect(lease).not.toBeNull()
+      if (!lease) return expect.fail('JSON syntax contribution is missing')
+      const result = await lease.refresh(buffer.getTextSnapshot())
+      expect(result.projection.snapshot.documentId).toBe('worker-observation.json')
+      expect(result.projection.language.languageId).toBe('json')
+      expect(result.captures.length).toBeGreaterThan(0)
     } finally {
-      await backend.dispose()
+      lease?.dispose()
+      analysis.dispose()
+      await worker.dispose()
     }
   },
 )

@@ -1,5 +1,13 @@
 # @singapore-editor/minimap
 
+## 0.2.6
+
+### Patch Changes
+
+- 5670c3d: Deliver clipped minimap summaries through document contributions while each view keeps its own canvas and rendering demand. Release worker and canvas resources when a document closes, and preserve canonical source acknowledgements across edits, undo and hidden views.
+- Updated dependencies [5670c3d]
+  - @singapore-editor/core@0.2.6
+
 ## 0.2.5
 
 ### Patch Changes

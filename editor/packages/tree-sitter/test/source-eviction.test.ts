@@ -1,104 +1,81 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { TreeSitterWorkerClient } from '../src/treeSitter/workerClient'
+import { RecordingWorker } from './factories/worker'
+import { createTreeSource, disposeTreeSources } from './factories/source'
 
-import {
-  createPieceTableSnapshot,
-  deleteFromPieceTable,
-  insertIntoPieceTable,
-  materializePieceTableFullText,
-  type PieceTableSnapshot,
-} from '@singapore-editor/core/document'
-import {
-  readTreeSitterInputRange,
-  resolveTreeSitterSourceDescriptor,
-  type TreeSitterSourceCache,
-} from '../src/treeSitter/source.ts'
-import {
-  TreeSitterSourceChunkRetention,
-  type TreeSitterSourceChunkRequest,
-} from '../src/treeSitter/sourceChunkRetention.ts'
-
-const payload = (cycle: number) => `${cycle.toString().padStart(8, '0')}${'x'.repeat(16376)}`
-
-// Build, post and resolve in order like the client and worker; responses land in any order.
-class Transport {
-  readonly retention = new TreeSitterSourceChunkRetention()
-  readonly worker: TreeSitterSourceCache = new Map()
-  readonly inFlight: TreeSitterSourceChunkRequest[] = []
-
-  send(snapshot: PieceTableSnapshot): void {
-    const source = this.retention.createDescriptor('doc', snapshot)
-    const request = this.retention.createRequest('doc', source)
-    const input = resolveTreeSitterSourceDescriptor(this.worker, 'doc', source)
-    expect(readTreeSitterInputRange(input, 0, input.length)).toBe(
-      materializePieceTableFullText(snapshot),
-    )
-    this.inFlight.push(request)
-  }
-
-  respond(index: number): void {
-    const [request] = this.inFlight.splice(index, 1)
-    this.retention.markRequestSent(request!)
-  }
-
-  workerChunks(): number {
-    return this.worker.get('doc')?.size ?? 0
-  }
+const clients: TreeSitterWorkerClient[] = []
+afterEach(async () => {
+  disposeTreeSources()
+  for (const client of clients.splice(0)) await client.dispose()
+})
+function transport() {
+  const worker = new RecordingWorker()
+  const client = new TreeSitterWorkerClient({ workerFactory: () => worker })
+  clients.push(client)
+  return { worker, client }
 }
 
-describe('tree-sitter source chunk eviction', () => {
-  it('rejects an old acknowledgement after retirement resets the source epoch', () => {
-    const retention = new TreeSitterSourceChunkRetention()
-    const snapshot = createPieceTableSnapshot('const answer = 1;')
-    const oldSource = retention.createDescriptor('doc', snapshot)
-    const oldRequest = retention.createRequest('doc', oldSource)
-    retention.invalidateDocument('doc')
-    retention.markRequestSent(oldRequest)
-    expect(retention.inspect()).toEqual({ documents: 1, sentChunks: 0, sourceEpochs: 1 })
-    retention.retireDocument('doc')
-    expect(retention.inspect()).toEqual({ documents: 0, sentChunks: 0, sourceEpochs: 0 })
-
-    const source = retention.createDescriptor('doc', snapshot)
-    const request = retention.createRequest('doc', source)
-    expect(request.epoch).toBe(oldRequest.epoch)
-    retention.markRequestSent(oldRequest)
-    expect(retention.inspect().sentChunks).toBe(0)
-    retention.markRequestSent(request)
-    expect(retention.inspect()).toEqual({ documents: 1, sentChunks: 1, sourceEpochs: 0 })
+describe('common source retirement behind the Tree endpoint', () => {
+  it('rejects a late reset after the document registration is released', async () => {
+    const { client, worker } = transport()
+    const source = createTreeSource(client.sourceEndpoint, 'const answer = 1')
+    const prepared = await source.prepare()
+    const reset = worker.messages.find(
+      (request) => request.payload.type === 'source' && request.payload.command.kind === 'reset',
+    )!.payload
+    await prepared.dispose()
+    source.dispose()
+    expect(worker.reader.inspect()).toMatchObject({
+      documents: 0,
+      reads: 0,
+      pins: 0,
+      sourceUnits: 0,
+    })
+    if (reset.type !== 'source')
+      throw new TypeError('The actual source reset must have been dispatched')
+    expect(worker.reader.apply(reset.command)).toMatchObject({
+      kind: 'rejected',
+      reason: 'detached',
+    })
   })
 
-  it('keeps the worker to the chunks of the latest descriptor', () => {
-    const transport = new Transport()
-    let snapshot = createPieceTableSnapshot('prefix suffix')
+  it('keeps the source at the current small text across forty insert/delete cycles', async () => {
+    const { client, worker } = transport()
+    const source = createTreeSource(client.sourceEndpoint, 'prefix suffix')
     for (let cycle = 0; cycle < 40; cycle++) {
-      snapshot = insertIntoPieceTable(snapshot, 7, payload(cycle))
-      transport.send(snapshot)
-      transport.respond(0)
-      snapshot = deleteFromPieceTable(snapshot, 7, 16384)
-      transport.send(snapshot)
-      transport.respond(0)
+      source.edit([
+        { from: 7, to: 7, text: `${cycle.toString().padStart(8, '0')}${'x'.repeat(16376)}` },
+      ])
+      await (await source.prepare()).dispose()
+      source.edit([{ from: 7, to: 16391, text: '' }])
+      await (await source.prepare()).dispose()
     }
-    expect(transport.workerChunks()).toBe(1)
-    expect(transport.retention.inspect().sentChunks).toBe(1)
+    expect(worker.reader.inspect()).toEqual({ documents: 1, reads: 0, pins: 0, sourceUnits: 13 })
+    source.dispose()
+    expect(worker.reader.inspect()).toEqual({ documents: 0, reads: 0, pins: 0, sourceUnits: 0 })
   })
 
-  it('never names a chunk the worker dropped when responses overlap or reorder', () => {
-    const transport = new Transport()
-    const states: PieceTableSnapshot[] = [createPieceTableSnapshot('prefix suffix')]
-    let seed = 7
-    const next = () => (seed = (seed * 48271) % 2147483647) / 2147483647
-    for (let step = 0; step < 300; step++) {
-      const choice = next()
-      const current = states.at(-1)!
-      if (choice < 0.35) states.push(insertIntoPieceTable(current, 7, payload(step)))
-      else if (choice < 0.6 && current.length > 13) {
-        states.push(deleteFromPieceTable(current, 7, Math.min(16384, current.length - 13)))
-      }
-      // Revisit an older state, as undo does, so a dropped chunk is needed again.
-      const target = next() < 0.2 ? states[Math.floor(next() * states.length)]! : states.at(-1)!
-      transport.send(target)
-      while (transport.inFlight.length > 0 && next() < 0.5) {
-        transport.respond(Math.floor(next() * transport.inFlight.length))
-      }
-    }
+  it('keeps an exact pinned old source and independent peer through head advance and retirement', async () => {
+    const { client, worker } = transport()
+    const source = createTreeSource(client.sourceEndpoint, 'old😀', 'one')
+    const peer = createTreeSource(client.sourceEndpoint, 'peer', 'two')
+    const old = await source.prepare()
+    await (await peer.prepare()).dispose()
+    source.edit([{ from: 0, to: 0, text: 'new' }])
+    await (await source.prepare()).dispose()
+    const loan = worker.reader.acquire(old.reference)!
+    expect(loan.text.readRange(0, loan.text.length)).toBe('old😀')
+    await old.dispose()
+    loan.dispose()
+    source.dispose()
+    expect(worker.reader.inspect()).toEqual({ documents: 1, reads: 0, pins: 0, sourceUnits: 4 })
+    peer.edit([{ from: 4, to: 4, text: '!' }])
+    const latest = await peer.prepare()
+    const survivor = worker.reader.acquire(latest.reference)!
+    expect(survivor.text.readRange(0, survivor.text.length)).toBe('peer!')
+    survivor.dispose()
+    await latest.dispose()
+    peer.dispose()
+    expect(worker.reader.inspect()).toEqual({ documents: 0, reads: 0, pins: 0, sourceUnits: 0 })
   })
 })

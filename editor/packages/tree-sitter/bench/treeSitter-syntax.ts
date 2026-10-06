@@ -2,15 +2,88 @@ import { performance } from 'node:perf_hooks'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '../../tree-sitter-languages/src/index'
 
 import {
-  applyBatchToPieceTable,
-  createPieceTableSnapshot,
-  type PieceTableSnapshot,
+  createEditorTextBuffer,
+  createEditorBufferSession,
   type TextEdit,
 } from '@singapore-editor/core/document'
-import { resolveTreeSitterLanguageContribution } from '../src'
-import { createTreeSitterEditPayload } from '../src/session'
-import { TreeSitterWorkerClient } from '../src/treeSitter/workerClient'
+import { createEditorDocumentAnalysis } from '@singapore-editor/core/editor'
+import { createTreeSitterSyntaxProvider, createTreeSitterWorkerOwner } from '../src'
 import type { TreeSitterParseResult } from '../src/treeSitter/types'
+
+type WorkerTiming = Pick<TreeSitterParseResult, 'timings'>
+
+type BenchmarkRuntime = ReturnType<typeof createBenchmarkRuntime>
+
+function createBenchmarkRuntime() {
+  let lastTiming: WorkerTiming | undefined
+  const owner = createTreeSitterWorkerOwner({
+    workerFactory: () => {
+      const worker = new Worker(
+        new URL('../src/treeSitter/treeSitter.worker.ts', import.meta.url),
+        { type: 'module' },
+      )
+      worker.addEventListener('message', (event: MessageEvent<unknown>) => {
+        const timing = parseWorkerTimings(event.data)
+        if (timing) lastTiming = timing
+      })
+      return worker
+    },
+  })
+  const provider = createTreeSitterSyntaxProvider({ workerOwner: owner })
+  for (const language of TREE_SITTER_LANGUAGE_CONTRIBUTIONS) provider.registerLanguage(language)
+  return { owner, provider, timing: () => lastTiming }
+}
+
+function parseWorkerTimings(response: unknown): WorkerTiming | undefined {
+  if (
+    !response ||
+    typeof response !== 'object' ||
+    !('ok' in response) ||
+    response.ok !== true ||
+    !('result' in response)
+  )
+    return
+  const result = response.result
+  if (
+    !result ||
+    typeof result !== 'object' ||
+    !('timings' in result) ||
+    !Array.isArray(result.timings)
+  )
+    return
+  const timings: TreeSitterParseResult['timings'][number][] = []
+  for (const item of result.timings) {
+    if (
+      !item ||
+      typeof item !== 'object' ||
+      !('name' in item) ||
+      typeof item.name !== 'string' ||
+      !('durationMs' in item) ||
+      typeof item.durationMs !== 'number'
+    )
+      return
+    timings.push({ name: item.name, durationMs: item.durationMs })
+  }
+  return { timings }
+}
+
+function openAnalysis(
+  runtime: BenchmarkRuntime,
+  text: string,
+  documentId: string,
+  languageId: string,
+) {
+  const buffer = createEditorTextBuffer(text)
+  const view = createEditorBufferSession(buffer)
+  const analysis = createEditorDocumentAnalysis({ buffer, documentId })
+  const session = analysis.borrowStructural({
+    provider: runtime.provider,
+    languageId,
+    includeCaptures: true,
+  })
+  if (!session) throw new TypeError('The syntax benchmark requires its registered operation')
+  return { buffer, view, analysis, session }
+}
 
 declare const Bun: { gc?: (force?: boolean) => void } | undefined
 
@@ -109,120 +182,88 @@ const buildMarkdownWithFences = (fences: number): string => {
   return chunks.join('')
 }
 
-const editForSnapshot = (snapshot: PieceTableSnapshot): TextEdit => {
-  const midpoint = Math.floor(snapshot.length / 2)
+const editForLength = (length: number): TextEdit => {
+  const midpoint = Math.floor(length / 2)
   return { from: midpoint, to: midpoint, text: '/* syntax-bench */' }
 }
 
-const measureSyntax = async (
-  workerClient: TreeSitterWorkerClient,
-  lines: number,
-): Promise<SyntaxSample> => {
+const measureSyntax = async (runtime: BenchmarkRuntime, lines: number): Promise<SyntaxSample> => {
   const text = buildText(lines)
-  const snapshot = createPieceTableSnapshot(text)
-  const documentId = `bench-${lines}.ts`
-  const runtimeSessionId = `runtime-${documentId}`
-
-  const parseStart = performance.now()
-  const parsed = await workerClient.parse({
-    documentId,
-    runtimeSessionId,
-    snapshotVersion: 1,
-    languageId: 'typescript',
-    snapshot,
-  })
-  const initialTotalMs = performance.now() - parseStart
-  if (!parsed) throw new Error(`parse cancelled for ${lines} lines`)
-
-  const memoryAfterParse = readMemory()
-  const edit = editForSnapshot(snapshot)
-  const nextSnapshot = applyBatchToPieceTable(snapshot, [edit])
-  const payload = createTreeSitterEditPayload({
-    documentId,
-    runtimeSessionId,
-    languageId: 'typescript',
-    previousSnapshotVersion: 1,
-    snapshotVersion: 2,
-    previousSnapshot: snapshot,
-    nextSnapshot,
-    edits: [edit],
-  })
-  if (!payload) throw new Error('failed to create syntax edit payload')
-
-  const editStart = performance.now()
-  const edited = await workerClient.edit(payload)
-  const editTotalMs = performance.now() - editStart
-  if (!edited) throw new Error(`incremental parse cancelled for ${lines} lines`)
-
-  const memoryAfterEdit = readMemory()
-  const forcedGcAvailable = forceGc()
-
-  return {
-    lines,
-    textLength: text.length,
-    initialTotalMs,
-    initialParseMs: timing(parsed, 'treeSitter.parse'),
-    initialQueryMs: timing(parsed, 'treeSitter.query'),
-    editTotalMs,
-    editParseMs: timing(edited, 'treeSitter.parse'),
-    editQueryMs: timing(edited, 'treeSitter.query'),
-    captures: edited.captures.length,
-    folds: edited.folds.length,
-    memoryAfterParse,
-    memoryAfterEdit,
-    memoryAfterGc: readMemory(),
-    forcedGcAvailable,
+  const { buffer, view, analysis, session } = openAnalysis(
+    runtime,
+    text,
+    `bench-${lines}.ts`,
+    'typescript',
+  )
+  try {
+    const parseStart = performance.now()
+    await session.refresh(buffer.getTextSnapshot())
+    const initialTotalMs = performance.now() - parseStart
+    const initialTimings = runtime.timing()
+    const memoryAfterParse = readMemory()
+    view.applyEdits([editForLength(buffer.getTextSnapshot().length)])
+    const editStart = performance.now()
+    const edited = await session.refresh(buffer.getTextSnapshot())
+    const editTotalMs = performance.now() - editStart
+    const editedTimings = runtime.timing()
+    const memoryAfterEdit = readMemory()
+    const forcedGcAvailable = forceGc()
+    return {
+      lines,
+      textLength: text.length,
+      initialTotalMs,
+      initialParseMs: timing(initialTimings, 'treeSitter.parse'),
+      initialQueryMs: timing(initialTimings, 'treeSitter.query'),
+      editTotalMs,
+      editParseMs: timing(editedTimings, 'treeSitter.parse'),
+      editQueryMs: timing(editedTimings, 'treeSitter.query'),
+      captures: edited.captures.length,
+      folds: edited.folds.length,
+      memoryAfterParse,
+      memoryAfterEdit,
+      memoryAfterGc: readMemory(),
+      forcedGcAvailable,
+    }
+  } finally {
+    session.dispose()
+    analysis.dispose()
+    await runtime.owner.awaitIdleFence()
   }
 }
 
 const measureInjectionEdit = async (
-  workerClient: TreeSitterWorkerClient,
+  runtime: BenchmarkRuntime,
   fences: number,
 ): Promise<InjectionEditSample> => {
   const text = buildMarkdownWithFences(fences)
-  const snapshot = createPieceTableSnapshot(text)
-  const documentId = `bench-injections-${fences}.md`
-  const runtimeSessionId = `runtime-${documentId}`
-  const parsed = await workerClient.parse({
-    documentId,
-    runtimeSessionId,
-    snapshotVersion: 1,
-    languageId: 'markdown',
-    snapshot,
-  })
-  if (!parsed) throw new Error(`injection benchmark parse cancelled for ${fences} fences`)
-
-  const target = text.indexOf(`value${Math.floor(fences / 2)}`)
-  const edit = { from: target, to: target, text: 'edited' }
-  const nextSnapshot = applyBatchToPieceTable(snapshot, [edit])
-  const payload = createTreeSitterEditPayload({
-    documentId,
-    runtimeSessionId,
-    languageId: 'markdown',
-    previousSnapshotVersion: 1,
-    snapshotVersion: 2,
-    previousSnapshot: snapshot,
-    nextSnapshot,
-    edits: [edit],
-    resultMode: 'parseOnly',
-  })
-  if (!payload) throw new Error('failed to create injection benchmark edit payload')
-
-  const editStart = performance.now()
-  const edited = await workerClient.edit(payload)
-  const editTotalMs = performance.now() - editStart
-  if (!edited) throw new Error(`injection benchmark edit cancelled for ${fences} fences`)
-
-  const initialParseMs = timing(parsed, 'treeSitter.parse')
-  const editParseMs = timing(edited, 'treeSitter.parse')
-  return {
-    fences,
-    textLength: text.length,
-    injections: parsed.injections.length,
-    initialParseMs,
-    editTotalMs,
-    editParseMs,
-    baselineDelta: initialParseMs / editParseMs,
+  const { buffer, view, analysis, session } = openAnalysis(
+    runtime,
+    text,
+    `bench-injections-${fences}.md`,
+    'markdown',
+  )
+  try {
+    const parsed = await session.refresh(buffer.getTextSnapshot())
+    const initialParseMs = timing(runtime.timing(), 'treeSitter.parse')
+    const target = text.indexOf(`value${Math.floor(fences / 2)}`)
+    view.applyEdits([{ from: target, to: target, text: 'edited' }])
+    const editStart = performance.now()
+    await session.refresh(buffer.getTextSnapshot())
+    const editTotalMs = performance.now() - editStart
+    const editParseMs = timing(runtime.timing(), 'treeSitter.parse')
+    return {
+      fences,
+      textLength: text.length,
+      injections: parsed.injections.length,
+      initialParseMs,
+      editTotalMs,
+      editParseMs,
+      baselineDelta: initialParseMs / editParseMs,
+    }
+  } finally {
+    session.dispose()
+    analysis.dispose()
+    await runtime.owner.awaitIdleFence()
   }
 }
 
@@ -262,30 +303,21 @@ const printInjectionEditSample = (sample: InjectionEditSample): void => {
   console.log('')
 }
 
-const syntaxWorkerClient = new TreeSitterWorkerClient()
-
+console.log(
+  'instrument: typed document analysis admission; worker timings observed from real replies',
+)
+console.log(
+  'injection edits return full analysis; source and configuration stay under the document owner',
+)
+const syntax = createBenchmarkRuntime()
 try {
-  await registerDefaultLanguages(syntaxWorkerClient)
-
-  for (const lines of LINE_COUNTS) {
-    printSample(await measureSyntax(syntaxWorkerClient, lines))
-  }
+  for (const lines of LINE_COUNTS) printSample(await measureSyntax(syntax, lines))
 } finally {
-  await syntaxWorkerClient.dispose()
+  await syntax.owner.dispose()
 }
-
-const injectionWorkerClient = new TreeSitterWorkerClient()
-
+const injections = createBenchmarkRuntime()
 try {
-  await registerDefaultLanguages(injectionWorkerClient)
-  printInjectionEditSample(await measureInjectionEdit(injectionWorkerClient, MARKDOWN_FENCE_COUNT))
+  printInjectionEditSample(await measureInjectionEdit(injections, MARKDOWN_FENCE_COUNT))
 } finally {
-  await injectionWorkerClient.dispose()
-}
-
-async function registerDefaultLanguages(workerClient: TreeSitterWorkerClient): Promise<void> {
-  const descriptors = await Promise.all(
-    TREE_SITTER_LANGUAGE_CONTRIBUTIONS.map(resolveTreeSitterLanguageContribution),
-  )
-  await workerClient.registerLanguages(descriptors)
+  await injections.owner.dispose()
 }

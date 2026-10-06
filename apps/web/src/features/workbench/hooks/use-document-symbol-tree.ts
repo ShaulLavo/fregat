@@ -12,11 +12,13 @@ import {
 import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { documentSymbolKeys } from '@/lib/query-keys'
+import { useWorkspaceEditHost } from '@/lib/workspace-edits/providers/host-context'
 
 const EMPTY_SYMBOLS: readonly DocumentSymbol[] = []
 
 export function useDocumentSymbolTree(rootPath: FilesystemPath, filePath: FilesystemPath | null) {
   const documentStore = useEditorDocumentStoreApi()
+  const onApplyWorkspaceEdit = useWorkspaceEditHost()
   const key = filePath ? fileDocumentKey(filePath) : null
   const settledRevision = useSymbolRevision(documentStore, key)
   const matches = useLanguageServerMatches(rootPath, filePath ?? '', filePath !== null)
@@ -32,7 +34,8 @@ export function useDocumentSymbolTree(rootPath: FilesystemPath, filePath: Filesy
           rootPath,
           serverId: serverId ?? '',
           signal,
-          text: liveDocument?.buffer.isDirty() ? liveDocument.buffer.materializeFullText() : null,
+          buffer: liveDocument?.buffer,
+          onApplyWorkspaceEdit,
         },
         clientForQueryClient(client),
       )

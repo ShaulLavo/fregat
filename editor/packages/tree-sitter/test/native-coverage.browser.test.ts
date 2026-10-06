@@ -1,3 +1,11 @@
+import { createTreeSource, disposeTreeSources } from './factories/source'
+import { createTreeDocument, disposeTreeDocuments } from './factories/document'
+import { readAll } from '../../editor/test/factories/snapshotText'
+import { afterEach } from 'vitest'
+afterEach(() => {
+  disposeTreeDocuments()
+  disposeTreeSources()
+})
 import { expect, it } from 'vitest'
 import { styleForTreeSitterCapture, type EditorSyntaxResult } from '@singapore-editor/core/syntax'
 import {
@@ -43,16 +51,15 @@ browserTest(
     const backend = new TreeSitterWorkerClient()
     const loads: string[] = []
     const snapshot = createPieceTableSnapshot('const n = <number>value\n')
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       documentId: 'cold.ts',
       languageId: 'typescript',
       languageResolver: registry(loads),
       backend,
-      snapshot,
-      textSnapshot: createDocumentTextSnapshot(snapshot),
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
     try {
-      const result = await session.refresh(createDocumentTextSnapshot(snapshot))
+      const result = await session.run()
       expect(loads).toEqual(['typescript'])
       expect(result.errors).toEqual([])
       expect(result.captures.some((capture) => capture.captureName === 'type.builtin')).toBe(true)
@@ -71,19 +78,18 @@ browserTest.each(['full', 'range'] as const)(
     const snapshot = createPieceTableSnapshot(
       '# **Heading**\n\n```astro\n' + astro + '```\n\nAfter the fence.\n',
     )
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       documentId: 'mixed.md',
       languageId: 'markdown',
       languageResolver: registry(loads),
       backend,
-      snapshot,
-      textSnapshot: createDocumentTextSnapshot(snapshot),
       syntaxMode,
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
     try {
-      let result = await session.refresh(createDocumentTextSnapshot(snapshot))
+      let result = await session.run()
       if (syntaxMode === 'range')
-        result = await session.queryRange({ startIndex: 0, endIndex: snapshot.length })
+        result = await session.runtime.queryRange({ startIndex: 0, endIndex: snapshot.length })
       expect(result.degraded).toBeNull()
       expect(new Set(loads)).toEqual(new Set(['markdown', 'css', 'astro', 'typescript']))
       expect(loads.length).toBe(new Set(loads).size)
@@ -124,16 +130,15 @@ browserTest(
     let text = '```plain\n' + astro + '```\n'
     const document = createDocumentSession(text)
     let snapshot = document.getSnapshot()
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       documentId: 'edits.md',
       languageId: 'markdown',
       languageResolver,
       backend,
-      snapshot,
-      textSnapshot: createDocumentTextSnapshot(snapshot),
+      text: readAll(createDocumentTextSnapshot(snapshot)),
     })
     try {
-      await session.refresh(createDocumentTextSnapshot(snapshot))
+      await session.run()
       for (const [before, after] of [
         ['plain', 'astro'],
         ['title', 'heading'],
@@ -147,16 +152,15 @@ browserTest(
         const change = document.applyEdits(edits)
         snapshot = change.snapshot
         text = text.slice(0, from) + after! + text.slice(from + before!.length)
-        const incremental = await session.applyChange(change)
-        const fresh = new TreeSitterSyntaxSession({
+        const incremental = await session.edit(change.edits)
+        const fresh = createTreeDocument({
           documentId: 'fresh.md',
           languageId: 'markdown',
           languageResolver,
           backend,
-          snapshot,
-          textSnapshot: createDocumentTextSnapshot(snapshot),
+          text: readAll(createDocumentTextSnapshot(snapshot)),
         })
-        const expected = await fresh.refresh(createDocumentTextSnapshot(snapshot))
+        const expected = await fresh.run()
         expect(incremental.captures).toEqual(expected.captures)
         expect(tokenValues(incremental)).toEqual(tokenValues(expected))
         expect(incremental.injections).toEqual(expected.injections)
@@ -177,16 +181,15 @@ browserTest.each(NATIVE_FIXTURES)(
     const loads: string[] = []
     const languageResolver = registry(loads)
     const document = createDocumentSession(fixture.text)
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       documentId: fixture.id,
       languageId: fixture.id,
       languageResolver,
       backend,
-      snapshot: document.getSnapshot(),
-      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
+      text: readAll(createDocumentTextSnapshot(document.getSnapshot())),
     })
     try {
-      const result = await session.refresh(createDocumentTextSnapshot(document.getSnapshot()))
+      const result = await session.run()
       expect(result.degraded).toBeNull()
       expect(result.tokens.length).toBeGreaterThan(0)
       expect(result.captures.map((capture) => capture.captureName)).toEqual(
@@ -194,16 +197,15 @@ browserTest.each(NATIVE_FIXTURES)(
       )
       const from = fixture.text.indexOf('🪐')
       const change = document.applyEdits([{ from, to: from + 2, text: '🌍 unicode' }])
-      const incremental = await session.applyChange(change)
-      const fresh = new TreeSitterSyntaxSession({
+      const incremental = await session.edit(change.edits)
+      const fresh = createTreeDocument({
         documentId: `fresh-${fixture.id}`,
         languageId: fixture.id,
         languageResolver,
         backend,
-        snapshot: change.snapshot,
-        textSnapshot: createDocumentTextSnapshot(change.snapshot),
+        text: readAll(createDocumentTextSnapshot(change.snapshot)),
       })
-      const expected = await fresh.refresh(createDocumentTextSnapshot(change.snapshot))
+      const expected = await fresh.run()
       expect(incremental.captures).toEqual(expected.captures)
       expect(tokenValues(incremental)).toEqual(tokenValues(expected))
       expect(incremental.folds).toEqual(expected.folds)
@@ -229,18 +231,17 @@ browserTest.each(['full', 'range'] as const)(
     const document = createDocumentSession(text)
     text = document.getTextSnapshot().materializeFullText()
     const options = { languageId: 'markdown', languageResolver, backend, syntaxMode }
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       ...options,
       documentId: 'sql.md',
-      snapshot: document.getSnapshot(),
-      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
+      text: readAll(createDocumentTextSnapshot(document.getSnapshot())),
     })
     try {
-      const initial = await session.refresh(createDocumentTextSnapshot(document.getSnapshot()))
+      const initial = await session.run()
       const result =
         syntaxMode === 'full'
           ? initial
-          : await session.queryRange({ startIndex: 0, endIndex: text.length })
+          : await session.runtime.queryRange({ startIndex: 0, endIndex: text.length })
       expect(result.degraded).toBeNull()
       expect(new Set(loads)).toEqual(new Set([...requiredLanguages('markdown'), 'sql']))
       assertPaint(result, text, SQL_CATEGORIES)
@@ -258,11 +259,11 @@ browserTest.each(['full', 'range'] as const)(
         expect(from).toBeGreaterThanOrEqual(0)
         const change = document.applyEdits([{ from, to: from + before!.length, text: after! }])
         text = text.slice(0, from) + after! + text.slice(from + before!.length)
-        const updated = await session.applyChange(change)
+        const updated = await session.edit(change.edits)
         const actual =
           syntaxMode === 'full'
             ? updated
-            : await session.queryRange({ startIndex: 0, endIndex: text.length })
+            : await session.runtime.queryRange({ startIndex: 0, endIndex: text.length })
         await assertFreshSyntax(options, change.snapshot, actual, text.length)
       }
       expect(loads.length).toBe(new Set(loads).size)
@@ -289,18 +290,17 @@ browserTest.each([
     const document = createDocumentSession(text)
     text = document.getTextSnapshot().materializeFullText()
     const options = { languageId, languageResolver, backend, syntaxMode }
-    const session = new TreeSitterSyntaxSession({
+    const session = createTreeDocument({
       ...options,
       documentId: 'mixed.mdx',
-      snapshot: document.getSnapshot(),
-      textSnapshot: createDocumentTextSnapshot(document.getSnapshot()),
+      text: readAll(createDocumentTextSnapshot(document.getSnapshot())),
     })
     try {
-      const initial = await session.refresh(createDocumentTextSnapshot(document.getSnapshot()))
+      const initial = await session.run()
       const result =
         syntaxMode === 'full'
           ? initial
-          : await session.queryRange({ startIndex: 0, endIndex: text.length })
+          : await session.runtime.queryRange({ startIndex: 0, endIndex: text.length })
       expect(result.degraded).toBeNull()
       expect(new Set(loads)).toEqual(new Set([...requiredLanguages('mdx'), 'sql']))
       assertPaint(result, text, MDX_CATEGORIES)
@@ -331,11 +331,11 @@ browserTest.each([
         expect(from).toBeGreaterThanOrEqual(0)
         const change = document.applyEdits([{ from, to: from + before!.length, text: after! }])
         text = text.slice(0, from) + after! + text.slice(from + before!.length)
-        const updated = await session.applyChange(change)
+        const updated = await session.edit(change.edits)
         const actual =
           syntaxMode === 'full'
             ? updated
-            : await session.queryRange({ startIndex: 0, endIndex: text.length })
+            : await session.runtime.queryRange({ startIndex: 0, endIndex: text.length })
         await assertFreshSyntax(options, change.snapshot, actual, text.length)
       }
       expect(loads.length).toBe(new Set(loads).size)
@@ -368,18 +368,17 @@ async function assertFreshSyntax(
   actual: EditorSyntaxResult,
   length: number,
 ) {
-  const fresh = new TreeSitterSyntaxSession({
+  const fresh = createTreeDocument({
     ...options,
     documentId: 'fresh-syntax',
-    snapshot,
-    textSnapshot: createDocumentTextSnapshot(snapshot),
+    text: readAll(createDocumentTextSnapshot(snapshot)),
   })
   try {
-    const initial = await fresh.refresh(createDocumentTextSnapshot(snapshot))
+    const initial = await fresh.run()
     const expected =
       options.syntaxMode === 'full'
         ? initial
-        : await fresh.queryRange({ startIndex: 0, endIndex: length })
+        : await fresh.runtime.queryRange({ startIndex: 0, endIndex: length })
     expect(actual.captures).toEqual(expected.captures)
     expect(tokenValues(actual)).toEqual(tokenValues(expected))
     expect(actual.injections).toEqual(expected.injections)
@@ -403,7 +402,12 @@ browserTest('reports unsupported style preprocessors without treating them as CS
       runtimeSessionId: 'preprocessor',
       languageId: 'astro',
       snapshotVersion: 1,
-      snapshot,
+      source: (
+        await createTreeSource(
+          backend.sourceEndpoint,
+          readAll(createDocumentTextSnapshot(snapshot)),
+        ).prepare()
+      ).reference,
     })
     expect(result?.missingLanguages).toContain('scss')
     expect(result?.injections.some((injection) => injection.languageId === 'css')).toBe(false)

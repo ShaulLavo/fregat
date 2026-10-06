@@ -9,11 +9,11 @@ import {
 } from '@/features/workbench/utils/panels'
 import {
   emptyWorkspaceSlice,
-  workspaceSliceStorageKey,
   writeRootFolderCache,
   writeWorkspaceIndexCache,
   writeWorkspaceSliceCache,
 } from '@/features/workspace/state/cache'
+import { workspaceSliceStorageKey } from '@/features/workspace/utils/cache-keys'
 import { testWorkspaceAddress } from './workspace-address'
 
 const rawSliceSchema = v.looseObject({

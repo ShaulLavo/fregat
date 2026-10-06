@@ -1,10 +1,17 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { createEditorTextBuffer } from '../../src/documentSession'
+import { createEditorDocumentAnalysis } from '../../src/editor/documentAnalysis'
+import { createShikiHighlighterProvider } from '../../src/shiki/plugin'
+import type { ShikiWorkerRequest, ShikiWorkerRequestPayload } from '../../src/shiki/workerTypes'
+import { createHighlighterDocument } from './documentFixture'
+import { readAll } from '../factories/snapshotText'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createDocumentTextSnapshot } from '../../src/documentTextSnapshot'
 import { createPieceTableSnapshot } from '@singapore-editor/textbuffer'
 import { createShikiWorkerOwner, type ShikiWorkerOwner } from '../../src/shiki/workerClient'
 import type { ShikiWorkerResponse } from '../../src/shiki/workerTypes'
 
 const owners = new Set<ShikiWorkerOwner>()
+let externalId = 1000000
 
 afterEach(async () => {
   await Promise.all(Array.from(owners, (owner) => owner.dispose()))
@@ -58,6 +65,12 @@ function workerTransport() {
   const worker = new Worker(new URL('../../src/shiki/shiki.worker.ts', import.meta.url), {
     type: 'module',
   })
+  const requests: ShikiWorkerRequest[] = []
+  const post = worker.postMessage.bind(worker)
+  vi.spyOn(worker, 'postMessage').mockImplementation((request: ShikiWorkerRequest) => {
+    requests.push(request)
+    post(request)
+  })
   let hold: ReturnType<typeof deferred<HeldReply>> | null = null
   worker.addEventListener('message', (event: MessageEvent<ShikiWorkerResponse>) => {
     if (!event.data.ok || !event.data.result?.retention || !hold) return
@@ -70,6 +83,19 @@ function workerTransport() {
   })
   return {
     worker,
+    requests,
+    request(payload: ShikiWorkerRequestPayload): Promise<ShikiWorkerResponse> {
+      const id = externalId++
+      return new Promise((resolve) => {
+        const receive = (event: MessageEvent<ShikiWorkerResponse>) => {
+          if (event.data.id !== id) return
+          worker.removeEventListener('message', receive)
+          resolve(event.data)
+        }
+        worker.addEventListener('message', receive)
+        worker.postMessage({ id, payload })
+      })
+    },
     holdNextReply() {
       expect(hold).toBeNull()
       const next = deferred<HeldReply>()
@@ -95,26 +121,22 @@ function transportOwner() {
 async function populate(owner: ShikiWorkerOwner, runtimeSessionId: string) {
   const text = `const ${runtimeSessionId} = true;`
   const snapshot = createPieceTableSnapshot(text)
-  const session = owner.createSession({
+  const session = createHighlighterDocument(owner, {
     documentId: 'shared.ts',
     runtimeSessionId,
     languageId: 'typescript',
     lang: 'typescript',
     theme: 'github-dark',
     registrations: await registrations(),
-    snapshot,
-    textSnapshot: createDocumentTextSnapshot(snapshot),
+    text: readAll(createDocumentTextSnapshot(snapshot)),
   })!
-  expect(
-    (await session.refresh(createDocumentTextSnapshot(snapshot))).tokens.length,
-  ).toBeGreaterThan(0)
+  expect((await session.run()).tokens.length).toBeGreaterThan(0)
   return { session, snapshot, text }
 }
 
 describe('real Shiki worker retention', () => {
   it('fences documents and keeps shared resources distinct through disposal and recreation', async () => {
-    const owner = createShikiWorkerOwner()
-    owners.add(owner)
+    const { owner, transports } = transportOwner()
     expect(await owner.inspectRetention()).toBeNull()
     expect(await owner.awaitIdleFence()).toBeUndefined()
     expect(owner.inspect().workerGeneration).toBe(0)
@@ -131,17 +153,16 @@ describe('real Shiki worker retention', () => {
 
     const open = (runtimeSessionId: string, text: string) => {
       const snapshot = createPieceTableSnapshot(text)
-      const session = owner.createSession({
+      const session = createHighlighterDocument(owner, {
         documentId: 'shared.ts',
         runtimeSessionId,
         languageId: 'typescript',
         lang: 'typescript',
         theme: 'github-dark',
         registrations: resolved,
-        snapshot,
-        textSnapshot: createDocumentTextSnapshot(snapshot),
+        text: readAll(createDocumentTextSnapshot(snapshot)),
       })!
-      const refresh = session.refresh(createDocumentTextSnapshot(snapshot))
+      const refresh = session.run()
       return { session, refresh }
     }
     const firstText = 'const value = 1;\nconst next = value;\n'
@@ -172,56 +193,58 @@ describe('real Shiki worker retention', () => {
       'retention-survivor',
     ])
     expect(surviving?.shared).toEqual(retained?.shared)
-    await owner.request({
-      type: 'open',
-      documentId: 'shared.ts',
-      runtimeSessionId: 'retention-first',
-      lang: 'typescript',
-      theme: 'github-dark',
-      ...resolved,
-      text: firstText,
-      maxLineLength: owner.maxTokenizationLineLength(),
-    })
+    const firstOpen = transports[0]!.requests.find(
+      (request) =>
+        request.payload.type === 'open' && request.payload.runtimeSessionId === 'retention-first',
+    )?.payload
+    if (firstOpen?.type !== 'open')
+      throw new TypeError('The real first runtime must have opened before retirement')
+    await transports[0]!.request(firstOpen)
     expect((await owner.inspectRetention())?.documentCount).toBe(1)
 
     const pendingRegistrations = deferred<typeof resolved>()
-    const pendingSnapshot = createPieceTableSnapshot(firstText)
-    const pendingText = createDocumentTextSnapshot(pendingSnapshot)
-    const pendingSession = owner.createSession({
+    const pendingBuffer = createEditorTextBuffer(firstText)
+    const pendingAnalysis = createEditorDocumentAnalysis({
+      buffer: pendingBuffer,
       documentId: 'pending.ts',
-      runtimeSessionId: 'retention-pending',
-      languageId: 'typescript',
-      lang: 'typescript',
+    })
+    const entered = deferred<void>()
+    const pendingProvider = createShikiHighlighterProvider({
+      workerOwner: owner,
       theme: 'github-dark',
-      registrations: pendingRegistrations.promise,
-      snapshot: pendingSnapshot,
-      textSnapshot: pendingText,
+      resolveLanguage: async () => {
+        entered.resolve()
+        return (await pendingRegistrations.promise).languageRegistrations
+      },
+      resolveTheme: async () => resolved.themeRegistration,
+    })
+    const pendingSession = pendingAnalysis.borrowHighlighter({
+      provider: pendingProvider,
+      languageId: 'typescript',
     })!
-    const materialize = pendingText.materializeFullText.bind(pendingText)
-    const enteredRegistrationWait = deferred<void>()
-    let fullTextReads = 0
-    pendingText.materializeFullText = () => {
-      const text = materialize()
-      fullTextReads += 1
-      enteredRegistrationWait.resolve()
-      return text
-    }
-    const pendingRefresh = observeSettlement(pendingSession.refresh(pendingText))
-    await enteredRegistrationWait.promise
-    expect(fullTextReads).toBe(1)
+    const fullRead = vi.spyOn(pendingBuffer, 'materializeFullText')
+    const pendingRefresh = observeSettlement(
+      pendingSession.refresh(pendingBuffer.getTextSnapshot()),
+    )
+    await entered.promise
+    pendingAnalysis.dispose()
     pendingSession.dispose()
+    await expect(pendingRefresh.promise).rejects.toMatchObject({ name: 'AbortError' })
     const pendingInspection = observeSettlement(owner.inspectRetention())
     const pendingFence = observeSettlement(owner.awaitIdleFence())
-    await new Promise<void>((resolve) => setTimeout(resolve, 0))
-    expect(pendingRefresh.settled).toBe(false)
-    expect(pendingInspection.settled).toBe(false)
-    expect(pendingFence.settled).toBe(false)
-    expect(owner.inspect().pendingRequests).toBe(0)
-    pendingRegistrations.resolve(resolved)
-    expect((await pendingRefresh.promise).tokens.length).toBe(0)
     expect(await pendingInspection.promise).toEqual({ ...surviving, retiredRuntimeCount: 2 })
     expect(await pendingFence.promise).toBeUndefined()
-    expect(fullTextReads).toBe(1)
+    expect(owner.inspect().pendingRequests).toBe(0)
+    expect(fullRead).not.toHaveBeenCalled()
+    pendingRegistrations.resolve(resolved)
+    await Promise.resolve()
+    expect(
+      transports[0]!.requests.some(
+        (request) =>
+          request.payload.type === 'open' &&
+          request.payload.runtimeSessionId === pendingSession.runtimeSessionId,
+      ),
+    ).toBe(false)
 
     const recreated = open('retention-recreated', firstText)
     const reacquired = await owner.inspectRetention()
@@ -247,8 +270,7 @@ describe('real Shiki worker retention', () => {
   it('bounds retired runtime metadata while preserving a populated survivor', async ({
     annotate,
   }) => {
-    const owner = createShikiWorkerOwner()
-    owners.add(owner)
+    const { owner } = transportOwner()
     const survivor = await populate(owner, 'retiredSurvivor')
     const before = await owner.inspectRetention()
     await annotate('retired metadata before disposal', {
@@ -278,7 +300,7 @@ describe('real Shiki worker retention', () => {
 
     const distinctRetirements = limit + 2
     for (let index = 1; index < distinctRetirements; index += 1) {
-      await owner.request({ type: 'disposeDocument', runtimeSessionId: `retired-bound-${index}` })
+      await owner.disposeDocument(`retired-bound-${index}`)
     }
     const bounded = await owner.inspectRetention()
     await annotate('retired metadata after exceeding the limit', {
@@ -288,9 +310,7 @@ describe('real Shiki worker retention', () => {
     })
     expect(bounded).toEqual({ ...before, retiredRuntimeCount: limit })
     expect(await owner.awaitIdleFence()).toBeUndefined()
-    expect(
-      (await survivor.session.refresh(createDocumentTextSnapshot(survivor.snapshot))).tokens.length,
-    ).toBeGreaterThan(0)
+    expect((await survivor.session.run()).tokens.length).toBeGreaterThan(0)
     expect(await owner.inspectRetention()).toEqual(bounded)
   })
 
@@ -317,7 +337,10 @@ describe('real Shiki worker retention', () => {
       expect(survivorBefore?.documents).toMatchObject([
         { runtimeSessionId: 'survivor', sourceUnits: survivorDocument.text.length },
       ])
-      expect(await first.owner.request({ type: 'idleFence' })).toBeUndefined()
+      const fenceReply = await transportRequest(first.transports[0]!, { type: 'idleFence' })
+      expect(fenceReply.ok).toBe(true)
+      if (!fenceReply.ok) throw new TypeError('The actual worker fence must succeed')
+      expect(fenceReply.result).toBeUndefined()
       expect(await first.owner.awaitIdleFence()).toBeUndefined()
 
       const positiveReply = transport.holdNextReply()
@@ -351,9 +374,18 @@ describe('real Shiki worker retention', () => {
       expect(first.owner.inspect().workerGeneration).toBe(generation)
       expect(first.transports).toHaveLength(1)
       expect(await survivor.owner.inspectRetention()).toEqual(survivorBefore)
-      const updated = createPieceTableSnapshot('const survivorUpdated = 42;\n')
+      const updatedText = 'const survivorUpdated = 42;\n'
+      const updated = createPieceTableSnapshot(updatedText)
       expect(
-        (await survivorDocument.session.refresh(createDocumentTextSnapshot(updated))).tokens.length,
+        (
+          await survivorDocument.session.edit([
+            {
+              from: 0,
+              to: survivorDocument.session.buffer.getTextSnapshot().length,
+              text: updatedText,
+            },
+          ])
+        ).tokens.length,
       ).toBeGreaterThan(0)
       expect(await survivor.owner.inspectRetention()).toMatchObject({
         documentCount: 1,
@@ -365,10 +397,7 @@ describe('real Shiki worker retention', () => {
       expect(survivor.transports).toHaveLength(1)
       if (teardown === 'dispose') return
 
-      expect(
-        (await firstDocument.session.refresh(createDocumentTextSnapshot(firstDocument.snapshot)))
-          .tokens.length,
-      ).toBeGreaterThan(0)
+      expect((await firstDocument.session.run()).tokens.length).toBeGreaterThan(0)
       expect(first.transports).toHaveLength(2)
       expect(first.owner.inspect().workerGeneration).toBe(generation + 1)
       const currentReply = first.transports[1]!.holdNextReply()
@@ -385,3 +414,10 @@ describe('real Shiki worker retention', () => {
     },
   )
 })
+
+async function transportRequest(
+  transport: ReturnType<typeof workerTransport>,
+  payload: ShikiWorkerRequestPayload,
+) {
+  return transport.request(payload)
+}
