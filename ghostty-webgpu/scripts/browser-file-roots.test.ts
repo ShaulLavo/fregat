@@ -1,9 +1,9 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { isFileServingAllowed, resolveConfig, searchForWorkspaceRoot } from 'vite'
+import { createServer, isFileServingAllowed, searchForWorkspaceRoot } from 'vite'
 import { expect, test } from 'vitest'
-import { browserFileRoots } from './browser-file-roots'
+import { browserFileRoots, counterpartWasmServing } from './browser-file-roots'
 
 test.each(['hoisted', 'standalone'])(
   'serves declared counterpart assets within the existing root for a %s install',
@@ -53,15 +53,24 @@ test.each(['hoisted', 'standalone'])(
     symlinkSync(counterpart, path.join(install, 'node_modules', 'ghostty-web'), 'junction')
     try {
       const roots = browserFileRoots(family)
-      expect(roots).toEqual([searchForWorkspaceRoot(family), stylesheet, wasm])
-      const config = await resolveConfig(
-        { configFile: false, root: family, server: { fs: { allow: roots } } },
-        'serve',
-      )
-      expect(isFileServingAllowed(config, stylesheet)).toBe(true)
-      expect(isFileServingAllowed(config, neighbor)).toBe(layout === 'standalone')
-      expect(isFileServingAllowed(config, wasm)).toBe(true)
-      expect(isFileServingAllowed(config, neighborWasm)).toBe(layout === 'standalone')
+      expect(roots).toEqual([searchForWorkspaceRoot(family), stylesheet])
+      const server = await createServer({
+        configFile: false,
+        root: family,
+        plugins: [counterpartWasmServing()],
+        server: { middlewareMode: true, hmr: false, fs: { allow: roots } },
+      })
+      try {
+        expect(server.config.server.fs.allow).not.toContain(wasm)
+        await server.pluginContainer.resolveId('ghostty-web/ghostty-vt.wasm?url')
+        expect(server.config.server.fs.allow).toContain(wasm)
+        expect(isFileServingAllowed(server.config, stylesheet)).toBe(true)
+        expect(isFileServingAllowed(server.config, neighbor)).toBe(layout === 'standalone')
+        expect(isFileServingAllowed(server.config, wasm)).toBe(true)
+        expect(isFileServingAllowed(server.config, neighborWasm)).toBe(layout === 'standalone')
+      } finally {
+        await server.close()
+      }
       expect(roots).not.toContain(dependency)
       expect(roots).not.toContain(directory)
     } finally {
