@@ -12,7 +12,9 @@ The Search side panel, or the address URL search parameters (`s.*`).
 
 ## Driving it with agent:browser
 
-`search-input-undo` types into the query and replace fields and presses Ctrl+Z in each; the step labels carry the remaining value. No replace scenario yet. Add `search-replace-bulk`: open the search panel, type a query that hits many files, run replace, then read two changed files from disk.
+`search-input-undo` types into the query and replace fields and presses Ctrl+Z in each; the step labels carry the remaining value.
+
+`search-replace-refresh` opens a dirty buffer beside two disk matches, pauses actual replacement finalization until the dirty-buffer overlay refreshes, and checks the completed replacement summary. It then drives Workspace Edit Undo and Redo through the command palette, checking restored matches and actual disk contents. Its disposable fixture keeps dirty-buffer text separate from saved files.
 
 `search-type-delete` types `ddd` into the sidebar search slowly enough that `d` and `dd` each stream their 20,000 rows, deletes it the same way, and samples the result tree every frame. The last step label is `changes-N-scrolled-M`; `scrolled` must be 0, because nobody picked a result and the list has no reason to leave the top.
 

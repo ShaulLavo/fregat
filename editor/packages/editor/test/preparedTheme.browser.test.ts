@@ -1,13 +1,23 @@
 import { expect, test } from 'vitest'
-import { Editor, createEditorDocumentAnalysis, createEditorPreparedDocument } from '../src/editor'
-import { createEditorTextBuffer, createEditorBufferSession } from '../src/public/document'
-import { createShikiHighlighterProvider, createShikiWorkerOwner } from '../src/shiki/index'
-import { createTreeSitterSyntaxProvider, TreeSitterWorkerClient } from '../../tree-sitter/src/index'
-import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '../../tree-sitter-languages/src/index'
+import {
+  Editor,
+  createEditorDocumentAnalysis,
+  createEditorPreparedDocument,
+} from '@singapore-editor/core/editor'
+import { createEditorTextBuffer, createEditorBufferSession } from '@singapore-editor/core/document'
+import {
+  createShikiHighlighterProvider,
+  createShikiWorkerOwner,
+} from '@singapore-editor/core/shiki'
+import {
+  createTreeSitterSyntaxProvider,
+  createTreeSitterWorkerOwner,
+} from '../../tree-sitter/dist/index.js'
+import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '../../tree-sitter-languages/dist/index.js'
 import type { EditorHighlighterProvider } from '../src/syntax/highlighter'
 import type { EditorInitialPaintEvent } from '../src/plugins'
 import type { EditorPerformanceDiagnostic } from '../src/editor/performanceDiagnostics'
-import '../src/style.css'
+import '@singapore-editor/core/style.css'
 
 test.each(['typescript', 'markdown'] as const)(
   'attaches public Shiki %s preparation with synchronous theme, paint and capture',
@@ -18,8 +28,8 @@ test.each(['typescript', 'markdown'] as const)(
         : await import('@shikijs/langs/markdown')
     const themeModule = await import('@shikijs/themes/github-dark')
     const shiki = createShikiWorkerOwner()
-    const tree = new TreeSitterWorkerClient()
-    const structural = createTreeSitterSyntaxProvider({ backend: tree })
+    const tree = createTreeSitterWorkerOwner()
+    const structural = createTreeSitterSyntaxProvider({ workerOwner: tree })
     for (const contribution of TREE_SITTER_LANGUAGE_CONTRIBUTIONS)
       structural.registerLanguage(contribution)
     const original = createShikiHighlighterProvider({

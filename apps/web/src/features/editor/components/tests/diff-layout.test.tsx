@@ -1,3 +1,4 @@
+import { projectionControl } from '../../../../../test/factories/diff-attachment'
 import { createTextDiff } from '@singapore-editor/diff'
 import { waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
@@ -29,7 +30,11 @@ test('switching diff tabs restores each tab’s pane proportions', async () => {
   function body(index: 0 | 1 | 2) {
     return (
       <EditorUiStateContext value={uiStore}>
-        <DiffEditor file={files[index]!} mode='split' tabId={tabs[index]} />
+        <DiffEditor
+          attachment={projectionControl(files[index]!)}
+          mode='split'
+          tabId={tabs[index]}
+        />
       </EditorUiStateContext>
     )
   }

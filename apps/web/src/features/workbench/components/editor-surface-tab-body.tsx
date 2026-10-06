@@ -13,7 +13,7 @@ import { SearchPane } from '@/features/workspace/components/search-pane'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorConflictState } from '@/features/editor/state/conflict-state'
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
-import { useWorkspaceEditHost } from '@/features/editor/providers/workspace-edit-context'
+import { useWorkspaceEditHost } from '@/lib/workspace-edits/providers/host-context'
 import { useEditorUiState, useEditorUiStoreApi } from '@/features/editor/state/ui-state'
 import { FileDocumentBody } from '@/features/workbench/components/file-document-body'
 import {

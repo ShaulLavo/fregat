@@ -1,16 +1,9 @@
 import { Editor } from '@singapore-editor/core/editor'
-import {
-  createEditorTextBuffer,
-  createEditorBufferSession,
-  type TextSnapshot,
-} from '@singapore-editor/core/document'
+import { createEditorTextBuffer, createEditorBufferSession } from '@singapore-editor/core/document'
 import { createShikiWorkerOwner, createShikiHighlighterPlugin } from '@singapore-editor/core/shiki'
 import { createEditorFindPlugin } from '@singapore-editor/find'
 import { createMinimapPlugin } from '@singapore-editor/minimap'
-import {
-  createLspContentChangesInSnapshot,
-  type LspTextDocumentSnapshot,
-} from '@singapore-editor/lsp'
+import { createLspConsumer } from './lspConsumer'
 import '@singapore-editor/core/style.css'
 import '@singapore-editor/find/style.css'
 
@@ -32,19 +25,6 @@ function record(event: Diagnostic) {
   const item = (totals[name] ??= { count: 0, units: 0 })
   item.count++
   item.units += Number(event.detail?.length ?? 0)
-}
-
-function descriptor(textSnapshot: TextSnapshot): LspTextDocumentSnapshot {
-  return {
-    textSnapshot,
-    lineStarts: {
-      length: textSnapshot.lineCount,
-      at: (row) => (row < textSnapshot.lineCount ? textSnapshot.lineStart(row) : undefined),
-      indexForOffset: (offset) => textSnapshot.lineAt(offset),
-      toArray: () =>
-        Array.from({ length: textSnapshot.lineCount }, (_, row) => textSnapshot.lineStart(row)),
-    },
-  }
 }
 
 function open(size: number, instrumented: boolean) {
@@ -73,24 +53,19 @@ function open(size: number, instrumented: boolean) {
       createMinimapPlugin(),
     ],
   })
-  let previous = descriptor(buffer.getTextSnapshot())
-  const unsubscribe = buffer.subscribe(({ change }) => {
-    const next = descriptor(buffer.getTextSnapshot())
-    createLspContentChangesInSnapshot(previous, next, { incremental: true, edits: change.edits })
-    previous = next
-  })
+  const lsp = createLspConsumer(buffer)
   editor.attachSession(createEditorBufferSession(buffer), {
     documentId: 'consumers',
     languageId: 'typescript',
   })
   editor.focus()
-  return { editor, buffer, owner, unsubscribe }
+  return { editor, buffer, owner, lsp }
 }
 
 async function dispose() {
   if (!active) return
   released = [new WeakRef(active.editor), new WeakRef(active.buffer)]
-  active.unsubscribe()
+  active.lsp.dispose()
   active.editor.dispose()
   await active.owner.dispose()
   active = null
@@ -98,15 +73,17 @@ async function dispose() {
 }
 
 const bridge = {
-  open(size: number, instrumented: boolean) {
+  async open(size: number, instrumented: boolean) {
     active = open(size, instrumented)
+    await active.lsp.settle()
   },
-  observe: () => ({ state: active?.editor.getState(), totals }),
+  observe: () => ({ state: active?.editor.getState(), totals, lsp: active?.lsp.observe() }),
   reset: () => {
     totals = {}
   },
   async settle() {
     await active?.owner.awaitIdleFence()
+    await active?.lsp.settle()
   },
   dispose,
   retained: () => released.filter((reference) => reference.deref()).length,

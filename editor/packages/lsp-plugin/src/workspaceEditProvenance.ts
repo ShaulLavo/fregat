@@ -8,7 +8,12 @@ export function currentWorkspaceEditOrigin(
   plan: ParsedWorkspaceEdit,
 ): WorkspaceTextDocumentProvenance | null {
   const origin = guard.documents.find((document) => document.uri === active.uri)
-  if (!origin || origin.textSnapshot !== active.textSnapshot) return null
+  if (
+    !origin ||
+    origin.sourceRevision !== active.sourceRevision ||
+    origin.sourceSegment !== active.sourceSegment
+  )
+    return null
   if (!guard.isCurrent(active.uri)) return null
 
   const affectedUris = new Set(

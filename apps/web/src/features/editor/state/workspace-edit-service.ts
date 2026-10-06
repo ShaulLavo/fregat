@@ -24,6 +24,7 @@ import {
   completePreparedDocumentTransactionSequence,
   completeReverseDocumentTransactionSequence,
   createDocumentLogicalRevisionScope,
+  createDocumentTextSnapshot,
   offsetToPoint,
   documentTextRoundTripStatus,
   pieceTableDocumentText,
@@ -94,6 +95,15 @@ import {
   workspaceEditUriPath,
 } from '@/features/editor/utils/workspace-edit-paths'
 
+import { createTextDiff, type DiffFile } from '@singapore-editor/diff'
+import { languageIdForFilePath } from '@/lib/file-language'
+import { operationComparisonSubject } from '@/lib/snapshot-comparison'
+import type {
+  OperationComparisonInput,
+  SnapshotComparisonLease,
+  SnapshotComparisonRead,
+} from '@/lib/snapshot-comparison'
+
 type WorkspacePersistenceOperation = WorkspaceEditPrepareRequest['operations'][number]
 
 const MAX_WORKSPACE_EDIT_UNDO_GROUPS = 20
@@ -121,9 +131,9 @@ export type WorkspaceEditServicePhase =
 type WorkspaceEditPreviewTargetKind = 'dirty' | 'open' | 'unopened'
 
 export type WorkspaceEditPreviewRow = {
-  readonly afterText?: string
+  readonly comparison: SnapshotComparisonRead | null
+  readonly file: DiffFile | null
   readonly annotationIds: readonly string[]
-  readonly beforeText?: string
   readonly fromPath?: FilesystemPath
   readonly ignored: boolean
   readonly index: number
@@ -236,6 +246,7 @@ export type WorkspaceEditServiceOptions = {
   readonly documentStore: EditorDocumentStoreApi
   readonly fileSync: FileSyncService
   readonly getRoot: () => WorkspaceEditRoot | null
+  readonly onHistorySettled?: (rootPath: FilesystemPath) => void
   readonly inspectPath?: (
     path: FilesystemPath,
     signal: AbortSignal,
@@ -301,6 +312,7 @@ type PreparedTarget = {
   readonly dirtyInitially: boolean
   readonly initialPath: FilesystemPath
   readonly initialSnapshot: DocumentTextSnapshot
+  readonly initialSyncPoint: ReturnType<EditorTextBuffer['getDocumentSyncPoint']>
   readonly kind: WorkspaceEditPreviewTargetKind
   readonly liveStamp: WorkspaceDocumentTargetStamp | null
   readonly segments: WorkspaceTextReplaySegmentInput[]
@@ -345,6 +357,7 @@ type WorkspaceEditGroup = {
   readonly affectedPaths: readonly FilesystemPath[]
   readonly legs: LocalLeg[]
   readonly operationId: string
+  readonly root: WorkspaceEditRoot
   projection: WorkspaceMutationProjectionReceipt | null
   receipts: Map<PreparedTarget, DocumentTransactionReceipt>
   server: WorkspaceEditResult | null
@@ -380,6 +393,7 @@ const IDLE_SNAPSHOT: WorkspaceEditServiceSnapshot = {
 
 export class WorkspaceEditService {
   private active: ActiveWorkspaceEdit | null = null
+  private previewComparisons: readonly SnapshotComparisonLease[] = []
   private readonly cleanupPending = new Map<string, WorkspaceEditResult>()
   private readonly createOperationEvent: (
     options: WorkspaceEditOperationEventOptions,
@@ -524,6 +538,7 @@ export class WorkspaceEditService {
         root,
       )
       assertPreparedRequestCurrent(this.options, prepared)
+      prepared = { ...prepared, preview: this.retainPreviewComparisons(prepared) }
     } catch (error) {
       const isCurrent = this.preparingController === controller
       if (isCurrent) {
@@ -899,6 +914,8 @@ export class WorkspaceEditService {
 
   dispose(): void {
     this.cancelPreCommitActive()
+    this.releasePreviewComparisons()
+    this.publish({ preview: null })
     this.clearHistory()
     this.releaseRecoveryLocks()
     this.recoveryGroup = null
@@ -1336,6 +1353,7 @@ export class WorkspaceEditService {
       operationId: prepared.operationId,
       projection: local.projection,
       receipts: local.receipts,
+      root: prepared.root,
       server,
     }
     this.undoStack.push(group)
@@ -1384,7 +1402,7 @@ export class WorkspaceEditService {
     let provisional = group.server
     let localReversed = false
     let projection: WorkspaceMutationProjectionReceipt | null = null
-    const rootPath = group.projection?.rootPath ?? this.options.getRoot()?.path ?? null
+    const rootPath = group.root.path
     try {
       // A refetch since the edit landed replaced the projected cache entries with disk truth. That
       // supersedes the projection, it does not conflict with it: the server's version guards
@@ -1437,17 +1455,20 @@ export class WorkspaceEditService {
       group.projection = projection ?? group.projection
       // A persisted group with no projection left, discarded now or on an earlier transition,
       // settles the cache from disk: nothing else will.
-      if (provisional && !group.projection && rootPath) {
+      if (provisional && !group.projection) {
         await this.reconcileProjectionSafely(rootPath, group.affectedPaths)
       }
       source.pop()
       const destination = direction === 'undo' ? this.redoStack : this.undoStack
       destination.push(group)
+      const settlementFailure = this.notifyHistorySettled(rootPath)
       this.publish({ phase: direction === 'undo' ? 'applied' : 'applied' })
-      log.info({
+      log[settlementFailure ? 'warn' : 'info']({
         action: 'workspace_edit.reverse',
         area: 'workspace-edit',
         direction,
+        historySettlement: settlementFailure ? 'failed' : 'settled',
+        historySettlementError: settlementFailure?.error,
         operationId: group.operationId,
         outcome: 'applied',
       })
@@ -1484,7 +1505,7 @@ export class WorkspaceEditService {
         locks = null
         return false
       }
-      if ((group.projection || provisional) && rootPath) {
+      if (group.projection || provisional) {
         await this.reconcileProjectionSafely(rootPath, group.affectedPaths)
       }
       await this.invalidateHistoryDependencyChain(source, group.affectedPaths)
@@ -1496,6 +1517,16 @@ export class WorkspaceEditService {
       return false
     } finally {
       if (locks) releaseWorkspaceLocks(this.options.documentStore, locks)
+    }
+  }
+
+  private notifyHistorySettled(rootPath: FilesystemPath): { readonly error: unknown } | null {
+    try {
+      this.options.onHistorySettled?.(rootPath)
+      return null
+    } catch (error) {
+      // Read invalidation cannot compensate a completed history transaction.
+      return { error }
     }
   }
 
@@ -1599,7 +1630,53 @@ export class WorkspaceEditService {
     active.settlement.resolve({ status: 'cancelled' })
   }
 
+  private retainPreviewComparisons(prepared: PreparedWorkspaceEdit): WorkspaceEditPreview {
+    if (!prepared.operations.some((operation) => operation.kind === 'text')) return prepared.preview
+    const state = this.options.documentStore.getState()
+    const environmentId = state.environmentId
+    if (!environmentId)
+      throw createClientInvariantError('Operation preview requires a captured document owner', {
+        ownerPresent: false,
+      })
+    const leases: SnapshotComparisonLease[] = []
+    try {
+      const rows = prepared.preview.rows.map((row, index) => {
+        const resolved = prepared.operations[index]
+        if (!resolved || resolved.kind !== 'text') return row
+        const input = operationComparisonInput(prepared, resolved, environmentId)
+        if (!input) return row
+        const lease = state.acquireSnapshotComparison({
+          input,
+          signal: new AbortController().signal,
+        })
+        leases.push(lease)
+        const comparison = lease.read()
+        if (comparison.kind === 'released')
+          throw createClientInvariantError('Operation comparison owner has ended', {
+            reason: comparison.reason,
+          })
+        return Object.freeze({ ...row, comparison, file: input.display })
+      })
+      this.previewComparisons = leases
+      return Object.freeze({ ...prepared.preview, rows: Object.freeze(rows) })
+    } catch (error) {
+      for (const lease of leases) lease.release()
+      throw error
+    }
+  }
+
+  private releasePreviewComparisons(): void {
+    for (const lease of this.previewComparisons) lease.release()
+    this.previewComparisons = []
+  }
+
   private publish(next: Partial<WorkspaceEditServiceSnapshot>): void {
+    if (
+      this.snapshot.preview &&
+      next.preview !== undefined &&
+      next.preview !== this.snapshot.preview
+    )
+      this.releasePreviewComparisons()
     const phase = next.phase ?? this.snapshot.phase
     const historyAvailable =
       !this.active &&
@@ -1946,6 +2023,7 @@ class WorkspaceEditPreparationBuilder {
       dirtyInitially: stamp.dirty,
       initialPath: document.target.resource.path,
       initialSnapshot: document.buffer.getTextSnapshot(),
+      initialSyncPoint: document.buffer.getDocumentSyncPoint(),
       kind: stamp.dirty ? 'dirty' : 'open',
       liveStamp: stamp,
       prepared: null,
@@ -2295,6 +2373,7 @@ function prepareTextTargets(
         buffer: target.buffer,
         expectedRevision: target.liveStamp?.bufferRevision ?? target.buffer.getRevision(),
         initialSnapshot: target.initialSnapshot,
+        initialSyncPoint: target.initialSyncPoint,
       },
     })
     if (!prepared.ok) {
@@ -2579,12 +2658,8 @@ function workspaceEditPreviewRow(resolved: ResolvedOperation): WorkspaceEditPrev
   if (resolved.kind === 'text') {
     const segment = preparedSegment(resolved)
     return {
-      ...(segment
-        ? {
-            afterText: pieceTableDocumentText(segment.snapshotAfter),
-            beforeText: pieceTableDocumentText(segment.snapshotBefore),
-          }
-        : {}),
+      comparison: null,
+      file: null,
       annotationIds,
       ignored: segment?.logicalRevisionCount === 0,
       index: resolved.index,
@@ -2594,6 +2669,8 @@ function workspaceEditPreviewRow(resolved: ResolvedOperation): WorkspaceEditPrev
     }
   }
   return {
+    comparison: null,
+    file: null,
     annotationIds,
     ...(resolved.fromPath ? { fromPath: resolved.fromPath } : {}),
     ignored: resolved.ignored,
@@ -2602,6 +2679,40 @@ function workspaceEditPreviewRow(resolved: ResolvedOperation): WorkspaceEditPrev
     path: resolved.path,
     ...(resolved.toPath ? { toPath: resolved.toPath } : {}),
   }
+}
+
+function operationComparisonInput(
+  prepared: PreparedWorkspaceEdit,
+  resolved: ResolvedTextOperation,
+  environmentId: import('@workspace/contracts').EnvironmentId,
+): OperationComparisonInput | null {
+  const segment = preparedSegment(resolved)
+  if (!segment) return null
+  const old = createDocumentTextSnapshot(segment.snapshotBefore)
+  const next = createDocumentTextSnapshot(segment.snapshotAfter)
+  const path = resolved.path
+  const languageId = languageIdForFilePath(path)
+  const input: Omit<OperationComparisonInput, 'subject'> = {
+    kind: 'operation',
+    scope: { environmentId, rootPath: prepared.root.path },
+    root: {
+      generation: prepared.root.generation,
+      path: prepared.root.path,
+      uriPath: prepared.root.uriPath ?? prepared.root.path,
+      workspacePath: prepared.root.workspacePath ?? prepared.root.path,
+    },
+    operationId: prepared.operationId,
+    operationIndex: resolved.index,
+    path,
+    segment,
+    old,
+    new: next,
+    display: createTextDiff({
+      oldFile: { path, languageId, text: old.materializeFullText() },
+      newFile: { path, languageId, text: next.materializeFullText() },
+    }),
+  }
+  return { ...input, subject: operationComparisonSubject(input) }
 }
 
 function operationAnnotationIds(operation: WorkspaceEditOperation): readonly string[] {
@@ -2624,6 +2735,7 @@ function transientTarget(path: FilesystemPath, text: string): PreparedTarget {
     dirtyInitially: false,
     initialPath: path,
     initialSnapshot: buffer.getTextSnapshot(),
+    initialSyncPoint: buffer.getDocumentSyncPoint(),
     kind: 'unopened',
     liveStamp: null,
     prepared: null,
@@ -2664,7 +2776,10 @@ function currentExactProvenance(
   if (request.kind !== 'language-server' || !request.guard.isCurrent(uri)) return null
   return (
     request.guard.documents.find(
-      (entry) => entry.uri === uri && entry.textSnapshot === target.initialSnapshot,
+      (entry) =>
+        entry.uri === uri &&
+        entry.sourceRevision === target.initialSyncPoint.revision &&
+        entry.sourceSegment === target.initialSyncPoint.segment,
     ) ?? null
   )
 }
@@ -3007,7 +3122,7 @@ function transitionDocumentUri(
   options.documentSyncController?.transitionDocumentUri({
     fromUri: fileUriForPath(fromPath),
     syncPoint: rotated.syncPoint,
-    textSnapshot: target.buffer.getTextSnapshot(),
+    previousSyncPoint: expectedPoint,
     toUri: fileUriForPath(toPath),
   })
 }

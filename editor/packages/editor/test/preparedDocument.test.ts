@@ -1,3 +1,12 @@
+import {
+  createEditorStructuralOperation,
+  createEditorHighlighterOperation,
+} from '../src/editor/operationDefinitions'
+import type {
+  EditorStructuralOperationContext,
+  EditorHighlighterOperationContext,
+} from '../src/document/operations'
+import type { DocumentRead } from '../src/editor/documentDelivery'
 import { createEditorDocumentAnalysis } from '../src/editor/documentAnalysis'
 import { EditorSyntaxController } from '../src/editor/syntaxController'
 import { describe, expect, it, vi } from 'vitest'
@@ -9,16 +18,13 @@ import {
 import { createVisibleEditor } from './factories/visibleEditor'
 import { createEditorPreparedDocument } from '../src/editor/preparedDocument'
 import type { EditorPlugin } from '../src/plugins'
-import type {
-  EditorHighlightResult,
-  EditorHighlighterProvider,
-  EditorHighlighterSession,
-} from '../src/syntax/highlighter'
+import type { EditorHighlightResult, EditorHighlighterProvider } from '../src/syntax/highlighter'
 import { createPieceTableSnapshot } from '@singapore-editor/textbuffer'
 import {
   createEmptySyntaxResult,
   type EditorSyntaxProvider,
-  type EditorSyntaxSession,
+  type EditorSyntaxRange,
+  type EditorSyntaxRuntime,
 } from '../src/syntax/session'
 import { EditorTokenStore } from '../src/syntax/tokenStore'
 import type { EditorInitialPaintEvent } from '../src/plugins'
@@ -38,7 +44,7 @@ describe('prepared editor documents', () => {
         return theme
       })
     const provider: EditorHighlighterProvider = {
-      createSession: () => highlightSession(),
+      operation: createEditorHighlighterOperation(() => highlightSession()),
       loadTheme: loader,
     }
     const prepared = createEditorPreparedDocument({
@@ -91,7 +97,7 @@ describe('prepared editor documents', () => {
   it('keeps ordinary provider colors before opening and after clearing an Editor', async () => {
     const loader = vi.fn(async () => ({ gutterForegroundColor: '#123456' }))
     const provider: EditorHighlighterProvider = {
-      createSession: () => highlightSession(),
+      operation: createEditorHighlighterOperation(() => highlightSession()),
       loadTheme: loader,
     }
     const container = document.createElement('div')
@@ -103,13 +109,15 @@ describe('prepared editor documents', () => {
       await vi.waitFor(() =>
         expect(editor['syntax'].providerTheme).toEqual({ gutterForegroundColor: '#123456' }),
       )
+      expect(loader).toHaveBeenCalledTimes(1)
       editor.openDocument({ documentId: 'file.ts', languageId: 'typescript', text: 'alpha' })
       await vi.waitFor(() => expect(editor.getState().initialHighlightStatus).toBe('painted'))
+      expect(loader).toHaveBeenCalledTimes(2)
       editor.detachSession()
       await vi.waitFor(() =>
         expect(editor['syntax'].providerTheme).toEqual({ gutterForegroundColor: '#123456' }),
       )
-      expect(loader).toHaveBeenCalledTimes(2)
+      expect(loader).toHaveBeenCalledTimes(3)
     } finally {
       editor.dispose()
       container.remove()
@@ -122,8 +130,13 @@ describe('prepared editor documents', () => {
       const buffer = createEditorTextBuffer('alpha')
       const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
       const loader = vi.fn(async () => ({ foregroundColor: '#123456' }))
-      const primary: EditorHighlighterProvider = { createSession: () => highlightSession() }
-      const secondary: EditorHighlighterProvider = { createSession: () => null, loadTheme: loader }
+      const primary: EditorHighlighterProvider = {
+        operation: createEditorHighlighterOperation(() => highlightSession()),
+      }
+      const secondary: EditorHighlighterProvider = {
+        operation: createEditorHighlighterOperation(() => null),
+        loadTheme: loader,
+      }
       const prepared = createEditorPreparedDocument({
         buffer,
         analysis,
@@ -177,7 +190,7 @@ describe('prepared editor documents', () => {
       throw failure
     })
     const provider: EditorHighlighterProvider = {
-      createSession: () => highlightSession(),
+      operation: createEditorHighlighterOperation(() => highlightSession()),
       loadTheme: loader,
     }
     const prepared = createEditorPreparedDocument({
@@ -247,7 +260,7 @@ describe('prepared editor documents', () => {
     const theme = deferred<{ foregroundColor: string }>()
     const loader = vi.fn(() => theme.promise)
     const provider: EditorHighlighterProvider = {
-      createSession: () => highlightSession(),
+      operation: createEditorHighlighterOperation(() => highlightSession()),
       loadTheme: loader,
     }
     const prepared = createEditorPreparedDocument({
@@ -301,17 +314,20 @@ describe('prepared editor documents', () => {
         backgroundColor: '#101010',
       }))
       const primary: EditorHighlighterProvider = {
-        createSession: () => ({
+        operation: createEditorHighlighterOperation(() => ({
           ...highlightSession(),
-          refresh: async () => ({
+          analyze: async () => ({
             tokens: EditorTokenStore.empty(),
             theme: { foregroundColor: '#222222', backgroundColor: '#202020' },
           }),
-        }),
+        })),
       }
-      const secondary: EditorHighlighterProvider = { createSession: () => null, loadTheme: loader }
+      const secondary: EditorHighlighterProvider = {
+        operation: createEditorHighlighterOperation(() => null),
+        loadTheme: loader,
+      }
       const providers = mode === 'secondary-loader' ? [primary, secondary] : [primary]
-      const structural = { createSession: () => syntaxSession() }
+      const structural = { operation: createEditorStructuralOperation(() => syntaxSession()) }
       const prepared = createEditorPreparedDocument({
         buffer,
         analysis,
@@ -397,15 +413,21 @@ describe('prepared editor documents', () => {
       const refresh = vi.fn(() => completion.promise)
       const structuralSession = {
         ...syntaxSession(),
-        refresh,
-        queryRange: vi.fn(async () => result),
+        analyze: refresh,
+        queryRange: vi.fn(async (_range: EditorSyntaxRange) => result),
       }
-      const highlighterSession = { ...highlightSession(), refresh }
+      const highlighterSession = { ...highlightSession(), analyze: refresh }
+      const structuralProviderOpenRuntime = vi.fn(
+        (_context: EditorStructuralOperationContext) => structuralSession,
+      )
       const structuralProvider: EditorSyntaxProvider = {
-        createSession: vi.fn(() => structuralSession),
+        operation: createEditorStructuralOperation(structuralProviderOpenRuntime),
       }
+      const highlighterProviderOpenRuntime = vi.fn(
+        (_context: EditorHighlighterOperationContext) => highlighterSession,
+      )
       const highlighterProvider: EditorHighlighterProvider = {
-        createSession: vi.fn(() => highlighterSession),
+        operation: createEditorHighlighterOperation(highlighterProviderOpenRuntime),
       }
       const prepared = createEditorPreparedDocument({
         buffer,
@@ -479,11 +501,11 @@ describe('prepared editor documents', () => {
         expect(analysis.inspectRetention().entries[0]!.status).toBe('ready')
         expect(refresh).toHaveBeenCalledTimes(1)
         if (family === 'structural') {
-          expect(structuralProvider.createSession).toHaveBeenCalledTimes(1)
+          expect(structuralProviderOpenRuntime).toHaveBeenCalledTimes(1)
           expect(structuralSession.queryRange).toHaveBeenCalledTimes(1)
           expect(structuralSession.dispose).not.toHaveBeenCalled()
         } else {
-          expect(highlighterProvider.createSession).toHaveBeenCalledTimes(1)
+          expect(highlighterProviderOpenRuntime).toHaveBeenCalledTimes(1)
           expect(highlighterSession.dispose).not.toHaveBeenCalled()
         }
         expect(originalOutcome).toBe('stale')
@@ -511,17 +533,17 @@ describe('prepared editor documents', () => {
       languageId: 'typescript',
     })
     const failingProvider: EditorHighlighterProvider = {
-      createSession: () => ({
+      operation: createEditorHighlighterOperation(() => ({
         ...highlightSession(),
-        refresh: async () => {
+        analyze: async () => {
           throw new TypeError('Controlled external provider failure')
         },
-      }),
+      })),
     }
     await expect(
       ready.startStage({
         family: 'highlighter',
-        provider: { createSession: () => highlightSession() },
+        provider: { operation: createEditorHighlighterOperation(() => highlightSession()) },
         configurationTag: [],
         range: 'full',
         abortSignal: new AbortController().signal,
@@ -545,7 +567,10 @@ describe('prepared editor documents', () => {
   it('promotes preparation interest before release and reuses metadata after reclamation', async () => {
     const buffer = createEditorTextBuffer('alpha beta')
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
-    const provider: EditorSyntaxProvider = { createSession: vi.fn(() => syntaxSession()) }
+    const providerOpenRuntime = vi.fn(() => syntaxSession())
+    const provider: EditorSyntaxProvider = {
+      operation: createEditorStructuralOperation(providerOpenRuntime),
+    }
     const prepared = createEditorPreparedDocument({
       buffer,
       analysis,
@@ -600,7 +625,7 @@ describe('prepared editor documents', () => {
     expect(recreated.runtimeSessionId).not.toBe(original.runtimeSessionId)
     await recreated.result
     expect(recreated.readyResult).not.toBeNull()
-    expect(provider.createSession).toHaveBeenCalledTimes(2)
+    expect(providerOpenRuntime).toHaveBeenCalledTimes(2)
     expect(analysis.inspectRetention().entries[0]!.leaseCount).toBe(1)
     prepared.dispose()
     expect(analysis.inspectRetention().entries[0]!.leaseCount).toBe(1)
@@ -695,8 +720,10 @@ describe('prepared editor documents', () => {
     const buffer = createEditorTextBuffer('root\n  child\n'.repeat(2_000))
     const result = deferred<ReturnType<typeof createEmptySyntaxResult>>()
     const pendingSession = { ...syntaxSession(), foldingSupport: 'pending' as const }
-    pendingSession.refresh = vi.fn(() => result.promise)
-    const provider: EditorSyntaxProvider = { createSession: () => pendingSession }
+    pendingSession.analyze = vi.fn(() => result.promise)
+    const provider: EditorSyntaxProvider = {
+      operation: createEditorStructuralOperation(() => pendingSession),
+    }
     const prepared = fixedPreparedDocument(buffer)
     try {
       prepared.startStage({
@@ -748,17 +775,19 @@ describe('prepared editor documents', () => {
         get foldingSupport() {
           return foldingSupport
         },
-        refresh: async () => {
+        analyze: async () => {
           await Promise.resolve()
           if (terminal === 'failed') throw new TypeError('Parser failed')
           foldingSupport = 'unsupported'
           return createEmptySyntaxResult()
         },
       }
-      const provider: EditorSyntaxProvider = { createSession: () => session }
+      const provider: EditorSyntaxProvider = {
+        operation: createEditorStructuralOperation(() => session),
+      }
       const prepared = fixedPreparedDocument(buffer)
       try {
-        await prepared.startStage({
+        const outcome = prepared.startStage({
           family: 'structural',
           provider,
           configuration: structuralConfiguration,
@@ -767,6 +796,7 @@ describe('prepared editor documents', () => {
           abortSignal: new AbortController().signal,
         })
         await vi.runAllTimersAsync()
+        await outcome
         await expect(prepared.fallbackReady).resolves.toBe(false)
         const claimed = prepared.borrow({
           ...match(buffer, provider, null),
@@ -817,20 +847,20 @@ describe('prepared editor documents', () => {
         },
       ],
     }
-    structuralSession.refresh = vi.fn(async () => structuralResult)
+    structuralSession.analyze = vi.fn(async () => structuralResult)
     structuralSession.queryRange = vi.fn(async () => structuralResult)
     const structuralProvider: EditorSyntaxProvider = {
-      createSession: () => structuralSession,
+      operation: createEditorStructuralOperation(() => structuralSession),
     }
     const highlighterSession = highlightSession()
-    highlighterSession.refresh = vi.fn(async () => ({
+    highlighterSession.analyze = vi.fn(async () => ({
       tokens: EditorTokenStore.fromTokens([
         { start: 0, end: 1, style: { color: 'first' } },
         { start: 2, end: 3, style: { color: 'second' } },
       ]),
     }))
     const highlighterProvider: EditorHighlighterProvider = {
-      createSession: () => highlighterSession,
+      operation: createEditorHighlighterOperation(() => highlighterSession),
     }
     const prepared = createEditorPreparedDocument({
       buffer,
@@ -869,11 +899,17 @@ describe('prepared editor documents', () => {
     const buffer = createEditorTextBuffer('const value = 1;\n')
     const structuralSession = syntaxSession()
     const highlighterSession = highlightSession()
+    const structuralProviderOpenRuntime = vi.fn(
+      (_context: EditorStructuralOperationContext) => structuralSession,
+    )
     const structuralProvider: EditorSyntaxProvider = {
-      createSession: vi.fn(() => structuralSession),
+      operation: createEditorStructuralOperation(structuralProviderOpenRuntime),
     }
+    const highlighterProviderOpenRuntime = vi.fn(
+      (_context: EditorHighlighterOperationContext) => highlighterSession,
+    )
     const highlighterProvider: EditorHighlighterProvider = {
-      createSession: vi.fn(() => highlighterSession),
+      operation: createEditorHighlighterOperation(highlighterProviderOpenRuntime),
     }
     const prepared = createEditorPreparedDocument({
       buffer,
@@ -913,15 +949,21 @@ describe('prepared editor documents', () => {
     expect(claimed?.structural?.runtimeSessionId).not.toBe(claimed?.highlighter?.runtimeSessionId)
     expect(claimed?.structural?.readyResult).toBe(structuralSession.getResult())
     expect(claimed?.highlighter?.readyResult?.tokens.toTokens()).toEqual([])
-    const source = buffer.getTextSnapshot()
-    expect(structuralProvider.createSession).toHaveBeenCalledWith(
-      expect.objectContaining({ textSnapshot: source }),
-    )
-    expect(structuralSession.refresh).toHaveBeenCalledWith(source)
-    expect(highlighterProvider.createSession).toHaveBeenCalledWith(
-      expect.objectContaining({ textSnapshot: source }),
-    )
-    expect(highlighterSession.refresh).toHaveBeenCalledWith(source)
+    const point = buffer.getDocumentSyncPoint()
+    for (const open of [structuralProviderOpenRuntime, highlighterProviderOpenRuntime]) {
+      const context = open.mock.calls[0]?.[0]
+      expect(context?.initialRead.revision.point).toBe(point)
+      expect(context?.initialRead.text.readRange(0, context.initialRead.text.length)).toBe(
+        'const value = 1;\n',
+      )
+      expect(context).not.toHaveProperty('snapshot')
+      expect(context).not.toHaveProperty('textSnapshot')
+    }
+    for (const runtime of [structuralSession, highlighterSession]) {
+      const read = vi.mocked(runtime.analyze).mock.calls[0]?.[0]
+      expect(read?.revision.point).toBe(point)
+      expect(read?.text.readRange(0, read.text.length)).toBe('const value = 1;\n')
+    }
     const second = prepared.borrow(match(buffer, structuralProvider, highlighterProvider))
     expect(second?.structural?.runtimeSessionId).toBe(claimed?.structural?.runtimeSessionId)
     expect(second?.highlighter?.runtimeSessionId).toBe(claimed?.highlighter?.runtimeSessionId)
@@ -943,7 +985,9 @@ describe('prepared editor documents', () => {
   it('rejects a stale prepared snapshot while retaining document analysis', () => {
     const buffer = createEditorTextBuffer('alpha\n')
     const session = syntaxSession()
-    const provider: EditorSyntaxProvider = { createSession: () => session }
+    const provider: EditorSyntaxProvider = {
+      operation: createEditorStructuralOperation(() => session),
+    }
     const prepared = createEditorPreparedDocument({
       buffer,
       analysis: createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' }),
@@ -978,10 +1022,10 @@ describe('prepared editor documents', () => {
     const structuralSession = syntaxSession()
     const highlighterSession = highlightSession()
     const structuralProvider: EditorSyntaxProvider = {
-      createSession: () => structuralSession,
+      operation: createEditorStructuralOperation(() => structuralSession),
     }
     const highlighterProvider: EditorHighlighterProvider = {
-      createSession: () => highlighterSession,
+      operation: createEditorHighlighterOperation(() => highlighterSession),
     }
     const prepared = createEditorPreparedDocument({
       buffer,
@@ -1031,11 +1075,17 @@ describe('prepared editor documents', () => {
       const buffer = createEditorTextBuffer('const value = 1;\n')
       const structuralSession = syntaxSession()
       const highlighterSession = highlightSession()
+      const structuralProviderOpenRuntime = vi.fn(
+        (_context: EditorStructuralOperationContext) => structuralSession,
+      )
       const structuralProvider: EditorSyntaxProvider = {
-        createSession: vi.fn(() => structuralSession),
+        operation: createEditorStructuralOperation(structuralProviderOpenRuntime),
       }
+      const highlighterProviderOpenRuntime = vi.fn(
+        (_context: EditorHighlighterOperationContext) => highlighterSession,
+      )
       const highlighterProvider: EditorHighlighterProvider = {
-        createSession: vi.fn(() => highlighterSession),
+        operation: createEditorHighlighterOperation(highlighterProviderOpenRuntime),
       }
       const prepared = createEditorPreparedDocument({
         buffer,
@@ -1095,10 +1145,10 @@ describe('prepared editor documents', () => {
       }
       await new Promise((resolve) => setTimeout(resolve, 10))
 
-      expect(structuralProvider.createSession).toHaveBeenCalledTimes(1)
-      expect(highlighterProvider.createSession).toHaveBeenCalledTimes(1)
-      expect(structuralSession.refresh).toHaveBeenCalledTimes(1)
-      expect(highlighterSession.refresh).toHaveBeenCalledTimes(1)
+      expect(structuralProviderOpenRuntime).toHaveBeenCalledTimes(1)
+      expect(highlighterProviderOpenRuntime).toHaveBeenCalledTimes(1)
+      expect(structuralSession.analyze).toHaveBeenCalledTimes(1)
+      expect(highlighterSession.analyze).toHaveBeenCalledTimes(1)
       expect(editor.getState()).toMatchObject({
         initialHighlightStatus: 'painted',
         syntaxStatus: 'ready',
@@ -1106,8 +1156,8 @@ describe('prepared editor documents', () => {
 
       editor.edit({ from: 0, to: 0, text: 'x' })
       await vi.waitFor(() => {
-        expect(structuralSession.applyChange).toHaveBeenCalledOnce()
-        expect(highlighterSession.applyChange).toHaveBeenCalledOnce()
+        expect(structuralSession.analyze).toHaveBeenCalledOnce()
+        expect(highlighterSession.analyze).toHaveBeenCalledOnce()
       })
 
       editor.dispose()
@@ -1126,9 +1176,12 @@ describe('prepared editor documents', () => {
         { start: 0, end: 5, style: { color: 'prepared-token' } },
       ])
       const highlighterSession = highlightSession()
-      highlighterSession.refresh = vi.fn(async () => ({ tokens: readyTokens }))
+      highlighterSession.analyze = vi.fn(async () => ({ tokens: readyTokens }))
+      const highlighterProviderOpenRuntime = vi.fn(
+        (_context: EditorHighlighterOperationContext) => highlighterSession,
+      )
       const highlighterProvider: EditorHighlighterProvider = {
-        createSession: vi.fn(() => highlighterSession),
+        operation: createEditorHighlighterOperation(highlighterProviderOpenRuntime),
       }
       const observedTokenColors: Array<readonly (string | undefined)[]> = []
       const plugin: EditorPlugin = {
@@ -1195,14 +1248,17 @@ describe('prepared editor documents', () => {
         { start: 0, end: 5, style: { color: 'retained-full-token' } },
       ]),
     }
-    const session: EditorSyntaxSession = {
+    const session: EditorSyntaxRuntime = {
       ...syntaxSession(),
       canQueryRange: () => false,
-      refresh: vi.fn(async () => result),
+      analyze: vi.fn(async (_read: DocumentRead) => result),
       getResult: () => result,
       getTokens: () => result.tokens,
     }
-    const provider: EditorSyntaxProvider = { createSession: vi.fn(() => session) }
+    const providerOpenRuntime = vi.fn(() => session)
+    const provider: EditorSyntaxProvider = {
+      operation: createEditorStructuralOperation(providerOpenRuntime),
+    }
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'file.ts' })
     const warm = analysis.borrowStructural({
       provider,
@@ -1238,7 +1294,7 @@ describe('prepared editor documents', () => {
       })
       expect(colors[0]).toEqual(['retained-full-token'])
       expect(colors).not.toContainEqual([])
-      expect(provider.createSession).toHaveBeenCalledTimes(1)
+      expect(providerOpenRuntime).toHaveBeenCalledTimes(1)
       expect(session.queryRange).not.toHaveBeenCalled()
     } finally {
       editor.dispose()
@@ -1356,10 +1412,13 @@ describe('prepared editor documents', () => {
       ],
     }
     const structuralSession = syntaxSession()
-    structuralSession.refresh = vi.fn(async () => structuralResult)
+    structuralSession.analyze = vi.fn(async () => structuralResult)
     structuralSession.queryRange = vi.fn(async () => structuralResult)
+    const structuralProviderOpenRuntime = vi.fn(
+      (_context: EditorStructuralOperationContext) => structuralSession,
+    )
     const structuralProvider: EditorSyntaxProvider = {
-      createSession: vi.fn(() => structuralSession),
+      operation: createEditorStructuralOperation(structuralProviderOpenRuntime),
     }
     const foldCounts: number[] = []
     const plugin: EditorPlugin = {
@@ -1420,8 +1479,11 @@ describe('prepared editor documents', () => {
     )
     const buffer = createEditorTextBuffer(text)
     const structuralSession = syntaxSession()
+    const structuralProviderOpenRuntime = vi.fn(
+      (_context: EditorStructuralOperationContext) => structuralSession,
+    )
     const structuralProvider: EditorSyntaxProvider = {
-      createSession: vi.fn(() => structuralSession),
+      operation: createEditorStructuralOperation(structuralProviderOpenRuntime),
     }
     const prepared = createEditorPreparedDocument({
       buffer,
@@ -1479,11 +1541,12 @@ describe('prepared editor documents', () => {
     await vi.waitFor(() => expect(structuralSession.queryRange).toHaveBeenCalledTimes(2))
     expect(structuralSession.queryRange).toHaveBeenLastCalledWith(
       expect.objectContaining({ endIndex: expect.any(Number) }),
+      expect.any(AbortSignal),
     )
     const uncoveredRange = vi.mocked(structuralSession.queryRange!).mock.calls.at(-1)?.[0]
     expect(uncoveredRange?.startIndex).toBe(5)
     expect(uncoveredRange?.endIndex).toBeGreaterThan(5)
-    expect(structuralProvider.createSession).toHaveBeenCalledOnce()
+    expect(structuralProviderOpenRuntime).toHaveBeenCalledOnce()
     editor.dispose()
     container.remove()
   })
@@ -1492,9 +1555,12 @@ describe('prepared editor documents', () => {
     const buffer = createEditorTextBuffer('const value = 1;\n')
     const completion = deferred<ReturnType<typeof createEmptySyntaxResult>>()
     const structuralSession = syntaxSession()
-    structuralSession.refresh = vi.fn(() => completion.promise)
+    structuralSession.analyze = vi.fn(() => completion.promise)
+    const structuralProviderOpenRuntime = vi.fn(
+      (_context: EditorStructuralOperationContext) => structuralSession,
+    )
     const structuralProvider: EditorSyntaxProvider = {
-      createSession: vi.fn(() => structuralSession),
+      operation: createEditorStructuralOperation(structuralProviderOpenRuntime),
     }
     const prepared = createEditorPreparedDocument({
       buffer,
@@ -1531,13 +1597,13 @@ describe('prepared editor documents', () => {
         structuralConfigurationTag: ['tree-sitter', 1],
       },
     )
-    expect(structuralProvider.createSession).toHaveBeenCalledOnce()
+    expect(structuralProviderOpenRuntime).toHaveBeenCalledOnce()
 
     completion.resolve(createEmptySyntaxResult())
     await vi.waitFor(() => expect(editor.getState().syntaxStatus).toBe('ready'))
 
-    expect(structuralProvider.createSession).toHaveBeenCalledOnce()
-    expect(structuralSession.refresh).toHaveBeenCalledOnce()
+    expect(structuralProviderOpenRuntime).toHaveBeenCalledOnce()
+    expect(structuralSession.analyze).toHaveBeenCalledOnce()
     editor.dispose()
     container.remove()
   })
@@ -1546,9 +1612,12 @@ describe('prepared editor documents', () => {
     const buffer = createEditorTextBuffer('const value = 1;\n')
     const completion = deferred<EditorHighlightResult>()
     const highlighterSession = highlightSession()
-    highlighterSession.refresh = vi.fn(() => completion.promise)
+    highlighterSession.analyze = vi.fn(() => completion.promise)
+    const highlighterProviderOpenRuntime = vi.fn(
+      (_context: EditorHighlighterOperationContext) => highlighterSession,
+    )
     const highlighterProvider: EditorHighlighterProvider = {
-      createSession: vi.fn(() => highlighterSession),
+      operation: createEditorHighlighterOperation(highlighterProviderOpenRuntime),
     }
     const observedTokenColors: Array<readonly (string | undefined)[]> = []
     const plugin: EditorPlugin = {
@@ -1614,8 +1683,10 @@ describe('prepared editor documents', () => {
     const buffer = createEditorTextBuffer('alpha\n')
     const completion = deferred<ReturnType<typeof createEmptySyntaxResult>>()
     const session = syntaxSession()
-    session.refresh = vi.fn(() => completion.promise)
-    const provider: EditorSyntaxProvider = { createSession: () => session }
+    session.analyze = vi.fn(() => completion.promise)
+    const provider: EditorSyntaxProvider = {
+      operation: createEditorStructuralOperation(() => session),
+    }
     const abortController = new AbortController()
     const prepared = createEditorPreparedDocument({
       buffer,
@@ -1648,8 +1719,9 @@ describe('prepared editor documents', () => {
   it('does not create or refresh a stage whose signal is already aborted', async () => {
     const buffer = createEditorTextBuffer('alpha\n')
     const session = highlightSession()
+    const providerOpenRuntime = vi.fn(() => session)
     const provider: EditorHighlighterProvider = {
-      createSession: vi.fn(() => session),
+      operation: createEditorHighlighterOperation(providerOpenRuntime),
     }
     const abortController = new AbortController()
     abortController.abort()
@@ -1672,8 +1744,8 @@ describe('prepared editor documents', () => {
     })
 
     await expect(outcome).resolves.toBe('aborted')
-    expect(provider.createSession).not.toHaveBeenCalled()
-    expect(session.refresh).not.toHaveBeenCalled()
+    expect(providerOpenRuntime).not.toHaveBeenCalled()
+    expect(session.analyze).not.toHaveBeenCalled()
     expect(session.dispose).not.toHaveBeenCalled()
   })
 
@@ -1757,25 +1829,23 @@ function fixedPreparedDocument(buffer: ReturnType<typeof createEditorTextBuffer>
   })
 }
 
-function syntaxSession(): EditorSyntaxSession {
+function syntaxSession() {
   const result = createEmptySyntaxResult()
   return {
-    applyChange: vi.fn(async () => result),
     dispose: vi.fn(),
     getResult: () => result,
-    foldingSupport: 'supported',
+    foldingSupport: 'supported' as const,
     getSnapshotVersion: () => 0,
     getTokens: () => result.tokens,
-    queryRange: vi.fn(async () => result),
-    refresh: vi.fn(async () => result),
+    queryRange: vi.fn(async (_range: EditorSyntaxRange) => result),
+    analyze: vi.fn(async (_read: DocumentRead) => result),
   }
 }
 
-function highlightSession(): EditorHighlighterSession {
+function highlightSession() {
   return {
-    applyChange: vi.fn(async () => ({ tokens: EditorTokenStore.empty() })),
     dispose: vi.fn(),
-    refresh: vi.fn(async () => ({ tokens: EditorTokenStore.empty() })),
+    analyze: vi.fn(async (_read: DocumentRead) => ({ tokens: EditorTokenStore.empty() })),
   }
 }
 

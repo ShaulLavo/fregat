@@ -181,6 +181,9 @@ jobs:
       - name: Query API
         run: bun run query:check
 
+      - name: Document contribution ownership
+        run: bun run documents:check
+
       - name: Structured errors census
         run: bun run errors:census
 
@@ -371,10 +374,45 @@ jobs:
         timeout-minutes: 5
         run: bun run --cwd apps/web test:browser
 
+      - name: Browser test (syntax settings)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        run: bun run --cwd apps/web test:syntax-settings-browser
+
       - name: Browser test (tree)
         if: ${{ !cancelled() }}
         timeout-minutes: 5
         run: bun run --cwd apps/web test:tree-browser
+
+      - name: Browser test (retention reload)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: bun run --cwd apps/web test:retention-reload-browser
+
+      - name: Upload failed retention reload evidence
+        if: ${{ failure() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: retention-reload-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/retention-acceptance-reload-*
+          if-no-files-found: ignore
+
+      - name: Browser test (retention layout)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: bun run --cwd apps/web test:retention-layout-browser
+
+      - name: Upload failed retention layout evidence
+        if: ${{ failure() && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: retention-layout-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/retention-acceptance-layout-*
+          if-no-files-found: ignore
 
   # The site's demo build bundles apps/web in a different mode than the app build, so it
   # pulls in packages (like MSW) the other CI jobs never touch and needs its own licence
@@ -427,11 +465,26 @@ jobs:
     timeout-minutes: 5
     permissions:
       actions: read
+      contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
       - name: Verdict
         env:
-          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
-        run: test "$FAILED" = false
+          CI_NEEDS_JSON: ${{ toJSON(needs) }}
+          CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?filter=latest&per_page=100" --paginate --slurp > "$RUNNER_TEMP/ci-jobs.json"
+          gh api "repos/$GH_REPO/actions/runs/$RUN_ID" > "$RUNNER_TEMP/ci-run.json"
+          bun scripts/ci-verdict.ts .github/workflows/ci.yml "$RUNNER_TEMP/ci-jobs.json" "$RUNNER_TEMP/ci-run.json"
       - name: Report queue and execution times
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -441,7 +494,6 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          gh api "repos/$GH_REPO/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT/jobs?per_page=100" --paginate --slurp > "$RUNNER_TEMP/ci-jobs.json"
           jq -r '
             def seconds: fromdateiso8601;
             "| Job | Queue seconds | Execution seconds |",
@@ -449,6 +501,6 @@ jobs:
             (.[].jobs[] | select(.started_at != null and .completed_at != null and .conclusion != "skipped") |
               "| \(.name) | \((.started_at | seconds) - (.created_at | seconds)) | \((.completed_at | seconds) - (.started_at | seconds)) |")
           ' "$RUNNER_TEMP/ci-jobs.json" >> "$GITHUB_STEP_SUMMARY"
-          created=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT" --jq '.created_at')
+          created=$(jq -r '.created_at' "$RUNNER_TEMP/ci-run.json")
           started=$(jq -r '.[].jobs[] | select(.name == "CI") | .started_at' "$RUNNER_TEMP/ci-jobs.json")
           echo "Run created to verdict runner started: $(( $(date -d "$started" +%s) - $(date -d "$created" +%s) )) seconds" >> "$GITHUB_STEP_SUMMARY"

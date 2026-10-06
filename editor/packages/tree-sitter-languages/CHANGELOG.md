@@ -1,5 +1,23 @@
 # @singapore-editor/tree-sitter-languages
 
+## 0.2.6
+
+### Patch Changes
+
+- Updated dependencies [5670c3d]
+  - @singapore-editor/core@0.2.6
+  - @singapore-editor/tree-sitter@0.2.6
+
+## 0.2.5
+
+### Patch Changes
+
+- Updated dependencies [832e149]
+- Updated dependencies [fd035f2]
+- Updated dependencies [51d2a71]
+  - @singapore-editor/core@0.2.5
+  - @singapore-editor/tree-sitter@0.2.5
+
 ## 0.2.3
 
 ### Patch Changes

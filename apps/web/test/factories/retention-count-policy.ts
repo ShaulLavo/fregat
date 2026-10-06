@@ -17,10 +17,13 @@ import {
 } from '@singapore-editor/core/editor'
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import type { EditorHighlighterProvider } from '@singapore-editor/core/extensions'
-import { createShikiWorkerOwner } from '@singapore-editor/core/shiki'
+import {
+  createShikiWorkerOwner,
+  createShikiHighlighterProvider,
+} from '@singapore-editor/core/shiki'
 import {
   createTreeSitterSyntaxProvider,
-  TreeSitterWorkerClient,
+  createTreeSitterWorkerOwner,
 } from '@singapore-editor/tree-sitter'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
 import { emptyWorkspaceState } from '@/features/workspace/state/cache'
@@ -279,35 +282,28 @@ export async function retentionCountHost(fixture: RetentionFixture) {
       tabSize: 4,
     },
   })
-  const tree = new TreeSitterWorkerClient()
-  const structuralProvider = createTreeSitterSyntaxProvider({ backend: tree })
+  const tree = createTreeSitterWorkerOwner()
+  const structuralProvider = createTreeSitterSyntaxProvider({ workerOwner: tree })
   for (const contribution of TREE_SITTER_LANGUAGE_CONTRIBUTIONS)
     structuralProvider.registerLanguage(contribution)
   const shiki = createShikiWorkerOwner()
-  const registrations = {
-    languageRegistrations: language.default,
-    themeRegistration: { ...theme.default, name: 'github-dark' },
-    themeRegistrations: [],
-  }
   const highlighterProvider: EditorHighlighterProvider = {
-    createSession(options) {
-      return shiki.createSession({
-        ...options,
-        lang: fixture.language,
-        theme: 'github-dark',
-        registrations,
-      })
-    },
+    operation: createShikiHighlighterProvider({
+      workerOwner: shiki,
+      languages: { [fixture.language]: fixture.language },
+      theme: 'github-dark',
+      resolveLanguage: async () => language.default,
+      resolveTheme: async () => ({ ...theme.default, name: 'github-dark' }),
+    }).operation,
   }
   const failedHighlighterProvider: EditorHighlighterProvider = {
-    createSession(options) {
-      return shiki.createSession({
-        ...options,
-        lang: 'retention-unregistered-language',
-        theme: 'github-dark',
-        registrations,
-      })
-    },
+    operation: createShikiHighlighterProvider({
+      workerOwner: shiki,
+      languages: { 'retention-unregistered-language': 'retention-unregistered-language' },
+      theme: 'github-dark',
+      resolveLanguage: async () => language.default,
+      resolveTheme: async () => ({ ...theme.default, name: 'github-dark' }),
+    }).operation,
   }
   const source = retentionFixtureText(fixture)
   function createDocument(name: string) {
@@ -747,10 +743,10 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     await observation.frame()
     await Promise.resolve()
     await expect.poll(hasPendingRetentionMutation).toBe(false)
+    await Promise.all([tree.awaitIdleFence(), shiki.awaitIdleFence()])
     await expect
       .poll(() => tree.inspect().pendingRequests + shiki.inspect().pendingRequests)
       .toBe(0)
-    await Promise.all([tree.awaitIdleFence(), shiki.awaitIdleFence()])
     await Promise.resolve()
     await expect.poll(hasPendingRetentionMutation).toBe(false)
     await expect
@@ -857,6 +853,26 @@ export async function retentionCountHost(fixture: RetentionFixture) {
       b: { revision: b.buffer.getRevision(), dirty: b.buffer.isDirty() },
     }
   }
+  let disposal: Promise<void> | null = null
+  function dispose() {
+    disposal ??= disposeHost()
+    return disposal
+  }
+  async function disposeHost() {
+    try {
+      for (const view of views) view.dispose()
+      releaseViewMetadata()
+      application.dispose()
+    } finally {
+      for (const stop of stopPublications) stop()
+      await Promise.all([tree.dispose(), shiki.dispose()])
+      useEnvironmentsStore.setState(previousEnvironments, true)
+      if (previousSettings === undefined)
+        queries.removeQueries({ queryKey: settingsKeys.document(), exact: true })
+      else queries.setQueryData(settingsKeys.document(), previousSettings)
+      observation.restore()
+    }
+  }
   return {
     application,
     a,
@@ -890,20 +906,6 @@ export async function retentionCountHost(fixture: RetentionFixture) {
     survivorEditor,
     tree,
     shiki,
-    async dispose() {
-      try {
-        for (const view of views) view.dispose()
-        releaseViewMetadata()
-        application.dispose()
-      } finally {
-        for (const stop of stopPublications) stop()
-        await Promise.all([tree.dispose(), shiki.dispose()])
-        useEnvironmentsStore.setState(previousEnvironments, true)
-        if (previousSettings === undefined)
-          queries.removeQueries({ queryKey: settingsKeys.document(), exact: true })
-        else queries.setQueryData(settingsKeys.document(), previousSettings)
-        observation.restore()
-      }
-    },
+    dispose,
   }
 }

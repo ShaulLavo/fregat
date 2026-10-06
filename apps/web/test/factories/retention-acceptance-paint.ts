@@ -5,6 +5,10 @@ import { allEditorGroups } from '@/lib/documents/utils/groups'
 import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { projectSettings } from '@workspace/client-core/settings/projection'
+import { settingsIntentStore } from '@workspace/client-core/settings/intent-store'
+import type { SettingsSnapshot } from '@workspace/contracts'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import {
   captureTokenPaint,
@@ -14,6 +18,7 @@ import {
   type TokenPaintObservation,
 } from '../../../../scripts/agent/scenarios/editor-tab-hover-highlights-probe'
 import type { RetentionAcceptanceApp } from './retention-acceptance-app'
+import { settingsSnapshot } from './settings'
 import type { EditorViewSnapshot } from '@singapore-editor/core/editor'
 import { languageIdForFilePath } from '@/lib/file-language'
 import {
@@ -22,7 +27,14 @@ import {
   type RetentionAcceptanceReference,
 } from './retention-acceptance-projection'
 
-export function retentionAcceptanceSubject(app: RetentionAcceptanceApp, path: FilesystemPath) {
+type RetentionPaintApp = {
+  readonly read: () => Pick<
+    ReturnType<RetentionAcceptanceApp['read']>,
+    'documents' | 'theme' | 'ui' | 'workspace'
+  >
+}
+
+export function retentionAcceptanceSubject(app: RetentionPaintApp, path: FilesystemPath) {
   const state = app.read()
   const document = state.documents.getState().getLiveEditorDocument(fileDocumentKey(path))
   if (!document)
@@ -50,7 +62,7 @@ export function retentionAcceptanceSubject(app: RetentionAcceptanceApp, path: Fi
 }
 
 export function retentionAcceptanceReference(
-  app: RetentionAcceptanceApp,
+  app: RetentionPaintApp,
   path: FilesystemPath,
 ): RetentionAcceptanceReference {
   const subject = retentionAcceptanceSubject(app, path)
@@ -90,7 +102,7 @@ export function retentionAcceptanceReference(
 }
 
 export function retentionAcceptanceBinding(
-  app: RetentionAcceptanceApp,
+  app: RetentionPaintApp,
   path: FilesystemPath,
   snapshot: EditorViewSnapshot,
 ): RetentionAcceptanceBinding {
@@ -115,9 +127,59 @@ export function retentionAcceptanceBinding(
   }
 }
 
-export async function awaitRetentionAcceptanceReady(
+export async function configureRetentionAcceptanceSyntax(
   app: RetentionAcceptanceApp,
+  enabled: boolean,
+) {
+  await app.queryClient.cancelQueries({ queryKey: settingsKeys.document(), exact: true })
+  app.queryClient.setQueryData(
+    settingsKeys.document(),
+    settingsSnapshot({ values: { 'editor.syntaxHighlighting.enabled': enabled } }),
+  )
+  await expect
+    .poll(() => {
+      const snapshot = app.queryClient.getQueryData<SettingsSnapshot>(settingsKeys.document())
+      const intents = settingsIntentStore
+        .getState()
+        .active.filter((entry) => entry.patch.owner === app.queryClient)
+      return {
+        confirmed: snapshot?.values['editor.syntaxHighlighting.enabled'],
+        projected: snapshot
+          ? projectSettings(snapshot, intents).values['editor.syntaxHighlighting.enabled']
+          : undefined,
+        mirror: readSettingsMirror()['editor.syntaxHighlighting.enabled'],
+      }
+    })
+    .toEqual({ confirmed: enabled, projected: enabled, mirror: enabled })
+}
+
+export type RetentionAcceptanceReadyDiagnostics = {
+  last?: {
+    sourceDocumentId: EditorViewSnapshot['documentId']
+    sourceRevision: number
+    sourceConfiguration: ReturnType<typeof retentionAcceptanceSubject>['configuration']
+    mounted: readonly {
+      documentId: EditorViewSnapshot['documentId'] | undefined
+      revision: number | undefined
+      syntaxStatus: EditorViewSnapshot['syntaxStatus'] | undefined
+      initialHighlightStatus: EditorViewSnapshot['initialHighlightStatus'] | undefined
+      paintAvailable: boolean
+    }[]
+    request: {
+      languageId: string
+      configurationTag: ReturnType<typeof retentionAcceptanceSubject>['configuration']
+    } | null
+    lease:
+      | { kind: 'not-borrowed' | 'unavailable' | 'unread' }
+      | { kind: 'pending' | 'ready' | 'failed'; revision: number }
+    comparedRevision: number | null
+  }
+}
+
+export async function awaitRetentionAcceptanceReady(
+  app: RetentionPaintApp,
   path: FilesystemPath,
+  diagnostics?: RetentionAcceptanceReadyDiagnostics,
 ) {
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
   await expect
@@ -128,6 +190,24 @@ export async function awaitRetentionAcceptanceReady(
           .map((controller) => controller.getSnapshot())
           .filter((snapshot) => snapshot?.documentId === subject.document.analysis.documentId)
         const revision = subject.document.buffer.getRevision()
+        const poll: RetentionAcceptanceReadyDiagnostics['last'] = diagnostics
+          ? {
+              sourceDocumentId: subject.document.analysis.documentId,
+              sourceRevision: revision,
+              sourceConfiguration: subject.configuration,
+              mounted: mounted.map((snapshot) => ({
+                documentId: snapshot?.documentId,
+                revision: snapshot?.documentSyncPoint.revision,
+                syntaxStatus: snapshot?.syntaxStatus,
+                initialHighlightStatus: snapshot?.initialHighlightStatus,
+                paintAvailable: snapshot ? snapshot.paintLayers !== null : false,
+              })),
+              request: null,
+              lease: { kind: 'not-borrowed' },
+              comparedRevision: null,
+            }
+          : undefined
+        if (diagnostics) diagnostics.last = poll
         if (
           mounted.length === 0 ||
           !mounted.every(
@@ -139,19 +219,32 @@ export async function awaitRetentionAcceptanceReady(
           )
         )
           return false
-        const lease = subject.document.analysis.borrowHighlighter({
+        const request = {
           provider: editorHighlighterProvider(),
           languageId: 'typescript',
           configurationTag: subject.configuration,
-        })
+        }
+        if (poll)
+          poll.request = {
+            languageId: request.languageId,
+            configurationTag: request.configurationTag,
+          }
+        const lease = subject.document.analysis.borrowHighlighter(request)
+        if (poll) poll.lease = { kind: lease ? 'unread' : 'unavailable' }
         if (!lease) return false
+        let comparedRevision: number | null = null
         try {
           const read = lease.read()
-          if (read.kind !== 'ready' || read.revision !== subject.document.buffer.getRevision())
+          if (poll) poll.lease = { kind: read.kind, revision: read.revision }
+          if (
+            read.kind !== 'ready' ||
+            read.revision !== (comparedRevision = subject.document.buffer.getRevision())
+          )
             return false
           return true
         } finally {
           lease.dispose()
+          if (poll) poll.comparedRevision = comparedRevision
         }
       },
       { timeout: 10_000 },
@@ -160,7 +253,7 @@ export async function awaitRetentionAcceptanceReady(
 }
 
 export function captureRetentionAcceptancePaint(
-  app: RetentionAcceptanceApp,
+  app: RetentionPaintApp,
   path: FilesystemPath,
   tab: TabId,
 ) {

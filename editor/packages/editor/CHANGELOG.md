@@ -1,5 +1,21 @@
 # @singapore-editor/core
 
+## 0.2.6
+
+### Patch Changes
+
+- 5670c3d: Own source delivery and contribution lifetimes in document analysis. Use typed structural and highlighter operations with immutable worker reads, preserve exact pinned work, and reject partial diff sources before syntax preparation.
+- @singapore-editor/textbuffer@0.2.6
+
+## 0.2.5
+
+### Patch Changes
+
+- 832e149: Keep current highlight readiness pending across provider and theme replacement overlaps until the current result is accepted, while preserving rebased styles.
+- fd035f2: Prepare the ordered provider theme with retained highlighter results so compatible ready documents attach synchronously without another constructor theme request.
+- 51d2a71: Keep word-wrap choices in retained logical editor views across native editor remounts.
+- @singapore-editor/textbuffer@0.2.5
+
 ## 0.2.3
 
 ### Patch Changes

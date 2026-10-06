@@ -1,5 +1,27 @@
 # ghostty-webgpu
 
+## 0.3.17
+
+### Patch Changes
+
+- f78b378: Measure WebGPU through production default device ownership and coordinated submission. Read adapter provenance from the renderer's actual device, and join encoded commands to their submitted group before qualifying presentation feedback.
+
+## 0.3.16
+
+### Patch Changes
+
+- ef362cb: Retain unchanged DOM rows when cursor appearance forwards an equal renderer theme, while refreshing geometry and publishing the cursor frame.
+- 324667b: Refresh glyph resources when browser fonts load or fail, including replacements with unchanged fitted metrics.
+- a5a8f0e: Build the packed Canvas compositor from Zig with the same memory ownership, RGBA arithmetic, scalar/SIMD modes and Wasm API.
+
+## 0.3.15
+
+### Patch Changes
+
+- 367e5a7: Reject regressing or nonfinite benchmark CPU counters before aggregation and retain the rejected process ID and counter values in the failure message.
+- fda88dc: Retain packed Canvas glyph stamps when terminal appearance forwarding updates the theme.
+- 0bd8659: Preserve native selection identities across repeated unchanged worker layouts. Keep native operation and result codes in worker failure diagnostics.
+
 ## 0.3.14
 
 ### Patch Changes

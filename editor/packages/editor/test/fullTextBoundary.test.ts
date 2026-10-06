@@ -1,3 +1,4 @@
+import { createEditorStructuralOperation } from '../src/editor/operationDefinitions'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Kind } from 'tree-sitter-md'
 
@@ -19,7 +20,7 @@ import {
   createEmptySyntaxResult,
   type EditorSyntaxCapture,
   type EditorSyntaxResult,
-  type EditorSyntaxSession,
+  type EditorSyntaxRuntime,
 } from '../src/syntax'
 import { createVisibleEditor } from './factories/visibleEditor'
 
@@ -304,9 +305,8 @@ function markdownCaptures(): EditorPlugin {
       data: new Uint32Array([BOLD_START, BOLD_START + 8, Kind.Strong, 0]),
     },
   })
-  const session: EditorSyntaxSession = {
-    refresh: async () => result(),
-    applyChange: async () => result(),
+  const session: EditorSyntaxRuntime = {
+    analyze: async () => result(),
     foldingSupport: 'supported',
     getResult: result,
     getTokens: () => [],
@@ -314,7 +314,8 @@ function markdownCaptures(): EditorPlugin {
     dispose() {},
   }
   return {
-    activate: (context) => context.registerSyntaxProvider({ createSession: () => session }),
+    activate: (context) =>
+      context.registerSyntaxProvider({ operation: createEditorStructuralOperation(() => session) }),
   }
 }
 

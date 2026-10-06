@@ -1,4 +1,4 @@
-import type { EditorDocumentAnalysis } from './documentAnalysis'
+import { acquireEditorDocumentAnalysis, type EditorDocumentAnalysis } from './documentAnalysis'
 import { normalizeGutterLeadingInset } from '../virtualization/virtualizedTextViewHelpers'
 import { captureJumpLocation, JumpHistory, type JumpLocation, type JumpCause } from './jumpHistory'
 import type { EditorPointHit, EditorMarkerHit } from '../pointQueries'
@@ -325,10 +325,13 @@ export class Editor {
   private syntaxScrollDeltaPx = 0
   private syntaxScrollDirection: SyntaxScrollDirection = 0
   private readonly options: EditorOptions
+  private pendingWordWrapOverride: boolean | undefined
+  private wordWrapOwner: 'host' | 'external-view' = 'host'
   private readonly pluginHost: EditorPluginHost
   private readonly ambientPlugins: EditorAmbientPluginController
   private readonly commandRouter: EditorCommandRouter
   private analysis: EditorDocumentAnalysis | null = null
+  private analysisInterest: { dispose(): void } | null = null
   private readonly document: EditorDocumentController
   private readonly editorFeatures = new Map<EditorCapabilityToken<unknown>, unknown>()
   private readonly editorFeatureTokensById = new Map<string, EditorCapabilityToken<unknown>>()
@@ -514,6 +517,7 @@ export class Editor {
     const mountStart = nowMs()
     this.container = container
     this.options = options
+    this.pendingWordWrapOverride = options.wordWrap
     this.presentationReady = options.presentationReady !== false
     this.configuredTabSize = normalizeTabSize(options.tabSize)
     this.detectIndentation = options.detectIndentation ?? true
@@ -598,7 +602,6 @@ export class Editor {
       getCurrentSessionDocumentId: () => this.currentSessionDocumentId(),
       getLanguageId: () => this.languageId,
       getSession: () => this.session,
-      getDocumentEditChain: () => this.currentDocumentEditChain(),
       getVisibleSyntaxRange: () => this.visibleSyntaxRange(),
       adoptTokens: (tokens) => {
         this.view.adoptTokens(tokens)
@@ -1184,7 +1187,7 @@ export class Editor {
   }
 
   setTokens(tokens: EditorTokenInput): void {
-    this.adoptTokens(toEditorTokenStore(tokens))
+    this.syntax.setExternalTokens(toEditorTokenStore(tokens))
   }
 
   /**
@@ -1293,11 +1296,29 @@ export class Editor {
   /** Turns soft wrap on or off. Returns the state actually in effect afterwards. */
   setWordWrap(enabled: boolean): boolean {
     this.view.setWrapEnabled(enabled)
-    return this.isWordWrapEnabled()
+    const actual = this.isWordWrapEnabled()
+    const logicalView = editorBufferSession(this.session)?.view
+    logicalView?.setWordWrap(actual)
+    if (this.wordWrapOwner === 'host') this.pendingWordWrapOverride = actual
+    return actual
   }
 
   isWordWrapEnabled(): boolean {
     return this.view.isWrapEnabled()
+  }
+
+  private restoreViewWordWrap(): void {
+    const logicalView = editorBufferSession(this.session)?.view
+    if (!logicalView) {
+      this.wordWrapOwner = 'host'
+      return
+    }
+    const enabled =
+      this.pendingWordWrapOverride ?? logicalView.getWordWrap() ?? this.isWordWrapEnabled()
+    this.view.setWrapEnabled(enabled)
+    logicalView.setWordWrap(this.isWordWrapEnabled())
+    this.pendingWordWrapOverride = undefined
+    this.wordWrapOwner = 'external-view'
   }
 
   /**
@@ -2189,6 +2210,7 @@ export class Editor {
       const replacingDocument = this.session !== null
       this.disposeBufferSubscriptions()
       const attachment = this.document.attachSession(session, options)
+      this.restoreViewWordWrap()
       if (this.view.isProvisional) this.snapshotGeneration = attachment.documentVersion
       this.attachAnalysis(session, options.analysis ?? options.preparedDocument?.analysis)
       this.subscribeToBufferSession(session)
@@ -2262,6 +2284,7 @@ export class Editor {
     this.syntax.clearDocument()
     this.releaseAnalysis()
     this.document.detachSession()
+    this.wordWrapOwner = 'host'
     this.inputSelection.clearSelectionHighlight()
     this.view.setEditable(false)
     this.lifecycleSummary.document.detachedCount += 1
@@ -2276,6 +2299,7 @@ export class Editor {
     this.detachedEditChain.rotate()
     this.disposeBufferSubscriptions()
     this.document.clear()
+    this.wordWrapOwner = 'host'
     this.syntax.clearDocument()
     this.releaseAnalysis()
     this.inputSelection.clearSelectionHighlight()
@@ -2340,6 +2364,8 @@ export class Editor {
     const replacingDocument = this.session !== null
     this.disposeBufferSubscriptions()
     const attachment = this.document.resetOwnedDocument(document, options)
+    this.wordWrapOwner = 'host'
+    editorBufferSession(attachment.session)?.view.setWordWrap(this.isWordWrapEnabled())
     this.attachAnalysis(attachment.session)
     this.subscribeToBufferSession(attachment.session)
     if (this.view.isProvisional) this.snapshotGeneration = attachment.documentVersion
@@ -3337,6 +3363,7 @@ export class Editor {
       highlightPrefix: this.highlightPrefix,
       hasDocument: () => this.session !== null,
       getSnapshot: () => this.createViewSnapshot(),
+      getDocumentContributions: () => this.analysis?.contributions ?? null,
       requestViewUpdate: () => this.requestViewUpdate(owner()),
       onDidType: (listener) => this.claimedBy(claims, () => this.addTypedTextListener(listener)),
       registerPressParticipant: (participant) =>
@@ -3607,10 +3634,22 @@ export class Editor {
     const buffer = editorBufferSession(session)?.buffer
     if (analysis && analysis.buffer !== buffer)
       throw new TypeError('Document analysis must reference the attached buffer')
-    this.analysis = analysis ?? null
+    this.releaseAnalysis()
+    if (analysis || !buffer) {
+      this.analysis = analysis ?? null
+      return
+    }
+    const interest = acquireEditorDocumentAnalysis({
+      buffer,
+      documentId: this.currentSessionDocumentId(),
+    })
+    this.analysisInterest = interest
+    this.analysis = interest.analysis
   }
 
   private releaseAnalysis(): void {
+    this.analysisInterest?.dispose()
+    this.analysisInterest = null
     this.analysis = null
   }
 

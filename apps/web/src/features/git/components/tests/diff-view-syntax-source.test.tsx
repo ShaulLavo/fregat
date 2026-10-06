@@ -1,13 +1,10 @@
+import { installSyntaxWorker } from '../../../../../test/factories/syntax-worker'
 import { Editor } from '@singapore-editor/core/editor'
-import type { DocumentTextSnapshot } from '@singapore-editor/core/document'
 import {
-  createEmptySyntaxResult,
   toEditorTokenStore,
-  type EditorSyntaxSessionOptions,
   type EditorToken,
   type EditorTokenInput,
 } from '@singapore-editor/core/syntax'
-import type { TreeSitterSyntaxProvider } from '@singapore-editor/tree-sitter'
 import type { GitFileDiff } from '@workspace/contracts'
 import { screen, waitFor } from '@testing-library/react'
 import { execFileSync } from 'node:child_process'
@@ -20,10 +17,6 @@ import { fetchDiff } from '@/lib/git-diff-query'
 import { saveSettings } from '@/features/settings/utils/api'
 import { blobDiffQueryKey, fetchBlobDiff } from '@/lib/blob-diff-query'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
-import {
-  editorHighlighterProvider,
-  editorSyntaxProvider,
-} from '@/features/editor/state/syntax-highlighting'
 import type { Client } from '@/lib/client'
 import { fileResource, filesystemPath } from '@/lib/documents/utils/identity'
 import type { GitComparison } from '@/lib/documents/utils/types'
@@ -220,47 +213,33 @@ async function renderCheckpoint(
   }
 }
 
-/** Both diff syntax backends parse through the stub, whichever the active theme selects. */
 function stubParsers(parsed: string[]) {
-  const record = (text: DocumentTextSnapshot) => {
-    const source = text.readRange(0, text.length)
-    parsed.push(source)
-    return firstWordTokens(source)
-  }
-  const treeSitter = vi
-    .spyOn(editorSyntaxProvider(), 'createSession')
-    .mockImplementation(
-      (options) =>
-        firstWordSession(options, record(options.textSnapshot)) as ReturnType<
-          TreeSitterSyntaxProvider['createSession']
-        >,
-    )
-  const shiki = vi
-    .spyOn(editorHighlighterProvider(), 'createSession')
-    .mockImplementation((options) => {
-      const tokens = toEditorTokenStore(record(options.textSnapshot))
-      return {
-        applyChange: async () => ({ tokens }),
-        dispose: () => undefined,
-        refresh: async () => ({ tokens }),
-      }
-    })
-  onTestFinished(() => {
-    treeSitter.mockRestore()
-    shiki.mockRestore()
-  })
+  installSyntaxWorker(firstWordTokens, (text) => parsed.push(text))
 }
 
 /** Each pane's latest buffer text and the tokens applied over it. */
 function recordPaint(painted: Map<Editor, Painted>) {
-  const setText = Editor.prototype.setText
+  const openDocument = Editor.prototype.openDocument
+  const syncText = Editor.prototype.syncText
   const setTokens = Editor.prototype.setTokens
-  const textSpy = vi.spyOn(Editor.prototype, 'setText').mockImplementation(function (
+  const openSpy = vi.spyOn(Editor.prototype, 'openDocument').mockImplementation(function (
     this: Editor,
-    ...args: Parameters<Editor['setText']>
+    ...args: Parameters<Editor['openDocument']>
   ) {
-    painted.set(this, { text: args[0], tokens: tokenList(args[1]?.tokens ?? []) })
-    return setText.apply(this, args)
+    const result = openDocument.apply(this, args)
+    painted.set(this, { text: this.materializeFullText(), tokens: tokenList(args[0].tokens ?? []) })
+    return result
+  })
+  const syncSpy = vi.spyOn(Editor.prototype, 'syncText').mockImplementation(function (
+    this: Editor,
+    ...args: Parameters<Editor['syncText']>
+  ) {
+    const result = syncText.apply(this, args)
+    painted.set(this, {
+      text: this.materializeFullText(),
+      tokens: tokenList(args[1]?.tokens ?? []),
+    })
+    return result
   })
   const tokensSpy = vi.spyOn(Editor.prototype, 'setTokens').mockImplementation(function (
     this: Editor,
@@ -271,7 +250,8 @@ function recordPaint(painted: Map<Editor, Painted>) {
     return setTokens.apply(this, args)
   })
   onTestFinished(() => {
-    textSpy.mockRestore()
+    openSpy.mockRestore()
+    syncSpy.mockRestore()
     tokensSpy.mockRestore()
   })
 }
@@ -313,32 +293,6 @@ function firstWordTokens(text: string) {
   }
 
   return tokens
-}
-
-function firstWordSession(options: EditorSyntaxSessionOptions, tokens: readonly EditorToken[]) {
-  const result = {
-    ...createEmptySyntaxResult({
-      language: {
-        includeCaptures: true,
-        includeHighlights: true,
-        languageId: options.languageId,
-        mode: 'full',
-      },
-      requestedRanges: [{ endIndex: options.snapshot.length, startIndex: 0 }],
-      snapshot: { documentId: options.documentId, length: options.snapshot.length, version: 1 },
-    }),
-    tokens,
-  }
-
-  return {
-    applyChange: async () => result,
-    dispose: () => undefined,
-    foldingSupport: 'supported' as const,
-    getResult: () => result,
-    getSnapshotVersion: () => 0,
-    getTokens: () => tokens,
-    refresh: async () => result,
-  }
 }
 
 function checkpointComparison(kind: Kind, file: string): GitComparison {

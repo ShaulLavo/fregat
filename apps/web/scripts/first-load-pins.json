@@ -1,12 +1,12 @@
 {
   "reading": "disk",
-  "scriptGzip": 1754768,
+  "scriptGzip": 1772746,
   "phoneScriptGzip": 1449825,
   "owners": {
     "node_modules": 505079,
-    "editor": 350240,
+    "editor": 373737,
     "apps/web/src/features/chat": 183480,
-    "apps/web/src/features/editor": 91781,
+    "apps/web/src/features/editor": 99601,
     "apps/web/src/features/workspace": 64433,
     "apps/web/src/lib": 74095,
     "packages/client-core": 54773,
@@ -91,7 +91,7 @@
     {
       "at": "2026-09-26T21:03:33.154Z",
       "scriptGzip": 1736796,
-      "reason": "Plan 180 P5: 26 Catppuccin file icons for types the pack has no glyph for (audio, video, PDF, Java, Kotlin, PHP, Lua, LaTeX, Makefile, shaders, certificates\u2026). Rows draw icons synchronously, so the glyph data ships with the first load; apps/web/src/lib grows by the glyph strings and their rules."
+      "reason": "Plan 180 P5: 26 Catppuccin file icons for types the pack has no glyph for (audio, video, PDF, Java, Kotlin, PHP, Lua, LaTeX, Makefile, shaders, certificates…). Rows draw icons synchronously, so the glyph data ships with the first load; apps/web/src/lib grows by the glyph strings and their rules."
     },
     {
       "at": "2026-09-26T22:35:40.666Z",
@@ -145,6 +145,18 @@
       "scriptGzip": 1754239,
       "phoneScriptGzip": 1446002,
       "reason": "Accepted PR738 semantic Git provenance and selective restore with the complete consumed source. Actual matched main 097eee3731559491c5c50a2c7a02455ffcd19c13 and candidate 733be8fd57b77e527ef544cca0f211fb546cd1b2 include all intended cost: desktop 1751303 -> 1754239 (+2936), phone conversation 1443568 -> 1446002 (+2434), Git weighted owner 41505 -> 41690 (+185), Git rendered bytes 249449 -> 250572 (+1123), first-load modules 120 -> 119. Retained source also adds lib 8501, contracts 1495 and client-core 2665 rendered bytes; existing feature queries are deleted after genuine shared consumer migration. Re-pin only Git 39461 -> 41690 for this intended growth under the existing policy. Preserve Workbench 43448, all other owner pins, desktop and phone total pins, prior history, the 1% total and 5%/2 KiB owner margins, assertions and ceilings. Original CI failure remains in ci738-6e-types.log, and the matched-source unchanged-gate FAIL remains in provenance200-unchanged-bundle-gate.log/.json. Complete paired reports and stats are provenance200-bundle-main097 and provenance200-bundle-candidate733; module attribution is provenance200-bundle-comparison.json. This accepts source cost and makes no performance improvement claim."
+    },
+    {
+      "at": "2026-10-05T04:45:00Z",
+      "scriptGzip": 1761960,
+      "phoneScriptGzip": 1450018,
+      "reason": "Accepted PR756 complete retained comparison attachment and source anchors. True matched main 0bd8659f59a6526c95611a5fa8b90f0ee70144af versus complete candidate 57eaedd520a714d7d798c8fbcbe138091536bba2, with identical guarded CI=1 bundle-report options, frozen owned dependencies and fresh web outputs: desktop 1758417 -> 1761960 (+3543), phone conversation 1449967 -> 1450018 (+51), Editor weighted owner 96095 -> 99601 (+3506), rendered 618866 -> 639599 (+20733), first-load modules 161 -> 163. Editor module rendered deltas: utils/diff-source-anchors +9936; utils/diff-attachment +3831; state/diff-presentation +3546; components/diff-pane +2225; components/history-pane +672; components/diff-editor +324; components/compare-saved-view -258; hooks/use-diff-rows +228; state/tab-presentation +184; hooks/use-history-viewer +45. The full required implementation adds actual admitted reads and child identity, independent generated sessions, synchronous publication, weak exact-reference revisit claims and deterministic source anchors. Source and glyph/paint assertions remain intact. Per-owner gzip is a shared-chunk weighted estimate. Re-pin only Editor 91781 -> 99601 for this intended growth. Desktop/phone total pins, Workbench/Git/all other owner pins, prior history and the 1% total and 5%/2 KiB owner margins remain unchanged. Original unchanged-gate failure at PR756 head704d8332c1da83dfbb1aa3b9d65cae35ecc3b70c, CI job111612627910, is preserved in ci756-704-types.log. Both complete reports, stats, all owner changes and module attribution are in attachment200-proof/cost/paired-cost.json. This accepts source cost and makes no runtime performance improvement claim."
+    },
+    {
+      "at": "2026-10-05T12:26:39.232Z",
+      "scriptGzip": 1772746,
+      "phoneScriptGzip": 1459983,
+      "reason": "Plan 099 retained document contribution delivery and migrated consumer APIs. Matched untouched main94684d6fd versus complete candidate95579ea41, with identical CI=1 bundle-report options and resolved dependencies: desktop 1763961 -> 1772746 (+8785); phone conversation 1452046 -> 1459983 (+7937); Editor weighted first-load owner 366233 -> 373737 (+7504). Accept this intended canonical source runtime, immutable worker reader and typed contribution cost. Update desktop total and Editor owner only; preserve phone total, all other owner pins, previous history, 1% total and 5%/2 KiB owner margins. Original CI75 unchanged-gate failure is preserved in ci75-111745903327.log; complete matched reports are bundle-main946.json and bundle-candidate955.json. Weighted owner gzip includes shared-chunk attribution and is separate from total gzip. This records source cost; final latency, retention and deployment qualification remain open."
     }
   ]
 }

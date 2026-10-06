@@ -76,6 +76,10 @@ export default defineConfig({
     include: ['src/**/*.browser.tsx'],
     // The tree's own browser tests run alone, in vitest.tree-browser.config.ts.
     exclude: [
+      'src/features/editor/tests/retention-acceptance-reload.browser.tsx',
+      // Settings writers share one fixture server and run serially in their own project.
+      'src/features/editor/tests/syntax-settings.browser.tsx',
+      'src/features/editor/tests/retention-acceptance-identity.browser.tsx',
       'src/features/workspace/tests/tree-view*.browser.tsx',
       'src/features/workspace/tests/tree-parity-*.browser.tsx',
     ],
@@ -145,7 +149,7 @@ type DelayRequestContext = {
       url: (url: URL) => boolean,
       handler: (route: { readonly continue: () => Promise<void> }) => Promise<void>,
       options: { readonly times: number },
-    ) => Promise<void>
+    ) => Promise<unknown>
   }
 }
 

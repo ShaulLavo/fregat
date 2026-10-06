@@ -1,3 +1,4 @@
+import { testScopedStorage } from '../../../../test/factories/scoped-storage'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -15,6 +16,7 @@ import type { ApplyWorkspaceEditRequest } from '@singapore-editor/lsp-plugin'
 import {
   createDocumentLogicalRevisionScope,
   createEditorBufferSession,
+  type EditorTextBuffer,
 } from '@singapore-editor/core/document'
 import { QueryClient } from '@tanstack/react-query'
 import type {
@@ -129,8 +131,8 @@ test.describe('WorkspaceEditService', () => {
     const application = request([entry.operation], {
       originUri,
       documents: [
-        currentProvenance(origin.buffer.getTextSnapshot(), originUri, 1),
-        currentProvenance(target.buffer.getTextSnapshot(), targetUri, 1),
+        currentProvenance(origin.buffer, originUri, 1),
+        currentProvenance(target.buffer, targetUri, 1),
       ],
     })
     const unsubscribe = service.subscribe(() => {
@@ -172,8 +174,8 @@ test.describe('WorkspaceEditService', () => {
     const original = request([textOperation(targetUri, 7, 0, 1, 'T')], {
       originUri,
       documents: [
-        currentProvenance(originSnapshot, originUri, 7),
-        currentProvenance(targetSnapshot, targetUri, 7),
+        currentProvenance(origin.buffer, originUri, 7),
+        currentProvenance(target.buffer, targetUri, 7),
       ],
     })
     const pending = harness.service.onApplyWorkspaceEdit({
@@ -206,9 +208,25 @@ test.describe('WorkspaceEditService', () => {
     const harness = createHarness()
     const document = addLiveDocument(harness, '/repo/active.ts', 'alpha')
     const uri = fileUri(document.target)
-    const provenance = currentProvenance(document.buffer.getTextSnapshot(), uri, 7)
+    const provenance = currentProvenance(document.buffer, uri, 7)
     const phases: WorkspaceEditServicePhase[] = []
-    harness.service.subscribe(() => phases.push(harness.service.getSnapshot().phase))
+    const captures: unknown[] = []
+    harness.service.subscribe(() => {
+      const state = harness.service.getSnapshot()
+      phases.push(state.phase)
+      if (state.phase !== 'committing') return
+      const row = state.preview?.rows[0]
+      const read = row?.comparison
+      if (read?.kind !== 'ready' || read.input.kind !== 'operation') return
+      captures.push({
+        old: read.input.old.materializeFullText(),
+        new: read.input.new.materializeFullText(),
+        exactBefore: read.input.old.snapshot === read.input.segment.snapshotBefore,
+        exactAfter: read.input.new.snapshot === read.input.segment.snapshotAfter,
+        exactFile: row?.file === read.input.display,
+        admitted: [...harness.store.getState().snapshotComparisons.values()].includes(read),
+      })
+    })
 
     const result = await harness.service.onApplyWorkspaceEdit(
       request([textOperation(uri, 7, 0, 1, 'A')], {
@@ -218,6 +236,17 @@ test.describe('WorkspaceEditService', () => {
     )
 
     expect(result).toEqual({ status: 'applied' })
+    expect(captures).toEqual([
+      {
+        old: 'alpha',
+        new: 'Alpha',
+        exactBefore: true,
+        exactAfter: true,
+        exactFile: true,
+        admitted: true,
+      },
+    ])
+    expect(harness.store.getState().snapshotComparisons.size).toBe(0)
     expect(document.buffer.materializeFullText()).toBe('Alpha')
     expect(document.buffer.canUndo()).toBe(true)
     expect(harness.service.getSnapshot()).toMatchObject({
@@ -254,7 +283,7 @@ test.describe('WorkspaceEditService', () => {
     const activeUri = fileUri(active.target)
     const secondaryUri = fileUri(secondary.target)
     const unopenedUri = fileUri('/repo/unopened.ts')
-    const provenance = currentProvenance(active.buffer.getTextSnapshot(), activeUri, 4)
+    const provenance = currentProvenance(active.buffer, activeUri, 4)
 
     const pending = harness.service.onApplyWorkspaceEdit(
       request(
@@ -270,23 +299,29 @@ test.describe('WorkspaceEditService', () => {
 
     expect(harness.service.getSnapshot().preview?.rows).toMatchObject([
       {
-        afterText: 'Active!',
-        beforeText: 'active!',
         path: '/repo/active.ts',
         targetKind: 'dirty',
       },
       {
-        afterText: 'Secondary',
-        beforeText: 'secondary',
         path: '/repo/secondary.ts',
         targetKind: 'open',
       },
       {
-        afterText: 'Unopened',
-        beforeText: 'unopened',
         path: '/repo/unopened.ts',
         targetKind: 'unopened',
       },
+    ])
+    expect(
+      harness.service.getSnapshot().preview?.rows.map((row) => {
+        const read = row.comparison
+        return read?.kind === 'ready' && read.input.kind === 'operation'
+          ? [read.input.old.materializeFullText(), read.input.new.materializeFullText()]
+          : null
+      }),
+    ).toEqual([
+      ['active!', 'Active!'],
+      ['secondary', 'Secondary'],
+      ['unopened', 'Unopened'],
     ])
     expect(harness.service.getSnapshot()).toMatchObject({ canCancel: true })
 
@@ -309,7 +344,7 @@ test.describe('WorkspaceEditService', () => {
     const document = addLiveDocument(harness, '/repo/dirty.ts', 'dirty')
     createEditorBufferSession(document.buffer).applyText('!')
     const uri = fileUri(document.target)
-    const provenance = currentProvenance(document.buffer.getTextSnapshot(), uri, 11)
+    const provenance = currentProvenance(document.buffer, uri, 11)
 
     const result = await harness.service.onApplyWorkspaceEdit(
       request([textOperation(uri, null, 0, 1, 'D')], {
@@ -332,9 +367,7 @@ test.describe('WorkspaceEditService', () => {
       const document = addLiveDocument(harness, '/repo/dirty.ts', 'dirty')
       createEditorBufferSession(document.buffer).applyText('!')
       const uri = fileUri(document.target)
-      const documents = current
-        ? []
-        : [currentProvenance(document.buffer.getTextSnapshot(), uri, 11)]
+      const documents = current ? [] : [currentProvenance(document.buffer, uri, 11)]
 
       const result = await harness.service.onApplyWorkspaceEdit(
         request([textOperation(uri, null, 0, 1, 'D')], {
@@ -423,7 +456,7 @@ test.describe('WorkspaceEditService', () => {
     addDiskFile(harness, '/repo/unopened.ts', 'unopened', 90)
     const liveUri = fileUri(live.target)
     const unopenedUri = fileUri('/repo/unopened.ts')
-    const provenance = currentProvenance(live.buffer.getTextSnapshot(), liveUri, 3)
+    const provenance = currentProvenance(live.buffer, liveUri, 3)
     const pending = harness.service.onApplyWorkspaceEdit(
       request(
         [textOperation(liveUri, null, 0, 1, 'L'), textOperation(unopenedUri, null, 0, 1, 'U')],
@@ -450,7 +483,7 @@ test.describe('WorkspaceEditService', () => {
     const second = addLiveDocument(harness, '/repo/second.ts', 'second')
     const firstUri = fileUri(first.target)
     const secondUri = fileUri(second.target)
-    const provenance = currentProvenance(first.buffer.getTextSnapshot(), firstUri, 5)
+    const provenance = currentProvenance(first.buffer, firstUri, 5)
     const pending = harness.service.onApplyWorkspaceEdit(
       request(
         [textOperation(firstUri, null, 0, 1, 'F'), textOperation(secondUri, null, 0, 1, 'S')],
@@ -489,7 +522,7 @@ test.describe('WorkspaceEditService', () => {
     const treeKey = fileSystemKeys.tree(ROOT)
     harness.queryClient.setQueryData<TreeModel>(treeKey, emptyTreeModel())
     const liveUri = fileUri(live.target)
-    const provenance = currentProvenance(live.buffer.getTextSnapshot(), liveUri, 5)
+    const provenance = currentProvenance(live.buffer, liveUri, 5)
     const pending = harness.service.onApplyWorkspaceEdit(
       request(
         [
@@ -648,7 +681,7 @@ test.describe('WorkspaceEditService', () => {
     addDiskFile(harness, '/repo/unopened.ts', 'unopened', 100)
     const liveUri = fileUri(live.target)
     const unopenedUri = fileUri('/repo/unopened.ts')
-    const provenance = currentProvenance(live.buffer.getTextSnapshot(), liveUri, 6)
+    const provenance = currentProvenance(live.buffer, liveUri, 6)
     const pending = harness.service.onApplyWorkspaceEdit(
       request(
         [textOperation(liveUri, null, 0, 1, 'L'), textOperation(unopenedUri, null, 0, 1, 'U')],
@@ -674,7 +707,7 @@ test.describe('WorkspaceEditService', () => {
     addDiskFile(harness, '/repo/unopened.ts', 'unopened', 110)
     const liveUri = fileUri(live.target)
     const unopenedUri = fileUri('/repo/unopened.ts')
-    const provenance = currentProvenance(live.buffer.getTextSnapshot(), liveUri, 8)
+    const provenance = currentProvenance(live.buffer, liveUri, 8)
     const pending = harness.service.onApplyWorkspaceEdit(
       request(
         [textOperation(liveUri, null, 0, 1, 'L'), textOperation(unopenedUri, null, 0, 1, 'U')],
@@ -829,10 +862,14 @@ test.describe('WorkspaceEditService', () => {
     const source = addLiveDocument(harness, '/repo/before.ts', 'saved')
     const events: string[] = []
     source.buffer.subscribe(() => events.push('change'))
-    harness.onUriTransition = () => events.push('uri')
+    const transitionTexts: string[] = []
+    harness.onUriTransition = () => {
+      events.push('uri')
+      transitionTexts.push(source.buffer.materializeFullText())
+    }
     const sourceUri = fileUri(source.target)
     const destinationUri = fileUri('/repo/after.ts')
-    const provenance = currentProvenance(source.buffer.getTextSnapshot(), sourceUri, 4)
+    const provenance = currentProvenance(source.buffer, sourceUri, 4)
     const pending = harness.service.onApplyWorkspaceEdit(
       request(
         [textOperation(sourceUri, null, 0, 1, 'S'), renameOperation(sourceUri, destinationUri)],
@@ -850,7 +887,7 @@ test.describe('WorkspaceEditService', () => {
       fromUri: sourceUri,
       toUri: destinationUri,
     })
-    expect(harness.uriTransitions[0]?.textSnapshot.materializeFullText()).toBe('Saved')
+    expect(transitionTexts).toEqual(['Saved'])
     expect(
       harness.store.getState().getLiveEditorDocument(testDocumentKey('/repo/after.ts'))?.buffer,
     ).toBe(source.buffer)
@@ -861,7 +898,11 @@ test.describe('WorkspaceEditService', () => {
     const source = addLiveDocument(harness, '/repo/before.ts', 'saved')
     const events: string[] = []
     source.buffer.subscribe(() => events.push('change'))
-    harness.onUriTransition = () => events.push('uri')
+    const transitionTexts: string[] = []
+    harness.onUriTransition = () => {
+      events.push('uri')
+      transitionTexts.push(source.buffer.materializeFullText())
+    }
     const sourceUri = fileUri(source.target)
     const destinationUri = fileUri('/repo/after.ts')
     const pending = harness.service.onApplyWorkspaceEdit(
@@ -879,7 +920,7 @@ test.describe('WorkspaceEditService', () => {
     await expect(pending).resolves.toEqual({ status: 'applied' })
 
     expect(events).toEqual(['uri', 'change'])
-    expect(harness.uriTransitions[0]?.textSnapshot.materializeFullText()).toBe('saved')
+    expect(transitionTexts).toEqual(['saved'])
     expect(source.buffer.materializeFullText()).toBe('Saved')
   })
 
@@ -1240,7 +1281,7 @@ test.describe('WorkspaceEditService', () => {
     const target = addLiveDocument(harness, '/repo/unknown.ts', 'target')
     const originUri = fileUri(origin.target)
     const application = request([textOperation(fileUri(target.target), null, 0, 1, 'T')], {
-      documents: [currentProvenance(origin.buffer.getTextSnapshot(), originUri, 1)],
+      documents: [currentProvenance(origin.buffer, originUri, 1)],
       originUri,
     })
 
@@ -1266,7 +1307,7 @@ test.describe('WorkspaceEditService', () => {
 
     const result = await harness.service.onApplyWorkspaceEdit(
       request([textOperation(fileUri(target.target), null, 0, 1, 'T')], {
-        documents: [currentProvenance(origin.buffer.getTextSnapshot(), originUri, 1)],
+        documents: [currentProvenance(origin.buffer, originUri, 1)],
         originUri,
       }),
     )
@@ -1283,7 +1324,7 @@ test.describe('WorkspaceEditService', () => {
     const originUri = fileUri(origin.target)
     const pending = harness.service.onApplyWorkspaceEdit(
       request([textOperation(fileUri(target.target), null, 0, 1, 'T')], {
-        documents: [currentProvenance(origin.buffer.getTextSnapshot(), originUri, 1)],
+        documents: [currentProvenance(origin.buffer, originUri, 1)],
         originUri,
       }),
     )
@@ -1309,7 +1350,7 @@ test.describe('WorkspaceEditService', () => {
     const file = addDiskFile(harness, '/repo/unknown.ts', 'target', 90)
     const originUri = fileUri(origin.target)
     const application = request([textOperation(fileUri(file.path), null, 0, 1, 'T')], {
-      documents: [currentProvenance(origin.buffer.getTextSnapshot(), originUri, 1)],
+      documents: [currentProvenance(origin.buffer, originUri, 1)],
       originUri,
     })
 
@@ -1338,8 +1379,8 @@ test.describe('WorkspaceEditService', () => {
       const unrelatedSnapshot = unrelated.buffer.getTextSnapshot()
       const application = request([textOperation(fileUri(target.target), null, 0, 1, 'T')], {
         documents: [
-          currentProvenance(originSnapshot, originUri, 1),
-          currentProvenance(unrelatedSnapshot, unrelatedUri, 2),
+          currentProvenance(origin.buffer, originUri, 1),
+          currentProvenance(unrelated.buffer, unrelatedUri, 2),
         ],
         originUri,
       })
@@ -1369,7 +1410,7 @@ test.describe('WorkspaceEditService', () => {
 })
 
 function createHarness(options: HarnessOptions = {}) {
-  const store = createEditorDocumentStore()
+  const store = createEditorDocumentStore({ environmentId: testScopedStorage.environmentId })
   const files = new Map<string, FileResult>()
   const inspections = new Map<string, WorkspaceEditPathInspection>()
   const transport = new RecordingWorkspaceMutationTransport(options)
@@ -1687,11 +1728,18 @@ function renameOperation(
 }
 
 function currentProvenance(
-  textSnapshot: WorkspaceTextDocumentProvenance['textSnapshot'],
+  buffer: EditorTextBuffer,
   uri: string,
   version: number,
 ): WorkspaceTextDocumentProvenance {
-  return { textSnapshot, uri, version }
+  const point = buffer.getDocumentSyncPoint()
+  return {
+    textSnapshot: buffer.getTextSnapshot(),
+    uri,
+    version,
+    sourceRevision: point.revision,
+    sourceSegment: point.segment,
+  }
 }
 
 async function applyTwoBufferGroup(
@@ -1703,7 +1751,7 @@ async function applyTwoBufferGroup(
   const secondUri = fileUri(second.target)
   const pending = harness.service.onApplyWorkspaceEdit(
     request([textOperation(firstUri, null, 0, 1, 'F'), textOperation(secondUri, null, 0, 1, 'S')], {
-      documents: [currentProvenance(first.buffer.getTextSnapshot(), firstUri, 10)],
+      documents: [currentProvenance(first.buffer, firstUri, 10)],
       originUri: firstUri,
     }),
   )
@@ -1721,7 +1769,7 @@ function applyImmediateEdit(
   const uri = fileUri(document.target)
   return harness.service.onApplyWorkspaceEdit(
     request([textOperation(uri, version, 0, 1, newText)], {
-      documents: [currentProvenance(document.buffer.getTextSnapshot(), uri, version)],
+      documents: [currentProvenance(document.buffer, uri, version)],
       originUri: uri,
     }),
   )

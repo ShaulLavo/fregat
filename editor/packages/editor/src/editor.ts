@@ -46,7 +46,6 @@ export type {
 export {
   observeEditorMountTiming,
   resetEditorInstanceCount,
-  setEditorSyntaxSessionFactory,
   setHighlightRegistry,
 } from './editor/runtime'
 export {
@@ -78,7 +77,6 @@ export type {
   EditorSessionOptions,
   EditorSetTextOptions,
   EditorState,
-  EditorSyntaxSessionFactory,
   EditorSyntaxStatus,
   HighlightRegistry,
 } from './editor/types'
@@ -198,6 +196,9 @@ export type { JumpCause } from './editor/jumpHistory'
 export { createEditorDocumentAnalysis } from './editor/documentAnalysis'
 export type {
   EditorDocumentAnalysis,
+  EditorDocumentContributions,
+  EditorStructuralContributionRequest,
+  EditorHighlighterContributionRequest,
   EditorAnalysisRead,
   EditorAnalysisStructuralRequest,
   EditorAnalysisHighlighterRequest,
@@ -208,3 +209,28 @@ export type {
 } from './editor/documentAnalysis'
 
 export { editorCommandMutates, editorCommandDeclaration } from './editor/commandCatalog'
+
+export type { DocumentRead, DocumentRevision } from './editor/documentDelivery'
+export type { EditorStructuralOperation, EditorHighlighterOperation } from './document/operations'
+export {
+  createEditorStructuralOperation,
+  createEditorHighlighterOperation,
+} from './editor/operationDefinitions'
+export type {
+  EditorStructuralOperationContext,
+  EditorHighlighterOperationContext,
+} from './document/operations'
+
+export type {
+  DocumentOperation,
+  DocumentOperationOptions,
+  DocumentContributionLease,
+} from './editor/contributionOperation'
+
+export type {
+  DocumentContributionAudience,
+  DocumentContributionOwner,
+  DocumentContributionDemand,
+  DocumentContributionTask,
+  DocumentContributionOutcome,
+} from './editor/contributionDemand'

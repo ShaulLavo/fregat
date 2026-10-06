@@ -9,12 +9,15 @@
 
 import { EditorTokenStore } from '@singapore-editor/core/syntax'
 import {
-  type DocumentSessionChange,
+  createEditorTextBuffer,
+  createEditorBufferSession,
   type SelectionAffinity,
   type TextEdit,
   type TextReadSnapshot,
 } from '@singapore-editor/core/document'
 import type { EditorAnyCommandId } from '@singapore-editor/core/editor'
+import type { EditorDocumentContributions } from '@singapore-editor/core/editor'
+import { acquireEditorDocumentAnalysis } from '@singapore-editor/core/internal/document-worker'
 import type {
   EditorCommandHandler,
   EditorEditContributionContext,
@@ -27,7 +30,7 @@ import type {
 } from '@singapore-editor/core/extensions'
 import { createHoverPlugin } from '@singapore-editor/plugin-ui'
 import type { LspManagedTransport, LspTransportHandler } from '@singapore-editor/lsp'
-import { vi } from 'vitest'
+import { afterEach, vi } from 'vitest'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 import { createLanguageServerAdapterPlugin } from '../src/plugin'
@@ -53,6 +56,11 @@ import {
 type JsonMessage = Record<string, unknown>
 
 export const COMPLETION_ACCEPT_TIMING_NAME = 'testLsp.completion.accept'
+const ownedEditors = new Set<() => void>()
+afterEach(() => {
+  for (const dispose of ownedEditors) dispose()
+  ownedEditors.clear()
+})
 
 /** What `documentId` below resolves to once the plugin has turned the path into a document uri. */
 export const DOCUMENT_URI = 'file:///src/index.ts'
@@ -91,6 +99,7 @@ export type ConnectedEditor = {
   readonly focusEditor: ReturnType<typeof vi.fn>
   dispose(): void
   type(character: string): void
+  typeClosedPair(open: string, close: string): void
   backspace(): void
   moveCaret(offset: number): void
   selectRange(start: number, end: number): void
@@ -118,6 +127,7 @@ export type ConnectedEditor = {
   publishDiagnostics(diagnostics: readonly lsp.Diagnostic[], version?: number): void
   runCommand(commandId: EditorAnyCommandId): boolean
   completionElement(): HTMLElement
+  completionAnchorElement(): HTMLElement
   completionLabels(): readonly string[]
   focusedCompletionLabel(): string | null
   completionRequests(): readonly lsp.CompletionParams[]
@@ -171,6 +181,20 @@ export async function connectedEditor(
   const focusEditor = vi.fn()
   const features = new Map<unknown, unknown>()
   const element = document.createElement('div')
+  let buffer = createEditorTextBuffer(text)
+  let bufferView = createEditorBufferSession(buffer)
+  let owner = acquireEditorDocumentAnalysis({ buffer, documentId: 'src/index.ts' })
+  let connected = false
+  const editorSnapshot = (...args: Parameters<typeof displaySnapshot>): EditorViewSnapshot => {
+    const captured = buffer
+    return {
+      ...displaySnapshot(...args),
+      textSnapshot: captured.getTextSnapshot(),
+      documentSyncPoint: captured.getDocumentSyncPoint(),
+      changesSinceDocumentSyncPoint: (point, scope) =>
+        captured.changesSinceDocumentSyncPoint(point, scope),
+    }
+  }
   let snapshot = editorSnapshot(text, caretOffset, 1, options.affinity ?? 'after')
   let pointerOffset = 0
   let anchorRect = new DOMRect(10, 20, 40, 18)
@@ -188,6 +212,9 @@ export async function connectedEditor(
     options,
     snippetSessions,
     workspaceEditRequests,
+    () => {
+      connected = true
+    },
   )
   // The editor reports the keystroke separately from the edit it caused, because auto-closing and
   // typing over a closer both make the edit a poor stand-in for it.
@@ -198,6 +225,7 @@ export async function connectedEditor(
     registerKeymapContextKey: keymap.registerKeymapContextKey,
     registerKeymapNode: keymap.registerKeymapNode,
     getSnapshot: () => snapshot,
+    getDocumentContributions: () => owner.analysis.contributions,
     getPointerOffset: () => pointerOffset,
     getRangeClientRect: () => anchorRect,
     getFeature: (token) => features.get(token) ?? null,
@@ -243,15 +271,14 @@ export async function connectedEditor(
       },
     },
   })
-  await flushPromises()
+  await vi.waitUntil(() => connected, { interval: 1, timeout: 1000 })
 
   const awaitRequest = async (method: string, count = 1): Promise<void> => {
-    for (let turn = 0; turn < 100; turn++) {
-      if (transport.sent.map(jsonMessage).filter((sent) => sent.method === method).length >= count)
-        return
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    }
-    throw new Error(`no ${method} request after waiting`)
+    await vi.waitUntil(
+      () =>
+        transport.sent.map(jsonMessage).filter((sent) => sent.method === method).length >= count,
+      { interval: 1, timeout: 1000 },
+    )
   }
 
   const answer = (method: string, result: unknown): void => {
@@ -266,6 +293,7 @@ export async function connectedEditor(
   }
 
   const applyChange = (edit: TextEdit, caretOffset: number): void => {
+    const change = bufferView.applyEdits([edit])
     const next = `${viewText(snapshot).slice(0, edit.from)}${edit.text}${viewText(snapshot).slice(edit.to)}`
     snapshot = editorSnapshot(
       next,
@@ -273,20 +301,28 @@ export async function connectedEditor(
       snapshot.textVersion + 1,
       caretAffinityOf(snapshot),
     )
-    contribution.update(snapshot, 'content', documentChange([edit]))
+    contribution.update(snapshot, 'content', change)
   }
+  const dispose = () => {
+    contribution.dispose()
+    keymap.dispose()
+    owner.dispose()
+    ownedEditors.delete(dispose)
+  }
+  ownedEditors.add(dispose)
 
   return {
     applyEdits,
     focusEditor,
-    dispose: () => {
-      contribution.dispose()
-      keymap.dispose()
-    },
+    dispose,
     type: (character) => {
       const at = caretOffsetOf(snapshot)
       applyChange({ from: at, to: at, text: character }, at + character.length)
-      for (const listener of [...typedTextListeners]) listener(character)
+      for (const listener of typedTextListeners) listener(character)
+    },
+    typeClosedPair: (open, close) => {
+      const at = caretOffsetOf(snapshot)
+      applyChange({ from: at, to: at, text: open + close }, at + open.length)
     },
     backspace: () => {
       const at = caretOffsetOf(snapshot)
@@ -345,8 +381,13 @@ export async function connectedEditor(
     releaseNavigationModifier: () =>
       document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta' })),
     replaceText: (text) => {
+      const previous = owner
+      buffer = createEditorTextBuffer(text)
+      bufferView = createEditorBufferSession(buffer)
+      owner = acquireEditorDocumentAnalysis({ buffer, documentId: 'src/index.ts' })
       snapshot = editorSnapshot(text, 0, snapshot.textVersion + 1, caretAffinityOf(snapshot))
       contribution.update(snapshot, 'document', null)
+      previous.dispose()
     },
     answerCompletion: (items, isIncomplete = false) =>
       answer('textDocument/completion', { isIncomplete, items }),
@@ -373,6 +414,11 @@ export async function connectedEditor(
       const widget = document.querySelector<HTMLElement>('.editor-test-lsp-completion')
       if (!widget) throw new Error('missing completion widget')
       return widget
+    },
+    completionAnchorElement: () => {
+      const anchor = document.querySelector<HTMLElement>('.editor-test-lsp-completion-anchor')
+      if (!anchor) throw new Error('missing completion anchor')
+      return anchor
     },
     completionLabels: () =>
       Array.from(
@@ -432,6 +478,7 @@ function activateProvider(
   options: ConnectedEditorOptions,
   snippetSessions: (readonly SnippetStopRange[])[],
   workspaceEditRequests: ApplyWorkspaceEditRequest[],
+  connected: () => void,
 ): EditorViewContributionProvider {
   let provider: EditorViewContributionProvider | null = null
   const disposable = { dispose: () => undefined }
@@ -451,6 +498,7 @@ function activateProvider(
     onRequestRenameName: options.onRequestRenameName,
     onDefinitionLinkHover: options.onDefinitionLinkHover,
     onConnectionCreated: options.onConnectionCreated,
+    onConnected: connected,
     onRequestError: (_serverId, _method, error) => errors.push(error),
   }).activate(
     createTestPluginContext({
@@ -546,6 +594,7 @@ function providerRegistry(): Pick<
 function viewContributionContext(options: {
   element: HTMLDivElement
   getSnapshot(): EditorViewSnapshot
+  getDocumentContributions(): EditorDocumentContributions
   getPointerOffset(): number
   getRangeClientRect(): DOMRect
   getFeature(token: unknown): unknown
@@ -564,6 +613,7 @@ function viewContributionContext(options: {
     contentElement: options.element,
     highlightPrefix: 'editor-test',
     getSnapshot: options.getSnapshot,
+    getDocumentContributions: options.getDocumentContributions,
     getFeature: options.getFeature as EditorViewContributionContext['getFeature'],
     focusEditor: options.focusEditor,
     textOffsetFromPoint: () => options.getPointerOffset(),
@@ -571,7 +621,7 @@ function viewContributionContext(options: {
   })
 }
 
-function editorSnapshot(
+function displaySnapshot(
   fullText: string,
   caretOffset: number,
   textVersion: number,
@@ -637,10 +687,6 @@ function caretOffsetOf(snapshot: EditorViewSnapshot): number {
 
 function caretAffinityOf(snapshot: EditorViewSnapshot): SelectionAffinity {
   return snapshot.selections[0]!.affinity
-}
-
-function documentChange(edits: readonly TextEdit[]): DocumentSessionChange {
-  return { kind: 'edit', edits } as unknown as DocumentSessionChange
 }
 
 function jsonMessage(item: unknown): JsonMessage {

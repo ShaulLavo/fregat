@@ -4,7 +4,8 @@ import {
   type PieceTableSnapshot,
 } from '@singapore-editor/textbuffer'
 
-import { createDocumentTextSnapshot, type DocumentTextSnapshot } from '../documentTextSnapshot'
+import type { DocumentTextSnapshot } from '../documentTextSnapshot'
+import { createEditorSnapshotBuffer, type EditorTextBuffer } from '../documentSession'
 import type { EditorToken } from '../tokens'
 import { toEditorTokenStore, type EditorTokenInput } from './tokenStore'
 
@@ -13,6 +14,7 @@ import { toEditorTokenStore, type EditorTokenInput } from './tokenStore'
 export type SnippetLines = 'as-submitted' | 'as-document'
 
 export type SnippetDocument = {
+  readonly buffer: EditorTextBuffer
   readonly snapshot: PieceTableSnapshot
   readonly textSnapshot: DocumentTextSnapshot
   /** A session's tokens over this document, as offsets into exactly the submitted text. */
@@ -40,9 +42,11 @@ function snippetDocument(
   removed: readonly number[],
 ): SnippetDocument {
   const snapshot = createPieceTableSnapshot(text, options)
+  const buffer = createEditorSnapshotBuffer(snapshot)
   return {
-    snapshot,
-    textSnapshot: createDocumentTextSnapshot(snapshot, text),
+    buffer,
+    snapshot: buffer.getSnapshot(),
+    textSnapshot: buffer.getTextSnapshot(),
     submittedTokens: (tokens) => toSubmitted(toEditorTokenStore(tokens).toTokens(), removed),
   }
 }

@@ -1,15 +1,12 @@
+import { createSyntaxPlugin } from './factories/syntaxRuntime'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { createBracketMatchPlugin } from '../src/bracketMatchPlugin'
 import { Editor } from '../src/editor/Editor'
-import {
-  resetEditorInstanceCount,
-  setEditorSyntaxSessionFactory,
-  setHighlightRegistry,
-} from '../src/public/testing'
+import { resetEditorInstanceCount, setHighlightRegistry } from '../src/public/testing'
 import type { EditorPlugin, EditorViewSnapshot } from '../src/plugins'
 import { createEmptySyntaxResult } from '../src/syntax/session'
-import type { BracketInfo, EditorSyntaxResult, EditorSyntaxSession } from '../src/syntax/session'
+import type { BracketInfo, EditorSyntaxResult, EditorSyntaxRuntime } from '../src/syntax/session'
 
 /**
  * Proves the whole path the unit tests stop short of: a structural parse carrying brackets reaches
@@ -45,11 +42,14 @@ describe('bracket match plugin inside a real editor', () => {
     globalThis.Highlight = MockHighlight
     setHighlightRegistry(mockRegistry)
     resetEditorInstanceCount()
-    setEditorSyntaxSessionFactory(() => bracketSyntaxSession())
+    const syntaxPlugin = createSyntaxPlugin(() => bracketSyntaxSession())
     container = document.createElement('div')
     document.body.appendChild(container)
     editor = new Editor(container, {
-      plugins: [createBracketMatchPlugin(), snapshotProbePlugin((s) => seenSnapshots.push(s))],
+      plugins: [
+        syntaxPlugin,
+        ...[createBracketMatchPlugin(), snapshotProbePlugin((s) => seenSnapshots.push(s))],
+      ],
     })
   })
 
@@ -57,7 +57,6 @@ describe('bracket match plugin inside a real editor', () => {
     editor.dispose()
     container.remove()
     setHighlightRegistry(undefined)
-    setEditorSyntaxSessionFactory(undefined)
   })
 
   // The parse lands after openDocument resolves, so the brackets show up on the next update the
@@ -128,16 +127,15 @@ function bracketHighlightNames(): readonly string[] {
   return [...highlightsMap.keys()].filter((name) => name.includes('bracket-match'))
 }
 
-function bracketSyntaxSession(): EditorSyntaxSession {
+function bracketSyntaxSession(): EditorSyntaxRuntime {
   const result: EditorSyntaxResult = { ...createEmptySyntaxResult(), brackets: BRACKETS }
   return {
-    applyChange: async () => result,
     dispose: () => undefined,
     getResult: () => result,
     foldingSupport: 'supported',
     getSnapshotVersion: () => 0,
     getTokens: () => [],
-    refresh: async () => result,
+    analyze: async () => result,
   }
 }
 

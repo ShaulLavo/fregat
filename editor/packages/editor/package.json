@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/core",
-  "version": "0.2.3",
+  "version": "0.2.6",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ShaulLavo/fregat.git",
@@ -17,6 +17,11 @@
     "./dist/style.css"
   ],
   "exports": {
+    "./internal/document-worker": {
+      "types": "./dist/document/workerReader.d.ts",
+      "import": "./dist/document/workerReader.js",
+      "default": "./dist/document/workerReader.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",

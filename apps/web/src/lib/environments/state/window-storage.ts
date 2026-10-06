@@ -1,8 +1,8 @@
 import type { EnvironmentId } from '@workspace/contracts'
-import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
+import { environmentStorageKey, type ScopedStorage } from '@/lib/environments/state/scoped-storage'
 
 export function environmentWindowStorage(environmentId: EnvironmentId): ScopedStorage {
-  const prefix = `env:${environmentId}|`
+  const prefix = environmentStorageKey(environmentId, '')
   return {
     environmentId,
     getItem(key) {

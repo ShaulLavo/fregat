@@ -18,6 +18,7 @@ import '@singapore-editor/find/style.css'
 import { createInputLatencyProbe } from './inputLatency.ts'
 import { createInputConsumers, inputConsumersForFixture } from './inputConsumers.ts'
 import { readInputOutput } from './input-output.ts'
+import { createInputSourceIdentity } from '../input-worker-proof.mjs'
 import { fixtureFacts, generateFixture, normalizedText, type FixtureId } from './fixtures.ts'
 
 type Diagnostic = {
@@ -40,6 +41,7 @@ type Active = {
   readonly editors: readonly Editor[]
   readonly inputAbort: AbortController
   readonly consumers: ReturnType<typeof createInputConsumers> | null
+  readonly sourceIdentity: ReturnType<typeof createInputSourceIdentity>
 }
 
 declare global {
@@ -129,7 +131,7 @@ function resetInput() {
   for (const [index, editor] of editors.entries()) {
     const host = document.querySelector<HTMLElement>(`#view-${index}`)!
     host.hidden = index === 2
-    if (index !== 2) host.style.display = 'flex'
+    host.style.display = index === 2 ? 'none' : 'flex'
     editor.setSelection(0, 0, { reveal: true })
   }
   paints = []
@@ -159,11 +161,20 @@ function createHost(index: number): HTMLElement {
 function open(multiple: boolean, highlight: boolean, consumerId?: string) {
   start = performance.now()
   const buffer = createEditorTextBuffer(source)
+  const sourceIdentity = createInputSourceIdentity(buffer.getDocumentSyncPoint())
   const analysis = createEditorDocumentAnalysis({ buffer, documentId: fixture })
   const editors: Editor[] = []
   const inputAbort = new AbortController()
   const consumers = consumerId ? createInputConsumers(consumerId, fixture, source.length) : null
-  active = { buffer, analysis, editors, inputAbort, consumers, ownerIdentity: crypto.randomUUID() }
+  active = {
+    buffer,
+    analysis,
+    editors,
+    inputAbort,
+    consumers,
+    sourceIdentity,
+    ownerIdentity: crypto.randomUUID(),
+  }
   for (let index = 0; index < (multiple ? 3 : 1); index++)
     editors.push(createInputEditor(index, highlight))
   editors[0]!
@@ -203,7 +214,14 @@ async function reloadInputDocument(multiple = current().editors.length === 3) {
   const analysis = createEditorDocumentAnalysis({ buffer, documentId: fixture })
   const editors = [...previous.editors]
   check(editors.length <= (multiple ? 3 : 1), 'Warm view count must grow once')
-  active = { ...previous, buffer, analysis, editors, consumers }
+  active = {
+    ...previous,
+    buffer,
+    analysis,
+    editors,
+    consumers,
+    sourceIdentity: createInputSourceIdentity(buffer.getDocumentSyncPoint()),
+  }
   for (const editor of editors) {
     if (consumers && consumers !== previous.consumers) editor.setPlugins(consumers.plugins)
     if (!consumers)
@@ -415,10 +433,15 @@ async function dispose() {
 }
 
 async function settleConsumers() {
-  const { consumers, editors, buffer } = current()
+  const { consumers, editors, buffer, sourceIdentity } = current()
   if (!consumers) return null
   const readiness = await consumers.settle(editors)
-  return readInputOutput(readiness, buffer.materializeFullText())
+  return readInputOutput(
+    readiness,
+    buffer.materializeFullText(),
+    buffer.getDocumentSyncPoint(),
+    sourceIdentity,
+  )
 }
 
 function retention() {

@@ -1,12 +1,24 @@
 import { chromium, firefox, webkit } from 'playwright'
 import { statSync } from 'node:fs'
 import { basename, relative, resolve, sep } from 'node:path'
-import {
-  WORKSPACE_CACHE_STORAGE_KEYS,
-  workspaceSliceStorageKey,
-} from '../src/features/workspace/state/cache.ts'
+import { WORKSPACE_CACHE_STORAGE_KEYS } from '../src/lib/workspace-cache-keys.ts'
+import { workspaceSliceStorageKey } from '../src/features/workspace/utils/cache-keys.ts'
 import { createDefaultWorkbenchLayout } from '../src/features/workbench/utils/layout.ts'
-import { createDefaultWorkbenchPanels } from '../src/features/workbench/utils/panels.ts'
+import {
+  createDefaultWorkbenchPanels,
+  openEditorContentInWorkbenchPanels,
+} from '../src/features/workbench/utils/panels.ts'
+import {
+  filesystemPath,
+  fileDocument,
+  fileResource,
+  workspaceRoot,
+} from '../src/lib/documents/utils/identity.ts'
+import { documentTab } from '../src/lib/documents/utils/tabs.ts'
+import { encodeTabContent } from '../src/lib/documents/utils/storage-codec.ts'
+import { environmentStorageKey } from '../src/lib/environments/state/scoped-storage.ts'
+import { environmentIdSchema, workspaceAddressSchema } from '@workspace/contracts'
+import { parse } from 'valibot'
 import { createBenchmarkError } from './structured-errors.mjs'
 
 export const browserTypes = { chromium, firefox, webkit }
@@ -93,9 +105,18 @@ export async function createWorkspaceContext({ appUrl, serverUrl, workspaceRoot,
   const rootPath = clientPathForAbsolutePath(absoluteRootPath, health.workspaceRoot)
   const clientFilePath = clientPathForAbsolutePath(absoluteFilePath, health.workspaceRoot)
   const rootStat = statSync(absoluteRootPath)
+  const addressResponse = await fetch(new URL('/fs/workspace-address', serverUrl), {
+    method: 'POST',
+    headers: { Origin: new URL(appUrl).origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: rootPath }),
+  })
+  if (!addressResponse.ok)
+    throw createBenchmarkError(`Workspace address registration failed: ${addressResponse.status}`)
+  const address = parse(workspaceAddressSchema, await addressResponse.json())
 
   return {
     absoluteRootPath,
+    environmentId: parse(environmentIdSchema, health.environmentId),
     filePath: clientFilePath,
     rootFolder: {
       birthtimeMs: rootStat.birthtimeMs,
@@ -105,6 +126,7 @@ export async function createWorkspaceContext({ appUrl, serverUrl, workspaceRoot,
       size: rootStat.size,
       type: 'directory',
       version: '',
+      workspaceAddress: address,
     },
   }
 }
@@ -137,26 +159,46 @@ export async function seedWorkspaceCache(context, workspace) {
   }, workspaceCacheEntries(workspace))
 }
 
-export function workspaceCacheEntries(workspace) {
+export function workspaceCacheEntries(workspace, { inert = false } = {}) {
   const rootPath = workspace.rootFolder.path
+  const root = workspaceRoot(rootPath)
+  const content = documentTab(
+    inert
+      ? { kind: 'search', root }
+      : fileDocument(fileResource(filesystemPath(workspace.filePath))),
+  )
+  const stored = encodeTabContent(content, root)
+  if (!stored) throw createBenchmarkError('Benchmark file must belong to its workspace root')
+  const location = { kind: 'folder', rootPath }
+  const scopedKey = (key) => environmentStorageKey(workspace.environmentId, key)
   return {
-    [WORKSPACE_CACHE_STORAGE_KEYS.rootFolder]: workspace.rootFolder,
+    [scopedKey(WORKSPACE_CACHE_STORAGE_KEYS.rootFolder)]: {
+      folder: workspace.rootFolder,
+      location,
+    },
     [WORKSPACE_CACHE_STORAGE_KEYS.workbenchLayout]: createDefaultWorkbenchLayout(),
-    [WORKSPACE_CACHE_STORAGE_KEYS.workspaceIndex]: [rootPath],
-    [workspaceSliceStorageKey(rootPath)]: {
-      editorHistory: [workspace.filePath],
-      recentlyClosedEditorPaths: [],
-      scrollPositionByPath: {},
-      workbenchPanels: workbenchPanelsEntry(workspace),
+    [scopedKey(WORKSPACE_CACHE_STORAGE_KEYS.workspaceIndex)]: [location],
+    [scopedKey(workspaceSliceStorageKey(rootPath))]: {
+      editorHistory: [stored],
+      recentlyClosedTabs: [],
+      reopenScrollPositions: [],
+      viewScrollPositions: [],
+      workbenchPanels: workbenchPanelsEntry(content, stored),
     },
   }
 }
 
-function workbenchPanelsEntry(workspace) {
+function workbenchPanelsEntry(content, stored) {
+  const panels = openEditorContentInWorkbenchPanels(createDefaultWorkbenchPanels(), content)
+  const group = panels.editorGroups.root
+  if (group.kind !== 'group') throw createBenchmarkError('Benchmark seed requires one editor group')
   return {
-    ...createDefaultWorkbenchPanels(),
-    activeEditorTabId: 'tab-bench',
-    editorTabs: [{ id: 'tab-bench', path: workspace.filePath }],
+    ...panels,
+    editorGroups: {
+      ...panels.editorGroups,
+      root: { ...group, tabs: group.tabs.map((tab) => ({ id: tab.id, content: stored })) },
+    },
+    terminalTabs: panels.terminalTabs.map(({ id, name, title }) => ({ id, name, title })),
   }
 }
 
