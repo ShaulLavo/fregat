@@ -63,15 +63,12 @@ test('a genuine external spawn Error retains identity and always restores the bo
   Bun.spawnSync = tap
   let caught: unknown
   try {
-    observeNativeBuild(() => Bun.spawnSync([path.join(io.root, 'absent')]), io.sink)
-  } catch (error) {
-    caught = error
-  } finally {
+    try {
+      observeNativeBuild(() => Bun.spawnSync([path.join(io.root, 'absent')]), io.sink)
+    } catch (error) {
+      caught = error
+    }
     expect(Bun.spawnSync).toBe(tap)
-    Bun.spawnSync = original
-    closeSync(io.fd)
-  }
-  try {
     expect(primary).toBeDefined()
     expect(caught).toBe(primary)
     const text = readFileSync(io.file, 'utf8')
@@ -80,6 +77,8 @@ test('a genuine external spawn Error retains identity and always restores the bo
     expect(text).not.toContain('absent')
     expect(text).not.toContain(io.root)
   } finally {
+    Bun.spawnSync = original
+    closeSync(io.fd)
     rmSync(io.root, { recursive: true, force: true })
   }
 })
