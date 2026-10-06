@@ -1,5 +1,6 @@
 import { open, writeFile } from 'node:fs/promises'
-import { createWriteStream } from 'node:fs'
+import { fstatSync } from 'node:fs'
+import { Socket } from 'node:net'
 import { constants } from 'node:os'
 import { isAbsolute, join, relative } from 'node:path'
 import { inspect } from 'node:util'
@@ -800,8 +801,42 @@ export const retentionEntryBudget = {
 } as const
 let receiptWriter: ReturnType<typeof createRetentionEntryWriter> | undefined
 
+function writeBunEntryOutput(
+  target: ReturnType<typeof Bun.file>,
+  encoded: Buffer,
+  completed: (error?: unknown) => void,
+) {
+  void Bun.write(target, encoded).then((written) => {
+    if (written !== encoded.byteLength) {
+      completed({ code: 'EIO' })
+      return
+    }
+    completed()
+  }, completed)
+}
+
+function createRetentionEntryOutput(failed: (error: unknown) => void) {
+  const fd = typeof Bun === 'undefined' ? process.stdout.fd : 1
+  const descriptor = fstatSync(fd)
+  const socket = descriptor.isSocket()
+  const fifo = descriptor.isFIFO()
+  if ((!socket && !fifo) || (typeof Bun === 'undefined' && process.platform === 'win32'))
+    throw createScriptError('Receipt output descriptor is unavailable', {
+      internal: { socket, fifo, platform: process.platform },
+    })
+  if (typeof Bun !== 'undefined') {
+    const target = Bun.file(fd)
+    return (encoded: Buffer, completed: (error?: unknown) => void) =>
+      writeBunEntryOutput(target, encoded, completed)
+  }
+  const output = new Socket({ fd, readable: false, writable: true, allowHalfOpen: true })
+  output.on('error', failed)
+  return (encoded: Buffer, completed: (error?: unknown) => void) => {
+    output.write(encoded, completed)
+  }
+}
+
 function createRetentionEntryWriter() {
-  const output = createWriteStream('', { fd: 1, autoClose: false })
   const queue: PendingEntryFact[] = []
   const droppedByKind = { ...factDropCounts }
   const refusedByReason = { 'input-schema': 0, 'record-bytes': 0, 'tap-path': 0 }
@@ -864,7 +899,7 @@ function createRetentionEntryWriter() {
     queue.length = 0
     state = { kind: 'unavailable', code }
   }
-  output.on('error', failed)
+  const output = createRetentionEntryOutput(failed)
   const encode = (facts: readonly PendingEntryFact[]): Encoding => {
     const time = retentionEntryReceiptTime()
     const base = {
@@ -923,12 +958,12 @@ function createRetentionEntryWriter() {
     dirty = false
     state = { kind: 'writing', flight: selected }
     try {
-      output.write(selected.encoded, completed)
+      output(selected.encoded, completed)
     } catch (error) {
       failed(error)
     }
   }
-  const completed = (error?: Error | null) => {
+  const completed = (error?: unknown) => {
     if (error) {
       failed(error)
       return

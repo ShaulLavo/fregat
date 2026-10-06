@@ -3,11 +3,12 @@ import { server as requestInterceptor } from '../msw/server'
 import { request as playwrightRequest } from 'playwright'
 import { createServer } from 'node:http'
 import { EventEmitter, once } from 'node:events'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-import { mkdtemp, readFile, rm, mkdir, readdir } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, mkdir, readdir, open } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, join } from 'node:path'
 import { test, expect } from '../fixtures'
 import { createScriptError } from '../../../../scripts/structured-errors'
 import {
@@ -31,6 +32,24 @@ import {
   failRetentionEntryCase,
   endRetentionEntryCase,
 } from './retention-acceptance-reload-transport'
+
+function controlRuntime(runtime: string) {
+  const name = process.platform === 'win32' ? runtime + '.exe' : runtime
+  const candidates = [
+    process.execPath,
+    ...(process.env.PATH ?? '').split(delimiter).map((directory) => join(directory, name)),
+  ]
+  for (const candidate of candidates) {
+    if (!existsSync(candidate)) continue
+    const result = spawnSync(
+      candidate,
+      ['--eval', 'process.stdout.write(process.versions.bun ? "bun" : "node")'],
+      { encoding: 'utf8' },
+    )
+    if (result.status === 0 && result.stdout === runtime) return candidate
+  }
+  return null
+}
 
 test('caller cancellation alone leaves an old pending forward unsettled', async () => {
   const owner = createRetentionReloadTransport()
@@ -1268,7 +1287,12 @@ test.for(
   ),
 )(
   'review F1 $runtime diagnostic writer $mode preserves primary and bounds queued metadata',
-  async ({ runtime, mode }) => {
+  async ({ runtime, mode }, { skip }) => {
+    const executable = controlRuntime(runtime)
+    if (!executable) {
+      skip(`System ${runtime} is unavailable`)
+      return
+    }
     const source = pathToFileURL(
       join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
     ).href
@@ -1283,7 +1307,7 @@ test.for(
             script,
           ]
         : ['--eval', script]
-    const child = spawn(runtime, args, {
+    const child = spawn(executable, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     const closed = once(child, 'close')
@@ -1560,6 +1584,142 @@ const wireControlCoverage = {
   code: null,
 }
 
+test.for(['partial', 'rejected'])(
+  'Bun entry output keeps incomplete %s completion unavailable',
+  async (mode, { skip }) => {
+    const executable = controlRuntime('bun')
+    if (!executable) {
+      skip('System Bun is unavailable')
+      return
+    }
+    const source = pathToFileURL(
+      join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
+    ).href
+    const script = `import {writeRetentionEntryReceipt,retentionEntryReceiptTime} from ${JSON.stringify(source)};
+const primary=(()=>{try{JSON.parse('controlled primary')}catch(error){return error}})();Object.assign(primary,{code:'EPIPE'});let calls=0;
+Bun.write=(_target,encoded)=>{calls++;return ${mode === 'partial' ? 'Promise.resolve(encoded.byteLength-1)' : 'Promise.reject(primary)'}};
+const event={...retentionEntryReceiptTime(),kind:'request',socketId:1,path:'/controlled.ts',method:'GET'};let writer;
+for(let requestId=1;requestId<=3;requestId++)writer=writeRetentionEntryReceipt({...event,requestId});await new Promise(setImmediate);writer.write({...event,requestId:4});
+let observed;try{throw primary}catch(error){observed=error}process.stderr.write(JSON.stringify({calls,identity:observed===primary,state:writer.inspect()}));`
+    const child = spawn(executable, ['--eval', script], { stdio: ['ignore', 'pipe', 'pipe'] })
+    const closed = once(child, 'close')
+    let stderr = ''
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+    })
+    const [code, signal] = await closed
+    child.stdout.destroy()
+    expect(code).toBe(0)
+    expect(signal).toBeNull()
+    expect(JSON.parse(stderr)).toMatchObject({
+      calls: 1,
+      identity: true,
+      state: {
+        unavailable: true,
+        code: mode === 'partial' ? 'EIO' : 'EPIPE',
+        pendingBytes: 0,
+        queuedRecords: 0,
+        dropped: 4,
+        refused: 0,
+        countersExact: true,
+      },
+    })
+  },
+)
+
+test.for(['node', 'bun'])(
+  'entry output preserves the primary for unsupported regular-file $0 output',
+  async (runtime, { skip }) => {
+    const executable = controlRuntime(runtime)
+    if (!executable) {
+      skip(`System ${runtime} is unavailable`)
+      return
+    }
+    const output = await mkdtemp(join(tmpdir(), 'retention-output-kind-'))
+    const path = join(output, 'output')
+    const file = await open(path, 'w')
+    try {
+      const source = pathToFileURL(
+        join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
+      ).href
+      const script = `import {writeRetentionEntryReceipt,retentionEntryReceiptTime} from ${JSON.stringify(source)};
+const primary=(()=>{try{JSON.parse('controlled primary')}catch(error){return error}})();let observed;try{throw primary}catch(error){observed=error}
+const writer=writeRetentionEntryReceipt({...retentionEntryReceiptTime(),kind:'socket-open',socketId:1,port:52865});process.stderr.write(JSON.stringify({unavailable:writer===undefined,identity:observed===primary}));`
+      const child = spawn(executable, ['--experimental-strip-types', '--eval', script], {
+        stdio: ['ignore', file.fd, 'pipe'],
+      })
+      const closed = once(child, 'close')
+      let stderr = ''
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString()
+      })
+      const [code, signal] = await closed
+      expect(code).toBe(0)
+      expect(signal).toBeNull()
+      expect(JSON.parse(stderr)).toEqual({ unavailable: true, identity: true })
+      expect(await readFile(path, 'utf8')).toBe('')
+    } finally {
+      await file.close()
+      await rm(output, { recursive: true, force: true })
+    }
+  },
+)
+
+test.for(['node', 'bun'])(
+  'parent stop terminates the pending $0 entry output',
+  async (runtime, { skip, annotate }) => {
+    const executable = controlRuntime(runtime)
+    if (!executable) {
+      skip(`System ${runtime} is unavailable`)
+      return
+    }
+    const source = pathToFileURL(
+      join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
+    ).href
+    const script = `import {writeRetentionEntryReceipt,retentionEntryReceiptTime,retentionEntryBudget} from ${JSON.stringify(source)};let writer;
+for(let requestId=1;requestId<=80;requestId++)writer=writeRetentionEntryReceipt({...retentionEntryReceiptTime(),kind:'request',requestId,socketId:1,path:'/'+'"'.repeat(1023),method:'GET'});
+for(let turn=0;turn<retentionEntryBudget.producer.factCells;turn++)await new Promise(setImmediate);
+process.stderr.write(JSON.stringify({runtime:process.versions.bun?'bun':'node',state:writer.inspect(),listeners:process.stdout.listenerCount('error')})+String.fromCharCode(10));await new Promise(()=>{});`
+    const child = spawn(executable, ['--experimental-strip-types', '--eval', script], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    const closed = once(child, 'close')
+    let stderr = ''
+    let markReady = () => {}
+    const ready = new Promise<void>((resolve) => {
+      markReady = resolve
+    })
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+      if (stderr.includes('\n')) markReady()
+    })
+    const timer = setTimeout(() => child.kill('SIGKILL'), 15000)
+    try {
+      await Promise.race([ready, closed])
+      const facts = JSON.parse(stderr)
+      expect(facts).toMatchObject({
+        runtime,
+        listeners: 0,
+        state: { unavailable: false, dropped: 16, pendingRecords: 1 },
+      })
+      expect(facts.state.pendingBytes).toBeGreaterThan(0)
+      expect(facts.state.retainedBytes).toBeLessThanOrEqual(retentionEntryBudget.producer.bytes)
+      expect(facts.state.retainedRecords).toBeLessThanOrEqual(retentionEntryBudget.producer.records)
+      expect(child.kill('SIGTERM')).toBe(true)
+      const [code, signal] = await closed
+      expect(code).toBeNull()
+      expect(signal).toBe('SIGTERM')
+      expect(child.exitCode).toBeNull()
+      expect(child.signalCode).toBe('SIGTERM')
+      await annotate(JSON.stringify({ executable, facts, code, signal }), 'writer-owned-stop')
+    } finally {
+      clearTimeout(timer)
+      child.stdout.destroy()
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+    }
+  },
+)
+
 function entryControlFrame(event: unknown, sequence = 1) {
   return {
     version: 2,
@@ -1582,7 +1742,12 @@ test.for(
   ),
 )(
   'writer v2 $runtime $mode retains FIFO facts and explicit bounded loss',
-  async ({ runtime, mode }, { annotate }) => {
+  async ({ runtime, mode }, { annotate, skip }) => {
+    const executable = controlRuntime(runtime)
+    if (!executable) {
+      skip(`System ${runtime} is unavailable`)
+      return
+    }
     const source = pathToFileURL(
       join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
     ).href
@@ -1609,7 +1774,7 @@ setTimeout(()=>{process.stderr.write(JSON.stringify({state:writer.inspect(),peak
             script,
           ]
         : ['--eval', script]
-    const child = spawn(runtime, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(executable, args, { stdio: ['ignore', 'pipe', 'pipe'] })
     const closed = once(child, 'close')
     const capture = createRetentionEntryCapture()
     const chunks: Buffer[] = []
@@ -1687,6 +1852,7 @@ setTimeout(()=>{process.stderr.write(JSON.stringify({state:writer.inspect(),peak
     await annotate(
       JSON.stringify({
         runtime,
+        executable,
         mode,
         facts,
         delivered: delivered.length,
