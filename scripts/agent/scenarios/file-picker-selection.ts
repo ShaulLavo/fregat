@@ -7,7 +7,7 @@ import { releaseFixture } from '../fixture-workspace'
 import { captureScenarioFailure } from '../scenario-failure'
 import type { Scenario } from './index'
 import type { JSHandle } from 'playwright'
-import type { FilePreviewFrame } from '../selectors'
+import type { FilePreviewFrame, filePreviewIdentityFacts } from '../selectors'
 
 export const filePickerSelection: Scenario = {
   name: 'file-picker-selection',
@@ -58,6 +58,11 @@ export const filePickerSelection: Scenario = {
       await releaseFixture(root)
     }
   },
+}
+
+export function assertPreviewIdentity(facts: ReturnType<typeof filePreviewIdentityFacts>) {
+  ok(facts, 'Actual longitudinal live references were captured')
+  for (const [name, matches] of Object.entries(facts)) strictEqual(matches, true, name)
 }
 
 export async function finishPreviewScenario(

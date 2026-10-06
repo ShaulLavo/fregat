@@ -13,6 +13,7 @@ import {
   pickerLivePreview,
   rootlessPickerPreview,
   finishPreviewScenario,
+  assertPreviewIdentity,
 } from './file-picker-selection'
 import {
   captureFilePreviewFrame,
@@ -27,11 +28,6 @@ import type { Scenario } from './index'
 
 const liveName = 'native-preview-live.txt'
 const diskName = 'native-preview-disk.txt'
-
-export function assertPreviewIdentity(facts: ReturnType<typeof filePreviewIdentityFacts>) {
-  ok(facts, 'Actual longitudinal live references were captured')
-  for (const [name, matches] of Object.entries(facts)) strictEqual(matches, true, name)
-}
 
 export const quickOpenPreview: Scenario = {
   name: 'quick-open-preview',
