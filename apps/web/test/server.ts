@@ -3,6 +3,11 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
+  cleanupObservation,
+  fixtureDirectoryAvailability,
+  observeFixtureRemoval,
+} from './env/cleanup-observation'
+import {
   closeApp,
   createApp,
   appUsageCollector,
@@ -192,13 +197,31 @@ async function cleanupTestServer(
   stateHome: string,
   database: MetadataDatabaseHandle,
 ) {
+  const observation = cleanupObservation(app)
   try {
+    observation.point('app', 'before', 'available')
     await closeApp(app)
+    observation.point('app', 'after')
   } finally {
+    observation.point('database', 'before', 'available')
     database.close()
-    await Promise.all([
+    observation.point('database', 'after')
+    observation.point('removals', 'before')
+    observation.point('workspace', 'before', fixtureDirectoryAvailability(root))
+    const removeRoot = observeFixtureRemoval(
       rm(root, { force: true, recursive: true }),
+      observation,
+      'workspace',
+      root,
+    )
+    observation.point('state-home', 'before', fixtureDirectoryAvailability(stateHome))
+    const removeStateHome = observeFixtureRemoval(
       rm(stateHome, { force: true, recursive: true }),
-    ])
+      observation,
+      'state-home',
+      stateHome,
+    )
+    await Promise.all([removeRoot, removeStateHome])
+    observation.point('removals', 'after')
   }
 }
