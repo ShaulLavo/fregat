@@ -300,7 +300,6 @@ export type {
   EditorSetSelectionOptions,
   EditorSetTextOptions,
   EditorState,
-  EditorSyntaxSessionFactory,
   EditorSyntaxStatus,
   HighlightRegistry,
 } from './editor'

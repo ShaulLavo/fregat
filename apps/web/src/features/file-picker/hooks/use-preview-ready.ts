@@ -55,7 +55,7 @@ export function usePreviewReady(
     ...imageReadyQueryOptions(previewImageUrl(serverEndpoint(origin), path)),
     enabled: kind === 'image',
   })
-  const ready = kind === 'folder' ? !folder.isPending : kind === 'image' ? !image.isPending : true
+  const ready = (kind !== 'folder' || !folder.isPending) && (kind !== 'image' || !image.isPending)
   const start = useEffectEvent((controller: AbortController) => {
     if (!entry) return
     pending.current = controller

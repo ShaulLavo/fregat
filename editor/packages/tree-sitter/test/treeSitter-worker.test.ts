@@ -1,18 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import type { Node, Query, Range as TreeSitterRange, Tree } from 'web-tree-sitter'
 
 import {
-  applyBatchToPieceTable,
-  createPieceTableSnapshot,
-  insertIntoPieceTable,
-  materializePieceTableFullText,
-} from '@singapore-editor/core/document'
-import {
-  createTreeSitterSourceDescriptor,
-  readTreeSitterInputRange,
-  resolveTreeSitterSourceDescriptor,
-  type TreeSitterSourceCache,
-} from '../src/treeSitter/source.ts'
+  DocumentWorkerReader,
+  type DocumentWorkerReadReference,
+} from '@singapore-editor/core/internal/document-worker'
+import { createTreeSitterInput, readTreeSitterInputRange } from '../src/treeSitter/source.ts'
 import { __treeSitterWorkerInternalsForTests } from '../src/treeSitter/treeSitter.worker.ts'
 
 const {
@@ -46,102 +39,23 @@ describe('tree-sitter worker internals', () => {
     ).toBe('xb\nyz')
   })
 
-  it('reads parser input from piece-table chunks without flattening', () => {
-    const snapshot = insertIntoPieceTable(createPieceTableSnapshot('a😀\n'), 4, 'tail')
-    const descriptor = createTreeSitterSourceDescriptor(snapshot)
-    const input = resolveTreeSitterSourceDescriptor(new Map(), 'doc', descriptor)
-
-    expect(input.chunks.length).toBeGreaterThan(1)
-    expect(readTreeSitterPieceTableInput(input, 0)).toBe('a😀\n')
-    expect(input.lastChunkIndex).toBe(0)
+  it('reads parser input through the ordinary bounded reader', () => {
+    const input = inputFromText('a😀\ntail')
+    expect(readTreeSitterPieceTableInput(input, 0)).toBe('a😀\ntail')
     expect(readTreeSitterPieceTableInput(input, 4)).toBe('tail')
-    expect(input.lastChunkIndex).toBe(1)
-    expect(readTreeSitterPieceTableInput(input, snapshot.length)).toBeUndefined()
+    expect(readTreeSitterPieceTableInput(input, input.length)).toBeUndefined()
+    expect(readTreeSitterInputRange(input, 1, input.length)).toBe('😀\ntail')
   })
 
   it('caps parser input reads to fit the web-tree-sitter UTF-16 callback buffer', () => {
-    const snapshot = createPieceTableSnapshot('a'.repeat(10_000))
-    const descriptor = createTreeSitterSourceDescriptor(snapshot)
-    const input = resolveTreeSitterSourceDescriptor(new Map(), 'doc', descriptor)
-
+    const input = inputFromText('a'.repeat(10_000))
     expect(readTreeSitterPieceTableInput(input, 0)).toHaveLength(4096)
     expect(readTreeSitterPieceTableInput(input, 4096)).toHaveLength(4096)
     expect(readTreeSitterPieceTableInput(input, 8192)).toHaveLength(1808)
   })
 
-  it('builds full descriptors with only unsent chunk payloads', () => {
-    const snapshot = createPieceTableSnapshot('const answer = 1;\n')
-    const first = createTreeSitterSourceDescriptor(snapshot)
-    const second = createTreeSitterSourceDescriptor(snapshot, {
-      sentChunkLengths: sentChunkLengthsOf(first),
-    })
-
-    expect(first.length).toBe(snapshot.length)
-    expect(first.pieces.map((piece) => piece.length).reduce((sum, length) => sum + length, 0)).toBe(
-      snapshot.length,
-    )
-    expect(first.chunks.length).toBeGreaterThan(0)
-    expect(second.pieces).toEqual(first.pieces)
-    expect(second.chunks).toEqual([])
-  })
-
-  it('sends only new chunks after edits while preserving current ordered spans', () => {
-    const previous = createPieceTableSnapshot('ab\ncd')
-    const first = createTreeSitterSourceDescriptor(previous)
-    const next = applyBatchToPieceTable(previous, [{ from: 3, to: 5, text: 'xyz' }])
-    const edited = createTreeSitterSourceDescriptor(next, {
-      sentChunkLengths: sentChunkLengthsOf(first),
-    })
-    const input = resolveTreeSitterSourceDescriptor(cacheWith('doc', first), 'doc', edited)
-
-    expect(edited.length).toBe(next.length)
-    expect(edited.chunks).toHaveLength(1)
-    expect(readTreeSitterInputRange(input, 0, next.length)).toBe(
-      materializePieceTableFullText(next),
-    )
-  })
-
-  it('re-sends the tail chunk grown in place by coalesced typing inserts', () => {
-    const base = insertIntoPieceTable(createPieceTableSnapshot('const answer = 1;\n'), 18, 'q')
-    const first = createTreeSitterSourceDescriptor(base)
-    const cache = cacheWith('doc', first)
-
-    // The second keystroke coalesces into the newest piece buffer: the chunk
-    // id stays the same while its text grows, so it must be sent again.
-    const next = insertIntoPieceTable(base, 19, 'w')
-    const edited = createTreeSitterSourceDescriptor(next, {
-      sentChunkLengths: sentChunkLengthsOf(first),
-    })
-    const input = resolveTreeSitterSourceDescriptor(cache, 'doc', edited)
-
-    expect(edited.chunks).toHaveLength(1)
-    expect(readTreeSitterInputRange(input, 0, next.length)).toBe(
-      materializePieceTableFullText(next),
-    )
-    // A stale worker cache reads '' past the old chunk end, which tree-sitter
-    // treats as EOF and silently truncates the parse at the edit point.
-    expect(readTreeSitterPieceTableInput(input, next.length - 1)).toBe('w')
-  })
-
-  it('reads source chunks across piece boundaries', () => {
-    const snapshot = insertIntoPieceTable(createPieceTableSnapshot('a😀\n'), 4, 'tail')
-    const input = resolveTreeSitterSourceDescriptor(
-      new Map(),
-      'strings',
-      createTreeSitterSourceDescriptor(snapshot),
-    )
-
-    expect(readTreeSitterInputRange(input, 0, snapshot.length)).toBe('a😀\ntail')
-    expect(readTreeSitterPieceTableInput(input, 1)).toBe('😀\n')
-  })
-
-  it('resolves empty descriptors', () => {
-    const snapshot = createPieceTableSnapshot('')
-    const descriptor = createTreeSitterSourceDescriptor(snapshot)
-    const input = resolveTreeSitterSourceDescriptor(new Map(), 'empty', descriptor)
-
-    expect(descriptor).toEqual({ length: 0, pieces: [], chunks: [] })
-    expect(readTreeSitterPieceTableInput(input, 0)).toBeUndefined()
+  it('reads an empty ordinary source', () => {
+    expect(readTreeSitterPieceTableInput(inputFromText(''), 0)).toBeUndefined()
   })
 
   it('tracks bracket depth while walking open and close nodes', () => {
@@ -251,23 +165,41 @@ describe('tree-sitter worker internals', () => {
   })
 })
 
-function cacheWith(
-  documentId: string,
-  descriptor: ReturnType<typeof createTreeSitterSourceDescriptor>,
-): TreeSitterSourceCache {
-  const cache: TreeSitterSourceCache = new Map()
-  resolveTreeSitterSourceDescriptor(cache, documentId, descriptor)
-  return cache
+const sourceCleanup: Array<() => void> = []
+afterEach(() => {
+  for (const dispose of sourceCleanup.splice(0)) dispose()
+})
+const messageSource: DocumentWorkerReadReference = {
+  identity: {
+    documentId: 'worker-fixture',
+    documentGeneration: 1,
+    endpointGeneration: 1,
+    registrationId: 1,
+  },
+  point: { segment: 'worker-fixture', revision: 0, textVersion: 0 },
+  readId: 'worker-fixture',
 }
-
-function sentChunkLengthsOf(
-  descriptor: ReturnType<typeof createTreeSitterSourceDescriptor>,
-): Map<string, number> {
-  const sent = new Map<string, number>()
-  for (const chunk of descriptor.chunks) {
-    sent.set(chunk.chunkId, chunk.text.length)
-  }
-  return sent
+function inputFromText(text: string) {
+  const reader = new DocumentWorkerReader()
+  const { identity, point } = messageSource
+  reader.apply({ kind: 'register', identity })
+  reader.apply({
+    kind: 'reset',
+    identity,
+    base: null,
+    target: point,
+    chunks: [text],
+    lineEnding: '\n',
+    byteOrderMark: '',
+    containsUnusualLineTerminators: false,
+  })
+  const loan = reader.acquire({ identity, point })!
+  const input = createTreeSitterInput(loan)
+  sourceCleanup.push(() => {
+    input.dispose()
+    reader.dispose()
+  })
+  return input
 }
 
 type TestNode = Node & {
@@ -405,13 +337,12 @@ class FakeTreeCursor {
 describe('parse document reuse', () => {
   type WorkerParsedDocument = Parameters<typeof replaceCachedDocument>[1]
   type WorkerParseRequest = Parameters<typeof reusableParsedDocument>[0]
-  type WorkerSource = Parameters<typeof reusableParsedDocument>[1]
 
   const fakeParsedDocument = (length: number, deleted: string[]): WorkerParsedDocument =>
     ({
       snapshotVersion: 1,
       languageId: 'typescript',
-      source: { length, chunks: [] },
+      source: inputFromText('x'.repeat(length)),
       layers: [{ tree: { delete: () => deleted.push('root') } }],
       degraded: [],
       missingLanguages: [],
@@ -427,8 +358,7 @@ describe('parse document reuse', () => {
       snapshotVersion,
     }) as unknown as WorkerParseRequest
 
-  const sourceOfLength = (length: number): WorkerSource =>
-    ({ length, chunks: [] }) as unknown as WorkerSource
+  const sourceOfLength = (length: number) => inputFromText('x'.repeat(length))
 
   it('reuses the cached document for an identical document version', async () => {
     const runtimeSessionId = 'runtime-reuse'

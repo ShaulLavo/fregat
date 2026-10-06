@@ -82,7 +82,7 @@ import {
 } from '@tanstack/react-query'
 import { useEffect, useEffectEvent } from 'react'
 import type { TreeEntry, WatchServerMessage } from '@workspace/contracts'
-import { useWorkspaceEditEventClassifier } from '@/features/editor/providers/workspace-edit-context'
+import { useWorkspaceEditEventClassifier } from '@/lib/workspace-edits/providers/host-context'
 import { planWorkspaceEditAwareEventBatch } from '@/features/workspace/utils/workspace-edit-events'
 
 export type FilesystemEvent = Extract<

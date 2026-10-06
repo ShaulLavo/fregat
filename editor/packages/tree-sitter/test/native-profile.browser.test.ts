@@ -1,5 +1,10 @@
+import { createTreeSource } from './factories/source'
+import { readAll } from '../../editor/test/factories/snapshotText'
 import { expect, it } from 'vitest'
-import { createPieceTableSnapshot } from '@singapore-editor/core/document'
+import {
+  createPieceTableSnapshot,
+  createDocumentTextSnapshot,
+} from '@singapore-editor/core/document'
 import { TYPESCRIPT_TREE_SITTER_LANGUAGE } from '../../tree-sitter-languages/src/index'
 import { resolveTreeSitterLanguageContribution } from '../src/treeSitter/registry'
 import { TreeSitterWorkerClient } from '../src/treeSitter/workerClient'
@@ -33,17 +38,26 @@ async function profileRun(run: number) {
   const documentId = 'profile.ts'
   const languageId = 'typescript'
   const samples = []
+  const source = createTreeSource(
+    backend.sourceEndpoint,
+    readAll(createDocumentTextSnapshot(snapshot)),
+  )
   try {
+    const initial = await source.prepare()
     await backend.parse({
       documentId,
       runtimeSessionId,
       languageId,
       snapshotVersion: 1,
-      snapshot,
+      source: initial.reference,
       resultMode: 'parseOnly',
     })
+    await initial.dispose()
     for (let edit = 0; edit < 20; edit += 1) {
       const edits = [{ from: 13, to: 18, text: edit % 2 ? 'value' : 'VALUE' }]
+      const previousRead = source.buffer.getTextSnapshot()
+      source.edit(edits)
+      const prepared = await source.prepare()
       const next = applyBatchToPieceTable(snapshot, edits)
       const payload = createTreeSitterEditPayload({
         documentId,
@@ -51,12 +65,13 @@ async function profileRun(run: number) {
         languageId,
         previousSnapshotVersion: edit + 1,
         snapshotVersion: edit + 2,
-        previousSnapshot: snapshot,
-        nextSnapshot: next,
+        previousRead,
+        source: prepared.reference,
         edits,
         resultMode: 'parseOnly',
       })!
       await backend.edit(payload)
+      await prepared.dispose()
       snapshot = next
       const result = await backend.queryRange({
         documentId,
@@ -74,6 +89,7 @@ async function profileRun(run: number) {
       samples.push({ run, edit, timings: result?.timings })
     }
   } finally {
+    source.dispose()
     await backend.dispose()
   }
   return samples

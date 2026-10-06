@@ -39,7 +39,7 @@ export function EditorGroup({
   const requestedTab = group.tabs.find((tab) => tab.id === group.selectedTabId) ?? null
   const { shown, pending: comparisonPending } = useShownComparisonTab(requestedTab)
   const selectedTab = group.tabs.some((tab) => tab.id === shown?.id) ? shown : requestedTab
-  const inputPending = useEditorInputPending(requestedTab?.content)
+  const inputPending = useEditorInputPending(requestedTab?.content, requestedTab?.id ?? null)
   const filePath = selectedTab ? tabFileResource(selectedTab.content)?.path : null
   const tabs = group.tabs.map((tab) =>
     editorTabModel({

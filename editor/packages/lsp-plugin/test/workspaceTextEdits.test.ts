@@ -70,7 +70,14 @@ function provenance(
   uri: string,
   version: number,
 ): WorkspaceTextDocumentProvenance {
-  return { textSnapshot: fixture.initialSnapshot, uri, version }
+  const point = fixture.buffer.getDocumentSyncPoint()
+  return {
+    textSnapshot: fixture.initialSnapshot,
+    uri,
+    version,
+    sourceRevision: point.revision,
+    sourceSegment: point.segment,
+  }
 }
 
 function prepare(
@@ -87,6 +94,7 @@ function prepare(
       buffer: fixture.buffer,
       expectedRevision,
       initialSnapshot: fixture.initialSnapshot,
+      initialSyncPoint: fixture.buffer.getDocumentSyncPoint(),
     },
   })
 }
@@ -128,6 +136,7 @@ describe('prepareWorkspaceTextReplay', () => {
         buffer: target.buffer,
         expectedRevision: target.buffer.getRevision(),
         initialSnapshot: guardedSnapshot,
+        initialSyncPoint: target.buffer.getDocumentSyncPoint(),
       },
     })
 
@@ -462,6 +471,7 @@ describe('prepareWorkspaceTextReplay', () => {
         buffer: target.buffer,
         expectedRevision: target.buffer.getRevision(),
         initialSnapshot: unrelated,
+        initialSyncPoint: target.buffer.getDocumentSyncPoint(),
       },
     })
 

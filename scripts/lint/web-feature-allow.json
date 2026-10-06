@@ -908,12 +908,6 @@
   {
     "from": "workbench",
     "to": "editor",
-    "module": "features/editor/providers/workspace-edit-context.ts",
-    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useWorkspaceEditHost."
-  },
-  {
-    "from": "workbench",
-    "to": "editor",
     "module": "features/editor/state/conflict-state.tsx",
     "reason": "owner: The workbench composes feature panes and their commands; this module supplies useEditorConflictState."
   },

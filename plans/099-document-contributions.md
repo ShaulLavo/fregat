@@ -1,8 +1,12 @@
 # Plan 099: Route document consumers through one contribution runtime
 
-Status: Approved. The owner approved units 2–7 on 2026-10-04, including benchmark repairs and
-acceptance proofs. Production unit 2 starts after accepted Plan 282 evidence and the exact host
-prerequisites below. Unit 1 publication implemented and focused proof delivered in the foundations wave,
+Status: Delivered. The owner approved units 2–7 on 2026-10-04, including benchmark repairs and
+acceptance proofs. Their implementation merged in [PR #787](https://github.com/ShaulLavo/fregat/pull/787)
+as `5670c3d799f1776a7bc995b029b29a29e2eb3b31`, after all 21 exact-head PR checks passed.
+Implementation and scoped qualification are complete. The owner's web release is installed;
+served-release verification and the read-only live UI check pass.
+Performance, source-volume, retention, and host evidence are reviewed below.
+Unit 1 publication implemented and focused proof delivered in the foundations wave,
 2026-09-30. Unit 0 is partial: 5/10 configurations calibrated; the remaining absolute-threshold matrix
 is superseded by Plan 282's paired A/B instrument. The session diff correction and
 Editor E057 transport removal landed. Retained-analysis subscribers now consume captured frames.
@@ -12,6 +16,99 @@ Requested on 2026-09-12.
 Owner: Editor and Platform. Priority P1, effort XL, change risk high.
 Inspected Platform: `2f9528ac1e147615cf81431ef8509f551af4b290`.
 Inspected Editor: `64926519bfdd39f4afcfae225019a932d3e27785`.
+
+## Delivery checkpoint, 2026-10-06
+
+Portable release `20261005T232731Z-5670c3d7-main-8af24fd4` was built from clean merged
+`5670c3d799f1776a7bc995b029b29a29e2eb3b31` and installed on the owner's instance.
+The release receipt reports that commit, zero dirty files, phase `serving` and no pending release.
+Its live check passed at `2026-10-05T23:27:44.087Z`. The web update reuses API server `9adc0219f`
+and the existing terminal host; this records the delivered web runtime without claiming those
+independent services were rebuilt.
+
+The subsequent read-only doctor reports ready, healthy, no page problems and no warning/error
+logs. The inspected `20261005T232824Z-look-platform-1440x1000/page.png` shows the ordinary
+empty-folder startup surface. This is live startup/health evidence; the CRLF, typing/Undo and
+worker/source proofs retain their separate pre-install qualification receipts.
+
+[Main CI run `37386873720`](https://github.com/ShaulLavo/fregat/actions/runs/37386873720)
+passes after an unchanged-source retry of the existing cold autofix
+test failure. No timeout or runtime source changed. The failure remains in
+[issue #840](https://github.com/ShaulLavo/fregat/issues/840). Historical unit 0, issues 818/820,
+the full-command runtime miss and unmeasured paint/allocated-memory costs keep the limits below.
+No further matrix or host capture was collected for closeout.
+
+## Execution checkpoint, 2026-10-05
+
+Units 2–5 route Tree-sitter, Shiki, minimap, local TypeScript and external LSP through retained
+document contributions. Prepared, diff, snippet and excerpt callers use that ownership. Replaced
+provider factories, generic source cursors and duplicate delivery paths are removed. Unit 7 adds
+an AST ownership check with 29 adversarial probes to the normal gates, verification and CI.
+
+Reviewed revision `38902d606` passes every CI check, including the reconciled caller fixtures, inventory, all 413 stress
+checks, real worker transport, and mounted highlighting. The app doctor, CRLF diff syntax, and
+typing/Undo scenarios pass with reviewed screenshots and an exactly restored Unicode fixture.
+
+Qualification uses untouched main `51d2a71ae` and candidate `9e773c8fa`, with equal external
+dependencies and measurement `b615d5ab` / validation `e76f680d`. Fresh input, frame, detection-floor,
+and native controls pass. The default Platform/native comparison passes all 216 blocking checks
+in 566.201 seconds within its 900-second budget, with exact raw replay and complete cleanup.
+The complete ten-configuration matrix passes all 972 required comparisons and 1,080 raw
+comparisons, with exact replay and complete cleanup. Its public command takes 2,798.161 seconds,
+98.161 seconds beyond the 2,700-second tooling target. Following the owner's October 5 cost
+concern, that runtime target is a tooling follow-up and does not block this delivery. Preserve
+the measured miss and valid comparison evidence. A full rerun requires a concrete affected-scope
+reason; runtime chasing supplies none. Loaded native/disabled passes all 216 comparisons in
+231.822 seconds with actual CPU contention and complete cleanup. A separately reviewed
+Tree-sitter/Shiki multiple-view paste experiment measures about 8.3 seconds less current-result
+readiness delay in each counterbalanced pair. Its diagnostic identity stays separate; earliest
+token application, visible-paint speed, and total-memory improvement are not established.
+
+The bounded load smoke and selected cohort are complete. Three keys near their loaded budgets
+expand the ten archived keys to thirteen keys across eleven groups. All ten repetitions finish
+in 893.648 seconds: two selected and two auxiliary native Undo verdicts reject identical
+candidate bytes on both arms. The original zero-rejection predicate remains false. Matching
+source, compiled bytes, dependencies, source/output checks, CPU affinity, and cleanup establish
+these as benchmark reliability findings, not evidence of a code-change regression. They remain
+[issue #820](https://github.com/ShaulLavo/fregat/issues/820) follow-ups and do not block this
+delivery. Preserve every flag; do not retry to obtain zero.
+Actual baseline/candidate budgets stay unchanged and passing. Broader loaded matrices and
+historical negative matrices remain Plan 282 follow-ups with no credit for uncollected results.
+App-only changes require affected app checks; they do not restart unchanged SDK qualification.
+
+The [bounded source and ownership proof](../docs/document-contributions/source-ownership-proof.md)
+passes the paired 605-check source workloads, candidate lifetime checks, separate fresh-owner
+tails, and actual public LSP serialization. It preserves the baseline's physical-restart failure
+and reports a higher candidate main-renderer heap. Complete allocated memory remains unavailable.
+Version-only delivery metadata retains the measured source, compiled bytes, export resolution,
+and external dependency closure; the original qualification identities remain unchanged.
+
+The final app revision `38902d606` passes all three 150-sample open calibrations and the derived
+open gate. Its real document-symbol caller shares the existing workspace-edit host, removing a
+duplicate TypeScript backend in the focused before/after proof. Earlier prepared-300 misses
+remain preserved. The typing check stops after recording 21 of 40 expected edit events. A
+source-neutral diagnostic proves all 40 characters and stable focus; its 5,000-event trace ring
+evicts early events that the summary then omits. Complete summary accounting is repaired while
+the ring bound, workload, and latency limits stay fixed. Three unchanged typing trials pass,
+each with 40 edits in steady and burst scenarios. Scroll timing limits pass; its 270-range cap
+rejects both the untouched baseline and candidate at exactly 354 matching current ranges, with
+no duplicated or detached ranges. The invalid count reference remains red in
+[issue #818](https://github.com/ShaulLavo/fregat/issues/818) as a tooling follow-up rather than
+a production blocker. The final `b20cf82db` shared-observer refresh passes all three calibrations,
+the derived open gate, typing, and scroll timing limits. Its 120 measured prepared-300 samples
+start no transferable work after activation. Original count-cap failures remain preserved.
+A subsequent test-only Search correction prepares its dirty starting state before mount;
+the existing delayed-preview and stale-token checks pass without changing runtime code.
+The later Search equivalence-settlement and serial browser identity-fixture integrations pass
+their focused checks. Their unchanged Editor host contracts carry the named `b20cf82db` proof;
+the earlier receipts retain their original hashes. Exact-head PR CI is green and the runtime is
+merged, installed and read-only live-verified as recorded above. The historical instrument `341`
+Undo failure, 215 of 216 passing keys, stays
+archived under its original identity and supplies no final-candidate acceptance.
+
+The sections below retain the design, unit contracts and historical decisions. The approved
+implementation is delivered. Broader Plan 282 matrices
+and unmeasured paint/memory costs remain Approved follow-ups with their own scope.
 
 The editor already has contribution registration, immutable text snapshots, and an edit chain.
 Its consumers independently manage how documents reach their workers. Replace those independent
@@ -575,13 +672,15 @@ failed its holdout; the driver stopped at `2026-10-01T04:39:01Z`, without runnin
 `shiki-minimap`, `tree-sitter-minimap`, `all` and `platform` never ran in this matrix. The owner
 ended the absolute-threshold work rather than spending approximately three more hours on it;
 the remaining matrix and planned phase sweep are superseded by **Plan 282's paired A/B instrument**.
-Unit 0 is not complete, and units 2–7 remain gated. See
+At that October 1 closeout, unit 0 was incomplete and units 2–7 remained gated. See
 [the paired method and historical reference](../docs/document-contributions/paired-input-latency.md)
 for the accepted results, archive locations, product prerequisites and limits. The original protocol below
 records what the delivered instrument was built to test; it does not schedule another matrix run.
 
 That closeout's authorization restriction is superseded by the October 4 owner decision.
-Unit 0 still needs accepted paired evidence for the declared production comparison.
+The declared production comparison now has the accepted paired evidence recorded above.
+The historical unit 0 result remains partial; later qualification does not retroactively
+complete its superseded absolute-threshold matrix.
 
 Record both revisions, dirty diffs, built exports, link resolution, package versions, browser,
 hardware, fixture hashes, viewport, and enabled contributions. Recheck current capability flags.
@@ -771,9 +870,9 @@ does not prove that a patch-backed session view uses the correct source coordina
 
 ### Measurement matrix
 
-Plan 282 implements the paired command below with frozen historical budgets. Minimap acceptance
-is temporarily excluded pending its separately owned source-correctness fix; the frozen products
-and Platform's runtime composition stay unchanged. Archived native/disabled/Tree-sitter/Shiki
+Plan 282 implements the paired command below with frozen historical budgets. Standalone minimap
+latency is excluded from this delivery's budget acceptance; source/render correctness remains
+required for all ten configurations. Its source-correctness repairs are delivered. Archived native/disabled/Tree-sitter/Shiki
 quiet and loaded receipts retain their original instrument identities. They earn no credit for
 shared-analysis/capture changes. The retained restricted quiet Platform A/A is 0/10 per selected
 key. After proving removal of superseded minimap capture retention, corrected-identity controls
@@ -823,8 +922,10 @@ worker restart, delayed consumers, and long retention/disposal runs.
    adaptive groups cannot change a key's order. Conditional stopping has no sequential coverage
    guarantee; `--fixed-repetitions` uses complete even-sized blocks of at least four pairs. The
    matrix retains 108 blocking and 36 advisory measures per configuration. The new measurement
-   identity requires fresh controls, acceptance, matrix timings and zero selected loaded A/A
-   rejects across ten runs per key; units remain gated until those results are complete.
+   identity requires fresh controls, acceptance, matrix timings, and ten selected loaded A/A
+   runs per key. The October 5 delivery policy preserves identical-source control rejections as
+   benchmark reliability follow-ups after source/output/context verification. Actual changed-code
+   comparisons keep their original blocking budgets. No favorable repeat supplies acceptance.
 4. Prove exact text, accepted revisions, mounted coverage, visible changed pixels, and cleanup.
    Screenshot completion time is not a substitute for native input-to-frame measurements.
 5. Compare publication overhead, time to visible syntax, open/scroll latency, total source reads,
@@ -918,17 +1019,19 @@ and complete validation. Writing the plan does not schedule production execution
 ## Completion checklist
 
 - [x] Every accepted buffer transition has one canonical publication path and preserved semantics.
-- [ ] Every first-party secondary document consumer enters through contribution registration.
-- [ ] Domain APIs remain typed; synchronous view/input behavior stays synchronous.
-- [ ] Source synchronization and result provenance have one owner, including prepared and diff callers.
-- [ ] Regular and checkpoint diffs share complete-source acquisition; partial patches cannot enter whole-document syntax, and browser spans match their displayed text.
-- [ ] Multiple views, endpoints, environments, logical revisions, and compensation pass focused proof.
-- [ ] Queues, mirrors, pinned snapshots, and disposal have measured bounded lifetimes.
-- [ ] Old source publishers, duplicate generic sync state, unused APIs, and compatibility paths are deleted.
-- [ ] Built exports and all affected framework/Platform consumers use the new contract.
-- [ ] Paired input browser gates pass, and the declared multiple-consumer improvement is measured.
-- [ ] SAB text transport is removed; separate workers, atomic cancellation, and packed-result transfers are preserved.
-- [ ] Permanent architecture/performance references and all overlapping plan links are reconciled.
+- [x] Every first-party secondary document consumer enters through contribution registration.
+- [x] Domain APIs remain typed; synchronous view/input behavior stays synchronous.
+- [x] Source synchronization and result provenance have one owner, including prepared and diff callers.
+- [x] Regular and checkpoint diffs share complete-source acquisition; partial patches cannot enter whole-document syntax, and browser spans match their displayed text.
+- [x] Multiple views, endpoints, environments, logical revisions, and compensation pass focused proof.
+- [x] Queues, mirrors, pinned snapshots, and disposal have measured bounded lifetimes.
+- [x] Old source publishers, duplicate generic sync state, unused APIs, and compatibility paths are deleted.
+- [x] Built exports and all affected framework/Platform consumers use the new contract.
+- [x] Paired input comparison budgets pass, and the declared multiple-consumer readiness improvement is measured. The original timing and control failures remain follow-ups.
+- [x] SAB text transport is removed; separate workers, atomic cancellation, and packed-result transfers are preserved.
+- [x] Permanent architecture/performance references and all overlapping plan links are reconciled.
+- [x] Merge reviewed green source in PR #787.
+- [x] Install the owner's web release and verify the served release and read-only live UI.
 
 If two independent adapters need their own generic source cursor, reset policy, or revision check
 after migration, the proposed boundary has failed. Redesign it before migrating more consumers.
@@ -947,7 +1050,8 @@ that needed no product code were done; the harness extension and calibrated `ben
 were outside that research pass. The historical record is
 [baseline and inventory](../docs/document-contributions/baseline-and-inventory.md).
 The 2026-10-01 closeout above records the delivered harness and 5/10 calibrated configurations;
-Plan 282 supersedes the remaining absolute-threshold matrix. Units 2–7 remain gated.
+Plan 282 supersedes the remaining absolute-threshold matrix. The gated status at that historical
+checkpoint was superseded by the October 4 approval and the merged implementation above.
 
 ### Unit 0 questions, answered
 

@@ -1,19 +1,21 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import type { DocumentSessionChange } from '../src/documentSession'
+import type { DocumentRead } from '../src/editor/documentDelivery'
+import type { DocumentChangesSinceSyncPoint } from '../src/editor/editChain'
+import {
+  createEditorStructuralOperation,
+  createEditorHighlighterOperation,
+} from '../src/editor/operationDefinitions'
+import { waitForDocumentWork } from '../src/editor/documentWork'
 import type { Editor } from '../src/editor'
 import type { EditorPlugin } from '../src/plugins'
 import type { EditorHighlightResult } from '../src/syntax/highlighter'
 import { setHighlightRegistry } from '../src/public/testing'
-import {
-  createEmptySyntaxResult,
-  type EditorSyntaxResult,
-  EditorTokenStore,
-  type EditorSyntaxSession,
-} from '../src/syntax'
+import { createEmptySyntaxResult, type EditorSyntaxResult, EditorTokenStore } from '../src/syntax'
 import { createVisibleEditor } from './factories/visibleEditor'
 
 type PendingResult<T> = {
-  readonly change: DocumentSessionChange
+  readonly read: DocumentRead
+  readonly changes: DocumentChangesSinceSyncPoint
   resolve(value: T): void
 }
 
@@ -34,39 +36,52 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function enqueueResult<T>(pending: PendingResult<T>[], change: DocumentSessionChange): Promise<T> {
-  return new Promise((resolve) => pending.push({ change, resolve }))
+function enqueueResult<T>(
+  pending: PendingResult<T>[],
+  read: DocumentRead,
+  changes: DocumentChangesSinceSyncPoint,
+  signal: AbortSignal,
+): Promise<T> {
+  const result = new Promise<T>((resolve) => pending.push({ read, changes, resolve }))
+  return waitForDocumentWork(result, signal)
 }
 
 async function syntaxEditor() {
   const structural: PendingResult<EditorSyntaxResult>[] = []
   const highlights: PendingResult<EditorHighlightResult>[] = []
-  const syntaxSession: EditorSyntaxSession = {
-    refresh: async () => createEmptySyntaxResult(),
-    applyChange: (change) => enqueueResult(structural, change),
+  const structuralOperation = createEditorStructuralOperation((context) => ({
+    analyze: (read, signal) =>
+      read.revision === context.initialRead.revision
+        ? Promise.resolve(createEmptySyntaxResult())
+        : enqueueResult(
+            structural,
+            read,
+            context.source.changesBetween(context.initialRead.revision, read.revision)!,
+            signal,
+          ),
     foldingSupport: 'supported',
     getResult: createEmptySyntaxResult,
     getTokens: () => [],
     getSnapshotVersion: () => 0,
     dispose() {},
-  }
+  }))
+  const highlighterOperation = createEditorHighlighterOperation((context) => ({
+    analyze: (read, signal) =>
+      read.revision === context.initialRead.revision
+        ? Promise.resolve({ tokens: EditorTokenStore.empty() })
+        : enqueueResult(
+            highlights,
+            read,
+            context.source.changesBetween(context.initialRead.revision, read.revision)!,
+            signal,
+          ),
+    dispose() {},
+  }))
   const plugin: EditorPlugin = {
-    activate: (context) => {
-      const syntax = context.registerSyntaxProvider({ createSession: () => syntaxSession })
-      const highlight = context.registerHighlighter({
-        createSession: () => ({
-          refresh: async () => ({ tokens: EditorTokenStore.empty() }),
-          applyChange: (change) => enqueueResult(highlights, change),
-          dispose() {},
-        }),
-      })
-      return {
-        dispose: () => {
-          syntax.dispose()
-          highlight.dispose()
-        },
-      }
-    },
+    activate: (context) => [
+      context.registerSyntaxProvider({ operation: structuralOperation }),
+      context.registerHighlighter({ operation: highlighterOperation }),
+    ],
   }
   const container = document.createElement('div')
   document.body.append(container)
@@ -139,17 +154,20 @@ test('nested operations hand both committed batches to syntax once in order', as
   ])
   expect(changes.map((change) => change.edits.length)).toEqual([2, 2])
   await vi.advanceTimersByTimeAsync(200)
-  // Neither session received the first batch, so each request carries both batches composed
-  // against the text that session last saw rather than the second batch alone.
   const composed = {
-    ...changes[1],
+    logicalRevisionCount: 2,
     edits: [
       { from: 0, to: 0, text: 'BA' },
       { from: 14, to: 14, text: 'AB' },
     ],
   }
-  expect(structural.map((entry) => entry.change)).toEqual([composed])
-  expect(highlights.map((entry) => entry.change)).toEqual([composed])
+  expect(structural).toHaveLength(1)
+  expect(highlights).toHaveLength(1)
+  for (const entry of [structural[0]!, highlights[0]!]) {
+    expect(entry.changes).toMatchObject(composed)
+    expect(entry.read.text.readRange(0, entry.read.text.length)).toBe('BAhead\nbody\ntailAB')
+    expect(entry.read.revision.point.revision).toBe(2)
+  }
 })
 
 test.each(['replace', 'dispose'])('pending batch results are cancelled on %s', async (action) => {

@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { createSyntaxPlugin } from './factories/syntaxRuntime'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createFoldGutterContribution,
   createLineGutterContribution,
@@ -9,13 +10,9 @@ import type { EditorPlugin } from '../src/plugins'
 import {
   createEmptySyntaxResult,
   type EditorSyntaxResult,
-  type EditorSyntaxSession,
+  type EditorSyntaxRuntime,
 } from '../src/public/syntax'
-import {
-  resetEditorInstanceCount,
-  setEditorSyntaxSessionFactory,
-  setHighlightRegistry,
-} from '../src/public/testing'
+import { resetEditorInstanceCount, setHighlightRegistry } from '../src/public/testing'
 import type { FoldRange } from '../src/syntax'
 
 /**
@@ -58,7 +55,7 @@ const mockRegistry = {
 class MockHighlight extends Set<Range> {}
 
 type FoldDelivery = {
-  readonly foldingSupport?: EditorSyntaxSession['foldingSupport']
+  readonly foldingSupport?: EditorSyntaxRuntime['foldingSupport']
   folds: readonly FoldRange[]
 }
 
@@ -185,7 +182,7 @@ function createRowRecorderPlugin(rows: { latest: readonly string[] }): EditorPlu
   }
 }
 
-function createFoldSyntaxSession(delivery: FoldDelivery): EditorSyntaxSession {
+function createFoldSyntaxSession(delivery: FoldDelivery): EditorSyntaxRuntime {
   const result = (): EditorSyntaxResult => ({
     ...createEmptySyntaxResult(),
     folds: delivery.folds,
@@ -193,8 +190,7 @@ function createFoldSyntaxSession(delivery: FoldDelivery): EditorSyntaxSession {
   })
 
   return {
-    refresh: async () => result(),
-    applyChange: async () => result(),
+    analyze: async () => result(),
     getResult: () => result(),
     getTokens: () => [],
     foldingSupport: delivery.foldingSupport ?? 'supported',
@@ -265,17 +261,16 @@ describe('fold collapse durability', () => {
     editor.dispose()
     container.remove()
     setHighlightRegistry(undefined)
-    setEditorSyntaxSessionFactory(undefined)
   })
 
   async function openWithFold(delivery: FoldDelivery, text = TEXT): Promise<void> {
-    setEditorSyntaxSessionFactory(() => createFoldSyntaxSession(delivery))
+    editor.addPlugin(createSyntaxPlugin(() => createFoldSyntaxSession(delivery)))
     editor.openDocument({
       documentId: 'main.ts',
       languageId: 'typescript',
       text,
     })
-    await flushMicrotasks()
+    await vi.waitFor(() => expect(editor.getState().syntaxStatus).toBe('ready'))
   }
 
   it('keeps a collapsed block folded when a keystroke above it shifts the reparsed offsets', async () => {

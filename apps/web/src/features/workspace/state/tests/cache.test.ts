@@ -1,4 +1,5 @@
 import { snapshotTarget } from '../../../../../test/factories/git-diff'
+import { workspaceCacheEntries } from '../../../../../scripts/bench-workspace.mjs'
 import { selectEditorGroupTab } from '@/lib/documents/utils/groups'
 import { groupLeaf, groupTree, groupBranch } from '../../../../../test/factories/editor-groups'
 import {
@@ -33,12 +34,9 @@ import {
   setWorkbenchSidebarTab,
 } from '@/features/workbench/utils/panels'
 import {
-  WORKSPACE_CACHE_STORAGE_KEYS,
   WORKSPACE_SLICE_LIMIT,
   emptyWorkspaceSlice,
   readWorkspaceCache,
-  searchBufferStorageKey,
-  workspaceSliceStorageKey,
   type CachedSearchBufferState,
   type CachedWorkspaceSlice,
   writeRootFolderCache,
@@ -50,6 +48,11 @@ import {
   writeWorkspaceIndexCache,
   writeWorkspaceSliceCache,
 } from '@/features/workspace/state/cache'
+import { WORKSPACE_CACHE_STORAGE_KEYS } from '@/lib/workspace-cache-keys'
+import {
+  searchBufferStorageKey,
+  workspaceSliceStorageKey,
+} from '@/features/workspace/utils/cache-keys'
 import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
 import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import { DEFAULT_WORKSPACE_UI_MODE } from '@/lib/ui-mode'
@@ -62,6 +65,26 @@ import {
 const STORE = new Map<string, string>()
 
 describe('workspace cache', () => {
+  it.each([false, true])('restores the host benchmark subject with inert=%s', (inert) => {
+    const rootFolder = pickedDirectory('/repo')
+    const entries = workspaceCacheEntries(
+      { environmentId: testScopedStorage.environmentId, rootFolder, filePath: '/repo/src/a.ts' },
+      { inert },
+    )
+    for (const [key, value] of Object.entries(entries))
+      localStorage.setItem(key, JSON.stringify(value))
+    const restored = readWorkspaceCache(testScopedStorage)
+    expect(restored.rootFolder).toEqual(rootFolder)
+    const selected = activeEditorTabForWorkbenchPanels(
+      restored.workspaces['/repo']!.workbenchPanels,
+    )
+    expect(selected?.content).toEqual(
+      inert
+        ? documentTab({ kind: 'search', root: workspaceRoot('/repo') })
+        : testTabContent('/repo/src/a.ts'),
+    )
+  })
+
   it('applies capture ownership to restored terminals once', () => {
     const slice = emptyWorkspaceSlice()
     writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))

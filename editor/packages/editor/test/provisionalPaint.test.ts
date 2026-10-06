@@ -1,3 +1,4 @@
+import { createEditorHighlighterOperation } from '../src/editor/operationDefinitions'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { Editor } from '../src/editor/Editor'
 import { VirtualizedTextView } from '../src/virtualization'
@@ -550,11 +551,10 @@ function delayedHighlighter(result: Promise<EditorHighlightResult>): EditorPlugi
   return {
     activate: (context) =>
       context.registerHighlighter({
-        createSession: () => ({
-          refresh: () => result,
-          applyChange: () => result,
+        operation: createEditorHighlighterOperation(() => ({
+          analyze: () => result,
           dispose: () => undefined,
-        }),
+        })),
       }),
   }
 }

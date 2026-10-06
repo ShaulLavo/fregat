@@ -33,6 +33,7 @@
     "@singapore-editor/find": "workspace:*",
     "@singapore-editor/gutters": "workspace:*",
     "@singapore-editor/lsp": "workspace:*",
+    "@singapore-editor/lsp-plugin": "workspace:*",
     "@singapore-editor/markdown": "workspace:*",
     "@singapore-editor/minimap": "workspace:*",
     "@singapore-editor/paged": "workspace:*",
