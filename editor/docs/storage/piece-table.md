@@ -2,7 +2,7 @@
 
 ## Status: Implemented and Proven
 
-The editor's storage engine is a piece table on a persistent AVL tree (a treap until [E040](../performance/e040-balanced-tree.md)) with persistent immutable snapshots via structural sharing. Each mutation returns a new snapshot; previous snapshots remain valid and unmodified.
+The editor's storage engine is a piece table on a persistent AVL tree with immutable snapshots through structural sharing. Each mutation returns a new snapshot; previous snapshots remain valid and unmodified.
 
 What each piece costs the garbage collector, and the layouts measured against it, is in [Heap cost per piece](../performance/piece-heap-cost.md).
 
@@ -18,18 +18,20 @@ What each piece costs the garbage collector, and the layouts measured against it
 - Buffer chunk storage is exposed as a read-only `get`/`keys`/iterator view at the type boundary; no debug-only accessor layer for now
 - UTF-16 code units as the native encoding
 - Line-ending normalization to `\n` on load
-- Phase 2 deletion keeps invisible pieces in the treap rather than physically removing them
+- Deletion marks pieces invisible in the AVL tree, retaining their identity for anchor resolution
 
 ## Capabilities
 
-| Capability            | Complexity   | Notes                                                                                              |
-| --------------------- | ------------ | -------------------------------------------------------------------------------------------------- |
-| Insert text at offset | O(log n)     | One descent; the landing places the new node and each ancestor rejoins                             |
-| Delete text range     | O(log n)     | Current implementation physically removes pieces; Phase 2 changes this to mark pieces invisible    |
-| Read text range       | O(log n + k) | Tree walk collecting piece slices                                                                  |
-| Snapshot isolation    | O(1)         | Structural sharing; old roots remain valid                                                         |
-| Document length       | O(1)         | Cached in the root's `subtreeVisibleLength`                                                        |
-| Piece count           | O(1)         | Cached in `subtreePieces` aggregate                                                                |
+| Capability            | Complexity   | Notes                                                                   |
+| --------------------- | ------------ | ----------------------------------------------------------------------- |
+| Insert text at offset | O(log n)     | One descent; the landing places the new node and each ancestor rejoins  |
+| Delete text range     | O(log n + d) | Tombstones covered pieces and splits the pieces at the range boundaries |
+| Read text range       | O(log n + k) | Tree walk collecting piece slices                                       |
+| Snapshot isolation    | O(1)         | Structural sharing; old roots remain valid                              |
+| Document length       | O(1)         | Cached in the root's `subtreeVisibleLength`                             |
+| Piece count           | O(1)         | Cached in `subtreePieces` aggregate                                     |
+
+Here, `n` is the number of stored pieces, `k` is the returned text length, and `d` is the number of nodes visited in covered subtrees during deletion. Hiding a subtree visits its visible descendants, so deleting the whole document can take O(n).
 
 ## The Piece
 
@@ -41,36 +43,37 @@ A piece's `(buffer, start)` pair serves as its insertion identity — no separat
 
 All subtree aggregates (`subtreeVisibleLength`, `subtreePieces`, `subtreeLineBreaks`, `subtreeOriginalLength` and the rest) are computed in a single function pattern. `createNode` delegates to aggregate computation; every site that reassigns children recomputes aggregates on the result. There is no separate update that mutates individual fields — partial aggregate updates are structurally impossible. Adding a new aggregate means adding it to the aggregate function and the `PieceTreeNode` type.
 
-## Enrichment Roadmap
+## Line breaks and visibility
 
-**Phase 1 — Line breaks:**
+**Line breaks:**
 
-- Piece gains `lineBreaks` field (newline count in its buffer slice)
-- Piece gains `firstLineBreak` (E046): the position of its first break in its chunk's line index.
+- Each piece records `lineBreaks`, the newline count in its buffer slice
+- Each piece records `firstLineBreak` (E046), the position of its first break in its chunk's line index.
   A chunk only grows at its end, so the position never moves. A cut gives the right part the left
   part's position plus the left part's count, and an appended piece takes the tail's running count
-- Treap node gains `subtreeLineBreaks` aggregate
-- Enables O(log n) offset-to-row/column conversion
+- AVL nodes cache the `subtreeLineBreaks` aggregate
+- These aggregates support O(log n) offset-to-row/column conversion
 
-**Phase 2 — Anchor resolution:**
+**Visibility and anchor resolution:**
 
-- Treap node gains `subtreeVisibleLength` aggregate, maintained in the shared aggregate function
-- Piece gains `visible: boolean`
-- Delete marks pieces invisible instead of removing them
-- `subtreeVisibleLength` sums only visible pieces and becomes the user-facing document length aggregate
+- Each piece records `visible: boolean`
+- Deletion marks covered pieces invisible and preserves their buffer identity and position
+- AVL nodes cache `subtreeVisibleLength`, maintained in the shared aggregate function
+- `subtreeVisibleLength` sums visible pieces and gives the user-facing document length
 
-**Future — Collaboration:**
+## Historical design
 
-- The Phase 2 visibility model is reused rather than redesigned
-- Reverse index keys remain extensible to replica-scoped buffer identity
+The original tree was a treap. [E040](../performance/e040-balanced-tree.md) records the completed move to an AVL tree. The earlier line-break and anchor-resolution phases introduced the metadata described above.
 
-## Phase 1 Prerequisites
+Future work is scheduled in Fregat's [root roadmap](../../../PLAN.md).
+
+## Buffer storage
 
 ### Opaque BufferId
 
 **Status: complete.** `PieceBufferId` is an opaque branded number.
 
-Phase 2 must continue treating buffer identity as opaque. No string-literal comparisons should be introduced.
+Anchor resolution treats buffer identity as opaque.
 
 ### Chunked Append Buffer
 
