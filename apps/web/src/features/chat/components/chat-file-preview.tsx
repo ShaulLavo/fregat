@@ -1,6 +1,7 @@
 import { isPdfFile } from '@/lib/pdf-viewer/format'
 import { PdfPresentation } from '@/components/pdf-viewer/presentation'
-import { useEffect, useState } from 'react'
+import { use, useEffect, useState } from 'react'
+import { useStore } from 'zustand'
 import { useMutation, useQuery, type QueryClient } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
 import { Dialog, DialogContent, DialogTitle } from '@workspace/ui/components/dialog'
@@ -15,6 +16,9 @@ import {
 import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 import { errorMessage } from '@/lib/error-message'
 import { chatMutationKeys } from '../utils/mutation-keys'
+import { FileOpenIntentContext } from '@/lib/file-open-intent/providers/context'
+import { useApplicationRuntime } from '@/hooks/use-application-runtime'
+import { attachmentPreviewMutationOptions } from '@/lib/file-preview/utils/source'
 
 export function ChatFilePreview({
   input,
@@ -26,6 +30,13 @@ export function ChatFilePreview({
   onClose: () => void
 }) {
   const { attachment, origin } = input
+  const application = useApplicationRuntime()
+  const capability =
+    use(FileOpenIntentContext)?.previewSource ?? application.getSnapshot().editor.previewSource
+  const adoption = useMutation(
+    attachmentPreviewMutationOptions(capability, queryClient),
+    queryClient,
+  )
   const url = attachmentFileUrl(attachment, origin)
   const pdf = isPdfFile(attachment.name, attachment.mimeType)
   const previewable = !pdf && canPreviewAttachmentText(attachment)
@@ -65,6 +76,24 @@ export function ChatFilePreview({
   const stagedCapture = currentAcquisition ? acquisition.data : null
   const sentCapture = sameOwner ? held.capture : null
   const capture = staged ? stagedCapture : sentCapture
+  const binding =
+    adoption.variables &&
+    adoption.variables.input === capture &&
+    adoption.variables.expected.attachment === attachment
+      ? adoption.data
+      : null
+  const sourceRead = useStore(capability.store, (state) =>
+    binding?.lease
+      ? (state.previewSources.get(binding.lease) ?? binding.lease.read())
+      : (binding?.read ?? null),
+  )
+  const { mutate: adopt } = adoption
+  useEffect(() => {
+    if (capture?.kind !== 'attachment') return
+    const controller = new AbortController()
+    adopt({ input: capture, expected: { ...input, url }, signal: controller.signal })
+    return () => controller.abort()
+  }, [capture, input, url, queryClient, capability, adopt])
   if (!sameOwner) setHeld({ input, queryClient, capture: null })
   const acquired = preview.isSuccess && !staged && !preview.isFetching
   if (!capture && acquired) setHeld({ input, queryClient, capture: preview.data })
@@ -89,7 +118,9 @@ export function ChatFilePreview({
             <PdfPresentation source={{ kind: 'attachment', origin, attachment }} />
           </div>
         )}
-        {previewable && !capture && !failed && <Spinner size='lg' label='Loading file preview' />}
+        {previewable && (!capture || (capture.kind === 'attachment' && !sourceRead)) && !failed && (
+          <Spinner size='lg' label='Loading file preview' />
+        )}
         {previewable && !capture && failed && (
           <div className='text-destructive text-xs' role='alert'>
             Could not load this file.{' '}
@@ -114,17 +145,22 @@ export function ChatFilePreview({
             />
           </div>
         )}
-        {previewable && capture?.kind === 'attachment' && (
+        {previewable && sourceRead?.kind === 'attachment' && (
           <pre
             className='bg-muted max-h-96 overflow-auto overscroll-contain p-3 text-xs whitespace-pre-wrap'
             data-chat-file-preview
           >
-            {capture.reader.readRange(0, capture.reader.length)}
+            {sourceRead.input.reader.readRange(0, sourceRead.input.reader.length)}
           </pre>
         )}
-        {!pdf && (!previewable || (capture && capture.kind !== 'attachment')) && (
-          <p className='text-muted-foreground text-xs'>Download this file to view its contents.</p>
-        )}
+        {!pdf &&
+          (!previewable ||
+            (capture && capture.kind !== 'attachment') ||
+            (sourceRead && sourceRead.kind !== 'attachment')) && (
+            <p className='text-muted-foreground text-xs'>
+              Download this file to view its contents.
+            </p>
+          )}
         <Button
           role='link'
           render={<a href={url} download={attachment.name} />}

@@ -5,7 +5,9 @@ import {
   type PreviewSourceLease,
   type LivePreviewRequest,
   type DiskHeadInput,
+  type AttachmentTextCapture,
 } from '@/lib/file-preview/utils/source'
+import { serverEndpoint } from '@/lib/client'
 import {
   filesystemComparisonSubject,
   sameFilesystemCapture,
@@ -366,9 +368,12 @@ export class WorkspaceDocumentService {
         : null
     if (samePreviewScope(next, this.previewScope) && origin === this.previewOrigin) return
     this.previewScope = next
+    const originChanged = origin !== this.previewOrigin
     this.previewOrigin = origin
-    for (const lease of Array.from(this.previewInterests.keys()))
+    for (const [lease, interest] of Array.from(this.previewInterests)) {
+      if (!originChanged && interest.current.kind === 'attachment') continue
       this.endPreview(lease, { kind: 'released', reason: 'interest-ended' })
+    }
     this.onStateChange()
   }
 
@@ -421,9 +426,22 @@ export class WorkspaceDocumentService {
     input,
     signal,
   }: {
-    readonly input: DiskHeadInput
+    readonly input: DiskHeadInput | AttachmentTextCapture
     readonly signal: AbortSignal
   }): PreviewSourceLease {
+    if (input.kind === 'attachment') {
+      if (
+        input.environmentId !== this.environmentId ||
+        this.previewOrigin === null ||
+        input.origin !== serverEndpoint(this.previewOrigin)
+      )
+        throw createClientInvariantError('Attachment capture belongs to a different owner', {
+          environmentMatches: input.environmentId === this.environmentId,
+          originMatches:
+            this.previewOrigin !== null && input.origin === serverEndpoint(this.previewOrigin),
+        })
+      return this.createPreviewInterest({ kind: 'attachment', input }, signal)
+    }
     this.assertPreviewScope(input.scope)
     if (input.origin !== this.previewOrigin)
       throw createClientInvariantError('Preview capture belongs to a different origin', {

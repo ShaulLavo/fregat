@@ -1,3 +1,6 @@
+import { attachmentPreviewMutationOptions } from '@/lib/file-preview/utils/source'
+import { runMutation } from '@/lib/mutations/run'
+import { createAddressTestRuntime } from '../../../../../test/factories/address-runtime'
 import { chatMutationKeys } from '../../utils/mutation-keys'
 import { attachmentUploadTicketSchema } from '@workspace/contracts'
 import { directInProcessFetcher } from '../../../../../test/client'
@@ -561,3 +564,87 @@ test('F1 staged Retry starts a new acquisition after an actual transport failure
     queryClient.clear()
   }
 })
+
+test.for(['sent', 'staged'] as const)(
+  'common attachment source admits the actual $0 capture and ends only its view interest',
+  async (provenance, { server, client }) => {
+    const f = await createAddressTestRuntime(client)
+    const queryClient = f.application.getSnapshot().queryClient
+    const upload = await client.attachments.uploads.post({
+      type: 'file',
+      name: 'shared.txt',
+      mimeType: 'text/plain',
+      sizeBytes: 3,
+    })
+    const ticket = v.parse(attachmentUploadTicketSchema, upload.data)
+    const fetcher = directInProcessFetcher(server)
+    const uploaded = await fetcher(new URL(ticket.uploadPath, server.origin), {
+      method: 'PUT',
+      body: 'one',
+    })
+    const attachment = v.parse(chatAttachmentSchema, await uploaded.json())
+    if (attachment.type !== 'file') return expect.fail('Actual file capture required')
+    const input = {
+      attachment,
+      environmentId: f.environmentId,
+      origin: serverEndpoint(originForQueryClient(queryClient)),
+      provenance,
+    }
+    const capture = await queryClient.query(
+      attachmentTextOptions(input, async () => new Response('one')),
+    )
+    if (capture.kind !== 'attachment') return expect.fail('Actual reader capture required')
+    transport.use(
+      http.get(
+        capture.url,
+        () =>
+          new HttpResponse('one', {
+            headers: { 'content-length': '3', 'content-type': 'text/plain' },
+          }),
+      ),
+    )
+    const view = renderWithProviders(
+      <ChatFilePreview input={input} queryClient={queryClient} onClose={() => {}} />,
+      { application: f.application, queryClient },
+    )
+    await waitFor(() =>
+      expect(document.querySelector('[data-chat-file-preview]')?.textContent).toBe('one'),
+    )
+    expect(capture.reader.readRange(0, capture.reader.length)).toBe('one')
+    await waitFor(() => expect(f.editor.documentStore.getState().previewSources.size).toBe(1))
+    const shown = Array.from(f.editor.documentStore.getState().previewSources.values())[0]
+    if (shown?.kind !== 'attachment') return expect.fail('Actual adopted source required')
+    const options = attachmentTextOptions(input)
+    expect(shown.input).toBe(queryClient.getQueryData(options.queryKey))
+    expect(shown.input.reader.readRange(0, shown.input.reader.length)).toBe('one')
+    const peer = await runMutation(
+      queryClient,
+      attachmentPreviewMutationOptions(f.editor.previewSource, queryClient),
+      { input: shown.input, expected: shown.input, signal: new AbortController().signal },
+    )
+    expect(peer.lease).not.toBeNull()
+    expect(f.editor.documentStore.getState().previewSources.size).toBe(2)
+    transport.use(
+      http.get(
+        capture.url,
+        () =>
+          new HttpResponse('two', {
+            headers: { 'content-length': '3', 'content-type': 'text/plain' },
+          }),
+      ),
+    )
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: options.queryKey, refetchType: 'none' })
+      await queryClient.query(options)
+    })
+    expect(queryClient.getQueryData(options.queryKey)).not.toBe(shown.input)
+    expect(document.querySelector('[data-chat-file-preview]')?.textContent).toBe('one')
+    expect(peer.lease?.read()).toBe(peer.read)
+    expect(shown.input.bytes).toEqual(new TextEncoder().encode('one'))
+    view.unmount()
+    expect(f.editor.documentStore.getState().previewSources.size).toBe(1)
+    expect(peer.lease?.read()).toBe(peer.read)
+    peer.lease?.release()
+    expect(f.editor.documentStore.getState().previewSources.size).toBe(0)
+  },
+)
