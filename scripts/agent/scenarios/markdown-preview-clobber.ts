@@ -28,6 +28,8 @@ export const markdownPreviewClobber: Scenario = {
     const fixture = await mkdtemp(scratchPath('fregat-preview-clobber-'))
     const errors: string[] = []
     let owner: JSHandle<ReturnType<typeof captureMarkdownSource>> | null = null
+    let operationError: { readonly error: unknown } | null = null
+    const cleanupErrors: unknown[] = []
     page.on('pageerror', (error) => errors.push(error.message))
     try {
       await writeFile(path.join(fixture, 'readme.md'), README)
@@ -142,10 +144,26 @@ export const markdownPreviewClobber: Scenario = {
       strictEqual(await readFile(path.join(fixture, 'readme.md'), 'utf8'), README)
       await step('undo-restored-source-and-preview')
       strictEqual(errors.join('\n'), '')
+    } catch (error) {
+      operationError = { error }
     } finally {
-      await owner?.dispose()
-      await releaseFixture(fixture)
+      try {
+        await owner?.dispose()
+      } catch (error) {
+        cleanupErrors.push(error)
+      }
+      try {
+        await releaseFixture(fixture)
+      } catch (error) {
+        cleanupErrors.push(error)
+      }
+      if (cleanupErrors.length)
+        await Promise.resolve()
+          .then(() => evidence.json('markdown-cleanup-errors.json', cleanupErrors.map(String)))
+          .catch(() => undefined)
     }
+    if (operationError) throw operationError.error
+    if (cleanupErrors.length) throw cleanupErrors[0]
   },
 }
 
@@ -329,6 +347,10 @@ async function recordMarkdownFacts(
   await evidence.json('markdown-source-lifetime.json', observations)
   strictEqual(facts.sameBuffer, true)
   strictEqual(facts.nativeBuffer, true)
+  strictEqual(facts.sameController, true)
+  strictEqual(facts.sameNative, true)
+  strictEqual(facts.sameView, true)
+  strictEqual(facts.sameInput, true)
   if (facts.previewVisible) strictEqual(facts.previewBuffer, true)
   strictEqual(facts.seedSnapshotText, README)
   return facts

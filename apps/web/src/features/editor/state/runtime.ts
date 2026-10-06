@@ -290,6 +290,7 @@ export function createEditorRuntime({
       originForQueryClient(queryClient),
     )
   const previewSource: import('@/lib/file-preview/utils/source').PreviewSourceCapability = {
+    environmentId: storage.environmentId,
     queryClient,
     origin: originForQueryClient(queryClient),
     store: documentStore,

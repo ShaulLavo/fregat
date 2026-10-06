@@ -18,11 +18,11 @@ import type {
 import {
   diffAttachmentRevision,
   diffAttachmentReferences,
-  diffAttachmentLines,
   diffAttachmentSubject,
   sameDiffAttachmentSubject,
   type DiffAttachment,
 } from '@/lib/diff-attachment'
+import { diffAttachmentLines } from '@/features/editor/utils/attachment-presentation'
 import { captureDiffAnchors, resolveDiffAnchors } from '@/features/editor/utils/diff-source-anchors'
 
 type SyntaxConfiguration = {
