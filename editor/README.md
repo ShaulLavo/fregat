@@ -1,19 +1,25 @@
-# singapore
+![singapore editor with a file tree and syntax highlighting](docs/images/editor.webp)
 
-Development happens in the [Fregat monorepo](https://github.com/ShaulLavo/fregat/tree/main/editor).
-This repository mirrors its `editor/` folder. Submit changes to Fregat.
+# singapore
 
 a code editor for the browser, written from scratch. same shelf as monaco and codemirror
 
-![](docs/images/editor.webp)
+the core is a persistent AVL piece table with copy-on-write. edits copy the changed tree path and share the rest, so old versions stay readable. snapshots and stable text anchors take inspiration from zed
 
-piece table storage, rendering through the css highlight api, tree-sitter and lsp as optional plugins. the core owns the text and the editing runtime. loading and saving are the host's job
+## how it differs
 
-still moving. package boundaries change between commits
+| editor                                                                                            | text storage                                          |
+| ------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| [singapore](docs/storage/piece-table.md)                                                          | persistent AVL piece table, copy-on-write             |
+| [monaco and vs code](https://code.visualstudio.com/blogs/2018/03/23/text-buffer-reimplementation) | mutable red-black piece tree                          |
+| [codemirror 6](https://github.com/codemirror/state/blob/main/src/text.ts)                         | immutable tree of text lines, with structural sharing |
+| [zed](https://zed.dev/blog/zed-decoded-rope-sumtree)                                              | copy-on-write B+ tree rope, built on SumTree          |
+
+singapore paints syntax through the css highlight api. tree-sitter and language servers are optional plugins. still moving
 
 ## try it
 
-[demo](https://shaullavo.github.io/singapore/), browses this repo off the github api
+[open the demo](https://shaullavo.github.io/singapore/), which browses this repo through the github api
 
 ```sh
 npm install @singapore-editor/core
@@ -31,36 +37,18 @@ editor.openDocument({
 })
 ```
 
-gutters, find, minimap, syntax and language servers are separate packages. nothing loads until you register it
+call `editor.dispose()` when you're done
 
-## packages
+## what's in it
 
-`core` (the `editor` folder), `textbuffer`, `gutters`, `find`, `markdown`, `minimap`, `scope-lines`, `diff`, `panes`, `tree-sitter`, `tree-sitter-languages`, `lsp`, `plugin-ui`, `lsp-plugin`, `typescript-lsp`, `decode`, `spellcheck`, `highlighting`, `paged`, `react`, `solid`. all under `@singapore-editor/`, one folder each in `packages/`
-
-## running the repo
-
-bun 1.4.2 or newer. browser tests need playwright
-
-```sh
-bun install
-bun run dev
-```
-
-`dev` serves the demo from `examples/app`
-
-```sh
-bun run typecheck
-bun run test
-bun run lint
-bun run build
-```
-
-`bench:stress` and `bench:input` run from the root. most packages with hot paths (`editor`, `textbuffer`, `find`, `tree-sitter`, …) have their own `bench:*` scripts
+- multi-cursor editing, undo, folding, and virtualized rows
+- gutters, find, minimap, diff, and markdown as [separate packages](packages/)
+- tree-sitter syntax, language servers, and react and solid adapters
 
 ## more
 
-- [architecture](ARCHITECTURE.md), main thread vs worker, open questions
-- [progress](PROGRESS.md), what's implemented vs designed
-- [piece table](docs/storage/piece-table.md), [positions](docs/positions/types-and-conversions.md), [anchors](docs/positions/anchors.md), [selections and undo](docs/editing/selections-and-undo.md), [transforms](docs/display/transforms.md), [virtualization](docs/display/browser-virtualization.md), [tree-sitter](docs/syntax/tree-sitter.md)
-- [fregat's roadmap](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md) sets execution order across the workspace
-- [shared Markdown semantics for Editor and Fregat TUI](https://github.com/ShaulLavo/fregat/blob/main/plans/bubli-markdown-consumer.md), the existing consumer work package aligned with Fregat's app-local terminal UI
+[core api](packages/editor/README.md) · [architecture](ARCHITECTURE.md) · [progress](PROGRESS.md) · [roadmap](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md)
+
+development happens in [fregat](https://github.com/ShaulLavo/fregat/tree/main/editor). this repo mirrors its `editor/` folder; submit changes there.
+
+to run the demo locally, use bun 1.4.2 or newer, then `bun install` and `bun run dev` from this folder

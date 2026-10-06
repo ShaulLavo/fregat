@@ -8,22 +8,36 @@ test('mounts the editor pane in the real app shell', async ({ page }) => {
   await expect(editorPane).toHaveCSS('display', 'flex')
 })
 
-test('loads Shiki token highlights for a source file', async ({ page }) => {
-  const file = {
-    path: 'src/index.ts',
-    text: 'const answer: number = 42;\n',
-  }
-  await mockGitHubSource(page, file.path, file.text)
-  await page.addInitScript((path) => {
-    localStorage.clear()
-    localStorage.setItem('editor-selected-file', path)
-  }, file.path)
+for (const extension of ['ts', 'tsx']) {
+  test(`loads Tree-sitter token highlights for a .${extension} source file`, async ({ page }) => {
+    const file = {
+      path: `src/index.${extension}`,
+      text:
+        extension === 'tsx'
+          ? 'const answer = <div title="Answer">{42}</div>;\n'
+          : 'const answer: number = 42;\n',
+    }
+    await mockGitHubSource(page, file.path, file.text)
+    await page.addInitScript((path) => {
+      localStorage.clear()
+      localStorage.setItem('editor-selected-file', path)
+    }, file.path)
 
-  await page.goto('/')
+    await page.goto('/')
 
-  await expect(page.locator('.editor-virtualized')).toContainText('const answer')
-  await expect.poll(() => tokenHighlightRangeCount(page)).toBeGreaterThan(0)
-})
+    await expect(page.locator('.editor-virtualized')).toContainText('const answer')
+    const language = extension === 'tsx' ? 'tsx' : 'typescript'
+    await expect(page.locator('#status-syntax')).toHaveText(`${language} ready`, {
+      timeout: 15000,
+    })
+    await expect.poll(() => tokenHighlightRangeCount(page), { timeout: 15000 }).toBeGreaterThan(0)
+
+    await page.getByRole('button', { name: 'Diff', exact: true }).click()
+    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+    await expect(page.locator('#status-syntax')).toHaveText(`${language} ready`)
+    await expect.poll(() => tokenHighlightRangeCount(page)).toBeGreaterThan(0)
+  })
+}
 
 test('loads Tree-sitter Markdown highlights for a Markdown file', async ({ page }) => {
   const file = {

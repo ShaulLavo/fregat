@@ -1,53 +1,35 @@
+![fregat workbench with editor, terminals, and agent sessions](docs/images/workbench.webp)
+
 # fregat
 
 an open cursor, built from scratch
 
-![](docs/images/workbench.webp)
+open a folder and get an editor, terminals, git, and language servers in panes, with claude code and codex beside them. agents use the subscriptions you already have. move between projects and their editors, terminals, and agent sessions from one workspace
 
-open a folder and you get the editor, a terminal, git and language servers in panes, with claude code and codex beside them. the agents run on the subscriptions you already have. sign in from inside the app, no accounts here, nothing proxied. run both at once, each in its own session with its own permission mode
-
-cursor is a fork of vs code. t3 code stops at the harness. fregat is the whole editor, written from scratch
-
-everything runs on your machine. the same workspace opens from a browser, the desktop app, a terminal, or a phone over tailscale
-
-no releases yet. clone it and run it
+everything runs on your machine. open the same workspace from a browser, the desktop app, a terminal, or a phone over tailscale
 
 ## try it
 
-needs [bun](https://bun.sh) and at least one of
+clone this repo, then run with [bun](https://bun.sh)
 
-- claude code. `claude auth login`, or sign in from the app
-- codex. install the [cli](https://developers.openai.com/codex/cli), `codex login`
-
-```bash
+```sh
 bun install
 bun run dev
 ```
 
-open the url it prints, pick a folder
-
-with [mesh](https://github.com/ShaulLavo/mesh), `bun run dev:serve` registers one shared dev server instead: the first connection to `localhost:5173` starts it, and it stops once nothing has been connected for the idle window. `bun run dev:unserve` removes it
-
-`bun run desktop:dev` opens the shared dev routes through the desktop launcher. It uses an installed Chromium app or Fregat's system-webview window; closing the app leaves shared servers and terminals running. `bun run app:mac` builds the self-contained `Fregat.app` on macOS. See [Plan 114](plans/114-installed-app.md) for installation and window ownership.
-
-`bun run dev:web` skips the desktop app. `bun run dev:tui` is the terminal client, see the [tui guide](apps/tui/README.md)
-
-## build a release
-
-`bun run build-release --output=./fregat-release` builds a self-contained web/server runtime for this OS and architecture. It needs the build prerequisites and writes to your selected directory; its default output is an OS temporary directory.
-
-`bun run install-release` builds and installs into an explicitly configured local Mesh/systemd target. `--from=<directory>` installs an existing release. See [development](docs/development.md#optional-local-release-installation) for target configuration, server updates, restart and rollback.
+open the url it prints and pick a folder. for agents, install [claude code](https://code.claude.com/docs/en/setup) or [codex](https://developers.openai.com/codex/cli), then sign in
 
 ## what's in it
 
-- [singapore](https://github.com/ShaulLavo/singapore), the editor. written from scratch
-- [ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu), the terminal. libghostty-vt in wasm, not xterm.js
-- an elysia server that owns files, git, watching, language servers and the agent processes
-- clients for web, the installed-browser/native-window desktop app, native mac, and a tui
+- [singapore](https://github.com/ShaulLavo/singapore), a browser editor written from scratch, with multi-cursor editing, syntax highlighting, and language servers
+- [ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu), a terminal powered by libghostty-vt in wasm, with gpu rendering
+- claude code and codex sessions side by side, each with its own permissions
+- web, desktop, native mac, and terminal clients sharing one local server
+
+## benchmarks
+
+[terminal comparisons](ghostty-webgpu/docs/benchmarks.md)
 
 ## more
 
-- [documentation](docs/README.md), architecture, plans, research and delivery records
-- [development](docs/development.md), repo layout, linked checkouts, checks, releases and installation
-- [filesystem boundaries](docs/filesystem-boundaries.md), what the editor can reach vs what agents can
-- [settings reference](docs/settings-reference.md), generated from the registry
+[development and releases](docs/development.md) · [tui](apps/tui/README.md) · [docs](docs/README.md) · [settings](docs/settings-reference.md) · [roadmap](PLAN.md)

@@ -1,3 +1,5 @@
+// Complete the real server fixture's cold imports during test collection.
+import '../../../test/server'
 import { preparedDocumentLease } from '../../../test/factories/prepared-document'
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { testDocumentKey } from '../../../test/factories/document-targets'
