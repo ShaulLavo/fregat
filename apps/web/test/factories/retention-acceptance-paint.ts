@@ -27,7 +27,14 @@ import {
   type RetentionAcceptanceReference,
 } from './retention-acceptance-projection'
 
-export function retentionAcceptanceSubject(app: RetentionAcceptanceApp, path: FilesystemPath) {
+type RetentionPaintApp = {
+  readonly read: () => Pick<
+    ReturnType<RetentionAcceptanceApp['read']>,
+    'documents' | 'theme' | 'ui' | 'workspace'
+  >
+}
+
+export function retentionAcceptanceSubject(app: RetentionPaintApp, path: FilesystemPath) {
   const state = app.read()
   const document = state.documents.getState().getLiveEditorDocument(fileDocumentKey(path))
   if (!document)
@@ -55,7 +62,7 @@ export function retentionAcceptanceSubject(app: RetentionAcceptanceApp, path: Fi
 }
 
 export function retentionAcceptanceReference(
-  app: RetentionAcceptanceApp,
+  app: RetentionPaintApp,
   path: FilesystemPath,
 ): RetentionAcceptanceReference {
   const subject = retentionAcceptanceSubject(app, path)
@@ -95,7 +102,7 @@ export function retentionAcceptanceReference(
 }
 
 export function retentionAcceptanceBinding(
-  app: RetentionAcceptanceApp,
+  app: RetentionPaintApp,
   path: FilesystemPath,
   snapshot: EditorViewSnapshot,
 ): RetentionAcceptanceBinding {
@@ -170,7 +177,7 @@ export type RetentionAcceptanceReadyDiagnostics = {
 }
 
 export async function awaitRetentionAcceptanceReady(
-  app: RetentionAcceptanceApp,
+  app: RetentionPaintApp,
   path: FilesystemPath,
   diagnostics?: RetentionAcceptanceReadyDiagnostics,
 ) {
@@ -246,7 +253,7 @@ export async function awaitRetentionAcceptanceReady(
 }
 
 export function captureRetentionAcceptancePaint(
-  app: RetentionAcceptanceApp,
+  app: RetentionPaintApp,
   path: FilesystemPath,
   tab: TabId,
 ) {
