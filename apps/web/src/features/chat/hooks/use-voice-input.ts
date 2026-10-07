@@ -6,11 +6,7 @@ import type { LexicalEditor } from 'lexical'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat-input-draft-store'
 import { BrowserVoiceInput, browserSpeechRecognition } from '../utils/browser-voice-input'
-import {
-  readChatInputSelection,
-  readChatInputText,
-  replaceChatInputEditorRange,
-} from '../utils/input-editor-actions'
+import { readChatInputSelection, replaceChatInputEditorRange } from '../utils/input-editor-actions'
 import { chatMutationKeys } from '../utils/mutation-keys'
 import { resolveTranscriptCommit } from '../utils/voice-draft'
 import { voiceErrors } from '../utils/voice-errors'
@@ -93,9 +89,9 @@ async function dictateDraft({
   const captured = { ...readChatInputSelection(editor), ownerKey, revision: 0 }
   const locale = navigator.language
   let revision = 0
-  let lastText = captured.text
-  const unsubscribe = editor.registerUpdateListener(() => {
-    const text = readChatInputText(editor)
+  let lastText = useChatInputDraftStore.getState().getDraft(draftTarget).prompt
+  const unsubscribe = useChatInputDraftStore.subscribe((state) => {
+    const text = state.getDraft(draftTarget).prompt
     if (text !== lastText) revision += 1
     lastText = text
   })
