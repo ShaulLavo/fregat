@@ -972,6 +972,26 @@ function scrollSnapshotsEqual(first: TerminalScrollEvent, second: TerminalScroll
   )
 }
 
+interface ObservedSelection {
+  readonly coordinates: SelectionCoordinates | undefined
+  readonly text: string | undefined
+}
+
+function selectionsEqual(first: ObservedSelection, second: ObservedSelection): boolean {
+  if (first.text !== second.text) return false
+  const start = first.coordinates
+  const end = second.coordinates
+  if (start === end) return true
+  if (!start || !end) return false
+  return (
+    start.rectangle === end.rectangle &&
+    start.start.x === end.start.x &&
+    start.start.y === end.start.y &&
+    start.end.x === end.end.x &&
+    start.end.y === end.end.y
+  )
+}
+
 function copyInput(data: TerminalInputData): Uint8Array {
   if (typeof data === 'string') return encoder.encode(data)
   return Uint8Array.from(data)
@@ -1229,14 +1249,17 @@ export class TerminalSession<TEvent = unknown> {
 
   writeAndReadGeometry(data: TerminalInputData): TerminalGeometry {
     return this.runOperation(() => {
+      const selectionBefore = this.readObservedSelection()
       this.runVtWrite(() => this.terminal.write(data))
       this.mouseEncoder.syncFromTerminal()
       this.invalidateLinks()
       this.revisionValue += 1
       // Effects can reenter the owner; capture this write before publishing any of them.
       const scroll = this.commitScrollChange()
+      const selectionChanged = this.selectionChanged(selectionBefore)
       const geometry = this.geometry()
       this.flushEffects()
+      if (selectionChanged) this.emitSelection()
       if (scroll) this.emitState(this.emitters.scroll, () => this.scrollValue)
       this.emitRenderRequest()
       return geometry
@@ -1601,13 +1624,16 @@ export class TerminalSession<TEvent = unknown> {
   }
 
   private writeNow(data: TerminalInputData): TerminalMutationResult {
+    const selectionBefore = this.readObservedSelection()
     this.runVtWrite(() => this.terminal.write(data))
     this.mouseEncoder.syncFromTerminal()
     this.invalidateLinks()
     // Observers can read geometry or reenter; publish the committed native revision first.
     this.revisionValue += 1
     const scroll = this.commitScrollChange()
+    const selectionChanged = this.selectionChanged(selectionBefore)
     this.flushEffects()
+    if (selectionChanged) this.emitSelection()
     if (scroll) this.emitState(this.emitters.scroll, () => this.scrollValue)
     return this.emitRenderRequest()
   }
@@ -1711,7 +1737,8 @@ export class TerminalSession<TEvent = unknown> {
     const linesChanged = current.scrollbackLimit !== next.scrollbackLimit
     const bytesChanged = current.scrollbackByteLimit !== next.scrollbackByteLimit
     const scrollbackChanged = linesChanged || bytesChanged
-    const hadSelection = scrollbackChanged && this.selection.hasSelection
+    const selectionBefore =
+      gridChanged || scrollbackChanged ? this.readObservedSelection() : undefined
     const colorSchemeChanged = current.colorScheme !== next.colorScheme
 
     if (themeChanged) applyTheme(this.terminal, next.theme)
@@ -1727,8 +1754,7 @@ export class TerminalSession<TEvent = unknown> {
     const nextScroll =
       gridChanged || scrollbackChanged ? readScrollSnapshot(this.terminal) : this.scrollValue
     const scrollChanged = !scrollSnapshotsEqual(this.scrollValue, nextScroll)
-    const selectionChanged =
-      hadSelection && this.scrollValue.scrollbackLength !== nextScroll.scrollbackLength
+    const selectionChanged = this.selectionChanged(selectionBefore)
     // Resize listeners can paint synchronously; commit viewport and revision before notifying.
     if (scrollChanged) this.scrollValue = nextScroll
     this.revisionValue += 1
@@ -1772,6 +1798,18 @@ export class TerminalSession<TEvent = unknown> {
     if (!update.selectionChanged) return
     this.emitSelection()
     this.requestRender()
+  }
+
+  private readObservedSelection(): ObservedSelection | undefined {
+    if (!this.emitters.selection.hasListeners) return undefined
+    const coordinates = this.selection.coordinates()
+    return { coordinates, text: coordinates ? this.selection.getSelection() : undefined }
+  }
+
+  private selectionChanged(before: ObservedSelection | undefined): boolean {
+    if (!before) return false
+    const next = this.readObservedSelection()
+    return next !== undefined && !selectionsEqual(before, next)
   }
 
   private emitSelection(): void {

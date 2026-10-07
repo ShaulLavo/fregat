@@ -1149,6 +1149,116 @@ describe('TerminalSession', () => {
     },
   )
 
+  it.each(['write', 'writeAndReadGeometry'] as const)(
+    'publishes selection after %s evicts selected history',
+    async (write) => {
+      const session = await createSession({
+        appearance: {
+          grid: grid({ columns: 40, rows: 12 }),
+          scrollbackByteLimit: 64 * 1024 * 1024,
+          scrollbackLimit: 10000,
+        },
+      })
+      session.write(Array.from({ length: 20000 }, (_, index) => `row-${index}`).join('\r\n'))
+      session.selectRange({ x: 0, y: 10 }, { x: 3, y: 11 })
+      const before = session.selectionCoordinates()
+      const selections: Array<{ event: TerminalSelectionEvent; text: string | undefined }> = []
+      session.on('selection', (event) => selections.push({ event, text: session.getSelection() }))
+      let pruned = false
+      for (let index = 0; index < 1400; index += 1) {
+        const count = session.lineCount()
+        session[write](`\r\nrow-${20000 + index}`)
+        if (session.lineCount() >= count) continue
+        pruned = true
+        break
+      }
+      expect(pruned).toBe(true)
+      expect(session.selectionCoordinates()).not.toEqual(before)
+      expect(session.selectionCoordinates()).toEqual({
+        end: { x: 0, y: 0 },
+        rectangle: false,
+        start: { x: 0, y: 0 },
+      })
+      expect(session.getSelection()).toBe('r')
+      expect(selections.at(-1)).toEqual({
+        event: { coordinates: session.selectionCoordinates(), hasSelection: true },
+        text: session.getSelection(),
+      })
+    },
+  )
+
+  it('publishes eviction changes to copied text when selection coordinates stay the same', async () => {
+    const session = await createSession({
+      appearance: {
+        grid: grid({ columns: 40, rows: 12 }),
+        scrollbackByteLimit: 64 * 1024 * 1024,
+        scrollbackLimit: 10000,
+      },
+    })
+    session.write(
+      Array.from(
+        { length: 20000 },
+        (_, index) => `${String.fromCharCode(65 + (index % 26))}-${index}`,
+      ).join('\r\n'),
+    )
+    session.selectRange({ x: 0, y: 0 }, { x: 0, y: 0 })
+    const coordinates = session.selectionCoordinates()
+    const text = session.getSelection()
+    const selections: Array<{ event: TerminalSelectionEvent; text: string | undefined }> = []
+    session.on('selection', (event) => selections.push({ event, text: session.getSelection() }))
+    let pruned = false
+    for (let index = 0; index < 1400; index += 1) {
+      const count = session.lineCount()
+      session.write(`\r\nrow-${20000 + index}`)
+      if (session.lineCount() >= count) continue
+      pruned = true
+      break
+    }
+    expect(pruned).toBe(true)
+    expect(session.selectionCoordinates()).toEqual(coordinates)
+    expect(session.getSelection()).not.toBe(text)
+    expect(selections.at(-1)).toEqual({
+      event: { coordinates, hasSelection: true },
+      text: session.getSelection(),
+    })
+  })
+
+  it('notifies changed copied text and keeps unchanged selection notifications quiet', async () => {
+    const session = await createSession({ appearance: { grid: grid() } })
+    session.write('abc')
+    session.selectRange({ x: 0, y: 0 }, { x: 2, y: 0 })
+    const coordinates = session.selectionCoordinates()
+    const selections: Array<{ event: TerminalSelectionEvent; text: string | undefined }> = []
+    session.on('selection', (event) => selections.push({ event, text: session.getSelection() }))
+    session.write('\u001b[31m')
+    expect(selections).toEqual([])
+    session.write('\rXYZ')
+    expect(selections).toEqual([{ event: { coordinates, hasSelection: true }, text: 'XYZ' }])
+    session.write('tail')
+    expect(selections).toHaveLength(1)
+  })
+
+  it('publishes reflowed selection coordinates while the history count stays zero', async () => {
+    const session = await createSession({ appearance: { grid: grid({ columns: 80 }) } })
+    session.write('x'.repeat(60))
+    session.selectRange({ x: 45, y: 0 }, { x: 50, y: 0 })
+    expect(session.scrollbackLength).toBe(0)
+    const selections: Array<{ event: TerminalSelectionEvent; text: string | undefined }> = []
+    session.on('selection', (event) => selections.push({ event, text: session.getSelection() }))
+    session.setAppearance({ grid: { columns: 40 } })
+    expect(session.scrollbackLength).toBe(0)
+    expect(session.selectionCoordinates()).toEqual({
+      end: { x: 10, y: 1 },
+      rectangle: false,
+      start: { x: 5, y: 1 },
+    })
+    expect(session.getSelection()).toBe('xxxxxx')
+    expect(selections.at(-1)).toEqual({
+      event: { coordinates: session.selectionCoordinates(), hasSelection: true },
+      text: session.getSelection(),
+    })
+  })
+
   it('preserves the native default byte budget when appearance omits it', async () => {
     const session = await createSession()
     expect(session.appearance.scrollbackByteLimit).toBeGreaterThan(0)
