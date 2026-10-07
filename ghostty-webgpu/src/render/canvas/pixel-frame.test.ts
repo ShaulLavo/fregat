@@ -20,6 +20,13 @@ function fixture() {
   return { memory, putImageData, frame, output }
 }
 
+function uploadedRegion(call: readonly unknown[] | undefined) {
+  if (!call) return undefined
+  const [image, , top] = call
+  if (!(image instanceof ImageDataFixture)) return undefined
+  return [0, top, image.width, image.height]
+}
+
 beforeEach(() => vi.stubGlobal('ImageData', ImageDataFixture))
 afterEach(() => vi.unstubAllGlobals())
 
@@ -65,7 +72,7 @@ describe('WASM output handoff lifetime', () => {
     frame.markRow(0)
     frame.markRow(2)
     frame.present()
-    expect(putImageData.mock.calls.map((call) => call.slice(3))).toEqual([
+    expect(putImageData.mock.calls.map((call) => uploadedRegion(call))).toEqual([
       [0, 0, 4, 2],
       [0, 4, 4, 2],
     ])
@@ -73,7 +80,7 @@ describe('WASM output handoff lifetime', () => {
     frame.markRow(0)
     frame.markRow(1)
     frame.present()
-    expect(putImageData.mock.calls.map((call) => call.slice(3))).toEqual([[0, 0, 4, 4]])
+    expect(putImageData.mock.calls.map((call) => uploadedRegion(call))).toEqual([[0, 0, 4, 4]])
   })
 
   it('retains all scheduled damage after a later upload fails', () => {
@@ -89,7 +96,7 @@ describe('WASM output handoff lifetime', () => {
     expect(() => frame.present()).toThrow('Injected output failure')
     putImageData.mockClear()
     frame.present()
-    expect(putImageData.mock.calls.map((call) => call.slice(3))).toEqual([
+    expect(putImageData.mock.calls.map((call) => uploadedRegion(call))).toEqual([
       [0, 0, 4, 2],
       [0, 4, 4, 2],
     ])
@@ -101,12 +108,49 @@ describe('WASM output handoff lifetime', () => {
     putImageData.mockClear()
     frame.markTransportedRows(-1)
     frame.present()
-    expect(putImageData.mock.calls[0]?.slice(3)).toEqual([0, 0, 4, 4])
+    expect(uploadedRegion(putImageData.mock.calls[0])).toEqual([0, 0, 4, 4])
     const old = frame.getImage()
     frame.invalidate()
     expect(frame.getImage() === old).toBe(false)
     frame.present()
-    expect(putImageData.mock.lastCall?.slice(3)).toEqual([0, 0, 4, 6])
+    expect(uploadedRegion(putImageData.mock.lastCall)).toEqual([0, 0, 4, 6])
+  })
+
+  it('reuses row aliases while exposing changed transparent RGBA bytes', () => {
+    const { frame, memory, putImageData } = fixture()
+    frame.present()
+    frame.markRow(1)
+    frame.present()
+    const image = putImageData.mock.lastCall?.[0]
+    expect(image.data.buffer).toBe(memory.buffer)
+    expect(image.data.byteOffset).toBe(64)
+    expect(image.height).toBe(2)
+    new Uint8Array(memory.buffer).set([17, 29, 43, 0], 64)
+    frame.markRow(1)
+    frame.present()
+    expect(putImageData.mock.lastCall?.[0]).toBe(image)
+    expect(Array.from(image.data.subarray(0, 4))).toEqual([17, 29, 43, 0])
+  })
+
+  it('replaces a presented row alias after memory growth and output rebinding', () => {
+    const { frame, memory, output, putImageData } = fixture()
+    frame.present()
+    frame.markRow(1)
+    frame.present()
+    const old = putImageData.mock.lastCall?.[0]
+    memory.grow(1)
+    frame.markRow(1)
+    frame.present()
+    const grown = putImageData.mock.lastCall?.[0]
+    expect(old.data.byteLength).toBe(0)
+    expect(grown === old).toBe(false)
+    expect(grown.data.buffer).toBe(memory.buffer)
+    frame.bind({ ...output, offset: 160, generation: 1 }, 2)
+    frame.present()
+    frame.markRow(1)
+    frame.present()
+    expect(putImageData.mock.lastCall?.[0].data.byteOffset).toBe(192)
+    expect(putImageData.mock.lastCall?.[0]).not.toBe(grown)
   })
 
   it('rejects invalid rows, shape, memory bounds and disposed access', () => {

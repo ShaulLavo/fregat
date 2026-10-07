@@ -28,6 +28,7 @@ export class PixelFrame {
   }
   private readonly dirty = new Set<number>()
   private view?: FrameView
+  private rowTransfer?: { source: ImageData; top: number; height: number; image: ImageData }
   private rowHeight = 0
   private output?: FrameOutput
 
@@ -45,6 +46,7 @@ export class PixelFrame {
     this.output = { ...output }
     this.rowHeight = rowHeight
     if (old && this.sameOutput(old, output) && oldRowHeight === rowHeight) return
+    this.rowTransfer = undefined
     this.dirty.clear()
     for (let y = 0; y < output.height / rowHeight; y++) this.dirty.add(y)
   }
@@ -85,6 +87,7 @@ export class PixelFrame {
   }
 
   invalidate(): void {
+    this.rowTransfer = undefined
     this.view = undefined
     const output = this.output
     if (!output) return
@@ -92,6 +95,7 @@ export class PixelFrame {
   }
 
   dispose(): void {
+    this.rowTransfer = undefined
     this.dirty.clear()
     this.output = undefined
     this.view = undefined
@@ -129,7 +133,22 @@ export class PixelFrame {
       throw createGhosttyError('canvas.frame', 'Canvas pixel memory changed during presentation')
     const top = first * this.rowHeight
     const height = (last - first + 1) * this.rowHeight
-    this.context.putImageData(image, 0, 0, 0, top, image.width, height)
+    let transfer = this.rowTransfer
+    if (
+      !transfer ||
+      transfer.source !== image ||
+      transfer.top !== top ||
+      transfer.height !== height
+    ) {
+      const pixels = new Uint8ClampedArray(
+        image.data.buffer,
+        image.data.byteOffset + top * image.width * 4,
+        image.width * height * 4,
+      )
+      transfer = { source: image, top, height, image: new ImageData(pixels, image.width, height) }
+      this.rowTransfer = transfer
+    }
+    this.context.putImageData(transfer.image, 0, top)
     this.metrics.uploadedRegions += 1
     this.metrics.uploadedPixelBytes += image.width * height * 4
   }
