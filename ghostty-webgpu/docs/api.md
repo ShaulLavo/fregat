@@ -67,10 +67,12 @@ value after a page is removed. The effective budget permits at least one standar
 so small values, including zero, can retain more rows than configured. Pages that overlap the
 active screen stay whole. Page capacity depends on terminal width, styles, and graphemes.
 
-`appearance.scrollbackByteLimit` sets the native page-granular allocation budget. Both budgets
-apply independently, and the first reached triggers pruning. Creation preserves Ghostty's native
-byte budget when this option is omitted. Zero erases retained history and disables further
-scrollback. The alternate screen always contains only its active rows.
+`appearance.scrollbackByteLimit` sets a logical page-allocation budget that includes the active
+area. A positive budget is raised to Ghostty's minimum: enough standard pages for the active
+area plus one extra page. Both budgets apply independently, and the first reached triggers
+pruning. Creation preserves Ghostty's native byte budget when this option is omitted. Zero
+erases retained history and disables further scrollback. The alternate screen always contains
+only its active rows.
 
 ```ts
 const terminal = await Terminal.create({
@@ -94,7 +96,9 @@ The browser-independent `GhosttyTerminal` exposes `scrollbackLength` for actual 
 `setScrollbackLimit(undefined)` and `setScrollbackByteLimit(undefined)` remove the corresponding
 budget. `TerminalSession` exposes the same setters and publishes scroll and selection changes
 when a budget prunes history.
-Unlimited lines still obey the byte budget; unlimited bytes still obey the line budget.
+Unlimited lines still obey the byte budget; unlimited bytes still obey the line budget. The
+wasm32 unlimited sentinel `0xffffffff` is accepted for either budget and canonicalized to
+`undefined` in core readback and main/worker appearance.
 
 The shipped native artifact uses the pinned official Ghostty source without patches. Its
 [page limit enforcement](https://github.com/ghostty-org/ghostty/blob/7b11f3dca034d8d24369ad3856afe57946d7902a/src/terminal/PageList.zig#L6991-L7041)

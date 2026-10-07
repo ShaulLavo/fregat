@@ -1043,6 +1043,72 @@ describe('TerminalSession', () => {
     expect(session.scrollbackLength).toBe(1)
   })
 
+  it.each([
+    { scrollbackLimit: 4, scrollbackByteLimit: -1 },
+    { scrollbackByteLimit: 0, grid: { columns: 65536 } },
+    { scrollbackByteLimit: 0, grid: { rows: 65536 } },
+    { scrollbackByteLimit: 0, grid: { cellWidth: 0x100000000 } },
+    { scrollbackByteLimit: 0, grid: { cellHeight: 0x100000000 } },
+  ])('rejects compound appearance updates without changing native history: %j', async (update) => {
+    const session = await createSession({
+      appearance: {
+        grid: grid({ columns: 40, rows: 12 }),
+        scrollbackByteLimit: 64 * 1024 * 1024,
+        scrollbackLimit: 10000,
+      },
+    })
+    session.write(Array.from({ length: 20000 }, (_, index) => `row-${index}`).join('\r\n'))
+    session.selectLines(0, 1)
+    const before = {
+      appearance: session.appearance,
+      count: session.lineCount(),
+      coordinates: session.selectionCoordinates(),
+      history: session.readLines(0, Infinity),
+      revision: session.revision,
+      scrollback: session.scrollbackLength,
+      scrollbar: session.scrollbar,
+      selection: session.getSelection(),
+      viewportActive: session.viewportActive,
+    }
+    const events: string[] = []
+    for (const type of ['appearance', 'resize', 'scroll', 'selection', 'renderRequest'] as const) {
+      session.on(type, () => events.push(type))
+    }
+    expect(() => session.setAppearance(update)).toThrow()
+    expect({
+      appearance: session.appearance,
+      count: session.lineCount(),
+      coordinates: session.selectionCoordinates(),
+      history: session.readLines(0, Infinity),
+      revision: session.revision,
+      scrollback: session.scrollbackLength,
+      scrollbar: session.scrollbar,
+      selection: session.getSelection(),
+      viewportActive: session.viewportActive,
+    }).toEqual(before)
+    expect(session.appearance).toBe(before.appearance)
+    expect(events).toEqual([])
+    session.write('\r\nstill retained')
+    expect(session.lineCount()).toBe(before.count + 1)
+  })
+
+  it('canonicalizes native unlimited sentinels in creation and both appearance setters', async () => {
+    const session = await createSession({
+      appearance: { scrollbackByteLimit: 0xffffffff, scrollbackLimit: 0xffffffff },
+    })
+    expect(session.appearance.scrollbackByteLimit).toBeUndefined()
+    expect(session.appearance.scrollbackLimit).toBeUndefined()
+    session.setAppearance({ scrollbackByteLimit: 0, scrollbackLimit: 10 })
+    session.setAppearance({ scrollbackByteLimit: 0xffffffff, scrollbackLimit: 0xffffffff })
+    expect(session.appearance.scrollbackByteLimit).toBeUndefined()
+    expect(session.appearance.scrollbackLimit).toBeUndefined()
+    session.setAppearance({ scrollbackByteLimit: 0, scrollbackLimit: 10 })
+    session.setScrollbackByteLimit(0xffffffff)
+    session.setScrollbackLimit(0xffffffff)
+    expect(session.appearance.scrollbackByteLimit).toBeUndefined()
+    expect(session.appearance.scrollbackLimit).toBeUndefined()
+  })
+
   it('preserves the native default byte budget when appearance omits it', async () => {
     const session = await createSession()
     expect(session.appearance.scrollbackByteLimit).toBeGreaterThan(0)

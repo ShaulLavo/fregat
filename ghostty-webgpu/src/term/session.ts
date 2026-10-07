@@ -29,7 +29,11 @@ import {
   type SelectionGestureUpdate,
   type SelectionPoint,
 } from '../core/selection.js'
-import { GhosttyTerminal } from '../core/terminal.js'
+import {
+  GhosttyTerminal,
+  normalizeScrollbackLimit,
+  normalizeTerminalSize,
+} from '../core/terminal.js'
 import { normalizeCellGeometry } from '../core/types.js'
 import type {
   CustomOscObservation,
@@ -696,7 +700,18 @@ function createAppearance(
 }
 
 function freezeAppearance(appearance: TerminalAppearance): TerminalAppearance {
-  return Object.freeze(appearance)
+  normalizeTerminalSize(nativeGrid(appearance.grid))
+  return Object.freeze({
+    ...appearance,
+    scrollbackByteLimit: normalizeScrollbackLimit(
+      appearance.scrollbackByteLimit,
+      'ghostty_terminal_set(SCROLLBACK_MAX_BYTES)',
+    ),
+    scrollbackLimit: normalizeScrollbackLimit(
+      appearance.scrollbackLimit,
+      'ghostty_terminal_set(SCROLLBACK_MAX_LINES)',
+    ),
+  })
 }
 
 function mergeAppearance(

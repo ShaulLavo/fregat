@@ -102,6 +102,14 @@ describe('built native history API in Chromium', () => {
       await expect
         .poll(() => mirrorRows().map((row) => row.getAttribute('aria-setsize')))
         .toEqual(Array(rows).fill(String(rows)))
+      await terminal.setAppearance({
+        scrollbackByteLimit: 0xffffffff,
+        scrollbackLimit: 0xffffffff,
+      })
+      expect(terminal.appearance.scrollbackByteLimit).toBeUndefined()
+      expect(terminal.appearance.scrollbackLimit).toBeUndefined()
+      await terminal.write('\r\nunlimited')
+      expect(await terminal.lineCount()).toBe(rows + 1)
     },
   )
 
