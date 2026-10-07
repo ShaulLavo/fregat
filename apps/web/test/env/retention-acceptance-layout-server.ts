@@ -58,17 +58,19 @@ export async function startLayoutServers(preferredPeer: string, primary: string)
     const stopPeer = await startLayoutServer(peer, web, 'peer')
     return {
       peer: peer.origin,
-      stop: async () => {
-        try {
-          await stopPeer()
-        } finally {
-          await stopPrimary()
-        }
-      },
+      stop: () => stopLayoutPair(stopPeer, stopPrimary),
     }
   } catch (error) {
     await stopPrimary()
     throw error
+  }
+}
+
+async function stopLayoutPair(stopPeer: () => Promise<void>, stopPrimary: () => Promise<void>) {
+  try {
+    await stopPeer()
+  } finally {
+    await stopPrimary()
   }
 }
 
