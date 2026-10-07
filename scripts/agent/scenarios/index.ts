@@ -175,6 +175,7 @@ import { chatResume } from './chat-resume'
 import { chatTurnSettle } from './chat-turn-settle'
 import { devicePairing } from './device-pairing'
 import { phoneShell } from './phone-shell'
+import { phoneListReturn } from './phone-list-return'
 import { phoneContextMenus } from './phone-context-menus'
 import { phoneSurfaces } from './phone-surfaces'
 import { phoneComposer } from './phone-composer'
@@ -841,6 +842,7 @@ export const scenarios: readonly Scenario[] = [
   chatTurnSettle,
   devicePairing,
   phoneShell,
+  phoneListReturn,
   phoneContextMenus,
   phoneSurfaces,
   phoneComposer,

@@ -578,6 +578,7 @@ export const selectors = {
   sessionDraggingRow: (page: Page) =>
     page.locator('aside [aria-roledescription="sortable session row"][data-dragging="true"]'),
   sessionRail: (page: Page) => page.getByRole('listbox', { name: 'Sessions', exact: true }),
+  sessionMarkedRowSelector: '[aria-label="Sessions"] [data-slot="list-row"][data-marked="true"]',
   sessionRowForWorktree,
   sessionPullRequestBadge: (page: Page, worktreeId: string) =>
     sessionRowForWorktree(page, worktreeId).locator('[data-pull-request-state]'),
@@ -1290,6 +1291,7 @@ export const selectors = {
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
   phoneTerminalCanvas: (page: Page) => page.locator('[data-phone-level="terminal"] canvas').first(),
   phoneFirstScreenSelector: '[data-phone-level="sessions"] section[aria-label="Sessions"]',
+  phoneLevelSelector: '[data-phone-level]',
   desktopFirstScreenSelector: '[aria-label="Window toolbar"]',
   phoneShell: (page: Page) => page.locator('[data-phone-shell]'),
   /** The phone shell showing `level`: sessions, session, changes, file or terminal. */
