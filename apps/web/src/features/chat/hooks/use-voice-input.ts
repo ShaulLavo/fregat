@@ -1,9 +1,10 @@
-import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useIsMutating, useMutation } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useStore } from 'zustand'
 import type { LexicalEditor } from 'lexical'
 
 import { useSettingValue } from '@/hooks/use-setting-value'
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat-input-draft-store'
 import { BrowserVoiceInput, browserSpeechRecognition } from '../utils/browser-voice-input'
 import { readChatInputSelection, replaceChatInputEditorRange } from '../utils/input-editor-actions'
@@ -15,7 +16,6 @@ export function useVoiceInput(
   draftTarget: ChatInputDraftTarget,
   editorRef: RefObject<LexicalEditor | null>,
 ) {
-  const queryClient = useQueryClient()
   const [capture] = useState(() => new BrowserVoiceInput())
   const phase = useStore(capture.store, (state) => state.phase)
   const elapsedSeconds = useStore(capture.store, (state) => state.elapsedSeconds)
@@ -24,16 +24,20 @@ export function useVoiceInput(
   const ownerKey = `${draftTarget.environmentId}:${draftTarget.rootPath}:${draftTarget.draftKey}`
   const currentOwner = useRef(ownerKey)
   const mutationKey = chatMutationKeys.voice(ownerKey)
-  const pending = useIsMutating({ mutationKey }) > 0
-  const anyPending = useIsMutating({ mutationKey: chatMutationKeys.voiceAll }) > 0
-  const mutation = useMutation({
-    mutationKey,
-    scope: { id: 'chat-voice-input' },
-    retry: false,
-    networkMode: 'always',
-    mutationFn: () =>
-      dictateDraft({ capture, editorRef, currentOwner, ownerKey, draftTarget, limitSeconds }),
-  })
+  const pending = useIsMutating({ mutationKey }, resourceQueryClient) > 0
+  const anyPending =
+    useIsMutating({ mutationKey: chatMutationKeys.voiceAll }, resourceQueryClient) > 0
+  const mutation = useMutation(
+    {
+      mutationKey,
+      scope: { id: 'chat-voice-input' },
+      retry: false,
+      networkMode: 'always',
+      mutationFn: () =>
+        dictateDraft({ capture, editorRef, currentOwner, ownerKey, draftTarget, limitSeconds }),
+    },
+    resourceQueryClient,
+  )
   const reset = mutation.reset
   useEffect(() => {
     currentOwner.current = ownerKey
@@ -57,7 +61,7 @@ export function useVoiceInput(
     preview,
     error: mutation.error,
     start: () => {
-      if (queryClient.isMutating({ mutationKey: chatMutationKeys.voiceAll }) === 0)
+      if (resourceQueryClient.isMutating({ mutationKey: chatMutationKeys.voiceAll }) === 0)
         mutation.mutate()
     },
     finish: () => capture.finish(),

@@ -1,6 +1,7 @@
 import { strictEqual } from 'node:assert/strict'
 import { createSpeechRecognitionFixture } from '../../../apps/web/test/factories/speech-recognition'
 import { selectors } from '../selectors'
+import { readCaches } from '../cache-snapshot'
 import { isolatedNativeScenario, withUserSetting } from './native-provider-verification'
 
 export const chatDictation = isolatedNativeScenario({
@@ -27,6 +28,12 @@ export const chatDictation = isolatedNativeScenario({
     strictEqual(await selectors.chatSend(page).isDisabled(), true)
     await page.evaluate(() => window.speechRecognitionFixture?.current?.result('friend', false))
     await selectors.dictationStatus(page).getByText('friend', { exact: true }).waitFor()
+    const recordingCaches = await page.evaluate(readCaches)
+    const voiceCapture = recordingCaches
+      .find((cache) => cache.scope === 'resources')
+      ?.mutations.find((mutation) => mutation.key.startsWith('["chat","voice"'))
+    strictEqual(voiceCapture?.status, 'pending')
+    strictEqual(voiceCapture?.scope, 'chat-voice-input')
     await step('recording-selected-text')
     await page.evaluate(() => window.speechRecognitionFixture?.current?.result('friend'))
     await selectors.dictationFinish(page).click()
@@ -79,5 +86,6 @@ export const chatDictation = isolatedNativeScenario({
     await page.setViewportSize({ width: 390, height: 844 })
     await step('phone-composer')
     await page.setViewportSize({ width: 1440, height: 900 })
+    return { recordingCaches, completedCaches: await page.evaluate(readCaches) }
   },
 })
