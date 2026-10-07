@@ -34,6 +34,14 @@ import {
 } from './test/factories/retention-acceptance-reload-transport'
 import { createRetentionSocketProvenance } from './test/factories/retention-acceptance-socket-provenance'
 import type {} from './test/factories/retention-acceptance-entry.tsx'
+import {
+  beginColdProfile,
+  markColdProfile,
+  acceptColdFact,
+  safeColdObserve,
+} from './test/factories/retention-cold-profile'
+import { retentionColdBrowser } from './test/factories/retention-cold-browser'
+import { retentionColdServer } from './test/factories/retention-cold-server'
 
 export default defineConfig(({ mode }) =>
   mode === 'retention-acceptance-entry'
@@ -41,7 +49,11 @@ export default defineConfig(({ mode }) =>
         ...base,
         root: import.meta.dirname,
         test: undefined,
-        plugins: [...(base.plugins ?? []), retentionEntryReceiptPlugin()],
+        plugins: [
+          ...(base.plugins ?? []),
+          retentionEntryReceiptPlugin(),
+          ...retentionColdServer(process.env.CI === 'true'),
+        ],
       }
     : {
         ...base,
@@ -217,6 +229,15 @@ async function performRetentionAcceptanceReload(
   )
   const output = await mkdtemp(join(tmpdir(), 'retention-acceptance-reload-'))
   controllerMarks.setupReadyAt = Date.now()
+  const profiling = beginColdProfile(process.env.CI === 'true', arm, output)
+  const profile = (stage: Parameters<typeof markColdProfile>[0], queued = 0) => {
+    if (profiling) markColdProfile(stage, queued)
+  }
+  profile('start')
+  if (profiling)
+    safeColdObserve(() => {
+      void page.addInitScript(retentionColdBrowser).catch(() => {})
+    })
   beginRetentionEntryCase(entryOrigin, output, timings)
   const errors: string[] = []
   const pending = new Set<string>()
@@ -232,10 +253,14 @@ async function performRetentionAcceptanceReload(
       error: request.failure()?.errorText ?? null,
     })
   })
+  profile('setup')
+  if (profiling)
+    signal.addEventListener('abort', () => profile('cancelled', pending.size), { once: true })
   page.on('console', (message) => {
     const type = message.type()
     const text = message.text()
     consoleMessages.push({ type, text })
+    if (profiling) acceptColdFact(text)
     observeRetentionReadiness(text, (browser) => {
       console.info(
         'RETENTION_READINESS ' + JSON.stringify({ operationId, arm, at: Date.now(), browser }),
@@ -264,6 +289,7 @@ async function performRetentionAcceptanceReload(
     phase = 'baseline-ready'
     await waitForRetentionAcceptanceEntry(page, 'baseline')
     timings.baselineReadyAt = Date.now()
+    profile('baseline-ready', pending.size)
     const before = await page.evaluate(() => window.__retentionAcceptanceEntry?.capture())
     await page.addInitScript((saved) => {
       const savedKeys = Object.keys(localStorage).filter((key) =>
@@ -356,9 +382,11 @@ async function performRetentionAcceptanceReload(
     reloading = true
     await page.reload()
     timings.reloadLoadedAt = Date.now()
+    profile('reload-loaded', pending.size)
     timings.browserTimeOrigin = await page.evaluate(() => performance.timeOrigin)
     await waitForRetentionAcceptanceEntry(page, 'reload')
     timings.reloadReadyAt = Date.now()
+    profile('reload-ready', pending.size)
     phase = 'code-font-loaded'
     const fontLoadReceipt = await page.evaluate(async () => {
       const font = '13px "JetBrains Mono Variable"'
@@ -378,12 +406,14 @@ async function performRetentionAcceptanceReload(
       }
     })
     timings.fontReadyAt = Date.now()
+    profile('font-ready', pending.size)
     const after = await page.evaluate(() => window.__retentionAcceptanceEntry?.capture())
     const frames = await page.evaluate(() => window.__retentionAcceptanceReloadFrames)
     const cacheReceipt = await page.evaluate(() => window.__retentionAcceptanceReloadCacheReceipt)
     const screenshot = join(output, 'page.png')
     await page.screenshot({ path: screenshot, fullPage: true })
     timings.screenshotCompleteAt = Date.now()
+    profile('screenshot', pending.size)
     const result = {
       arm,
       before,
@@ -527,6 +557,7 @@ async function performRetentionAcceptanceReload(
         operation,
       )
       controllerMarks.cleanupReadyAt = Date.now()
+      profile('cleanup', pending.size)
       artifactFailures.push(
         ...(await archiveRetentionReloadArtifact(output, 'cleanup.json', {
           phase,
