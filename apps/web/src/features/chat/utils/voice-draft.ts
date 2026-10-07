@@ -1,4 +1,4 @@
-// Adapted from T3 Code. Copyright (c) 2026 T3 Tools Inc. MIT license: docs/licenses/t3code.txt.
+// Adapted from T3 Code. Copyright (c) 2026 T3 Tools Inc. MIT license: apps/web/public/licenses/t3code.txt.
 export type VoiceDraftSnapshot = {
   readonly ownerKey: string
   readonly text: string
