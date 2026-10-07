@@ -1,10 +1,15 @@
 import '../../../dist/worker/entry.js'
+import type { WorkerInitialize, WorkerMessage, WorkerRequest } from '../protocol.js'
 import { observeDevice, type DeviceLifecycleCounts } from './device-lifecycle.js'
 
 export type DeviceLifecycleObservation =
   | { readonly type: 'acquired'; readonly device: number }
-  | { readonly type: 'waiting' }
-  | { readonly type: 'closed'; readonly devices: readonly DeviceLifecycleCounts[] }
+  | { readonly type: 'waiting'; readonly device: number }
+  | { readonly type: 'destroyed'; readonly device: number }
+  | {
+      readonly type: 'completed' | 'inspected'
+      readonly devices: readonly DeviceLifecycleCounts[]
+    }
 
 const channel = new BroadcastChannel('packaged-worker-device-lifecycle')
 const mode = new URL(globalThis.location.href).searchParams.get('lifecycle')
@@ -14,17 +19,23 @@ const fence = Promise.withResolvers<void>()
 const requestDevice = GPUAdapter.prototype.requestDevice
 GPUAdapter.prototype.requestDevice = async function (descriptor) {
   const device = await requestDevice.call(this, descriptor)
+  const identity = devices.length
   losses.push(device.destroy.bind(device))
   const wait = device.queue.onSubmittedWorkDone.bind(device.queue)
-  if (mode === 'held')
+  if (mode === 'held' || (mode === 'retired-held' && identity === 0))
     device.queue.onSubmittedWorkDone = () => {
-      channel.postMessage({ type: 'waiting' })
+      channel.postMessage({ type: 'waiting', device: identity })
       return Promise.all([wait(), fence.promise]).then(() => undefined)
     }
   if (mode === 'rejected')
     device.queue.onSubmittedWorkDone = () =>
       Promise.reject(new DOMException('Fixture queue fence rejected', 'OperationError'))
-  const counts = observeDevice(device, devices.length)
+  const counts = observeDevice(device, identity)
+  const destroy = device.destroy.bind(device)
+  device.destroy = () => {
+    destroy()
+    channel.postMessage({ type: 'destroyed', device: identity })
+  }
   devices.push(counts)
   channel.postMessage({ type: 'acquired', device: counts.device })
   return device
@@ -35,13 +46,33 @@ if (mode === 'setup-failed')
     throw new DOMException('Fixture canvas configuration failed', 'OperationError')
   }
 
-channel.onmessage = ({ data }: MessageEvent<'release' | 'lose'>) => {
+channel.onmessage = ({ data }: MessageEvent<'release' | 'lose' | 'inspect'>) => {
   if (data === 'release') fence.resolve()
   if (data === 'lose') losses.at(-1)?.()
+  if (data === 'inspect') channel.postMessage({ type: 'inspected', devices })
 }
 
-const close = globalThis.close.bind(globalThis)
-globalThis.close = () => {
-  channel.postMessage({ type: 'closed', devices })
-  close()
+const scope = globalThis as unknown as {
+  onmessage(event: MessageEvent<WorkerInitialize>): void
+}
+const initialize = scope.onmessage
+scope.onmessage = (event) => {
+  const port = event.data.port
+  let opening: number | undefined
+  let disposing: number | undefined
+  port.addEventListener('message', ({ data }: MessageEvent<WorkerRequest>) => {
+    if (data.command === 'open') opening = data.id
+    if (data.command === 'dispose') disposing = data.id
+  })
+  const send = port.postMessage.bind(port)
+  port.postMessage = (message: WorkerMessage) => {
+    if (
+      message.type === 'fatal' ||
+      (message.type === 'reply' &&
+        (message.id === disposing || (message.id === opening && !!message.failure)))
+    )
+      channel.postMessage({ type: 'completed', devices })
+    send(message)
+  }
+  initialize(event)
 }

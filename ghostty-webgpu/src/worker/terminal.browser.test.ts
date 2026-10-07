@@ -93,7 +93,7 @@ it('waits and destroys each public Window device once', async () => {
   }
 })
 
-it.each(['normal', 'recovered', 'held', 'rejected', 'setup-failed'] as const)(
+it.each(['normal', 'recovered', 'held', 'retired-held', 'rejected', 'setup-failed'] as const)(
   'waits and destroys each public worker device once before closing (%s)',
   async (mode) => {
     const channel = new BroadcastChannel('packaged-worker-device-lifecycle')
@@ -120,7 +120,8 @@ it.each(['normal', 'recovered', 'held', 'rejected', 'setup-failed'] as const)(
           () => terminal.visibleLines()[0]?.includes('known-good lifecycle') === true,
         )
       }
-      if (mode === 'recovered') {
+      const recovering = mode === 'recovered' || mode === 'retired-held'
+      if (recovering) {
         const frame = terminal.submittedFrame!.frame
         channel.postMessage('lose')
         await eventually(() =>
@@ -131,20 +132,38 @@ it.each(['normal', 'recovered', 'held', 'rejected', 'setup-failed'] as const)(
         await eventually(() => terminal.visibleLines()[0]?.includes('recovered lifecycle') === true)
       }
       const disposal = terminal.dispose()
-      if (mode === 'held') {
+      if (mode === 'retired-held') {
+        await eventually(() =>
+          observations.some((value) => value.type === 'destroyed' && value.device === 1),
+        )
+        channel.postMessage('inspect')
+        await eventually(() =>
+          observations.some((value) => value.type === 'inspected' || value.type === 'completed'),
+        )
+        console.info('Packaged worker pending retired device', JSON.stringify(observations))
+        expect(observations.some((value) => value.type === 'completed')).toBe(false)
+        expect(observations.find((value) => value.type === 'inspected')).toEqual({
+          type: 'inspected',
+          devices: [
+            { device: 0, waits: 1, destroys: 0 },
+            { device: 1, waits: 1, destroys: 1 },
+          ],
+        })
+      }
+      if (mode === 'held' || mode === 'retired-held') {
         await eventually(() => observations.some((value) => value.type === 'waiting'))
-        expect(observations.some((value) => value.type === 'closed')).toBe(false)
+        expect(observations.some((value) => value.type === 'completed')).toBe(false)
         channel.postMessage('release')
       }
       await disposal
       await terminal.dispose()
-      await eventually(() => observations.some((value) => value.type === 'closed'))
-      const closed = observations.find((value) => value.type === 'closed')!
+      await eventually(() => observations.some((value) => value.type === 'completed'))
+      const completed = observations.find((value) => value.type === 'completed')!
       console.info('Packaged worker device lifecycle', mode, JSON.stringify(observations))
-      const count = mode === 'recovered' ? 2 : 1
+      const count = recovering ? 2 : 1
       expect(observations.filter((value) => value.type === 'acquired')).toHaveLength(count)
-      expect(closed).toEqual({
-        type: 'closed',
+      expect(completed).toEqual({
+        type: 'completed',
         devices: Array.from({ length: count }, (_, device) => ({ device, waits: 1, destroys: 1 })),
       })
     } finally {
