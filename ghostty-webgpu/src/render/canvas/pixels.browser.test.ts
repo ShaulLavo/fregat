@@ -99,6 +99,28 @@ it.each([1, 2])(
   },
 )
 
+it.each([
+  ['canvas2d-pixels', true],
+  ['canvas2d-fill-text', false],
+] as const)(
+  'chooses software backing %s only for pixel uploads',
+  async (rendererMode, software) => {
+    const { state } = await native('\x1b[?25lbacking 界')
+    const canvas = document.createElement('canvas')
+    const renderer = await CanvasTerminalRenderer.create({
+      canvas,
+      columns: 24,
+      rows: 4,
+      font: fittedFont(),
+      renderState: state,
+      schedulerClock: new TestClock(),
+      rendererMode,
+    })
+    cleanups.push(() => renderer.dispose())
+    expect(canvas.getContext('2d')!.getContextAttributes().willReadFrequently).toBe(software)
+  },
+)
+
 it('keeps default fillText free of compose downloads and explicit pixels on the same native state', async () => {
   const { state } = await native('\x1b[?25lhello 界')
   const options = { columns: 24, rows: 4, font: fittedFont(), renderState: state }
