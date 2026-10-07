@@ -124,6 +124,7 @@ runs:
             /^  https:\/\/github\.com\/[^/[:space:]]+\/[^/[:space:]]+\/releases\/download\/[^[:space:]]+\.tgz$/ { next }
             /^\+ [^[:space:]]+$/ || /^[0-9]+ packages? installed \[[0-9.]+(ms|s)\]$/ { next }
             /^Failed to install [0-9]+ packages?$/ { next }
+            /^\[[0-9]+\.[0-9][0-9]ms\] done$/ { next }
             { other++ }
             END { exit !(errors > 0 && other == 0) }
           ' "$log" || [[ "$attempt" == 6 ]] || (( status >= 128 )); then
