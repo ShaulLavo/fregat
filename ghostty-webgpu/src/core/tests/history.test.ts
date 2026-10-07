@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { GhosttyResult, TerminalOption } from '../abi.js'
 import { TERMINAL_READ_LINES_MAX_ROWS } from '../grid-text.js'
 import { GhosttyRuntime } from '../runtime.js'
 import { GhosttySelectionGesture } from '../selection.js'
@@ -11,6 +12,30 @@ afterEach(() => {
 })
 
 describe('terminal history', () => {
+  it.each(['row', '界é👩‍💻'])('retains exactly the configured lines for %s', async (prefix) => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 40, rows: 12 })
+    terminal.setScrollbackLimit(10000)
+    const pointer = runtime.memory.allocate(4)
+    try {
+      runtime.memory.view.setUint32(pointer, 64 * 1024 * 1024, true)
+      expect(
+        runtime.exports.ghostty_terminal_set(
+          terminal.handle,
+          TerminalOption.ScrollbackMaxBytes,
+          pointer,
+        ),
+      ).toBe(GhosttyResult.Success)
+    } finally {
+      runtime.memory.free(pointer, 4)
+    }
+    terminal.write(Array.from({ length: 10012 }, (_, index) => `${prefix}-${index}`).join('\r\n'))
+    expect(terminal.scrollbackLength).toBe(10000)
+    for (let index = 10012; index < 20000; index += 1) terminal.write(`\r\n${prefix}-${index}`)
+    console.log(`40x12 ${prefix}: limit=10000 bytes=67108864 retained=${terminal.scrollbackLength}`)
+    expect(terminal.scrollbackLength).toBe(10000)
+  })
+
   it('reads retained rows oldest-first after scrollback overflow', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 12, rows: 3 })
