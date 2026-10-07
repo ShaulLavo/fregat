@@ -263,7 +263,7 @@ export async function waitForHealth(
   while (Date.now() < deadline) {
     if (child.exitCode !== null) break
     const signal = AbortSignal.timeout(Math.max(1, deadline - Date.now()))
-    const healthy = await ownServerReadiness(origin, webOrigin, directory, signal).catch(
+    const healthy = await ownServerReadiness(child, origin, webOrigin, directory, signal).catch(
       () => false,
     )
     if (healthy && child.exitCode === null) return
@@ -278,21 +278,25 @@ export async function waitForHealth(
 }
 
 async function ownServerReadiness(
+  child: Bun.Subprocess,
   origin: string,
   webOrigin: string,
   directory: string,
   signal: AbortSignal,
 ) {
-  const health = await fetch(new URL('/health', origin), { headers: { origin: webOrigin }, signal })
-  if (!health.ok) return false
-  const descriptor: unknown = await health.json()
-  if (typeof descriptor !== 'object' || descriptor === null) return false
-  if (
-    !('metadataDbPath' in descriptor) ||
-    descriptor.metadataDbPath !== path.join(directory, 'home', 'fs-metadata.sqlite')
-  )
-    return false
-  return (await fixtureReadiness(new URL(origin), webOrigin, { signal })).ok
+  const fetcher = async (url: URL, init: RequestInit) => {
+    if (child.exitCode !== null) return Response.error()
+    const response = await fetch(url, init)
+    if (url.pathname !== '/health' || !response.ok) return response
+    const descriptor: unknown = await response.clone().json()
+    const own =
+      typeof descriptor === 'object' &&
+      descriptor !== null &&
+      'metadataDbPath' in descriptor &&
+      descriptor.metadataDbPath === path.join(directory, 'home', 'fs-metadata.sqlite')
+    return own && child.exitCode === null ? response : Response.error()
+  }
+  return (await fixtureReadiness(new URL(origin), webOrigin, { fetcher, signal })).ok
 }
 
 async function stopServer(child: Bun.Subprocess, directory: string, logs?: string) {

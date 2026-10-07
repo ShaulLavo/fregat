@@ -228,3 +228,48 @@ it('rejects a different healthy API before sending readiness mutations and leave
     rmSync(directory, { recursive: true, force: true })
   }
 })
+
+it('sends no readiness mutation when the owned child exits during a matching health response', async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'fregat-delayed-health-'))
+  const child = Bun.spawn({
+    cmd: [process.execPath, '--eval', 'await Bun.sleep(100)'],
+    stdin: 'ignore',
+    stdout: 'ignore',
+    stderr: 'ignore',
+  })
+  let healthCalls = 0
+  let clears = 0
+  const foreign = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    async fetch(request) {
+      if (new URL(request.url).pathname === '/terminal/clear') {
+        clears += 1
+        return Response.json({ ok: true })
+      }
+      healthCalls += 1
+      if (healthCalls === 1) {
+        await child.exited
+        return Response.json({
+          ok: true,
+          metadataDbPath: path.join(directory, 'home', 'fs-metadata.sqlite'),
+        })
+      }
+      return Response.json({ ok: true, metadataDbPath: '/foreign-run/fs-metadata.sqlite' })
+    },
+  })
+  const origin = `http://127.0.0.1:${foreign.port}`
+  try {
+    await expect(waitForHealth(child, origin, 'http://localhost:5238', directory)).rejects.toThrow(
+      'did not become healthy',
+    )
+    expect(child.exitCode).toBe(0)
+    expect(clears).toBe(0)
+    expect((await fetch(`${origin}/health`)).ok).toBe(true)
+  } finally {
+    if (child.exitCode === null) child.kill('SIGTERM')
+    await child.exited
+    foreign.stop(true)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
