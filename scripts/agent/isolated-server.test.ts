@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { readLogs } from './logs'
 
 import { TerminalHostClient } from '../../apps/server/src/terminal/host-client'
-import { startIsolatedServer, type IsolatedServer } from './isolated-server'
+import { startIsolatedServer, waitForHealth, type IsolatedServer } from './isolated-server'
 
 it.each(['bun', 'node'])(
   'ends the isolated host and its live shell through %s before removing its home',
@@ -135,3 +135,96 @@ it('preserves accepted client events and the shutdown receipt before removing is
     rmSync(evidence, { recursive: true, force: true })
   }
 }, 40_000)
+
+it('keeps independent concurrent callers on their own API identities and removes each home', async () => {
+  const entry = new URL('./isolated-server.ts', import.meta.url).href
+  const callers: Bun.Subprocess<'ignore', 'pipe', 'pipe'>[] = []
+  try {
+    for (let index = 0; index < 4; index += 1) {
+      callers.push(
+        Bun.spawn({
+          cmd: [
+            process.execPath,
+            '--eval',
+            `
+          import { startIsolatedServer } from ${JSON.stringify(entry)};
+          const web = new URL('http://localhost:5238');
+          const server = await startIsolatedServer(web);
+          try {
+            const health = await (await fetch(server.origin + '/health', { headers: { origin: web.origin } })).json();
+            console.log(JSON.stringify({ origin: server.origin, directory: server.directory, home: server.home, identity: health.environmentId, database: health.metadataDbPath }));
+            await Bun.sleep(1500);
+          } finally { await server.stop(); }
+        `,
+          ],
+          stdin: 'ignore',
+          stdout: 'pipe',
+          stderr: 'pipe',
+        }),
+      )
+      await Bun.sleep(100)
+    }
+    const receipts = await Promise.all(callers.map(readCallerReceipt))
+    expect(new Set(receipts.map((receipt) => receipt.origin)).size).toBe(callers.length)
+    expect(new Set(receipts.map((receipt) => receipt.identity)).size).toBe(callers.length)
+    for (const receipt of receipts) {
+      expect(receipt.database).toBe(path.join(receipt.home, 'fs-metadata.sqlite'))
+      expect(existsSync(receipt.directory)).toBe(false)
+    }
+  } finally {
+    for (const caller of callers) if (caller.exitCode === null) caller.kill('SIGTERM')
+    await Promise.all(callers.map((caller) => caller.exited))
+  }
+}, 40_000)
+
+async function readCallerReceipt(caller: Bun.Subprocess<'ignore', 'pipe', 'pipe'>) {
+  const stdout = new Response(caller.stdout).text()
+  const stderr = new Response(caller.stderr).text()
+  expect(await caller.exited, await stderr).toBe(0)
+  const receipt: unknown = JSON.parse(await stdout)
+  assert(typeof receipt === 'object' && receipt !== null)
+  assert('origin' in receipt && typeof receipt.origin === 'string')
+  assert('directory' in receipt && typeof receipt.directory === 'string')
+  assert('home' in receipt && typeof receipt.home === 'string')
+  assert('identity' in receipt && typeof receipt.identity === 'string')
+  assert('database' in receipt && typeof receipt.database === 'string')
+  return {
+    origin: receipt.origin,
+    directory: receipt.directory,
+    home: receipt.home,
+    identity: receipt.identity,
+    database: receipt.database,
+  }
+}
+
+it('rejects a different healthy API before sending readiness mutations and leaves it running', async () => {
+  let clears = 0
+  const foreign = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch(request) {
+      if (new URL(request.url).pathname === '/terminal/clear') clears += 1
+      return Response.json({ ok: true, metadataDbPath: '/other-run/fs-metadata.sqlite' })
+    },
+  })
+  const directory = mkdtempSync(path.join(tmpdir(), 'fregat-foreign-health-'))
+  const child = Bun.spawn({
+    cmd: [process.execPath, '--eval', 'await Bun.sleep(500)'],
+    stdin: 'ignore',
+    stdout: 'ignore',
+    stderr: 'ignore',
+  })
+  const origin = `http://127.0.0.1:${foreign.port}`
+  try {
+    await expect(waitForHealth(child, origin, 'http://localhost:5238', directory)).rejects.toThrow(
+      'did not become healthy',
+    )
+    expect(clears).toBe(0)
+    expect((await fetch(`${origin}/health`)).ok).toBe(true)
+  } finally {
+    if (child.exitCode === null) child.kill('SIGTERM')
+    await child.exited
+    foreign.stop(true)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})

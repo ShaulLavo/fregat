@@ -10,6 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import path from 'node:path'
+import net from 'node:net'
 import type { SettingsValues } from '../../packages/contracts/src/settings/keys'
 
 import {
@@ -22,7 +23,7 @@ import { promote } from '../deploy/systemd/promote'
 import { stopTerminalHost } from '../../apps/server/src/terminal-host/identity'
 import { hostPaths } from '../../apps/server/src/terminal-host/protocol'
 
-import { allowedOriginsForWebPort, isPortAvailable, selectAvailablePort } from '../runtime-network'
+import { allowedOriginsForWebPort } from '../runtime-network'
 import { linkWallpaperLibrary, productionStateHome } from '../state-home'
 import { createScriptError } from '../structured-errors'
 import { fixtureReadiness } from './fixture-readiness'
@@ -95,7 +96,7 @@ export async function startIsolatedServer(
           : {}),
       }),
     )
-  const port = await prepareHome(home, webOrigin).catch((error: unknown) => {
+  const port = await prepareHome(home).catch((error: unknown) => {
     rmSync(directory, { recursive: true, force: true })
     throw error
   })
@@ -236,17 +237,23 @@ export function isolatedServerEnv(input: {
   return env
 }
 
-async function prepareHome(home: string, webOrigin: URL) {
+async function prepareHome(home: string) {
   if (existsSync(path.join(productionStateHome, 'wallpapers'))) linkWallpaperLibrary(home)
-  return selectAvailablePort({
-    isAvailable: (candidate) => isPortAvailable('127.0.0.1', candidate),
-    // A band per web port: two worktrees probing one port at once can both see it free, and the
-    // loser's health check then passes against the winner's server, which refuses its origin.
-    preferredPort: 33_400 + (Number(webOrigin.port) % 100) * 10,
+  const listener = net.createServer()
+  await new Promise<void>((resolve, reject) => {
+    listener.once('error', reject)
+    listener.listen({ exclusive: true, host: '127.0.0.1', port: 0 }, resolve)
   })
+  const address = listener.address()
+  await new Promise<void>((resolve, reject) =>
+    listener.close((error) => (error ? reject(error) : resolve())),
+  )
+  if (address === null || typeof address === 'string')
+    throw createScriptError('The isolated API port probe did not return a TCP address.')
+  return address.port
 }
 
-async function waitForHealth(
+export async function waitForHealth(
   child: Bun.Subprocess,
   origin: string,
   webOrigin: string,
@@ -255,13 +262,11 @@ async function waitForHealth(
   const deadline = Date.now() + START_TIMEOUT_MS
   while (Date.now() < deadline) {
     if (child.exitCode !== null) break
-    const healthy = await fixtureReadiness(new URL(origin), webOrigin, {
-      signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
-    }).then(
-      (response) => response.ok,
+    const signal = AbortSignal.timeout(Math.max(1, deadline - Date.now()))
+    const healthy = await ownServerReadiness(origin, webOrigin, directory, signal).catch(
       () => false,
     )
-    if (healthy) return
+    if (healthy && child.exitCode === null) return
     await Bun.sleep(100)
   }
   const stderr = await Bun.file(path.join(directory, 'server.stderr'))
@@ -270,6 +275,24 @@ async function waitForHealth(
   throw createScriptError(
     `Isolated API server on ${origin} did not become healthy (exit ${child.exitCode ?? 'none'}).\n${stderr.slice(-2000)}`,
   )
+}
+
+async function ownServerReadiness(
+  origin: string,
+  webOrigin: string,
+  directory: string,
+  signal: AbortSignal,
+) {
+  const health = await fetch(new URL('/health', origin), { headers: { origin: webOrigin }, signal })
+  if (!health.ok) return false
+  const descriptor: unknown = await health.json()
+  if (typeof descriptor !== 'object' || descriptor === null) return false
+  if (
+    !('metadataDbPath' in descriptor) ||
+    descriptor.metadataDbPath !== path.join(directory, 'home', 'fs-metadata.sqlite')
+  )
+    return false
+  return (await fixtureReadiness(new URL(origin), webOrigin, { signal })).ok
 }
 
 async function stopServer(child: Bun.Subprocess, directory: string, logs?: string) {

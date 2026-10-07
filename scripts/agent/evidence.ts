@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { evidenceRoot } from './paths'
 
@@ -16,8 +16,8 @@ export async function createEvidence(verb: string, label: string): Promise<Evide
     .toISOString()
     .replace(/[-:]/g, '')
     .replace(/\.\d+Z$/, 'Z')
-  const dir = join(evidenceRoot, `${stamp}-${verb}-${slug(label)}`)
-  await mkdir(dir, { recursive: true })
+  await mkdir(evidenceRoot, { recursive: true })
+  const dir = await mkdtemp(join(evidenceRoot, `${stamp}-${verb}-${slug(label)}-`))
   const write = async (name: string, content: string | Uint8Array) => {
     const path = join(dir, name)
     await writeFile(path, content)
