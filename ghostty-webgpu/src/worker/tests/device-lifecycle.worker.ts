@@ -6,18 +6,22 @@ export type DeviceLifecycleObservation =
   | { readonly type: 'acquired'; readonly device: number }
   | { readonly type: 'waiting'; readonly device: number }
   | { readonly type: 'destroyed'; readonly device: number }
-  | { readonly type: 'interrupted' }
+  | { readonly type: 'interrupted' | 'closed' }
+  | { readonly type: 'deadline-armed' | 'deadline-cleared'; readonly delay: number }
+  | { readonly type: 'warning'; readonly value: unknown }
   | {
-      readonly type: 'completed' | 'inspected'
+      readonly type: 'completed' | 'inspected' | 'abandoned'
       readonly devices: readonly DeviceLifecycleCounts[]
     }
 
 const channel = new BroadcastChannel('packaged-worker-device-lifecycle')
-const mode = new URL(globalThis.location.href).searchParams.get('lifecycle')
+const parameters = new URL(globalThis.location.href).searchParams
+const mode = parameters.get('lifecycle')
 const devices: DeviceLifecycleCounts[] = []
 const losses: (() => void)[] = []
 const fence = Promise.withResolvers<void>()
 const acquisition = Promise.withResolvers<void>()
+const timers = new Map<number, () => void>()
 const requestDevice = GPUAdapter.prototype.requestDevice
 GPUAdapter.prototype.requestDevice = async function (descriptor) {
   const device = await requestDevice.call(this, descriptor)
@@ -52,15 +56,53 @@ if (mode === 'setup-failed')
     throw new DOMException('Fixture canvas configuration failed', 'OperationError')
   }
 
-channel.onmessage = ({ data }: MessageEvent<'release' | 'lose' | 'inspect' | 'acquire'>) => {
+channel.onmessage = ({
+  data,
+}: MessageEvent<'release' | 'lose' | 'inspect' | 'acquire' | 'deadline'>) => {
   if (data === 'acquire') acquisition.resolve()
   if (data === 'release') fence.resolve()
   if (data === 'lose') losses.at(-1)?.()
   if (data === 'inspect') channel.postMessage({ type: 'inspected', devices })
+  if (data === 'deadline') {
+    for (const [handle, callback] of timers) {
+      timers.delete(handle)
+      callback()
+    }
+  }
 }
 
 const scope = globalThis as unknown as {
   onmessage(event: MessageEvent<WorkerInitialize>): void
+  setTimeout(callback: () => void, delay: number): number
+  clearTimeout(handle: number): void
+  close(): void
+}
+if (parameters.get('clock') === 'manual') {
+  const setTimer = scope.setTimeout.bind(scope)
+  const clearTimer = scope.clearTimeout.bind(scope)
+  let nextTimer = -1
+  scope.setTimeout = (callback, delay) => {
+    if (delay !== 15_000) return setTimer(callback, delay)
+    const handle = nextTimer--
+    timers.set(handle, callback)
+    channel.postMessage({ type: 'deadline-armed', delay })
+    return handle
+  }
+  scope.clearTimeout = (handle) => {
+    if (handle >= 0) return clearTimer(handle)
+    timers.delete(handle)
+    channel.postMessage({ type: 'deadline-cleared', delay: 15_000 })
+  }
+}
+const warn = console.warn.bind(console)
+console.warn = (...args: unknown[]) => {
+  channel.postMessage({ type: 'warning', value: args[0] })
+  warn(...args)
+}
+const close = scope.close.bind(scope)
+scope.close = () => {
+  channel.postMessage({ type: 'closed' })
+  close()
 }
 const initialize = scope.onmessage
 scope.onmessage = (event) => {
@@ -75,7 +117,9 @@ scope.onmessage = (event) => {
   })
   const send = port.postMessage.bind(port)
   port.postMessage = (message: WorkerMessage) => {
-    if (
+    if (message.type === 'fatal' && message.failure.operation === 'cleanup')
+      channel.postMessage({ type: 'abandoned', devices })
+    else if (
       message.type === 'fatal' ||
       (message.type === 'reply' &&
         (message.id === disposing || (message.id === opening && !!message.failure)))

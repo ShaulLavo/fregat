@@ -221,100 +221,261 @@ it.each([
   },
 )
 
-it('joins initial device acquisition during fatal public worker shutdown', async () => {
-  const channel = new BroadcastChannel('packaged-worker-device-lifecycle')
-  const observations: DeviceLifecycleObservation[] = []
-  channel.onmessage = ({ data }: MessageEvent<DeviceLifecycleObservation>) =>
-    observations.push(data)
-  const url = new URL('./tests/device-lifecycle.worker.ts', import.meta.url)
-  url.searchParams.set('lifecycle', 'initial-held')
-  const worker = new Worker(url, { type: 'module' })
-  const control = new MessageChannel()
-  const messages: WorkerMessage[] = []
-  control.port1.onmessage = ({ data }: MessageEvent<WorkerMessage>) => messages.push(data)
-  control.port1.start()
-  try {
-    worker.postMessage(
-      {
-        type: 'initialize',
-        terminal: 'acquisition-test',
-        generation: 1,
-        port: control.port2,
-        assets,
-        backend: 'webgpu',
-        faces: [{ family, source: { url: fontUrl } }],
-        appearance: { font: { family, size: 16 }, cursor: { blink: false } },
-      },
-      [control.port2],
-    )
-    await eventually(() => messages.some((value) => value.type === 'reply' && value.id === 0))
-    const canvas = new OffscreenCanvas(480, 160)
-    control.port1.postMessage(
-      {
+it.each(['normal', 'held', 'retired-held', 'replacement-held'] as const)(
+  'bounds idle fatal worker shutdown (%s)',
+  async (mode) => {
+    const channel = new BroadcastChannel('packaged-worker-device-lifecycle')
+    const observations: DeviceLifecycleObservation[] = []
+    channel.onmessage = ({ data }: MessageEvent<DeviceLifecycleObservation>) =>
+      observations.push(data)
+    const url = new URL('./tests/device-lifecycle.worker.ts', import.meta.url)
+    url.searchParams.set('lifecycle', mode)
+    url.searchParams.set('clock', 'manual')
+    const terminal = await WorkerTerminal.create({
+      assets,
+      appearance: { font: { family, size: 16 }, cursor: { blink: false } },
+      backend: 'webgpu',
+      workerUrl: url,
+      fonts: [{ family, source: { url: fontUrl } }],
+    })
+    const errors: unknown[] = []
+    terminal.on('error', ({ cause }) => errors.push(cause))
+    const terminate = vi.spyOn(Worker.prototype, 'terminate')
+    const producer = new MessageChannel()
+    const ready = new Promise<TerminalOutputReady>((resolve) => {
+      producer.port1.onmessage = ({ data }: MessageEvent<TerminalOutputReady>) => {
+        if (data.type === 'ready') resolve(data)
+      }
+      producer.port1.start()
+    })
+    try {
+      await terminal.open(container())
+      await terminal.attachOutputPort(producer.port2)
+      const identity = await ready
+      await terminal.write('known-good idle lifecycle')
+      await eventually(() => terminal.visibleLines()[0]?.includes('known-good idle') === true)
+      const recovering = mode === 'retired-held' || mode === 'replacement-held'
+      if (recovering) {
+        const frame = terminal.submittedFrame!.frame
+        channel.postMessage('lose')
+        await eventually(() =>
+          observations.some((value) => value.type === 'acquired' && value.device === 1),
+        )
+        if (mode === 'retired-held') {
+          await eventually(() => terminal.submittedFrame!.frame > frame)
+          await terminal.write('\r recovered idle lifecycle')
+        }
+      }
+      expect(terminal.hasPendingFrame).toBe(false)
+      expect(errors).toEqual([])
+      terminate.mockClear()
+      const bytes = new TextEncoder().encode('invalid producer sequence')
+      producer.port1.postMessage({ ...identity, type: 'output', sequence: 2, data: bytes }, [
+        bytes.buffer,
+      ])
+      if (mode === 'normal') {
+        await eventually(() => errors.length > 0)
+        await eventually(() => observations.some((value) => value.type === 'completed'))
+        expect(errors).toHaveLength(1)
+        expect(errors[0]).toMatchObject({ code: 'protocol', operation: 'output' })
+        expect(observations.find((value) => value.type === 'completed')).toEqual({
+          type: 'completed',
+          devices: [{ device: 0, waits: 1, destroys: 1 }],
+        })
+        expect(observations.filter((value) => value.type === 'warning')).toEqual([])
+        expect(observations.filter((value) => value.type === 'deadline-cleared')).toHaveLength(
+          observations.filter((value) => value.type === 'deadline-armed').length,
+        )
+        expect(terminate).toHaveBeenCalled()
+        return
+      }
+      const destroyedDevice = mode === 'retired-held' ? 1 : 0
+      await eventually(() =>
+        observations.some((value) =>
+          mode === 'held'
+            ? value.type === 'waiting'
+            : value.type === 'destroyed' && value.device === destroyedDevice,
+        ),
+      )
+      channel.postMessage('inspect')
+      await eventually(() => observations.some((value) => value.type === 'inspected'))
+      const devices = [{ device: 0, waits: 1, destroys: mode === 'replacement-held' ? 1 : 0 }]
+      if (recovering)
+        devices.push({
+          device: 1,
+          waits: mode === 'retired-held' ? 1 : 0,
+          destroys: mode === 'retired-held' ? 1 : 0,
+        })
+      console.info('Packaged worker idle shutdown pending', mode, JSON.stringify(observations))
+      expect(observations.find((value) => value.type === 'inspected')).toEqual({
+        type: 'inspected',
+        devices,
+      })
+      expect(terminal.hasPendingFrame).toBe(false)
+      expect(errors).toEqual([])
+      expect(terminate).not.toHaveBeenCalled()
+      await eventually(() => observations.some((value) => value.type === 'deadline-armed'))
+      expect(observations.filter((value) => value.type === 'deadline-armed')).toEqual([
+        { type: 'deadline-armed', delay: 15_000 },
+      ])
+      channel.postMessage('deadline')
+      await eventually(() => errors.length > 0)
+      await eventually(() => observations.some((value) => value.type === 'abandoned'))
+      console.info('Packaged worker idle shutdown expired', mode, JSON.stringify(observations))
+      const internal = {
+        deviceCount: recovering ? 2 : 1,
+        reason: 'shutdown-deadline',
+        timeoutMs: 15_000,
+      }
+      expect(errors).toHaveLength(1)
+      expect(errors[0]).toMatchObject({ code: 'timeout', operation: 'cleanup', internal })
+      expect(observations.filter((value) => value.type === 'warning')).toEqual([
+        {
+          type: 'warning',
+          value: expect.objectContaining({ level: 'warn', area: 'worker.shutdown', ...internal }),
+        },
+      ])
+      expect(observations.find((value) => value.type === 'abandoned')).toEqual({
+        type: 'abandoned',
+        devices,
+      })
+      expect(observations.some((value) => value.type === 'completed')).toBe(false)
+      expect(terminate).toHaveBeenCalled()
+    } finally {
+      channel.postMessage('acquire')
+      channel.postMessage('release')
+      await terminal.dispose().catch(() => {})
+      producer.port1.close()
+      producer.port2.close()
+      channel.close()
+      terminate.mockRestore()
+    }
+  },
+  10_000,
+)
+
+it.each(['release', 'deadline'] as const)(
+  'joins initial device acquisition during fatal public worker shutdown (%s)',
+  async (outcome) => {
+    const channel = new BroadcastChannel('packaged-worker-device-lifecycle')
+    const observations: DeviceLifecycleObservation[] = []
+    channel.onmessage = ({ data }: MessageEvent<DeviceLifecycleObservation>) =>
+      observations.push(data)
+    const url = new URL('./tests/device-lifecycle.worker.ts', import.meta.url)
+    url.searchParams.set('lifecycle', 'initial-held')
+    if (outcome === 'deadline') url.searchParams.set('clock', 'manual')
+    const worker = new Worker(url, { type: 'module' })
+    const control = new MessageChannel()
+    const messages: WorkerMessage[] = []
+    control.port1.onmessage = ({ data }: MessageEvent<WorkerMessage>) => messages.push(data)
+    control.port1.start()
+    try {
+      worker.postMessage(
+        {
+          type: 'initialize',
+          terminal: 'acquisition-test',
+          generation: 1,
+          port: control.port2,
+          assets,
+          backend: 'webgpu',
+          faces: [{ family, source: { url: fontUrl } }],
+          appearance: { font: { family, size: 16 }, cursor: { blink: false } },
+        },
+        [control.port2],
+      )
+      await eventually(() => messages.some((value) => value.type === 'reply' && value.id === 0))
+      const canvas = new OffscreenCanvas(480, 160)
+      control.port1.postMessage(
+        {
+          type: 'request',
+          terminal: 'acquisition-test',
+          generation: 1,
+          id: 1,
+          control: 1,
+          output: 0,
+          command: 'open',
+          args: [
+            canvas,
+            {
+              identity: 1,
+              width: 480,
+              height: 160,
+              pixelRatio: 1,
+              padding: { left: 0, right: 0, top: 0, bottom: 0 },
+              scrollbarWidth: 0,
+              autoFit: true,
+            },
+          ],
+        },
+        [canvas],
+      )
+      await eventually(() => observations.some((value) => value.type === 'acquired'))
+      control.port1.postMessage({
         type: 'request',
         terminal: 'acquisition-test',
-        generation: 1,
-        id: 1,
-        control: 1,
+        generation: 2,
+        id: 2,
+        control: 2,
         output: 0,
-        command: 'open',
-        args: [
-          canvas,
+        command: 'geometry',
+        args: [],
+      })
+      await eventually(() => observations.some((value) => value.type === 'interrupted'))
+      channel.postMessage('inspect')
+      await eventually(() =>
+        observations.some((value) => value.type === 'inspected' || value.type === 'completed'),
+      )
+      console.info('Packaged worker pending initial acquisition', JSON.stringify(observations))
+      expect(observations.some((value) => value.type === 'completed')).toBe(false)
+      expect(observations.find((value) => value.type === 'inspected')).toEqual({
+        type: 'inspected',
+        devices: [{ device: 0, waits: 0, destroys: 0 }],
+      })
+      if (outcome === 'deadline') {
+        await eventually(() => observations.some((value) => value.type === 'deadline-armed'))
+        channel.postMessage('deadline')
+        await eventually(() => messages.some((value) => value.type === 'fatal'))
+        await eventually(() => observations.some((value) => value.type === 'closed'))
+        const internal = { deviceCount: 1, reason: 'shutdown-deadline', timeoutMs: 15_000 }
+        expect(messages.filter((value) => value.type === 'fatal')).toHaveLength(1)
+        expect(messages.find((value) => value.type === 'fatal')).toMatchObject({
+          failure: { code: 'timeout', operation: 'cleanup', internal },
+        })
+        expect(observations.filter((value) => value.type === 'warning')).toEqual([
           {
-            identity: 1,
-            width: 480,
-            height: 160,
-            pixelRatio: 1,
-            padding: { left: 0, right: 0, top: 0, bottom: 0 },
-            scrollbarWidth: 0,
-            autoFit: true,
+            type: 'warning',
+            value: expect.objectContaining({ level: 'warn', area: 'worker.shutdown', ...internal }),
           },
-        ],
-      },
-      [canvas],
-    )
-    await eventually(() => observations.some((value) => value.type === 'acquired'))
-    control.port1.postMessage({
-      type: 'request',
-      terminal: 'acquisition-test',
-      generation: 2,
-      id: 2,
-      control: 2,
-      output: 0,
-      command: 'geometry',
-      args: [],
-    })
-    await eventually(() => observations.some((value) => value.type === 'interrupted'))
-    channel.postMessage('inspect')
-    await eventually(() =>
-      observations.some((value) => value.type === 'inspected' || value.type === 'completed'),
-    )
-    console.info('Packaged worker pending initial acquisition', JSON.stringify(observations))
-    expect(observations.some((value) => value.type === 'completed')).toBe(false)
-    expect(observations.find((value) => value.type === 'inspected')).toEqual({
-      type: 'inspected',
-      devices: [{ device: 0, waits: 0, destroys: 0 }],
-    })
-    channel.postMessage('acquire')
-    await eventually(() => messages.some((value) => value.type === 'fatal'))
-    await eventually(() => observations.some((value) => value.type === 'completed'))
-    console.info('Packaged worker fatal acquisition lifecycle', JSON.stringify(observations))
-    expect(messages.find((value) => value.type === 'fatal')).toMatchObject({
-      failure: { code: 'protocol', operation: 'request' },
-    })
-    expect(observations.find((value) => value.type === 'completed')).toEqual({
-      type: 'completed',
-      devices: [{ device: 0, waits: 1, destroys: 1 }],
-    })
-  } finally {
-    channel.postMessage('acquire')
-    channel.postMessage('release')
-    worker.terminate()
-    control.port1.close()
-    control.port2.close()
-    channel.close()
-  }
-})
+        ])
+        expect(observations.find((value) => value.type === 'abandoned')).toEqual({
+          type: 'abandoned',
+          devices: [{ device: 0, waits: 0, destroys: 0 }],
+        })
+        expect(observations.some((value) => value.type === 'completed')).toBe(false)
+        return
+      }
+      channel.postMessage('acquire')
+      await eventually(() => messages.some((value) => value.type === 'fatal'))
+      await eventually(() => observations.some((value) => value.type === 'completed'))
+      console.info('Packaged worker fatal acquisition lifecycle', JSON.stringify(observations))
+      expect(messages.find((value) => value.type === 'fatal')).toMatchObject({
+        failure: { code: 'protocol', operation: 'request' },
+      })
+      expect(observations.find((value) => value.type === 'completed')).toEqual({
+        type: 'completed',
+        devices: [{ device: 0, waits: 1, destroys: 1 }],
+      })
+    } finally {
+      channel.postMessage('acquire')
+      channel.postMessage('release')
+      worker.terminate()
+      control.port1.close()
+      control.port2.close()
+      channel.close()
+    }
+  },
+  10_000,
+)
 
 it('rejects unfinished worker cleanup at the host operation deadline', async () => {
   const channel = new BroadcastChannel('packaged-worker-device-lifecycle')
