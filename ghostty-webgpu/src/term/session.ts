@@ -977,19 +977,41 @@ interface ObservedSelection {
   readonly text: string | undefined
 }
 
-function selectionsEqual(first: ObservedSelection, second: ObservedSelection): boolean {
-  if (first.text !== second.text) return false
-  const start = first.coordinates
-  const end = second.coordinates
-  if (start === end) return true
-  if (!start || !end) return false
+interface ObservedOutputSelection extends ObservedSelection {
+  readonly activeRange: SelectionCoordinates | undefined
+}
+
+function selectionCoordinatesEqual(
+  first: SelectionCoordinates | undefined,
+  second: SelectionCoordinates | undefined,
+): boolean {
+  if (first === second) return true
+  if (!first || !second) return false
   return (
-    start.rectangle === end.rectangle &&
-    start.start.x === end.start.x &&
-    start.start.y === end.start.y &&
-    start.end.x === end.end.x &&
-    start.end.y === end.end.y
+    first.rectangle === second.rectangle &&
+    first.start.x === second.start.x &&
+    first.start.y === second.start.y &&
+    first.end.x === second.end.x &&
+    first.end.y === second.end.y
   )
+}
+
+function selectionsEqual(first: ObservedSelection, second: ObservedSelection): boolean {
+  return (
+    first.text === second.text && selectionCoordinatesEqual(first.coordinates, second.coordinates)
+  )
+}
+
+function activeSelectionRange(
+  coordinates: SelectionCoordinates,
+  scrollbackLength: number,
+): SelectionCoordinates | undefined {
+  if (coordinates.end.y < scrollbackLength) return undefined
+  if (coordinates.start.y >= scrollbackLength) return coordinates
+  return {
+    ...coordinates,
+    start: { x: coordinates.rectangle ? coordinates.start.x : 0, y: scrollbackLength },
+  }
 }
 
 function copyInput(data: TerminalInputData): Uint8Array {
@@ -1249,14 +1271,14 @@ export class TerminalSession<TEvent = unknown> {
 
   writeAndReadGeometry(data: TerminalInputData): TerminalGeometry {
     return this.runOperation(() => {
-      const selectionBefore = this.readObservedSelection()
+      const selectionBefore = this.readObservedOutputSelection()
       this.runVtWrite(() => this.terminal.write(data))
       this.mouseEncoder.syncFromTerminal()
       this.invalidateLinks()
       this.revisionValue += 1
       // Effects can reenter the owner; capture this write before publishing any of them.
       const scroll = this.commitScrollChange()
-      const selectionChanged = this.selectionChanged(selectionBefore)
+      const selectionChanged = this.outputSelectionChanged(selectionBefore)
       const geometry = this.geometry()
       this.flushEffects()
       if (selectionChanged) this.emitSelection()
@@ -1624,14 +1646,14 @@ export class TerminalSession<TEvent = unknown> {
   }
 
   private writeNow(data: TerminalInputData): TerminalMutationResult {
-    const selectionBefore = this.readObservedSelection()
+    const selectionBefore = this.readObservedOutputSelection()
     this.runVtWrite(() => this.terminal.write(data))
     this.mouseEncoder.syncFromTerminal()
     this.invalidateLinks()
     // Observers can read geometry or reenter; publish the committed native revision first.
     this.revisionValue += 1
     const scroll = this.commitScrollChange()
-    const selectionChanged = this.selectionChanged(selectionBefore)
+    const selectionChanged = this.outputSelectionChanged(selectionBefore)
     this.flushEffects()
     if (selectionChanged) this.emitSelection()
     if (scroll) this.emitState(this.emitters.scroll, () => this.scrollValue)
@@ -1798,6 +1820,29 @@ export class TerminalSession<TEvent = unknown> {
     if (!update.selectionChanged) return
     this.emitSelection()
     this.requestRender()
+  }
+
+  private readObservedOutputSelection(): ObservedOutputSelection | undefined {
+    if (!this.emitters.selection.hasListeners) return undefined
+    const coordinates = this.selection.coordinates()
+    if (!coordinates) return { coordinates, activeRange: undefined, text: undefined }
+    // A tracked active top detects pruning even when a large write grows the retained count.
+    this.selection.trackHistoryBoundary(this.scrollValue.scrollbackLength)
+    const activeRange = activeSelectionRange(coordinates, this.scrollValue.scrollbackLength)
+    return {
+      coordinates,
+      activeRange,
+      text: activeRange ? this.selection.readRangeText(activeRange) : undefined,
+    }
+  }
+
+  private outputSelectionChanged(before: ObservedOutputSelection | undefined): boolean {
+    if (!before || !this.emitters.selection.hasListeners) return false
+    if (before.coordinates && this.selection.historyWasPruned) return true
+    if (!selectionCoordinatesEqual(before.coordinates, this.selection.coordinates())) return true
+    if (!before.activeRange) return false
+    // Only the previously active selected rows can change text while their pins survive.
+    return before.text !== this.selection.readRangeText(before.activeRange)
   }
 
   private readObservedSelection(): ObservedSelection | undefined {

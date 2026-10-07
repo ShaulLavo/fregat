@@ -95,9 +95,11 @@ The browser-independent `GhosttyTerminal` exposes `scrollbackLength` for actual 
 `scrollbackLimit` and `scrollbackByteLimit` for the configured budgets. Its
 `setScrollbackLimit(undefined)` and `setScrollbackByteLimit(undefined)` remove the corresponding
 budget. `TerminalSession` exposes the same setters and publishes native selection changes after
-output, grid reflow, and budget pruning. Appearance updates validate native budget and grid bounds
-before applying changes. State events deliver the latest committed snapshot to each synchronous
-observer. An observer's nested mutation becomes visible to later observers.
+output, grid reflow, and budget pruning. Output observation uses native coordinates and a tracked
+history-boundary reference to detect eviction. Text comparisons cover only the previously active
+selected rows, so their work is bounded by the active grid. Appearance updates validate native
+budget and grid bounds before applying changes. State events deliver the latest committed snapshot
+to each synchronous observer. An observer's nested mutation becomes visible to later observers.
 Unlimited lines still obey the byte budget; unlimited bytes still obey the line budget. The
 wasm32 unlimited sentinel `0xffffffff` is accepted for either budget and canonicalized to
 `undefined` in core readback and main/worker appearance.

@@ -1,7 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { KeyAction, KeyModifier, MouseAction, MouseButton, PhysicalKey } from '../../core/abi.js'
 import { GhosttyRuntime } from '../../core/runtime.js'
-import type { SelectionDragEvent, SelectionPressEvent } from '../../core/selection.js'
+import {
+  GhosttySelectionGesture,
+  type SelectionDragEvent,
+  type SelectionPressEvent,
+} from '../../core/selection.js'
 import { defaultRendererTheme } from '../../render/instances/types.js'
 import { EventEmitter } from '../events.js'
 import { createLinkLineSnapshot, LinkResolver } from '../links.js'
@@ -38,6 +42,7 @@ const runtimes: GhosttyRuntime[] = []
 afterEach(() => {
   for (const session of sessions.splice(0).reverse()) session.dispose()
   for (const runtime of runtimes.splice(0).reverse()) runtime.dispose()
+  vi.restoreAllMocks()
 })
 
 async function createSession<TEvent = unknown>(
@@ -1150,6 +1155,34 @@ describe('TerminalSession', () => {
   )
 
   it.each(['write', 'writeAndReadGeometry'] as const)(
+    'skips full selection extraction during non-evicting %s output',
+    async (write) => {
+      const session = await createSession({
+        appearance: {
+          grid: grid({ columns: 40, rows: 12 }),
+          scrollbackByteLimit: 256 * 1024 * 1024,
+          scrollbackLimit: 200000,
+        },
+      })
+      session.write(Array.from({ length: 100000 }, (_, index) => `row-${index}`).join('\r\n'))
+      session.selectAll()
+      session.on('selection', () => {})
+      const count = session.lineCount()
+      const extraction = vi.spyOn(GhosttySelectionGesture.prototype, 'getSelection')
+      const activeText = vi.spyOn(GhosttySelectionGesture.prototype, 'readRangeText')
+      for (let index = 0; index < 50; index += 1) session[write](`\r\nextra-${index}`)
+      expect(session.lineCount()).toBe(count + 50)
+      expect(extraction).not.toHaveBeenCalled()
+      for (const result of activeText.mock.results) {
+        expect(result.type).toBe('return')
+        expect(result.value?.length ?? 0).toBeLessThanOrEqual(
+          session.grid.rows * (session.grid.columns + 1),
+        )
+      }
+    },
+  )
+
+  it.each(['write', 'writeAndReadGeometry'] as const)(
     'publishes selection after %s evicts selected history',
     async (write) => {
       const session = await createSession({
@@ -1221,6 +1254,84 @@ describe('TerminalSession', () => {
       event: { coordinates, hasSelection: true },
       text: session.getSelection(),
     })
+  })
+
+  it.each(['write', 'writeAndReadGeometry'] as const)(
+    'publishes same-coordinate eviction during net-growing %s batched output',
+    async (write) => {
+      const session = await createSession({
+        appearance: {
+          grid: grid({ columns: 40, rows: 12 }),
+          scrollbackByteLimit: 64 * 1024 * 1024,
+          scrollbackLimit: 10000,
+        },
+      })
+      session.write(
+        Array.from(
+          { length: 20000 },
+          (_, index) => `${String.fromCharCode(65 + (index % 26))}-${index}`,
+        ).join('\r\n'),
+      )
+      session.selectRange({ x: 0, y: 0 }, { x: 0, y: 0 })
+      const coordinates = session.selectionCoordinates()
+      const text = session.getSelection()
+      const count = session.lineCount()
+      const selections: Array<{ event: TerminalSelectionEvent; text: string | undefined }> = []
+      session.on('selection', (event) => selections.push({ event, text: session.getSelection() }))
+      session[write](
+        Array.from({ length: 1800 }, (_, index) => `\r\nrow-${20000 + index}`).join(''),
+      )
+      expect(session.lineCount()).toBeGreaterThan(count)
+      expect(session.selectionCoordinates()).toEqual(coordinates)
+      expect(session.getSelection()).not.toBe(text)
+      expect(selections).toEqual([
+        { event: { coordinates, hasSelection: true }, text: session.getSelection() },
+      ])
+    },
+  )
+
+  it.each(['write', 'writeAndReadGeometry'] as const)(
+    'publishes same-coordinate history erasure during net-growing %s output',
+    async (write) => {
+      const session = await createSession({ appearance: { grid: grid({ columns: 40, rows: 12 }) } })
+      session.write(
+        Array.from({ length: 14 }, (_, index) => `${String.fromCharCode(65 + index)}-row`).join(
+          '\r\n',
+        ),
+      )
+      session.selectRange({ x: 0, y: 0 }, { x: 0, y: 0 })
+      const coordinates = session.selectionCoordinates()
+      const text = session.getSelection()
+      const count = session.lineCount()
+      const selections: Array<{ event: TerminalSelectionEvent; text: string | undefined }> = []
+      session.on('selection', (event) => selections.push({ event, text: session.getSelection() }))
+      session[write]('\u001b[3J\r\nnew-0\r\nnew-1\r\nnew-2')
+      expect(session.lineCount()).toBeGreaterThan(count)
+      expect(session.selectionCoordinates()).toEqual(coordinates)
+      expect(session.getSelection()).not.toBe(text)
+      expect(selections).toEqual([
+        { event: { coordinates, hasSelection: true }, text: session.getSelection() },
+      ])
+    },
+  )
+
+  it('keeps historical selection notifications quiet during active row edits', async () => {
+    const session = await createSession({ appearance: { grid: grid({ columns: 40, rows: 12 }) } })
+    session.write(Array.from({ length: 14 }, (_, index) => `row-${index}`).join('\r\n'))
+    session.selectRange({ x: 0, y: 0 }, { x: 3, y: 0 })
+    const selections: TerminalSelectionEvent[] = []
+    session.on('selection', (event) => selections.push(event))
+    const history = session.scrollbackLength
+    const text = session.getSelection()
+    const coordinates = session.selectionCoordinates()
+    session.write('\u001b[1;1H\u001b[M')
+    session.write('\u001b[L')
+    session.write('\u001b[1;1H\u001bM')
+    session.write('\u001b[2J')
+    expect(session.scrollbackLength).toBe(history)
+    expect(session.selectionCoordinates()).toEqual(coordinates)
+    expect(session.getSelection()).toBe(text)
+    expect(selections).toEqual([])
   })
 
   it('notifies changed copied text and keeps unchanged selection notifications quiet', async () => {
