@@ -75,6 +75,8 @@ try {
   }
   for (const name of [
     'comparison-runner.mjs',
+    'comparison-browser-temp.mjs',
+    'comparison-artifact.mjs',
     'comparison-report.mjs',
     'comparison-compact.mjs',
     'comparison-pixels.mjs',
@@ -121,6 +123,7 @@ try {
       '@xterm/addon-webgl',
       'ghostty-web',
       '@fontsource/jetbrains-mono',
+      '@discoveryjs/json-ext',
       'playwright',
       'ws',
     ].map((name) => {
@@ -203,7 +206,12 @@ try {
           smoke: 'node comparison-runner.mjs --smoke',
           compare: 'node comparison-runner.mjs',
         },
-        dependencies: { playwright: versions.playwright, pngjs: '7.0.0', ws: versions.ws },
+        dependencies: {
+          playwright: versions.playwright,
+          pngjs: '7.0.0',
+          ws: versions.ws,
+          '@discoveryjs/json-ext': versions['@discoveryjs/json-ext'],
+        },
       },
       null,
       2,

@@ -1,4 +1,5 @@
 rc: scripts/lefthook-env.sh
+no_auto_install: true
 
 pre-commit:
   parallel: false

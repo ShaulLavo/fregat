@@ -5,6 +5,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { analysisArguments, positiveInteger } from './comparison-options.mjs'
+import { writeComparisonArtifact } from './comparison-artifact.mjs'
 
 test('sample overrides require finite positive integers and a value', () => {
   for (const value of [undefined, '--output', 'NaN', 'Infinity', '1.5', '0', '-1']) {
@@ -281,21 +282,32 @@ for (const tracing of [false, true]) {
     assert.equal(artifact.gpuCommandTimeoutMilliseconds, timeout)
     assert.equal(artifact.environment.gpuIdleSettings.gpuCommandTimeoutMilliseconds, timeout)
     assert.deepEqual(artifact.manifest.settings, settings)
-    const finalStart = source.lastIndexOf('} finally {\n  await writeFile(artifactPath,')
-    const finalEnd = source.indexOf('  await browser?.close()', finalStart)
+    const writerStart = '} finally {\n  try {'
+    const finalStart = source.lastIndexOf(
+      `${writerStart}\n    await writeComparisonArtifact(artifactPath,`,
+    )
+    const finalEnd = source.indexOf('\n  } finally {', finalStart)
     assert(finalStart >= 0 && finalEnd > finalStart)
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
     const writer = new AsyncFunction(
       'writeFile',
+      'writeComparisonArtifact',
       'join',
       'artifactPath',
       'output',
       'artifact',
-      source.slice(finalStart + '} finally {'.length, finalEnd),
+      source.slice(finalStart + writerStart.length, finalEnd),
     )
     const output = await mkdtemp(join(tmpdir(), 'ghostty-trace-timeout-'))
     try {
-      await writer(writeFile, join, join(output, 'comparison.json'), output, artifact)
+      await writer(
+        writeFile,
+        writeComparisonArtifact,
+        join,
+        join(output, 'comparison.json'),
+        output,
+        artifact,
+      )
       const comparison = JSON.parse(await readFile(join(output, 'comparison.json'), 'utf8'))
       const qualification = JSON.parse(await readFile(join(output, 'qualification.json'), 'utf8'))
       assert.equal(comparison.gpuCommandTimeoutMilliseconds, timeout)

@@ -11,7 +11,7 @@
         "evlog": "catalog:",
         "jscpd": "^5.3.2",
         "knip": "catalog:",
-        "lefthook": "^2.1.14",
+        "lefthook": "2.1.15",
         "oxc-plugin-react-compiler": "^0.2.0",
         "oxfmt": "catalog:",
         "oxlint": "catalog:",
@@ -689,6 +689,7 @@
         "@webgpu/types": "0.1.74",
       },
       "devDependencies": {
+        "@discoveryjs/json-ext": "1.1.0",
         "@fontsource/jetbrains-mono": "5.3.0",
         "@types/bun": "1.4.2",
         "@types/node": "26.6.3",
@@ -972,7 +973,7 @@
     },
     "scripts": {
       "name": "scripts",
-      "version": "0.0.38",
+      "version": "0.0.40",
       "dependencies": {
         "@workspace/utils": "workspace:*",
       },
@@ -995,8 +996,10 @@
     },
   },
   "patchedDependencies": {
+    "@vitest/mocker@5.0.2": "patches/@vitest%2Fmocker@5.0.2.patch",
     "evlog@2.29.0": "patches/evlog@2.29.0.patch",
     "vitest@5.0.2": "patches/vitest@5.0.2.patch",
+    "lefthook@2.1.15": "patches/lefthook@2.1.15.patch",
   },
   "overrides": {
     "@opentui/core": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-core-0.5.12-bubli.2.tgz",
@@ -1177,6 +1180,8 @@
     "@clack/prompts": ["@clack/prompts@1.8.1", "", { "dependencies": { "@clack/core": "1.5.1", "fast-string-width": "^3.0.2", "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-dlT1m5e/0yUL0kRNcQn7yGLVThkgbB0Ga/1AmfDDC/8ik6AIiSf2QLQO2zPYvefsHP0aFgxO93cVLCCfDp7kzQ=="],
 
     "@cspell/cspell-types": ["@cspell/cspell-types@10.3.4", "", {}, "sha512-BFUDEATv9lhIa/JPK+BYulWEQcKmGHS0x8XLNeN+OeZtXNKOPGbvpgbXBRjQ33XqNuuOGRHulcok8M2998xA3w=="],
+
+    "@discoveryjs/json-ext": ["@discoveryjs/json-ext@1.1.0", "", {}, "sha512-Xc3VhU02wqZ1HvHRJUwL09HkZSTvidqY5Ya0NXBSYOxAp+Ln9dcJr9fySI+CkONzP3PekQo9WdzCv0PGER/mOA=="],
 
     "@dnd-kit/accessibility": ["@dnd-kit/accessibility@3.1.1", "", { "dependencies": { "tslib": "^2.0.0" }, "peerDependencies": { "react": ">=16.8.0" } }, "sha512-2P+YgaXF+gRsIihwwY1gCsQSYnu9Zyj2py8kY5fFvUM1qm2WA2u639R6YNVfU4GWr+ZM5mqEsfHZZLoRONbemw=="],
 
