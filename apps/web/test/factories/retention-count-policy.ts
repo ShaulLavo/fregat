@@ -50,6 +50,49 @@ type Structural = NonNullable<ReturnType<Analysis['borrowStructural']>>
 type Highlighter = NonNullable<ReturnType<Analysis['borrowHighlighter']>>
 type Pair = { readonly structural: Structural; readonly highlighter: Highlighter }
 
+export function delayRetentionInspectors() {
+  const postMessage = Worker.prototype.postMessage
+  const pending = new Map<ReturnType<typeof setTimeout>, () => void>()
+  let requests = 0
+  const spy = vi.spyOn(Worker.prototype, 'postMessage').mockImplementation(function (
+    this: Worker,
+    ...args: Parameters<Worker['postMessage']>
+  ) {
+    const request: unknown = args[0]
+    const send = () => Reflect.apply(postMessage, this, args)
+    if (
+      typeof request !== 'object' ||
+      request === null ||
+      !('payload' in request) ||
+      typeof request.payload !== 'object' ||
+      request.payload === null ||
+      !('includeRetention' in request.payload) ||
+      request.payload.includeRetention !== true
+    ) {
+      send()
+      return
+    }
+    requests++
+    // Keep real worker reads open across the virtualizer's 100 ms trailing scroll publication.
+    const timer = setTimeout(() => {
+      pending.delete(timer)
+      send()
+    }, 150)
+    pending.set(timer, send)
+  })
+  return {
+    requests: () => requests,
+    restore() {
+      spy.mockRestore()
+      for (const [timer, send] of pending) {
+        clearTimeout(timer)
+        send()
+      }
+      pending.clear()
+    },
+  }
+}
+
 type RetentionGenerationCause =
   | { readonly kind: 'schedule'; readonly key: string }
   | {

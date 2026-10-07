@@ -4,7 +4,10 @@ import { commands } from 'vitest/browser'
 import '@singapore-editor/core/style.css'
 import { pieceTableSnapshotsHaveSameText } from '@singapore-editor/textbuffer'
 import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
-import { retentionCountHost } from '../../../../test/factories/retention-count-policy'
+import {
+  delayRetentionInspectors,
+  retentionCountHost,
+} from '../../../../test/factories/retention-count-policy'
 import {
   RETENTION_COUNT_PROTOCOL,
   type RetentionRun,
@@ -662,7 +665,16 @@ async function verifyActualViews(
     expect(first.editor.getSelections()).not.toEqual(second.editor.getSelections())
     expect(first.editor.getScrollPosition().top).not.toBe(second.editor.getScrollPosition().top)
     expect(bView.editor.getSelections()).toEqual(bSelection)
-    await record(await host.sample('actual-two-editor-views', 0, [b]))
+    const delayed = delayRetentionInspectors()
+    try {
+      await record({
+        ...(await host.sample('actual-two-editor-views', 0, [b])),
+        delayedInspectors: delayed.requests(),
+      })
+      expect(delayed.requests()).toBe(2)
+    } finally {
+      delayed.restore()
+    }
     if (typeof commands.retentionScreenshot === 'function')
       await commands.retentionScreenshot(`${fixture}-two-views`)
     first.dispose()
