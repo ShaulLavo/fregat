@@ -72,7 +72,7 @@ scenario, trace and renders refuse a production URL unless the scenario is decla
 The throwaway server runs Codex and Claude only from fixture binaries. Without --real-providers,
 a scenario declared realProviders refuses to start, and so does any writing scenario on a server
 the run does not own.
-Evidence lands under ${evidenceRoot}/<stamp>-<verb>-<label>/.`
+Evidence lands under ${evidenceRoot}/<stamp>-<verb>-<label>-<unique>/.`
 
 type Options = CaptureSize & {
   readonly consoleCapture: boolean
