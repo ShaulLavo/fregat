@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { EditorWorkScheduler } from '../src/editor/workScheduler'
 import {
   computeFixedRowTotalSize,
   computeFixedRowVirtualItems,
@@ -211,6 +212,7 @@ describe('fixed row virtualizer', () => {
 
   it('defers scroll-only changes to one trailing emit with the exact final position', () => {
     vi.useFakeTimers()
+    const scheduled = vi.spyOn(EditorWorkScheduler.prototype, 'schedule')
 
     try {
       const onChange = vi.fn()
@@ -231,11 +233,25 @@ describe('fixed row virtualizer', () => {
       // Same stable window, untouched geometry: no immediate emit...
       virtualizer.setScrollMetrics({ scrollTop: 5, viewportHeight: 60 })
       expect(onChange).not.toHaveBeenCalled()
+      const first = scheduled.mock.results.at(-1)
+      const firstHandle = first?.type === 'return' ? first.value : null
+      expect(firstHandle?.isActive()).toBe(true)
+
+      vi.advanceTimersByTime(99)
+      expect(onChange).not.toHaveBeenCalled()
+      virtualizer.setScrollMetrics({ scrollTop: 6, viewportHeight: 60 })
+      expect(firstHandle?.isActive()).toBe(false)
+      const replacement = scheduled.mock.results.at(-1)
+      const replacementHandle = replacement?.type === 'return' ? replacement.value : null
+      expect(replacementHandle?.isActive()).toBe(true)
 
       // ...but the exact position is emitted once scrolling stops.
-      vi.advanceTimersByTime(200)
+      vi.advanceTimersByTime(99)
+      expect(onChange).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(1)
       expect(onChange).toHaveBeenCalledTimes(1)
-      expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ scrollTop: 5 }))
+      expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ scrollTop: 6 }))
+      expect(replacementHandle?.isActive()).toBe(false)
 
       onChange.mockClear()
 
@@ -253,6 +269,35 @@ describe('fixed row virtualizer', () => {
 
       virtualizer.dispose()
     } finally {
+      scheduled.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
+  it.each(['detach', 'dispose'])('cancels trailing scroll publication on %s', (action) => {
+    vi.useFakeTimers()
+    const scheduled = vi.spyOn(EditorWorkScheduler.prototype, 'schedule')
+    const virtualizer = new FixedRowVirtualizer({ count: 100, overscan: 2, rowHeight: 20 })
+    try {
+      const onChange = vi.fn()
+      virtualizer.attachScrollElement(document.createElement('div'), onChange, {
+        readInitialScrollPosition: false,
+      })
+      virtualizer.setScrollMetrics({ scrollTop: 0, viewportHeight: 60 })
+      virtualizer.getSnapshot()
+      onChange.mockClear()
+      virtualizer.setScrollMetrics({ scrollTop: 5, viewportHeight: 60 })
+      const work = scheduled.mock.results.at(-1)
+      const handle = work?.type === 'return' ? work.value : null
+      expect(handle?.isActive()).toBe(true)
+      if (action === 'detach') virtualizer.detachScrollElement()
+      else virtualizer.dispose()
+      expect(handle?.isActive()).toBe(false)
+      vi.advanceTimersByTime(100)
+      expect(onChange).not.toHaveBeenCalled()
+    } finally {
+      virtualizer.dispose()
+      scheduled.mockRestore()
       vi.useRealTimers()
     }
   })

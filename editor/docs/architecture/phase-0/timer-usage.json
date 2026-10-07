@@ -227,14 +227,6 @@
       "snippet": "setTimeout(() => {"
     },
     {
-      "api": "setTimeout",
-      "file": "packages/editor/src/virtualization/fixedRowVirtualizer.ts",
-      "id": "packages/editor/src/virtualization/fixedRowVirtualizer.ts:setTimeout:7aa8053100",
-      "justification": "The tail of a scroll, which has to be measured against the raw scroll events it follows rather than against editor work — pacing it with other tasks would make the settle time depend on what else was queued. Cancelled by `cancelTrailingScrollEmit` on every further scroll, so at most one is ever pending.",
-      "line": 396,
-      "snippet": "this.trailingScrollEmitTimer = setTimeout(() => {"
-    },
-    {
       "api": "queueMicrotask",
       "file": "packages/editor/src/virtualization/geckoHighlightRepaint.ts",
       "id": "packages/editor/src/virtualization/geckoHighlightRepaint.ts:queueMicrotask:804ee49585",
