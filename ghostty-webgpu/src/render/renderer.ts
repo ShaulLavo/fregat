@@ -253,6 +253,7 @@ export class WebGpuTerminalRenderer {
   private readonly onError?: (cause: unknown) => void
   private readonly renderState: RenderStateSource
   private restorePromise?: Promise<void>
+  private readonly retiredReleases = new Set<Promise<void>>()
   private deviceUnavailable = false
   private readonly scheduler: RenderScheduler
   private textPass: WebGpuTextPass
@@ -498,7 +499,9 @@ export class WebGpuTerminalRenderer {
       this.atlasTextures.destroy()
       this.unconfigureContext()
     }
-    return Promise.all([this.deviceLease.release(), this.restorePromise]).then(() => {})
+    return Promise.all([this.deviceLease.release(), this.restorePromise])
+      .then(() => Promise.all(this.retiredReleases))
+      .then(() => {})
   }
 
   private configureContext(device: GPUDevice): void {
@@ -869,7 +872,10 @@ export class WebGpuTerminalRenderer {
     this.atlasTextures = resources.atlasTextures
     this.deviceGeneration += 1
     this.deviceUnavailable = false
-    void previous.release()
+    const release = previous.release()
+    this.retiredReleases.add(release)
+    const forget = () => this.retiredReleases.delete(release)
+    void release.then(forget, forget)
     this.needsFullRebuild = true
     this.metrics.deviceRestores += 1
     this.watchDeviceLoss(replacement.device, this.deviceGeneration)
