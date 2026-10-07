@@ -99,6 +99,39 @@ it.each([1, 2])(
   },
 )
 
+it('keeps software pixel uploads byte-identical to an accelerated control', () => {
+  const image = new ImageData(256, 256)
+  for (let alpha = 0; alpha < 256; alpha++) {
+    for (let color = 0; color < 256; color++) {
+      const index = (alpha * 256 + color) * 4
+      image.data.set([color, color, color, alpha], index)
+    }
+  }
+  const read = (software: boolean) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 256
+    const context = canvas.getContext('2d', { alpha: true, willReadFrequently: software })!
+    context.putImageData(image, 0, 0)
+    return context.getImageData(0, 0, 256, 256).data
+  }
+  const reference = read(false)
+  expect(read(false)).toEqual(reference)
+  const software = read(true)
+  const differences = [...software.keys()].filter((index) => software[index] !== reference[index])
+  const first = differences[0]
+  const detail =
+    first === undefined
+      ? undefined
+      : {
+          index: first,
+          accelerated: reference[first],
+          software: software[first],
+          alpha: image.data[first - (first % 4) + 3],
+        }
+  console.info(JSON.stringify({ differentBytes: differences.length, first: detail }))
+  expect(differences.length).toBe(0)
+})
+
 it.each([
   ['canvas2d-pixels', true],
   ['canvas2d-fill-text', false],
