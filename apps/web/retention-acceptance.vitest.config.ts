@@ -590,31 +590,28 @@ function waitForRetentionAcceptanceEntry(
 
 function retentionReloadEntryReady(stage: 'baseline' | 'reload') {
   const observation = window.__retentionAcceptanceEntry?.capture()
+  const ready =
+    observation?.kind === 'mounted' &&
+    observation.views.some((view) => view.kind === 'observed' && view.mismatch === null)
   const observe = () => {
-    const views = observation?.kind === 'mounted' ? observation.views : []
+    if (stage !== 'baseline' && stage !== 'reload') return
+    if (typeof ready !== 'boolean') return
+    const at = performance.now()
+    if (typeof at !== 'number' || !Number.isFinite(at) || at < 0) return
     const state = {
       stage,
       observationType: observation === null ? 'null' : typeof observation,
-      mounted: observation?.kind === 'mounted',
-      viewCount: views.length,
-      observedViews: views.filter((view) => view.kind === 'observed').length,
-      matchingViews: views.filter((view) => view.kind === 'observed' && view.mismatch === null)
-        .length,
+      ready,
     }
     const identity = JSON.stringify(state)
     if (window.__retentionAcceptanceReadinessState === identity) return
     window.__retentionAcceptanceReadinessState = identity
-    console.info(
-      'RETENTION_READINESS ' + JSON.stringify({ at: performance.now(), clock: 'browser', state }),
-    )
+    console.info('RETENTION_READINESS ' + JSON.stringify({ at, clock: 'browser', state }))
   }
   try {
     observe()
   } catch {}
-  return (
-    observation?.kind === 'mounted' &&
-    observation.views.some((view) => view.kind === 'observed' && view.mismatch === null)
-  )
+  return ready
 }
 
 declare global {

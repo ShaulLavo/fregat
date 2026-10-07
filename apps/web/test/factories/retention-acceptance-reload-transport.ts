@@ -575,10 +575,7 @@ const readinessReceiptSchema = v.object({
       'bigint',
       'symbol',
     ]),
-    mounted: v.boolean(),
-    viewCount: receiptInteger,
-    observedViews: receiptInteger,
-    matchingViews: receiptInteger,
+    ready: v.boolean(),
   }),
 })
 const receiptStatus = v.pipe(v.number(), v.integer(), v.minValue(100), v.maxValue(599))
