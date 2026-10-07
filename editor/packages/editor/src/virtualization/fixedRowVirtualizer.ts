@@ -1,4 +1,5 @@
 import { scheduleFrame, type ScheduledFrame } from '../editor/scheduleFrame'
+import { EditorWorkScheduler } from '../editor/workScheduler'
 import { installNativeWheelScrollOwner } from './wheelScrollTarget'
 import {
   createRowHeightIndex,
@@ -89,6 +90,7 @@ const DEFAULT_ROW_GAP = 0
 const DEFAULT_MAX_SCROLL_HEIGHT = 16_000_000
 // Quiet period before a scroll-only change delivers its trailing snapshot.
 const TRAILING_SCROLL_EMIT_DELAY_MS = 100
+const TRAILING_SCROLL_EMIT_KEY = 'editor.virtualizer.trailingScroll'
 
 export function computeFixedRowTotalSize(
   count: number,
@@ -162,7 +164,7 @@ export class FixedRowVirtualizer {
   private scrollHandler: (() => void) | null = null
   private scrollAnimationFrame: ScheduledFrame | null = null
   private resizeAnimationFrame: ScheduledFrame | null = null
-  private trailingScrollEmitTimer: ReturnType<typeof setTimeout> | null = null
+  private readonly trailingScrollScheduler = new EditorWorkScheduler()
   private pendingResizeMetrics: PendingResizeMetrics | null = null
   private itemCache = new Map<number, FixedRowVirtualItem>()
   private cachedRowHeight = DEFAULT_ROW_HEIGHT
@@ -271,6 +273,7 @@ export class FixedRowVirtualizer {
 
   public dispose(): void {
     this.detachScrollElement()
+    this.trailingScrollScheduler.dispose()
     this.changeHandler = null
     this.itemCache.clear()
   }
@@ -386,24 +389,17 @@ export class FixedRowVirtualizer {
   }
 
   private scheduleTrailingScrollEmit(): void {
-    this.cancelTrailingScrollEmit()
-    /**
-     * @justification The tail of a scroll, which has to be measured against the raw scroll events it follows
-     * rather than against editor work — pacing it with other tasks would make the settle time
-     * depend on what else was queued. Cancelled by `cancelTrailingScrollEmit` on every further
-     * scroll, so at most one is ever pending.
-     */
-    this.trailingScrollEmitTimer = setTimeout(() => {
-      this.trailingScrollEmitTimer = null
-      this.emitChange()
-    }, TRAILING_SCROLL_EMIT_DELAY_MS)
+    this.trailingScrollScheduler.schedule({
+      key: TRAILING_SCROLL_EMIT_KEY,
+      taskClass: 'visible-render',
+      delayMs: TRAILING_SCROLL_EMIT_DELAY_MS,
+      run: () => undefined,
+      apply: () => this.emitChange(),
+    })
   }
 
   private cancelTrailingScrollEmit(): void {
-    if (this.trailingScrollEmitTimer === null) return
-
-    clearTimeout(this.trailingScrollEmitTimer)
-    this.trailingScrollEmitTimer = null
+    this.trailingScrollScheduler.cancel(TRAILING_SCROLL_EMIT_KEY)
   }
 
   private stableWindowWouldChange(): boolean {
