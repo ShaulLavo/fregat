@@ -50,7 +50,10 @@ export function createLogOutbox({
       return null
     }
     const serialized = JSON.stringify(parsed.output)
-    const key = `${prefix}${diagnostic ? `${instanceId}:delivery` : parsed.output.event.eventId}`
+    const recordId = diagnostic
+      ? `diagnostic:${instanceId}`
+      : `event:${instanceId}:${parsed.output.event.eventId}`
+    const key = `${prefix}${recordId}`
     const entry = { key, serialized, instanceId, context: { event: parsed.output.event } }
     volatile.set(key, entry)
     try {

@@ -133,8 +133,8 @@ test('destinations and simultaneous app instances preserve separate queued event
     instanceId: 'two',
     retention,
   })
-  first.persist(failure('one'))
-  second.persist(failure('two'))
+  first.persist(failure('shared-event'))
+  second.persist(failure('shared-event'))
   const otherServer = createLogOutbox({
     destination: `${destination}/other`,
     storage: localStorage,
