@@ -233,10 +233,11 @@ function readerSnapshot() {
 export function createColdReaderObservation(enabled: boolean) {
   if (!enabled) return <T>(_kind: 'coldWire' | 'capture', _chunk: Buffer, read: () => T) => read()
   const state = store(),
-    readers = createReaders()
-  readers.firstStarted = Boolean(state.record)
-  state.readers = readers
+    readers = (state.readers ??= createReaders())
+  if (state.record) readers.firstStarted = true
   return <T>(kind: 'coldWire' | 'capture', chunk: Buffer, read: () => T) => {
+    if (store() !== state || state.readers !== readers || (state.firstSeen && !state.record))
+      return read()
     const first = state.record?.readerWindowOpen ? readers.firstCase[kind] : null
     return measureColdReader(readers.suite[kind], first, chunk, read)
   }
@@ -289,9 +290,10 @@ export function beginColdProfile(
 export function markColdProfile(phase: ColdProfilePhase, pending = 0) {
   safeColdObserve(() => {
     const record = store().record
-    if (!record || record.phases.length >= 9) return
+    if (!record) return
+    if (phase === 'cancelled' || phase === 'cleanup') record.readerWindowOpen = false
+    if (record.phases.length >= 9) return
     const start = performance.now()
-    if (phase === 'cleanup') record.readerWindowOpen = false
     record.phases.push({
       phase,
       cpu: coldCpu(),
@@ -476,7 +478,7 @@ export async function publishColdProfile() {
           ? null
           : 'observer-refused',
       readerAdmission:
-        'first-case beginColdProfile through cleanup-mark entry; helper-lifetime suite; callbacks admitted at invocation',
+        'first-case beginColdProfile through cancelled or cleanup-mark entry; helper-lifetime suite; callbacks admitted at invocation',
       readerCpuLimit:
         'public thread counter bracket includes clock/counter edges; whole observer overhead unqualified',
       wireComplete: record.wire?.eofObserved
