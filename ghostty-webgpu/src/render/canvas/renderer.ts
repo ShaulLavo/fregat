@@ -18,6 +18,7 @@ import {
 import { CanvasRowPainter, type Canvas2dContext } from './painter.js'
 import type { PixelTarget, PixelMetrics, PixelTargetFactory } from './pixel-target.js'
 import { canvasScrollPlan, type CanvasScrollPlan } from './scroll.js'
+import { canvasRowKey } from './row-key.js'
 
 export interface CanvasRendererMetrics
   extends RowRendererMetrics, CanvasReuseMetrics, PixelMetrics {}
@@ -125,7 +126,8 @@ class CanvasSurface implements RowRendererSurface {
         for (const row of rows) {
           if (row.y < 0 || row.y >= this.rowCount) continue
           if (options?.rows && !options.rows.has(row.y)) continue
-          this.pending.set(row.y, JSON.stringify(row.cells))
+          const key = this.pixelTarget ? JSON.stringify(row.cells) : canvasRowKey(row.cells)
+          this.pending.set(row.y, key)
         }
         return rows
       },
