@@ -258,7 +258,7 @@ it('renders transparent defaults, opaque explicit colors, glyphs, and an outline
   expect(grid.pass.metrics).toEqual({
     draws: 2,
     submittedFrames: 1,
-    uploadedBytes: columns * rows * (64 + 80),
+    uploadedBytes: columns * rows * (64 + 96),
     uploadOperations: 2,
   })
   grid.destroy()
@@ -336,6 +336,39 @@ it('renders decorations, inverse, selection, invisibility, and minimum contrast 
   expect(maximumRegionAlpha(grid, 96, 32, cellSize)).toBeLessThan(
     maximumRegionAlpha(grid, 32, 0, cellSize),
   )
+  grid.destroy()
+  device.destroy()
+})
+
+it('selects the native color-atlas kind alongside grayscale glyphs', async () => {
+  const device = await createDevice()
+  const colorPixels = new Uint8Array(cellSize * cellSize * 4)
+  for (let index = 0; index < colorPixels.length; index += 4) {
+    colorPixels.set([255, 0, 255, 255], index)
+  }
+  const rasterizer: GlyphRasterizer = {
+    rasterize(input) {
+      const color = input.text === 'B'
+      return {
+        height: cellSize,
+        kind: color ? 'color' : 'grayscale',
+        offsetX: 0,
+        offsetY: 0,
+        pixels: color ? colorPixels : new Uint8Array(cellSize * cellSize).fill(255),
+        width: cellSize,
+      }
+    },
+  }
+  device.pushErrorScope('validation')
+  const grid = await renderGrid(
+    device,
+    defaultRendererTheme,
+    { style: 'outline', visible: false, x: 0, y: 0 },
+    { rasterizer, renderRows: [renderRow(0, [cell(0, { text: 'A' }), cell(1, { text: 'B' })])] },
+  )
+  expect(await device.popErrorScope()).toBeNull()
+  expect(grid.pixel(8, 8)[3]).toBe(255)
+  expect(grid.pixel(24, 8)).toEqual([255, 0, 255, 255])
   grid.destroy()
   device.destroy()
 })

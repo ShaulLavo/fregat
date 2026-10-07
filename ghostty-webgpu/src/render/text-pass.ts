@@ -1,16 +1,9 @@
 import type { AtlasGpuTextures } from './atlas/gpu-textures.js'
 import type { RowInstanceUpdate } from './instances/types.js'
 import { planUploadRanges } from './instances/upload-ranges.js'
-import {
-  CELL_INSTANCE_BYTES,
-  GLYPH_INSTANCE_BYTES,
-  GLYPH_INSTANCE_FLOATS,
-} from './instances/layout.js'
+import { CELL_INSTANCE_BYTES, GLYPH_INSTANCE_BYTES } from './instances/layout.js'
 import { cellShader } from './shaders/cell.wgsl.js'
 import { glyphShader } from './shaders/glyph.wgsl.js'
-
-const GPU_GLYPH_INSTANCE_FLOATS = 20
-const GPU_GLYPH_INSTANCE_BYTES = GPU_GLYPH_INSTANCE_FLOATS * Uint32Array.BYTES_PER_ELEMENT
 
 export interface TextPassMetrics {
   draws: number
@@ -52,7 +45,6 @@ export class WebGpuTextPass {
   private readonly cellBuffer: GPUBuffer
   private readonly device: GPUDevice
   private readonly glyphBuffer: GPUBuffer
-  private readonly glyphUploadWords: Uint32Array
   private frameUploadedBytesValue = 0
   private glyphBindGroupCreationCountValue = 0
   private glyphBindGroup?: GPUBindGroup
@@ -72,8 +64,7 @@ export class WebGpuTextPass {
     this.instanceCount = options.instanceCount
     try {
       this.cellBuffer = this.createStorageBuffer(options.instanceCount * CELL_INSTANCE_BYTES)
-      this.glyphBuffer = this.createStorageBuffer(options.instanceCount * GPU_GLYPH_INSTANCE_BYTES)
-      this.glyphUploadWords = new Uint32Array(options.instanceCount * GPU_GLYPH_INSTANCE_FLOATS)
+      this.glyphBuffer = this.createStorageBuffer(options.instanceCount * GLYPH_INSTANCE_BYTES)
       this.viewportBuffer = options.device.createBuffer({
         size: 16,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
@@ -123,14 +114,7 @@ export class WebGpuTextPass {
     const cellData = data.cellData
     const glyphData = data.glyphData
     for (const range of plan.cell) this.writeRange(this.cellBuffer, cellData, range)
-    const glyphWords = new Uint32Array(glyphData.buffer, glyphData.byteOffset, glyphData.length)
-    for (const range of plan.glyph) {
-      this.packGlyphRange(glyphWords, range)
-      this.writeRange(this.glyphBuffer, this.glyphUploadWords, {
-        byteOffset: (range.byteOffset / GLYPH_INSTANCE_BYTES) * GPU_GLYPH_INSTANCE_BYTES,
-        byteLength: (range.byteLength / GLYPH_INSTANCE_BYTES) * GPU_GLYPH_INSTANCE_BYTES,
-      })
-    }
+    for (const range of plan.glyph) this.writeRange(this.glyphBuffer, glyphData, range)
     return plan.cell.length + plan.glyph.length
   }
 
@@ -222,25 +206,6 @@ export class WebGpuTextPass {
     })
     this.ownedBuffers.push(buffer)
     return buffer
-  }
-
-  private packGlyphRange(
-    source: Uint32Array,
-    range: { readonly byteLength: number; readonly byteOffset: number },
-  ): void {
-    const first = range.byteOffset / GLYPH_INSTANCE_BYTES
-    const end = first + range.byteLength / GLYPH_INSTANCE_BYTES
-    const target = this.glyphUploadWords
-    for (let slot = first; slot < end; slot += 1) {
-      const input = slot * GLYPH_INSTANCE_FLOATS
-      const output = slot * GPU_GLYPH_INSTANCE_FLOATS
-      for (let word = 0; word < 16; word += 1) target[output + word] = source[input + word]!
-      // Native atlas generations remain in CPU records for retained-glyph validation.
-      target[output + 16] = source[input + 16]!
-      target[output + 17] = source[input + 18]!
-      target[output + 18] = source[input + 20]!
-      target[output + 19] = source[input + 22]!
-    }
   }
 
   private writeRange(
