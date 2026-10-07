@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { createBenchmarkError } from './structured-errors.mjs'
-import { auditHighlightRanges } from './editor-scroll-benchmark-ranges.mjs'
+import { auditHighlightRanges, scrollOverscanRows } from './editor-scroll-benchmark-ranges.mjs'
 import {
   applyCpuThrottle,
   average,
@@ -154,7 +154,10 @@ async function runTrialInBrowser(browser, browserName, trial, workspace) {
   await applyCpuThrottle(page, browserName, options.cpuThrottle)
   const cpuCalibrationMs = await measureCpuCalibration(page)
   const report = await runScrollSample(page)
-  const highlightRangeAudit = await page.evaluate(auditHighlightRanges, sourceLines)
+  const highlightRangeAudit = await page.evaluate(auditHighlightRanges, {
+    sourceLines,
+    overscanRows: scrollOverscanRows,
+  })
   return trialSample(browserName, trial, report, cpuCalibrationMs, highlightRangeAudit)
 }
 

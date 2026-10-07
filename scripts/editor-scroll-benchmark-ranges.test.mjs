@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { launchBrowser } from './agent/browser-launch.ts'
 import { chromiumUnavailable } from './agent/browser-prerequisites.ts'
-import { auditHighlightRanges } from '../apps/web/scripts/editor-scroll-benchmark-ranges.mjs'
+import {
+  auditHighlightRanges,
+  scrollOverscanRows,
+} from '../apps/web/scripts/editor-scroll-benchmark-ranges.mjs'
 
 const it = test.skipIf(chromiumUnavailable)
 let browser
@@ -57,11 +60,116 @@ it('accepts mutable DOM ranges', async () => {
   expect(audit.violationCount).toBe(0)
 })
 
+it('rejects connected source rows retained far outside the viewport', async () => {
+  const audit = await observeRetention()
+  expect(audit.renderedRows).toBe(600)
+  expect(audit.violationCount).toBeGreaterThan(0)
+  expect(audit.violations.retainedRows).toBeGreaterThan(0)
+})
+
+it('rejects hidden retained rows within the viewport envelope', async () => {
+  const audit = await observeRetention(true)
+  expect(audit.renderedRows).toBe(600)
+  expect(audit.violationCount).toBeGreaterThan(0)
+})
+
+it.each([
+  [-5, 5],
+  [0.5, 5],
+  [Number.POSITIVE_INFINITY, 5],
+  [Number.NaN, 5],
+  [0, 6],
+  [5, 0],
+])('rejects invalid source window %s to %s', async (start, end) => {
+  const page = await browser.newPage()
+  try {
+    const sourceLines = await page.evaluate(
+      ([start, end]) => {
+        const scroller = document.createElement('div')
+        scroller.className = 'editor-virtualized'
+        scroller.style.cssText = 'height:720px;overflow:auto;--editor-row-height:24px'
+        const row = document.createElement('div')
+        row.className = 'editor-virtualized-row'
+        row.style.height = '24px'
+        row.dataset.editorVirtualRow = '0'
+        row.dataset.editorVirtualWindowStart = String(start)
+        row.dataset.editorVirtualWindowEnd = String(end)
+        row.textContent = 'token'.slice(start, end)
+        scroller.append(row)
+        document.body.append(scroller)
+        CSS.highlights.set('editor-shared-token-0', new Highlight())
+        if (row.textContent.length > 0)
+          CSS.highlights.get('editor-shared-token-0').add(
+            new StaticRange({
+              startContainer: row.firstChild,
+              startOffset: 0,
+              endContainer: row.firstChild,
+              endOffset: 1,
+            }),
+          )
+        return ['token']
+      },
+      [start, end],
+    )
+    const audit = await page.evaluate(auditHighlightRanges, {
+      sourceLines,
+      overscanRows: scrollOverscanRows,
+    })
+    expect(audit.violationCount).toBeGreaterThan(0)
+    expect(audit.violations.invalidSourceWindows).toBeGreaterThan(0)
+  } finally {
+    await page.close()
+  }
+})
+
+async function observeRetention(hidden = false) {
+  const page = await browser.newPage()
+  try {
+    const sourceLines = await page.evaluate((hidden) => {
+      const scroller = document.createElement('div')
+      scroller.className = 'editor-virtualized'
+      scroller.style.cssText = 'height:720px;overflow:auto;--editor-row-height:24px'
+      document.body.append(scroller)
+      const highlight = new Highlight()
+      CSS.highlights.set('editor-shared-token-0', highlight)
+      const sourceLines = Array.from({ length: 600 }, (_, index) => `line${index} token`)
+      for (const [index, source] of sourceLines.entries()) {
+        const row = document.createElement('div')
+        row.className = 'editor-virtualized-row'
+        row.dataset.editorVirtualRow = String(index)
+        row.style.height = '24px'
+        row.hidden = hidden
+        row.textContent = source
+        scroller.append(row)
+        highlight.add(
+          new StaticRange({
+            startContainer: row.firstChild,
+            startOffset: 0,
+            endContainer: row.firstChild,
+            endOffset: 1,
+          }),
+        )
+      }
+      scroller.scrollTop = 10000
+      return sourceLines
+    }, hidden)
+    return await page.evaluate(auditHighlightRanges, {
+      sourceLines,
+      overscanRows: scrollOverscanRows,
+    })
+  } finally {
+    await page.close()
+  }
+}
+
 async function observe(fault, viewport = { width: 1440, height: 1000 }) {
   const page = await browser.newPage({ viewport })
   try {
     const sourceLines = await page.evaluate(mountFixture, fault)
-    return await page.evaluate(auditHighlightRanges, sourceLines)
+    return await page.evaluate(auditHighlightRanges, {
+      sourceLines,
+      overscanRows: scrollOverscanRows,
+    })
   } finally {
     await page.close()
   }
@@ -74,6 +182,7 @@ function mountFixture(fault) {
   )
   const scroller = document.createElement('div')
   scroller.className = 'editor-virtualized'
+  scroller.style.cssText = 'height:720px;overflow:auto;--editor-row-height:24px'
   document.body.append(scroller)
   const highlight = new Highlight()
   CSS.highlights.set('editor-shared-token-0', highlight)
@@ -97,6 +206,7 @@ function mountFixture(fault) {
   function mountRow(source, index) {
     const row = document.createElement('div')
     row.className = 'editor-virtualized-row'
+    row.style.height = '24px'
     row.dataset.editorVirtualRow = String(index)
     scroller.append(row)
     if (fault === 'chunked') return mountChunkedRow(row, source)

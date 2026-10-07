@@ -1,8 +1,14 @@
-export function auditHighlightRanges(sourceLines) {
+export { DEFAULT_OVERSCAN as scrollOverscanRows } from '@singapore-editor/core'
+
+export function auditHighlightRanges({ sourceLines, overscanRows }) {
   const violations = {
     missingRegistry: 0,
     missingEditor: 0,
     sourceMismatchRows: 0,
+    invalidSourceWindows: 0,
+    invalidViewportGeometry: 0,
+    retainedRows: 0,
+    excessRenderedRows: 0,
     disconnectedRanges: 0,
     foreignRanges: 0,
     invalidRanges: 0,
@@ -18,6 +24,7 @@ export function auditHighlightRanges(sourceLines) {
 
   const scroller = document.querySelector('.editor-virtualized')
   if (!scroller) violations.missingEditor = 1
+  const rowWindow = viewportWindow(scroller)
   for (const element of scroller?.querySelectorAll(
     '.editor-virtualized-row[data-editor-virtual-row]',
   ) ?? []) {
@@ -26,10 +33,16 @@ export function auditHighlightRanges(sourceLines) {
     const text = element.textContent ?? ''
     const end = Number(element.dataset.editorVirtualWindowEnd ?? start + text.length)
     const source = sourceLines?.[index]
+    const validWindow = validSourceWindow(index, start, end, source)
+    if (!validWindow) violations.invalidSourceWindows += 1
     if (sourceLines && source?.slice(start, end) !== text) violations.sourceMismatchRows += 1
-    rows.set(element, { index, start, text })
+    const rectangle = element.getBoundingClientRect()
+    if (rowWindow && (rectangle.bottom < rowWindow.top || rectangle.top > rowWindow.bottom))
+      violations.retainedRows += 1
+    rows.set(element, { index, start, text, validWindow })
     renderedCharacters += text.length
   }
+  if (rowWindow) violations.excessRenderedRows = Math.max(0, rows.size - rowWindow.maxRows)
 
   const registry = globalThis.CSS?.highlights
   if (!registry && sourceLines) violations.missingRegistry = 1
@@ -44,8 +57,43 @@ export function auditHighlightRanges(sourceLines) {
     renderedRows: rows.size,
     renderedCharacters,
     viewport: { width: innerWidth, height: innerHeight },
+    rowWindow,
     violations,
     violationCount: Object.values(violations).reduce((sum, count) => sum + count, 0),
+  }
+
+  function viewportWindow(scroller) {
+    if (!scroller) return null
+    const rowHeight = Number.parseFloat(
+      getComputedStyle(scroller).getPropertyValue('--editor-row-height'),
+    )
+    if (
+      !Number.isFinite(rowHeight) ||
+      rowHeight <= 0 ||
+      scroller.clientHeight <= 0 ||
+      !Number.isInteger(overscanRows) ||
+      overscanRows < 0
+    ) {
+      violations.invalidViewportGeometry += 1
+      return null
+    }
+    const top = scroller.getBoundingClientRect().top + scroller.clientTop
+    // A stable window can retain one overscan span after moving by another.
+    const overscanPx = 2 * overscanRows * rowHeight
+    return {
+      top: top - overscanPx,
+      bottom: top + scroller.clientHeight + overscanPx,
+      rowHeight,
+      overscanRows,
+      maxRows: Math.ceil(scroller.clientHeight / rowHeight) + 1 + 2 * overscanRows,
+    }
+  }
+
+  function validSourceWindow(index, start, end, source) {
+    if (!Number.isInteger(index) || index < 0) return false
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start) return false
+    if (!sourceLines) return true
+    return typeof source === 'string' && end <= source.length
   }
 
   function rowFor(node) {
@@ -62,6 +110,10 @@ export function auditHighlightRanges(sourceLines) {
     const row = rowFor(range.startContainer)
     if (!rows.has(row) || row !== rowFor(range.endContainer)) {
       violations.foreignRanges += 1
+      return
+    }
+    if (!rows.get(row).validWindow) {
+      violations.invalidRanges += 1
       return
     }
     const offsets = sourceOffsets(row, range)
