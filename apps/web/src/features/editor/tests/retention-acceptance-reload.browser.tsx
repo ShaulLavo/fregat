@@ -8,11 +8,15 @@ import {
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
-    retentionAcceptanceReload(arm: {
-      readonly syntax: 'colored' | 'plain'
-      readonly font: 'normal' | 'slow'
-      readonly saved: 'present' | 'absent'
-    }): Promise<RetentionAcceptanceReloadResult>
+    retentionAcceptanceReload(
+      arm: {
+        readonly syntax: 'colored' | 'plain'
+        readonly font: 'normal' | 'slow'
+        readonly saved: 'present' | 'absent'
+      },
+      operationId: string,
+    ): Promise<RetentionAcceptanceReloadResult>
+    retentionAcceptanceReloadFinish(operationId: string): Promise<void>
   }
 }
 
@@ -26,10 +30,15 @@ for (const arm of [
     `real page reload restores ${arm.syntax} canonical source with ${arm.font} fonts and no saved paint`,
     { timeout: 30_000 },
     async (context) => {
-      const result = await commands.retentionAcceptanceReload({
-        ...arm,
-        saved: 'absent',
-      })
+      const operationId = crypto.randomUUID()
+      context.onTestFinished(() => commands.retentionAcceptanceReloadFinish(operationId))
+      const result = await commands.retentionAcceptanceReload(
+        {
+          ...arm,
+          saved: 'absent',
+        },
+        operationId,
+      )
       await context.annotate(
         JSON.stringify({
           arm: result.arm,
@@ -108,11 +117,16 @@ test(
   'real page reload admits actual saved paint provisionally',
   { timeout: 30_000 },
   async (context) => {
-    const result = await commands.retentionAcceptanceReload({
-      syntax: 'colored',
-      font: 'normal',
-      saved: 'present',
-    })
+    const operationId = crypto.randomUUID()
+    context.onTestFinished(() => commands.retentionAcceptanceReloadFinish(operationId))
+    const result = await commands.retentionAcceptanceReload(
+      {
+        syntax: 'colored',
+        font: 'normal',
+        saved: 'present',
+      },
+      operationId,
+    )
     await context.annotate(
       JSON.stringify({ output: result.output, screenshot: result.screenshot, setup: result.setup }),
       'retention-acceptance-saved-admission',

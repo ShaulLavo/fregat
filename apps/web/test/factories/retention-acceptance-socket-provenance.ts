@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import { closeSync, openSync, readSync, ftruncateSync, unlinkSync, writeSync } from 'node:fs'
-import { ClientRequest, IncomingMessage, ServerResponse } from 'node:http'
+import { Agent, ClientRequest, IncomingMessage, ServerResponse } from 'node:http'
 import { Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -46,8 +46,41 @@ const identity = {
   thread: integer,
   incarnation: v.pipe(v.string(), v.regex(/^[a-f0-9]{32}$/)),
 }
+const selectionIdentity = {
+  socketId: integer,
+  socketIncarnation: identity.incarnation,
+  selectedAt: clockSchema,
+  destroyedBefore: v.boolean(),
+  reusedBefore: v.boolean(),
+}
+const selectionSchema = v.variant('outcome', [
+  v.strictObject({
+    ...selectionIdentity,
+    completedAt: v.null(),
+    outcome: v.null(),
+    destroyedAfter: v.null(),
+    reusedAfter: v.null(),
+  }),
+  v.strictObject({
+    ...selectionIdentity,
+    completedAt: clockSchema,
+    outcome: v.picklist(['returned', 'threw']),
+    destroyedAfter: v.boolean(),
+    reusedAfter: v.boolean(),
+  }),
+])
 const recordSchema = v.variant('kind', [
   v.strictObject({ ...identity, kind: v.literal('scope'), caseId: integer, forwardId: integer }),
+  v.strictObject({
+    ...identity,
+    kind: v.literal('selection'),
+    path: pathSchema,
+    selection: selectionSchema,
+    errored: nullableClock,
+    closed: nullableClock,
+    aborted: nullableClock,
+    code: codeSchema,
+  }),
   v.strictObject({
     ...identity,
     kind: v.literal('socket'),
@@ -65,6 +98,13 @@ const recordSchema = v.variant('kind', [
     timeoutDispatchDepth: integer,
     destroyInvokedAt: nullableClock,
     destroyContext: v.picklist(['unobserved', 'timeout-dispatch', 'other']),
+    destroyCompletion: v.nullable(
+      v.strictObject({
+        at: clockSchema,
+        outcome: v.picklist(['returned', 'threw']),
+        destroyed: v.boolean(),
+      }),
+    ),
     errored: nullableClock,
     closed: nullableClock,
     code: codeSchema,
@@ -89,12 +129,15 @@ const recordSchema = v.variant('kind', [
     status: v.nullable(integer),
     complete: v.boolean(),
     code: codeSchema,
+    selection: v.nullable(selectionSchema),
+    attachment: v.strictObject({ destroyed: v.boolean(), reused: v.nullable(v.boolean()) }),
   }),
 ])
 type Record = v.InferOutput<typeof recordSchema>
 type Clock = v.InferOutput<typeof clockSchema>
 type SocketRecord = Extract<Record, { kind: 'socket' }>
 type RequestRecord = Extract<Record, { kind: 'request' }>
+type Selection = v.InferOutput<typeof selectionSchema>
 type NewRecord = {
   [Kind in Record['kind']]: Omit<Extract<Record, { kind: Kind }>, keyof typeof identity>
 }[Record['kind']]
@@ -143,7 +186,11 @@ function writeAll(fd: number, bytes: Buffer, position: number) {
 }
 type EmitPhase = 'before' | 'returned' | 'threw'
 type EmitObserver = (event: string | symbol, args: readonly unknown[], phase: EmitPhase) => void
-type DestroyObserver = (args: readonly unknown[]) => void
+type CallOutcome = 'returned' | 'threw'
+type MethodCompletion = (outcome: CallOutcome) => void
+type MethodObserver<Args extends readonly unknown[]> = (args: Args) => MethodCompletion | undefined
+type DestroyObserver = MethodObserver<readonly unknown[]>
+type ReuseObserver = MethodObserver<Readonly<Parameters<Agent['reuseSocket']>>>
 type MethodHook<Observer> = {
   method: unknown
   descriptor: PropertyDescriptor | undefined
@@ -152,6 +199,26 @@ type MethodHook<Observer> = {
 type EmitHook = MethodHook<EmitObserver>
 const provenanceEmitHooks = new Map<EventEmitter, EmitHook>()
 const provenanceDestroyHooks = new Map<EventEmitter, MethodHook<DestroyObserver>>()
+const provenanceReuseHooks = new Map<EventEmitter, MethodHook<ReuseObserver>>()
+
+function beginMethodObservation<Args extends readonly unknown[]>(
+  observers: readonly MethodObserver<Args>[],
+  subject: EventEmitter,
+  args: Args,
+) {
+  const completions: MethodCompletion[] = []
+  for (let index = observers.length - 1; index >= 0; index--) {
+    const observer = observers[index]
+    if (!observer) continue
+    const completion = guard(() => observer.call(subject, args))
+    if (completion) completions.push(completion)
+  }
+  return completions
+}
+
+function completeMethodObservation(completions: readonly MethodCompletion[], outcome: CallOutcome) {
+  for (const complete of completions) guard(() => complete(outcome))
+}
 
 function dispatchEmitObservers(
   observers: readonly EmitObserver[],
@@ -168,7 +235,7 @@ function dispatchEmitObservers(
 
 function releaseMethodObserver<Observer>(
   target: EventEmitter,
-  key: 'emit' | 'destroy',
+  key: 'emit' | 'destroy' | 'reuseSocket',
   registry: Map<EventEmitter, MethodHook<Observer>>,
   hook: MethodHook<Observer>,
   observer: Observer,
@@ -240,11 +307,15 @@ function installDestroyHook(target: Socket): MethodHook<DestroyObserver> {
   const descriptor = Object.getOwnPropertyDescriptor(target, 'destroy')
   const observers: DestroyObserver[] = []
   const destroy: Socket['destroy'] = function (this: Socket, ...args) {
-    for (let index = observers.length - 1; index >= 0; index--) {
-      const observer = observers[index]
-      if (observer) guard(() => Reflect.apply(observer, this, [args]))
+    const completions = beginMethodObservation(observers, this, args)
+    let outcome: CallOutcome = 'threw'
+    try {
+      const result = Reflect.apply(original, this, args)
+      outcome = 'returned'
+      return result
+    } finally {
+      completeMethodObservation(completions, outcome)
     }
-    return Reflect.apply(original, this, args)
   }
   const hook = { method: destroy, descriptor, observers }
   target.destroy = destroy
@@ -252,13 +323,46 @@ function installDestroyHook(target: Socket): MethodHook<DestroyObserver> {
   return hook
 }
 
-function wrapDestroy(target: Socket, observe: (subject: Socket, args: readonly unknown[]) => void) {
+function wrapDestroy(
+  target: Socket,
+  observe: (subject: Socket, args: readonly unknown[]) => MethodCompletion | undefined,
+) {
   const hook = provenanceDestroyHooks.get(target) ?? installDestroyHook(target)
   const observer = function (this: Socket, args: readonly unknown[]) {
-    observe(this, args)
+    return observe(this, args)
   }
   hook.observers.push(observer)
   return releaseMethodObserver(target, 'destroy', provenanceDestroyHooks, hook, observer)
+}
+
+function installReuseHook(target: Agent): MethodHook<ReuseObserver> {
+  const original = target.reuseSocket
+  const descriptor = Object.getOwnPropertyDescriptor(target, 'reuseSocket')
+  const observers: ReuseObserver[] = []
+  const reuseSocket: Agent['reuseSocket'] = function (this: Agent, ...args) {
+    const completions = beginMethodObservation(observers, this, args)
+    let outcome: CallOutcome = 'threw'
+    try {
+      const result = Reflect.apply(original, this, args)
+      outcome = 'returned'
+      return result
+    } finally {
+      completeMethodObservation(completions, outcome)
+    }
+  }
+  const hook = { method: reuseSocket, descriptor, observers }
+  target.reuseSocket = reuseSocket
+  provenanceReuseHooks.set(target, hook)
+  return hook
+}
+
+function wrapReuse(
+  target: Agent,
+  observe: (args: Readonly<Parameters<Agent['reuseSocket']>>) => MethodCompletion | undefined,
+) {
+  const hook = provenanceReuseHooks.get(target) ?? installReuseHook(target)
+  hook.observers.push(observe)
+  return releaseMethodObserver(target, 'reuseSocket', provenanceReuseHooks, hook, observe)
 }
 
 function createJournal(side: Side) {
@@ -455,8 +559,8 @@ function createJournal(side: Side) {
         publish()
         return null
       }
-      const capacity =
-        Buffer.byteLength(JSON.stringify(parsed.output)) + (record.kind === 'socket' ? 320 : 128)
+      const growth = { socket: 448, request: 320, selection: 256, scope: 128 }
+      const capacity = Buffer.byteLength(JSON.stringify(parsed.output)) + growth[record.kind]
       if (capacity + frameHeaderBytes > pageBytes - pageHeaderBytes) {
         refused++
         publish()
@@ -600,6 +704,7 @@ export function createRetentionSocketProvenance(options: {
       timeoutDispatchDepth: 0,
       destroyInvokedAt: null,
       destroyContext: 'unobserved',
+      destroyCompletion: null,
       errored: null,
       closed: null,
       code: null,
@@ -663,7 +768,7 @@ export function createRetentionSocketProvenance(options: {
     const coverage = journal.coverage()
     const incomplete =
       coverage.partial || coverage.refused || coverage.referenceRefused || coverage.unavailable
-    journal.update(socket, (value) => {
+    const captured = journal.update(socket, (value) => {
       if (value.kind !== 'socket') return value
       let destroyContext: SocketRecord['destroyContext'] = 'unobserved'
       if (!incomplete) destroyContext = value.timeoutDispatchDepth ? 'timeout-dispatch' : 'other'
@@ -673,6 +778,70 @@ export function createRetentionSocketProvenance(options: {
         destroyContext,
       }
     })
+    if (captured?.kind !== 'socket' || !captured.destroyInvokedAt) return
+    const invocation = captured.destroyInvokedAt[1]
+    return (outcome: CallOutcome) => {
+      journal.update(socket, (value) => {
+        if (
+          value.kind !== 'socket' ||
+          value.destroyInvokedAt?.[1] !== invocation ||
+          value.destroyCompletion
+        )
+          return value
+        return { ...value, destroyCompletion: { at: now(), outcome, destroyed: socket.destroyed } }
+      })
+    }
+  }
+  const observeReuse = ([socket, request]: Readonly<Parameters<Agent['reuseSocket']>>) => {
+    if (stopped || !(socket instanceof Socket) || !(request instanceof ClientRequest)) return
+    const connection = getSocket(socket)
+    const path = options.normalizePath(request.path)
+    if (!connection || path === null || journal.lookup(request)) return
+    const host = request.getHeader('host')
+    if (
+      host !== `127.0.0.1:${options.entryPort}` &&
+      host !== `localhost:${options.entryPort}` &&
+      host !== `[::1]:${options.entryPort}`
+    )
+      return
+    const selection: Selection = {
+      socketId: connection.id,
+      socketIncarnation: connection.incarnation,
+      selectedAt: now(),
+      destroyedBefore: socket.destroyed,
+      reusedBefore: request.reusedSocket,
+      completedAt: null,
+      outcome: null,
+      destroyedAfter: null,
+      reusedAfter: null,
+    }
+    const slot = journal.create({
+      kind: 'selection',
+      path,
+      selection,
+      errored: null,
+      closed: null,
+      aborted: null,
+      code: null,
+    })
+    if (slot === null || !journal.bind(request, slot)) return
+    return (outcome: CallOutcome) => {
+      journal.update(request, (value) => {
+        if (value.kind !== 'selection' && value.kind !== 'request') return value
+        if (value.selection?.selectedAt[1] !== selection.selectedAt[1]) return value
+        return {
+          ...value,
+          selection: {
+            ...value.selection,
+            completedAt: now(),
+            outcome,
+            destroyedAfter: socket.destroyed,
+            reusedAfter: request.reusedSocket,
+          },
+        }
+      })
+      if (outcome === 'threw') journal.release(request)
+    }
   }
   const attachRequest = (subject: object, socket: Socket, path: string) => {
     let connection = getSocket(socket)
@@ -688,6 +857,9 @@ export function createRetentionSocketProvenance(options: {
     let association: RequestRecord['association'] =
       options.side === 'serving' ? 'serving' : 'unavailable'
     if (options.side === 'client' && scope?.kind === 'scope') association = 'context'
+    const pending = journal.lookup(subject)
+    const selection = pending?.kind === 'selection' ? pending.selection : null
+    if (pending?.kind === 'selection') journal.release(subject, true)
     const slot = journal.create({
       kind: 'request',
       repeated: 0,
@@ -707,6 +879,11 @@ export function createRetentionSocketProvenance(options: {
       status: null,
       complete: false,
       code: null,
+      selection,
+      attachment: {
+        destroyed: socket.destroyed,
+        reused: subject instanceof ClientRequest ? subject.reusedSocket : null,
+      },
     })
     if (slot !== null) journal.bind(subject, slot)
   }
@@ -718,6 +895,12 @@ export function createRetentionSocketProvenance(options: {
   ) => {
     if (!['finish', 'error', 'close', 'aborted'].includes(String(event))) return
     journal.update(subject, (value) => {
+      if (value.kind === 'selection') {
+        if (event === 'error') return { ...value, errored: now(), code: errorCode(args[0]) }
+        if (event === 'aborted') return { ...value, aborted: now() }
+        if (event === 'close') return { ...value, closed: now() }
+        return value
+      }
       if (value.kind !== 'request') return value
       if (event === 'finish')
         return {
@@ -747,6 +930,7 @@ export function createRetentionSocketProvenance(options: {
   }
   restores.push(wrapEmit(Socket.prototype, socketEvent, socketDispatchSettled))
   restores.push(wrapDestroy(Socket.prototype, socketDestroy))
+  if (options.side === 'client') restores.push(wrapReuse(Agent.prototype, observeReuse))
   if (options.side === 'client')
     restores.push(
       wrapEmit(ClientRequest.prototype, (request, event, args) => {

@@ -12,6 +12,7 @@ import { bundleStatsPlugin } from './scripts/bundle-stats-plugin.ts'
 import { demoPreviewPlugin } from './scripts/demo-preview-plugin.ts'
 import { devPagePlugin } from './scripts/dev-page-plugin.ts'
 import { bootAppearancePlugin } from './scripts/boot-appearance-plugin.ts'
+import { phosphorImportPlugin } from './scripts/phosphor-import-plugin.ts'
 import { phosphorWeightPlugin } from './scripts/phosphor-weight-plugin.ts'
 import {
   SHELL_ENTRIES,
@@ -133,6 +134,7 @@ export default defineConfig(({ command, isPreview, mode }) => {
         ],
       }),
       tailwindcss(),
+      phosphorImportPlugin(),
       phosphorWeightPlugin([
         path.resolve(import.meta.dirname, 'src'),
         path.resolve(workspaceRoot, 'packages/ui/src'),
