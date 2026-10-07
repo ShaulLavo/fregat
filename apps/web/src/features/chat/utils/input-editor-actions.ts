@@ -115,7 +115,9 @@ export function replaceChatInputEditorRange(
     rangeEnd,
     rangeStart,
     replacement,
+    focus = false,
   }: {
+    focus?: boolean
     expectedText?: string
     rangeEnd: number
     rangeStart: number
@@ -126,20 +128,27 @@ export function replaceChatInputEditorRange(
   // control-flow analysis would otherwise infer the return as plain `null`.
   let applied: ChatInputRangeReplacement | null = null
 
-  editor.update(() => {
-    const result = chatInputRangeReplacement({
-      expectedText,
-      rangeEnd,
-      rangeStart,
-      replacement,
-      text: $getRoot().getTextContent(),
-    })
-    if (!result) return
-    if (!$selectChatInputRange(result.rangeStart, result.rangeEnd)) return
-    if (!$replaceChatInputSelection(replacement)) return
+  editor.update(
+    () => {
+      const result = chatInputRangeReplacement({
+        expectedText,
+        rangeEnd,
+        rangeStart,
+        replacement,
+        text: $getRoot().getTextContent(),
+      })
+      if (!result) return
+      if (!$selectChatInputRange(result.rangeStart, result.rangeEnd)) return
+      if (!$replaceChatInputSelection(replacement)) return
 
-    applied = result
-  })
+      applied = result
+    },
+    {
+      onUpdate: () => {
+        if (focus && applied) editor.focus()
+      },
+    },
+  )
 
   return applied
 }
@@ -188,6 +197,20 @@ export function moveChatInputCaretToLineBoundary(
   })
 
   return moved
+}
+
+export function readChatInputSelection(editor: LexicalEditor) {
+  return editor.read(() => {
+    const text = $getRoot().getTextContent()
+    const offsets = $chatInputSelectionOffsets()
+    return {
+      text,
+      selection: {
+        start: offsets ? Math.min(offsets.anchor, offsets.focus) : text.length,
+        end: offsets ? Math.max(offsets.anchor, offsets.focus) : text.length,
+      },
+    }
+  })
 }
 
 export function $readChatInputTextSnapshot() {

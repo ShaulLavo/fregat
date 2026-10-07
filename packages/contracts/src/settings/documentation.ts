@@ -9,6 +9,12 @@ export const SETTINGS_DOCUMENTATION = {
     description:
       'What happens to a message you send while the agent is still working: it waits until the turn ends, or reaches the agent at once to correct it. The other send key (Ctrl/Cmd+Enter, or Shift+Ctrl/Cmd+Enter where Ctrl/Cmd+Enter sends) does the other one.',
   },
+  'chat.dictationLimitSeconds': {
+    title: 'Dictation time limit',
+    description:
+      'Maximum seconds of speech input before transcription finishes automatically. Uses the browser speech recognition service and the browser language. Audio may be sent to the browser provider for transcription.',
+    keywords: ['microphone', 'speech', 'voice', 'transcription'],
+  },
   'chat.sendShortcut': {
     optionTitles: {
       enter: 'Enter',

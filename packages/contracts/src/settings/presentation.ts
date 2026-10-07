@@ -6,6 +6,10 @@ export const SETTINGS_PRESENTATION = {
     widget: 'enum',
     category: 'Chat',
   },
+  'chat.dictationLimitSeconds': {
+    widget: 'number',
+    category: 'Chat',
+  },
   'chat.sendShortcut': {
     widget: 'enum',
     category: 'Chat',

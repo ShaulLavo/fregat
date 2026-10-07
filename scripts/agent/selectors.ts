@@ -1068,6 +1068,13 @@ export const selectors = {
   chatFilePreview: (page: Page) => page.locator('[data-chat-file-preview]'),
   chatFileDownload: (page: Page, name: string) =>
     page.getByRole('link', { name: `Download ${name}`, exact: true }),
+  dictationStart: (page: Page) =>
+    page.getByRole('button', { name: 'Start dictation', exact: true }),
+  dictationFinish: (page: Page) =>
+    page.getByRole('button', { name: 'Finish dictation', exact: true }),
+  dictationCancel: (page: Page) =>
+    page.getByRole('button', { name: 'Cancel dictation', exact: true }),
+  dictationStatus: (page: Page) => page.locator('[data-dictation-status]'),
   chatMessage: (page: Page) => page.getByRole('textbox', { name: 'Message', exact: true }),
   waitForChatText: (page: Page, text: string) =>
     page.waitForFunction(

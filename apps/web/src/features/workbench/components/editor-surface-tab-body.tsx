@@ -2,7 +2,7 @@ import { documentKey, fileDocument, fileResource } from '@/lib/documents/utils/i
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import { documentTab } from '@/lib/documents/utils/tabs'
 import type { DocumentKey, FilesystemPath, TabContent, TabId } from '@/lib/documents/utils/types'
-import { useEffect, useLayoutEffect, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useSyncExternalStore } from 'react'
 
 import {
   joinedEditorRenderDocument,
@@ -10,6 +10,7 @@ import {
 } from '@/features/workspace/utils/editor-render-document'
 import { useConflictEditorResolution } from '@/features/workspace/hooks/use-conflict-editor-resolution'
 import { SearchPane } from '@/features/workspace/components/search-pane'
+import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import { useWorkspaceEditHost } from '@/lib/workspace-edits/providers/host-context'
@@ -129,13 +130,18 @@ export function EditorSurfaceTabBody({
   const applyWorkspaceEdit = useWorkspaceEditHost()
   const resolveConflictEditorDocument = useConflictEditorResolution()
   const selectedFile = readyFile(fileState)
+  const { workspaceEditService } = useEditorRuntime()
+  const historyReversing = useSyncExternalStore(workspaceEditService.subscribe, () => {
+    const phase = workspaceEditService.getSnapshot().phase
+    return phase === 'undoing' || phase === 'redoing'
+  })
 
   useLayoutEffect(() => {
-    if (!selectedFile || selectedFile.seemsBinary) return
+    if (!selectedFile || selectedFile.seemsBinary || historyReversing) return
 
     const claim = fileOpenIntent.claimReadyClean(selectedFile.path)
     ensureEditorView(tabId, selectedFile, claim)
-  }, [ensureEditorView, fileOpenIntent, selectedFile, tabId])
+  }, [ensureEditorView, fileOpenIntent, historyReversing, selectedFile, tabId])
 
   useEffect(() => {
     if (!target || (!selectedConflict && !selectedReference)) return

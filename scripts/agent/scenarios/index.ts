@@ -99,6 +99,7 @@ import { chatCitationElsewhere } from './chat-citation-elsewhere'
 import { chatFindingSource } from './chat-finding-source'
 import { chatReviewContext } from './chat-review-context'
 import { chatMultipleModelsLostAck } from './chat-multiple-models-lost-ack'
+import { chatDictation } from './chat-dictation'
 import { chatComposerEditing } from './chat-composer-editing'
 import { chatArtifactTemplate } from './chat-artifact-template'
 import { chatModelFavorites } from './chat-model-favorites'
@@ -286,6 +287,7 @@ import { editorSplitOrder } from './editor-split-order'
 import { editorSplitTargets } from './editor-split-targets'
 import { editorSplitBreadcrumbs } from './editor-split-breadcrumbs'
 import { editorSplitHistoryState } from './editor-split-history-state'
+import { workspaceUndoReopen } from './workspace-undo-reopen'
 import { pageLifecycle } from './page-lifecycle'
 import { editorConflictMerge } from './editor-conflict-merge'
 import { editorExternalDiagnostics } from './editor-external-diagnostics'
@@ -510,6 +512,7 @@ export const scenarios: readonly Scenario[] = [
   chatFindingSource,
   chatReviewContext,
   chatMultipleModelsLostAck,
+  chatDictation,
   chatComposerEditing,
   chatArtifactTemplate,
   chatModelFavorites,
@@ -641,6 +644,7 @@ export const scenarios: readonly Scenario[] = [
   editorSplitTargets,
   editorSplitBreadcrumbs,
   editorSplitHistoryState,
+  workspaceUndoReopen,
   editorConflictMerge,
   editorExternalDiagnostics,
   editorExternalEdit,
