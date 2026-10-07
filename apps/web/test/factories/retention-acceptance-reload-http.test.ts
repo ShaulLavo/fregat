@@ -1,7 +1,8 @@
 import { createServer, request, type IncomingMessage, type ServerResponse } from 'node:http'
 import { once } from 'node:events'
 import { connect } from 'node:net'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
+import { delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
 import { http, passthrough } from 'msw'
@@ -316,19 +317,38 @@ test('the original registry refuses foreign finish and duplicate admission befor
 // The browser command runs in Node; Bun's HTTP parser rejects absolute proxy request targets.
 test.skipIf(!process.versions.bun)(
   'native Node executes the HTTP controller contract controls',
-  async () => {
+  async ({ onTestFinished }) => {
+    const name = process.platform === 'win32' ? 'node.exe' : 'node'
+    const executable = (process.env.PATH ?? '')
+      .split(delimiter)
+      .map((directory) => join(directory, name))
+      .find((candidate) => {
+        const result = spawnSync(
+          candidate,
+          ['--eval', 'process.stdout.write(process.versions.bun ? "bun" : "node")'],
+          { encoding: 'utf8' },
+        )
+        return result.status === 0 && result.stdout === 'node'
+      })
+    if (!executable) throw { code: 'NODE_RUNTIME_UNAVAILABLE' }
     const cli = fileURLToPath(
       new URL('../../../../node_modules/vitest/vitest.mjs', import.meta.url),
     )
     const filename = fileURLToPath(import.meta.url)
-    const child = spawn('node', [cli, 'run', '--project', 'node', filename], {
+    const child = spawn(executable, [cli, 'run', '--project', 'node', filename], {
       cwd: fileURLToPath(new URL('../..', import.meta.url)),
       stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    const closed = once(child, 'close')
+    onTestFinished(async () => {
+      if (child.exitCode !== null) return
+      child.kill('SIGTERM')
+      await closed
     })
     const output: Buffer[] = []
     child.stdout.on('data', (chunk: Buffer) => output.push(chunk))
     child.stderr.on('data', (chunk: Buffer) => output.push(chunk))
-    const [code] = await once(child, 'close')
+    const [code] = await closed
     expect(code, Buffer.concat(output).toString()).toBe(0)
   },
 )
