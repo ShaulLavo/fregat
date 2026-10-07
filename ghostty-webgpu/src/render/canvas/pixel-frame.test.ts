@@ -11,16 +11,45 @@ class ImageDataFixture {
   ) {}
 }
 
+class CanvasFixture {
+  width = 0
+  height = 0
+  readonly context = {
+    canvas: this,
+    putImageData: vi.fn((image: ImageData) => {
+      this.pixels = image.data.slice()
+    }),
+    getImageData: vi.fn(
+      (_x: number, _y: number, width: number, height: number) =>
+        new ImageData(this.pixels.slice(), width, height),
+    ),
+  }
+  private pixels = new Uint8ClampedArray(0)
+  getContext() {
+    return this.context
+  }
+}
+
+function uploadedRows(putImageData: ReturnType<typeof vi.fn>) {
+  return putImageData.mock.calls.map(([image, x, y]) => [x, y, image.width, image.height])
+}
+
 function fixture() {
   const memory = new WebAssembly.Memory({ initial: 1 })
   const putImageData = vi.fn()
-  const frame = new PixelFrame(memory, { putImageData } as unknown as Canvas2dContext)
+  const frame = new PixelFrame(memory, {
+    putImageData,
+    canvas: new CanvasFixture(),
+  } as unknown as Canvas2dContext)
   const output = { offset: 32, width: 4, height: 6, generation: 0 }
   frame.bind(output, 2)
   return { memory, putImageData, frame, output }
 }
 
-beforeEach(() => vi.stubGlobal('ImageData', ImageDataFixture))
+beforeEach(() => {
+  vi.stubGlobal('ImageData', ImageDataFixture)
+  vi.stubGlobal('OffscreenCanvas', CanvasFixture)
+})
 afterEach(() => vi.unstubAllGlobals())
 
 describe('WASM output handoff lifetime', () => {
@@ -65,7 +94,7 @@ describe('WASM output handoff lifetime', () => {
     frame.markRow(0)
     frame.markRow(2)
     frame.present()
-    expect(putImageData.mock.calls.map((call) => call.slice(3))).toEqual([
+    expect(uploadedRows(putImageData)).toEqual([
       [0, 0, 4, 2],
       [0, 4, 4, 2],
     ])
@@ -73,7 +102,14 @@ describe('WASM output handoff lifetime', () => {
     frame.markRow(0)
     frame.markRow(1)
     frame.present()
-    expect(putImageData.mock.calls.map((call) => call.slice(3))).toEqual([[0, 0, 4, 4]])
+    expect(uploadedRows(putImageData)).toEqual([[0, 0, 4, 4]])
+    expect(frame.metrics.stagingUploads).toBe(4)
+    expect(frame.metrics.stagingReadbacks).toBe(4)
+    expect(frame.metrics.stagingImageAllocations).toBe(8)
+    expect(frame.metrics.stagingUploadBytes).toBe(224)
+    expect(frame.metrics.stagingReadbackBytes).toBe(224)
+    expect(frame.metrics.uploadedPixelBytes).toBe(224)
+    expect(frame.metrics.copiedFrameBytes).toBe(0)
   })
 
   it('retains all scheduled damage after a later upload fails', () => {
@@ -89,7 +125,7 @@ describe('WASM output handoff lifetime', () => {
     expect(() => frame.present()).toThrow('Injected output failure')
     putImageData.mockClear()
     frame.present()
-    expect(putImageData.mock.calls.map((call) => call.slice(3))).toEqual([
+    expect(uploadedRows(putImageData)).toEqual([
       [0, 0, 4, 2],
       [0, 4, 4, 2],
     ])
@@ -101,12 +137,12 @@ describe('WASM output handoff lifetime', () => {
     putImageData.mockClear()
     frame.markTransportedRows(-1)
     frame.present()
-    expect(putImageData.mock.calls[0]?.slice(3)).toEqual([0, 0, 4, 4])
+    expect(uploadedRows(putImageData)).toEqual([[0, 0, 4, 4]])
     const old = frame.getImage()
     frame.invalidate()
     expect(frame.getImage() === old).toBe(false)
     frame.present()
-    expect(putImageData.mock.lastCall?.slice(3)).toEqual([0, 0, 4, 6])
+    expect(uploadedRows(putImageData).at(-1)).toEqual([0, 0, 4, 6])
   })
 
   it('rejects invalid rows, shape, memory bounds and disposed access', () => {

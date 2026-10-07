@@ -25,11 +25,20 @@ export class PixelFrame {
     uploadedRegions: 0,
     uploadedPixelBytes: 0,
     copiedFrameBytes: 0,
+    stagingImageAllocations: 0,
+    stagingUploads: 0,
+    stagingUploadBytes: 0,
+    stagingReadbacks: 0,
+    stagingReadbackBytes: 0,
+    stagingResizes: 0,
+    stagingPixelBytes: 0,
+    peakStagingPixelBytes: 0,
   }
   private readonly dirty = new Set<number>()
   private view?: FrameView
   private rowHeight = 0
   private output?: FrameOutput
+  private staging?: Canvas2dContext
 
   constructor(
     private readonly memory: WebAssembly.Memory,
@@ -86,6 +95,7 @@ export class PixelFrame {
 
   invalidate(): void {
     this.view = undefined
+    this.releaseStaging()
     const output = this.output
     if (!output) return
     for (let y = 0; y < output.height / this.rowHeight; y++) this.dirty.add(y)
@@ -95,6 +105,7 @@ export class PixelFrame {
     this.dirty.clear()
     this.output = undefined
     this.view = undefined
+    this.releaseStaging()
   }
 
   getImage(): ImageData {
@@ -129,9 +140,60 @@ export class PixelFrame {
       throw createGhosttyError('canvas.frame', 'Canvas pixel memory changed during presentation')
     const top = first * this.rowHeight
     const height = (last - first + 1) * this.rowHeight
-    this.context.putImageData(image, 0, 0, 0, top, image.width, height)
+    const staging = this.getStaging(image.width, height)
+    const pixels = new Uint8ClampedArray(
+      image.data.buffer,
+      image.data.byteOffset + top * image.width * 4,
+      image.width * height * 4,
+    )
+    const rows = new ImageData(pixels, image.width, height)
+    this.metrics.stagingImageAllocations += 1
+    staging.putImageData(rows, 0, 0)
+    this.metrics.stagingUploads += 1
+    this.metrics.stagingUploadBytes += pixels.byteLength
+    const ready = staging.getImageData(0, 0, image.width, height)
+    this.metrics.stagingImageAllocations += 1
+    this.metrics.stagingReadbacks += 1
+    this.metrics.stagingReadbackBytes += ready.data.byteLength
+    if (image.data.buffer !== this.memory.buffer)
+      throw createGhosttyError('canvas.frame', 'Canvas pixel memory changed during presentation')
+    this.context.putImageData(ready, 0, top)
     this.metrics.uploadedRegions += 1
     this.metrics.uploadedPixelBytes += image.width * height * 4
+  }
+
+  private getStaging(width: number, height: number): Canvas2dContext {
+    let staging = this.staging
+    if (!staging) {
+      const target = this.context.canvas
+      const canvas =
+        target instanceof OffscreenCanvas
+          ? new OffscreenCanvas(width, height)
+          : target.ownerDocument.createElement('canvas')
+      const context = canvas.getContext('2d', { alpha: true, willReadFrequently: true })
+      if (!context) throw createGhosttyError('canvas.frame', 'Canvas pixel staging is unavailable')
+      staging = context
+      this.staging = staging
+    }
+    if (staging.canvas.width !== width || staging.canvas.height !== height) {
+      staging.canvas.width = width
+      staging.canvas.height = height
+      this.metrics.stagingResizes += 1
+    }
+    this.metrics.stagingPixelBytes = width * height * 4
+    this.metrics.peakStagingPixelBytes = Math.max(
+      this.metrics.peakStagingPixelBytes,
+      this.metrics.stagingPixelBytes,
+    )
+    return staging
+  }
+
+  private releaseStaging(): void {
+    if (!this.staging) return
+    this.staging.canvas.width = 0
+    this.staging.canvas.height = 0
+    this.staging = undefined
+    this.metrics.stagingPixelBytes = 0
   }
 
   private sameOutput(left: FrameOutput, right: FrameOutput): boolean {
