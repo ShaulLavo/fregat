@@ -37,6 +37,23 @@ function target() {
 }
 
 describe('Canvas native cell ownership', () => {
+  it('paints space backgrounds and decorations without submitting empty glyphs', async () => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 12, rows: 2 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('a b\x1b[4;41m \x1b[0m')
+    state.update()
+    const context = target()
+    const painter = new CanvasRowPainter(
+      context,
+      fittedFont(),
+      canonicalRendererTheme(mergeRendererTheme({})),
+    )
+    painter.resetContext(fittedFont())
+    painter.paint(state.readRows()[0]!, undefined, 120)
+    expect(context.fillText.mock.calls.map(([text]) => text)).toEqual(['a', 'b'])
+    expect(context.fillRect).toHaveBeenCalled()
+  })
   it.each([false, true])(
     'keeps mode 2027=%s native text, continuations and cursor span',
     async (enabled) => {

@@ -161,6 +161,7 @@ export class CanvasRowPainter {
   private paintGlyph(row: RenderRow, index: number): number {
     const cell = row.cells[index]!
     if (cell.continuation || !cell.text || cell.style?.invisible) return 1
+    if (!this.context.glyph && cell.text === ' ') return 1
     const span = cellSpan(row.cells, index)
     const text = cell.text
     const deviceSpacing = this.font.deviceCellWidth - this.font.deviceCharWidth
