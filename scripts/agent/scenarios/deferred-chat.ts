@@ -119,6 +119,11 @@ export const deferredChat: Scenario = {
       panel.resolve()
       await page.unroute(deferredChatModuleRoutes.workspace)
       await page.unroute(deferredChatModuleRoutes.panel)
+      const current = new URL(page.url())
+      const prefix = current.pathname.startsWith('/platform/') ? '/platform' : ''
+      await page.goto(`${current.origin}${prefix}/~-/workbench`)
+      await waitForApp(page)
+      await selectors.folderTree(page).waitFor({ state: 'detached' })
       await releaseFixture(fixture)
     }
   },
