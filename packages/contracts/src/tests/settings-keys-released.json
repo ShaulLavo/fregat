@@ -101,6 +101,7 @@
     "git.worktreeSubmodules",
     "keybindings.overrides",
     "keybindings.preset",
+    "logs.clientFailureRetention",
     "logs.defaultTimeRange",
     "logs.retentionDays",
     "logs.slowThresholdMs",

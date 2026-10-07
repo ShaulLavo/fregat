@@ -1,4 +1,5 @@
 import { commandFoundation } from './command-foundation'
+import { clientLogDelivery } from './client-log-delivery'
 import { unknownWorkspaceSettings } from './unknown-workspace-settings'
 import { releaseInstallationSettings } from './release-installation-settings'
 import { nativeWindow } from './native-window'
@@ -173,6 +174,8 @@ import { chatResume } from './chat-resume'
 import { chatTurnSettle } from './chat-turn-settle'
 import { devicePairing } from './device-pairing'
 import { phoneShell } from './phone-shell'
+import { phoneListReturn } from './phone-list-return'
+import { phoneUpdateReload } from './client-update'
 import { phoneContextMenus } from './phone-context-menus'
 import { phoneSurfaces } from './phone-surfaces'
 import { phoneComposer } from './phone-composer'
@@ -601,6 +604,7 @@ export const scenarios: readonly Scenario[] = [
   settingsRawConflict,
   settingsResponsive,
   settingsSaveRejected,
+  clientLogDelivery,
   searchResults,
   terminalTabs,
   gitGraphKeyboard,
@@ -837,6 +841,8 @@ export const scenarios: readonly Scenario[] = [
   chatTurnSettle,
   devicePairing,
   phoneShell,
+  phoneListReturn,
+  phoneUpdateReload,
   phoneContextMenus,
   phoneSurfaces,
   phoneComposer,

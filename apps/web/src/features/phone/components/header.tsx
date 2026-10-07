@@ -31,8 +31,8 @@ export function Header({
         ) : null}
       </div>
       <div className='flex shrink-0 items-center gap-(--density-gap-tight)'>
-        {actions}
         <ServerUpdateStatus />
+        {actions}
         <PaletteButton />
       </div>
     </PaneBar>
