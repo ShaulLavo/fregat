@@ -12,6 +12,17 @@ export function retentionColdBrowser() {
     observerMs = 0,
     tasksSupported = false,
     resourcesSupported = false
+  let resourceReason: 'unsupported' | 'observer-refused' | null = 'unsupported',
+    taskReason: 'unsupported' | 'observer-refused' | null = 'unsupported'
+  let resourceObserver: PerformanceObserver | null = null,
+    taskObserver: PerformanceObserver | null = null
+  const supports = (type: string) => {
+    try {
+      return PerformanceObserver.supportedEntryTypes.includes(type)
+    } catch {
+      return false
+    }
+  }
   const add = (target: ReturnType<typeof histogram>, value: number) => {
     if (!Number.isFinite(value) || value < 0) return
     target.count++
@@ -28,30 +39,59 @@ export function retentionColdBrowser() {
     }
     observerMs += performance.now() - start
   }
-  const resourceObserver = new PerformanceObserver((list) =>
-    guard(() => collectResources(list.getEntries())),
-  )
-  guard(() => {
-    resourceObserver.observe({ type: 'resource', buffered: true })
+  const collectTasks = (entries: readonly PerformanceEntry[]) => {
+    const start = performance.now()
+    for (const entry of entries) add(longTasks, entry.duration)
+    observerMs += performance.now() - start
+  }
+  const receiveResources = (list: PerformanceObserverEntryList) =>
+    guard(() => collectResources(list.getEntries()))
+  const receiveTasks = (list: PerformanceObserverEntryList) =>
+    guard(() => collectTasks(list.getEntries()))
+  const registerResources = () => {
+    resourceReason = 'observer-refused'
+    const observer = new PerformanceObserver(receiveResources)
+    observer.observe({ type: 'resource', buffered: true })
+    resourceObserver = observer
     resourcesSupported = true
-  })
-  guard(() => {
-    const taskObserver = new PerformanceObserver((list) =>
-      guard(() => {
-        const start = performance.now()
-        for (const entry of list.getEntries()) add(longTasks, entry.duration)
-        observerMs += performance.now() - start
-      }),
-    )
-    taskObserver.observe({ type: 'longtask', buffered: true })
+    resourceReason = null
+  }
+  const registerTasks = () => {
+    taskReason = 'observer-refused'
+    const observer = new PerformanceObserver(receiveTasks)
+    observer.observe({ type: 'longtask', buffered: true })
+    taskObserver = observer
     tasksSupported = true
-  })
+    taskReason = null
+  }
+  if (supports('resource')) guard(registerResources)
+  if (supports('longtask')) guard(registerTasks)
+  const drainResources = () => {
+    if (!resourceObserver) return
+    try {
+      collectResources(resourceObserver.takeRecords())
+    } catch {
+      resourcesSupported = false
+      resourceReason = 'observer-refused'
+    }
+  }
+  const drainTasks = () => {
+    if (!taskObserver) return
+    try {
+      collectTasks(taskObserver.takeRecords())
+    } catch {
+      tasksSupported = false
+      taskReason = 'observer-refused'
+    }
+  }
   const emit = (phase: 'dom' | 'load' | 'hide') =>
     guard(() => {
-      collectResources(resourceObserver.takeRecords())
+      drainResources()
+      drainTasks()
       const navigation = performance.getEntriesByType('navigation')[0]
       const positive = (value: number) => (value > 0 ? value : null)
       const timing =
+        typeof PerformanceNavigationTiming === 'function' &&
         navigation instanceof PerformanceNavigationTiming
           ? {
               responseStart: positive(navigation.responseStart),
@@ -71,10 +111,10 @@ export function retentionColdBrowser() {
             monotonicMs: performance.now(),
             navigation: timing,
             resources: resourcesSupported ? resources : null,
-            resourceReason: resourcesSupported ? null : 'unsupported',
+            resourceReason,
             longTasks: tasksSupported ? longTasks : null,
             bytes: resourcesSupported ? bytes : null,
-            reason: tasksSupported ? null : 'unsupported',
+            reason: taskReason,
             observerMs,
           }),
       )

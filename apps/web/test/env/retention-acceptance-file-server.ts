@@ -71,7 +71,10 @@ async function startRetentionAcceptanceFileServer(project: TestProject) {
   const output: string[] = []
   server.stdout.on('data', (data: Buffer) => coldWire(data))
   server.stdout.on('data', (data: Buffer) => capture.read(data, (value) => output.push(value)))
-  server.stdout.once('end', () => capture.finishWire())
+  server.stdout.once('end', () => {
+    capture.finishWire()
+    coldWire.finish()
+  })
   server.stderr.on('data', (data: Buffer) => output.push(data.toString()))
   const stopServer = async () => {
     if (server.exitCode !== null || server.signalCode !== null) return

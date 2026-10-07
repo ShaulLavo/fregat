@@ -20,7 +20,7 @@ const cpu = v.object({
   involuntarySwitches: v.nullable(finite),
   loopActiveMs: v.nullable(finite),
   loopIdleMs: v.nullable(finite),
-  reason: v.nullable(v.literal('unsupported')),
+  reason: v.nullable(v.picklist(['unsupported', 'observer-refused'])),
 })
 const hash = v.nullable(v.pipe(v.string(), v.regex(/^[a-f0-9]{8,64}$/)))
 const cache = v.object({
@@ -62,7 +62,7 @@ const browserSchema = v.object({
   timeOriginMs: finite,
   monotonicMs: finite,
   resources: v.nullable(histogram),
-  resourceReason: v.nullable(v.literal('unsupported')),
+  resourceReason: v.nullable(v.picklist(['unsupported', 'observer-refused'])),
   navigation: v.nullable(
     v.object({
       responseStart: v.nullable(finite),
@@ -74,7 +74,7 @@ const browserSchema = v.object({
   ),
   longTasks: v.nullable(histogram),
   bytes: v.nullable(finite),
-  reason: v.nullable(v.literal('unsupported')),
+  reason: v.nullable(v.picklist(['unsupported', 'observer-refused'])),
   observerMs: finite,
 })
 const packetSchema = v.variant('kind', [serverSchema, browserSchema])
@@ -149,12 +149,29 @@ export function parseColdFact(text: string) {
     return null
   }
 }
+type ColdWireCoverage = {
+  bytesSeen: number
+  profileLines: number
+  ordinaryLines: number
+  ordinaryEofBytes: number
+  acceptedFrames: number
+  invalidFrames: number
+  oversizedFrames: number
+  incompleteFrames: number
+  inactiveFrames: number
+  decodeFailures: number
+  discardedBytes: number
+  afterEofBytes: number
+  observerFailures: number
+  eofObserved: boolean
+}
 type Record = {
   output: string
   phases: { phase: ColdProfilePhase; cpu: ReturnType<typeof coldCpu>; pendingRequests: number }[]
   browser: v.InferOutput<typeof browserSchema>[]
   server: v.InferOutput<typeof serverSchema> | null
   refused: number
+  wire: ColdWireCoverage | null
   observerMs: number
 }
 type Store = { firstSeen: boolean; record: Record | null }
@@ -174,7 +191,15 @@ export function beginColdProfile(
   state.firstSeen = true
   if (!enabled || arm.syntax !== 'plain' || arm.font !== 'normal' || arm.saved !== 'absent')
     return false
-  state.record = { output, phases: [], browser: [], server: null, refused: 0, observerMs: 0 }
+  state.record = {
+    output,
+    phases: [],
+    browser: [],
+    server: null,
+    refused: 0,
+    wire: null,
+    observerMs: 0,
+  }
   return true
 }
 export function markColdProfile(phase: ColdProfilePhase, pending = 0) {
@@ -187,33 +212,158 @@ export function markColdProfile(phase: ColdProfilePhase, pending = 0) {
   })
 }
 export function acceptColdFact(text: string) {
-  safeColdObserve(() => {
+  try {
     const record = store().record
-    if (!record) return
+    if (!record) return 'inactive' as const
     const fact = parseColdFact(text)
     if (!fact) {
       if (text.startsWith(coldProfilePrefix)) record.refused++
-      return
+      return 'refused' as const
     }
     if (fact.kind === 'server') {
       record.server = fact
-      return
+      return 'accepted' as const
     }
-    if (record.browser.length < 6) record.browser.push(fact)
-    else record.refused++
-  })
+    if (record.browser.length >= 6) {
+      record.refused++
+      return 'refused' as const
+    }
+    record.browser.push(fact)
+    return 'accepted' as const
+  } catch {
+    return 'refused' as const
+  }
 }
 export function readColdWire(enabled: boolean) {
-  if (!enabled) return (_chunk: Buffer) => {}
-  let pending = ''
-  return (chunk: Buffer) =>
-    safeColdObserve(() => {
-      pending += chunk.toString('utf8')
-      const lines = pending.split('\n')
-      pending = lines.pop() ?? ''
-      if (Buffer.byteLength(pending) > 16_384) pending = ''
-      for (const line of lines) if (line.startsWith(coldProfilePrefix)) acceptColdFact(line)
-    })
+  if (!enabled) return Object.assign((_chunk: Buffer) => {}, { finish: () => {} })
+  const prefix = Buffer.from(coldProfilePrefix),
+    pending = Buffer.alloc(16_384)
+  const decoder = new TextDecoder('utf-8', { fatal: true })
+  const coverage: ColdWireCoverage = {
+    bytesSeen: 0,
+    profileLines: 0,
+    ordinaryLines: 0,
+    ordinaryEofBytes: 0,
+    acceptedFrames: 0,
+    invalidFrames: 0,
+    oversizedFrames: 0,
+    incompleteFrames: 0,
+    inactiveFrames: 0,
+    decodeFailures: 0,
+    discardedBytes: 0,
+    afterEofBytes: 0,
+    observerFailures: 0,
+    eofObserved: false,
+  }
+  let length = 0,
+    lineBytes = 0
+  let state: 'prefix' | 'profile' | 'ordinary' | 'oversized' = 'prefix'
+  const attach = () => {
+    const record = store().record
+    if (record) record.wire = coverage
+  }
+  const refuse = () => {
+    const record = store().record
+    if (record) record.refused++
+  }
+  const complete = () => {
+    if (state === 'ordinary') {
+      coverage.ordinaryLines++
+      return
+    }
+    if (state === 'oversized') {
+      coverage.profileLines++
+      return
+    }
+    if (state !== 'profile' && !length) {
+      coverage.ordinaryLines++
+      return
+    }
+    if (state !== 'profile') {
+      coverage.invalidFrames++
+      coverage.discardedBytes += lineBytes
+      refuse()
+      return
+    }
+    coverage.profileLines++
+    let text: string
+    try {
+      text = decoder.decode(pending.subarray(0, length))
+    } catch {
+      coverage.decodeFailures++
+      coverage.discardedBytes += lineBytes
+      refuse()
+      return
+    }
+    const result = acceptColdFact(text)
+    if (result === 'accepted') {
+      coverage.acceptedFrames++
+      return
+    }
+    if (result === 'inactive') coverage.inactiveFrames++
+    else coverage.invalidFrames++
+    coverage.discardedBytes += lineBytes
+  }
+  const byte = (value: number) => {
+    if (value === 10) {
+      complete()
+      length = 0
+      lineBytes = 0
+      state = 'prefix'
+      return
+    }
+    lineBytes++
+    if (state === 'ordinary') return
+    if (state === 'oversized') {
+      coverage.discardedBytes++
+      return
+    }
+    if (length === pending.length) {
+      state = 'oversized'
+      coverage.oversizedFrames++
+      coverage.discardedBytes += lineBytes
+      refuse()
+      length = 0
+      return
+    }
+    pending[length++] = value
+    if (state === 'profile') return
+    if (prefix[length - 1] !== value) {
+      state = 'ordinary'
+      length = 0
+      return
+    }
+    if (length === prefix.length) state = 'profile'
+  }
+  const read = (chunk: Buffer) => {
+    attach()
+    coverage.bytesSeen += chunk.length
+    if (coverage.eofObserved) {
+      coverage.afterEofBytes += chunk.length
+      return
+    }
+    try {
+      for (const value of chunk) byte(value)
+    } catch {
+      coverage.observerFailures++
+    }
+  }
+  const finish = () => {
+    attach()
+    if (coverage.eofObserved) return
+    coverage.eofObserved = true
+    if (state === 'ordinary') coverage.ordinaryEofBytes = lineBytes
+    if (lineBytes && state !== 'ordinary') {
+      coverage.incompleteFrames++
+      if (state !== 'oversized') {
+        coverage.discardedBytes += lineBytes
+        refuse()
+      }
+    }
+    length = 0
+    lineBytes = 0
+  }
+  return Object.assign(read, { finish })
 }
 export async function publishColdProfile() {
   const record = store().record
@@ -228,6 +378,18 @@ export async function publishColdProfile() {
       },
       ...record,
       output: undefined,
+      wireComplete: record.wire?.eofObserved
+        ? record.wire.discardedBytes === 0 &&
+          record.wire.afterEofBytes === 0 &&
+          record.wire.observerFailures === 0
+        : null,
+      wireReason: !record.wire
+        ? 'unavailable'
+        : !record.wire.eofObserved
+          ? 'eof-unobserved'
+          : record.wire.discardedBytes || record.wire.afterEofBytes || record.wire.observerFailures
+            ? 'loss-observed'
+            : null,
       missingServerReason: record.server ? null : 'unavailable',
       missingBrowserReason: record.browser.length ? null : 'unavailable',
       queueDepth: null,
@@ -249,5 +411,16 @@ export async function publishColdProfile() {
 }
 
 export function observeColdPromise<T>(operation: () => Promise<T>, terminal: () => void) {
-  return operation().finally(() => safeColdObserve(terminal))
+  const promise = operation()
+  safeColdObserve(() => {
+    void promise.then(
+      () => {
+        safeColdObserve(terminal)
+      },
+      () => {
+        safeColdObserve(terminal)
+      },
+    )
+  })
+  return promise
 }
