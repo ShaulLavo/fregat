@@ -86,7 +86,36 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: bun install --frozen-lockfile
+      run: |
+        # Preparation can be repeated safely; lifecycle scripts run once in the final install.
+        log=$(mktemp "$RUNNER_TEMP/bun-install.XXXXXX")
+        trap 'rm -f "$log"' EXIT
+        for attempt in 1 2 3 4 5 6; do
+          if bun install --frozen-lockfile --ignore-scripts 2>&1 | tee "$log"; then
+            break
+          else
+            statuses=("${PIPESTATUS[@]}")
+          fi
+          if [[ "${statuses[1]}" != 0 ]]; then exit "${statuses[1]}"; fi
+          status="${statuses[0]}"
+          # Fail closed when any diagnostic falls outside the observed download failure.
+          if ! awk '
+            /^error: failed to download [^[:space:]]+@https:\/\/github\.com\/[^/[:space:]]+\/[^/[:space:]]+\/releases\/download\/[^[:space:]]+\.tgz: HTTP 5xx$/ { errors++; next }
+            /^$/ || /^bun install v[0-9]/ || /^Resolving dependencies$/ { next }
+            /^Resolved, downloaded and extracted \[[0-9]+\]$/ { next }
+            /^  https:\/\/github\.com\/[^/[:space:]]+\/[^/[:space:]]+\/releases\/download\/[^[:space:]]+\.tgz$/ { next }
+            /^\+ [^[:space:]]+$/ || /^[0-9]+ packages? installed \[[0-9.]+(ms|s)\]$/ { next }
+            /^Failed to install [0-9]+ packages?$/ { next }
+            { other++ }
+            END { exit !(errors > 0 && other == 0) }
+          ' "$log" || [[ "$attempt" == 6 ]] || (( status >= 128 )); then
+            exit "$status"
+          fi
+          delay=$((2 ** attempt))
+          echo "::warning::GitHub dependency download failed; retrying dependency preparation in ${delay}s (attempt $((attempt + 1))/6)"
+          sleep "$delay"
+        done
+        bun install --frozen-lockfile
 
     - name: Build workspace packages
       shell: bash
