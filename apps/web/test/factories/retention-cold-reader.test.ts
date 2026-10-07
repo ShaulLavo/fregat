@@ -122,3 +122,103 @@ test('real Buffer reads have independent helper lifetime and first-case aggregat
     await rm(output, { recursive: true, force: true })
   }
 })
+
+test('cancelled and cleanup close first admission idempotently even after the phase snapshot cap', async () => {
+  const output = await mkdtemp(join(tmpdir(), 'retention-reader-terminal-'))
+  try {
+    for (const capped of [false, true]) {
+      globalThis.__retentionColdCost = undefined
+      const observe = createColdReaderObservation(true),
+        input = Buffer.from('terminal boundary')
+      beginColdProfile(true, { syntax: 'plain', font: 'normal', saved: 'absent' }, output)
+      markColdProfile('start')
+      observe('coldWire', input, () => 17)
+      if (capped) for (let i = 1; i < 9; i++) markColdProfile('setup')
+      markColdProfile('cancelled')
+      observe('coldWire', input, () => 0)
+      markColdProfile('cleanup')
+      markColdProfile('cleanup')
+      markColdProfile('cancelled')
+      observe('coldWire', input, () => false)
+      await publishColdProfile()
+      const packet = JSON.parse(await readFile(join(output, 'cold-cost.json'), 'utf8'))
+      expect(packet.readers.firstCaseState).toBe('closed')
+      expect(packet.readers.firstCase.coldWire.chunks).toBe(1)
+      expect(packet.readers.firstCase.coldWire.bytes).toBe(input.length)
+      expect(packet.readers.suite.coldWire.chunks).toBe(3)
+      expect(packet.phases.length).toBeLessThanOrEqual(9)
+      if (capped) expect(packet.phases).toHaveLength(9)
+    }
+  } finally {
+    globalThis.__retentionColdCost = undefined
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test('repeated and late registrations retain the admitted counter owner and old closures stay reported', async () => {
+  globalThis.__retentionColdCost = undefined
+  const output = await mkdtemp(join(tmpdir(), 'retention-reader-owner-'))
+  try {
+    const input = Buffer.from('owned reader control'),
+      before = createColdReaderObservation(true)
+    before('coldWire', input, () => 1)
+    const startup = createColdReaderObservation(true)
+    beginColdProfile(true, { syntax: 'plain', font: 'normal', saved: 'absent' }, output)
+    markColdProfile('start')
+    before('coldWire', input, () => 2)
+    const during = createColdReaderObservation(true)
+    before('coldWire', input, () => 3)
+    during('coldWire', input, () => 4)
+    markColdProfile('cleanup')
+    const late = createColdReaderObservation(true)
+    startup('coldWire', input, () => 5)
+    late('coldWire', input, () => 6)
+    await publishColdProfile()
+    const packet = JSON.parse(await readFile(join(output, 'cold-cost.json'), 'utf8'))
+    expect(packet.readerObservationReason).toBeNull()
+    expect(packet.readers.firstCase.coldWire.chunks).toBe(3)
+    expect(packet.readers.firstCase.coldWire.bytes).toBe(input.length * 3)
+    expect(packet.readers.suite.coldWire.chunks).toBe(6)
+    expect(packet.readers.suite.coldWire.bytes).toBe(input.length * 6)
+    const owner = globalThis.__retentionColdCost?.readers
+    const publishedChunks = owner?.suite.coldWire.chunks
+    expect(before('coldWire', input, () => 0)).toBe(0)
+    expect(owner?.suite.coldWire.chunks).toBe(publishedChunks)
+    globalThis.__retentionColdCost = undefined
+    expect(before('coldWire', input, () => false)).toBe(false)
+    expect(owner?.suite.coldWire.chunks).toBe(publishedChunks)
+  } finally {
+    globalThis.__retentionColdCost = undefined
+    await rm(output, { recursive: true, force: true })
+  }
+})
+
+test('terminal marking retains a callback admitted before a synchronous primary throw', async () => {
+  globalThis.__retentionColdCost = undefined
+  const output = await mkdtemp(join(tmpdir(), 'retention-reader-primary-'))
+  try {
+    const observe = createColdReaderObservation(true),
+      input = Buffer.from('admitted primary')
+    beginColdProfile(true, { syntax: 'plain', font: 'normal', saved: 'absent' }, output)
+    let threw = false
+    try {
+      observe('capture', input, () => {
+        markColdProfile('cancelled')
+        throw null
+      })
+    } catch (actual) {
+      threw = true
+      expect(actual).toBeNull()
+    }
+    expect(threw).toBe(true)
+    observe('capture', input, () => 0)
+    await publishColdProfile()
+    const packet = JSON.parse(await readFile(join(output, 'cold-cost.json'), 'utf8'))
+    expect(packet.readers.firstCase.capture.chunks).toBe(1)
+    expect(packet.readers.firstCase.capture.throws).toBe(1)
+    expect(packet.readers.suite.capture.chunks).toBe(2)
+  } finally {
+    globalThis.__retentionColdCost = undefined
+    await rm(output, { recursive: true, force: true })
+  }
+})
