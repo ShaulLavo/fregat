@@ -25,11 +25,18 @@ export class PixelFrame {
     uploadedRegions: 0,
     uploadedPixelBytes: 0,
     copiedFrameBytes: 0,
+    transferImageAllocations: 0,
+    transferImageReuses: 0,
+    transferCopies: 0,
+    transferCopiedBytes: 0,
+    transferPixelBytes: 0,
+    peakTransferPixelBytes: 0,
   }
   private readonly dirty = new Set<number>()
   private view?: FrameView
   private rowHeight = 0
   private output?: FrameOutput
+  private transfer?: ImageData
 
   constructor(
     private readonly memory: WebAssembly.Memory,
@@ -45,6 +52,7 @@ export class PixelFrame {
     this.output = { ...output }
     this.rowHeight = rowHeight
     if (old && this.sameOutput(old, output) && oldRowHeight === rowHeight) return
+    this.releaseTransfer()
     this.dirty.clear()
     for (let y = 0; y < output.height / rowHeight; y++) this.dirty.add(y)
   }
@@ -86,6 +94,7 @@ export class PixelFrame {
 
   invalidate(): void {
     this.view = undefined
+    this.releaseTransfer()
     const output = this.output
     if (!output) return
     for (let y = 0; y < output.height / this.rowHeight; y++) this.dirty.add(y)
@@ -95,6 +104,7 @@ export class PixelFrame {
     this.dirty.clear()
     this.output = undefined
     this.view = undefined
+    this.releaseTransfer()
   }
 
   getImage(): ImageData {
@@ -129,9 +139,42 @@ export class PixelFrame {
       throw createGhosttyError('canvas.frame', 'Canvas pixel memory changed during presentation')
     const top = first * this.rowHeight
     const height = (last - first + 1) * this.rowHeight
-    this.context.putImageData(image, 0, 0, 0, top, image.width, height)
+    const transfer = this.getTransfer(image.width, height)
+    const pixels = new Uint8ClampedArray(
+      image.data.buffer,
+      image.data.byteOffset + top * image.width * 4,
+      image.width * height * 4,
+    )
+    transfer.data.set(pixels)
+    this.metrics.transferCopies += 1
+    this.metrics.transferCopiedBytes += pixels.byteLength
+    if (image.data.buffer !== this.memory.buffer)
+      throw createGhosttyError('canvas.frame', 'Canvas pixel memory changed during presentation')
+    this.context.putImageData(transfer, 0, top)
     this.metrics.uploadedRegions += 1
     this.metrics.uploadedPixelBytes += image.width * height * 4
+  }
+
+  private getTransfer(width: number, height: number): ImageData {
+    const old = this.transfer
+    if (old && old.width === width && old.height === height) {
+      this.metrics.transferImageReuses += 1
+      return old
+    }
+    const image = new ImageData(new Uint8ClampedArray(width * height * 4), width, height)
+    this.transfer = image
+    this.metrics.transferImageAllocations += 1
+    this.metrics.transferPixelBytes = image.data.byteLength
+    this.metrics.peakTransferPixelBytes = Math.max(
+      this.metrics.peakTransferPixelBytes,
+      image.data.byteLength,
+    )
+    return image
+  }
+
+  private releaseTransfer(): void {
+    this.transfer = undefined
+    this.metrics.transferPixelBytes = 0
   }
 
   private sameOutput(left: FrameOutput, right: FrameOutput): boolean {

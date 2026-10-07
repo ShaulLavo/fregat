@@ -9,12 +9,122 @@ import { ComposeKernel } from './kernel.js'
 import { CanvasRowPainter } from './painter.js'
 import { StampTarget } from './stamp-target.js'
 import { fittedFont } from './tests/font.js'
+import { PixelFrame } from './pixel-frame.js'
+import type { Canvas2dContext } from './painter.js'
 
 const cleanups: (() => void)[] = []
 afterEach(() => {
   for (const cleanup of cleanups.splice(0).reverse()) cleanup()
   vi.restoreAllMocks()
 })
+
+function frameFixture(offscreen: boolean, width: number, height: number, rowHeight = 1) {
+  const canvas = offscreen ? new OffscreenCanvas(width, height) : document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d', { alpha: true, willReadFrequently: false })!
+  const memory = new WebAssembly.Memory({ initial: Math.ceil((64 + width * height * 4) / 65536) })
+  const output = { offset: 64, width, height, generation: 0 }
+  const frame = new PixelFrame(memory, context)
+  frame.bind(output, rowHeight)
+  cleanups.push(() => frame.dispose())
+  return { canvas, context, memory, output, frame }
+}
+
+function hostileState(context: Canvas2dContext) {
+  context.globalAlpha = 0
+  context.globalCompositeOperation = 'destination-out'
+  context.filter = 'blur(3px)'
+  context.shadowBlur = 3
+  context.shadowColor = 'red'
+  context.imageSmoothingEnabled = true
+  context.setTransform(3, 0, 0, 3, 100, 100)
+  context.beginPath()
+  context.rect(0, 0, 0, 0)
+  context.clip()
+}
+
+it.each([false, true])(
+  'matches direct RGBA uploads through hostile target state, offscreen=%s',
+  (offscreen) => {
+    const { context, frame } = frameFixture(offscreen, 256, 256)
+    const reference = frameFixture(offscreen, 256, 256).context
+    const image = frame.getImage()
+    for (let alpha = 0; alpha < 256; alpha++) {
+      for (let value = 0; value < 256; value++) {
+        image.data.set([value, value, value, alpha], (alpha * 256 + value) * 4)
+      }
+    }
+    context.fillStyle = 'white'
+    context.fillRect(0, 0, 256, 256)
+    reference.fillStyle = 'white'
+    reference.fillRect(0, 0, 256, 256)
+    hostileState(context)
+    hostileState(reference)
+    const before = context.getTransform()
+    reference.putImageData(image, 0, 0)
+    frame.present()
+    expect(context.getImageData(0, 0, 256, 256).data).toEqual(
+      reference.getImageData(0, 0, 256, 256).data,
+    )
+    expect(context.getTransform()).toEqual(before)
+    expect(context.globalAlpha).toBe(0)
+    expect(context.globalCompositeOperation).toBe('destination-out')
+    expect(context.filter).toBe('blur(3px)')
+    expect(context.shadowBlur).toBe(3)
+    expect(context.imageSmoothingEnabled).toBe(true)
+    if (context instanceof CanvasRenderingContext2D)
+      expect(context.getContextAttributes()).toMatchObject({
+        alpha: true,
+        willReadFrequently: false,
+        desynchronized: false,
+      })
+  },
+)
+
+it.each([false, true])(
+  'preserves row gaps, offsets, growth and owned transfer disposal, offscreen=%s',
+  (offscreen) => {
+    const { context, frame, memory, output } = frameFixture(offscreen, 4, 6, 2)
+    const reference = frameFixture(offscreen, 4, 6, 2).context
+    frame.getImage().data.fill(255)
+    frame.present()
+    const image = frame.getImage()
+    reference.putImageData(image, 0, 0)
+    image.data.fill(0)
+    frame.markRow(0)
+    frame.markRow(2)
+    const submit = vi.spyOn(context, 'putImageData')
+    frame.present()
+    reference.putImageData(image, 0, 0, 0, 0, 4, 2)
+    reference.putImageData(image, 0, 0, 0, 4, 4, 2)
+    expect(context.getImageData(0, 0, 4, 6).data).toEqual(reference.getImageData(0, 0, 4, 6).data)
+    expect(submit.mock.calls.map(([rows, x, y]) => [rows.width, rows.height, x, y])).toEqual([
+      [4, 2, 0, 0],
+      [4, 2, 0, 4],
+    ])
+    memory.grow(1)
+    const moved = { ...output, offset: 192, generation: 1 }
+    frame.bind(moved, 2)
+    frame.getImage().data.set(new Uint8ClampedArray([64, 128, 192, 128]))
+    reference.putImageData(frame.getImage(), 0, 0)
+    frame.present()
+    expect(context.getImageData(0, 0, 4, 6).data).toEqual(reference.getImageData(0, 0, 4, 6).data)
+    frame.bind({ ...moved, width: 2, height: 2 }, 1)
+    frame.present()
+    expect(frame.metrics.transferPixelBytes).toBe(16)
+    expect(frame.metrics.peakTransferPixelBytes).toBe(96)
+    const allocated = frame.metrics.transferImageAllocations
+    frame.invalidate()
+    expect(frame.metrics.transferPixelBytes).toBe(0)
+    frame.present()
+    expect(frame.metrics.transferImageAllocations).toBe(allocated + 1)
+    frame.dispose()
+    expect(frame.metrics.transferPixelBytes).toBe(0)
+    expect(frame.metrics.copiedFrameBytes).toBe(0)
+    expect(() => frame.getImage()).toThrow('unavailable')
+  },
+)
 
 async function native(content: string, columns = 24, rows = 4) {
   const runtime = await GhosttyRuntime.create()
@@ -26,8 +136,71 @@ async function native(content: string, columns = 24, rows = 4) {
   return { terminal, state }
 }
 
+it.each([false, true])(
+  'keeps one owned transfer independent of source mutation and memory growth, offscreen=%s',
+  (offscreen) => {
+    const { frame, memory, context } = frameFixture(offscreen, 4, 6, 2)
+    frame.getImage().data.fill(255)
+    frame.present()
+    const submit = vi.spyOn(context, 'putImageData')
+    frame.markRow(0)
+    frame.present()
+    const owned = submit.mock.calls[0]![0]
+    expect(owned.data.buffer).toBeInstanceOf(ArrayBuffer)
+    expect(owned.data.buffer).not.toBe(memory.buffer)
+    expect(owned.data.byteOffset).toBe(0)
+    expect(owned.data.buffer.byteLength).toBe(32)
+    frame.getImage().data.fill(0)
+    expect(owned.data).toEqual(new Uint8ClampedArray(32).fill(255))
+    memory.grow(1)
+    expect(owned.data.byteLength).toBe(32)
+    frame.markRow(2)
+    frame.present()
+    expect(submit.mock.calls[1]![0]).toBe(owned)
+    expect(owned.data).toEqual(new Uint8ClampedArray(32))
+    expect(submit.mock.calls[1]![2]).toBe(4)
+    expect(frame.getImage().data.buffer).toBe(memory.buffer)
+    expect(frame.metrics.transferImageReuses).toBe(1)
+  },
+)
+
+it('detects synchronous memory growth during a row copy and retains all dirty rows', () => {
+  const { frame, memory, context } = frameFixture(false, 4, 6, 2)
+  frame.getImage().data.fill(255)
+  const original = Uint8ClampedArray.prototype.set
+  const growth = vi.spyOn(Uint8ClampedArray.prototype, 'set')
+  growth.mockImplementationOnce(function (this: Uint8ClampedArray, ...args) {
+    original.apply(this, args)
+    memory.grow(1)
+  })
+  const submit = vi.spyOn(context, 'putImageData')
+  expect(() => frame.present()).toThrow('memory changed')
+  expect(submit).not.toHaveBeenCalled()
+  growth.mockRestore()
+  frame.present()
+  expect(submit).toHaveBeenCalledTimes(1)
+  expect(submit.mock.calls[0]![0].data).toEqual(new Uint8ClampedArray(96).fill(255))
+})
+
+it('refreshes a failed target transfer after reentrant source memory growth', () => {
+  const { frame, memory, context } = frameFixture(false, 4, 6, 2)
+  frame.getImage().data.fill(255)
+  const submit = vi.spyOn(context, 'putImageData')
+  submit.mockImplementationOnce(() => {
+    memory.grow(1)
+    throw new TypeError('external output failure after memory growth')
+  })
+  expect(() => frame.present()).toThrow('external output failure')
+  frame.getImage().data.fill(0)
+  frame.present()
+  expect(submit).toHaveBeenCalledTimes(2)
+  expect(submit.mock.calls[1]![0]).toBe(submit.mock.calls[0]![0])
+  expect(context.getImageData(0, 0, 4, 6).data).toEqual(new Uint8ClampedArray(96))
+  expect(frame.getImage().data.buffer).toBe(memory.buffer)
+})
+
 it.each([1, 2])(
-  'composes real native owners at DPR %s with warm zero browser raster work',
+  'composes real native owners at DPR %s with warm zero glyph raster work',
   async (dpr) => {
     const { state } = await native(
       '\x1b[?25l\x1b[?2027lÁ界👩‍💻\r\n\x1b[?2027h👩‍💻\x1b[1;3;2m faint\x1b[0m\r\n\x1b[4:3mwave\x1b[4:4mdots\x1b[4:5mdash\x1b[0m',
@@ -86,7 +259,17 @@ it.each([1, 2])(
     expect(target.cache.metrics.stampCopiedBytes).toBe(cache.stampCopiedBytes)
     expect(target.frame.getImage().data).toEqual(exact)
     expect(submit).toHaveBeenCalledTimes(1)
-    expect(submit.mock.calls[0]![0].data.buffer).toBe(kernel.memory.buffer)
+    expect(submit.mock.calls[0]![0].data.buffer).not.toBe(kernel.memory.buffer)
+    const reference = document.createElement('canvas')
+    reference.width = canvas.width
+    reference.height = canvas.height
+    const referenceContext = reference.getContext('2d')!
+    referenceContext.putImageData(first, 0, 0)
+    expect(output.getImageData(0, 0, canvas.width, canvas.height).data).toEqual(
+      referenceContext.getImageData(0, 0, canvas.width, canvas.height).data,
+    )
+    expect(submit.mock.calls[0]![0].data).toEqual(exact)
+    expect(target.frame.metrics.transferCopiedBytes).toBe(exact.byteLength * 2)
     expect(target.frame.metrics.copiedFrameBytes).toBe(0)
     expect(target.metrics.rowCopyBytes).toBe(0)
     document.body.append(canvas)
