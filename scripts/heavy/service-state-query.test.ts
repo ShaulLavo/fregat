@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
-import { closeSync, openSync, readFileSync, writeSync } from 'node:fs'
+import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from 'node:fs'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { afterEach, expect, test } from 'vitest'
 import { recordEmptyServiceState, serviceState } from './service-state-query'
 import { removeSandboxes, sandbox, userScopes } from './sandbox'
@@ -81,3 +82,79 @@ test('genuine child output is bounded with explicit preview truncation and uncha
     closeSync(fd)
   }
 })
+
+const python = Bun.which('python3')
+const privatePipeAvailable = process.platform !== 'win32' && python !== null
+if (!privatePipeAvailable) console.info('Private blocking-pipe controls require Unix and Python 3.')
+
+const privatePipeControl = String.raw`import json,os,select,subprocess,sys,time
+config=json.load(sys.stdin)
+script="import {spawnSync} from 'node:child_process'; import {writeSync} from 'node:fs'; import {recordEmptyServiceState} from "+json.dumps(config['helper'])+"; writeSync(1,JSON.stringify({event:'identity',pid:process.pid,execPath:process.execPath,node:process.versions.node,bun:process.versions.bun??null})+'\\n'); const result=spawnSync(process.execPath,['-e','process.exit(7)'],{encoding:'utf8'}); writeSync(1,JSON.stringify({event:'query-complete',pid:result.pid,status:result.status})+'\\n'); recordEmptyServiceState('private-fixture.service',result); writeSync(1,JSON.stringify({event:'after',status:result.status})+'\\n');"
+argv=[config['runtime'],'--input-type=module','-e',script]
+good=subprocess.run(argv,capture_output=True,text=True,timeout=5)
+assert good.returncode==0 and '"event":"after"' in good.stdout
+rows=[{'mode':'ordinary','actualExit':good.returncode,'stdout':good.stdout,'stderr':good.stderr}]
+for mode in ['full','broken']:
+ readfd,writefd=os.pipe()
+ filled=0
+ if mode=='full':
+  os.set_blocking(writefd,False)
+  try:
+   while True: filled+=os.write(writefd,b'x'*4096)
+  except BlockingIOError: pass
+  os.set_blocking(writefd,True)
+ assert os.get_blocking(writefd)
+ writerBlocking=True
+ if mode=='broken': os.close(readfd);readfd=None
+ child=subprocess.Popen(argv,stdout=subprocess.PIPE,stderr=writefd)
+ os.close(writefd)
+ seen=b'';returned=False;drained=b'';start=time.monotonic()
+ try:
+  deadline=start+5
+  while time.monotonic()<deadline and b'"event":"after"' not in seen:
+   remaining=max(0,deadline-time.monotonic())
+   if not select.select([child.stdout],[],[],remaining)[0]: break
+   chunk=os.read(child.stdout.fileno(),4096)
+   if not chunk: break
+   seen+=chunk
+  returned=b'"event":"after"' in seen
+  if readfd is not None:
+   os.set_blocking(readfd,False)
+   drained=os.read(readfd,filled)
+  rest,_=child.communicate(timeout=5)
+  tail=b''
+  if readfd is not None:
+   try: tail=os.read(readfd,4096)
+   except BlockingIOError: pass
+  row={'mode':mode,'pid':child.pid,'writerInheritedBlocking':writerBlocking,'filledPipeBytes':filled,'stdoutBeforeDrain':seen.decode(),'returnedBeforeReaderDrain':returned,'drainedBytes':len(drained),'stdoutAfterDrain':rest.decode(),'diagnosticAfterDrain':tail.decode(),'actualExit':child.returncode,'wallSeconds':time.monotonic()-start,'childReaped':child.poll() is not None}
+  rows.append(row)
+  assert returned and child.returncode==0
+  if mode=='full': assert '[heavy-service-state-query]' in tail.decode()
+ finally:
+  if child.poll() is None: child.kill();child.wait()
+  child.stdout.close()
+  if readfd is not None: os.close(readfd)
+print(json.dumps({'rows':rows,'privatePipeFDsClosed':True,'childrenReaped':True}))
+`
+
+test.skipIf(!privatePipeAvailable)(
+  'default receipt returns before reader drain and contains closed-pipe errors',
+  () => {
+    const box = sandbox()
+    const file = path.join(box.root, 'pipe-control.py')
+    writeFileSync(file, privatePipeControl)
+    const result = spawnSync(python ?? 'python3', [file], {
+      encoding: 'utf8',
+      input: JSON.stringify({
+        runtime: process.execPath,
+        helper: pathToFileURL(path.join(import.meta.dirname, 'service-state-query.ts')).href,
+      }),
+    })
+    expect(result.stderr).toBe('')
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('"writerInheritedBlocking": true')
+    expect(result.stdout).toContain('"returnedBeforeReaderDrain": true')
+    expect(result.stdout).toContain('"privatePipeFDsClosed": true')
+    expect(result.stdout).toContain('"childrenReaped": true')
+  },
+)

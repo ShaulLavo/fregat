@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { writeSync } from 'node:fs'
+import { write } from 'node:fs'
 
 type QueryResult = ReturnType<typeof spawnSync>
 type Sink = (line: string) => unknown
@@ -12,7 +12,7 @@ function excerpt(value: unknown) {
 export function recordEmptyServiceState(
   service: string,
   result: QueryResult,
-  sink: Sink = (line) => writeSync(2, line),
+  sink: Sink = (line) => write(2, line, () => {}),
 ) {
   try {
     const errorCode = result.error && 'code' in result.error ? result.error.code : null
