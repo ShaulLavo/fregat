@@ -1076,6 +1076,7 @@ export const selectors = {
     page.getByRole('button', { name: 'Cancel dictation', exact: true }),
   dictationStatus: (page: Page) => page.locator('[data-dictation-status]'),
   dictationPreview: (page: Page) => page.locator('[data-dictation-preview]'),
+  dictationCaret: (page: Page) => page.locator('[data-dictation-caret]'),
   chatMessage: (page: Page) => page.getByRole('textbox', { name: 'Message', exact: true }),
   waitForChatText: (page: Page, text: string) =>
     page.waitForFunction(

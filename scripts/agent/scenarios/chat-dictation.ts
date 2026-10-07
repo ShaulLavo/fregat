@@ -8,7 +8,7 @@ import { isolatedNativeScenario, withUserSetting } from './native-provider-verif
 export const chatDictation = isolatedNativeScenario({
   name: 'chat-dictation',
   description:
-    'T3-style dictation replaces selected text, freezes sending and editing, discards cancelled speech, reports microphone failures, keeps the newest live words visible across growing text, right-to-left text and phone resizing, and finishes at the configured limit. The external browser speech API is a fixture; actual microphone transcription is a manual check.',
+    'T3-style dictation replaces selected text, freezes sending and editing, discards cancelled speech, reports microphone failures, scrolls the visible caret to every newest live word across growing text, right-to-left text and phone resizing, and finishes at the configured limit. The external browser speech API is a fixture; actual microphone transcription is a manual check.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step, orchestration }) {
     await page.addInitScript({
@@ -47,11 +47,18 @@ export const chatDictation = isolatedNativeScenario({
     await selectors.dictationPreview(page).getByText('lighthouse', { exact: false }).waitFor()
     await step('long-live-preview')
     await assertVisibleTail(page, 'lighthouse')
-    await page.evaluate(
-      (text) => window.speechRecognitionFixture?.current?.result(text, false),
-      `${longPreview}lighthouse beside the shore`,
-    )
-    await assertVisibleTail(page, 'shore')
+    await selectors.dictationPreview(page).evaluate((element) => {
+      element.scrollLeft = 0
+    })
+    let spokenPreview = `${longPreview}lighthouse`
+    for (const word of ['beside', 'the', 'shore']) {
+      spokenPreview += ` ${word}`
+      await page.evaluate(
+        (text) => window.speechRecognitionFixture?.current?.result(text, false),
+        spokenPreview,
+      )
+      await assertVisibleTail(page, word)
+    }
     await step('live-preview-follows-end')
     await page.evaluate(
       (text) => window.speechRecognitionFixture?.current?.result(text, false),
@@ -135,6 +142,14 @@ async function assertVisibleTail(page: Page, word: string) {
     element: await selectors.dictationPreview(page).elementHandle(),
     lastWord: word,
   })
+  await page.waitForFunction(
+    (element) => {
+      if (!element) return false
+      const distance = element.scrollWidth - element.clientWidth
+      return Math.abs(element.scrollLeft) >= distance - 1
+    },
+    await selectors.dictationPreview(page).elementHandle(),
+  )
   const geometry = await selectors.dictationPreview(page).evaluate((element, lastWord) => {
     const text = document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode()
     if (!(text instanceof Text)) return { visible: false, reason: 'missing text' }
@@ -143,13 +158,26 @@ async function assertVisibleTail(page: Page, word: string) {
     range.setStart(text, end - lastWord.length)
     range.setEnd(text, end)
     const tail = range.getBoundingClientRect()
+    const caret = element.querySelector('[data-dictation-caret]')?.getBoundingClientRect()
+    const scrollRange = element.scrollWidth - element.clientWidth
+    const rtl = getComputedStyle(element).direction === 'rtl'
     const viewport = element.getBoundingClientRect()
     return {
       visible:
+        caret !== undefined &&
+        caret.left >= viewport.left - 1 &&
+        caret.right <= viewport.right + 1 &&
+        (rtl ? caret.right <= tail.left + 1 : caret.left >= tail.right - 1) &&
+        scrollRange > 0 &&
+        Math.abs(element.scrollLeft) >= scrollRange - 1 &&
         text.data.endsWith(lastWord) &&
         tail.width > 0 &&
         tail.left >= viewport.left - 1 &&
         tail.right <= viewport.right + 1,
+      scrollLeft: element.scrollLeft,
+      scrollRange,
+      caretLeft: caret?.left,
+      caretRight: caret?.right,
       tailLeft: tail.left,
       tailRight: tail.right,
       viewportLeft: viewport.left,
