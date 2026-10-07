@@ -9,6 +9,7 @@ const tools = [
   'vite',
   'vitest',
   '@vitest/browser-playwright',
+  '@vitest/mocker',
   'oxlint',
   'oxfmt',
   'turbo',

@@ -218,14 +218,19 @@ test('terminal native input closure agrees with its package dependencies', () =>
   expect(['bootstrap', 'assembled']).toContain(result.stdout.trim())
 })
 
-test.each(['editor', 'ghostty-webgpu', 'hotkeys'])(
-  'keeps the shared Vitest patch inside the %s standalone export',
-  async (family) => {
+test.each(
+  ['editor', 'ghostty-webgpu', 'hotkeys'].flatMap((family) =>
+    [
+      { key: 'vitest@5.0.2', patch: 'patches/vitest@5.0.2.patch' },
+      { key: '@vitest/mocker@5.0.2', patch: 'patches/@vitest%2Fmocker@5.0.2.patch' },
+    ].map((tool) => ({ family, ...tool })),
+  ),
+)(
+  'keeps the shared $key patch inside the $family standalone export',
+  async ({ family, key, patch }) => {
     await withWorkspace(async (fixture) => {
       await prepare(fixture)
-      const key = 'vitest@5.0.2'
-      const patch = 'patches/vitest@5.0.2.patch'
-      const source = 'shared Vitest patch\n'
+      const source = 'shared test-tool patch\n'
       const root = await fixture.read('.')
       await fixture.put('.', { ...root, patchedDependencies: { [key]: patch } })
       await mkdir(join(fixture.root, 'patches'))
