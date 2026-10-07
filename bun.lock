@@ -973,7 +973,7 @@
     },
     "scripts": {
       "name": "scripts",
-      "version": "0.0.45",
+      "version": "0.0.47",
       "dependencies": {
         "@workspace/utils": "workspace:*",
       },
