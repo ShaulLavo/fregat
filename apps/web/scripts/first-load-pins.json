@@ -1,7 +1,7 @@
 {
   "reading": "disk",
   "scriptGzip": 1772746,
-  "phoneScriptGzip": 1470125,
+  "phoneScriptGzip": 1486936,
   "owners": {
     "node_modules": 505079,
     "editor": 373737,
@@ -91,7 +91,7 @@
     {
       "at": "2026-09-26T21:03:33.154Z",
       "scriptGzip": 1736796,
-      "reason": "Plan 180 P5: 26 Catppuccin file icons for types the pack has no glyph for (audio, video, PDF, Java, Kotlin, PHP, Lua, LaTeX, Makefile, shaders, certificates…). Rows draw icons synchronously, so the glyph data ships with the first load; apps/web/src/lib grows by the glyph strings and their rules."
+      "reason": "Plan 180 P5: 26 Catppuccin file icons for types the pack has no glyph for (audio, video, PDF, Java, Kotlin, PHP, Lua, LaTeX, Makefile, shaders, certificates\u2026). Rows draw icons synchronously, so the glyph data ships with the first load; apps/web/src/lib grows by the glyph strings and their rules."
     },
     {
       "at": "2026-09-26T22:35:40.666Z",
@@ -163,6 +163,12 @@
       "scriptGzip": 1785067,
       "phoneScriptGzip": 1470125,
       "reason": "Root preference 33 accepts the measured reference at independently approved PR851 source 10d087ec19f5d3abe0d733a665f26f4cda3f9123. Set only phoneScriptGzip 1449825 -> 1470125 and apps/web/src/features/editor 99601 -> 105972. Actual level9 disk gzip JS is desktop 1785067, phone home 1203579 and phone session maximum 1470125; phone CSS 38667 is separate. Editor 105972 is the canonical rounded approximate shared-chunk rendered-share attribution. Required filesystem, settings, preview and attachment semantics retain held immutable byte and reader references, synchronous capture and admission, source interests and release and current write authority; useful PR851 moves optional presentation behind actual Editor consumers. Raw report/measurement/gate receipts are track200/pr808-placement-implementation/candidate/report.json, measurement.receipt.json and gate-evaluation.json; independent 647-file disk, source and rounding proof is track200/pr808-placement-review/offline-cost-proof.json and APPROVE comment6009794865. Original failed phone limit1464323, exceeded by5802 bytes and Editor allowed104581.05, exceeded by1390.95 attributed bytes, plus original87/350 and66b/10d pair failures, remain preserved. Reading=disk, desktop pin1772746 and limit1790473, Workbench43448, Git41690, every other owner, prior history and the 1% total and 5%/2KiB owner margins are unchanged. Current assembly81eb3c2b548cce327cd0729b657bda0ba8a47697 has different Tailwind-scanned verification inputs; its bytes/finalC were not measured and equivalence is not claimed. Exact-head full CI evaluates current assembly against this named reference and still rejects unexplained growth or other failures. This records intended approved source cost; performance, functional, timeout and hardware qualification remain separate."
+    },
+    {
+      "at": "2026-10-07T11:10:18Z",
+      "scriptGzip": 1505973,
+      "phoneScriptGzip": 1486936,
+      "reason": "Approved chat dictation copies T3 Code draft insertion and adds browser capture with finish and cancel controls. Fresh matched main ac0669109 versus complete candidate 29c708072, with the same lockfile and production build options: desktop script gzip 1505939 -> 1505973 (+34); phone sessions list 1201823 -> 1201863 (+40); phone conversation 1483830 -> 1486936 (+3106). Unchanged main is within the prior 1484826 phone limit; the intended 3106-byte feature crosses it by 2110 bytes. Re-pin only phoneScriptGzip 1470125 -> 1486936. Preserve desktop pin 1772746, every owner pin, prior history and the 1% total and 5%/2 KiB owner margins. Original CI job112755878225 at candidate29 and the matched local unchanged-gate failure are retained with paired reports and stats in chat-speech-bundle-cost. See docs/chat-dictation.md for the source and cost evidence. This accepts source cost and makes no runtime performance improvement claim."
     }
   ]
 }

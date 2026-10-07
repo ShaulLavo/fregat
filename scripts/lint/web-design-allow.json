@@ -223,5 +223,10 @@
     "file": "apps/web/src/features/theme-studio/components/dock-tabs.tsx",
     "class": "no-scrollbar",
     "reason": "The phone studio tabs scroll within one bar; a scrollbar would cover the labels. Arrow keys and horizontal gestures reach every tab."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/chat-input-dictation-status.tsx",
+    "class": "no-scrollbar",
+    "reason": "The live transcript is a single-line strip that follows its caret automatically; the hidden scrollbar keeps its text row at one line."
   }
 ]

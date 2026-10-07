@@ -2,6 +2,8 @@ import type { attachmentQueryKeys } from './query-keys'
 import type { ProviderInstanceId } from '@workspace/contracts'
 
 export const chatMutationKeys = {
+  voiceAll: ['chat', 'voice'] as const,
+  voice: (ownerKey: string) => ['chat', 'voice', ownerKey] as const,
   sidePanelModule: ['chat', 'sidePanelModule', 'load'] as const,
   attachmentPreview: (key: ReturnType<typeof attachmentQueryKeys.text>) =>
     ['chat', 'attachment-preview', ...key] as const,

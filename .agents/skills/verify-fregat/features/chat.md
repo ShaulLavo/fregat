@@ -149,3 +149,5 @@ Each surface lists the states it must survive and the scenario that drives each 
 - `chat-tool-order`: mobile grouped activity with reasoning, successful tools and a failed command. Checks one current-activity row, a shared chronological history, reader-controlled reasoning disclosure, completed-turn folding, and retained failure output.
 
 - `chat-resume`: finishes a mock conversation, simulates hidden/visible lifecycle events and a socket loss, then verifies automatic recovery without composer interaction. Routine reconnects show one notice and retain the completed answer. This simulates lifecycle events in Chromium; it does not suspend iOS Safari.
+
+- `chat-dictation`: a browser speech API fixture drives the actual composer. Dictation replaces selected text, freezes editing and sending, cancels without changing the draft, reports microphone errors and finishes at the configured time limit. Captures desktop and phone layouts, with a visible caret and measured automatic scroll following each new word, right-to-left text and phone resizing. Actual microphone recognition requires a manual check in a browser with speech recognition support.

@@ -67,6 +67,12 @@ export const SETTINGS_REGISTRY = {
     default: 'queue',
     scope: 'application',
   }),
+  // Consumed by chat's use-voice-input hook.
+  'chat.dictationLimitSeconds': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(10), v.maxValue(1800)),
+    default: 300,
+    scope: 'application',
+  }),
   'chat.sendShortcut': defineSetting({
     schema: v.picklist(['enter', 'mod-enter-multiline', 'mod-enter']),
     default: 'enter',

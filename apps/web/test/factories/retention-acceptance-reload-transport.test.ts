@@ -31,7 +31,76 @@ import {
   beginRetentionEntryCase,
   failRetentionEntryCase,
   endRetentionEntryCase,
+  observeRetentionReadiness,
 } from './retention-acceptance-reload-transport'
+
+test.each([
+  undefined,
+  null,
+  false,
+  0,
+  '',
+  'ordinary console',
+  'RETENTION_READINESS invalid',
+  'RETENTION_READINESS null',
+])('ignores unavailable or malformed readiness diagnostic %s', (message) => {
+  const receipts: unknown[] = []
+  observeRetentionReadiness(message, (receipt) => receipts.push(receipt))
+  expect(receipts).toEqual([])
+})
+
+test('readiness receipts contain only type, boolean, stage and clock fields', () => {
+  const receipts: unknown[] = []
+  observeRetentionReadiness(
+    'RETENTION_READINESS ' +
+      JSON.stringify({
+        at: 1,
+        clock: 'browser',
+        privateField: 'discarded fixture value',
+        state: {
+          stage: 'reload',
+          observationType: 'object',
+          ready: false,
+          privateField: 'discarded fixture value',
+        },
+      }),
+    (receipt) => receipts.push(receipt),
+  )
+  expect(receipts).toEqual([
+    {
+      at: 1,
+      clock: 'browser',
+      state: {
+        stage: 'reload',
+        observationType: 'object',
+        ready: false,
+      },
+    },
+  ])
+})
+
+test('contains throwing readiness diagnostic sinks', () => {
+  const failure = createScriptError('Controlled diagnostic sink failed', {
+    internal: { channel: 'readiness' },
+  })
+  expect(() =>
+    observeRetentionReadiness(
+      'RETENTION_READINESS ' +
+        JSON.stringify({
+          at: 1,
+          clock: 'browser',
+          state: {
+            stage: 'baseline',
+            observationType: 'undefined',
+            ready: false,
+          },
+        }),
+      () => {
+        throw failure
+      },
+    ),
+  ).not.toThrow()
+})
 
 function controlRuntime(runtime: string) {
   const name = process.platform === 'win32' ? runtime + '.exe' : runtime
