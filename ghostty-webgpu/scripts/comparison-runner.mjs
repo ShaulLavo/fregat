@@ -236,7 +236,7 @@ const artifact = {
   outputFixture: selectedOutputFixture,
   cpuTickSeconds: tickSeconds,
   cpuTickSource,
-  processCounters: cpuOptions.processCounters,
+  ...(cpuOptions.processCounters ? { processCounters: true } : {}),
   counts,
   variants: variantIds,
   phases,
@@ -496,6 +496,8 @@ async function measure(testCase, repetition, browserSession) {
   } catch (error) {
     if (String(error).includes('Mac display unavailable')) throw error
     run.error = String(error.stack ?? error)
+    if (error.cpuFailure) run.cpuFailure = error.cpuFailure
+    if (error.phaseFailure) run.phaseFailure = error.phaseFailure
     run.status = 'failed'
     if (error instanceof ComparisonDeadlineError) {
       error.run = run
@@ -838,6 +840,8 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
   } catch (error) {
     if (String(error).includes('Mac display unavailable')) throw error
     run.error = String(error.stack ?? error)
+    if (error.cpuFailure) run.cpuFailure = error.cpuFailure
+    if (error.phaseFailure) run.phaseFailure = error.phaseFailure
     run.pageErrors = errors
     if (error.captureData) {
       run.captureFailure = error.captureMetadata

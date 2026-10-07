@@ -26,12 +26,13 @@ const createMeasureBody = new Function(
   `return ${source.slice(start, end)}`,
 )
 
-async function failureArtifacts(testCase, repetition) {
+async function failureArtifacts(testCase, repetition, evidence) {
   const screenshots = []
   const captures = []
   const error = new Error('Injected page navigation failure')
   error.captureData = Buffer.from('captured PNG').toString('base64')
   error.captureMetadata = { timestamp: 1 }
+  if (evidence) Object.assign(error, evidence)
   const page = {
     on() {},
     goto: async (url) => {
@@ -66,7 +67,7 @@ async function failureArtifacts(testCase, repetition) {
   await measureBody(testCase, repetition, undefined, run, contexts)
   assert.match(run.error, /Injected page navigation failure/)
   assert.equal(contexts.size, 0)
-  return { screenshots, captures }
+  return { screenshots, captures, ...(evidence ? { run } : {}) }
 }
 
 for (const [kind, prefix] of [
@@ -189,4 +190,28 @@ test('failure artifacts retain control variant, write path, count, and repetitio
     screenshots: ['failure-xterm-webgl-string-17-3.png'],
     captures: ['capture-failure-xterm-webgl-string-17-3.png'],
   })
+})
+
+test('review 7: runner failure handler preserves rejected CPU and phase counter evidence', async () => {
+  const workCounters = {
+    status: 'incomplete',
+    snapshots: { before: { processes: { 1: { values: { identity: '42' } } } } },
+    processes: [{ pid: 1, identity: '42', instructions: 100 }],
+    coverage: { matched: [1], errors: [{ pid: 2, reason: 'Process exited' }] },
+  }
+  const cpuFailure = { before: [{ id: 1 }, { id: 2 }], after: [{ id: 1 }], workCounters }
+  const phaseFailure = {
+    label: 'rejected',
+    traced: true,
+    cpu: cpuFailure,
+    trace: 'retained.trace.json.gz',
+  }
+  const { run } = await failureArtifacts({ variant: 'ghostty-webgl', path: 'bytes', count: 1 }, 0, {
+    cpuFailure,
+    phaseFailure,
+  })
+  assert.equal(run.cpuFailure, cpuFailure)
+  assert.equal(run.phaseFailure, phaseFailure)
+  assert.equal(run.cpuFailure.workCounters.processes[0].instructions, 100)
+  assert.equal(run.phaseFailure.trace, 'retained.trace.json.gz')
 })

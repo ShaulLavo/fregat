@@ -1272,6 +1272,7 @@ test('historical WebGL measurements keep their unlabeled identity beside labeled
 
 test('native work summaries are descriptive and leave paired CPU verdicts unchanged', () => {
   const artifact = pairedArtifact()
+  artifact.processCounters = true
   const baseline = pairedRatios(artifact)
   for (const run of artifact.runs)
     run.output.cpu.workCounters = {

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { once } from 'node:events'
-import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const macFields = {
   identity: 'ri_proc_start_abstime',
@@ -19,6 +19,32 @@ const macFields = {
   pEnergyNj: 'ri_penergy_nj',
 }
 
+const fieldCapabilities = {
+  pCoreSeconds: 'pCoreSeconds',
+  pUserTimeNs: 'pCoreSeconds',
+  pSystemTimeNs: 'pCoreSeconds',
+  instructions: 'instructions',
+  cycles: 'cycles',
+  pInstructions: 'pInstructions',
+  pCycles: 'pCycles',
+  energyNj: 'energyJ',
+  pEnergyNj: 'pEnergyJ',
+}
+
+function available(metadata, field) {
+  const name = fieldCapabilities[field]
+  return !name || metadata.capabilities?.[name]?.available === true
+}
+
+function parseMac(values, metadata) {
+  return Object.fromEntries(
+    Object.entries(macFields).map(([name, field]) => [
+      name,
+      available(metadata, name) ? integer(values[field], field) : null,
+    ]),
+  )
+}
+
 function integer(value, name) {
   assert(
     typeof value === 'string' && /^\d+$/.test(value),
@@ -27,23 +53,27 @@ function integer(value, name) {
   return BigInt(value)
 }
 
-function parsePerf(values) {
-  const pmus = {}
-  for (const [pmu, events] of Object.entries(values.pmus)) {
-    pmus[pmu] = {}
-    for (const name of ['instructions', 'cycles']) {
-      assert(
-        Array.isArray(events[name]) && events[name].length,
-        `${pmu}/${name} requires thread counters`,
-      )
-      pmus[pmu][name] = events[name].map((entry) => ({
-        tid: entry.tid,
-        value: integer(entry.value, name),
-        enabledNs: integer(entry.enabledNs, 'enabledNs'),
-        runningNs: integer(entry.runningNs, 'runningNs'),
-      }))
-    }
+function parsePmu(events, pmu) {
+  const parsed = {}
+  for (const name of ['instructions', 'cycles']) {
+    assert(
+      Array.isArray(events[name]) && events[name].length,
+      `${pmu}/${name} requires thread counters`,
+    )
+    parsed[name] = events[name].map((entry) => ({
+      tid: entry.tid,
+      value: integer(entry.value, name),
+      enabledNs: integer(entry.enabledNs, 'enabledNs'),
+      runningNs: integer(entry.runningNs, 'runningNs'),
+    }))
   }
+  return parsed
+}
+
+function parsePerf(values) {
+  const pmus = Object.fromEntries(
+    Object.entries(values.pmus).map(([pmu, events]) => [pmu, parsePmu(events, pmu)]),
+  )
   assert(Object.keys(pmus).length, 'At least one PMU required')
   return {
     identity: integer(values.identity, 'identity'),
@@ -82,11 +112,7 @@ export function parseCounterSnapshot(raw, metadata) {
       continue
     }
     const counters =
-      metadata.source === 'perf_event_open'
-        ? parsePerf(values)
-        : Object.fromEntries(
-            Object.entries(macFields).map(([name, field]) => [name, integer(values[field], field)]),
-          )
+      metadata.source === 'perf_event_open' ? parsePerf(values) : parseMac(values, metadata)
     processes.set(Number(pid), { ...times, ...counters })
   }
   return {
@@ -112,38 +138,71 @@ function addCount(left, right, name) {
   return value
 }
 
-function perfDelta(before, after) {
-  assert.deepEqual(Object.keys(before.pmus), Object.keys(after.pmus), 'PMU set changed')
-  const pmus = {}
-  for (const [pmu, events] of Object.entries(after.pmus)) {
-    const result = {}
-    for (const name of ['instructions', 'cycles']) {
-      const previous = before.pmus[pmu][name]
-      assert.deepEqual(
-        previous.map((row) => row.tid),
-        events[name].map((row) => row.tid),
-        'Attached thread counter set changed',
-      )
-      result[name] = 0
-      result[`${name}Coverage`] = events[name].map((entry, index) => {
-        const old = previous[index]
-        const value = difference(old.value, entry.value, name)
-        const enabledNs = difference(old.enabledNs, entry.enabledNs, 'enabledNs')
-        const runningNs = difference(old.runningNs, entry.runningNs, 'runningNs')
-        assert(value === 0 || runningNs > 0, 'Nonzero perf count requires running time')
-        result[name] = addCount(result[name], value, name)
-        return { tid: entry.tid, enabledNs, runningNs }
+function pmuDelta(before, after) {
+  const result = {}
+  for (const name of ['instructions', 'cycles']) {
+    const previous = before[name]
+    assert.deepEqual(
+      previous.map((row) => row.tid),
+      after[name].map((row) => row.tid),
+      'Attached thread counter set changed',
+    )
+    result[name] = 0
+    result[`${name}Coverage`] = after[name].map((entry, index) => {
+      const old = previous[index]
+      const value = difference(old.value, entry.value, name)
+      const enabledNs = difference(old.enabledNs, entry.enabledNs, 'enabledNs')
+      const runningNs = difference(old.runningNs, entry.runningNs, 'runningNs')
+      assert(runningNs <= enabledNs, 'Perf running time exceeds enabled time')
+      assert(value === 0 || runningNs > 0, 'Nonzero perf count requires running time')
+      result[name] = addCount(result[name], value, name)
+      return { tid: entry.tid, enabledNs, runningNs }
+    })
+  }
+  return result
+}
+
+function scheduling(pmus, name) {
+  const threads = new Map()
+  for (const pmu of Object.values(pmus)) {
+    for (const row of pmu[`${name}Coverage`]) {
+      const old = threads.get(row.tid) ?? { enabledNs: 0, runningNs: 0 }
+      threads.set(row.tid, {
+        enabledNs: Math.max(old.enabledNs, row.enabledNs),
+        runningNs: addCount(old.runningNs, row.runningNs, 'runningNs'),
       })
     }
-    pmus[pmu] = result
   }
+  return [...threads.values()]
+}
+
+function perfDelta(before, after, cpuSeconds) {
+  assert.deepEqual(Object.keys(before.pmus), Object.keys(after.pmus), 'PMU set changed')
+  const pmus = Object.fromEntries(
+    Object.entries(after.pmus).map(([pmu, events]) => [pmu, pmuDelta(before.pmus[pmu], events)]),
+  )
+  const counts = Object.fromEntries(
+    ['instructions', 'cycles'].map((name) => [
+      name,
+      Object.values(pmus).reduce((sum, row) => addCount(sum, row[name], name), 0),
+    ]),
+  )
+  const active = cpuSeconds > 0 || counts.instructions > 0 || counts.cycles > 0
+  const unavailable = ['instructions', 'cycles'].filter(
+    (name) => active && !scheduling(pmus, name).some((row) => row.runningNs > 0),
+  )
+  const clockAvailable = scheduling(pmus, 'cycles').every((row) => row.runningNs >= row.enabledNs)
   return {
-    instructions: Object.values(pmus).reduce(
-      (sum, row) => addCount(sum, row.instructions, 'instructions'),
-      0,
-    ),
-    cycles: Object.values(pmus).reduce((sum, row) => addCount(sum, row.cycles, 'cycles'), 0),
+    ...counts,
     pmus,
+    clockAvailable,
+    ...(unavailable.length
+      ? {
+          coverageError: `${unavailable.join(' and ')} events never scheduled during active user CPU`,
+          instructions: null,
+          cycles: null,
+        }
+      : {}),
   }
 }
 
@@ -158,7 +217,7 @@ function processDelta(before, after, metadata) {
     userSeconds,
     systemSeconds,
   }
-  if (linux) return { ...result, ...perfDelta(before, after) }
+  if (linux) return { ...result, ...perfDelta(before, after, result.cpuSeconds) }
   for (const field of [
     'instructions',
     'cycles',
@@ -167,37 +226,103 @@ function processDelta(before, after, metadata) {
     'energyNj',
     'pEnergyNj',
   ])
-    result[field] = difference(before[field], after[field], field)
-  result.pCoreSeconds =
-    (difference(before.pUserTimeNs, after.pUserTimeNs, 'pUserTimeNs') +
-      difference(before.pSystemTimeNs, after.pSystemTimeNs, 'pSystemTimeNs')) /
-    1e9
-  assert(result.pCoreSeconds <= result.cpuSeconds + 1e-9, 'P-core time exceeds total CPU time')
+    result[field] = available(metadata, field)
+      ? difference(before[field], after[field], field)
+      : null
+  result.pCoreSeconds = available(metadata, 'pUserTimeNs')
+    ? (difference(before.pUserTimeNs, after.pUserTimeNs, 'pUserTimeNs') +
+        difference(before.pSystemTimeNs, after.pSystemTimeNs, 'pSystemTimeNs')) /
+      1e9
+    : null
+  assert(
+    result.pCoreSeconds === null || result.pCoreSeconds <= result.cpuSeconds + 1e-9,
+    'P-core time exceeds total CPU time',
+  )
   return result
 }
 
-function channel(rows, mac) {
-  const sum = (field) =>
-    rows.reduce((total, row) => {
-      const value = row[field] ?? 0
-      return field.endsWith('Seconds') ? total + value : addCount(total, value, field)
-    }, 0)
+function channel(rows, metadata) {
+  const mac = metadata.source === 'proc_pid_rusage/RUSAGE_INFO_V6'
+  const sum = (field) => {
+    if ((mac && !available(metadata, field)) || rows.some((row) => row[field] === null)) return null
+    return rows.reduce(
+      (total, row) =>
+        field.endsWith('Seconds')
+          ? total + (row[field] ?? 0)
+          : addCount(total, row[field] ?? 0, field),
+      0,
+    )
+  }
   const cpuSeconds = sum('cpuSeconds')
   const cycles = sum('cycles')
   const pCoreSeconds = mac ? sum('pCoreSeconds') : null
+  const pCycles = mac ? sum('pCycles') : null
+  const energyNj = mac ? sum('energyNj') : null
+  const pEnergyNj = mac ? sum('pEnergyNj') : null
+  const clockAvailable = rows.every((row) => row.clockAvailable !== false)
   return {
     instructions: sum('instructions'),
     cycles,
     cpuSeconds,
     pCoreSeconds,
     pInstructions: mac ? sum('pInstructions') : null,
-    pCycles: mac ? sum('pCycles') : null,
-    pCoreShare: mac && cpuSeconds > 0 ? pCoreSeconds / cpuSeconds : null,
-    effectiveClockGHz: cpuSeconds > 0 ? cycles / cpuSeconds / 1e9 : null,
-    effectivePClockGHz: pCoreSeconds > 0 ? sum('pCycles') / pCoreSeconds / 1e9 : null,
-    energyJ: mac ? sum('energyNj') / 1e9 : null,
-    pEnergyJ: mac ? sum('pEnergyNj') / 1e9 : null,
+    pCycles,
+    pCoreShare: pCoreSeconds !== null && cpuSeconds > 0 ? pCoreSeconds / cpuSeconds : null,
+    effectiveClockGHz:
+      clockAvailable && cycles !== null && cpuSeconds > 0 ? cycles / cpuSeconds / 1e9 : null,
+    effectivePClockGHz: pCycles !== null && pCoreSeconds > 0 ? pCycles / pCoreSeconds / 1e9 : null,
+    energyJ: energyNj === null ? null : energyNj / 1e9,
+    pEnergyJ: pEnergyNj === null ? null : pEnergyNj / 1e9,
+    ...(!clockAvailable
+      ? {
+          clockReason:
+            'Counter scheduling cannot separate residency from multiplexing for a full-CPU clock ratio',
+        }
+      : {}),
   }
+}
+
+function matchedProcess(pid, prior, final, first, last, metadata) {
+  try {
+    assert(prior.has(pid) && final.has(pid), 'CDP process appeared or disappeared')
+    assert(prior.get(pid) === final.get(pid), 'CDP process type changed')
+    assert(first && last, 'Native process snapshot missing')
+    assert(!first.error && !last.error, first?.error ?? last?.error ?? 'Native read failed')
+    return {
+      pid,
+      type: final.get(pid),
+      identity: String(last.identity),
+      ...processDelta(first, last, metadata),
+    }
+  } catch (error) {
+    return { error: { pid, reason: error.message } }
+  }
+}
+
+function unavailableChannels(metadata) {
+  if (metadata.source !== 'proc_pid_rusage/RUSAGE_INFO_V6') {
+    const energy = metadata.energyReason ?? 'Per-process energy is unavailable'
+    const pTime = metadata.pCoreTimeReason ?? 'P-core CPU time is unavailable'
+    return {
+      energyJ: energy,
+      pEnergyJ: energy,
+      pCoreSeconds: pTime,
+      pCoreShare: pTime,
+      effectivePClockGHz: pTime,
+    }
+  }
+  const entries = [...new Set(Object.values(fieldCapabilities))].map((name) => [
+    name,
+    metadata.capabilities?.[name],
+  ])
+  return Object.fromEntries(
+    entries
+      .filter(([, value]) => !value?.available)
+      .map(([name, value]) => [
+        name,
+        value?.reason ?? `Native reader did not establish support for ${name}`,
+      ]),
+  )
 }
 
 export function counterDelta(before, after, cpuBefore, cpuAfter) {
@@ -206,40 +331,42 @@ export function counterDelta(before, after, cpuBefore, cpuAfter) {
   const coverage = { matched: [], errors: [] }
   const processes = []
   for (const pid of new Set([...prior.keys(), ...final.keys()])) {
-    const first = before.processes.get(pid)
-    const last = after.processes.get(pid)
-    try {
-      assert(prior.has(pid) && final.has(pid), 'CDP process appeared or disappeared')
-      assert(prior.get(pid) === final.get(pid), 'CDP process type changed')
-      assert(first && last, 'Native process snapshot missing')
-      assert(!first.error && !last.error, first?.error ?? last?.error ?? 'Native read failed')
-      const values = processDelta(first, last, before.metadata)
-      processes.push({ pid, type: final.get(pid), identity: String(last.identity), ...values })
-      coverage.matched.push(pid)
-    } catch (error) {
-      coverage.errors.push({ pid, reason: error.message })
+    const row = matchedProcess(
+      pid,
+      prior,
+      final,
+      before.processes.get(pid),
+      after.processes.get(pid),
+      before.metadata,
+    )
+    if (row.error) {
+      coverage.errors.push(row.error)
+      continue
     }
+    processes.push(row)
+    coverage.matched.push(pid)
+    if (row.coverageError) coverage.errors.push({ pid, reason: row.coverageError })
   }
   const mac = before.metadata.source === 'proc_pid_rusage/RUSAGE_INFO_V6'
   const channels = {}
   if (!coverage.errors.length && processes.length) {
     channels.renderer = channel(
       processes.filter((row) => row.type === 'renderer'),
-      mac,
+      before.metadata,
     )
     channels.GPU = channel(
       processes.filter((row) => row.type === 'GPU'),
-      mac,
+      before.metadata,
     )
     channels.rendererPlusGPU = channel(
       processes.filter((row) => ['renderer', 'GPU'].includes(row.type)),
-      mac,
+      before.metadata,
     )
     channels.otherChrome = channel(
       processes.filter((row) => !['renderer', 'GPU'].includes(row.type)),
-      mac,
+      before.metadata,
     )
-    channels.allChrome = channel(processes, mac)
+    channels.allChrome = channel(processes, before.metadata)
   }
   return {
     status: coverage.errors.length || !processes.length ? 'incomplete' : 'measured',
@@ -258,6 +385,7 @@ export function counterDelta(before, after, cpuBefore, cpuAfter) {
           'P-core time and per-process energy are unavailable.',
           'Endpoint snapshots cannot detect processes born and gone between endpoints.',
         ],
+    unavailable: unavailableChannels(before.metadata),
     processes,
     coverage,
     channels,
@@ -272,21 +400,10 @@ export async function createCounterReader(
     return { skipped: true, reason: `Native process counters are unavailable on ${platform}` }
   const executable = platform === 'darwin' ? '/usr/bin/python3' : 'python3'
   const script = platform === 'darwin' ? 'comparison-rusage.py' : 'comparison-perf.py'
-  const child = spawn(executable, [join(import.meta.dirname, script)], {
-    stdio: ['pipe', 'pipe', 'pipe'],
-  })
-  const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]()
+  let child
+  let lines
   let stderr = ''
   let failure
-  child.stderr.on('data', (data) => {
-    stderr = (stderr + data).slice(-2000)
-  })
-  child.on('error', (error) => {
-    failure = error
-  })
-  child.stdin.on('error', (error) => {
-    failure = error
-  })
   async function reply() {
     let timer
     try {
@@ -313,7 +430,7 @@ export async function createCounterReader(
     return reply()
   }
   async function close() {
-    if (!child.pid || child.exitCode !== null || child.signalCode !== null) return
+    if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return
     const exited = once(child, 'exit')
     child.stdin.end()
     const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMilliseconds)
@@ -324,15 +441,31 @@ export async function createCounterReader(
     }
   }
   try {
+    const requested = performance.now()
+    child = spawn(executable, [fileURLToPath(new URL(script, import.meta.url))], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+    lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]()
+    child.stderr.on('data', (data) => {
+      stderr = (stderr + data).slice(-2000)
+    })
+    child.on('error', (error) => {
+      failure = error
+    })
+    child.stdin.on('error', (error) => {
+      failure = error
+    })
     const metadata = await reply()
     assert(metadata.ready, metadata.reason ?? 'Native reader unavailable')
+    const { processInfo } = await session.send('SystemInfo.getProcessInfo')
     if (platform === 'linux') {
-      const { processInfo } = await session.send('SystemInfo.getProcessInfo')
       const attached = await request({ command: 'start', pids: processInfo.map((row) => row.id) })
       metadata.attached = attached
     }
     return {
       metadata,
+      initialProcessInfo: processInfo,
+      setup: { requested, completed: performance.now() },
       snapshot: (processes) => request({ pids: processes.map((row) => row.id) }),
       close,
     }

@@ -32,7 +32,20 @@ function macSnapshot(values = {}, identity = '42') {
     },
   }
 }
-const metadata = { source: 'proc_pid_rusage/RUSAGE_INFO_V6' }
+const metadata = {
+  source: 'proc_pid_rusage/RUSAGE_INFO_V6',
+  capabilities: Object.fromEntries(
+    [
+      'instructions',
+      'cycles',
+      'pCoreSeconds',
+      'pInstructions',
+      'pCycles',
+      'energyJ',
+      'pEnergyJ',
+    ].map((name) => [name, { available: true }]),
+  ),
+}
 
 function delta(before, after, info = metadata, final = cpuAfter) {
   return counterDelta(
@@ -164,6 +177,7 @@ test('CPU seconds and their acquisition brackets keep the existing arithmetic wi
   let closed = false
   const collector = {
     metadata,
+    initialProcessInfo: cpuBefore,
     async snapshot() {
       index++
       return macSnapshot({ ri_user_time: String(index * 1000000000) })

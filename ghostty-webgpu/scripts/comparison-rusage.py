@@ -2,6 +2,7 @@
 Times are converted from Mach absolute units to nanoseconds."""
 import ctypes
 import json
+import os
 import sys
 import time
 
@@ -53,11 +54,49 @@ def snapshot(pids):
     return {'requestedNs': str(requested), 'completedNs': str(time.monotonic_ns()), 'processes': processes}
 
 
+CAPABILITY_FIELDS = {
+    'instructions': ['ri_instructions'],
+    'cycles': ['ri_cycles'],
+    'pCoreSeconds': ['ri_user_ptime', 'ri_system_ptime'],
+    'pInstructions': ['ri_pinstructions'],
+    'pCycles': ['ri_pcycles'],
+    'energyJ': ['ri_energy_nj'],
+    'pEnergyJ': ['ri_penergy_nj'],
+}
+
+
+def capabilities_from_samples(before, after):
+    capabilities = {}
+    for name, fields in CAPABILITY_FIELDS.items():
+        supported = 'error' not in before and 'error' not in after and any(after.get(field, 0) > before.get(field, 0) for field in fields)
+        capabilities[name] = {'available': supported, 'evidence': 'positive owned-helper calibration delta'} if supported else {'available': False, 'reason': 'Owned-helper calibration could not establish support for ' + name}
+    return capabilities
+
+
+def calibrate():
+    requested = time.monotonic_ns()
+    # A successful rusage call can zero-fill unsupported kernel channels.
+    # Positive calibration deltas establish support independently of an idle or E-only window.
+    set_qos = getattr(system, 'pthread_set_qos_class_self_np', None)
+    if set_qos is not None:
+        set_qos(0x21, 0)
+    before = read(os.getpid())
+    value = 1
+    for index in range(200000):
+        value = ((value << 1) ^ index) & 0xffffffff
+    time.sleep(0.001)
+    after = read(os.getpid())
+    if set_qos is not None:
+        set_qos(0x15, 0)
+    return {'requestedNs': str(requested), 'completedNs': str(time.monotonic_ns()), 'capabilities': capabilities_from_samples(before, after)}
+
+
 def main():
     if libproc is None:
         print(json.dumps({'ready': False, 'reason': 'RUSAGE_INFO_V6 requires macOS'}), flush=True)
         return
-    print(json.dumps({'ready': True, 'source': 'proc_pid_rusage/RUSAGE_INFO_V6', 'timebase': [timebase.numer, timebase.denom], 'units': {'time': 'ns', 'energy': 'nJ', 'start': 'Mach absolute ticks'}}), flush=True)
+    calibration = calibrate()
+    print(json.dumps({'ready': True, 'source': 'proc_pid_rusage/RUSAGE_INFO_V6', 'timebase': [timebase.numer, timebase.denom], 'units': {'time': 'ns', 'energy': 'nJ', 'start': 'Mach absolute ticks'}, 'capabilities': calibration['capabilities'], 'calibration': calibration}), flush=True)
     for line in sys.stdin:
         if line.startswith('{'):
             request = json.loads(line)

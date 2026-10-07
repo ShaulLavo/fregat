@@ -44,6 +44,64 @@ async function cpuSnapshot(session, now) {
   return { processInfo, requested, completed, sampledAt: (requested + completed) / 2 }
 }
 
+async function measureCpuOnly(
+  session,
+  operation,
+  { now = () => performance.now(), tickSeconds = null } = {},
+) {
+  const before = await cpuSnapshot(session, now)
+  const started = now()
+  const sample = await operation()
+  const milliseconds = now() - started
+  const after = await cpuSnapshot(session, now)
+  const interval = after.sampledAt - before.sampledAt
+  assert(Number.isFinite(interval) && interval > 0, 'Positive CPU sampling interval required')
+  return {
+    sample,
+    milliseconds,
+    cpu: {
+      ...cpuSample(before.processInfo, after.processInfo, interval),
+      tickSeconds,
+      milliseconds: interval,
+      interval: {
+        before: { requested: before.requested, completed: before.completed },
+        after: { requested: after.requested, completed: after.completed },
+      },
+      acquisitionUncertaintyMilliseconds:
+        (before.completed - before.requested + after.completed - after.requested) / 2,
+    },
+  }
+}
+
+function workEvidence(reader, counterFailure, before, after, nativeBefore, nativeAfter, setup) {
+  const workCounters = { status: 'skipped', reason: counterFailure, setup: reader.setup ?? setup }
+  if (!reader.metadata) return workCounters
+  workCounters.metadata = reader.metadata
+  workCounters.snapshots = { before: nativeBefore?.raw ?? null, after: nativeAfter?.raw ?? null }
+  const bracket = (value) =>
+    value ? { requested: value.requested, completed: value.completed } : null
+  workCounters.boundary = {
+    before: { cdp: bracket(before), native: bracket(nativeBefore) },
+    after: { cdp: bracket(after), native: bracket(nativeAfter) },
+  }
+  if (counterFailure) return workCounters
+  try {
+    const result = {
+      ...workCounters,
+      ...counterDelta(
+        parseCounterSnapshot(nativeBefore.raw, reader.metadata),
+        parseCounterSnapshot(nativeAfter.raw, reader.metadata),
+        before.processInfo,
+        after.processInfo,
+      ),
+    }
+    delete result.reason
+    return result
+  } catch (error) {
+    return { ...workCounters, reason: error.message }
+  }
+}
+
 export async function measureCpu(
   session,
   operation,
@@ -55,14 +113,13 @@ export async function measureCpu(
     counterTimeoutMilliseconds,
   } = {},
 ) {
+  if (!processCounters && !counterReader)
+    return measureCpuOnly(session, operation, { now, tickSeconds })
+  const setupRequested = now()
   const reader =
     counterReader ??
-    (processCounters
-      ? await createCounterReader(session, { timeoutMilliseconds: counterTimeoutMilliseconds })
-      : {
-          skipped: true,
-          reason: 'Process counters are unregistered. Add --process-counters to a new protocol.',
-        })
+    (await createCounterReader(session, { timeoutMilliseconds: counterTimeoutMilliseconds }))
+  const setupCompleted = now()
   let counterFailure = reader.skipped ? reader.reason : null
   async function nativeSnapshot(processes) {
     if (counterFailure) return null
@@ -72,62 +129,46 @@ export async function measureCpu(
       return { raw, requested, completed: now() }
     } catch (error) {
       counterFailure = error.message
-      return null
+      return { raw: null, requested, completed: now(), error: error.message }
     }
   }
   try {
+    const initial = reader.initialProcessInfo ?? (await cpuSnapshot(session, now)).processInfo
+    const nativeBefore = await nativeSnapshot(initial)
     const before = await cpuSnapshot(session, now)
-    const nativeBefore = await nativeSnapshot(before.processInfo)
     const started = now()
     const sample = await operation()
     const milliseconds = now() - started
     const after = await cpuSnapshot(session, now)
     const nativeAfter = await nativeSnapshot(after.processInfo)
     const interval = after.sampledAt - before.sampledAt
-    assert(Number.isFinite(interval) && interval > 0, 'Positive CPU sampling interval required')
-    let workCounters = { status: 'skipped', reason: counterFailure }
-    if (reader.metadata) {
-      workCounters.metadata = reader.metadata
-      workCounters.snapshots = {
-        before: nativeBefore?.raw ?? null,
-        after: nativeAfter?.raw ?? null,
+    const workCounters = workEvidence(
+      reader,
+      counterFailure,
+      before,
+      after,
+      nativeBefore,
+      nativeAfter,
+      { requested: setupRequested, completed: setupCompleted },
+    )
+    let validated
+    try {
+      assert(Number.isFinite(interval) && interval > 0, 'Positive CPU sampling interval required')
+      validated = cpuSample(before.processInfo, after.processInfo, interval)
+    } catch (error) {
+      error.cpuFailure = {
+        before: before.processInfo,
+        after: after.processInfo,
+        milliseconds: interval,
+        workCounters,
       }
-      workCounters.boundary = {
-        before: {
-          cdp: { requested: before.requested, completed: before.completed },
-          native: nativeBefore
-            ? { requested: nativeBefore.requested, completed: nativeBefore.completed }
-            : null,
-        },
-        after: {
-          cdp: { requested: after.requested, completed: after.completed },
-          native: nativeAfter
-            ? { requested: nativeAfter.requested, completed: nativeAfter.completed }
-            : null,
-        },
-      }
-    }
-    if (!counterFailure) {
-      try {
-        workCounters = {
-          ...workCounters,
-          ...counterDelta(
-            parseCounterSnapshot(nativeBefore.raw, reader.metadata),
-            parseCounterSnapshot(nativeAfter.raw, reader.metadata),
-            before.processInfo,
-            after.processInfo,
-          ),
-        }
-        delete workCounters.reason
-      } catch (error) {
-        workCounters.reason = error.message
-      }
+      throw error
     }
     return {
       sample,
       milliseconds,
       cpu: {
-        ...cpuSample(before.processInfo, after.processInfo, interval),
+        ...validated,
         tickSeconds,
         milliseconds: interval,
         interval: {

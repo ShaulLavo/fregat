@@ -19,6 +19,8 @@ class Attr(ctypes.Structure):
 def identity(pid):
     text = pathlib.Path(f'/proc/{pid}/stat').read_text()
     fields = text[text.rfind(')') + 2:].split()
+    if fields[0] in {'Z', 'X', 'x'}:
+        raise OSError(errno.ESRCH, 'Process exited and is unavailable for counters')
     return fields[19], int(fields[11]), int(fields[12])
 
 
@@ -42,6 +44,7 @@ class Reader:
         self.syscall = {'x86_64': 298, 'aarch64': 241, 'armv7l': 364}.get(platform.machine())
         self.pmus = pmus()
         self.processes = {}
+        self.failures = {}
         self.hz = os.sysconf('SC_CLK_TCK')
 
     def open_event(self, tid, pmu, event):
@@ -65,16 +68,10 @@ class Reader:
         entry = {'identity': start, 'events': [], 'threads': threads}
         try:
             for tid in threads:
-                for pmu in self.pmus:
-                    for name, event in [('cycles', 0), ('instructions', 1)]:
-                        fd = self.open_event(tid, pmu, event)
-                        entry['events'].append((fd, tid, pmu['name'], name))
+                self.attach_thread(entry, tid)
             if identity(pid)[0] != start:
                 raise OSError(errno.ESRCH, 'PID identity changed while attaching counters')
-            for fd, _, _, _ in entry['events']:
-                if self.libc.ioctl(fd, 0x2400, 0) != 0:
-                    error = ctypes.get_errno()
-                    raise OSError(error, os.strerror(error))
+            self.enable_events(entry['events'])
             final_threads = sorted(int(path.name) for path in pathlib.Path(f'/proc/{pid}/task').iterdir())
             if final_threads != threads:
                 raise OSError(errno.EAGAIN, 'Thread set changed while attaching counters')
@@ -85,36 +82,66 @@ class Reader:
                 os.close(fd)
             raise
 
+    def enable_events(self, events):
+        for fd, _, _, _ in events:
+            if self.libc.ioctl(fd, 0x2400, 0) != 0:
+                error = ctypes.get_errno()
+                raise OSError(error, os.strerror(error))
+
+    def attach_thread(self, entry, tid):
+        for pmu in self.pmus:
+            for name, event in [('cycles', 0), ('instructions', 1)]:
+                fd = self.open_event(tid, pmu, event)
+                entry['events'].append((fd, tid, pmu['name'], name))
+
     def start(self, pids):
         self.close()
+        self.failures.clear()
         results = {}
         for pid in pids:
             try:
                 results[str(pid)] = self.attach(pid)
             except OSError as error:
-                results[str(pid)] = {'error': error.errno, 'reason': str(error)}
+                failure = {'error': error.errno, 'reason': str(error)}
+                self.failures[pid] = failure
+                results[str(pid)] = failure
         return {'started': True, 'processes': results}
+
+    def read_events(self, events):
+        per_pmu = {}
+        for fd, tid, pmu, name in events:
+            raw = os.read(fd, 24)
+            if len(raw) != 24:
+                raise OSError(errno.EIO, 'Short perf counter read')
+            value, enabled, running = struct.unpack('QQQ', raw)
+            rows = per_pmu.setdefault(pmu, {}).setdefault(name, [])
+            rows.append({'tid': tid, 'value': str(value), 'enabledNs': str(enabled), 'runningNs': str(running)})
+        return per_pmu
+
+    def close_process(self, pid):
+        entry = self.processes.pop(pid, None)
+        if entry is None:
+            return
+        for fd, _, _, _ in entry['events']:
+            os.close(fd)
 
     def read(self, pid):
         entry = self.processes.get(pid)
         if entry is None:
-            return {'error': 'Process was unavailable when counters were attached'}
+            return self.failures.get(pid, {'error': 'Process was unavailable when counters were attached'})
         try:
             start, user, system = identity(pid)
             if start != entry['identity']:
-                return {'error': 'PID identity changed'}
-            per_pmu = {}
-            for fd, tid, pmu, name in entry['events']:
-                raw = os.read(fd, 24)
-                if len(raw) != 24:
-                    return {'error': 'Short perf counter read'}
-                value, enabled, running = struct.unpack('QQQ', raw)
-                row = per_pmu.setdefault(pmu, {})
-                rows = row.setdefault(name, [])
-                rows.append({'tid': tid, 'value': str(value), 'enabledNs': str(enabled), 'runningNs': str(running)})
+                raise OSError(errno.ESRCH, 'PID identity changed')
+            per_pmu = self.read_events(entry['events'])
+            if identity(pid)[0] != start:
+                raise OSError(errno.ESRCH, 'PID identity changed during counter read')
             return {'identity': start, 'userTimeNs': str(user * 1000000000 // self.hz), 'systemTimeNs': str(system * 1000000000 // self.hz), 'pmus': per_pmu}
         except OSError as error:
-            return {'error': error.errno, 'reason': str(error)}
+            self.close_process(pid)
+            failure = {'error': error.errno, 'reason': str(error)}
+            self.failures[pid] = failure
+            return failure
 
     def snapshot(self, pids):
         start = time.monotonic_ns()
@@ -126,10 +153,8 @@ class Reader:
         return {'requestedNs': str(start), 'completedNs': str(time.monotonic_ns()), 'processes': values}
 
     def close(self):
-        for entry in self.processes.values():
-            for fd, _, _, _ in entry['events']:
-                os.close(fd)
-        self.processes.clear()
+        for pid in list(self.processes):
+            self.close_process(pid)
 
 
 def main():
