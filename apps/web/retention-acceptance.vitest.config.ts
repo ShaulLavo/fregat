@@ -90,7 +90,9 @@ function retentionAcceptanceReloadFinish(
   callerTiming?: RetentionAcceptanceReloadCallerTiming,
 ) {
   if (callerTiming)
-    console.info('RETENTION_CALLER_TIMING ' + JSON.stringify({ operationId, ...callerTiming }))
+    guardRetentionEntryObservation(() =>
+      console.info('RETENTION_CALLER_TIMING ' + JSON.stringify({ operationId, ...callerTiming })),
+    )
   return reloadCases.finish(context, operationId)
 }
 
@@ -548,9 +550,11 @@ async function performRetentionAcceptanceReload(
   if (cleanupFailures.length > 0) throw cleanupFailures[0]
   if (artifactFailures.length > 0) throw artifactFailures[0]
   controllerMarks.returnReadyAt = Date.now()
-  console.info(
-    'RETENTION_CONTROLLER_TIMING ' +
-      JSON.stringify({ operationId, arm, clock: 'node', marks: controllerMarks }),
+  guardRetentionEntryObservation(() =>
+    console.info(
+      'RETENTION_CONTROLLER_TIMING ' +
+        JSON.stringify({ operationId, arm, clock: 'node', marks: controllerMarks }),
+    ),
   )
   return outcome.result
 }
