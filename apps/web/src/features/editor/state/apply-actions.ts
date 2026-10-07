@@ -93,7 +93,7 @@ export type EditorApplyActions = {
 }
 
 export type EditorActivation = {
-  /** What an intent had ready for a file; null for content that is not a file. */
+  /** The file preparation installed by activation, or null when attachment is deferred. */
   activate(content: TabContent, tabId: TabId): PressPrefetch | null
   setRoot(rootPath: FilesystemPath | null): void
 }
@@ -613,6 +613,7 @@ export function createEditorActivation(
   fileOpenIntent: FileOpenIntentActivation,
   documentStore: EditorDocumentStoreApi,
   rootOwner: Pick<FileOpenIntentServiceOwner, 'setRoot'>,
+  historyReversing: () => boolean,
   prepareSavedComparison?: (path: FilesystemPath, tabId: TabId) => void,
   prepareSnapshotComparison?: (comparison: GitComparison, tabId: TabId) => void,
 ): EditorActivation {
@@ -628,6 +629,7 @@ export function createEditorActivation(
       }
       if (content.kind !== 'document' || content.document.kind !== 'file') return null
       const filePath = content.document.resource.path
+      if (historyReversing()) return null
 
       const liveClaim = fileOpenIntent.claimLive(filePath)
       if (liveClaim) {

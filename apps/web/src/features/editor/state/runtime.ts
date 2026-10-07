@@ -145,6 +145,10 @@ export function createEditorRuntime({
     fileOpenIntentOwner.activation,
     documentStore,
     fileOpenIntentOwner,
+    () => {
+      const phase = workspaceEditService.getSnapshot().phase
+      return phase === 'undoing' || phase === 'redoing'
+    },
     (path, tabId) => {
       const rootPath = workspaceStore.getState().rootFolder?.path
       const saved = queryClient.getQueryData<import('@/lib/file-snapshot').FileSnapshot>(

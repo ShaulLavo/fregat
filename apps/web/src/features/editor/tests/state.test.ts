@@ -1,3 +1,4 @@
+import { ok } from 'node:assert'
 import { preparedDocumentLease } from '../../../../test/factories/prepared-document'
 import { testWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { allEditorTabs, activeEditorTab as selectedGroupTab } from '@/lib/documents/utils/groups'
@@ -227,6 +228,44 @@ describe('editor workspace state', () => {
     commands.closeTab(tabId)
     expect(documentStore.getState().getLiveEditorDocument(document.key)).toBeNull()
   })
+  test('defers activation while history owns the file and preserves the reservation guard', () => {
+    const path = filesystemPath('/repo/src/app.ts')
+    const tabId = testTabId('busy-reopen')
+    const documentStore = createEditorDocumentStore()
+    const file = fileResult(path)
+    const document = documentStore.getState().ensureLiveEditorDocument(file)
+    const { owner } = fileOpenIntentService(documentStore)
+    let historyReversing = true
+    const activation = createEditorActivation(
+      owner.activation,
+      documentStore,
+      owner,
+      () => historyReversing,
+    )
+    const reserved = documentStore
+      .getState()
+      .reserveWorkspaceDocumentPaths(
+        [documentStore.getState().prepareWorkspaceDocumentPathReservation(path)],
+        'history-owner',
+      )
+    ok(reserved.status === 'acquired')
+    try {
+      expect(() => documentStore.getState().ensureEditorView(tabId, file)).toThrow(
+        'Workspace document path is reserved by another mutation',
+      )
+      expect(activation.activate(testTabContent(path), tabId)).toBeNull()
+      expect(documentStore.getState().getEditorView(tabId)).toBeNull()
+    } finally {
+      documentStore.getState().releaseWorkspaceDocumentPaths(reserved.reservation)
+    }
+    historyReversing = false
+    expect(activation.activate(testTabContent(path), tabId)).toBe('live')
+    expect(documentStore.getState().getEditorView(tabId)?.documentKey).toBe(document.key)
+    expect(documentStore.getState().getLiveEditorDocument(document.key)?.buffer).toBe(
+      document.buffer,
+    )
+  })
+
   test('reopens a tabless dirty buffer before publishing its new selection', () => {
     const path = '/repo/src/app.ts'
     const panels = workbenchPanelsForPaths([path], path)
@@ -241,7 +280,7 @@ describe('editor workspace state', () => {
     const { owner } = fileOpenIntentService(documentStore)
     const commands = createEditorApplyActions({
       retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
-      activation: createEditorActivation(owner.activation, documentStore, owner),
+      activation: createEditorActivation(owner.activation, documentStore, owner, () => false),
       documentStore,
       searchStore,
       uiStore,
@@ -288,7 +327,7 @@ describe('editor workspace state', () => {
       )
       const commands = createEditorApplyActions({
         retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
-        activation: createEditorActivation(owner.activation, documentStore, owner),
+        activation: createEditorActivation(owner.activation, documentStore, owner, () => false),
         documentStore,
         searchStore,
         uiStore,
