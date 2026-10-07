@@ -1,4 +1,5 @@
 import { commandFoundation } from './command-foundation'
+import { clientLogDelivery } from './client-log-delivery'
 import { unknownWorkspaceSettings } from './unknown-workspace-settings'
 import { releaseInstallationSettings } from './release-installation-settings'
 import { nativeWindow } from './native-window'
@@ -602,6 +603,7 @@ export const scenarios: readonly Scenario[] = [
   settingsRawConflict,
   settingsResponsive,
   settingsSaveRejected,
+  clientLogDelivery,
   searchResults,
   terminalTabs,
   gitGraphKeyboard,
