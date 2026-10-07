@@ -110,6 +110,7 @@ async function reopenDuringUndo(page: Page, step: (label: string) => Promise<voi
     await applied
   }
   await selectors.editorRows(page).filter({ hasText: 'renameMe' }).first().waitFor()
+  strictEqual((await selectors.editorRows(page).allInnerTexts()).join('\n'), originalA)
   await assertHealthyTab(page)
 }
 
