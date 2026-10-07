@@ -99,6 +99,7 @@ import { chatCitationElsewhere } from './chat-citation-elsewhere'
 import { chatFindingSource } from './chat-finding-source'
 import { chatReviewContext } from './chat-review-context'
 import { chatMultipleModelsLostAck } from './chat-multiple-models-lost-ack'
+import { chatDictation } from './chat-dictation'
 import { chatComposerEditing } from './chat-composer-editing'
 import { chatArtifactTemplate } from './chat-artifact-template'
 import { chatModelFavorites } from './chat-model-favorites'
@@ -511,6 +512,7 @@ export const scenarios: readonly Scenario[] = [
   chatFindingSource,
   chatReviewContext,
   chatMultipleModelsLostAck,
+  chatDictation,
   chatComposerEditing,
   chatArtifactTemplate,
   chatModelFavorites,

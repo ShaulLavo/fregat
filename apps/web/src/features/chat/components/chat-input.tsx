@@ -1,3 +1,5 @@
+import { useVoiceInput } from '../hooks/use-voice-input'
+import { ChatInputDictationStatus } from './chat-input-dictation-status'
 import { ReviewDraftBar } from '@/features/chat/components/review-draft-bar'
 import { useReviewDraft } from '@/lib/review-draft/hooks/use-review-draft'
 import { removeReviewComments } from '@/lib/review-draft/state/store'
@@ -150,6 +152,7 @@ export function ChatInput({
   const editorRef = useRef<LexicalEditor | null>(null)
   // State as well as the ref: the inbox only splices text once a caret exists,
   // and a ref cannot wake the effect that is waiting for one.
+  const voice = useVoiceInput(draftTarget, editorRef)
   const [editorReady, setEditorReady] = useState(false)
   const { ref: focusTargetRef } = useFocusTarget<HTMLDivElement>(
     {
@@ -182,11 +185,15 @@ export function ChatInput({
   const [dropTargetActive, setDropTargetActive] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [trigger, setTrigger] = useState<ChatInputTrigger | null>(null)
-  const composerDisabled = disabled || submitting
+  const composerDisabled = disabled || submitting || voice.pending
   const submissionDisabled =
-    disabledReason !== null || imagePreparation.preparing || (!busy && pendingAction !== null)
+    voice.pending ||
+    disabledReason !== null ||
+    imagePreparation.preparing ||
+    (!busy && pendingAction !== null)
   const visiblePendingAction = submitting ? 'sending' : pendingAction
-  const statusLabel = validationError ?? imagePreparation.error ?? persistenceError ?? error
+  const statusLabel =
+    voice.error?.message ?? validationError ?? imagePreparation.error ?? persistenceError ?? error
   const projectEntries = useProjectEntrySearch({
     enabled: trigger?.kind === 'mention',
     query: trigger?.kind === 'mention' ? trigger.query : '',
@@ -259,7 +266,14 @@ export function ChatInput({
   }
 
   async function handleSubmit(alternate = false) {
-    if (disabled || submitting || submissionDisabled || imagePreparation.isPreparing()) return false
+    if (
+      voice.pending ||
+      disabled ||
+      submitting ||
+      submissionDisabled ||
+      imagePreparation.isPreparing()
+    )
+      return false
 
     const queuesFollowUp = busy && (followUpBehavior === 'queue') !== alternate
     if (busy && !queuesFollowUp && steerDisabledReason !== null) return false
@@ -506,7 +520,9 @@ export function ChatInput({
                 onRemove={handleRemoveImage}
                 onRetry={imagePreparation.retry}
               />
+              <ChatInputDictationStatus voice={voice} />
               <ChatInputActions
+                voice={voice}
                 correctionDisabledReason={busySendDisabledReason}
                 busy={busy}
                 disabled={composerDisabled}

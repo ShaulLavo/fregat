@@ -18,6 +18,7 @@
     "chat.defaultInteractionMode",
     "chat.defaultRuntimeMode",
     "chat.diagramFontWaitMs",
+    "chat.dictationLimitSeconds",
     "chat.followUpBehavior",
     "chat.inAppNotificationsEnabled",
     "chat.keepImportedSessionsUpdated",
