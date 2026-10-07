@@ -16,7 +16,7 @@ type Observation = { boot: number; children: number }
 function probe(phase: string, server = false) {
   return `import {GearIcon} from '@phosphor-icons/react';
 ${server ? "import {renderToStaticMarkup} from 'react-dom/server.browser';window.serverMarkup=renderToStaticMarkup;" : ''}
-export function DevPage(){return <main data-phase='${phase}'><GearIcon weight='light'/><span>${phase}</span></main>}`
+export function DevPage(){return <main data-phase='${phase}'><GearIcon /><span>${phase}</span></main>}`
 }
 
 async function availablePort(): Promise<number> {
