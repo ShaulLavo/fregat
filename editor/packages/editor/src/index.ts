@@ -1,4 +1,5 @@
 export type { EditorPointHit, EditorMarkerHit } from './pointQueries'
+export { DEFAULT_OVERSCAN } from './virtualization/virtualizedTextViewHelpers'
 export {
   createEditorConsoleLogger,
   createEditorConsoleLoggingPlugin,
