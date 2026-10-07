@@ -25,6 +25,7 @@ import { sessionRailModel, type SessionRailItem } from '@workspace/client-core/c
 import { useActiveProjectStore } from '@/features/workspace/state/active-project'
 import { activeEnvironmentId } from '@/lib/environments/state/domain'
 import { getNavigation } from '@/state/navigation-binding'
+import { isPhoneShell } from '@/lib/shell/state/store'
 export type SessionTraversalDirection = 'next' | 'previous'
 export type SessionOpenOptions = {
   readonly baseWorktree?: ScopedWorktreeRef
@@ -50,7 +51,8 @@ export function activateSessionRow(session: SessionRailItem, intent: SessionClic
     )
     return true
   }
-  multi.markOnly(session.ref)
+  if (isPhoneShell()) multi.clear()
+  else multi.markOnly(session.ref)
   return openSessionRow(session)
 }
 export function clearSessionMultiSelect() {
@@ -136,8 +138,7 @@ export function jumpToSession(position: number) {
 function openSessionAt(sessions: readonly SessionRailItem[], index: number) {
   const session = sessions[index]
   if (!session) return false
-  useSessionMultiSelectStore.getState().markOnly(session.ref)
-  return openSessionRow(session)
+  return activateSessionRow(session, 'open')
 }
 // The rail's displayed order: grouped by project, collapsed groups showing only the active row.
 function visibleSessions() {

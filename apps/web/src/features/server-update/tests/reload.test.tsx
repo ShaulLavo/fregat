@@ -198,6 +198,25 @@ async function releaseFixture({ liveCheck = true } = {}) {
   }
 }
 
+test('reload feedback stays visible until the browser replaces the document and repeat clicks stay inert', async () => {
+  const fixture = await releaseFixture()
+  await fixture.promote()
+  let reloads = 0
+  const safety = createStore(() => ({ dirtyFiles: [] as readonly string[] }))
+  renderWithProviders(<ServerUpdateStatus reload={() => reloads++} safety={safety} />)
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: 'Reload app' }))
+  await waitFor(() => expect(reloads).toBe(1))
+  const reloading = screen.getByRole('button', { name: 'Reloading…' })
+  expect(reloading).toBeDisabled()
+  expect(reloading).toHaveAttribute('aria-busy', 'true')
+  expect(screen.getByRole('status', { name: 'Reloading…' })).toBeVisible()
+  await user.click(reloading)
+  await fixture.refresh()
+  expect(reloads).toBe(1)
+  expect(reloading).toBeDisabled()
+})
+
 test('an explicitly skipped live check reloads the exact healthy target without a report', async () => {
   const fixture = await releaseFixture({ liveCheck: false })
   let reloads = 0

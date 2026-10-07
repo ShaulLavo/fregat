@@ -627,6 +627,16 @@ export const SETTINGS_REGISTRY = {
     default: '1h',
     scope: 'window',
   }),
+  // Consumed by the browser's client-log delivery outbox.
+  'logs.clientFailureRetention': defineSetting({
+    schema: v.object({
+      maxEvents: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1000)),
+      maxBytes: v.pipe(v.number(), v.integer(), v.minValue(4096), v.maxValue(2_097_152)),
+      maxAgeHours: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(24)),
+    }),
+    default: { maxEvents: 250, maxBytes: 524_288, maxAgeHours: 24 },
+    scope: 'application',
+  }),
   'logs.retentionDays': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(3650)),
     default: 0,
