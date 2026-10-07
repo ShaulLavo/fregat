@@ -9,7 +9,7 @@ import { openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
 /** Mirrors `COMPACT_ACTIONS_WIDTH` in chat-input-actions.tsx. */
-const COMPACT_ACTIONS_WIDTH = 380
+const COMPACT_ACTIONS_WIDTH = 520
 
 export const chatComposerInsert: Scenario = {
   name: 'chat-composer-insert',
@@ -35,7 +35,10 @@ export const chatComposerInsert: Scenario = {
 
       await openFixtureWorkspace(page, fixture)
       await openGitPanel(page)
-      await selectors.worktreeFiles(page).first().click()
+      await selectors
+        .worktreeFiles(page)
+        .first()
+        .click({ position: { x: 40, y: 10 } })
       const row = selectors.diffRows(page).filter({ hasText: 'const changed = true' }).first()
       await row.hover({ position: { x: 40, y: 8 } })
       await page.mouse.down()
