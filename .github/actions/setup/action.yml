@@ -87,11 +87,28 @@ runs:
     - name: Install dependencies
       shell: bash
       run: |
-        # Preparation can be repeated safely; lifecycle scripts run once in the final install.
+        # Exported preparation requires committed manifests/configuration and complete tracked content.
+        git diff --quiet HEAD -- .
+        metadata=$(git ls-files --others --exclude=node_modules -- ':(glob)**/package.json' ':(glob)**/bunfig.toml' ':(glob)**/.npmrc' package.json bun.lock bunfig.toml .npmrc .env .env.local .env.development .env.test .env.production .env.development.local .env.test.local .env.production.local)
+        if [[ -n "$metadata" ]]; then
+          echo "::error::Dependency preparation requires tracked manifests and configuration"
+          exit 1
+        fi
+        git ls-files --stage | awk '$1 == "160000" { exit 1 }'
+        cache=$(bun pm cache)
+        prep=$(mktemp -d "$RUNNER_TEMP/bun-prepare.XXXXXX")
+        trap 'rm -rf "$prep"' EXIT
         log=$(mktemp "$RUNNER_TEMP/bun-install.XXXXXX")
-        trap 'rm -f "$log"' EXIT
+        trap 'rm -f "$log"; rm -rf "$prep"' EXIT
+        if git archive HEAD | tar -x -C "$prep"; then
+          :
+        else
+          statuses=("${PIPESTATUS[@]}")
+          if [[ "${statuses[0]}" != 0 ]]; then exit "${statuses[0]}"; fi
+          exit "${statuses[1]}"
+        fi
         for attempt in 1 2 3 4 5 6; do
-          if bun install --frozen-lockfile --ignore-scripts 2>&1 | tee "$log"; then
+          if (cd "$prep" && bun install --frozen-lockfile --ignore-scripts --cache-dir "$cache") 2>&1 | tee "$log"; then
             break
           else
             statuses=("${PIPESTATUS[@]}")
@@ -101,6 +118,7 @@ runs:
           # Fail closed when any diagnostic falls outside the observed download failure.
           if ! awk '
             /^error: failed to download [^[:space:]]+@https:\/\/github\.com\/[^/[:space:]]+\/[^/[:space:]]+\/releases\/download\/[^[:space:]]+\.tgz: HTTP 5xx$/ { errors++; next }
+            /^error: GET https:\/\/github\.com\/[^/[:space:]]+\/[^/[:space:]]+\/releases\/download\/[^[:space:]]+\.tgz - 5[0-9][0-9]$/ { errors++; next }
             /^$/ || /^bun install v[0-9]/ || /^Resolving dependencies$/ { next }
             /^Resolved, downloaded and extracted \[[0-9]+\]$/ { next }
             /^  https:\/\/github\.com\/[^/[:space:]]+\/[^/[:space:]]+\/releases\/download\/[^[:space:]]+\.tgz$/ { next }
