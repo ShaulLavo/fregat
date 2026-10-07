@@ -22,6 +22,7 @@ import {
   failRetentionEntryCase,
   endRetentionEntryCase,
   guardRetentionEntryObservation,
+  observeRetentionReadiness,
   observeRetentionEntryEvents,
   retentionEntryModulePath,
   retentionEntryErrorCode,
@@ -231,9 +232,16 @@ async function performRetentionAcceptanceReload(
       error: request.failure()?.errorText ?? null,
     })
   })
-  page.on('console', (message) =>
-    consoleMessages.push({ type: message.type(), text: message.text() }),
-  )
+  page.on('console', (message) => {
+    const type = message.type()
+    const text = message.text()
+    consoleMessages.push({ type, text })
+    observeRetentionReadiness(text, (browser) => {
+      console.info(
+        'RETENTION_READINESS ' + JSON.stringify({ operationId, arm, at: Date.now(), browser }),
+      )
+    })
+  })
   const responses: { readonly url: string; readonly status: number }[] = []
   let phase: RetentionEntryPhase = 'entry'
   page.on('response', (response) =>
@@ -254,7 +262,7 @@ async function performRetentionAcceptanceReload(
       await owner.openFixture()
     }, arm.syntax)
     phase = 'baseline-ready'
-    await waitForRetentionAcceptanceEntry(page)
+    await waitForRetentionAcceptanceEntry(page, 'baseline')
     timings.baselineReadyAt = Date.now()
     const before = await page.evaluate(() => window.__retentionAcceptanceEntry?.capture())
     await page.addInitScript((saved) => {
@@ -349,7 +357,7 @@ async function performRetentionAcceptanceReload(
     await page.reload()
     timings.reloadLoadedAt = Date.now()
     timings.browserTimeOrigin = await page.evaluate(() => performance.timeOrigin)
-    await waitForRetentionAcceptanceEntry(page)
+    await waitForRetentionAcceptanceEntry(page, 'reload')
     timings.reloadReadyAt = Date.now()
     phase = 'code-font-loaded'
     const fontLoadReceipt = await page.evaluate(async () => {
@@ -573,22 +581,45 @@ async function archiveFinalRetentionReloadFrames(
   return archiveRetentionReloadArtifact(output, 'final-raw.json', { ...facts, final })
 }
 
-function waitForRetentionAcceptanceEntry(page: BrowserCommandContext['page']) {
-  return page.waitForFunction(
-    () => {
-      const observation = window.__retentionAcceptanceEntry?.capture()
-      return (
-        observation?.kind === 'mounted' &&
-        observation.views.some((view) => view.kind === 'observed' && view.mismatch === null)
-      )
-    },
-    undefined,
-    { timeout: 15_000 },
+function waitForRetentionAcceptanceEntry(
+  page: BrowserCommandContext['page'],
+  stage: 'baseline' | 'reload',
+) {
+  return page.waitForFunction(retentionReloadEntryReady, stage, { timeout: 15_000 })
+}
+
+function retentionReloadEntryReady(stage: 'baseline' | 'reload') {
+  const observation = window.__retentionAcceptanceEntry?.capture()
+  const observe = () => {
+    const views = observation?.kind === 'mounted' ? observation.views : []
+    const state = {
+      stage,
+      observationType: observation === null ? 'null' : typeof observation,
+      mounted: observation?.kind === 'mounted',
+      viewCount: views.length,
+      observedViews: views.filter((view) => view.kind === 'observed').length,
+      matchingViews: views.filter((view) => view.kind === 'observed' && view.mismatch === null)
+        .length,
+    }
+    const identity = JSON.stringify(state)
+    if (window.__retentionAcceptanceReadinessState === identity) return
+    window.__retentionAcceptanceReadinessState = identity
+    console.info(
+      'RETENTION_READINESS ' + JSON.stringify({ at: performance.now(), clock: 'browser', state }),
+    )
+  }
+  try {
+    observe()
+  } catch {}
+  return (
+    observation?.kind === 'mounted' &&
+    observation.views.some((view) => view.kind === 'observed' && view.mismatch === null)
   )
 }
 
 declare global {
   interface Window {
+    __retentionAcceptanceReadinessState?: string
     __retentionAcceptanceReloadFrames?: readonly ReloadFrame[]
     __retentionAcceptanceReloadCacheReceipt?: {
       readonly priorSavedKeys: readonly string[]

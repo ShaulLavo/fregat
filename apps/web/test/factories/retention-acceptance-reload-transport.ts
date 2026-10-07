@@ -514,6 +514,19 @@ export function guardRetentionEntryObservation(observe: () => void) {
   } catch {}
 }
 
+export function observeRetentionReadiness(
+  message: unknown,
+  emit: (receipt: v.InferOutput<typeof readinessReceiptSchema>) => void,
+) {
+  guardRetentionEntryObservation(() => {
+    const prefix = 'RETENTION_READINESS '
+    if (typeof message !== 'string' || !message.startsWith(prefix)) return
+    const input: unknown = JSON.parse(message.slice(prefix.length))
+    const receipt = v.safeParse(readinessReceiptSchema, input)
+    if (receipt.success) emit(receipt.output)
+  })
+}
+
 // Observing emit preserves the emitter's existing error listeners and throws.
 export function observeRetentionEntryEvents(
   emitter: EventEmitter,
@@ -546,6 +559,28 @@ const receiptInteger = v.pipe(
   v.minValue(0),
   v.maxValue(Number.MAX_SAFE_INTEGER),
 )
+const readinessReceiptSchema = v.object({
+  at: v.pipe(v.number(), v.finite(), v.minValue(0)),
+  clock: v.literal('browser'),
+  state: v.object({
+    stage: v.picklist(['baseline', 'reload']),
+    observationType: v.picklist([
+      'undefined',
+      'null',
+      'object',
+      'boolean',
+      'number',
+      'string',
+      'function',
+      'bigint',
+      'symbol',
+    ]),
+    mounted: v.boolean(),
+    viewCount: receiptInteger,
+    observedViews: receiptInteger,
+    matchingViews: receiptInteger,
+  }),
+})
 const receiptStatus = v.pipe(v.number(), v.integer(), v.minValue(100), v.maxValue(599))
 const receiptCode = v.nullable(v.pipe(v.string(), v.regex(/^[A-Z][A-Z0-9_]{0,63}$/)))
 const receiptSignal = v.pipe(
