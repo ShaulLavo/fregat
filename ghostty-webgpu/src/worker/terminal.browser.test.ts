@@ -7,6 +7,7 @@ import { WebGlTerminalRenderer } from '../../dist/render/webgl/renderer.js'
 import { createDomInputController } from '../../dist/dom/input.js'
 import type { TerminalOutputReady, TerminalOutputMessage, TerminalOutputAck } from './protocol.js'
 import type { DeviceObservation } from './tests/device-loss.worker.js'
+import type { DeviceLifecycleObservation } from './tests/device-lifecycle.worker.js'
 
 const family = 'PackagedWorkerTest'
 const fontUrl = new URL(
@@ -59,6 +60,35 @@ async function create(mode: 'main' | 'webgpu' | 'webgl') {
   active.push(terminal)
   return terminal
 }
+
+it('waits and destroys each public worker device once before closing', async () => {
+  const channel = new BroadcastChannel('packaged-worker-device-lifecycle')
+  const observations: DeviceLifecycleObservation[] = []
+  channel.onmessage = ({ data }: MessageEvent<DeviceLifecycleObservation>) =>
+    observations.push(data)
+  try {
+    const terminal = await WorkerTerminal.create({
+      assets,
+      appearance: { font: { family, size: 16 }, cursor: { blink: false } },
+      backend: 'webgpu',
+      workerUrl: new URL('./tests/device-lifecycle.worker.ts', import.meta.url),
+      fonts: [{ family, source: { url: fontUrl } }],
+    })
+    active.push(terminal)
+    await terminal.open(container())
+    await terminal.write('known-good lifecycle')
+    await eventually(() => terminal.visibleLines()[0]?.includes('known-good lifecycle') === true)
+    await terminal.dispose()
+    await terminal.dispose()
+    await eventually(() => observations.some((value) => value.type === 'closed'))
+    const closed = observations.find((value) => value.type === 'closed')!
+    console.info('Packaged worker device lifecycle', JSON.stringify(observations))
+    expect(observations.filter((value) => value.type === 'acquired')).toHaveLength(1)
+    expect(closed).toEqual({ type: 'closed', devices: [{ device: 0, waits: 1, destroys: 1 }] })
+  } finally {
+    channel.close()
+  }
+})
 
 it('reacquires a live device and repaints after public worker device loss', async () => {
   const channel = new BroadcastChannel('packaged-worker-device-loss')
