@@ -249,15 +249,27 @@ export class GhosttyTerminal {
     return readTerminalLines(this, start, end, options)
   }
 
+  /** Actual retained physical rows, excluding the active screen. */
   get scrollbackLength(): number {
     return this.readUint32(TerminalData.ScrollbackRows, 'SCROLLBACK_ROWS')
   }
 
+  /** Configured page-granular line budget. Read scrollbackLength for the retained count. */
   get scrollbackLimit(): number | undefined {
     return this.readOptionalData(
       TerminalData.ScrollbackMaxLines,
       4,
       'SCROLLBACK_MAX_LINES',
+      (pointer) => this.runtime.memory.view.getUint32(pointer, true),
+    )
+  }
+
+  /** Configured page-granular byte budget. Undefined means unlimited; zero disables history. */
+  get scrollbackByteLimit(): number | undefined {
+    return this.readOptionalData(
+      TerminalData.ScrollbackMaxBytes,
+      4,
+      'SCROLLBACK_MAX_BYTES',
       (pointer) => this.runtime.memory.view.getUint32(pointer, true),
     )
   }
@@ -370,6 +382,8 @@ export class GhosttyTerminal {
     })
   }
 
+  /** Native pruning removes whole historical pages and permits at least one page of rows.
+   * The retained count can fall below or exceed this budget. Undefined removes the line limit. */
   setScrollbackLimit(limit?: number): void {
     this.ensureActive()
     if (limit === undefined) {
@@ -386,6 +400,29 @@ export class GhosttyTerminal {
       TerminalOption.ScrollbackMaxLines,
       4,
       'SCROLLBACK_MAX_LINES',
+      (pointer) => {
+        this.runtime.memory.view.setUint32(pointer, value, true)
+      },
+    )
+  }
+
+  /** Both budgets apply independently. Zero erases history and disables further scrollback. */
+  setScrollbackByteLimit(limit?: number): void {
+    this.ensureActive()
+    if (limit === undefined) {
+      this.setNullOption(TerminalOption.ScrollbackMaxBytes, 'SCROLLBACK_MAX_BYTES')
+      return
+    }
+    const value = validateUnsigned(
+      'limit',
+      limit,
+      uint32Max,
+      'ghostty_terminal_set(SCROLLBACK_MAX_BYTES)',
+    )
+    this.setAllocatedOption(
+      TerminalOption.ScrollbackMaxBytes,
+      4,
+      'SCROLLBACK_MAX_BYTES',
       (pointer) => {
         this.runtime.memory.view.setUint32(pointer, value, true)
       },

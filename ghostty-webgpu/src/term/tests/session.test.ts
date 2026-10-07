@@ -23,6 +23,7 @@ import type {
   TerminalMouseEvent,
   TerminalMouseState,
   TerminalScrollEvent,
+  TerminalSelectionEvent,
   TerminalSessionOptions,
   TerminalTheme,
 } from '../types.js'
@@ -990,6 +991,63 @@ describe('TerminalSession', () => {
     expect(session.grid.pixelRatio).toBe(2)
     session.write('\u001b[16t')
     expect(output).toEqual(['\u001b[6;40;16t'])
+  })
+
+  it('publishes actual history after changing either native retention budget', async () => {
+    const session = await createSession({
+      appearance: {
+        grid: grid({ columns: 40, rows: 12 }),
+        scrollbackByteLimit: 64 * 1024 * 1024,
+        scrollbackLimit: 10000,
+      },
+    })
+    expect(session.appearance.scrollbackByteLimit).toBe(64 * 1024 * 1024)
+    const written = Array.from({ length: 20000 }, (_, index) => `row-${index}`)
+    session.write(written.join('\r\n'))
+    expect(session.scrollbackLength).toBeLessThan(10000)
+    expect(session.scrollbackLength).toBeGreaterThan(0)
+    expect(session.lineCount()).toBe(session.scrollbackLength + session.grid.rows)
+    const retained = written.slice(-session.lineCount())
+    expect(session.readLines(0, 1)).toEqual([{ text: retained[0], wrapped: false }])
+    session.selectLines(0, 1)
+    expect(session.getSelection()).toBe(retained.slice(0, 2).join('\n'))
+    const events: TerminalScrollEvent[] = []
+    const selections: TerminalSelectionEvent[] = []
+    session.on('scroll', (event) => events.push(event))
+    session.on('selection', (event) => selections.push(event))
+    session.setAppearance({ scrollbackLimit: 4 })
+    expect(session.scrollbackLength).toBeGreaterThan(4)
+    expect(events.at(-1)?.scrollbackLength).toBe(session.scrollbackLength)
+    session.setAppearance({ scrollbackByteLimit: 0 })
+    expect(session.appearance.scrollbackByteLimit).toBe(0)
+    expect(session.scrollbackLength).toBe(0)
+    expect(session.lineCount()).toBe(session.grid.rows)
+    expect(session.getSelection()).toBe(session.readLines(0, 1)[0]!.text.slice(0, 1))
+    expect(session.selectionCoordinates()).toEqual({
+      end: { x: 0, y: 0 },
+      rectangle: false,
+      start: { x: 0, y: 0 },
+    })
+    expect(selections.at(-1)).toEqual({
+      coordinates: session.selectionCoordinates(),
+      hasSelection: true,
+    })
+    expect(events.at(-1)?.scrollbar).toEqual({ length: 12, offset: 0, total: 12 })
+    session.setAppearance({ scrollbackLimit: 10000 })
+    session.write('\r\nwhile disabled')
+    expect(session.appearance.scrollbackByteLimit).toBe(0)
+    expect(session.scrollbackLength).toBe(0)
+    session.setScrollbackByteLimit(undefined)
+    expect(session.appearance.scrollbackByteLimit).toBeUndefined()
+    session.write('\r\nmore')
+    expect(session.scrollbackLength).toBe(1)
+  })
+
+  it('preserves the native default byte budget when appearance omits it', async () => {
+    const session = await createSession()
+    expect(session.appearance.scrollbackByteLimit).toBeGreaterThan(0)
+    session.setAppearance({ scrollbackLimit: 10000 })
+    expect(session.appearance.scrollbackByteLimit).toBeGreaterThan(0)
   })
 
   it('diffs scroll snapshots and preserves a scrolled viewport across writes', async () => {

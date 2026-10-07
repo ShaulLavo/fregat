@@ -689,6 +689,7 @@ function createAppearance(
     font: normalizeFont(defaultFont, options.font),
     grid,
     rendererTheme: copyRendererTheme(theme),
+    scrollbackByteLimit: options.scrollbackByteLimit ?? terminal.scrollbackByteLimit,
     scrollbackLimit: options.scrollbackLimit,
     theme,
   })
@@ -709,6 +710,7 @@ function mergeAppearance(
     font: normalizeFont(current.font, options.font),
     grid: normalizeGrid(current.grid, options.grid),
     rendererTheme: copyRendererTheme(theme),
+    scrollbackByteLimit: options.scrollbackByteLimit ?? current.scrollbackByteLimit,
     scrollbackLimit: options.scrollbackLimit ?? current.scrollbackLimit,
     theme,
   })
@@ -782,6 +784,7 @@ function cursorsEqual(first: TerminalCursorSettings, second: TerminalCursorSetti
 function appearancesEqual(first: TerminalAppearance, second: TerminalAppearance): boolean {
   return (
     first.colorScheme === second.colorScheme &&
+    first.scrollbackByteLimit === second.scrollbackByteLimit &&
     first.scrollbackLimit === second.scrollbackLimit &&
     gridsEqual(first.grid, second.grid) &&
     fontsEqual(first.font, second.font) &&
@@ -933,6 +936,7 @@ function applyInitialAppearance(terminal: GhosttyTerminal, appearance: TerminalA
   terminal.setDefaultCursorStyle(appearance.cursor.style)
   terminal.setDefaultCursorBlink(appearance.cursor.blink)
   terminal.setScrollbackLimit(appearance.scrollbackLimit)
+  terminal.setScrollbackByteLimit(appearance.scrollbackByteLimit)
 }
 
 function readScrollSnapshot(terminal: GhosttyTerminal): TerminalScrollEvent {
@@ -1354,9 +1358,17 @@ export class TerminalSession<TEvent = unknown> {
     return this.setAppearance({ theme })
   }
 
+  /** Sets the native page-granular row budget. Read scrollbackLength for actual retention. */
   setScrollbackLimit(scrollbackLimit?: number): TerminalMutationResult {
     return this.runOperation(() =>
       this.commitAppearance(withScrollbackLimit(this.appearanceValue, scrollbackLimit)),
+    )
+  }
+
+  /** Undefined removes the byte budget. Zero erases history and disables further scrollback. */
+  setScrollbackByteLimit(scrollbackByteLimit?: number): TerminalMutationResult {
+    return this.runOperation(() =>
+      this.commitAppearance(freezeAppearance({ ...this.appearanceValue, scrollbackByteLimit })),
     )
   }
 
@@ -1681,12 +1693,16 @@ export class TerminalSession<TEvent = unknown> {
     const gridChanged = !gridsEqual(current.grid, next.grid)
     const cursorChanged = !cursorsEqual(current.cursor, next.cursor)
     const themeChanged = !themesEqual(current.theme, next.theme)
-    const scrollbackChanged = current.scrollbackLimit !== next.scrollbackLimit
+    const linesChanged = current.scrollbackLimit !== next.scrollbackLimit
+    const bytesChanged = current.scrollbackByteLimit !== next.scrollbackByteLimit
+    const scrollbackChanged = linesChanged || bytesChanged
+    const hadSelection = scrollbackChanged && this.selection.hasSelection
     const colorSchemeChanged = current.colorScheme !== next.colorScheme
 
     if (themeChanged) applyTheme(this.terminal, next.theme)
     if (cursorChanged) this.applyCursor(next.cursor)
-    if (scrollbackChanged) this.terminal.setScrollbackLimit(next.scrollbackLimit)
+    if (linesChanged) this.terminal.setScrollbackLimit(next.scrollbackLimit)
+    if (bytesChanged) this.terminal.setScrollbackByteLimit(next.scrollbackByteLimit)
     if (gridChanged) this.terminal.resize(nativeGrid(next.grid))
     if (colorSchemeChanged)
       this.effectState.effects.colorScheme = nativeColorScheme(next.colorScheme)
@@ -1696,10 +1712,13 @@ export class TerminalSession<TEvent = unknown> {
     const nextScroll =
       gridChanged || scrollbackChanged ? readScrollSnapshot(this.terminal) : this.scrollValue
     const scrollChanged = !scrollSnapshotsEqual(this.scrollValue, nextScroll)
+    const selectionChanged =
+      hadSelection && this.scrollValue.scrollbackLength !== nextScroll.scrollbackLength
     // Resize listeners can paint synchronously; commit viewport and revision before notifying.
     if (scrollChanged) this.scrollValue = nextScroll
     this.revisionValue += 1
     if (gridChanged) this.emitters.resize.emit({ grid: next.grid })
+    if (selectionChanged) this.emitSelection()
     if (scrollChanged) this.emitters.scroll.emit(nextScroll)
     this.emitters.appearance.emit({ appearance: next })
     return this.emitRenderRequest()
