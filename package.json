@@ -1,6 +1,6 @@
 {
   "name": "fregat",
-  "version": "0.0.21",
+  "version": "0.0.22",
   "private": true,
   "workspaces": {
     "packages": [
@@ -92,7 +92,7 @@
     "unused:exports": "knip --exports --no-config-hints",
     "unused:files": "knip --files --no-config-hints",
     "unused:check": "knip",
-    "hooks:install": "lefthook install",
+    "hooks:install": "bun scripts/install-hooks.mjs",
     "hooks:pre-commit": "lefthook run pre-commit",
     "themes:import-omarchy": "bun scripts/themes/import-omarchy-theme.ts",
     "themes:omarchy-catalog": "bun scripts/themes/generate-omarchy-catalog.ts",
@@ -122,7 +122,7 @@
     "evlog": "catalog:",
     "jscpd": "^5.3.2",
     "knip": "catalog:",
-    "lefthook": "^2.1.14",
+    "lefthook": "2.1.15",
     "oxc-plugin-react-compiler": "^0.2.0",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
@@ -145,6 +145,7 @@
   "patchedDependencies": {
     "vitest@5.0.2": "patches/vitest@5.0.2.patch",
     "evlog@2.29.0": "patches/evlog@2.29.0.patch",
-    "@vitest/mocker@5.0.2": "patches/@vitest%2Fmocker@5.0.2.patch"
+    "@vitest/mocker@5.0.2": "patches/@vitest%2Fmocker@5.0.2.patch",
+    "lefthook@2.1.15": "patches/lefthook@2.1.15.patch"
   }
 }

@@ -11,7 +11,7 @@
         "evlog": "catalog:",
         "jscpd": "^5.3.2",
         "knip": "catalog:",
-        "lefthook": "^2.1.14",
+        "lefthook": "2.1.15",
         "oxc-plugin-react-compiler": "^0.2.0",
         "oxfmt": "catalog:",
         "oxlint": "catalog:",
@@ -973,7 +973,7 @@
     },
     "scripts": {
       "name": "scripts",
-      "version": "0.0.39",
+      "version": "0.0.40",
       "dependencies": {
         "@workspace/utils": "workspace:*",
       },
@@ -999,6 +999,7 @@
     "@vitest/mocker@5.0.2": "patches/@vitest%2Fmocker@5.0.2.patch",
     "evlog@2.29.0": "patches/evlog@2.29.0.patch",
     "vitest@5.0.2": "patches/vitest@5.0.2.patch",
+    "lefthook@2.1.15": "patches/lefthook@2.1.15.patch",
   },
   "overrides": {
     "@opentui/core": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-core-0.5.12-bubli.2.tgz",
