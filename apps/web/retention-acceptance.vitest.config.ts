@@ -73,7 +73,26 @@ type ReloadArm = {
 
 const reloadCases = createRetentionReloadCases()
 
-function retentionAcceptanceReloadFinish(context: BrowserCommandContext, operationId: string) {
+export type RetentionAcceptanceReloadCallerTiming = {
+  readonly clock: 'browser'
+  readonly state?: string
+  readonly timedOut: boolean
+  readonly marks: readonly {
+    readonly stage: string
+    readonly at: number
+    readonly monotonicMs: number
+  }[]
+}
+
+function retentionAcceptanceReloadFinish(
+  context: BrowserCommandContext,
+  operationId: string,
+  callerTiming?: RetentionAcceptanceReloadCallerTiming,
+) {
+  if (callerTiming)
+    guardRetentionEntryObservation(() =>
+      console.info('RETENTION_CALLER_TIMING ' + JSON.stringify({ operationId, ...callerTiming })),
+    )
   return reloadCases.finish(context, operationId)
 }
 
@@ -109,6 +128,7 @@ function retentionAcceptanceReload(
         signal,
         disposeRequests,
         closeContext,
+        operationId,
       ),
       close: async () => {
         const results = await Promise.allSettled([disposeRequests(), closeContext()])
@@ -129,17 +149,22 @@ async function performRetentionAcceptanceReload(
   signal: AbortSignal,
   disposeRequests: () => Promise<void>,
   closeContext: () => Promise<void>,
+  operationId: string,
 ) {
+  const timings = createRetentionReloadTimings()
+  const controllerMarks: Record<string, number> = { startedAt: Date.now() }
+  timings.controller = controllerMarks
   const isolated = await created
+  controllerMarks.contextCreatedAt = Date.now()
   signal.throwIfAborted()
   const page = await isolated.newPage()
   signal.throwIfAborted()
   const runnerOrigin = new URL(context.page.url()).origin
   const entryOrigin = context.project.getProvidedContext().retentionAcceptanceEntryUrl
   await isolated.grantPermissions(['local-network-access'], { origin: runnerOrigin })
+  controllerMarks.permissionsReadyAt = Date.now()
   let reloading = false
   const delayedFonts: { url: string; heldAt: number; releasedAt: number }[] = []
-  const timings = createRetentionReloadTimings()
   const transport = createRetentionReloadTransport(
     {
       run: (observation, operation) =>
@@ -158,7 +183,7 @@ async function performRetentionAcceptanceReload(
     (route) => {
       return transport.run(
         route.request().url(),
-        async (fulfill, headersCompleted) => {
+        async (fulfill, headersCompleted, markHttp) => {
           const request = new URL(route.request().url())
           if (
             reloading &&
@@ -170,16 +195,19 @@ async function performRetentionAcceptanceReload(
             await new Promise<void>((resolve) => setTimeout(resolve, 1000))
             delayedFonts.push({ url: request.href, heldAt, releasedAt: Date.now() })
           }
+          markHttp('headersStartedAt')
           const headers =
             route.request().method() === 'GET'
               ? { ...(await route.request().allHeaders()), connection: 'close' }
               : undefined
           headersCompleted()
           signal.throwIfAborted()
+          markHttp('fetchStartedAt')
           const response = await route.fetch({
             url: new URL(request.pathname + request.search, entryOrigin).href,
             headers,
           })
+          markHttp('fetchCompletedAt')
           await fulfill(() => route.fulfill({ response }))
         },
         () => route.abort('failed'),
@@ -187,6 +215,7 @@ async function performRetentionAcceptanceReload(
     },
   )
   const output = await mkdtemp(join(tmpdir(), 'retention-acceptance-reload-'))
+  controllerMarks.setupReadyAt = Date.now()
   beginRetentionEntryCase(entryOrigin, output, timings)
   const errors: string[] = []
   const pending = new Set<string>()
@@ -369,6 +398,7 @@ async function performRetentionAcceptanceReload(
       screenshot,
     }
     if (transport.hasFailure) throw transport.firstError
+    controllerMarks.operationResultReadyAt = Date.now()
     await writeFile(join(output, 'raw.json'), JSON.stringify(result))
     return result
   })()
@@ -488,6 +518,7 @@ async function performRetentionAcceptanceReload(
         ],
         operation,
       )
+      controllerMarks.cleanupReadyAt = Date.now()
       artifactFailures.push(
         ...(await archiveRetentionReloadArtifact(output, 'cleanup.json', {
           phase,
@@ -518,6 +549,13 @@ async function performRetentionAcceptanceReload(
   if (transport.hasFailure) throw transport.firstError
   if (cleanupFailures.length > 0) throw cleanupFailures[0]
   if (artifactFailures.length > 0) throw artifactFailures[0]
+  controllerMarks.returnReadyAt = Date.now()
+  guardRetentionEntryObservation(() =>
+    console.info(
+      'RETENTION_CONTROLLER_TIMING ' +
+        JSON.stringify({ operationId, arm, clock: 'node', marks: controllerMarks }),
+    ),
+  )
   return outcome.result
 }
 
