@@ -55,7 +55,8 @@ export class WebGpuTextPass {
   private readonly glyphUploadWords: Uint32Array
   private frameUploadedBytesValue = 0
   private glyphBindGroupCreationCountValue = 0
-  private glyphBindGroup?: GPUBindGroup
+  private drawBundle?: GPURenderBundle
+  private readonly format: GPUTextureFormat
   private readonly instanceCount: number
   readonly metrics: TextPassMetrics = {
     draws: 0,
@@ -69,6 +70,7 @@ export class WebGpuTextPass {
 
   constructor(options: WebGpuTextPassOptions) {
     this.device = options.device
+    this.format = options.format
     this.instanceCount = options.instanceCount
     try {
       this.cellBuffer = this.createStorageBuffer(options.instanceCount * CELL_INSTANCE_BYTES)
@@ -93,7 +95,7 @@ export class WebGpuTextPass {
   }
 
   syncAtlas(textures: AtlasGpuTextures): void {
-    this.glyphBindGroup = this.device.createBindGroup({
+    const glyphBindGroup = this.device.createBindGroup({
       entries: [
         { binding: 0, resource: { buffer: this.glyphBuffer } },
         { binding: 1, resource: { buffer: this.viewportBuffer } },
@@ -104,6 +106,14 @@ export class WebGpuTextPass {
       layout: this.resources.glyphPipeline.getBindGroupLayout(0),
     })
     this.glyphBindGroupCreationCountValue += 1
+    const bundle = this.device.createRenderBundleEncoder({ colorFormats: [this.format] })
+    bundle.setPipeline(this.resources.cellPipeline)
+    bundle.setBindGroup(0, this.resources.cellBindGroup)
+    bundle.draw(6, this.instanceCount)
+    bundle.setPipeline(this.resources.glyphPipeline)
+    bundle.setBindGroup(0, glyphBindGroup)
+    bundle.draw(6, this.instanceCount)
+    this.drawBundle = bundle.finish()
   }
 
   get glyphBindGroupCreationCount(): number {
@@ -145,7 +155,7 @@ export class WebGpuTextPass {
   }
 
   encode(view: GPUTextureView, copy?: TextPassCopy): GPUCommandBuffer {
-    if (!this.glyphBindGroup) throw new Error('Atlas textures must be synchronized before drawing')
+    if (!this.drawBundle) throw new Error('Atlas textures must be synchronized before drawing')
     const encoder = this.device.createCommandEncoder()
     const pass = encoder.beginRenderPass({
       colorAttachments: [
@@ -157,12 +167,7 @@ export class WebGpuTextPass {
         },
       ],
     })
-    pass.setPipeline(this.resources.cellPipeline)
-    pass.setBindGroup(0, this.resources.cellBindGroup)
-    pass.draw(6, this.instanceCount)
-    pass.setPipeline(this.resources.glyphPipeline)
-    pass.setBindGroup(0, this.glyphBindGroup)
-    pass.draw(6, this.instanceCount)
+    pass.executeBundles([this.drawBundle])
     pass.end()
     if (copy) {
       encoder.copyTextureToBuffer(

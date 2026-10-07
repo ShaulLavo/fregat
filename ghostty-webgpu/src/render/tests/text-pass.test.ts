@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { WebGpuTextPass } from '../text-pass.js'
 import type { RowInstanceUpdate } from '../instances/types.js'
+import type { AtlasGpuTextures } from '../atlas/gpu-textures.js'
 
 interface BufferState {
   bytes: Uint8Array
@@ -17,6 +18,9 @@ function gpuFixture() {
     sourceBuffer: ArrayBufferLike
   }[] = []
   const pipeline = { getBindGroupLayout: () => ({}) }
+  const bundles: { commands: unknown[][] }[] = []
+  const executed: unknown[][] = []
+  const draw = vi.fn()
   const device = {
     createBuffer({ size }: { size: number }) {
       const buffer = { bytes: new Uint8Array(size), destroy() {} }
@@ -26,7 +30,30 @@ function gpuFixture() {
     createSampler: () => ({}),
     createShaderModule: () => ({}),
     createRenderPipeline: () => pipeline,
-    createBindGroup: () => ({}),
+    createBindGroup: (options: unknown) => ({ options }),
+    createRenderBundleEncoder() {
+      const commands: unknown[][] = []
+      return {
+        setPipeline: (...args: unknown[]) => commands.push(['pipeline', ...args]),
+        setBindGroup: (...args: unknown[]) => commands.push(['binding', ...args]),
+        draw: (...args: unknown[]) => commands.push(['draw', ...args]),
+        finish() {
+          const bundle = { commands }
+          bundles.push(bundle)
+          return bundle
+        },
+      }
+    },
+    createCommandEncoder: () => ({
+      beginRenderPass: () => ({
+        setPipeline() {},
+        setBindGroup() {},
+        draw,
+        executeBundles: (items: unknown[]) => executed.push(items),
+        end() {},
+      }),
+      finish: () => ({}),
+    }),
     queue: {
       writeBuffer(
         buffer: BufferState,
@@ -57,7 +84,7 @@ function gpuFixture() {
     instanceCount: 480,
   })
   writes.length = 0
-  return { pass, buffers, writes }
+  return { pass, buffers, writes, bundles, executed, draw }
 }
 
 function frame() {
@@ -88,6 +115,44 @@ function update(
 }
 
 afterEach(() => vi.unstubAllGlobals())
+
+it('records static draws once, reuses them across frames and rebuilds for atlas views', () => {
+  const fixture = gpuFixture()
+  const textures = { view: (kind: string) => ({ kind }) } as unknown as AtlasGpuTextures
+  fixture.pass.syncAtlas(textures)
+  expect(fixture.bundles).toHaveLength(1)
+  const first = fixture.bundles[0]!
+  expect(first.commands.map((command) => command[0])).toEqual([
+    'pipeline',
+    'binding',
+    'draw',
+    'pipeline',
+    'binding',
+    'draw',
+  ])
+  expect(first.commands.filter((command) => command[0] === 'draw')).toEqual([
+    ['draw', 6, 480],
+    ['draw', 6, 480],
+  ])
+  const view = {} as GPUTextureView
+  fixture.pass.encode(view)
+  fixture.pass.uploadFrame(frame(), [update(0, 0, 64, 0, 96)])
+  fixture.pass.encode(view)
+  expect(fixture.executed).toEqual([[first], [first]])
+  expect(fixture.draw).not.toHaveBeenCalled()
+  expect(fixture.pass.metrics.submittedFrames).toBe(0)
+  fixture.pass.acceptFrame()
+  fixture.pass.acceptFrame()
+  expect(fixture.pass.metrics.draws).toBe(4)
+  expect(fixture.pass.metrics.submittedFrames).toBe(2)
+  fixture.pass.syncAtlas(textures)
+  expect(fixture.bundles).toHaveLength(2)
+  const second = fixture.bundles[1]!
+  expect(second.commands[4]![2]).not.toBe(first.commands[4]![2])
+  fixture.pass.encode(view)
+  expect(fixture.executed[2]).toEqual([second])
+  expect(fixture.pass.glyphBindGroupCreationCount).toBe(2)
+})
 
 it('coalesces twelve full rows to two uploads with compact glyph bytes and preserved raw bits', () => {
   const fixture = gpuFixture(),
