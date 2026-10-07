@@ -1,6 +1,9 @@
 import { expect, test } from 'vitest'
 import { commands } from 'vitest/browser'
-import type { RetentionAcceptanceReloadResult } from '../../../../retention-acceptance.vitest.config'
+import type {
+  RetentionAcceptanceReloadResult,
+  RetentionAcceptanceReloadCallerTiming,
+} from '../../../../retention-acceptance.vitest.config'
 import {
   retentionAcceptanceReloadFrameOutcome,
   type RetentionAcceptanceReloadAdmission,
@@ -16,7 +19,10 @@ declare module 'vitest/browser' {
       },
       operationId: string,
     ): Promise<RetentionAcceptanceReloadResult>
-    retentionAcceptanceReloadFinish(operationId: string): Promise<void>
+    retentionAcceptanceReloadFinish(
+      operationId: string,
+      callerTiming?: RetentionAcceptanceReloadCallerTiming,
+    ): Promise<void>
   }
 }
 
@@ -31,7 +37,24 @@ for (const arm of [
     { timeout: 30_000 },
     async (context) => {
       const operationId = crypto.randomUUID()
-      context.onTestFinished(() => commands.retentionAcceptanceReloadFinish(operationId))
+      const callerMarks: { stage: string; at: number; monotonicMs: number }[] = []
+      const mark = (stage: string) => {
+        callerMarks.push({ stage, at: Date.now(), monotonicMs: performance.now() })
+      }
+      mark('caller-start')
+      context.onTestFinished(() => {
+        mark('test-finished')
+        return commands.retentionAcceptanceReloadFinish(operationId, {
+          clock: 'browser',
+          state: context.task.result?.state,
+          timedOut:
+            context.task.result?.errors?.some((error) =>
+              error.message.includes('Test timed out'),
+            ) ?? false,
+          marks: callerMarks,
+        })
+      })
+      mark('command-await')
       const result = await commands.retentionAcceptanceReload(
         {
           ...arm,
@@ -39,6 +62,8 @@ for (const arm of [
         },
         operationId,
       )
+      mark('command-return')
+      mark('annotation-enter')
       await context.annotate(
         JSON.stringify({
           arm: result.arm,
@@ -50,6 +75,8 @@ for (const arm of [
         }),
         'retention-acceptance-real-reload',
       )
+      mark('annotation-exit')
+      mark('assertions-enter')
       expect(result.errors).toEqual([])
       expect(result.cacheReceipt?.remainingSavedKeys).toEqual([])
       expect(result.frames?.length).toBeGreaterThan(0)
@@ -61,6 +88,7 @@ for (const arm of [
       expect(settledReference).toBeDefined()
       if (!settledReference) return
       let admission: RetentionAcceptanceReloadAdmission = 'unbound'
+      mark('frame-loop-enter')
       for (const frame of result.frames ?? []) {
         const outcome = retentionAcceptanceReloadFrameOutcome({
           frame,
@@ -76,6 +104,7 @@ for (const arm of [
         if (outcome.kind === 'pending' && admission === 'unbound') admission = 'source'
         if (outcome.kind === 'current') admission = 'current'
       }
+      mark('frame-loop-exit')
       expect(admission).toBe('current')
       if (arm.font === 'slow') {
         expect(result.fontLoadReceipt.faceCount).toBeGreaterThan(0)
@@ -110,6 +139,7 @@ for (const arm of [
       expect(after.reference.identity.document).toBe(before.reference.identity.document)
       expect(after.headerPath).toBe('repo/src/editor-tab-a.ts')
       expect(after.mismatch).toBeNull()
+      mark('assertions-exit')
     },
   )
 

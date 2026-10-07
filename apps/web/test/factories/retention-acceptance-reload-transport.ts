@@ -34,6 +34,7 @@ export type RetentionReloadTimings = {
   fontReadyAt: number | null
   screenshotCompleteAt: number | null
   browserTimeOrigin: number | null
+  controller?: Record<string, number>
 }
 
 export function createRetentionReloadTimings(): RetentionReloadTimings {
@@ -122,6 +123,12 @@ type ForwardObservation = {
   } | null
   skippedActions: ('fulfill' | 'abort')[]
   terminal: { kind: ForwardOutcome['kind']; at: number } | null
+  http?: Partial<
+    Record<
+      'headersStartedAt' | 'headersCompletedAt' | 'fetchStartedAt' | 'fetchCompletedAt',
+      number
+    >
+  >
   settlement: {
     kind: 'succeeded' | 'failed' | 'not-started'
     at: number
@@ -317,7 +324,11 @@ export function createRetentionReloadTransport(
     },
     run(
       url: string,
-      operation: (fulfill: FulfillForward, headersCompleted: () => void) => Promise<void>,
+      operation: (
+        fulfill: FulfillForward,
+        headersCompleted: () => void,
+        markHttp: (stage: 'headersStartedAt' | 'fetchStartedAt' | 'fetchCompletedAt') => void,
+      ) => Promise<void>,
       abort: () => Promise<void>,
     ) {
       const observation: ForwardObservation = {
@@ -332,7 +343,13 @@ export function createRetentionReloadTransport(
         settlement: null,
       }
       requests.push(observation)
+      const markHttp = (stage: 'headersStartedAt' | 'fetchStartedAt' | 'fetchCompletedAt') => {
+        observation.http ??= {}
+        observation.http[stage] = Date.now()
+      }
       const headersCompleted = () => {
+        observation.http ??= {}
+        observation.http.headersCompletedAt = Date.now()
         if (timings) timings.headersCompleted = { requestId: observation.requestId, at: Date.now() }
       }
       const request = createRetentionForward(observation, record, failed)
@@ -347,8 +364,9 @@ export function createRetentionReloadTransport(
       const actual = admitting
         ? observeRetentionForward(
             () =>
-              observer?.run(observation, () => operation(routeAction.fulfill, headersCompleted)) ??
-              operation(routeAction.fulfill, headersCompleted),
+              observer?.run(observation, () =>
+                operation(routeAction.fulfill, headersCompleted, markHttp),
+              ) ?? operation(routeAction.fulfill, headersCompleted, markHttp),
             (outcome) => {
               const selected = request.select(outcome)
               guardRetentionEntryObservation(() => observer?.settled(observation))
