@@ -1,6 +1,7 @@
 import type { EnvironmentId } from '@workspace/contracts'
 
 export const chatModeMutationKeys = {
+  surfaceModule: ['chat-mode', 'surfaceModule', 'load'] as const,
   checkpointHunk: (environmentId: string, sessionId: string) =>
     ['chat', 'checkpoint-hunk', environmentId, sessionId] as const,
   notificationOpen: () => ['chat', 'notification', 'open'] as const,

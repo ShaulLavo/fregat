@@ -113,7 +113,16 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
     .filter({ has: page.locator(`[data-worktree-id="${worktreeId}"]`) })
 }
 
+export const deferredChatModuleRoutes = {
+  workspace: '**/src/features/chat-mode/components/surface-view.tsx*',
+  panel: '**/src/features/chat/components/chat-side-panel.tsx*',
+} as const
+
 export const selectors = {
+  deferredChatLoading: (page: Page, surface: 'workspace' | 'panel') =>
+    page.getByRole('status', { name: `Opening chat ${surface}`, exact: true }),
+  deferredChatError: (page: Page, surface: 'workspace' | 'panel') =>
+    page.getByText(`Unable to load chat ${surface}`, { exact: true }),
   fileReadRetry: (page: Page) => page.getByRole('button', { name: 'Retry', exact: true }),
   fileReadErrorHeader: (page: Page) => page.locator('header[aria-label="File read error"]'),
   chatFileFallback: (page: Page) =>
@@ -1060,6 +1069,11 @@ export const selectors = {
   chatFileDownload: (page: Page, name: string) =>
     page.getByRole('link', { name: `Download ${name}`, exact: true }),
   chatMessage: (page: Page) => page.getByRole('textbox', { name: 'Message', exact: true }),
+  waitForChatText: (page: Page, text: string) =>
+    page.waitForFunction(
+      (value) => document.querySelector('[aria-label="Message"]')?.textContent?.includes(value),
+      text,
+    ),
   chatWelcome: (page: Page) =>
     page.getByText('Ask about your workspace', { exact: true }).locator('../..'),
   chatNewSession: (page: Page) => page.getByRole('button', { name: 'New session', exact: true }),

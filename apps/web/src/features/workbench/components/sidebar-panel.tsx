@@ -4,7 +4,7 @@ import { usePanelSurface } from '@/hooks/use-panel-surface'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 
 import { SearchPane } from '@/features/workspace/components/search-pane'
-import { ChatSidePanel } from '@/features/chat/components/chat-side-panel'
+import { DeferredSidePanel } from '@/features/chat/components/deferred-side-panel'
 import { DeferredLogsPanel } from '@/features/logs/components/deferred-panel'
 import { FileNavigatorPanel } from '@/features/workbench/components/file-navigator-panel'
 import { GitChangesPanel } from '@/features/workbench/components/git-changes-panel'
@@ -50,7 +50,7 @@ function renderSidebarPanel({
   readonly rootPath: FilesystemPath
   readonly tab: WorkbenchSidebarTab
 }) {
-  if (tab === 'chat') return <ChatSidePanel rootPath={rootPath} />
+  if (tab === 'chat') return <DeferredSidePanel rootPath={rootPath} />
   if (tab === 'git') return <GitChangesPanel rootPath={rootPath} />
   if (tab === 'logs') return <DeferredLogsPanel active />
   if (tab === 'search') return <SearchPane rootPath={rootPath} />
