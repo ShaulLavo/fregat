@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react'
 import type { useVoiceInput } from '../hooks/use-voice-input'
 
 export function ChatInputDictationStatus({
@@ -5,6 +6,19 @@ export function ChatInputDictationStatus({
 }: {
   readonly voice: ReturnType<typeof useVoiceInput>
 }) {
+  const previewRef = useRef<HTMLSpanElement | null>(null)
+  useLayoutEffect(() => {
+    const preview = previewRef.current
+    if (!preview) return
+    const observer = new ResizeObserver(() => followPreviewEnd(preview))
+    observer.observe(preview)
+    return () => observer.disconnect()
+  }, [voice.pending])
+  useLayoutEffect(() => {
+    const preview = previewRef.current
+    if (preview) followPreviewEnd(preview)
+  }, [voice.preview, voice.pending, voice.phase])
+
   if (!voice.pending) return null
   let label = 'Preparing microphone…'
   if (voice.phase === 'recording') label = 'Listening…'
@@ -17,16 +31,29 @@ export function ChatInputDictationStatus({
         {label}
       </span>
       <span className='text-muted-foreground shrink-0 font-mono tabular-nums'>{elapsed}</span>
-      {voice.preview ? (
-        <span
-          className='text-foreground flex min-w-0 flex-1 justify-end overflow-hidden'
-          data-dictation-preview
-          dir='auto'
-          title={voice.preview}
-        >
-          <span className='min-w-full shrink-0 whitespace-nowrap'>{voice.preview}</span>
+      <span
+        className='text-foreground no-scrollbar scroll-pinned min-w-0 flex-1 overflow-x-auto scroll-auto whitespace-nowrap'
+        data-dictation-preview
+        dir='auto'
+        ref={previewRef}
+        title={voice.preview}
+      >
+        <span className='inline-flex w-max items-center gap-0.5'>
+          <span>{voice.preview}</span>
+          {voice.phase === 'recording' ? (
+            <span
+              aria-hidden='true'
+              className='bg-foreground h-[1em] w-px shrink-0'
+              data-dictation-caret
+            />
+          ) : null}
         </span>
-      ) : null}
+      </span>
     </div>
   )
+}
+
+function followPreviewEnd(preview: HTMLElement) {
+  const direction = getComputedStyle(preview).direction
+  preview.scrollLeft = direction === 'rtl' ? -preview.scrollWidth : preview.scrollWidth
 }
