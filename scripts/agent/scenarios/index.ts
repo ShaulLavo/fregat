@@ -27,6 +27,7 @@ import {
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
 import { startupFailure } from './startup-failure'
+import { phoneFolderRetry } from './phone-folder-retry'
 import { settingsModuleFailure } from './settings-module-failure'
 import { settingsNewerServer, settingsStreamGiveUp } from './settings-newer-server'
 import { connectionRefusalRetention } from './connection-refusal-retention'
@@ -785,6 +786,7 @@ export const scenarios: readonly Scenario[] = [
   settingsNewerServer,
   settingsStreamGiveUp,
   startupFailure,
+  phoneFolderRetry,
   deferredDialogs,
   deferredChat,
   dialogEscape,
