@@ -1,3 +1,4 @@
+import { createGhosttyError } from '../core/error.js'
 import type { AtlasGpuTextures } from './atlas/gpu-textures.js'
 import type { RowInstanceUpdate } from './instances/types.js'
 import { planUploadRanges } from './instances/upload-ranges.js'
@@ -33,6 +34,32 @@ interface PipelineResources {
   glyphPipeline: GPURenderPipeline
 }
 
+interface GlyphBatch {
+  readonly buffer: GPUBuffer
+  readonly byteOffset: number
+  readonly instanceCount: number
+  bindGroup?: GPUBindGroup
+}
+
+export function textPassGlyphCapacity(device: GPUDevice, instanceCount: number): number {
+  const byteLimit = Math.min(device.limits.maxBufferSize, device.limits.maxStorageBufferBindingSize)
+  const cellBytes = instanceCount * CELL_INSTANCE_BYTES
+  if (!Number.isSafeInteger(instanceCount) || instanceCount < 1 || cellBytes > byteLimit) {
+    throw createGhosttyError(
+      'webgpu_capacity',
+      `The grid needs ${cellBytes} cell-storage bytes; this WebGPU device supports ${byteLimit}`,
+    )
+  }
+  const capacity = Math.floor(byteLimit / GLYPH_INSTANCE_BYTES)
+  if (capacity < 1) {
+    throw createGhosttyError(
+      'webgpu_capacity',
+      `A native glyph record needs ${GLYPH_INSTANCE_BYTES} bytes; this WebGPU device supports ${byteLimit}`,
+    )
+  }
+  return capacity
+}
+
 function blendState(): GPUBlendState {
   return {
     alpha: { dstFactor: 'one-minus-src-alpha', srcFactor: 'one' },
@@ -45,6 +72,8 @@ export class WebGpuTextPass {
   private readonly cellBuffer: GPUBuffer
   private readonly device: GPUDevice
   private readonly glyphBuffer: GPUBuffer
+  private readonly glyphBatches: GlyphBatch[] = []
+  readonly drawCount: number
   private frameUploadedBytesValue = 0
   private glyphBindGroupCreationCountValue = 0
   private glyphBindGroup?: GPUBindGroup
@@ -62,9 +91,19 @@ export class WebGpuTextPass {
   constructor(options: WebGpuTextPassOptions) {
     this.device = options.device
     this.instanceCount = options.instanceCount
+    const capacity = textPassGlyphCapacity(this.device, this.instanceCount)
     try {
-      this.cellBuffer = this.createStorageBuffer(options.instanceCount * CELL_INSTANCE_BYTES)
-      this.glyphBuffer = this.createStorageBuffer(options.instanceCount * GLYPH_INSTANCE_BYTES)
+      this.cellBuffer = this.createStorageBuffer(this.instanceCount * CELL_INSTANCE_BYTES)
+      for (let first = 0; first < this.instanceCount; first += capacity) {
+        const instanceCount = Math.min(capacity, this.instanceCount - first)
+        this.glyphBatches.push({
+          buffer: this.createStorageBuffer(instanceCount * GLYPH_INSTANCE_BYTES),
+          byteOffset: first * GLYPH_INSTANCE_BYTES,
+          instanceCount,
+        })
+      }
+      this.glyphBuffer = this.glyphBatches[0]!.buffer
+      this.drawCount = 1 + this.glyphBatches.length
       this.viewportBuffer = options.device.createBuffer({
         size: 16,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
@@ -84,17 +123,20 @@ export class WebGpuTextPass {
   }
 
   syncAtlas(textures: AtlasGpuTextures): void {
-    this.glyphBindGroup = this.device.createBindGroup({
-      entries: [
-        { binding: 0, resource: { buffer: this.glyphBuffer } },
-        { binding: 1, resource: { buffer: this.viewportBuffer } },
-        { binding: 2, resource: this.sampler },
-        { binding: 3, resource: textures.view('grayscale') },
-        { binding: 4, resource: textures.view('color') },
-      ],
-      layout: this.resources.glyphPipeline.getBindGroupLayout(0),
-    })
-    this.glyphBindGroupCreationCountValue += 1
+    for (const batch of this.glyphBatches) {
+      batch.bindGroup = this.device.createBindGroup({
+        entries: [
+          { binding: 0, resource: { buffer: batch.buffer } },
+          { binding: 1, resource: { buffer: this.viewportBuffer } },
+          { binding: 2, resource: this.sampler },
+          { binding: 3, resource: textures.view('grayscale') },
+          { binding: 4, resource: textures.view('color') },
+        ],
+        layout: this.resources.glyphPipeline.getBindGroupLayout(0),
+      })
+      this.glyphBindGroupCreationCountValue += 1
+    }
+    this.glyphBindGroup = this.glyphBatches[0]!.bindGroup
   }
 
   get glyphBindGroupCreationCount(): number {
@@ -114,8 +156,13 @@ export class WebGpuTextPass {
     const cellData = data.cellData
     const glyphData = data.glyphData
     for (const range of plan.cell) this.writeRange(this.cellBuffer, cellData, range)
-    for (const range of plan.glyph) this.writeRange(this.glyphBuffer, glyphData, range)
-    return plan.cell.length + plan.glyph.length
+    if (this.glyphBatches.length === 1) {
+      for (const range of plan.glyph) this.writeRange(this.glyphBuffer, glyphData, range)
+      return plan.cell.length + plan.glyph.length
+    }
+    let operations = plan.cell.length
+    for (const range of plan.glyph) operations += this.writeGlyphRange(glyphData, range)
+    return operations
   }
 
   submit(view: GPUTextureView, copy?: TextPassCopy): void {
@@ -124,7 +171,7 @@ export class WebGpuTextPass {
   }
 
   acceptFrame(): void {
-    this.metrics.draws += 2
+    this.metrics.draws += this.drawCount
     this.metrics.submittedFrames += 1
   }
 
@@ -146,7 +193,12 @@ export class WebGpuTextPass {
     pass.draw(6, this.instanceCount)
     pass.setPipeline(this.resources.glyphPipeline)
     pass.setBindGroup(0, this.glyphBindGroup)
-    pass.draw(6, this.instanceCount)
+    pass.draw(6, this.glyphBatches[0]!.instanceCount)
+    for (let index = 1; index < this.glyphBatches.length; index += 1) {
+      const batch = this.glyphBatches[index]!
+      pass.setBindGroup(0, batch.bindGroup!)
+      pass.draw(6, batch.instanceCount)
+    }
     pass.end()
     if (copy) {
       encoder.copyTextureToBuffer(
@@ -208,17 +260,41 @@ export class WebGpuTextPass {
     return buffer
   }
 
+  private writeGlyphRange(
+    data: Float32Array,
+    range: { byteLength: number; byteOffset: number },
+  ): number {
+    let operations = 0
+    for (const batch of this.glyphBatches) {
+      const start = Math.max(range.byteOffset, batch.byteOffset)
+      const end = Math.min(
+        range.byteOffset + range.byteLength,
+        batch.byteOffset + batch.instanceCount * GLYPH_INSTANCE_BYTES,
+      )
+      if (end <= start) continue
+      this.writeRange(
+        batch.buffer,
+        data,
+        { byteOffset: start - batch.byteOffset, byteLength: end - start },
+        start,
+      )
+      operations += 1
+    }
+    return operations
+  }
+
   private writeRange(
     buffer: GPUBuffer,
     data: Float32Array | Uint32Array,
     range: { byteLength: number; byteOffset: number },
+    sourceOffset = range.byteOffset,
   ): void {
     if (range.byteLength === 0) return
     this.device.queue.writeBuffer(
       buffer,
       range.byteOffset,
       data.buffer,
-      data.byteOffset + range.byteOffset,
+      data.byteOffset + sourceOffset,
       range.byteLength,
     )
     this.frameUploadedBytesValue += range.byteLength

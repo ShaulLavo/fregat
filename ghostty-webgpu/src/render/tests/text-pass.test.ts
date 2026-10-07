@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { WebGpuTextPass } from '../text-pass.js'
+import { AtlasGpuTextures } from '../atlas/gpu-textures.js'
 import type { RowInstanceUpdate } from '../instances/types.js'
 
 interface BufferState {
@@ -7,8 +8,12 @@ interface BufferState {
   destroy(): void
 }
 
-function gpuFixture() {
+function gpuFixture(
+  instanceCount = 480,
+  limits = { maxStorageBufferBindingSize: 134217728, maxBufferSize: 268435456 },
+) {
   vi.stubGlobal('GPUBufferUsage', { COPY_DST: 8, STORAGE: 128, UNIFORM: 64 })
+  vi.stubGlobal('GPUTextureUsage', { COPY_DST: 8, COPY_SRC: 4, TEXTURE_BINDING: 16 })
   const buffers: BufferState[] = []
   const writes: {
     buffer: BufferState
@@ -16,8 +21,21 @@ function gpuFixture() {
     bytes: Uint8Array
     sourceBuffer: ArrayBufferLike
   }[] = []
+  const bindGroups: GPUBindGroupDescriptor[] = []
+  const draws: number[] = []
+  const renderPass = {
+    setPipeline() {},
+    setBindGroup() {},
+    draw(_vertices: number, instances: number) {
+      draws.push(instances)
+    },
+    end() {},
+  }
   const pipeline = { getBindGroupLayout: () => ({}) }
   const device = {
+    limits: { ...limits, maxTextureArrayLayers: 256 },
+    createTexture: () => ({ createView: () => ({}), destroy() {} }),
+    createCommandEncoder: () => ({ beginRenderPass: () => renderPass, finish: () => ({}) }),
     createBuffer({ size }: { size: number }) {
       const buffer = { bytes: new Uint8Array(size), destroy() {} }
       buffers.push(buffer)
@@ -26,7 +44,10 @@ function gpuFixture() {
     createSampler: () => ({}),
     createShaderModule: () => ({}),
     createRenderPipeline: () => pipeline,
-    createBindGroup: () => ({}),
+    createBindGroup(descriptor: GPUBindGroupDescriptor) {
+      bindGroups.push(descriptor)
+      return {}
+    },
     queue: {
       writeBuffer(
         buffer: BufferState,
@@ -54,10 +75,10 @@ function gpuFixture() {
     format: 'rgba8unorm',
     height: 12,
     width: 40,
-    instanceCount: 480,
+    instanceCount,
   })
   writes.length = 0
-  return { pass, buffers, writes }
+  return { device, pass, buffers, writes, bindGroups, draws }
 }
 
 function frame() {
@@ -88,6 +109,72 @@ function update(
 }
 
 afterEach(() => vi.unstubAllGlobals())
+
+it.each([
+  { maxStorageBufferBindingSize: 256, maxBufferSize: 268435456 },
+  { maxStorageBufferBindingSize: 134217728, maxBufferSize: 256 },
+])(
+  'splits native glyphs at either device limit: $maxStorageBufferBindingSize/$maxBufferSize',
+  (limits) => {
+    const fixture = gpuFixture(4, limits)
+    const data = frame()
+    const textures = new AtlasGpuTextures(fixture.device, {
+      layerCount: 1,
+      pageHeight: 8,
+      pageWidth: 8,
+    })
+    fixture.pass.syncAtlas(textures)
+    expect(fixture.buffers.map((buffer) => buffer.bytes.byteLength)).toEqual([256, 192, 192, 16])
+    expect(fixture.pass.glyphBindGroupCreationCount).toBe(2)
+    expect(fixture.pass.uploadFrame(data, [update(0, 0, 256, 0, 384)])).toBe(3)
+    expect(fixture.pass.frameUploadedBytes).toBe(640)
+    expect(
+      fixture.writes.slice(1).map((write) => write.sourceBuffer === data.glyphData.buffer),
+    ).toEqual([true, true])
+    expect(fixture.buffers[1]!.bytes).toEqual(
+      new Uint8Array(data.glyphData.buffer, data.glyphData.byteOffset, 192),
+    )
+    expect(fixture.buffers[2]!.bytes).toEqual(
+      new Uint8Array(data.glyphData.buffer, data.glyphData.byteOffset + 192, 192),
+    )
+    fixture.pass.encode({} as GPUTextureView)
+    fixture.pass.acceptFrame()
+    expect(fixture.draws).toEqual([4, 2, 2])
+    expect(fixture.pass.metrics.draws).toBe(3)
+
+    fixture.writes.length = 0
+    data.glyphData.fill(0, 72, 96)
+    expect(fixture.pass.uploadFrame(data, [update(0, 0, 0, 288, 96)])).toBe(1)
+    expect(fixture.writes[0]!.buffer).toBe(fixture.buffers[2])
+    expect(fixture.writes[0]!.offset).toBe(96)
+    expect(fixture.writes[0]!.bytes).toEqual(new Uint8Array(96))
+    expect(fixture.pass.frameUploadedBytes).toBe(96)
+    expect(fixture.pass.uploadFrame(data, [])).toBe(0)
+  },
+)
+
+it.each([
+  { maxStorageBufferBindingSize: 255, maxBufferSize: 268435456 },
+  { maxStorageBufferBindingSize: 134217728, maxBufferSize: 255 },
+])(
+  'rejects an unsupported cell allocation before creating any buffers: $maxStorageBufferBindingSize/$maxBufferSize',
+  (limits) => {
+    const fixture = gpuFixture(1)
+    const created = fixture.buffers.length
+    Object.assign(fixture.device.limits, limits)
+    expect(
+      () =>
+        new WebGpuTextPass({
+          device: fixture.device,
+          format: 'rgba8unorm',
+          height: 1,
+          width: 1,
+          instanceCount: 4,
+        }),
+    ).toThrow('The grid needs 256 cell-storage bytes')
+    expect(fixture.buffers).toHaveLength(created)
+  },
+)
 
 it('uploads native glyph records from their current backing view without repacking', () => {
   const fixture = gpuFixture()
