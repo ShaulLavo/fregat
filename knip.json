@@ -81,6 +81,7 @@
         "agent/injected/style-marks.ts",
         "agent/fixtures/fake-*.mjs",
         "agent/logs.ts",
+        "install-hooks.mjs",
         "install-release.ts",
         "build-release.ts",
         "deploy/live-check.mjs",

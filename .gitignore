@@ -1,5 +1,7 @@
 # Dependencies
 node_modules
+/.fregat-hooks/
+/.fregat-hooks-stage-*/
 .pnp
 .pnp.js
 

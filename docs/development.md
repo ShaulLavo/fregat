@@ -28,7 +28,9 @@ bun run verify
 
 typecheck, lint, format:check, test. lint is oxlint, formatting is oxfmt. narrow it with `bun --filter web test` or `bun --filter server typecheck`
 
-commit hooks are opt-in. `bun run hooks:install` gets you oxfmt and oxlint over staged files, then a repo typecheck
+Use Git 2.31 or newer. Run `bun run hooks:install` in each checkout that should use commit hooks. The command installs an ignored `.fregat-hooks/pre-commit` wrapper and selects it through Git's worktree configuration. Commits run oxfmt, oxlint, repository gates, and typechecking. Dependency installation leaves existing hook selection unchanged.
+
+Relative selection follows a moved checkout. The installer preserves existing custom `core.hooksPath` settings and stops before writes when one applies. A custom hook manager can invoke `bun run hooks:pre-commit` explicitly. The first opt-in enables `extensions.worktreeConfig`. An ordinary common `core.bare=false` value moves into the main worktree's config. Bare repositories, `core.worktree` overrides, and unrelated dormant worktree configuration require separate Git setup. Existing common hooks remain in place.
 
 ## workspace libraries
 
