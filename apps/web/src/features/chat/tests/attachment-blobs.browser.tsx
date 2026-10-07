@@ -37,6 +37,23 @@ test('attachment writes settle after commit and round-trip real blobs', async ()
   expect(await readAttachmentBlob('one')).toBeNull()
 })
 
+test('picked screenshot files persist as raw bytes and retain their media type', async () => {
+  const file = new File([new Uint8Array([137, 80, 78, 71])], 'Screenshot.png', {
+    type: 'image/png',
+  })
+  await storeAttachmentBlob('screenshot', file)
+  const restored = await readAttachmentBlob('screenshot')
+  expect(restored?.type).toBe('image/png')
+  expect(await restored?.arrayBuffer()).toEqual(await file.arrayBuffer())
+  const db = database.connections[0]!
+  const request = db.transaction('blobs').objectStore('blobs').get('screenshot')
+  const stored = await new Promise<unknown>((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+  expect(stored).toEqual({ bytes: await file.arrayBuffer(), mimeType: 'image/png' })
+})
+
 test('the staged-byte budget rejects an oversized blob without storing it', async () => {
   const part = new Blob([new Uint8Array(1024 * 1024)])
   const oversized = new Blob([...Array.from({ length: 400 }, () => part), 'x'])
