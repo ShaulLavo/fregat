@@ -455,12 +455,9 @@ it.each(['fill-text', 'pixels'] as const)(
     clock.flush()
     expect(renderer.canvasPaintMode).toBe(mode)
     expect(renderer.metrics.repaintedRows).toBe(7)
-    if (mode === 'pixels') {
+    expect(renderer.reuseMetrics).toMatchObject({ copiedRows: 5, selfCopies: 1 })
+    if (mode === 'pixels')
       expect(renderer.pixelMetrics).toMatchObject({ bufferMoves: 1, movedRows: 5 })
-      expect(renderer.reuseMetrics.selfCopies).toBe(0)
-    } else {
-      expect(renderer.reuseMetrics).toMatchObject({ copiedRows: 5, selfCopies: 1 })
-    }
     control.width = canvas.width
     control.height = canvas.height
     const context = control.getContext('2d', { alpha: true, willReadFrequently: false })!

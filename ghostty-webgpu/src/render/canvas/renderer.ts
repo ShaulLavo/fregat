@@ -227,10 +227,6 @@ class CanvasSurface implements RowRendererSurface {
   }
 
   private copyRows(offset: number): void {
-    if (this.pixelTarget) {
-      this.pixelTarget.copyRows(offset)
-      return
-    }
     const sourceY = Math.max(0, -offset) * this.rowHeight
     const targetY = Math.max(0, offset) * this.rowHeight
     const height = (this.rowCount - Math.abs(offset)) * this.rowHeight
@@ -260,6 +256,8 @@ class CanvasSurface implements RowRendererSurface {
     }
     this.reuseMetrics.copiedRows += this.rowCount - Math.abs(offset)
     this.reuseMetrics.selfCopies += 1
+    // The canvas already holds the transported rows; the framebuffer follows without re-uploading them.
+    this.pixelTarget?.copyRows(offset)
   }
 }
 

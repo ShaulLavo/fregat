@@ -56,13 +56,22 @@ export class PixelFrame {
     this.dirty.add(y)
   }
 
-  markTransportedRows(offset: number): void {
+  /** Moves pending damage with rows the output canvas has already transported by `offset`. */
+  transportDirtyRows(offset: number): void {
     const output = this.requireOutput()
     if (!Number.isSafeInteger(offset))
       throw createGhosttyError('canvas.frame', 'Canvas row transport requires an integer offset')
     const first = Math.max(0, offset)
     const last = output.height / this.rowHeight + Math.min(0, offset)
-    for (let y = first; y < last; y++) this.dirty.add(y)
+    const moved = new Set<number>()
+    for (const y of this.dirty) {
+      const target = y + offset
+      if (target >= first && target < last) moved.add(target)
+      // Rows outside the transported band keep their own pixels and damage.
+      if (y < first || y >= last) moved.add(y)
+    }
+    this.dirty.clear()
+    for (const y of moved) this.dirty.add(y)
   }
 
   present(): void {

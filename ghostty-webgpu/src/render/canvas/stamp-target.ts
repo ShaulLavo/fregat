@@ -176,7 +176,7 @@ export class StampTarget implements PixelTarget, PaintTarget {
         (rows - Math.abs(offset)) * this.rowHeight,
       ),
     )
-    this.frame.markTransportedRows(offset)
+    this.frame.transportDirtyRows(offset)
     this.metrics.bufferMoves += 1
     this.metrics.movedRows += rows - Math.abs(offset)
   }
