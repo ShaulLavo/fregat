@@ -66,7 +66,9 @@ export class TerminalWorkerRuntime {
   private control = 0
   private acceptedControl = 0
   private prefetchedDevice?: GPUDevice
+  private prefetchedAcquisition?: Promise<GPUDevice>
   private gpuRenderer?: Promise<WebGpuTerminalRenderer>
+  private cleanupPromise?: Promise<void>
   private layout?: WorkerLayout
   private layoutFont?: TerminalFittedFont
   private disposed = false
@@ -219,15 +221,18 @@ export class TerminalWorkerRuntime {
     const font = this.fit(layout)
     let device: GPUDevice | undefined
     if (this.initialize.backend !== 'webgl') {
+      this.prefetchedAcquisition = this.requestDevice().then((acquired) => {
+        this.prefetchedDevice = acquired
+        return acquired
+      })
       try {
-        device = await this.requestDevice()
+        device = await this.prefetchedAcquisition
       } catch (cause) {
         if (this.initialize.backend === 'webgpu')
           throw workerError('capability', 'renderer.webgpu', {
             causeType: cause instanceof Error ? cause.name : typeof cause,
           })
       }
-      this.prefetchedDevice = device
       if (!device && this.initialize.backend === 'webgpu')
         throw workerError('capability', 'renderer.webgpu', { device: false })
     }
@@ -282,12 +287,7 @@ export class TerminalWorkerRuntime {
   private async requestDevice(): Promise<GPUDevice> {
     const adapter = await navigator.gpu?.requestAdapter()
     if (!adapter) throw workerError('capability', 'renderer.webgpu', { adapter: false })
-    const device = await adapter.requestDevice()
-    if (this.disposed) {
-      device.destroy()
-      throw workerError('disposed', 'renderer.webgpu', { disposed: true })
-    }
-    return device
+    return adapter.requestDevice()
   }
 
   private deviceFactory(initialDevice: GPUDevice): () => Promise<GPUDevice> {
@@ -297,6 +297,7 @@ export class TerminalWorkerRuntime {
       const device = initial
       initial = undefined
       this.prefetchedDevice = undefined
+      this.prefetchedAcquisition = undefined
       return device
     }
   }
@@ -592,8 +593,11 @@ export class TerminalWorkerRuntime {
     this.initialize.port.postMessage(message)
   }
 
-  private async cleanup(): Promise<void> {
-    if (this.disposed) return
+  private cleanup(): Promise<void> {
+    return (this.cleanupPromise ??= this.performCleanup())
+  }
+
+  private async performCleanup(): Promise<void> {
     this.disposed = true
     this.abort.abort()
     this.outputWaiter?.reject(workerError('disposed', 'fence', { output: this.output }))
@@ -602,6 +606,10 @@ export class TerminalWorkerRuntime {
     this.execution?.dispose()
     for (const face of this.faces) scope.fonts.delete(face)
     this.faces.length = 0
+    await this.prefetchedAcquisition?.then(
+      () => {},
+      () => {},
+    )
     await this.gpuRenderer?.then(
       (renderer) => renderer.dispose(),
       () => {},
