@@ -141,6 +141,7 @@ export class PixelFrame {
     const top = first * this.rowHeight
     const height = (last - first + 1) * this.rowHeight
     const staging = this.getStaging(image.width, height)
+    this.requireStagingReady(staging)
     const pixels = new Uint8ClampedArray(
       image.data.buffer,
       image.data.byteOffset + top * image.width * 4,
@@ -155,6 +156,7 @@ export class PixelFrame {
     this.metrics.stagingImageAllocations += 1
     this.metrics.stagingReadbacks += 1
     this.metrics.stagingReadbackBytes += ready.data.byteLength
+    this.requireStagingReady(staging)
     if (image.data.buffer !== this.memory.buffer)
       throw createGhosttyError('canvas.frame', 'Canvas pixel memory changed during presentation')
     this.context.putImageData(ready, 0, top)
@@ -194,6 +196,12 @@ export class PixelFrame {
     this.staging.canvas.height = 0
     this.staging = undefined
     this.metrics.stagingPixelBytes = 0
+  }
+
+  private requireStagingReady(staging: Canvas2dContext): void {
+    if (!staging.isContextLost()) return
+    this.releaseStaging()
+    throw createGhosttyError('canvas.frame', 'Canvas pixel staging context was lost')
   }
 
   private sameOutput(left: FrameOutput, right: FrameOutput): boolean {

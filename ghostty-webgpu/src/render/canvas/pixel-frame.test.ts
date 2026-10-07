@@ -16,6 +16,7 @@ class CanvasFixture {
   height = 0
   readonly context = {
     canvas: this,
+    isContextLost: () => false,
     putImageData: vi.fn((image: ImageData) => {
       this.pixels = image.data.slice()
     }),

@@ -170,6 +170,59 @@ it('rejects memory growth during staging readback and retries from the current a
   expect(frame.getImage().data.buffer).toBe(memory.buffer)
 })
 
+function loseStaging(context: Canvas2dContext, duringReadback: boolean) {
+  const prototype =
+    context instanceof CanvasRenderingContext2D
+      ? CanvasRenderingContext2D.prototype
+      : OffscreenCanvasRenderingContext2D.prototype
+  const originalRead = prototype.getImageData
+  let lost = !duringReadback
+  vi.spyOn(prototype, 'isContextLost').mockImplementation(function (this: Canvas2dContext) {
+    return this !== context && lost
+  })
+  if (!duringReadback) return
+  vi.spyOn(prototype, 'getImageData').mockImplementation(function (this: Canvas2dContext, ...args) {
+    if (this === context) return originalRead.apply(this, args)
+    lost = true
+    return new ImageData(args[2], args[3])
+  })
+}
+
+it.each([
+  [false, false],
+  [false, true],
+  [true, false],
+  [true, true],
+])(
+  'retains healthy output and retries lost staging, offscreen=%s, loss during readback=%s',
+  (offscreen, duringReadback) => {
+    const { context, frame } = frameFixture(offscreen, 4, 6, 2)
+    frame.getImage().data.fill(255)
+    frame.present()
+    const healthy = context.getImageData(0, 0, 4, 6).data
+    frame.getImage().data.fill(0)
+    frame.markRow(0)
+    frame.markRow(2)
+    const target = vi.spyOn(context, 'putImageData')
+    loseStaging(context, duringReadback)
+    expect(() => frame.present()).toThrow('staging context was lost')
+    expect(target).not.toHaveBeenCalled()
+    expect(context.getImageData(0, 0, 4, 6).data).toEqual(healthy)
+    expect(frame.metrics.stagingPixelBytes).toBe(0)
+    vi.restoreAllMocks()
+    const retry = vi.spyOn(context, 'putImageData')
+    frame.present()
+    expect(retry.mock.calls.map(([rows, x, y]) => [rows.width, rows.height, x, y])).toEqual([
+      [4, 2, 0, 0],
+      [4, 2, 0, 4],
+    ])
+    const result = context.getImageData(0, 0, 4, 6).data
+    expect(result.slice(0, 32)).toEqual(new Uint8ClampedArray(32))
+    expect(result.slice(32, 64)).toEqual(new Uint8ClampedArray(32).fill(255))
+    expect(result.slice(64)).toEqual(new Uint8ClampedArray(32))
+  },
+)
+
 async function native(content: string, columns = 24, rows = 4) {
   const runtime = await GhosttyRuntime.create()
   cleanups.push(() => runtime.dispose())
