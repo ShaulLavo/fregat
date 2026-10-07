@@ -1960,6 +1960,12 @@
         },
         {
           "kind": "unknown",
+          "name": "DEFAULT_OVERSCAN",
+          "source": "packages/editor/src/virtualization/virtualizedTextViewHelpers.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "unknown",
           "name": "defaultEditorPacks",
           "source": "packages/editor/src/keymap/presets.ts",
           "via": "packages/editor/src/index.ts"
