@@ -1106,6 +1106,110 @@ test('stdout fragments retain valid metadata and pass ordinary output without re
   expect(capture.inspect().refused).toBe(4)
 })
 
+test('framing keeps one callback per read across ordinary slices, protocol and split UTF8', () => {
+  const capture = createRetentionEntryCapture()
+  const output: string[] = []
+  const packet = Buffer.from(
+    retentionEntryReceiptPrefix +
+      JSON.stringify(
+        entryControlFrame({ ...retentionEntryReceiptTime(), kind: 'socket-close', socketId: 1 }),
+      ) +
+      '\n',
+  )
+  capture.read(Buffer.from('started '), (text) => output.push(text))
+  const ordinary = 'שלום😀\r\n' + 'x'.repeat(100_000) + '\n'
+  capture.read(
+    Buffer.concat([
+      Buffer.from(ordinary),
+      packet,
+      Buffer.from('tail '),
+      Buffer.from([0xff, 0xe2, 0x82]),
+    ]),
+    (text) => output.push(text),
+  )
+  expect(output).toEqual(['started ', ordinary + 'tail \uFFFD'])
+  capture.read(Buffer.from([0xac, 10]), (text) => output.push(text))
+  expect(output).toEqual(['started ', ordinary + 'tail \uFFFD', '€\n'])
+  expect(capture.inspect()).toMatchObject({
+    refused: 0,
+    observations: { lastReceived: 1, gaps: 0 },
+  })
+})
+
+test('framing recognizes a protocol prefix split at every byte after an ordinary line', () => {
+  const packet = Buffer.from(
+    retentionEntryReceiptPrefix +
+      JSON.stringify(
+        entryControlFrame({ ...retentionEntryReceiptTime(), kind: 'socket-close', socketId: 1 }),
+      ) +
+      '\r\n',
+  )
+  for (let split = 0; split <= Buffer.byteLength(retentionEntryReceiptPrefix); split++) {
+    const capture = createRetentionEntryCapture()
+    const output: string[] = []
+    capture.read(Buffer.from('ordinary'), (text) => output.push(text))
+    capture.read(Buffer.concat([Buffer.from('\n'), packet.subarray(0, split)]), (text) =>
+      output.push(text),
+    )
+    capture.read(Buffer.alloc(0), (text) => output.push(text))
+    capture.read(Buffer.concat([packet.subarray(split), Buffer.from('tail\n')]), (text) =>
+      output.push(text),
+    )
+    expect(output).toEqual(['ordinary', '\n', 'tail\n'])
+    expect(capture.inspect()).toMatchObject({ refused: 0, pendingWireBytes: 0 })
+  }
+})
+
+test('framing preserves discard recovery and the original incomplete EOF policy', () => {
+  const capture = createRetentionEntryCapture()
+  const output: string[] = []
+  const input = Buffer.from(
+    'head\n' +
+      retentionEntryReceiptPrefix +
+      'x'.repeat(retentionEntryReceiptLimits.recordBytes + 2) +
+      '\nordinary recovery\r\n' +
+      retentionEntryReceiptPrefix.slice(0, -1),
+  )
+  capture.read(input, (text) => output.push(text))
+  expect(output).toEqual(['head\nordinary recovery\r\n'])
+  capture.finishWire()
+  expect(output).toEqual(['head\nordinary recovery\r\n'])
+  expect(capture.inspect()).toMatchObject({
+    refused: 1,
+    pendingWireBytes: 0,
+    wireEndObserved: true,
+  })
+  capture.read(Buffer.concat([Buffer.from('ordinary'), Buffer.from([0xe2, 0x82])]), (text) =>
+    output.push(text),
+  )
+  capture.finishWire()
+  expect(output).toEqual(['head\nordinary recovery\r\n', 'ordinary'])
+})
+
+test.each([undefined, null, false, 0, ''])(
+  'framing contains the original falsy callback throw %s',
+  (failure) => {
+    const capture = createRetentionEntryCapture()
+    expect(
+      capture.read(Buffer.from('ordinary\n'), () => {
+        throw failure
+      }),
+    ).toBeUndefined()
+    expect(capture.inspect().refused).toBe(1)
+    let getterCalls = 0
+    const result = {
+      // oxlint-disable-next-line unicorn/no-thenable -- Callback results must stay unobserved.
+      get then() {
+        getterCalls++
+        throw failure
+      },
+    }
+    capture.read(Buffer.from('next\n'), () => result)
+    expect(getterCalls).toBe(0)
+    expect(capture.inspect().refused).toBe(1)
+  },
+)
+
 test('unknown, private, oversized and throwing metadata is refused without values in the receipt', async () => {
   const output = await mkdtemp(join(tmpdir(), 'retention-entry-refusal-'))
   const capture = createRetentionEntryCapture()

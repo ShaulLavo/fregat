@@ -1529,6 +1529,29 @@ export function createRetentionEntryCapture(socketOptions?: { entryPort: number;
       ordinaryLine = true
     }
   }
+  const ordinaryBytes = (chunk: Buffer) => {
+    const slices: Buffer[] = []
+    const ordinary: number[] = []
+    const other = (value: number) => ordinary.push(value)
+    let offset = 0
+    while (offset < chunk.length) {
+      if (!ordinaryLine) {
+        byte(chunk.readUInt8(offset++), other)
+        continue
+      }
+      if (ordinary.length) {
+        slices.push(Buffer.from(ordinary))
+        ordinary.length = 0
+      }
+      const newline = chunk.indexOf(10, offset)
+      const end = newline < 0 ? chunk.length : newline + 1
+      slices.push(chunk.subarray(offset, end))
+      ordinaryLine = newline < 0
+      offset = end
+    }
+    if (ordinary.length) slices.push(Buffer.from(ordinary))
+    return Buffer.concat(slices)
+  }
   const pin = (values: Iterable<ReceiptRecord>) => {
     const selected: ReceiptRecord[] = []
     for (const record of values) {
@@ -1692,9 +1715,7 @@ export function createRetentionEntryCapture(socketOptions?: { entryPort: number;
     },
     read(chunk: Buffer, other?: (value: string) => void) {
       try {
-        const ordinary: number[] = []
-        for (const value of chunk) byte(value, (value) => ordinary.push(value))
-        const text = decoder.write(Buffer.from(ordinary))
+        const text = decoder.write(ordinaryBytes(chunk))
         if (text) other?.(text)
       } catch {
         refused = addRelayCounter(refused)
