@@ -1237,7 +1237,7 @@ export class TerminalSession<TEvent = unknown> {
       const scroll = this.commitScrollChange()
       const geometry = this.geometry()
       this.flushEffects()
-      if (scroll) this.emitters.scroll.emit(scroll)
+      if (scroll) this.emitState(this.emitters.scroll, () => this.scrollValue)
       this.emitRenderRequest()
       return geometry
     })
@@ -1608,7 +1608,7 @@ export class TerminalSession<TEvent = unknown> {
     this.revisionValue += 1
     const scroll = this.commitScrollChange()
     this.flushEffects()
-    if (scroll) this.emitters.scroll.emit(scroll)
+    if (scroll) this.emitState(this.emitters.scroll, () => this.scrollValue)
     return this.emitRenderRequest()
   }
 
@@ -1662,7 +1662,7 @@ export class TerminalSession<TEvent = unknown> {
     const scroll = this.commitScrollChange(forceScroll)
     this.flushEffects()
     if (hadSelection) this.emitSelection()
-    if (scroll) this.emitters.scroll.emit(scroll)
+    if (scroll) this.emitState(this.emitters.scroll, () => this.scrollValue)
     return this.emitRenderRequest()
   }
 
@@ -1678,7 +1678,7 @@ export class TerminalSession<TEvent = unknown> {
     const scroll = this.commitScrollChange()
     this.flushEffects()
     if (hadSelection) this.emitSelection()
-    if (scroll) this.emitters.scroll.emit(scroll)
+    if (scroll) this.emitState(this.emitters.scroll, () => this.scrollValue)
     return this.emitRenderRequest()
   }
 
@@ -1688,7 +1688,7 @@ export class TerminalSession<TEvent = unknown> {
     const scroll = this.commitScrollChange()
     if (!update.selectionChanged && !scroll) return update
     this.revisionValue += 1
-    if (scroll) this.emitters.scroll.emit(scroll)
+    if (scroll) this.emitState(this.emitters.scroll, () => this.scrollValue)
     if (update.selectionChanged) this.emitSelection()
     this.emitRenderRequest()
     return update
@@ -1732,10 +1732,11 @@ export class TerminalSession<TEvent = unknown> {
     // Resize listeners can paint synchronously; commit viewport and revision before notifying.
     if (scrollChanged) this.scrollValue = nextScroll
     this.revisionValue += 1
-    if (gridChanged) this.emitters.resize.emit({ grid: next.grid })
+    if (gridChanged)
+      this.emitState(this.emitters.resize, () => ({ grid: this.appearanceValue.grid }))
     if (selectionChanged) this.emitSelection()
-    if (scrollChanged) this.emitters.scroll.emit(nextScroll)
-    this.emitters.appearance.emit({ appearance: next })
+    if (scrollChanged) this.emitState(this.emitters.scroll, () => this.scrollValue)
+    this.emitState(this.emitters.appearance, () => ({ appearance: this.appearanceValue }))
     return this.emitRenderRequest()
   }
 
@@ -1750,7 +1751,7 @@ export class TerminalSession<TEvent = unknown> {
     const scroll = this.commitScrollChange()
     if (!scroll) return this.mutationResult()
     this.revisionValue += 1
-    this.emitters.scroll.emit(scroll)
+    this.emitState(this.emitters.scroll, () => this.scrollValue)
     return this.emitRenderRequest()
   }
 
@@ -1774,12 +1775,16 @@ export class TerminalSession<TEvent = unknown> {
   }
 
   private emitSelection(): void {
-    const hasSelection = this.selection.hasSelection
-    const coordinates = this.selection.coordinates()
-    this.emitters.selection.emit({
-      coordinates,
-      hasSelection,
-    })
+    this.emitState(this.emitters.selection, () => ({
+      coordinates: this.selection.coordinates(),
+      hasSelection: this.selection.hasSelection,
+    }))
+  }
+
+  private emitState<T>(emitter: EventEmitter<T>, readCurrent: () => T): void {
+    if (!emitter.hasListeners) return
+    // Reentrant observers can commit new state before the next listener receives it.
+    emitter.emit(readCurrent(), readCurrent)
   }
 
   private commitScrollChange(force = false): TerminalScrollEvent | undefined {
@@ -1837,7 +1842,10 @@ export class TerminalSession<TEvent = unknown> {
 
   private emitRenderRequest(): TerminalMutationResult {
     const result = this.mutationResult()
-    this.emitters.renderRequest.emit({ ...result, state: this.nativeRenderState })
+    this.emitState(this.emitters.renderRequest, () => ({
+      ...this.mutationResult(),
+      state: this.nativeRenderState,
+    }))
     return result
   }
 

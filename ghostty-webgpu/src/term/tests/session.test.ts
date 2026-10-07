@@ -1109,6 +1109,46 @@ describe('TerminalSession', () => {
     expect(session.appearance.scrollbackLimit).toBeUndefined()
   })
 
+  it.each(['selection', 'scroll', 'appearance'] as const)(
+    'keeps final snapshots current after reentrant %s observers mutate retention',
+    async (type) => {
+      const session = await createSession({
+        appearance: {
+          grid: grid({ columns: 40, rows: 12 }),
+          scrollbackByteLimit: 64 * 1024 * 1024,
+          scrollbackLimit: 10000,
+        },
+      })
+      session.write(Array.from({ length: 20000 }, (_, index) => `row-${index}`).join('\r\n'))
+      session.selectLines(0, 1)
+      let reentered = false
+      session.on(type, () => {
+        if (reentered) return
+        reentered = true
+        session.setScrollbackByteLimit(undefined)
+        session.write('\r\nnested')
+      })
+      const appearances: Array<number | undefined> = []
+      const scrolls: TerminalScrollEvent[] = []
+      const revisions: number[] = []
+      const errors: unknown[] = []
+      session.on('appearance', ({ appearance }) => appearances.push(appearance.scrollbackByteLimit))
+      session.on('scroll', (event) => scrolls.push(event))
+      session.on('renderRequest', ({ revision }) => revisions.push(revision))
+      session.on('error', (event) => errors.push(event))
+      session.setScrollbackByteLimit(0)
+      expect(reentered).toBe(true)
+      expect(errors).toEqual([])
+      expect(session.appearance.scrollbackByteLimit).toBeUndefined()
+      expect(session.scrollbackLength).toBe(1)
+      expect(appearances.length).toBeGreaterThan(0)
+      expect(appearances.at(-1)).toBe(session.appearance.scrollbackByteLimit)
+      expect(scrolls.at(-1)?.scrollbackLength).toBe(session.scrollbackLength)
+      expect(scrolls.at(-1)?.scrollbar).toEqual(session.scrollbar)
+      expect(revisions.at(-1)).toBe(session.revision)
+    },
+  )
+
   it('preserves the native default byte budget when appearance omits it', async () => {
     const session = await createSession()
     expect(session.appearance.scrollbackByteLimit).toBeGreaterThan(0)
