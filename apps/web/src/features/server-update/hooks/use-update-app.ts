@@ -32,6 +32,7 @@ import {
 const EMPTY_SAFETY = createReloadSafetyStore()
 const NO_BUSY = [] as const
 const reloadPage = () => window.location.reload()
+const nextFrame = () => new Promise<number>((resolve) => requestAnimationFrame(resolve))
 
 export function useUpdateApp({
   safety,
@@ -151,6 +152,9 @@ export function useUpdateApp({
       scope: { id: 'server-update.reload' },
       retry: false,
       mutationFn: async (target: UpdateTarget) => {
+        // Paint the busy control before browser navigation can freeze the old document.
+        await nextFrame()
+        await nextFrame()
         if (safetyStore.getState().dirtyFiles.length > 0) return
         const latest = primaryQueryClient().getQueryData<NonNullable<typeof data>>(
           serverUpdateQueryKeys.release(),
@@ -160,7 +164,7 @@ export function useUpdateApp({
         if (newerUpdateTarget(announced?.pending, target)) return
         const current = updateIntentStore.getState().intent
         if (current.kind !== 'reload' || !sameUpdateTarget(current.target, target)) return
-        setIntent({ kind: 'idle' })
+        setIntent({ kind: 'navigating', target })
         reload()
       },
     },
@@ -168,7 +172,7 @@ export function useUpdateApp({
   )
 
   const reconcile = useEffectEvent(() => {
-    if (intent.kind === 'idle' || !data) return
+    if (intent.kind === 'idle' || intent.kind === 'navigating' || !data) return
     const target = intent.target
     if (intent.kind === 'restarting' && query.dataUpdatedAt < intent.startedAt) return
     const disposition = reconcileUpdateIntent(intent, data)
@@ -265,7 +269,13 @@ export function useUpdateApp({
 
   function request() {
     const target = intent.kind === 'failed' ? intent.target : available
-    if (intent.kind === 'reload' || intent.kind === 'restarting' || !target) return
+    if (
+      intent.kind === 'reload' ||
+      intent.kind === 'navigating' ||
+      intent.kind === 'restarting' ||
+      !target
+    )
+      return
     if (
       intent.kind === 'failed' &&
       target.stagedAt !== null &&
@@ -311,7 +321,7 @@ export function useUpdateApp({
 
   let progressLabel: string | null = null
   if (intent.kind === 'waiting') progressLabel = 'Waiting to update…'
-  if (intent.kind === 'reload') progressLabel = 'Reloading…'
+  if (intent.kind === 'reload' || intent.kind === 'navigating') progressLabel = 'Reloading…'
   if (intent.kind === 'restarting') {
     progressLabel = 'Restarting…'
     if (connection.phase !== 'connected') progressLabel = 'Reconnecting…'
