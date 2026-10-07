@@ -8,6 +8,7 @@ import { createDomInputController } from '../../dist/dom/input.js'
 import type { TerminalOutputReady, TerminalOutputMessage, TerminalOutputAck } from './protocol.js'
 import type { DeviceObservation } from './tests/device-loss.worker.js'
 import type { DeviceLifecycleObservation } from './tests/device-lifecycle.worker.js'
+import { observeDevice, type DeviceLifecycleCounts } from './tests/device-lifecycle.js'
 
 const family = 'PackagedWorkerTest'
 const fontUrl = new URL(
@@ -61,34 +62,97 @@ async function create(mode: 'main' | 'webgpu' | 'webgl') {
   return terminal
 }
 
-it('waits and destroys each public worker device once before closing', async () => {
-  const channel = new BroadcastChannel('packaged-worker-device-lifecycle')
-  const observations: DeviceLifecycleObservation[] = []
-  channel.onmessage = ({ data }: MessageEvent<DeviceLifecycleObservation>) =>
-    observations.push(data)
+it('waits and destroys each public Window device once', async () => {
+  const devices: DeviceLifecycleCounts[] = []
+  const request = GPUAdapter.prototype.requestDevice
+  const acquisition = vi
+    .spyOn(GPUAdapter.prototype, 'requestDevice')
+    .mockImplementation(async function (this: GPUAdapter, descriptor) {
+      const device = await request.call(this, descriptor)
+      devices.push(observeDevice(device, devices.length))
+      return device
+    })
   try {
-    const terminal = await WorkerTerminal.create({
-      assets,
+    const face = await new FontFace(family, `url(${JSON.stringify(fontUrl)})`).load()
+    document.fonts.add(face)
+    const terminal = await MainTerminal.create({
       appearance: { font: { family, size: 16 }, cursor: { blink: false } },
-      backend: 'webgpu',
-      workerUrl: new URL('./tests/device-lifecycle.worker.ts', import.meta.url),
-      fonts: [{ family, source: { url: fontUrl } }],
+      runtime: { kind: 'owned', options: assets },
     })
     active.push(terminal)
     await terminal.open(container())
+    expect(terminal.diagnostics.rendererBackend).toBe('webgpu')
     await terminal.write('known-good lifecycle')
     await eventually(() => terminal.visibleLines()[0]?.includes('known-good lifecycle') === true)
     await terminal.dispose()
-    await terminal.dispose()
-    await eventually(() => observations.some((value) => value.type === 'closed'))
-    const closed = observations.find((value) => value.type === 'closed')!
-    console.info('Packaged worker device lifecycle', JSON.stringify(observations))
-    expect(observations.filter((value) => value.type === 'acquired')).toHaveLength(1)
-    expect(closed).toEqual({ type: 'closed', devices: [{ device: 0, waits: 1, destroys: 1 }] })
+    await eventually(() => devices.some((value) => value.destroys > 0))
+    console.info('Packaged Window device lifecycle', JSON.stringify(devices))
+    expect(devices).toEqual([{ device: 0, waits: 1, destroys: 1 }])
   } finally {
-    channel.close()
+    acquisition.mockRestore()
   }
 })
+
+it.each(['normal', 'recovered', 'held', 'rejected', 'setup-failed'] as const)(
+  'waits and destroys each public worker device once before closing (%s)',
+  async (mode) => {
+    const channel = new BroadcastChannel('packaged-worker-device-lifecycle')
+    const observations: DeviceLifecycleObservation[] = []
+    channel.onmessage = ({ data }: MessageEvent<DeviceLifecycleObservation>) =>
+      observations.push(data)
+    try {
+      const url = new URL('./tests/device-lifecycle.worker.ts', import.meta.url)
+      url.searchParams.set('lifecycle', mode)
+      const terminal = await WorkerTerminal.create({
+        assets,
+        appearance: { font: { family, size: 16 }, cursor: { blink: false } },
+        backend: 'webgpu',
+        workerUrl: url,
+        fonts: [{ family, source: { url: fontUrl } }],
+      })
+      active.push(terminal)
+      if (mode === 'setup-failed') {
+        await expect(terminal.open(container())).rejects.toBeInstanceOf(TerminalWorkerError)
+      } else {
+        await terminal.open(container())
+        await terminal.write('known-good lifecycle')
+        await eventually(
+          () => terminal.visibleLines()[0]?.includes('known-good lifecycle') === true,
+        )
+      }
+      if (mode === 'recovered') {
+        const frame = terminal.submittedFrame!.frame
+        channel.postMessage('lose')
+        await eventually(() =>
+          observations.some((value) => value.type === 'acquired' && value.device === 1),
+        )
+        await eventually(() => terminal.submittedFrame!.frame > frame)
+        await terminal.write('\r recovered lifecycle')
+        await eventually(() => terminal.visibleLines()[0]?.includes('recovered lifecycle') === true)
+      }
+      const disposal = terminal.dispose()
+      if (mode === 'held') {
+        await eventually(() => observations.some((value) => value.type === 'waiting'))
+        expect(observations.some((value) => value.type === 'closed')).toBe(false)
+        channel.postMessage('release')
+      }
+      await disposal
+      await terminal.dispose()
+      await eventually(() => observations.some((value) => value.type === 'closed'))
+      const closed = observations.find((value) => value.type === 'closed')!
+      console.info('Packaged worker device lifecycle', mode, JSON.stringify(observations))
+      const count = mode === 'recovered' ? 2 : 1
+      expect(observations.filter((value) => value.type === 'acquired')).toHaveLength(count)
+      expect(closed).toEqual({
+        type: 'closed',
+        devices: Array.from({ length: count }, (_, device) => ({ device, waits: 1, destroys: 1 })),
+      })
+    } finally {
+      channel.postMessage('release')
+      channel.close()
+    }
+  },
+)
 
 it('reacquires a live device and repaints after public worker device loss', async () => {
   const channel = new BroadcastChannel('packaged-worker-device-loss')

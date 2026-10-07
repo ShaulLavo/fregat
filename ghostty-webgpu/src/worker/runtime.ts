@@ -65,7 +65,8 @@ export class TerminalWorkerRuntime {
   private output = 0
   private control = 0
   private acceptedControl = 0
-  private device?: GPUDevice
+  private prefetchedDevice?: GPUDevice
+  private gpuRenderer?: Promise<WebGpuTerminalRenderer>
   private layout?: WorkerLayout
   private layoutFont?: TerminalFittedFont
   private disposed = false
@@ -226,7 +227,7 @@ export class TerminalWorkerRuntime {
             causeType: cause instanceof Error ? cause.name : typeof cause,
           })
       }
-      this.device = device
+      this.prefetchedDevice = device
       if (!device && this.initialize.backend === 'webgpu')
         throw workerError('capability', 'renderer.webgpu', { device: false })
     }
@@ -254,11 +255,13 @@ export class TerminalWorkerRuntime {
     const renderer = await execution.createRenderer(
       async (input) => {
         try {
-          if (device)
-            return await WebGpuTerminalRenderer.create({
+          if (device) {
+            this.gpuRenderer = WebGpuTerminalRenderer.create({
               ...input,
               deviceFactory: this.deviceFactory(device),
             })
+            return await this.gpuRenderer
+          }
           return await WebGlTerminalRenderer.create(input)
         } catch (cause) {
           if (cause instanceof WebGpuUnavailableError)
@@ -284,7 +287,6 @@ export class TerminalWorkerRuntime {
       device.destroy()
       throw workerError('disposed', 'renderer.webgpu', { disposed: true })
     }
-    this.device = device
     return device
   }
 
@@ -294,6 +296,7 @@ export class TerminalWorkerRuntime {
       if (!initial) return this.requestDevice()
       const device = initial
       initial = undefined
+      this.prefetchedDevice = undefined
       return device
     }
   }
@@ -599,11 +602,15 @@ export class TerminalWorkerRuntime {
     this.execution?.dispose()
     for (const face of this.faces) scope.fonts.delete(face)
     this.faces.length = 0
+    await this.gpuRenderer?.then(
+      (renderer) => renderer.dispose(),
+      () => {},
+    )
     try {
-      await this.device?.queue.onSubmittedWorkDone()
+      await this.prefetchedDevice?.queue.onSubmittedWorkDone()
     } catch {}
-    this.device?.destroy()
-    this.device = undefined
+    this.prefetchedDevice?.destroy()
+    this.prefetchedDevice = undefined
   }
   private fail(cause: unknown): void {
     if (this.disposed) return

@@ -487,17 +487,18 @@ export class WebGpuTerminalRenderer {
     await this.restoreDevice(this.deviceGeneration)
   }
 
-  dispose(): void {
-    if (this.disposed) return
-    this.disposed = true
-    this.coordinator?.flushOwner(this)
-    this.deviceGeneration += 1
-    this.scheduler.dispose()
-    this.zigBuilder?.dispose()
-    this.textPass.destroy()
-    this.atlasTextures.destroy()
-    this.unconfigureContext()
-    void this.deviceLease.release()
+  dispose(): Promise<void> {
+    if (!this.disposed) {
+      this.disposed = true
+      this.coordinator?.flushOwner(this)
+      this.deviceGeneration += 1
+      this.scheduler.dispose()
+      this.zigBuilder?.dispose()
+      this.textPass.destroy()
+      this.atlasTextures.destroy()
+      this.unconfigureContext()
+    }
+    return Promise.all([this.deviceLease.release(), this.restorePromise]).then(() => {})
   }
 
   private configureContext(device: GPUDevice): void {
