@@ -9,6 +9,8 @@ import { useElementWidth } from '@/hooks/use-element-width'
 import { contextUsageForActivities } from '@workspace/client-core/chat/context-usage'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import type { ChatInputDraftTarget } from '@/features/chat/state/chat-input-draft-store'
+import type { useVoiceInput } from '../hooks/use-voice-input'
+import { ChatInputDictation } from './chat-input-dictation'
 import { ChatInputAttachButton } from './chat-input-attach-button'
 import { ChatInputSubmitButton } from './chat-input-submit-button'
 import { ComposerControlsMenu } from './composer-controls-menu'
@@ -34,6 +36,7 @@ const NARROW_ACTIONS_WIDTH = 420
 const TINY_ACTIONS_WIDTH = 300
 
 export function ChatInputActions({
+  voice,
   busy,
   correctionDisabledReason = null,
   disabled,
@@ -48,6 +51,7 @@ export function ChatInputActions({
   sendDisabled,
   statusLabel,
 }: {
+  voice?: ReturnType<typeof useVoiceInput>
   busy: boolean
   correctionDisabledReason?: string | null
   disabled: boolean
@@ -143,6 +147,7 @@ export function ChatInputActions({
           ) : null}
         </div>
         <div className='flex shrink-0 items-center gap-1'>
+          {voice ? <ChatInputDictation voice={voice} disabled={disabled} /> : null}
           <PromptStashBadge disabled={disabled} draftTarget={draftTarget} />
           <ChatInputSubmitButton
             correctionDisabledReason={correctionDisabledReason}
