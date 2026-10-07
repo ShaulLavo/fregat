@@ -240,11 +240,12 @@ stays safe to read, share and export.
 
 ## Logs
 
-| Setting                 | Default | Scope   | What it does                                                                                                                       |
-| ----------------------- | ------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `logs.defaultTimeRange` | `"1h"`  | window  | Time range the logs view opens on.                                                                                                 |
-| `logs.retentionDays`    | `0`     | machine | Days of server log files this machine keeps, today included; older days are deleted once a day. 0 keeps every day, up to 60 files. |
-| `logs.slowThresholdMs`  | `500`   | window  | How many milliseconds counts as a slow operation.                                                                                  |
+| Setting                       | Default                                                | Scope       | What it does                                                                                                                       |
+| ----------------------------- | ------------------------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `logs.defaultTimeRange`       | `"1h"`                                                 | window      | Time range the logs view opens on.                                                                                                 |
+| `logs.clientFailureRetention` | `{"maxEvents":250,"maxBytes":524288,"maxAgeHours":24}` | application | Limits on browser warnings and errors saved until the server accepts them: event count, bytes, and hours.                          |
+| `logs.retentionDays`          | `0`                                                    | machine     | Days of server log files this machine keeps, today included; older days are deleted once a day. 0 keeps every day, up to 60 files. |
+| `logs.slowThresholdMs`        | `500`                                                  | window      | How many milliseconds counts as a slow operation.                                                                                  |
 
 ## Machines
 

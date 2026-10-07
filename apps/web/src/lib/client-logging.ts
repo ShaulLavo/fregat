@@ -2,7 +2,6 @@ import { isAbortError } from '@/lib/abort-error'
 import { elapsedMs } from '@workspace/utils/timing'
 import { sanitizeRecord } from '@workspace/observability/sanitize'
 import { initLogger, isLevelEnabled, log as evlog, type DrainContext, type LogLevel } from 'evlog'
-import { createHttpLogDrain } from 'evlog/http'
 import { errorSummary } from '@workspace/contracts'
 import { observabilityEnabledFromEnv } from '@workspace/observability/env'
 
@@ -10,6 +9,8 @@ import { annotateClientError } from '@/lib/client-error-context'
 import { primaryServerOrigin } from '@/lib/client'
 import { eventLogContext } from '@/lib/environments/state/log-context'
 import { clientInstanceId, instanceQueryParam } from '@/lib/instance-id'
+import { createClientLogDelivery } from '@/lib/client-logging/delivery'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 
 export type ClientLogLevel = LogLevel
 
@@ -50,17 +51,11 @@ export function initializeClientLogging() {
     return
   }
 
-  const drain = createHttpLogDrain({
-    pipeline: {
-      maxBufferSize: 1000,
-      onDropped: (events) => {
-        console.warn(`[logging] Dropped ${events.length} events from the bounded delivery queue.`)
-      },
-    },
-    drain: {
-      credentials: 'omit',
-      endpoint: logIngestEndpoint(),
-    },
+  const drain = createClientLogDelivery({
+    endpoint: logIngestEndpoint(),
+    instanceId: clientInstanceId(),
+    storage: clientLogStorage(),
+    retention: () => readSettingsMirror()['logs.clientFailureRetention'],
   })
 
   initLogger({
@@ -79,6 +74,14 @@ export function initializeClientLogging() {
     silent: true,
     stringify: true,
   })
+}
+
+function clientLogStorage(): Storage | null {
+  try {
+    return globalThis.localStorage ?? null
+  } catch {
+    return null
+  }
 }
 
 export async function observeClientOperation<T>(
