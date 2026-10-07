@@ -666,6 +666,12 @@ export const SETTINGS_DOCUMENTATION = {
     description: 'Time range the logs view opens on.',
     keywords: ['logs', 'time', 'range', 'filter'],
   },
+  'logs.clientFailureRetention': {
+    title: 'Browser error log retention',
+    description:
+      'Limits on browser warnings and errors saved until the server accepts them: event count, bytes, and hours.',
+    keywords: ['logs', 'browser', 'offline', 'delivery', 'retention'],
+  },
   'logs.retentionDays': {
     title: 'Log retention',
     description:
