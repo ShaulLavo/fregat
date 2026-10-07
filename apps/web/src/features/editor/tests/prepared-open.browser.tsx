@@ -531,6 +531,7 @@ test(
     await triggerForesightIntent()
     await expect.poll(workerRequestGate.heldTypes, { timeout: 20_000 }).toEqual(['queryRange'])
     // Both stages start together; Shiki finishes while Tree-sitter's query is held.
+    await expect.poll(() => workerRuntimeSessionIds('shiki').length, { timeout: 10_000 }).toBe(1)
     await Promise.all(workerRuntimeSessionIds('shiki').map(awaitEditorSyntaxRuntimeSessionIdle))
     diagnostics = []
     performance.clearMarks('editor.worker.request')

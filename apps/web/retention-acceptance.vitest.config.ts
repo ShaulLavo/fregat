@@ -22,6 +22,7 @@ import {
   failRetentionEntryCase,
   endRetentionEntryCase,
   guardRetentionEntryObservation,
+  observeRetentionReadiness,
   observeRetentionEntryEvents,
   retentionEntryModulePath,
   retentionEntryErrorCode,
@@ -73,7 +74,26 @@ type ReloadArm = {
 
 const reloadCases = createRetentionReloadCases()
 
-function retentionAcceptanceReloadFinish(context: BrowserCommandContext, operationId: string) {
+export type RetentionAcceptanceReloadCallerTiming = {
+  readonly clock: 'browser'
+  readonly state?: string
+  readonly timedOut: boolean
+  readonly marks: readonly {
+    readonly stage: string
+    readonly at: number
+    readonly monotonicMs: number
+  }[]
+}
+
+function retentionAcceptanceReloadFinish(
+  context: BrowserCommandContext,
+  operationId: string,
+  callerTiming?: RetentionAcceptanceReloadCallerTiming,
+) {
+  if (callerTiming)
+    guardRetentionEntryObservation(() =>
+      console.info('RETENTION_CALLER_TIMING ' + JSON.stringify({ operationId, ...callerTiming })),
+    )
   return reloadCases.finish(context, operationId)
 }
 
@@ -109,6 +129,7 @@ function retentionAcceptanceReload(
         signal,
         disposeRequests,
         closeContext,
+        operationId,
       ),
       close: async () => {
         const results = await Promise.allSettled([disposeRequests(), closeContext()])
@@ -129,17 +150,22 @@ async function performRetentionAcceptanceReload(
   signal: AbortSignal,
   disposeRequests: () => Promise<void>,
   closeContext: () => Promise<void>,
+  operationId: string,
 ) {
+  const timings = createRetentionReloadTimings()
+  const controllerMarks: Record<string, number> = { startedAt: Date.now() }
+  timings.controller = controllerMarks
   const isolated = await created
+  controllerMarks.contextCreatedAt = Date.now()
   signal.throwIfAborted()
   const page = await isolated.newPage()
   signal.throwIfAborted()
   const runnerOrigin = new URL(context.page.url()).origin
   const entryOrigin = context.project.getProvidedContext().retentionAcceptanceEntryUrl
   await isolated.grantPermissions(['local-network-access'], { origin: runnerOrigin })
+  controllerMarks.permissionsReadyAt = Date.now()
   let reloading = false
   const delayedFonts: { url: string; heldAt: number; releasedAt: number }[] = []
-  const timings = createRetentionReloadTimings()
   const transport = createRetentionReloadTransport(
     {
       run: (observation, operation) =>
@@ -158,7 +184,7 @@ async function performRetentionAcceptanceReload(
     (route) => {
       return transport.run(
         route.request().url(),
-        async (fulfill, headersCompleted) => {
+        async (fulfill, headersCompleted, markHttp) => {
           const request = new URL(route.request().url())
           if (
             reloading &&
@@ -170,16 +196,19 @@ async function performRetentionAcceptanceReload(
             await new Promise<void>((resolve) => setTimeout(resolve, 1000))
             delayedFonts.push({ url: request.href, heldAt, releasedAt: Date.now() })
           }
+          markHttp('headersStartedAt')
           const headers =
             route.request().method() === 'GET'
               ? { ...(await route.request().allHeaders()), connection: 'close' }
               : undefined
           headersCompleted()
           signal.throwIfAborted()
+          markHttp('fetchStartedAt')
           const response = await route.fetch({
             url: new URL(request.pathname + request.search, entryOrigin).href,
             headers,
           })
+          markHttp('fetchCompletedAt')
           await fulfill(() => route.fulfill({ response }))
         },
         () => route.abort('failed'),
@@ -187,6 +216,7 @@ async function performRetentionAcceptanceReload(
     },
   )
   const output = await mkdtemp(join(tmpdir(), 'retention-acceptance-reload-'))
+  controllerMarks.setupReadyAt = Date.now()
   beginRetentionEntryCase(entryOrigin, output, timings)
   const errors: string[] = []
   const pending = new Set<string>()
@@ -202,9 +232,16 @@ async function performRetentionAcceptanceReload(
       error: request.failure()?.errorText ?? null,
     })
   })
-  page.on('console', (message) =>
-    consoleMessages.push({ type: message.type(), text: message.text() }),
-  )
+  page.on('console', (message) => {
+    const type = message.type()
+    const text = message.text()
+    consoleMessages.push({ type, text })
+    observeRetentionReadiness(text, (browser) => {
+      console.info(
+        'RETENTION_READINESS ' + JSON.stringify({ operationId, arm, at: Date.now(), browser }),
+      )
+    })
+  })
   const responses: { readonly url: string; readonly status: number }[] = []
   let phase: RetentionEntryPhase = 'entry'
   page.on('response', (response) =>
@@ -225,7 +262,7 @@ async function performRetentionAcceptanceReload(
       await owner.openFixture()
     }, arm.syntax)
     phase = 'baseline-ready'
-    await waitForRetentionAcceptanceEntry(page)
+    await waitForRetentionAcceptanceEntry(page, 'baseline')
     timings.baselineReadyAt = Date.now()
     const before = await page.evaluate(() => window.__retentionAcceptanceEntry?.capture())
     await page.addInitScript((saved) => {
@@ -320,7 +357,7 @@ async function performRetentionAcceptanceReload(
     await page.reload()
     timings.reloadLoadedAt = Date.now()
     timings.browserTimeOrigin = await page.evaluate(() => performance.timeOrigin)
-    await waitForRetentionAcceptanceEntry(page)
+    await waitForRetentionAcceptanceEntry(page, 'reload')
     timings.reloadReadyAt = Date.now()
     phase = 'code-font-loaded'
     const fontLoadReceipt = await page.evaluate(async () => {
@@ -369,6 +406,7 @@ async function performRetentionAcceptanceReload(
       screenshot,
     }
     if (transport.hasFailure) throw transport.firstError
+    controllerMarks.operationResultReadyAt = Date.now()
     await writeFile(join(output, 'raw.json'), JSON.stringify(result))
     return result
   })()
@@ -488,6 +526,7 @@ async function performRetentionAcceptanceReload(
         ],
         operation,
       )
+      controllerMarks.cleanupReadyAt = Date.now()
       artifactFailures.push(
         ...(await archiveRetentionReloadArtifact(output, 'cleanup.json', {
           phase,
@@ -518,6 +557,13 @@ async function performRetentionAcceptanceReload(
   if (transport.hasFailure) throw transport.firstError
   if (cleanupFailures.length > 0) throw cleanupFailures[0]
   if (artifactFailures.length > 0) throw artifactFailures[0]
+  controllerMarks.returnReadyAt = Date.now()
+  guardRetentionEntryObservation(() =>
+    console.info(
+      'RETENTION_CONTROLLER_TIMING ' +
+        JSON.stringify({ operationId, arm, clock: 'node', marks: controllerMarks }),
+    ),
+  )
   return outcome.result
 }
 
@@ -535,22 +581,42 @@ async function archiveFinalRetentionReloadFrames(
   return archiveRetentionReloadArtifact(output, 'final-raw.json', { ...facts, final })
 }
 
-function waitForRetentionAcceptanceEntry(page: BrowserCommandContext['page']) {
-  return page.waitForFunction(
-    () => {
-      const observation = window.__retentionAcceptanceEntry?.capture()
-      return (
-        observation?.kind === 'mounted' &&
-        observation.views.some((view) => view.kind === 'observed' && view.mismatch === null)
-      )
-    },
-    undefined,
-    { timeout: 15_000 },
-  )
+function waitForRetentionAcceptanceEntry(
+  page: BrowserCommandContext['page'],
+  stage: 'baseline' | 'reload',
+) {
+  return page.waitForFunction(retentionReloadEntryReady, stage, { timeout: 15_000 })
+}
+
+function retentionReloadEntryReady(stage: 'baseline' | 'reload') {
+  const observation = window.__retentionAcceptanceEntry?.capture()
+  const ready =
+    observation?.kind === 'mounted' &&
+    observation.views.some((view) => view.kind === 'observed' && view.mismatch === null)
+  const observe = () => {
+    if (stage !== 'baseline' && stage !== 'reload') return
+    if (typeof ready !== 'boolean') return
+    const at = performance.now()
+    if (typeof at !== 'number' || !Number.isFinite(at) || at < 0) return
+    const state = {
+      stage,
+      observationType: observation === null ? 'null' : typeof observation,
+      ready,
+    }
+    const identity = JSON.stringify(state)
+    if (window.__retentionAcceptanceReadinessState === identity) return
+    window.__retentionAcceptanceReadinessState = identity
+    console.info('RETENTION_READINESS ' + JSON.stringify({ at, clock: 'browser', state }))
+  }
+  try {
+    observe()
+  } catch {}
+  return ready
 }
 
 declare global {
   interface Window {
+    __retentionAcceptanceReadinessState?: string
     __retentionAcceptanceReloadFrames?: readonly ReloadFrame[]
     __retentionAcceptanceReloadCacheReceipt?: {
       readonly priorSavedKeys: readonly string[]
