@@ -1,15 +1,73 @@
-import { strictEqual } from 'node:assert/strict'
+import { ok, strictEqual } from 'node:assert/strict'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
+import { openChat } from './chat-verification'
 
 export const screenshotDrop: Scenario = {
   name: 'screenshot-drop',
   description:
-    'Drop a standard screenshot, a browser-readable raster requiring conversion, and an untyped screenshot into the composer.',
+    'Pick and recover a screenshot, then drop a standard screenshot, a raster requiring conversion, and an untyped screenshot into the composer.',
   async run(page, { step }) {
-    await selectors.workspaceMode(page, 'Chat').click()
+    await openChat(page)
     await selectors.chatNewSession(page).click()
     await selectors.chatMessage(page).waitFor()
+    const screenshot = await page.evaluate(() => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 48
+      canvas.height = 32
+      canvas.getContext('2d')!.fillRect(0, 0, 48, 32)
+      return canvas.toDataURL().split(',')[1]!
+    })
+    await selectors.chatComposerFileInput(page).setInputFiles({
+      name: 'Picked screenshot.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(screenshot, 'base64'),
+    })
+    const picked = selectors.iconHintControl(page, 'Open Picked screenshot.png')
+    await picked.click({ trial: true })
+    await step('picked-screenshot-uploaded')
+    await page.reload()
+    await picked.click({ trial: true })
+    ok(
+      await picked.locator('img').evaluate(async (image) => {
+        if (!(image instanceof HTMLImageElement)) return false
+        await image.decode()
+        return image.naturalWidth > 0
+      }),
+      'The recovered screenshot decodes',
+    )
+    await step('picked-screenshot-recovered')
+    await selectors.iconHintControl(page, 'Remove Picked screenshot.png').click()
+    await page.evaluate(() => {
+      const put = IDBObjectStore.prototype.put
+      IDBObjectStore.prototype.put = function (...args) {
+        IDBObjectStore.prototype.put = put
+        const request = put.apply(this, args)
+        this.transaction.abort()
+        return request
+      }
+    })
+    await selectors.chatComposerFileInput(page).setInputFiles({
+      name: 'Storage failure.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('retry bytes'),
+    })
+    await page.getByText('Upload failed', { exact: true }).waitFor()
+    await page
+      .getByText('The attachment could not be saved for recovery. Remove it and attach it again.', {
+        exact: true,
+      })
+      .waitFor()
+    await step('storage-failure-explained')
+    await selectors.iconHintControl(page, 'Remove Storage failure.txt').click()
+    await selectors.chatComposerFileInput(page).setInputFiles({
+      name: 'Storage failure.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('retry bytes'),
+    })
+    await selectors.iconHintControl(page, 'Open Storage failure.txt').click({ trial: true })
+    await step('storage-failure-retried')
+    await selectors.iconHintControl(page, 'Remove Storage failure.txt').click()
     for (const type of ['image/png', 'image/bmp', '']) {
       const name = type === 'image/bmp' ? 'Screenshot.bmp' : 'Screenshot.png'
       await selectors.chatMessage(page).evaluate(

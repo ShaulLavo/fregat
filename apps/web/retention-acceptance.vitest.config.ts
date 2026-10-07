@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Socket } from 'node:net'
+import type { BrowserContext } from 'playwright'
 import type { HotPayload, Plugin, ViteDevServer } from 'vite'
 import { stripVTControlCharacters } from 'node:util'
 import { createScriptError } from '../../scripts/structured-errors.ts'
@@ -12,6 +13,8 @@ import { errorMessage } from '../../packages/contracts/src/error-fields'
 import base from './vitest.browser.config.ts'
 import {
   createRetentionReloadTransport,
+  createRetentionReloadCases,
+  createRetentionReloadTimings,
   archiveRetentionReloadFailure,
   archiveRetentionReloadArtifact,
   settleRetentionReloadCleanup,
@@ -52,7 +55,11 @@ export default defineConfig(({ mode }) =>
           ),
           browser: {
             ...base.test?.browser,
-            commands: { ...base.test?.browser?.commands, retentionAcceptanceReload },
+            commands: {
+              ...base.test?.browser?.commands,
+              retentionAcceptanceReload,
+              retentionAcceptanceReloadFinish,
+            },
           },
         },
       },
@@ -64,30 +71,94 @@ type ReloadArm = {
   readonly saved: 'present' | 'absent'
 }
 
-async function retentionAcceptanceReload(context: BrowserCommandContext, arm: ReloadArm) {
-  const browser = context.context.browser()
-  if (!browser) throw createScriptError('Retention acceptance isolated browser is unavailable')
-  const isolated = await browser.newContext({
-    colorScheme: 'dark',
-    viewport: { width: 1200, height: 800 },
+const reloadCases = createRetentionReloadCases()
+
+function retentionAcceptanceReloadFinish(context: BrowserCommandContext, operationId: string) {
+  return reloadCases.finish(context, operationId)
+}
+
+function retentionAcceptanceReload(
+  context: BrowserCommandContext,
+  arm: ReloadArm,
+  operationId: string,
+) {
+  return reloadCases.run(context, operationId, (signal) => {
+    const browser = context.context.browser()
+    if (!browser) throw createScriptError('Retention acceptance isolated browser is unavailable')
+    const created = browser.newContext({
+      colorScheme: 'dark',
+      viewport: { width: 1200, height: 800 },
+    })
+    let disposed: Promise<void> | null = null
+    let closed: Promise<void> | null = null
+    const disposeRequests = () =>
+      (disposed ??= created.then(
+        (isolated) => isolated.request.dispose(),
+        () => undefined,
+      ))
+    const closeContext = () =>
+      (closed ??= created.then(
+        (isolated) => isolated.close(),
+        () => undefined,
+      ))
+    return {
+      result: performRetentionAcceptanceReload(
+        context,
+        arm,
+        created,
+        signal,
+        disposeRequests,
+        closeContext,
+      ),
+      close: async () => {
+        const results = await Promise.allSettled([disposeRequests(), closeContext()])
+        const failures = results.filter((result) => result.status === 'rejected')
+        if (failures.length)
+          throw createScriptError('Retention acceptance context cleanup failed', {
+            internal: { count: failures.length },
+          })
+      },
+    }
   })
+}
+
+async function performRetentionAcceptanceReload(
+  context: BrowserCommandContext,
+  arm: ReloadArm,
+  created: Promise<BrowserContext>,
+  signal: AbortSignal,
+  disposeRequests: () => Promise<void>,
+  closeContext: () => Promise<void>,
+) {
+  const isolated = await created
+  signal.throwIfAborted()
   const page = await isolated.newPage()
+  signal.throwIfAborted()
   const runnerOrigin = new URL(context.page.url()).origin
   const entryOrigin = context.project.getProvidedContext().retentionAcceptanceEntryUrl
   await isolated.grantPermissions(['local-network-access'], { origin: runnerOrigin })
   let reloading = false
   const delayedFonts: { url: string; heldAt: number; releasedAt: number }[] = []
-  const transport = createRetentionReloadTransport({
-    run: (observation, operation) =>
-      observeRetentionEntryForward(entryOrigin, output, observation, operation),
-    settled: (observation) => endRetentionEntryForward(entryOrigin, observation),
-  })
+  const timings = createRetentionReloadTimings()
+  const transport = createRetentionReloadTransport(
+    {
+      run: (observation, operation) =>
+        observeRetentionEntryForward(entryOrigin, output, observation, operation),
+      settled: (observation) => endRetentionEntryForward(entryOrigin, observation),
+    },
+    timings,
+  )
+  const stopTransport = () => {
+    transport.stopAdmission()
+    void transport.cancelPending()
+  }
+  signal.addEventListener('abort', stopTransport, { once: true })
   await page.route(
     (url) => url.origin === runnerOrigin,
     (route) => {
       return transport.run(
         route.request().url(),
-        async (fulfill) => {
+        async (fulfill, headersCompleted) => {
           const request = new URL(route.request().url())
           if (
             reloading &&
@@ -99,8 +170,15 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
             await new Promise<void>((resolve) => setTimeout(resolve, 1000))
             delayedFonts.push({ url: request.href, heldAt, releasedAt: Date.now() })
           }
+          const headers =
+            route.request().method() === 'GET'
+              ? { ...(await route.request().allHeaders()), connection: 'close' }
+              : undefined
+          headersCompleted()
+          signal.throwIfAborted()
           const response = await route.fetch({
             url: new URL(request.pathname + request.search, entryOrigin).href,
+            headers,
           })
           await fulfill(() => route.fulfill({ response }))
         },
@@ -109,7 +187,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
     },
   )
   const output = await mkdtemp(join(tmpdir(), 'retention-acceptance-reload-'))
-  beginRetentionEntryCase(entryOrigin, output)
+  beginRetentionEntryCase(entryOrigin, output, timings)
   const errors: string[] = []
   const pending = new Set<string>()
   const consoleMessages: { readonly type: string; readonly text: string }[] = []
@@ -148,6 +226,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
     }, arm.syntax)
     phase = 'baseline-ready'
     await waitForRetentionAcceptanceEntry(page)
+    timings.baselineReadyAt = Date.now()
     const before = await page.evaluate(() => window.__retentionAcceptanceEntry?.capture())
     await page.addInitScript((saved) => {
       const savedKeys = Object.keys(localStorage).filter((key) =>
@@ -239,7 +318,10 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
     phase = 'reload'
     reloading = true
     await page.reload()
+    timings.reloadLoadedAt = Date.now()
+    timings.browserTimeOrigin = await page.evaluate(() => performance.timeOrigin)
     await waitForRetentionAcceptanceEntry(page)
+    timings.reloadReadyAt = Date.now()
     phase = 'code-font-loaded'
     const fontLoadReceipt = await page.evaluate(async () => {
       const font = '13px "JetBrains Mono Variable"'
@@ -258,11 +340,13 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
           document.fonts.check(font),
       }
     })
+    timings.fontReadyAt = Date.now()
     const after = await page.evaluate(() => window.__retentionAcceptanceEntry?.capture())
     const frames = await page.evaluate(() => window.__retentionAcceptanceReloadFrames)
     const cacheReceipt = await page.evaluate(() => window.__retentionAcceptanceReloadCacheReceipt)
     const screenshot = join(output, 'page.png')
     await page.screenshot({ path: screenshot, fullPage: true })
+    timings.screenshotCompleteAt = Date.now()
     const result = {
       arm,
       before,
@@ -270,6 +354,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
       frames,
       cacheReceipt,
       delayedFonts,
+      timings,
       fontLoadReceipt,
       setup: {
         entryOrigin,
@@ -315,6 +400,7 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
         artifactFailures.push(
           ...(await archiveRetentionReloadFailure(output, {
             arm,
+            timings,
             phase,
             pending: [...pending],
             consoleMessages,
@@ -332,74 +418,80 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
       },
     )
     .finally(async () => {
-      const cleanup = await settleRetentionReloadCleanup([
-        {
-          stage: 'restore-syntax',
-          run: async () => {
-            transport.beginRestoration()
-            await page.evaluate(() => window.__retentionAcceptanceEntry?.setSyntaxEnabled(true))
+      const cleanup = await settleRetentionReloadCleanup(
+        [
+          {
+            stage: 'restore-syntax',
+            run: async () => {
+              if (signal.aborted) return
+              transport.beginRestoration()
+              await page.evaluate(() => window.__retentionAcceptanceEntry?.setSyntaxEnabled(true))
+            },
           },
-        },
-        {
-          stage: 'stop-forward-admission',
-          run: async () => {
-            transport.stopAdmission()
+          {
+            stage: 'stop-forward-admission',
+            run: async () => {
+              transport.stopAdmission()
+            },
           },
-        },
-        {
-          stage: 'archive-final-frames',
-          run: async () => {
-            artifactFailures.push(
-              ...(await archiveFinalRetentionReloadFrames(page, output, {
-                phase,
-                transportFailures: transport.failures,
-                transportRequests: transport.requests,
-                requestFailures,
-              })),
-            )
+          {
+            stage: 'archive-final-frames',
+            run: async () => {
+              artifactFailures.push(
+                ...(await archiveFinalRetentionReloadFrames(page, output, {
+                  phase,
+                  timings,
+                  transportFailures: transport.failures,
+                  transportRequests: transport.requests,
+                  requestFailures,
+                })),
+              )
+            },
           },
-        },
-        {
-          stage: 'cancel-forwarding',
-          run: async () => {
-            await transport.cancelPending()
+          {
+            stage: 'cancel-forwarding',
+            run: async () => {
+              await transport.cancelPending()
+            },
           },
-        },
-        {
-          stage: 'dispose-forward-context',
-          run: async () => {
-            forwardContextDisposal = isolated.request.dispose().then(() => {
-              forwardContextDisposed = true
-            })
-            void forwardContextDisposal.catch(() => {})
+          {
+            stage: 'dispose-forward-context',
+            run: async () => {
+              forwardContextDisposal = disposeRequests().then(() => {
+                forwardContextDisposed = true
+              })
+              void forwardContextDisposal.catch(() => {})
+            },
           },
-        },
-        {
-          stage: 'fallback-context-close',
-          run: async () => {
-            if (forwardContextDisposed && !transport.needsContextClose) return
-            await isolated.close()
-            contextClosedAsFallback = true
+          {
+            stage: 'fallback-context-close',
+            run: async () => {
+              if (forwardContextDisposed && !transport.needsContextClose) return
+              await closeContext()
+              contextClosedAsFallback = true
+            },
           },
-        },
-        {
-          stage: 'join-forward-context-disposal',
-          run: async () => {
-            await forwardContextDisposal
+          {
+            stage: 'join-forward-context-disposal',
+            run: async () => {
+              await forwardContextDisposal
+            },
           },
-        },
-        { stage: 'drain-routes', run: () => transport.drain() },
-        {
-          stage: 'unroute',
-          run: async () => {
-            if (!contextClosedAsFallback) await page.unrouteAll({ behavior: 'default' })
+          { stage: 'drain-routes', run: () => transport.drain() },
+          {
+            stage: 'unroute',
+            run: async () => {
+              if (!contextClosedAsFallback) await page.unrouteAll({ behavior: 'default' })
+            },
           },
-        },
-        { stage: 'close-context', run: () => isolated.close() },
-      ])
+          { stage: 'close-context', run: closeContext },
+        ],
+        operation,
+      )
       artifactFailures.push(
         ...(await archiveRetentionReloadArtifact(output, 'cleanup.json', {
           phase,
+          timings,
           requestFailures,
           transportFailures: transport.failures,
           transportRequests: transport.requests,
@@ -415,12 +507,14 @@ async function retentionAcceptanceReload(context: BrowserCommandContext, arm: Re
         .map((result) => result.error)
     })
   if (outcome.kind === 'failure') {
+    signal.removeEventListener('abort', stopTransport)
     endRetentionEntryCase(entryOrigin, output)
     throw outcome.error
   }
   if (transport.hasFailure || cleanupFailures.length > 0 || artifactFailures.length > 0)
     failRetentionEntryCase(entryOrigin, output, phase, transport.failures)
   endRetentionEntryCase(entryOrigin, output)
+  signal.removeEventListener('abort', stopTransport)
   if (transport.hasFailure) throw transport.firstError
   if (cleanupFailures.length > 0) throw cleanupFailures[0]
   if (artifactFailures.length > 0) throw artifactFailures[0]

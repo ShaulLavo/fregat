@@ -6,3 +6,7 @@ export const sessionSearchQueryKeys = {
 export const chatNotificationQueryKeys = {
   sound: (kind: 'input' | 'completion') => ['chat-notification-sound', kind] as const,
 }
+
+export const chatModeViewQueryKeys = {
+  module: ['chat-mode', 'surfaceModule'] as const,
+}

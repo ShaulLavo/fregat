@@ -722,3 +722,125 @@ try{const closed=once(socket,'close');socket.once('timeout',function(){firstRetu
     await rm(output, { recursive: true, force: true })
   }
 })
+
+const selectionModes = [
+  'pooled',
+  'pooled-earlier-first',
+  'pooled-later-first',
+  'destroy-before-selection',
+  'cancel-before-attachment',
+  'reuse-throws',
+  'unobserved-override',
+] as const
+
+test.for(selectionModes)(
+  'socket selection public pooled %s observations preserve native outcomes',
+  async (mode, { skip, annotate }) => {
+    const node = systemNode()
+    if (!node) {
+      skip('System Node is unavailable')
+      return
+    }
+    const output = await mkdtemp(join(tmpdir(), 'retention-socket-selection-control-'))
+    const source = pathToFileURL(
+      join(import.meta.dirname, 'retention-acceptance-socket-provenance.ts'),
+    ).href
+    const script = `import {createServer,request,Agent} from 'node:http';import {Socket} from 'node:net';import {once} from 'node:events';import {readFileSync} from 'node:fs';
+const [output,source,mode]=process.argv.slice(1);const {createRetentionSocketProvenance,snapshotRetentionSocketJournal}=await import(source);let primary;try{JSON.parse('controlled public selection')}catch(error){primary=error}
+const nativeReuse=Agent.prototype.reuseSocket;const originals=[[Agent.prototype,'reuseSocket'],[Socket.prototype,'destroy'],[Socket.prototype,'emit']].map(([target,key])=>({target,key,method:target[key],descriptor:Object.getOwnPropertyDescriptor(target,key)}));
+const server=createServer((req,res)=>res.end('controlled response'));server.listen(0,'127.0.0.1');await once(server,'listening');const port=server.address().port;
+const collector=createRetentionSocketProvenance({side:'client',entryPort:port,normalizePath:path=>path}),other=mode.startsWith('pooled-')?createRetentionSocketProvenance({side:'client',entryPort:port,normalizePath:path=>path}):null;let active=collector;let reuseReceiver=false,reuseArgs=false,selectedSocket,selectedRequest;
+class PublicAgent extends Agent{reuseSocket(socket,req){reuseReceiver=this===agent;reuseArgs=socket instanceof Socket&&req.path==='/second';selectedSocket=socket;selectedRequest=req;if(mode==='unobserved-override')return Reflect.apply(nativeReuse,this,[socket,req]);if(mode==='destroy-before-selection')socket.destroy();if(mode==='reuse-throws'){const ref=socket.ref;socket.ref=function(){throw primary};try{return super.reuseSocket(socket,req)}finally{socket.ref=ref}}const result=super.reuseSocket(socket,req);nativeReturnUndefined=result===undefined;if(mode==='cancel-before-attachment')req.destroy(primary);return result}}
+const agent=new PublicAgent({keepAlive:true,maxSockets:1});let firstSocket,secondSocket,secondError,secondSuccess=false,secondRequest,nativeReturnUndefined=false;
+const run=path=>new Promise((resolve,reject)=>{let req;try{req=request({host:'127.0.0.1',port,path,agent},res=>{res.resume();res.once('end',()=>resolve(req))});req.once('socket',socket=>{if(path==='/first')firstSocket=socket;else secondSocket=socket});req.once('error',reject);req.end()}catch(error){reject(error)}});
+try{const freed=once(agent,'free');await run('/first');await freed;if(mode==='pooled-earlier-first'){collector.close();active=other}if(mode==='pooled-later-first')other.close();
+try{secondRequest=await active.runForward(41,{requestId:72},()=>run('/second'));secondSuccess=true}catch(error){secondError=error}
+await new Promise(resolve=>setImmediate(resolve));const socketClosed=firstSocket.closed?Promise.resolve():once(firstSocket,'close');agent.destroy();firstSocket.destroy();await socketClosed;const summary=snapshotRetentionSocketJournal(active.basename,output,'frozen'),rows=readFileSync(output+'/'+summary.basename,'utf8').trim().split('\\n').map(JSON.parse);collector.close();other?.close();const restored=originals.map(({target,key,method,descriptor})=>({key,method:target[key]===method,descriptor:JSON.stringify(Object.getOwnPropertyDescriptor(target,key))===JSON.stringify(descriptor)}));
+process.stdout.write(JSON.stringify({mode,secondSuccess,secondErrorSame:secondError===primary,errorCode:secondError?.code??null,pooledSame:firstSocket===selectedSocket,reuseReceiver,reuseArgs,secondSocketSame:secondSocket===selectedSocket,nativeReturnUndefined,selectedSocketDestroyed:selectedSocket?.destroyed??null,rows,summary,restored}));
+}finally{collector.close();collector.remove();other?.close();other?.remove();agent.destroy();firstSocket?.destroy();await new Promise(resolve=>server.close(resolve))}`
+    const child = spawn(
+      node,
+      [
+        '--experimental-strip-types',
+        '--disable-warning=ExperimentalWarning',
+        '--input-type=module',
+        '--eval',
+        script,
+        output,
+        source,
+        mode,
+      ],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    const closed = once(child, 'close')
+    let stdout = '',
+      stderr = ''
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString()
+    })
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+    })
+    const timer = setTimeout(() => child.kill('SIGKILL'), 15000)
+    try {
+      const [code, signal] = await closed
+      expect(code, stderr).toBe(0)
+      expect(signal).toBeNull()
+      await annotate('Public pooled selection observation', 'socket-provenance', {
+        body: stdout,
+        bodyEncoding: 'utf-8',
+        contentType: 'application/json',
+      })
+      const result = JSON.parse(stdout)
+      expect(result.pooledSame, stdout).toBe(true)
+      expect(result.reuseReceiver, stdout).toBe(true)
+      expect(result.reuseArgs, stdout).toBe(true)
+      expect(
+        result.restored.every(
+          (x: { method: boolean; descriptor: boolean }) => x.method && x.descriptor,
+        ),
+        stdout,
+      ).toBe(true)
+      const requestRow = result.rows.find(
+        (x: { kind: string; path?: string }) => x.kind === 'request' && x.path === '/second',
+      )
+      const pending = result.rows.find(
+        (x: { kind: string; path?: string }) => x.kind === 'selection' && x.path === '/second',
+      )
+      const observed = requestRow?.selection ?? pending?.selection
+      if (mode === 'unobserved-override') {
+        expect(result.secondSuccess, stdout).toBe(true)
+        expect(requestRow.selection, stdout).toBeNull()
+        expect(requestRow.attachment, stdout).toMatchObject({ destroyed: false, reused: true })
+        return
+      }
+      expect(observed, stdout).toBeDefined()
+      expect(observed.completedAt, stdout).toEqual([
+        expect.any(Number),
+        expect.stringMatching(/^\d+$/),
+      ])
+      expect(observed.outcome, stdout).toBe(mode === 'reuse-throws' ? 'threw' : 'returned')
+      if (mode !== 'reuse-throws') expect(result.nativeReturnUndefined, stdout).toBe(true)
+      expect(observed.destroyedBefore, stdout).toBe(mode === 'destroy-before-selection')
+      if (mode.startsWith('pooled')) {
+        expect(result.secondSuccess, stdout).toBe(true)
+        expect(requestRow.attachment, stdout).toMatchObject({ destroyed: false, reused: true })
+      }
+      if (mode === 'reuse-throws' || mode === 'cancel-before-attachment')
+        expect(result.secondErrorSame, stdout).toBe(true)
+      const socket = result.rows.find(
+        (x: { kind: string; id?: number }) => x.kind === 'socket' && x.id === observed.socketId,
+      )
+      expect(socket.destroyCompletion.outcome, stdout).toBe('returned')
+      expect(socket.destroyCompletion.destroyed, stdout).toBe(true)
+      expect(socket.repeated, stdout).toBe(0)
+      expect(result.summary.partial, stdout).toBe(0)
+      expect(result.summary.coverage.refused, stdout).toBe(0)
+      expect(result.summary.coverage.retainedRecords).toBeLessThanOrEqual(8000)
+      expect(result.summary.coverage.retainedBytes).toBeLessThanOrEqual(2621440)
+    } finally {
+      clearTimeout(timer)
+      await rm(output, { recursive: true, force: true })
+    }
+  },
+)
