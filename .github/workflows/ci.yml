@@ -358,6 +358,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun --bun vitest run scripts/agent/browser-launch.test.ts --environment node
 
+      - name: Scroll highlight range controls
+        if: ${{ !cancelled() }}
+        run: bun --bun vitest run --config vitest.scripts.config.mjs scripts/editor-scroll-benchmark-ranges.test.mjs
+
       - name: Browser resource teardown
         if: ${{ !cancelled() }}
         timeout-minutes: 2

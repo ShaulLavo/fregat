@@ -3,7 +3,10 @@ import { runBrowserTrial as runTrial } from './bench-workspace.mjs'
 import { diagnostic } from './bench-workspace.mjs'
 import { defaultBrowsers } from './bench-workspace.mjs'
 import { resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { createBenchmarkError } from './structured-errors.mjs'
+import { auditHighlightRanges, scrollOverscanRows } from './editor-scroll-benchmark-ranges.mjs'
 import {
   applyCpuThrottle,
   average,
@@ -12,6 +15,7 @@ import {
   fractionOption,
   jumpToScrollFraction,
   measureCpuCalibration,
+  maximum,
   median,
   minimum,
   numberOption,
@@ -28,7 +32,7 @@ const options = parseOptions(process.argv.slice(2))
 
 const gateThresholds = {
   chromium: {
-    maxCssHighlightRanges: 270,
+    maxHighlightRangeViolations: 0,
     // Uncapped frame throughput baseline is ~5ms/frame; 10 leaves ~2x
     // headroom for machine load without letting real regressions hide.
     maxMedianFrameMeanMs: 10,
@@ -38,13 +42,13 @@ const gateThresholds = {
     maxMeanSegmentsTotalMs: 8,
   },
   firefox: {
-    maxCssHighlightRanges: 270,
+    maxHighlightRangeViolations: 0,
     maxBestFrameMeanMs: 30,
     maxMeanRangesCount: 12,
     maxMeanSegmentsCount: 12,
   },
   webkit: {
-    maxCssHighlightRanges: 270,
+    maxHighlightRangeViolations: 0,
     maxBestFrameMeanMs: 60,
     maxMeanRangesCount: 12,
     maxMeanRangesTotalMs: 20,
@@ -54,6 +58,9 @@ const gateThresholds = {
 
 const browserNames = options.browsers.length > 0 ? options.browsers : defaultBrowsers(options.gate)
 const workspace = await createWorkspaceContext(options)
+const source = readFileSync(resolve(workspace.absoluteRootPath, options.filePath), 'utf8')
+const sourceSha256 = createHash('sha256').update(source).digest('hex')
+const sourceLines = options.expectHighlights ? source.split(/\r\n|\r|\n/) : undefined
 const results = {}
 
 for (const browserName of browserNames) {
@@ -147,7 +154,11 @@ async function runTrialInBrowser(browser, browserName, trial, workspace) {
   await applyCpuThrottle(page, browserName, options.cpuThrottle)
   const cpuCalibrationMs = await measureCpuCalibration(page)
   const report = await runScrollSample(page)
-  return trialSample(browserName, trial, report, cpuCalibrationMs)
+  const highlightRangeAudit = await page.evaluate(auditHighlightRanges, {
+    sourceLines,
+    overscanRows: scrollOverscanRows,
+  })
+  return trialSample(browserName, trial, report, cpuCalibrationMs, highlightRangeAudit)
 }
 
 async function runScrollSample(page) {
@@ -177,13 +188,16 @@ async function runScrollSample(page) {
   return report
 }
 
-function trialSample(browserName, trial, report, cpuCalibrationMs) {
+function trialSample(browserName, trial, report, cpuCalibrationMs, highlightRangeAudit) {
   const ranges = diagnostic(report, 'editor.tokenHighlights.ranges')
   const segments = diagnostic(report, 'editor.tokenHighlights.segments')
   return {
     browserName,
     trial,
     cpuCalibrationMs,
+    sourceSha256,
+    highlightRangeAudit,
+    highlightRangeViolations: highlightRangeAudit.violationCount,
     cssHighlightRanges: report.dom.cssHighlightRanges,
     editorRows: report.dom.editorRows,
     frameMaxMs: report.frameStats.maxMs,
@@ -200,6 +214,8 @@ function trialSample(browserName, trial, report, cpuCalibrationMs) {
 function summarizeSamples(samples) {
   return {
     trials: samples.length,
+    sourceSha256,
+    highlightRangeViolations: maximum(samples.map((sample) => sample.highlightRangeViolations)),
     bestFrameMeanMs: minimum(samples.map((sample) => sample.frameMeanMs)),
     cssHighlightRanges: samples.at(-1)?.cssHighlightRanges ?? 0,
     meanCpuCalibrationMs: average(samples.map((sample) => sample.cpuCalibrationMs)),
