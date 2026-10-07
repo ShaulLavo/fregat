@@ -2,6 +2,11 @@ import { performance } from 'node:perf_hooks'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import * as v from 'valibot'
+import {
+  createColdReaderCounters,
+  coldReaderSummary,
+  measureColdReader,
+} from './retention-cold-reader.ts'
 
 const finite = v.pipe(v.number(), v.finite(), v.minValue(0))
 const histogram = v.object({
@@ -165,16 +170,94 @@ type ColdWireCoverage = {
   observerFailures: number
   eofObserved: boolean
 }
+type Readers = ReturnType<typeof createReaders>
+function createReaders() {
+  return {
+    firstStarted: false,
+    suite: { coldWire: createColdReaderCounters(), capture: createColdReaderCounters() },
+    firstCase: { coldWire: createColdReaderCounters(), capture: createColdReaderCounters() },
+  }
+}
+const count = v.pipe(finite, v.integer(), v.maxValue(Number.MAX_SAFE_INTEGER))
+const readerSummarySchema = v.object({
+  chunks: count,
+  bytes: v.nullable(count),
+  byteMissing: count,
+  observedBytes: count,
+  wallMs: v.nullable(finite),
+  wallMissing: count,
+  throws: count,
+  threadUserUs: v.nullable(count),
+  threadSystemUs: v.nullable(count),
+  observedThreadUserUs: v.nullable(count),
+  observedThreadSystemUs: v.nullable(count),
+  cpuSamples: count,
+  cpuMissing: v.object({ unsupported: count, 'observer-refused': count, 'counter-drift': count }),
+  cpuReason: v.nullable(
+    v.picklist(['no-calls', 'unsupported', 'observer-refused', 'counter-drift', 'incomplete']),
+  ),
+})
+const readerPairSchema = v.object({ coldWire: readerSummarySchema, capture: readerSummarySchema })
+const readerSnapshotSchema = v.object({
+  cpuScope: v.literal('current-thread-synchronous-bracket'),
+  wallScope: v.literal('synchronous-read-callback'),
+  firstCaseState: v.picklist(['not-admitted', 'open', 'closed']),
+  suite: readerPairSchema,
+  firstCase: readerPairSchema,
+})
+function firstReaderState(state: Store, readers: Readers) {
+  if (!readers.firstStarted) return 'not-admitted' as const
+  if (state.record?.readerWindowOpen) return 'open' as const
+  return 'closed' as const
+}
+function readerSnapshot() {
+  const state = store(),
+    readers = state.readers
+  if (!readers) return null
+  const value = {
+    cpuScope: 'current-thread-synchronous-bracket',
+    wallScope: 'synchronous-read-callback',
+    firstCaseState: firstReaderState(state, readers),
+    suite: {
+      coldWire: coldReaderSummary(readers.suite.coldWire),
+      capture: coldReaderSummary(readers.suite.capture),
+    },
+    firstCase: {
+      coldWire: coldReaderSummary(readers.firstCase.coldWire),
+      capture: coldReaderSummary(readers.firstCase.capture),
+    },
+  }
+  const parsed = v.safeParse(readerSnapshotSchema, value)
+  return parsed.success ? parsed.output : null
+}
+export function createColdReaderObservation(enabled: boolean) {
+  if (!enabled) return <T>(_kind: 'coldWire' | 'capture', _chunk: Buffer, read: () => T) => read()
+  const state = store(),
+    readers = (state.readers ??= createReaders())
+  if (state.record) readers.firstStarted = true
+  return <T>(kind: 'coldWire' | 'capture', chunk: Buffer, read: () => T) => {
+    if (store() !== state || state.readers !== readers || (state.firstSeen && !state.record))
+      return read()
+    const first = state.record?.readerWindowOpen ? readers.firstCase[kind] : null
+    return measureColdReader(readers.suite[kind], first, chunk, read)
+  }
+}
 type Record = {
   output: string
-  phases: { phase: ColdProfilePhase; cpu: ReturnType<typeof coldCpu>; pendingRequests: number }[]
+  readerWindowOpen: boolean
+  phases: {
+    phase: ColdProfilePhase
+    cpu: ReturnType<typeof coldCpu>
+    pendingRequests: number
+    readers: ReturnType<typeof readerSnapshot>
+  }[]
   browser: v.InferOutput<typeof browserSchema>[]
   server: v.InferOutput<typeof serverSchema> | null
   refused: number
   wire: ColdWireCoverage | null
   observerMs: number
 }
-type Store = { firstSeen: boolean; record: Record | null }
+type Store = { firstSeen: boolean; record: Record | null; readers?: Readers }
 declare global {
   var __retentionColdCost: Store | undefined
 }
@@ -193,6 +276,7 @@ export function beginColdProfile(
     return false
   state.record = {
     output,
+    readerWindowOpen: true,
     phases: [],
     browser: [],
     server: null,
@@ -200,14 +284,22 @@ export function beginColdProfile(
     wire: null,
     observerMs: 0,
   }
+  if (state.readers) state.readers.firstStarted = true
   return true
 }
 export function markColdProfile(phase: ColdProfilePhase, pending = 0) {
   safeColdObserve(() => {
     const record = store().record
-    if (!record || record.phases.length >= 9) return
+    if (!record) return
+    if (phase === 'cancelled' || phase === 'cleanup') record.readerWindowOpen = false
+    if (record.phases.length >= 9) return
     const start = performance.now()
-    record.phases.push({ phase, cpu: coldCpu(), pendingRequests: pending })
+    record.phases.push({
+      phase,
+      cpu: coldCpu(),
+      pendingRequests: pending,
+      readers: readerSnapshot(),
+    })
     record.observerMs += performance.now() - start
   })
 }
@@ -378,6 +470,17 @@ export async function publishColdProfile() {
       },
       ...record,
       output: undefined,
+      readerWindowOpen: undefined,
+      readers: readerSnapshot(),
+      readerObservationReason: !store().readers
+        ? 'unavailable'
+        : readerSnapshot()
+          ? null
+          : 'observer-refused',
+      readerAdmission:
+        'first-case beginColdProfile through cancelled or cleanup-mark entry; helper-lifetime suite; callbacks admitted at invocation',
+      readerCpuLimit:
+        'public thread counter bracket includes clock/counter edges; whole observer overhead unqualified',
       wireComplete: record.wire?.eofObserved
         ? record.wire.discardedBytes === 0 &&
           record.wire.afterEofBytes === 0 &&

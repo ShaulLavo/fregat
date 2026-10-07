@@ -11,7 +11,11 @@ import {
   retentionEntryReceiptTime,
 } from '../factories/retention-acceptance-reload-transport'
 
-import { readColdWire, publishColdProfile } from '../factories/retention-cold-profile'
+import {
+  readColdWire,
+  publishColdProfile,
+  createColdReaderObservation,
+} from '../factories/retention-cold-profile'
 
 const entries = new Map<string, { ready: Promise<() => Promise<void>>; users: number }>()
 
@@ -68,9 +72,12 @@ async function startRetentionAcceptanceFileServer(project: TestProject) {
     guardRetentionEntryObservation(() => note({ kind: 'process-exit', exitCode, signal })),
   )
   const coldWire = readColdWire(process.env.CI === 'true')
+  const observeReader = createColdReaderObservation(process.env.CI === 'true')
   const output: string[] = []
-  server.stdout.on('data', (data: Buffer) => coldWire(data))
-  server.stdout.on('data', (data: Buffer) => capture.read(data, (value) => output.push(value)))
+  server.stdout.on('data', (data: Buffer) => observeReader('coldWire', data, () => coldWire(data)))
+  server.stdout.on('data', (data: Buffer) =>
+    observeReader('capture', data, () => capture.read(data, (value) => output.push(value))),
+  )
   server.stdout.once('end', () => {
     capture.finishWire()
     coldWire.finish()
