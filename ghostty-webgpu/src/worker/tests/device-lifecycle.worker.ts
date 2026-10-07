@@ -6,6 +6,7 @@ export type DeviceLifecycleObservation =
   | { readonly type: 'acquired'; readonly device: number }
   | { readonly type: 'waiting'; readonly device: number }
   | { readonly type: 'destroyed'; readonly device: number }
+  | { readonly type: 'interrupted' }
   | {
       readonly type: 'completed' | 'inspected'
       readonly devices: readonly DeviceLifecycleCounts[]
@@ -16,6 +17,7 @@ const mode = new URL(globalThis.location.href).searchParams.get('lifecycle')
 const devices: DeviceLifecycleCounts[] = []
 const losses: (() => void)[] = []
 const fence = Promise.withResolvers<void>()
+const acquisition = Promise.withResolvers<void>()
 const requestDevice = GPUAdapter.prototype.requestDevice
 GPUAdapter.prototype.requestDevice = async function (descriptor) {
   const device = await requestDevice.call(this, descriptor)
@@ -38,6 +40,8 @@ GPUAdapter.prototype.requestDevice = async function (descriptor) {
   }
   devices.push(counts)
   channel.postMessage({ type: 'acquired', device: counts.device })
+  if (mode === 'initial-held' || (mode === 'replacement-held' && identity === 1))
+    await acquisition.promise
   return device
 }
 
@@ -46,7 +50,8 @@ if (mode === 'setup-failed')
     throw new DOMException('Fixture canvas configuration failed', 'OperationError')
   }
 
-channel.onmessage = ({ data }: MessageEvent<'release' | 'lose' | 'inspect'>) => {
+channel.onmessage = ({ data }: MessageEvent<'release' | 'lose' | 'inspect' | 'acquire'>) => {
+  if (data === 'acquire') acquisition.resolve()
   if (data === 'release') fence.resolve()
   if (data === 'lose') losses.at(-1)?.()
   if (data === 'inspect') channel.postMessage({ type: 'inspected', devices })
@@ -63,6 +68,8 @@ scope.onmessage = (event) => {
   port.addEventListener('message', ({ data }: MessageEvent<WorkerRequest>) => {
     if (data.command === 'open') opening = data.id
     if (data.command === 'dispose') disposing = data.id
+    if (mode === 'initial-held' && data.generation !== event.data.generation)
+      queueMicrotask(() => channel.postMessage({ type: 'interrupted' }))
   })
   const send = port.postMessage.bind(port)
   port.postMessage = (message: WorkerMessage) => {
