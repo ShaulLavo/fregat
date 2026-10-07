@@ -102,6 +102,7 @@ it.each([
   'normal',
   'recovered',
   'held',
+  'rejected-held',
   'retired-held',
   'replacement-held',
   'rejected',
@@ -186,11 +187,21 @@ it.each([
           ],
         })
       }
-      if (mode === 'held' || mode === 'retired-held') {
+      if (mode === 'held' || mode === 'rejected-held') {
         await eventually(() => observations.some((value) => value.type === 'waiting'))
+        channel.postMessage('inspect')
+        await eventually(() =>
+          observations.some((value) => value.type === 'inspected' || value.type === 'completed'),
+        )
+        console.info('Packaged worker pending queue fence', JSON.stringify(observations))
         expect(observations.some((value) => value.type === 'completed')).toBe(false)
-        channel.postMessage('release')
+        expect(observations.find((value) => value.type === 'inspected')).toEqual({
+          type: 'inspected',
+          devices: [{ device: 0, waits: 1, destroys: 0 }],
+        })
       }
+      if (mode === 'held' || mode === 'rejected-held' || mode === 'retired-held')
+        channel.postMessage('release')
       await disposal
       await terminal.dispose()
       await eventually(() => observations.some((value) => value.type === 'completed'))

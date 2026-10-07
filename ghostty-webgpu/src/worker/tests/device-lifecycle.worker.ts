@@ -23,15 +23,15 @@ GPUAdapter.prototype.requestDevice = async function (descriptor) {
   const device = await requestDevice.call(this, descriptor)
   const identity = devices.length
   losses.push(device.destroy.bind(device))
+  if (mode === 'rejected' || mode === 'rejected-held')
+    device.queue.onSubmittedWorkDone = () =>
+      Promise.reject(new DOMException('Fixture queue fence rejected', 'OperationError'))
   const wait = device.queue.onSubmittedWorkDone.bind(device.queue)
-  if (mode === 'held' || (mode === 'retired-held' && identity === 0))
+  if (mode === 'held' || mode === 'rejected-held' || (mode === 'retired-held' && identity === 0))
     device.queue.onSubmittedWorkDone = () => {
       channel.postMessage({ type: 'waiting', device: identity })
       return Promise.all([wait(), fence.promise]).then(() => undefined)
     }
-  if (mode === 'rejected')
-    device.queue.onSubmittedWorkDone = () =>
-      Promise.reject(new DOMException('Fixture queue fence rejected', 'OperationError'))
   const counts = observeDevice(device, identity)
   const destroy = device.destroy.bind(device)
   device.destroy = () => {
