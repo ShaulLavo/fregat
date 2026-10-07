@@ -20,7 +20,7 @@ export function ChatInputDictationStatus({
   }, [voice.preview, voice.pending, voice.phase])
 
   if (!voice.pending) return null
-  let label = 'Preparing microphone…'
+  let label = 'Starting microphone…'
   if (voice.phase === 'recording') label = 'Listening…'
   if (voice.phase === 'transcribing') label = 'Transcribing…'
   const seconds = voice.elapsedSeconds
