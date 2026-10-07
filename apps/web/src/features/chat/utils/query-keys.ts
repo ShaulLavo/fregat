@@ -94,3 +94,7 @@ export const machineCapacityKeys = {
   resources: (environmentId: EnvironmentId, origin: string) =>
     ['chat', 'machine-capacity', environmentId, origin] as const,
 }
+
+export const chatPanelQueryKeys = {
+  module: ['chat', 'sidePanelModule'] as const,
+}

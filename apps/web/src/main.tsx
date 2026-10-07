@@ -17,6 +17,7 @@ import { EmptyState } from '@workspace/ui/components/empty-state'
 import { createBootError } from '@/lib/structured-errors'
 import { reportClientError } from '@/lib/client-error-reporting'
 import { createRoot } from 'react-dom/client'
+import { createRenderer } from '@/state/renderer'
 
 // Production tree shaking can skip the editor barrels that import these styles.
 import '@singapore-editor/core/style.css'
@@ -117,7 +118,19 @@ const restoredWorkspace = bootstrap
   .getState()
   .application?.getSnapshot()
   .editor.workspaceStore.getState()
-if (import.meta.hot) import.meta.hot.dispose(() => bootstrap.dispose())
+const renderer = createRenderer()
+function dispose() {
+  renderer.dispose()
+  bootstrap.dispose()
+}
+const hot = import.meta.hot
+if (hot) {
+  hot.on('vite:beforeFullReload', dispose)
+  hot.dispose(() => {
+    hot.off('vite:beforeFullReload', dispose)
+    dispose()
+  })
+}
 // Not a top-level await: the lazy chunks the boot waits on import this module's chunk, and would
 // wait on its evaluation forever.
 void start().catch((cause: unknown) => {
@@ -128,7 +141,8 @@ void start().catch((cause: unknown) => {
     message: error.message,
     cause: error,
   })
-  createRoot(document.getElementById('root')!).render(
+  renderer.render(
+    () => createRoot(document.getElementById('root')!),
     <EmptyState
       className='h-dvh'
       tone='error'
@@ -146,6 +160,7 @@ async function start() {
     await import('@/lib/pairing/state/claim-at-boot')
       .then(({ claimAtBoot }) => claimAtBoot(pairingCode))
       .catch(() => undefined)
+  if (renderer.disposed) return
   // The boot script already preloads the chosen shell's chunks; this evaluates them before the first render.
   const kind = useShellStore.getState().kind
   const warmViews: Promise<unknown>[] = [
@@ -191,18 +206,21 @@ async function start() {
       ).catch(() => null),
     )
   await Promise.all(warmViews)
+  if (renderer.disposed) return
 
-  createRoot(document.getElementById('root')!, {
-    onCaughtError: (error, errorInfo) => {
-      reportReactError({ error, errorInfo, kind: 'caught' })
-    },
-    onRecoverableError: (error, errorInfo) => {
-      reportReactError({ error, errorInfo, kind: 'recoverable' })
-    },
-    onUncaughtError: (error, errorInfo) => {
-      reportReactError({ error, errorInfo, kind: 'uncaught' })
-    },
-  }).render(
+  renderer.render(
+    () =>
+      createRoot(document.getElementById('root')!, {
+        onCaughtError: (error, errorInfo) => {
+          reportReactError({ error, errorInfo, kind: 'caught' })
+        },
+        onRecoverableError: (error, errorInfo) => {
+          reportReactError({ error, errorInfo, kind: 'recoverable' })
+        },
+        onUncaughtError: (error, errorInfo) => {
+          reportReactError({ error, errorInfo, kind: 'uncaught' })
+        },
+      }),
     <StrictMode>
       <LoggingErrorBoundary>
         <NavigationProvider navigation={navigation}>
@@ -217,6 +235,7 @@ async function start() {
   sampleStartupFrameCadence()
 
   window.launchQueue?.setConsumer(({ targetURL }) => {
+    if (renderer.disposed) return
     window.focus()
     const href = launchAddress(targetURL, new URL(import.meta.env.BASE_URL, location.href).href)
     if (!href || href === `${location.pathname}${location.search}${location.hash}`) return
@@ -230,6 +249,7 @@ async function start() {
 
 // Warm closed views on idle. A failed prefetch is silent: the query retries when opened.
 function prefetchDeferredChunks() {
+  if (renderer.disposed) return
   if (useShellStore.getState().kind === 'phone') return
   void resourceQueryClient
     .query(paletteContentQueryOptions)

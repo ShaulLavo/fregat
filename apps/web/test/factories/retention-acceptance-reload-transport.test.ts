@@ -3,14 +3,18 @@ import { server as requestInterceptor } from '../msw/server'
 import { request as playwrightRequest } from 'playwright'
 import { createServer } from 'node:http'
 import { EventEmitter, once } from 'node:events'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-import { mkdtemp, readFile, rm, mkdir, readdir } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, mkdir, readdir, open } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, join } from 'node:path'
 import { test, expect } from '../fixtures'
+import { createScriptError } from '../../../../scripts/structured-errors'
 import {
   createRetentionReloadTransport,
+  createRetentionReloadCases,
+  createRetentionReloadTimings,
   archiveRetentionReloadFailure,
   archiveRetentionReloadArtifact,
   settleRetentionReloadCleanup,
@@ -28,6 +32,341 @@ import {
   failRetentionEntryCase,
   endRetentionEntryCase,
 } from './retention-acceptance-reload-transport'
+
+function controlRuntime(runtime: string) {
+  const name = process.platform === 'win32' ? runtime + '.exe' : runtime
+  const candidates = [
+    process.execPath,
+    ...(process.env.PATH ?? '').split(delimiter).map((directory) => join(directory, name)),
+  ]
+  for (const candidate of candidates) {
+    if (!existsSync(candidate)) continue
+    const result = spawnSync(
+      candidate,
+      ['--eval', 'process.stdout.write(process.versions.bun ? "bun" : "node")'],
+      { encoding: 'utf8' },
+    )
+    if (result.status === 0 && result.stdout === runtime) return candidate
+  }
+  return null
+}
+
+test('caller cancellation alone leaves an old pending forward unsettled', async () => {
+  const owner = createRetentionReloadTransport()
+  let release = () => {}
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let settled = false
+  const operation = owner.run(
+    '/pending-source',
+    () => waiting,
+    async () => {},
+  )
+  void operation.then(() => {
+    settled = true
+  })
+  await owner.cancelPending()
+  await Promise.resolve()
+  expect(settled).toBe(false)
+  release()
+  await owner.drain()
+  expect(settled).toBe(true)
+})
+
+test.each(['headers', 'source', 'font', 'fulfillment', 'screenshot'])(
+  'caller finish closes and settles only its pending %s operation',
+  async (phase) => {
+    const cases = createRetentionReloadCases()
+    const consumer = { sessionId: 'owned-consumer', testPath: 'reload' }
+    const id = crypto.randomUUID()
+    const owner = createRetentionReloadTransport()
+    const primary = createScriptError('Controlled external wait closed', { internal: { phase } })
+    let rejectWait = (_error: unknown) => {}
+    const waiting = new Promise<void>((_resolve, reject) => {
+      rejectWait = reject
+    })
+    let closes = 0
+    let lateWork = 0
+    const operation = cases.run(consumer, id, (signal) => {
+      signal.addEventListener(
+        'abort',
+        () => {
+          owner.stopAdmission()
+          void owner.cancelPending()
+        },
+        { once: true },
+      )
+      const forward = owner.run(
+        '/controlled-wait',
+        async (fulfill) => {
+          if (phase === 'fulfillment') await fulfill(() => waiting)
+          else await waiting
+          lateWork++
+        },
+        async () => {},
+      )
+      return {
+        result: owner.race(forward).finally(() => owner.drain()),
+        close: async () => {
+          closes++
+          rejectWait(primary)
+        },
+      }
+    })
+    const observed = operation.catch((error: unknown) => error)
+    await Promise.all([cases.finish(consumer, id), cases.finish(consumer, id)])
+    expect(closes).toBe(1)
+    expect(lateWork).toBe(0)
+    expect(owner.requests[0]?.terminal?.kind).toBe('cancelled')
+    expect(owner.requests[0]?.settlement?.kind).toBe('failed')
+    expect(cases.activeCount).toBe(0)
+    await cases.finish(consumer, id)
+    expect(closes).toBe(1)
+    await observed
+  },
+)
+
+test('caller finish preserves a live peer and rejects foreign ownership', async () => {
+  const cases = createRetentionReloadCases()
+  const owner = { sessionId: 'one', testPath: 'reload' }
+  const peer = { sessionId: 'two', testPath: 'reload' }
+  const id = crypto.randomUUID()
+  const peerId = crypto.randomUUID()
+  let release = () => {}
+  let peerRelease = () => {}
+  let closed = 0
+  let peerClosed = 0
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const peerWaiting = new Promise<void>((resolve) => {
+    peerRelease = resolve
+  })
+  const operation = cases.run(owner, id, () => ({
+    result: waiting,
+    close: async () => {
+      closed++
+      release()
+    },
+  }))
+  const other = cases.run(peer, peerId, () => ({
+    result: peerWaiting,
+    close: async () => {
+      peerClosed++
+      peerRelease()
+    },
+  }))
+  expect(() => cases.finish(peer, id)).toThrow()
+  await cases.finish(owner, id)
+  await operation
+  expect(closed).toBe(1)
+  expect(peerClosed).toBe(0)
+  expect(cases.activeCount).toBe(1)
+  await cases.finish(peer, peerId)
+  await other
+  expect(peerClosed).toBe(1)
+  expect(cases.activeCount).toBe(0)
+})
+
+test('caller lifecycle preserves primary failure and qualifies secondary cleanup', async () => {
+  const cases = createRetentionReloadCases()
+  const owner = { sessionId: 'failure', testPath: 'reload' }
+  const id = crypto.randomUUID()
+  const primary = createScriptError('Controlled reload failed', {
+    internal: { phase: 'operation' },
+  })
+  const secondary = createScriptError('Controlled close failed', { internal: { phase: 'close' } })
+  let closes = 0
+  const operation = cases.run(owner, id, () => ({
+    result: Promise.reject(primary),
+    close: async () => {
+      closes++
+      throw secondary
+    },
+  }))
+  await expect(operation).rejects.toBe(primary)
+  await expect(cases.finish(owner, id)).rejects.toBeDefined()
+  expect(closes).toBe(1)
+  expect(cases.activeCount).toBe(0)
+  await cases.finish(owner, id)
+})
+
+test.each(['fulfilled', 'rejected'])(
+  'caller finish joins an independent %s main body after a separate fatal forward',
+  async (settlement) => {
+    const cases = createRetentionReloadCases()
+    const owner = { sessionId: 'independent-main', testPath: 'reload' }
+    const id = crypto.randomUUID()
+    const transport = createRetentionReloadTransport()
+    const primary = createScriptError('Controlled separate forward failed', {
+      internal: { phase: 'forward' },
+    })
+    const secondary = createScriptError('Controlled independent main failed', {
+      internal: { phase: 'main-body' },
+    })
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let mainSettled = false
+    let finished = false
+    let lateWork = 0
+    let closes = 0
+    let closed: Promise<void> | null = null
+    const close = () =>
+      (closed ??= Promise.resolve().then(() => {
+        closes++
+      }))
+    let cleanup: Awaited<ReturnType<typeof settleRetentionReloadCleanup>> = []
+    const result = cases.run(owner, id, () => {
+      const main = gate.then(() => {
+        if (finished) lateWork++
+        mainSettled = true
+        if (settlement === 'rejected') throw secondary
+      })
+      void transport.run(
+        '/fatal-forward',
+        async () => {
+          throw primary
+        },
+        async () => {},
+      )
+      const performed = (async () => {
+        let failure: unknown
+        try {
+          await transport.race(main)
+        } catch (error) {
+          failure = error
+        }
+        cleanup = await settleRetentionReloadCleanup(
+          [
+            { stage: 'stop', run: async () => transport.stopAdmission() },
+            { stage: 'cancel', run: () => transport.cancelPending() },
+            { stage: 'close-context', run: close },
+            { stage: 'drain-routes', run: () => transport.drain() },
+          ],
+          main,
+        )
+        throw failure
+      })()
+      return { result: performed, close }
+    })
+    const observedPrimary = result.catch((error: unknown) => error)
+    const finishing = cases.finish(owner, id).then(() => {
+      finished = true
+    })
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(finished).toBe(false)
+    expect(mainSettled).toBe(false)
+    expect(cases.activeCount).toBe(1)
+    expect(closes).toBe(1)
+    release()
+    await finishing
+    expect(await observedPrimary).toBe(primary)
+    expect(mainSettled).toBe(true)
+    expect(lateWork).toBe(0)
+    expect(cases.activeCount).toBe(0)
+    expect(closes).toBe(1)
+    expect(cleanup.find((outcome) => outcome.stage === 'join-main-operation')?.error).toBe(
+      settlement === 'rejected' ? secondary : null,
+    )
+  },
+)
+
+test('normal caller completion closes once and timing stays in the existing case cell', async () => {
+  const cases = createRetentionReloadCases()
+  const owner = { sessionId: 'normal', testPath: 'reload' }
+  const id = crypto.randomUUID()
+  let closes = 0
+  const operation = cases.run(owner, id, () => ({
+    result: Promise.resolve('ready'),
+    close: async () => {
+      closes++
+    },
+  }))
+  await expect(operation).resolves.toBe('ready')
+  await cases.finish(owner, id)
+  expect(closes).toBe(1)
+  const timings = createRetentionReloadTimings()
+  expect(timings.reloadLoadedAt).toBeNull()
+  const capture = createRetentionEntryCapture()
+  capture.begin('/timing-cell', timings)
+  const initial = capture.inspect()
+  const transport = createRetentionReloadTransport(undefined, timings)
+  await transport.run(
+    '/first',
+    async (_fulfill, headersCompleted) => {
+      headersCompleted()
+    },
+    async () => {},
+  )
+  await transport.run(
+    '/second',
+    async (_fulfill, headersCompleted) => {
+      headersCompleted()
+    },
+    async () => {},
+  )
+  timings.baselineReadyAt = Number.MAX_SAFE_INTEGER
+  timings.reloadLoadedAt = Number.MAX_SAFE_INTEGER
+  timings.reloadReadyAt = Number.MAX_SAFE_INTEGER
+  timings.fontReadyAt = Number.MAX_SAFE_INTEGER
+  timings.screenshotCompleteAt = Number.MAX_SAFE_INTEGER
+  timings.browserTimeOrigin = Number.MAX_SAFE_INTEGER
+  expect(timings.headersCompleted?.requestId).toBe(2)
+  timings.headersCompleted = {
+    requestId: Number.MAX_SAFE_INTEGER,
+    at: Number.MAX_SAFE_INTEGER,
+  }
+  expect(Buffer.byteLength(JSON.stringify(timings))).toBeLessThan(
+    retentionEntryReceiptLimits.recordBytes,
+  )
+  expect(capture.inspect().retainedBytes).toBe(initial.retainedBytes)
+  expect(capture.inspect().retainedRecords).toBe(initial.retainedRecords)
+  expect(initial.retainedBytes).toBeLessThanOrEqual(retentionEntryReceiptLimits.bytes)
+  capture.end('/timing-cell')
+  capture.dispose()
+})
+
+test.for([false, true])('entry archives preserve optional timing facts $0', async (withTimings) => {
+  const output = await mkdtemp(join(tmpdir(), 'retention-entry-timing-'))
+  const capture = createRetentionEntryCapture()
+  const timings = withTimings ? createRetentionReloadTimings() : undefined
+  if (timings) {
+    timings.headersCompleted = { requestId: 7, at: 13 }
+    timings.baselineReadyAt = 17
+    timings.reloadLoadedAt = 18
+    timings.reloadReadyAt = 19
+    timings.fontReadyAt = 23
+    timings.screenshotCompleteAt = 29
+    timings.browserTimeOrigin = 31
+  }
+  const frozenTimings = timings && { ...timings }
+  try {
+    capture.begin(output, timings)
+    expect(await capture.fail(output, 'reload')).toEqual({ status: 'written', codes: [] })
+    if (timings) {
+      timings.reloadLoadedAt = 41
+      timings.screenshotCompleteAt = 37
+    }
+    capture.end(output)
+    expect(await capture.persistFailures()).toEqual([{ status: 'written', codes: [] }])
+    for (const name of ['entry-transport.frozen.json', 'entry-transport.json']) {
+      const packet: unknown = JSON.parse(await readFile(join(output, name), 'utf8'))
+      expect(packet).toMatchObject({ version: 2, phase: 'reload' })
+      if (withTimings) expect(packet).toHaveProperty('timings', frozenTimings)
+      if (!withTimings) expect(packet).not.toHaveProperty('timings')
+    }
+    expect((await readdir(output)).sort()).toEqual([
+      'entry-transport.frozen.json',
+      'entry-transport.json',
+    ])
+  } finally {
+    capture.dispose()
+    await rm(output, { recursive: true, force: true })
+  }
+})
 
 test('socket reset fails the owning reload command, retains raw evidence, and attempts every cleanup', async ({
   annotate,
@@ -958,7 +1297,12 @@ test.for(
   ),
 )(
   'review F1 $runtime diagnostic writer $mode preserves primary and bounds queued metadata',
-  async ({ runtime, mode }) => {
+  async ({ runtime, mode }, { skip }) => {
+    const executable = controlRuntime(runtime)
+    if (!executable) {
+      skip(`System ${runtime} is unavailable`)
+      return
+    }
     const source = pathToFileURL(
       join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
     ).href
@@ -973,7 +1317,7 @@ test.for(
             script,
           ]
         : ['--eval', script]
-    const child = spawn(runtime, args, {
+    const child = spawn(executable, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     const closed = once(child, 'close')
@@ -1250,6 +1594,142 @@ const wireControlCoverage = {
   code: null,
 }
 
+test.for(['partial', 'rejected'])(
+  'Bun entry output keeps incomplete %s completion unavailable',
+  async (mode, { skip }) => {
+    const executable = controlRuntime('bun')
+    if (!executable) {
+      skip('System Bun is unavailable')
+      return
+    }
+    const source = pathToFileURL(
+      join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
+    ).href
+    const script = `import {writeRetentionEntryReceipt,retentionEntryReceiptTime} from ${JSON.stringify(source)};
+const primary=(()=>{try{JSON.parse('controlled primary')}catch(error){return error}})();Object.assign(primary,{code:'EPIPE'});let calls=0;
+Bun.write=(_target,encoded)=>{calls++;return ${mode === 'partial' ? 'Promise.resolve(encoded.byteLength-1)' : 'Promise.reject(primary)'}};
+const event={...retentionEntryReceiptTime(),kind:'request',socketId:1,path:'/controlled.ts',method:'GET'};let writer;
+for(let requestId=1;requestId<=3;requestId++)writer=writeRetentionEntryReceipt({...event,requestId});await new Promise(setImmediate);writer.write({...event,requestId:4});
+let observed;try{throw primary}catch(error){observed=error}process.stderr.write(JSON.stringify({calls,identity:observed===primary,state:writer.inspect()}));`
+    const child = spawn(executable, ['--eval', script], { stdio: ['ignore', 'pipe', 'pipe'] })
+    const closed = once(child, 'close')
+    let stderr = ''
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+    })
+    const [code, signal] = await closed
+    child.stdout.destroy()
+    expect(code).toBe(0)
+    expect(signal).toBeNull()
+    expect(JSON.parse(stderr)).toMatchObject({
+      calls: 1,
+      identity: true,
+      state: {
+        unavailable: true,
+        code: mode === 'partial' ? 'EIO' : 'EPIPE',
+        pendingBytes: 0,
+        queuedRecords: 0,
+        dropped: 4,
+        refused: 0,
+        countersExact: true,
+      },
+    })
+  },
+)
+
+test.for(['node', 'bun'])(
+  'entry output preserves the primary for unsupported regular-file $0 output',
+  async (runtime, { skip }) => {
+    const executable = controlRuntime(runtime)
+    if (!executable) {
+      skip(`System ${runtime} is unavailable`)
+      return
+    }
+    const output = await mkdtemp(join(tmpdir(), 'retention-output-kind-'))
+    const path = join(output, 'output')
+    const file = await open(path, 'w')
+    try {
+      const source = pathToFileURL(
+        join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
+      ).href
+      const script = `import {writeRetentionEntryReceipt,retentionEntryReceiptTime} from ${JSON.stringify(source)};
+const primary=(()=>{try{JSON.parse('controlled primary')}catch(error){return error}})();let observed;try{throw primary}catch(error){observed=error}
+const writer=writeRetentionEntryReceipt({...retentionEntryReceiptTime(),kind:'socket-open',socketId:1,port:52865});process.stderr.write(JSON.stringify({unavailable:writer===undefined,identity:observed===primary}));`
+      const child = spawn(executable, ['--experimental-strip-types', '--eval', script], {
+        stdio: ['ignore', file.fd, 'pipe'],
+      })
+      const closed = once(child, 'close')
+      let stderr = ''
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString()
+      })
+      const [code, signal] = await closed
+      expect(code).toBe(0)
+      expect(signal).toBeNull()
+      expect(JSON.parse(stderr)).toEqual({ unavailable: true, identity: true })
+      expect(await readFile(path, 'utf8')).toBe('')
+    } finally {
+      await file.close()
+      await rm(output, { recursive: true, force: true })
+    }
+  },
+)
+
+test.for(['node', 'bun'])(
+  'parent stop terminates the pending $0 entry output',
+  async (runtime, { skip, annotate }) => {
+    const executable = controlRuntime(runtime)
+    if (!executable) {
+      skip(`System ${runtime} is unavailable`)
+      return
+    }
+    const source = pathToFileURL(
+      join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
+    ).href
+    const script = `import {writeRetentionEntryReceipt,retentionEntryReceiptTime,retentionEntryBudget} from ${JSON.stringify(source)};let writer;
+for(let requestId=1;requestId<=80;requestId++)writer=writeRetentionEntryReceipt({...retentionEntryReceiptTime(),kind:'request',requestId,socketId:1,path:'/'+'"'.repeat(1023),method:'GET'});
+for(let turn=0;turn<retentionEntryBudget.producer.factCells;turn++)await new Promise(setImmediate);
+process.stderr.write(JSON.stringify({runtime:process.versions.bun?'bun':'node',state:writer.inspect(),listeners:process.stdout.listenerCount('error')})+String.fromCharCode(10));await new Promise(()=>{});`
+    const child = spawn(executable, ['--experimental-strip-types', '--eval', script], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    const closed = once(child, 'close')
+    let stderr = ''
+    let markReady = () => {}
+    const ready = new Promise<void>((resolve) => {
+      markReady = resolve
+    })
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+      if (stderr.includes('\n')) markReady()
+    })
+    const timer = setTimeout(() => child.kill('SIGKILL'), 15000)
+    try {
+      await Promise.race([ready, closed])
+      const facts = JSON.parse(stderr)
+      expect(facts).toMatchObject({
+        runtime,
+        listeners: 0,
+        state: { unavailable: false, dropped: 16, pendingRecords: 1 },
+      })
+      expect(facts.state.pendingBytes).toBeGreaterThan(0)
+      expect(facts.state.retainedBytes).toBeLessThanOrEqual(retentionEntryBudget.producer.bytes)
+      expect(facts.state.retainedRecords).toBeLessThanOrEqual(retentionEntryBudget.producer.records)
+      expect(child.kill('SIGTERM')).toBe(true)
+      const [code, signal] = await closed
+      expect(code).toBeNull()
+      expect(signal).toBe('SIGTERM')
+      expect(child.exitCode).toBeNull()
+      expect(child.signalCode).toBe('SIGTERM')
+      await annotate(JSON.stringify({ executable, facts, code, signal }), 'writer-owned-stop')
+    } finally {
+      clearTimeout(timer)
+      child.stdout.destroy()
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+    }
+  },
+)
+
 function entryControlFrame(event: unknown, sequence = 1) {
   return {
     version: 2,
@@ -1272,7 +1752,12 @@ test.for(
   ),
 )(
   'writer v2 $runtime $mode retains FIFO facts and explicit bounded loss',
-  async ({ runtime, mode }, { annotate }) => {
+  async ({ runtime, mode }, { annotate, skip }) => {
+    const executable = controlRuntime(runtime)
+    if (!executable) {
+      skip(`System ${runtime} is unavailable`)
+      return
+    }
     const source = pathToFileURL(
       join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
     ).href
@@ -1299,7 +1784,7 @@ setTimeout(()=>{process.stderr.write(JSON.stringify({state:writer.inspect(),peak
             script,
           ]
         : ['--eval', script]
-    const child = spawn(runtime, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(executable, args, { stdio: ['ignore', 'pipe', 'pipe'] })
     const closed = once(child, 'close')
     const capture = createRetentionEntryCapture()
     const chunks: Buffer[] = []
@@ -1377,6 +1862,7 @@ setTimeout(()=>{process.stderr.write(JSON.stringify({state:writer.inspect(),peak
     await annotate(
       JSON.stringify({
         runtime,
+        executable,
         mode,
         facts,
         delivered: delivered.length,
@@ -1648,7 +2134,12 @@ test.for(['claimed-loss', 'observed-regression'] as const)(
 
 test.for(['node', 'bun'] as const)(
   'writer boundary R2 %s refusal arithmetic leaves later facts encodable',
-  async (runtime) => {
+  async (runtime, { skip }) => {
+    const executable = controlRuntime(runtime)
+    if (!executable) {
+      skip(`System ${runtime} is unavailable`)
+      return
+    }
     const source = pathToFileURL(
       join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
     ).href
@@ -1667,7 +2158,7 @@ process.stderr.write(JSON.stringify({state:writer.inspect(),primaryIdentity:seen
             script,
           ]
         : ['--eval', script]
-    const child = spawn(runtime, args, { stdio: ['ignore', 'pipe', 'pipe'] }),
+    const child = spawn(executable, args, { stdio: ['ignore', 'pipe', 'pipe'] }),
       closed = once(child, 'close'),
       capture = createRetentionEntryCapture()
     const chunks: Buffer[] = []
@@ -1908,7 +2399,12 @@ test('writer boundary R2 exact category totals refuse arithmetic overflow', () =
 
 test.for(['node', 'bun'] as const)(
   'writer boundary R2 %s schema faults report explicit unavailability',
-  async (runtime) => {
+  async (runtime, { skip }) => {
+    const executable = controlRuntime(runtime)
+    if (!executable) {
+      skip(`System ${runtime} is unavailable`)
+      return
+    }
     const source = pathToFileURL(
       join(import.meta.dirname, 'retention-acceptance-reload-transport.ts'),
     ).href
@@ -1926,7 +2422,7 @@ process.stderr.write(JSON.stringify(writer.inspect()));`
             script,
           ]
         : ['--eval', script]
-    const child = spawn(runtime, args, { stdio: ['ignore', 'pipe', 'pipe'] }),
+    const child = spawn(executable, args, { stdio: ['ignore', 'pipe', 'pipe'] }),
       closed = once(child, 'close')
     let stderr = '',
       stdout = ''

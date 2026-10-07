@@ -14,6 +14,7 @@ import { editorSavedSnapshot } from './editor-saved-snapshot'
 import { sessionNoFlicker } from './session-no-flicker'
 import { restNoFlicker } from './rest-no-flicker'
 import { deferredDialogs } from './deferred-dialogs'
+import { deferredChat } from './deferred-chat'
 import { dialogEscape } from './dialog-escape'
 import { rootSwitchNoFlicker } from './root-switch-no-flicker'
 import { turnFilesNoFlicker } from './turn-files-no-flicker'
@@ -781,6 +782,7 @@ export const scenarios: readonly Scenario[] = [
   settingsStreamGiveUp,
   startupFailure,
   deferredDialogs,
+  deferredChat,
   dialogEscape,
   projectMenu,
   workspaceSwitch,

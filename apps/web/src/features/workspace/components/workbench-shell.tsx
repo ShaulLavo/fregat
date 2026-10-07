@@ -1,4 +1,4 @@
-import { ChatModeSurfaceView } from '@/features/chat-mode/components/surface-view'
+import { DeferredSurfaceView } from '@/features/chat-mode/components/deferred-surface'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { EditorSurfaceLayoutView } from '@/features/workbench/components/editor-surface-layout-view'
 import { useRestoreDeskMode } from '@/features/workspace/hooks/use-restore-desk-mode'
@@ -14,7 +14,7 @@ export function WorkbenchShell({ rootPath }: { readonly rootPath: FilesystemPath
       <div className='flex h-full min-w-[1024px] flex-col'>
         <div className='relative min-h-0 flex-1 overflow-hidden' data-terminal-overlay-bounds>
           {uiMode === 'chat' ? (
-            <ChatModeSurfaceView rootPath={rootPath} />
+            <DeferredSurfaceView rootPath={rootPath} />
           ) : (
             <EditorSurfaceLayoutView rootPath={rootPath} />
           )}

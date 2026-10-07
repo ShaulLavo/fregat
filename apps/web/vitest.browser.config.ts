@@ -1,3 +1,4 @@
+import { rendererLifecycleControl } from './src/state/tests/renderer-lifecycle.command.ts'
 import { browserTestResponses } from '../../editor/scripts/browser-test-responses.ts'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -89,6 +90,7 @@ export default defineConfig({
     api: { host: '127.0.0.1', port: Number(browserTestPort) },
     browser: {
       commands: {
+        rendererLifecycleControl,
         delayRequest,
         diffMouseWheel,
         proofContextClick,

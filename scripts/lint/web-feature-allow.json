@@ -830,7 +830,7 @@
   {
     "from": "workbench",
     "to": "chat",
-    "module": "features/chat/components/chat-side-panel.tsx",
+    "module": "features/chat/components/deferred-side-panel.tsx",
     "reason": "owner: The workbench composes feature panes and their commands; this module supplies ChatSidePanel."
   },
   {
@@ -1112,7 +1112,7 @@
   {
     "from": "workspace",
     "to": "chat-mode",
-    "module": "features/chat-mode/components/surface-view.tsx",
+    "module": "features/chat-mode/components/deferred-surface.tsx",
     "reason": "owner: Workspace selects the chat mode surface as one of its root layouts."
   },
   {
