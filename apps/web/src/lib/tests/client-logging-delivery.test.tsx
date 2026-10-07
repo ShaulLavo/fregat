@@ -1,37 +1,44 @@
+import * as v from 'valibot'
 import { onTestFinished, vi } from 'vitest'
 import { expect, test } from '../../../test/fixtures'
 import { initializeClientLogging, log } from '@/lib/client-logging'
 import { createWideEventScope } from '@/lib/wide-event-scope'
 
-/** A hidden page whose log drain delivers by beacon; `hide` fires the flush and returns what it sent. */
-function hiddenPageBeacons() {
+/** A hidden page whose HTTP drain acknowledges failures; `hide` returns the sent events. */
+function hiddenPageRequests() {
   vi.stubEnv('OBSERVABILITY_ENABLED', 'true')
   vi.stubEnv('VITE_CLIENT_LOG_LEVEL', 'info')
-  const bodies: Blob[] = []
-  const sendBeacon = vi.fn((_url: string, body: Blob) => {
-    bodies.push(body)
-    return true
+  const bodies: { event: Record<string, unknown> }[][] = []
+  vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+    bodies.push(
+      v.parse(
+        v.array(v.object({ event: v.record(v.string(), v.unknown()) })),
+        JSON.parse(String(init.body)),
+      ),
+    )
+    return new Response(null, { status: 204 })
   })
-  vi.stubGlobal('navigator', { sendBeacon })
   vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
   onTestFinished(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     vi.unstubAllEnvs()
+    localStorage.clear()
   })
   initializeClientLogging()
 
   return async function hide(): Promise<Record<string, unknown>[]> {
-    bodies.length = 0
     document.dispatchEvent(new Event('visibilitychange'))
     await vi.waitFor(() => expect(bodies.length).toBeGreaterThan(0))
-    const batches = await Promise.all(bodies.map(async (body) => JSON.parse(await body.text())))
-    return batches.flat().map((item) => item.event)
+    return bodies
+      .splice(0)
+      .flat()
+      .map((item) => item.event)
   }
 }
 
 test('real evlog drains a redacted, identified scope failure as one line on visibility flush', async () => {
-  const hide = hiddenPageBeacons()
+  const hide = hiddenPageRequests()
   log.debug(() => ({ action: 'filtered', area: 'test' }))
   const scope = createWideEventScope({ action: 'stream', area: 'test' })
   scope.increment('messages', 3)
@@ -53,7 +60,7 @@ test('real evlog drains a redacted, identified scope failure as one line on visi
 })
 
 test('a failed scope still open when the page hides is checkpointed once', async () => {
-  const hide = hiddenPageBeacons()
+  const hide = hiddenPageRequests()
   const scope = createWideEventScope({ action: 'connection', area: 'test' })
   scope.error(new TypeError('socket lost'))
 

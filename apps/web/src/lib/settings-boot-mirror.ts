@@ -61,6 +61,7 @@ const MIRRORED_KEYS = [
   'editor.syntaxHighlighting.enabled',
   'editor.tabSize',
   'logs.defaultTimeRange',
+  'logs.clientFailureRetention',
   // Read per pointer intent, outside React.
   'prefetch.enabled',
   'prefetch.files',
