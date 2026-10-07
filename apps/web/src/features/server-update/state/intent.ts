@@ -32,6 +32,7 @@ export type UpdateIntent =
       readonly startedAt: number
     }
   | { readonly kind: 'reload'; readonly target: UpdateTarget }
+  | { readonly kind: 'navigating'; readonly target: UpdateTarget }
   | {
       readonly kind: 'failed'
       readonly target: UpdateTarget

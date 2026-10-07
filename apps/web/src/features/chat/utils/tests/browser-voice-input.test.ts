@@ -60,3 +60,82 @@ test('the time limit finishes recording and clears its timer', async () => {
   expect(capture.store.getState().phase).toBe('idle')
   expect(vi.getTimerCount()).toBe(0)
 })
+
+test('service start alone keeps preparing until microphone capture starts', async () => {
+  const capture = new BrowserVoiceInput()
+  owned.push(capture)
+  const Recognition = createSpeechRecognitionFixture()
+  Recognition.delayedAudio = true
+  const result = capture.run(Recognition, 'en-US', 300)
+  expect(capture.store.getState().phase).toBe('preparing')
+  Recognition.current!.onaudiostart?.()
+  expect(capture.store.getState().phase).toBe('recording')
+  capture.cancel()
+  expect(await result).toBeNull()
+})
+
+test('audio capture alone keeps preparing until the recognition service starts', async () => {
+  const capture = new BrowserVoiceInput()
+  owned.push(capture)
+  const Recognition = createSpeechRecognitionFixture()
+  Recognition.delayedService = true
+  const result = capture.run(Recognition, 'en-US', 300)
+  expect(capture.store.getState().phase).toBe('preparing')
+  Recognition.current!.onstart?.()
+  expect(capture.store.getState().phase).toBe('recording')
+  capture.cancel()
+  expect(await result).toBeNull()
+})
+
+test('capture ending stops the Listening state while final results are pending', async () => {
+  const { capture, recognition, result } = setup()
+  recognition.onaudioend?.()
+  expect(capture.store.getState().phase).toBe('transcribing')
+  recognition.result('complete transcript')
+  recognition.onend?.()
+  expect(await result).toBe('complete transcript')
+})
+
+test('finish waits for late final words, preserves earlier segments and excludes provisional text', async () => {
+  const capture = new BrowserVoiceInput()
+  owned.push(capture)
+  const Recognition = createSpeechRecognitionFixture()
+  Recognition.delayedFinish = true
+  const result = capture.run(Recognition, 'en-US', 300)
+  const recognition = Recognition.current!
+  recognition.onresult?.({
+    results: [
+      { isFinal: true, 0: { transcript: 'first phrase' } },
+      { isFinal: false, 0: { transcript: 'uncertain tail' } },
+    ],
+  })
+  capture.finish()
+  expect(capture.store.getState().phase).toBe('transcribing')
+  recognition.onaudioend?.()
+  recognition.onresult?.({
+    results: [
+      { isFinal: true, 0: { transcript: 'first phrase' } },
+      { isFinal: true, 0: { transcript: 'corrected final phrase' } },
+    ],
+  })
+  recognition.onend?.()
+  expect(await result).toBe('first phrase corrected final phrase')
+})
+
+test('cancel during microphone preparation ignores late start events on the next recording', async () => {
+  const capture = new BrowserVoiceInput()
+  owned.push(capture)
+  const Recognition = createSpeechRecognitionFixture()
+  Recognition.delayedAudio = true
+  const first = capture.run(Recognition, 'en-US', 300)
+  const lateAudioStart = Recognition.current!.onaudiostart
+  capture.cancel()
+  expect(await first).toBeNull()
+  const second = capture.run(Recognition, 'en-US', 300)
+  lateAudioStart?.()
+  expect(capture.store.getState().phase).toBe('preparing')
+  Recognition.current!.onaudiostart?.()
+  expect(capture.store.getState().phase).toBe('recording')
+  capture.cancel()
+  expect(await second).toBeNull()
+})

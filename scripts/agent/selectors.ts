@@ -578,6 +578,7 @@ export const selectors = {
   sessionDraggingRow: (page: Page) =>
     page.locator('aside [aria-roledescription="sortable session row"][data-dragging="true"]'),
   sessionRail: (page: Page) => page.getByRole('listbox', { name: 'Sessions', exact: true }),
+  sessionMarkedRowSelector: '[aria-label="Sessions"] [data-slot="list-row"][data-marked="true"]',
   sessionRowForWorktree,
   sessionPullRequestBadge: (page: Page, worktreeId: string) =>
     sessionRowForWorktree(page, worktreeId).locator('[data-pull-request-state]'),
@@ -1032,6 +1033,8 @@ export const selectors = {
   clientUpdateReload: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),
   serverUpdate: (page: Page) => page.locator('[data-server-update]'),
   serverUpdating: (page: Page) => page.locator('[data-server-update] button[aria-busy="true"]'),
+  serverReloadProgressSelector: '[data-slot="spinner"][aria-label="Reloading…"]',
+  serverUpdateButtonSelector: '[data-server-update] button',
   serverUpdateRetry: (page: Page) =>
     page.getByRole('button', { name: 'Retry update', exact: true }),
   serverUpdateTooltip: (page: Page) =>
@@ -1075,6 +1078,8 @@ export const selectors = {
   dictationCancel: (page: Page) =>
     page.getByRole('button', { name: 'Cancel dictation', exact: true }),
   dictationStatus: (page: Page) => page.locator('[data-dictation-status]'),
+  dictationPreview: (page: Page) => page.locator('[data-dictation-preview]'),
+  dictationCaret: (page: Page) => page.locator('[data-dictation-caret]'),
   chatMessage: (page: Page) => page.getByRole('textbox', { name: 'Message', exact: true }),
   waitForChatText: (page: Page, text: string) =>
     page.waitForFunction(
@@ -1283,6 +1288,7 @@ export const selectors = {
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
   phoneTerminalCanvas: (page: Page) => page.locator('[data-phone-level="terminal"] canvas').first(),
   phoneFirstScreenSelector: '[data-phone-level="sessions"] section[aria-label="Sessions"]',
+  phoneLevelSelector: '[data-phone-level]',
   desktopFirstScreenSelector: '[aria-label="Window toolbar"]',
   phoneShell: (page: Page) => page.locator('[data-phone-shell]'),
   /** The phone shell showing `level`: sessions, session, changes, file or terminal. */

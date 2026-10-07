@@ -981,6 +981,33 @@
       "enum": ["ours", "vscode", "zed"],
       "type": "string"
     },
+    "logs.clientFailureRetention": {
+      "default": {
+        "maxAgeHours": 24,
+        "maxBytes": 524288,
+        "maxEvents": 250
+      },
+      "description": "Limits on browser warnings and errors saved until the server accepts them: event count, bytes, and hours.",
+      "properties": {
+        "maxAgeHours": {
+          "maximum": 24,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "maxBytes": {
+          "maximum": 2097152,
+          "minimum": 4096,
+          "type": "integer"
+        },
+        "maxEvents": {
+          "maximum": 1000,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": ["maxAgeHours", "maxBytes", "maxEvents"],
+      "type": "object"
+    },
     "logs.defaultTimeRange": {
       "default": "1h",
       "description": "Time range the logs view opens on.",

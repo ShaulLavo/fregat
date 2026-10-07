@@ -445,6 +445,11 @@ export const SETTINGS_PRESENTATION = {
     category: 'Logs',
     visibility: 'advanced',
   },
+  'logs.clientFailureRetention': {
+    widget: 'complex',
+    category: 'Logs',
+    visibility: 'advanced',
+  },
   'logs.retentionDays': {
     widget: 'number',
     category: 'Logs',
