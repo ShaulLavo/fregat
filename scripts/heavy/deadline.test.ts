@@ -7,6 +7,7 @@ import { live } from './queue'
 import { bootSeconds, sliceState } from './admission'
 import { DEADLINE_START_SECONDS, removeSlice } from './job'
 import { tryLock, unlock } from './lock'
+import { serviceState } from './service-state-query'
 import {
   alive,
   removeSandboxes,
@@ -194,10 +195,6 @@ test.skipIf(processObservationUnavailable)(
 )
 const systemdRun = userScopes ? Bun.which('systemd-run') : null
 const watchdogOf = (slice: string) => `${slice.slice(0, -'.slice'.length)}_deadline.service`
-const serviceState = (service: string) =>
-  spawnSync('systemctl', ['--user', 'show', service, '-p', 'LoadState', '--value'], {
-    encoding: 'utf8',
-  }).stdout.trim()
 
 function launcher(box: ReturnType<typeof sandbox>, body: string) {
   expect(systemdRun).toBeTruthy()
