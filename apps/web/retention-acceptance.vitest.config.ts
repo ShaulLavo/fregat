@@ -32,6 +32,7 @@ import {
   endRetentionEntryForward,
   type RetentionEntryPhase,
 } from './test/factories/retention-acceptance-reload-transport'
+import { createRetentionReloadHttp } from './test/factories/retention-acceptance-reload-http'
 import { createRetentionSocketProvenance } from './test/factories/retention-acceptance-socket-provenance'
 import type {} from './test/factories/retention-acceptance-entry.tsx'
 import {
@@ -117,15 +118,40 @@ function retentionAcceptanceReload(
   return reloadCases.run(context, operationId, (signal) => {
     const browser = context.context.browser()
     if (!browser) throw createScriptError('Retention acceptance isolated browser is unavailable')
-    const created = browser.newContext({
-      colorScheme: 'dark',
-      viewport: { width: 1200, height: 800 },
+    const apiOrigin: unknown = JSON.parse(
+      base.define?.['import.meta.env.VITE_SERVER_URL'] ?? 'null',
+    )
+    if (typeof apiOrigin !== 'string')
+      throw createScriptError('Retention acceptance API origin is unavailable', {
+        internal: { valid: false },
+      })
+    const forwarding = createRetentionReloadHttp({
+      runnerOrigin: new URL(context.page.url()).origin,
+      entryOrigin: context.project.getProvidedContext().retentionAcceptanceEntryUrl,
+      apiOrigin,
+      signal,
     })
+    const created = forwarding.then(({ proxy }) =>
+      browser.newContext({
+        colorScheme: 'dark',
+        viewport: { width: 1200, height: 800 },
+        proxy,
+      }),
+    )
+    let forwardingClosed: Promise<void> | null = null
+    const closeForwarding = () =>
+      (forwardingClosed ??= forwarding.then(
+        (owner) => owner.close(),
+        () => undefined,
+      ))
     let disposed: Promise<void> | null = null
     let closed: Promise<void> | null = null
     const disposeRequests = () =>
       (disposed ??= created.then(
-        (isolated) => isolated.request.dispose(),
+        async (isolated) => {
+          await (await forwarding).disposeRequests()
+          await isolated.request.dispose()
+        },
         () => undefined,
       ))
     const closeContext = () =>
@@ -142,9 +168,15 @@ function retentionAcceptanceReload(
         disposeRequests,
         closeContext,
         operationId,
+        forwarding,
+        closeForwarding,
       ),
       close: async () => {
-        const results = await Promise.allSettled([disposeRequests(), closeContext()])
+        const results = await Promise.allSettled([
+          disposeRequests(),
+          closeContext(),
+          closeForwarding(),
+        ])
         const failures = results.filter((result) => result.status === 'rejected')
         if (failures.length)
           throw createScriptError('Retention acceptance context cleanup failed', {
@@ -163,6 +195,8 @@ async function performRetentionAcceptanceReload(
   disposeRequests: () => Promise<void>,
   closeContext: () => Promise<void>,
   operationId: string,
+  forwarding: ReturnType<typeof createRetentionReloadHttp>,
+  closeForwarding: () => Promise<void>,
 ) {
   const timings = createRetentionReloadTimings()
   const controllerMarks: Record<string, number> = { startedAt: Date.now() }
@@ -191,42 +225,21 @@ async function performRetentionAcceptanceReload(
     void transport.cancelPending()
   }
   signal.addEventListener('abort', stopTransport, { once: true })
-  await page.route(
-    (url) => url.origin === runnerOrigin,
-    (route) => {
-      return transport.run(
-        route.request().url(),
-        async (fulfill, headersCompleted, markHttp) => {
-          const request = new URL(route.request().url())
-          if (
-            reloading &&
-            arm.font === 'slow' &&
-            request.pathname.includes('jetbrains-mono') &&
-            request.pathname.endsWith('.woff2')
-          ) {
-            const heldAt = Date.now()
-            await new Promise<void>((resolve) => setTimeout(resolve, 1000))
-            delayedFonts.push({ url: request.href, heldAt, releasedAt: Date.now() })
-          }
-          markHttp('headersStartedAt')
-          const headers =
-            route.request().method() === 'GET'
-              ? { ...(await route.request().allHeaders()), connection: 'close' }
-              : undefined
-          headersCompleted()
-          signal.throwIfAborted()
-          markHttp('fetchStartedAt')
-          const response = await route.fetch({
-            url: new URL(request.pathname + request.search, entryOrigin).href,
-            headers,
-          })
-          markHttp('fetchCompletedAt')
-          await fulfill(() => route.fulfill({ response }))
-        },
-        () => route.abort('failed'),
-      )
+  ;(await forwarding).bind({
+    transport,
+    beforeFetch: async (request) => {
+      if (
+        reloading &&
+        arm.font === 'slow' &&
+        request.pathname.includes('jetbrains-mono') &&
+        request.pathname.endsWith('.woff2')
+      ) {
+        const heldAt = Date.now()
+        await new Promise<void>((resolve) => setTimeout(resolve, 1000))
+        delayedFonts.push({ url: request.href, heldAt, releasedAt: Date.now() })
+      }
     },
-  )
+  })
   const output = await mkdtemp(join(tmpdir(), 'retention-acceptance-reload-'))
   controllerMarks.setupReadyAt = Date.now()
   const profiling = beginColdProfile(process.env.CI === 'true', arm, output)
@@ -444,7 +457,6 @@ async function performRetentionAcceptanceReload(
   let cleanupFailures: unknown[] = []
   let forwardContextDisposal: Promise<void> | null = null
   let forwardContextDisposed = false
-  let contextClosedAsFallback = false
   const outcome = await transport
     .race(operation)
     .then(
@@ -536,7 +548,6 @@ async function performRetentionAcceptanceReload(
             run: async () => {
               if (forwardContextDisposed && !transport.needsContextClose) return
               await closeContext()
-              contextClosedAsFallback = true
             },
           },
           {
@@ -549,7 +560,7 @@ async function performRetentionAcceptanceReload(
           {
             stage: 'unroute',
             run: async () => {
-              if (!contextClosedAsFallback) await page.unrouteAll({ behavior: 'default' })
+              await closeForwarding()
             },
           },
           { stage: 'close-context', run: closeContext },
