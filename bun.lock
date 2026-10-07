@@ -973,7 +973,7 @@
     },
     "scripts": {
       "name": "scripts",
-      "version": "0.0.38",
+      "version": "0.0.39",
       "dependencies": {
         "@workspace/utils": "workspace:*",
       },
@@ -996,6 +996,7 @@
     },
   },
   "patchedDependencies": {
+    "@vitest/mocker@5.0.2": "patches/@vitest%2Fmocker@5.0.2.patch",
     "evlog@2.29.0": "patches/evlog@2.29.0.patch",
     "vitest@5.0.2": "patches/vitest@5.0.2.patch",
   },
