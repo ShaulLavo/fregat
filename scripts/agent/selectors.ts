@@ -1033,6 +1033,8 @@ export const selectors = {
   clientUpdateReload: (page: Page) => page.getByRole('button', { name: 'Reload app', exact: true }),
   serverUpdate: (page: Page) => page.locator('[data-server-update]'),
   serverUpdating: (page: Page) => page.locator('[data-server-update] button[aria-busy="true"]'),
+  serverReloadProgressSelector: '[data-slot="spinner"][aria-label="Reloading…"]',
+  serverUpdateButtonSelector: '[data-server-update] button',
   serverUpdateRetry: (page: Page) =>
     page.getByRole('button', { name: 'Retry update', exact: true }),
   serverUpdateTooltip: (page: Page) =>
