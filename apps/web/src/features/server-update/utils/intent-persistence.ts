@@ -65,7 +65,12 @@ export function restoreUpdateIntent(
 }
 
 export function persistUpdateIntent(storage: IntentStorage | null, intent: UpdateIntent): void {
-  if (intent.kind === 'idle' || intent.kind === 'confirm' || intent.kind === 'failed') {
+  if (
+    intent.kind === 'idle' ||
+    intent.kind === 'confirm' ||
+    intent.kind === 'failed' ||
+    intent.kind === 'navigating'
+  ) {
     clearPersistedIntent(storage)
     return
   }

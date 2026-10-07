@@ -115,6 +115,7 @@ test('completion, supersession, failure and a new confirmation remove durable in
   const store = createUpdateIntentStore({ storage })
   const cleared = [
     { kind: 'idle' },
+    { kind: 'navigating', target },
     { kind: 'failed', target },
     { kind: 'confirm', target: laterTarget, busy },
   ] as const
