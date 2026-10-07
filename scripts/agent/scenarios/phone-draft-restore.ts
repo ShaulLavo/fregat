@@ -1,9 +1,24 @@
 import { ok, strictEqual } from 'node:assert/strict'
+import type { Page } from 'playwright'
 import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
 import { selectors } from '../selectors'
 import { readShell } from './chat-verification'
 import { openFixtureChat } from './phone-fixture'
 import type { Scenario } from './index'
+
+async function allowHealthOnRetry(page: Page, allow: () => void) {
+  await page.exposeFunction('allowDraftRestoreHealth', allow)
+  await selectors.bootstrapRetry(page).evaluate((button) => {
+    button.addEventListener(
+      'click',
+      () => {
+        const recover = Reflect.get(window, 'allowDraftRestoreHealth')
+        if (typeof recover === 'function') void recover()
+      },
+      { once: true, capture: true },
+    )
+  })
+}
 
 export const phoneDraftRestore: Scenario = {
   name: 'phone-draft-restore',
@@ -68,7 +83,9 @@ export const phoneDraftRestore: Scenario = {
       strictEqual(socketCount, 0, 'Failed first health has no admitted socket')
       strictEqual(page.url(), address)
       await step('failed-first-health-exposes-owner-retry')
-      failHealth = false
+      await allowHealthOnRetry(page, () => {
+        failHealth = false
+      })
       const reconnected = page.waitForEvent('websocket', {
         predicate: (socket) => new URL(socket.url()).pathname.endsWith('/orchestration/rpc'),
       })
