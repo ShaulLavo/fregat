@@ -17,6 +17,29 @@ export const chatDictation = isolatedNativeScenario({
     await page.reload()
     const composer = selectors.chatMessage(page)
     await composer.waitFor()
+    await page.evaluate(() => {
+      if (window.speechRecognitionFixture) window.speechRecognitionFixture.delayedAudio = true
+    })
+    await selectors.dictationStart(page).click()
+    await selectors
+      .dictationStatus(page)
+      .getByText('Starting microphone…', { exact: true })
+      .waitFor()
+    strictEqual(await selectors.dictationFinish(page).isDisabled(), true)
+    strictEqual(await selectors.dictationCaret(page).count(), 0)
+    await step('speech-service-started-microphone-waiting')
+    await page.evaluate(() => window.speechRecognitionFixture?.current?.onaudiostart?.())
+    await selectors.dictationStatus(page).getByText('Listening…', { exact: true }).waitFor()
+    strictEqual(await selectors.dictationFinish(page).isEnabled(), true)
+    await step('microphone-capture-ready')
+    await page.evaluate(() => window.speechRecognitionFixture?.current?.onaudioend?.())
+    await selectors.dictationStatus(page).getByText('Transcribing…', { exact: true }).waitFor()
+    await step('microphone-stopped-final-results-waiting')
+    await selectors.dictationCancel(page).click()
+    await selectors.dictationStart(page).waitFor()
+    await page.evaluate(() => {
+      if (window.speechRecognitionFixture) window.speechRecognitionFixture.delayedAudio = false
+    })
     await composer.fill('Hello world')
     await page.keyboard.press('End')
     await page.keyboard.press('ControlOrMeta+Shift+ArrowLeft')
@@ -32,7 +55,9 @@ export const chatDictation = isolatedNativeScenario({
     const recordingCaches = await page.evaluate(readCaches)
     const voiceCapture = recordingCaches
       .find((cache) => cache.scope === 'resources')
-      ?.mutations.find((mutation) => mutation.key.startsWith('["chat","voice"'))
+      ?.mutations.find(
+        (mutation) => mutation.key.startsWith('["chat","voice"') && mutation.status === 'pending',
+      )
     strictEqual(voiceCapture?.status, 'pending')
     strictEqual(voiceCapture?.scope, 'chat-voice-input')
     await step('recording-selected-text')
