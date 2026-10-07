@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
+import { counterDelta, createCounterReader, parseCounterSnapshot } from './comparison-counters.mjs'
 
 export function verifyHash(bytes, expected, name) {
   assert.equal(
@@ -46,29 +47,100 @@ async function cpuSnapshot(session, now) {
 export async function measureCpu(
   session,
   operation,
-  { now = () => performance.now(), tickSeconds = null } = {},
+  {
+    now = () => performance.now(),
+    tickSeconds = null,
+    processCounters = false,
+    counterReader,
+    counterTimeoutMilliseconds,
+  } = {},
 ) {
-  const before = await cpuSnapshot(session, now)
-  const started = now()
-  const sample = await operation()
-  const milliseconds = now() - started
-  const after = await cpuSnapshot(session, now)
-  const interval = after.sampledAt - before.sampledAt
-  assert(Number.isFinite(interval) && interval > 0, 'Positive CPU sampling interval required')
-  return {
-    sample,
-    milliseconds,
-    cpu: {
-      ...cpuSample(before.processInfo, after.processInfo, interval),
-      tickSeconds,
-      milliseconds: interval,
-      interval: {
-        before: { requested: before.requested, completed: before.completed },
-        after: { requested: after.requested, completed: after.completed },
+  const reader =
+    counterReader ??
+    (processCounters
+      ? await createCounterReader(session, { timeoutMilliseconds: counterTimeoutMilliseconds })
+      : {
+          skipped: true,
+          reason: 'Process counters are unregistered. Add --process-counters to a new protocol.',
+        })
+  let counterFailure = reader.skipped ? reader.reason : null
+  async function nativeSnapshot(processes) {
+    if (counterFailure) return null
+    const requested = now()
+    try {
+      const raw = await reader.snapshot(processes)
+      return { raw, requested, completed: now() }
+    } catch (error) {
+      counterFailure = error.message
+      return null
+    }
+  }
+  try {
+    const before = await cpuSnapshot(session, now)
+    const nativeBefore = await nativeSnapshot(before.processInfo)
+    const started = now()
+    const sample = await operation()
+    const milliseconds = now() - started
+    const after = await cpuSnapshot(session, now)
+    const nativeAfter = await nativeSnapshot(after.processInfo)
+    const interval = after.sampledAt - before.sampledAt
+    assert(Number.isFinite(interval) && interval > 0, 'Positive CPU sampling interval required')
+    let workCounters = { status: 'skipped', reason: counterFailure }
+    if (reader.metadata) {
+      workCounters.metadata = reader.metadata
+      workCounters.snapshots = {
+        before: nativeBefore?.raw ?? null,
+        after: nativeAfter?.raw ?? null,
+      }
+      workCounters.boundary = {
+        before: {
+          cdp: { requested: before.requested, completed: before.completed },
+          native: nativeBefore
+            ? { requested: nativeBefore.requested, completed: nativeBefore.completed }
+            : null,
+        },
+        after: {
+          cdp: { requested: after.requested, completed: after.completed },
+          native: nativeAfter
+            ? { requested: nativeAfter.requested, completed: nativeAfter.completed }
+            : null,
+        },
+      }
+    }
+    if (!counterFailure) {
+      try {
+        workCounters = {
+          ...workCounters,
+          ...counterDelta(
+            parseCounterSnapshot(nativeBefore.raw, reader.metadata),
+            parseCounterSnapshot(nativeAfter.raw, reader.metadata),
+            before.processInfo,
+            after.processInfo,
+          ),
+        }
+        delete workCounters.reason
+      } catch (error) {
+        workCounters.reason = error.message
+      }
+    }
+    return {
+      sample,
+      milliseconds,
+      cpu: {
+        ...cpuSample(before.processInfo, after.processInfo, interval),
+        tickSeconds,
+        milliseconds: interval,
+        interval: {
+          before: { requested: before.requested, completed: before.completed },
+          after: { requested: after.requested, completed: after.completed },
+        },
+        acquisitionUncertaintyMilliseconds:
+          (before.completed - before.requested + after.completed - after.requested) / 2,
+        workCounters,
       },
-      acquisitionUncertaintyMilliseconds:
-        (before.completed - before.requested + after.completed - after.requested) / 2,
-    },
+    }
+  } finally {
+    await reader.close?.()
   }
 }
 

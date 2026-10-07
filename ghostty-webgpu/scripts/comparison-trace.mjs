@@ -244,6 +244,7 @@ export async function tracePhase({
   traced,
   now,
   categories,
+  cpuOptions,
 }) {
   if (traced)
     await browserSession.send('Tracing.start', {
@@ -274,7 +275,7 @@ export async function tracePhase({
           return error.partialLatency
         }
       },
-      { now },
+      { ...cpuOptions, now },
     )
     const records = traced ? await page.evaluate(() => window.__compare.traceEnd()) : undefined
     recording = false

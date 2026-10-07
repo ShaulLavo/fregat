@@ -139,7 +139,11 @@ if (platform() === 'darwin') {
   tickSeconds = accounting.tickSeconds
   cpuTickSource = accounting.source
 }
-const cpuOptions = { tickSeconds }
+const cpuOptions = {
+  tickSeconds,
+  processCounters: args.includes('--process-counters'),
+  counterTimeoutMilliseconds: gpuCommandTimeoutMilliseconds,
+}
 const traceFrames = positiveInteger(args, '--trace-frames', 180)
 const tracePhases = selectedTracePhases(args, manifest.fixtures)
 await prepareOutput(output, { tracing })
@@ -232,6 +236,7 @@ const artifact = {
   outputFixture: selectedOutputFixture,
   cpuTickSeconds: tickSeconds,
   cpuTickSource,
+  processCounters: cpuOptions.processCounters,
   counts,
   variants: variantIds,
   phases,
@@ -581,6 +586,7 @@ async function presentedLatency(page, session, browserSession, run, label, optio
         return sample
       },
       traced: true,
+      cpuOptions,
     }),
   )
   const trace = phase.error
@@ -751,7 +757,16 @@ async function measureBody(testCase, repetition, browserSession, run, contexts) 
           run.phases.push(
             Object.assign(
               await qualifiedWindow(run, label, () =>
-                tracePhase({ page, session, browserSession, output, label, operation, traced }),
+                tracePhase({
+                  page,
+                  session,
+                  browserSession,
+                  output,
+                  label,
+                  operation,
+                  traced,
+                  cpuOptions,
+                }),
               ),
               { refreshPeriods },
             ),

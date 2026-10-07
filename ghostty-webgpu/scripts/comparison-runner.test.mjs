@@ -102,7 +102,7 @@ for (const name of ['rolling-logs', 'rolling-slow'])
     const {randomUUID, manifest, smoke, tracing, repetitions, latencySamples, outputFrames,
       selectedOutputFixture, tickSeconds, cpuTickSource, counts, variantIds, phases, writePaths,
       fixtures, s, tracePhases, traceFrames, accessibility, measurementCases,
-      gpuCommandTimeoutMilliseconds} = context;
+      gpuCommandTimeoutMilliseconds, cpuOptions} = context;
     ${source.slice(artifactStart, artifactEnd)}
     return artifact;
   `,
@@ -112,6 +112,7 @@ for (const name of ['rolling-logs', 'rolling-slow'])
       smoke: false,
       tracing: false,
       gpuCommandTimeoutMilliseconds: 2000,
+      cpuOptions: { processCounters: true },
       repetitions: 4,
       outputFrames: 1200,
       selectedOutputFixture: fixture.name,
@@ -127,6 +128,7 @@ for (const name of ['rolling-logs', 'rolling-slow'])
     assert.equal(artifact.outputFixture, fixture.name)
     assert.equal(artifact.outputFrames, 1200)
     assert.equal(artifact.accessibility, 'on')
+    assert.equal(artifact.processCounters, true)
     assert.equal(artifact.measurementBudgetMilliseconds, 2 * 4 * 600000)
     const blockStart = source.indexOf("    if (phases.includes('output')) {")
     const blockEnd = source.indexOf('\n    assert.deepEqual(errors, [])', blockStart)

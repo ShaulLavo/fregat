@@ -21,12 +21,15 @@ function cpu(value) {
     acquisitionUncertaintyMilliseconds,
     tickSeconds,
   } = value
+  const workCounters = value.workCounters ? { ...value.workCounters } : undefined
+  if (workCounters) delete workCounters.snapshots
   return {
     milliseconds,
     secondsByType,
     percentOfOneCore,
     acquisitionUncertaintyMilliseconds,
     tickSeconds,
+    ...(value.workCounters ? { workCounters } : {}),
   }
 }
 function gpu(value) {
@@ -123,6 +126,7 @@ export async function compactEvidence(artifact, directory) {
     outputFixture: artifact.outputFixture,
     cpuTickSeconds: artifact.cpuTickSeconds,
     cpuTickSource: artifact.cpuTickSource,
+    processCounters: artifact.processCounters,
     gpuCommandTimeoutMilliseconds: artifact.gpuCommandTimeoutMilliseconds,
     hardware: artifact.hardware,
     manifest: {
