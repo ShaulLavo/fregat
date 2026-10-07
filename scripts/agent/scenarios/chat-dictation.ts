@@ -84,6 +84,10 @@ export const chatDictation = isolatedNativeScenario({
       },
     )
     await page.setViewportSize({ width: 390, height: 844 })
+    await selectors.phoneLevel(page, 'session').waitFor()
+    await selectors.dictationStart(page).waitFor()
+    const mic = await selectors.dictationStart(page).boundingBox()
+    strictEqual(mic !== null && mic.x >= 0 && mic.x + mic.width <= 390, true)
     await step('phone-composer')
     await page.setViewportSize({ width: 1440, height: 900 })
     return { recordingCaches, completedCaches: await page.evaluate(readCaches) }
