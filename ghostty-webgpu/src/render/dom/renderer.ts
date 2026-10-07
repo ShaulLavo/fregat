@@ -53,6 +53,7 @@ class DomSurface implements RowRendererSurface {
   private readonly previousAnchorName: string
   private readonly anchorName: string
   private readonly canvasStyle: CSSStyleDeclaration
+  private readonly computedStyle: StylePropertyMapReadOnly | undefined
   private font: TerminalFittedFont
   private grid: RendererGridSize
   private theme: CanonicalRendererTheme
@@ -65,6 +66,7 @@ class DomSurface implements RowRendererSurface {
     this.canvas = options.canvas
     const view = this.canvas.ownerDocument.defaultView!
     this.canvasStyle = view.getComputedStyle(this.canvas)
+    this.computedStyle = this.canvas.computedStyleMap?.()
     this.previousAnchorName = this.canvas.style.anchorName
     this.anchorName = `--ghostty-dom-${view.crypto.getRandomValues(new Uint32Array(4)).join('-')}`
     const anchors = this.canvasStyle.anchorName === 'none' ? '' : this.canvasStyle.anchorName
@@ -165,6 +167,20 @@ class DomSurface implements RowRendererSurface {
   }
 
   private position(): void {
+    const computed = this.computedStyle
+    const leftPixels = computed?.get('padding-left')?.toString()
+    const topPixels = computed?.get('padding-top')?.toString()
+    if (
+      leftPixels?.endsWith('px') &&
+      topPixels?.endsWith('px') &&
+      ['transform', 'translate', 'rotate', 'scale'].every(
+        (property) => computed?.get(property)?.toString() === 'none',
+      )
+    ) {
+      // Computed pixel lengths avoid resolved-style layout reads while following live CSS changes.
+      this.positionAtAnchor(parseFloat(leftPixels), parseFloat(topPixels))
+      return
+    }
     const style = this.canvasStyle
     const left = parseFloat(style.paddingLeft) || 0
     const top = parseFloat(style.paddingTop) || 0
@@ -179,6 +195,10 @@ class DomSurface implements RowRendererSurface {
       this.container.style.top = `${this.canvas.offsetTop + top}px`
       return
     }
+    this.positionAtAnchor(left, top)
+  }
+
+  private positionAtAnchor(left: number, top: number): void {
     this.container.style.left = `calc(round(nearest, anchor(${this.anchorName} left), 1px) + ${left}px)`
     this.container.style.top = `calc(round(nearest, anchor(${this.anchorName} top), 1px) + ${top}px)`
   }

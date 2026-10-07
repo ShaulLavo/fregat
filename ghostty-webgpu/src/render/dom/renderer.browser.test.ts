@@ -609,6 +609,52 @@ it('keeps live geometry through fractional CSS, sibling flow, transforms and sty
     'canvas[data-dom-position-probe] { margin-top: 23.25px !important; padding-left: 19px !important }',
   )
   expectPosition()
+  sheet.remove()
+  canvas.style.padding = '5% 7%'
+  host.style.width = '400px'
+  expectPosition()
+  host.style.width = '350px'
+  expectPosition()
+})
+
+it('avoids resolved padding reads for stable pixel-padded real-core repaint frames', async ({
+  skip,
+}) => {
+  if (typeof HTMLCanvasElement.prototype.computedStyleMap !== 'function') {
+    skip('CSS Typed OM is unavailable in this browser')
+    return
+  }
+  const probe = await rendererProbe('dom')
+  const surface = Reflect.get(probe.renderer, 'surface')
+  const style = Reflect.get(surface, 'canvasStyle') as CSSStyleDeclaration
+  const padding = vi.spyOn(style, 'paddingLeft', 'get')
+  for (const input of ['\rfirst', '\rsecond', '\rthird']) {
+    probe.terminal.write(input)
+    probe.renderer.notifyWrite()
+    probe.clock.flush()
+  }
+  expect(padding).not.toHaveBeenCalled()
+})
+
+it('keeps live geometry when computed Typed OM is unavailable', async () => {
+  const prototype = HTMLCanvasElement.prototype
+  const descriptor = Object.getOwnPropertyDescriptor(prototype, 'computedStyleMap')
+  Object.defineProperty(prototype, 'computedStyleMap', { configurable: true, value: undefined })
+  cleanups.push(() => {
+    if (descriptor) {
+      Object.defineProperty(prototype, 'computedStyleMap', descriptor)
+      return
+    }
+    Reflect.deleteProperty(prototype, 'computedStyleMap')
+  })
+  const probe = await rendererProbe('dom')
+  probe.canvas.style.marginLeft = '19px'
+  probe.canvas.style.paddingLeft = '13px'
+  probe.terminal.write('\rchanged')
+  probe.renderer.notifyWrite()
+  probe.clock.flush()
+  const expected = probe.canvas.offsetLeft + parseFloat(getComputedStyle(probe.canvas).paddingLeft)
+  expect(parseFloat(getComputedStyle(probe.canvas.nextElementSibling!).left)).toBe(expected)
 })
 
 it('avoids canvas geometry reads across stable real-core repaint frames', async () => {
