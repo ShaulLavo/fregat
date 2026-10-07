@@ -176,10 +176,13 @@ it('detects synchronous memory growth during a row copy and retains all dirty ro
   const submit = vi.spyOn(context, 'putImageData')
   expect(() => frame.present()).toThrow('memory changed')
   expect(submit).not.toHaveBeenCalled()
+  expect(frame.metrics.transferCopiedBytes).toBe(96)
   growth.mockRestore()
   frame.present()
   expect(submit).toHaveBeenCalledTimes(1)
   expect(submit.mock.calls[0]![0].data).toEqual(new Uint8ClampedArray(96).fill(255))
+  expect(frame.metrics.transferCopiedBytes).toBe(192)
+  expect(frame.metrics.transferCopies).toBe(2)
 })
 
 it('refreshes a failed target transfer after reentrant source memory growth', () => {

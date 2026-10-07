@@ -145,9 +145,10 @@ export class PixelFrame {
       image.data.byteOffset + top * image.width * 4,
       image.width * height * 4,
     )
+    const copiedBytes = pixels.byteLength
     transfer.data.set(pixels)
     this.metrics.transferCopies += 1
-    this.metrics.transferCopiedBytes += pixels.byteLength
+    this.metrics.transferCopiedBytes += copiedBytes
     if (image.data.buffer !== this.memory.buffer)
       throw createGhosttyError('canvas.frame', 'Canvas pixel memory changed during presentation')
     this.context.putImageData(transfer, 0, top)
