@@ -564,6 +564,68 @@ describe('DOM terminal renderer', () => {
   })
 })
 
+it('keeps live geometry through fractional CSS, sibling flow, transforms and stylesheet rules', async () => {
+  const probe = await rendererProbe('dom')
+  const canvas = probe.canvas
+  const host = canvas.parentElement!
+  const container = canvas.nextElementSibling as HTMLElement
+  const oracle = document.createElement('div')
+  oracle.style.position = 'absolute'
+  host.append(oracle)
+  const expectPosition = () => {
+    probe.terminal.write('\rnext')
+    probe.renderer.notifyWrite()
+    probe.clock.flush()
+    const style = getComputedStyle(canvas)
+    oracle.style.left = `${canvas.offsetLeft + parseFloat(style.paddingLeft)}px`
+    oracle.style.top = `${canvas.offsetTop + parseFloat(style.paddingTop)}px`
+    const expected = oracle.getBoundingClientRect()
+    const actual = container.getBoundingClientRect()
+    expect(actual.left).toBeCloseTo(expected.left, 5)
+    expect(actual.top).toBeCloseTo(expected.top, 5)
+  }
+  expectPosition()
+  host.style.border = '2.25px solid transparent'
+  host.style.padding = '3.25px 4.5px'
+  canvas.style.margin = '2.5px 5.5px'
+  expectPosition()
+  const sibling = document.createElement('div')
+  sibling.style.height = '17.25px'
+  host.prepend(sibling)
+  expectPosition()
+  canvas.style.transform = 'translate(11.5px, 13.25px)'
+  expectPosition()
+  canvas.style.transform = ''
+  canvas.style.translate = '9px 12px'
+  expectPosition()
+  canvas.style.translate = ''
+  host.style.transform = 'scale(0.75)'
+  expectPosition()
+  canvas.setAttribute('data-dom-position-probe', '')
+  const sheet = document.createElement('style')
+  document.head.append(sheet)
+  cleanups.push(() => sheet.remove())
+  sheet.sheet!.insertRule(
+    'canvas[data-dom-position-probe] { margin-top: 23.25px !important; padding-left: 19px !important }',
+  )
+  expectPosition()
+})
+
+it('avoids canvas geometry reads across stable real-core repaint frames', async () => {
+  const probe = await rendererProbe('dom')
+  const left = vi.spyOn(probe.canvas, 'offsetLeft', 'get')
+  const top = vi.spyOn(probe.canvas, 'offsetTop', 'get')
+  const style = vi.spyOn(window, 'getComputedStyle')
+  for (const input of ['\rfirst', '\rsecond', '\rthird']) {
+    probe.terminal.write(input)
+    probe.renderer.notifyWrite()
+    probe.clock.flush()
+  }
+  expect(left).not.toHaveBeenCalled()
+  expect(top).not.toHaveBeenCalled()
+  expect(style.mock.calls.filter(([element]) => element === probe.canvas)).toHaveLength(0)
+})
+
 it('observes peer canvas CSS changes between participating native callbacks', async () => {
   const runtime = await GhosttyRuntime.create()
   cleanups.push(() => runtime.dispose())
@@ -596,8 +658,8 @@ it('observes peer canvas CSS changes between participating native callbacks', as
   peer = b.canvas
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
   expect(events).toEqual(['paint-a', 'peer-css-change', 'paint-b'])
-  const expected = `${b.canvas.offsetLeft + parseFloat(getComputedStyle(b.canvas).paddingLeft)}px`
-  expect(b.canvas.nextElementSibling!.getAttribute('style')).toContain(`left: ${expected}`)
+  const expected = b.canvas.offsetLeft + parseFloat(getComputedStyle(b.canvas).paddingLeft)
+  expect(parseFloat(getComputedStyle(b.canvas.nextElementSibling!).left)).toBe(expected)
 })
 
 it('packed DOM rows keep styled callbacks and lazy snapshots owned across writes and memory growth', async () => {

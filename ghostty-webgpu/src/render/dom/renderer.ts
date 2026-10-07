@@ -50,6 +50,9 @@ class DomSurface implements RowRendererSurface {
   private readonly container: HTMLDivElement
   private readonly canvas: HTMLCanvasElement
   private readonly previousOpacity: string
+  private readonly previousAnchorName: string
+  private readonly anchorName: string
+  private readonly canvasStyle: CSSStyleDeclaration
   private font: TerminalFittedFont
   private grid: RendererGridSize
   private theme: CanonicalRendererTheme
@@ -60,6 +63,11 @@ class DomSurface implements RowRendererSurface {
       throw new TypeError('The DOM renderer requires a canvas mounted in a terminal host')
     }
     this.canvas = options.canvas
+    const view = this.canvas.ownerDocument.defaultView!
+    this.canvasStyle = view.getComputedStyle(this.canvas)
+    this.previousAnchorName = this.canvas.style.anchorName
+    this.anchorName = `--ghostty-dom-${view.crypto.getRandomValues(new Uint32Array(4)).join('-')}`
+    const anchors = this.canvasStyle.anchorName === 'none' ? '' : this.canvasStyle.anchorName
     this.font = copyFittedFont(options.font)
     this.grid = normalizeRendererGrid(options)
     this.theme = canonicalRendererTheme(mergeRendererTheme(options.theme))
@@ -68,6 +76,7 @@ class DomSurface implements RowRendererSurface {
     this.container.style.pointerEvents = 'none'
     this.previousOpacity = this.canvas.style.opacity
     this.resize(this.font, this.grid)
+    this.canvas.style.anchorName = `${anchors} ${this.anchorName}`.trim()
     // Transparency preserves the canvas as the terminal pointer target.
     this.canvas.style.opacity = '0'
     this.canvas.after(this.container)
@@ -77,6 +86,7 @@ class DomSurface implements RowRendererSurface {
     this.container.remove()
     this.rows = []
     this.canvas.style.opacity = this.previousOpacity
+    this.canvas.style.anchorName = this.previousAnchorName
   }
 
   beginFrame(): void {
@@ -155,9 +165,22 @@ class DomSurface implements RowRendererSurface {
   }
 
   private position(): void {
-    const style = this.canvas.ownerDocument.defaultView!.getComputedStyle(this.canvas)
-    this.container.style.left = `${this.canvas.offsetLeft + (parseFloat(style.paddingLeft) || 0)}px`
-    this.container.style.top = `${this.canvas.offsetTop + (parseFloat(style.paddingTop) || 0)}px`
+    const style = this.canvasStyle
+    const left = parseFloat(style.paddingLeft) || 0
+    const top = parseFloat(style.paddingTop) || 0
+    const transformed =
+      style.transform !== 'none' ||
+      style.translate !== 'none' ||
+      style.rotate !== 'none' ||
+      style.scale !== 'none'
+    if (transformed) {
+      // Anchor coordinates include canvas transforms; offset coordinates deliberately ignore them.
+      this.container.style.left = `${this.canvas.offsetLeft + left}px`
+      this.container.style.top = `${this.canvas.offsetTop + top}px`
+      return
+    }
+    this.container.style.left = `calc(round(nearest, anchor(${this.anchorName} left), 1px) + ${left}px)`
+    this.container.style.top = `calc(round(nearest, anchor(${this.anchorName} top), 1px) + ${top}px)`
   }
 }
 
