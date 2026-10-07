@@ -35,6 +35,7 @@ if (!supported)
 
 function runInstall({
   output,
+  firstOutput = output,
   failures = 1,
   status = 1,
   finalStatus = 0,
@@ -44,6 +45,7 @@ function runInstall({
   preflight = 'none',
 }: {
   output: string
+  firstOutput?: string
   failures?: number
   status?: number
   finalStatus?: number
@@ -55,6 +57,7 @@ function runInstall({
   const root = mkdtempSync(path.join(tmpdir(), 'setup-install-'))
   try {
     writeFileSync(path.join(root, 'failure'), output)
+    writeFileSync(path.join(root, 'first-failure'), firstOutput)
     writeFileSync(path.join(root, 'package.json'), '{}')
     writeFileSync(path.join(root, '.gitignore'), 'node_modules/\n.npmrc\n')
     writeFileSync(path.join(root, 'final-output'), finalOutput)
@@ -72,7 +75,7 @@ if [[ "$*" == 'install --frozen-lockfile' ]]; then
 fi
 if [[ "$count" -le ${failures} ]]; then
   printf 'bun install v1.4.2 (744846f84)\\nResolving dependencies\\n'
-  cat failure >&2
+  if [[ "$count" == 1 ]]; then cat first-failure >&2; else cat failure >&2; fi
   printf 'partial install' > installed
   if ${signal}; then kill -TERM "$$"; fi
   exit ${status}
@@ -244,13 +247,14 @@ async function runBash(script: string, root: string, env: Record<string, string 
 const realSupported = supported && Bun.which('tar') !== null
 if (!realSupported) console.info('Skipping real Bun lifecycle controls. Bash and tar are required.')
 
-async function lifecycleFixture(mode: 'cold' | 'healthy' | 'warm' | 'workspace') {
+async function lifecycleFixture(mode: 'cold' | 'healthy' | 'warm' | 'workspace' | 'persistent') {
   const warm = mode === 'warm'
-  const workspace = mode === 'workspace'
+  const workspace = mode === 'workspace' || mode === 'persistent'
   const healthy = mode === 'healthy'
   const root = mkdtempSync(path.join(tmpdir(), 'setup-lifecycle-'))
   let failing = false
   let scriptsAtRecovery = ''
+  let recoveryCalls = 0
   const archive = path.join(root, 'bad.tgz')
   const goodArchive = path.join(root, 'good.tgz')
   const scriptLog = path.join(root, 'scripts.log')
@@ -260,7 +264,8 @@ async function lifecycleFixture(mode: 'cold' | 'healthy' | 'warm' | 'workspace')
     fetch(request) {
       if (new URL(request.url).pathname === '/recover') {
         scriptsAtRecovery = readFileSync(scriptLog, { encoding: 'utf8', flag: 'a+' })
-        failing = false
+        recoveryCalls++
+        failing = mode === 'persistent' && recoveryCalls < 2
         return new Response('recovered')
       }
       if (new URL(request.url).pathname === '/good.tgz') return new Response(Bun.file(goodArchive))
@@ -407,20 +412,23 @@ process.exit(status)
           raw.includes(`error: GET ${url} - 503`),
         raw,
       ).toBe(true)
+    if (mode === 'persistent') expect(raw).toMatch(/^\[[0-9]+\.[0-9][0-9]ms\] done$/m)
     expect(scriptsAtRecovery).toBe('')
     expect(readFileSync(scriptLog, 'utf8')).toBe('good\nroot\n')
+    const preparationCounts = { healthy: 1, persistent: 3, cold: 2, workspace: 2, warm: 1 }
+    const preparationCount = preparationCounts[mode]
+    expect(recoveryCalls).toBe(preparationCount - 1)
     expect(readFileSync(path.join(root, 'prep-state'), 'utf8')).toBe(
-      healthy ? 'false false true\n' : 'false false true\nfalse false true\n',
+      'false false true\n'.repeat(preparationCount),
     )
     expect(readFileSync(path.join(install, 'bun.lock'), 'utf8')).toBe(
       readFileSync(path.join(seed, 'bun.lock'), 'utf8'),
     )
     expect(readdirSync(root).filter((name) => /^bun-(prepare|install)\./.test(name))).toEqual([])
     expect(readFileSync(path.join(root, 'calls'), 'utf8').trim().split('\n')).toEqual([
-      ...(!healthy
-        ? ['install --frozen-lockfile --ignore-scripts --cache-dir <fixture>/install-cache']
-        : []),
-      'install --frozen-lockfile --ignore-scripts --cache-dir <fixture>/install-cache',
+      ...Array(preparationCount).fill(
+        'install --frozen-lockfile --ignore-scripts --cache-dir <fixture>/install-cache',
+      ),
       'install --frozen-lockfile',
     ])
   } finally {
@@ -536,3 +544,65 @@ for (const preflight of ['dirty', 'untracked', 'ignored', 'archive', 'cache'] sa
     expect(result.sleeps).toEqual([])
   })
 }
+
+const cachedFailure = [
+  'Resolved, downloaded and extracted [4]',
+  download,
+  '  https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-react-0.5.12-bubli.2.tgz',
+  '',
+  'Failed to install 1 package',
+  '[657.00ms] done',
+].join('\n')
+
+test.skipIf(!supported)(
+  'continues preparation after the observed cached partial-install failure',
+  () => {
+    const result = runInstall({ output: cachedFailure, firstOutput: download, failures: 2 })
+    expect(result.status, result.output).toBe(0)
+    expect(result.calls).toHaveLength(4)
+    expect(result.sleeps).toEqual(['2', '4'])
+    expect(result.output).toContain('[657.00ms] done')
+  },
+)
+
+test.skipIf(!realSupported)(
+  'real Bun recovers after two preparation failures with the partial cache retained',
+  async () => {
+    await lifecycleFixture('persistent')
+  },
+)
+
+for (const output of [
+  cachedFailure + '\nerror: Integrity check failed',
+  cachedFailure + '\nunknown diagnostic',
+  cachedFailure.replace(download, ''),
+  cachedFailure.replace('[657.00ms] done', '[657.00ms] done with unknown suffix'),
+]) {
+  test.skipIf(!supported)(`cached summary keeps terminal diagnostics terminal: ${output}`, () => {
+    const result = runInstall({ output, status: 23 })
+    expect(result.status, result.output).toBe(23)
+    expect(result.calls).toHaveLength(1)
+    expect(result.sleeps).toEqual([])
+  })
+}
+
+test.skipIf(!supported)('cached summary cannot override a logging failure', () => {
+  const result = runInstall({ output: cachedFailure, loggingStatus: 74 })
+  expect(result.status, result.output).toBe(74)
+  expect(result.calls).toHaveLength(1)
+  expect(result.sleeps).toEqual([])
+})
+
+test.skipIf(!supported)('cached summary cannot override a signaled preparation', () => {
+  const result = runInstall({ output: cachedFailure, signal: true })
+  expect(result.status, result.output).toBe(143)
+  expect(result.calls).toHaveLength(1)
+  expect(result.sleeps).toEqual([])
+})
+
+test.skipIf(!supported)('cached summary in the final normal failure never triggers retry', () => {
+  const result = runInstall({ output: download, finalOutput: cachedFailure, finalStatus: 42 })
+  expect(result.status, result.output).toBe(42)
+  expect(result.calls).toHaveLength(3)
+  expect(result.sleeps).toEqual(['2'])
+})
