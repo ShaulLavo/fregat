@@ -18,8 +18,13 @@ export function ChatInputDictationStatus({
       </span>
       <span className='text-muted-foreground shrink-0 font-mono tabular-nums'>{elapsed}</span>
       {voice.preview ? (
-        <span className='text-foreground min-w-0 truncate' title={voice.preview}>
-          {voice.preview}
+        <span
+          className='text-foreground flex min-w-0 flex-1 justify-end overflow-hidden'
+          data-dictation-preview
+          dir='auto'
+          title={voice.preview}
+        >
+          <span className='min-w-full shrink-0 whitespace-nowrap'>{voice.preview}</span>
         </span>
       ) : null}
     </div>

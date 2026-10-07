@@ -1,4 +1,5 @@
 import { strictEqual } from 'node:assert/strict'
+import type { Page } from 'playwright'
 import { createSpeechRecognitionFixture } from '../../../apps/web/test/factories/speech-recognition'
 import { selectors } from '../selectors'
 import { readCaches } from '../cache-snapshot'
@@ -7,7 +8,7 @@ import { isolatedNativeScenario, withUserSetting } from './native-provider-verif
 export const chatDictation = isolatedNativeScenario({
   name: 'chat-dictation',
   description:
-    'T3-style dictation replaces selected text, freezes sending and editing, discards cancelled speech, reports microphone failures and finishes at the configured limit. The external browser speech API is a fixture; actual microphone transcription is a manual check.',
+    'T3-style dictation replaces selected text, freezes sending and editing, discards cancelled speech, reports microphone failures, keeps the newest live words visible across growing text, right-to-left text and phone resizing, and finishes at the configured limit. The external browser speech API is a fixture; actual microphone transcription is a manual check.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step, orchestration }) {
     await page.addInitScript({
@@ -35,6 +36,29 @@ export const chatDictation = isolatedNativeScenario({
     strictEqual(voiceCapture?.status, 'pending')
     strictEqual(voiceCapture?.scope, 'chat-voice-input')
     await step('recording-selected-text')
+    const longPreview =
+      'This is a longer sentence that keeps growing as I speak and should keep the newest words visible. '.repeat(
+        8,
+      )
+    await page.evaluate(
+      (text) => window.speechRecognitionFixture?.current?.result(text, false),
+      `${longPreview}lighthouse`,
+    )
+    await selectors.dictationPreview(page).getByText('lighthouse', { exact: false }).waitFor()
+    await step('long-live-preview')
+    await assertVisibleTail(page, 'lighthouse')
+    await page.evaluate(
+      (text) => window.speechRecognitionFixture?.current?.result(text, false),
+      `${longPreview}lighthouse beside the shore`,
+    )
+    await assertVisibleTail(page, 'shore')
+    await step('live-preview-follows-end')
+    await page.evaluate(
+      (text) => window.speechRecognitionFixture?.current?.result(text, false),
+      `${'זה משפט ארוך שממשיך להתעדכן בזמן הדיבור '.repeat(12)}סיום`,
+    )
+    await assertVisibleTail(page, 'סיום')
+    await step('live-preview-right-to-left')
     await page.evaluate(() => window.speechRecognitionFixture?.current?.result('friend'))
     await selectors.dictationFinish(page).click()
     await selectors.dictationStart(page).waitFor()
@@ -89,7 +113,48 @@ export const chatDictation = isolatedNativeScenario({
     const mic = await selectors.dictationStart(page).boundingBox()
     strictEqual(mic !== null && mic.x >= 0 && mic.x + mic.width <= 390, true)
     await step('phone-composer')
+    await selectors.dictationStart(page).click()
+    await page.evaluate(
+      (text) => window.speechRecognitionFixture?.current?.result(text, false),
+      `${longPreview}lighthouse`,
+    )
+    await assertVisibleTail(page, 'lighthouse')
+    await step('phone-live-preview-follows-end')
+    await page.setViewportSize({ width: 320, height: 844 })
+    await assertVisibleTail(page, 'lighthouse')
+    await step('phone-narrow-live-preview-follows-end')
+    await selectors.dictationCancel(page).click()
+    await selectors.dictationStart(page).waitFor()
     await page.setViewportSize({ width: 1440, height: 900 })
     return { recordingCaches, completedCaches: await page.evaluate(readCaches) }
   },
 })
+
+async function assertVisibleTail(page: Page, word: string) {
+  await page.waitForFunction(({ element, lastWord }) => element?.textContent?.endsWith(lastWord), {
+    element: await selectors.dictationPreview(page).elementHandle(),
+    lastWord: word,
+  })
+  const geometry = await selectors.dictationPreview(page).evaluate((element, lastWord) => {
+    const text = document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode()
+    if (!(text instanceof Text)) return { visible: false, reason: 'missing text' }
+    const end = text.length
+    const range = document.createRange()
+    range.setStart(text, end - lastWord.length)
+    range.setEnd(text, end)
+    const tail = range.getBoundingClientRect()
+    const viewport = element.getBoundingClientRect()
+    return {
+      visible:
+        text.data.endsWith(lastWord) &&
+        tail.width > 0 &&
+        tail.left >= viewport.left - 1 &&
+        tail.right <= viewport.right + 1,
+      tailLeft: tail.left,
+      tailRight: tail.right,
+      viewportLeft: viewport.left,
+      viewportRight: viewport.right,
+    }
+  }, word)
+  strictEqual(geometry.visible, true, JSON.stringify(geometry))
+}
