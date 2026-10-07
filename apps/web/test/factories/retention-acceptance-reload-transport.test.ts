@@ -49,7 +49,7 @@ test.each([
   expect(receipts).toEqual([])
 })
 
-test('readiness receipts contain only type, count, stage and clock fields', () => {
+test('readiness receipts contain only type, boolean, stage and clock fields', () => {
   const receipts: unknown[] = []
   observeRetentionReadiness(
     'RETENTION_READINESS ' +
@@ -60,10 +60,7 @@ test('readiness receipts contain only type, count, stage and clock fields', () =
         state: {
           stage: 'reload',
           observationType: 'object',
-          mounted: true,
-          viewCount: 1,
-          observedViews: 1,
-          matchingViews: 0,
+          ready: false,
           privateField: 'discarded fixture value',
         },
       }),
@@ -76,10 +73,7 @@ test('readiness receipts contain only type, count, stage and clock fields', () =
       state: {
         stage: 'reload',
         observationType: 'object',
-        mounted: true,
-        viewCount: 1,
-        observedViews: 1,
-        matchingViews: 0,
+        ready: false,
       },
     },
   ])
@@ -98,10 +92,7 @@ test('contains throwing readiness diagnostic sinks', () => {
           state: {
             stage: 'baseline',
             observationType: 'undefined',
-            mounted: false,
-            viewCount: 0,
-            observedViews: 0,
-            matchingViews: 0,
+            ready: false,
           },
         }),
       () => {
