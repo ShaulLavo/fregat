@@ -14,16 +14,77 @@ class ImageDataFixture {
 function fixture() {
   const memory = new WebAssembly.Memory({ initial: 1 })
   const putImageData = vi.fn()
-  const frame = new PixelFrame(memory, { putImageData } as unknown as Canvas2dContext)
+  const outputPutImageData = vi.fn()
+  const drawImage = vi.fn()
+  const rect = vi.fn()
+  const restore = vi.fn()
+  const getContext = vi.fn(() => ({ putImageData }))
+  vi.stubGlobal(
+    'OffscreenCanvas',
+    class {
+      constructor(
+        public width: number,
+        public height: number,
+      ) {}
+      getContext = getContext
+    },
+  )
+  const context = {
+    putImageData: outputPutImageData,
+    drawImage,
+    rect,
+    restore,
+    save: vi.fn(),
+    setTransform: vi.fn(),
+    beginPath: vi.fn(),
+    clip: vi.fn(),
+  }
+  const frame = new PixelFrame(memory, context as unknown as Canvas2dContext)
   const output = { offset: 32, width: 4, height: 6, generation: 0 }
   frame.bind(output, 2)
-  return { memory, putImageData, frame, output }
+  return {
+    memory,
+    putImageData,
+    outputPutImageData,
+    drawImage,
+    rect,
+    restore,
+    getContext,
+    frame,
+    output,
+  }
 }
 
 beforeEach(() => vi.stubGlobal('ImageData', ImageDataFixture))
 afterEach(() => vi.unstubAllGlobals())
 
 describe('WASM output handoff lifetime', () => {
+  it('uploads only to staging and replaces each clipped output region with a recorded draw', () => {
+    const { frame, outputPutImageData, putImageData, drawImage, rect, getContext } = fixture()
+    frame.present()
+    drawImage.mockClear()
+    rect.mockClear()
+    putImageData.mockClear()
+    frame.markRow(1)
+    frame.present()
+    expect(outputPutImageData).not.toHaveBeenCalled()
+    expect(getContext).toHaveBeenCalledWith('2d', { alpha: true, willReadFrequently: true })
+    expect(putImageData.mock.lastCall?.slice(3)).toEqual([0, 2, 4, 2])
+    expect(rect.mock.lastCall).toEqual([0, 2, 4, 2])
+    expect(drawImage.mock.lastCall?.slice(1)).toEqual([0, 2, 4, 2, 0, 2, 4, 2])
+  })
+
+  it('retains damage and restores context state after a recorded draw fails', () => {
+    const { frame, drawImage, restore } = fixture()
+    drawImage.mockImplementationOnce(() => {
+      throw new TypeError('Injected draw failure')
+    })
+    expect(() => frame.present()).toThrow('Injected draw failure')
+    expect(restore).toHaveBeenCalledTimes(1)
+    frame.present()
+    expect(drawImage).toHaveBeenCalledTimes(2)
+  })
+
   it('aliases output bytes and reuses only the same view identity', () => {
     const { frame, memory } = fixture()
     const image = frame.getImage()
@@ -95,13 +156,28 @@ describe('WASM output handoff lifetime', () => {
     ])
   })
 
-  it('dirties transported destinations and invalidates after context loss', () => {
+  it('moves pending damage with canvas-transported rows', () => {
     const { frame, putImageData } = fixture()
     frame.present()
     putImageData.mockClear()
-    frame.markTransportedRows(-1)
+    frame.transportDirtyRows(-1)
     frame.present()
-    expect(putImageData.mock.calls[0]?.slice(3)).toEqual([0, 0, 4, 4])
+    expect(putImageData).not.toHaveBeenCalled()
+    frame.markRow(1)
+    frame.markRow(2)
+    frame.transportDirtyRows(-1)
+    frame.present()
+    expect(putImageData.mock.calls.map((call) => call.slice(3))).toEqual([[0, 0, 4, 6]])
+    putImageData.mockClear()
+    frame.markRow(0)
+    frame.transportDirtyRows(1)
+    frame.present()
+    expect(putImageData.mock.calls.map((call) => call.slice(3))).toEqual([[0, 0, 4, 4]])
+  })
+
+  it('invalidates after context loss', () => {
+    const { frame, putImageData } = fixture()
+    frame.present()
     const old = frame.getImage()
     frame.invalidate()
     expect(frame.getImage() === old).toBe(false)
@@ -113,7 +189,7 @@ describe('WASM output handoff lifetime', () => {
     const { frame, output } = fixture()
     expect(() => frame.markRow(-1)).toThrow()
     expect(() => frame.markRow(3)).toThrow()
-    expect(() => frame.markTransportedRows(0.5)).toThrow()
+    expect(() => frame.transportDirtyRows(0.5)).toThrow()
     expect(() => frame.bind({ ...output, offset: 65536 }, 2)).toThrow()
     expect(() => frame.bind({ ...output, width: 0 }, 2)).toThrow()
     expect(() => frame.bind(output, 4)).toThrow()

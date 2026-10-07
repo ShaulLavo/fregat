@@ -8,6 +8,7 @@ import { CanvasTerminalRenderer } from './renderer.js'
 import { ComposeKernel } from './kernel.js'
 import { CanvasRowPainter } from './painter.js'
 import { StampTarget } from './stamp-target.js'
+import { PixelFrame } from './pixel-frame.js'
 import { fittedFont } from './tests/font.js'
 
 const cleanups: (() => void)[] = []
@@ -58,7 +59,7 @@ it.each([1, 2])(
     }
     const rasterText = vi.spyOn(OffscreenCanvasRenderingContext2D.prototype, 'fillText')
     const readback = vi.spyOn(OffscreenCanvasRenderingContext2D.prototype, 'getImageData')
-    const submit = vi.spyOn(output, 'putImageData')
+    const submit = vi.spyOn(output, 'drawImage')
     const glyphs = vi.spyOn(target, 'glyph')
     draw()
     expect(
@@ -86,7 +87,7 @@ it.each([1, 2])(
     expect(target.cache.metrics.stampCopiedBytes).toBe(cache.stampCopiedBytes)
     expect(target.frame.getImage().data).toEqual(exact)
     expect(submit).toHaveBeenCalledTimes(1)
-    expect(submit.mock.calls[0]![0].data.buffer).toBe(kernel.memory.buffer)
+    expect(submit.mock.calls[0]![0]).toBeInstanceOf(OffscreenCanvas)
     expect(target.frame.metrics.copiedFrameBytes).toBe(0)
     expect(target.metrics.rowCopyBytes).toBe(0)
     document.body.append(canvas)
@@ -208,7 +209,7 @@ it('retains native scheduled damage when a pixel submission fails', async () => 
   terminal.write('\x1b[2;1Hnew text')
   renderer.notifyWrite()
   const output = canvas.getContext('2d')!
-  const failure = vi.spyOn(output, 'putImageData').mockImplementationOnce(() => {
+  const failure = vi.spyOn(output, 'drawImage').mockImplementationOnce(() => {
     throw new TypeError('external canvas upload failure')
   })
   expect(() => clock.flushFrame()).toThrow('external canvas upload failure')
@@ -252,8 +253,8 @@ it('rejects framebuffer reallocation during synchronous presentation and dispose
   const target = new StampTarget(kernel, output)
   cleanups.push(() => target.dispose())
   target.resize(24, 20, 20)
-  const submit = output.putImageData.bind(output)
-  vi.spyOn(output, 'putImageData').mockImplementation((...args) => {
+  const submit = output.drawImage.bind(output)
+  vi.spyOn(output, 'drawImage').mockImplementation((...args) => {
     expect(() => target.resize(48, 20, 20)).toThrow('presentation')
     expect(() => target.dispose()).toThrow('presentation')
     submit(...args)
@@ -463,4 +464,30 @@ it('keeps packed glyph variants distinct and clears font-scoped stamps across me
   for (const input of variants) target.glyph(input, 0, 0)
   expect(target.cache.metrics.rasterCalls - cold.rasterCalls).toBe(variants.length)
   expect(target.cache.metrics.residentEntries).toBe(variants.length)
+})
+
+it('keeps staged transparent dirty rows byte-identical to direct pixel uploads', () => {
+  const canvas = document.createElement('canvas')
+  const reference = document.createElement('canvas')
+  canvas.width = reference.width = 8
+  canvas.height = reference.height = 6
+  const output = canvas.getContext('2d')!
+  const expected = reference.getContext('2d')!
+  const memory = new WebAssembly.Memory({ initial: 1 })
+  const frame = new PixelFrame(memory, output)
+  cleanups.push(() => frame.dispose())
+  frame.bind({ offset: 32, width: 8, height: 6, generation: 0 }, 2)
+  const forbidden = vi.spyOn(output, 'putImageData')
+  for (let iteration = 0; iteration < 12; iteration++) {
+    const image = frame.getImage()
+    const row = iteration % 3
+    const top = row * 2
+    for (let index = top * 8 * 4; index < (top + 2) * 8 * 4; index++)
+      image.data[index] = (index * 31 + iteration * 47) % 256
+    frame.markRow(row)
+    frame.present()
+    expected.putImageData(image, 0, 0, 0, top, 8, 2)
+    expect(output.getImageData(0, 0, 8, 6).data).toEqual(expected.getImageData(0, 0, 8, 6).data)
+  }
+  expect(forbidden).not.toHaveBeenCalled()
 })

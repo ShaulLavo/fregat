@@ -30,11 +30,17 @@ export class PixelFrame {
   private view?: FrameView
   private rowHeight = 0
   private output?: FrameOutput
+  private readonly staging = new OffscreenCanvas(1, 1)
+  private readonly stagingContext: OffscreenCanvasRenderingContext2D
 
   constructor(
     private readonly memory: WebAssembly.Memory,
     private readonly context: Canvas2dContext,
-  ) {}
+  ) {
+    const staging = this.staging.getContext('2d', { alpha: true, willReadFrequently: true })
+    if (!staging) throw createGhosttyError('canvas.pixels', 'Canvas pixel staging is unavailable')
+    this.stagingContext = staging
+  }
 
   bind(output: FrameOutput, rowHeight: number): void {
     this.validate(output)
@@ -45,6 +51,8 @@ export class PixelFrame {
     this.output = { ...output }
     this.rowHeight = rowHeight
     if (old && this.sameOutput(old, output) && oldRowHeight === rowHeight) return
+    if (this.staging.width !== output.width) this.staging.width = output.width
+    if (this.staging.height !== output.height) this.staging.height = output.height
     this.dirty.clear()
     for (let y = 0; y < output.height / rowHeight; y++) this.dirty.add(y)
   }
@@ -56,13 +64,22 @@ export class PixelFrame {
     this.dirty.add(y)
   }
 
-  markTransportedRows(offset: number): void {
+  /** Moves pending damage with rows the output canvas has already transported by `offset`. */
+  transportDirtyRows(offset: number): void {
     const output = this.requireOutput()
     if (!Number.isSafeInteger(offset))
       throw createGhosttyError('canvas.frame', 'Canvas row transport requires an integer offset')
     const first = Math.max(0, offset)
     const last = output.height / this.rowHeight + Math.min(0, offset)
-    for (let y = first; y < last; y++) this.dirty.add(y)
+    const moved = new Set<number>()
+    for (const y of this.dirty) {
+      const target = y + offset
+      if (target >= first && target < last) moved.add(target)
+      // Rows outside the transported band keep their own pixels and damage.
+      if (y < first || y >= last) moved.add(y)
+    }
+    this.dirty.clear()
+    for (const y of moved) this.dirty.add(y)
   }
 
   present(): void {
@@ -95,6 +112,8 @@ export class PixelFrame {
     this.dirty.clear()
     this.output = undefined
     this.view = undefined
+    this.staging.width = 0
+    this.staging.height = 0
   }
 
   getImage(): ImageData {
@@ -129,7 +148,21 @@ export class PixelFrame {
       throw createGhosttyError('canvas.frame', 'Canvas pixel memory changed during presentation')
     const top = first * this.rowHeight
     const height = (last - first + 1) * this.rowHeight
-    this.context.putImageData(image, 0, 0, 0, top, image.width, height)
+    this.stagingContext.putImageData(image, 0, 0, 0, top, image.width, height)
+    this.context.save()
+    try {
+      this.context.setTransform(1, 0, 0, 1, 0, 0)
+      this.context.beginPath()
+      this.context.rect(0, top, image.width, height)
+      this.context.clip()
+      this.context.globalAlpha = 1
+      // Copy replaces destination alpha; clipping keeps unrelated rows intact.
+      this.context.globalCompositeOperation = 'copy'
+      this.context.imageSmoothingEnabled = false
+      this.context.drawImage(this.staging, 0, top, image.width, height, 0, top, image.width, height)
+    } finally {
+      this.context.restore()
+    }
     this.metrics.uploadedRegions += 1
     this.metrics.uploadedPixelBytes += image.width * height * 4
   }
