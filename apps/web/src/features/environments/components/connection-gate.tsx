@@ -57,7 +57,7 @@ export function ConnectionGate({
   // Only a completed handshake admits the retained tree; persisted descriptors start at generation zero.
   if (known && connection.generation > 0) return children
   const refused = drifted || connection.phase === 'protocol-mismatch'
-  if (refused || (query.isError && !query.data && !known)) {
+  if (refused || (query.isError && !query.data)) {
     return (
       <StatusFrame
         action={
