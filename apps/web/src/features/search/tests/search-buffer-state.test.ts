@@ -847,6 +847,44 @@ describe('search buffer store', () => {
     })
   })
 
+  it('clears the settled replacement summary when history requests a refresh', () => {
+    const store = createSearchBufferStore()
+    store.getState().prepareBuffer('repo')
+    const token = startReadyReplace(store, 'repo')
+    if (!token) expect.fail('A ready search must start replacement')
+
+    store.getState().finishReplace(token, '1 match replaced.', true)
+    expect(store.getState().active).toMatchObject({
+      replaceMessage: '1 match replaced.',
+      replaceStatus: 'success',
+    })
+
+    store.getState().requestSearchRefresh('repo')
+
+    expect(store.getState().active).toMatchObject({
+      replaceMessage: null,
+      replaceRequest: null,
+      replaceStatus: 'idle',
+      status: 'loading',
+    })
+  })
+
+  it('keeps an in-flight replacement while history requests a refresh', () => {
+    const store = createSearchBufferStore()
+    store.getState().prepareBuffer('repo')
+    const token = startReadyReplace(store, 'repo')
+    if (!token) expect.fail('A ready search must start replacement')
+
+    store.getState().requestSearchRefresh('repo')
+
+    expect(store.getState().active).toMatchObject({
+      replaceMessage: null,
+      replaceRequest: token,
+      replaceStatus: 'running',
+      status: 'loading',
+    })
+  })
+
   it('requests a search refresh for a whitespace-only query', () => {
     const store = createSearchBufferStore()
     store.getState().prepareBuffer('repo')

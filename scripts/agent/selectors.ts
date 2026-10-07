@@ -1014,10 +1014,10 @@ export const selectors = {
   searchFilterToggle: (page: Page) =>
     page.getByRole('button', { name: 'Include and exclude files', exact: true }).first(),
   searchInclude: (page: Page) => page.getByLabel('Include', { exact: true }).first(),
-  searchSummary: (page: Page) =>
-    page
-      .locator('span[title]')
-      .filter({ hasText: /(?:matches|shown, limit reached) in [\d,]+ files?/ }),
+  searchSummary: (
+    page: Page,
+    title: string | RegExp = /(?:match(?:es)?|shown, limit reached) in [\d,]+ files?/,
+  ) => page.locator('span[title]').and(page.getByTitle(title)),
   replaceBox: (page: Page) =>
     page.getByRole('textbox', { name: 'Replace in workspace', exact: true }),
   replaceToggle: (page: Page) => page.getByRole('button', { name: 'Replace', exact: true }),

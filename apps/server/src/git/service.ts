@@ -258,9 +258,9 @@ export class GitService {
     return gitCommonDirectory({ rootAbsolutePath: cwd, run: (args) => this.git(cwd, args) })
   }
 
-  async repo(input = '') {
+  async repo(input = '', fresh = false) {
     recordGitServiceOperation('repo', input)
-    const repository = await this.resolveRepository(input)
+    const repository = await this.resolveRepository(input, fresh)
     return { repository: repository?.info ?? null }
   }
 
@@ -1083,8 +1083,8 @@ export class GitService {
     return repository
   }
 
-  private async resolveRepository(input = ''): Promise<GitRepository | null> {
-    const location = await this.resolveRepositoryLocation(input)
+  private async resolveRepository(input = '', fresh = false): Promise<GitRepository | null> {
+    const location = await this.resolveRepositoryLocation(input, fresh)
     if (!location) return null
 
     const info = await this.repositoryInfo(location.rootAbsolutePath, location.rootPath)
