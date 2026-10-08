@@ -131,6 +131,46 @@ describe('exact plugin transactions on the simple API', () => {
     expect(seen).toEqual(['first', 'second'])
   })
 
+  it('delivers attached-session edits before replacements authored by onChange', () => {
+    let editor!: Editor
+    let armed = false
+    const mounted = mount('abc', () => {
+      if (!armed) return
+      armed = false
+      editor.setText('second')
+    })
+    editor = mounted.editor
+    const session = createDocumentSession('abc')
+    editor.attachSession(session)
+    armed = true
+    session.applyEdits([{ from: 1, to: 1, text: 'x' }])
+    expect(
+      mounted.transactions.map((event) => materializePieceTableFullText(event.snapshotAfter)),
+    ).toEqual(['axbc', 'second'])
+  })
+
+  it('retains both replacements when onChange calls setText reentrantly', () => {
+    let editor!: Editor
+    let armed = false
+    const mounted = mount('abc', () => {
+      if (!armed) return
+      armed = false
+      editor.setText('second')
+    })
+    editor = mounted.editor
+    armed = true
+    editor.setText('first')
+    expect(
+      mounted.transactions.map((event) => [
+        materializePieceTableFullText(event.snapshotBefore),
+        materializePieceTableFullText(event.snapshotAfter),
+      ]),
+    ).toEqual([
+      ['abc', 'first'],
+      ['first', 'second'],
+    ])
+  })
+
   it('preserves selection options when the positional selection is omitted', () => {
     const { scope } = mount()
     scope.applyEdits([{ from: 0, to: 0, text: 'x' }], undefined, { selection: { anchor: 3 } })
