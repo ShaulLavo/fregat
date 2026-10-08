@@ -69,7 +69,7 @@ import {
   type JobDuringRun,
   type ServerAtAdmission,
 } from './record'
-import { beginRun, finishRun, isActiveQuietRun, stopRunConcurrency } from './runtime'
+import { beginRun, finishRun, isActiveQuietRun, resumeRun, stopRunConcurrency } from './runtime'
 
 const USAGE =
   'Usage: bun /work/platform-production/heavy/current/run.js [--class suite|browser|build|bench|light] [--quiet | --server] [--host local|pi] [--max-wall <seconds, pi only>] [--state-dir <dir>] [--slice-root <name>] [--production-state-dir <dir>] [--production-slice-root <name>] [--log-dir <dir>] [--settings-home <dir>] [--proc <dir>] <label> -- <command…>'
@@ -251,7 +251,11 @@ async function run(options: Options) {
     const job = startJob(
       placed.spec,
       () => duplicateDescriptor(2),
-      (launch) => (placed.entry ? beginRun(options.stateDir, placed.entry, launch) : launch()),
+      (launch, recovering) => {
+        if (!placed.entry) return launch()
+        if (recovering) return resumeRun(options.stateDir, placed.entry.id, launch)
+        return beginRun(options.stateDir, placed.entry, launch)
+      },
       () => {
         if (placed.entry?.quiet) stopRunConcurrency(options.stateDir, placed.entry.id)
       },

@@ -173,7 +173,10 @@ export type JobSpec =
 export function startJob(
   job: JobSpec,
   copyStderr: () => number | null,
-  publish = (launch: () => ReturnType<typeof Bun.spawn>) => launch(),
+  publish: (
+    launch: () => ReturnType<typeof Bun.spawn>,
+    recovering?: boolean,
+  ) => ReturnType<typeof Bun.spawn> = (launch) => launch(),
   onExit = () => {},
   onRecovery: (level: 'warn' | 'info', unit: string, recovery: ScopeRecovery) => void = () => {},
 ) {
@@ -243,8 +246,7 @@ export function startJob(
       recovery = { ...recovery, retries: 1, status: 'launch-failed' }
       const command = localCommand({ ...job, slice: slice!, unit, accountingFile })
       try {
-        // Keep the existing publication and its quiet journal; a retry is the same admitted run.
-        child = spawnJob(job, command, copyStderr)
+        child = spawnJob(job, command, copyStderr, (launch) => publish(launch, true))
       } catch {
         return { ...first, recovery }
       }

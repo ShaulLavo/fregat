@@ -376,3 +376,77 @@ test.for([{ cleanupWait: true }, { active: true }])(
     }
   },
 )
+
+test.for([false, true])(
+  'a quiet payload admits light followers and excludes suite successors after recovery=%s',
+  async (recover, context) => {
+    if (!locks || !userScopes) context.skip('Requires Linux user scopes and Bun FFI')
+    const systemdRun = Bun.which('systemd-run')!
+    const box = sandbox()
+    writeMachine(box, { availableMiB: 65536 })
+    writeSettings(box, { 'developer.heavyJobQuietHoldSeconds': 600 })
+    const bin = path.join(box.root, 'bin')
+    const attempts = path.join(box.root, 'attempts')
+    const launchGate = path.join(box.root, 'release-launch')
+    const payloadGate = path.join(box.root, 'release-payload')
+    mkdirSync(bin)
+    writeFileSync(
+      path.join(bin, 'systemd-run'),
+      `#!/bin/bash
+if [[ "$*" == *--scope* ]]; then
+  printf 'launch\\n' >> ${JSON.stringify(attempts)}
+  if [[ ${recover ? 'yes' : 'no'} == yes && $(wc -l < ${JSON.stringify(attempts)}) == 1 ]]; then
+    printf '%s\\n' ${JSON.stringify(transport)} >&2
+    ${until(launchGate)}
+    exit 1
+  fi
+fi
+exec ${JSON.stringify(systemdRun)} "$@"
+`,
+      { mode: 0o755 },
+    )
+    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` }
+    const job = start(box, 'light-policy', ['bash', '-c', `echo ready; ${until(payloadGate)}`], {
+      env,
+      quiet: true,
+      machine: true,
+      jobClass: 'light',
+    })
+    let light: ReturnType<typeof start> | undefined
+    let suite: ReturnType<typeof start> | undefined
+    try {
+      if (recover) await expect.poll(job.stderr).toContain(transport)
+      if (!recover) await expect.poll(job.stdout).toContain('ready')
+      const originalEntry = queue!.live(box.state, 'jobs')[0]!
+      const runFile = path.join(box.state, 'runs', `${originalEntry.id}.json`)
+      const journalFile = path.join(box.state, 'measurements', `${originalEntry.id}.json`)
+      const originalRun = JSON.parse(readFileSync(runFile, 'utf8'))
+      const originalJournal = readFileSync(journalFile, 'utf8')
+      writeFileSync(launchGate, '')
+      await expect.poll(job.stdout).toContain('ready')
+      expect(queue!.live(box.state, 'jobs')[0]).toEqual(originalEntry)
+      expect(readFileSync(journalFile, 'utf8')).toBe(originalJournal)
+      expect(readFileSync(attempts, 'utf8').trim().split('\n')).toHaveLength(recover ? 2 : 1)
+      light = start(box, 'permitted-light', ['true'], { env, machine: true, jobClass: 'light' })
+      expect(await firstDecision(light)).toBe('started')
+      expect(JSON.parse(readFileSync(runFile, 'utf8'))).toEqual(originalRun)
+      expect((await light.done).code).toBe(0)
+      suite = start(box, 'excluded-suite', ['true'], { env, machine: true, jobClass: 'suite' })
+      expect(await firstDecision(suite)).toBe('waiting')
+      writeFileSync(payloadGate, '')
+      expect((await job.done).code).toBe(0)
+      expect(recordOf(box, 'light-policy')?.jobsDuringRun).toMatchObject([
+        { label: 'permitted-light' },
+      ])
+      expect((await suite.done).code).toBe(0)
+      released(box)
+    } finally {
+      writeFileSync(launchGate, '')
+      writeFileSync(payloadGate, '')
+      job.child.kill('SIGTERM')
+      light?.child.kill('SIGTERM')
+      suite?.child.kill('SIGTERM')
+      await Promise.all([job.done, light?.done, suite?.done])
+    }
+  },
+)
