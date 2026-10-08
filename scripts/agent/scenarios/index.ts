@@ -38,6 +38,7 @@ import { primaryIdentityReplacement } from './primary-identity-replacement'
 import { editorLspTabSwitch } from './editor-lsp-tab-switch'
 import { editorLspServerExit } from './editor-lsp-server-exit'
 import { editorTypography } from './editor-typography'
+import { editorWrappedGutter } from './editor-wrapped-gutter'
 import { editorDecodeReveal } from './editor-decode-reveal'
 import { responseDelivery } from './response-delivery'
 import { draftRecovery } from './draft-recovery'
@@ -741,6 +742,7 @@ export const scenarios: readonly Scenario[] = [
   editorLspTabSwitch,
   editorLspServerExit,
   editorTypography,
+  editorWrappedGutter,
   editorDecodeReveal,
   editorDefinitionCrlf,
   editorExternalDeletion,
