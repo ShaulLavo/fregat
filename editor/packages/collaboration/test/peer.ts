@@ -32,9 +32,17 @@ export interface PeerSnapshot {
   readonly errors: readonly string[]
 }
 
+export interface SelectedCandidatePair {
+  readonly localType: string
+  readonly remoteType: string
+  readonly bytesSent: number
+  readonly bytesReceived: number
+}
+
 interface PeerHarness {
   start(options: PeerOptions): Promise<void>
   snapshot(): PeerSnapshot
+  selectedCandidatePairs(): Promise<readonly SelectedCandidatePair[]>
   submit(text: string): void
   stopRTC(): Promise<void>
   restartRTC(): void
@@ -59,6 +67,14 @@ let seq = 0
 let credentialCalls = 0
 const offers = new Set<string>()
 const errors: string[] = []
+const peerConnections: RTCPeerConnection[] = []
+const NativePeerConnection = window.RTCPeerConnection
+window.RTCPeerConnection = class extends NativePeerConnection {
+  constructor(configuration?: RTCConfiguration) {
+    super(configuration)
+    peerConnections.push(this)
+  }
+}
 const onError = (error: unknown) => {
   errors.push(String(error))
 }
@@ -144,6 +160,30 @@ window.collaborationPeer = {
     offers: [...offers],
     errors: [...errors],
   }),
+  async selectedCandidatePairs() {
+    const reports = await Promise.all(
+      peerConnections
+        .filter((connection) => connection.connectionState === 'connected')
+        .map((connection) => connection.getStats()),
+    )
+    return reports.flatMap((report) => {
+      const transports = Array.from(report.values()).filter((stat) => stat.type === 'transport')
+      return transports.flatMap((transport) => {
+        const pair = report.get(transport.selectedCandidatePairId)
+        if (!pair) return []
+        const local = report.get(pair.localCandidateId)
+        const remote = report.get(pair.remoteCandidateId)
+        return [
+          {
+            localType: local?.candidateType ?? 'unknown',
+            remoteType: remote?.candidateType ?? 'unknown',
+            bytesSent: pair.bytesSent ?? 0,
+            bytesReceived: pair.bytesReceived ?? 0,
+          },
+        ]
+      })
+    })
+  },
   submit(text) {
     session.submit({
       document: 'transport-browser',

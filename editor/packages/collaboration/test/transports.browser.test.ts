@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { commands } from 'vitest/browser'
-import type { PeerSnapshot } from './peer'
+import type { PeerSnapshot, SelectedCandidatePair } from './peer'
 
 declare const __COLLABORATION_TURN_AVAILABLE__: boolean
 
@@ -19,6 +19,7 @@ declare module 'vitest/browser' {
       after: readonly PeerSnapshot[]
       rejoined: readonly PeerSnapshot[]
       texts: readonly string[]
+      selectedPairs: readonly (readonly SelectedCandidatePair[])[]
     }>
   }
 }
@@ -62,5 +63,14 @@ test.skipIf(!__COLLABORATION_TURN_AVAILABLE__)(
     const result = await commands.collaborationScenario('turn')
     expect(new Set(result.after.map((peer) => peer.text)).size).toBe(1)
     expect(result.before.every((peer) => peer.rtcLinks === 1)).toBe(true)
+    expect(result.selectedPairs).toHaveLength(2)
+    for (const pairs of result.selectedPairs) {
+      expect(pairs).toHaveLength(1)
+      expect(pairs[0]!.localType).toBe('relay')
+      expect(pairs[0]!.remoteType).toBe('relay')
+      expect(pairs[0]!.bytesSent).toBeGreaterThan(0)
+      expect(pairs[0]!.bytesReceived).toBeGreaterThan(0)
+    }
+    for (const peer of result.after) expect(peer.errors).toEqual([])
   },
 )
