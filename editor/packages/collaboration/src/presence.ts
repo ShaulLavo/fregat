@@ -41,7 +41,6 @@ const MAX_SELECTIONS = 32
 const MAX_ID = 256
 
 type Entry = {
-  clock: number
   updated: number
   applied: number
   state: PresenceState | null
@@ -51,6 +50,7 @@ type Entry = {
 /** Uses the caller's clock only while renewal, queued state or expiry needs work. */
 export class Presence {
   private readonly entries = new Map<string, Entry>()
+  private readonly clockFloors = new Map<string, number>()
   private readonly workPeers = new Set<string>()
   private readonly listeners = new Set<() => void>()
   private remoteStates: readonly PresenceState[] = []
@@ -130,6 +130,7 @@ export class Presence {
     this.attachments = 0
     this.clearRemote()
     this.entries.clear()
+    this.clockFloors.clear()
     this.listeners.clear()
     this.updateClock()
   }
@@ -174,23 +175,16 @@ export class Presence {
     this.prune()
     const payload = parsePresence(input, peer, this.documentId)
     if (!payload) return false
-    const previous = this.entries.get(peer)
-    if (!previous && (payload.clock === 0 || this.entries.size >= MAX_PEERS)) return false
-    if (
-      previous &&
-      (payload.clock < previous.clock ||
-        (payload.clock === previous.clock &&
-          (payload.state !== null || (previous.state === null && !previous.pending))))
-    )
-      return false
-    const entry = previous ?? {
-      clock: payload.clock,
+    const floor = this.clockFloors.get(peer)
+    if (payload.clock <= (floor ?? 0)) return false
+    if (floor === undefined && this.clockFloors.size >= MAX_PEERS) return false
+    const entry = this.entries.get(peer) ?? {
       updated: this.now,
       applied: -Infinity,
       state: null,
       pending: undefined,
     }
-    entry.clock = payload.clock
+    this.clockFloors.set(peer, payload.clock)
     entry.updated = this.now
     this.entries.set(peer, entry)
     if (payload.state && this.now - entry.applied < UPDATE_MS) {

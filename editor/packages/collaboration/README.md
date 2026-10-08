@@ -115,13 +115,14 @@ state and authenticated leave remove visible state promptly and cancel queued st
 Repeated leave/reappearance cannot bypass the positive-state cadence. View notifications
 coalesce to one repaint request per animation frame.
 
-Newer clocks win, including queued states. Equal-clock null state removes a peer. Expiry
-retains clock metadata for 60 seconds after removal, bounded to 256 peer incarnations.
-Expired tombstones are pruned on packet receipt or attachment, so an idle room performs
-no clock scans. Replay protection covers that retention window; a transport closes a
-departed incarnation's links, and a restarted peer uses a fresh session ID. Completed
-local departure clears remote awareness from the readable final document. Awareness
-clock dispatch is independent of the session's ordering-host role. Each state has at most 32 selections,
+Every message, including null state, needs a clock greater than the peer session's last
+accepted clock. One clock floor per peer session survives expiry, detach and reattachment
+until `dispose()` closes the room. A room admits up to 256 peer session IDs across its
+lifetime. Removed state entries are pruned after 60 seconds on packet receipt or attachment;
+clock floors remain without clock callbacks or expiry scans. A restarted peer uses a
+fresh session ID. Completed local departure clears remote awareness from the readable
+final document. Awareness clock dispatch is independent of the session's ordering-host
+role. Each state has at most 32 selections,
 128 display-name code units, and 256 code units per identifier. Names exclude control
 and formatting characters. Parsing copies validated fields and discards extra fields.
 

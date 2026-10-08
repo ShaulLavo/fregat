@@ -82,7 +82,7 @@ test('renews every 15 seconds through the session clock and sends null on final 
   expect(channel.channel.sendPresence).toHaveBeenCalledTimes(3)
 })
 
-test('newer clocks win, equal-clock null removes, renewals refresh expiry without repainting', () => {
+test('newer clocks win, equal-clock null is rejected, renewals refresh expiry without repainting', () => {
   const presence = new Presence('local', 'document')
   const changed = vi.fn()
   presence.subscribe(changed)
@@ -98,9 +98,14 @@ test('newer clocks win, equal-clock null removes, renewals refresh expiry withou
   expect(presence.states).toHaveLength(0)
   expect(presence.receive('remote', payload('remote', 4))).toBe(false)
   expect(presence.receive('remote', payload('remote', 5))).toBe(true)
-  expect(presence.receive('remote', { clock: 5, state: null })).toBe(true)
-  expect(presence.receive('remote', payload('remote', 5))).toBe(false)
   expect(presence.receive('remote', { clock: 5, state: null })).toBe(false)
+  expect(presence.states).toHaveLength(0)
+  presence.tick(50_050)
+  expect(presence.states).toHaveLength(1)
+  expect(presence.receive('remote', { clock: 6, state: null })).toBe(true)
+  expect(presence.states).toHaveLength(0)
+  expect(presence.receive('remote', payload('remote', 5))).toBe(false)
+  expect(presence.receive('remote', { clock: 6, state: null })).toBe(false)
 })
 
 test('ignores own state, preserves tombstone clocks, and bounds peer churn', () => {
@@ -336,7 +341,7 @@ test('coalesces each inbound peer to latest state, preserves clocks and removes 
   expect(changed).toHaveBeenCalledTimes(2)
   expect(presence.states[0]?.displayName).toBe('Latest 10000')
   presence.receive('remote', payload('remote', 10_001))
-  presence.receive('remote', { clock: 10_001, state: null })
+  presence.receive('remote', { clock: 10_002, state: null })
   expect(presence.states).toHaveLength(0)
   presence.tick(100)
   expect(presence.states).toHaveLength(0)
@@ -481,13 +486,20 @@ test.each([false, true])(
   },
 )
 
-test('expires retained tombstone clocks lazily so idle rooms admit fresh peer incarnations', () => {
+test('bounds peer-session clock floors across lazy state pruning and releases them on disposal', () => {
   const presence = new Presence('local', 'document')
   for (let peer = 0; peer < 256; peer++) presence.receive(`peer-${peer}`, { clock: 3, state: null })
   expect(presence.receive('overflow', payload('overflow'))).toBe(false)
   presence.tick(60_000)
-  expect(presence.receive('overflow', payload('overflow'))).toBe(true)
-  expect(presence.receive('peer-0', payload('peer-0', 1))).toBe(true)
+  expect(presence.receive('overflow', payload('overflow'))).toBe(false)
+  expect(presence.receive('peer-0', payload('peer-0', 1))).toBe(false)
+  expect(presence.receive('peer-0', payload('peer-0', 3))).toBe(false)
+  expect(presence.receive('peer-0', payload('peer-0', 4))).toBe(true)
+  presence.dispose()
+  const nextRoom = new Presence('local', 'document')
+  expect(nextRoom.receive('peer-0', payload('peer-0', 1))).toBe(true)
+  expect(nextRoom.receive('overflow', payload('overflow'))).toBe(true)
+  nextRoom.dispose()
 })
 
 test('disposal discards queued incoming and outgoing states without deferred callbacks', () => {
@@ -549,15 +561,15 @@ test('prompt null removal cannot be used to bypass a peer inbound cadence', () =
   const presence = new Presence('local', 'document')
   const changed = vi.fn()
   presence.subscribe(changed)
-  for (let clock = 1; clock <= 10_000; clock++) {
+  for (let clock = 1; clock <= 20_000; clock += 2) {
     presence.receive('remote', payload('remote', clock))
-    presence.receive('remote', { clock, state: null })
+    presence.receive('remote', { clock: clock + 1, state: null })
   }
-  presence.receive('remote', payload('remote', 10_001))
+  presence.receive('remote', payload('remote', 20_001))
   expect(changed).toHaveBeenCalledTimes(2)
   presence.tick(50)
   expect(changed).toHaveBeenCalledTimes(3)
-  expect(presence.states[0]?.presenceClock).toBe(10_001)
+  expect(presence.states[0]?.presenceClock).toBe(20_001)
 })
 
 test('attachment churn preserves the positive-state sending cadence', () => {
