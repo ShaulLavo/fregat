@@ -26,7 +26,6 @@
           "id": "3a4ee215cda3",
           "label": "comfy-gallery",
           "pid": 3971985,
-          "cwd": "/work/comfy/gallery",
           "sliceRoot": "heavy",
           "allowedCpus": []
         }
@@ -58,7 +57,6 @@
           "id": "3a4ee215cda3",
           "label": "comfy-gallery",
           "pid": 3971985,
-          "cwd": "/work/comfy/gallery",
           "sliceRoot": "heavy",
           "allowedCpus": []
         }
@@ -67,7 +65,6 @@
         {
           "allowedCpus": [],
           "class": "light",
-          "cwd": "/work/comfy/gallery",
           "endedAt": null,
           "id": "3a4ee215cda3",
           "label": "comfy-gallery",
@@ -103,7 +100,6 @@
           "id": "3a4ee215cda3",
           "label": "comfy-gallery",
           "pid": 3971985,
-          "cwd": "/work/comfy/gallery",
           "sliceRoot": "heavy",
           "allowedCpus": []
         }
@@ -135,7 +131,6 @@
           "id": "3a4ee215cda3",
           "label": "comfy-gallery",
           "pid": 3971985,
-          "cwd": "/work/comfy/gallery",
           "sliceRoot": "heavy",
           "allowedCpus": []
         }
@@ -144,7 +139,6 @@
         {
           "allowedCpus": [],
           "class": "light",
-          "cwd": "/work/comfy/gallery",
           "endedAt": null,
           "id": "3a4ee215cda3",
           "label": "comfy-gallery",
