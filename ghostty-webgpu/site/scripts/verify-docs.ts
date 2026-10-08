@@ -60,6 +60,13 @@ try {
     await page.getByRole('link', { name: 'Docs', exact: true }).getAttribute('href'),
     root.pathname,
   )
+  assert(
+    await page.evaluate(async () => {
+      const faces = await document.fonts.load('19px "Bricolage Grotesque"')
+      return faces.length > 0 && faces.every((face) => face.status === 'loaded')
+    }),
+    'Landing font must load under the active hosting base',
+  )
   await page.screenshot({ path: `${directory}/landing.png`, fullPage: true })
   await page.goto(root.href)
   await page.getByRole('button', { name: 'Search' }).click()
