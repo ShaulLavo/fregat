@@ -445,7 +445,7 @@ jobs:
       - name: Test Singapore documentation checks
         run: bun run --cwd editor/site test
       - name: Build Singapore docs and check samples and internal links
-        run: bun run --cwd editor/site build
+        run: bun run --cwd editor/site build --base /singapore/
       - name: Install Singapore browser test dependencies
         uses: ./.github/actions/install-browsers
         with:
