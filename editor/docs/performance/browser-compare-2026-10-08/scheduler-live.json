@@ -1,0 +1,30 @@
+{
+  "observedAt": "2026-10-08T08:58:21.605383+00:00",
+  "note": "Redacted live registry snapshot during the viewport-validated comparison. Unrelated labels, commands, paths and process identifiers are excluded.",
+  "jobs": [
+    {
+      "id": "2f7d3fbd6729",
+      "class": "bench",
+      "server": false,
+      "quiet": false,
+      "since": "2026-10-08T08:57:43.791Z",
+      "benchmark": true
+    },
+    {
+      "id": "7548519918e5",
+      "class": "suite",
+      "server": false,
+      "quiet": false,
+      "since": "2026-10-08T08:57:45.746Z",
+      "benchmark": false
+    },
+    {
+      "id": "54535b7fd3a8",
+      "class": "light",
+      "server": true,
+      "quiet": false,
+      "since": "2026-10-08T08:58:06.966Z",
+      "benchmark": false
+    }
+  ]
+}
