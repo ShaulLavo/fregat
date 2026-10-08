@@ -370,7 +370,16 @@ describe('DOM terminal renderer', () => {
     expect(probe.canvas.style.opacity).toBe('')
   })
 
-  it('continues through DOM when a lost WebGL context cannot acquire Canvas2D', async () => {
+  it('continues through DOM when a lost WebGL context cannot acquire Canvas2D', async ({
+    skip,
+  }) => {
+    const available = document.createElement('canvas').getContext('webgl2')
+    const lose = available?.getExtension('WEBGL_lose_context')
+    if (!lose) {
+      skip('WebGL 2 context loss is unavailable in this browser')
+      return
+    }
+    lose.loseContext()
     const runtime = await GhosttyRuntime.create()
     cleanups.push(() => runtime.dispose())
     const terminal = runtime.createTerminal({ columns: 12, rows: 3 })
