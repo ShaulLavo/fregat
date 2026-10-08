@@ -257,3 +257,62 @@ Current owner: [apps/server/src/git/tests/process.test.ts](https://github.com/Sh
 CI 37459899866 job 112256612017 observed 1,523,712 bytes for a real 2,000,000-byte Git blob with maxOutputBytes=1,024, failing the less-than-1,000,000 assertion. Output-limit and empty-stdout assertions passed. Local real-pipe and stalled-consumer controls did not reproduce that overshoot. Retain first chunk size, cumulative observed bytes, read/cancel phase and exit/signal in the next failing original composition. Do not clamp observedBytes or weaken the cap/overshoot assertion to make the test green.
 
 - [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+## Stale-claim follow-ups, 2026-10-08
+
+Status: Approved. Plan 336 Track H's second pass released the inactive claims after checking open PRs, branch dates and worktree processes. [The close-out record](issue-closeout-2026-10.md#second-pass-stale-claims) records those checks. These failures still need cause evidence.
+
+### Issue 563
+
+Source: [#563](https://github.com/ShaulLavo/fregat/issues/563). Current owners are `apps/server/src/settings/store.ts`, `layer.ts`, `write-coordinator.ts` and `tests/write-concurrency.test.ts`.
+
+The ordered dark, light, system test rejected with `settings.WRITE_CONTENDED` in PR #522's [job 111236444189](https://github.com/ShaulLavo/fregat/actions/runs/37134008428/job/111236444189), then on actual main `fd999a3f9a1b019a86fd115fadfd0d95ada1b815` in [job 112203877587](https://github.com/ShaulLavo/fregat/actions/runs/37443862823/job/112203877587). The latter ran for 62 ms. Both serialized failures omit attempts and coordinator wait. The fixture has a unique directory, `watch: false`, explicit stage gates and no injected external edit. Main retains the coordination test and bounded semantic attempts. A short elapsed time does not identify which bound failed.
+
+The original reproduction owner worked on `backlog/503-20261003-131439`, head `8a7635ca8ad570ae890087fd4201ddb4c1464a49`, for the separate merged desktop PR #522. Its exact case and full-file 50-repeat controls passed on the PR and captured main. A two-attempt injected revision mismatch proved attempt and wait facts observable. Thirty loaded ordered-write iterations on each tree also passed with first-attempt revision agreement and zero remaining coordinators. The exact full-shard attempt expired in admission and never ran. Preserve these results as controls, not a cause proof.
+
+- [ ] Capture a natural failing ordered-write fixture's attempt count, coordinator wait, elapsed time, admitted owner and pending write IDs, and stage/read revision agreement. Use fixture-owned facts and the existing known-contention control. Run the original `bun run --cwd apps/server test --shard=1/2` only as a bounded hypothesis-directed capture. Compare an exact-source healthy control.
+- [ ] Fix the demonstrated settings or fixture cause in its own change. Preserve admission order, the eight-attempt and 2000 ms bounds, and every assertion. Keep owner settings untouched. A passing rerun or larger timeout cannot close this follow-up.
+
+### Issue 574
+
+Source: [#574](https://github.com/ShaulLavo/fregat/issues/574). Current owners are `apps/web/src/features/editor/tests/file-sync-service.test.ts`, the real FileSyncService/query/watch lifecycle and `apps/web/test/fixtures.ts`.
+
+The clean-buffer case `recreates a deleted file after failed refetch and retained-data remount (dirty: false)` exceeded its 5000 ms CI deadline. The actually executed historical source was synthetic merge `2e26940a8ce889af113ea025d963dc24c5334e25`, with parents `4b382fb46c9ac0f7f123dd1a721f6e5c3bb4fc21` and `ad6ee788c4234c57b7357f60c97b61749df7a1f6`. Current main still checks failed deletion refetch, retained buffer identity, orphan state, save recreation and cleanup. Runtime impact and cause remain unconfirmed.
+
+The abandoned `backlog/574-20261003` head `4a292fcb92cc352a578bf88d1ad34b0db0a92e19` contains observation-only checkpoints and a historical Ubuntu capture harness. Its dispatch-only workflow replaces ordinary CI and must stay outside main. The [20-job capture](https://github.com/ShaulLavo/fregat/actions/runs/37158037955) ran ten unchanged and ten checkpoint cases once each at the original deadline, all passing. Every instrumented attempt showed all 32 checkpoints. Server import took 1.501–2.388 s, while the body through cache cleanup took 25.8–57.6 ms. Historical test, fixture, lock and configuration hashes and the observation-only AST comparison passed. This selected-case capture did not reproduce the original concurrent shard or establish import time as its cause.
+
+- [ ] Reuse the branch's 32-checkpoint design for a bounded capture on the original failing shard composition. Record the first missing fixture-import, query, refetch, remount, save or teardown checkpoint with monotonic elapsed time. Compare the dirty-true positive control and recover actual checkout identity before interpreting a failure.
+- [ ] Repair only the demonstrated lifecycle or fixture cause. Preserve the real in-process server, retry policy, buffer retention assertions and 5000 ms deadline. Do not transplant the diagnostic workflow, replay healthy jobs without a new hypothesis, or claim local passing controls fixed CI.
+
+### Issue 665
+
+Source: [#665](https://github.com/ShaulLavo/fregat/issues/665). Current owner is `apps/web/scripts/generate-preset-runtime.ts`, `registeredPresetCommandIds`, with `src/keymap/tests/preset-data.test.ts`.
+
+The generator authority test took 20,993 ms against its 20,000 ms bound in [job 111433213599](https://github.com/ShaulLavo/fregat/actions/runs/37201240507/job/111433213599). The adjacent bare Bun check passed in 12,402 ms. A compiler lookup for 319 IDs loaded 6,922 source files and about 41.887 million UTF-16 source units. Exact controls passed on both the PR and main, with roughly 2 GB direct-probe RSS. A private 2 GiB ceiling control recorded two OOM kills, while normal 8 GiB controls passed. These observations do not identify the CI timeout cause.
+
+The abandoned `docwave/presets665` head `83c2b949012b39d8030f916faecedc79bd448b5c` shipped in [PR #698](https://github.com/ShaulLavo/fregat/pull/698), squash `541ce4681ead968b58e0208181d481108c1c1b76`. Current main retains `host.jsDocParsingMode = ts.JSDocParsingMode.ParseForTypeErrors`. The branch's same-tree diagnostic reduced documentation AST work while keeping the full 6,923-file graph and exact 319-ID digest. Its one timing pair is diagnostic evidence, not a qualified speedup or proof the timeout was fixed. The full-graph cost and duplicate compiler construction in the adjacent CLI test remain.
+
+- [ ] Capture the current graph and memory cost with an exact live-table control, then reproduce the resource or timing failure under a bounded comparable load. Separate command-ID authority from handler type imports if that preserves exact live authority, or remove duplicate compiler construction when the evidence supports it.
+- [ ] Keep frozen inventories, binding reports, generated output and the silent bare Bun `--check` behavior exact. Run `bun run --cwd apps/web test src/keymap/tests/preset-data.test.ts` without timeout, retry or skip changes. Report paired qualified time and resource evidence before claiming an improvement.
+
+### Issue 810
+
+Source: [#810](https://github.com/ShaulLavo/fregat/issues/810). Current owners are `apps/web/src/features/chat/tests/mermaid-fence.browser.tsx` and the `delayRequest` browser command in `apps/web/vitest.browser.config.ts`.
+
+At main `60313f9eae767694326b9b2e00bd398c549040af`, [job 111879139435](https://github.com/ShaulLavo/fregat/actions/runs/37344356134/job/111879139435) observed `held.face.status = loaded` where the stalled-face case expected `loading`. Three diagrams had painted and the earlier elapsed assertion was not reported as failed. The test uses a 1000 ms font wait, a 5000 ms held request, a 2500 ms paint bound and the original 30-second case deadline. Main still retains this contract. A request-hold failure, cache effect, setup delay or production font behavior has not been established.
+
+The abandoned `docwave/main603-mermaid810` head `60313f9eae767694326b9b2e00bd398c549040af` has an uncommitted test-only observation patch, last modified 2026-10-05 17:29:56 UTC. It observes FontFace registration/status/load events, selected family, same-family faces and resource timing before disposal. Its optional `fontHoldObservation` command is absent from both that checkout's committed browser config and current main. The patch is an incomplete diagnostic sketch, not verified code to copy. Leave the original dirty tree untouched.
+
+- [ ] First prove the selected face actually downloads under a known-good hold. On the exact stalled case, capture request identity, route match, hold start/release, FontFace and font-set events, resource timing and paint start on comparable clocks. Add the missing bounded command-side hold observation if needed. Freeze failure facts before disposal calls `face.load()`.
+- [ ] Fix only a demonstrated route, fixture or font owner defect. Preserve all three diagrams, original wait/hold/elapsed bounds and the loading-face assertion. Keep this failure separate from #805's syntax readiness.
+
+### Issue 833
+
+Source: [#833](https://github.com/ShaulLavo/fregat/issues/833). Current owner is `scripts/agent/browser-doctor.test.ts`.
+
+The real CLI healthy case exceeded 5000 ms in PR #808 head `06a2e9b02c4fdeeced48eaa1673aea9913858686`, [job 111986432965](https://github.com/ShaulLavo/fregat/actions/runs/37375811230/job/111986432965). The other 15 doctor cases passed. The failure preceded the feature suite and supplies no editor-product cause. One cold healthy and one deliberate 504 control passed at the original deadline with owned cleanup. Passing main runs also do not explain the failed phase.
+
+The abandoned `docwave/browser-doctor-diagnostics200` source head `bfa82f30f1971de34066b7005a21b6cbca0fc05a`, published head `eab0a406946d465371ed2208e361d422aca04e92`, shipped in [PR #836](https://github.com/ShaulLavo/fregat/pull/836), squash `a4c772693f1fd557e22b711e6f639f5c5a4c3a84`. Main retains `doctor-fixture-failure`, with parent boundary, CLI PID/exit/signal, pipe bytes/completion and capped fixture request status/completion. The original case order, argv, predicates and deadline remain. This shipped observer is useful continuation work, not a timeout cure.
+
+- [ ] On a bounded natural recurrence, retain that journal and identify the last completed child, pipe, browser or fixture-request phase before cleanup. Calibrate observability with the same healthy and deliberate 504 controls, and preserve the original job's exact source and command.
+- [ ] Repair a demonstrated cause with a failing-first test. Keep the original 5000 ms deadline, predicates, argv and owned cleanup. Do not replay the 15 healthy cases without a cause-directed reason or add a generic retry.
