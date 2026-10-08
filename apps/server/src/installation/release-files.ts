@@ -20,6 +20,8 @@ export const RUNTIME_MANIFEST = 'runtime/package.json'
 export const RUNTIME_LOCK = 'runtime/bun.lock'
 /** Built by the `build` script from `remote-support.ts`. */
 export const REMOTE_SUPPORT = 'remote-support.js'
+/** Built by the `build` script from `devices/pair-command.ts`; prints a pairing code over SSH. */
+export const PAIR_COMMAND = 'pair.js'
 /** Built by the `build` script from `terminal-host/main.ts`; the server launches it for shells. */
 export const PTY_HOST = 'pty-host.js'
 /** Built by the `build` script; the bundle starts it as its native watch worker. */
@@ -64,6 +66,7 @@ export async function missingReleaseFiles(serverDirectory: string) {
     RUNTIME_MANIFEST,
     RUNTIME_LOCK,
     REMOTE_SUPPORT,
+    PAIR_COMMAND,
     PTY_HOST,
     WATCH_WORKER,
     IMAGE_WORKER,

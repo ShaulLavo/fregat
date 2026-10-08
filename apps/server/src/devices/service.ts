@@ -1,5 +1,11 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
-import type { PairedDevice, PairingClaim, PairingTrust } from '@workspace/contracts'
+import {
+  pairingLink,
+  type PairedDevice,
+  type PairingClaim,
+  type PairingLink,
+  type PairingTrust,
+} from '@workspace/contracts'
 
 import { recordRequestContext, runDetached } from '../observability'
 import type { DeviceStore } from './device-store'
@@ -34,7 +40,7 @@ type Admission = { readonly trust: PairingTrust; readonly deviceId: string | nul
 /**
  * Who may reach this machine. Requests from the machine itself pass, and so do the owner's own
  * Tailscale devices; any other device needs the cookie a one-time pairing link gave it. Pairing
- * grants full access: there is one trust level.
+ * grants full access: there is one trust level, so a paired device may make links too.
  */
 export class DevicePairing {
   private readonly store: DeviceStore
@@ -43,6 +49,7 @@ export class DevicePairing {
   private readonly own: () => ReadonlySet<string>
   private readonly tailnet: TailnetOwners | null
   private readonly now: () => number
+  private readonly appUrl: string | null
   /** The close of every live socket, by the device or Tailscale address it was admitted for. */
   private readonly live = new Map<string, Set<() => void>>()
   readonly cookieName: string
@@ -54,6 +61,8 @@ export class DevicePairing {
     readonly ownAddresses?: () => ReadonlySet<string>
     readonly tailnet?: TailnetOwners
     readonly now?: () => number
+    /** The app's public base URL that devices open, for links; null when only loopback serves it. */
+    readonly appUrl?: string | null
   }) {
     this.store = options.store
     this.required = options.required
@@ -61,6 +70,7 @@ export class DevicePairing {
     this.own = options.ownAddresses ?? ownAddresses
     this.tailnet = options.tailnet ?? null
     this.now = options.now ?? Date.now
+    this.appUrl = options.appUrl ?? null
   }
 
   /** A settings store that cannot answer leaves pairing on: it fails closed. */
@@ -156,11 +166,15 @@ export class DevicePairing {
     return this.admit(header).trust !== 'unpaired' || !this.isRequired()
   }
 
-  issueLink(header: HeaderReader) {
+  /** Any device let in may let the next one in: pairing has one trust level, so this grants nothing. */
+  issueLink(header: HeaderReader): PairingLink {
     const { trust } = this.admit(header)
-    if (trust !== 'host') throw pairingErrors.HOST_ONLY({ internal: { trust } })
-    const link = this.codes.issue(this.now())
-    recordRequestContext({ pairing: { outcome: 'link-issued', expiresAt: link.expiresAt } })
+    if (trust === 'unpaired') throw pairingErrors.PAIRED_ONLY({ internal: { trust } })
+    const issued = this.codes.issue(this.now())
+    const link = { ...issued, url: this.appUrl ? pairingLink(this.appUrl, issued.code) : null }
+    recordRequestContext({
+      pairing: { outcome: 'link-issued', issuedBy: trust, expiresAt: link.expiresAt },
+    })
     return link
   }
 

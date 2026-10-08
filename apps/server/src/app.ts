@@ -38,6 +38,7 @@ import { FontCatalogService } from './fonts/catalog'
 import { errorPayload, FsError, isFsError } from './fs/errors'
 import { fsRoutes, nativePickerRoutes } from './fs/routes'
 import { NativePicker } from './fs/native-picker'
+import { isLoopbackAddress } from './system/locality'
 import { readMachineId } from './system/machine-id'
 import { defaultNativePickerHelper, hasDesktopSession } from './system/native-helper'
 import { systemRoutes } from './system/routes'
@@ -631,6 +632,7 @@ export function createApp(options: AppOptions) {
       lookup: options.devices?.tailnet ?? defaultTailnetLookup(),
       enabled: () => settings.snapshot().values['environments.tailnetOwnerDevices'],
     }),
+    appUrl: publicAppUrl(options.webOrigin, options.system?.webBase ?? '/'),
   })
   const auth = createAuthConfig(options.auth, devices)
   const stopDeviceSweep = devices.startSweeping()
@@ -1036,4 +1038,12 @@ function defaultTailnetLookup() {
 function defaultDeviceFile() {
   if (!isTestProcess()) return platformHomePath('devices.json')
   return path.join(tmpdir(), `platform-test-devices-${process.pid}.json`)
+}
+
+/** The app's base URL as other devices open it: an HTTP(S) origin other devices can reach. */
+function publicAppUrl(origin: string | undefined, webBase: string) {
+  const url = origin ? URL.parse(webBase, origin) : null
+  if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:')) return null
+  const host = url.hostname.replace(/^\[|\]$/g, '')
+  return host === 'localhost' || isLoopbackAddress(host) ? null : url.href
 }

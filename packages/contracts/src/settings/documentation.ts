@@ -167,7 +167,7 @@ export const SETTINGS_DOCUMENTATION = {
   'environments.devicePairing': {
     title: 'Require pairing for other devices',
     description:
-      'A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a link from this machine pairs it. This machine’s own browser needs no pairing.',
+      'A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a code from this machine or a paired device pairs it. This machine’s own browser needs no pairing.',
     keywords: ['pair', 'phone', 'device', 'security', 'mesh', 'tailnet'],
   },
   'environments.tailnetOwnerDevices': {
@@ -708,7 +708,7 @@ export const SETTINGS_DOCUMENTATION = {
   },
   'developer.deployTarget': {
     title: 'Installation target',
-    description: 'Install releases and pair through Mesh and systemd.',
+    description: 'Install releases through Mesh and systemd.',
   },
   'developer.deployRestartWaitMinutes': {
     title: 'Restart wait',

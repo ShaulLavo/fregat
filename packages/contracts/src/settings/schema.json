@@ -300,7 +300,7 @@
         }
       ],
       "default": null,
-      "description": "Install releases and pair through Mesh and systemd."
+      "description": "Install releases through Mesh and systemd."
     },
     "developer.devServerIdleMinutes": {
       "default": 15,
@@ -685,7 +685,7 @@
     },
     "environments.devicePairing": {
       "default": true,
-      "description": "A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a link from this machine pairs it. This machine’s own browser needs no pairing.",
+      "description": "A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a code from this machine or a paired device pairs it. This machine’s own browser needs no pairing.",
       "type": "boolean"
     },
     "environments.loadBalancing": {
