@@ -1,5 +1,5 @@
 export function installOpenProbe() {
-  const probe = { diagnostics: [], messages: [] }
+  const probe = { diagnostics: [], messages: [], outputs: [] }
   globalThis.__compareOpenProbe = probe
   globalThis.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = (event) => {
     probe.diagnostics.push(event)
@@ -11,6 +11,7 @@ export function installOpenProbe() {
       super(...args)
       this.probeId = ++nextWorker
       this.addEventListener('message', ({ data }) => {
+        if (data?.result?.tokensPacked) probe.outputs.push(data.result)
         probe.messages.push({
           direction: 'received',
           worker: this.probeId,
@@ -38,6 +39,8 @@ export function installOpenProbe() {
         absoluteAt: performance.timeOrigin + performance.now(),
         type: data?.payload?.type,
         resultMode: data?.payload?.resultMode,
+        documentId: data?.payload?.documentId,
+        runtimeSessionId: data?.payload?.runtimeSessionId,
         sourceCommand: command?.kind,
         sourceCodeUnits: command?.chunks?.reduce((sum, chunk) => sum + chunk.length, 0),
       }
@@ -123,10 +126,16 @@ export function summarizeOpenProfile(events, probe) {
             : received.absoluteAt - received.workerPostedAt,
       }
     })
+  const tasks = main.filter((event) =>
+    ['RunTask', 'ThreadControllerImpl::RunTask'].includes(event.name),
+  )
   return {
     completed: !!settled,
     startedAtMs: probe.startedAtMs,
+    warmup: probe.warmup,
     marksMs: Object.fromEntries(marks.map((event) => [event.name, (event.ts - start.ts) / 1000])),
+    mainTaskCount: tasks.length,
+    largestMainTaskMs: tasks.length ? Math.max(...tasks.map((event) => event.dur / 1000)) : null,
     mainWorkMs: unionMs(spans(work)),
     mainRenderingMs: unionMs(spans(rendering)),
     requests,

@@ -26,6 +26,23 @@ test('open work unions nested spans, clips the clock and separates rendering fro
   assert.equal(profile.mainWorkMs, 7)
   assert.equal(profile.mainRenderingMs, 4)
   assert.equal(profile.marksMs['compare-open-mounted'], 2)
+  assert.equal(profile.mainTaskCount, 0)
+  assert.equal(profile.largestMainTaskMs, null)
+})
+
+test('largest main task includes complete overlapping tasks and excludes worker tasks', () => {
+  const profile = summarizeOpenProfile(
+    [
+      mark('start', 1000),
+      mark('settled', 5000),
+      task('ThreadControllerImpl::RunTask', 0, 2000),
+      task('RunTask', 2000, 4000),
+      task('RunTask', 0, 10000, 2),
+    ],
+    { messages: [], diagnostics: [] },
+  )
+  assert.equal(profile.mainTaskCount, 2)
+  assert.equal(profile.largestMainTaskMs, 4)
 })
 
 test('worker round trips match worker identity and preserve incomplete requests', () => {
@@ -193,6 +210,30 @@ test('profile rows keep the request timeline separate from nested worker phases'
   assert.equal(row.structuralWalkMs, 6)
   assert.equal(row.structuralApplyMs, 2)
   assert.equal(row.queryTokenBytes, 1200)
+  result.samples[0].openProfile.requests.push(
+    {
+      resultMode: 'full',
+      returnedResult: true,
+      timings: [
+        { name: 'treeSitter.parse', durationMs: 50 },
+        { name: 'treeSitter.query', durationMs: 80 },
+      ],
+      statistics: { tokens: 100 },
+    },
+    {
+      resultMode: 'full',
+      returnedResult: true,
+      timings: [
+        { name: 'treeSitter.parse', durationMs: 60 },
+        { name: 'treeSitter.query', durationMs: 90 },
+      ],
+      statistics: { tokens: 200 },
+    },
+  )
+  const [retried] = openProfileRows(result)
+  assert.equal(retried.fullAttempts, 2)
+  assert.equal(retried.fullWorkerWorkMs, 280)
+  assert.equal(retried.queryTokens, 200)
 })
 
 test('diagnostic comparison retains failed groups and rejects changed measurement contracts', async () => {

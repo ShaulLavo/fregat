@@ -145,6 +145,12 @@ For injections, retain lazy language registration while accounting for its full 
 
 Exit with a checked full-document baseline and the ranked bottleneck. Leave viewport-first off for every acceptance run.
 
+Qualification work in progress, 2026-10-08:
+
+- The benchmark checks canonical token, palette and structural hashes, root/injection bounds, query limits and final tokens. It has cold-context and warmed-runtime controls with fresh measured documents, deterministic additional corpora, memory observations and a bounded CI smoke command. Browser verification and quiet qualification remain pending.
+- The packaged runtime WASM is byte-identical to an `-O3`/LTO/`wasm-opt -O3` rebuild of tree-sitter-x source `fc034c3ad42a6a5669202fa40303bfb2cd8829fc` with wasi-sdk 34.0 and Binaryen 132. [Build provenance](../editor/docs/performance/singapore-full-parse-2026-10-08/runtime-wasm-provenance.json) records the flags, exports and grammar input hashes. The grammar WASM has not had a byte-identical rebuild.
+- Quiet M0 numbers must follow the merge of PR #1021 and integration of its full-document probe changes. No new quiet baseline or accepted optimization has been measured.
+
 ### Phase 1: Remove the largest single-worker cost
 
 - [ ] Profile the dominant phase. Split query engine, predicates, materialization and normalization when the coarse phase bundles them.

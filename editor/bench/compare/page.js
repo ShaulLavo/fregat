@@ -53,7 +53,26 @@ const geometry = () => {
 window.bench = {
   geometry,
   prepare(mib) {
-    preparedText = fixture(mib)
+    preparedText = fixture(mib, new URLSearchParams(location.search).get('corpus') ?? 'repeated')
+  },
+  async warm() {
+    this.prepare(1)
+    await this.open()
+    this.warmEditor = editor
+    editor = undefined
+    host.replaceChildren()
+    const probe = globalThis.__compareOpenProbe
+    probe.warmup = probe.messages
+      .filter((message) => message.resultMode === 'full')
+      .map((message) => ({
+        worker: message.worker,
+        documentId: message.documentId,
+        runtimeSessionId: message.runtimeSessionId,
+      }))
+    globalThis.__compareOpenProbe.diagnostics.length = 0
+    globalThis.__compareOpenProbe.messages.length = 0
+    globalThis.__compareOpenProbe.outputs.length = 0
+    performance.clearMarks()
   },
   async open() {
     const text = preparedText

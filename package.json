@@ -19,6 +19,7 @@
       "hotkeys/packages/*",
       "editor/packages/*",
       "editor/examples/*",
+      "editor/bench/compare",
       "ghostty-webgpu",
       "ghostty-webgpu-line-editor",
       "ghostty-webgpu/demo",
