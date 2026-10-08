@@ -14,6 +14,7 @@ const { values } = parseArgs({
     port: { type: 'string' },
     baseline: { type: 'boolean', default: false },
     'headings-only': { type: 'boolean', default: false },
+    'without-uuid': { type: 'boolean', default: false },
     compare: { type: 'string' },
     condition: { type: 'string', default: 'unspecified' },
     'core-dist': { type: 'string' },
@@ -73,6 +74,10 @@ try {
   await server.listen()
   browser = await chromium.launch()
   const page = await browser.newPage({ viewport: { width: 1024, height: 640 } })
+  if (values['without-uuid'])
+    await page.addInitScript(() =>
+      Object.defineProperty(crypto, 'randomUUID', { value: undefined }),
+    )
   const errors = []
   page.on('pageerror', (error) => errors.push(error.message))
   await page.goto(`http://127.0.0.1:${values.port}`)

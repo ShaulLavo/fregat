@@ -562,6 +562,31 @@ describe('VirtualizedTextView', () => {
     })
   })
 
+  it('allocates unique ownership ids across package instances without randomUUID', async () => {
+    vi.stubGlobal('crypto', { randomUUID: undefined })
+    const otherContainer = document.createElement('div')
+    document.body.append(otherContainer)
+    vi.resetModules()
+    const { VirtualizedTextView: SeparateTextView } =
+      await import('../src/virtualization/virtualizedTextView')
+    const other = new SeparateTextView(otherContainer, { rowHeight: 20, overscan: 2 })
+    try {
+      view.setText(createLines(100))
+      other.setText(createLines(100))
+      view.setScrollMetrics(0, 100)
+      other.setScrollMetrics(0, 100)
+      const ids = [...view.getState().mountedRows, ...other.getState().mountedRows].map(
+        (row) => row.element.id,
+      )
+      expect(ids.every(Boolean)).toBe(true)
+      expect(new Set(ids).size).toBe(ids.length)
+    } finally {
+      other.dispose()
+      otherContainer.remove()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('owns reused rows in document reading order through forward and backward scroll', () => {
     view.setText(createLines(100))
     for (const top of [0, 20, 80, 400, 380, 60, 0]) {
