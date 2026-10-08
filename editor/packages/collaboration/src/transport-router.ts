@@ -1,4 +1,5 @@
 import type { EditEnvelope, Message } from './protocol'
+import { prunePeerHistory } from './peer-history'
 
 export type TransportKind = 'broadcast' | 'webrtc'
 export interface SessionEndpoint<E extends EditEnvelope> {
@@ -62,7 +63,9 @@ export class TransportRouter<E extends EditEnvelope = EditEnvelope> {
 
   receive(peer: string, input: unknown): void {
     if (!this.peers.has(peer) || !isMessage<E>(input, this.identity, peer)) return
-    const seen = this.seen.get(peer) ?? { floor: 0, ids: new Set<number>() }
+    const previous = this.seen.get(peer)
+    if (!previous) prunePeerHistory(this.seen, (candidate) => this.peers.has(candidate))
+    const seen = previous ?? { floor: 0, ids: new Set<number>() }
     if (input.messageId <= seen.floor || seen.ids.has(input.messageId)) return
     // A bounded sliding window keeps delayed cross-adapter duplicates fenced.
     seen.floor = Math.max(seen.floor, input.messageId - 4096)

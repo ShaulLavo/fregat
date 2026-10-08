@@ -2,4 +2,4 @@
 '@singapore-editor/collaboration': patch
 ---
 
-Add native WebRTC and encrypted BroadcastChannel transports, authenticated WebSocket signaling and a self-hostable Bun signaling broker.
+Added `WebRTCTransport` and `BroadcastTransport` for browser collaboration, plus `WebSocketSignaling` and a self-hostable Bun broker. `RoomCrypto` encrypts room signaling with an invitation secret.

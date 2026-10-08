@@ -3,6 +3,7 @@ import type { EditEnvelope, Message } from './protocol'
 import { RoomCrypto, sealedPacketSize } from './room-crypto'
 import type { SignalingClient } from './signaling'
 import { TransportRouter } from './transport-router'
+import { prunePeerHistory } from './peer-history'
 
 export interface WebRTCTransportOptions<E extends EditEnvelope> {
   readonly router: TransportRouter<E>
@@ -208,6 +209,8 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
         opened.packet.sequence <= (this.latestOffers.get(sender) ?? 0)
       )
         return
+      if (!this.latestOffers.has(sender))
+        prunePeerHistory(this.latestOffers, (peer) => this.discovered.has(peer))
       this.latestOffers.set(sender, opened.packet.sequence)
       const existing = this.links.get(sender)
       if (existing?.generation === generation) return

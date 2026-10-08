@@ -194,6 +194,9 @@ sender/message ID. It prefers BroadcastChannel when both paths exist. The WebRTC
 adapter closes an existing link when the same peer appears on BroadcastChannel,
 then reconnects if the tab heartbeat expires. A 4,096-message receive window
 rejects duplicates and older messages, including packets from a retired path.
+The router retains at most 64 peer-session histories, preserving active peers and
+replacing the oldest inactive history as new members arrive. WebRTC's offer
+sequence histories use the same bound and preserve discovered peers.
 Session pulses and retained pending edits recover messages outside that window.
 There are no changes to the session protocol.
 

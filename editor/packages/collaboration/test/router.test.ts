@@ -45,6 +45,27 @@ test('prefers BroadcastChannel, deduplicates across adapters and disconnects onl
   expect(received).toHaveLength(1)
 })
 
+test('bounds departed peer histories while preserving active peer deduplication', () => {
+  const received: Message[] = []
+  const router = new TransportRouter(
+    { room: 'room', document: 'document', peer: 'local' },
+    { connect: () => {}, disconnect: () => {}, receive: (input) => received.push(input) },
+  )
+  router.add('remote', 'webrtc', () => {})
+  router.receive('remote', message)
+  for (let index = 0; index < 128; index++) {
+    const peer = `departed-${index}`
+    router.add(peer, 'webrtc', () => {})
+    router.receive(peer, { ...message, sender: peer })
+    router.remove(peer, 'webrtc')
+  }
+  const histories = Reflect.get(router, 'seen') as Map<string, unknown>
+  expect(histories.size).toBe(64)
+  expect(histories.has('remote')).toBe(true)
+  router.receive('remote', message)
+  expect(received).toHaveLength(129)
+})
+
 test('bounds rooms at eight and keeps duplicates fenced after the receive window advances', () => {
   const received: Message[] = []
   const router = new TransportRouter(
