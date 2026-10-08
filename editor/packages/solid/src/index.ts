@@ -63,6 +63,7 @@ export type SolidEditorOptions = Omit<
   | 'fontFamily'
   | 'fontSize'
   | 'gutterLeadingInset'
+  | 'gutterScroll'
   | 'hiddenCharacters'
   | 'keymap'
   | 'lineHeight'
@@ -81,6 +82,7 @@ export type SolidEditorOptions = Omit<
   readonly fontFamily?: SolidEditorReactiveValue<string | undefined>
   readonly fontSize?: SolidEditorReactiveValue<number | undefined>
   readonly gutterLeadingInset?: SolidEditorReactiveValue<number | undefined>
+  readonly gutterScroll?: SolidEditorReactiveValue<EditorOptions['gutterScroll']>
   readonly theme?: SolidEditorReactiveValue<EditorTheme | null | undefined>
   readonly hiddenCharacters?: SolidEditorReactiveValue<HiddenCharactersMode | undefined>
   readonly keymap?: SolidEditorReactiveValue<EditorKeymapOptions | undefined>
@@ -279,6 +281,7 @@ function createConstructorOptions(
     fontFamily,
     fontSize,
     gutterLeadingInset,
+    gutterScroll,
     hiddenCharacters,
     keymap,
     lineHeight,
@@ -303,6 +306,7 @@ function createConstructorOptions(
     fontFamily: readReactive(fontFamily),
     fontSize: readReactive(fontSize),
     gutterLeadingInset: readReactive(gutterLeadingInset),
+    gutterScroll: readReactive(gutterScroll),
     hiddenCharacters: readReactive(hiddenCharacters),
     keymap: readReactive(keymap),
     lineHeight: readReactive(lineHeight),
