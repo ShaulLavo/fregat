@@ -38,7 +38,9 @@ before/after snapshots, the actual normalized atomic edits, its origin, the loca
 source view ID, and an optional opaque author tag. Buffer revision numbers are local
 to each buffer; `setText` replaces that buffer. Document attachment itself emits no
 text transaction. Scopes release their subscriptions when removed, and plugins that
-do not subscribe incur no transaction fan-out.
+do not subscribe incur no transaction fan-out. Transactions are captured in commit
+order and delivered once after view acceptance, including edits and replacements
+authored by change callbacks or transaction listeners.
 
 ```ts
 import { createPlugin } from '@singapore-editor/core/extensions'
@@ -65,11 +67,12 @@ projects tracked decorations, and keeps the existing history graph. It adds no u
 entry and emits no transaction echo. Its origin defaults to `remote`; `replay` is
 also supported. Collaborative undo policy belongs to the caller.
 
-Every batch uses offsets into the preceding batch's resulting snapshot. Optional
+Every batch uses offsets into the preceding batch's resulting snapshot. Required
 `options.edits` describes the current-to-final transition for selection and consumer
-projection; reconciliation validates it before changing state. Otherwise the editor
-computes that transition, preserving unchanged interior spans. An identity-aware
-caller can supply precise effective edits through this same offset API.
+projection; reconciliation validates it before changing state. Supply the precise
+edits known by the collaboration layer, including an empty array for unchanged text.
+This preserves unchanged interior spans without computing a character diff.
+Offsets allow an identity-aware caller to use this same API.
 
 The 128-entry synchronization chain is a bounded consumer aid. Consumers that cannot
 bridge their cursor to the current snapshot reset from the new snapshot. It does not

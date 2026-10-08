@@ -94,12 +94,11 @@ test(
     })
     await expect.poll(() => paintedText(host, true)).toEqual(['answer'])
     transactions.length = 0
-    scope.reconcile(createPieceTableSnapshot('const answer = 1;'), [
-      [
-        { from: 0, to: 5, text: 'let' },
-        { from: 6, to: 6, text: 'remote_' },
-      ],
-    ])
+    const edits = [
+      { from: 0, to: 5, text: 'let' },
+      { from: 6, to: 6, text: 'remote_' },
+    ]
+    scope.reconcile(createPieceTableSnapshot('const answer = 1;'), [edits], { edits })
     await expect.poll(() => editor.getState().syntaxStatus).toBe('ready')
     await expect.poll(() => paintedText(host, false)).toContain('let')
     await expect.poll(() => paintedText(host, true)).toEqual(['answer'])
@@ -165,7 +164,9 @@ describe.each(['textarea', 'edit-context'] as const)('%s exact transactions', (r
     await commands.proofImeComposition('候補')
     await frames()
     expect(editor.materializeFullText()).toBe('abc')
-    scope.reconcile(createPieceTableSnapshot('abc'), [[{ from: 0, to: 0, text: 'R' }]])
+    scope.reconcile(createPieceTableSnapshot('abc'), [[{ from: 0, to: 0, text: 'R' }]], {
+      edits: [{ from: 0, to: 0, text: 'R' }],
+    })
     await frames()
     expect(host.querySelector('.editor-virtualized-composition')?.textContent ?? '').toBe('')
     editor

@@ -8,6 +8,7 @@ import {
   documentSessionChangeTextSnapshot,
   getDocumentMutationLeaseState,
   subscribeDocumentMutationLeaseState,
+  subscribeDocumentTransactions,
   type DocumentSession,
   type DocumentSessionChange,
   type DocumentSessionReconcileOptions,
@@ -280,6 +281,16 @@ type EditorContributionFailurePhase =
   | 'reserved-width'
   | 'non-caret-row'
 
+type PendingTextTransaction = {
+  readonly event: EditorTextTransaction
+  ready: boolean
+}
+
+type ReplacementTransactionBefore = Pick<
+  EditorTextTransaction,
+  'snapshotBefore' | 'textSnapshotBefore' | 'revisionBefore' | 'sourceViewId'
+>
+
 type TrackedAnchor = {
   anchor: PieceTableAnchor
   deleted: boolean
@@ -394,6 +405,7 @@ export class Editor {
   private readonly secondaryWork = new EditorSecondaryWorkScheduler()
   private readonly detachedEditChain = new DocumentEditChain(0, 0)
   private unsubscribeBufferChanges: (() => void) | null = null
+  private unsubscribeTransactionCommits: (() => void) | null = null
   private unsubscribeLeaseChanges: (() => void) | null = null
   private lineStartsViewCache: {
     textVersion: number
@@ -1612,42 +1624,38 @@ export class Editor {
 
   setText(text: string, options: EditorSetTextOptions = {}): void {
     this.runInOperation(() => {
-      const previous = this.transactionListeners.size > 0 ? this.getBufferSession() : null
-      const textSnapshotBefore = previous?.getTextSnapshot()
-      const revisionBefore = previous?.buffer.getRevision()
-      const currentScrollPosition = this.getScrollPosition()
-      const documentVersion = this.resetOwnedDocument(
-        {
-          text,
-          documentMode: options.documentMode ?? this.documentMode,
-          languageId: options.languageId,
-          tokens: options.tokens,
-        },
-        {
-          documentId: null,
-          persistentIdentity: false,
-          scrollPosition: preservedScrollPosition(currentScrollPosition, options.scrollPosition),
-        },
-      )
-      this.notifyChange(null)
-      this.refreshSyntax(documentVersion, null)
-      this.lifecycleSummary.document.setTextCount += 1
-      const next = textSnapshotBefore && this.getBufferSession()
-      if (
-        next &&
-        !pieceTableSnapshotsHaveSameText(textSnapshotBefore.snapshot, next.getSnapshot())
-      ) {
-        const snapshotAfter = next.getSnapshot()
-        this.emitTransaction({
-          snapshotBefore: textSnapshotBefore.snapshot,
-          snapshotAfter,
-          textSnapshotBefore,
-          edits: [{ from: 0, to: textSnapshotBefore.length, text: next.materializeFullText() }],
-          origin: 'local',
-          sourceViewId: previous!.view.viewId,
-          revisionBefore: revisionBefore!,
-          revisionAfter: next.buffer.getRevision(),
-        })
+      this.transactionPublicationDepth++
+      try {
+        const previous = this.transactionListeners.size > 0 ? this.getBufferSession() : null
+        const transactionBefore = previous
+          ? {
+              snapshotBefore: previous.getSnapshot(),
+              textSnapshotBefore: previous.getTextSnapshot(),
+              revisionBefore: previous.buffer.getRevision(),
+              sourceViewId: previous.view.viewId,
+            }
+          : undefined
+        const currentScrollPosition = this.getScrollPosition()
+        const documentVersion = this.resetOwnedDocument(
+          {
+            text,
+            documentMode: options.documentMode ?? this.documentMode,
+            languageId: options.languageId,
+            tokens: options.tokens,
+          },
+          {
+            documentId: null,
+            persistentIdentity: false,
+            scrollPosition: preservedScrollPosition(currentScrollPosition, options.scrollPosition),
+          },
+          transactionBefore,
+        )
+        this.notifyChange(null)
+        this.refreshSyntax(documentVersion, null)
+        this.lifecycleSummary.document.setTextCount += 1
+      } finally {
+        this.transactionPublicationDepth--
+        this.flushTransactions()
       }
     })
   }
@@ -1712,31 +1720,98 @@ export class Editor {
   })
 
   private readonly trackedAnchors = new Set<WeakRef<TrackedAnchor>>()
-  private readonly pendingTransactions: EditorTextTransaction[] = []
+  private readonly pendingTransactions: PendingTextTransaction[] = []
+  private readonly pendingBufferTransactions = new WeakMap<
+    EditorTextBufferChange,
+    PendingTextTransaction
+  >()
   private publishingTransactions = false
+  private transactionPublicationDepth = 0
 
-  private emitTransaction(event: EditorTextTransaction): void {
-    this.pendingTransactions.push(event)
-    if (this.publishingTransactions) return
+  private flushTransactions(): void {
+    if (this.publishingTransactions || this.transactionPublicationDepth > 0) return
     this.publishingTransactions = true
     try {
-      while (this.pendingTransactions.length > 0) {
-        this.transactionListeners.fire(this.pendingTransactions.shift()!)
+      while (this.pendingTransactions[0]?.ready) {
+        this.transactionListeners.fire(this.pendingTransactions.shift()!.event)
       }
     } finally {
       this.publishingTransactions = false
     }
   }
 
+  private syncTransactionSubscription(): void {
+    if (this.unsubscribeTransactionCommits || this.transactionListeners.size === 0) return
+    const session = this.getBufferSession()
+    if (!session) return
+    this.unsubscribeTransactionCommits = subscribeDocumentTransactions(session.buffer, (event) => {
+      if (
+        this.session !== session ||
+        event.revisionAfter === event.revisionBefore ||
+        event.change.kind === 'reconcile'
+      )
+        return
+      const pending: PendingTextTransaction = {
+        ready: false,
+        event: {
+          snapshotBefore: event.textSnapshotBefore.snapshot,
+          snapshotAfter: event.change.snapshot,
+          textSnapshotBefore: event.textSnapshotBefore,
+          edits: event.change.edits,
+          origin: event.origin,
+          sourceViewId: event.sourceViewId,
+          author: event.author,
+          revisionBefore: event.revisionBefore,
+          revisionAfter: event.revisionAfter,
+        },
+      }
+      this.pendingTransactions.push(pending)
+      this.pendingBufferTransactions.set(event, pending)
+    })
+  }
+
+  private queueReplacementTransaction(
+    before: ReplacementTransactionBefore | undefined,
+    session: DocumentSession,
+  ): PendingTextTransaction | null {
+    if (!before) return null
+    const next = editorBufferSession(session)
+    if (!next || pieceTableSnapshotsHaveSameText(before.snapshotBefore, next.getSnapshot()))
+      return null
+    const pending: PendingTextTransaction = {
+      ready: false,
+      event: {
+        ...before,
+        snapshotAfter: next.getSnapshot(),
+        edits: [
+          { from: 0, to: before.textSnapshotBefore.length, text: next.materializeFullText() },
+        ],
+        origin: 'local',
+        revisionAfter: next.buffer.getRevision(),
+      },
+    }
+    this.pendingTransactions.push(pending)
+    return pending
+  }
+
   /** Each logical edit, before view updates can coalesce it. The registration survives document swaps. */
   onDidTransaction(listener: (event: EditorTextTransaction) => void): EditorDisposable {
-    return this.claimForContribution(this.transactionListeners.subscribe(listener))
+    const subscription = this.transactionListeners.subscribe(listener)
+    this.syncTransactionSubscription()
+    return this.claimForContribution({
+      dispose: () => {
+        subscription.dispose()
+        if (this.transactionListeners.size > 0) return
+        this.unsubscribeTransactionCommits?.()
+        this.unsubscribeTransactionCommits = null
+      },
+    })
   }
 
   reconcile(
     base: PieceTableSnapshot,
     batches: readonly (readonly TextEdit[])[],
-    options: DocumentSessionReconcileOptions = {},
+    options: DocumentSessionReconcileOptions,
   ): void {
     this.runInOperation(() => {
       if (this.disposed) return
@@ -2423,6 +2498,7 @@ export class Editor {
   private resetOwnedDocument(
     document: EditorOpenDocumentOptions,
     options: ResetOwnedDocumentOptions,
+    transactionBefore?: ReplacementTransactionBefore,
   ): number {
     this.preparingDocument = true
     const savedScroll = this.pendingDocumentScroll ?? this.view.provisionalScrollPosition
@@ -2434,6 +2510,7 @@ export class Editor {
     const replacingDocument = this.session !== null
     this.disposeBufferSubscriptions()
     const attachment = this.document.resetOwnedDocument(document, options)
+    const transaction = this.queueReplacementTransaction(transactionBefore, attachment.session)
     this.wordWrapOwner = 'host'
     editorBufferSession(attachment.session)?.view.setWordWrap(this.isWordWrapEnabled())
     this.attachAnalysis(attachment.session)
@@ -2462,6 +2539,7 @@ export class Editor {
     this.preparingDocument = false
     if (!this.commitSnapshotIfReady() && !this.view.isProvisional)
       this.syntax.notifyBaseTextPainted()
+    if (transaction) transaction.ready = true
     return attachment.documentVersion
   }
 
@@ -3755,6 +3833,7 @@ export class Editor {
     const bufferSession = editorBufferSession(session)
     if (!bufferSession) return
 
+    this.syncTransactionSubscription()
     this.unsubscribeBufferChanges = bufferSession.buffer.subscribe((event) =>
       this.handleBufferChange(bufferSession, event),
     )
@@ -3770,6 +3849,7 @@ export class Editor {
       this.inputSelection.acceptReconcile()
     }
     this.bufferPublication = event
+    this.transactionPublicationDepth++
     try {
       const pending = this.pendingBufferChangeOptions.get(event.change.textSnapshot)
       if (event.change.kind !== 'synchronize' && event.sourceViewId !== session.view.viewId) {
@@ -3790,27 +3870,18 @@ export class Editor {
       )
     } finally {
       if (this.bufferPublication === event) this.bufferPublication = null
-    }
-    if (
-      this.transactionListeners.size > 0 &&
-      event.revisionAfter !== event.revisionBefore &&
-      event.change.kind !== 'reconcile'
-    ) {
-      this.emitTransaction({
-        snapshotBefore: event.textSnapshotBefore.snapshot,
-        snapshotAfter: event.change.snapshot,
-        textSnapshotBefore: event.textSnapshotBefore,
-        edits: event.change.edits,
-        origin: event.origin,
-        sourceViewId: event.sourceViewId,
-        author: event.author,
-        revisionBefore: event.revisionBefore,
-        revisionAfter: event.revisionAfter,
-      })
+      const transaction = this.pendingBufferTransactions.get(event)
+      if (transaction) transaction.ready = true
+      this.transactionPublicationDepth--
+      this.flushTransactions()
     }
   }
 
   private disposeBufferSubscriptions(): void {
+    this.unsubscribeTransactionCommits?.()
+    this.unsubscribeTransactionCommits = null
+    // A document swap supersedes pending view deliveries, but their commits remain authored.
+    for (const transaction of this.pendingTransactions) transaction.ready = true
     this.bufferPublication = null
     this.unsubscribeBufferChanges?.()
     this.unsubscribeLeaseChanges?.()

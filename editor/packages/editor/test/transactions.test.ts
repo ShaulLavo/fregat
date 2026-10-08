@@ -171,6 +171,48 @@ describe('exact plugin transactions on the simple API', () => {
     ])
   })
 
+  it('keeps a commit queued during onChange when that callback also replaces the document', () => {
+    let editor!: Editor
+    let scope!: EditorViewScope
+    let armed = false
+    const mounted = mount('abc', () => {
+      if (!armed) return
+      armed = false
+      scope.applyEdits([{ from: 2, to: 2, text: 'y' }])
+      editor.setText('second')
+    })
+    editor = mounted.editor
+    scope = mounted.scope
+    armed = true
+    scope.applyEdits([{ from: 1, to: 1, text: 'x' }])
+    expect(
+      mounted.transactions.map((event) => [
+        materializePieceTableFullText(event.snapshotBefore),
+        materializePieceTableFullText(event.snapshotAfter),
+      ]),
+    ).toEqual([
+      ['abc', 'axbc'],
+      ['axbc', 'axybc'],
+      ['axybc', 'second'],
+    ])
+  })
+
+  it('delivers each commit once to every listener when a transaction callback edits and replaces', () => {
+    const { editor, scope, transactions } = mount()
+    scope.onDidTransaction((event) => {
+      if (event.edits[0]?.text !== 'x') return
+      scope.applyEdits([{ from: 2, to: 2, text: 'y' }])
+      editor.setText('second')
+    })
+    const seen: string[] = []
+    scope.onDidTransaction((event) => seen.push(materializePieceTableFullText(event.snapshotAfter)))
+    scope.applyEdits([{ from: 1, to: 1, text: 'x' }])
+    expect(transactions.map((event) => materializePieceTableFullText(event.snapshotAfter))).toEqual(
+      ['axbc', 'axybc', 'second'],
+    )
+    expect(seen).toEqual(['axbc', 'axybc', 'second'])
+  })
+
   it('preserves selection options when the positional selection is omitted', () => {
     const { scope } = mount()
     scope.applyEdits([{ from: 0, to: 0, text: 'x' }], undefined, { selection: { anchor: 3 } })
@@ -239,24 +281,68 @@ describe('atomic reconcile', () => {
     scope.applyEdits([{ from: 2, to: 2, text: 'XY' }])
     const range = scope.view.trackRanges([{ start: 2, end: 4 }])
     const point = scope.view.trackPoint({ kind: 'point', offset: 3, bias: 'right' })
-    scope.reconcile(createPieceTableSnapshot('abXYcdef'), [[{ from: 0, to: 0, text: 'R' }]])
+    scope.reconcile(createPieceTableSnapshot('abXYcdef'), [[{ from: 0, to: 0, text: 'R' }]], {
+      edits: [{ from: 0, to: 0, text: 'R' }],
+    })
     expect(range.resolve()).toEqual([{ start: 3, end: 5 }])
     expect(point.resolve()).toEqual({ kind: 'live', offset: 4 })
-    scope.reconcile(createPieceTableSnapshot('Rabcdef'), [])
+    scope.reconcile(createPieceTableSnapshot('Rabcdef'), [], {
+      edits: [{ from: 3, to: 5, text: '' }],
+    })
     expect(range.resolve()).toEqual([])
     expect(point.resolve()).toEqual({ kind: 'deleted' })
-    scope.reconcile(createPieceTableSnapshot('Rabcdef!'), [])
+    scope.reconcile(createPieceTableSnapshot('Rabcdef!'), [], {
+      edits: [{ from: 7, to: 7, text: '!' }],
+    })
     expect(point.resolve()).toEqual({ kind: 'deleted' })
   })
 
-  it('publishes code-point-safe effective replacements', () => {
+  it('publishes supplied code-point-safe effective replacements', () => {
     const buffer = createEditorTextBuffer('a😀b')
     const session = createEditorBufferSession(buffer)
     const point = buffer.getDocumentSyncPoint()
-    session.reconcile(createPieceTableSnapshot('a😃b'), [])
+    session.reconcile(createPieceTableSnapshot('a😃b'), [], {
+      edits: [{ from: 1, to: 3, text: '😃' }],
+    })
     expect(buffer.changesSinceDocumentSyncPoint(point, null)?.edits).toEqual([
       { from: 1, to: 3, text: '😃' },
     ])
+  })
+
+  it('requires effective edits from runtime callers without changing state', () => {
+    const session = createDocumentSession('abc')
+    const before = session.getSnapshot()
+    expect(() =>
+      session.reconcile(createPieceTableSnapshot('xyz'), [], undefined as never),
+    ).toThrow('requires effective edits')
+    expect(session.getSnapshot()).toBe(before)
+    expect(session.materializeFullText()).toBe('abc')
+  })
+
+  it('publishes precise distant edits on 100,000 lines and preserves interior selections', () => {
+    const text = Array.from(
+      { length: 100_000 },
+      (_, index) => `const row_${index} = ${index};\n`,
+    ).join('')
+    const buffer = createEditorTextBuffer(text)
+    const session = createEditorBufferSession(buffer)
+    const mid = text.indexOf('const row_50000')
+    session.setSelection(mid + 5, mid)
+    const edits = [
+      { from: 0, to: 0, text: 'R' },
+      { from: text.length, to: text.length, text: '!' },
+    ]
+    const point = buffer.getDocumentSyncPoint()
+    const events: unknown[] = []
+    buffer.subscribe((event) => events.push(event))
+    session.reconcile(createPieceTableSnapshot(text), [edits], { edits })
+    expect(session.materializeFullText()).toBe('R' + text + '!')
+    expect(buffer.changesSinceDocumentSyncPoint(point, null)?.edits).toEqual(edits)
+    expect(
+      resolveSelection(session.getSnapshot(), session.getSelections().selections[0]!),
+    ).toMatchObject({ anchorOffset: mid + 6, headOffset: mid + 1 })
+    expect(events).toHaveLength(1)
+    expect(buffer.getHistoryGraph().nodes).toHaveLength(1)
   })
 
   it('rejects mismatched supplied effective edits before changing any state', () => {
@@ -272,10 +358,16 @@ describe('atomic reconcile', () => {
     const { editor, scope, transactions } = mount('abc', () => publications.push('published'))
     editor.setSelection(2)
     publications.length = 0
-    scope.reconcile(createPieceTableSnapshot('abc'), [
-      [{ from: 0, to: 0, text: 'R' }],
-      [{ from: 4, to: 4, text: '!' }],
-    ])
+    scope.reconcile(
+      createPieceTableSnapshot('abc'),
+      [[{ from: 0, to: 0, text: 'R' }], [{ from: 4, to: 4, text: '!' }]],
+      {
+        edits: [
+          { from: 0, to: 0, text: 'R' },
+          { from: 3, to: 3, text: '!' },
+        ],
+      },
+    )
     expect(editor.materializeFullText()).toBe('Rabc!')
     expect(publications).toEqual(['published'])
     expect(transactions).toHaveLength(0)
@@ -290,12 +382,21 @@ describe('atomic reconcile', () => {
     first.setSelection(4, 2)
     second.setSelection(3)
     const point = buffer.getDocumentSyncPoint()
-    first.reconcile(createPieceTableSnapshot('abcdef'), [
+    first.reconcile(
+      createPieceTableSnapshot('abcdef'),
       [
-        { from: 0, to: 0, text: 'R' },
-        { from: 6, to: 6, text: '!' },
+        [
+          { from: 0, to: 0, text: 'R' },
+          { from: 6, to: 6, text: '!' },
+        ],
       ],
-    ])
+      {
+        edits: [
+          { from: 0, to: 0, text: 'R' },
+          { from: 6, to: 6, text: '!' },
+        ],
+      },
+    )
     expect(
       resolveSelection(first.getSnapshot(), first.getSelections().selections[0]!),
     ).toMatchObject({ anchorOffset: 5, headOffset: 3 })
@@ -318,7 +419,7 @@ describe('atomic reconcile', () => {
     const current = buffer.getDocumentSyncPoint()
     const events: unknown[] = []
     buffer.subscribe((event) => events.push(event))
-    session.reconcile(createPieceTableSnapshot(session.materializeFullText()), [])
+    session.reconcile(createPieceTableSnapshot(session.materializeFullText()), [], { edits: [] })
     expect(events).toHaveLength(1)
     expect(buffer.changesSinceDocumentSyncPoint(current, null)?.edits).toEqual([])
     expect(buffer.changesSinceDocumentSyncPoint(expired, null)).toBeNull()
@@ -329,10 +430,11 @@ describe('atomic reconcile', () => {
     session.applyEdits([{ from: 1, to: 1, text: 'L' }])
     const buffer = (session as ReturnType<typeof createEditorBufferSession>).buffer
     const before = buffer.getHistoryGraph()
-    session.reconcile(createPieceTableSnapshot('abc'), [
-      [{ from: 0, to: 0, text: 'R' }],
-      [{ from: 2, to: 2, text: 'L' }],
-    ])
+    session.reconcile(
+      createPieceTableSnapshot('abc'),
+      [[{ from: 0, to: 0, text: 'R' }], [{ from: 2, to: 2, text: 'L' }]],
+      { edits: [{ from: 0, to: 0, text: 'R' }] },
+    )
     expect(buffer.getHistoryGraph().nodes.map((node) => node.id)).toEqual(
       before.nodes.map((node) => node.id),
     )
@@ -344,7 +446,11 @@ describe('atomic reconcile', () => {
       'test',
     )
     expect(leased.status).toBe('acquired')
-    expect(session.reconcile(createPieceTableSnapshot('blocked'), []).kind).toBe('none')
+    expect(
+      session.reconcile(createPieceTableSnapshot('blocked'), [], {
+        edits: [{ from: 0, to: 5, text: 'blocked' }],
+      }).kind,
+    ).toBe('none')
     expect(session.materializeFullText()).toBe('RaLbc')
     if (leased.status === 'acquired') releaseDocumentMutationLease(buffer, leased.lease)
   })

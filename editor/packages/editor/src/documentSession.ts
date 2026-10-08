@@ -107,7 +107,7 @@ export type DocumentSession = {
   reconcile(
     base: PieceTableSnapshot,
     batches: readonly (readonly TextEdit[])[],
-    options?: DocumentSessionReconcileOptions,
+    options: DocumentSessionReconcileOptions,
   ): DocumentSessionChange
   backspace(tabSize?: number): DocumentSessionChange
   deleteSelection(): DocumentSessionChange
@@ -248,7 +248,7 @@ export type EditorTextBuffer = {
   reconcile(
     base: PieceTableSnapshot,
     batches: readonly (readonly TextEdit[])[],
-    options?: DocumentSessionReconcileOptions,
+    options: DocumentSessionReconcileOptions,
     sourceView?: EditorViewSession | null,
   ): DocumentSessionChange
   backspace(
@@ -358,8 +358,8 @@ export type DocumentSessionEditSelection = DocumentSessionSelectionRange
 export type DocumentSessionReconcileOptions = {
   readonly origin?: 'remote' | 'replay'
   readonly author?: unknown
-  /** Effective edits from the current snapshot to the final snapshot. Computed when omitted. */
-  readonly edits?: readonly TextEdit[]
+  /** Effective edits from the current snapshot to the final snapshot. */
+  readonly edits: readonly TextEdit[]
 }
 
 export type DocumentSessionApplyEditsOptions = {
@@ -622,6 +622,29 @@ export const MAX_HEAP_OPERATION_LENGTH = 256 * 1024 * 1024
 export const exceedsHeapOperationBudget = (length: number): boolean =>
   length > MAX_HEAP_OPERATION_LENGTH
 
+const transactionSources = new WeakMap<
+  EditorTextBuffer,
+  EditorEventSource<EditorTextBufferChange>
+>()
+
+/** Capture commits before change callbacks can author another transition. */
+export function subscribeDocumentTransactions(
+  buffer: EditorTextBuffer,
+  listener: (event: EditorTextBufferChange) => void,
+): () => void {
+  let source = transactionSources.get(buffer)
+  if (!source) {
+    source = new EditorEventSource({ action: 'editor.buffer.transaction_listener_failed' })
+    transactionSources.set(buffer, source)
+  }
+  const subscription = source.subscribe(listener)
+  return () => {
+    subscription.dispose()
+    if (source.size === 0 && transactionSources.get(buffer) === source)
+      transactionSources.delete(buffer)
+  }
+}
+
 class PieceTableEditorTextBuffer implements EditorTextBuffer {
   private readonly pendingChanges: EditorTextBufferChange[] = []
   private publishingChanges = false
@@ -784,7 +807,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
   public reconcile(
     base: PieceTableSnapshot,
     batches: readonly (readonly TextEdit[])[],
-    options: DocumentSessionReconcileOptions = {},
+    options: DocumentSessionReconcileOptions,
     sourceView: EditorViewSession | null = null,
   ): DocumentSessionChange {
     if (this.mutationLease) return this.createChange('none', [])
@@ -794,7 +817,8 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
       const edits = snapBatchEditRanges(snapshot, normalizeTextEdits(batch))
       snapshot = applyBatchToPieceTable(snapshot, edits)
     }
-    const supplied = options.edits && snapBatchEditRanges(before, normalizeTextEdits(options.edits))
+    const supplied =
+      options?.edits && snapBatchEditRanges(before, normalizeTextEdits(options.edits))
     const edits = reconciledEdits(before, snapshot, supplied)
     const selections = reconcileSelections(before, snapshot, this.history.selections, edits)
     const mappedViews = [...(bufferViews.get(this) ?? [])].flatMap((reference) => {
@@ -1862,6 +1886,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     const deletedUnits = change.edits.reduce((sum, edit) => sum + edit.to - edit.from, 0)
     this.storageMaintenance.request(deletedUnits)
     this.pendingChanges.push(event)
+    transactionSources.get(this)?.fire(event)
     this.dispatchChanges()
     return change
   }
@@ -2087,7 +2112,7 @@ class EditorBufferDocumentSession implements EditorBufferSession {
   public reconcile(
     base: PieceTableSnapshot,
     batches: readonly (readonly TextEdit[])[],
-    options: DocumentSessionReconcileOptions = {},
+    options: DocumentSessionReconcileOptions,
   ): DocumentSessionChange {
     return this.buffer.reconcile(base, batches, options, this.view)
   }

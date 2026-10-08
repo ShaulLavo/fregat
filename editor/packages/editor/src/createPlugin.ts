@@ -165,7 +165,7 @@ export type EditorViewScope = {
   reconcile(
     base: PieceTableSnapshot,
     batches: readonly (readonly TextEdit[])[],
-    options?: DocumentSessionReconcileOptions,
+    options: DocumentSessionReconcileOptions,
   ): void
   /** Experimental: while `accepts` answers false, text input (typing, IME, paste, drop) is refused. */
   textGate(accepts: () => boolean): void

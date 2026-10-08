@@ -550,7 +550,7 @@ export type EditorViewContributionContext = {
   reconcile(
     base: PieceTableSnapshot,
     batches: readonly (readonly TextEdit[])[],
-    options?: DocumentSessionReconcileOptions,
+    options: DocumentSessionReconcileOptions,
   ): void
   /**
    * The character the user typed, after its edit has landed. A contribution that acts on a

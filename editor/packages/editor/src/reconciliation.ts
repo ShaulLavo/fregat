@@ -1,11 +1,6 @@
-import { diffChars } from 'diff'
 import {
-  anchorAt,
   applyBatchToPieceTable,
-  diffPieceTableSnapshots,
   pieceTableSnapshotsHaveSameText,
-  readPieceTableTextRange,
-  resolveAnchor,
   type PieceTableAnchor,
   type PieceTableSnapshot,
 } from '@singapore-editor/textbuffer'
@@ -22,57 +17,30 @@ import type { TextEdit } from './tokens'
 export function reconciledEdits(
   before: PieceTableSnapshot,
   after: PieceTableSnapshot,
-  supplied?: readonly TextEdit[],
+  supplied: readonly TextEdit[] | undefined,
 ): readonly TextEdit[] {
-  if (supplied) {
-    if (pieceTableSnapshotsHaveSameText(applyBatchToPieceTable(before, supplied), after))
-      return supplied
+  if (!supplied) {
     throw createError({
-      code: 'EDITOR_RECONCILE_EDITS_MISMATCH',
-      message: 'Reconciliation edits do not produce the reconciled text',
-      why: 'The published edits must describe the transition from the current snapshot to the final snapshot.',
-      fix: 'Supply edits against the current snapshot, or let reconciliation compute them.',
-      internal: {
-        editCount: supplied.length,
-        previousLength: before.length,
-        nextLength: after.length,
-      },
+      code: 'EDITOR_RECONCILE_EDITS_REQUIRED',
+      message: 'Reconciliation requires effective edits',
+      why: 'The published edits describe the transition from the current snapshot to the final snapshot.',
+      fix: 'Supply the current-to-final edits in the reconciliation options.',
+      internal: { previousLength: before.length, nextLength: after.length },
     })
   }
-  const changed = diffPieceTableSnapshots(before, after)
-  if (!changed) return []
-  // The coarse diff may split an emoji while its replacement mends the cut.
-  // Widen both sides before character diffing so each token is a complete code point.
-  const from = resolveAnchor(before, anchorAt(before, changed.from, 'left')).offset
-  const snappedEnd = resolveAnchor(before, anchorAt(before, changed.to, 'left')).offset
-  const to = snappedEnd === changed.to ? changed.to : changed.to + 1
-  const span = {
-    from,
-    to,
-    text: readPieceTableTextRange(after, from, to + after.length - before.length),
-  }
-  if (span.from === span.to || span.text.length === 0) return [span]
-
-  const parts = diffChars(readPieceTableTextRange(before, span.from, span.to), span.text)
-  const edits: TextEdit[] = []
-  let offset = span.from
-  let pending: { from: number; to: number; text: string } | null = null
-  for (const part of parts) {
-    if (!part.added && !part.removed) {
-      if (pending) edits.push(pending)
-      pending = null
-      offset += part.value.length
-      continue
-    }
-    pending ??= { from: offset, to: offset, text: '' }
-    if (part.added) pending.text += part.value
-    if (part.removed) {
-      offset += part.value.length
-      pending.to = offset
-    }
-  }
-  if (pending) edits.push(pending)
-  return edits
+  if (pieceTableSnapshotsHaveSameText(applyBatchToPieceTable(before, supplied), after))
+    return supplied
+  throw createError({
+    code: 'EDITOR_RECONCILE_EDITS_MISMATCH',
+    message: 'Reconciliation edits do not produce the reconciled text',
+    why: 'The published edits must describe the transition from the current snapshot to the final snapshot.',
+    fix: 'Supply edits against the current snapshot that produce the final snapshot.',
+    internal: {
+      editCount: supplied.length,
+      previousLength: before.length,
+      nextLength: after.length,
+    },
+  })
 }
 
 export function reconcileSelections(
