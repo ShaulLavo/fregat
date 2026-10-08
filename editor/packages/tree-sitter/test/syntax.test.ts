@@ -414,6 +414,8 @@ describe('Tree-sitter syntax capture conversion', () => {
 
     expect(result.degraded).toBeNull()
     expect(result.projection).toEqual({
+      source: undefined,
+      analysis: { kind: 'full', coveredRange: { startIndex: 0, endIndex: text.length } },
       language: {
         includeCaptures: true,
         includeHighlights: true,
@@ -500,6 +502,61 @@ describe('Tree-sitter syntax capture conversion', () => {
     expect(parsePayloads[0]?.includeCaptures).toBe(true)
     expect(result.captures).toEqual(captures)
     expect(tokenObjects(result.tokens)).toEqual(treeSitterCapturesToEditorTokens(captures))
+  })
+
+  it('keeps the completed tree queryable after a range query exhausts its budget', async () => {
+    const tokens = [{ start: 0, end: 5, style: { color: '#123456' } }]
+    let calls = 0
+    const backend = {
+      generation: 1,
+      sourceEndpoint: createSourceEndpoint(),
+      disposeDocument: () => undefined,
+      edit: async () => undefined,
+      parse: async (payload) => ({
+        ...createParseAck(payload.snapshotVersion),
+        analysis: { kind: 'full', coveredRange: { startIndex: 0, endIndex: 12 } },
+      }),
+      queryRange: async (payload) => {
+        const result = createRangeResult(payload, tokens)
+        if (++calls !== 2) return result
+        return {
+          ...result,
+          tokens: [],
+          analysis: {
+            kind: 'cancelled',
+            reason: 'budget',
+            elapsedMs: 20_001,
+            budgetMs: 20_000,
+            coveredRange: { startIndex: 0, endIndex: 0 },
+            timings: [{ name: 'treeSitter.highlights', durationMs: 20_001 }],
+          },
+        }
+      },
+      registerLanguages: async () => undefined,
+      select: async () => undefined,
+    } satisfies TreeSitterBackend
+    const doc = createTreeDocument({
+      backend,
+      documentId: 'file.ts',
+      languageId: 'typescript',
+      syntaxMode: 'range',
+      text: 'const x = 1;',
+    })
+    await doc.run()
+    const successful = await doc.runtime.queryRange({ startIndex: 0, endIndex: 12 })
+    const cancelled = await doc.runtime.queryRange({ startIndex: 0, endIndex: 12 })
+    expect(cancelled.projection.analysis).toMatchObject({
+      kind: 'cancelled',
+      reason: 'budget',
+      elapsedMs: 20_001,
+      timings: [{ name: 'treeSitter.highlights', durationMs: 20_001 }],
+    })
+    expect(doc.runtime.getResult()).toBe(successful)
+    expect(doc.runtime.canQueryRange()).toBe(true)
+    const retried = await doc.runtime.queryRange({ startIndex: 0, endIndex: 5 })
+    expect(calls).toBe(3)
+    expect(tokenObjects(retried.tokens)).toEqual(tokens)
+    expect(doc.runtime.canQueryRange()).toBe(true)
   })
 
   it('uses parse acknowledgements and explicit range queries in range syntax mode', async () => {
@@ -623,7 +680,7 @@ describe('Tree-sitter syntax capture conversion', () => {
     await session.run()
     await session.runtime.queryRange({ startIndex: 1_000, endIndex: 2_000 })
 
-    expect(parsePayloads[0]?.resultMode).toBe('parseOnly')
+    expect(parsePayloads[0]?.resultMode).toBe('bootstrap')
     expect(rangePayloads).toMatchObject([
       {
         range: { startIndex: 1_000, endIndex: 2_000 },
@@ -1156,7 +1213,9 @@ function createParseResult(payload: {
   }
 }
 
-function createParseAck(snapshotVersion: number): TreeSitterParseAckResult {
+function createParseAck(
+  snapshotVersion: number,
+): Extract<TreeSitterParseAckResult, { readonly status: 'parsed' }> {
   return {
     changedRanges: [],
     documentId: 'file.ts',

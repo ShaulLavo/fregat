@@ -174,7 +174,7 @@ export const resolveTreeSitterLanguageClosure = async (
   return withInjectedLanguages(resolver, descriptor, isCancelled)
 }
 
-export const withInjectedLanguages = async (
+const withInjectedLanguages = async (
   resolver: TreeSitterLanguageResolver | undefined,
   descriptor: TreeSitterLanguageDescriptor,
   isCancelled: () => boolean,

@@ -1,38 +1,48 @@
 # @singapore-editor/panes
 
-resizable split panes for plain dom elements. give it a container and its panes, and it puts a drag handle between each pair and sizes them in percentages. zero dependencies
+Resizable split panes for browser DOM elements.
 
-## try it
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+
+## Install
 
 ```sh
 npm install @singapore-editor/panes
 ```
 
+## Usage
+
 ```ts
 import { ResizablePaneGroup } from '@singapore-editor/panes'
 import '@singapore-editor/panes/style.css'
 
-const group = new ResizablePaneGroup(document.querySelector<HTMLElement>('#panes')!, {
+const host = document.createElement('div')
+host.style.cssText = 'height: 400px; width: 100%'
+document.body.append(host)
+const group = new ResizablePaneGroup(host, {
   orientation: 'horizontal',
   panes: [
-    {
-      id: 'files',
-      element: document.querySelector<HTMLElement>('#files')!,
-      defaultSize: 30,
-      minSize: 15,
-    },
-    { id: 'editor', element: document.querySelector<HTMLElement>('#editor')! },
+    { id: 'files', element: document.createElement('div'), defaultSize: 30 },
+    { id: 'editor', element: document.createElement('div') },
   ],
-  onLayoutChanged: (layout) => localStorage.setItem('layout', JSON.stringify(layout)),
 })
+// Call group.dispose() when removing the panes.
 ```
 
-a pane without `defaultSize` shares what the others leave. `onLayoutChange` fires on every move while dragging, `onLayoutChanged` once the drag ends. a key press or `setLayout` fires both
+## API highlights
 
-handles are `role="separator"` with aria values. focus one and use the arrow keys (`keyboardStep`, 5% by default) or Home and End
+- `ResizablePaneGroup` owns panes and drag handles.
+- `getLayout()` reads sizes by pane ID.
+- `setLayout()` changes the split.
 
-`group.getLayout()` and `group.setLayout({ files: 25, editor: 75 })` read and write sizes by pane id. `createHandle` swaps in your own handle element. `group.dispose()` takes it all back out
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/panes/overview/)
 
-## more
+## In the Singapore family
 
-- [the singapore repo](../../README.md), with the editor and its other packages
+You can use this package on its own. `@singapore-editor/core` owns editor views; optional packages add syntax, search, gutters, and language features.
+
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+
+## License
+
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)

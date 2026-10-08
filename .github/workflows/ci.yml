@@ -155,7 +155,8 @@ jobs:
           FILES: ${{ needs.changes.outputs.docs_files }}
         run: |
           version=$(jq -r '.workspaces.catalog.oxfmt' package.json)
-          jq -r '.[] | "./" + .' <<<"$FILES" | xargs -d '\n' bunx "oxfmt@$version" --check
+          jq -j '.[] | "./" + . + "\u0000"' <<<"$FILES" |
+            xargs -0 -r bunx "oxfmt@$version" --check --no-error-on-unmatched-pattern
 
   # Jobs instead of one runner doing everything in turn: each pays for setup once,
   # and no suite shares four cores with another.
@@ -174,6 +175,9 @@ jobs:
 
       - name: Check shared tooling
         run: bun run workspace:check
+
+      - name: Check package pages
+        run: bun run package-pages:check
 
       # `format:check`, never `format` — a CI job that rewrites files and then
       # passes is a job that reports on a tree nobody reviewed.

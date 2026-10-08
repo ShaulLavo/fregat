@@ -15,7 +15,7 @@ import {
   type RowRendererSurface,
   type RowThemeInvalidation,
 } from '../row-renderer.js'
-import { CanvasRowPainter, type Canvas2dContext } from './painter.js'
+import { CanvasRowPainter, plainRowText, type Canvas2dContext } from './painter.js'
 import type { PixelTarget, PixelMetrics, PixelTargetFactory } from './pixel-target.js'
 import { canvasScrollPlan, type CanvasScrollPlan } from './scroll.js'
 
@@ -120,12 +120,13 @@ class CanvasSurface implements RowRendererSurface {
         return source.update()
       },
       readRows: (options) => {
-        const rows = source.readRows(options)
+        const rows = source.readRows(this.pixelTarget ? options : { ...options, packed: true })
         if (!this.capturing) return rows
         for (const row of rows) {
           if (row.y < 0 || row.y >= this.rowCount) continue
           if (options?.rows && !options.rows.has(row.y)) continue
-          this.pending.set(row.y, JSON.stringify(row.cells))
+          const text = this.pixelTarget ? undefined : plainRowText(row)
+          this.pending.set(row.y, text === undefined ? JSON.stringify(row.cells) : `plain:${text}`)
         }
         return rows
       },
@@ -146,6 +147,7 @@ class CanvasSurface implements RowRendererSurface {
   }
 
   invalidate(): void {
+    this.painter.invalidate()
     this.image = undefined
     this.nextImage = undefined
     this.plan = undefined
@@ -158,7 +160,16 @@ class CanvasSurface implements RowRendererSurface {
       if (!this.plan) this.prepare(cursor)
       if (!this.canReuse(row.y, cursor)) {
         this.pixelTarget?.beginRow(row.y)
-        this.painter.paint(row, cursor, this.canvas.width)
+        // Pixel targets publish the whole scratch row.
+        const key = this.pending.get(row.y)
+        const text = key?.startsWith('plain:') ? key.slice(6) : undefined
+        this.painter.paint(
+          row,
+          cursor,
+          this.canvas.width,
+          !this.pixelTarget && this.pending.size === 1 && this.plan!.offset === 0,
+          text,
+        )
         this.pixelTarget?.finishRow(row.y)
         this.reuseMetrics.repaintedRows += 1
       }
@@ -189,14 +200,8 @@ class CanvasSurface implements RowRendererSurface {
     this.canvas.style.height = `${grid.rows * font.cssCellHeight}px`
   }
 
-  restoreContext(): void {
-    this.contextLost = false
+  refreshFontResources(): void {
     this.painter.resetContext(this.font)
-    this.clearPixelCache()
-    this.invalidate()
-  }
-
-  clearPixelCache(): void {
     this.pixelTarget?.invalidate?.()
   }
 
@@ -213,7 +218,10 @@ class CanvasSurface implements RowRendererSurface {
     const keys = new Map(previous)
     for (const [y, key] of this.pending) keys.set(y, key)
     this.nextImage = { keys, cursor: cursor ? { ...cursor } : undefined }
-    if (this.plan.offset !== 0) this.copyRows(this.plan.offset)
+    if (this.plan.offset !== 0) {
+      this.painter.invalidate()
+      this.copyRows(this.plan.offset)
+    }
   }
 
   private canReuse(y: number, cursor: CursorState | undefined): boolean {
@@ -277,7 +285,7 @@ export class CanvasTerminalRenderer extends RowTerminalRenderer {
     this.canvasSurface.invalidate()
   }
   private readonly onContextRestored = (): void => {
-    this.canvasSurface.restoreContext()
+    this.canvasSurface.contextLost = false
     this.clearTextureAtlas()
   }
 
@@ -312,7 +320,7 @@ export class CanvasTerminalRenderer extends RowTerminalRenderer {
 
   override clearTextureAtlas(): void {
     this.canvasSurface.invalidate()
-    this.canvasSurface.clearPixelCache()
+    this.canvasSurface.refreshFontResources()
     super.clearTextureAtlas()
   }
 

@@ -35,7 +35,7 @@ export interface DocumentEngine<E extends EditEnvelope> {
   apply(record: Confirmation<E>): boolean
   exportHistory(from: Checkpoint): readonly Confirmation<E>[] | undefined
   verify(history: readonly Confirmation<E>[], tip: Checkpoint): boolean
-  install(history: readonly Confirmation<E>[]): void
+  install(history: readonly Confirmation<E>[], recovered?: readonly E[]): void
   uniquePending(history: readonly Confirmation<E>[]): readonly E[]
 }
 
@@ -89,7 +89,7 @@ export interface Payloads<E extends EditEnvelope> {
     | { readonly handoffStage?: never; readonly pending?: never }
     | { readonly handoffStage: 'prepare' | 'commit'; readonly pending: readonly EditId[] }
   )
-  HISTORY_REQUEST: { readonly tip: Checkpoint; readonly from: Checkpoint }
+  HISTORY_REQUEST: { readonly tip: Checkpoint; readonly from: Checkpoint; readonly index: number }
   HISTORY_CHUNK: {
     readonly tip: Checkpoint
     readonly from: Checkpoint

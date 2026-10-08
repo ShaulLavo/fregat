@@ -51,6 +51,62 @@ test('bootstrap emptiness preserves saved rows and an authoritative empty file r
   expect(restored.host.querySelectorAll('.editor-virtualized')).toHaveLength(1)
 })
 
+test.each([undefined, 'live text'])(
+  'initial paint contributors preserve saved paint with default text %s',
+  (defaultText) => {
+    const initialTexts: string[] = []
+    const admissions: unknown[] = []
+    const logger: EditorPlugin = {
+      activate: (context) =>
+        context.registerLogger((event) => {
+          if (event.action === 'editor.snapshot.admission') admissions.push(event.snapshot)
+        }),
+    }
+    const layer: EditorPlugin = {
+      activate: (context) =>
+        context.registerViewContribution({
+          createContribution: (view) => {
+            const text = view.getSnapshot().textSnapshot
+            initialTexts.push(text.readRange(0, text.length))
+            return {
+              snapshotKey: 'initial-layer:1',
+              captureVisiblePaint: () => ({
+                id: 'initial-layer',
+                status: 'ready',
+                rectangles: [],
+              }),
+              update() {},
+              dispose() {},
+            }
+          },
+        }),
+    }
+    const original = mount({ documentKey: 'file-a', plugins: [layer] })
+    original.editor.openDocument({ documentId: 'file-a', text: 'saved paint' })
+    const saved = original.editor.captureSnapshot()
+    expect(saved).not.toBeNull()
+    if (!saved) return
+    const restored = mount({
+      documentKey: 'file-a',
+      snapshot: saved.paint,
+      defaultText,
+      presentationReady: false,
+      plugins: [layer, logger],
+    })
+
+    expect(admissions).toEqual([expect.objectContaining({ reason: 'admitted' })])
+    expect(initialTexts.at(-1)).toBe(defaultText ?? '')
+    expect(restored.editor.getPresentationState()).toBe('provisional')
+    expect(restored.host.textContent).toContain('saved paint')
+    expect(restored.editor.materializeFullText()).toBe(defaultText ?? '')
+    restored.editor.setText('live text', { documentMode: 'static', languageId: null })
+    restored.editor.setPresentationReady(true)
+    expect(restored.editor.getPresentationState()).toBe('live')
+    expect(restored.host.textContent).toContain('live text')
+    expect(restored.host.textContent).not.toContain('saved paint')
+  },
+)
+
 test('content-dependent overlay reservations do not reject bootstrap paint', () => {
   const overlay = (width: number): EditorPlugin => ({
     activate: (context) =>

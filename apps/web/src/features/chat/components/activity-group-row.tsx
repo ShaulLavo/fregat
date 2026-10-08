@@ -1,5 +1,5 @@
 import { CaretRightIcon } from '@phosphor-icons/react'
-import { Button } from '@workspace/ui/components/button'
+import { TimelineAction } from '@/features/chat/components/timeline-action'
 import { cn } from '@workspace/ui/lib/utils'
 
 import { ActivityRow } from '@/features/chat/components/activity-row'
@@ -25,9 +25,9 @@ export function ActivityGroupRow({ activities }: { activities: readonly ChatWork
   return (
     <section className='min-w-0 space-y-0.5'>
       {expanded || hiddenCount > 0 ? (
-        <Button
+        <TimelineAction
           aria-expanded={expanded}
-          className='text-muted-foreground h-auto max-w-full justify-start gap-2 px-1 py-1 text-xs font-normal tabular-nums'
+          className='text-muted-foreground h-auto max-w-full justify-start gap-2 py-1 text-xs font-normal tabular-nums'
           data-scroll-anchor-ignore
           variant='ghost'
           onClick={() => toggle(groupId)}
@@ -40,7 +40,7 @@ export function ActivityGroupRow({ activities }: { activities: readonly ChatWork
             )}
           />
           <span className='truncate'>{summary}</span>
-        </Button>
+        </TimelineAction>
       ) : null}
       {expanded ? (
         <ActivityHistory activities={activities} />

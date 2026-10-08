@@ -1,0 +1,58 @@
+---
+import Manual from '../../layouts/Manual.astro'
+import { MANUAL_PAGES, MANUAL_SOURCES, NAV, renderPage } from '../../manual/content'
+
+export function getStaticPaths() {
+  return [...MANUAL_SOURCES.keys()].map((file) => ({
+    params: { slug: file.replace(/\.md$/, '') },
+    props: { file },
+  }))
+}
+
+const { file } = Astro.props as { file: string }
+const page = await renderPage(file)
+const slash = file.lastIndexOf('/') + 1
+---
+
+<Manual
+  title={`${page.title} · Singapore docs`}
+  description={page.description}
+  file={file}
+  bodyClass="manual"
+>
+  <div class="pathrow">
+    <span class="path">docs/{file.slice(0, slash)}<b>{file.slice(slash)}</b></span>
+    <span class="mode"></span>
+  </div>
+  <div class="viewport">
+    <nav class="pages" aria-label="Documentation">
+      {
+        NAV.map((section) => (
+          <>
+            <h2>{section.label}</h2>
+            <ul>
+              {section.pages.map((entry) => (
+                <li>
+                  <a
+                    href={entry.href}
+                    data-md={entry.md}
+                    aria-current={entry.md === file ? 'page' : undefined}
+                  >
+                    {entry.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </>
+        ))
+      }
+    </nav>
+    <main id="doc" class="pane" tabindex="-1">
+      <article class="src" data-pagefind-body set:html={page.html} />
+    </main>
+  </div>
+  <script is:inline type="application/json" id="manual-pages" set:html={JSON.stringify(MANUAL_PAGES)} />
+  <script>
+    import '../../manual/takeover'
+  </script>
+</Manual>

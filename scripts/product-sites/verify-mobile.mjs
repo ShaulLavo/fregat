@@ -223,7 +223,7 @@ async function checkPage(page, engine, url) {
 
 async function checkSearch(page, engine, url) {
   // Pagefind's dialog has a separate layout on each documentation page.
-  const search = page.locator('site-search button')
+  const search = page.locator('site-search button, button.search-open')
   if (!(await search.count())) return
   await search.first().click()
   await page.locator('dialog[open]').waitFor()

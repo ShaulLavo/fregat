@@ -1,0 +1,85 @@
+---
+import '../styles/manual.css'
+import mono from '../fonts/jetbrains-mono.woff2?url'
+import serif from '../fonts/source-serif-4.woff2?url'
+import { NAV } from '../manual/content'
+import { syntaxStyles } from '../manual/theme'
+
+type Props = {
+  readonly title: string
+  readonly description: string
+  /** The open Markdown file under `docs/`, for docs pages. */
+  readonly file?: string
+  readonly bodyClass: string
+}
+
+const { title, description, file, bodyClass } = Astro.props
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/')
+const github = 'https://github.com/ShaulLavo/fregat/tree/main/editor'
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfaf7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1a1916" />
+    <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <link rel="preload" href={mono} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={serif} as="font" type="font/woff2" crossorigin />
+    <script is:inline>
+      try {
+        const theme = localStorage.getItem('starlight-theme')
+        if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme
+      } catch {}
+    </script>
+    <style is:inline set:html={syntaxStyles}></style>
+  </head>
+  <body class={bodyClass} data-file={file}>
+    <a class="skip" href="#doc">Skip to content</a>
+    <header class="top">
+      <a class="brand" href={base}>Singapore</a>
+      {
+        file && (
+          <details class="menu">
+            <summary>Pages</summary>
+            <nav aria-label="All pages">
+              {NAV.map((entry) => (
+                <section>
+                  <h2>{entry.label}</h2>
+                  <ul>
+                    {entry.pages.map((page) => (
+                      <li>
+                        <a
+                          href={page.href}
+                          data-md={page.md}
+                          aria-current={page.md === file ? 'page' : undefined}
+                        >
+                          {page.label}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </nav>
+          </details>
+        )
+      }
+      <div class="right">
+        <button class="search-open" type="button" aria-label="Search" aria-keyshortcuts="/" hidden>
+          Search <kbd>/</kbd>
+        </button>
+        <button class="theme-toggle" type="button" aria-label="Dark theme" aria-pressed="false" hidden>
+          Dark
+        </button>
+        <a href={`${base}docs/start-here/introduction/`}>Docs</a>
+        <a href={github}>GitHub</a>
+      </div>
+    </header>
+    <slot />
+  </body>
+</html>

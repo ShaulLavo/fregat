@@ -8,6 +8,45 @@ import type {
 import { createScriptError } from '../structured-errors'
 import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 
+export const overlayAlignmentSelectors = {
+  pickerFooter: (page: Page) => selectors.pickerDialog(page).locator('[data-slot="dialog-footer"]'),
+  pickerFooterButton: (page: Page) =>
+    selectors.pickerDialog(page).locator('[data-slot="dialog-footer"] button').last(),
+  gallery: (page: Page) => page.locator('[data-overlay-gallery]'),
+  trigger: (page: Page, name: string) => page.getByRole('button', { name, exact: true }),
+  menuRow: (page: Page, name: string) =>
+    page.getByRole('menuitem', { name: new RegExp(`^${name}`) }),
+  checkedRow: (page: Page) =>
+    page.getByRole('menuitemcheckbox', { name: 'Checked action', exact: true }),
+  shortcut: (row: Locator) => row.locator('[data-slot="kbd"]'),
+  dialog: (page: Page) => page.getByRole('dialog', { name: 'Aligned dialog', exact: true }),
+  dialogTitle: (page: Page) =>
+    overlayAlignmentSelectors.dialog(page).locator('[data-slot="dialog-title"]'),
+  dialogDescription: (page: Page) =>
+    overlayAlignmentSelectors.dialog(page).locator('[data-slot="dialog-description"]'),
+  dialogBody: (page: Page) => overlayAlignmentSelectors.dialog(page).locator('p').last(),
+  dialogButton: (page: Page) =>
+    overlayAlignmentSelectors.dialog(page).getByRole('button', { name: 'Done', exact: true }),
+  rowIcon: (row: Locator) => row.locator(':scope > svg').first(),
+  rowLabel: (row: Locator) => row.locator(':scope > span:not([data-slot]):not(.absolute)').first(),
+  inputIcon: (page: Page) => page.locator('[data-slot="command-input-wrapper"] svg').first(),
+  settingLabel: (row: Locator) => row.locator('label').first(),
+  settingDescription: (row: Locator) => row.locator('p').first(),
+  modified: (row: Locator) => row.getByLabel('Modified', { exact: true }),
+  menuIcon: (row: Locator) => row.locator(':scope > svg').first(),
+  menuLabels: (page: Page) => selectors.projectMenuRows(page).locator(':scope > span:last-child'),
+  settingHeading: (row: Locator) =>
+    row.locator('xpath=ancestor::section[1]').getByRole('heading').first(),
+  phoneHeader: (page: Page) => selectors.phoneShell(page).locator('header').first(),
+  phoneTitle: (page: Page) => overlayAlignmentSelectors.phoneHeader(page).getByRole('heading'),
+  phoneAddProjectIcon: (page: Page) =>
+    selectors
+      .phoneShell(page)
+      .getByRole('button', { name: 'Add project', exact: true })
+      .locator('svg'),
+  phoneButtons: (page: Page) => overlayAlignmentSelectors.phoneHeader(page).getByRole('button'),
+}
+
 export const workbenchPaintSelectors = {
   terminal:
     '[data-slot="tool-pane"][aria-label="Terminal"] [data-terminal-presentation="saved"] canvas, [data-slot="tool-pane"][aria-label="Terminal"] :not([inert]) > .ghostty-webgpu > canvas',
@@ -40,6 +79,38 @@ export const csvSelectors = {
   queryRetry: (page: Page) =>
     page.getByRole('status').getByRole('button', { name: 'Retry', exact: true }),
 }
+
+export const workbenchAlignmentSelectors = {
+  tabs: (page: Page) =>
+    page.locator(
+      '[data-editor-tab-strip] [role="tab"], [aria-label="Bottom panel tabs"] [role="tab"]',
+    ),
+  title: (page: Page) => workbenchAlignmentSelectors.header(page).locator('.font-medium').first(),
+  filterField: (page: Page) =>
+    selectors.folderTree(page).locator('[data-slot="input-group"]').first(),
+  lanes: (page: Page) =>
+    selectors
+      .folderTree(page)
+      .locator('[role="treeitem"]:not([data-item-parked]) [data-slot="tree-row-lane"]'),
+  gutter: (page: Page) => page.locator('.editor-virtualized-gutter').first(),
+  editor: (page: Page) => page.locator('.editor-virtualized').first(),
+  header: (page: Page) =>
+    page
+      .locator('[data-slot="resizable-panel"][id="sidebar"] [data-slot="tool-pane-header"]')
+      .first(),
+  bars: (page: Page) =>
+    page.locator(
+      '[data-workbench] [data-slot="tool-pane-header"], [data-workbench] [data-slot="filter-field"], [data-workbench] [data-editor-tab-strip], [data-workbench] [data-slot="pane-bar"]',
+    ),
+  filter: (page: Page) => page.getByRole('textbox', { name: 'Filter files', exact: true }),
+  scroll: (page: Page) => selectors.folderTree(page).locator('[data-file-tree-virtualized-scroll]'),
+  flowRows: (page: Page) =>
+    selectors.folderTree(page).locator('[role="treeitem"]:not([data-item-parked])'),
+  railTab: (page: Page, name: string) =>
+    page
+      .getByRole('navigation', { name: 'Sidebar tabs' })
+      .getByRole('button', { name, exact: true }),
+} as const
 
 export const treeScrollSelectors = {
   scroll: '[data-file-tree-virtualized-scroll]',
@@ -1164,6 +1235,22 @@ export const selectors = {
   agentTreeChild: (page: Page, threadId: string) =>
     page.locator(`[data-agent-tree-level="child"] [data-agent-thread-id="${threadId}"]`),
   modelSwitch: (page: Page) => page.locator('[data-model-switch]').first(),
+  chatAlignment: (page: Page) => ({
+    assistant: selectors.chatAssistantMarkdown(page).last(),
+    nestedRow: page.locator('[data-timeline-row-type="turn-fold"] [data-timeline-row-id]').first(),
+    nestedIcon: page
+      .locator('[data-timeline-row-type="turn-fold"] [data-timeline-row-id] button svg')
+      .first(),
+    composer: selectors.chatMessage(page),
+    workIcon: selectors.completedWorkGroup(page).locator('svg').first(),
+    rowTitle: selectors.sessionRows(page).first().locator('span.truncate').first(),
+    rowContext: selectors.sessionRows(page).first().locator('[data-worktree-id]').first(),
+    stageHeader: page
+      .locator('[data-slot="tool-pane-header"]')
+      .filter({ has: page.getByRole('navigation', { name: 'Session', exact: true }) }),
+    toolHeader: page.locator('[data-chat-mode] [data-workbench-tool-pane-header]'),
+    toolbarIcons: selectors.composerActions(page).locator('button > svg'),
+  }),
   composerActions: (page: Page) => page.locator('[data-composer-actions]'),
   draftContext: (page: Page) => page.getByRole('group', { name: 'Session workspace', exact: true }),
   draftSetup: (page: Page) => page.getByRole('button', { name: /^Session setup: / }),
@@ -1474,8 +1561,10 @@ export async function waitForSessionWorkspace(
         | null
       // Lexical's rendered owner can lag the session URL during a workspace switch.
       const namespace = composer?.__lexicalEditor?._config.namespace
-      const workspaceReady = title === rootPath || title?.startsWith(`${rootPath} ·`)
-      return workspaceReady && namespace === expectedNamespace
+      const workspaceReady = title === rootPath || title?.startsWith(`${rootPath} ·`) === true
+      // The phone header has no project switcher; Lexical names the exact workspace there.
+      const phone = document.documentElement.dataset.shell === 'phone'
+      return (phone || workspaceReady) && namespace === expectedNamespace
     },
     {
       composerSelector: chatComposerSelector,

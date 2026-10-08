@@ -24,6 +24,8 @@ export type Link = {
   readonly drop: number
   readonly duplicate: number
   readonly tailDelay?: number
+  readonly reverse?: boolean
+  readonly dropTypes?: readonly Message['type'][]
 }
 
 export class Network {
@@ -41,6 +43,9 @@ export class Network {
     oldGeneration: 0,
     reconnectReorder: 0,
   }
+  readonly replay = { uniqueDelivery: 0, duplicateDrop: 0, staleDrop: 0, maxReorderDistance: 0 }
+  readonly staleByType: Partial<Record<Message['type'], number>> = {}
+  private readonly deliveries = new Map<string, { highWater: number; ids: Set<number> }>()
   private readonly generations = new Map<string, number>()
   private readonly deliveredGeneration = new Map<string, number>()
   private readonly packets = new Map<number, Packet[]>()
@@ -53,6 +58,8 @@ export class Network {
   constructor(
     readonly seed: number,
     count: number,
+    readonly replayWindowSize = 8192,
+    readonly historyChunkRecords = 5,
   ) {
     this.randomState = seed
 
@@ -181,6 +188,7 @@ export class Network {
   rejoin(index: number): void {
     const node = this.nodes[index]!
     const pending = [...node.session.pending.values()]
+    for (const other of this.nodes) if (other !== node) other.session.retire(node.session.peer)
     node.incarnation++
     node.session = this.session(index, node.incarnation, node.engine)
     for (const edit of pending) node.session.submit(edit)
@@ -191,8 +199,31 @@ export class Network {
     const faults = new Map(this.links)
     for (const [key, link] of this.links) this.links.set(key, { ...link, drop: 0, duplicate: 0 })
     this.advance(240)
+    // Selective repeat serializes download pages; allow bounded extra round trips after elections.
+    for (let retry = 0; retry < 12 && !this.settled(); retry++) this.advance(60)
     this.invariants()
     for (const [key, link] of faults) this.links.set(key, link)
+  }
+  private settled(): boolean {
+    for (const group of this.components()) {
+      const first = this.nodes[group[0]!]!
+      if (!first.session.host) return false
+      const tip = first.engine.checkpoint()
+      if (
+        group.some((index) => {
+          const node = this.nodes[index]!
+          const own = node.engine.checkpoint()
+          return (
+            node.session.host !== first.session.host ||
+            node.session.pending.size > 0 ||
+            own.depth !== tip.depth ||
+            own.hash !== tip.hash
+          )
+        })
+      )
+        return false
+    }
+    return true
   }
   advance(steps: number): void {
     for (let step = 0; step < steps; step++) {
@@ -201,7 +232,12 @@ export class Network {
       const packets = this.packets.get(this.clock) ?? []
       this.packets.delete(this.clock)
       const reordered = packets
-        .map((packet) => ({ packet, order: this.random() }))
+        .map((packet) => ({
+          packet,
+          order: this.links.get(`${packet.from}:${packet.to}`)?.reverse
+            ? -packet.message.messageId
+            : this.random(),
+        }))
         .sort((a, b) => a.order - b.order)
       for (const { packet } of reordered) {
         const from = this.nodes[packet.from]!
@@ -219,7 +255,7 @@ export class Network {
           Math.max(packet.generation, this.deliveredGeneration.get(edge) ?? -1),
         )
         const before = `${to.session.status}/${to.session.branch.authority.epoch}`
-        to.session.receive(packet.message)
+        this.deliver(to.session, packet.message)
         const after = `${to.session.status}/${to.session.branch.authority.epoch}`
         if (before !== after) {
           this.trace.push(
@@ -231,6 +267,35 @@ export class Network {
       if (this.nodes.some((node) => node.session.status === 'left')) this.reconnect()
     }
   }
+  private deliver(session: Session<ToyEdit>, message: Message<ToyEdit>): void {
+    const eligible = session.status !== 'left' && session.members.has(message.sender)
+    const key = JSON.stringify([session.peer, message.sender])
+    const ledger = this.deliveries.get(key) ?? { highWater: 0, ids: new Set<number>() }
+    const duplicate = ledger.ids.has(message.messageId)
+    const stale = message.messageId <= ledger.highWater - this.replayWindowSize
+    const accepted = session.receive(message)
+    assert.equal(
+      accepted,
+      eligible && !duplicate && !stale,
+      `Exact replay admission: seed=${this.seed} receiver=${session.peer} sender=${message.sender} id=${message.messageId} highWater=${ledger.highWater} window=${this.replayWindowSize}`,
+    )
+    if (!eligible) return
+    if (duplicate) this.replay.duplicateDrop++
+    if (!duplicate && stale) {
+      this.replay.staleDrop++
+      this.staleByType[message.type] = (this.staleByType[message.type] ?? 0) + 1
+    }
+    if (!duplicate && !stale) this.replay.uniqueDelivery++
+    if (!duplicate)
+      this.replay.maxReorderDistance = Math.max(
+        this.replay.maxReorderDistance,
+        ledger.highWater - message.messageId,
+      )
+    ledger.highWater = Math.max(ledger.highWater, message.messageId)
+    ledger.ids.add(message.messageId)
+    this.deliveries.set(key, ledger)
+  }
+
   invariants(): void {
     const components = this.components()
     for (const group of components) {
@@ -280,7 +345,8 @@ export class Network {
       pulseInterval: 30,
       suspicionTimeout: 300,
       dependencyTimeout: 900,
-      historyChunkRecords: 5,
+      historyChunkRecords: this.historyChunkRecords,
+      replayWindowSize: this.replayWindowSize,
       send: (peer, message) => this.send(index, peer, message),
     })
   }
@@ -291,7 +357,7 @@ export class Network {
     const to = this.nodes.findIndex((node) => node.session.peer === peer)
     if (to < 0 || !this.edges.has(`${from}:${to}`)) return
     const link = this.links.get(`${from}:${to}`)!
-    if (this.random() < link.drop) return
+    if (link.dropTypes?.includes(message.type) || this.random() < link.drop) return
     const generation = this.generations.get(`${from}:${to}`)!
     const delay =
       link.delay + this.integer(link.jitter) + (this.random() < 0.01 ? (link.tailDelay ?? 80) : 0)
@@ -341,10 +407,13 @@ export class Network {
   }
 }
 
-export function runSeed(seed: number): Network['hits'] {
+export function runSeed(
+  seed: number,
+  replayWindowSize?: number,
+): Network['hits'] & Network['replay'] & { staleByType: Network['staleByType'] } {
   const scenario = seed % 3
   const count = scenario === 1 ? 4 : 3 + (Math.floor(seed / 3) % 6)
-  const network = new Network(seed, count)
+  const network = new Network(seed, count, replayWindowSize)
   network.stabilize()
   network.type(8)
   if (scenario === 0) {
@@ -396,5 +465,5 @@ export function runSeed(seed: number): Network['hits'] {
   network.stabilize()
   network.reconnectTraffic()
   network.stabilize()
-  return network.hits
+  return { ...network.hits, ...network.replay, staleByType: network.staleByType }
 }

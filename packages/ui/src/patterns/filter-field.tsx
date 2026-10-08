@@ -51,7 +51,7 @@ export function FilterField({
   )
 
   return (
-    <PaneBar data-slot='filter-field'>
+    <PaneBar data-slot='filter-field' className='font-sans'>
       <InputGroup
         className='h-(--density-control-height-sm) min-w-0 flex-1'
         onBlur={(event) => {

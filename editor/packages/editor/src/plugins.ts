@@ -8,6 +8,7 @@ import type {
   DocumentSessionApplyEditsOptions,
   DocumentSessionChange,
   DocumentSessionReconcileOptions,
+  DocumentEditAuthor,
   EditorTextTransaction,
 } from './documentSession'
 import type { PieceTableSnapshot } from '@singapore-editor/textbuffer'
@@ -546,6 +547,8 @@ export type EditorViewContributionContext = {
   getDocumentContributions(): EditorDocumentContributions | null
   requestViewUpdate(): void
   /** Each authored text transaction, with its exact pre-edit snapshot and batch. */
+  /** Owns local snapshot authoring for this document; confirmations use reconcile. */
+  authorEdits(author: DocumentEditAuthor): EditorDisposable
   onDidTransaction(listener: (event: EditorTextTransaction) => void): EditorDisposable
   reconcile(
     base: PieceTableSnapshot,

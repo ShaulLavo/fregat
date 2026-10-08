@@ -1,5 +1,5 @@
 import { CaretRightIcon, HandPalmIcon } from '@phosphor-icons/react'
-import { Button } from '@workspace/ui/components/button'
+import { TimelineAction } from '@/features/chat/components/timeline-action'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 
@@ -45,16 +45,16 @@ export function LiveActivityRow({
   return (
     <section className='min-w-0' data-live-activity>
       {expandable ? (
-        <Button
+        <TimelineAction
           aria-expanded={expanded}
-          className='text-muted-foreground h-7 max-w-full justify-start gap-2 px-1 text-xs font-normal'
+          className='text-muted-foreground h-7 max-w-full justify-start gap-2 text-xs font-normal'
           data-scroll-anchor-ignore
           title={activity.label}
           variant='ghost'
           onClick={() => toggle(historyId)}
         >
           {label}
-        </Button>
+        </TimelineAction>
       ) : (
         <div
           className='text-muted-foreground flex h-7 items-center gap-2 px-1 text-xs'

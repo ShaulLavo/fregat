@@ -54,6 +54,12 @@ const OPTION_SAMPLES: Record<EditorControlledOptionName, OptionSample> = {
   folding: { initial: true, next: false, method: 'setFolding', applied: [false] },
   fontSize: { initial: 12, next: 15, method: 'setFontSize', applied: [15] },
   gutterLeadingInset: { initial: 0, next: 12, method: 'setGutterLeadingInset', applied: [12] },
+  gutterScroll: {
+    initial: 'fixed',
+    next: 'content',
+    method: 'setGutterScroll',
+    applied: ['content'],
+  },
   hiddenCharacters: {
     initial: 'show-on-selection',
     next: 'hidden',

@@ -110,6 +110,14 @@ export class UndoManager {
     if (!Number.isFinite(delay) || delay < 0) throw new CollabFailure('invalid-group-delay')
   }
 
+  get canUndo(): boolean {
+    return this.traversal.undo.top !== null
+  }
+
+  get canRedo(): boolean {
+    return this.traversal.redo.top !== null
+  }
+
   state(): UndoState {
     return {
       undo: Array.from(this.traversal.undo, (key) => this.transaction(key)),

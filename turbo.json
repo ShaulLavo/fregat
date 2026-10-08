@@ -104,7 +104,12 @@
         "@singapore-editor/scope-lines#build",
         "@singapore-editor/tree-sitter-languages#build"
       ],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/examples/stress/src/fixtures.ts"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/editor/examples/stress/src/fixtures.ts",
+        "$TURBO_ROOT$/editor/bench/compare/fixture.mjs",
+        "$TURBO_ROOT$/editor/bench/compare/protocol.mjs"
+      ]
     },
     "@singapore-editor/react#typecheck": {
       "dependsOn": ["^build", "build", "@singapore-editor/tree-sitter-languages#build"]
@@ -163,10 +168,73 @@
       "dependsOn": ["^build", "build"],
       "cache": false,
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/docs/performance/e034-*.json.gz"]
+    },
+    "@singapore-editor/core#bench:edit-commands": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"]
+    },
+    "@singapore-editor/highlighting#test:browser": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"]
+    },
+    "@singapore-editor/highlighting#test:engines": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"]
+    },
+    "@singapore-editor/typescript-lsp#test:browser": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"]
+    },
+    "@singapore-editor/tree-sitter#test:browser": {
+      "dependsOn": [
+        "^build",
+        "build",
+        "@singapore-editor/markdown#build",
+        "@singapore-editor/tree-sitter-languages#build"
+      ]
+    },
+    "@singapore-editor/tree-sitter#test:runtime": {
+      "dependsOn": [
+        "^build",
+        "build",
+        "@singapore-editor/markdown#build",
+        "@singapore-editor/tree-sitter-languages#build"
+      ]
+    },
+    "singapore-editor-site#build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*",
+        "$TURBO_ROOT$/editor/package.json",
+        "$TURBO_ROOT$/editor/packages/*/package.json"
+      ],
+      "outputs": ["dist/**"]
+    },
+    "singapore-editor-site#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/editor/package.json",
+        "$TURBO_ROOT$/editor/packages/*/package.json"
+      ],
+      "outputs": []
+    },
+    "singapore-editor-site#typecheck": {
+      "dependsOn": ["^typecheck"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/package.json"]
+    },
+    "@singapore-editor/collaboration#test:editor": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/packages/editor/src/**"],
+      "env": ["COLLABORATION_MEASURE", "COLLABORATION_EVIDENCE_DIR"],
+      "outputs": [],
+      "cache": false
     }
   },
   "agentGuidance": false,
   "globalDependencies": [
+    "package.json",
     ".oxfmtrc.json",
     ".oxlintrc.json",
     "tsconfig.json",

@@ -20,6 +20,11 @@ export function installOpenProbe() {
           hasResult: data?.result !== undefined,
           timings: data?.result?.timings,
           statistics: data?.result?.statistics,
+          analysis: data?.result?.analysis,
+          degraded: data?.result?.degraded,
+          workerReceivedAt: data?.__compareReceivedAt,
+          workerPostedAt: data?.__comparePostedAt,
+          absoluteAt: performance.timeOrigin + performance.now(),
         })
       })
     }
@@ -31,6 +36,7 @@ export function installOpenProbe() {
         worker: this.probeId,
         at: performance.now(),
         id: data?.id,
+        absoluteAt: performance.timeOrigin + performance.now(),
         type: data?.payload?.type,
         resultMode: data?.payload?.resultMode,
         sourceCommand: command?.kind,
@@ -107,6 +113,16 @@ export function summarizeOpenProfile(events, probe) {
         roundTripMs: received ? received.at - sent.at : null,
         timings: received?.timings,
         statistics: received?.statistics,
+        analysis: received?.analysis,
+        degraded: received?.degraded,
+        outboundMs:
+          received?.workerReceivedAt === undefined
+            ? null
+            : received.workerReceivedAt - sent.absoluteAt,
+        inboundMs:
+          received?.workerPostedAt === undefined
+            ? null
+            : received.absoluteAt - received.workerPostedAt,
       }
     })
   return {

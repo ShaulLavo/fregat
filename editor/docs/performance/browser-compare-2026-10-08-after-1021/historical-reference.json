@@ -1,0 +1,31 @@
+{
+  "note": "The supplied reference combines Singapore from the instrumented open diagnostic with Monaco and CodeMirror rounded from the uninstrumented comparison. These noisy historical runs are context, not a controlled before/after pair.",
+  "uninstrumentedGit": "a410c9167cc813e7c968dc2dac933981c6e0ce69",
+  "profiledGit": "308f5e514573c6cee874ad63201bbb17151b5c36",
+  "references": [
+    {
+      "editor": "singapore",
+      "mib": 10,
+      "uninstrumentedHighlightedOpenMedianMs": 1517.699999988079,
+      "uninstrumentedAttempts": 3,
+      "suppliedReferenceMs": 1464,
+      "profiledHighlightedOpenMedianMs": 1464
+    },
+    {
+      "editor": "monaco",
+      "mib": 10,
+      "uninstrumentedHighlightedOpenMedianMs": 169.4000000357628,
+      "uninstrumentedAttempts": 3,
+      "suppliedReferenceMs": 169,
+      "profiledHighlightedOpenMedianMs": 179.9000000357628
+    },
+    {
+      "editor": "codemirror",
+      "mib": 10,
+      "uninstrumentedHighlightedOpenMedianMs": 56.10000002384186,
+      "uninstrumentedAttempts": 3,
+      "suppliedReferenceMs": 56,
+      "profiledHighlightedOpenMedianMs": 77
+    }
+  ]
+}

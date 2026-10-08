@@ -87,7 +87,7 @@ const scenario: BrowserCommand<
           ),
         ),
       )
-      return { before: [], after: await snapshots(), rejoined: [], texts: [] }
+      return { before: [], after: await snapshots(), rejoined: [], texts: [], selectedPairs: [] }
     }
     const stable = async (depth: number) => {
       await Promise.all(
@@ -115,6 +115,11 @@ const scenario: BrowserCommand<
     )
     await stable(count)
     const after = await snapshots()
+    const selectedPairs = await Promise.all(
+      pages.map((peerPage) =>
+        peerPage.evaluate(() => window.collaborationPeer.selectedCandidatePairs()),
+      ),
+    )
     let rejoined: readonly PeerSnapshot[] = []
     if (kind === 'webrtc') {
       await pages[0]!.evaluate(() => window.collaborationPeer.stopRTC())
@@ -136,7 +141,7 @@ const scenario: BrowserCommand<
       await stable(count + 1)
       rejoined = await snapshots()
     }
-    return { before, after, rejoined, texts }
+    return { before, after, rejoined, texts, selectedPairs }
   } finally {
     await Promise.allSettled(
       pages.map(async (peerPage) => {
@@ -160,6 +165,8 @@ export default defineConfig({
   },
   test: {
     include: ['test/**/*.browser.test.ts'],
+    // Editor bindings use source aliases and native input/evidence commands in vitest.editor.config.ts.
+    exclude: ['test/editor*.browser.test.ts'],
     testTimeout: 90_000,
     fileParallelism: false,
     browser: {

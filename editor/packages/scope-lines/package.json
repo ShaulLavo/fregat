@@ -1,6 +1,19 @@
 {
   "name": "@singapore-editor/scope-lines",
   "version": "0.2.6",
+  "description": "Indent guides, sticky headers, and bracket pair colors for the Singapore editor.",
+  "keywords": [
+    "browser",
+    "editor",
+    "indent-guides",
+    "singapore",
+    "sticky-scroll",
+    "typescript"
+  ],
+  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/scope-lines/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

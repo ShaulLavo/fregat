@@ -267,7 +267,9 @@ const captureCandidates = (captures: readonly EditorSyntaxCapture[]): CaptureCan
 
     candidates.push({
       end: capture.endIndex,
-      rank: captureRank(capture.captureName),
+      rank:
+        captureRank(capture.captureName) -
+        (capture.injectionDepth ?? 0) * (UNRANKED_CAPTURE_RANK + 1),
       start: capture.startIndex,
       style,
     })

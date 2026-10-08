@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gunzipSync } from 'node:zlib'
+import { verifyFullDocumentRow } from './full-document.mjs'
 import { editors, percentile, verifyGeometry } from './protocol.mjs'
 
 export function verifyOpenProfiles(result) {
@@ -32,18 +33,33 @@ function verifyProfileRow(row, config) {
     if (!row.errors?.length) throw new RangeError('Failed profile has no retained error')
     return
   }
+  if (row.editor === 'singapore' && config.fullDocument) verifyFullDocumentRow(row)
   verifyGeometry(row.open)
   if (!row.openProfile.completed || !Number.isFinite(row.open.highlightedFrameMs))
     throw new RangeError('Successful profile has no settled open clock')
-  if (
-    row.editor === 'singapore' &&
-    !firstParse(row)?.timings?.some((timing) => timing.name === 'treeSitter.parseRoot')
-  )
+  if (row.editor === 'singapore' && !hasInitialParseMeasurement(row))
     throw new RangeError('Successful Singapore profile has no worker parse measurement')
 }
 
 function firstParse(row) {
-  return row.openProfile.requests.find((request) => request.resultMode === 'parseOnly')
+  return row.openProfile.requests.find(
+    (request) =>
+      request.resultMode === 'bootstrap' ||
+      request.resultMode === 'parseOnly' ||
+      request.resultMode === 'full',
+  )
+}
+
+function hasInitialParseMeasurement(row) {
+  const parse = firstParse(row)
+  if (parse?.resultMode !== 'bootstrap')
+    return parse?.timings?.some((timing) => timing.name === 'treeSitter.parseRoot')
+  return row.openProfile.requests.some(
+    (request) =>
+      request.type === 'queryRange' &&
+      request.analysis?.kind === 'partial' &&
+      request.timings?.some((timing) => timing.name === 'treeSitter.bootstrapRoot'),
+  )
 }
 
 export function openProfileRows(result) {
@@ -53,9 +69,11 @@ export function openProfileRows(result) {
   return result.samples.map((row) => {
     const parse = firstParse(row)
     const reset = row.openProfile.requests.find((request) => request.sourceCommand === 'reset')
-    const query = row.openProfile.requests.find(
-      (request) => request.type === 'queryRange' && request.statistics?.tokens > 0,
-    )
+    const query =
+      row.openProfile.requests.find((request) => request.resultMode === 'full') ??
+      row.openProfile.requests.find(
+        (request) => request.type === 'queryRange' && request.statistics?.tokens > 0,
+      )
     const relative = (request) => (request ? request.at - row.openProfile.startedAtMs : undefined)
     const applied = row.openProfile.diagnostics?.find(
       (event) =>
@@ -72,16 +90,24 @@ export function openProfileRows(result) {
       sourceStartMs: relative(reset),
       sourceResetMs: reset?.roundTripMs,
       sourcePostMs: reset?.postMessageMs,
+      sourceOutboundMs: reset?.outboundMs,
       sourceCodeUnits: reset?.sourceCodeUnits,
       parseStartMs: relative(parse),
       parseRoundTripMs: parse?.roundTripMs,
       parseReturnedResult: parse?.returnedResult,
       parseMs: phase(parse, 'treeSitter.parse'),
       parseRootMs: phase(parse, 'treeSitter.parseRoot'),
+      bootstrapRootMs: phase(query, 'treeSitter.bootstrapRoot'),
+      bootstrapUnits: query?.statistics?.bootstrapUnits,
       injectionDiscoveryMs: phase(parse, 'treeSitter.injectionDiscovery'),
       queryStartMs: relative(query),
       queryRoundTripMs: query?.roundTripMs,
-      queryMs: phase(query, 'treeSitter.queryRange'),
+      queryMs: phase(query, 'treeSitter.queryRange') ?? phase(query, 'treeSitter.query'),
+      inboundMs: query?.inboundMs,
+      tokenStoreMs: row.openProfile.diagnostics?.find(
+        (event) => event.name === 'compare.full.tokenStore',
+      )?.durationMs,
+      reference: row.open?.facts?.fullHighlight,
       structuralWalkMs: phase(query, 'treeSitter.structuralWalk'),
       highlightQueryMs: phase(query, 'treeSitter.highlightQueryAndPredicates'),
       packingMs: phase(query, 'treeSitter.packing'),

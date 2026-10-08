@@ -1,6 +1,7 @@
 import { contrastAdjustedColor } from '../contrast.js'
 import type { PaintTarget } from './paint-target.js'
 import type { RenderCell, RenderRow } from '../../core/types.js'
+import { emptyRenderCell } from '../../core/packed-cells.js'
 import type { TerminalFittedFont } from '../../term/types.js'
 import type { CanonicalRendererTheme, CursorState } from '../instances/types.js'
 import { CanvasColorCache, resolveCanvasCellColors, type CanvasCellColors } from './colors.js'
@@ -29,6 +30,48 @@ function cursorForCell(
   return cursor
 }
 
+interface PlainRowImage {
+  readonly text: string
+  readonly cursor: string
+}
+
+export function plainRowText(row: RenderRow): string | undefined {
+  const packed = row.packed
+  const cells = packed ? undefined : row.cells
+  const length = packed?.length ?? cells!.length
+  const scratch = packed ? emptyRenderCell() : undefined
+  let text = ''
+  for (let index = 0; index < length; index += 1) {
+    const cell = packed ? packed.read(index, scratch!) : cells![index]!
+    if (
+      cell.x !== index ||
+      cell.continuation ||
+      cell.selected ||
+      cell.background ||
+      cell.foreground
+    )
+      return undefined
+    const style = cell.style
+    if (
+      style &&
+      (style.bold ||
+        style.italic ||
+        style.faint ||
+        style.invisible ||
+        style.inverse ||
+        style.overline ||
+        style.strikethrough ||
+        style.underline > 0)
+    )
+      return undefined
+    if (cell.text.length > 1) return undefined
+    const code = cell.text.charCodeAt(0)
+    if (cell.text && (code < 32 || code > 126)) return undefined
+    text += cell.text || '\u0000'
+  }
+  return text
+}
+
 export class CanvasRowPainter {
   private backgroundColor?: string
   private backgroundStart = 0
@@ -39,6 +82,9 @@ export class CanvasRowPainter {
   private currentFill?: string
   private currentFont?: string
   private fonts: readonly string[] = []
+  private readonly plainRows = new Map<number, PlainRowImage>()
+  private overhangLeft = 0
+  private overhangRight = 0
 
   constructor(
     private readonly context: PaintTarget,
@@ -59,27 +105,149 @@ export class CanvasRowPainter {
     this.context.font = this.fonts[0]!
     this.context.textAlign = 'center'
     this.context.textBaseline = 'alphabetic'
+    this.invalidate()
+    this.overhangLeft = 0
+    this.overhangRight = 0
+    if (!this.context.measureText) return
+    const center = font.charLeft + font.deviceCharWidth / 2
+    for (let code = 32; code <= 126; code += 1) {
+      const ink = this.context.measureText(String.fromCharCode(code))
+      this.overhangLeft = Math.max(this.overhangLeft, Math.ceil(ink.actualBoundingBoxLeft - center))
+      this.overhangRight = Math.max(
+        this.overhangRight,
+        Math.ceil(center + ink.actualBoundingBoxRight - font.deviceCellWidth),
+      )
+    }
+  }
+
+  invalidate(): void {
+    this.plainRows.clear()
   }
 
   setTheme(theme: CanonicalRendererTheme): void {
     this.theme = theme
     this.colors = new CanvasColorCache(theme.minimumContrast)
+    this.invalidate()
   }
 
-  paint(row: RenderRow, cursor: CursorState | undefined, width: number): void {
+  paint(
+    row: RenderRow,
+    cursor: CursorState | undefined,
+    width: number,
+    allowCellDamage = true,
+    capturedPlainText?: string,
+  ): void {
+    const damage = allowCellDamage
+      ? this.plainDamage(row, cursor, width, capturedPlainText)
+      : undefined
+    const plain = damage !== undefined && !this.context.glyph
+    if (!allowCellDamage) this.plainRows.delete(row.y)
+    if (damage && damage.width === 0) return
+    const x = damage?.x ?? 0
+    const paintWidth = damage?.width ?? width
+    if (damage && !plain) {
+      const packed = row.packed
+      const cells = packed
+        ? Array.from({ length: damage.end - damage.first }, (_, index) =>
+            packed.read(damage.first + index, emptyRenderCell()),
+          )
+        : row.cells.slice(damage.first, damage.end)
+      // Spreading the source row would invoke its complete-cell getter.
+      row = { y: row.y, dirty: row.dirty, cells }
+    }
     const y = row.y * this.font.deviceCellHeight
     this.currentFill = undefined
     this.currentFont = this.fonts[0]
     this.currentAlpha = 1
-    this.cellColors.length = row.cells.length
+    if (!plain) this.cellColors.length = row.cells.length
     this.context.save()
     this.context.beginPath()
-    this.context.rect(0, y, width, this.font.deviceCellHeight)
+    this.context.rect(x, y, paintWidth, this.font.deviceCellHeight)
     this.context.clip()
-    this.context.clearRect(0, y, width, this.font.deviceCellHeight)
+    this.context.clearRect(x, y, paintWidth, this.font.deviceCellHeight)
+    if (plain) {
+      this.paintPlain(damage.text, cursor, row.y, damage.first, damage.end)
+      this.context.restore()
+      return
+    }
     this.paintBackgrounds(row, cursor, y)
     for (let index = 0; index < row.cells.length;) index += this.paintGlyph(row, index)
     this.context.restore()
+  }
+
+  private plainDamage(
+    row: RenderRow,
+    cursor: CursorState | undefined,
+    width: number,
+    capturedPlainText?: string,
+  ): { x: number; width: number; first: number; end: number; text: string } | undefined {
+    if (!this.context.measureText || !Number.isInteger(this.font.deviceCellWidth)) return undefined
+    const text = capturedPlainText ?? plainRowText(row)
+    if (text === undefined) {
+      this.plainRows.delete(row.y)
+      return undefined
+    }
+    const cellWidth = this.font.deviceCellWidth
+    const currentCursor = cursor?.visible && cursor.y === row.y ? `${cursor.x}:${cursor.style}` : ''
+    const previous = this.plainRows.get(row.y)
+    this.plainRows.set(row.y, { text, cursor: currentCursor })
+    if (!previous || previous.text.length !== text.length) return undefined
+    let first = 0
+    let end = text.length
+    while (first < end && previous.text[first] === text[first]) first += 1
+    while (end > first && previous.text[end - 1] === text[end - 1]) end -= 1
+    if (first === end) end = 0
+    if (previous.cursor !== currentCursor) {
+      for (const value of [previous.cursor, currentCursor]) {
+        if (!value) continue
+        const column = Number(value.split(':')[0])
+        first = Math.min(first, column)
+        end = Math.max(end, column + 1)
+      }
+    }
+    if (end <= first) return { x: 0, width: 0, first: 0, end: 0, text }
+    const left = Math.max(0, first * cellWidth - this.overhangLeft)
+    const right = Math.min(width, end * cellWidth + this.overhangRight)
+    // Unchanged neighboring ink can cross the clear region and must be restored too.
+    const glyphFirst = Math.max(0, Math.floor((left - this.overhangRight) / cellWidth))
+    const glyphEnd = Math.min(text.length, Math.ceil((right + this.overhangLeft) / cellWidth))
+    return { x: left, width: right - left, first: glyphFirst, end: glyphEnd, text }
+  }
+
+  private paintPlain(
+    text: string,
+    cursor: CursorState | undefined,
+    row: number,
+    first: number,
+    end: number,
+  ): void {
+    const cell = emptyRenderCell()
+    const colors = resolveCanvasCellColors(cell, this.theme, false)
+    const activeCursor =
+      cursor?.visible && cursor.y === row && cursor.x >= first && cursor.x < end
+        ? cursor
+        : undefined
+    const cursorColors = activeCursor
+      ? resolveCanvasCellColors(cell, this.theme, activeCursor.style === 'block')
+      : colors
+    const y = row * this.font.deviceCellHeight
+    if (activeCursor) {
+      const x = activeCursor.x * this.font.deviceCellWidth
+      this.appendBackground(cursorColors, x, y)
+      this.paintCursor(activeCursor, cursorColors, x, y)
+    }
+    this.flushBackground(y)
+    const foreground = this.colors.foreground(colors)
+    const cursorForeground = this.colors.foreground(cursorColors)
+    const deviceSpacing = this.font.deviceCellWidth - this.font.deviceCharWidth
+    const characterWidth = this.font.deviceCellWidth - deviceSpacing
+    for (let column = first; column < end; column += 1) {
+      const glyph = text[column]!
+      if (glyph === '\u0000') continue
+      this.setFill(column === activeCursor?.x ? cursorForeground : foreground)
+      const x = column * this.font.deviceCellWidth + this.font.charLeft + characterWidth / 2
+      this.context.fillText(glyph, x, y + this.font.deviceBaseline)
+    }
   }
 
   private paintBackgrounds(row: RenderRow, cursor: CursorState | undefined, y: number): void {

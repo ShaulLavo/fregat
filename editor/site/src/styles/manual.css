@@ -1,0 +1,638 @@
+/* The docs manual (design d1): one reading column whose static rows mirror Singapore's Markdown
+   live preview (22 px rows, marks hidden), so the real editor can take the column over in place.
+   Every metric of `.src` and `.r` must match what the editor draws. The --sg-* values are the
+   editor theme: the takeover passes them to Singapore's Editor. */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url(../fonts/jetbrains-mono.woff2) format('woff2');
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Source Serif 4';
+  src: url(../fonts/source-serif-4.woff2) format('woff2');
+  font-weight: 200 900;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light dark;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --chrome: 'Source Serif 4', Georgia, serif;
+  --row: 22px;
+  --size: 14px;
+  --cw: 8px;
+  --gw: 48px;
+  --gap: 18px;
+  /* Text measure: 88 columns of the 8 px advance. */
+  --measure: 704px;
+  --hh: 52px;
+  --ph: 30px;
+  /* Column start, chosen so the prose (not the gutter) is centred. */
+  --left: max(0px, calc((100vw - var(--measure)) / 2 - var(--gw)));
+
+  /* Light paper and its dark counterpart: the same calm hues, lifted for a dark page. */
+  --muted: light-dark(#7d786e, #8f897e);
+  --sg-bg: light-dark(#fbfaf7, #1a1916);
+  --sg-fg: light-dark(#2b2925, #d6d1c6);
+  --sg-gutter: light-dark(#d3cfc6, #46423b);
+  --sg-selection: light-dark(rgb(44 94 145 / 0.14), rgb(141 180 221 / 0.22));
+  --sg-caret: light-dark(#9c3b2c, #d98a76);
+  --sg-title: light-dark(#141310, #f2eee5);
+  --sg-link: light-dark(#2c5e91, #8db4dd);
+  --sg-code-bg: light-dark(#f3f1ec, #23211d);
+  --sg-kw: light-dark(#9c3b2c, #d98a76);
+  --sg-str: light-dark(#4b7238, #a3c18b);
+  --sg-com: light-dark(#7a756b, #8a8479);
+  --sg-num: light-dark(#8a5a12, #d6a85c);
+  --sg-type: light-dark(#2b2925, #d6d1c6);
+  --sg-fn: light-dark(#2c5e91, #8db4dd);
+  --sg-prop: light-dark(#2c5e91, #8db4dd);
+  --sg-punct: light-dark(#7d786e, #8f897e);
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+}
+body {
+  background: var(--sg-bg);
+  color: var(--sg-fg);
+  font: 15px/1.5 var(--chrome);
+  -webkit-text-size-adjust: 100%;
+}
+body.manual {
+  overflow: hidden;
+}
+a {
+  color: var(--sg-link);
+}
+:focus-visible {
+  outline: 2px solid var(--sg-caret);
+  outline-offset: 2px;
+}
+::selection {
+  background: var(--sg-selection);
+}
+.skip {
+  position: absolute;
+  left: 8px;
+  top: -40px;
+  z-index: 10;
+  background: var(--sg-code-bg);
+  color: var(--sg-title);
+  padding: 6px 10px;
+}
+.skip:focus {
+  top: 6px;
+}
+
+/* Header: the serif brand, then quiet links. */
+.top {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: var(--hh);
+  padding: 0 max(24px, calc(100vw - var(--left) - var(--gw) - var(--measure) - 8px)) 0
+    max(24px, calc(var(--left) - 220px));
+  white-space: nowrap;
+}
+.brand {
+  color: var(--sg-title);
+  text-decoration: none;
+  font: italic 21px/1 var(--chrome);
+  letter-spacing: -0.01em;
+}
+.top .right {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.top .right a,
+.top button,
+.menu summary {
+  color: var(--muted);
+  text-decoration: none;
+  font: inherit;
+  background: none;
+  border: 0;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.top .right a:hover,
+.top button:hover,
+.menu summary:hover,
+.menu[open] summary {
+  color: var(--sg-title);
+}
+.theme-toggle[aria-pressed='true'] {
+  color: var(--sg-title);
+}
+/* Every page, from the header, when the margin list has no room. */
+.menu {
+  display: none;
+  position: relative;
+}
+.menu summary {
+  list-style: none;
+}
+.menu summary::-webkit-details-marker {
+  display: none;
+}
+.menu nav {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  max-height: min(70dvh, 640px);
+  overflow: auto;
+  padding: 10px 18px 4px;
+  background: var(--sg-bg);
+  border-radius: 8px;
+  box-shadow: 0 18px 60px rgb(0 0 0 / 0.22);
+  white-space: normal;
+}
+.menu h2 {
+  margin: 8px 0 4px;
+  font: 11px/1.5 var(--chrome);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.menu ul {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+.menu nav a {
+  display: block;
+  padding: 3px 0;
+  color: var(--sg-fg);
+  text-decoration: none;
+}
+.menu nav a[aria-current] {
+  color: var(--sg-link);
+}
+kbd {
+  font: 11px var(--mono);
+  color: var(--muted);
+  background: var(--sg-code-bg);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+/* The slim file path above the column. */
+.pathrow {
+  display: flex;
+  align-items: center;
+  height: var(--ph);
+  padding: 0 0 0 calc(var(--left) + var(--gw));
+  width: calc(var(--left) + var(--gw) + var(--measure));
+  max-width: 100%;
+  font: 12px/1 var(--mono);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.path b {
+  font-weight: 400;
+  color: var(--sg-fg);
+}
+.path .dirty {
+  color: var(--sg-caret);
+  margin-left: 6px;
+}
+.mode {
+  margin-left: auto;
+  padding: 0 8px 0 12px;
+  flex-shrink: 0;
+}
+.mode button {
+  font: inherit;
+  color: var(--sg-link);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* The column: the static page and the slot the editor mounts into share one box. */
+.viewport {
+  position: relative;
+  height: calc(100dvh - var(--hh) - var(--ph));
+}
+.pane,
+.editor-host {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--left);
+  width: min(100%, calc(var(--gw) + var(--measure)));
+}
+.pane {
+  overflow: auto;
+  outline: none;
+  container-type: inline-size;
+  overflow-x: hidden;
+}
+/* No scrollbar in the middle of the page; the margins forward the wheel to the column. */
+.pane,
+.editor-host .editor-virtualized {
+  scrollbar-width: none;
+}
+.editor-host[data-state='mounting'] {
+  visibility: hidden;
+}
+body[data-mode='editor'] .pane {
+  display: none;
+}
+
+/* The page list in the left margin. */
+.pages {
+  position: absolute;
+  top: 8px;
+  left: calc(var(--left) - 220px);
+  width: 196px;
+  max-height: 100%;
+  overflow: auto;
+  scrollbar-width: none;
+  font: 15px/1.55 var(--chrome);
+}
+.pages h2 {
+  margin: 0 0 6px;
+  font: 11px/1.5 var(--chrome);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pages ul {
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 0;
+}
+.pages a {
+  display: block;
+  padding: 2px 0;
+  color: var(--sg-fg);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pages a:hover {
+  color: var(--sg-title);
+}
+.pages a[aria-current] {
+  color: var(--sg-link);
+}
+
+/* The prerendered rows. */
+.src {
+  /* The editor fits ceil(width / advance) columns, so the static rows round up the same way. */
+  --wrap: round(up, 100cqw - var(--gw) - 0.01px, var(--cw));
+  font-family: var(--mono);
+  font-size: var(--size);
+  line-height: var(--row);
+  font-variant-ligatures: normal;
+  color: var(--sg-fg);
+  padding: 0 0 40vh;
+}
+.src > *,
+.src pre,
+.src ul,
+.src blockquote {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.r {
+  display: block;
+  position: relative;
+  min-height: var(--row);
+  margin: 0;
+  padding: 0 0 0 var(--gw);
+  font-size: var(--size);
+  line-height: var(--row);
+  font-weight: 400;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  /* Half an advance of slack: fonts can render a fraction wider than 8 px, while the editor
+     counts whole columns. */
+  width: calc(var(--gw) + var(--wrap) + var(--cw) / 2);
+}
+.r::before {
+  content: attr(data-n) / '';
+  position: absolute;
+  left: 0;
+  width: calc(var(--gw) - var(--gap));
+  text-align: right;
+  font-size: var(--size);
+  font-weight: 400;
+  font-style: normal;
+  color: var(--sg-gutter);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+.src .h1,
+.src .h2,
+.src .h3,
+.src .h4,
+.src .h5,
+.src .h6 {
+  font-weight: 700;
+}
+.src .h1 {
+  font-size: calc(var(--size) * 1.35);
+}
+.src .h2 {
+  font-size: calc(var(--size) * 1.2);
+}
+.src .h3 {
+  font-size: calc(var(--size) * 1.1);
+}
+.nw {
+  white-space: nowrap;
+}
+.u {
+  text-decoration: underline;
+}
+/* The preview draws a link label as one widget, so it wraps as a unit. */
+.src a {
+  color: var(--sg-link);
+  text-decoration: underline;
+  white-space: nowrap;
+}
+.src pre,
+.src code {
+  font: inherit;
+}
+.src pre .r {
+  background: linear-gradient(to right, transparent var(--gw), var(--sg-code-bg) var(--gw));
+}
+
+/* Search */
+.search {
+  position: fixed;
+  inset: 72px auto auto 50%;
+  transform: translateX(-50%);
+  width: min(600px, calc(100vw - 24px));
+  max-height: min(70dvh, 520px);
+  display: flex;
+  flex-direction: column;
+  background: var(--sg-bg);
+  color: var(--sg-fg);
+  border: 0;
+  border-radius: 8px;
+  padding: 0;
+  box-shadow: 0 18px 60px rgb(0 0 0 / 0.28);
+  font: 14px/1.4 var(--mono);
+}
+.search:not([open]) {
+  display: none;
+}
+.search::backdrop {
+  background: rgb(0 0 0 / 0.25);
+}
+.search input {
+  font: 14px var(--mono);
+  color: var(--sg-title);
+  background: var(--sg-code-bg);
+  border: 0;
+  padding: 12px 14px;
+  outline: none;
+}
+.search ol {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  overflow: auto;
+}
+.search li a {
+  display: block;
+  padding: 6px 14px;
+  color: var(--sg-fg);
+  text-decoration: none;
+}
+.search li a:hover,
+.search li a:focus {
+  background: var(--sg-code-bg);
+  outline: none;
+}
+.search li b {
+  color: var(--sg-title);
+  font-weight: 400;
+}
+.search li span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.search mark {
+  background: none;
+  color: var(--sg-link);
+}
+.search .empty {
+  padding: 8px 14px;
+  color: var(--muted);
+}
+
+/* Without room for the margin list, the header menu lists every page. */
+@media (max-width: 1199px) {
+  .pages {
+    display: none;
+  }
+  .menu {
+    display: block;
+  }
+  .top {
+    padding: 0 24px;
+  }
+}
+/* Phones: the page scrolls as a document. */
+@media (max-width: 760px) {
+  :root {
+    --gw: 36px;
+    --gap: 12px;
+    --left: 0px;
+    --measure: calc(100vw - var(--gw) - 8px);
+  }
+  body.manual {
+    overflow: visible;
+  }
+  .top {
+    padding: 0 8px 0 14px;
+    gap: 8px;
+  }
+  .top .right a,
+  .search-open kbd {
+    display: none;
+  }
+  /* The summary sits mid-header, so the list spans the screen below it. */
+  .menu nav {
+    position: fixed;
+    top: calc(var(--hh) - 4px);
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: none;
+  }
+  .pathrow {
+    padding-left: var(--gw);
+    width: 100%;
+  }
+  .viewport {
+    height: auto;
+  }
+  /* Phones read the static page, so rows fit whole columns inside the screen instead of
+     rounding up the way the editor does. */
+  .src {
+    --wrap: round(down, 100cqw - var(--gw) - var(--cw) / 2, var(--cw));
+  }
+  .nw.wide {
+    white-space: inherit;
+  }
+  .pane {
+    position: static;
+    overflow: visible;
+    overflow-x: clip;
+    width: auto;
+  }
+  .src {
+    padding-bottom: 48px;
+  }
+  body[data-mode='editor'] .viewport {
+    height: calc(100dvh - var(--hh) - var(--ph));
+  }
+  .editor-host {
+    width: 100%;
+  }
+}
+
+/* Home: one column of prose around the editable sample. */
+.home-column {
+  max-width: calc(var(--gw) + var(--measure));
+  margin: 0 auto;
+  padding: 24px 0 64px;
+  outline: none;
+}
+.home-column > :not(figure, .install) {
+  margin-left: var(--gw);
+  margin-right: 8px;
+}
+.home-column h1 {
+  font: 400 34px/1.2 var(--chrome);
+  letter-spacing: -0.01em;
+  color: var(--sg-title);
+  margin-top: 32px;
+  margin-bottom: 16px;
+  text-wrap: balance;
+}
+.home-column h2 {
+  font: 11px/1.5 var(--chrome);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 40px;
+  margin-bottom: 10px;
+}
+.home-column p {
+  font-size: 17px;
+  line-height: 1.6;
+  max-width: 62ch;
+}
+.home-column .index {
+  list-style: none;
+  padding: 0;
+  font-size: 17px;
+  line-height: 1.8;
+}
+.home-column .index a {
+  text-decoration: none;
+}
+.home-column footer {
+  margin-top: 56px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.hero {
+  margin: 28px 0 0;
+}
+.hero-box {
+  position: relative;
+  container-type: inline-size;
+  padding: 0;
+}
+.hero-box .editor-host {
+  position: absolute;
+  inset: 0;
+  left: 0;
+  width: 100%;
+}
+.hero-box[data-mode='editor'] .hero-static {
+  visibility: hidden;
+}
+.hero figcaption {
+  display: flex;
+  gap: 16px;
+  margin: 10px 8px 0 var(--gw);
+  font-size: 14px;
+  font-style: italic;
+  color: var(--muted);
+}
+.hero-mode {
+  margin-left: auto;
+  font-style: normal;
+}
+.hero-mode button {
+  font: inherit;
+  color: var(--sg-link);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.install {
+  container-type: inline-size;
+  padding: 0;
+}
+/* Desktop rows round their width up to whole columns, as the editor does; clip the excess. */
+.hero-box,
+.install {
+  overflow-x: clip;
+}
+@media (max-width: 760px) {
+  .home-column {
+    padding-top: 8px;
+  }
+  .home-column h1 {
+    font-size: 27px;
+  }
+  .hero figcaption {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .hero-mode {
+    margin-left: 0;
+  }
+}

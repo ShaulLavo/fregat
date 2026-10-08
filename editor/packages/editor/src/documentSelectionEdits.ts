@@ -97,10 +97,11 @@ export const applyTextToSelections = (
   snapshot: PieceTableSnapshot,
   set: SelectionSet<PieceTableAnchor>,
   text: string,
+  applyEdits: typeof applyBatchToPieceTable = applyBatchToPieceTable,
 ): SelectionEditResult => {
   const targets = resolvedSelectionsToRanges(snapshot, set).map(selectionToEditTarget)
   const edits = targets.map((target) => rangeToEdit(target.range, text))
-  const nextSnapshot = applyBatchToPieceTable(snapshot, edits)
+  const nextSnapshot = applyEdits(snapshot, edits)
 
   return {
     snapshot: nextSnapshot,
@@ -113,6 +114,7 @@ export const indentSelections = (
   snapshot: PieceTableSnapshot,
   set: SelectionSet<PieceTableAnchor>,
   text: string,
+  applyEdits: typeof applyBatchToPieceTable = applyBatchToPieceTable,
 ): SelectionEditResult => {
   if (text.length === 0) return emptySelectionEdit(snapshot, set)
 
@@ -122,7 +124,7 @@ export const indentSelections = (
     const start = lineStart(snapshot, row)
     return rangeToEdit({ start, end: start }, text)
   })
-  const nextSnapshot = applyBatchToPieceTable(snapshot, edits)
+  const nextSnapshot = applyEdits(snapshot, edits)
 
   return {
     snapshot: nextSnapshot,
@@ -139,6 +141,7 @@ export const outdentSelections = (
   snapshot: PieceTableSnapshot,
   set: SelectionSet<PieceTableAnchor>,
   tabSize: number,
+  applyEdits: typeof applyBatchToPieceTable = applyBatchToPieceTable,
 ): SelectionEditResult => {
   const normalizedTabSize = normalizeTabSize(tabSize)
   const selections = resolvedSelectionsToRanges(snapshot, set)
@@ -148,7 +151,7 @@ export const outdentSelections = (
     .filter((edit): edit is PieceTableEdit => edit !== null)
   if (edits.length === 0) return emptySelectionEdit(snapshot, set)
 
-  const nextSnapshot = applyBatchToPieceTable(snapshot, edits)
+  const nextSnapshot = applyEdits(snapshot, edits)
   return {
     snapshot: nextSnapshot,
     selections: createSelectionSet(
@@ -163,6 +166,7 @@ export const outdentSelections = (
 export const deleteSelections = (
   snapshot: PieceTableSnapshot,
   set: SelectionSet<PieceTableAnchor>,
+  applyEdits: typeof applyBatchToPieceTable = applyBatchToPieceTable,
 ): SelectionEditResult => {
   const normalized = normalizeSelectionSet(snapshot, set)
   const targets = normalized.selections
@@ -170,7 +174,7 @@ export const deleteSelections = (
     .filter((selection) => !selection.collapsed)
     .map(selectionToEditTarget)
   const edits = targets.map((target) => rangeToEdit(target.range, ''))
-  const nextSnapshot = applyBatchToPieceTable(snapshot, edits)
+  const nextSnapshot = applyEdits(snapshot, edits)
 
   if (edits.length === 0) {
     return {
@@ -190,7 +194,8 @@ export const deleteSelections = (
 export const backspaceSelections = (
   snapshot: PieceTableSnapshot,
   set: SelectionSet<PieceTableAnchor>,
-  tabSize?: number,
+  tabSize: number | undefined = undefined,
+  applyEdits: typeof applyBatchToPieceTable = applyBatchToPieceTable,
 ): SelectionEditResult => {
   const normalized = normalizeSelectionSet(snapshot, set)
   const targets = normalized.selections
@@ -199,7 +204,7 @@ export const backspaceSelections = (
   const lastAddedTarget = targets[normalized.lastAddedIndex ?? 0]
   const orderedTargets = targets.toSorted(compareSelectionEditTargets)
   const edits = mergeOrderedTargetRanges(orderedTargets).map((range) => rangeToEdit(range, ''))
-  const nextSnapshot = applyBatchToPieceTable(snapshot, edits)
+  const nextSnapshot = applyEdits(snapshot, edits)
 
   if (edits.length === 0) {
     return {

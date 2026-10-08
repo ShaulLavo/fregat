@@ -924,7 +924,7 @@ function handle(message) {
     return
   }
   if (
-    ['response-delivery', 'physical-chat'].includes(scenario) &&
+    ['response-delivery', 'physical-chat', 'chat-alignment'].includes(scenario) &&
     message.method === 'turn/start'
   ) {
     send({ id: message.id, result: { turn: { id: turnId, status: 'inProgress', items: [] } } })

@@ -206,6 +206,12 @@ export const SETTINGS_REGISTRY = {
     // Machine scope: it decides who reaches this machine's files, terminals and agents.
     scope: 'machine',
   }),
+  'environments.tailnetOwnerDevices': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    // Machine scope: it decides who reaches this machine's files, terminals and agents.
+    scope: 'machine',
+  }),
   'server.address': defineSetting({
     // One explicit IPv4 loopback origin: `localhost` may resolve to ::1 and miss the socket unit.
     schema: v.pipe(

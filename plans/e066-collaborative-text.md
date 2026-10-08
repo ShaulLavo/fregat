@@ -2,7 +2,7 @@
 
 Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
 
-- Status: Approved
+- Status: In progress
 - Kind: Implementation
 - Owner: Editor
 - Priority: P2
@@ -131,16 +131,32 @@ Types' and Fugue's test suites. The research settles the rest:
 - Steps 2 and 3: textbuffer suites pass, and an ID edit applied to two snapshots, including
   inserts after deleted characters, gives identical text, anchors and IDs.
 - Step 4: Loro's four `fugue.rs` interleaving cases, the three-replica Yjs counterexample (`ab`
-  stays adjacent), Loro's tombstone-origin cases and the `AXYBN`/`xaaaabn` regressions pass. The
+  stays adjacent), Loro's tombstone-origin cases and the `AXYBN`/`xaaaabn` regressions pass (under FugueMax the
+  `AXYBN` history yields `AYXBN`, checked against the Fugue reference; Loro's literal reflects
+  original Fugue's sibling order). The
   Yjs five-user disconnect scheduler, adapted to one host and optimistic participants, converges
   over 10,000 seeded rounds.
-- Step 5: lane C's Zed, Loro and Yjs undo cases and its 14 Singapore cases pass, including two
+- Step 5: lane C's Loro and Yjs undo cases, independently written scenarios for Zed's visibility
+  rule (Zed's text tests are GPL and are not copied), and its 14 Singapore cases pass, including two
   overlapping deletes undone separately and a duplicate acknowledgement.
 - Step 6: in a browser test, a remote edit updates highlighting, folds, diagnostics and a
   decoration. At 0, 100 and 1,000 inert plugins, uninterested extensions get zero transaction
   callbacks.
 - Throughout: `bench:input` keystroke cost stays within the 8.3 ms bar and within noise of the
   step 1 baseline, alone and with 1, 10 and 100 pending edits during a remote arrival.
+
+## Delivery (2026-10-08 wave)
+
+- Steps 1–4, 6 and 7 are delivered: `@singapore-editor/collab` with FugueMax, Host,
+  Participant and simulator (#950); textbuffer character identity and exact structural edits
+  (#952); `TextbufferEngine` (#967); ported Loro, Yjs and Diamond Types suites (#955); editor
+  transaction stream and atomic reconcile (#963); reconcile cost on fragmented history within
+  budget (#1010: 100 pending edits on 100,000 lines from ~75 ms to under 1 ms, experiment);
+  editor binding (#1026).
+- Reconcile takes the exact edits as input; there is no character-diff fallback (#963 review).
+- Step 5 is delivered for author-selective undo with deletion provenance and `setEffects`
+  (#971, #993). The E017 branching graph driving collaborative undo, ID-gap selections and
+  identity-keyed E018 persistence remain.
 
 ## Risks and decisions
 

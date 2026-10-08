@@ -514,6 +514,12 @@
         },
         {
           "kind": "type",
+          "name": "EditorGutterScroll",
+          "source": "packages/editor/src/editor.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorGutterWidthContext",
           "source": "packages/editor/src/public/extensions.ts",
           "via": "packages/editor/src/index.ts"
@@ -960,6 +966,12 @@
           "kind": "type",
           "name": "EditorSuspiciousCharactersOptions",
           "source": "packages/editor/src/editor.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorSyntaxAnalysis",
+          "source": "packages/editor/src/public/syntax.ts",
           "via": "packages/editor/src/index.ts"
         },
         {
@@ -3862,6 +3874,12 @@
         },
         {
           "kind": "type",
+          "name": "EditorGutterScroll",
+          "source": "packages/editor/src/editor/types.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorGutterWidthContext",
           "source": "packages/editor/src/plugins.ts",
           "via": "packages/editor/src/editor.ts"
@@ -4746,6 +4764,12 @@
           "kind": "type",
           "name": "AmbientEditorPlugin",
           "source": "packages/editor/src/plugins.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentEditAuthor",
+          "source": "packages/editor/src/documentSession.ts",
           "via": "packages/editor/src/public/extensions.ts"
         },
         {
@@ -6983,6 +7007,12 @@
           "kind": "type",
           "name": "EditorScopeStyles",
           "source": "packages/editor/src/theme.ts",
+          "via": "packages/editor/src/public/syntax.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorSyntaxAnalysis",
+          "source": "packages/editor/src/syntax/index.ts",
           "via": "packages/editor/src/public/syntax.ts"
         },
         {

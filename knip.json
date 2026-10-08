@@ -25,6 +25,7 @@
         "src/system/tests/fixtures/file-lock-write-failure.ts",
         "test/factories/claude-ipc.cjs",
         "src/installation/remote-support.ts",
+        "src/devices/pair-command.ts",
         "src/terminal-host/main.ts",
         "scripts/pty-benchmark.ts",
         "scripts/pty-smoke.ts",
@@ -68,6 +69,7 @@
     "scripts": {
       "entry": [
         "check-editor-backlog.mjs",
+        "check-package-pages.mjs",
         "agent/browser.ts",
         "agent/scenarios/editor-retention-count-policy-driver.ts",
         "agent/desktop-display.ts",
@@ -101,7 +103,6 @@
         "app-icon/generate.ts",
         "install-server.ts",
         "import-proxy-usage-key.ts",
-        "pair.ts",
         "prod.ts",
         "product-sites/test-mobile.mjs",
         "product-sites/verify-mobile.mjs",
@@ -127,6 +128,7 @@
       "ignoreBinaries": ["ssh-keygen", "systemd-run", "taskset"]
     },
     ".": {
+      "entry": ["hotkeys/scripts/check-samples.mjs"],
       "ignoreDependencies": ["typescript-api"],
       "vitest": {
         "config": ["vitest.scripts.config.mjs"]
@@ -173,7 +175,8 @@
         "src/shiki/index.ts",
         "src/**/*.worker.ts",
         "bench/**/*.ts",
-        "test/types/**/*.ts"
+        "test/types/**/*.ts",
+        "test/reading-order.proof.mjs"
       ],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"],
       "ignoreDependencies": ["@playwright/test"]
@@ -217,7 +220,7 @@
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
     },
     "editor/packages/markdown": {
-      "entry": ["src/index.ts"],
+      "entry": ["src/index.ts", "test/reading-order.fixture.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
     },
     "editor/packages/minimap": {
@@ -313,7 +316,7 @@
       "ignoreDependencies": ["@singapore-editor/gutters"]
     },
     "editor/examples/app": {
-      "entry": ["index.html", "src/jumpHistoryDemo.ts"],
+      "entry": ["src/collaboration.ts", "index.html", "src/jumpHistoryDemo.ts"],
       "project": ["src/**/*.{ts,tsx}"]
     },
     "ghostty-webgpu": {
@@ -345,8 +348,7 @@
       "project": ["src/**/*.ts", "server/**/*.ts", "examples/**/*.ts", "test/**/*.ts"]
     },
     "editor/site": {
-      "entry": ["src/examples/*.tsx"],
-      "ignoreDependencies": ["@singapore-editor/*", "satteri"]
+      "ignoreDependencies": ["@singapore-editor/*", "satteri", "react", "@types/react", "solid-js"]
     }
   },
   "ignore": ["editor/**/*.d.css.ts"],

@@ -1,12 +1,16 @@
 # @singapore-editor/find
 
-find and replace for the singapore editor. a widget in the top right corner, matches painted in the text and on the minimap, regex and case-preserving replace
+Find and replace with regular expressions and case-preserving replacements for the Singapore editor.
 
-## try it
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+
+## Install
 
 ```sh
 npm install @singapore-editor/core @singapore-editor/find
 ```
+
+## Usage
 
 ```ts
 import { Editor } from '@singapore-editor/core/editor'
@@ -14,27 +18,30 @@ import { createEditorFindPlugin } from '@singapore-editor/find'
 import '@singapore-editor/core/style.css'
 import '@singapore-editor/find/style.css'
 
-const editor = new Editor(document.querySelector('#editor')!, {
+const host = document.createElement('div')
+host.style.height = '400px'
+document.body.append(host)
+
+const editor = new Editor(host, {
   plugins: [createEditorFindPlugin()],
 })
+editor.setText('const value = 1\n')
 ```
 
-ctrl/cmd+f opens it. the editor's default keymap already binds next, previous, and the case, whole word, regex, in-selection and preserve-case toggles
+## API highlights
 
-from code, `editor.openFind()`, `editor.findNext()`, `editor.replaceAll()` and friends drive the same widget
+- `createEditorFindPlugin()` adds the search widget.
+- `editor.openFind()` opens search from code.
+- `editor.replaceAll()` applies the current replacement.
 
-## options
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/find/overview/)
 
-`createEditorFindPlugin(options)` takes:
+## In the Singapore family
 
-- `loop`, wrap around at the ends. default `true`
-- `seedSearchStringFromSelection`, `'always'` (default), `'selection'` or `'never'`
-- `findOnType`, search while typing in the widget. default `true`
-- `cursorMoveOnType`, move to the first match while typing. default `true`
-- `autoFindInSelection`, `'never'` (default), `'always'` or `'multiline'`
+`@singapore-editor/core` owns the editor view. Add this plugin for find and replace.
 
-## more
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
 
-- `createEditorFindContributionProviders` hands back the view, command, capability and edit providers for hosts that register contributions themselves
-- `EDITOR_FIND_FEATURE` is the capability token, for `editor.getFeature(EDITOR_FIND_FEATURE)`
-- [the editor](../../README.md)
+## License
+
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)

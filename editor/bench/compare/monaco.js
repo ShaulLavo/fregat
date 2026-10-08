@@ -1,5 +1,6 @@
 import * as monaco from 'monaco-editor/editor/editor.api'
 import 'monaco-editor/languages/definitions/typescript/register'
+import { language } from 'monaco-editor/languages/definitions/typescript/typescript'
 import Worker from 'monaco-editor/editor/editor.worker?worker'
 
 self.MonacoEnvironment = { getWorker: () => new Worker() }
@@ -23,7 +24,21 @@ export function mount(host, text, highlighted) {
     largeFileOptimizations: false,
   })
   const model = editor.getModel()
+  let fullHighlight
   return {
+    fullHighlight() {
+      monaco.languages.setMonarchTokensProvider('typescript', language)
+      const start = performance.now()
+      const lines = monaco.editor.tokenize(text, 'typescript')
+      const elapsedMs = performance.now() - start
+      const spans = lines.reduce((sum, tokens) => sum + tokens.length, 0)
+      if (
+        lines.length !== text.split('\n').length ||
+        !lines.some((tokens) => tokens.some((token) => token.type))
+      )
+        throw new RangeError('Incomplete Monaco lexical highlight')
+      fullHighlight = { engine: 'Monarch TypeScript', elapsedMs, spans, lines: lines.length }
+    },
     slice: (from, to) =>
       model.getValueInRange({
         startLineNumber: model.getPositionAt(from).lineNumber,
@@ -50,6 +65,7 @@ export function mount(host, text, highlighted) {
     rowCount: () => host.querySelectorAll('.view-line').length,
     facts: () => ({
       language: model.getLanguageId(),
+      fullHighlight,
       largeFileOptimizations: false,
       tooLargeForTokenization: model.isTooLargeForTokenization?.() ?? null,
     }),

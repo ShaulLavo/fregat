@@ -1,21 +1,62 @@
 ---
-import '../styles/site.css'
-const docs = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/docs/start-here/introduction/`
+import Manual from '../layouts/Manual.astro'
+import { NAV } from '../manual/content'
+import { renderCode } from '../manual/render'
+import hero from '../examples/hero.ts?raw'
+
+const heroSource = hero.replace(/\n$/, '')
+const sample = await renderCode(heroSource, 'typescript')
+const install = await renderCode('npm install @singapore-editor/core', 'shellscript')
+const start = NAV.find((section) => section.label === 'Start here')!
+const tagline = 'A code editor for the browser that keeps every version.'
 ---
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Singapore browser code editor documentation." />
-    <title>Singapore</title>
-  </head>
-  <body>
-    <main class="placeholder-home">
-      <h1>Singapore</h1>
-      <p>A code editor for the browser.</p>
-      <a href={docs}>Read the documentation</a>
-      <p><a href="https://shaulavo.dev/singapore/demo/">Open the full demo</a></p>
-    </main>
-  </body>
-</html>
+
+<Manual title="Singapore" description={tagline} bodyClass="home">
+  <main id="doc" class="home-column" tabindex="-1">
+    <h1>{tagline}</h1>
+    <p>
+      Singapore is a modular code editor component. Each edit makes a new version of a persistent
+      piece table, and anchors follow text through edits. Parsing, highlighting and language
+      servers run in workers.
+    </p>
+    <figure class="hero">
+      <div class="hero-box src">
+        <div class="hero-static" set:html={sample.html} />
+      </div>
+      <figcaption>
+        <span>This is a Singapore editor, configured for TypeScript. Edit this.</span>
+        <span class="hero-mode"></span>
+      </figcaption>
+    </figure>
+    <h2>Install</h2>
+    <div class="src install" set:html={install.html} />
+    <p>
+      Then follow the <a href={start.pages[1]!.href}>quick start</a>. Every docs page opens in the
+      same editor you are installing.
+    </p>
+    <h2>Start here</h2>
+    <ul class="index">
+      {
+        start.pages.map((page) => (
+          <li>
+            <a href={page.href}>{page.label}</a>
+          </li>
+        ))
+      }
+    </ul>
+    <h2>Limits</h2>
+    <p>
+      The public API is still changing. Rows have fixed height, syntax colours cannot use bold or
+      italic, and mobile and touch are outside the current target. There is no published
+      editor-level benchmark against Monaco or CodeMirror yet.
+    </p>
+    <footer>
+      MIT licensed. Part of <a href="https://github.com/ShaulLavo/fregat">Fregat</a>, where issues
+      and contributions go.
+    </footer>
+  </main>
+  <script is:inline type="application/json" id="hero-source" set:html={JSON.stringify(heroSource)} />
+  <script>
+    import '../manual/home'
+  </script>
+</Manual>

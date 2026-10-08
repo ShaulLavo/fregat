@@ -1,6 +1,19 @@
 {
   "name": "@singapore-editor/typescript-lsp",
   "version": "0.2.6",
+  "description": "TypeScript and JavaScript language services in a browser worker for the Singapore editor.",
+  "keywords": [
+    "browser",
+    "editor",
+    "language-server",
+    "lsp",
+    "singapore",
+    "typescript"
+  ],
+  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/typescript-lsp/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
