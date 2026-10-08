@@ -431,7 +431,7 @@ export function* compactTombstones(
   snapshot: PieceTableSnapshot,
 ): Generator<void, TombstoneCompactionResult> {
   const result: TombstoneCompactionResult = { runs: 0, tombstones: 0, unverified: 0 }
-  if (snapshot.consumed || !snapshot.root) return result
+  if (snapshot.charIds || snapshot.consumed || !snapshot.root) return result
   retainPieceTableSnapshot(snapshot)
   const root = snapshot.root
   const layout = yield* readLayout(root)

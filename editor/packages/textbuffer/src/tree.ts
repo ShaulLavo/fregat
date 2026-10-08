@@ -868,3 +868,130 @@ export const normalizePieceOrders = (
   next.right = normalizePieceOrders(next.right, nextOrder, epoch, relabel)
   return summarize(next)
 }
+
+// The caller chose this structural boundary. Hidden pieces use their real
+// length here; visible-offset landing would collapse distinct tombstone slots.
+export const insertAtPieceBoundary = (
+  node: PieceTreeNode | null,
+  order: number | null,
+  offset: number,
+  buffers: PieceTableBuffers,
+  context: InsertContext,
+  epoch: number,
+  coalesce: boolean,
+  lower: number | null = null,
+  upper: number | null = null,
+): PieceTreeNode | null => {
+  if (!node) {
+    const pieces = piecesForInsert(buffers, context, lower, upper)
+    context.changes.push(...pieces)
+    return appendRun(null, pieces, epoch)
+  }
+  if (order! < node.piece.order) {
+    const left = insertAtPieceBoundary(
+      node.left,
+      order,
+      offset,
+      buffers,
+      context,
+      epoch,
+      coalesce,
+      lower,
+      node.piece.order,
+    )
+    return rejoinAfterInsert(node, 'left', left, context.probe, epoch)
+  }
+  if (order! > node.piece.order) {
+    const right = insertAtPieceBoundary(
+      node.right,
+      order,
+      offset,
+      buffers,
+      context,
+      epoch,
+      coalesce,
+      node.piece.order,
+      upper,
+    )
+    return rejoinAfterInsert(node, 'right', right, context.probe, epoch)
+  }
+  if (coalesce && node.piece.visible && offset === node.piece.length) {
+    const joined = probeAtEnd(node, buffers, epoch, context.probe)
+    if (joined) return joined
+  }
+  return insertAtLanding(node, offset, node.piece.length, buffers, context, epoch, [lower, upper])
+}
+
+export type PieceHideRange = { readonly from: number; readonly to: number }
+
+const firstTargetAtOrAfter = (
+  orders: readonly number[],
+  order: number,
+  from: number,
+  to: number,
+): number => {
+  while (from < to) {
+    const middle = (from + to) >>> 1
+    if (orders[middle]! < order) from = middle + 1
+    else to = middle
+  }
+  return from
+}
+
+// Only descend toward targeted orders. Every range is relative to the original
+// piece, and hiding right to left keeps the remaining prefix's coordinates fixed.
+export const hideAtPieceRanges = (
+  node: PieceTreeNode | null,
+  targets: ReadonlyMap<number, readonly PieceHideRange[]>,
+  orders: readonly number[],
+  buffers: PieceTableBuffers,
+  context: EditContext,
+  epoch: number,
+  from = 0,
+  to = orders.length,
+  upper: number | null = null,
+): PieceTreeNode | null => {
+  if (!node || from === to) return node
+  const split = firstTargetAtOrAfter(orders, node.piece.order, from, to)
+  const ranges = targets.get(node.piece.order)
+  let right = hideAtPieceRanges(
+    node.right,
+    targets,
+    orders,
+    buffers,
+    context,
+    epoch,
+    split + (ranges ? 1 : 0),
+    to,
+    upper,
+  )
+  const left = hideAtPieceRanges(
+    node.left,
+    targets,
+    orders,
+    buffers,
+    context,
+    epoch,
+    from,
+    split,
+    node.piece.order,
+  )
+  const next = own(node, epoch)
+  if (ranges) {
+    for (let index = ranges.length - 1; index >= 0; index--) {
+      const range = ranges[index]!
+      right = hidePieceRange(
+        next,
+        range.from,
+        range.to,
+        right,
+        buffers,
+        context,
+        epoch,
+        upper,
+        null,
+      )
+    }
+  }
+  return join(left, next, right, epoch)
+}
