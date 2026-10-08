@@ -58,6 +58,21 @@ export function beginRun<T>(stateDir: string, entry: Entry, launch: () => T): T 
   })
 }
 
+/** Resumes eligibility around a fresh spawn while retaining the original interval and journal. */
+export function resumeRun<T>(stateDir: string, id: string, launch: () => T): T {
+  return underLock(stateDir, () => {
+    const run = readRuns(stateDir).find((job) => job.id === id)
+    if (!run?.quiet) return launch()
+    writeJson(runFile(stateDir, id), { ...run, acceptsLight: true })
+    try {
+      return launch()
+    } catch (error) {
+      writeJson(runFile(stateDir, id), run)
+      throw error
+    }
+  })
+}
+
 /** Finished overlaps stay in the measurement's journal after their live entries disappear. */
 export function finishRun(stateDir: string, id: string): readonly JobDuringRun[] {
   return underLock(stateDir, () => {

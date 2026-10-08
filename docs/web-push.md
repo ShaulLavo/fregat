@@ -58,10 +58,8 @@ with every Platform tab closed. Tapping it opens that session.
 - `sw.js` is served from the Vite base and registered with that base as scope: `/` in the lane
   Vite, `/platform/sw.js` with scope `/platform/` on the mesh. No `Service-Worker-Allowed` header.
   It handles only `push` and `notificationclick` and caches nothing, so it calls `skipWaiting()`.
-- The worker is registered only from the Turn on button, never in the demo. When another worker
-  controls the page (the demo's MSW), the section says so and sends no `/push` request. In dev both
-  share scope `/`, so opening `/demo.html` after turning push on replaces the push worker; recover
-  by unregistering it in DevTools › Application › Service workers. The mesh build has no demo.html.
+- The worker is registered only from the Turn on button. When another service worker
+  controls the page, the section explains the scope conflict and sends no `/push` request.
 - The manifest has `display: standalone`, `start_url` and `scope` of `./`, and 192 and 512 px icons.
   On iPhone and iPad outside the Home Screen the section says push needs the app on the Home Screen.
 

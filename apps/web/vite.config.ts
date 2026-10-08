@@ -9,7 +9,6 @@ import { portFromEnv } from '../../scripts/runtime-network.ts'
 import { createScriptError } from '../../scripts/structured-errors.ts'
 import { readDevSources, sourceAliases } from '../../scripts/dev-sources.ts'
 import { bundleStatsPlugin } from './scripts/bundle-stats-plugin.ts'
-import { demoPreviewPlugin } from './scripts/demo-preview-plugin.ts'
 import { devPagePlugin } from './scripts/dev-page-plugin.ts'
 import { bootAppearancePlugin } from './scripts/boot-appearance-plugin.ts'
 import { phosphorImportPlugin } from './scripts/phosphor-import-plugin.ts'
@@ -49,7 +48,7 @@ export function requireLiteralAddress(value: string | undefined, fallback: strin
   throw createScriptError(`WEB_HOST must be a literal IP address, got ${JSON.stringify(value)}.`)
 }
 
-export default defineConfig(({ command, isPreview, mode }) => {
+export default defineConfig(({ command, isPreview }) => {
   const packages = command === 'serve' && !isPreview ? readDevSources(import.meta.dirname) : []
   // A build compiles the linked checkouts' pre-built `dist`; none of it is ours to memoize.
   const linkedDist = command === 'build' ? readDevSources(import.meta.dirname) : []
@@ -73,19 +72,15 @@ export default defineConfig(({ command, isPreview, mode }) => {
             }),
           },
         },
-        input:
-          mode === 'demo'
-            ? path.resolve(import.meta.dirname, 'demo.html')
-            : {
-                index: path.resolve(import.meta.dirname, 'index.html'),
-                dev: path.resolve(import.meta.dirname, 'dev.html'),
-                // An entry, so rolldown tags the modules it reaches `$initial` like the app's.
-                workbench: path.resolve(import.meta.dirname, SHELL_ENTRIES.workbench),
-              },
+        input: {
+          index: path.resolve(import.meta.dirname, 'index.html'),
+          dev: path.resolve(import.meta.dirname, 'dev.html'),
+          // An entry, so rolldown tags the modules it reaches `$initial` like the app's.
+          workbench: path.resolve(import.meta.dirname, SHELL_ENTRIES.workbench),
+        },
       },
     },
     define: {
-      ...(mode === 'demo' ? { 'import.meta.env.VITE_SERVER_URL': 'undefined' } : {}),
       'import.meta.env.OBSERVABILITY_ENABLED': JSON.stringify(
         process.env.OBSERVABILITY_ENABLED ?? '',
       ),
@@ -116,7 +111,6 @@ export default defineConfig(({ command, isPreview, mode }) => {
     plugins: [
       bootAppearancePlugin(import.meta.dirname),
       shellChunksPlugin(import.meta.dirname),
-      demoPreviewPlugin(import.meta.dirname),
       devPagePlugin(),
       react({
         // Vitest configs keep `compiler: true`: the flag would reprint every diagnostic per run.
