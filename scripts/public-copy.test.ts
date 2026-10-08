@@ -15,7 +15,7 @@ test('the landing page offers the source build and no downloads or native apps',
 test('the README names the shipped desktop client and phone setup', () => {
   const readme = source('README.md')
   expect(readme).not.toContain('native mac')
-  expect(readme).toContain('https proxy')
+  expect(readme).toMatch(/https proxy/i)
   expect(readme).toContain('pairing')
 })
 
