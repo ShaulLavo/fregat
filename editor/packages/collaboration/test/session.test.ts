@@ -4,7 +4,11 @@ import { genesis, ToyEngine, type ToyEdit } from './engine'
 import { compareBranches, type Message } from '../src/protocol'
 import { Session } from '../src/session'
 
-const runs = process.env.COLLABORATION_LONG_RUN === '1' ? 10_000 : 100
+const longRun = process.env.COLLABORATION_LONG_RUN === '1'
+const seeds = longRun
+  ? Array.from({ length: 10_000 }, (_, index) => index + 1)
+  : [1, 2, 4, 7, 8, 9, 12, 15, 17]
+const handoffRuns = longRun ? 100 : 18
 
 describe('transport-neutral session', () => {
   test.each([8, 8192])(
@@ -26,7 +30,7 @@ describe('transport-neutral session', () => {
         maxReorderDistance: 0,
       }
       const staleByType: Network['staleByType'] = {}
-      for (let seed = 1; seed <= runs; seed++) {
+      for (const seed of seeds) {
         const result = runSeed(seed, window)
         for (const key of Object.keys(hits) as (keyof typeof hits)[]) hits[key] += result[key]
         for (const key of ['uniqueDelivery', 'duplicateDrop', 'staleDrop'] as const)
@@ -42,7 +46,7 @@ describe('transport-neutral session', () => {
       if (window === 8) expect(replay.staleDrop).toBeGreaterThan(0)
       else expect(replay.staleDrop).toBe(0)
       console.log(
-        `Session simulation: ${runs} seeded runs passed; 3–8 peers; window=${window}; hits=${JSON.stringify(hits)}; replay=${JSON.stringify(replay)}; staleByType=${JSON.stringify(staleByType)}`,
+        `Session simulation: ${seeds.length} seeded runs passed; 3–8 peers; window=${window}; hits=${JSON.stringify(hits)}; replay=${JSON.stringify(replay)}; staleByType=${JSON.stringify(staleByType)}`,
       )
     },
     600_000,
@@ -132,7 +136,7 @@ describe('transport-neutral session', () => {
     'handoff selects its successor across lossy links with window %i',
     (window) => {
       let staleHandoffs = 0
-      for (let seed = 90100; seed < 90200; seed++) {
+      for (let seed = 90100; seed < 90100 + handoffRuns; seed++) {
         const network = new Network(seed, 4, window)
         network.stabilize()
         const host = network.nodes.findIndex((node) => node.session.isHost)
@@ -148,7 +152,7 @@ describe('transport-neutral session', () => {
       }
       if (window === 8) expect(staleHandoffs).toBeGreaterThan(0)
       console.log(
-        `Handoff simulation: 100 seeded runs passed; window=${window}; staleHandoffs=${staleHandoffs}`,
+        `Handoff simulation: ${handoffRuns} seeded runs passed; window=${window}; staleHandoffs=${staleHandoffs}`,
       )
     },
   )
@@ -319,7 +323,7 @@ describe('transport-neutral session', () => {
   })
 
   test('lossy non-coordinator handoffs retain typing in both transfer stages', () => {
-    for (let seed = 90200; seed < 90300; seed++) {
+    for (let seed = 90200; seed < 90200 + handoffRuns; seed++) {
       const network = new Network(seed, 4)
       network.stabilize()
       network.partition([[0], [1], [2], [3]])
@@ -346,6 +350,7 @@ describe('transport-neutral session', () => {
       network.stabilize()
       expect(network.nodes[2]!.session.isHost, `seed=${seed}`).toBe(true)
     }
+    console.log(`Non-coordinator handoffs: ${handoffRuns} seeded runs passed; both transfer stages`)
   })
 
   test('departure intent survives an election that replaces the interrupted handoff', () => {

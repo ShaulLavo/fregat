@@ -1,14 +1,16 @@
 # @singapore-editor/gutters
 
-line numbers and fold arrows for the editor's left edge
+Line numbers and fold controls for the Singapore editor.
 
-folds come from the syntax plugin when one is loaded and from indentation otherwise, so the fold gutter works on plain text too
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
 
-## try it
+## Install
 
 ```sh
 npm install @singapore-editor/core @singapore-editor/gutters
 ```
+
+## Usage
 
 ```ts
 import { Editor } from '@singapore-editor/core/editor'
@@ -16,25 +18,29 @@ import { createFoldGutterPlugin, createLineGutterPlugin } from '@singapore-edito
 import '@singapore-editor/core/style.css'
 import '@singapore-editor/gutters/style.css'
 
-const editor = new Editor(document.querySelector<HTMLElement>('#editor')!, {
+const host = document.createElement('div')
+host.style.height = '400px'
+document.body.append(host)
+
+const editor = new Editor(host, {
   plugins: [createLineGutterPlugin(), createFoldGutterPlugin()],
 })
+editor.setText('const value = 1\n')
 ```
 
-line numbers take `startLine`, `minDigits`, a css `counterStyle`, or `labelForRow` to print your own label per row
+## API highlights
 
-fold arrows take a string, an svg path, or a function that returns a dom node, through `icon`, `expandedIcon` and `collapsedIcon`
+- `createLineGutterPlugin()` adds line numbers.
+- `createFoldGutterPlugin()` adds fold controls.
 
-```ts
-createFoldGutterPlugin({
-  icon: { kind: 'svg', viewBox: '0 0 16 16', path: 'M2 5L8 11L14 5Z' },
-  iconClassName: 'fold-icon',
-})
-```
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/gutters/overview/)
 
-svg icons use `currentColor` and fill their wrapper, so size them through `iconClassName`. the button's `data-editor-fold-state` is `expanded` or `collapsed` for styling. strings and svg icons can be painted from a snapshot before the editor is ready. a dom-node function turns that snapshot off
+## In the Singapore family
 
-## more
+`@singapore-editor/core` owns the editor view. Add these plugins for line numbers and fold controls.
 
-- `@singapore-editor/gutters/line-gutter` and `/fold-gutter` import one gutter alone, with `line-gutter.css` and `fold-gutter.css` beside them
-- `createLineGutterContribution` and `createFoldGutterContribution` return the raw gutter contribution, for hosts that register gutters themselves. gutter cells let clicks through to the text unless the contribution sets `interactive: true`, as the fold gutter does
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+
+## License
+
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)

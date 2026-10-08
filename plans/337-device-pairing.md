@@ -74,10 +74,23 @@ Constraints:
 - The mechanism follows the study of how T3 Code (`references/t3code`) handles this. Record the
   chosen mechanism and what was copied in this section when it lands.
 
+T3 Code findings (2026-10-08, `references/t3code` at 12069eefd): T3 Code never trusts Tailscale
+identity. `t3 pair --tailscale` publishes the server with Tailscale Serve and prints a one-time
+pairing URL and QR code (`/pair#token=…`, valid 5 minutes); claiming it sets a 30-day session
+cookie. Its desktop app bootstraps its own window with a separate desktop token. Pairing there is
+one scan per device, which is the step this section removes, so nothing was copied.
+
+Mechanism (PR #1035): the server runs `tailscale whois --json` on the single `X-Forwarded-For`
+address mesh sets (the server listens only on loopback, so that hop is local), and on its own
+tailnet address. Same `UserProfile.LoginName`, no tags on either side and no `Sharer` gives trust
+`tailnet`. Verdicts are cached per address for a minute (5 s after a failure) and every failure
+pairs. Sockets admitted this way are checked again every minute and on settings changes, and close
+when the check fails. `environments.tailnetOwnerDevices` (machine scope, on by default) turns it off.
+
 Checklist:
 
-- [ ] Record the T3 Code findings and the chosen mechanism here.
-- [ ] Trust same-user tailnet devices without pairing; refuse shared-in nodes and other tailnet
+- [x] Record the T3 Code findings and the chosen mechanism here.
+- [x] Trust same-user tailnet devices without pairing; refuse shared-in nodes and other tailnet
       users. Tests for each case, plus the no-Tailscale and failed-lookup cases.
 - [ ] Show Tailscale-trusted devices in the paired-devices list.
 - [ ] Owner check: the phone on the tailnet opens the app without pairing; a shared-in device still

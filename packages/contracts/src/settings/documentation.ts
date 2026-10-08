@@ -170,6 +170,12 @@ export const SETTINGS_DOCUMENTATION = {
       'A browser on another device, such as a phone reaching this machine over the mesh, shows a pairing screen until a link from this machine pairs it. This machine’s own browser needs no pairing.',
     keywords: ['pair', 'phone', 'device', 'security', 'mesh', 'tailnet'],
   },
+  'environments.tailnetOwnerDevices': {
+    title: 'Let in your own Tailscale devices',
+    description:
+      'A device signed in to Tailscale as the same user as this machine opens Fregat without pairing. Tagged devices, devices shared from another tailnet, and other users still pair.',
+    keywords: ['pair', 'tailscale', 'tailnet', 'phone', 'device', 'security', 'mesh'],
+  },
   'server.address': {
     title: 'Server address',
     description:

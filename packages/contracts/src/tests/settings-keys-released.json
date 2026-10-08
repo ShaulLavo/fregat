@@ -79,6 +79,7 @@
     "environments.loadBalancing",
     "environments.loadPreferences",
     "environments.machines",
+    "environments.tailnetOwnerDevices",
     "files.autoSave",
     "files.autoSaveDelay",
     "files.picker.hiddenLocations",

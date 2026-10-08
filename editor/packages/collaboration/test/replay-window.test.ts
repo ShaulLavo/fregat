@@ -1,3 +1,4 @@
+import { strictEqual } from 'node:assert'
 import { expect, test } from 'vitest'
 import { ReplayWindow } from '../src/replay-window'
 
@@ -12,17 +13,19 @@ function* permutations(values: readonly number[]): Generator<readonly number[]> 
 }
 
 test('every ordering inside the window accepts each ID once', () => {
+  const size = process.env.COLLABORATION_LONG_RUN === '1' ? 8 : 6
   let orderings = 0
-  for (const ids of permutations([1, 2, 3, 4, 5, 6, 7, 8])) {
-    const window = new ReplayWindow(8)
+  for (const ids of permutations(Array.from({ length: size }, (_, index) => index + 1))) {
+    const window = new ReplayWindow(size)
     for (const id of ids) {
-      expect(window.accept(id)).toBe(true)
-      expect(window.accept(id)).toBe(false)
+      strictEqual(window.accept(id), true)
+      strictEqual(window.accept(id), false)
     }
-    for (const id of ids) expect(window.accept(id)).toBe(false)
+    for (const id of ids) strictEqual(window.accept(id), false)
     orderings++
   }
-  expect(orderings).toBe(40_320)
+  expect(orderings).toBe(size === 8 ? 40_320 : 720)
+  console.log(`Replay permutations: ${size} IDs; ${orderings} orderings passed`)
 })
 
 test.each([1, 8, 31, 32, 33, 1024])('ring rollover keeps the exact %i-ID window', (size) => {

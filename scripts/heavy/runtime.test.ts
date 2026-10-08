@@ -3,7 +3,7 @@ import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 
 import { enqueue, promote, release, type Entry } from './queue'
-import { beginRun, finishRun, stopRunConcurrency } from './runtime'
+import { beginRun, finishRun, resumeRun, stopRunConcurrency } from './runtime'
 import { removeSandboxes, sandbox } from './sandbox'
 
 const entries: readonly Entry[] = ['before', 'measurement', 'short', 'after', 'next'].map(
@@ -150,5 +150,63 @@ test('stopping concurrency retains ownership and journal intervals until whole-s
       finishRun(box.state, job.entry.id)
       release(job)
     }
+  }
+})
+
+test('recovery restores eligibility without resetting intervals or finished-overlap journals', () => {
+  const box = sandbox()
+  const held = entries.slice(1, 3).map((entry) => promote(box.state, enqueue(box.state, entry)))
+  const measurement = held[0]!.entry
+  const runtimeFile = path.join(box.state, 'runs', measurement.id + '.json')
+  const journalFile = path.join(box.state, 'measurements', measurement.id + '.json')
+  try {
+    beginRun(box.state, measurement, () => true)
+    beginRun(box.state, held[1]!.entry, () => true)
+    finishRun(box.state, held[1]!.entry.id)
+    const original = readFileSync(runtimeFile, 'utf8')
+    const journal = readFileSync(journalFile, 'utf8')
+    expect(JSON.parse(journal)[held[1]!.entry.id].endedAt).toEqual(expect.any(String))
+    stopRunConcurrency(box.state, measurement.id)
+    const stopped = readFileSync(runtimeFile, 'utf8')
+    const refusal = { code: 'fixture-refused' }
+    expect(() =>
+      resumeRun(box.state, measurement.id, () => {
+        expect(readFileSync(runtimeFile, 'utf8')).toBe(original)
+        throw refusal
+      }),
+    ).toThrow()
+    expect(readFileSync(runtimeFile, 'utf8')).toBe(stopped)
+    expect(readFileSync(journalFile, 'utf8')).toBe(journal)
+    expect(
+      resumeRun(box.state, measurement.id, () => {
+        expect(readFileSync(runtimeFile, 'utf8')).toBe(original)
+        return 'launched'
+      }),
+    ).toBe('launched')
+    expect(readFileSync(runtimeFile, 'utf8')).toBe(original)
+    expect(readFileSync(journalFile, 'utf8')).toBe(journal)
+    stopRunConcurrency(box.state, measurement.id)
+    expect(readFileSync(runtimeFile, 'utf8')).toBe(stopped)
+  } finally {
+    for (const job of held) {
+      finishRun(box.state, job.entry.id)
+      release(job)
+    }
+  }
+})
+
+test('recovery keeps ordinary runs ineligible for concurrent light admission', () => {
+  const box = sandbox()
+  const held = promote(box.state, enqueue(box.state, entries[0]!))
+  const runtimeFile = path.join(box.state, 'runs', held.entry.id + '.json')
+  try {
+    beginRun(box.state, held.entry, () => true)
+    const original = readFileSync(runtimeFile, 'utf8')
+    expect(JSON.parse(original).acceptsLight).toBe(false)
+    expect(resumeRun(box.state, held.entry.id, () => 'launched')).toBe('launched')
+    expect(readFileSync(runtimeFile, 'utf8')).toBe(original)
+  } finally {
+    finishRun(box.state, held.entry.id)
+    release(held)
   }
 })

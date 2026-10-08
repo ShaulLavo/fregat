@@ -122,6 +122,7 @@ test('every whole-tree gate runs in the commit hook, in verify and in CI', () =>
   const gates = manifest.scripts.gates.split('&&').map((part) => part.trim())
   expect(gates).toEqual([
     'bun run workspace:check',
+    'bun run package-pages:check',
     'bun run plans:check',
     'bun run dupes:functions',
     'bun run dupes',
@@ -133,6 +134,7 @@ test('every whole-tree gate runs in the commit hook, in verify and in CI', () =>
     'bun run unused:check',
   ])
   expect(hook).toContain('bun run gates')
+  expect(workflow).toContain('run: bun run package-pages:check')
   for (const gate of gates) {
     const name = gate.replace('bun run ', '')
     expect(manifest.scripts[name]).toBeDefined()

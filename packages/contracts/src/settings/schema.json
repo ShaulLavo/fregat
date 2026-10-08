@@ -762,6 +762,11 @@
       },
       "type": "object"
     },
+    "environments.tailnetOwnerDevices": {
+      "default": true,
+      "description": "A device signed in to Tailscale as the same user as this machine opens Fregat without pairing. Tagged devices, devices shared from another tailnet, and other users still pair.",
+      "type": "boolean"
+    },
     "files.autoSave": {
       "default": "off",
       "description": "Save edited files automatically, and when.",

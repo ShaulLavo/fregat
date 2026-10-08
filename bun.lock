@@ -1077,7 +1077,7 @@
     },
     "scripts": {
       "name": "scripts",
-      "version": "0.0.52",
+      "version": "0.0.56",
       "dependencies": {
         "@workspace/utils": "workspace:*",
       },

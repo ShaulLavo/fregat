@@ -1,14 +1,16 @@
 # @singapore-editor/minimap
 
-a zoomed-out picture of the whole file beside the editor, like vs code's. drag or click it to scroll
+A worker-rendered file overview with scroll controls for the Singapore editor.
 
-it draws in a web worker on an offscreen canvas, so long files cost the main thread little. syntax colors, selections and marks from other plugins (search matches, diagnostics, merge conflicts) show up on it
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
 
-## try it
+## Install
 
 ```sh
 npm install @singapore-editor/core @singapore-editor/minimap
 ```
+
+## Usage
 
 ```ts
 import { Editor } from '@singapore-editor/core/editor'
@@ -16,19 +18,31 @@ import { createMinimapPlugin } from '@singapore-editor/minimap'
 import '@singapore-editor/core/style.css'
 import '@singapore-editor/minimap/style.css'
 
-const editor = new Editor(document.querySelector<HTMLElement>('#editor')!, {
+const host = document.createElement('div')
+host.style.height = '400px'
+document.body.append(host)
+
+const editor = new Editor(host, {
   plugins: [createMinimapPlugin({ side: 'right', showSlider: 'always' })],
 })
+editor.setText('const value = 1\n')
 ```
 
-the options follow vs code's `editor.minimap.*` settings: `side`, `size` (`proportional`, `fill`, `fit`), `autohide`, `showSlider`, `renderCharacters`, `maxColumn` and `scale`
+## API highlights
 
-comments like `// MARK: - Parsing` become section labels on the minimap. turn that off with `showMarkSectionHeaders: false` or change the pattern with `markSectionHeaderRegex`
+- `createMinimapPlugin()` adds the overview.
+- `side` chooses its edge.
+- `showSlider` controls the viewport marker.
 
-other plugins add marks through the core's `EDITOR_MINIMAP_FEATURE` capability
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/minimap/overview/)
 
-## more
+## In the Singapore family
 
-- `bun run bench:update` and `bun run bench:browser` measure update and scroll cost. [browser bench notes](bench/browser/README.md)
+`@singapore-editor/core` owns the editor view. Add this plugin for a file overview beside the text.
+Use a bundler that serves the package worker and data assets. See the [hosting guide](https://shaulavo.dev/singapore/docs/guides/bundling/).
 
-section header detection is ported from vs code, MIT, copyright microsoft
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+
+## License
+
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)

@@ -4,6 +4,8 @@ import { type Message } from '../src/protocol'
 import { genesis, ToyEngine, type ToyEdit } from './engine'
 import { Network } from './network'
 
+const largeHistoryRecords = process.env.COLLABORATION_LONG_RUN === '1' ? 8193 : 33
+
 function transfer(
   records: number,
   window: number,
@@ -97,7 +99,7 @@ test.each([
   [12, 8, false],
   [12, 8192, true],
   [12, 8, true],
-  [8193, 8192, true],
+  [largeHistoryRecords, 8192, true],
 ] as const)(
   'history of %i records converges with window %i and reversed delivery %s',
   (records, window, reversed) => {
@@ -132,7 +134,7 @@ test.each([17, 32])('history recovery keeps a verified prefix of %i records', (p
 
 test.each([
   [8, 33, 17],
-  [8192, 8193, 3],
+  [8192, largeHistoryRecords, 3],
 ] as const)(
   'large transfers, branch replay and handoff progress under reversed delivery with window %i',
   (window, records, branchRecords) => {

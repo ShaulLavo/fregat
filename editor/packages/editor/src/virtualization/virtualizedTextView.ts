@@ -74,6 +74,7 @@ import {
   deleteTokenRangesForRow,
   flushDeferredCaret,
   rebuildStyleRules,
+  rebaseCaretPaint,
   renderRangeHighlight,
   renderSelectionHighlight,
   renderTokenHighlights,
@@ -89,7 +90,11 @@ import {
   renderHiddenCharacters,
   setSuspiciousCharacters,
 } from './virtualizedTextViewHiddenCharacters'
-import { compositionCharacterRects, setCompositionPreedit } from './virtualizedTextViewComposition'
+import {
+  compositionCharacterRects,
+  refreshCompositionPreedit,
+  setCompositionPreedit,
+} from './virtualizedTextViewComposition'
 import { attachEditContext, createEditContext, type EditorEditContext } from './editContext'
 import { createVirtualizedTextViewModel } from './virtualizedTextViewModel'
 import {
@@ -579,7 +584,7 @@ export class VirtualizedTextView {
       return [
         {
           left: bounds.left - origin.left,
-          top: bounds.top - origin.top,
+          top: bounds.top - origin.top - this.view.viewport.paintOffsetY,
           width: bounds.width,
           height: bounds.height,
           backgroundColor: window?.getComputedStyle(element).backgroundColor ?? '',
@@ -1638,7 +1643,9 @@ export class VirtualizedTextView {
       view.model.projection.clearCache()
     }
 
+    const previousPaintOffsetY = view.viewport.paintOffsetY
     updateSpacerHeight(view, snapshot)
+    if (view.viewport.paintOffsetY !== previousPaintOffsetY) rebaseCaretPaint(view)
     updateSpacerWidth(view, snapshot.viewportWidth)
     const key = rowsKey(view, snapshot)
     if (key === view.lastRenderedRowsKey) {
@@ -1654,6 +1661,7 @@ export class VirtualizedTextView {
     renderTokenHighlights(view)
     for (const name of view.rangeHighlightGroups.keys()) renderRangeHighlight(view, name)
     renderSelectionHighlight(view)
+    refreshCompositionPreedit(view)
     this.reportViewportChange()
     this.flushPendingReveal()
   }
