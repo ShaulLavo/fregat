@@ -6,7 +6,7 @@ import sys
 
 LANE = pathlib.Path(sys.argv[1]).resolve()
 CHANNELS = ['renderer', 'GPU', 'rendererPlusGPU', 'allChrome', 'otherChrome']
-METRICS = ['instructions', 'cycles', 'energyJ', 'cpuSeconds', 'effectiveClockGHz', 'pCoreTimeShare']
+METRICS = ['instructions', 'cycles', 'energyJ', 'cpuSeconds', 'pCpuSeconds', 'effectiveClockGHz', 'pCoreTimeShare']
 COMPONENTS = {
     'ghosttyParse': [('GPARSE', 1)],
     'ghosttyFrameInclusive': [('GFRAME', 1), ('GPARSE', -1)],
@@ -34,7 +34,10 @@ result = {
         'GPU dispatch residual includes WebGL JS/API work and mutation-observer overhead; GPU process is host CPU, physical GPU energy is outside scope.',
         'xterm has no public equivalent of native frame building without GPU, so its rendering residual cannot be partitioned comparably.',
         'Counter differences can include interaction and GC changes. Two windows per arm establish descriptive budgets, not significance.',
+        'Diagnostic branch checks, parser/frame counters, immutable input-reference capture and WebGL mutation wrappers remain included; their overhead was not separately calibrated or subtracted.',
+        'Endpoint PID/type/start identities are stable, but reads are sequential and non-atomic; entirely short-lived processes between endpoints are outside coverage.',
         'Energy is the kernel CPU estimate. Readback and screenshot settlement are outside logical counter endpoints.',
+        'Write settlement and two RAFs do not prove GPU completion or presentation.',
         'At lower clocks memory stalls consume fewer cycles, slightly favouring the lower-clocked arm. Cycles improvement with instruction loss needs stall analysis.',
     ],
     'workloads': {},
@@ -61,6 +64,10 @@ for protocol_path in sorted(LANE.glob('mac-*/protocol.json')):
     assert len({row['cellLayoutSha256'] for row in raw['runs']}) == 1
     assert all(row['native']['commonValidation']['status'] == 'measured' for row in raw['runs'])
     means = {actor: {channel: {metric: statistics.mean(row['native']['channels'][channel][metric] for row in rows) for metric in METRICS} for channel in CHANNELS} for actor, rows in groups.items()}
+    for channels in means.values():
+        for values in channels.values():
+            values['effectiveClockGHz'] = values['cycles'] / values['cpuSeconds'] / 1e9
+            values['pCoreTimeShare'] = values['pCpuSeconds'] / values['cpuSeconds']
     budget = {}
     for name, terms in COMPONENTS.items():
         budget[name] = {}
