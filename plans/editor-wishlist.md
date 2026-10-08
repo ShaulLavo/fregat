@@ -657,6 +657,13 @@ semantic tokens and the rest) paint through two separate pipelines. Only tokens 
 and know about edits; range highlights rebuild live `Range`s and are never projected through an
 edit. Whatever we do with highlights should be reusable across every painter.
 
+## Collaborative editing
+
+Added 2026-10-08. Several people or agents edit one document at once and every copy ends with the
+same text. The core follows Matthew Weidner's host-ordered model (stable character IDs, one host
+orders edits, participants replay their unconfirmed edits) and stays network-agnostic. A plugin
+adds peer-to-peer sessions over WebRTC; Fregat's server becomes another host.
+
 ## Platform-agnostic core and React Strict DOM
 
 Requested on 2026-09-20. Extract existing document and editing behavior from DOM and browser

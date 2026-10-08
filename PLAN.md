@@ -248,6 +248,10 @@ contracts a consumer needs:
   Approved [229](plans/229-multibuffer-excerpt-model.md)/[230](plans/230-aggregated-source-views.md)
   retain their excerpt-engine and aggregated-view scopes and gates.
   [171](plans/171-composer-on-our-editor.md) owns the composer migration. Neither moves into 200.
+- Collaborative editing (approved 2026-10-08): [E066](plans/e066-collaborative-text.md) gives
+  the Editor host-ordered collaboration, [E067](plans/e067-webrtc-collaboration-plugin.md) adds a
+  peer-to-peer WebRTC plugin, and the revised [Delta DB plan](plans/delta-db-implementation-plan.md)
+  makes Fregat's server the host for open documents. Research: [docs/collab-editing](docs/collab-editing/README.md).
 - Markdown authoring and rendered blocks follow [108](plans/108-markdown-modes.md),
   [111](plans/111-editor-decorations.md) and [176](plans/176-markdown-parser.md). Reconcile landed
   authoring/parser work before scheduling their remaining parts. [189](plans/189-tree-sitter-md-improvement.md)

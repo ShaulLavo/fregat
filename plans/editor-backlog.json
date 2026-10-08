@@ -790,6 +790,32 @@
       "dependsOn": ["E001"],
       "topics": ["Input latency as an enforced budget"],
       "baseline": "7d06ab6f52370b3f8bc116bd0491ffe47c1c2107"
+    },
+    {
+      "id": "E066",
+      "file": "e066-collaborative-text.md",
+      "title": "Collaborative text with one ordering host",
+      "status": "Approved",
+      "owner": "Editor",
+      "kind": "Implementation",
+      "priority": "P2",
+      "effort": "XL",
+      "dependsOn": [],
+      "topics": ["Collaborative editing"],
+      "baseline": "1e066d38b6455b45d406fce175f902152a58295b"
+    },
+    {
+      "id": "E067",
+      "file": "e067-webrtc-collaboration-plugin.md",
+      "title": "Peer-to-peer collaboration plugin over WebRTC",
+      "status": "Approved",
+      "owner": "Editor",
+      "kind": "Implementation",
+      "priority": "P2",
+      "effort": "L",
+      "dependsOn": ["E027", "E066"],
+      "topics": ["Collaborative editing"],
+      "baseline": "1e066d38b6455b45d406fce175f902152a58295b"
     }
   ]
 }
