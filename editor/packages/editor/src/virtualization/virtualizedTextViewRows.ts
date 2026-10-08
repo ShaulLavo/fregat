@@ -2126,7 +2126,10 @@ function proportionalChunkWindow(
   const { text } = content
   const left = horizontalTextScrollLeft(view, snapshot.scrollLeft)
   const overscan = view.horizontalOverscanColumns * characterWidth(view)
-  const right = left + Math.max(0, snapshot.viewportWidth - gutterWidth(view)) + overscan
+  const right =
+    left +
+    Math.max(0, snapshot.viewportWidth - visibleGutterWidth(view, snapshot.scrollLeft)) +
+    overscan
   const startPixels = pixelsBeforeWidgetAdvances(view, content, widgets, left - overscan, 'before')
   const endPixels = pixelsBeforeWidgetAdvances(view, content, widgets, right, 'after')
   const startColumn = columnAtPixels(text, startPixels, glyphs, view.tabSize, 'before')
@@ -2157,7 +2160,8 @@ export function horizontalViewportColumns(
 ): number {
   if (viewportWidth === 0) return view.model.wrapColumn ?? 1
 
-  const width = Math.max(0, viewportWidth - gutterWidth(view))
+  const inset = view.wrapEnabled ? gutterWidth(view) : visibleGutterWidth(view)
+  const width = Math.max(0, viewportWidth - inset)
   return Math.max(1, Math.ceil(width / characterWidth(view)))
 }
 
@@ -2917,6 +2921,13 @@ export function updateSpacerHeight(
   applyTotalHeight(view, snapshot)
 }
 
+export function visibleGutterWidth(
+  view: VirtualizedTextViewInternal,
+  scrollLeft = view.virtualizer.getSnapshot().scrollLeft,
+): number {
+  return view.viewport.visibleGutterWidth(gutterWidth(view), scrollLeft)
+}
+
 export function spacerWidth(view: VirtualizedTextViewInternal, viewportWidth: number): number {
   return Math.max(viewportWidth, view.contentWidth + gutterWidth(view) + characterWidth(view))
 }
@@ -3043,7 +3054,8 @@ function visibleCaretPosition(
 ): { readonly left: number; readonly top: number } | null {
   const position = knownPosition === undefined ? primaryCaretPosition(view) : knownPosition
   if (!position) return null
-  if (position.left < snapshot.scrollLeft + gutterWidth(view)) return null
+  if (position.left < snapshot.scrollLeft + visibleGutterWidth(view, snapshot.scrollLeft))
+    return null
   if (position.left > snapshot.scrollLeft + snapshot.viewportWidth) return null
 
   return position
@@ -3172,9 +3184,10 @@ function scrollLeftForVisibleOffset(
 ): number {
   const caretLeft = gutterWidth(view) + rowTextLeftForOffset(view, row, offset, affinity)
   const caretRight = caretLeft + characterWidth(view)
-  const viewportLeft = snapshot.scrollLeft + gutterWidth(view)
+  const viewportLeft = snapshot.scrollLeft + visibleGutterWidth(view, snapshot.scrollLeft)
   const viewportRight = snapshot.scrollLeft + snapshot.viewportWidth
-  if (caretLeft < viewportLeft) return Math.max(0, caretLeft - gutterWidth(view))
+  if (caretLeft < viewportLeft)
+    return Math.max(0, caretLeft - visibleGutterWidth(view, snapshot.scrollLeft))
   if (caretRight > viewportRight) return Math.max(0, Math.ceil(caretRight - snapshot.viewportWidth))
   return snapshot.scrollLeft
 }

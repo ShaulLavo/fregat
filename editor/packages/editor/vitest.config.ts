@@ -89,7 +89,10 @@ export default defineConfig({
               ) => {
                 const cdp = await page.context().newCDPSession(page)
                 const range = replacement
-                  ? { replacementStart: replacement[0], replacementEnd: replacement[1] }
+                  ? {
+                      replacementStart: replacement[0],
+                      replacementEnd: replacement[1],
+                    }
                   : {}
                 await cdp.send('Input.imeSetComposition', {
                   text,
@@ -119,7 +122,11 @@ export default defineConfig({
             instances: [{ browser: 'chromium' }],
           },
           include: ['test/**/*.browser.test.ts'],
-          exclude: ['test/highlightPaint.browser.test.ts', 'test/paintOrigin.browser.test.ts'],
+          exclude: [
+            'test/highlightPaint.browser.test.ts',
+            'test/markdownFencePaint.browser.test.ts',
+            'test/paintOrigin.browser.test.ts',
+          ],
         },
       },
       {
@@ -144,10 +151,14 @@ export default defineConfig({
       },
       {
         plugins: [browserTestResponses()],
+        optimizeDeps: { exclude: ['web-tree-sitter', 'tree-sitter-md'] },
         test: {
           name: 'highlight-paint',
           sequence: { groupOrder: 2 },
-          include: ['test/highlightPaint.browser.test.ts'],
+          include: [
+            'test/highlightPaint.browser.test.ts',
+            'test/markdownFencePaint.browser.test.ts',
+          ],
           browser: {
             enabled: true,
             headless: true,
@@ -155,6 +166,23 @@ export default defineConfig({
             fileParallelism: false,
             provider: playwright(),
             commands: {
+              proofMarkdownFenceScreenshot: async (
+                { iframe },
+                hostId: string,
+                row: number,
+                text?: string,
+              ) => {
+                const target = text
+                  ? iframe
+                      .locator(`#${hostId} .editor-virtualized-row`)
+                      .filter({ hasText: text })
+                      .first()
+                  : iframe.locator(`#${hostId} [data-editor-virtual-row="${row}"]`)
+                const image = await target.screenshot({
+                  animations: 'disabled',
+                })
+                return image.toString('base64')
+              },
               proofHighlightPaintScreenshot: async ({ iframe }, hostId: string) => {
                 const image = await iframe
                   .locator(`#${hostId} [data-editor-virtual-row="0"]`)

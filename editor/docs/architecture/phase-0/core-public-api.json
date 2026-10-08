@@ -514,6 +514,12 @@
         },
         {
           "kind": "type",
+          "name": "EditorGutterScroll",
+          "source": "packages/editor/src/editor.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorGutterWidthContext",
           "source": "packages/editor/src/public/extensions.ts",
           "via": "packages/editor/src/index.ts"
@@ -3858,6 +3864,12 @@
           "kind": "type",
           "name": "EditorGutterRowContext",
           "source": "packages/editor/src/plugins.ts",
+          "via": "packages/editor/src/editor.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorGutterScroll",
+          "source": "packages/editor/src/editor/types.ts",
           "via": "packages/editor/src/editor.ts"
         },
         {

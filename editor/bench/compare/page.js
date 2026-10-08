@@ -62,6 +62,8 @@ window.bench = {
     performance.mark('compare-open-start')
     editor = mount(host, text, HIGHLIGHTED)
     performance.mark('compare-open-mounted')
+    if (new URLSearchParams(location.search).get('fullDocument') === 'true')
+      await editor.fullHighlight?.()
     await painted()
     const firstFrameMs = performance.now() - start
     performance.mark('compare-open-first-frame')
