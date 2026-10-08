@@ -84,6 +84,51 @@ function expectNativeRecords(frame: ZigFrameBuilder): void {
 }
 
 describe('WASM frame records', () => {
+  it.each([false, true])(
+    'reuses unchanged native cells after row movement with stableRows=%s',
+    async (stableRows) => {
+      let cellReads = 0
+      const instantiate = WebAssembly.instantiate
+      vi.spyOn(WebAssembly, 'instantiate').mockImplementation(async (module, imports) => {
+        const read = imports?.env?.ghostty_cell_get
+        if (typeof read !== 'function') return instantiate(module, imports)
+        return instantiate(module, {
+          ...imports,
+          env: {
+            ...imports?.env,
+            ghostty_cell_get: (...args: number[]) => {
+              cellReads += 1
+              return read(...args)
+            },
+          },
+        })
+      })
+      runtime = await GhosttyRuntime.create()
+      const terminal = runtime.createTerminal({ columns: 8, rows: 4 })
+      const state = runtime.createRenderState(terminal)
+      terminal.write('\x1b[?25laaaaaaaa\r\nbbbbbbbb\r\naaaaaaaa\r\nbbbbbbbb')
+      state.update()
+      builder = state.createFrameBuilder(8, 4)
+      readyFrame({ ...options, stableRows })
+      state.acknowledge()
+      terminal.write('\r\naaaaaaaa')
+      state.update()
+      readyFrame({ ...options, stableRows, full: false })
+      expect(builder.rowOffset).toBe(stableRows ? 1 : 0)
+      state.acknowledge()
+      cellReads = 0
+      terminal.write('\x1b[1;2Ha')
+      state.update()
+      readyFrame({ ...options, stableRows, full: false })
+      expect(cellReads).toBe(5)
+      const cells = builder.cellData.slice()
+      const glyphs = builder.glyphData.slice()
+      readyFrame({ ...options, stableRows })
+      expect(builder.cellData).toEqual(cells)
+      expect(builder.glyphData).toEqual(glyphs)
+    },
+  )
+
   it('reports every logical row moved by a physical instance ring', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 24, rows: 4 })

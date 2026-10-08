@@ -693,8 +693,9 @@ fn rememberRenderedCell(cache: *FrameCache, slot: usize, input: CachedCell) void
 
 fn reuseRenderedCell(frame: *Frame, raw: c.GhosttyCell, x: u32, y: u32, selected: bool) bool {
     const cache = frame.row_cache.?;
-    if (frame.stable_rows != 0) return false;
-    const previous = cache.previous[y];
+    // Rendered cells are physical; selection and appearance belong to their previous logical row.
+    const previous_y = if (frame.stable_rows != 0) (y + frame.row_offset + frame.rows - cache.previous_offset) % frame.rows else y;
+    const previous = cache.previous[previous_y];
     if (!std.mem.eql(u32, &previous.appearance, &cache.appearance)) return false;
     if (sameRowId(previous.id, std.mem.zeroes(c.GhosttyRenderStateRowId))) return false;
     const old_selected = previous.selected and x >= previous.selection_start and x <= previous.selection_end;
