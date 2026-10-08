@@ -23,6 +23,7 @@ export type Link = {
   readonly jitter: number
   readonly drop: number
   readonly duplicate: number
+  readonly tailDelay?: number
 }
 
 export class Network {
@@ -160,12 +161,12 @@ export class Network {
     const to = 1
     const key = `${from}:${to}`
     const link = this.links.get(key)!
-    this.links.set(key, { delay: 18, jitter: 1, drop: 0, duplicate: 0 })
+    this.links.set(key, { delay: 18, jitter: 1, drop: 0, duplicate: 0, tailDelay: 0 })
     this.advance(3)
     this.edge(from, to, false)
     this.edge(to, from, false)
     this.advance(2)
-    this.links.set(key, { delay: 1, jitter: 1, drop: 0, duplicate: 0 })
+    this.links.set(key, { delay: 1, jitter: 1, drop: 0, duplicate: 0, tailDelay: 0 })
     this.edge(from, to, true)
     this.edge(to, from, true)
     this.advance(30)
@@ -227,6 +228,7 @@ export class Network {
           if (this.trace.length > 40) this.trace.shift()
         }
       }
+      if (this.nodes.some((node) => node.session.status === 'left')) this.reconnect()
     }
   }
   invariants(): void {
@@ -263,7 +265,7 @@ export class Network {
         assert.equal(node.session.host, first.session.host, `One authority: ${context}`)
     }
     if (components.length !== 1 || this.nodes.some((node) => !node.alive)) return
-    const history = this.nodes[0]!.engine.exportHistory(genesis)!
+    const history = this.nodes[components[0]![0]!]!.engine.exportHistory(genesis)!
     const outcomes = new Map(history.map((record) => [editKey(record.id), record.outcome]))
     for (const key of this.authored.keys())
       assert.ok(outcomes.has(key), `No edit lost: seed=${this.seed} edit=${key}`)
@@ -291,7 +293,8 @@ export class Network {
     const link = this.links.get(`${from}:${to}`)!
     if (this.random() < link.drop) return
     const generation = this.generations.get(`${from}:${to}`)!
-    const delay = link.delay + this.integer(link.jitter) + (this.random() < 0.01 ? 80 : 0)
+    const delay =
+      link.delay + this.integer(link.jitter) + (this.random() < 0.01 ? (link.tailDelay ?? 80) : 0)
     this.queue(this.clock + delay, { from, to, sender: message.sender, message, generation })
     if (this.random() < link.duplicate)
       this.queue(this.clock + delay + 1 + this.integer(10), {
@@ -311,7 +314,12 @@ export class Network {
     const next = new Set(
       [...this.topology].filter((edge) => {
         const [from, to] = edge.split(':').map(Number)
-        return this.nodes[from!]!.alive && this.nodes[to!]!.alive
+        return (
+          this.nodes[from!]!.alive &&
+          this.nodes[to!]!.alive &&
+          this.nodes[from!]!.session.status !== 'left' &&
+          this.nodes[to!]!.session.status !== 'left'
+        )
       }),
     )
     const old = this.edges

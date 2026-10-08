@@ -67,13 +67,28 @@ export interface Commit<E extends EditEnvelope> {
 }
 
 export interface Payloads<E extends EditEnvelope> {
-  HELLO: { readonly branch: Branch; readonly term: number }
-  HOST_PULSE: { readonly branch: Branch; readonly members: readonly string[] }
+  HELLO: {
+    readonly branch: Branch
+    readonly term: number
+    readonly members: readonly string[]
+    readonly handoff?: Payloads<E>['HANDOFF']
+  }
+  HOST_PULSE: {
+    readonly branch: Branch
+    readonly members: readonly string[]
+    readonly handoff?: Payloads<E>['HANDOFF']
+  }
   ELECTION_OFFER: Offer
   HOST_CLAIM: Commit<E>
   SUBMIT: { readonly authority: Authority; readonly edit: E }
   CONFIRM: { readonly authority: Authority; readonly record: Confirmation<E> }
-  HAVE: { readonly tip: Checkpoint; readonly epoch: string; readonly pending?: readonly EditId[] }
+  HAVE: {
+    readonly tip: Checkpoint
+    readonly epoch: string
+  } & (
+    | { readonly handoffStage?: never; readonly pending?: never }
+    | { readonly handoffStage: 'prepare' | 'commit'; readonly pending: readonly EditId[] }
+  )
   HISTORY_REQUEST: { readonly tip: Checkpoint; readonly from: Checkpoint }
   HISTORY_CHUNK: {
     readonly tip: Checkpoint

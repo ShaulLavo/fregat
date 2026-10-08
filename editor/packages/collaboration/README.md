@@ -28,6 +28,10 @@ recorded outcome unchanged. The toy engine in
 `test/engine.ts` is deliberately an ordered ID/text list, independent of a text CRDT.
 The adapter for `@singapore-editor/collab`'s Host and Participant is follow-up work.
 
+After `status` becomes `left`, the caller closes the session's links and reports those
+closures to the surviving peers. Departure keeps its final document readable while
+later confirmations continue on the survivors.
+
 The caller supplies a fresh peer ID after a process restart, retains authored intents
 and pending work durably if crashes must preserve unsent work, and reconnects using
 that new identity. A surviving peer's branch retains edits authored by departed peers.
@@ -35,12 +39,18 @@ The session has no timer, editor hook or browser dependency of its own.
 
 ## State and convergence
 
-Membership is the current full-mesh link set. Each membership change or host suspicion
-freezes confirmation and starts a roster-bound round coordinated by its lowest peer
-ID. Every participant supplies its frozen branch. The coordinator fetches and verifies
-complete histories before selecting a base. On one lineage, the freshest holder wins
-and peer ID breaks ties. Divergent histories compare depth, branch-host ID, then tip
-hash. Terms fence authority traffic and never rank history.
+Membership is the current set of direct authenticated links. `HELLO` and `HOST_PULSE`
+carry each peer's sorted roster and its installed handoff announcement. Receivers
+verify and install that announcement before interpreting the advertised authority;
+reordered discovery traffic therefore preserves a completed handoff. Sequencing and
+host activation require matching
+rosters from every member. A partial or asymmetric rejoin therefore freezes incumbent
+hosts until the connected component becomes a full mesh. Membership changes and host
+suspicion start roster-bound rounds coordinated by the lowest peer ID. Every
+participant supplies its frozen branch. The coordinator fetches and verifies complete
+histories before selecting a base. On one lineage, the freshest holder wins and peer
+ID breaks ties. Divergent histories compare depth, branch-host ID, then tip hash.
+Terms fence authority traffic and never rank history.
 
 The coordinator distributes a base and the union of losing branches' unique original
 intents. Peers archive their replaced branch and install the base. The chosen host
@@ -50,10 +60,23 @@ the round. A third partition therefore starts another frozen round rather than
 accepting a partially discovered pairwise result as globally final.
 
 Clean handoff freezes the outgoing host, transfers its confirmed tip and pending
-intents, and waits for the successor's verified `HAVE`. It then retries the successor
-announcement until every connected member acknowledges installation. The successor
-relays that announcement so delayed members can recover after the outgoing host
-leaves. Removing a follower keeps the current host; removing the host starts election.
+intents, and waits for the successor's verified `HAVE`. Both preparation and committed
+announcements carry pending edits authored throughout the transfer. `HAVE` identifies
+the handoff stage and the retained EditIds. Departure waits for the successor to retain
+every pending edit and for every member to install the successor announcement.
+Installing a handoff base settles pending IDs already present in its confirmed history.
+The outgoing host continues pulses and retransmits its preceding authority announcement
+throughout preparation. Members relay preparation and
+commit announcements to the successor across delayed direct links. The successor
+retains the union of transferred edits and relays the committed announcement.
+
+The requested departure survives an intervening election. A re-elected outgoing host
+retries its handoff, choosing a connected successor if the requested one disconnected.
+A host with no connected successor retains its document until a peer connects.
+An outgoing host that becomes a follower leaves after its pending
+work receives confirmed outcomes from the elected host. The election chooses authority
+using the same history rules. Calling `submit` after the session has left throws a
+`TypeError`. Removing a follower keeps the current host; removing the host starts election.
 
 Liveness requires eventual delivery, a stable full-mesh component and a ticking clock.
 The transport reports closed or failed links through `disconnect`. Pulse suspicion
@@ -77,10 +100,23 @@ COLLABORATION_LONG_RUN=1 bun run --cwd editor/packages/collaboration test
 ```
 
 The default run has 100 deterministic seeds. The long run has 10,000. Each seed
-checks stabilized connected components after host crash/restart, two-pair splits or
-three-way splits with staggered healing. Links have independent delay, loss and
-duplicate delivery. Queued packets can arrive out of order across reconnects.
-Every run checks identical confirmed history and text, EditId uniqueness, one host
-per component, and settlement of every authored edit as accepted or rejected after
-all peers rejoin. Rejected outcomes represent surfaced conflicts in this simulation.
+checks components computed from the actual directed-link graph after host crash and
+restart, two-pair splits, or three-way splits with staggered healing. Partial-heal
+checks include a one-way bridge followed by a bidirectional bridge before full-mesh
+recovery. Those bridges check that at most one host can sequence in their connected
+component. A focused four-peer path also proves that both incumbents stop advancing.
+
+Links have independent delay, loss and duplicate delivery. Every seed performs a
+short disconnect and reconnect with packets still queued. Packets carry the link
+generation at send time. Counters require both delivery from an older generation and
+its arrival after traffic from the new generation. The suite prints and asserts
+positive counts for every required scenario.
+
+Full-mesh quiescence checks require identical confirmed history and text, EditId
+uniqueness, one host per component, and settlement of every authored edit as accepted
+or rejected after all peers rejoin. Rejected outcomes represent surfaced conflicts in
+this simulation. Focused handoff tests cover typing in both transfer stages, delayed
+base confirmations, non-coordinator hosts, election-interrupted departure, and a
+requested successor disconnecting. The simulator closes completed departures' links
+and checks authored outcomes against the surviving component's history.
 CI runs the default checks and offers the long run through workflow dispatch.

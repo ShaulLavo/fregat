@@ -50,6 +50,7 @@ type Phase<E extends EditEnvelope> =
       readonly next: Authority
       readonly committed: boolean
       readonly acknowledgements: Set<string>
+      readonly transferred: Set<string>
     }
   | { readonly kind: 'left' }
 
@@ -74,11 +75,13 @@ export class Session<E extends EditEnvelope> {
   private commitWaiting: Commit<E> | undefined
   private lastCommit: Commit<E> | undefined
   private incomingHandoff: Payloads<E>['HANDOFF'] | undefined
+  private departure: string | undefined
+  private readonly departed = new Set<string>()
   private lastHandoff: Payloads<E>['HANDOFF'] | undefined
   private readonly blockedSince = new Map<string, number>()
   private readonly observed = new Map<
     string,
-    { readonly messageId: number; readonly branch: Branch }
+    { readonly messageId: number; readonly branch: Branch; readonly members: readonly string[] }
   >()
 
   constructor(private readonly options: SessionOptions<E>) {
@@ -107,7 +110,9 @@ export class Session<E extends EditEnvelope> {
     return this.phase.kind
   }
   get host(): string | undefined {
-    return this.phase.kind === 'stable' ? this.authority.host : undefined
+    return this.phase.kind === 'stable' && this.compatibleMembership()
+      ? this.authority.host
+      : undefined
   }
   get isHost(): boolean {
     return this.host === this.peer
@@ -117,20 +122,29 @@ export class Session<E extends EditEnvelope> {
   }
 
   connect(peer: string): void {
-    if (this.phase.kind === 'left' || peer === this.peer || this.members.has(peer)) return
+    if (
+      this.phase.kind === 'left' ||
+      peer === this.peer ||
+      this.members.has(peer) ||
+      this.departed.has(peer)
+    )
+      return
     if (this.members.size >= 8) throw new RangeError('A session supports up to eight peers')
     this.members.add(peer)
+    this.observed.delete(peer)
     this.negotiate()
-    this.send(peer, 'HELLO', { branch: this.branch, term: this.maxTerm })
+    this.send(peer, 'HELLO', { ...this.advertisement(this.branch), term: this.maxTerm })
   }
 
   disconnect(peer: string): void {
     if (!this.members.delete(peer) || this.phase.kind === 'left') return
+    this.observed.delete(peer)
     if (this.phase.kind === 'stable' && peer !== this.authority.host) return
     this.negotiate()
   }
 
   submit(edit: E): void {
+    if (this.phase.kind === 'left') throw new TypeError('The session has left the room')
     if (edit.document !== this.options.document)
       throw new TypeError('The edit belongs to another document')
     if (this.options.engine.outcome(edit.id) || this.pending.has(editKey(edit.id))) return
@@ -147,9 +161,10 @@ export class Session<E extends EditEnvelope> {
       !this.isHost
     )
       this.negotiate()
-    this.broadcast('HELLO', { branch: this.branch, term: this.maxTerm })
+    this.broadcast('HELLO', { ...this.advertisement(this.branch), term: this.maxTerm })
     this.retryPhase()
     this.flushPending()
+    this.resumeDeparture()
   }
 
   receive(message: Message<E>): void {
@@ -168,11 +183,23 @@ export class Session<E extends EditEnvelope> {
     switch (message.type) {
       case 'HELLO':
         this.maxTerm = Math.max(this.maxTerm, message.payload.term)
-        this.observe(message.sender, message.payload.branch, message.messageId)
+        this.observe(
+          message.sender,
+          message.payload.branch,
+          message.messageId,
+          message.payload.members,
+          message.payload.handoff,
+        )
         break
       case 'HOST_PULSE':
         if (message.sender !== message.payload.branch.authority.host) break
-        this.observe(message.sender, message.payload.branch, message.messageId)
+        this.observe(
+          message.sender,
+          message.payload.branch,
+          message.messageId,
+          message.payload.members,
+          message.payload.handoff,
+        )
         if (sameAuthority(this.authority, message.payload.branch.authority))
           this.lastHostPulse = this.now
         break
@@ -206,7 +233,9 @@ export class Session<E extends EditEnvelope> {
         this.handoff(message.sender, message.payload)
         break
       case 'LEAVE':
+        this.departed.add(message.sender)
         this.members.delete(message.sender)
+        this.observed.delete(message.sender)
         if (
           this.authority.host === message.sender ||
           this.phase.kind === 'collecting' ||
@@ -223,6 +252,11 @@ export class Session<E extends EditEnvelope> {
   leave(successor: string): void {
     if (!this.isHost || !this.members.has(successor) || successor === this.peer)
       throw new TypeError('Handoff needs a connected successor and a stable host')
+    this.departure = successor
+    this.startHandoff(successor)
+  }
+
+  private startHandoff(successor: string): void {
     const next = {
       term: this.maxTerm + 1,
       host: successor,
@@ -235,12 +269,43 @@ export class Session<E extends EditEnvelope> {
       next,
       committed: false,
       acknowledgements: new Set(),
+      transferred: new Set(),
     }
     this.retryPhase()
   }
 
+  private advertisement(branch: Branch): Payloads<E>['HOST_PULSE'] {
+    return { branch, members: this.roster(), handoff: this.lastHandoff }
+  }
+
   private roster(): string[] {
-    return [...this.members].sort(compareIds)
+    return this.liveRoster([...this.members])
+  }
+  private liveRoster(members: readonly string[]): string[] {
+    return members.filter((peer) => !this.departed.has(peer)).sort(compareIds)
+  }
+  private compatibleMembership(): boolean {
+    const roster = this.roster()
+    const key = JSON.stringify(roster)
+    return roster.every(
+      (peer) =>
+        peer === this.peer ||
+        JSON.stringify(this.liveRoster(this.observed.get(peer)?.members ?? [])) === key,
+    )
+  }
+  private resumeDeparture(): void {
+    if (!this.departure || this.phase.kind !== 'stable' || !this.host) return
+    if (this.isHost) {
+      const successor = this.members.has(this.departure)
+        ? this.departure
+        : this.roster().find((peer) => peer !== this.peer)
+      if (successor) this.startHandoff(successor)
+      return
+    }
+    if (this.pending.size) return
+    this.broadcast('LEAVE', { successor: this.departure })
+    this.phase = { kind: 'left' }
+    this.departure = undefined
   }
   private coordinator(): string {
     return this.roster()[0]!
@@ -309,7 +374,12 @@ export class Session<E extends EditEnvelope> {
   }
 
   private finishRound(): void {
-    if (this.phase.kind !== 'collecting' || this.coordinator() !== this.peer) return
+    if (
+      this.phase.kind !== 'collecting' ||
+      this.coordinator() !== this.peer ||
+      !this.compatibleMembership()
+    )
+      return
     const { round, offers } = this.phase
     if (round.roster.some((peer) => !offers.has(peer))) return
     const entries = round.roster.map((peer) => ({ peer, branch: offers.get(peer)!.branch }))
@@ -381,10 +451,7 @@ export class Session<E extends EditEnvelope> {
     engine.install(base)
     for (const edit of engine.uniquePending(old)) this.pending.set(editKey(edit.id), edit)
     for (const edit of commit.replay) this.pending.set(editKey(edit.id), edit)
-    for (const id of this.pending.keys()) {
-      const edit = this.pending.get(id)!
-      if (engine.outcome(edit.id)) this.pending.delete(id)
-    }
+    this.settlePending()
     this.authority = commit.authority
     this.maxTerm = Math.max(this.maxTerm, commit.authority.term)
     this.lastCommit = commit
@@ -394,27 +461,8 @@ export class Session<E extends EditEnvelope> {
   }
 
   private have(peer: string, payload: Payloads<E>['HAVE']): void {
-    if (
-      this.phase.kind === 'handoff' &&
-      sameTip(payload.tip, this.phase.branch.tip) &&
-      payload.epoch === this.phase.next.epoch
-    ) {
-      if (this.phase.committed && payload.pending === undefined) {
-        this.phase.acknowledgements.add(peer)
-        const { acknowledgements } = this.phase
-        if (
-          [...this.members].some((member) => member !== this.peer && !acknowledgements.has(member))
-        )
-          return
-        this.broadcast('LEAVE', { successor: this.phase.successor })
-        this.phase = { kind: 'left' }
-        return
-      }
-      if (peer !== this.phase.successor) return
-      const acknowledged = new Set(payload.pending?.map(editKey))
-      if ([...this.pending.keys()].some((id) => !acknowledged.has(id))) return
-      this.phase = { ...this.phase, committed: true }
-      this.retryPhase()
+    if (this.phase.kind === 'handoff') {
+      this.haveHandoff(peer, payload)
       return
     }
     if (
@@ -427,8 +475,34 @@ export class Session<E extends EditEnvelope> {
     this.activate()
   }
 
+  private haveHandoff(peer: string, payload: Payloads<E>['HAVE']): void {
+    if (this.phase.kind !== 'handoff' || !payload.handoffStage) return
+    if (!sameTip(payload.tip, this.phase.branch.tip) || payload.epoch !== this.phase.next.epoch)
+      return
+    const { transferred, acknowledgements, successor } = this.phase
+    if (peer === successor) for (const id of payload.pending) transferred.add(editKey(id))
+    if (!this.phase.committed) {
+      if (peer !== successor || [...this.pending.keys()].some((id) => !transferred.has(id))) return
+      this.phase = { ...this.phase, committed: true }
+      this.retryPhase()
+    }
+    if (payload.handoffStage === 'commit') acknowledgements.add(peer)
+    if ([...this.pending.keys()].some((id) => !transferred.has(id))) return
+    if (this.roster().some((member) => member !== this.peer && !acknowledgements.has(member)))
+      return
+    this.broadcast('LEAVE', { successor })
+    this.pending.clear()
+    this.phase = { kind: 'left' }
+    this.departure = undefined
+  }
+
   private activate(): void {
-    if (this.phase.kind !== 'activating' || this.authority.host !== this.peer) return
+    if (
+      this.phase.kind !== 'activating' ||
+      this.authority.host !== this.peer ||
+      !this.compatibleMembership()
+    )
+      return
     const { commit, acknowledgements } = this.phase
     if (commit.round.roster.some((peer) => !acknowledgements.has(peer))) return
     this.phase = { kind: 'stable' }
@@ -442,18 +516,32 @@ export class Session<E extends EditEnvelope> {
       this.lastCommit?.authority.epoch !== commit.authority.epoch
     )
       return
-    if (this.phase.kind !== 'activating' && this.phase.kind !== 'stable') return
+    if (
+      (this.phase.kind !== 'activating' && this.phase.kind !== 'stable') ||
+      !this.compatibleMembership()
+    )
+      return
     this.phase = { kind: 'stable' }
     this.lastHostPulse = this.now
   }
 
-  private observe(peer: string, branch: Branch, messageId?: number): void {
+  private observe(
+    peer: string,
+    branch: Branch,
+    messageId?: number,
+    members?: readonly string[],
+    handoff?: Payloads<E>['HANDOFF'],
+  ): void {
     const previous = this.observed.get(peer)
     if (messageId !== undefined && messageId < (previous?.messageId ?? 0)) return
-    if (messageId !== undefined) this.observed.set(peer, { messageId, branch })
+    if (messageId !== undefined) this.observed.set(peer, { messageId, branch, members: members! })
+    if (handoff && sameAuthority(handoff.authority, branch.authority)) this.handoff(peer, handoff)
+    this.finishRound()
+    this.activate()
     this.maxTerm = Math.max(this.maxTerm, branch.authority.term)
     this.request(peer, branch.tip)
-    if (this.phase.kind !== 'stable') return
+    if (this.phase.kind !== 'stable' || !this.compatibleMembership()) return
+    if (this.lastHandoff?.branch.authority.host === peer) return
     if (!sameAuthority(this.authority, branch.authority)) {
       const history = this.histories.get(tipKey(branch.tip))
       if (!history) return
@@ -519,7 +607,7 @@ export class Session<E extends EditEnvelope> {
   }
 
   private flushPending(): void {
-    if (this.phase.kind !== 'stable') return
+    if (this.phase.kind !== 'stable' || !this.compatibleMembership()) return
     if (!this.isHost) {
       for (const edit of this.pending.values())
         this.send(this.authority.host, 'SUBMIT', { authority: this.authority, edit })
@@ -573,6 +661,10 @@ export class Session<E extends EditEnvelope> {
       return
     }
     if (this.phase.kind === 'handoff') {
+      // A follower can still be awaiting the claim that activated this outgoing host.
+      if (this.lastCommit) this.broadcast('HOST_CLAIM', this.lastCommit)
+      if (this.lastHandoff) this.broadcast('HANDOFF', this.lastHandoff)
+      this.broadcast('HOST_PULSE', this.advertisement(this.phase.branch))
       const handoff: Payloads<E>['HANDOFF'] = {
         stage: this.phase.committed ? 'commit' : 'prepare',
         successor: this.phase.successor,
@@ -580,14 +672,13 @@ export class Session<E extends EditEnvelope> {
         authority: this.phase.next,
         pending: [...this.pending.values()],
       }
-      if (this.phase.committed) this.broadcast('HANDOFF', handoff)
-      else this.send(this.phase.successor, 'HANDOFF', handoff)
+      this.broadcast('HANDOFF', handoff)
       return
     }
     if (!this.isHost) return
     if (this.lastCommit) this.broadcast('HOST_CLAIM', this.lastCommit)
     if (this.lastHandoff) this.broadcast('HANDOFF', this.lastHandoff)
-    this.broadcast('HOST_PULSE', { branch: this.branch, members: this.roster() })
+    this.broadcast('HOST_PULSE', this.advertisement(this.branch))
   }
 
   private rememberLocal(): void {
@@ -640,19 +731,34 @@ export class Session<E extends EditEnvelope> {
   }
 
   private handoff(peer: string, payload: Payloads<E>['HANDOFF']): void {
+    if (
+      this.phase.kind === 'handoff' ||
+      this.phase.kind === 'collecting' ||
+      this.phase.kind === 'activating'
+    )
+      return
     if (payload.authority.epoch === this.authority.epoch) {
-      if (payload.stage === 'commit')
-        this.send(peer, 'HAVE', { tip: payload.branch.tip, epoch: payload.authority.epoch })
+      if (payload.stage !== 'commit' || payload.successor !== this.authority.host) return
+      const edits = new Map<string, E>()
+      for (const edit of [...(this.lastHandoff?.pending ?? []), ...payload.pending])
+        edits.set(editKey(edit.id), edit)
+      const added = edits.size !== (this.lastHandoff?.pending.length ?? 0)
+      this.lastHandoff = { ...payload, pending: [...edits.values()] }
+      for (const edit of payload.pending) this.submit(edit)
+      this.acknowledgeHandoff(peer, payload)
+      if (added && this.peer === payload.successor) this.broadcast('HANDOFF', this.lastHandoff)
+      if (peer !== payload.successor && this.peer !== payload.successor)
+        this.send(payload.successor, 'HANDOFF', this.lastHandoff)
       return
     }
-    const relayed =
-      payload.stage === 'commit' &&
-      peer === payload.successor &&
-      payload.branch.authority.host === this.authority.host
+    const relayed = sameAuthority(payload.branch.authority, this.authority)
     if (peer !== this.authority.host && !relayed) return
-    if (payload.stage === 'prepare' && payload.successor !== this.peer) return
     if (payload.authority.term <= this.authority.term) return
-    if (this.phase.kind === 'handoff') return
+    if (payload.stage === 'prepare' && payload.successor !== this.peer) {
+      this.lastHostPulse = this.now
+      this.send(payload.successor, 'HANDOFF', payload)
+      return
+    }
     this.phase = { kind: 'waiting' }
     this.incomingHandoff = payload
     const source = payload.stage === 'prepare' ? peer : payload.successor
@@ -667,14 +773,11 @@ export class Session<E extends EditEnvelope> {
     if (!history) return
     const old = this.options.engine.exportHistory(this.options.genesis)!
     this.options.engine.install(history)
+    this.settlePending()
     for (const edit of this.options.engine.uniquePending(old)) this.submit(edit)
     for (const edit of handoff.pending) this.submit(edit)
     if (handoff.stage === 'prepare') {
-      this.send(handoff.branch.authority.host, 'HAVE', {
-        tip: handoff.branch.tip,
-        epoch: handoff.authority.epoch,
-        pending: handoff.pending.map((edit) => edit.id),
-      })
+      this.acknowledgeHandoff(handoff.branch.authority.host, handoff)
       return
     }
     this.authority = handoff.authority
@@ -684,11 +787,29 @@ export class Session<E extends EditEnvelope> {
     this.incomingHandoff = undefined
     this.lastCommit = undefined
     this.lastHandoff = handoff
-    this.send(handoff.branch.authority.host, 'HAVE', {
+    this.acknowledgeHandoff(handoff.branch.authority.host, handoff)
+    if (this.peer === handoff.successor) this.broadcast('HANDOFF', handoff)
+    else this.send(handoff.successor, 'HANDOFF', handoff)
+  }
+
+  private settlePending(): void {
+    for (const [key, edit] of this.pending) {
+      if (!this.options.engine.outcome(edit.id)) continue
+      this.pending.delete(key)
+      this.blockedSince.delete(key)
+    }
+  }
+
+  private acknowledgeHandoff(peer: string, handoff: Payloads<E>['HANDOFF']): void {
+    const acknowledgement = {
       tip: handoff.branch.tip,
       epoch: handoff.authority.epoch,
-    })
-    if (this.peer === handoff.successor) this.broadcast('HANDOFF', handoff)
+      handoffStage: handoff.stage,
+      pending: handoff.pending.map((edit) => edit.id),
+    }
+    this.send(peer, 'HAVE', acknowledgement)
+    if (peer !== handoff.branch.authority.host)
+      this.send(handoff.branch.authority.host, 'HAVE', acknowledgement)
   }
 
   private send<K extends keyof Payloads<E>>(peer: string, type: K, payload: Payloads<E>[K]): void {
