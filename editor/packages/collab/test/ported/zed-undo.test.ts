@@ -79,10 +79,17 @@ test('Zed test_edit_partially_intersecting_a_deleted_fragment: retain partial hi
   )
 })
 
-test('Zed test_random_concurrent_edits: edits, undo, redo and asynchronous delivery converge', () => {
-  for (let seed = 400; seed < 500; seed++)
+const concurrentUndoSeeds =
+  process.env.COLLAB_STRESS === '1'
+    ? Array.from({ length: 100 }, (_, index) => 400 + index)
+    : [400, 411, 422, 433, 444, 455, 466, 477, 488, 499]
+
+test.each(concurrentUndoSeeds)(
+  'Zed test_random_concurrent_edits: edits, undo, redo and asynchronous delivery converge, seed %s',
+  (seed) => {
     expect(simulate({ seed, participants: 3, edits: 64, undoRedo: true }).hostSequence).toBe(64)
-})
+  },
+)
 
 test('Zed test_edit_undo_after_split: reverse a long replacement across identity splits', () => {
   const room = undoRoom()
