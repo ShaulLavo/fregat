@@ -5,6 +5,8 @@ import { gunzipSync } from 'node:zlib'
 import { editors, summarize, percentile, verifyGeometry } from './protocol.mjs'
 
 export function summary(result) {
+  if (result.config.profileOpen)
+    throw new RangeError('Use summarize-open.mjs for diagnostic profiles')
   const rows = []
   for (const mib of result.config.selected) {
     for (const editor of editors) {
@@ -49,6 +51,8 @@ export function summary(result) {
 }
 
 export function verify(result) {
+  if (result.config.profileOpen)
+    throw new RangeError('Use summarize-open.mjs for diagnostic profiles')
   const expected = result.config.selected.length * result.config.repetitions * 3
   if (result.samples.length !== expected)
     throw new RangeError(`Expected ${expected} samples, got ${result.samples.length}`)
