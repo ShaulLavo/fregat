@@ -11,7 +11,8 @@ export interface WebSocketSignalingOptions {
   readonly room: string
   readonly credentials: { readonly protocols: readonly string[] }
   readonly reconnectInterval: number
-  readonly onError: (error: unknown) => void
+  readonly onError: (error: unknown, url: string) => void
+  readonly onRecovery?: (url: string) => void
 }
 
 export class WebSocketSignaling implements SignalingClient {
@@ -73,13 +74,19 @@ export class WebSocketSignaling implements SignalingClient {
       try {
         const frame = JSON.parse(event.data)
         if (frame.topic !== this.options.room) return
-        if (frame.type === 'subscribed') this.callbacks?.ready()
-        if (frame.type === 'publish') this.callbacks?.receive(frame.payload)
+        if (frame.type === 'subscribed') {
+          this.callbacks?.ready()
+          this.options.onRecovery?.(url)
+        }
+        if (frame.type === 'publish') {
+          this.callbacks?.receive(frame.payload)
+          this.options.onRecovery?.(url)
+        }
       } catch (error) {
-        this.options.onError(error)
+        this.options.onError(error, url)
       }
     }
-    socket.onerror = () => this.options.onError(new TypeError('Signaling connection failed'))
+    socket.onerror = () => this.options.onError(new TypeError('Signaling connection failed'), url)
     socket.onclose = () => {
       this.sockets.delete(url)
       if (!this.closed)

@@ -8,7 +8,8 @@ export interface BroadcastTransportOptions<E extends EditEnvelope> {
   readonly crypto: RoomCrypto
   readonly heartbeatInterval: number
   readonly peerTimeout: number
-  readonly onError: (error: unknown) => void
+  readonly onError: (error: unknown, direction: 'send' | 'receive') => void
+  readonly onRecovery?: (direction: 'send' | 'receive') => void
 }
 
 type BroadcastPayload =
@@ -50,7 +51,7 @@ export class BroadcastTransport<E extends EditEnvelope = EditEnvelope> {
       this.inbound = this.inbound
         .then(() => this.receive(event.data))
         .catch(async (error) => {
-          options.onError(error)
+          options.onError(error, 'receive')
           if (error instanceof DuplicatePeerSessionError) await this.close()
         })
         .finally(() => {
@@ -89,16 +90,18 @@ export class BroadcastTransport<E extends EditEnvelope = EditEnvelope> {
     if (this.closed) return
     const size = new TextEncoder().encode(JSON.stringify(payload)).byteLength
     if (size > MESSAGE_LIMIT || this.queued + size > 2 * MESSAGE_LIMIT) {
-      this.options.onError(new RangeError('Broadcast send queue exceeds its byte limit'))
+      this.options.onError(new RangeError('Broadcast send queue exceeds its byte limit'), 'send')
       return
     }
     this.queued += size
     this.outbound = this.outbound
       .then(async () => {
         const packet = await this.options.crypto.seal(this.generation, payload)
-        if (!this.closed) this.channel.postMessage(packet)
+        if (this.closed) return
+        this.channel.postMessage(packet)
+        this.options.onRecovery?.('send')
       })
-      .catch(this.options.onError)
+      .catch((error) => this.options.onError(error, 'send'))
       .finally(() => {
         this.queued -= size
       })
@@ -114,6 +117,7 @@ export class BroadcastTransport<E extends EditEnvelope = EditEnvelope> {
       opened.payload.document !== this.options.router.identity.document
     )
       return
+    this.options.onRecovery?.('receive')
     const { sender, generation, sequence } = opened.packet
     const previous = this.peers.get(sender)
     if (previous && sequence <= previous.sequence) return

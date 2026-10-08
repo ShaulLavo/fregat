@@ -36,6 +36,24 @@ presence.dispose()
 
 [Integration guide](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/collaboration/docs/integration.md)
 
+## Transport status
+
+Transport options accept an optional `onRecovery` callback. Match its scope to the second
+argument of `onError` when tracking outstanding failures:
+
+- `BroadcastTransport` reports `send` after a successful channel send and `receive` after
+  accepting an authenticated packet for the document. Recovery in one direction clears
+  failures in that direction.
+- `WebSocketSignaling` reports the broker URL after a subscription acknowledgement or a
+  published frame from that broker.
+- `WebRTCTransport` reports the remote peer ID when its current data channel opens and the
+  router accepts the link. An authenticated signaling packet reports `undefined` for the
+  transport-wide scope. Peer-scoped failures remain until that peer's link opens again.
+
+`WebRTCTransport.onPeerLeft(peer)` reports an authenticated departure. Applications can
+remove that departed peer's outstanding failures. Discovery-record expiry leaves
+outstanding failures intact until a matching recovery or authenticated departure.
+
 ## TURN verification
 
 The browser suite skips its TURN-only case until `COLLABORATION_TEST_TURN` contains an

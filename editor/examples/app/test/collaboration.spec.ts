@@ -131,7 +131,8 @@ async function failingBroadcastExample(page: Page) {
           if (message) failures.set(channel, message)
           else failures.delete(channel)
         }
-        for (const announce of heartbeat) announce()
+        for (const [channel, announce] of [...heartbeat].entries())
+          if (index === undefined || index === channel) announce()
       },
     })
   })
