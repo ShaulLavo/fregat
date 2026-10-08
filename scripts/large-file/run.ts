@@ -1,10 +1,11 @@
 import { strictEqual } from 'node:assert/strict'
+import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 import { copyFile, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium, type CDPSession, type Page } from 'playwright'
 import { startIsolatedServer } from '../agent/isolated-server'
 import { openFixtureWorkspace, releaseFixture } from '../agent/fixture-workspace'
-import { paintedTokenColors, selectors } from '../agent/selectors'
+import { paintedTokenColors, pressShortcut, selectors } from '../agent/selectors'
 import { createScriptError } from '../structured-errors'
 import { expectedEditedHash, fileHash, MARKER, writeFixture } from './fixture'
 import { hostLabel, renderingPath, type RenderingPath } from './host'
@@ -41,7 +42,8 @@ async function typeBurst(page: Page, keys: number) {
     .first()
     .click({ position: { x: 180, y: 12 } })
   await selectors.editorInput(page).first().focus()
-  await page.keyboard.press('Control+Home')
+  const platform = await page.evaluate(detectPlatform)
+  await page.keyboard.press(platform === 'mac' ? 'Meta+ArrowUp' : 'Control+Home')
   await page.evaluate((name) => {
     performance.clearMeasures(name)
     let index = 0
@@ -187,7 +189,7 @@ async function exercise(
     page.waitForResponse((item) => new URL(item.url()).pathname.endsWith('/fs/write'), {
       timeout: 120_000,
     }),
-    page.keyboard.press('Control+s'),
+    pressShortcut(page, 'Mod+s'),
   ])
   const saveMs = performance.now() - savedAt
   strictEqual(saved.status(), 200, 'Save must succeed for every supported open size')

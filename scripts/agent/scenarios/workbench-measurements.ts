@@ -171,6 +171,7 @@ export const workbenchMeasurements: Scenario = {
       await selectors.serverUpdateApply(page).waitFor()
       server.restartDelayMs = 1000
       const before = connections.length
+      const beforeDocument = await page.evaluate(() => performance.timeOrigin)
       let down = false
       let backAt: number | null = null
       const observeHealth = async () => {
@@ -191,8 +192,14 @@ export const workbenchMeasurements: Scenario = {
       const health = observeHealth()
       await selectors.serverUpdateApply(page).click()
       await health
+      // The update flow reloads the document after its transport reconnects.
+      await page.waitForFunction((previous) => performance.timeOrigin !== previous, beforeDocument)
+      await selectors.projectMenuTrigger(page).waitFor()
       await until(
-        () => connections.slice(before).some((item) => item.ready && item.output.includes(marker)),
+        () =>
+          connections.length > before &&
+          connections.at(-1)?.ready === true &&
+          connections.at(-1)?.output.includes(marker) === true,
         'A fresh connection must replay the marker',
       )
       await selectors.terminalLiveCanvas(page).first().waitFor()
@@ -224,6 +231,13 @@ export const workbenchMeasurements: Scenario = {
       await page.screenshot({ path: evidence.file('replayed-after-server-restart.png') })
       await step('replayed-after-server-restart')
     } catch (error) {
+      await evidence.json('measurement-error.json', {
+        error: String(error),
+        connections,
+        workspaceReloadMs: reloadMs,
+        editorTabSwitchMs: switchMs,
+        terminalReloadFirstFrameMs: terminalReloadMs,
+      })
       await evidence.json(
         'measurement-failure.json',
         await page.evaluate(
@@ -248,7 +262,9 @@ export const workbenchMeasurements: Scenario = {
       await step('measurement-failure')
       throw error
     } finally {
-      await page.goto('about:blank')
+      await page.goto('about:blank', { waitUntil: 'commit', timeout: 5000 }).catch(async () => {
+        await page.close()
+      })
       for (const terminal of terminals.values()) {
         const result = await killCaptureTerminal(page.context().request, terminal)
         ok(!result.error, 'Measurement-owned shell cleanup must succeed')

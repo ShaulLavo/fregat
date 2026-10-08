@@ -44,7 +44,7 @@ export function typingCost(events: readonly TraceEvent[], keys: number) {
   const sorted = samples.map((item) => item.mainThreadMs).sort((a, b) => a - b)
   return {
     method:
-      'Sum of renderer main-thread RunTask intervals from the keydown task through the second animation-frame callback task. Includes input processing, frame work and other main-thread work in that window; excludes idle time and worker time. This is an upper bound on causal keystroke work.',
+      'Sum of renderer main-thread RunTask intervals from the keydown task through the second animation-frame callback task. Includes input processing, frame work and other main-thread work in that window; excludes idle time, worker time and work scheduled after the window. This is an upper bound on causal main-thread work inside the sampled window.',
     count: keys,
     p50: sorted[Math.floor(keys * 0.5)],
     p95: sorted[Math.min(keys - 1, Math.ceil(keys * 0.95) - 1)],
