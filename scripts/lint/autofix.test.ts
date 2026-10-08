@@ -13,6 +13,7 @@ const { byteLength: byteLength } = bytes
 assert.equal(byteLength, 4)
 `
 
+// Four cold processes took 12.7s with 64 CPU burners sharing two cores.
 test('the commit autofix preserves typed-array conversion and keeps other safe fixes', async () => {
   const fixture = await mkdtemp(join(tmpdir(), 'platform-autofix-'))
   const file = join(fixture, 'bytes.ts')
@@ -44,7 +45,7 @@ test('the commit autofix preserves typed-array conversion and keeps other safe f
   } finally {
     await rm(fixture, { force: true, recursive: true })
   }
-})
+}, 15_000)
 
 async function execute(command: string[], environment: Record<string, string> = {}) {
   const process = Bun.spawn(command, {
