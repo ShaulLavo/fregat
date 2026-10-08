@@ -3,6 +3,48 @@ import { readFile, readdir, stat } from 'node:fs/promises'
 import { resolve, sep } from 'node:path'
 import { editors } from './protocol.mjs'
 
+export async function sourceIdentity(root) {
+  const files = []
+  for (const path of [
+    '../../packages/editor/src',
+    '../../packages/textbuffer/src',
+    '../../packages/tree-sitter/src',
+    '../../packages/tree-sitter-languages/src',
+    '../../../hotkeys/packages/hotkeys/src',
+  ]) {
+    const folder = resolve(root, path)
+    for (const file of (await readdir(folder, { recursive: true })).sort()) {
+      if (!(await stat(resolve(folder, file))).isFile()) continue
+      files.push([
+        `${path}/${file}`,
+        createHash('sha256')
+          .update(await readFile(resolve(folder, file)))
+          .digest('hex'),
+      ])
+    }
+  }
+  for (const file of [
+    'full-document.mjs',
+    'output-proof.mjs',
+    'page.js',
+    'page.html',
+    'fixture.mjs',
+    'singapore.js',
+    'monaco.js',
+    'codemirror.js',
+    'build.mjs',
+    'provenance.mjs',
+    '../../../bun.lock',
+  ])
+    files.push([
+      file,
+      createHash('sha256')
+        .update(await readFile(resolve(root, file)))
+        .digest('hex'),
+    ])
+  return createHash('sha256').update(JSON.stringify(files)).digest('hex')
+}
+
 export async function readServedBuilds(directory) {
   const builds = []
   for (const editor of editors) {

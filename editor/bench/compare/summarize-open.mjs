@@ -8,7 +8,10 @@ import { editors, percentile, verifyGeometry } from './protocol.mjs'
 export function verifyOpenProfiles(result) {
   if (!result.config.profileOpen || !result.config.openOnly)
     throw new RangeError('Expected an open-only diagnostic profile')
-  const expected = result.config.selected.length * result.config.repetitions * editors.length
+  const expected =
+    result.config.selected.length *
+    result.config.repetitions *
+    (result.config.editors ?? editors).length
   const identities = new Set(
     result.samples.map((row) => `${row.editor}/${row.mib}/${row.repetition}`),
   )
@@ -20,7 +23,7 @@ export function verifyOpenProfiles(result) {
 
 function verifyProfileRow(row, config) {
   if (
-    !editors.includes(row.editor) ||
+    !(config.editors ?? editors).includes(row.editor) ||
     !config.selected.includes(row.mib) ||
     !Number.isInteger(row.repetition) ||
     row.repetition < 0 ||
@@ -68,9 +71,20 @@ export function openProfileRows(result) {
     request?.timings?.find((timing) => timing.name === name)?.durationMs
   return result.samples.map((row) => {
     const parse = firstParse(row)
+    const fullAttempts = row.openProfile.requests.filter((request) => request.resultMode === 'full')
+    const totalFullPhase = (name) => {
+      const values = fullAttempts.map((request) => phase(request, name))
+      return values.length && values.every(Number.isFinite)
+        ? values.reduce((sum, value) => sum + value, 0)
+        : undefined
+    }
+    const fullParseMs = totalFullPhase('treeSitter.parse')
+    const fullQueryMs = totalFullPhase('treeSitter.query')
     const reset = row.openProfile.requests.find((request) => request.sourceCommand === 'reset')
     const query =
-      row.openProfile.requests.find((request) => request.resultMode === 'full') ??
+      row.openProfile.requests.findLast(
+        (request) => request.resultMode === 'full' && request.returnedResult,
+      ) ??
       row.openProfile.requests.find(
         (request) => request.type === 'queryRange' && request.statistics?.tokens > 0,
       )
@@ -117,6 +131,17 @@ export function openProfileRows(result) {
       queryTokenBytes: query?.statistics?.transferredTokenBytes,
       queryStart: query?.statistics?.rangeStart,
       queryEnd: query?.statistics?.rangeEnd,
+      fullAttempts: fullAttempts.length,
+      fullParseMs,
+      fullQueryMs,
+      fullWorkerWorkMs:
+        Number.isFinite(fullParseMs) && Number.isFinite(fullQueryMs)
+          ? fullParseMs + fullQueryMs
+          : undefined,
+      outputProof: row.outputProof,
+      processMemory: row.processMemory,
+      heapAfter: row.heapAfter,
+      largestMainTaskMs: row.openProfile.largestMainTaskMs,
       mainWorkMs: row.openProfile.mainWorkMs,
       mainRenderingMs: row.openProfile.mainRenderingMs,
       errors: row.errors,
@@ -127,7 +152,7 @@ export function openProfileRows(result) {
 export function openProfileSummary(result) {
   const rows = openProfileRows(result)
   const groups = result.config.selected.flatMap((mib) =>
-    editors.map((editor) => {
+    (result.config.editors ?? editors).map((editor) => {
       const successful = rows.filter(
         (row) => row.mib === mib && row.editor === editor && row.status === 'ok',
       )

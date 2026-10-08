@@ -1,6 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
+    "editor/bench/compare": {
+      "entry": ["page.js", "singapore.js", "monaco.js", "codemirror.js"],
+      "ignoreBinaries": ["cc"],
+      "ignoreDependencies": ["ACTOR", "FIXTURE"]
+    },
     "hotkeys/packages/hotkeys": {
       "entry": ["bench/lookup.ts"]
     },

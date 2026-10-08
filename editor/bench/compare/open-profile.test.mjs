@@ -26,6 +26,23 @@ test('open work unions nested spans, clips the clock and separates rendering fro
   assert.equal(profile.mainWorkMs, 7)
   assert.equal(profile.mainRenderingMs, 4)
   assert.equal(profile.marksMs['compare-open-mounted'], 2)
+  assert.equal(profile.mainTaskCount, 0)
+  assert.equal(profile.largestMainTaskMs, null)
+})
+
+test('largest main task includes complete overlapping tasks and excludes worker tasks', () => {
+  const profile = summarizeOpenProfile(
+    [
+      mark('start', 1000),
+      mark('settled', 5000),
+      task('ThreadControllerImpl::RunTask', 0, 2000),
+      task('RunTask', 2000, 4000),
+      task('RunTask', 0, 10000, 2),
+    ],
+    { messages: [], diagnostics: [] },
+  )
+  assert.equal(profile.mainTaskCount, 2)
+  assert.equal(profile.largestMainTaskMs, 4)
 })
 
 test('worker round trips match worker identity and preserve incomplete requests', () => {
@@ -189,10 +206,23 @@ test('provisional profiles require a measured bounded bootstrap query', async ()
     {
       resultMode: 'full',
       returnedResult: true,
-      statistics: { rangeStart: 0, rangeEnd: 200 * 1024 * 1024, tokens: 100 },
+      analysis: { kind: 'full' },
+      statistics: { rangeStart: 0, rangeEnd: 200 * 1024 * 1024, tokens: 100, layers: 1 },
       timings: [{ name: 'treeSitter.parseRoot', durationMs: 80 }],
     },
   ]
+  assert.throws(() => verifyOpenProfiles(result), /root tree must cover/)
+  row.outputProof = {
+    tokenCount: 100,
+    tokenSha256: 'a'.repeat(64),
+    stylesSha256: 'b'.repeat(64),
+    structuralSha256: 'c'.repeat(64),
+    coverage: [{ kind: 'root', start: 0, end: 200 * 1024 * 1024, ranges: [] }],
+    lastToken: [200 * 1024 * 1024 - 1, 200 * 1024 * 1024, 0],
+    missingLanguages: [],
+    queryCalls: 1,
+    matchLimitExceeded: false,
+  }
   assert.equal(verifyOpenProfiles(result), '3 open profiles retained; 1 completed')
   assert.equal(openProfileRows(result)[0].parseRootMs, 80)
   assert.equal(openProfileRows(result)[0].queryTokens, 100)
@@ -248,6 +278,30 @@ test('profile rows keep the request timeline separate from nested worker phases'
   assert.equal(row.structuralWalkMs, 6)
   assert.equal(row.structuralApplyMs, 2)
   assert.equal(row.queryTokenBytes, 1200)
+  result.samples[0].openProfile.requests.push(
+    {
+      resultMode: 'full',
+      returnedResult: true,
+      timings: [
+        { name: 'treeSitter.parse', durationMs: 50 },
+        { name: 'treeSitter.query', durationMs: 80 },
+      ],
+      statistics: { tokens: 100 },
+    },
+    {
+      resultMode: 'full',
+      returnedResult: true,
+      timings: [
+        { name: 'treeSitter.parse', durationMs: 60 },
+        { name: 'treeSitter.query', durationMs: 90 },
+      ],
+      statistics: { tokens: 200 },
+    },
+  )
+  const [retried] = openProfileRows(result)
+  assert.equal(retried.fullAttempts, 2)
+  assert.equal(retried.fullWorkerWorkMs, 280)
+  assert.equal(retried.queryTokens, 200)
 })
 
 test('diagnostic comparison retains failed groups and rejects changed measurement contracts', async () => {
@@ -274,4 +328,63 @@ test('diagnostic comparison retains failed groups and rejects changed measuremen
   const changed = structuredClone(after)
   changed.bundles.find((bundle) => bundle.id === 'monaco-typescript').files[0].sha256 = 'changed'
   assert.throws(() => compareOpenProfiles(before, changed), /competitor bundles/)
+})
+
+test('retention inspection fences every observed worker with distinct request IDs', async () => {
+  const originalWorker = globalThis.Worker
+  const previousProbe = globalThis.__compareOpenProbe
+  const diagnostics = globalThis.__EDITOR_PERFORMANCE_DIAGNOSTICS__
+  const ids = []
+  class WorkerControl extends EventTarget {
+    postMessage(request) {
+      assert.deepEqual(request.payload, { type: 'idleFence', includeRetention: true })
+      ids.push(request.id)
+      queueMicrotask(() => {
+        const event = new Event('message')
+        event.data = { id: request.id, ok: true, result: { retention: { documentCount: 1 } } }
+        this.dispatchEvent(event)
+      })
+    }
+  }
+  try {
+    globalThis.Worker = WorkerControl
+    installOpenProbe()
+    new Worker('first')
+    new Worker('second')
+    const retention = await globalThis.__compareOpenProbe.inspectRetention()
+    assert.deepEqual(retention, [
+      { worker: 1, documentCount: 1 },
+      { worker: 2, documentCount: 1 },
+    ])
+    assert.equal(new Set(ids).size, 2)
+    assert.ok(ids.every((id) => id < 0))
+  } finally {
+    globalThis.Worker = originalWorker
+    globalThis.__compareOpenProbe = previousProbe
+    globalThis.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = diagnostics
+  }
+})
+
+test('worker replies retain only the latest full payload with a monotonic counter', () => {
+  const originalWorker = globalThis.Worker
+  const previousProbe = globalThis.__compareOpenProbe
+  const diagnostics = globalThis.__EDITOR_PERFORMANCE_DIAGNOSTICS__
+  try {
+    globalThis.Worker = class extends EventTarget {}
+    installOpenProbe()
+    const worker = new Worker()
+    const replies = [1, 2, 3].map((id) => ({ tokensPacked: { starts: new Uint32Array([id]) } }))
+    for (const result of replies) {
+      const event = new Event('message')
+      event.data = { result }
+      worker.dispatchEvent(event)
+    }
+    assert.deepEqual(globalThis.__compareOpenProbe.outputs, [replies[2]])
+    assert.equal(globalThis.__compareOpenProbe.outputCount, 3)
+    assert.ok(globalThis.__compareOpenProbe.messages.every((message) => !message.tokensPacked))
+  } finally {
+    globalThis.Worker = originalWorker
+    globalThis.__compareOpenProbe = previousProbe
+    globalThis.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = diagnostics
+  }
 })

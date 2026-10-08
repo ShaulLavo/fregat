@@ -1,15 +1,17 @@
 import { createHash } from 'node:crypto'
-import { fixture, line } from './fixture.mjs'
+import { fixture } from './fixture.mjs'
 
 export const editors = ['singapore', 'monaco', 'codemirror']
 export const sizes = [1, 10, 50, 100, 200]
 
-export function fixtureIdentity(mib) {
-  const text = fixture(mib)
+export function fixtureIdentity(mib, corpus = 'repeated') {
+  const text = fixture(mib, corpus)
   return {
     mib,
-    bytes: text.length,
-    lines: Math.floor(text.length / line.length) + 1,
+    corpus,
+    bytes: Buffer.byteLength(text),
+    utf16Length: text.length,
+    lines: text.split('\n').length,
     sha256: createHash('sha256').update(text).digest('hex'),
   }
 }

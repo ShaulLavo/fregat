@@ -8,9 +8,12 @@ import { execFileSync } from 'node:child_process'
 import { parseArgs } from 'node:util'
 import { chromium } from 'playwright'
 import { root, output } from './build.mjs'
-import { readServedBuilds, verifyResume } from './provenance.mjs'
+import { readServedBuilds, verifyResume, sourceIdentity } from './provenance.mjs'
 import { verifyFullDocumentRow } from './full-document.mjs'
 import { installOpenProbe, summarizeOpenProfile } from './open-profile.mjs'
+import { outputProof, verifyOutputEquality } from './output-proof.mjs'
+import { corpora } from './fixture.mjs'
+import { monitorProcessMemory, processMemoryBytes } from './memory.mjs'
 import {
   fixtureIdentity,
   order,
@@ -36,14 +39,25 @@ const { values } = parseArgs({
     'profile-open': { type: 'boolean', default: false },
     'full-document': { type: 'boolean', default: false },
     'open-only': { type: 'boolean', default: false },
+    corpus: { type: 'string', default: 'repeated' },
+    editors: { type: 'string', default: 'singapore,monaco,codemirror' },
+    warm: { type: 'boolean', default: false },
+    lifecycle: { type: 'boolean', default: false },
   },
 })
+const selectedEditors = values.editors.split(',')
 const selected = values.sizes.split(',').map(Number)
 const repetitions = Number(values.repetitions)
 const keys = Number(values.keys)
 const frames = Number(values['scroll-frames'])
 const timeout = Number(values.timeout)
 if (
+  !corpora.includes(values.corpus) ||
+  (values.lifecycle && (!values['full-document'] || selectedEditors.join(',') !== 'singapore')) ||
+  selectedEditors.some((editor) => !['singapore', 'monaco', 'codemirror'].includes(editor)) ||
+  new Set(selectedEditors).size !== selectedEditors.length ||
+  ((values.corpus !== 'repeated' || values.warm) &&
+    (!values['full-document'] || selectedEditors.join(',') !== 'singapore')) ||
   (values['full-document'] && (!values['profile-open'] || !values['open-only'])) ||
   (values['open-only'] && !values['profile-open']) ||
   !['quiet', 'noisy', 'unspecified'].includes(values.condition) ||
@@ -58,6 +72,8 @@ await mkdir(values.output, { recursive: true })
 const mode = JSON.parse(await readFile(resolve(output, 'mode.json'), 'utf8'))
 if (mode.fullDocument !== values['full-document'])
   throw new RangeError('Rebuild with the requested full-document mode')
+if (mode.sourceSha256 !== (await sourceIdentity(root)))
+  throw new RangeError('Rebuild after changing benchmark or package sources')
 const builds = await readServedBuilds(output)
 const server = createServer(async (request, response) => {
   const path = resolve(output, `.${new URL(request.url, 'http://localhost').pathname}`)
@@ -133,6 +149,9 @@ let results = {
       (
         await Promise.all(
           [
+            'memory.mjs',
+            'retention.mjs',
+            'output-proof.mjs',
             'full-document.mjs',
             'native-full-parse.c',
             'build.mjs',
@@ -150,7 +169,7 @@ let results = {
             'summarize.mjs',
             'summarize-open.mjs',
             'verify-control.mjs',
-            'bun.lock',
+            '../../../bun.lock',
           ].map((file) => readFile(resolve(root, file))),
         )
       )
@@ -159,11 +178,22 @@ let results = {
     )
     .digest('hex'),
   git: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+  dirtySource: execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], {
+    cwd: root,
+    encoding: 'utf8',
+  }).trim(),
+  transformSha256: createHash('sha256')
+    .update(await readFile(resolve(root, 'full-document.mjs')))
+    .digest('hex'),
   config: {
+    lifecycle: values.lifecycle,
     condition: values.condition,
     profileOpen: values['profile-open'],
     fullDocument: values['full-document'],
     openOnly: values['open-only'],
+    corpus: values.corpus,
+    editors: selectedEditors,
+    startup: values.warm ? 'warm-runtime-fresh-document' : 'cold-context',
     selected,
     repetitions,
     keys,
@@ -173,8 +203,9 @@ let results = {
     viewport: { width: 1280, height: 720 },
     deviceScaleFactor: 1,
   },
-  fixtures: selected.map(fixtureIdentity),
+  fixtures: selected.map((mib) => fixtureIdentity(mib, values.corpus)),
   builds,
+  buildMode: mode,
   bundles: JSON.parse(await readFile(resolve(output, 'bundles.json'), 'utf8')),
   samples: [],
 }
@@ -182,7 +213,7 @@ let results = {
 async function trace(cdp, operation, profile = false) {
   await cdp.send('Tracing.start', {
     categories: profile
-      ? 'devtools.timeline,blink.user_timing,disabled-by-default-v8.cpu_profiler'
+      ? 'toplevel,devtools.timeline,blink.user_timing,disabled-by-default-v8.cpu_profiler'
       : 'devtools.timeline,blink.user_timing',
     transferMode: 'ReturnAsStream',
   })
@@ -266,6 +297,28 @@ async function heap(cdp) {
   }
 }
 
+async function processMemory() {
+  const connection = await browser.newBrowserCDPSession()
+  try {
+    const { processInfo } = await connection.send('SystemInfo.getProcessInfo')
+    return await Promise.all(
+      processInfo.map(async (process) => {
+        const status =
+          platform() === 'linux'
+            ? await readFile(`/proc/${process.id}/status`, 'utf8').catch(() => '')
+            : ''
+        return {
+          ...process,
+          rssBytes: processMemoryBytes(status, 'VmRSS'),
+          highWaterBytes: processMemoryBytes(status, 'VmHWM'),
+        }
+      }),
+    )
+  } finally {
+    await connection.detach()
+  }
+}
+
 async function profileOpen(page, cdp, row) {
   const captured = await trace(
     cdp,
@@ -287,7 +340,9 @@ async function profileOpen(page, cdp, row) {
     gzipSync(JSON.stringify({ traceEvents: captured.events })),
   )
   const probe = await page.evaluate(() => ({
-    ...globalThis.__compareOpenProbe,
+    diagnostics: globalThis.__compareOpenProbe.diagnostics,
+    messages: globalThis.__compareOpenProbe.messages,
+    warmup: globalThis.__compareOpenProbe.warmup,
     startedAtMs: performance.getEntriesByName('compare-open-start').at(-1).startTime,
   }))
   row.openProfile = { trace: file, ...summarizeOpenProfile(captured.events, probe) }
@@ -296,7 +351,15 @@ async function profileOpen(page, cdp, row) {
 }
 
 async function sample(editor, mib, repetition) {
-  const row = { editor, mib, repetition, status: 'failed', errors: [] }
+  const row = {
+    editor,
+    mib,
+    repetition,
+    corpus: values.corpus,
+    startup: results.config.startup,
+    status: 'failed',
+    errors: [],
+  }
   const context = await browser.newContext({
     viewport: results.config.viewport,
     deviceScaleFactor: 1,
@@ -311,23 +374,46 @@ async function sample(editor, mib, repetition) {
     if (row.console.length < 20)
       row.console.push({ type: message.type(), text: message.text().slice(0, 500) })
   })
+  let stopMemory
   try {
     if (values['profile-open']) await page.addInitScript(installOpenProbe)
     await page.goto(
-      `http://127.0.0.1:${port}/${editor}-typescript/index.html?delay=${results.config.delayMs}&fullDocument=${results.config.fullDocument}`,
+      `http://127.0.0.1:${port}/${editor}-typescript/index.html?delay=${results.config.delayMs}&fullDocument=${results.config.fullDocument}&corpus=${values.corpus}`,
     )
     await page.waitForFunction(() => !!window.bench)
+    if (values.warm) await page.evaluate(() => window.bench.warm())
     row.heapBefore = await heap(cdp)
     row.heapBeforeBytes = row.heapBefore.usedSize
+    const processIds = (await processMemory()).map((process) => process.id)
+    stopMemory = monitorProcessMemory(processIds)
     await page.evaluate((mib) => window.bench.prepare(mib), mib)
     row.open = values['profile-open']
       ? await profileOpen(page, cdp, row)
       : await page.evaluate(() => window.bench.open())
-    if (values['full-document'] && editor === 'singapore') verifyFullDocumentRow(row)
+    row.openMemory = await stopMemory()
+    stopMemory = undefined
+    if (values['full-document'] && editor === 'singapore') {
+      row.outputProof = await page.evaluate(outputProof)
+      verifyFullDocumentRow(row)
+    }
     verifyGeometry(row.open)
     if (row.open.length !== mib * 1024 * 1024) throw new RangeError('Open changed document length')
     if (values['open-only']) {
+      row.heapAfter = await heap(cdp)
+      row.heapAfterBytes = row.heapAfter.usedSize
+      row.heapDeltaBytes = row.heapAfterBytes - row.heapBeforeBytes
+      row.processMemory = await processMemory()
+      if (editor === 'singapore' && values['full-document'])
+        row.retention = await page.evaluate(() => globalThis.__compareOpenProbe.inspectRetention())
       await page.screenshot({ path: resolve(values.output, `${editor}-${mib}-${repetition}.png`) })
+      if (values.lifecycle) {
+        stopMemory = monitorProcessMemory((await processMemory()).map((process) => process.id))
+        row.lifecycle = await page.evaluate((mib) => window.bench.lifecycle(mib), mib)
+        row.lifecycleMemory = await stopMemory()
+        stopMemory = undefined
+        row.lifecycleHeapAfter = await heap(cdp)
+        row.lifecycleProcessMemory = await processMemory()
+      }
       row.status = row.errors.length ? 'page-error' : 'ok'
       return row
     }
@@ -405,6 +491,7 @@ async function sample(editor, mib, repetition) {
     row.errors.push(error.message)
     row.failureFacts = await page.evaluate(() => window.bench?.facts()).catch(() => null)
   } finally {
+    if (stopMemory) row.failedMemory = await stopMemory()
     await context.close().catch((error) => {
       row.errors.push(`Context cleanup: ${error.message}`)
       row.status = 'failed'
@@ -422,7 +509,7 @@ try {
   }
   for (const mib of selected) {
     for (let repetition = 0; repetition < repetitions; repetition++) {
-      for (const editor of order(repetition)) {
+      for (const editor of order(repetition).filter((editor) => selectedEditors.includes(editor))) {
         if (
           results.samples.some(
             (row) => row.editor === editor && row.mib === mib && row.repetition === repetition,
@@ -483,3 +570,6 @@ try {
   await new Promise((resolve) => server.close(resolve))
 }
 console.log(`Experiment saved to ${resolve(values.output, 'experiment.json')}`)
+if (values['full-document'] && selectedEditors.includes('singapore'))
+  verifyOutputEquality(results.samples)
+if (results.samples.some((row) => row.status !== 'ok')) process.exitCode = 1

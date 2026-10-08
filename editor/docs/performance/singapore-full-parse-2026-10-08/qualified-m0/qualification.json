@@ -1,0 +1,4104 @@
+{
+  "status": "TypeScript baseline qualified; Markdown control remains unqualified; no accepted optimization",
+  "measuredSource": {
+    "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+    "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+    "config": {
+      "lifecycle": false,
+      "condition": "quiet",
+      "profileOpen": true,
+      "fullDocument": true,
+      "openOnly": true,
+      "corpus": "repeated",
+      "editors": ["singapore"],
+      "startup": "cold-context",
+      "selected": [10],
+      "repetitions": 5,
+      "keys": 40,
+      "frames": 120,
+      "timeout": 60000,
+      "delayMs": 0,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "deviceScaleFactor": 1
+    },
+    "machine": {
+      "cpu": "Intel(R) Core(TM) i7-14700K",
+      "logicalCpus": 28,
+      "memoryBytes": 33368662016,
+      "platform": "linux",
+      "kernel": "7.2.8-arch1-2",
+      "arch": "x64"
+    },
+    "browser": "153.0.8010.12",
+    "rootLockSha256": "12206b62c199101fb96bc77dc43ead5dc792ef7b81fecd392cc07538971922a0",
+    "benchmarkSha256": "c242f7d09241bc4e2321822cc068e40897e703a962773e0a8d9a414862757bdf",
+    "transformSha256": "282d7ddf5d9e505f480043142847824996d0b2d7e1a0d7a6d5eab516d439ba3f",
+    "builds": [
+      {
+        "id": "singapore-core",
+        "files": [
+          {
+            "file": "assets/_compare-Cc6cWIQ_.css",
+            "sha256": "12022a722208df2c1f534bffbd9bb177edc235f5183340342609244d3770e7b5"
+          },
+          {
+            "file": "entry.js",
+            "sha256": "0e3753a57a50e5e91e652073b07ae9be8ed36f35d6e1f7ee5acfd79bfc7c08d3"
+          },
+          {
+            "file": "index.html",
+            "sha256": "37761030feb755cc97c9198dcf694d0cca180b6fab20b2aa9e22585d41909c30"
+          }
+        ]
+      },
+      {
+        "id": "singapore-typescript",
+        "files": [
+          {
+            "file": "assets/__vite-browser-external-hyI0Gqyk.js",
+            "sha256": "1dab5fa9316d1f6b272b46c0f0d2d3ffc0fff74f7ff246fa02f3632ea4f778d9"
+          },
+          {
+            "file": "assets/_compare-Cc6cWIQ_.css",
+            "sha256": "12022a722208df2c1f534bffbd9bb177edc235f5183340342609244d3770e7b5"
+          },
+          {
+            "file": "assets/astro-folds-B4VAtzaA.js",
+            "sha256": "bb96040f5195a10ab67ed71f1c670689f234da0123bbe7a876ac8ba15246cf2d"
+          },
+          {
+            "file": "assets/astro-highlights-BcNaTdP2.js",
+            "sha256": "e2e85aad78c0f0937dd345881f1a01c0221656af4db382b5b831ad415d887150"
+          },
+          {
+            "file": "assets/astro-injections-C-WpCkWK.js",
+            "sha256": "e2239f13ecd74e4e78cc8fac316f8fd3133b3963048650388ac05bf72ff68b31"
+          },
+          {
+            "file": "assets/css-folds-ClN0bM0N.js",
+            "sha256": "ea37cda171d25e0055433c36efe2f15c3b901a261fe5c42df6c232c88d9a11bb"
+          },
+          {
+            "file": "assets/folds-CVp2ICys.js",
+            "sha256": "a67fe78b3479a49684374a40fd038abde6916b4e02033b3ae253bc83b6a0bd2c"
+          },
+          {
+            "file": "assets/highlights-1lDIPJr3.js",
+            "sha256": "2f27df59f1b9d00e4af1bbe1c796c2a76c313697bda74cd3fb9f80d69e9edbee"
+          },
+          {
+            "file": "assets/highlights-98yePrIp.js",
+            "sha256": "3d1e4ca644164371921804a7b770fbdfaa720d80a6ebcc1067f1aced1474b06c"
+          },
+          {
+            "file": "assets/highlights-BADX33Bq.js",
+            "sha256": "fa5002e6e28a5f548debd94a56d073cb193004af0ff7979e264cfbb8b9b1682a"
+          },
+          {
+            "file": "assets/highlights-BCAPA-wT.js",
+            "sha256": "4bb4d27cc5d8a05a35ed84bffe4899518062af8d2b243d3646d432d381e8c510"
+          },
+          {
+            "file": "assets/highlights-BHyYC7gf.js",
+            "sha256": "41dec7f0f9428cceb2d9e20a3c9c079226e142b1b544b1b67477d8da1e0c2009"
+          },
+          {
+            "file": "assets/highlights-BZjrEwij.js",
+            "sha256": "12a15102073b50c45b8b2b027c02092bc4023271bf19ad9d0b6f7134fd29c738"
+          },
+          {
+            "file": "assets/highlights-Bud46zNe.js",
+            "sha256": "ed2d3d43f08d4a9d301fd83da70e0815bc915c874dc7b338b51004ffbf7c44d1"
+          },
+          {
+            "file": "assets/highlights-C2jqLqMv.js",
+            "sha256": "25693fe4d808c9e6ccaf74513432d2cd8e5b16017ab3c823862489eef5913c14"
+          },
+          {
+            "file": "assets/highlights-Ch6OfObk.js",
+            "sha256": "c44079e97a8ffbbf892c075d4898321db19a21460a68a56bf90c8a362ff683e8"
+          },
+          {
+            "file": "assets/highlights-CzveUe24.js",
+            "sha256": "4dd9451c6c0b9852f74de2ec2bfe27b90800c699f5f0d433ecc93a3b3f888dd8"
+          },
+          {
+            "file": "assets/highlights-DYfIcZkC.js",
+            "sha256": "04dcdf4620505efed21689439d938ae65194d67cd407047059e107de7d845184"
+          },
+          {
+            "file": "assets/highlights-DjgeXuL_.js",
+            "sha256": "5dbaeb5efbf3370389e7807f1ba2d09362d11344d2ca5588e0b713f4db3756c5"
+          },
+          {
+            "file": "assets/highlights-jZRiKgrN.js",
+            "sha256": "7a0f501bda3959004d9ce53ea03c864c1ebdbf50e3edecd987dda16c31268a6a"
+          },
+          {
+            "file": "assets/highlights-jsx-DXAD7Dm4.js",
+            "sha256": "2d8394be9bfaf57e944e2e1ce6ead5c6c1ba29d0c7dd91408cad92ef1e3fbeca"
+          },
+          {
+            "file": "assets/highlights-kxVENyri.js",
+            "sha256": "f1ba9077d7a2c87d4d9387984fe890c527b939b805a7a98391c3af288b37446b"
+          },
+          {
+            "file": "assets/highlights-kzIria7C.js",
+            "sha256": "f6703f3ff5eb0a846b44f746dcc23d14ac414497e075dabc265d6f42496a8d5c"
+          },
+          {
+            "file": "assets/highlights-nFwP4WUT.js",
+            "sha256": "e1f4147cb6c1476fed5f28f3f38b174cb5f584c086c4e4c8e44e928eba58d31d"
+          },
+          {
+            "file": "assets/highlights-srn7ewoy.js",
+            "sha256": "81e88be4bb74cbe138a5a6c6a44481a2442cadd9a8bee79ca0b8b4f156f25088"
+          },
+          {
+            "file": "assets/highlights-tgdwzbM3.js",
+            "sha256": "d6b409391d720cbb04cc5abedeb6c0745314a8f6c8e56eb0332702def448460e"
+          },
+          {
+            "file": "assets/html-folds-BV0Om1nn.js",
+            "sha256": "c5fee86ad0c7bd8ea66d474c39c108699d79c6c97e10ef53c04e6e3424cf4920"
+          },
+          {
+            "file": "assets/injections-1hRXiEHT.js",
+            "sha256": "6f1ffbf5ec8f36e998554677224c5729fcc54e24a8e73ab242d451690c51a89e"
+          },
+          {
+            "file": "assets/injections-CP9YUjRI.js",
+            "sha256": "d95b91b6b6875959d2e221aefd0004882ae275238c90c1cb32e3a91e7b5509a2"
+          },
+          {
+            "file": "assets/injections-IWSGYMcD.js",
+            "sha256": "43f1dc8503a4ce7675cb5601fcc593d41b25381f997eb94850e9c23fbf2aa99c"
+          },
+          {
+            "file": "assets/javascript-folds-B7oa76u2.js",
+            "sha256": "a294218964502478f8ae9ada2955fceb5380f82b079cedb78d388958a92c72f4"
+          },
+          {
+            "file": "assets/javascript-highlights-70ziJmbJ.js",
+            "sha256": "5c43ae82fbe03deedc5ba34391d1b28b80ee82f20a8b72b34a9144357dd232ba"
+          },
+          {
+            "file": "assets/javascript-injections-lY2DqCBO.js",
+            "sha256": "d1f170ea56e1ee62ab3ac616156c35f15df7c806807a751a44296a9fcb2fed3e"
+          },
+          {
+            "file": "assets/json-folds-CspXhjwO.js",
+            "sha256": "4d2d1483b0b1b49a3a01ffae65a286effb150218cb8cd86120b1c65064be9d2d"
+          },
+          {
+            "file": "assets/jsx-folds-9_i_ZbC4.js",
+            "sha256": "b95451fd8ff79245b8324ee6c18a90046c18bf9d941466355eb7fedfb9e89cd8"
+          },
+          {
+            "file": "assets/mdx-highlights-qS0Z90Fb.js",
+            "sha256": "a13ec2286778e5130dd214901a1a175d1f3c90d53e4f36437da9648f15ff9c04"
+          },
+          {
+            "file": "assets/mdx-injections-BleRUh6l.js",
+            "sha256": "169dfb536dccc19cd281c110a5162a59359ab45ce7651a9a6256b61657a64396"
+          },
+          {
+            "file": "assets/sql-highlights-D5YaqcrW.js",
+            "sha256": "691ca927382a9b41e1d2b9b1c2f221041fc7917c0e51b099f6df83cdfed485ba"
+          },
+          {
+            "file": "assets/svelte-injections-DKBGuUis.js",
+            "sha256": "816ec374e5d089dabb7b71e68e55d06ffaa83145a91fd1e697873a4fbb53571a"
+          },
+          {
+            "file": "assets/tree-sitter-astro-BB8dcP4P.js",
+            "sha256": "d3c978e016c763a51ae9576b54a3623d79a7866d31e3e63eb74bc2b847ba3289"
+          },
+          {
+            "file": "assets/tree-sitter-astro-CA-be8gX.wasm",
+            "sha256": "602004854e05205f4a0f4890283c4693e0533f1a497e42053a38572610aa3163"
+          },
+          {
+            "file": "assets/tree-sitter-bash-DCDqG4Zt.wasm",
+            "sha256": "8292919c88a0f7d3fb31d0cd0253ca5a9531bc1ede82b0537f2c63dd8abe6a7a"
+          },
+          {
+            "file": "assets/tree-sitter-bash-DQdfDHlL.js",
+            "sha256": "0af48588b9def2b5a47b13bf0c6d45e5a744036cacb3f14336404b5afd778483"
+          },
+          {
+            "file": "assets/tree-sitter-c-BPxA867Y.js",
+            "sha256": "5dd85edd5d93a15f9608e4eff76a12920dc3f6521ed0344cb8f06b201f390a0b"
+          },
+          {
+            "file": "assets/tree-sitter-c-BxIYOGrK.wasm",
+            "sha256": "c852c2a85ebf2beb636aa3b0ef7f7e70458684d74f6741b20dcb296885bed9f9"
+          },
+          {
+            "file": "assets/tree-sitter-c_sharp-BCAI4jhH.wasm",
+            "sha256": "6f69e1cae44e1c32c1eccc170dc5a9778fb94ff716f71113fe1f8c4299aa2f40"
+          },
+          {
+            "file": "assets/tree-sitter-c_sharp-BFIyyJiu.js",
+            "sha256": "575cf4f09077af4b9d57b87aa50c053533f268821b13b8f8b8572f698be27837"
+          },
+          {
+            "file": "assets/tree-sitter-cpp-DId2GiRO.wasm",
+            "sha256": "174eb0deb75b2ec7881bcacda9f995648d8e683956e5c2267e69ab6dc503fcbf"
+          },
+          {
+            "file": "assets/tree-sitter-cpp-DV62w25F.js",
+            "sha256": "687605533eeea3d7592810d59e3e026c063c12899e42e4d4912f29bae2f1ffea"
+          },
+          {
+            "file": "assets/tree-sitter-css-D8S9tSNX.js",
+            "sha256": "ac861193a533a7a6a853646f3dd7662cd1480f140f8aedead9ffc1ecdf027224"
+          },
+          {
+            "file": "assets/tree-sitter-css-UR1ll_wC.wasm",
+            "sha256": "8a23977fe271357cce6f254ef88c9bebf3854602d8046605aef6a45c02135c59"
+          },
+          {
+            "file": "assets/tree-sitter-go-B-RdJNI9.js",
+            "sha256": "ded147bf623be63b8d3e362bef2caa617e5b049f3ac99cf414ee44756c923943"
+          },
+          {
+            "file": "assets/tree-sitter-go-CbfkDgzm.wasm",
+            "sha256": "9504573f352b20be7f2f1911754d710622aedc15afff16d5ed8fb5645681aee7"
+          },
+          {
+            "file": "assets/tree-sitter-html-4qiYmJng.wasm",
+            "sha256": "c48fcd82c7ea8bf943180088ba7f28c48b2bb5287874179168bf9d31e394cf85"
+          },
+          {
+            "file": "assets/tree-sitter-html-D1suPgGc.js",
+            "sha256": "b0b25ba3441caebeed8ad3f6b55b73f07c3bbd513a372d0bb7443433dd72dbd5"
+          },
+          {
+            "file": "assets/tree-sitter-java-CNWQbYjk.js",
+            "sha256": "f8fa9e40d7da9539dccd54756ca488467397403c2afc8482048ba5c1bf684a2d"
+          },
+          {
+            "file": "assets/tree-sitter-java-DY4xdUi9.wasm",
+            "sha256": "4fdeac4ca6ca089f06c6f7e562abcac1733cd465728cc7031ebb73c2019122c4"
+          },
+          {
+            "file": "assets/tree-sitter-javascript-BDsndACb.js",
+            "sha256": "33a102f855f0ef3766f9e0a5f4c89a3aa3fc6668e235c257e47cf02f725f5459"
+          },
+          {
+            "file": "assets/tree-sitter-javascript-BIQS8cIx.wasm",
+            "sha256": "5fb488d0cabb4775a594bab85682de5ad6ce83c0d6ac997a9f82dd084d571240"
+          },
+          {
+            "file": "assets/tree-sitter-jsdoc-B1GCqhOP.wasm",
+            "sha256": "5530e630fd42424b1c026ec4b2b260ff1b73b78b7040239ac33d4be22a9b2271"
+          },
+          {
+            "file": "assets/tree-sitter-jsdoc-dyI6iPUH.js",
+            "sha256": "21c6e9977f3bea5cbd3f24d87b11051ac76f5f838c0165105874e616c35f80e7"
+          },
+          {
+            "file": "assets/tree-sitter-json-Ch3QXS4F.js",
+            "sha256": "5e9b27966b9c71863132da56f6c138c64a56170ecfbeb7874506810e5b47b568"
+          },
+          {
+            "file": "assets/tree-sitter-json-CtrBzfa5.wasm",
+            "sha256": "d2119fb98d5912719b13f9458574f8608d2d29dfbe45f6be1f860ea1fe2a2405"
+          },
+          {
+            "file": "assets/tree-sitter-lua-BgmWez5o.wasm",
+            "sha256": "6d95607fc7d78964cfdf065ccb1ba76be5ed217c5ec0d0a3cace13c59fa1ae43"
+          },
+          {
+            "file": "assets/tree-sitter-lua-DsJ9x9IS.js",
+            "sha256": "b1bb2b2d49ff11f78a96622609998a0893776468acea19e46727eaa389da13f0"
+          },
+          {
+            "file": "assets/tree-sitter-markdown-0oeW31on.js",
+            "sha256": "41f0823c4a24b64eb05bf97fb1bc224d08c7b735cea714781a7166d3398a8246"
+          },
+          {
+            "file": "assets/tree-sitter-markdown-DrJHx2LB.wasm",
+            "sha256": "4d71e4c53f38c368b3c80fad9a6ff5d000873b2e63d8666ac9dac8ff736b6367"
+          },
+          {
+            "file": "assets/tree-sitter-md-Cipfsb5X.wasm",
+            "sha256": "f0a19a99ebb9cd0f50d3b4797e6fb28e600ee8a73fff7028a429c68aab222ac9"
+          },
+          {
+            "file": "assets/tree-sitter-mdx-CAsey8IL.js",
+            "sha256": "0d0cfdcc4fac9b3fa85fb5a6916e5399e034c43a66946bcb214f6ada6b88e020"
+          },
+          {
+            "file": "assets/tree-sitter-mdx-DH9KrJyd.wasm",
+            "sha256": "71c92f82a0805e336b60b08a62d1cc48be287cb699cc943acad8640829624245"
+          },
+          {
+            "file": "assets/tree-sitter-php-DJVy23ky.js",
+            "sha256": "dc8e00a7c7388115de2b798df48d6108417f80accb0ebf4552165dda19fde27d"
+          },
+          {
+            "file": "assets/tree-sitter-php-mL1QzIxs.wasm",
+            "sha256": "d4df6a6ff08c87c3ec4f9cbb785fe09998a0cb570e03f57d7b19b3acfb146aa7"
+          },
+          {
+            "file": "assets/tree-sitter-python-BlcJAWGl.wasm",
+            "sha256": "16108b50df4ee9a30168794252ab55e7c93bfc5765d7fa0aa3e335752c515f47"
+          },
+          {
+            "file": "assets/tree-sitter-python-VikXyn2C.js",
+            "sha256": "468f7fb939bd7e55964db8ef61df69e34b0a4c6acfe1614739585d0d7dcc1932"
+          },
+          {
+            "file": "assets/tree-sitter-regex-Cq6yboI8.js",
+            "sha256": "bd83513c45c99f29e872222e85e5df7b7d4c577d14877275e274386b06f31b5a"
+          },
+          {
+            "file": "assets/tree-sitter-regex-lJTgzp2M.wasm",
+            "sha256": "e63c28e3a023614e14f2086b0d818e190239ebe5b2fcce7e64a9940091d83a79"
+          },
+          {
+            "file": "assets/tree-sitter-rust-B7GBmQNo.js",
+            "sha256": "09d5c2cf4150a34253bca536f75038e631ac8d5228ca04aa2ace8179266d527b"
+          },
+          {
+            "file": "assets/tree-sitter-rust-mj92ghJo.wasm",
+            "sha256": "f65f354215611fd94ad34134b3427eb3d58cbb745df7b6509ba722184db73d57"
+          },
+          {
+            "file": "assets/tree-sitter-sql-Cqk5ho2r.wasm",
+            "sha256": "13df5dd065a3870728b32f37089b3bf6f54ec0868c3840d718d60ffb084a6365"
+          },
+          {
+            "file": "assets/tree-sitter-sql-DUU4H8zH.js",
+            "sha256": "b53dad85566c8445e6f3574cc4906281c485c1cb5ade19a1debef64dae3657ac"
+          },
+          {
+            "file": "assets/tree-sitter-svelte-BVWc8PTT.wasm",
+            "sha256": "0ed8d4aca53f9f1bafc1844575dcb259a598cca099105b772f6c0c6bcbd299b4"
+          },
+          {
+            "file": "assets/tree-sitter-svelte-CV9UHcNE.js",
+            "sha256": "1c109c1e41fdb04b0723a197079d8006269ff53af9f2ea329168a3a1cb10e144"
+          },
+          {
+            "file": "assets/tree-sitter-toml-DU6cTcYm.js",
+            "sha256": "143721deb71cb628a40c5db110f9e11b4075b1857f401b68dbd106aef2d82c3a"
+          },
+          {
+            "file": "assets/tree-sitter-toml-DwHrQ9uN.wasm",
+            "sha256": "1ac6a83826c35a68857f8325e00c78f6bcbef4eb6db3931a6cf3041f76e5e09f"
+          },
+          {
+            "file": "assets/tree-sitter-tsx-DFihddBo.wasm",
+            "sha256": "79e5da75ea62855a0cd67177685f0164eac87d5f630b3cbe1e0a099751ad30f8"
+          },
+          {
+            "file": "assets/tree-sitter-tsx-fNET8Y-4.js",
+            "sha256": "6030c18249b082fcd80ee49db04b2a906b93c3203d8d12fd63269eeb396304c9"
+          },
+          {
+            "file": "assets/tree-sitter-typescript-BQpamM5l.wasm",
+            "sha256": "778025db5a8be0e70f8ccc3671e486dfeddd048c25d9e8a70c26de2e1bf6f97d"
+          },
+          {
+            "file": "assets/tree-sitter-typescript-kGURkynB.js",
+            "sha256": "a0899e8a7e0734feaf1609d7e993d1ec5e5884a13f38506154c46f66b8834350"
+          },
+          {
+            "file": "assets/tree-sitter-yaml-BfGBXPyc.wasm",
+            "sha256": "e752dc21c3591df9b45692fe417d101f45d1828c28c44d79005f4066dc7e4e91"
+          },
+          {
+            "file": "assets/tree-sitter-yaml-UA09FpXQ.js",
+            "sha256": "0e656982274310385ea398acfdb75f6e9058bae70c6f7d9f4aac7fc569af479c"
+          },
+          {
+            "file": "assets/treeSitter.worker-DG6b_sHT.js",
+            "sha256": "afea25f85ea72b2efbb40c41de01328de2b961fa9554623b2470d0853ac8214e"
+          },
+          {
+            "file": "assets/typescript-folds-CDo24_RU.js",
+            "sha256": "5e4fdb833df03f14959c9ceeb8850055cd224b36bcc5d7778ee9ab7843e3fde2"
+          },
+          {
+            "file": "assets/typescript-highlights-B1M37L6P.js",
+            "sha256": "8b59b3a276138158b2009e71dda3878db4e449128aa6a5f505deac7ff9900f0e"
+          },
+          {
+            "file": "assets/web-tree-sitter-BgoxpvfJ.wasm",
+            "sha256": "65aa79c497fe2172b9d635af91f7004129ba2728eeb41eb226c17de208ed5eed"
+          },
+          {
+            "file": "assets/web-tree-sitter-CRN4w07M.js",
+            "sha256": "d33afc948f38eaee332ffffff578b1c30bd9898f834b7791d554c40dcb7b0330"
+          },
+          {
+            "file": "entry.js",
+            "sha256": "8f270278fd19971050d23e90a13c6c76d31c04582b159a3e6446ad49be6a3da2"
+          },
+          {
+            "file": "index.html",
+            "sha256": "37761030feb755cc97c9198dcf694d0cca180b6fab20b2aa9e22585d41909c30"
+          }
+        ]
+      },
+      {
+        "id": "monaco-core",
+        "files": [
+          {
+            "file": "assets/_compare-DjpsE8to.css",
+            "sha256": "797aa85d5570a0ebbb047093f58e9adc13945078495425b27133073e5b15a9da"
+          },
+          {
+            "file": "assets/editor.worker-Yd1NR0QT.js",
+            "sha256": "3fe48a91b2bd735e0ff735995c15f86f2bc14ba4318ae1975c9afe64dcfef5e3"
+          },
+          {
+            "file": "assets/editorWebWorkerMain-J2ryhYi2.js",
+            "sha256": "df527c1b09369e5b7df5fd63e4d9f0856030597e7e4f71a2ffbcdc586c0acb77"
+          },
+          {
+            "file": "entry.js",
+            "sha256": "18bd288f0694499f46bb1df8a24c265aec2cadcd09b1494bc845b4b4a2ee2ba8"
+          },
+          {
+            "file": "index.html",
+            "sha256": "faab9a1cb4360d3608d22cf018214de73a725cf97c52db9909bfedaa4a321fb2"
+          }
+        ]
+      },
+      {
+        "id": "monaco-typescript",
+        "files": [
+          {
+            "file": "assets/_compare-DjpsE8to.css",
+            "sha256": "797aa85d5570a0ebbb047093f58e9adc13945078495425b27133073e5b15a9da"
+          },
+          {
+            "file": "assets/editor.worker-Yd1NR0QT.js",
+            "sha256": "3fe48a91b2bd735e0ff735995c15f86f2bc14ba4318ae1975c9afe64dcfef5e3"
+          },
+          {
+            "file": "assets/editorWebWorkerMain-J2ryhYi2.js",
+            "sha256": "df527c1b09369e5b7df5fd63e4d9f0856030597e7e4f71a2ffbcdc586c0acb77"
+          },
+          {
+            "file": "entry.js",
+            "sha256": "709fca7dc13723381dcff23c6174f3dadc2d18ecbc34af989c11bb3bd6b0cf68"
+          },
+          {
+            "file": "index.html",
+            "sha256": "faab9a1cb4360d3608d22cf018214de73a725cf97c52db9909bfedaa4a321fb2"
+          }
+        ]
+      },
+      {
+        "id": "codemirror-core",
+        "files": [
+          {
+            "file": "entry.js",
+            "sha256": "6bda22e9019b48949b138a6ccc52fe559d1f28871a46d842671d51d1f8c3521e"
+          },
+          {
+            "file": "index.html",
+            "sha256": "e3c1d1b89e284aa3d9eddfe2fad3735c1eb007fa4b52ed55c5567155b415feda"
+          }
+        ]
+      },
+      {
+        "id": "codemirror-typescript",
+        "files": [
+          {
+            "file": "entry.js",
+            "sha256": "dadf5823deb4819ba5104e89ee65a182057e250407004e43c54d02ab7442e832"
+          },
+          {
+            "file": "index.html",
+            "sha256": "e3c1d1b89e284aa3d9eddfe2fad3735c1eb007fa4b52ed55c5567155b415feda"
+          }
+        ]
+      }
+    ],
+    "bundles": [
+      {
+        "id": "singapore-core",
+        "files": [
+          {
+            "file": "assets/_compare-Cc6cWIQ_.css",
+            "kind": "css",
+            "bytes": 11353,
+            "gzip": 2106,
+            "brotli": 1812,
+            "sha256": "12022a722208df2c1f534bffbd9bb177edc235f5183340342609244d3770e7b5"
+          },
+          {
+            "file": "entry.js",
+            "kind": "js",
+            "bytes": 916936,
+            "gzip": 242049,
+            "brotli": 198730,
+            "sha256": "9b38e7185478f47f1ef179db5dc1cf80300d00dca5288a1a4736a84dcef3535e"
+          }
+        ],
+        "totals": {
+          "bytes": 928289,
+          "gzip": 244155,
+          "brotli": 200542
+        }
+      },
+      {
+        "id": "singapore-typescript",
+        "files": [
+          {
+            "file": "assets/__vite-browser-external-hyI0Gqyk.js",
+            "kind": "js",
+            "bytes": 120,
+            "gzip": 132,
+            "brotli": 104,
+            "sha256": "1dab5fa9316d1f6b272b46c0f0d2d3ffc0fff74f7ff246fa02f3632ea4f778d9"
+          },
+          {
+            "file": "assets/_compare-Cc6cWIQ_.css",
+            "kind": "css",
+            "bytes": 11353,
+            "gzip": 2106,
+            "brotli": 1812,
+            "sha256": "12022a722208df2c1f534bffbd9bb177edc235f5183340342609244d3770e7b5"
+          },
+          {
+            "file": "assets/astro-folds-B4VAtzaA.js",
+            "kind": "js",
+            "bytes": 111,
+            "gzip": 95,
+            "brotli": 71,
+            "sha256": "bb96040f5195a10ab67ed71f1c670689f234da0123bbe7a876ac8ba15246cf2d"
+          },
+          {
+            "file": "assets/astro-highlights-BcNaTdP2.js",
+            "kind": "js",
+            "bytes": 258,
+            "gzip": 179,
+            "brotli": 154,
+            "sha256": "e2e85aad78c0f0937dd345881f1a01c0221656af4db382b5b831ad415d887150"
+          },
+          {
+            "file": "assets/astro-injections-C-WpCkWK.js",
+            "kind": "js",
+            "bytes": 847,
+            "gzip": 293,
+            "brotli": 257,
+            "sha256": "e2239f13ecd74e4e78cc8fac316f8fd3133b3963048650388ac05bf72ff68b31"
+          },
+          {
+            "file": "assets/css-folds-ClN0bM0N.js",
+            "kind": "js",
+            "bytes": 61,
+            "gzip": 75,
+            "brotli": 62,
+            "sha256": "ea37cda171d25e0055433c36efe2f15c3b901a261fe5c42df6c232c88d9a11bb"
+          },
+          {
+            "file": "assets/folds-CVp2ICys.js",
+            "kind": "js",
+            "bytes": 157,
+            "gzip": 110,
+            "brotli": 92,
+            "sha256": "a67fe78b3479a49684374a40fd038abde6916b4e02033b3ae253bc83b6a0bd2c"
+          },
+          {
+            "file": "assets/highlights-1lDIPJr3.js",
+            "kind": "js",
+            "bytes": 227,
+            "gzip": 170,
+            "brotli": 149,
+            "sha256": "2f27df59f1b9d00e4af1bbe1c796c2a76c313697bda74cd3fb9f80d69e9edbee"
+          },
+          {
+            "file": "assets/highlights-98yePrIp.js",
+            "kind": "js",
+            "bytes": 3240,
+            "gzip": 1014,
+            "brotli": 888,
+            "sha256": "3d1e4ca644164371921804a7b770fbdfaa720d80a6ebcc1067f1aced1474b06c"
+          },
+          {
+            "file": "assets/highlights-BADX33Bq.js",
+            "kind": "js",
+            "bytes": 1207,
+            "gzip": 457,
+            "brotli": 376,
+            "sha256": "fa5002e6e28a5f548debd94a56d073cb193004af0ff7979e264cfbb8b9b1682a"
+          },
+          {
+            "file": "assets/highlights-BCAPA-wT.js",
+            "kind": "js",
+            "bytes": 1987,
+            "gzip": 876,
+            "brotli": 776,
+            "sha256": "4bb4d27cc5d8a05a35ed84bffe4899518062af8d2b243d3646d432d381e8c510"
+          },
+          {
+            "file": "assets/highlights-BHyYC7gf.js",
+            "kind": "js",
+            "bytes": 607,
+            "gzip": 327,
+            "brotli": 271,
+            "sha256": "41dec7f0f9428cceb2d9e20a3c9c079226e142b1b544b1b67477d8da1e0c2009"
+          },
+          {
+            "file": "assets/highlights-BZjrEwij.js",
+            "kind": "js",
+            "bytes": 992,
+            "gzip": 386,
+            "brotli": 322,
+            "sha256": "12a15102073b50c45b8b2b027c02092bc4023271bf19ad9d0b6f7134fd29c738"
+          },
+          {
+            "file": "assets/highlights-Bud46zNe.js",
+            "kind": "js",
+            "bytes": 2923,
+            "gzip": 933,
+            "brotli": 836,
+            "sha256": "ed2d3d43f08d4a9d301fd83da70e0815bc915c874dc7b338b51004ffbf7c44d1"
+          },
+          {
+            "file": "assets/highlights-C2jqLqMv.js",
+            "kind": "js",
+            "bytes": 63,
+            "gzip": 78,
+            "brotli": 62,
+            "sha256": "25693fe4d808c9e6ccaf74513432d2cd8e5b16017ab3c823862489eef5913c14"
+          },
+          {
+            "file": "assets/highlights-Ch6OfObk.js",
+            "kind": "js",
+            "bytes": 969,
+            "gzip": 432,
+            "brotli": 343,
+            "sha256": "c44079e97a8ffbbf892c075d4898321db19a21460a68a56bf90c8a362ff683e8"
+          },
+          {
+            "file": "assets/highlights-CzveUe24.js",
+            "kind": "js",
+            "bytes": 2813,
+            "gzip": 949,
+            "brotli": 830,
+            "sha256": "4dd9451c6c0b9852f74de2ec2bfe27b90800c699f5f0d433ecc93a3b3f888dd8"
+          },
+          {
+            "file": "assets/highlights-DYfIcZkC.js",
+            "kind": "js",
+            "bytes": 3559,
+            "gzip": 992,
+            "brotli": 866,
+            "sha256": "04dcdf4620505efed21689439d938ae65194d67cd407047059e107de7d845184"
+          },
+          {
+            "file": "assets/highlights-DjgeXuL_.js",
+            "kind": "js",
+            "bytes": 1214,
+            "gzip": 440,
+            "brotli": 377,
+            "sha256": "5dbaeb5efbf3370389e7807f1ba2d09362d11344d2ca5588e0b713f4db3756c5"
+          },
+          {
+            "file": "assets/highlights-jZRiKgrN.js",
+            "kind": "js",
+            "bytes": 1451,
+            "gzip": 584,
+            "brotli": 496,
+            "sha256": "7a0f501bda3959004d9ce53ea03c864c1ebdbf50e3edecd987dda16c31268a6a"
+          },
+          {
+            "file": "assets/highlights-jsx-DXAD7Dm4.js",
+            "kind": "js",
+            "bytes": 467,
+            "gzip": 195,
+            "brotli": 155,
+            "sha256": "2d8394be9bfaf57e944e2e1ce6ead5c6c1ba29d0c7dd91408cad92ef1e3fbeca"
+          },
+          {
+            "file": "assets/highlights-kxVENyri.js",
+            "kind": "js",
+            "bytes": 1464,
+            "gzip": 506,
+            "brotli": 440,
+            "sha256": "f1ba9077d7a2c87d4d9387984fe890c527b939b805a7a98391c3af288b37446b"
+          },
+          {
+            "file": "assets/highlights-kzIria7C.js",
+            "kind": "js",
+            "bytes": 202,
+            "gzip": 164,
+            "brotli": 126,
+            "sha256": "f6703f3ff5eb0a846b44f746dcc23d14ac414497e075dabc265d6f42496a8d5c"
+          },
+          {
+            "file": "assets/highlights-nFwP4WUT.js",
+            "kind": "js",
+            "bytes": 531,
+            "gzip": 284,
+            "brotli": 244,
+            "sha256": "e1f4147cb6c1476fed5f28f3f38b174cb5f584c086c4e4c8e44e928eba58d31d"
+          },
+          {
+            "file": "assets/highlights-srn7ewoy.js",
+            "kind": "js",
+            "bytes": 777,
+            "gzip": 382,
+            "brotli": 318,
+            "sha256": "81e88be4bb74cbe138a5a6c6a44481a2442cadd9a8bee79ca0b8b4f156f25088"
+          },
+          {
+            "file": "assets/highlights-tgdwzbM3.js",
+            "kind": "js",
+            "bytes": 2096,
+            "gzip": 745,
+            "brotli": 635,
+            "sha256": "d6b409391d720cbb04cc5abedeb6c0745314a8f6c8e56eb0332702def448460e"
+          },
+          {
+            "file": "assets/html-folds-BV0Om1nn.js",
+            "kind": "js",
+            "bytes": 91,
+            "gzip": 82,
+            "brotli": 64,
+            "sha256": "c5fee86ad0c7bd8ea66d474c39c108699d79c6c97e10ef53c04e6e3424cf4920"
+          },
+          {
+            "file": "assets/injections-1hRXiEHT.js",
+            "kind": "js",
+            "bytes": 207,
+            "gzip": 135,
+            "brotli": 101,
+            "sha256": "6f1ffbf5ec8f36e998554677224c5729fcc54e24a8e73ab242d451690c51a89e"
+          },
+          {
+            "file": "assets/injections-CP9YUjRI.js",
+            "kind": "js",
+            "bytes": 263,
+            "gzip": 146,
+            "brotli": 127,
+            "sha256": "d95b91b6b6875959d2e221aefd0004882ae275238c90c1cb32e3a91e7b5509a2"
+          },
+          {
+            "file": "assets/injections-IWSGYMcD.js",
+            "kind": "js",
+            "bytes": 295,
+            "gzip": 185,
+            "brotli": 143,
+            "sha256": "43f1dc8503a4ce7675cb5601fcc593d41b25381f997eb94850e9c23fbf2aa99c"
+          },
+          {
+            "file": "assets/javascript-folds-B7oa76u2.js",
+            "kind": "js",
+            "bytes": 170,
+            "gzip": 134,
+            "brotli": 96,
+            "sha256": "a294218964502478f8ae9ada2955fceb5380f82b079cedb78d388958a92c72f4"
+          },
+          {
+            "file": "assets/javascript-highlights-70ziJmbJ.js",
+            "kind": "js",
+            "bytes": 3013,
+            "gzip": 1030,
+            "brotli": 859,
+            "sha256": "5c43ae82fbe03deedc5ba34391d1b28b80ee82f20a8b72b34a9144357dd232ba"
+          },
+          {
+            "file": "assets/javascript-injections-lY2DqCBO.js",
+            "kind": "js",
+            "bytes": 684,
+            "gzip": 349,
+            "brotli": 272,
+            "sha256": "d1f170ea56e1ee62ab3ac616156c35f15df7c806807a751a44296a9fcb2fed3e"
+          },
+          {
+            "file": "assets/json-folds-CspXhjwO.js",
+            "kind": "js",
+            "bytes": 59,
+            "gzip": 72,
+            "brotli": 59,
+            "sha256": "4d2d1483b0b1b49a3a01ffae65a286effb150218cb8cd86120b1c65064be9d2d"
+          },
+          {
+            "file": "assets/jsx-folds-9_i_ZbC4.js",
+            "kind": "js",
+            "bytes": 85,
+            "gzip": 90,
+            "brotli": 71,
+            "sha256": "b95451fd8ff79245b8324ee6c18a90046c18bf9d941466355eb7fedfb9e89cd8"
+          },
+          {
+            "file": "assets/mdx-highlights-qS0Z90Fb.js",
+            "kind": "js",
+            "bytes": 3870,
+            "gzip": 1256,
+            "brotli": 1080,
+            "sha256": "a13ec2286778e5130dd214901a1a175d1f3c90d53e4f36437da9648f15ff9c04"
+          },
+          {
+            "file": "assets/mdx-injections-BleRUh6l.js",
+            "kind": "js",
+            "bytes": 204,
+            "gzip": 163,
+            "brotli": 121,
+            "sha256": "169dfb536dccc19cd281c110a5162a59359ab45ce7651a9a6256b61657a64396"
+          },
+          {
+            "file": "assets/sql-highlights-D5YaqcrW.js",
+            "kind": "js",
+            "bytes": 8379,
+            "gzip": 2158,
+            "brotli": 1898,
+            "sha256": "691ca927382a9b41e1d2b9b1c2f221041fc7917c0e51b099f6df83cdfed485ba"
+          },
+          {
+            "file": "assets/svelte-injections-DKBGuUis.js",
+            "kind": "js",
+            "bytes": 694,
+            "gzip": 264,
+            "brotli": 216,
+            "sha256": "816ec374e5d089dabb7b71e68e55d06ffaa83145a91fd1e697873a4fbb53571a"
+          },
+          {
+            "file": "assets/tree-sitter-astro-BB8dcP4P.js",
+            "kind": "js",
+            "bytes": 91,
+            "gzip": 107,
+            "brotli": 88,
+            "sha256": "d3c978e016c763a51ae9576b54a3623d79a7866d31e3e63eb74bc2b847ba3289"
+          },
+          {
+            "file": "assets/tree-sitter-astro-CA-be8gX.wasm",
+            "kind": "wasm",
+            "bytes": 27460,
+            "gzip": 9534,
+            "brotli": 7860,
+            "sha256": "602004854e05205f4a0f4890283c4693e0533f1a497e42053a38572610aa3163"
+          },
+          {
+            "file": "assets/tree-sitter-bash-DCDqG4Zt.wasm",
+            "kind": "wasm",
+            "bytes": 1358224,
+            "gzip": 184676,
+            "brotli": 130330,
+            "sha256": "8292919c88a0f7d3fb31d0cd0253ca5a9531bc1ede82b0537f2c63dd8abe6a7a"
+          },
+          {
+            "file": "assets/tree-sitter-bash-DQdfDHlL.js",
+            "kind": "js",
+            "bytes": 90,
+            "gzip": 108,
+            "brotli": 88,
+            "sha256": "0af48588b9def2b5a47b13bf0c6d45e5a744036cacb3f14336404b5afd778483"
+          },
+          {
+            "file": "assets/tree-sitter-c-BPxA867Y.js",
+            "kind": "js",
+            "bytes": 87,
+            "gzip": 105,
+            "brotli": 85,
+            "sha256": "5dd85edd5d93a15f9608e4eff76a12920dc3f6521ed0344cb8f06b201f390a0b"
+          },
+          {
+            "file": "assets/tree-sitter-c-BxIYOGrK.wasm",
+            "kind": "wasm",
+            "bytes": 625918,
+            "gzip": 74584,
+            "brotli": 49178,
+            "sha256": "c852c2a85ebf2beb636aa3b0ef7f7e70458684d74f6741b20dcb296885bed9f9"
+          },
+          {
+            "file": "assets/tree-sitter-c_sharp-BCAI4jhH.wasm",
+            "kind": "wasm",
+            "bytes": 5350581,
+            "gzip": 320696,
+            "brotli": 178414,
+            "sha256": "6f69e1cae44e1c32c1eccc170dc5a9778fb94ff716f71113fe1f8c4299aa2f40"
+          },
+          {
+            "file": "assets/tree-sitter-c_sharp-BFIyyJiu.js",
+            "kind": "js",
+            "bytes": 93,
+            "gzip": 111,
+            "brotli": 88,
+            "sha256": "575cf4f09077af4b9d57b87aa50c053533f268821b13b8f8b8572f698be27837"
+          },
+          {
+            "file": "assets/tree-sitter-cpp-DId2GiRO.wasm",
+            "kind": "wasm",
+            "bytes": 3434931,
+            "gzip": 283387,
+            "brotli": 171064,
+            "sha256": "174eb0deb75b2ec7881bcacda9f995648d8e683956e5c2267e69ab6dc503fcbf"
+          },
+          {
+            "file": "assets/tree-sitter-cpp-DV62w25F.js",
+            "kind": "js",
+            "bytes": 89,
+            "gzip": 107,
+            "brotli": 89,
+            "sha256": "687605533eeea3d7592810d59e3e026c063c12899e42e4d4912f29bae2f1ffea"
+          },
+          {
+            "file": "assets/tree-sitter-css-D8S9tSNX.js",
+            "kind": "js",
+            "bytes": 89,
+            "gzip": 105,
+            "brotli": 88,
+            "sha256": "ac861193a533a7a6a853646f3dd7662cd1480f140f8aedead9ffc1ecdf027224"
+          },
+          {
+            "file": "assets/tree-sitter-css-UR1ll_wC.wasm",
+            "kind": "wasm",
+            "bytes": 128668,
+            "gzip": 21510,
+            "brotli": 15453,
+            "sha256": "8a23977fe271357cce6f254ef88c9bebf3854602d8046605aef6a45c02135c59"
+          },
+          {
+            "file": "assets/tree-sitter-go-B-RdJNI9.js",
+            "kind": "js",
+            "bytes": 88,
+            "gzip": 105,
+            "brotli": 85,
+            "sha256": "ded147bf623be63b8d3e362bef2caa617e5b049f3ac99cf414ee44756c923943"
+          },
+          {
+            "file": "assets/tree-sitter-go-CbfkDgzm.wasm",
+            "kind": "wasm",
+            "bytes": 217182,
+            "gzip": 40511,
+            "brotli": 29165,
+            "sha256": "9504573f352b20be7f2f1911754d710622aedc15afff16d5ed8fb5645681aee7"
+          },
+          {
+            "file": "assets/tree-sitter-html-4qiYmJng.wasm",
+            "kind": "wasm",
+            "bytes": 18385,
+            "gzip": 6795,
+            "brotli": 5617,
+            "sha256": "c48fcd82c7ea8bf943180088ba7f28c48b2bb5287874179168bf9d31e394cf85"
+          },
+          {
+            "file": "assets/tree-sitter-html-D1suPgGc.js",
+            "kind": "js",
+            "bytes": 90,
+            "gzip": 108,
+            "brotli": 88,
+            "sha256": "b0b25ba3441caebeed8ad3f6b55b73f07c3bbd513a372d0bb7443433dd72dbd5"
+          },
+          {
+            "file": "assets/tree-sitter-java-CNWQbYjk.js",
+            "kind": "js",
+            "bytes": 90,
+            "gzip": 108,
+            "brotli": 89,
+            "sha256": "f8fa9e40d7da9539dccd54756ca488467397403c2afc8482048ba5c1bf684a2d"
+          },
+          {
+            "file": "assets/tree-sitter-java-DY4xdUi9.wasm",
+            "kind": "wasm",
+            "bytes": 414641,
+            "gzip": 52670,
+            "brotli": 37183,
+            "sha256": "4fdeac4ca6ca089f06c6f7e562abcac1733cd465728cc7031ebb73c2019122c4"
+          },
+          {
+            "file": "assets/tree-sitter-javascript-BDsndACb.js",
+            "kind": "js",
+            "bytes": 96,
+            "gzip": 111,
+            "brotli": 88,
+            "sha256": "33a102f855f0ef3766f9e0a5f4c89a3aa3fc6668e235c257e47cf02f725f5459"
+          },
+          {
+            "file": "assets/tree-sitter-javascript-BIQS8cIx.wasm",
+            "kind": "wasm",
+            "bytes": 411770,
+            "gzip": 50662,
+            "brotli": 37757,
+            "sha256": "5fb488d0cabb4775a594bab85682de5ad6ce83c0d6ac997a9f82dd084d571240"
+          },
+          {
+            "file": "assets/tree-sitter-jsdoc-B1GCqhOP.wasm",
+            "kind": "wasm",
+            "bytes": 30206,
+            "gzip": 9651,
+            "brotli": 7715,
+            "sha256": "5530e630fd42424b1c026ec4b2b260ff1b73b78b7040239ac33d4be22a9b2271"
+          },
+          {
+            "file": "assets/tree-sitter-jsdoc-dyI6iPUH.js",
+            "kind": "js",
+            "bytes": 91,
+            "gzip": 109,
+            "brotli": 89,
+            "sha256": "21c6e9977f3bea5cbd3f24d87b11051ac76f5f838c0165105874e616c35f80e7"
+          },
+          {
+            "file": "assets/tree-sitter-json-Ch3QXS4F.js",
+            "kind": "js",
+            "bytes": 90,
+            "gzip": 106,
+            "brotli": 87,
+            "sha256": "5e9b27966b9c71863132da56f6c138c64a56170ecfbeb7874506810e5b47b568"
+          },
+          {
+            "file": "assets/tree-sitter-json-CtrBzfa5.wasm",
+            "kind": "wasm",
+            "bytes": 5596,
+            "gzip": 2230,
+            "brotli": 1876,
+            "sha256": "d2119fb98d5912719b13f9458574f8608d2d29dfbe45f6be1f860ea1fe2a2405"
+          },
+          {
+            "file": "assets/tree-sitter-lua-BgmWez5o.wasm",
+            "kind": "wasm",
+            "bytes": 49488,
+            "gzip": 12436,
+            "brotli": 9807,
+            "sha256": "6d95607fc7d78964cfdf065ccb1ba76be5ed217c5ec0d0a3cace13c59fa1ae43"
+          },
+          {
+            "file": "assets/tree-sitter-lua-DsJ9x9IS.js",
+            "kind": "js",
+            "bytes": 89,
+            "gzip": 106,
+            "brotli": 86,
+            "sha256": "b1bb2b2d49ff11f78a96622609998a0893776468acea19e46727eaa389da13f0"
+          },
+          {
+            "file": "assets/tree-sitter-markdown-0oeW31on.js",
+            "kind": "js",
+            "bytes": 94,
+            "gzip": 110,
+            "brotli": 87,
+            "sha256": "41f0823c4a24b64eb05bf97fb1bc224d08c7b735cea714781a7166d3398a8246"
+          },
+          {
+            "file": "assets/tree-sitter-markdown-DrJHx2LB.wasm",
+            "kind": "wasm",
+            "bytes": 127311,
+            "gzip": 26150,
+            "brotli": 19917,
+            "sha256": "4d71e4c53f38c368b3c80fad9a6ff5d000873b2e63d8666ac9dac8ff736b6367"
+          },
+          {
+            "file": "assets/tree-sitter-md-Cipfsb5X.wasm",
+            "kind": "wasm",
+            "bytes": 126226,
+            "gzip": 58825,
+            "brotli": 45617,
+            "sha256": "f0a19a99ebb9cd0f50d3b4797e6fb28e600ee8a73fff7028a429c68aab222ac9"
+          },
+          {
+            "file": "assets/tree-sitter-mdx-CAsey8IL.js",
+            "kind": "js",
+            "bytes": 89,
+            "gzip": 106,
+            "brotli": 84,
+            "sha256": "0d0cfdcc4fac9b3fa85fb5a6916e5399e034c43a66946bcb214f6ada6b88e020"
+          },
+          {
+            "file": "assets/tree-sitter-mdx-DH9KrJyd.wasm",
+            "kind": "wasm",
+            "bytes": 904586,
+            "gzip": 110743,
+            "brotli": 76561,
+            "sha256": "71c92f82a0805e336b60b08a62d1cc48be287cb699cc943acad8640829624245"
+          },
+          {
+            "file": "assets/tree-sitter-php-DJVy23ky.js",
+            "kind": "js",
+            "bytes": 89,
+            "gzip": 106,
+            "brotli": 87,
+            "sha256": "dc8e00a7c7388115de2b798df48d6108417f80accb0ebf4552165dda19fde27d"
+          },
+          {
+            "file": "assets/tree-sitter-php-mL1QzIxs.wasm",
+            "kind": "wasm",
+            "bytes": 1058041,
+            "gzip": 108050,
+            "brotli": 71376,
+            "sha256": "d4df6a6ff08c87c3ec4f9cbb785fe09998a0cb570e03f57d7b19b3acfb146aa7"
+          },
+          {
+            "file": "assets/tree-sitter-python-BlcJAWGl.wasm",
+            "kind": "wasm",
+            "bytes": 457883,
+            "gzip": 68790,
+            "brotli": 50558,
+            "sha256": "16108b50df4ee9a30168794252ab55e7c93bfc5765d7fa0aa3e335752c515f47"
+          },
+          {
+            "file": "assets/tree-sitter-python-VikXyn2C.js",
+            "kind": "js",
+            "bytes": 92,
+            "gzip": 110,
+            "brotli": 90,
+            "sha256": "468f7fb939bd7e55964db8ef61df69e34b0a4c6acfe1614739585d0d7dcc1932"
+          },
+          {
+            "file": "assets/tree-sitter-regex-Cq6yboI8.js",
+            "kind": "js",
+            "bytes": 91,
+            "gzip": 107,
+            "brotli": 88,
+            "sha256": "bd83513c45c99f29e872222e85e5df7b7d4c577d14877275e274386b06f31b5a"
+          },
+          {
+            "file": "assets/tree-sitter-regex-lJTgzp2M.wasm",
+            "kind": "wasm",
+            "bytes": 21162,
+            "gzip": 5987,
+            "brotli": 4847,
+            "sha256": "e63c28e3a023614e14f2086b0d818e190239ebe5b2fcce7e64a9940091d83a79"
+          },
+          {
+            "file": "assets/tree-sitter-rust-B7GBmQNo.js",
+            "kind": "js",
+            "bytes": 90,
+            "gzip": 107,
+            "brotli": 86,
+            "sha256": "09d5c2cf4150a34253bca536f75038e631ac8d5228ca04aa2ace8179266d527b"
+          },
+          {
+            "file": "assets/tree-sitter-rust-mj92ghJo.wasm",
+            "kind": "wasm",
+            "bytes": 1102547,
+            "gzip": 118602,
+            "brotli": 81869,
+            "sha256": "f65f354215611fd94ad34134b3427eb3d58cbb745df7b6509ba722184db73d57"
+          },
+          {
+            "file": "assets/tree-sitter-sql-Cqk5ho2r.wasm",
+            "kind": "wasm",
+            "bytes": 11063021,
+            "gzip": 835935,
+            "brotli": 429071,
+            "sha256": "13df5dd065a3870728b32f37089b3bf6f54ec0868c3840d718d60ffb084a6365"
+          },
+          {
+            "file": "assets/tree-sitter-sql-DUU4H8zH.js",
+            "kind": "js",
+            "bytes": 89,
+            "gzip": 107,
+            "brotli": 86,
+            "sha256": "b53dad85566c8445e6f3574cc4906281c485c1cb5ade19a1debef64dae3657ac"
+          },
+          {
+            "file": "assets/tree-sitter-svelte-BVWc8PTT.wasm",
+            "kind": "wasm",
+            "bytes": 35635,
+            "gzip": 13602,
+            "brotli": 10930,
+            "sha256": "0ed8d4aca53f9f1bafc1844575dcb259a598cca099105b772f6c0c6bcbd299b4"
+          },
+          {
+            "file": "assets/tree-sitter-svelte-CV9UHcNE.js",
+            "kind": "js",
+            "bytes": 92,
+            "gzip": 109,
+            "brotli": 89,
+            "sha256": "1c109c1e41fdb04b0723a197079d8006269ff53af9f2ea329168a3a1cb10e144"
+          },
+          {
+            "file": "assets/tree-sitter-toml-DU6cTcYm.js",
+            "kind": "js",
+            "bytes": 90,
+            "gzip": 107,
+            "brotli": 94,
+            "sha256": "143721deb71cb628a40c5db110f9e11b4075b1857f401b68dbd106aef2d82c3a"
+          },
+          {
+            "file": "assets/tree-sitter-toml-DwHrQ9uN.wasm",
+            "kind": "wasm",
+            "bytes": 24040,
+            "gzip": 7513,
+            "brotli": 6191,
+            "sha256": "1ac6a83826c35a68857f8325e00c78f6bcbef4eb6db3931a6cf3041f76e5e09f"
+          },
+          {
+            "file": "assets/tree-sitter-tsx-DFihddBo.wasm",
+            "kind": "wasm",
+            "bytes": 1445638,
+            "gzip": 142518,
+            "brotli": 99258,
+            "sha256": "79e5da75ea62855a0cd67177685f0164eac87d5f630b3cbe1e0a099751ad30f8"
+          },
+          {
+            "file": "assets/tree-sitter-tsx-fNET8Y-4.js",
+            "kind": "js",
+            "bytes": 89,
+            "gzip": 106,
+            "brotli": 84,
+            "sha256": "6030c18249b082fcd80ee49db04b2a906b93c3203d8d12fd63269eeb396304c9"
+          },
+          {
+            "file": "assets/tree-sitter-typescript-BQpamM5l.wasm",
+            "kind": "wasm",
+            "bytes": 1413849,
+            "gzip": 139163,
+            "brotli": 93152,
+            "sha256": "778025db5a8be0e70f8ccc3671e486dfeddd048c25d9e8a70c26de2e1bf6f97d"
+          },
+          {
+            "file": "assets/tree-sitter-typescript-kGURkynB.js",
+            "kind": "js",
+            "bytes": 96,
+            "gzip": 110,
+            "brotli": 91,
+            "sha256": "a0899e8a7e0734feaf1609d7e993d1ec5e5884a13f38506154c46f66b8834350"
+          },
+          {
+            "file": "assets/tree-sitter-yaml-BfGBXPyc.wasm",
+            "kind": "wasm",
+            "bytes": 189255,
+            "gzip": 35542,
+            "brotli": 26694,
+            "sha256": "e752dc21c3591df9b45692fe417d101f45d1828c28c44d79005f4066dc7e4e91"
+          },
+          {
+            "file": "assets/tree-sitter-yaml-UA09FpXQ.js",
+            "kind": "js",
+            "bytes": 90,
+            "gzip": 108,
+            "brotli": 88,
+            "sha256": "0e656982274310385ea398acfdb75f6e9058bae70c6f7d9f4aac7fc569af479c"
+          },
+          {
+            "file": "assets/treeSitter.worker-DG6b_sHT.js",
+            "kind": "js",
+            "bytes": 139619,
+            "gzip": 40823,
+            "brotli": 36582,
+            "sha256": "afea25f85ea72b2efbb40c41de01328de2b961fa9554623b2470d0853ac8214e"
+          },
+          {
+            "file": "assets/typescript-folds-CDo24_RU.js",
+            "kind": "js",
+            "bytes": 155,
+            "gzip": 111,
+            "brotli": 83,
+            "sha256": "5e4fdb833df03f14959c9ceeb8850055cd224b36bcc5d7778ee9ab7843e3fde2"
+          },
+          {
+            "file": "assets/typescript-highlights-B1M37L6P.js",
+            "kind": "js",
+            "bytes": 1304,
+            "gzip": 562,
+            "brotli": 443,
+            "sha256": "8b59b3a276138158b2009e71dda3878db4e449128aa6a5f505deac7ff9900f0e"
+          },
+          {
+            "file": "assets/web-tree-sitter-BgoxpvfJ.wasm",
+            "kind": "wasm",
+            "bytes": 237259,
+            "gzip": 93154,
+            "brotli": 76382,
+            "sha256": "65aa79c497fe2172b9d635af91f7004129ba2728eeb41eb226c17de208ed5eed"
+          },
+          {
+            "file": "assets/web-tree-sitter-CRN4w07M.js",
+            "kind": "js",
+            "bytes": 100251,
+            "gzip": 20453,
+            "brotli": 17514,
+            "sha256": "d33afc948f38eaee332ffffff578b1c30bd9898f834b7791d554c40dcb7b0330"
+          },
+          {
+            "file": "entry.js",
+            "kind": "js",
+            "bytes": 974203,
+            "gzip": 254929,
+            "brotli": 209308,
+            "sha256": "5d75f39a49db85ab87d4b09fc13df1f97a313fa02c729eb4bbf62a3e54aef5a8"
+          }
+        ],
+        "totals": {
+          "bytes": 31555009,
+          "gzip": 3172451,
+          "brotli": 2056133
+        }
+      },
+      {
+        "id": "monaco-core",
+        "files": [
+          {
+            "file": "assets/_compare-DjpsE8to.css",
+            "kind": "css",
+            "bytes": 99095,
+            "gzip": 14110,
+            "brotli": 12501,
+            "sha256": "797aa85d5570a0ebbb047093f58e9adc13945078495425b27133073e5b15a9da"
+          },
+          {
+            "file": "assets/editor.worker-Yd1NR0QT.js",
+            "kind": "js",
+            "bytes": 303996,
+            "gzip": 92678,
+            "brotli": 73338,
+            "sha256": "3fe48a91b2bd735e0ff735995c15f86f2bc14ba4318ae1975c9afe64dcfef5e3"
+          },
+          {
+            "file": "assets/editorWebWorkerMain-J2ryhYi2.js",
+            "kind": "js",
+            "bytes": 544,
+            "gzip": 239,
+            "brotli": 184,
+            "sha256": "df527c1b09369e5b7df5fd63e4d9f0856030597e7e4f71a2ffbcdc586c0acb77"
+          },
+          {
+            "file": "entry.js",
+            "kind": "js",
+            "bytes": 2703961,
+            "gzip": 684831,
+            "brotli": 543079,
+            "sha256": "4b37dae956789c6ec776d273bd7e231c96e5db0f40caaf283809ce2bcac4fa41"
+          }
+        ],
+        "totals": {
+          "bytes": 3107596,
+          "gzip": 791858,
+          "brotli": 629102
+        }
+      },
+      {
+        "id": "monaco-typescript",
+        "files": [
+          {
+            "file": "assets/_compare-DjpsE8to.css",
+            "kind": "css",
+            "bytes": 99095,
+            "gzip": 14110,
+            "brotli": 12501,
+            "sha256": "797aa85d5570a0ebbb047093f58e9adc13945078495425b27133073e5b15a9da"
+          },
+          {
+            "file": "assets/editor.worker-Yd1NR0QT.js",
+            "kind": "js",
+            "bytes": 303996,
+            "gzip": 92678,
+            "brotli": 73338,
+            "sha256": "3fe48a91b2bd735e0ff735995c15f86f2bc14ba4318ae1975c9afe64dcfef5e3"
+          },
+          {
+            "file": "assets/editorWebWorkerMain-J2ryhYi2.js",
+            "kind": "js",
+            "bytes": 544,
+            "gzip": 239,
+            "brotli": 184,
+            "sha256": "df527c1b09369e5b7df5fd63e4d9f0856030597e7e4f71a2ffbcdc586c0acb77"
+          },
+          {
+            "file": "assets/typescript-Ppcpk4B2.js",
+            "kind": "js",
+            "bytes": 4662,
+            "gzip": 1914,
+            "brotli": 1662,
+            "sha256": "c1554969680394eb5182e6bb5287fdc2b14449e368524ea4c18e983e0aed59ce"
+          },
+          {
+            "file": "entry.js",
+            "kind": "js",
+            "bytes": 2704897,
+            "gzip": 685139,
+            "brotli": 543040,
+            "sha256": "b93ce99e7dc91a28fe74f788f6ff446124b3f9caabb10aa7814139716dac76f8"
+          }
+        ],
+        "totals": {
+          "bytes": 3113194,
+          "gzip": 794080,
+          "brotli": 630725
+        }
+      },
+      {
+        "id": "codemirror-core",
+        "files": [
+          {
+            "file": "entry.js",
+            "kind": "js",
+            "bytes": 199221,
+            "gzip": 63587,
+            "brotli": 55623,
+            "sha256": "64412909f3de5042a9a0faa2d4e1d09ccfe4157fafbe3e07561b543a745f1484"
+          }
+        ],
+        "totals": {
+          "bytes": 199221,
+          "gzip": 63587,
+          "brotli": 55623
+        }
+      },
+      {
+        "id": "codemirror-typescript",
+        "files": [
+          {
+            "file": "entry.js",
+            "kind": "js",
+            "bytes": 499594,
+            "gzip": 165280,
+            "brotli": 139433,
+            "sha256": "390f1176dfabc7ebd54d6a2d6e3e44b7abd844d138e83ac1ac5b249d9e74807c"
+          }
+        ],
+        "totals": {
+          "bytes": 499594,
+          "gzip": 165280,
+          "brotli": 139433
+        }
+      }
+    ],
+    "versions": {
+      "@singapore-editor/core": "0.2.6",
+      "@singapore-editor/textbuffer": "0.2.6",
+      "@singapore-editor/tree-sitter": "0.2.6",
+      "@singapore-editor/tree-sitter-languages": "0.2.6",
+      "monaco-editor": "0.57.0",
+      "codemirror": "6.0.2",
+      "@codemirror/state": "6.7.6",
+      "@codemirror/view": "6.43.14",
+      "@codemirror/lang-javascript": "6.2.5",
+      "playwright": "1.63.0",
+      "vite": "8.3.1"
+    }
+  },
+  "verification": {
+    "crossStartupCanonicalEquality": true,
+    "controlBrowserAssetEquality": true,
+    "allObservedProcessListsNonempty": true
+  },
+  "baseline": {
+    "cold": {
+      "count": 5,
+      "highlightedFrameMs": {
+        "median": 4877.900000035763,
+        "p95": 4922.599999964237,
+        "samples": [
+          4868.100000023842, 4906.899999976158, 4922.599999964237, 4877.900000035763, 4865
+        ]
+      },
+      "workerFullMs": {
+        "median": 4700.700000047684,
+        "p95": 4735.5,
+        "samples": [
+          4676.599999964237, 4725.100000023842, 4735.5, 4700.700000047684, 4699.100000023842
+        ]
+      },
+      "totalWorkProxyMs": {
+        "median": 4718.737000047684,
+        "p95": 4752.94,
+        "samples": [
+          4698.039999964237, 4741.131000023842, 4752.94, 4718.737000047684, 4713.925000023842
+        ]
+      },
+      "parseRootMs": {
+        "median": 773.5,
+        "p95": 783.0999999642372,
+        "samples": [
+          773.5, 773.8999999761581, 783.0999999642372, 757.8999999761581, 763.6999999880791
+        ]
+      },
+      "injectionDiscoveryMs": {
+        "median": 348.2000000476837,
+        "p95": 366.9000001549721,
+        "samples": [
+          347.4000002145767, 346.19999998807907, 348.2000000476837, 366.9000001549721,
+          351.29999989271164
+        ]
+      },
+      "structuralWalkMs": {
+        "median": 1185.699999988079,
+        "p95": 1203,
+        "samples": [
+          1171.6000000238419, 1193.199999988079, 1185.699999988079, 1203, 1175.199999988079
+        ]
+      },
+      "highlightQueryMs": {
+        "median": 1315.9000000357628,
+        "p95": 1332.5,
+        "samples": [
+          1313.300000011921, 1330.9000000357628, 1315.9000000357628, 1298.6000000238419, 1332.5
+        ]
+      },
+      "tokenStoreMs": {
+        "median": 1.199999988079071,
+        "p95": 1.300000011920929,
+        "samples": [
+          1.199999988079071, 1.199999988079071, 1.0999999642372131, 1.0999999642372131,
+          1.300000011920929
+        ]
+      },
+      "largestMainTaskMs": {
+        "median": 46.845,
+        "p95": 48.136,
+        "samples": [33.838, 46.623, 48.136, 46.891, 46.845]
+      },
+      "sampledPeakRssBytes": {
+        "median": 1556869120,
+        "p95": 1560154112,
+        "samples": [1468293120, 1557622784, 1556869120, 1560154112, 1552048128]
+      },
+      "outputProof": {
+        "tokenCount": 1198376,
+        "injectionCount": 0,
+        "errorCount": 0,
+        "tokenSha256": "ead02149f9a329c3106bf699501acc77c2bf444d5678a63ab817e841bce096e2",
+        "stylesSha256": "f8f4e938301d1d54b813348fdbff2e4305c672c1693f6d9e1d40f952f6e1b948",
+        "structuralSha256": "5f270d10706424f2925b087a0c9c34d4c8b784073890e5f923be8354e0ce5e77",
+        "firstToken": [0, 6, 3],
+        "lastToken": [10485754, 10485760, 1],
+        "missingLanguages": [],
+        "coverage": [
+          {
+            "languageId": "typescript",
+            "kind": "root",
+            "start": 0,
+            "end": 10485760,
+            "ranges": [[0, 10485760]]
+          }
+        ],
+        "wasmBytes": 329187328,
+        "queryCalls": 42,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        [
+          {
+            "worker": 1,
+            "documentCount": 1,
+            "snapshotCount": 1,
+            "treeCount": 1,
+            "markdownDocumentEntries": 0,
+            "markdownDocumentCount": 0,
+            "injectedMarkdownDocumentCount": 0,
+            "documents": [
+              {
+                "runtimeSessionId": "092b0b04-e3a9-42ae-9c1f-ae59474b8958",
+                "snapshots": [
+                  {
+                    "snapshotVersion": 1,
+                    "languageId": "typescript",
+                    "sourceUnits": 10485760,
+                    "layerCount": 1,
+                    "treeCount": 1,
+                    "markdownDocumentCount": 0
+                  }
+                ]
+              }
+            ],
+            "source": {
+              "documentCount": 1,
+              "readCount": 1,
+              "pinCount": 0,
+              "sourceUnits": 10485760
+            },
+            "shared": {
+              "registeredLanguages": 1,
+              "wasmMemory": {
+                "kind": "committed",
+                "bytes": 329187328,
+                "pages": 5023
+              },
+              "runtimeEntries": 1,
+              "runtimeCount": 1,
+              "parserCount": 1,
+              "languageCount": 1,
+              "queryCount": 3,
+              "runtimes": [
+                {
+                  "languageId": "typescript",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 1,
+                  "injectionQueryCount": 1
+                }
+              ]
+            },
+            "unmeasuredResources": [
+              "markdown-parser-language-query-handles",
+              "markdown-tree-handles"
+            ],
+            "unmeasuredBytes": [
+              "javascript-objects",
+              "source-strings",
+              "grammars-parsers-queries",
+              "trees",
+              "markdown-documents",
+              "worker-heap",
+              "wasm-allocator-live"
+            ]
+          }
+        ],
+        [
+          {
+            "worker": 1,
+            "documentCount": 1,
+            "snapshotCount": 1,
+            "treeCount": 1,
+            "markdownDocumentEntries": 0,
+            "markdownDocumentCount": 0,
+            "injectedMarkdownDocumentCount": 0,
+            "documents": [
+              {
+                "runtimeSessionId": "91913dda-3aac-4d47-968c-c448bfa38c3d",
+                "snapshots": [
+                  {
+                    "snapshotVersion": 1,
+                    "languageId": "typescript",
+                    "sourceUnits": 10485760,
+                    "layerCount": 1,
+                    "treeCount": 1,
+                    "markdownDocumentCount": 0
+                  }
+                ]
+              }
+            ],
+            "source": {
+              "documentCount": 1,
+              "readCount": 1,
+              "pinCount": 0,
+              "sourceUnits": 10485760
+            },
+            "shared": {
+              "registeredLanguages": 1,
+              "wasmMemory": {
+                "kind": "committed",
+                "bytes": 329187328,
+                "pages": 5023
+              },
+              "runtimeEntries": 1,
+              "runtimeCount": 1,
+              "parserCount": 1,
+              "languageCount": 1,
+              "queryCount": 3,
+              "runtimes": [
+                {
+                  "languageId": "typescript",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 1,
+                  "injectionQueryCount": 1
+                }
+              ]
+            },
+            "unmeasuredResources": [
+              "markdown-parser-language-query-handles",
+              "markdown-tree-handles"
+            ],
+            "unmeasuredBytes": [
+              "javascript-objects",
+              "source-strings",
+              "grammars-parsers-queries",
+              "trees",
+              "markdown-documents",
+              "worker-heap",
+              "wasm-allocator-live"
+            ]
+          }
+        ],
+        [
+          {
+            "worker": 1,
+            "documentCount": 1,
+            "snapshotCount": 1,
+            "treeCount": 1,
+            "markdownDocumentEntries": 0,
+            "markdownDocumentCount": 0,
+            "injectedMarkdownDocumentCount": 0,
+            "documents": [
+              {
+                "runtimeSessionId": "1b799297-9cbe-4ae0-a270-8a7dc2030e46",
+                "snapshots": [
+                  {
+                    "snapshotVersion": 1,
+                    "languageId": "typescript",
+                    "sourceUnits": 10485760,
+                    "layerCount": 1,
+                    "treeCount": 1,
+                    "markdownDocumentCount": 0
+                  }
+                ]
+              }
+            ],
+            "source": {
+              "documentCount": 1,
+              "readCount": 1,
+              "pinCount": 0,
+              "sourceUnits": 10485760
+            },
+            "shared": {
+              "registeredLanguages": 1,
+              "wasmMemory": {
+                "kind": "committed",
+                "bytes": 329187328,
+                "pages": 5023
+              },
+              "runtimeEntries": 1,
+              "runtimeCount": 1,
+              "parserCount": 1,
+              "languageCount": 1,
+              "queryCount": 3,
+              "runtimes": [
+                {
+                  "languageId": "typescript",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 1,
+                  "injectionQueryCount": 1
+                }
+              ]
+            },
+            "unmeasuredResources": [
+              "markdown-parser-language-query-handles",
+              "markdown-tree-handles"
+            ],
+            "unmeasuredBytes": [
+              "javascript-objects",
+              "source-strings",
+              "grammars-parsers-queries",
+              "trees",
+              "markdown-documents",
+              "worker-heap",
+              "wasm-allocator-live"
+            ]
+          }
+        ],
+        [
+          {
+            "worker": 1,
+            "documentCount": 1,
+            "snapshotCount": 1,
+            "treeCount": 1,
+            "markdownDocumentEntries": 0,
+            "markdownDocumentCount": 0,
+            "injectedMarkdownDocumentCount": 0,
+            "documents": [
+              {
+                "runtimeSessionId": "756bee73-174a-4722-ae71-262ed23d7c2f",
+                "snapshots": [
+                  {
+                    "snapshotVersion": 1,
+                    "languageId": "typescript",
+                    "sourceUnits": 10485760,
+                    "layerCount": 1,
+                    "treeCount": 1,
+                    "markdownDocumentCount": 0
+                  }
+                ]
+              }
+            ],
+            "source": {
+              "documentCount": 1,
+              "readCount": 1,
+              "pinCount": 0,
+              "sourceUnits": 10485760
+            },
+            "shared": {
+              "registeredLanguages": 1,
+              "wasmMemory": {
+                "kind": "committed",
+                "bytes": 329187328,
+                "pages": 5023
+              },
+              "runtimeEntries": 1,
+              "runtimeCount": 1,
+              "parserCount": 1,
+              "languageCount": 1,
+              "queryCount": 3,
+              "runtimes": [
+                {
+                  "languageId": "typescript",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 1,
+                  "injectionQueryCount": 1
+                }
+              ]
+            },
+            "unmeasuredResources": [
+              "markdown-parser-language-query-handles",
+              "markdown-tree-handles"
+            ],
+            "unmeasuredBytes": [
+              "javascript-objects",
+              "source-strings",
+              "grammars-parsers-queries",
+              "trees",
+              "markdown-documents",
+              "worker-heap",
+              "wasm-allocator-live"
+            ]
+          }
+        ],
+        [
+          {
+            "worker": 1,
+            "documentCount": 1,
+            "snapshotCount": 1,
+            "treeCount": 1,
+            "markdownDocumentEntries": 0,
+            "markdownDocumentCount": 0,
+            "injectedMarkdownDocumentCount": 0,
+            "documents": [
+              {
+                "runtimeSessionId": "935e70b0-f3c2-4bfb-a41e-f28604a9badb",
+                "snapshots": [
+                  {
+                    "snapshotVersion": 1,
+                    "languageId": "typescript",
+                    "sourceUnits": 10485760,
+                    "layerCount": 1,
+                    "treeCount": 1,
+                    "markdownDocumentCount": 0
+                  }
+                ]
+              }
+            ],
+            "source": {
+              "documentCount": 1,
+              "readCount": 1,
+              "pinCount": 0,
+              "sourceUnits": 10485760
+            },
+            "shared": {
+              "registeredLanguages": 1,
+              "wasmMemory": {
+                "kind": "committed",
+                "bytes": 329187328,
+                "pages": 5023
+              },
+              "runtimeEntries": 1,
+              "runtimeCount": 1,
+              "parserCount": 1,
+              "languageCount": 1,
+              "queryCount": 3,
+              "runtimes": [
+                {
+                  "languageId": "typescript",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 1,
+                  "injectionQueryCount": 1
+                }
+              ]
+            },
+            "unmeasuredResources": [
+              "markdown-parser-language-query-handles",
+              "markdown-tree-handles"
+            ],
+            "unmeasuredBytes": [
+              "javascript-objects",
+              "source-strings",
+              "grammars-parsers-queries",
+              "trees",
+              "markdown-documents",
+              "worker-heap",
+              "wasm-allocator-live"
+            ]
+          }
+        ]
+      ],
+      "wasmBytes": [329187328, 329187328, 329187328, 329187328, 329187328]
+    },
+    "warm": {
+      "count": 5,
+      "highlightedFrameMs": {
+        "median": 4887.900000035763,
+        "p95": 4953,
+        "samples": [
+          4845.799999952316, 4927.800000011921, 4887.900000035763, 4802.300000011921, 4953
+        ]
+      },
+      "workerFullMs": {
+        "median": 4755.700000047684,
+        "p95": 4824.100000023842,
+        "samples": [
+          4711.900000035763, 4795.899999976158, 4755.700000047684, 4670.599999964237,
+          4824.100000023842
+        ]
+      },
+      "totalWorkProxyMs": {
+        "median": 4768.502000047683,
+        "p95": 4839.248000023842,
+        "samples": [
+          4725.033000035763, 4808.372999976158, 4768.502000047683, 4682.830999964237,
+          4839.248000023842
+        ]
+      },
+      "parseRootMs": {
+        "median": 657.6000000238419,
+        "p95": 678.2000000476837,
+        "samples": [
+          652.6000000238419, 659.6999999880791, 657.6000000238419, 657.0999999642372,
+          678.2000000476837
+        ]
+      },
+      "injectionDiscoveryMs": {
+        "median": 341.19999980926514,
+        "p95": 350.3000001311302,
+        "samples": [
+          341.19999980926514, 340.19999998807907, 341.19999980926514, 334.8999999165535,
+          350.3000001311302
+        ]
+      },
+      "structuralWalkMs": {
+        "median": 1168.2999999523163,
+        "p95": 1206.699999988079,
+        "samples": [
+          1167.9000000357628, 1206.699999988079, 1168.2999999523163, 1165.5, 1169.6000000238419
+        ]
+      },
+      "highlightQueryMs": {
+        "median": 1254.8999999761581,
+        "p95": 1287.800000011921,
+        "samples": [
+          1239.4000000357628, 1272.8999999761581, 1252.8999999761581, 1254.8999999761581,
+          1287.800000011921
+        ]
+      },
+      "tokenStoreMs": {
+        "median": 1.300000011920929,
+        "p95": 1.600000023841858,
+        "samples": [
+          1.600000023841858, 1.199999988079071, 1.300000011920929, 1.2999999523162842,
+          1.300000011920929
+        ]
+      },
+      "largestMainTaskMs": {
+        "median": 39.067,
+        "p95": 44.461,
+        "samples": [44.461, 10.647, 10.491, 39.067, 40.555]
+      },
+      "sampledPeakRssBytes": {
+        "median": 1523945472,
+        "p95": 1526693888,
+        "samples": [1457954816, 1523945472, 1526693888, 1526632448, 1522790400]
+      },
+      "outputProof": {
+        "tokenCount": 1198376,
+        "injectionCount": 0,
+        "errorCount": 0,
+        "tokenSha256": "ead02149f9a329c3106bf699501acc77c2bf444d5678a63ab817e841bce096e2",
+        "stylesSha256": "f8f4e938301d1d54b813348fdbff2e4305c672c1693f6d9e1d40f952f6e1b948",
+        "structuralSha256": "5f270d10706424f2925b087a0c9c34d4c8b784073890e5f923be8354e0ce5e77",
+        "firstToken": [0, 6, 3],
+        "lastToken": [10485754, 10485760, 1],
+        "missingLanguages": [],
+        "coverage": [
+          {
+            "languageId": "typescript",
+            "kind": "root",
+            "start": 0,
+            "end": 10485760,
+            "ranges": [[0, 10485760]]
+          }
+        ],
+        "wasmBytes": 350683136,
+        "queryCalls": 48,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        [
+          {
+            "worker": 1,
+            "documentCount": 2,
+            "snapshotCount": 2,
+            "treeCount": 2,
+            "markdownDocumentEntries": 0,
+            "markdownDocumentCount": 0,
+            "injectedMarkdownDocumentCount": 0,
+            "documents": [
+              {
+                "runtimeSessionId": "bc9c08bb-8f8c-4b4b-b42c-b3e202433ded",
+                "snapshots": [
+                  {
+                    "snapshotVersion": 1,
+                    "languageId": "typescript",
+                    "sourceUnits": 1048576,
+                    "layerCount": 1,
+                    "treeCount": 1,
+                    "markdownDocumentCount": 0
+                  }
+                ]
+              },
+              {
+                "runtimeSessionId": "e8949366-d832-4f14-afa8-fc640ae9a589",
+                "snapshots": [
+                  {
+                    "snapshotVersion": 1,
+                    "languageId": "typescript",
+                    "sourceUnits": 10485760,
+                    "layerCount": 1,
+                    "treeCount": 1,
+                    "markdownDocumentCount": 0
+                  }
+                ]
+              }
+            ],
+            "source": {
+              "documentCount": 2,
+              "readCount": 2,
+              "pinCount": 0,
+              "sourceUnits": 11534336
+            },
+            "shared": {
+              "registeredLanguages": 1,
+              "wasmMemory": {
+                "kind": "committed",
+                "bytes": 350683136,
+                "pages": 5351
+              },
+              "runtimeEntries": 1,
+              "runtimeCount": 1,
+              "parserCount": 1,
+              "languageCount": 1,
+              "queryCount": 3,
+              "runtimes": [
+                {
+                  "languageId": "typescript",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 1,
+                  "injectionQueryCount": 1
+                }
+              ]
+            },
+            "unmeasuredResources": [
+              "markdown-parser-language-query-handles",
+              "markdown-tree-handles"
+            ],
+            "unmeasuredBytes": [
+              "javascript-objects",
+              "source-strings",
+              "grammars-parsers-queries",
+              "trees",
+              "markdown-documents",
+              "worker-heap",
+              "wasm-allocator-live"
+            ]
+          }
+        ],
+        [
+          {
+            "worker": 1,
+            "documentCount": 2,
+            "snapshotCount": 2,
+            "treeCount": 2,
+            "markdownDocumentEntries": 0,
+            "markdownDocumentCount": 0,
+            "injectedMarkdownDocumentCount": 0,
+            "documents": [
+              {
+                "runtimeSessionId": "7d2f9aee-ce75-4932-abfe-e9044e120c32",
+                "snapshots": [
+                  {
+                    "snapshotVersion": 1,
+                    "languageId": "typescript",
+                    "sourceUnits": 1048576,
+                    "layerCount": 1,
+                    "treeCount": 1,
+                    "markdownDocumentCount": 0
+                  }
+                ]
+              },
+              {
+                "runtimeSessionId": "3f841f97-a75c-451f-b050-8773ee52615f",
+                "snapshots": [
+                  {
+                    "snapshotVersion": 1,
+                    "languageId": "typescript",
+                    "sourceUnits": 10485760,
+                    "layerCount": 1,
+                    "treeCount": 1,
+                    "markdownDocumentCount": 0
+                  }
+                ]
+              }
+            ],
+            "source": {
+              "documentCount": 2,
+              "readCount": 2,
+              "pinCount": 0,
+              "sourceUnits": 11534336
+            },
+            "shared": {
+              "registeredLanguages": 1,
+              "wasmMemory": {
+                "kind": "committed",
+                "bytes": 350683136,
+                "pages": 5351
+              },
+              "runtimeEntries": 1,
+              "runtimeCount": 1,
+              "parserCount": 1,
+              "languageCount": 1,
+              "queryCount": 3,
+              "runtimes": [
+                {
+                  "languageId": "typescript",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 1,
+                  "injectionQueryCount": 1
+                }
+              ]
+            },
+            "unmeasuredResources": [
+              "markdown-parser-language-query-handles",
+              "markdown-tree-handles"
+            ],
+            "unmeasuredBytes": [
+              "javascript-objects",
+              "source-strings",
+              "grammars-parsers-queries",
+              "trees",
+              "markdown-documents",
+              "worker-heap",
+              "wasm-allocator-live"
+            ]
+          }
+        ],
+        [
+          {
+            "worker": 1,
+            "documentCount": 2,
+            "snapshotCount": 2,
+            "treeCount": 2,
+            "markdownDocumentEntries": 0,
+            "markdownDocumentCount": 0,
+            "injectedMarkdownDocumentCount": 0,
+            "documents": [
+              {
+                "runtimeSessionId": "9bac82bb-623a-4c0a-94de-be7646adb265",
+                "snapshots": [
+                  {
+                    "snapshotVersion": 1,
+                    "languageId": "typescript",
+                    "sourceUnits": 1048576,
+                    "layerCount": 1,
+                    "treeCount": 1,
+                    "markdownDocumentCount": 0
+                  }
+                ]
+              },
+              {
+                "runtimeSessionId": "3f4f0673-f890-4687-956d-cefdca1104e2",
+                "snapshots": [
+                  {
+                    "snapshotVersion": 1,
+                    "languageId": "typescript",
+                    "sourceUnits": 10485760,
+                    "layerCount": 1,
+                    "treeCount": 1,
+                    "markdownDocumentCount": 0
+                  }
+                ]
+              }
+            ],
+            "source": {
+              "documentCount": 2,
+              "readCount": 2,
+              "pinCount": 0,
+              "sourceUnits": 11534336
+            },
+            "shared": {
+              "registeredLanguages": 1,
+              "wasmMemory": {
+                "kind": "committed",
+                "bytes": 350683136,
+                "pages": 5351
+              },
+              "runtimeEntries": 1,
+              "runtimeCount": 1,
+              "parserCount": 1,
+              "languageCount": 1,
+              "queryCount": 3,
+              "runtimes": [
+                {
+                  "languageId": "typescript",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 1,
+                  "injectionQueryCount": 1
+                }
+              ]
+            },
+            "unmeasuredResources": [
+              "markdown-parser-language-query-handles",
+              "markdown-tree-handles"
+            ],
+            "unmeasuredBytes": [
+              "javascript-objects",
+              "source-strings",
+              "grammars-parsers-queries",
+              "trees",
+              "markdown-documents",
+              "worker-heap",
+              "wasm-allocator-live"
+            ]
+          }
+        ],
+        [
+          {
+            "worker": 1,
+            "documentCount": 2,
+            "snapshotCount": 2,
+            "treeCount": 2,
+            "markdownDocumentEntries": 0,
+            "markdownDocumentCount": 0,
+            "injectedMarkdownDocumentCount": 0,
+            "documents": [
+              {
+                "runtimeSessionId": "a943b25e-c6ef-461a-a4cf-7f5509349f4a",
+                "snapshots": [
+                  {
+                    "snapshotVersion": 1,
+                    "languageId": "typescript",
+                    "sourceUnits": 1048576,
+                    "layerCount": 1,
+                    "treeCount": 1,
+                    "markdownDocumentCount": 0
+                  }
+                ]
+              },
+              {
+                "runtimeSessionId": "05234b29-4081-45d1-85ed-5a0869c6eaa3",
+                "snapshots": [
+                  {
+                    "snapshotVersion": 1,
+                    "languageId": "typescript",
+                    "sourceUnits": 10485760,
+                    "layerCount": 1,
+                    "treeCount": 1,
+                    "markdownDocumentCount": 0
+                  }
+                ]
+              }
+            ],
+            "source": {
+              "documentCount": 2,
+              "readCount": 2,
+              "pinCount": 0,
+              "sourceUnits": 11534336
+            },
+            "shared": {
+              "registeredLanguages": 1,
+              "wasmMemory": {
+                "kind": "committed",
+                "bytes": 350683136,
+                "pages": 5351
+              },
+              "runtimeEntries": 1,
+              "runtimeCount": 1,
+              "parserCount": 1,
+              "languageCount": 1,
+              "queryCount": 3,
+              "runtimes": [
+                {
+                  "languageId": "typescript",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 1,
+                  "injectionQueryCount": 1
+                }
+              ]
+            },
+            "unmeasuredResources": [
+              "markdown-parser-language-query-handles",
+              "markdown-tree-handles"
+            ],
+            "unmeasuredBytes": [
+              "javascript-objects",
+              "source-strings",
+              "grammars-parsers-queries",
+              "trees",
+              "markdown-documents",
+              "worker-heap",
+              "wasm-allocator-live"
+            ]
+          }
+        ],
+        [
+          {
+            "worker": 1,
+            "documentCount": 2,
+            "snapshotCount": 2,
+            "treeCount": 2,
+            "markdownDocumentEntries": 0,
+            "markdownDocumentCount": 0,
+            "injectedMarkdownDocumentCount": 0,
+            "documents": [
+              {
+                "runtimeSessionId": "5cb43ce4-373f-48cc-ba66-07584c571409",
+                "snapshots": [
+                  {
+                    "snapshotVersion": 1,
+                    "languageId": "typescript",
+                    "sourceUnits": 1048576,
+                    "layerCount": 1,
+                    "treeCount": 1,
+                    "markdownDocumentCount": 0
+                  }
+                ]
+              },
+              {
+                "runtimeSessionId": "11e96be0-3d51-410f-890a-6a6e6f15ab36",
+                "snapshots": [
+                  {
+                    "snapshotVersion": 1,
+                    "languageId": "typescript",
+                    "sourceUnits": 10485760,
+                    "layerCount": 1,
+                    "treeCount": 1,
+                    "markdownDocumentCount": 0
+                  }
+                ]
+              }
+            ],
+            "source": {
+              "documentCount": 2,
+              "readCount": 2,
+              "pinCount": 0,
+              "sourceUnits": 11534336
+            },
+            "shared": {
+              "registeredLanguages": 1,
+              "wasmMemory": {
+                "kind": "committed",
+                "bytes": 350683136,
+                "pages": 5351
+              },
+              "runtimeEntries": 1,
+              "runtimeCount": 1,
+              "parserCount": 1,
+              "languageCount": 1,
+              "queryCount": 3,
+              "runtimes": [
+                {
+                  "languageId": "typescript",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 1,
+                  "injectionQueryCount": 1
+                }
+              ]
+            },
+            "unmeasuredResources": [
+              "markdown-parser-language-query-handles",
+              "markdown-tree-handles"
+            ],
+            "unmeasuredBytes": [
+              "javascript-objects",
+              "source-strings",
+              "grammars-parsers-queries",
+              "trees",
+              "markdown-documents",
+              "worker-heap",
+              "wasm-allocator-live"
+            ]
+          }
+        ]
+      ],
+      "wasmBytes": [350683136, 350683136, 350683136, 350683136, 350683136]
+    }
+  },
+  "controls": [
+    {
+      "corpus": "dense-injected",
+      "mib": 1,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 1,
+          "corpus": "dense-injected",
+          "bytes": 1048576,
+          "utf16Length": 1048576,
+          "lines": 31301,
+          "sha256": "2aba4ebc42a69e40fa6c215b8e5c45cc76828fd6c688af56ff017adf14406aef"
+        }
+      ],
+      "highlightedFrameMs": 1586.199999988079,
+      "output": {
+        "tokenCount": 266050,
+        "injectionCount": 31300,
+        "errorCount": 0,
+        "tokenSha256": "8a583ffeb67a4c49cc92b258c3c5da69eed059fbfa21659761a256bcc0434e33",
+        "stylesSha256": "12e0c0a7c36388b90a978c344bb8a51f5dd0dedd639a701e2c1291c2dc8e9edb",
+        "structuralSha256": "ca4abd5488831fe4f052ac917fa5ceeef843f92e382f836d3f9db2c866a8b663",
+        "layers": 31301,
+        "wasmBytes": 58785792,
+        "queryCalls": 31312,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 31301,
+          "shared": {
+            "registeredLanguages": 3,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 58785792,
+              "pages": 897
+            },
+            "runtimeEntries": 3,
+            "runtimeCount": 3,
+            "parserCount": 3,
+            "languageCount": 3,
+            "queryCount": 5,
+            "runtimes": [
+              {
+                "languageId": "typescript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              },
+              {
+                "languageId": "jsdoc",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 0,
+                "injectionQueryCount": 0
+              },
+              {
+                "languageId": "regex",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 0,
+                "injectionQueryCount": 0
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 791183360,
+      "lifecycle": {
+        "retainedTextSnapshots": 4,
+        "afterEdits": [
+          {
+            "documentCount": 1,
+            "snapshotCount": 4,
+            "treeCount": 125202,
+            "shared": {
+              "registeredLanguages": 3,
+              "wasmMemory": {
+                "kind": "committed",
+                "bytes": 105709568,
+                "pages": 1613
+              },
+              "runtimeEntries": 3,
+              "runtimeCount": 3,
+              "parserCount": 3,
+              "languageCount": 3,
+              "queryCount": 5,
+              "runtimes": [
+                {
+                  "languageId": "typescript",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 1,
+                  "injectionQueryCount": 1
+                },
+                {
+                  "languageId": "jsdoc",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 0,
+                  "injectionQueryCount": 0
+                },
+                {
+                  "languageId": "regex",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 0,
+                  "injectionQueryCount": 0
+                }
+              ]
+            },
+            "unmeasuredBytes": [
+              "javascript-objects",
+              "source-strings",
+              "grammars-parsers-queries",
+              "trees",
+              "markdown-documents",
+              "worker-heap",
+              "wasm-allocator-live"
+            ],
+            "unmeasuredResources": [
+              "markdown-parser-language-query-handles",
+              "markdown-tree-handles"
+            ]
+          }
+        ],
+        "multiple": [
+          {
+            "documentCount": 3,
+            "snapshotCount": 6,
+            "treeCount": 187804,
+            "shared": {
+              "registeredLanguages": 3,
+              "wasmMemory": {
+                "kind": "committed",
+                "bytes": 184942592,
+                "pages": 2822
+              },
+              "runtimeEntries": 3,
+              "runtimeCount": 3,
+              "parserCount": 3,
+              "languageCount": 3,
+              "queryCount": 5,
+              "runtimes": [
+                {
+                  "languageId": "typescript",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 1,
+                  "injectionQueryCount": 1
+                },
+                {
+                  "languageId": "jsdoc",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 0,
+                  "injectionQueryCount": 0
+                },
+                {
+                  "languageId": "regex",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 0,
+                  "injectionQueryCount": 0
+                }
+              ]
+            },
+            "unmeasuredBytes": [
+              "javascript-objects",
+              "source-strings",
+              "grammars-parsers-queries",
+              "trees",
+              "markdown-documents",
+              "worker-heap",
+              "wasm-allocator-live"
+            ],
+            "unmeasuredResources": [
+              "markdown-parser-language-query-handles",
+              "markdown-tree-handles"
+            ]
+          }
+        ],
+        "afterDisposal": [
+          {
+            "documentCount": 1,
+            "snapshotCount": 4,
+            "treeCount": 125202,
+            "shared": {
+              "registeredLanguages": 3,
+              "wasmMemory": {
+                "kind": "committed",
+                "bytes": 204472320,
+                "pages": 3120
+              },
+              "runtimeEntries": 3,
+              "runtimeCount": 3,
+              "parserCount": 3,
+              "languageCount": 3,
+              "queryCount": 5,
+              "runtimes": [
+                {
+                  "languageId": "typescript",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 1,
+                  "injectionQueryCount": 1
+                },
+                {
+                  "languageId": "jsdoc",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 0,
+                  "injectionQueryCount": 0
+                },
+                {
+                  "languageId": "regex",
+                  "highlightQueryCount": 1,
+                  "foldQueryCount": 0,
+                  "injectionQueryCount": 0
+                }
+              ]
+            },
+            "unmeasuredBytes": [
+              "javascript-objects",
+              "source-strings",
+              "grammars-parsers-queries",
+              "trees",
+              "markdown-documents",
+              "worker-heap",
+              "wasm-allocator-live"
+            ],
+            "unmeasuredResources": [
+              "markdown-parser-language-query-handles",
+              "markdown-tree-handles"
+            ]
+          }
+        ],
+        "cancellation": {
+          "direction": "received",
+          "worker": 1,
+          "at": 11171.699999988079,
+          "id": 36,
+          "ok": true,
+          "hasResult": true,
+          "timings": [
+            {
+              "name": "treeSitter.parseRoot",
+              "durationMs": 49.30000001192093
+            },
+            {
+              "name": "treeSitter.injectionDiscovery",
+              "durationMs": 7.599999964237213
+            }
+          ],
+          "statistics": {
+            "parseSlices": 0
+          },
+          "analysis": {
+            "kind": "cancelled",
+            "coveredRange": {
+              "startIndex": 0,
+              "endIndex": 0
+            },
+            "reason": "superseded",
+            "elapsedMs": 64.60000002384186,
+            "budgetMs": 20000,
+            "timings": [
+              {
+                "name": "treeSitter.parseRoot",
+                "durationMs": 49.30000001192093
+              },
+              {
+                "name": "treeSitter.injectionDiscovery",
+                "durationMs": 7.599999964237213
+              }
+            ]
+          },
+          "degraded": [],
+          "workerReceivedAt": 1791493261843.7,
+          "workerPostedAt": 1791493261908.4,
+          "absoluteAt": 1791493261910.3
+        },
+        "sampledPeakRssBytes": 2045657088
+      }
+    },
+    {
+      "corpus": "dense-recovery",
+      "mib": 1,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 1,
+          "corpus": "dense-recovery",
+          "bytes": 1048576,
+          "utf16Length": 1048576,
+          "lines": 38131,
+          "sha256": "9448a5106e092483eac87c8f36fa99ee84649f6ba1847c13dce5c38a4ebca78f"
+        }
+      ],
+      "highlightedFrameMs": 2068.100000023842,
+      "output": {
+        "tokenCount": 324105,
+        "injectionCount": 38130,
+        "errorCount": 57195,
+        "tokenSha256": "2a41de46db51b501835f9e3c1d4e522abe3a2ed8b532750ed5b5ab1095969842",
+        "stylesSha256": "12e0c0a7c36388b90a978c344bb8a51f5dd0dedd639a701e2c1291c2dc8e9edb",
+        "structuralSha256": "a0a046d4626a544b1e8800ff0cee78c006efe841d778e88d22308e3a78382051",
+        "layers": 38131,
+        "wasmBytes": 67764224,
+        "queryCalls": 38142,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 38131,
+          "shared": {
+            "registeredLanguages": 3,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 67764224,
+              "pages": 1034
+            },
+            "runtimeEntries": 3,
+            "runtimeCount": 3,
+            "parserCount": 3,
+            "languageCount": 3,
+            "queryCount": 5,
+            "runtimes": [
+              {
+                "languageId": "typescript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              },
+              {
+                "languageId": "jsdoc",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 0,
+                "injectionQueryCount": 0
+              },
+              {
+                "languageId": "regex",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 0,
+                "injectionQueryCount": 0
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 980463616
+    },
+    {
+      "corpus": "html",
+      "mib": 1,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 1,
+          "corpus": "html",
+          "bytes": 1048576,
+          "utf16Length": 1048576,
+          "lines": 23831,
+          "sha256": "a616709f595bb301b3cbfd117b2fa8382622b3fb1029b3d37018b97ead217d25"
+        }
+      ],
+      "highlightedFrameMs": 1777.5,
+      "output": {
+        "tokenCount": 190665,
+        "injectionCount": 3,
+        "errorCount": 0,
+        "tokenSha256": "974c9ef6df0d5ff1cab31dbe41c6991853d4c202ac3656d3330032bbb918c760",
+        "stylesSha256": "10d83c677887ee9c2ef3526ef1d17c77e4cee9d82e637fa4390698b71960fccc",
+        "structuralSha256": "1856a3c75abf8a07a1c040cd3967acbc1ec4e4d90fe91766f2b933ff9b3b9096",
+        "layers": 4,
+        "wasmBytes": 42008576,
+        "queryCalls": 29,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 4,
+          "shared": {
+            "registeredLanguages": 4,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 42008576,
+              "pages": 641
+            },
+            "runtimeEntries": 4,
+            "runtimeCount": 4,
+            "parserCount": 4,
+            "languageCount": 4,
+            "queryCount": 9,
+            "runtimes": [
+              {
+                "languageId": "html",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              },
+              {
+                "languageId": "css",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 0
+              },
+              {
+                "languageId": "javascript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              },
+              {
+                "languageId": "regex",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 0,
+                "injectionQueryCount": 0
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 690819072
+    },
+    {
+      "corpus": "injected",
+      "mib": 1,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 1,
+          "corpus": "injected",
+          "bytes": 1048576,
+          "utf16Length": 1048576,
+          "lines": 14981,
+          "sha256": "bd2232514b230d159222777e3d011ab1c386e5027931c20b2896b3bf469bf9e7"
+        }
+      ],
+      "highlightedFrameMs": 970.6999999880791,
+      "output": {
+        "tokenCount": 119854,
+        "injectionCount": 2,
+        "errorCount": 1,
+        "tokenSha256": "efd5985c8638a9b5e95a6fa62a1d0b16c5289ea5d6694f529458f4ba32074ec9",
+        "stylesSha256": "00fbc6a7ea9069b02202fb28c8f91e00d1e72b24565173915f2c16412336521d",
+        "structuralSha256": "560fda6b9c4153f616a5856a868ce2fed498d27602f27f961176ec12cf96daf8",
+        "layers": 3,
+        "wasmBytes": 36700160,
+        "queryCalls": 14,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 3,
+          "shared": {
+            "registeredLanguages": 3,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 36700160,
+              "pages": 560
+            },
+            "runtimeEntries": 3,
+            "runtimeCount": 3,
+            "parserCount": 3,
+            "languageCount": 3,
+            "queryCount": 5,
+            "runtimes": [
+              {
+                "languageId": "typescript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              },
+              {
+                "languageId": "jsdoc",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 0,
+                "injectionQueryCount": 0
+              },
+              {
+                "languageId": "regex",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 0,
+                "injectionQueryCount": 0
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 654884864
+    },
+    {
+      "corpus": "long-line",
+      "mib": 1,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 1,
+          "corpus": "long-line",
+          "bytes": 1048576,
+          "utf16Length": 1048576,
+          "lines": 2,
+          "sha256": "f04d19bf80d6e181bfd7921755548abcbe77fba54ad06f1a3a4a40c8e776f351"
+        }
+      ],
+      "highlightedFrameMs": 1546.6000000238419,
+      "output": {
+        "tokenCount": 419427,
+        "injectionCount": 0,
+        "errorCount": 0,
+        "tokenSha256": "ceb705f0f34b6b793e802952f099f763c60a2afa29189772a9276ef92ac4b35f",
+        "stylesSha256": "7355279f1c56edca2128aad947325b973de79a32d1cecd040d94e48fd25e926a",
+        "structuralSha256": "0d08bac86d59a44bd39fbc173d9f409b9de0b90ef83e9bdfb0ef4520050fd69e",
+        "layers": 1,
+        "wasmBytes": 115474432,
+        "queryCalls": 6,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 1,
+          "shared": {
+            "registeredLanguages": 1,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 115474432,
+              "pages": 1762
+            },
+            "runtimeEntries": 1,
+            "runtimeCount": 1,
+            "parserCount": 1,
+            "languageCount": 1,
+            "queryCount": 3,
+            "runtimes": [
+              {
+                "languageId": "typescript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 804667392
+    },
+    {
+      "corpus": "malformed",
+      "mib": 1,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 1,
+          "corpus": "malformed",
+          "bytes": 1048576,
+          "utf16Length": 1048576,
+          "lines": 38837,
+          "sha256": "4f1c903f098190228ea199008650e4c4073a3b34450e6016bc8562639b9ee00d"
+        }
+      ],
+      "highlightedFrameMs": 1690.9000000357628,
+      "output": {
+        "tokenCount": 271853,
+        "injectionCount": 0,
+        "errorCount": 38836,
+        "tokenSha256": "e1905a1a3d6b2607136440def427419a75e2c8380cdc931e5297399b85e7ea20",
+        "stylesSha256": "9eb01de62935e23935b9fe54affb3fc4d84527512e8539847f93bd231020e2aa",
+        "structuralSha256": "67cbe891224fbf9c94e38a6a1e7fe13f83b9904e3fcc83d1553be824ddf530d0",
+        "layers": 1,
+        "wasmBytes": 119865344,
+        "queryCalls": 6,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 1,
+          "shared": {
+            "registeredLanguages": 1,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 119865344,
+              "pages": 1829
+            },
+            "runtimeEntries": 1,
+            "runtimeCount": 1,
+            "parserCount": 1,
+            "languageCount": 1,
+            "queryCount": 3,
+            "runtimes": [
+              {
+                "languageId": "typescript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 741412864
+    },
+    {
+      "corpus": "markdown",
+      "mib": 1,
+      "status": "failed",
+      "errors": ["Full-document result must declare complete analysis"],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 1,
+          "corpus": "markdown",
+          "bytes": 1048576,
+          "utf16Length": 1048576,
+          "lines": 62601,
+          "sha256": "02bc0046f999a522830da7ddf2fdbbf6e20307d0151611ddcd0bb635c7d49cbe"
+        }
+      ],
+      "highlightedFrameMs": 451.60000002384186,
+      "output": {
+        "tokenCount": 125195,
+        "injectionCount": 0,
+        "errorCount": 0,
+        "tokenSha256": "dcaafc6b48febb2f21f6d3ce32ff989aef16bd1f14f5bae0362d3dcb87ade082",
+        "stylesSha256": "394bf115eb54b825da235c2bcb44f04424c3b6dec2b899148a3c634abdd2f16d",
+        "structuralSha256": "550c7b692a74f8437d423e24eb3eeec2f83c0049d861758a6ebeea1b0980d59e",
+        "layers": 0,
+        "wasmBytes": 46006272,
+        "queryCalls": 0,
+        "matchLimitExceeded": false
+      },
+      "sampledPeakRssBytes": 534523904
+    },
+    {
+      "corpus": "realistic",
+      "mib": 1,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 1,
+          "corpus": "realistic",
+          "bytes": 1048576,
+          "utf16Length": 1048576,
+          "lines": 19910,
+          "sha256": "0953a55d733e0098e0171d0cc7a1a7e65ffd9b23688675433fd75fd8c6137e60"
+        }
+      ],
+      "highlightedFrameMs": 1321.0999999642372,
+      "output": {
+        "tokenCount": 258820,
+        "injectionCount": 0,
+        "errorCount": 1,
+        "tokenSha256": "e613188158b1b8f3f48f2e377e54f5c88f33603444fb909e555adaa583d2a734",
+        "stylesSha256": "dd917a8bd58dceeea087cc1a2bb2ddbdd7db00d7fe1852cdd2f6eb31b65f7cfb",
+        "structuralSha256": "ebb007cab9e7d06e74a8858bfbbb19b472eeb9f1782ecf556a5fe335f4db27ce",
+        "layers": 1,
+        "wasmBytes": 118095872,
+        "queryCalls": 6,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 1,
+          "shared": {
+            "registeredLanguages": 1,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 118095872,
+              "pages": 1802
+            },
+            "runtimeEntries": 1,
+            "runtimeCount": 1,
+            "parserCount": 1,
+            "languageCount": 1,
+            "queryCount": 3,
+            "runtimes": [
+              {
+                "languageId": "typescript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 766332928
+    },
+    {
+      "corpus": "unicode",
+      "mib": 1,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 1,
+          "corpus": "unicode",
+          "bytes": 1468003,
+          "utf16Length": 1048576,
+          "lines": 23302,
+          "sha256": "6df8da5831653adaf99232b482787146801b92479ac7ed9509b24cced3e3f5e0"
+        }
+      ],
+      "highlightedFrameMs": 807.5,
+      "output": {
+        "tokenCount": 163111,
+        "injectionCount": 0,
+        "errorCount": 1,
+        "tokenSha256": "c1255a551500a80d7af858578ea9b91412c74034116e1f15b22bacc68332db6d",
+        "stylesSha256": "2223fe3f3e051ca6b92138a5983dd81446bbe8fa00d28edfa5b08fa757187b85",
+        "structuralSha256": "f2ca825a8dd142416e8ae2ec6153c1461c90ad67c9ef53dc3087b002f7b3c3dc",
+        "layers": 1,
+        "wasmBytes": 57671680,
+        "queryCalls": 6,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 1,
+          "shared": {
+            "registeredLanguages": 1,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 57671680,
+              "pages": 880
+            },
+            "runtimeEntries": 1,
+            "runtimeCount": 1,
+            "parserCount": 1,
+            "languageCount": 1,
+            "queryCount": 3,
+            "runtimes": [
+              {
+                "languageId": "typescript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 620228608
+    },
+    {
+      "corpus": "dense-injected",
+      "mib": 10,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 10,
+          "corpus": "dense-injected",
+          "bytes": 10485760,
+          "utf16Length": 10485760,
+          "lines": 313007,
+          "sha256": "e5ae07990e23f91d29875dbd86d195b9aff18e84a22d52f732976c8c432ca41c"
+        }
+      ],
+      "highlightedFrameMs": 14952.399999976158,
+      "output": {
+        "tokenCount": 2660551,
+        "injectionCount": 313006,
+        "errorCount": 0,
+        "tokenSha256": "b888a882b11b6c0fae17b3cf12fc506fdfdc700462fb71d8ec921d3b9d3ce2aa",
+        "stylesSha256": "12e0c0a7c36388b90a978c344bb8a51f5dd0dedd639a701e2c1291c2dc8e9edb",
+        "structuralSha256": "a4ca37deba5ce3f3356547a63f9b742cd479514eb697fa9f6a801a9ddb21952b",
+        "layers": 313007,
+        "wasmBytes": 531562496,
+        "queryCalls": 313090,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 313007,
+          "shared": {
+            "registeredLanguages": 3,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 531562496,
+              "pages": 8111
+            },
+            "runtimeEntries": 3,
+            "runtimeCount": 3,
+            "parserCount": 3,
+            "languageCount": 3,
+            "queryCount": 5,
+            "runtimes": [
+              {
+                "languageId": "typescript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              },
+              {
+                "languageId": "jsdoc",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 0,
+                "injectionQueryCount": 0
+              },
+              {
+                "languageId": "regex",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 0,
+                "injectionQueryCount": 0
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 3783266304
+    },
+    {
+      "corpus": "dense-recovery",
+      "mib": 10,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 10,
+          "corpus": "dense-recovery",
+          "bytes": 10485760,
+          "utf16Length": 10485760,
+          "lines": 381301,
+          "sha256": "d543780e0da322670cf9c3bc3aee045d94629e5c6176f60892a45ec001a93141"
+        }
+      ],
+      "highlightedFrameMs": 19372.30000001192,
+      "output": {
+        "tokenCount": 3241050,
+        "injectionCount": 381300,
+        "errorCount": 571950,
+        "tokenSha256": "aceaa7f0335fda2433a8a2ce46a068a017d4fdedc5322ecfdaa7b3f5d769b599",
+        "stylesSha256": "12e0c0a7c36388b90a978c344bb8a51f5dd0dedd639a701e2c1291c2dc8e9edb",
+        "structuralSha256": "366eea58870bdae06fb9f405e7412bfdf0f744d4fca626c9dfe220f27e052c73",
+        "layers": 381301,
+        "wasmBytes": 754712576,
+        "queryCalls": 381384,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 381301,
+          "shared": {
+            "registeredLanguages": 3,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 754712576,
+              "pages": 11516
+            },
+            "runtimeEntries": 3,
+            "runtimeCount": 3,
+            "parserCount": 3,
+            "languageCount": 3,
+            "queryCount": 5,
+            "runtimes": [
+              {
+                "languageId": "typescript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              },
+              {
+                "languageId": "jsdoc",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 0,
+                "injectionQueryCount": 0
+              },
+              {
+                "languageId": "regex",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 0,
+                "injectionQueryCount": 0
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 5628911616
+    },
+    {
+      "corpus": "html",
+      "mib": 10,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 10,
+          "corpus": "html",
+          "bytes": 10485760,
+          "utf16Length": 10485760,
+          "lines": 238312,
+          "sha256": "7aa184317607a4a9c0427647807ce3beb92c134a4b7709fbb8d22494d25c073f"
+        }
+      ],
+      "highlightedFrameMs": 17433.700000047684,
+      "output": {
+        "tokenCount": 1906515,
+        "injectionCount": 3,
+        "errorCount": 1,
+        "tokenSha256": "357b7c032878a12e95cdf08cc549ec29f62e0c52824cbcd2d4aa202f3646cb21",
+        "stylesSha256": "10d83c677887ee9c2ef3526ef1d17c77e4cee9d82e637fa4390698b71960fccc",
+        "structuralSha256": "a489fb46b8f659551ef052d4ded140a7064dd028cb36b1e87d4bd126b3eca7a2",
+        "layers": 4,
+        "wasmBytes": 375783424,
+        "queryCalls": 137,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 4,
+          "shared": {
+            "registeredLanguages": 4,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 375783424,
+              "pages": 5734
+            },
+            "runtimeEntries": 4,
+            "runtimeCount": 4,
+            "parserCount": 4,
+            "languageCount": 4,
+            "queryCount": 9,
+            "runtimes": [
+              {
+                "languageId": "html",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              },
+              {
+                "languageId": "css",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 0
+              },
+              {
+                "languageId": "javascript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              },
+              {
+                "languageId": "regex",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 0,
+                "injectionQueryCount": 0
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 3234779136
+    },
+    {
+      "corpus": "injected",
+      "mib": 10,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 10,
+          "corpus": "injected",
+          "bytes": 10485760,
+          "utf16Length": 10485760,
+          "lines": 149798,
+          "sha256": "8c3507479c949939703c1ed2e77f1687c9ca45876f6f41c7c3cad0e02874f4bf"
+        }
+      ],
+      "highlightedFrameMs": 8609.100000023842,
+      "output": {
+        "tokenCount": 1198389,
+        "injectionCount": 2,
+        "errorCount": 0,
+        "tokenSha256": "88e56993d63b839aafea82db745f6aa008aa84b204dd680b12811cbeb709205d",
+        "stylesSha256": "00fbc6a7ea9069b02202fb28c8f91e00d1e72b24565173915f2c16412336521d",
+        "structuralSha256": "671b0201bdc698a3acefda197dc84f613122267a5b6259953115b3125f934eca",
+        "layers": 3,
+        "wasmBytes": 329252864,
+        "queryCalls": 86,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 3,
+          "shared": {
+            "registeredLanguages": 3,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 329252864,
+              "pages": 5024
+            },
+            "runtimeEntries": 3,
+            "runtimeCount": 3,
+            "parserCount": 3,
+            "languageCount": 3,
+            "queryCount": 5,
+            "runtimes": [
+              {
+                "languageId": "typescript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              },
+              {
+                "languageId": "jsdoc",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 0,
+                "injectionQueryCount": 0
+              },
+              {
+                "languageId": "regex",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 0,
+                "injectionQueryCount": 0
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 1692573696
+    },
+    {
+      "corpus": "long-line",
+      "mib": 10,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 10,
+          "corpus": "long-line",
+          "bytes": 10485760,
+          "utf16Length": 10485760,
+          "lines": 11,
+          "sha256": "d075796c9a42a2c7a87f24faf5c696ea7e76afd7734213d30c4a022d1f69b6d5"
+        }
+      ],
+      "highlightedFrameMs": 14667.199999988079,
+      "output": {
+        "tokenCount": 4194270,
+        "injectionCount": 0,
+        "errorCount": 0,
+        "tokenSha256": "851b2d8a789f61dd319561e7251be7ab610000257fe3f21b5193ca1e5fbbdd73",
+        "stylesSha256": "7355279f1c56edca2128aad947325b973de79a32d1cecd040d94e48fd25e926a",
+        "structuralSha256": "6b1b0428f4a915bfe7c8d0fd8fa376374b0f0ba4c6f6aeb77950b81108333c31",
+        "layers": 1,
+        "wasmBytes": 1343553536,
+        "queryCalls": 42,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 1,
+          "shared": {
+            "registeredLanguages": 1,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 1343553536,
+              "pages": 20501
+            },
+            "runtimeEntries": 1,
+            "runtimeCount": 1,
+            "parserCount": 1,
+            "languageCount": 1,
+            "queryCount": 3,
+            "runtimes": [
+              {
+                "languageId": "typescript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 3755511808
+    },
+    {
+      "corpus": "malformed",
+      "mib": 10,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 10,
+          "corpus": "malformed",
+          "bytes": 10485760,
+          "utf16Length": 10485760,
+          "lines": 388362,
+          "sha256": "019df5308dd293ca134dab95b5658ecc5419e05a9a19cc026f7a88433bc7f6d4"
+        }
+      ],
+      "highlightedFrameMs": 16411.099999964237,
+      "output": {
+        "tokenCount": 2718528,
+        "injectionCount": 0,
+        "errorCount": 388361,
+        "tokenSha256": "947dc1c153497dc523e9ff76b9ae22703b132f8c29a31c77720faf60aa34914a",
+        "stylesSha256": "9eb01de62935e23935b9fe54affb3fc4d84527512e8539847f93bd231020e2aa",
+        "structuralSha256": "fbbc10a9d0bfd0f3f9bee5a831fd8389bdc4fa5fe862a1937f911ae6fc2dc378",
+        "layers": 1,
+        "wasmBytes": 1056571392,
+        "queryCalls": 42,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 1,
+          "shared": {
+            "registeredLanguages": 1,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 1056571392,
+              "pages": 16122
+            },
+            "runtimeEntries": 1,
+            "runtimeCount": 1,
+            "parserCount": 1,
+            "languageCount": 1,
+            "queryCount": 3,
+            "runtimes": [
+              {
+                "languageId": "typescript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 3172052992
+    },
+    {
+      "corpus": "realistic",
+      "mib": 10,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 10,
+          "corpus": "realistic",
+          "bytes": 10485760,
+          "utf16Length": 10485760,
+          "lines": 199097,
+          "sha256": "5c73e5a3a23bbd29644f236755ec743af9523da1a558f89bddd9493dd9084c77"
+        }
+      ],
+      "highlightedFrameMs": 12098.300000011921,
+      "output": {
+        "tokenCount": 2588251,
+        "injectionCount": 0,
+        "errorCount": 1,
+        "tokenSha256": "79e3a0c5668b49066797e95eed09b5a62d33b28a592b1da9128c0de70d3d5149",
+        "stylesSha256": "dd917a8bd58dceeea087cc1a2bb2ddbdd7db00d7fe1852cdd2f6eb31b65f7cfb",
+        "structuralSha256": "cc5d4458e95eb76fac07ab2f870c79795da05e223b967f687218ec92c87bd096",
+        "layers": 1,
+        "wasmBytes": 1043202048,
+        "queryCalls": 42,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 1,
+          "shared": {
+            "registeredLanguages": 1,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 1043202048,
+              "pages": 15918
+            },
+            "runtimeEntries": 1,
+            "runtimeCount": 1,
+            "parserCount": 1,
+            "languageCount": 1,
+            "queryCount": 3,
+            "runtimes": [
+              {
+                "languageId": "typescript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 3333275648
+    },
+    {
+      "corpus": "unicode",
+      "mib": 10,
+      "status": "ok",
+      "errors": [],
+      "benchmarkSha256": "9809c3b9ed929e92f0c9a71960636c5b949cccfd3225f4a95d70748e9bd1729a",
+      "git": "15e3b0f1d92caf9a62559316bf60306620841310",
+      "dirtySource": "M .github/workflows/workspace-libraries.yml\n M editor/bench/compare/README.md\n M editor/bench/compare/build.mjs\n M editor/bench/compare/fixture.mjs\n M editor/bench/compare/full-document.mjs\n M editor/bench/compare/full-document.test.mjs\n M editor/bench/compare/open-profile.mjs\n M editor/bench/compare/open-profile.test.mjs\n M editor/bench/compare/output-proof.mjs\n M editor/bench/compare/page.js\n M editor/bench/compare/provenance.mjs\n M editor/bench/compare/run.mjs\n M editor/bench/compare/singapore.js\n M plans/339-singapore-full-parse-speed.md",
+      "fixture": [
+        {
+          "mib": 10,
+          "corpus": "unicode",
+          "bytes": 14680063,
+          "utf16Length": 10485760,
+          "lines": 233017,
+          "sha256": "6c7812f63f40efb25ee65b6f187fde0890af1f0eeaf17cc41a9d8a792891b70a"
+        }
+      ],
+      "highlightedFrameMs": 6992.400000035763,
+      "output": {
+        "tokenCount": 1631119,
+        "injectionCount": 0,
+        "errorCount": 0,
+        "tokenSha256": "ef935431b7dae805b21c0359f57031c4d27ef814329e541dfa718e6aab1f2eb9",
+        "stylesSha256": "2223fe3f3e051ca6b92138a5983dd81446bbe8fa00d28edfa5b08fa757187b85",
+        "structuralSha256": "5f270d10706424f2925b087a0c9c34d4c8b784073890e5f923be8354e0ce5e77",
+        "layers": 1,
+        "wasmBytes": 504168448,
+        "queryCalls": 42,
+        "matchLimitExceeded": false
+      },
+      "retention": [
+        {
+          "documentCount": 1,
+          "snapshotCount": 1,
+          "treeCount": 1,
+          "shared": {
+            "registeredLanguages": 1,
+            "wasmMemory": {
+              "kind": "committed",
+              "bytes": 504168448,
+              "pages": 7693
+            },
+            "runtimeEntries": 1,
+            "runtimeCount": 1,
+            "parserCount": 1,
+            "languageCount": 1,
+            "queryCount": 3,
+            "runtimes": [
+              {
+                "languageId": "typescript",
+                "highlightQueryCount": 1,
+                "foldQueryCount": 1,
+                "injectionQueryCount": 1
+              }
+            ]
+          },
+          "unmeasuredBytes": [
+            "javascript-objects",
+            "source-strings",
+            "grammars-parsers-queries",
+            "trees",
+            "markdown-documents",
+            "worker-heap",
+            "wasm-allocator-live"
+          ],
+          "unmeasuredResources": ["markdown-parser-language-query-handles", "markdown-tree-handles"]
+        }
+      ],
+      "sampledPeakRssBytes": 1827577856
+    }
+  ],
+  "smokes": [
+    {
+      "name": "cold",
+      "status": "ok",
+      "highlightedFrameMs": 628,
+      "benchmarkSha256": "c242f7d09241bc4e2321822cc068e40897e703a962773e0a8d9a414862757bdf",
+      "output": {
+        "tokenCount": 119840,
+        "injectionCount": 0,
+        "errorCount": 0
+      }
+    },
+    {
+      "name": "warm",
+      "status": "ok",
+      "highlightedFrameMs": 510.69999998807907,
+      "benchmarkSha256": "c242f7d09241bc4e2321822cc068e40897e703a962773e0a8d9a414862757bdf",
+      "output": {
+        "tokenCount": 119840,
+        "injectionCount": 0,
+        "errorCount": 0
+      }
+    },
+    {
+      "name": "lifecycle",
+      "status": "ok",
+      "highlightedFrameMs": 1580.800000011921,
+      "benchmarkSha256": "c242f7d09241bc4e2321822cc068e40897e703a962773e0a8d9a414862757bdf",
+      "output": {
+        "tokenCount": 266050,
+        "injectionCount": 31300,
+        "errorCount": 0
+      },
+      "lifecycle": {
+        "retainedTextSnapshots": 4,
+        "afterEdits": [
+          {
+            "documentCount": 1,
+            "snapshotCount": 4,
+            "treeCount": 125202
+          }
+        ],
+        "multiple": [
+          {
+            "documentCount": 3,
+            "snapshotCount": 6,
+            "treeCount": 187804
+          }
+        ],
+        "afterDisposal": [
+          {
+            "documentCount": 1,
+            "snapshotCount": 4,
+            "treeCount": 125202
+          }
+        ],
+        "cancellation": {
+          "kind": "cancelled",
+          "coveredRange": {
+            "startIndex": 0,
+            "endIndex": 0
+          },
+          "reason": "superseded",
+          "elapsedMs": 70.19999998807907,
+          "budgetMs": 20000,
+          "timings": [
+            {
+              "name": "treeSitter.parseRoot",
+              "durationMs": 47.59999996423721
+            },
+            {
+              "name": "treeSitter.injectionDiscovery",
+              "durationMs": 7.699999988079071
+            }
+          ]
+        },
+        "sampledPeakRssBytes": 2060058624
+      }
+    }
+  ],
+  "receipts": [
+    {
+      "label": "plan339 integrated control corpora and lifecycle",
+      "requestId": "5812b27924f2",
+      "timestamp": "2026-10-08T21:01:08.318Z",
+      "quiet": true,
+      "class": "browser",
+      "queuedMs": 49398,
+      "wallMs": 35733,
+      "cpuUsageUsec": 48978623,
+      "memoryPeakBytes": 2049671168,
+      "exitCode": 1,
+      "oomKills": 0,
+      "leftoverProcesses": 0,
+      "quietHoldExpired": false,
+      "serversAtAdmission": 1,
+      "overlaps": [
+        {
+          "class": "light",
+          "server": true,
+          "startedAt": "2026-10-08T13:27:12.978Z",
+          "endedAt": null
+        }
+      ]
+    },
+    {
+      "label": "plan339 ten MiB control coverage",
+      "requestId": "cf77e914650f",
+      "timestamp": "2026-10-08T21:04:10.155Z",
+      "quiet": true,
+      "class": "suite",
+      "queuedMs": 13095,
+      "wallMs": 168511,
+      "cpuUsageUsec": 209010936,
+      "memoryPeakBytes": 6432743424,
+      "exitCode": 0,
+      "oomKills": 0,
+      "leftoverProcesses": 0,
+      "quietHoldExpired": false,
+      "serversAtAdmission": 1,
+      "overlaps": [
+        {
+          "class": "light",
+          "server": true,
+          "startedAt": "2026-10-08T13:27:12.978Z",
+          "endedAt": null
+        }
+      ]
+    },
+    {
+      "label": "plan339 final M0 repeated cold warm",
+      "requestId": "b50005324a65",
+      "timestamp": "2026-10-08T21:17:03.662Z",
+      "quiet": true,
+      "class": "bench",
+      "queuedMs": 82724,
+      "wallMs": 58641,
+      "cpuUsageUsec": 69405657,
+      "memoryPeakBytes": 1498374144,
+      "exitCode": 0,
+      "oomKills": 0,
+      "leftoverProcesses": 0,
+      "quietHoldExpired": false,
+      "serversAtAdmission": 1,
+      "overlaps": [
+        {
+          "class": "light",
+          "server": true,
+          "startedAt": "2026-10-08T13:27:12.978Z",
+          "endedAt": null
+        }
+      ]
+    },
+    {
+      "label": "plan339 final bounded cold warm and lifecycle smoke",
+      "requestId": "a19abf1dd844",
+      "timestamp": "2026-10-08T21:19:21.305Z",
+      "quiet": true,
+      "class": "browser",
+      "queuedMs": 78646,
+      "wallMs": 19651,
+      "cpuUsageUsec": 26511199,
+      "memoryPeakBytes": 2375110656,
+      "exitCode": 0,
+      "oomKills": 0,
+      "leftoverProcesses": 0,
+      "quietHoldExpired": false,
+      "serversAtAdmission": 1,
+      "overlaps": [
+        {
+          "class": "light",
+          "server": true,
+          "startedAt": "2026-10-08T13:27:12.978Z",
+          "endedAt": null
+        }
+      ]
+    }
+  ],
+  "thresholds": {
+    "M1": {
+      "workerFullMaxMs": 4000,
+      "highlightedFrameMaxMs": 4500,
+      "medianTotalWorkProxyMaxMs": {
+        "cold": 3539.052750035763,
+        "warm": 3576.3765000357625
+      },
+      "phaseRegression": "Reject a median increase above max(1 ms, baseline maximum minus baseline minimum), using the five frozen baseline samples for that phase and startup condition.",
+      "memory": "Reject a matched whole-job peak at least twice baseline, unless the smaller-memory variant meets the latency target.",
+      "repetitions": 5
+    },
+    "totalWorkProxy": "Sum each sample worker parse/query elapsed durations and main-thread union work. This is a diagnostic work proxy, not CPU seconds or elapsed open time."
+  },
+  "limits": [
+    "Headless frames are presentation opportunities.",
+    "Controls have one sample each and establish output correctness, not latency distributions.",
+    "RSS is a 100 ms sampled simultaneous sum over pre-open browser process IDs and includes shared-page double counting.",
+    "Scheduler memory peaks cover each whole batch, including controller, browser, hashes, traces and lifecycle work.",
+    "One declared server remained running during each quiet job; new admissions were excluded with the admission lock.",
+    "WASM capacity is committed bytes; allocator-live bytes remain unmeasured.",
+    "Runtime WASM was rebuilt byte-identically; grammar WASMs were pinned and hashed but were not byte-identically rebuilt.",
+    "Control runs precede the empty-process-list RSS guard and its formatting. Every recorded process list is nonempty, and all measured browser asset hashes equal the final baseline. Each control retains its own benchmark fingerprint.",
+    "The final unused-export gate made readProcessRss private after these measurements. Its implementation, call sites and measured browser assets are unchanged."
+  ],
+  "memoryStatus": {
+    "status": "Superseded instrumentation observations; timing baseline and M1 thresholds remain frozen",
+    "replacement": "../memory-correction/qualification.json",
+    "reasons": [
+      "Linux post-open RSS/high-water parsing omitted tab-separated fields",
+      "Lifecycle probe retained every full reply",
+      "Disposal gate checked only document counts"
+    ]
+  }
+}

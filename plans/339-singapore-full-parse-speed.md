@@ -140,10 +140,17 @@ For injections, retain lazy language registration while accounting for its full 
 
 - [x] Commit a full-document mode to the existing comparison benchmark, with tests for source drift, partial/range results and degraded replies.
 - [x] Measure the 10 MiB browser workload and native parse control, keeping the competitor clocks reference-only.
-- [ ] Run quiet M0 qualification and add output checksums, root/injection coverage and exact provenance for the packaged WASM source/build.
-- [ ] Add the realistic, Unicode and injected corpora and a bounded browser smoke command. Record cold/warm startup and memory.
+- [x] Run quiet TypeScript M0 qualification with output checksums, root/injection coverage and packaged runtime WASM source/build provenance.
+- [x] Add realistic, Unicode and injected corpora and bounded browser smoke commands. Record cold/warm startup, memory, retained snapshots, edits, cancellation and multiple dense documents.
+- [ ] Qualify Markdown through resolver-owned root coverage and query-limit diagnostics. Complete byte-identical grammar WASM rebuilds before attributing performance to grammar build flags.
 
 Exit with a checked full-document baseline and the ranked bottleneck. Leave viewport-first off for every acceptance run.
+
+Qualification work in progress, 2026-10-08:
+
+- The benchmark checks canonical token, palette and structural hashes, root/injection bounds, query limits and final tokens. Five quiet cold-context and five warmed-runtime repetitions passed with fresh measured documents and identical canonical output across both conditions. The deterministic TypeScript and HTML controls passed at 1 MiB and 10 MiB, including complete dense injections. The Markdown control remains rejected.
+- The packaged runtime WASM is byte-identical to an `-O3`/LTO/`wasm-opt -O3` rebuild of tree-sitter-x source `fc034c3ad42a6a5669202fa40303bfb2cd8829fc` with wasi-sdk 34.0 and Binaryen 132. [Build provenance](../editor/docs/performance/singapore-full-parse-2026-10-08/runtime-wasm-provenance.json) records the flags, exports and grammar input hashes. The grammar WASM has not had a byte-identical rebuild.
+- PR #1021 and the complete-injection repair #1062 are integrated. The earlier five cold and five warm runs remain preliminary evidence. The frozen M0 below uses the integrated main and expanded retention and lifecycle controls. Phase 0 remains partial because Markdown proof is absent.
 
 ### Phase 1: Remove the largest single-worker cost
 
@@ -186,3 +193,149 @@ bun -e 'import { Language, Parser } from "web-tree-sitter"; await Parser.init();
 ```
 
 The bounded standalone and worker evidence is under `/work/reports/plan-339/qualification/injection-cost/`. Dependency source was unchanged. An upstream grammar fix needs the owner's request under the local upstream policy; dropping error records would invalidate the full-output comparison. Consumer impact beyond the syntax-result error records is unconfirmed.
+
+### Qualification controls and unresolved Markdown proof, 2026-10-08
+
+The full-document harness now measures simultaneous sampled browser RSS and
+records idle-fence worker retention. Its separate lifecycle control retains four
+text snapshots across three edits, restores the original token and structural
+hashes, opens two extra dense documents, supersedes an already dispatched dense
+parse and checks its cancellation reply, then verifies that disposal restores
+the active document's snapshot/tree counts. The dense fixtures require every
+expected injection range, including the tail, exact token counts and retained
+grammar recovery records. CI runs a bounded dense lifecycle smoke.
+
+A 1 MiB grammar-valid lifecycle run returned 31,300 injections and 266,050
+tokens with zero syntax errors. Its worker held 125,202 trees in four edited
+snapshots, grew to 187,804 trees across three documents, and returned to 125,202
+after the extra documents were disposed. The cancelled parse reported
+`reason: superseded` after root parsing and injection discovery had started.
+These are bounded verification observations, not a throughput improvement.
+
+The Markdown control remains unqualified. Reproduce with
+`bun run --cwd editor/bench/compare build:full`, then
+`bun run --cwd editor/bench/compare smoke:full --corpus markdown --output <evidence>`.
+The root Markdown resolver exposes decorations, highlights, folds, injections
+and line positions, but no actual root-tree bounds. The worker's
+`parseMarkdownDocument` stores the resolver with `layers: []`; only embedded
+syntax contributes ordinary Tree-sitter layers. Its full reply also lacks the
+explicit full-analysis marker. The strict gate rejects this reply. Inferring root
+coverage from requested ranges, line count or source length would conceal the
+missing proof. A resolver-owned coverage/query-limit diagnostic is needed before
+Markdown timings can qualify. No dependency source was changed and no new issue
+was opened. Realistic TypeScript, long lines, Unicode, malformed TypeScript,
+sparse JSDoc/regex and HTML controls passed the prior 1 MiB strict run; final
+qualification records their reruns and the Markdown failure separately.
+
+### Frozen TypeScript M0 and next experiment, 2026-10-09
+
+[Qualification evidence](../editor/docs/performance/singapore-full-parse-2026-10-08/qualified-m0/qualification.json)
+contains all samples, canonical output, phase budgets, build hashes and sanitized
+whole-job memory receipts. Compressed experiments and browser traces sit beside
+it. These instrumented, headless runs establish a full-document baseline. They
+make no headline performance or physical-presentation claim.
+
+The frozen 10 MiB repeated fixture has five quiet repetitions per startup
+condition, a fresh measured document and tree, 1,198,376 tokens, no syntax errors,
+and identical token, palette and structural hashes across all ten samples.
+Every result covers the actual root from 0 through 10,485,760 UTF-16 units and
+reports no query-limit exhaustion. The warm condition keeps a separate 1 MiB
+prime editor on the shared worker. One declared server remained running during
+quiet admission; the admission lock excluded new jobs for the measured span.
+
+| Metric                         | Cold median |   Cold p95 | Warm median |   Warm p95 |
+| ------------------------------ | ----------: | ---------: | ----------: | ---------: |
+| Complete highlighted frame     |  4,877.9 ms | 4,922.6 ms |  4,887.9 ms | 4,953.0 ms |
+| Worker full work               |  4,700.7 ms | 4,735.5 ms |  4,755.7 ms | 4,824.1 ms |
+| Structural walk                |  1,185.7 ms | 1,203.0 ms |  1,168.3 ms | 1,206.7 ms |
+| Highlight query and predicates |  1,315.9 ms | 1,332.5 ms |  1,254.9 ms | 1,287.8 ms |
+| Token-store construction       |      1.2 ms |     1.3 ms |      1.3 ms |     1.6 ms |
+| Largest main-thread task       |     46.8 ms |    48.1 ms |     39.1 ms |    44.5 ms |
+
+M1 now requires all five repetitions in each condition to stay within 4,000 ms
+worker full work and 4,500 ms complete highlighted frame. It also requires a
+25% reduction in median diagnostic work, measured as each sample's worker
+parse/query elapsed durations plus main-thread union work. The frozen ceilings
+are 3,539.052750035763 ms cold and 3,576.3765000357625 ms warm. This work measure
+is a proxy, not CPU seconds. Reject a phase median increase greater than the
+larger of 1 ms and that phase's frozen maximum-minus-minimum spread. Reject a
+latency win that doubles a matched whole-job peak unless the smaller-memory
+variant meets the target. M1 has not passed.
+
+The historical pre-review baseline batch's whole-job peak was 1,498,374,144 bytes. The 1 MiB controls
+and lifecycle batch peaked at 2,049,671,168 bytes, and the 10 MiB controls batch
+at 6,432,743,424 bytes. These include browser control, hashes, traces and
+retention inspection; they are separate from sampled browser RSS and committed
+WASM capacity. These memory receipts are superseded by the correction below.
+The original raw measurements remain intact. All three receipts show zero OOM kills and zero leftovers. The
+1 MiB batch exited 1 because the final Markdown proof was correctly rejected.
+The 10 MiB batch completed all eight controls, including 313,006 grammar-valid
+injections with zero errors and 381,300 recovery injections with 571,950 error
+records. Those controls have one repetition each and establish correctness,
+not timing distributions.
+
+The controls precede a final portable RSS guard that reports an unavailable
+process list as unknown memory. Every recorded process list was nonempty. The
+final baseline and every earlier control have byte-identical measured browser
+assets; their distinct benchmark fingerprints are preserved. The final harness
+has a regression test for the unavailable-list case.
+
+Reproduce from the checkout after the documented root install and browser setup:
+
+```sh
+bun run --cwd editor/bench/compare test
+bun run --cwd editor/bench/compare build:full
+bun run --cwd editor/bench/compare smoke:full --corpus dense-injected --lifecycle --timeout 150000 --output <lifecycle-evidence>
+node editor/bench/compare/run.mjs --profile-open --open-only --full-document --sizes 10 --editors singapore --repetitions 5 --timeout 60000 --condition quiet --output <cold-evidence>
+node editor/bench/compare/run.mjs --profile-open --open-only --full-document --sizes 10 --editors singapore --repetitions 5 --timeout 60000 --condition quiet --warm --output <warm-evidence>
+node editor/bench/compare/summarize-open.mjs <cold-experiment.json.gz>
+```
+
+Use the execution host's quiet scheduler for measurement. Repeat the control
+command with `--corpus realistic|long-line|unicode|malformed|injected|html|dense-injected|dense-recovery`
+and one repetition at each size. Preserve Markdown's failure with
+`--corpus markdown`; it remains outside the qualified timing set.
+
+Phase 1 starts by splitting query engine, predicate and materialization costs
+inside the 1.25 to 1.32 second highlight phase. The separate 1.17 to 1.19 second
+structural walk is the other leading cost. Inspect `collectTreeData`,
+`walkTreeCursor`, `collectCursorBracket` and `collectCursorError` in
+`editor/packages/tree-sitter/src/treeSitter/treeSitter.worker.ts`, recording
+node visits and native getter counts before choosing a candidate. Keep the
+whole-tree traversal and all diagnostics. No optimization or measured ceiling
+has been accepted yet.
+
+### Memory review corrections, 2026-10-09
+
+[Corrected memory evidence](../editor/docs/performance/singapore-full-parse-2026-10-08/memory-correction/qualification.json)
+replaces the historical memory observations while preserving the frozen timing
+baseline and M1 thresholds. The probe now parses Linux RSS/high-water fields
+with tab or space separation, retains only the latest unproved reply, counts
+replies monotonically, and releases packed/structural payloads after hashing.
+The disposal gate compares worker/document/snapshot identities, tree and
+snapshot counts, and source reads, pins and UTF-16 units. Committed WASM
+capacity may remain allocated.
+
+All 28 refreshed samples passed: five cold and five warm 10 MiB repetitions,
+sixteen 1 MiB/10 MiB controls, and cold/warm 1 MiB smoke. Every canonical output
+and actual coverage list equals its historical counterpart. Linux per-process
+RSS and high-water values are now available for every observed process. The
+dense lifecycle returns to one document, four snapshots, 125,202 trees, four
+source reads, zero pins and 4,194,304 retained source units, with the same
+identities as after the edits. Post-disposal, post-GC JavaScript heap is
+91,100,436 bytes; simultaneous observed process RSS is 799,404,032 bytes. These
+remain distinct from allocator-live bytes, which are unmeasured.
+
+The corrected cold/warm batch peaked at 1,572,909,056 whole-job bytes. All ten
+samples completed before an invalid operator corpus argument stopped that
+batch with exit 1; no control sample was attempted in that invocation. The
+corrected controls/smoke batch exited 0 and peaked at 6,544,244,736 bytes. Both
+receipts show zero OOM kills, zero leftovers and no expired quiet hold. The
+required coverage metadata, hashes and traces still have diagnostic memory
+costs; these are memory qualification results, not memory-reduction claims.
+
+The three reviewer regressions fail with the original whitespace parser,
+append-only reply retention and document-count-only disposal gate. The fixed
+probe suite passes 39 tests, including proof release and rejection of unchanged
+document counts with leaked trees, snapshots, sources or changed identities.
+No shipping parser/editor source or open timing markers changed.

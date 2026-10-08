@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto'
 import { build } from 'vite'
 import { editors } from './protocol.mjs'
 import { fullDocumentTransform } from './full-document.mjs'
+import { sourceIdentity } from './provenance.mjs'
 
 export const root = dirname(fileURLToPath(import.meta.url))
 export const output = resolve(root, 'dist')
@@ -66,6 +67,7 @@ function minimalEntry(editor, highlighted) {
 }
 
 export async function buildAll({ fullDocument = false } = {}) {
+  const sourceSha256 = await sourceIdentity(root)
   const sizes = []
   const template = await readFile(resolve(root, 'page.html'), 'utf8')
   const page = await readFile(resolve(root, 'page.js'), 'utf8')
@@ -94,6 +96,10 @@ export async function buildAll({ fullDocument = false } = {}) {
                   return (minimal ? minimalEntry(editor, highlighted) : page)
                     .replace("'ACTOR'", JSON.stringify(resolve(root, `${editor}.js`)))
                     .replace("'FIXTURE'", JSON.stringify(resolve(root, 'fixture.mjs')))
+                    .replace(
+                      "'./output-proof.mjs'",
+                      JSON.stringify(resolve(root, 'output-proof.mjs')),
+                    )
                     .replaceAll('HIGHLIGHTED', JSON.stringify(highlighted))
               },
               transform(code, id) {
@@ -171,8 +177,10 @@ export async function buildAll({ fullDocument = false } = {}) {
       })
     }
   }
+  if (sourceSha256 !== (await sourceIdentity(root)))
+    throw new RangeError('Benchmark sources changed during build')
   await mkdir(output, { recursive: true })
-  await writeFile(resolve(output, 'mode.json'), JSON.stringify({ fullDocument }))
+  await writeFile(resolve(output, 'mode.json'), JSON.stringify({ fullDocument, sourceSha256 }))
   await writeFile(resolve(output, 'bundles.json'), JSON.stringify(sizes, null, 2))
   return sizes
 }
