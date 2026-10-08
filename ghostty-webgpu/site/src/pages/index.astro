@@ -42,7 +42,7 @@ const base = import.meta.env.BASE_URL
       <nav class="links" aria-label="Project links">
         <a href="https://github.com/ShaulLavo/ghostty-webgpu">GitHub</a>
         <a href="https://www.npmjs.com/package/ghostty-webgpu">npm</a>
-        <a href="https://github.com/ShaulLavo/ghostty-webgpu/blob/main/docs/integration.md">Docs</a>
+        <a href={`${base.replace(/\/$/, '')}/docs/`}>Docs</a>
       </nav>
     </header>
 
@@ -93,7 +93,7 @@ socket.binaryType <span class="tk-p">=</span> <span class="tk-s">'arraybuffer'</
 
 terminal.<span class="tk-f">onData</span><span class="tk-p">((</span>bytes<span class="tk-p">) =&gt;</span> <span class="tk-p">{'{'}</span>
   <span class="tk-k">if</span> <span class="tk-p">(</span>socket.readyState <span class="tk-p">!==</span> <span class="tk-t">WebSocket</span>.OPEN<span class="tk-p">)</span> <span class="tk-k">return</span>
-  socket.<span class="tk-f">send</span><span class="tk-p">(</span>bytes<span class="tk-p">)</span>
+  socket.<span class="tk-f">send</span><span class="tk-p">(</span><span class="tk-k">new</span> <span class="tk-t">Uint8Array</span><span class="tk-p">(</span>bytes<span class="tk-p">))</span>
 <span class="tk-p">{'}'})</span>
 
 socket.<span class="tk-f">addEventListener</span><span class="tk-p">(</span><span class="tk-s">'message'</span><span class="tk-p">,</span> <span class="tk-p">(</span><span class="tk-p">{'{'}</span> data <span class="tk-p">{'}'}</span><span class="tk-p">) =&gt;</span> <span class="tk-p">{'{'}</span>

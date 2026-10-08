@@ -1,0 +1,39 @@
+---
+title: Scrollback and reading history
+description: Read retained rows without changing the viewport or selection.
+sidebar:
+  order: 7
+---
+
+import { Code } from '@astrojs/starlight/components'
+import sample from '../../../../examples/history.ts?raw'
+
+You will read the last 100 retained rows as text. Start with a live main-thread terminal.
+
+## 1. Read rows
+
+<Code code={sample} lang='ts' title='history.ts' />
+
+`lineCount` includes retained history and visible rows, including empty visible rows. `readLines(start, end)` reads a half-open interval. Each row has `text` and `wrapped`. `wrapped` means that row soft-wraps into the next row.
+
+## 2. Choose retention
+
+Set `appearance.scrollbackLimit` for a row budget and `appearance.scrollbackByteLimit` for a byte budget. Retention is page-granular, so the actual row count can vary around the requested limit. Zero disables history. Read `lineCount` for the current count.
+
+A single `readLines` call returns at most 1,024 rows. Paginate larger reads by advancing by the number returned. Writes, eviction and reflow between calls can shift row indices. Use a paused producer when you need a stable export.
+
+## 3. Read the active screen
+
+History reads use current emulator state, even before the terminal paints. While the alternate screen is active, reads cover that screen. Return to the primary screen to read its retained history. `visibleLines` reads the last submitted viewport frame.
+
+## If it doesn't work
+
+### A read returns fewer rows than requested
+
+Check the per-call cap, current count and active screen. Bounds clamp to the retained range.
+
+### A reload shows the old frame but the shell state is empty
+
+A captured viewport restores paint. Restore the emulator through replay or a server session protocol. The [saved viewport guide](https://github.com/ShaulLavo/fregat/blob/main/ghostty-webgpu/docs/saved-viewport.md) describes the visual checkpoint.
+
+Next, read [how damage tracking works](https://shaullavo.github.io/ghostty-webgpu/docs/concepts/damage-tracking/).
