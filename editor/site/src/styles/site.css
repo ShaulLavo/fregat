@@ -1,13 +1,85 @@
-/* Site-specific styling stays here while the landing page design is chosen. */
-.placeholder-home {
-  max-width: 48rem;
-  margin: 4rem auto;
-  padding: 1.5rem;
-  font-family: system-ui, sans-serif;
+/* Starlight pages (the playground, the package list and the generated API reference) in the
+   docs manual's look: the same warm paper, serif chrome and JetBrains Mono, light and dark. */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url(../fonts/jetbrains-mono.woff2) format('woff2');
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
 }
-.live-editor {
-  display: flex;
-  flex-direction: column;
-  height: 20rem;
-  margin-block: 1.5rem;
+@font-face {
+  font-family: 'Source Serif 4';
+  src: url(../fonts/source-serif-4.woff2) format('woff2');
+  font-weight: 200 900;
+  font-display: swap;
+}
+
+:root,
+::backdrop {
+  --sl-font: 'Source Serif 4', Georgia, serif;
+  --sl-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --sl-text-body: 1.0625rem;
+  --sl-content-width: 46rem;
+
+  --sl-color-white: #f2eee5;
+  --sl-color-gray-1: #e3ded3;
+  --sl-color-gray-2: #d6d1c6;
+  --sl-color-gray-3: #a29c90;
+  --sl-color-gray-4: #6b665d;
+  --sl-color-gray-5: #3a3731;
+  --sl-color-gray-6: #23211d;
+  --sl-color-black: #1a1916;
+  --sl-color-accent-low: #253445;
+  --sl-color-accent: #6f98c4;
+  --sl-color-accent-high: #8db4dd;
+  --sl-color-bg-nav: var(--sl-color-black);
+  --sl-color-bg-sidebar: var(--sl-color-black);
+}
+
+:root[data-theme='light'],
+[data-theme='light'] ::backdrop {
+  --sl-color-white: #141310;
+  --sl-color-gray-1: #1f1d1a;
+  --sl-color-gray-2: #2b2925;
+  --sl-color-gray-3: #5c5850;
+  --sl-color-gray-4: #7d786e;
+  --sl-color-gray-5: #d3cfc6;
+  --sl-color-gray-6: #f3f1ec;
+  --sl-color-gray-7: #f7f5f1;
+  --sl-color-black: #fbfaf7;
+  --sl-color-accent-low: #dbe5ef;
+  --sl-color-accent: #2c5e91;
+  --sl-color-accent-high: #2c5e91;
+  --sl-color-bg-nav: var(--sl-color-black);
+  --sl-color-bg-sidebar: var(--sl-color-black);
+}
+
+.site-title {
+  font: italic 1.3125rem/1 var(--sl-font);
+  letter-spacing: -0.01em;
+  color: var(--sl-color-white);
+}
+.sl-markdown-content :is(h1, h2, h3, h4) {
+  font-weight: 600;
+}
+.sl-markdown-content code:not(pre code) {
+  color: #a3c18b;
+  background: none;
+  padding: 0;
+}
+:root[data-theme='light'] .sl-markdown-content code:not(pre code) {
+  color: #4b7238;
+}
+/* No hairlines and a quiet current page, as on the editor pages. */
+:root {
+  --sl-color-hairline: transparent;
+  --sl-color-hairline-light: transparent;
+  --sl-color-hairline-shade: transparent;
+}
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+  background: none;
+  color: var(--sl-color-accent-high);
+  font-weight: 600;
 }
