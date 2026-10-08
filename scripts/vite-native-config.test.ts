@@ -75,6 +75,8 @@ test.for(['bundle', 'native'] as const)(
     const result = spawnSync(
       node,
       [
+        // Node 22.12 requires an explicit opt-in to load TypeScript files.
+        '--experimental-strip-types',
         '--input-type=module',
         '--eval',
         `

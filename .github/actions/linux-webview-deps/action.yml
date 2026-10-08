@@ -1,0 +1,16 @@
+name: Install Linux webview dependencies
+description: Installs the Ubuntu dependencies needed to build the Linux webview host.
+
+runs:
+  using: composite
+  steps:
+    - name: Verify Linux dependency setup
+      shell: bash
+      run: bun --bun vitest run "$GITHUB_ACTION_PATH/action.test.ts" --environment node
+
+    - name: Install Linux webview build dependencies
+      shell: bash
+      run: |
+        sudo sed -i '\|^http://azure\.archive\.ubuntu\.com/ubuntu/|d' /etc/apt/apt-mirrors.txt
+        sudo apt-get update
+        sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev
