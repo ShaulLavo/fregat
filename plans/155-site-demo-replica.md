@@ -2,9 +2,11 @@
 
 ## Status and authorization
 
-- Status: APPROVED — research done 2026-09-25 (findings and proposed phases below). Owner questions answered
-  2026-09-26; the phone layout waits on Plan 143.
-- Priority: P3. The site is not live.
+- Status: Approved. The Plates landing page and animated replica shipped in
+  [PR #1012](https://github.com/ShaulLavo/fregat/pull/1012).
+- Live demo decision confirmed 2026-10-08. Delete the mock backend, app entry, demo assets,
+  browser scenarios and second site build. The landing page has no link to the retired demo.
+- Production site: https://shaulavo.dev/fregat/.
 - Planned at: Platform `9c1c45d1`, 2026-09-25. Origin: the UI library survey
   ([docs/ui-research/brainless.md](../docs/ui-research/brainless.md)).
 
@@ -15,7 +17,7 @@ way cursor.com's hero shows an animated copy of Cursor's UI rather than Cursor i
 plays a scripted story (files, editor, terminal, agents), loads in kilobytes instead of megabytes,
 loops, pauses off-screen and holds a final frame under reduced motion.
 
-## What exists today
+## Baseline at planning time
 
 - `apps/site` is Astro 5 with no React and no Tailwind: one page (`src/pages/index.astro`), one
   component, hand-written `styles/global.css`, deployed to GitHub Pages at `/fregat`.
@@ -194,12 +196,11 @@ the stage is intersecting and the tab is visible.
 
 ### 5. The real demo
 
-**Recommendation: take it off the landing page in the same change that ships the replica. Keep it
-as its own page (`/fregat/demo/`) behind a plain "try it live" link, with no iframe and no
-preload.** Deleting it is the owner's call (Owner question 1). What this rests on: it costs 6 MB
-gz to show a first frame, it fails to start when embedded in headless Chromium, and in 11 days it
-needed a mock-backend update in ten feature commits. It is still the only
-way to touch fregat without cloning.
+Decision confirmed 2026-10-08. Delete the live app demo at `/fregat/demo/`.
+The Plates replica shipped in [PR #1012](https://github.com/ShaulLavo/fregat/pull/1012).
+The site build now builds only the Astro landing page. The MSW backend, web entry,
+preview plugin and demo-only browser scenarios are removed. The cold-start test's offline
+font remains as a test fixture with its license.
 
 ### Open questions, answered
 
@@ -233,7 +234,7 @@ way to touch fregat without cloning.
    Decided 2026-09-26: owner — none yet: the phone hero shows what the app looks like on a phone,
    so it waits on [Plan 143](143-phone-layout.md)'s phone shell and is designed from it.
 
-### Proposed phases
+### Approved phases
 
 1. **Stage and still frame.** Split `globals.css` so the site can import theme, palette and
    utilities without the app's `@source` globs. Add build-only `@astrojs/react` and Tailwind to
@@ -247,4 +248,4 @@ way to touch fregat without cloning.
    script in 4. magic-move for the edit landing only if it stays within budget.
 3. **Agents section.** The brainless Claude and Codex ports replace the static `<ol>` sessions in
    `#agents` (as in [brainless.md](../docs/ui-research/brainless.md)), sharing the player.
-4. **The live demo**, as the owner decides in question 1.
+4. **The live demo.** Delete it, as decided in question 1 and confirmed 2026-10-08.

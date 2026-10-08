@@ -10,6 +10,8 @@ everything runs on your machine. open the same workspace from a browser, the des
 
 ## try it
 
+[The landing page](https://shaulavo.dev/fregat/) shows an animated workbench replica. Run the app locally with the steps below.
+
 clone this repo, then run with [bun](https://bun.sh)
 
 ```sh

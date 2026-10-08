@@ -3,13 +3,14 @@
     "target": "ES2023",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2023", "DOM"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node", "bun"],
     "strict": true,
     "allowImportingTsExtensions": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "allowArbitraryExtensions": true
   },
   "include": [
     "src/**/*.ts",
@@ -18,6 +19,7 @@
     "server/**/*.ts",
     "examples/**/*.ts",
     "vitest.browser.config.ts",
-    "vitest.server.config.ts"
+    "vitest.server.config.ts",
+    "../../global.d.ts"
   ]
 }

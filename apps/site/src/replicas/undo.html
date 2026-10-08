@@ -1,0 +1,51 @@
+<div class="rep win" style="--ww:660px" data-timeline="1000,2400,4000,5300" role="img" aria-label="A folder is deleted with its open tabs, then one undo restores the folder, the tabs and an unsaved edit.">
+  <div class="rep-title">{i:folder:sm}<span class="ws">fregat</span><span class="sp"></span><span class="ic">{i:layout:sm}{i:files:sm}</span></div>
+  <div class="win-body" style="grid-template-columns:220px minmax(0,1fr);height:330px">
+    <div class="tree">
+      <div class="r">{i:down:sm}apps/web/src/features</div>
+      <div class="r" style="padding-left:22px">{i:right:sm}settings</div>
+      <div class="r press-target" data-until="2" data-point="1" data-press style="padding-left:22px" data-sel>{i:down:sm}usage</div>
+      <div class="r" data-until="2" style="padding-left:40px"><span class="ts">TS</span>usage-meter.tsx<span class="mfg">M</span></div>
+      <div class="r" data-until="2" style="padding-left:40px"><span class="ts">TS</span>usage-store.ts</div>
+      <div class="r" data-until="2" style="padding-left:40px"><span class="ts">TS</span>format.ts</div>
+      <div class="r back" data-at="4" style="padding-left:22px">{i:down:sm}usage</div>
+      <div class="r back" data-at="4" style="padding-left:40px"><span class="ts">TS</span>usage-meter.tsx<span class="mfg">M</span></div>
+      <div class="r back" data-at="4" style="padding-left:40px"><span class="ts">TS</span>usage-store.ts</div>
+      <div class="r back" data-at="4" style="padding-left:40px"><span class="ts">TS</span>format.ts</div>
+      <div class="r" style="padding-left:22px">{i:right:sm}worktrees</div>
+      <div class="r">{i:right:sm}apps/server</div>
+    </div>
+    <div style="display:grid;grid-template-rows:36px 1fr;min-width:0">
+      <div class="rep-tabs">
+        <span class="tb on" data-until="2"><span class="ts">TS</span>usage-meter.tsx<span class="mod"></span></span>
+        <span class="tb" data-until="2"><span class="ts">TS</span>usage-store.ts</span>
+        <span class="tb" data-until="2"><span class="ts">TS</span>format.ts</span>
+        <span class="tb on" data-at="4"><span class="ts">TS</span>usage-meter.tsx<span class="mod"></span></span>
+        <span class="tb" data-at="4"><span class="ts">TS</span>usage-store.ts</span>
+        <span class="tb" data-at="4"><span class="ts">TS</span>format.ts</span>
+      </div>
+      <div class="rep-code" data-until="2">
+        <div class="ln"><i>8</i><span class="k">export function</span> <span class="f">UsageMeter</span>({ chat }: <span class="t">Props</span>) {</div>
+        <div class="ln"><i>9</i>  <span class="k">const</span> usage = <span class="f">useChatUsage</span>(chat.id)</div>
+        <div class="ln cur"><i>10</i>  <span class="k">const</span> label = <span class="f">formatLimit</span>(usage.window, <span class="s">'5h'</span>)</div>
+        <div class="ln"><i>11</i>  <span class="k">return</span> &lt;<span class="t">Meter</span> value={usage.used} label={label} /&gt;</div>
+        <div class="ln"><i>12</i>}</div>
+      </div>
+      <div class="empty" data-at="2" data-until="4">No open editors</div>
+      <div class="rep-code" data-at="4">
+        <div class="ln"><i>8</i><span class="k">export function</span> <span class="f">UsageMeter</span>({ chat }: <span class="t">Props</span>) {</div>
+        <div class="ln"><i>9</i>  <span class="k">const</span> usage = <span class="f">useChatUsage</span>(chat.id)</div>
+        <div class="ln cur"><i>10</i>  <span class="k">const</span> label = <span class="f">formatLimit</span>(usage.window, <span class="s">'5h'</span>)</div>
+        <div class="ln"><i>11</i>  <span class="k">return</span> &lt;<span class="t">Meter</span> value={usage.used} label={label} /&gt;</div>
+        <div class="ln"><i>12</i>}</div>
+      </div>
+    </div>
+  </div>
+  <div class="toast" data-at="2" data-until="4" style="right:14px;bottom:14px;width:300px">
+    <div style="display:flex;align-items:center;gap:8px">{i:trash:sm}<span style="flex:1">Deleted <span class="mono">usage/</span> and 3 files</span><span class="btn press-target" data-point="3" data-press>Undo <span class="kbd">⌘Z</span></span></div>
+  </div>
+  <div class="toast" data-at="4" style="right:14px;bottom:14px;width:300px">
+    <div style="display:flex;align-items:center;gap:8px"><span class="sq ok"></span><span>Restored <span class="mono">usage/</span> with 3 tabs and 1 unsaved edit</span></div>
+  </div>
+  <div class="pointer"><svg viewBox="0 0 24 24" width="18" height="18"><use href="#i-pointer"/></svg></div>
+</div>

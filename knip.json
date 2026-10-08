@@ -40,7 +40,6 @@
       "entry": [
         "boot.css",
         "public/sw.js",
-        "src/demo-entry.ts",
         "src/dev-entry.tsx",
         "src/features/address/tests/navigation.types.ts",
         "scripts/chat-parity-proof.mjs",
@@ -138,7 +137,9 @@
         "test/processes/job-control-session.ts",
         "test/processes/storage-writer.ts",
         "test/processes/focus-trace-timeout.probe.ts",
-        "test/processes/focus-trace.vitest.config.ts"
+        "test/processes/focus-trace.vitest.config.ts",
+        "test/processes/source-location.probe.tsx",
+        "test/processes/source-location.vitest.config.ts"
       ]
     },
     "packages/pty": {

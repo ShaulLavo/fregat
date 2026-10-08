@@ -1,4 +1,4 @@
-import { isRecord } from '@workspace/utils/objects'
+import { isObject, isRecord } from '@workspace/utils/objects'
 const maxStringLength = 2_000
 const redactedDiagnosticValue = '[redacted]'
 // Server logs already retain stack traces, so the client keeps them for the
@@ -63,6 +63,34 @@ export function createRecordSanitizer(policy: DiagnosticPolicy) {
     sanitizeFields(record, 0, { ...resolved, seen: new WeakSet() })
 }
 
+export function errorInternalContext(error: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(error)) return undefined
+
+  const internal = readDiagnosticField(error, 'internal')
+  return isRecord(internal) ? internal : undefined
+}
+
+/** Diagnostic getters are optional evidence; their failures cannot replace the operation's error. */
+export function readDiagnosticField(record: unknown, key: string | number): unknown {
+  if (!isObject(record)) return undefined
+
+  try {
+    return record[key]
+  } catch {
+    return '[unreadable: getter threw]'
+  }
+}
+
+export function readDiagnosticStringField(record: unknown, key: string) {
+  const value = readDiagnosticField(record, key)
+  return typeof value === 'string' ? value : undefined
+}
+
+export function readDiagnosticNumberField(record: unknown, key: string) {
+  const value = readDiagnosticField(record, key)
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
 export function sanitizeRecord(record: Record<string, unknown>) {
   return sanitizeFields(record, 0, { ...logPolicy, seen: new WeakSet() })
 }
@@ -79,11 +107,11 @@ function sensitiveFieldsFor(policy: DiagnosticPolicy): ReadonlySet<string> {
 
 function sanitizeFields(record: Record<string, unknown>, depth: number, walk: Walk) {
   const safe: Record<string, unknown> = {}
-  const entries = Object.entries(record).slice(0, walk.limits.maxObjectKeys)
-  for (const [key, value] of entries) {
+  const keys = Object.keys(record).slice(0, walk.limits.maxObjectKeys)
+  for (const key of keys) {
     safe[key] = walk.sensitiveFields.has(key)
       ? redactedDiagnosticValue
-      : sanitizeDiagnosticValue(value, depth, walk)
+      : sanitizeDiagnosticValue(readDiagnosticField(record, key), depth, walk)
   }
   return safe
 }
@@ -104,23 +132,36 @@ function sanitizeDiagnosticValue(value: unknown, depth: number, walk: Walk): unk
 }
 
 function sanitizeArray(values: readonly unknown[], depth: number, walk: Walk) {
+  if (walk.seen.has(values)) return '[circular]'
   if (depth >= walk.limits.maxDepth) return '[truncated]'
 
-  return values
-    .slice(0, walk.limits.maxArrayItems)
-    .map((item) => sanitizeDiagnosticValue(item, depth + 1, walk))
+  walk.seen.add(values)
+  const length = readDiagnosticField(values, 'length')
+  const count = typeof length === 'number' ? Math.min(length, walk.limits.maxArrayItems) : 0
+  const safe: unknown[] = []
+  for (let index = 0; index < count; index++) {
+    safe.push(sanitizeDiagnosticValue(readDiagnosticField(values, index), depth + 1, walk))
+  }
+  walk.seen.delete(values)
+  return safe
 }
 
 function sanitizeError(error: Error, depth: number, walk: Walk) {
   if (walk.seen.has(error)) return '[circular]'
 
   walk.seen.add(error)
-  const safe = {
-    cause: sanitizeDiagnosticValue(error.cause, depth + 1, walk),
-    message: walk.policy.formatString(error.message),
-    name: error.name,
-    ...(walk.sensitiveFields.has('stack') ? {} : { stack: error.stack }),
+  const internal = errorInternalContext(error)
+  const safe: Record<string, unknown> = {
+    cause: sanitizeDiagnosticValue(readDiagnosticField(error, 'cause'), depth + 1, walk),
+    message: walk.policy.formatString(readDiagnosticStringField(error, 'message') ?? ''),
+    name: readDiagnosticStringField(error, 'name') ?? 'Error',
+    ...(walk.sensitiveFields.has('stack') ? {} : { stack: readDiagnosticField(error, 'stack') }),
     ...walk.policy.errorFields?.(error),
+  }
+  if (internal !== undefined) {
+    safe.internal = walk.sensitiveFields.has('internal')
+      ? redactedDiagnosticValue
+      : sanitizeDiagnosticValue(internal, depth + 1, walk)
   }
   walk.seen.delete(error)
   return safe

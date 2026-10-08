@@ -2,6 +2,7 @@ import { realpath } from 'node:fs/promises'
 import { isSameOrDescendant } from '../fs/path'
 import {
   commandIdSchema,
+  errorSummary,
   type ModelSelection,
   type OrchestrationCommand,
   type OrchestrationProject,
@@ -15,7 +16,7 @@ import { DEFAULT_CLAUDE_MODEL } from '../provider/adapters/utils/claude-models'
 import type { ProviderService } from '../provider/provider-service'
 import type { ProviderDiscoveredSession, ProviderHistoryMessage } from '../provider/types'
 import { operatorErrorSummary } from '../observability/logging'
-import { isEvlogError } from '../observability/structured-errors'
+import { readDiagnosticField } from '@workspace/observability/sanitize'
 import { recordChatPipelineInfo, recordChatPipelineWarning } from './orchestration-logging'
 import type { OrchestrationReadModel, OrchestrationProjectedWorktree } from './read-model'
 import { resolveRepositoryIdentity, type RegistrationBoundary } from './registration'
@@ -34,16 +35,20 @@ type DiscoveryFailureContext = { providerInstanceId: ProviderInstanceId } & (
 )
 
 type DiscoveryFailure = DiscoveryFailureContext & {
-  error: ReturnType<typeof discoveryErrorDetails>
+  error: unknown
 }
 
-export type DiscoveryScanResult = {
+type DiscoveryScanDiagnostics = {
   scanned: number
   imported: number
   refreshed: number
   messages: number
   skipped: Record<string, number>
   failures: DiscoveryFailure[]
+}
+
+export type DiscoveryScanResult = Omit<DiscoveryScanDiagnostics, 'failures'> & {
+  failures: (DiscoveryFailureContext & { error: ReturnType<typeof discoveryResponseError> })[]
 }
 
 type DiscoveryOptions = {
@@ -134,7 +139,7 @@ export class SessionDiscoveryReconciler {
     importedOnly: boolean,
   ): Promise<DiscoveryScanResult> {
     const started = performance.now()
-    const result: DiscoveryScanResult = {
+    const result: DiscoveryScanDiagnostics = {
       scanned: 0,
       imported: 0,
       refreshed: 0,
@@ -154,8 +159,21 @@ export class SessionDiscoveryReconciler {
     const record = Object.keys(result.skipped).length
       ? recordChatPipelineWarning
       : recordChatPipelineInfo
-    record('chat.pipeline.discovery.scan', { ...result, durationMs: performance.now() - started })
-    return result
+    record('chat.pipeline.discovery.scan', {
+      ...result,
+      failures: result.failures.map(({ error, ...context }) => ({
+        ...context,
+        error: discoveryErrorDetails(error),
+      })),
+      durationMs: performance.now() - started,
+    })
+    return {
+      ...result,
+      failures: result.failures.map(({ error, ...context }) => ({
+        ...context,
+        error: discoveryResponseError(error),
+      })),
+    }
   }
 
   private hasImportedSessions(providerInstanceId: ProviderInstanceId) {
@@ -173,7 +191,7 @@ export class SessionDiscoveryReconciler {
     providerInstanceId: ProviderInstanceId,
     roots: readonly OrchestrationWorktree[],
     seen: Set<string>,
-    result: DiscoveryScanResult,
+    result: DiscoveryScanDiagnostics,
     importedOnly: boolean,
   ) {
     if (this.closed || roots.length === 0) return
@@ -185,7 +203,7 @@ export class SessionDiscoveryReconciler {
   private async discoverRoots(
     providerInstanceId: ProviderInstanceId,
     roots: readonly OrchestrationWorktree[],
-    result: DiscoveryScanResult,
+    result: DiscoveryScanDiagnostics,
   ) {
     try {
       return await this.options.providerService.discoverSessions({
@@ -206,7 +224,7 @@ export class SessionDiscoveryReconciler {
     providerInstanceId: ProviderInstanceId,
     rows: readonly ProviderDiscoveredSession[],
     seen: Set<string>,
-    result: DiscoveryScanResult,
+    result: DiscoveryScanDiagnostics,
     importedOnly: boolean,
   ) {
     for (const row of rows) {
@@ -232,7 +250,7 @@ export class SessionDiscoveryReconciler {
   private async importOne(
     providerInstanceId: ProviderInstanceId,
     row: ProviderDiscoveredSession,
-    result: DiscoveryScanResult,
+    result: DiscoveryScanDiagnostics,
   ) {
     try {
       const match = await this.resolveCheckout(row.cwd, result)
@@ -251,7 +269,7 @@ export class SessionDiscoveryReconciler {
     providerInstanceId: ProviderInstanceId,
     row: ProviderDiscoveredSession,
     match: CheckoutMatch,
-    result: DiscoveryScanResult,
+    result: DiscoveryScanDiagnostics,
   ) {
     const existing = this.options.getReadModel().sessions.get(row.sessionId)
     if (existing?.deletedAt) return skipped(result, 'deleted-session')
@@ -344,7 +362,7 @@ export class SessionDiscoveryReconciler {
 
   private async resolveCheckout(
     cwd: string | null,
-    result: DiscoveryScanResult,
+    result: DiscoveryScanDiagnostics,
   ): Promise<CheckoutMatch | null> {
     if (!cwd) return skipped(result, 'missing-cwd')
     const canonicalCwd = await realpath(cwd)
@@ -378,7 +396,7 @@ export class SessionDiscoveryReconciler {
   private async registerExternalCheckout(
     canonicalPath: string,
     branch: string | null,
-    result: DiscoveryScanResult,
+    result: DiscoveryScanDiagnostics,
   ): Promise<CheckoutMatch | null> {
     const identity = await resolveRepositoryIdentity(
       this.options.registration.git,
@@ -451,13 +469,13 @@ export class SessionDiscoveryReconciler {
   }
 }
 
-function skipped(result: DiscoveryScanResult, reason: string): null {
+function skipped(result: DiscoveryScanDiagnostics, reason: string): null {
   result.skipped[reason] = (result.skipped[reason] ?? 0) + 1
   return null
 }
 
 function recordScanFailure(
-  result: DiscoveryScanResult,
+  result: DiscoveryScanDiagnostics,
   context: DiscoveryFailureContext,
   error: unknown,
 ) {
@@ -466,14 +484,22 @@ function recordScanFailure(
     context.stage === 'provider-scan' ? 'provider-scan-failed' : 'reconciliation-refused',
   )
   if (result.failures.length >= DISCOVERY_FAILURE_EXAMPLE_LIMIT) return
-  result.failures.push({ ...context, error: discoveryErrorDetails(error) })
+  result.failures.push({ ...context, error })
 }
 
 function discoveryErrorDetails(error: unknown) {
+  const cause = readDiagnosticField(error, 'cause')
   return {
     ...operatorErrorSummary(error),
-    ...(isEvlogError(error) ? { internal: error.internal } : {}),
-    ...(error instanceof Error && error.cause ? { cause: operatorErrorSummary(error.cause) } : {}),
+    ...(cause === undefined ? {} : { cause: operatorErrorSummary(cause) }),
+  }
+}
+
+function discoveryResponseError(error: unknown) {
+  const cause = readDiagnosticField(error, 'cause')
+  return {
+    ...errorSummary(error, { guidance: true }),
+    ...(cause === undefined ? {} : { cause: errorSummary(cause, { guidance: true }) }),
   }
 }
 

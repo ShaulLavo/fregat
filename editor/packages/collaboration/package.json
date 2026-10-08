@@ -13,12 +13,19 @@
     "examples/signaling-server.ts"
   ],
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "**/*.css"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./presence-plugin": {
+      "types": "./dist/presence-plugin.d.ts",
+      "import": "./dist/presence-plugin.js",
+      "default": "./dist/presence-plugin.js"
     },
     "./transports": {
       "types": "./dist/transports.d.ts",
@@ -44,7 +51,11 @@
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:server": "bun --bun vitest run --config vitest.server.config.ts"
   },
+  "dependencies": {
+    "@singapore-editor/collab": "workspace:*"
+  },
   "devDependencies": {
+    "@singapore-editor/core": "workspace:*",
     "@types/bun": "1.4.2",
     "@types/node": "26.6.3",
     "@vitest/browser-playwright": "5.0.2",
@@ -52,5 +63,13 @@
     "oxlint": "1.85.0",
     "typescript": "7.0.2",
     "vitest": "5.0.2"
+  },
+  "peerDependencies": {
+    "@singapore-editor/core": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@singapore-editor/core": {
+      "optional": true
+    }
   }
 }

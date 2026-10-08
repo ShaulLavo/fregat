@@ -51,13 +51,32 @@ Restore assigns that retained state by reference. Neither operation enumerates t
 text or placement runs. There is one text store and no per-character placement
 object. A bootstrap document of any length occupies one placement run.
 
-Indexed lookups and path copies cost logarithmic time in run/piece count. Ancestry
-and subtree-boundary searches jump whole segments. Their cost depends on branch
-depth, and sibling insertion copies the touched parent's child array. Highly
-fragmented or adversarial histories can therefore cost more than straight typing;
-this is not a worst-case logarithmic placement guarantee. Edits never enumerate
-all document characters or materialize the document text. `text()` deliberately
-materializes the visible projection when a consumer requests it.
+Indexed lookups and path copies cost logarithmic time in run/piece count. Each
+allocated chain retains its original depth and binary ancestor jumps across chain
+boundaries. Splits share that ancestry. An ancestry query takes logarithmically
+many indexed jumps; `charIdAfter` finds the structural successor directly in the
+piece tree, including tombstones. Subtree-edge searches still descend placement
+branches, and sibling insertion copies the touched parent's child array. This
+keeps the measured scattered and deep-tail histories bounded while leaving
+adversarial sibling fanout and subtree-edge work as separate costs.
+
+`text()` deliberately materializes the visible projection when a consumer asks.
+`state()` also includes this explicit text read. Participant subscriptions publish
+`ParticipantChange`: frontier, host sequence, pending and blocked edits, plus
+`edits: readonly { from, to, text }[]`. These effective edits transform the previous
+published projection into the final coherent projection. Offsets refer to the
+previous projection, and the shape matches the editor's `TextEdit` and reconcile
+options. Acknowledgements with equal text publish an empty edit list. Apply edits
+from right to left when maintaining a string projection.
+
+Both engines expose `changesBetween(snapshot)` for the same effective-edit
+contract. The reference engine uses a string diff as its oracle. The textbuffer
+engine diffs persistent trees, skipping shared subtrees and identical storage
+ranges before reading changed text. Subscribers incur one diff after the entire
+confirmed-prefix apply and pending replay. Unsubscribed participants retain no
+publication snapshot and perform no diff. Subscriber failures are surfaced after
+all entitled subscribers receive the committed changes in order; the first thrown
+value is preserved.
 
 ## Undo and retained provenance
 
@@ -89,6 +108,13 @@ bun run bench
 The shared fixture runs every unit, simulator and ported upstream suite against
 both engines. A paired simulator checks authored envelopes, text, live IDs, hidden
 IDs and visible offsets after every apply and restore, including pending replay, undo and redo. An independent scalar visibility model checks each ID before and after deliveries under both engines. `COLLAB_STRESS=1 bun run test` expands the seeded workloads to 10,000 rounds.
+Set `COLLAB_STRESS_SHARD=1/8` through `8/8` to divide the simulator, differential
+replay, independent visibility and Yjs short-round seed ranges between jobs. The
+eight stress CI jobs cover each seed exactly once in those loops, including the
+200-seed single-author history comparisons. Other tests run in every job. An
+unsharded stress run retains the complete workload; ordinary runs ignore the shard.
+`bench/stress-shard-evidence.json` records full-suite shard durations and qualified
+CI estimates at twice the local elapsed time.
 
 `Engine.characters()` returns a diagnostic inventory sorted by bunch and counter.
 Each record contains the ID, deletion state and visible offset. Hidden IDs retain
@@ -102,3 +128,11 @@ pending edits on 10,000-line and 100,000-line documents. Setup and exact output
 validation stay outside timers. Results are 21 in-process samples after five
 warmups. These are storage/protocol experiments; browser rendering and editor
 consumer costs need separate input verification.
+
+`bun run bench:fragmented "experiment, shared machine"` measures the fragmented
+100,000-line workload at 5,000 and 50,000 retained inserts: five concurrent authors,
+scattered or deep-tail placement, and exact-ID tombstones. It reports typing and
+reconcile medians/p99 at 1, 10 and 100 pending edits, subscribed publication, method
+profiles, run lookups and shared-tree edge visits. Add `--counts` to omit typing
+and reconcile timing batches. `bench/fragmented-evidence.json` records an alternating
+A/B/B/A experiment, its source fingerprints and the counted-work comparison.

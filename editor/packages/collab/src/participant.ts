@@ -5,7 +5,7 @@ import { UndoManager } from './undo'
 import type { CaptureOptions, UndoOptions } from './undo'
 import type { HostMessage } from './host'
 import { editKey } from './types'
-import type { EditId, Effect, Engine, Envelope, OffsetEdit } from './types'
+import type { EditId, Effect, EffectiveEdit, Engine, Envelope, OffsetEdit } from './types'
 
 export type ParticipantOptions<Snapshot> = {
   readonly actor: string
@@ -22,6 +22,16 @@ export type ParticipantState = {
   readonly blocked: readonly EditId[]
 }
 
+export type ParticipantChange = Omit<ParticipantState, 'text'> & {
+  readonly edits: readonly EffectiveEdit[]
+}
+
+type Subscription = { readonly listener: (change: ParticipantChange) => void }
+type Publication = {
+  readonly change: ParticipantChange
+  readonly listeners: readonly Subscription[]
+}
+
 export class Participant<Snapshot = unknown> {
   readonly actor: string
   readonly undoManager: UndoManager
@@ -36,7 +46,10 @@ export class Participant<Snapshot = unknown> {
   private editSequence = 0
   private lamport = 0
   private readonly allocator: CharIdAllocator
-  private listeners = new Set<(state: ParticipantState) => void>()
+  private listeners = new Set<Subscription>()
+  private publication: { readonly snapshot: Snapshot } | null = null
+  private publications: Publication[] = []
+  private publishing = false
 
   constructor(private readonly options: ParticipantOptions<Snapshot>) {
     if (!options.actor) throw new CollabFailure('invalid-actor')
@@ -56,8 +69,11 @@ export class Participant<Snapshot = unknown> {
   }
 
   state(): ParticipantState {
+    return { ...this.metadata(), text: this.text() }
+  }
+
+  private metadata(): Omit<ParticipantState, 'text'> {
     return {
-      text: this.text(),
       frontier: [...this.frontier.values()].map((id) => ({ ...id })),
       hostSequence: this.sequence,
       pending: this.pending.map(cloneEnvelope),
@@ -65,10 +81,13 @@ export class Participant<Snapshot = unknown> {
     }
   }
 
-  subscribe(listener: (state: ParticipantState) => void): () => void {
-    this.listeners.add(listener)
+  subscribe(listener: (change: ParticipantChange) => void): () => void {
+    if (this.listeners.size === 0) this.publication = { snapshot: this.options.engine.snapshot() }
+    const subscription = { listener }
+    this.listeners.add(subscription)
     return () => {
-      this.listeners.delete(listener)
+      this.listeners.delete(subscription)
+      if (this.listeners.size === 0) this.publication = null
     }
   }
 
@@ -179,7 +198,30 @@ export class Participant<Snapshot = unknown> {
 
   private publish(): void {
     if (this.listeners.size === 0) return
-    const state = this.state()
-    for (const listener of this.listeners) listener(state)
+    const edits = this.options.engine.changesBetween(this.publication!.snapshot)
+    this.publication = { snapshot: this.options.engine.snapshot() }
+    const change = { ...this.metadata(), edits }
+    this.publications.push({ change, listeners: [...this.listeners] })
+    if (this.publishing) return
+    this.publishing = true
+    const errors: unknown[] = []
+    try {
+      while (this.publications.length) this.deliver(this.publications.shift()!, errors)
+    } finally {
+      this.publications = []
+      this.publishing = false
+    }
+    if (errors.length) throw errors[0]
+  }
+
+  private deliver({ change, listeners }: Publication, errors: unknown[]): void {
+    for (const subscription of listeners) {
+      if (!this.listeners.has(subscription)) continue
+      try {
+        subscription.listener(change)
+      } catch (error) {
+        errors.push(error)
+      }
+    }
   }
 }

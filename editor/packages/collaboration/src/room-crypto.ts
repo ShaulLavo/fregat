@@ -44,6 +44,7 @@ export class DuplicatePeerSessionError extends TypeError {
 }
 
 export class RoomCrypto {
+  private readonly createdAt = Date.now()
   private sequence = 0
   private readonly seen = new Map<string, ReplayWindow>()
   private readonly owned = new Map<string, number>()
@@ -100,7 +101,8 @@ export class RoomCrypto {
     if (
       !validPacket(input) ||
       input.room !== this.room ||
-      (input.sender === this.peer && this.owned.has(input.generation)) ||
+      (input.sender === this.peer &&
+        (this.owned.has(input.generation) || input.sentAt <= this.createdAt)) ||
       Math.abs(Date.now() - input.sentAt) > PACKET_LIFETIME
     )
       return undefined
