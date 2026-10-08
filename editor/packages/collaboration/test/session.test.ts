@@ -48,6 +48,55 @@ describe('transport-neutral session', () => {
     600_000,
   )
 
+  test('history recovery progresses while an eight-peer host replies to concurrent downloads', () => {
+    runSeed(107, 8)
+  })
+
+  test('stable history recovery installs verified prefixes before the final chunk arrives', () => {
+    const network = new Network(994, 2, 8, 1)
+    network.stabilize()
+    const host = network.nodes.findIndex((node) => node.session.isHost)
+    const follower = network.nodes[1 - host]!
+    for (const key of network.links.keys())
+      network.links.set(key, { delay: 1, jitter: 1, drop: 0, duplicate: 0, dropTypes: ['CONFIRM'] })
+    for (let index = 0; index < 17; index++) network.author(host)
+    let partial = 0
+    for (let step = 0; step < 200; step++) {
+      network.advance(1)
+      partial = follower.engine.checkpoint().depth
+      if (partial > 0) break
+    }
+    expect(partial).toBeGreaterThan(0)
+    expect(partial).toBeLessThan(17)
+    const transfers = Reflect.get(follower.session, 'transfers') as Map<string, object>
+    expect(transfers.has(network.nodes[host]!.session.peer)).toBe(true)
+    network.stabilize()
+    expect(follower.engine.checkpoint().depth).toBe(17)
+  })
+
+  test('a growing host tip keeps each selective download on its current target', () => {
+    const network = new Network(995, 2, 8, 1)
+    network.stabilize()
+    const host = network.nodes.findIndex((node) => node.session.isHost)
+    const follower = network.nodes[1 - host]!
+    for (const key of network.links.keys())
+      network.links.set(key, {
+        delay: 10,
+        jitter: 1,
+        drop: 0,
+        duplicate: 0,
+        tailDelay: 0,
+        dropTypes: ['CONFIRM'],
+      })
+    for (let index = 0; index < 300; index++) {
+      network.author(host)
+      network.advance(3)
+    }
+    expect(follower.engine.checkpoint().depth).toBeGreaterThan(16)
+    network.stabilize()
+    expect(follower.engine.checkpoint().depth).toBe(300)
+  })
+
   test('delayed archived history and stale election requests remain fenced', () => {
     runSeed(5377)
     runSeed(3928)

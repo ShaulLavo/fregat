@@ -199,8 +199,31 @@ export class Network {
     const faults = new Map(this.links)
     for (const [key, link] of this.links) this.links.set(key, { ...link, drop: 0, duplicate: 0 })
     this.advance(240)
+    // Selective repeat serializes download pages; allow bounded extra round trips after elections.
+    for (let retry = 0; retry < 12 && !this.settled(); retry++) this.advance(60)
     this.invariants()
     for (const [key, link] of faults) this.links.set(key, link)
+  }
+  private settled(): boolean {
+    for (const group of this.components()) {
+      const first = this.nodes[group[0]!]!
+      if (!first.session.host) return false
+      const tip = first.engine.checkpoint()
+      if (
+        group.some((index) => {
+          const node = this.nodes[index]!
+          const own = node.engine.checkpoint()
+          return (
+            node.session.host !== first.session.host ||
+            node.session.pending.size > 0 ||
+            own.depth !== tip.depth ||
+            own.hash !== tip.hash
+          )
+        })
+      )
+        return false
+    }
+    return true
   }
   advance(steps: number): void {
     for (let step = 0; step < steps; step++) {

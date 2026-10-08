@@ -748,7 +748,8 @@ export class Session<E extends EditEnvelope> {
       previous &&
       scope !== undefined &&
       previous.scope === scope &&
-      previous.tip.depth > tip.depth
+      !sameTip(previous.tip, tip) &&
+      !this.histories.has(tipKey(previous.tip))
     ) {
       this.request(peer, previous.tip, scope)
       return
@@ -797,7 +798,8 @@ export class Session<E extends EditEnvelope> {
 
   private transferPrefix(transfer: HistoryTransfer<E>, from: Checkpoint): Checkpoint {
     const history = this.transferHistory(transfer)
-    const tip = history?.at(-1) ?? this.options.genesis
+    const last = history?.at(-1)
+    const tip = last ? { depth: last.depth, hash: last.hash } : this.options.genesis
     if (!history || tip.depth <= from.depth || !this.options.engine.verify(history, tip))
       return from
     this.histories.set(tipKey(tip), history)
@@ -847,8 +849,17 @@ export class Session<E extends EditEnvelope> {
     transfer.count = payload.count
     transfer.chunks.set(payload.index, payload.records)
     transfer.requested.delete(payload.index)
+    const previousNext = transfer.next
     while (transfer.chunks.has(transfer.next)) transfer.next++
     if (transfer.next !== payload.count) {
+      if (
+        transfer.next > previousNext &&
+        this.phase.kind === 'stable' &&
+        transfer.scope === this.authority.epoch
+      ) {
+        const tip = this.transferPrefix(transfer, this.branch.tip)
+        this.sync({ tip, authority: this.authority })
+      }
       this.request(peer, payload.tip, transfer.scope)
       return
     }
@@ -863,7 +874,11 @@ export class Session<E extends EditEnvelope> {
     this.tryHandoff()
     // A delayed transfer can belong to an archived branch; only a current advertisement drives sync.
     const advertised = this.observed.get(peer)?.branch
-    if (advertised && sameTip(advertised.tip, payload.tip)) this.observe(peer, advertised)
+    if (
+      advertised &&
+      (sameTip(advertised.tip, payload.tip) || transfer.scope === advertised.authority.epoch)
+    )
+      this.observe(peer, advertised)
   }
 
   private handoff(peer: string, payload: Payloads<E>['HANDOFF']): void {

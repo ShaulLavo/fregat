@@ -81,10 +81,11 @@ for cached chunks return no credit. Each outstanding index gets at most one requ
 per pulse interval. Discovery and phase retries request missing indices with fresh
 message IDs.
 
-Each peer has one active download. Advertisements and confirmations from one authority
-advance its synchronization target, retaining a verified contiguous prefix from the
-previous target. Older advertisements keep recovery aimed at that newer target. Frozen
-offers and handoff bases retain their own recovery targets.
+Each peer has one active download. Same-authority synchronization completes its current
+target before downloading the latest advertised tip, reusing the verified prefix for
+the next suffix. Stable downloads install each verified contiguous prefix while
+remaining chunks are in flight. A continuously growing host tip keeps existing chunk
+requests valid. Frozen offers and handoff bases retain their own recovery targets.
 
 This selective-repeat flow keeps each response to one chunk regardless of the total
 history size. Reversed delivery and a lost prefix therefore leave a smaller set of
@@ -166,7 +167,10 @@ bun run --cwd editor/packages/collaboration test
 COLLABORATION_LONG_RUN=1 bun run --cwd editor/packages/collaboration test
 ```
 
-The default run has 100 deterministic seeds. The long run has 10,000. Each seed
+The default run has 100 deterministic seeds. The long run has 10,000. Quiescence
+allows up to 960 simulator steps for elections and serialized download pages, then
+checks the full invariants. Settled components finish after the first 240 steps.
+Each seed
 checks components computed from the actual directed-link graph after host crash and
 restart, two-pair splits, or three-way splits with staggered healing. Partial-heal
 checks include a one-way bridge followed by a bidirectional bridge before full-mesh
