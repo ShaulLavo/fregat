@@ -60,7 +60,7 @@ test('broadcast recovery identifies successful sends and authenticated receives'
   }
 })
 
-test('signaling failures and recovery identify the affected broker URL', () => {
+test('signaling failures and recovery identify the affected broker URL', async () => {
   const room = crypto.randomUUID()
   const sockets: Socket[] = []
   class Socket {
@@ -79,13 +79,14 @@ test('signaling failures and recovery identify the affected broker URL', () => {
   const signaling = new WebSocketSignaling({
     urls: ['ws://localhost:12345', 'ws://localhost:12346'],
     room,
-    credentials: { protocols: [] },
+    credentials: { protocols: () => [] },
     reconnectInterval: 1000,
     onError,
     onRecovery,
   })
   try {
     signaling.start(receive, vi.fn())
+    await expect.poll(() => sockets.length).toBe(2)
     sockets[0]!.onerror?.()
     expect(onError).toHaveBeenCalledWith(expect.any(TypeError), sockets[0]!.url)
     const subscribed = { data: JSON.stringify({ type: 'subscribed', topic: room }) }

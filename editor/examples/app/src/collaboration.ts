@@ -94,7 +94,7 @@ async function mountPeer(
     ? new WebSocketSignaling({
         urls,
         room,
-        credentials: { protocols: signalingProtocols },
+        credentials: { protocols: () => signalingProtocols },
         reconnectInterval: 1000,
         ...transportStatus('signaling'),
       })
