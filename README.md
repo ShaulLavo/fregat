@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/ShaulLavo/fregat/actions/workflows/ci.yml"><img src="https://github.com/ShaulLavo/fregat/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license" /></a>
-  <a href="https://github.com/ShaulLavo/fregat/releases"><img src="https://img.shields.io/github/v/release/ShaulLavo/fregat" alt="Latest release" /></a>
+  <a href="docs/development.md"><img src="https://img.shields.io/badge/install-source-blue" alt="Run from source" /></a>
 </p>
 <p align="center">
   <a href="https://shaulavo.dev/fregat/">Website and demo</a> ·
