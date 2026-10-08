@@ -1,7 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { fixture } from './fixture.mjs'
-import { fixtureIdentity, order, summarize, scrollCosts, editors } from './protocol.mjs'
+import {
+  fixtureIdentity,
+  order,
+  summarize,
+  scrollCosts,
+  scrollTraceName,
+  editors,
+} from './protocol.mjs'
 
 test('fixtures are exact MiB, ASCII and deterministic', () => {
   for (const mib of [1, 10]) {
@@ -17,6 +24,12 @@ test('rotation gives every editor each run position', () => {
 })
 test('percentiles use nearest rank and preserve slow samples', () => {
   assert.deepEqual(summarize([4, 1, 2, 100]), { n: 4, p50: 2, p95: 100, max: 100 })
+})
+test('representative trace names preserve editor and fixture size', () => {
+  const names = editors.flatMap((editor) => [1, 10].map((mib) => scrollTraceName(editor, mib)))
+  assert.equal(new Set(names).size, 6)
+  assert.equal(scrollTraceName('singapore', 1), 'singapore-1-scroll.trace.json.gz')
+  assert.equal(scrollTraceName('singapore', 10), 'singapore-10-scroll.trace.json.gz')
 })
 test('scroll costs union script and rendering spans, clip frames, and filter threads', () => {
   const event = (name, ts, dur, tid = 1) => ({ name, ts, dur, ph: 'X', pid: 1, tid })

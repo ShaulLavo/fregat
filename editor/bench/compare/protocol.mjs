@@ -32,6 +32,10 @@ export function order(repetition) {
   return editors.map((_, index) => editors[(index + repetition) % editors.length])
 }
 
+export function scrollTraceName(editor, mib) {
+  return `${editor}-${mib}-scroll.trace.json.gz`
+}
+
 export function scrollCosts(events, frameStarts, thread) {
   const names = new Set([
     'FunctionCall',

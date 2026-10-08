@@ -14,6 +14,7 @@ import {
   sizes,
   summarize,
   scrollCosts,
+  scrollTraceName,
   verifyGeometry,
 } from './protocol.mjs'
 
@@ -314,7 +315,7 @@ async function sample(editor, mib, repetition) {
     )
     if (repetition === 0 && [1, 10].includes(mib))
       await writeFile(
-        resolve(values.output, `${editor}-10-scroll.trace.json.gz`),
+        resolve(values.output, scrollTraceName(editor, mib)),
         gzipSync(JSON.stringify({ traceEvents: captured.events })),
       )
     const starts = captured.events
