@@ -155,7 +155,7 @@ Qualification work in progress, 2026-10-08:
 ### Phase 1: Remove the largest single-worker cost
 
 - [ ] Profile the dominant phase. Split query engine, predicates, materialization and normalization when the coarse phase bundles them.
-- [x] Retain the first isolated candidate with canonical output, before/after traces and native cursor-read counter deltas. Continue one candidate at a time toward M1.
+- [x] Retain the first correctness- and counter-backed candidate with unqualified timing, canonical output and all traces. Continue one candidate at a time toward M1.
 - [ ] Implement tree-sitter-x improvements in that repository, test its bindings/native correctness, then pin the reviewed package artifact in Fregat. Other changes stay in their owning Singapore package. Normal package patch changesets apply to future package-code PRs.
 - [ ] Meet M1 or record the next bounded experiment with a measured ceiling. Delete rejected experiments.
 
@@ -352,30 +352,34 @@ bracket depth, error order and independent injection trees are preserved.
 The 10 MiB ordinary fixture's native structural counters confirm type reads
 drop from 4,194,318 to 2,097,159 and start-offset reads from 2,097,159 to zero.
 Missing-state reads remain 2,097,159. Highlight predicate calls remain 748,985.
-These instrumented counter profiles establish work shape, not latency. The
-normal timed series contains ten cold and ten warm repetitions; every sample
-is retained and all complete token, palette, structural and actual-coverage
-proofs equal the frozen baseline. Sixteen controls, both 1 MiB smokes, retained
-snapshots, cancellation and disposal also pass with identical output.
+These counter profiles establish work shape. All twenty timing samples and
+eighteen controls/smokes preserve complete token, palette, structural and
+actual-coverage output. Lifecycle checks also pass.
 
-| Metric                     | Frozen cold median | Candidate cold median | Frozen warm median | Candidate warm median |
-| -------------------------- | -----------------: | --------------------: | -----------------: | --------------------: |
-| Complete highlighted frame |         4,877.9 ms |            4,599.9 ms |         4,887.9 ms |            4,560.2 ms |
-| Worker full work           |         4,700.7 ms |            4,409.4 ms |         4,755.7 ms |            4,434.6 ms |
-| Structural walk            |         1,185.7 ms |              931.0 ms |         1,168.3 ms |              924.9 ms |
-| Diagnostic work proxy      |         4,718.7 ms |            4,426.3 ms |         4,768.5 ms |            4,446.4 ms |
+Timing qualification failed. The result below uses the original paired five
+baseline and five candidate samples per startup condition. The structural
+speedup is supported by the output and native counters, but the timing is
+unqualified.
 
-Candidate complete-frame p95 is 4,763.4 ms cold and 4,686.4 ms warm. Structural
-median reductions are 21.5% cold and 20.8% warm; complete-frame median reductions
-are 5.7% and 6.7%. These are instrumented headless-frame comparisons, not
-physical-presentation, CPU-seconds or uninstrumented headline claims.
+| Metric                     | Frozen cold median | Original candidate cold median | Frozen warm median | Original candidate warm median |
+| -------------------------- | -----------------: | -----------------------------: | -----------------: | -----------------------------: |
+| Complete highlighted frame |         4,877.9 ms |                     4,599.9 ms |         4,887.9 ms |                     4,669.4 ms |
+| Worker full work           |         4,700.7 ms |                     4,398.4 ms |         4,755.7 ms |                     4,519.4 ms |
+| Structural walk            |         1,185.7 ms |                       929.7 ms |         1,168.3 ms |                       924.6 ms |
+| Diagnostic work proxy      |         4,718.7 ms |                     4,426.3 ms |         4,768.5 ms |                     4,530.7 ms |
 
-The first five warm samples missed the frozen overlap-resolution phase guard
-by 0.3 ms. That miss is retained. One additional five-per-startup replication
-was declared before running it, with unchanged source/builds and no discarded
-samples. The final ten-per-startup summaries pass every original phase guard.
-The source does not change overlap resolution; the two series and their
-separate checks are available for independent review. No threshold was moved.
+Cold passed its phase guards. Warm overlap resolution rose from 160.4 ms to
+167.7 ms, an increase of 7.3 ms against the frozen 7.0 ms allowance. Both
+windows completed successfully, so adding five more samples and pooling them
+cannot turn that failure into acceptance. All confirmation artifacts, pooled
+distributions and the declared replication intent remain as exploratory
+evidence. No unchanged-code acceptance rerun will be performed.
+
+The retained windows also used baseline-first ordering. Future qualification
+must prospectively freeze the paired protocol and alternate baseline/candidate
+order. The next optimization will measure on top of this structural change.
+These are instrumented headless-frame experiments. They establish no physical
+presentation, CPU-seconds or uninstrumented headline claim.
 
 Matched whole-job peak memory is 1,906,339,840 bytes across the candidate timing
 batches versus 1,572,909,056 corrected baseline bytes. Controls/smoke peak at
@@ -384,7 +388,8 @@ batches versus 1,572,909,056 corrected baseline bytes. Controls/smoke peak at
 separately. No memory-reduction claim is made.
 
 M1 is still unpassed: worker/frame maxima exceed 4,000/4,500 ms, and median
-diagnostic work falls only 6.2% cold and 6.8% warm against the required 25%.
+diagnostic work falls only 6.2% cold and 5.0% warm in the original unqualified
+windows against the required 25%.
 The next bounded experiment is to split predicate text extraction and capture
 materialization in the remaining roughly 1.25 s highlight-query phase, count
 node wrappers/string reads, and test one change on the same complete-output
