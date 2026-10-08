@@ -2,4 +2,4 @@
 'ghostty-webgpu': patch
 ---
 
-Keep comparison browser socket paths short when the benchmark directory has a long path.
+Fixed terminal comparison benchmarks failing to start Chromium when the output directory has a long path.
