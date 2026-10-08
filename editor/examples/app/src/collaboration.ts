@@ -32,6 +32,8 @@ const linked = fragment.has('room') && fragment.has('secret')
 if (linked) start.textContent = 'Join session'
 
 const mounted: (() => Promise<void>)[] = []
+const connections = new Set<CollaborationConnection>()
+const readyStatus = 'Session ready. Share the invitation link to add peers.'
 
 function report(error: unknown): void {
   status.textContent = error instanceof Error ? error.message : 'The connection failed.'
@@ -102,7 +104,11 @@ async function mountPeer(
         }),
       ],
     })
-    cleanups.push(() => editor.dispose())
+    connections.add(connection)
+    cleanups.push(() => {
+      connections.delete(connection)
+      editor.dispose()
+    })
     router = new TransportRouter({ room, document: 'example-document', peer }, connection.session)
     const broadcast = new BroadcastTransport({
       router,
@@ -133,6 +139,13 @@ async function mountPeer(
       const role = session.isHost ? 'Ordering host' : 'Participant'
       state.textContent =
         session.status === 'stable' ? `${role} · ${session.members.size} peers` : session.status
+      if (
+        session.status === 'stable' &&
+        [...connections].every(
+          ({ session }) => session.status === 'stable' || session.status === 'left',
+        )
+      )
+        status.textContent = readyStatus
       if (session.status !== 'left') return
       clearInterval(timer)
       editor.setPlugins([])
@@ -200,7 +213,7 @@ async function begin(): Promise<void> {
       servers,
       policy.value as RTCIceTransportPolicy,
     )
-    status.textContent = 'Session ready. Share the invitation link to add peers.'
+    status.textContent = readyStatus
   } catch (error) {
     await close()
     peers.replaceChildren()
