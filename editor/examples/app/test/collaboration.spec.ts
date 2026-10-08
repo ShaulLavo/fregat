@@ -104,6 +104,64 @@ test('failed setup releases its intervals, channels and editor before retry', as
   await expect(page.locator('.peer-header span').filter({ hasText: '2 peers' })).toHaveCount(2)
 })
 
+test('connection errors are replaced and cleared after the session recovers', async ({
+  page,
+}, testInfo) => {
+  await page.clock.install()
+  await page.addInitScript(() => {
+    const heartbeat = new Set<() => void>()
+    const interval = window.setInterval.bind(window)
+    window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
+      if (timeout === 500 && typeof handler === 'function') heartbeat.add(() => handler(...args))
+      return interval(handler, timeout, ...args)
+    }) as typeof setInterval
+    let failure: string | undefined
+    const Channel = window.BroadcastChannel
+    window.BroadcastChannel = class extends Channel {
+      override postMessage(message: unknown) {
+        if (failure) throw new TypeError(failure)
+        super.postMessage(message)
+      }
+    }
+    Object.assign(window, {
+      failBroadcast(message: string | undefined) {
+        failure = message
+        for (const announce of heartbeat) announce()
+      },
+    })
+  })
+  await page.goto('/collaboration.html')
+  await page.locator('#start').click()
+  await expect(page.locator('.peer-header span').filter({ hasText: '2 peers' })).toHaveCount(2)
+  await page.clock.pauseAt(new Date(Date.now() + 1000))
+  const status = page.locator('#status')
+  await expect(status).toContainText('Session ready')
+  const failBroadcast = (message: string | undefined) =>
+    page.evaluate((error) => {
+      ;(window as unknown as { failBroadcast(message: string | undefined): void }).failBroadcast(
+        error,
+      )
+    }, message)
+  await failBroadcast('Peer connection stopped')
+  await expect(status).toHaveText('Peer connection stopped')
+  await failBroadcast('Data channel failed')
+  await expect(status).toHaveText('Data channel failed')
+  await failBroadcast(undefined)
+  await page
+    .locator('.peer')
+    .filter({ has: page.locator('span', { hasText: 'Ordering host' }) })
+    .getByRole('button', { name: 'Leave session' })
+    .click()
+  await expect
+    .poll(async () => {
+      await page.clock.runFor(100)
+      return page.locator('.peer-header span').allTextContents()
+    })
+    .toEqual(expect.arrayContaining(['left', 'Ordering host · 1 peers']))
+  await expect(status).toHaveText('Session ready. Share the invitation link to add peers.')
+  await page.screenshot({ path: testInfo.outputPath('recovered.png') })
+})
+
 test('the ready example displays a usable invitation without a broker token', async ({ page }) => {
   await page.goto('/collaboration.html')
   await page.locator('#admission').fill('private-broker-token')
