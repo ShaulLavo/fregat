@@ -9,7 +9,8 @@
   cycle and issue tracker. Mesh, fast-ulid and the other owned repos stay out until the owner adds them.
 - Priority: P1. Effort: XL in total, split into tracks that mostly run in parallel.
 - Owner decisions 2026-10-08: MIT for everything (done: `LICENSE` files and `license` fields). npm
-  publishing setup and the domains/Cloudflare token come last, once everything else is done. Versions
+  publishing setup comes last. The owner authorized production sites on the Hetzner VPS at
+  `shaulavo.dev` on 2026-10-08. Cloudflare keeps DNS; hosting uses the existing Coolify proxy. Versions
   stay as they are: patch bumps only, no 1.0.0, no version-policy changes while we are setting up.
 - Planned against Fregat `0df5eb872`.
 
@@ -65,8 +66,11 @@ The facts that change the plan:
 5. **Every code sample in docs and READMEs is type-checked in CI.** Long examples are real files the
    page shows and the live demo runs; inline blocks are extracted and compiled. Internal links are
    checked per build, external links weekly.
-6. **Hosting is Cloudflare Workers with static assets**, one Worker per site, our own domains, PR
-   previews. GitHub Pages turns off after redirect pages cover all five old addresses.
+6. **Production sites use the Hetzner VPS at `shaulavo.dev`**, with `/fregat`, `/singapore` and
+   `/ghostty-webgpu`, plus a project index at `/`. A read-only Nginx container sits behind the
+   existing Coolify proxy, which handles TLS. CI builds main and atomically publishes through a
+   restricted SSH deploy key. GitHub Pages keeps running until redirects cover the old addresses.
+   PR previews remain separate work.
 7. **Mirrors are read-only and say so:** "[READ ONLY]" in the description, Issues off, a workflow that
    closes PRs with a pointer to fregat. Links inside mirrored folders are absolute URLs.
 8. **Lead with what only we have; keep table stakes as features.** "Use your Claude subscription" is a
@@ -104,8 +108,9 @@ inside. The closest rival (Orca) is VS Code's editor plus xterm.js; ours is buil
 for the browser.
 
 - Every edit returns a new version; old versions stay readable. Anchors survive edits, even deletion.
-- Parsing, highlighting, the minimap, spellcheck and the real TypeScript language service run in
-  workers that receive edits, never whole documents. (The document itself lives on the main thread.)
+- Parsing and highlighting use a worker-side source snapshot. Initial connection sends document
+  chunks; subsequent revisions send edits. The editor retains the document on the main thread.
+  The minimap, spellcheck and TypeScript language service also have worker implementations.
 - Modern platform: CSS Custom Highlight API paint, EditContext input (Chromium), OffscreenCanvas,
   `Intl.Segmenter`, `scheduler.postTask`. Not used: WebGPU, WebGL, SharedWorker.
 - Measured limits: 200 MiB editable, 600 MiB read-only in about 2.3 MiB of heap; syntax tokens per
@@ -211,14 +216,24 @@ Follow the [landing-sites report](../docs/research/packages-as-products/landing-
 5. Every site: under 1 MB on first load, readable without JavaScript, reduced motion, Open Graph
    images, sitemap, 404, `llms.txt`. Screenshots at desktop and phone widths go to the owner.
 
-## Track E: Hosting (last, with Track N; site builds do not wait)
+## Track E: Production hosting on the VPS
 
-1. Owner chooses the domains (DNS on Cloudflare) and grants a Cloudflare API token as a GitHub
-   Actions secret.
-2. One Worker with static assets per site; CI deploys main to production and PRs to previews,
-   replacing `.github/workflows/site.yml`'s Pages deploy.
-3. Redirect pages at the five old GitHub Pages addresses (two in the mirror repos), then disable
-   Pages. Update every link in READMEs, `package.json` and docs.
+Owner authorized this track now on 2026-10-08. It replaces the Cloudflare Workers proposal.
+
+1. Serve `https://shaulavo.dev/` and the `/fregat`, `/singapore` and `/ghostty-webgpu` paths from
+   one static directory on the owner's Hetzner VPS. Coolify's existing Traefik proxy terminates
+   TLS; a read-only Nginx container serves files. Leave Mesh and every subdomain untouched.
+2. `.github/workflows/product-sites.yml` builds main with the production base paths and uploads
+   in a secret-free job, then deploys through the `PRODUCT_SITES_DEPLOY_KEY` secret in the
+   main-only `production` environment. The dedicated SSH user can only
+   publish a validated archive to `/srv/product-sites`. A symlink swap activates all sites
+   together. Keep three complete releases, prune assets with their releases, and skip identical
+   content. HTML caches for 60 seconds; hashed assets cache for a year with `immutable`;
+   missing files return 404. See [deployment setup](../scripts/product-sites/README.md).
+3. Start with `apps/site`, `editor/examples/app` and `ghostty-webgpu/site`. The pipeline selects
+   `editor/site` when it lands. The new Astro sites replace current builds through this pipeline.
+4. Keep `.github/workflows/site.yml` and GitHub Pages running. Redirect the five old Pages
+   addresses before disabling them. Update published links then. PR previews are later work.
 
 ## Track F: Documentation (after Track 0; alongside D)
 
@@ -264,9 +279,205 @@ policy. This track improves how releases read, not how they are numbered. Follow
   to the owner.
 - Every performance claim links a reproducible, like-for-like benchmark.
 - Docs builds fail on a broken code sample or internal link.
-- Sites serve from our domains on Cloudflare; GitHub Pages is off.
+- Sites serve from `shaulavo.dev` on the VPS. GitHub Pages turns off after redirects ship.
 - `docs/releasing.md` exists and changesets read for package users.
 - Zero agent-filed issues remain open.
+
+## Singapore highlighted open
+
+Status: Approved. The 2026-10-08 browser comparison makes large-file syntax startup a separate
+execution item. Establish the critical path before changing the parser bootstrap.
+
+### What the open clock measures
+
+The comparison waits for first detectable syntax in the mounted rows, then two animation-frame
+callbacks. It does not check every visible token, token correctness or whole-document completion.
+Singapore's detector requires one nonempty token CSS Highlight collection. Monaco's detector
+requires one colored token span. CodeMirror's detector requires one classed span in a rendered line;
+this fixture gives those spans language-highlighting classes.
+
+The outcomes share that readiness clock, but their prerequisite work differs:
+
+- Monaco uses its TypeScript Monarch lexical tokenizer. Its visible-line path calls
+  `tokenizeHeuristically`; background tokenization continues separately.
+- CodeMirror's Lezer language state initially targets the first 3,000 code units with a 20 ms work budget.
+  Its parse worker prioritizes the viewport and advances in bounded scheduled work. Decorations use
+  visible ranges.
+- Singapore's structural session requests `parseOnly` in range mode. The worker still completes a
+  full root Tree-sitter parse and injection discovery before acknowledging that request. Only then
+  can the session request and paint visible-range tokens.
+
+The comparison therefore measures a shared user outcome with each editor's normal algorithm.
+It cannot support a claim about equal full-document parsing throughput. Keep the normal-algorithm
+comparison. Add an explicitly named viewport-first Singapore mode only when its coverage and
+correctness controls pass.
+
+### Diagnostic method
+
+The original committed traces capture scrolling after open. They contain no open-clock markers
+or CPU-profile samples, so they cannot explain the original 1,517.7 ms median.
+
+Use `editor/bench/compare/run.mjs --profile-open --open-only` for the missing measurement. It runs
+the original constructor, fixture, geometry checks and 30-second highlighting deadline, and retains
+failed-open traces. Its opt-in worker probe records existing parser phase timings and request
+metadata. Initial source chunk sizes and synchronous `postMessage` times are measured without
+recording document contents. The normal ranking reducer rejects these instrumented runs.
+
+Report constructor wall time, initial source round trip, root parse, injection discovery, visible
+query, token payload, main-thread projection and rendering. Round trips contain queueing,
+serialization, execution and delivery. Worker phases sit inside them; do not add those durations
+as separate costs. Mount includes buffer creation and editor setup, so CPU attribution is needed
+to distinguish them. Frame markers measure callback opportunities, not physical presentation.
+
+### Measurement and execution decision
+
+The noisy diagnostic experiment ran on 2026-10-08, on Linux 7.2.8-arch1-2 with an Intel Core
+i7-14700K, 28 logical CPUs, 33,368,662,016 bytes of RAM and headless Chromium 153.0.8010.12.
+Singapore's packages were 0.2.6, Monaco 0.57.0, CodeMirror 6.0.2, its state 6.7.6, view 6.43.14
+and TypeScript mode 6.2.5. Playwright was 1.63.0 and Vite 8.3.1. The product base was
+`308f5e514573c6cee874ad63201bbb17151b5c36`, the open comparison branch. The opt-in instrumentation
+was an uncommitted addition; its source hash is retained in the experiment.
+
+The matrix retained all 27 attempts at 1, 10 and 200 MiB. Twenty-four completed. All three Singapore
+200 MiB attempts reached the 30-second visible-highlighting deadline; Monaco and CodeMirror
+completed all their attempts. The original uninstrumented comparison remains the ranking evidence.
+These diagnostic numbers establish where work happens and do not establish a speedup.
+
+| Singapore at 10 MiB, median of three attempts           |      ms |
+| ------------------------------------------------------- | ------: |
+| Constructor and mount                                   |    28.7 |
+| First frame opportunity                                 |    32.5 |
+| Initial source reset round trip                         |     6.7 |
+| Synchronous reset `postMessage`, inside that round trip |     1.7 |
+| Parse acknowledgement round trip                        | 1,275.5 |
+| Worker parse operation, inside that round trip          | 1,268.3 |
+| Root parse, inside the worker operation                 |   783.9 |
+| Injection discovery, inside the worker operation        |   477.2 |
+| Visible query round trip                                |   125.6 |
+| Structural range walk, inside the query                 |   100.0 |
+| Highlight query and predicates, inside the query        |     4.5 |
+| Token packing, inside the query                         |     0.4 |
+| Main-thread structural syntax application               |     4.0 |
+| Recorded style, layout and paint spans                  |    10.2 |
+| First detected syntax                                   | 1,542.7 |
+| Settled highlighted frame opportunity                   | 1,576.0 |
+
+These are medians of nested or overlapping observations, not additive slices. Main-thread
+constructor wall time includes buffer adoption and editor setup. The existing `editor.input`
+diagnostic takes 20.7 ms in the representative attempt; it does not isolate buffer construction.
+The trace's named main-thread script/render spans total 12.5 ms but omit the DevTools-evaluated
+constructor. Keep that subtotal separate from constructor wall time. CPU samples exist, but
+minified functions without source maps do not support a finer buffer attribution.
+
+The representative 10 MiB attempt gives the ordering directly. Mount finishes at 28.7 ms. Worker
+initialization starts at 38.2 ms and takes 18.7 ms. The source reset starts at 58.0 ms and finishes
+at 64.2 ms. Parsing runs from 64.7 to 1,338.4 ms. The source-unpin request then takes 69.5 ms;
+this is a worker queue/execution gap, not measured token transfer. The visible query runs from
+1,408.9 to 1,534.5 ms. Syntax is detected at 1,538.3 ms, and two more frame callbacks finish at
+1,570.5 ms. The query covers code units 0 through 23,359 and returns 2,672 tokens in 32,064 bytes.
+Its round trip exceeds its reported worker query by only 0.3 ms. That difference bounds neither
+network latency nor transfer cost in isolation, but gives no evidence of a large token-transfer
+bottleneck. Mounted token segment/range work takes 0.8/1.8 ms inside the 3.4 ms structural apply.
+
+The initial reset transmits all 10,485,760 code units. It sends chunks, and the worker parser reads
+bounded 4,096-code-unit callbacks from its source snapshot. Removing a supposed full-string parse
+copy would target a copy this parser does not make. Initial source transport costs are measured
+and are small beside parsing in this fixture.
+
+At 200 MiB, constructor wall time is 79.2, 84.6 and 89.6 ms. Reset round trips are 149.5, 149.5 and
+159.7 ms, with synchronous sends taking 57.8, 61.1 and 62.6 ms. Parse requests return successfully
+at the transport level after 20,126.4, 20,156.8 and 20,132.4 ms, with no parse result or phase
+timings. No visible query follows. This matches the worker's 20-second cancellation budget and
+its cancellation-to-undefined path. The trace cannot divide cancelled parsing between root and
+injection phases because that path drops phase timings. The browser then exhausts its independent
+30-second syntax deadline. Raising either deadline would leave the startup dependency intact.
+
+The measured full parse plus injection discovery occupies about 80% of the 10 MiB open clock.
+There is also a bounded range-walk defect: after reaching the requested end, traversal skips each
+remaining subtree but continues visiting every following root sibling. A visible query therefore
+pays for document length. Stop the walk at its ordered end and prove that trailing siblings are
+unvisited while in-range diagnostics remain identical. This narrow correction does not solve
+full-document bootstrap or the 200 MiB cancellation.
+
+Evidence is retained in
+[the raw matrix](../editor/docs/performance/singapore-open-2026-10-08/baseline/experiment.json.gz),
+[the 10 MiB open trace](../editor/docs/performance/singapore-open-2026-10-08/baseline/singapore-10-0-open.trace.json.gz)
+and [the failed 200 MiB open trace](../editor/docs/performance/singapore-open-2026-10-08/baseline/singapore-200-0-open.trace.json.gz).
+The three settled 10 MiB editor screenshots were read back. All display highlighted initial rows.
+
+### Bounded correction and repeated experiment
+
+The ordered-end correction is implemented. The regression control failed before the change,
+with one trailing sibling read where zero was expected. After the change, all 18 worker tests
+pass in both Bun and Node, including middle-range nested diagnostics and bracket depth.
+
+The second noisy diagnostic matrix uses the same 1, 10 and 200 MiB fixtures, three repetitions,
+browser, machine, dependency lock, package versions and clock. Both matrices retain 27 attempts
+and 24 completed opens. The comparator verifies those identities and unchanged competitor bundle
+manifests before reporting differences. Singapore's emitted worker hash changed from
+`9103714cff5238bf29efc4894409cd210aae7a5b1fafcaf867f8a86ed45e8136` to
+`692028b39cd9a0d2083b9ed8d189667412f0bc6fa6d10fb6f14ecca44b8a5aad`.
+Both captures use the product base above, with uncommitted instrumentation and, in the second,
+the ordered-end guard. Analysis-only reducer changes also change the recorded harness source hash;
+the page clock, fixture and probe remain unchanged between captures. These runs predate the merged
+harness's full served-build manifest. Their minimal-bundle manifests include the worker identities.
+
+| Singapore at 10 MiB, median of three attempts | Before, ms | After, ms |
+| --------------------------------------------- | ---------: | --------: |
+| Settled highlighted frame opportunity         |    1,576.0 |   1,464.0 |
+| First frame opportunity                       |       32.5 |      32.8 |
+| Root parse                                    |      783.9 |     767.0 |
+| Injection discovery                           |      477.2 |     476.4 |
+| Visible query round trip                      |      125.6 |      30.1 |
+| Structural range walk                         |      100.0 |       4.6 |
+| Main-thread structural syntax application     |        4.0 |       3.3 |
+
+The structural walk falls by 95.4 ms in this experiment. Its three after observations are 4.4,
+4.6 and 4.6 ms. The visible query still covers code units 0 through 23,359 and returns 2,672 tokens
+in 32,064 bytes in every 10 MiB attempt. Singapore's mounted row pool remains 48 before and after.
+The three after screenshots were read back and show highlighted initial rows. These controls
+support removing trailing traversal work; the noisy clocks do not establish a headline speedup.
+The 1 MiB highlighted medians are 309.8 and 308.8 ms.
+
+The larger dependency remains. All three after Singapore 200 MiB attempts still miss the existing
+30-second deadline. Their parse round trips are 20,157.7, 20,094.1 and 20,097.3 ms and return no
+parse result; no visible query follows. All competitor attempts complete. Keep the viewport-first
+bootstrap below as Approved work, with cancellation accounting and correctness controls.
+
+[The after matrix](../editor/docs/performance/singapore-open-2026-10-08/after/experiment.json.gz),
+[the diagnostic comparison](../editor/docs/performance/singapore-open-2026-10-08/after/comparison.json)
+and [the after 10 MiB trace](../editor/docs/performance/singapore-open-2026-10-08/after/singapore-10-0-open.trace.json.gz)
+retain the proof. Reproduce the phase comparison with:
+
+```sh
+node editor/bench/compare/summarize-open.mjs \
+  editor/docs/performance/singapore-open-2026-10-08/after/experiment.json.gz \
+  --compare editor/docs/performance/singapore-open-2026-10-08/baseline/experiment.json.gz
+```
+
+### Approved viewport-first follow-up
+
+1. Give the initial visible query a bounded Tree-sitter bootstrap, with explicit source version and
+   covered-range metadata. Keep partial and full trees distinct. A partial tree must not claim
+   complete folds, diagnostics or structural navigation. Use existing viewport/overscan demand to
+   choose coverage; register any new execution setting in the settings registry.
+2. Publish visible tokens from that bootstrap before scheduling full-document parsing and injection
+   discovery. Continue the complete analysis through cancellable worker tasks, yielding between
+   bounded work units. Visible queries and edits take priority. Do not queue an idle full reparse
+   ahead of the first visible result. Measure the existing post-acknowledgement unpin gap before
+   changing that idle policy.
+3. Preserve grammar context and prove preview correctness. Compare initial tokens with the completed
+   parse for this TypeScript fixture, multiline strings/comments, syntax crossing the preview end,
+   TSX ambiguities and injected languages. Scroll or jump beyond covered ranges must request valid
+   context rather than reuse a partial root as a complete document. Edits and disposal cancel stale
+   bootstrap/background results by source identity and version.
+4. Retain timings and a structured cancellation outcome when analysis exhausts a work budget.
+   Silent missing results must not leave the visible-highlight request permanently unsettled.
+5. Re-run the original uninstrumented matrix and the diagnostic open matrix on the same machine,
+   versions, fixture and geometry. Require initial visible highlighting before the existing
+   30-second deadline at 200 MiB, bounded initial parsing work as file size grows, and token coverage
+   and correctness controls in addition to the first-token detector. Publish any headline only after
+   the full comparison protocol passes. Keep noisy trials labelled as experiments.
 
 ## Kickoff prompt for an executing coordinator
 
@@ -274,6 +485,7 @@ policy. This track improves how releases read, not how they are numbered. Follow
 > `fregat-local` skills, and read `docs/research/packages-as-products/README.md` and the report each
 > lane needs. Start Track 0, Track P and Track H now in parallel. When Track P's first results land,
 > run Track B and send the owner the pitch as a private Mesh app link. After the owner approves it,
-> run Tracks C, D, F and G in parallel lanes. Do not change package versions. Tracks N and E come last:
-> ask the owner for npm setup, domains and the Cloudflare token only when everything else is done.
+> run Tracks C, D, F and G in parallel lanes. Do not change package versions. Track E is authorized
+> now on the VPS. Track N comes last:
+> ask the owner for npm setup only when everything else is done.
 > Send screenshots of every site and README at each milestone.

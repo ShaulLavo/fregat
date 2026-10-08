@@ -1,5 +1,5 @@
 > [!NOTE]
-> Generated from the settings registry by `bun scripts/generate-settings-reference.ts`.
+> Generated from the settings registry by `bun run settings:reference`.
 > Edit `packages/contracts/src/settings/keys.ts`, not this file.
 
 # Settings reference

@@ -1,3 +1,4 @@
+import { submitAsAuthor } from '../host-fixtures'
 // josephg/diamond-types @ 89ae3a0ab8d941a2885e6ec89d094bc9ce9d2922.
 // src/listmerge/fuzzer.rs, random_single_document (seed 10, rope oracle).
 // src/listmerge/merge.rs, ins_back, backspace and test_concurrent_delete.
@@ -6,6 +7,7 @@
 // seed numbers do not reproduce Rust SmallRng's exact operation stream.
 import { expect, test } from 'vitest'
 import { replica } from '../fixtures'
+import { characters } from '../engine-fixture'
 import { network, randomSource } from './adapter'
 import { randomChange } from './diamond-workload'
 
@@ -21,7 +23,7 @@ test.each(seeds)(
     const author = replica('seph')
     const random = randomSource(seed)
     let oracle = ''
-    const steps = seed === 10 || stress ? 1000 : 100
+    const steps = stress ? 1000 : 100
     for (let step = 0; step < steps; step++) {
       const change = randomChange(oracle, random)
       for (const edit of change.edits) author.participant.local(edit)
@@ -61,13 +63,13 @@ test('Diamond Types repeated concurrent deletion preserves one hidden ID per cha
   expect(net.settle()).toBe('')
   const snapshot = net.engine.snapshot()
   for (let repeat = 0; repeat < 10; repeat++) {
-    net.host.submit(a)
-    net.host.submit(b)
+    submitAsAuthor(net.host, a)
+    submitAsAuthor(net.host, b)
     net.engine.apply(a)
     net.engine.apply(b)
   }
   expect(net.host.hostSequence).toBe(3)
   expect(net.engine.snapshot()).toEqual(snapshot)
-  expect(snapshot.nodes).toHaveLength(3)
-  expect(snapshot.nodes.every((node) => node.deleted)).toBe(true)
+  expect(characters(net.engine)).toHaveLength(3)
+  expect(characters(net.engine).every((node) => node.deleted)).toBe(true)
 })

@@ -1,3 +1,4 @@
+import { characters } from '../engine-fixture'
 // loro-dev/loro @ c00c9fa501f8d32f68d6255eacb7035a67fb6ab6.
 // loro-js/tests/richtext-anchors.test.ts, positions convert across Unicode,
 // UTF-16, and UTF-8 around anchors; runtime.test.ts, tracks stable cursors
@@ -22,7 +23,7 @@ test('Loro Unicode workload allocates consecutive code-unit IDs', () => {
   expect(author.engine.visibleOffset({ bunch: edit.change.start.bunch, counter: 3 })).toBe(3)
   author.remove(1, 2)
   expect(author.engine.text()).toBe('ab中c')
-  const deleted = author.engine.snapshot().nodes.filter((node) => node.deleted)
+  const deleted = characters(author.engine).filter((node) => node.deleted)
   expect(deleted.map((node) => node.id.counter)).toEqual([1, 2])
 })
 
@@ -76,9 +77,8 @@ test('Loro stable cursor ID retains its gap after prepend and deletion', () => {
   expect(author.engine.text()).toBe('abc23')
   expect(author.engine.visibleOffset(cursor)).toBe(3)
   expect(
-    author.engine
-      .snapshot()
-      .nodes.find((node) => node.id.bunch === cursor.bunch && node.id.counter === cursor.counter)
-      ?.deleted,
+    characters(author.engine).find(
+      (node) => node.id.bunch === cursor.bunch && node.id.counter === cursor.counter,
+    )?.deleted,
   ).toBe(true)
 })

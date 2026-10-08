@@ -152,7 +152,7 @@ function workspacePackages() {
 
 function expandWorkspacePattern(pattern) {
   const starIndex = pattern.indexOf('*')
-  if (starIndex === -1) return packageJsonIfExists(pattern)
+  if (starIndex === -1) return packageJsonIfExists(path.join(pattern, 'package.json'))
 
   const prefix = pattern.slice(0, starIndex)
   const suffix = pattern.slice(starIndex + 1)

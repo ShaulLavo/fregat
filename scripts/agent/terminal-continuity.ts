@@ -1,6 +1,10 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
-import { installCaptureTerminalNamespace, killCaptureTerminal } from './product-terminal'
+import {
+  capturedTerminal,
+  installCaptureTerminalNamespace,
+  killCaptureTerminal,
+} from './product-terminal'
 import { selectors } from './selectors'
 
 export async function observeTerminalContinuity(page: Page) {
@@ -14,22 +18,9 @@ export async function observeTerminalContinuity(page: Page) {
   page.on('websocket', (socket) => {
     const url = new URL(socket.url())
     if (!url.pathname.endsWith('/terminal')) return
-    const terminalId = url.searchParams.get('terminalId')
-    const worktreeId = url.searchParams.get('worktreeId')
-    ok(
-      terminalId && terminalId.startsWith(prefix) && worktreeId,
-      'Continuity proof can use only its isolated shells',
-    )
-    const kill = new URL(url)
-    kill.protocol = kill.protocol === 'wss:' ? 'https:' : 'http:'
-    kill.pathname += '/kill'
-    kill.search = ''
-    terminals.set(socket.url(), {
-      socketUrl: socket.url(),
-      killUrl: kill.href,
-      worktreeId,
-      terminalId,
-    })
+    const terminal = capturedTerminal(socket.url(), prefix)
+    ok(terminal, 'Continuity proof can use only its isolated shells')
+    terminals.set(socket.url(), terminal)
     socket.on('framereceived', ({ payload }) => {
       if (typeof payload !== 'string') {
         output += payload.toString('utf8')

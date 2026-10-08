@@ -32,6 +32,7 @@ import {
   type HistoryNodeId,
 } from './history'
 import type { TextEdit } from './tokens'
+import { reconciledEdits, reconcileSelections } from './reconciliation'
 import type { EditorViewFoldState } from './viewFolds'
 export type { HistoryNodeId } from './history'
 import {
@@ -72,6 +73,7 @@ export type DocumentSessionChangeKind =
   | 'redo'
   | 'checkout'
   | 'synchronize'
+  | 'reconcile'
   | 'none'
 
 export type EditorTimingMeasurement = {
@@ -101,6 +103,11 @@ export type DocumentSession = {
   applyEdits(
     edits: readonly TextEdit[],
     options?: DocumentSessionApplyEditsOptions,
+  ): DocumentSessionChange
+  reconcile(
+    base: PieceTableSnapshot,
+    batches: readonly (readonly TextEdit[])[],
+    options: DocumentSessionReconcileOptions,
   ): DocumentSessionChange
   backspace(tabSize?: number): DocumentSessionChange
   deleteSelection(): DocumentSessionChange
@@ -155,8 +162,25 @@ export type EditorTextBufferChange = {
     point: DocumentSyncPoint,
     scope: DocumentLogicalRevisionScope | null,
   ): DocumentChangesSinceSyncPoint | null
-  readonly origin: 'external' | 'view'
+  readonly origin: EditorTextOrigin
+  readonly author?: unknown
   readonly sourceViewId: string | null
+}
+
+/** Provenance of an authored edit. The source view identifies its local editing surface. */
+export type EditorTextOrigin = 'external' | 'view' | 'local' | 'remote' | 'replay' | 'undo' | 'redo'
+
+/** One logical edit against snapshotBefore, delivered before any view coalescing. */
+export type EditorTextTransaction = {
+  readonly snapshotBefore: PieceTableSnapshot
+  readonly snapshotAfter: PieceTableSnapshot
+  readonly textSnapshotBefore: DocumentTextSnapshot
+  readonly edits: readonly TextEdit[]
+  readonly origin: EditorTextOrigin
+  readonly sourceViewId: string | null
+  readonly author?: unknown
+  readonly revisionBefore: number
+  readonly revisionAfter: number
 }
 
 export type EditorTextBufferChangeListener = (event: EditorTextBufferChange) => void
@@ -219,6 +243,12 @@ export type EditorTextBuffer = {
     selections: SelectionSet<PieceTableAnchor>,
     edits: readonly TextEdit[],
     options?: DocumentSessionApplyEditsOptions,
+    sourceView?: EditorViewSession | null,
+  ): DocumentSessionChange
+  reconcile(
+    base: PieceTableSnapshot,
+    batches: readonly (readonly TextEdit[])[],
+    options: DocumentSessionReconcileOptions,
     sourceView?: EditorViewSession | null,
   ): DocumentSessionChange
   backspace(
@@ -325,7 +355,16 @@ export type DocumentSessionEditHistoryMode = 'record' | 'skip'
 
 export type DocumentSessionEditSelection = DocumentSessionSelectionRange
 
+export type DocumentSessionReconcileOptions = {
+  readonly origin?: 'remote' | 'replay'
+  readonly author?: unknown
+  /** Effective edits from the current snapshot to the final snapshot. */
+  readonly edits: readonly TextEdit[]
+}
+
 export type DocumentSessionApplyEditsOptions = {
+  readonly origin?: EditorTextOrigin
+  readonly author?: unknown
   readonly history?: DocumentSessionEditHistoryMode
   readonly selection?: DocumentSessionEditSelection
   readonly selections?: readonly DocumentSessionEditSelection[]
@@ -505,6 +544,8 @@ export type ReleaseDocumentMutationLeaseResult = {
 }
 
 type CommitEditOptions = {
+  readonly origin?: EditorTextOrigin
+  readonly author?: unknown
   readonly history: DocumentSessionEditHistoryMode
   readonly metadata: DocumentTransactionMetadata
   readonly selectionBefore: SelectionSet<PieceTableAnchor>
@@ -581,6 +622,29 @@ export const MAX_HEAP_OPERATION_LENGTH = 256 * 1024 * 1024
 export const exceedsHeapOperationBudget = (length: number): boolean =>
   length > MAX_HEAP_OPERATION_LENGTH
 
+const transactionSources = new WeakMap<
+  EditorTextBuffer,
+  EditorEventSource<EditorTextBufferChange>
+>()
+
+/** Capture commits before change callbacks can author another transition. */
+export function subscribeDocumentTransactions(
+  buffer: EditorTextBuffer,
+  listener: (event: EditorTextBufferChange) => void,
+): () => void {
+  let source = transactionSources.get(buffer)
+  if (!source) {
+    source = new EditorEventSource({ action: 'editor.buffer.transaction_listener_failed' })
+    transactionSources.set(buffer, source)
+  }
+  const subscription = source.subscribe(listener)
+  return () => {
+    subscription.dispose()
+    if (source.size === 0 && transactionSources.get(buffer) === source)
+      transactionSources.delete(buffer)
+  }
+}
+
 class PieceTableEditorTextBuffer implements EditorTextBuffer {
   private readonly pendingChanges: EditorTextBufferChange[] = []
   private publishingChanges = false
@@ -609,10 +673,9 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     () => this.history.current,
   )
 
-  public constructor(rawText: string | PieceTableSnapshot, options: EditorTextBufferOptions = {}) {
+  public constructor(initial: InitialBufferSource, options: EditorTextBufferOptions = {}) {
     this.retainedHistoryStates = options.retainedHistoryStates
     this.now = options.now ?? Date.now
-    const initial = initialBufferSource(rawText)
     const snapshot = initial.snapshot
     const selections = createInitialSelectionSet(snapshot, createSelectionIdFactory())
     this.history = this.createHistory(snapshot, selections)
@@ -729,6 +792,8 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     return appendTiming(
       this.commitEdit(nextSnapshot, nextSelections, effectiveEdits, {
         history: options.history ?? 'record',
+        origin: options.origin,
+        author: options.author,
         metadata: ordinaryTransactionMetadata('programmatic', 'programmatic-edit'),
         selectionBefore: selections,
         sourceView,
@@ -736,6 +801,54 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
       'session.applyEdits',
       start,
     )
+  }
+
+  public reconcile(
+    base: PieceTableSnapshot,
+    batches: readonly (readonly TextEdit[])[],
+    options: DocumentSessionReconcileOptions,
+    sourceView: EditorViewSession | null = null,
+  ): DocumentSessionChange {
+    if (this.mutationLease) return this.createChange('none', [])
+    const before = this.history.current
+    let snapshot = retainPieceTableSnapshot(base)
+    for (const batch of batches) {
+      const edits = snapBatchEditRanges(snapshot, normalizeTextEdits(batch))
+      snapshot = applyBatchToPieceTable(snapshot, edits)
+    }
+    const supplied =
+      options?.edits && snapBatchEditRanges(before, normalizeTextEdits(options.edits))
+    const edits = reconciledEdits(before, snapshot, supplied)
+    const selections = reconcileSelections(before, snapshot, this.history.selections, edits)
+    const mappedViews = [...(bufferViews.get(this) ?? [])].flatMap((reference) => {
+      const view = reference.deref()
+      if (!view) {
+        bufferViews.get(this)?.delete(reference)
+        return []
+      }
+      return [
+        { view, selections: reconcileSelections(before, snapshot, view.getSelections(), edits) },
+      ]
+    })
+    this.history = replaceEditorHistoryState(this.history, snapshot, selections)
+    this.typingRun = null
+    for (const mapped of mappedViews) mapped.view.acceptBufferSelections(mapped.selections)
+    if (sourceView && !mappedViews.some((mapped) => mapped.view === sourceView)) {
+      sourceView.acceptBufferSelections(
+        reconcileSelections(before, snapshot, sourceView.getSelections(), edits),
+      )
+    }
+    return this.publish({
+      revision: {
+        edits,
+        logicalRevisionCount: 1,
+        logicalRevisionScope: null,
+        textChanged: edits.length > 0,
+      },
+      createChange: () => this.createChange('reconcile', edits),
+      origin: options.origin ?? 'remote',
+      author: options.author,
+    })
   }
 
   public backspace(
@@ -809,6 +922,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
           start,
         ),
       sourceView,
+      origin: 'undo',
       updateSelections: true,
     })
     return change
@@ -842,6 +956,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
           start,
         ),
       sourceView,
+      origin: 'redo',
       updateSelections: true,
     })
     return change
@@ -1624,6 +1739,8 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
       revision: publication,
       createChange: () => this.createChange('edit', edits, transaction),
       sourceView: options.sourceView,
+      origin: options.origin,
+      author: options.author,
       updateSelections: true,
     })
     return change
@@ -1734,6 +1851,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     readonly sourceView?: EditorViewSession | null
     readonly updateSelections?: boolean
     readonly origin?: EditorTextBufferChange['origin']
+    readonly author?: unknown
   }): DocumentSessionChange {
     const revisionBefore = this.revision
     const textSnapshotBefore = this.textSnapshot
@@ -1760,12 +1878,14 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
       syncPointAfter,
       changesSinceDocumentSyncPoint: (point, scope) =>
         this.editChain.changesSince(point, scope, syncPointAfter),
-      origin: transition.origin ?? 'view',
+      origin: transition.origin ?? 'local',
+      author: transition.author,
       sourceViewId: transition.sourceView?.viewId ?? null,
     }
     const deletedUnits = change.edits.reduce((sum, edit) => sum + edit.to - edit.from, 0)
     this.storageMaintenance.request(deletedUnits)
     this.pendingChanges.push(event)
+    transactionSources.get(this)?.fire(event)
     this.dispatchChanges()
     return change
   }
@@ -1789,6 +1909,20 @@ function* historyStorageSnapshots(history: DocumentHistory): Generator<PieceTabl
     yield node.transaction.snapshotBefore
     yield node.transaction.snapshotAfter
   }
+}
+
+const bufferViews = new WeakMap<EditorTextBuffer, Set<WeakRef<EditorViewSession>>>()
+const registeredBufferViews = new WeakSet<EditorViewSession>()
+
+function registerBufferView(buffer: EditorTextBuffer, view: EditorViewSession): void {
+  if (registeredBufferViews.has(view)) return
+  registeredBufferViews.add(view)
+  let views = bufferViews.get(buffer)
+  if (!views) {
+    views = new Set()
+    bufferViews.set(buffer, views)
+  }
+  views.add(new WeakRef(view))
 }
 
 class PieceTableEditorViewSession implements EditorViewSession {
@@ -1974,6 +2108,14 @@ class EditorBufferDocumentSession implements EditorBufferSession {
     return this.buffer.applyEdits(this.view.getSelections(), edits, options, this.view)
   }
 
+  public reconcile(
+    base: PieceTableSnapshot,
+    batches: readonly (readonly TextEdit[])[],
+    options: DocumentSessionReconcileOptions,
+  ): DocumentSessionChange {
+    return this.buffer.reconcile(base, batches, options, this.view)
+  }
+
   public backspace(tabSize?: number): DocumentSessionChange {
     return this.buffer.backspace(this.view.getSelections(), this.view, tabSize)
   }
@@ -2078,8 +2220,8 @@ class StaticTextBuffer extends PieceTableEditorTextBuffer {
 }
 
 class StaticDocumentSession extends EditorBufferDocumentSession {
-  public constructor(rawText: string) {
-    const buffer = new StaticTextBuffer(rawText, { retainedHistoryStates: 0 })
+  public constructor(initial: InitialBufferSource) {
+    const buffer = new StaticTextBuffer(initial, { retainedHistoryStates: 0 })
     super(buffer, createEditorViewSession(buffer))
   }
 
@@ -2123,12 +2265,18 @@ class StaticDocumentSession extends EditorBufferDocumentSession {
   }
 }
 
-function initialBufferSource(source: string | PieceTableSnapshot): {
+type InitialBufferSource = {
   readonly snapshot: PieceTableSnapshot
   readonly text?: string
-} {
+}
+
+function initialBufferSource(source: string | PieceTableSnapshot): InitialBufferSource {
   if (typeof source !== 'string') return { snapshot: retainPieceTableSnapshot(source) }
-  const ingested = normalizeDocumentText(source)
+  return ingestBufferSource(source)
+}
+
+function ingestBufferSource(text: string): InitialBufferSource & { readonly text: string } {
+  const ingested = normalizeDocumentText(text)
   return {
     text: ingested.text,
     snapshot: createPieceTableSnapshot(ingested.text, {
@@ -2144,24 +2292,27 @@ export function createEditorTextBuffer(
   text: string,
   options: EditorTextBufferOptions = {},
 ): EditorTextBuffer {
-  return new PieceTableEditorTextBuffer(text, options)
+  return new PieceTableEditorTextBuffer(initialBufferSource(text), options)
 }
 
 export function createEditorSnapshotBuffer(snapshot: PieceTableSnapshot): EditorTextBuffer {
-  return new PieceTableEditorTextBuffer(snapshot)
+  return new PieceTableEditorTextBuffer(initialBufferSource(snapshot))
 }
 
 export function createEditorViewSession(
   buffer: EditorTextBuffer,
   viewId = createEditorViewSessionId(),
 ): EditorViewSession {
-  return new PieceTableEditorViewSession(buffer, viewId)
+  const view = new PieceTableEditorViewSession(buffer, viewId)
+  registerBufferView(buffer, view)
+  return view
 }
 
 export function createEditorBufferSession(
   buffer: EditorTextBuffer,
   view: EditorViewSession = createEditorViewSession(buffer),
 ): EditorBufferSession {
+  registerBufferView(buffer, view)
   return new EditorBufferDocumentSession(buffer, view)
 }
 
@@ -2170,7 +2321,19 @@ export function createDocumentSession(text: string): DocumentSession {
 }
 
 export function createStaticDocumentSession(text: string): DocumentSession {
-  return new StaticDocumentSession(text)
+  return new StaticDocumentSession(initialBufferSource(text))
+}
+
+export function createEditorDocumentSession(
+  text: string,
+  documentMode: 'session' | 'static',
+): { readonly session: DocumentSession; readonly text: string } {
+  const initial = ingestBufferSource(text)
+  const session =
+    documentMode === 'static'
+      ? new StaticDocumentSession(initial)
+      : createEditorBufferSession(new PieceTableEditorTextBuffer(initial))
+  return { session, text: initial.text }
 }
 
 export function prepareDocumentTransaction(
@@ -2532,7 +2695,8 @@ function documentChangeLogicalRevision(
   transaction: DocumentTransaction | null,
 ): { readonly count: number; readonly scope: DocumentLogicalRevisionScope | null } {
   if (kind === 'checkout' && !transaction) return { count: 0, scope: null }
-  if (kind === 'undo' || kind === 'redo' || kind === 'checkout') return { count: 1, scope: null }
+  if (kind === 'undo' || kind === 'redo' || kind === 'checkout' || kind === 'reconcile')
+    return { count: 1, scope: null }
   if (kind !== 'edit' || !transaction) return { count: 0, scope: null }
   return {
     count: transaction.metadata.logicalRevisionCount,

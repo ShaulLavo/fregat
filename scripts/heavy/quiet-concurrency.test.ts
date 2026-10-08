@@ -54,7 +54,14 @@ describe.skipIf(!userScopes)('quiet concurrent work', () => {
     const children = [quiet]
     try {
       await expect.poll(quiet.stdout, { timeout: 10_000 }).toContain('started')
-      const held = []
+      const lateServer = start(box, 'late-server', ['echo', 'server'], {
+        server: true,
+        jobClass: 'light',
+        machine: true,
+      })
+      children.push(lateServer)
+      const held = [lateServer]
+      await expect.poll(lateServer.stderr, { timeout: 10_000 }).toContain('quiet hold by')
       for (const jobClass of ['browser', 'suite', 'build', 'bench']) {
         const blocked = start(box, jobClass, ['echo', jobClass], { jobClass, machine: true })
         held.push(blocked)
@@ -72,7 +79,7 @@ describe.skipIf(!userScopes)('quiet concurrent work', () => {
       children.push(quietLight)
       await expect
         .poll(() => live(box.state, 'queue').map((entry) => entry.label))
-        .toEqual(['browser', 'suite', 'build', 'bench', 'quiet-light'])
+        .toEqual(['late-server', 'browser', 'suite', 'build', 'bench', 'quiet-light'])
       const finished = start(box, 'short-light', ['echo', 'short'], {
         jobClass: 'light',
         machine: true,
@@ -229,7 +236,7 @@ describe.skipIf(!userScopes)('quiet concurrent work', () => {
   )
 
   test.each(['expired', 'cancelled'])(
-    'late light servers overlap repeated and %s holds with their own slice',
+    'late light servers wait for %s holds and remain running through the next hold',
     async (mode) => {
       const box = concurrentBox(mode === 'expired' ? 2 : 600)
       const releaseServer = path.join(box.root, 'release-server')
@@ -260,7 +267,8 @@ describe.skipIf(!userScopes)('quiet concurrent work', () => {
             machine: true,
           },
         )
-        await expect.poll(server.stdout, { timeout: 10_000 }).toContain('started')
+        await expect.poll(server.stderr, { timeout: 10_000 }).toContain('quiet hold by')
+        expect(server.stdout()).toBe('')
         if (mode === 'cancelled') {
           cancellation = {
             at: new Date().toISOString(),
@@ -273,20 +281,19 @@ describe.skipIf(!userScopes)('quiet concurrent work', () => {
         const first = recordOf(box, 'expires')!
         expect(first.quietHoldExpired).toBe(mode === 'expired')
         expect(first.serversAtAdmission).toEqual([])
-        expect(first.jobsDuringRun).toHaveLength(1)
-        expect(first.jobsDuringRun[0]).toMatchObject({
-          label: 'late-server',
-          server: true,
-          endedAt: null,
-        })
+        expect(first.jobsDuringRun).toEqual([])
+        await expect.poll(server.stdout, { timeout: 10_000 }).toContain('started')
         expect(live(box.state, 'jobs').map((job) => job.label)).toEqual(['late-server'])
         const next = start(box, 'next', ['true'], { quiet: true, jobClass: 'bench', machine: true })
         expect((await next.done).code).toBe(0)
         const second = recordOf(box, 'next')!
         expect(second.serversAtAdmission.map((job) => job.label)).toEqual(['late-server'])
-        expect(second.jobsDuringRun.map((job) => job.id)).toEqual(
-          first.jobsDuringRun.map((job) => job.id),
-        )
+        expect(second.jobsDuringRun).toHaveLength(1)
+        expect(second.jobsDuringRun[0]).toMatchObject({
+          label: 'late-server',
+          server: true,
+          endedAt: null,
+        })
         writeFileSync(releaseServer, '')
         expect((await server.done).code).toBe(0)
         expect(recordOf(box, 'late-server')).toMatchObject({

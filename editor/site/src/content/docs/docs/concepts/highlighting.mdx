@@ -1,0 +1,28 @@
+---
+title: Highlighting with the CSS Highlight API
+description: Separate browser text layout from syntax paint.
+sidebar:
+  order: 5
+---
+
+Singapore mounts visible text as DOM content. The browser lays it out and answers geometry queries. The CSS Custom Highlight API paints ranges over that text for syntax and other marks.
+
+## The syntax pipeline
+
+A highlighting worker derives tokens from a document version. The editor maps the relevant token ranges onto mounted text and adds them to named CSS highlights. Scrolling changes which ranges need paint as rows enter and leave the viewport.
+
+Tree-sitter supplies structural syntax data, including fold and injection information. Shiki supplies another tokenization path. Semantic tokens from a language server can add a separate layer where the integration supports them.
+
+## Paint has limits
+
+`::highlight()` supports a restricted set of paint properties. It cannot set font weight, font style or text layout. Themes can change syntax colours; bold and italic syntax styles need a different rendering contract.
+
+Widgets, row content and gutter markers use DOM contributions because they need content or layout. Keep a decoration's coordinates tied to the document version it describes.
+
+## Input and browser support
+
+The EditContext input route is Chromium-specific. Highlight painting and highlighting engines also have Firefox and WebKit tests, but that does not establish full editor parity across those browsers. Verify your application's browser matrix.
+
+Screen-reader completeness has no published audit. Test keyboard navigation and assistive technology on your required browsers before adopting the editor for those workflows.
+
+The [browser virtualization design](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/display/browser-virtualization.md) explains mounted rows and browser-owned geometry.
