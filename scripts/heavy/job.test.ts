@@ -1,7 +1,19 @@
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vitest'
 
+import { bootSeconds } from './admission'
 import { reaperSandbox } from './reaper-sandbox'
 
 import {
@@ -81,9 +93,63 @@ test('a quiet job passes its immutable boot-time deadline to the in-scope guard'
     runtimeDeadline: 123.45,
     slice: 'heavy-1.slice',
   })
+  expect(command.slice(0, 6)).toEqual([
+    'bash',
+    '-p',
+    SCOPE_SHIM,
+    '--launch-deadline',
+    '12345',
+    'systemd-run',
+  ])
   const deadline = command.indexOf('--deadline')
   expect(deadline).toBeGreaterThan(command.indexOf(SCOPE_SHIM))
   expect(command.slice(deadline, deadline + 2)).toEqual(['--deadline', '12345'])
+})
+
+test.for([
+  { deadline: '0', exitCode: 75 },
+  { deadline: 'invalid', exitCode: 125 },
+])(
+  'the pre-launch guard rejects $deadline before invoking the manager',
+  ({ deadline, exitCode }, context) => {
+    if (process.platform !== 'linux') context.skip('Requires Linux boot-time procfs')
+    const result = spawnSync(
+      'bash',
+      ['-p', SCOPE_SHIM, '--launch-deadline', deadline, 'bash', '-c', 'echo launched'],
+      { encoding: 'utf8' },
+    )
+    expect(result.status).toBe(exitCode)
+    expect(result.stdout).toBe('')
+  },
+)
+
+test('a live pre-launch deadline transfers fd 6 to the manager command', (context) => {
+  if (process.platform !== 'linux') context.skip('Requires Linux boot-time procfs')
+  const root = mkdtempSync(path.join(tmpdir(), 'heavy-launch-'))
+  const entry = path.join(root, 'entry')
+  writeFileSync(entry, 'owned')
+  const fd = openSync(entry, 'r')
+  try {
+    const result = spawnSync(
+      'bash',
+      [
+        '-p',
+        SCOPE_SHIM,
+        '--launch-deadline',
+        String(Math.floor((bootSeconds() + 60) * 100)),
+        'bash',
+        '-p',
+        '-c',
+        'cat <&6',
+      ],
+      { stdio: ['ignore', 'pipe', 'pipe', 'ignore', 'ignore', 'ignore', fd] },
+    )
+    expect(result.status).toBe(0)
+    expect(result.stdout.toString()).toBe('owned')
+  } finally {
+    closeSync(fd)
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 const locks = process.platform === 'linux' ? await import('./lock').catch(() => null) : null

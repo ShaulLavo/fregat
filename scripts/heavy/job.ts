@@ -53,6 +53,9 @@ export function localCommand({
   readonly runtimeDeadline?: number
 }) {
   return [
+    ...(runtimeDeadline === undefined
+      ? []
+      : ['bash', '-p', SCOPE_SHIM, '--launch-deadline', String(Math.floor(runtimeDeadline * 100))]),
     'systemd-run',
     '--user',
     '--scope',
