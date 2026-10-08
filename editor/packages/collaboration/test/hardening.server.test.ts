@@ -1,4 +1,5 @@
-import { beforeAll, beforeEach, expect, test } from 'vitest'
+import { beforeAll, expect, test } from 'vitest'
+import { memberAdmission } from '../examples/signaling-server'
 import { startSignalingServer, type SignalingServerOptions } from '../server/signaling'
 import { probe, type BrokerProbe } from './broker-probe'
 
@@ -32,10 +33,6 @@ beforeAll(async () => {
     await server.stop(true)
   }
 })
-beforeEach((context) => {
-  if (!distinctLoopback && !context.task.name.startsWith('invalid '))
-    context.skip('This host cannot bind distinct 127.0.0.x client addresses')
-})
 
 async function subscribe(client: BrokerProbe, topic = crypto.randomUUID()) {
   client.send({ type: 'subscribe', topic })
@@ -66,7 +63,7 @@ test('admission tokens never appear in any response header', async () => {
         request.headers.get('sec-websocket-protocol')?.includes(token) === true,
     },
     async (port, clients) => {
-      const accepted = await probe(port, '127.0.0.2', {
+      const accepted = await probe(port, '127.0.0.1', {
         'Sec-WebSocket-Protocol': `${token}, singapore-collaboration`,
       })
       clients.push(accepted)
@@ -74,7 +71,7 @@ test('admission tokens never appear in any response header', async () => {
       expect(accepted.headers).not.toContain(token)
       expect(accepted.headers).toMatch(/sec-websocket-protocol: singapore-collaboration\r?$/im)
       await subscribe(accepted)
-      const rejected = await probe(port, '127.0.0.2', {
+      const rejected = await probe(port, '127.0.0.1', {
         'Sec-WebSocket-Protocol': token,
       })
       clients.push(rejected)
@@ -87,7 +84,7 @@ test('admission tokens never appear in any response header', async () => {
 test('forwarded headers stay untrusted without an address hook', async () => {
   await withBroker(options, async (port, clients) => {
     for (let index = 0; index < 3; index++) {
-      const client = await probe(port, '127.0.0.2', {
+      const client = await probe(port, '127.0.0.1', {
         'X-Forwarded-For': `192.0.2.${index + 1}`,
         Forwarded: `for=192.0.2.${index + 1}`,
         'X-Real-IP': `192.0.2.${index + 1}`,
@@ -103,7 +100,7 @@ test('trusted proxies opt into client addresses and keep their per-address quota
     {
       ...options,
       clientAddress: (request, server) =>
-        server.requestIP(request)?.address === '127.0.0.2'
+        server.requestIP(request)?.address === '127.0.0.1'
           ? (request.headers.get('x-forwarded-for') ?? undefined)
           : server.requestIP(request)?.address,
     },
@@ -115,7 +112,7 @@ test('trusted proxies opt into client addresses and keep their per-address quota
         ['192.0.2.2', 101],
         ['192.0.2.2', 101],
       ] as const) {
-        const client = await probe(port, '127.0.0.2', { 'X-Forwarded-For': address })
+        const client = await probe(port, '127.0.0.1', { 'X-Forwarded-For': address })
         clients.push(client)
         expect(client.status).toBe(status)
       }
@@ -147,7 +144,7 @@ for (const prefix of [undefined, 48, 63, 128]) {
                 prefix === 48 ? '2001:db8:1235::1' : '2001:db8:1234:2::1',
               ]
         for (const [index, address] of addresses.entries()) {
-          const client = await probe(port, `127.0.0.${index + 2}`, { 'X-Client-Address': address })
+          const client = await probe(port, '127.0.0.1', { 'X-Client-Address': address })
           clients.push(client)
           expect(client.status).toBe(index === 2 ? 429 : 101)
         }
@@ -156,14 +153,15 @@ for (const prefix of [undefined, 48, 63, 128]) {
   })
 }
 
-test('one admitted member cannot consume total capacity from many socket addresses', async () => {
+test('one admitted member cannot consume total capacity from many socket addresses', async (context) => {
+  if (!distinctLoopback) context.skip('This host cannot bind distinct 127.0.0.x client addresses')
   await withBroker(
     {
       ...options,
       authorize: (request) =>
         request.headers.has('x-test-member')
           ? { member: request.headers.get('x-test-member')! }
-          : true,
+          : { member: 'attacker' },
       limits: { ...options.limits, connections: 8, connectionsPerMember: 4 },
     },
     async (port, clients) => {
@@ -210,9 +208,7 @@ test('room capacity follows a configured connection limit above 1024', async () 
     async (port, clients) => {
       for (let start = 0; start < 1025; start += 32) {
         const batch = await Promise.all(
-          Array.from({ length: Math.min(32, 1025 - start) }, (_, index) =>
-            probe(port, `127.0.0.${((start + index) % 30) + 2}`),
-          ),
+          Array.from({ length: Math.min(32, 1025 - start) }, () => probe(port, '127.0.0.1')),
         )
         clients.push(...batch)
         for (const client of batch) expect(client.status).toBe(101)
@@ -236,7 +232,7 @@ test('mapped IPv6 and IPv4 addresses share one quota', async () => {
         '::ffff:192.0.2.1',
         '192.0.2.2',
       ].entries()) {
-        const client = await probe(port, `127.0.0.${index + 2}`, { 'X-Client-Address': address })
+        const client = await probe(port, '127.0.0.1', { 'X-Client-Address': address })
         clients.push(client)
         expect(client.status).toBe(index === 2 ? 429 : 101)
       }
@@ -281,10 +277,91 @@ test('address hooks fail closed on missing and invalid addresses', async () => {
     },
     async (port, clients) => {
       for (const address of ['', 'anything', '192.0.2.1, 192.0.2.2']) {
-        const client = await probe(port, '127.0.0.2', { 'X-Client-Address': address })
+        const client = await probe(port, '127.0.0.1', { 'X-Client-Address': address })
         clients.push(client)
         expect(client.status).toBe(403)
       }
     },
   )
+})
+
+test('shared-token admission uses address quotas without a pooled member quota', async () => {
+  await withBroker(
+    {
+      ...options,
+      clientAddress: (request) => request.headers.get('x-client-address') ?? undefined,
+      limits: { ...options.limits, connections: 4, connectionsPerMember: 1 },
+    },
+    async (port, clients) => {
+      for (const [address, status] of [
+        ['192.0.2.1', 101],
+        ['192.0.2.1', 101],
+        ['192.0.2.1', 429],
+        ['192.0.2.2', 101],
+        ['192.0.2.2', 101],
+        ['192.0.2.3', 429],
+      ] as const) {
+        const client = await probe(port, '127.0.0.1', { 'X-Client-Address': address })
+        clients.push(client)
+        expect(client.status).toBe(status)
+      }
+    },
+  )
+})
+
+test('one example member at its quota leaves another authenticated member capacity', async () => {
+  const aliceToken = 'a'.repeat(43)
+  const bobToken = 'b'.repeat(43)
+  await withBroker(
+    {
+      ...options,
+      authorize: memberAdmission(`alice ${aliceToken}\nbob ${bobToken}`),
+      limits: { ...options.limits, connectionsPerIP: 32 },
+    },
+    async (port, clients) => {
+      for (let index = 0; index < 17; index++) {
+        const client = await probe(port, '127.0.0.1', {
+          'Sec-WebSocket-Protocol': `singapore-collaboration, ${aliceToken}`,
+          'X-Test-Member': 'bob',
+        })
+        clients.push(client)
+        expect(client.status).toBe(index < 16 ? 101 : 429)
+        if (index < 16) await subscribe(client)
+      }
+      const bob = await probe(port, '127.0.0.1', {
+        'Sec-WebSocket-Protocol': `singapore-collaboration, ${bobToken}`,
+      })
+      clients.push(bob)
+      expect(bob.status).toBe(101)
+      expect(bob.headers).not.toContain(bobToken)
+      await subscribe(bob)
+    },
+  )
+})
+
+test('example admission rejects a shared-token file at startup', () => {
+  expect(() => memberAdmission('a'.repeat(43))).toThrow('member token')
+})
+
+test('example admission binds verified tokens to configured member identities', () => {
+  const token = 'a'.repeat(43)
+  const authorize = memberAdmission(`alice ${token}`)
+  expect(
+    authorize(
+      new Request('http://collaboration.test', {
+        headers: {
+          'Sec-WebSocket-Protocol': `singapore-collaboration, ${token}`,
+          'X-Test-Member': 'bob',
+        },
+      }),
+    ),
+  ).toEqual({ member: 'alice' })
+  expect(
+    authorize(
+      new Request('http://collaboration.test', {
+        headers: { 'Sec-WebSocket-Protocol': `singapore-collaboration, ${'b'.repeat(43)}` },
+      }),
+    ),
+  ).toBe(false)
+  expect(authorize(new Request('http://collaboration.test'))).toBe(false)
 })
