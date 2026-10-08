@@ -1,9 +1,4 @@
----
-title: Performance
-description: Measure the editor and the features your application adds.
-sidebar:
-  order: 6
----
+# Performance
 
 Singapore's target is to keep a keystroke within one display frame. Measure latency for each file, browser and plugin combination against that budget.
 

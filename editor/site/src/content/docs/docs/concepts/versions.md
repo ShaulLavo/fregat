@@ -1,9 +1,4 @@
----
-title: Versioned documents and the piece table
-description: Understand structural sharing and stable document reads.
-sidebar:
-  order: 2
----
+# Versioned documents and the piece table
 
 The text buffer stores pieces that refer to immutable character buffers. A persistent AVL tree orders the pieces and maintains aggregates for navigation. The document's logical text is the pieces read in order.
 

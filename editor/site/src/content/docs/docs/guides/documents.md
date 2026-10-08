@@ -1,9 +1,4 @@
----
-title: Documents and sessions
-description: Give text an identity and own the view lifetime.
-sidebar:
-  order: 2
----
+# Documents and sessions
 
 Open a named document when text needs an identity shared with tabs, persistence or a language server. You need a mounted editor.
 
@@ -11,7 +6,7 @@ Open a named document when text needs an identity shared with tabs, persistence 
 
 `setText` works for unnamed text. `openDocument` adds `documentId` and optional language metadata.
 
-```ts title="documents.ts"
+```ts
 import { Editor } from '@singapore-editor/core/editor'
 
 const editor = new Editor(document.querySelector<HTMLElement>('#editor')!)
@@ -44,4 +39,4 @@ Use a stable path-like document id and a matching root URI. Check the Language s
 
 Confirm that both views use the same document session and that a closing view has not disposed the shared owner.
 
-Continue with Versioned documents, Anchors and Language servers in the sidebar.
+Continue with [versioned documents](../concepts/versions.md), [anchors](../concepts/anchors.md) and [language servers](lsp.md).

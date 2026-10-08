@@ -1,9 +1,4 @@
----
-title: Bundling and workers
-description: Serve editor packages, workers and grammar assets.
-sidebar:
-  order: 1
----
+# Bundling and workers
 
 Serve the editor with its stylesheets and worker assets. You need an ESM-capable bundler and a browser page.
 
@@ -45,4 +40,4 @@ Verify the grammar response and its MIME type. Check the console for CSP failure
 
 Mount the editor in the browser lifecycle. Framework adapters own the editor after their component mounts.
 
-Continue with Languages and tree-sitter or Language servers in the sidebar.
+Continue with [languages and tree-sitter](languages.md) or [language servers](lsp.md).

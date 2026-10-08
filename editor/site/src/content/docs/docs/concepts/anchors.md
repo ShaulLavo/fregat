@@ -1,9 +1,4 @@
----
-title: Anchors
-description: Track positions across edits and deleted text.
-sidebar:
-  order: 3
----
+# Anchors
 
 An offset is a position in one document version. An anchor is a durable reference into immutable buffer storage. Resolve it against a snapshot to obtain the position and whether its text is still live there.
 

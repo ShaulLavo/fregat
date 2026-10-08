@@ -1,15 +1,10 @@
----
-title: Decorations
-description: Paint text ranges and choose a presentation contract.
-sidebar:
-  order: 8
----
+# Decorations
 
 Add visual marks without changing document text. You need a mounted editor and UTF-16 ranges for the text you want to mark.
 
 ## 1. Paint a range
 
-```ts title="decorations.ts"
+```ts
 import { Editor } from '@singapore-editor/core/editor'
 
 const editor = new Editor(document.querySelector<HTMLElement>('#editor')!)
@@ -37,4 +32,4 @@ A raw offset belongs to a specific text version. Use tracked ranges or anchors a
 
 Give overlapping layers explicit ordering and check that the plugin removes its old contribution on disposal.
 
-Continue with Anchors, Highlighting and Write a plugin in the sidebar.
+Continue with [anchors](../concepts/anchors.md), [highlighting](../concepts/highlighting.md) and [writing a plugin](plugins.md).

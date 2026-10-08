@@ -14,7 +14,7 @@ The browser lays out visible text. Singapore paints syntax colours with the CSS 
 
 ## Choose an integration path
 
-Start with the [quick start](quick-start.md). It mounts an editor and shows the source that does it. The [React and Solid guide](../guides/frameworks.mdx) shows each framework's adapter.
+Start with the [quick start](quick-start.md). It mounts an editor and shows the source that does it. The [React and Solid guide](../guides/frameworks.md) shows each framework's adapter.
 
 The [Monaco](monaco.md) and [CodeMirror](codemirror.md) migration pages map familiar APIs to Singapore and list the differences to check before moving an application.
 
@@ -24,7 +24,7 @@ The public API is still changing. Screen-reader accessibility has no published a
 
 Monaco has VS Code's language ecosystem and a longer record of editor edge cases. CodeMirror has a small core and a large extension ecosystem. Singapore requires worker and WebAssembly asset hosting when you add tree-sitter. Choose based on the features and browser support your application needs.
 
-There is no published editor-level benchmark proving Singapore faster than either editor. The [performance page](../concepts/performance.mdx) explains the measurements to run for your own workload.
+There is no published editor-level benchmark proving Singapore faster than either editor. The [performance page](../concepts/performance.md) explains the measurements to run for your own workload.
 
 ## Source and roadmap
 

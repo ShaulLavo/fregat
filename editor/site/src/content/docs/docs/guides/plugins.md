@@ -1,15 +1,10 @@
----
-title: Write a plugin
-description: Add a view-owned contribution and release it with the editor.
-sidebar:
-  order: 9
----
+# Write a plugin
 
 Use a plugin when a feature needs an editor-owned lifecycle. Start with a plain `EditorPlugin`, then use the extension entry point for commands and view contributions.
 
 ## 1. Define a plugin
 
-```ts title="plugin.ts"
+```ts
 import { Editor } from '@singapore-editor/core/editor'
 import type { EditorPlugin } from '@singapore-editor/core/extensions'
 
@@ -41,7 +36,7 @@ Line numbers and fold markers stay at the left edge by default. For a documentat
 set `gutterScroll: 'content'` on the editor. All gutter lanes then move horizontally with the text,
 including any leading inset.
 
-```ts title="reading-view.ts"
+```ts
 import { Editor } from '@singapore-editor/core/editor'
 import { createFoldGutterPlugin, createLineGutterPlugin } from '@singapore-editor/gutters'
 
@@ -66,4 +61,4 @@ Put each listener and worker under an owned disposable. Check externally supplie
 
 Check whether the feature actually needs shared identity. A URI or language can be a plain integration option for an unnamed editor.
 
-Continue with the Packages reference and Workers concepts in the sidebar.
+Continue with the [packages reference](/docs/reference/packages/) and [workers](../concepts/workers.md).

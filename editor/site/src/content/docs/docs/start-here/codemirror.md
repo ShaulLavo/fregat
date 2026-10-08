@@ -38,4 +38,4 @@ Lezer can parse on the main thread. Singapore's tree-sitter package parses in a 
 
 CodeMirror has a large community extension ecosystem and years of production use. Singapore's public API is still moving, and no published editor-level comparison proves a smaller bundle or faster editor. Keep the existing editor available until your application's required features pass integration tests.
 
-Continue with [languages and tree-sitter](../guides/languages.mdx), [bundling and workers](../guides/bundling.mdx) and [writing a plugin](../guides/plugins.mdx).
+Continue with [languages and tree-sitter](../guides/languages.md), [bundling and workers](../guides/bundling.md) and [writing a plugin](../guides/plugins.md).

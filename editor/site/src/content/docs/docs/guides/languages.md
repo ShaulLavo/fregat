@@ -1,9 +1,4 @@
----
-title: Languages and tree-sitter
-description: Load syntax highlighting, folding and language grammars.
-sidebar:
-  order: 4
----
+# Languages and tree-sitter
 
 Add syntax colours and structural language data with tree-sitter. You need a bundler that emits module workers and WebAssembly assets.
 
@@ -15,7 +10,7 @@ npm install @singapore-editor/core @singapore-editor/tree-sitter @singapore-edit
 
 ## 2. Register the bundled languages
 
-```ts title="syntax.ts"
+```ts
 import { Editor } from '@singapore-editor/core/editor'
 import { createTreeSitterLanguagePlugin } from '@singapore-editor/tree-sitter'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
@@ -37,7 +32,7 @@ The grammar loads when the document needs it. Tree-sitter parses in a worker and
 
 Register a language on `createTreeSitterSyntaxProvider`, then install `createTreeSitterSyntaxPlugin(provider)`. The contribution supplies a WebAssembly URL and highlight queries. Fold and injection queries are optional additions.
 
-```ts title="custom-language.ts"
+```ts
 import { createTreeSitterSyntaxProvider } from '@singapore-editor/tree-sitter'
 
 const provider = createTreeSitterSyntaxProvider()
@@ -69,4 +64,4 @@ Check `languageId`, the grammar request and the worker console. A document langu
 
 Check the WebAssembly response and runtime compatibility, then validate the highlight query against that grammar's node names.
 
-Continue with Bundling and workers, Workers and Highlighting concepts in the sidebar.
+Continue with [bundling and workers](bundling.md), [workers](../concepts/workers.md) and [highlighting](../concepts/highlighting.md).

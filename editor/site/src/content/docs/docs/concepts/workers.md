@@ -1,9 +1,4 @@
----
-title: Workers
-description: Understand which work leaves the main thread and who owns it.
-sidebar:
-  order: 4
----
+# Workers
 
 The canonical document stays on the main thread. Workers maintain derived state for parsing, highlighting, minimap drawing, spellcheck and TypeScript language analysis.
 

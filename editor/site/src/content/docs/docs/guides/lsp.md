@@ -1,9 +1,4 @@
----
-title: Language servers
-description: Add diagnostics, completion and other language features.
-sidebar:
-  order: 5
----
+# Language servers
 
 Connect a language server for diagnostics, completion, hover and the features it supports. Syntax highlighting is a separate plugin.
 
@@ -15,7 +10,7 @@ You need a server endpoint that carries LSP JSON-RPC messages. The example assum
 npm install @singapore-editor/core @singapore-editor/lsp @singapore-editor/lsp-plugin
 ```
 
-```ts title="language-server.ts"
+```ts
 import { Editor } from '@singapore-editor/core/editor'
 import { createLanguageServerPlugin } from '@singapore-editor/lsp-plugin'
 import '@singapore-editor/core/style.css'
@@ -45,7 +40,7 @@ Use `onOpenDefinition` and `onOpenReferences` to open files in your application.
 
 `@singapore-editor/typescript-lsp` runs the TypeScript language service in the browser and supplies its standard-library declarations. Pass the other virtual files so imports resolve.
 
-```ts title="typescript.ts"
+```ts
 import { Editor } from '@singapore-editor/core/editor'
 import { createTypeScriptLspPlugin } from '@singapore-editor/typescript-lsp'
 

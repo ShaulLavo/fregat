@@ -1,15 +1,10 @@
----
-title: Themes
-description: Set editor colours and convert a VS Code theme.
-sidebar:
-  order: 3
----
+# Themes
 
 Apply editor and syntax colours with an `EditorTheme`. You need the core stylesheet and a mounted editor.
 
 ## 1. Set the editor colours
 
-```ts title="theme.ts"
+```ts
 import { Editor } from '@singapore-editor/core/editor'
 import type { EditorTheme } from '@singapore-editor/core/rendering'
 import '@singapore-editor/core/style.css'
@@ -29,7 +24,7 @@ editor.setText('Hello, theme\n')
 
 The `/shiki` entry point converts VS Code theme definitions. It supplies theme colours; language features still come from plugins.
 
-```ts title="vscode-theme.ts"
+```ts
 import { editorThemeFromVscodeTheme } from '@singapore-editor/core/shiki'
 
 const theme = editorThemeFromVscodeTheme({
@@ -56,4 +51,4 @@ Set gutter colour options and check your plugin stylesheet imports. `gutterLeadi
 
 Check that the syntax plugin has loaded its language and that your theme supplies syntax colours for the token categories it produces.
 
-Continue with Languages and tree-sitter and the generated rendering reference in the sidebar.
+Continue with [languages and tree-sitter](languages.md) and the generated [rendering reference](/docs/reference/api/core/public/rendering/overview/).

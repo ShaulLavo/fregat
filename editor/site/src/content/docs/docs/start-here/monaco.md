@@ -31,7 +31,7 @@ const text = editor.materializeFullText()
 console.log(text)
 ```
 
-Keep the original application's saved text separate from view lifetime. Monaco model ownership and Singapore document sessions have different contracts. Read [documents and sessions](../guides/documents.mdx) before sharing a document across views.
+Keep the original application's saved text separate from view lifetime. Monaco model ownership and Singapore document sessions have different contracts. Read [documents and sessions](../guides/documents.md) before sharing a document across views.
 
 ## Port language features separately
 
@@ -45,4 +45,4 @@ Singapore's syntax paint cannot use bold or italic. Rows have fixed height. Inla
 
 No editor-level comparison currently establishes an overall speed or memory advantage over Monaco. Run your application's real files through both editors before making that claim.
 
-Continue with [themes](../guides/themes.mdx), [language servers](../guides/lsp.mdx) and [decorations](../guides/decorations.mdx).
+Continue with [themes](../guides/themes.md), [language servers](../guides/lsp.md) and [decorations](../guides/decorations.md).

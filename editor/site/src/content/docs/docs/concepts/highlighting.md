@@ -1,9 +1,4 @@
----
-title: Highlighting with the CSS Highlight API
-description: Separate browser text layout from syntax paint.
-sidebar:
-  order: 5
----
+# Highlighting with the CSS Highlight API
 
 Singapore mounts visible text as DOM content. The browser lays it out and answers geometry queries. The CSS Custom Highlight API paints ranges over that text for syntax and other marks.
 

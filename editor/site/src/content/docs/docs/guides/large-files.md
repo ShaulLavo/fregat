@@ -1,9 +1,4 @@
----
-title: Large files
-description: Choose editable text or a paged read-only view.
-sidebar:
-  order: 7
----
+# Large files
 
 Choose a loading path based on whether the user needs editing and language analysis. You need representative files and a production browser build to measure your integration.
 
@@ -41,4 +36,4 @@ Check the cutoff your host enforces, and measure each plugin's work separately. 
 
 Check document, worker and file-source disposal. Compare retained memory after closing the view against a plain-text baseline.
 
-Continue with Performance and Workers in the sidebar.
+Continue with [performance](../concepts/performance.md) and [workers](../concepts/workers.md).

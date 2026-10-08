@@ -345,8 +345,7 @@
       "project": ["src/**/*.ts", "server/**/*.ts", "examples/**/*.ts", "test/**/*.ts"]
     },
     "editor/site": {
-      "entry": ["src/examples/*.tsx"],
-      "ignoreDependencies": ["@singapore-editor/*", "satteri"]
+      "ignoreDependencies": ["@singapore-editor/*", "satteri", "react", "@types/react", "solid-js"]
     }
   },
   "ignore": ["editor/**/*.d.css.ts"],

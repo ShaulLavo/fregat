@@ -1,9 +1,4 @@
----
-title: Architecture
-description: Follow an edit through the document, visible rows and workers.
-sidebar:
-  order: 1
----
+# Architecture
 
 Singapore keeps one canonical document on the main thread. Visible text, syntax, folding and the minimap are projections of that document. A projection carries the version it describes so an old worker answer can be recognized.
 

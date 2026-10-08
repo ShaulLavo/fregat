@@ -58,10 +58,10 @@ Check the container's height, flex layout and the core stylesheet import. Mount 
 
 ### Highlighting is absent
 
-The core edits plain text. Follow the [languages and tree-sitter guide](../guides/languages.mdx) to load a syntax plugin.
+The core edits plain text. Follow the [languages and tree-sitter guide](../guides/languages.md) to load a syntax plugin.
 
 ### A server-rendered page fails to load
 
 Create the editor after client-side mount. The core uses browser DOM APIs.
 
-Continue with [documents and sessions](../guides/documents.mdx), [themes](../guides/themes.mdx), or the [TypeScript playground](playground.mdx).
+Continue with [documents and sessions](../guides/documents.md), [themes](../guides/themes.md), or the [TypeScript playground](playground.mdx).
