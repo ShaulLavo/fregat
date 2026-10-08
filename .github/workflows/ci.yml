@@ -84,11 +84,8 @@ jobs:
               - '!plans/**'
               - '!docs/**'
               - '!*.md'
-            # Mirrors site.yml's own push paths: the site build bundles apps/web in
-            # demo mode, so anything that can change that bundle belongs here too.
             site:
               - 'apps/site/**'
-              - 'apps/web/**'
               - 'packages/**'
               - 'editor/**'
               - 'ghostty-webgpu/**'
@@ -419,9 +416,6 @@ jobs:
             ${{ runner.temp }}/retention-layout-*-server-evidence-*
           if-no-files-found: ignore
 
-  # The site's demo build bundles apps/web in a different mode than the app build, so it
-  # pulls in packages (like MSW) the other CI jobs never touch and needs its own licence
-  # check. Building it here is what site.yml's push-to-main build does, run before merge.
   site:
     name: Site build
     needs: changes
@@ -435,7 +429,7 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
-      - name: Build landing page and interactive app
+      - name: Build landing page
         working-directory: apps/site
         run: bun run site:build
       - name: Build Editor example
@@ -445,7 +439,7 @@ jobs:
       - name: Test Singapore documentation checks
         run: bun run --cwd editor/site test
       - name: Build Singapore docs and check samples and internal links
-        run: bun run --cwd editor/site build
+        run: bun run --cwd editor/site build --base /singapore/
       - name: Install Singapore browser test dependencies
         uses: ./.github/actions/install-browsers
         with:
@@ -453,6 +447,8 @@ jobs:
           browsers: chromium
       - name: Test Singapore editor history restoration
         run: bun run --cwd editor/site test:browser
+      - name: Check landing page focus, contrast and motion controls
+        run: bun run --cwd apps/site verify:a11y
       - name: Build ghostty site
         run: bun run --cwd ghostty-webgpu/site build --base /${{ github.event.repository.name }}/ghostty-webgpu/
 

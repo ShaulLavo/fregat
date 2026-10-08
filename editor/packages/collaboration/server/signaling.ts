@@ -1,7 +1,9 @@
-import type { ServerWebSocket } from 'bun'
+import type { Server, ServerWebSocket } from 'bun'
+import { clientAddressKey } from './client-address'
 
 type Connection = {
   readonly ip: string
+  member?: string
   topic?: string
   deadline?: ReturnType<typeof setTimeout>
   released: boolean
@@ -10,13 +12,21 @@ type Connection = {
   bytes: number
 }
 type Subscriber = ServerWebSocket<Connection>
+export type Admission = boolean | { readonly member: string }
+
 export interface SignalingServerOptions {
   readonly hostname: string
   readonly port: number
   readonly allowedOrigins: readonly string[]
-  readonly authorize: (request: Request) => boolean | Promise<boolean>
+  readonly authorize: (request: Request) => Admission | Promise<Admission>
+  readonly clientAddress?: (
+    request: Request,
+    server: Pick<Server<unknown>, 'requestIP'>,
+  ) => string | undefined
+  readonly ipv6Prefix?: number
   readonly limits: {
     readonly connections: number
+    readonly connectionsPerMember?: number
     readonly connectionsPerIP: number
     readonly subscribeTimeout: number
     readonly idleTimeout: number
@@ -49,13 +59,26 @@ export function startSignalingServer(options: SignalingServerOptions) {
     ].some((value) => !Number.isSafeInteger(value) || value <= 0)
   )
     throw new TypeError('Positive integer broker limits are required')
+  const ipv6Prefix = options.ipv6Prefix ?? 64
+  if (!Number.isInteger(ipv6Prefix) || ipv6Prefix < 0 || ipv6Prefix > 128)
+    throw new TypeError('IPv6 prefix must be an integer from 0 to 128')
+  const connectionsPerMember =
+    options.limits.connectionsPerMember ?? Math.min(16, options.limits.connections)
+  if (!Number.isSafeInteger(connectionsPerMember) || connectionsPerMember <= 0)
+    throw new TypeError('A positive integer per-member limit is required')
   const topics = new Map<string, Set<Subscriber>>()
   const ips = new Map<string, number>()
+  const admissions = new Map<string, number>()
   let connections = 0
   const release = (data: Connection) => {
     if (data.released) return
     data.released = true
     connections--
+    if (data.member) {
+      const count = admissions.get(data.member)! - 1
+      if (count === 0) admissions.delete(data.member)
+      else admissions.set(data.member, count)
+    }
     const count = (ips.get(data.ip) ?? 1) - 1
     if (count === 0) ips.delete(data.ip)
     else ips.set(data.ip, count)
@@ -83,14 +106,28 @@ export function startSignalingServer(options: SignalingServerOptions) {
       const origin = request.headers.get('origin')
       if (!origin || !options.allowedOrigins.includes(origin))
         return new Response('Origin refused', { status: 403 })
-      const ip = server.requestIP(request)?.address
+      let address: string | undefined
+      try {
+        address = options.clientAddress
+          ? options.clientAddress(request, server)
+          : server.requestIP(request)?.address
+      } catch {
+        return new Response('Client address refused', { status: 403 })
+      }
+      const ip = address ? clientAddressKey(address, ipv6Prefix) : undefined
       if (!ip) return new Response('Client address required', { status: 403 })
       if (
         connections >= options.limits.connections ||
         (ips.get(ip) ?? 0) >= options.limits.connectionsPerIP
       )
         return new Response('Connection capacity reached', { status: 429 })
-      let admission: boolean | Promise<boolean>
+      const protocols = request.headers.get('sec-websocket-protocol')
+      if (
+        protocols !== null &&
+        !protocols.split(',').some((value) => value.trim() === 'singapore-collaboration')
+      )
+        return new Response('Public signaling protocol required', { status: 400 })
+      let admission: Admission | Promise<Admission>
       try {
         admission = options.authorize(request)
       } catch {
@@ -111,14 +148,35 @@ export function startSignalingServer(options: SignalingServerOptions) {
       try {
         const accepted = await Promise.race([
           Promise.resolve(admission).catch(() => false),
-          new Promise<boolean>((resolve) => {
+          new Promise<Admission>((resolve) => {
             // @justification Authorization may never settle; the deadline bounds reserved quota,
             // and finally clears it and releases the reservation when upgrade fails.
             timeout = setTimeout(() => resolve(false), options.limits.subscribeTimeout)
           }),
         ])
-        if (accepted !== true) return new Response('Admission refused', { status: 403 })
-        upgraded = server.upgrade(request, { data })
+        let member: string | undefined
+        if (accepted === true) member = undefined
+        else if (
+          accepted &&
+          typeof accepted.member === 'string' &&
+          accepted.member.length > 0 &&
+          accepted.member.length <= 256
+        )
+          member = `member:${accepted.member}`
+        else return new Response('Admission refused', { status: 403 })
+        if (member) {
+          if ((admissions.get(member) ?? 0) >= connectionsPerMember)
+            return new Response('Member capacity reached', { status: 429 })
+          data.member = member
+          admissions.set(member, (admissions.get(member) ?? 0) + 1)
+        }
+        upgraded = server.upgrade(request, {
+          data,
+          headers:
+            protocols === null
+              ? undefined
+              : { 'Sec-WebSocket-Protocol': 'singapore-collaboration' },
+        })
         return upgraded ? undefined : new Response('WebSocket upgrade required', { status: 426 })
       } finally {
         clearTimeout(timeout)
@@ -179,7 +237,10 @@ export function startSignalingServer(options: SignalingServerOptions) {
             return
           }
           const members = topics.get(topic) ?? new Set<Subscriber>()
-          if (members.size >= 8 || (!topics.has(topic) && topics.size >= 1024)) {
+          if (
+            members.size >= 8 ||
+            (!topics.has(topic) && topics.size >= options.limits.connections)
+          ) {
             socket.close(1013, 'Room capacity reached')
             return
           }

@@ -67,6 +67,7 @@ export {
   CharIdAllocator,
   applyCharIdEdit,
   charIdAt,
+  charIdAfter,
   charIdSpansInRange,
   deleteByCharId,
   insertByCharId,

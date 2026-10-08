@@ -5,6 +5,8 @@ import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
 import type { BrowserCommand } from 'vitest/node'
 import type { PeerOptions, PeerSnapshot } from './test/peer.ts'
+import { browserTestResponses } from '../../scripts/browser-test-responses.ts'
+import { workspaceRoot } from '../../scripts/workspace-root.ts'
 
 const scenario: BrowserCommand<
   [kind: 'webrtc' | 'broadcast' | 'combined' | 'turn' | 'duplicate-webrtc' | 'duplicate-broadcast']
@@ -151,6 +153,8 @@ const scenario: BrowserCommand<
 }
 
 export default defineConfig({
+  plugins: [browserTestResponses()],
+  server: { fs: { allow: [workspaceRoot] } },
   define: {
     __COLLABORATION_TURN_AVAILABLE__: JSON.stringify(Boolean(process.env.COLLABORATION_TEST_TURN)),
   },
@@ -161,9 +165,15 @@ export default defineConfig({
     browser: {
       enabled: true,
       headless: true,
+      viewport: { width: 900, height: 650 },
       provider: playwright(),
       instances: [{ browser: 'chromium' }],
-      commands: { collaborationScenario: scenario },
+      commands: {
+        collaborationScenario: scenario,
+        presenceMotion: async ({ page }, reduced: boolean) => {
+          await page.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' })
+        },
+      },
     },
   },
 })

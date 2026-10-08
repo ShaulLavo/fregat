@@ -19,3 +19,15 @@ export {
   type Payloads,
   type Message,
 } from './protocol'
+
+export {
+  Presence,
+  parsePresence,
+  type CharacterGap,
+  type PresenceState,
+  type PresenceMessage,
+  type LocalPresence,
+  type GapResolver,
+  type PresenceChannel,
+  type PresenceObserver,
+} from './presence'

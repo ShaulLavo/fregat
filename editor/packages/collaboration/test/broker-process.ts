@@ -6,7 +6,11 @@ const server = startSignalingServer({
   hostname: '127.0.0.1',
   port: 0,
   allowedOrigins: [origin],
-  authorize: (request) => request.headers.get('sec-websocket-protocol') === 'fixture-admission',
+  authorize: (request) =>
+    request.headers
+      .get('sec-websocket-protocol')
+      ?.split(',')
+      .some((value) => value.trim() === 'fixture-admission') === true,
   limits: {
     connections: 16,
     connectionsPerIP: 16,

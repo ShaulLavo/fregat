@@ -45,7 +45,10 @@ type Link = {
 export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
   private readonly links = new Map<string, Link>()
   private readonly pending = new Map<string, AbortController>()
-  private readonly handshakes = new Map<string, { tail: Promise<void>; count: number }>()
+  private readonly handshakes = new Map<
+    string,
+    { tail: Promise<void>; count: number; bytes: number }
+  >()
   private handshakeBytes = 0
   private readonly discovered = new Map<
     string,
@@ -271,9 +274,12 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
     description: RTCSessionDescriptionInit,
     work: () => Promise<void>,
   ): void {
-    const queue = this.handshakes.get(peer) ?? { tail: Promise.resolve(), count: 0 }
+    const queue = this.handshakes.get(peer) ?? { tail: Promise.resolve(), count: 0, bytes: 0 }
     const size = 2 * (description.sdp?.length ?? 0) + 4096
-    if (queue.count >= 8 || this.handshakeBytes + size > 4 * 1024 * 1024) return
+    const budget = 4 * 1024 * 1024
+    if (queue.count >= 8 || queue.bytes + size > budget / 7 || this.handshakeBytes + size > budget)
+      return
+    queue.bytes += size
     this.handshakeBytes += size
     queue.count++
     this.handshakes.set(peer, queue)
@@ -284,6 +290,7 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
       .catch(this.options.onError)
       .finally(() => {
         this.handshakeBytes -= size
+        queue.bytes -= size
         queue.count--
         if (queue.count === 0) this.handshakes.delete(peer)
       })

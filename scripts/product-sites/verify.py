@@ -22,7 +22,7 @@ for path in ('/fregat', '/singapore', '/ghostty-webgpu'):
         print(path, 'redirects to', response.url)
 
 
-for path in ('/', '/fregat/', '/singapore/', '/ghostty-webgpu/'):
+for path in ('/', '/fregat/', '/singapore/', '/singapore/demo/', '/ghostty-webgpu/'):
     with fetch(path) as response:
         assert response.status == 200, (path, response.status)
         cache = response.headers.get('Cache-Control')
@@ -49,6 +49,11 @@ for path in ('/', '/fregat/', '/singapore/', '/ghostty-webgpu/'):
         with fetch(missing) as response:
             assert response.status == 404, (missing, response.status)
             print(missing, response.status)
+
+for path in ('/singapore/docs/start-here/introduction/', '/singapore/docs/start-here/playground/', '/singapore/pagefind/pagefind.js', '/singapore/favicon.svg'):
+    with fetch(path) as response:
+        assert response.status == 200, (path, response.status)
+        print(path, response.status)
 
 with fetch('/ghostty-webgpu/bridge.wasm') as response:
     assert response.status == 200

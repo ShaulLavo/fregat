@@ -13,6 +13,7 @@ import {
   CharIdAllocator,
   applyCharIdEdit,
   charIdAt,
+  charIdAfter,
   charIdSpansInRange,
   deleteByCharId,
   insertByCharId,
@@ -658,3 +659,26 @@ it.each([false, true])(
     expect(text(hidden)).toBe('aef')
   },
 )
+
+it('structural successor includes hidden identities across split pieces and retained snapshots', () => {
+  const before = make('abcd')
+  const inserted = insertByCharId(before, {
+    start: id(0, 'peer'),
+    text: 'XY',
+    at: { after: id(0) },
+  })
+  const hidden = deleteByCharId(inserted, [
+    { start: id(0, 'peer'), count: 2 },
+    { start: id(1), count: 1 },
+  ])
+  const expected = [id(0), id(0, 'peer'), id(1, 'peer'), id(1), id(2), id(3)]
+  let left: CharId | 'start' = 'start'
+  for (const next of expected) {
+    expect(charIdAfter(hidden, left)).toEqual(next)
+    left = next
+  }
+  expect(charIdAfter(hidden, left)).toBeNull()
+  expect(charIdAfter(before, id(0))).toEqual(id(1))
+  expect(charIdAfter(make(''), 'start')).toBeNull()
+  expect(() => charIdAfter(before, id(0, 'unknown'))).toThrow(RangeError)
+})

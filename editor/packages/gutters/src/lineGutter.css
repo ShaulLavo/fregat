@@ -9,7 +9,7 @@
   tab-size: var(--editor-tab-size, 4);
 }
 
-.editor-virtualized-line-number::before {
+.editor-virtualized-line-number:not([hidden])::before {
   content: counter(editor-line, var(--editor-line-gutter-counter-style, decimal));
 }
 

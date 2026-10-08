@@ -102,6 +102,32 @@ export const locateCharId = (snapshot: PieceTableSnapshot, id: CharId): CharIdLo
   }
 }
 
+/** The next retained UTF-16 identity in structural order, including hidden pieces. */
+export const charIdAfter = (snapshot: PieceTableSnapshot, id: CharId | 'start'): CharId | null => {
+  const index = identitiesOf(snapshot)
+  const location = id === 'start' ? null : locateCharId(snapshot, id)
+  if (id !== 'start' && !location) throw new RangeError('successor character is unknown')
+  if (location && location.unit + 1 < location.piece.start + location.piece.length) {
+    const unit = location.unit + 1
+    const run = identityRunAtStorage(index, location.piece.buffer, unit)!
+    return { bunch: run.bunch, counter: run.counter + unit - run.offset }
+  }
+  const order = location?.piece.order ?? -Infinity
+  let node = snapshot.root
+  let next: PieceTreeNode | null = null
+  while (node) {
+    if (node.piece.order <= order) {
+      node = node.right
+      continue
+    }
+    next = node
+    node = node.left
+  }
+  if (!next) return null
+  const run = identityRunAtStorage(index, next.piece.buffer, next.piece.start)!
+  return { bunch: run.bunch, counter: run.counter + next.piece.start - run.offset }
+}
+
 const visibleLocation = (root: PieceTreeNode | null, offset: number): AnchorLocation => {
   const location =
     findVisiblePieceStartingAt(root, offset) ?? findVisiblePieceContainingOffset(root, offset)

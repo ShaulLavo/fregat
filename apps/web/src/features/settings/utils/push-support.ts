@@ -41,7 +41,7 @@ export function readPushEnvironment(): PushEnvironment {
 }
 
 export function pushSupport(environment: PushEnvironment): PushSupport {
-  // The demo's mock backend owns the scope; registering ours would replace it.
+  // Registering our worker would replace the worker that owns this scope.
   if (
     environment.controllerScript &&
     workerPath(environment.controllerScript) !== environment.workerScript
