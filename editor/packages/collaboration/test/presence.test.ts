@@ -423,6 +423,64 @@ test('real Session-backed awareness has no empty, post-expiry or detached clock 
   expect(tick).not.toHaveBeenCalled()
 })
 
+test.each([false, true])(
+  'rejects delayed presence replays after expiry and long idle periods (reattach=%s)',
+  (reattach) => {
+    const session = new Session({
+      peer: 'local',
+      room: 'room',
+      document: 'document',
+      genesis,
+      engine: new ToyEngine(),
+      send() {},
+      pulseInterval: 100,
+      suspicionTimeout: 300,
+      dependencyTimeout: 500,
+      historyChunkRecords: 10,
+    })
+    session.connect('remote')
+    const presence = new Presence('local', 'document', session)
+    let detach = presence.attach()
+    let messageId = 0
+    const receive = (clock: number) =>
+      session.receive({
+        version: 1,
+        room: 'room',
+        document: 'document',
+        sender: 'remote',
+        epoch: 'epoch',
+        messageId: ++messageId,
+        type: 'PRESENCE',
+        payload: payload('remote', clock),
+      })
+    try {
+      receive(7)
+      expect(presence.states[0]?.presenceClock).toBe(7)
+      session.tick(30_000)
+      expect(presence.states).toHaveLength(0)
+      session.tick(89_999)
+      receive(6)
+      expect(presence.states).toHaveLength(0)
+      if (reattach) detach()
+      session.tick(90_000)
+      if (reattach) detach = presence.attach()
+      receive(5)
+      expect(presence.states).toHaveLength(0)
+      receive(7)
+      expect(presence.states).toHaveLength(0)
+      session.tick(86_400_000)
+      receive(5)
+      receive(7)
+      expect(presence.states).toHaveLength(0)
+      receive(8)
+      expect(presence.states[0]?.presenceClock).toBe(8)
+    } finally {
+      detach()
+      presence.dispose()
+    }
+  },
+)
+
 test('expires retained tombstone clocks lazily so idle rooms admit fresh peer incarnations', () => {
   const presence = new Presence('local', 'document')
   for (let peer = 0; peer < 256; peer++) presence.receive(`peer-${peer}`, { clock: 3, state: null })
