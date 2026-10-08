@@ -19,7 +19,7 @@ import type {
   EditorPluginHost,
 } from '../plugins'
 import type { EditorHighlightResult, EditorHighlighterSession } from '../syntax/highlighter'
-import { createEmptySyntaxResult } from '../syntax/session'
+import { createEmptySyntaxResult, syntaxResultCoversRange } from '../syntax/session'
 import type {
   BracketInfo,
   EditorSyntaxCapture,
@@ -214,6 +214,7 @@ export class EditorSyntaxController {
   // Refresh failures since the last success or re-entry (document, provider or highlighter theme).
   private failedHighlightRefreshes = 0
   private unsubscribeHighlighterTheme: (() => void) | null = null
+  private unsubscribeProducedSyntax: (() => void) | null = null
   private unsubscribeProducedTokens: (() => void) | null = null
   private preparedSyntaxDisposer: (() => void) | null = null
   private preparedHighlighterDisposer: (() => void) | null = null
@@ -624,6 +625,7 @@ export class EditorSyntaxController {
       this.refreshHighlighterTheme(false)
     }
     this.observeProducedHighlighterTokens()
+    this.observeProducedStructuralSyntax()
     this.observePreparedResults(prepared)
     this.logSyntaxStatus('editor.syntax.document_started')
   }
@@ -770,6 +772,7 @@ export class EditorSyntaxController {
       textSnapshot: session.getTextSnapshot(),
       snapshot: session.getSnapshot(),
     })
+    this.observeProducedStructuralSyntax()
     this.syntaxStatus = this.syntaxSession ? 'loading' : 'plain'
     this.options.clearSyntaxFolds()
     this.logSyntaxStatus('editor.syntax.reloaded')
@@ -1023,6 +1026,24 @@ export class EditorSyntaxController {
     this.observeProducedHighlighterTokens()
   }
 
+  private observeProducedStructuralSyntax(): void {
+    this.unsubscribeProducedSyntax?.()
+    this.unsubscribeProducedSyntax = null
+    const retained = this.retainedSyntax
+    if (!retained) return
+    this.unsubscribeProducedSyntax = retained.onDidProduceSyntax(() => {
+      if (this.retainedSyntax !== retained) return
+      this.rangeRequests.cancel()
+      this.prefetchRangeRequests.cancel()
+      this.warmRangeRequests.cancel()
+      this.pendingPrefetch = null
+      this.pendingWarm = null
+      this.clearSyntaxRangeCache()
+      this.parsedSyntaxContentVersion = null
+      this.refreshStructuralSyntax(this.options.getDocumentVersion(), null, { delayMs: 0 })
+    })
+  }
+
   private observeProducedHighlighterTokens(): void {
     this.unsubscribeProducedTokens?.()
     this.unsubscribeProducedTokens = null
@@ -1199,6 +1220,7 @@ export class EditorSyntaxController {
       textSnapshot: session.getTextSnapshot(),
       snapshot: session.getSnapshot(),
     })
+    this.observeProducedStructuralSyntax()
     this.syntaxStatus = this.syntaxSession ? 'loading' : 'plain'
     this.refreshStructuralSyntax(documentVersion, null)
   }
@@ -1256,6 +1278,8 @@ export class EditorSyntaxController {
   }
 
   private disposeSyntaxSession(): void {
+    this.unsubscribeProducedSyntax?.()
+    this.unsubscribeProducedSyntax = null
     this.stoppedWarm = null
     this.syntaxRequests.cancel()
     this.rangeRequests.cancel()
@@ -1499,7 +1523,8 @@ export class EditorSyntaxController {
     configurationGeneration: number,
   ): boolean {
     const session = this.options.getSession()
-    if (loadResult.skipApply) return false
+    if (loadResult.skipApply || !syntaxResultCoversRange(loadResult.result, loadResult.range))
+      return false
     if (!session || documentVersion !== this.options.getDocumentVersion()) return false
     if (configurationGeneration !== this.initialHighlightConfigurationGeneration) return false
     if (loadResult.contentVersion !== this.syntaxContentVersion) return false

@@ -1065,10 +1065,7 @@ function removeUnusedTokenGroups(
     removed = true
   }
 
-  if (!removed) return false
-
-  clearRowTokenState(view)
-  return true
+  return removed
 }
 
 function deleteViewTokenRangesForStyle(
@@ -1076,12 +1073,13 @@ function deleteViewTokenRangesForStyle(
   styleKey: string,
   highlight: Highlight,
 ): void {
-  for (const rangesByStyle of view.rowTokenRanges.values()) {
+  for (const [rowSlotId, rangesByStyle] of view.rowTokenRanges) {
     const ranges = rangesByStyle.get(styleKey)
     if (!ranges) continue
 
     for (const range of ranges) highlight.delete(range)
     rangesByStyle.delete(styleKey)
+    view.rowTokenSignatures.delete(rowSlotId)
   }
 }
 

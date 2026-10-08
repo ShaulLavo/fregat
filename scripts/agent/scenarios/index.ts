@@ -1,3 +1,4 @@
+import { overlayAlignment } from './overlay-alignment'
 import { commandFoundation } from './command-foundation'
 import { clientLogDelivery } from './client-log-delivery'
 import { unknownWorkspaceSettings } from './unknown-workspace-settings'
@@ -44,6 +45,7 @@ import { responseDelivery } from './response-delivery'
 import { draftRecovery } from './draft-recovery'
 import { composerDefaults } from './composer-defaults'
 import { sessionNotifications } from './session-notifications'
+import { workbenchAlignment } from './workbench-alignment'
 import { workbenchMeasurements } from './workbench-measurements'
 import { terminalHistory, terminalIdleShells } from './terminal-history'
 import { chatStream } from './chat-stream'
@@ -358,6 +360,7 @@ import { paletteThemeNoFlicker, studioThemeNoFlicker } from './code-theme-no-fli
 import { quickOpenNoFlicker } from './quick-open-no-flicker'
 import { gitHistorySearchNoFlicker } from './git-history-search-no-flicker'
 import { logsSearchNoFlicker } from './logs-search-no-flicker'
+import { chromeAlignment } from './chrome-alignment'
 import { searchTypeDelete } from './search-type-delete'
 import { searchResultLinePick } from './search-result-line-pick'
 import { searchResultRecycleFocus } from './search-result-recycle-focus'
@@ -464,6 +467,7 @@ import { treeParityBehaviour } from './tree-parity-behaviour'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  overlayAlignment,
   unknownWorkspaceSettings,
   releaseInstallationSettings,
   nativeWindow,
@@ -479,6 +483,7 @@ export const scenarios: readonly Scenario[] = [
   editorSavedSnapshot,
   historyComparisonNoFlicker,
   workbenchMeasurements,
+  workbenchAlignment,
   terminalHistory,
   terminalIdleShells,
   responseDelivery,
@@ -764,6 +769,7 @@ export const scenarios: readonly Scenario[] = [
   branchActionsNoFlicker,
   gitHistorySearchNoFlicker,
   logsSearchNoFlicker,
+  chromeAlignment,
   searchTypeDelete,
   searchResultLinePick,
   searchResultRecycleFocus,

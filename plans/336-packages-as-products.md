@@ -466,11 +466,14 @@ node editor/bench/compare/summarize-open.mjs \
    bounded work units. Visible queries and edits take priority. Do not queue an idle full reparse
    ahead of the first visible result. Measure the existing post-acknowledgement unpin gap before
    changing that idle policy.
-3. Preserve grammar context and prove preview correctness. Compare initial tokens with the completed
-   parse for this TypeScript fixture, multiline strings/comments, syntax crossing the preview end,
-   TSX ambiguities and injected languages. Scroll or jump beyond covered ranges must request valid
-   context rather than reuse a partial root as a complete document. Edits and disposal cancel stale
-   bootstrap/background results by source identity and version.
+3. Preserve grammar entry context. Provisional colors may be corrected when complete analysis
+   arrives. Replace visible colors atomically in one frame, without an unstyled flash or an
+   intermediate palette; unchanged visible colors persist. Final colors must exactly match a
+   separate non-provisional run. Cover this TypeScript fixture, multiline strings/comments, syntax
+   crossing the preview end, TSX ambiguities, injected languages and custom highlight queries. Scroll
+   or jump beyond covered ranges must request valid context rather than reuse a partial root as a
+   complete document. Edits and disposal cancel stale bootstrap/background results by source
+   identity and version.
 4. Retain timings and a structured cancellation outcome when analysis exhausts a work budget.
    Silent missing results must not leave the visible-highlight request permanently unsettled.
 5. Re-run the original uninstrumented matrix and the diagnostic open matrix on the same machine,
@@ -478,6 +481,149 @@ node editor/bench/compare/summarize-open.mjs \
    30-second deadline at 200 MiB, bounded initial parsing work as file size grows, and token coverage
    and correctness controls in addition to the first-token detector. Publish any headline only after
    the full comparison protocol passes. Keep noisy trials labelled as experiments.
+
+#### Viewport-first execution decisions
+
+Status: Approved. Implemented and verified on `lane/singapore-viewport-first`; awaiting PR review.
+The 200 MiB initial-highlight requirement passes. Its full typing/scroll comparison remains blocked
+by the pre-existing tail-layout failure recorded below.
+
+- Bootstrap admission applies to range-mode sources larger than 65,536 UTF-16 code units.
+  Markdown and MDX keep their complete-context path. Their parser and injection contracts need
+  separate preview controls before changing that path.
+- The first demanded range chooses a canonical prefix ending 4,096 code units beyond demand,
+  capped at 65,536. Parsing starts at offset zero to preserve the grammar entry state. These are
+  fixed library work limits; this change adds no host execution setting.
+- A distant range waits for complete context. Grammar recovery errors in a truncated preview
+  also wait for complete context. The prefix can supply approximate colors: distant continuations,
+  combined injections and custom predicates can change them when complete analysis arrives.
+  Statement-kind whitelists and injection-content exclusions are removed. Preview parsing owns
+  only the host-language root tree and does no injection discovery or injected-language parsing;
+  injected regions initially receive ordinary host-language colors.
+- Completion advances the retained-analysis generation, preventing displayed provisional contributors
+  from repopulating cleared range caches. A measured mounted control reproduced retained provisional
+  colors after complete analysis before this fix. Completion keeps the displayed token store until its replacement is ready. Token adoption and
+  CSS Highlight range reconciliation run synchronously in one task. Unchanged row signatures keep
+  their existing registered ranges; changed rows receive their final ranges before the next paint.
+  Removing an unused palette color now invalidates only rows that used it; it previously cleared
+  every row's ranges, including unchanged tokens. A real-browser identity control reproduced this
+  before the fix, and a view unit control covers replacing and removing a color.
+- Partial trees occupy separate worker storage. Their replies carry the canonical source identity,
+  sync point, snapshot version and coverage. They publish tokens and captures, with empty folds,
+  diagnostics, brackets and injection structure. Structural selection reads complete trees only.
+- Complete root and injected-language parses use dedicated resumable parsers, yielding after
+  approximately eight milliseconds of parser work. Injection discovery queries at most 262,144
+  source code units per interval and yields between intervals. Source-range bounds do not promise
+  a strict wall-time bound for grammar predicates or language compilation.
+- Background completion invalidates retained provisional range caches and notifies the mounted
+  editor to request its current visible range again. Source changes and disposal cancel stale
+  work. Budget cancellation retains its phase timings and structured outcome. Already produced
+  provisional tokens remain available when complete analysis exhausts its budget. Range-query
+  cancellation belongs to that operation: its reply retains cancellation details while the session
+  preserves its last usable tree and colors, allowing another range query without editing.
+- The noisy baseline measured acknowledgement-to-unpin gaps of 65.4, 66.2 and 67.9 ms at 10 MiB.
+  The viewport-first complete path skips the unchanged idle reparse so it cannot block subsequent
+  visible requests. Existing small-source and Markdown idle behavior is unchanged. First-edit
+  behavior remains part of the original uninstrumented comparison matrix.
+- The frozen baseline at `66c8e8a68` failed all six initial preview controls. At `664dff34a`, the
+  complete real-worker Chromium suite passed 95 controls, including 21 viewport-first cases, mounted replacement,
+  canonical edit cancellation, disposal, TSX ambiguity and HTML script/style injections. Unit
+  controls passed 107 tests; diagnostic harness controls passed nine tests. Core and Tree-sitter
+  typechecks, workspace builds, retained syntax regressions and repository gates passed.
+
+#### Review fixes and verification
+
+Both blocking controls failed on `832edf887`: a distant call continuation changed first-screen
+capture interpretation, and a budget-cancelled range replaced the session's usable result. The
+current controls compare complete resolved token styles and captures with a non-provisional run
+for the future call, arrow continuation and a terminated-call positive case. Function declarations
+now receive bounded provisional coverage without a statement-kind whitelist. The cancellation
+control checks preserved timings, retained session state and a successful third query without an
+edit or reopen.
+
+The second review reproduced three future-context hazards inside combined tagged-template
+injections. The root-only exclusion revision at `664dff34a` passed those controls but a further
+review found twelve provisional/final differences through interpolation holes, combined ranges
+spanning host code and later-context custom queries. This showed that statement terminators and
+injection-content exclusions do not prove stable provisional colors.
+
+The coordinator's Approved correction changes the contract: provisional colors may change,
+complete colors must equal a separate non-provisional baseline, and replacement must be atomic
+without an unstyled frame. Partial structural results remain withheld and the cancellation recovery
+fix remains. The twelve failing controls, the passing unknown-tag case and a node-local custom-query
+positive case now exercise mounted editor replacement. The exact long-space sources use word wrap inside a constrained, measured viewport
+to keep mounted demand inside the bootstrap cap. The first observation fixture accidentally let
+the editor grow to 16,000,000 pixels tall and requested the whole source; those failures described
+the fixture, not replacement behavior. Native worker replies are held after provisional
+adoption, ensuring a visible provisional frame before completion is released; parsing stays real. Historical failing-first evidence in
+`injection-fixes/` records the earlier contract, not the current acceptance criterion.
+
+The correction passes 15 mounted frame/convergence controls, including a calibrated observer that
+can detect an unstyled frame and checks unchanged range identities. All 110 real-worker Chromium
+controls and 107 Tree-sitter unit controls pass; 229 retained-analysis, display-demand and view
+controls pass, alongside nine diagnostic harness controls. Core and Tree-sitter typechecks and
+workspace builds, repository gates and root workspace typechecks pass. Four provisional/final
+screenshots were read back. Raw logs and images live
+in `atomic-replacement/` under the retained evidence directory. A fresh isolated Fregat doctor and
+tracked-source scrolling scenario pass; ready and scrolled screenshots were reviewed. The initial
+ignored scratch fixture was unavailable in quick open, so verification used `treeSitter.worker.ts`.
+No new performance matrix was run for this correction, and the historical timings below describe
+earlier implementations.
+
+A fresh one-repetition 200 MiB diagnostic smoke after the first review fixes highlights in 375.9 ms with
+27,455 bootstrap units. Its screenshot was read back and shows colored text throughout the visible
+viewport. This is a noisy smoke check, not a replacement for the earlier balanced matrix or a
+full typing/scroll endorsement. The earlier matrices describe the pre-review implementation.
+Evidence is retained in the existing evidence directory's `review-fixes/` subdirectory.
+
+#### Viewport-first retained experiments
+
+All numbers below are **noisy experiments**, measured on 2026-10-08 on the same Linux x64
+Intel Core i7-14700K host, 28 logical CPUs and 33,368,662,016 bytes of RAM. The retained JSON
+records browser/tool/package versions, fixture hashes, served bundle hashes and configuration.
+Both matrices use 1, 10 and 200 MiB, three repetitions, 1280 × 720, DPR 1 and the existing
+30-second highlighting deadline. No public speedup claim is authorized by these trials.
+
+| Size    | Diagnostic baseline visible highlight | Diagnostic after visible highlight | Original baseline           | Original after                                                   |
+| ------- | ------------------------------------- | ---------------------------------- | --------------------------- | ---------------------------------------------------------------- |
+| 1 MiB   | 416.2 / 342.0 / 295.2 ms              | 214.2 / 159.3 / 178.1 ms           | 544.1 / 269.7 / 275.2 ms    | 152.9 / 143.5 / 144.8 ms                                         |
+| 10 MiB  | 1540.5 / 1543.9 / 1507.0 ms           | 177.3 / 178.6 / 163.6 ms           | 1380.1 / 1413.6 / 1405.8 ms | 159.4 / 165.6 / 164.6 ms                                         |
+| 200 MiB | All three miss 30 seconds             | 354.7 / 356.7 / 354.1 ms           | All three miss 30 seconds   | 345.0 / 331.0 / 354.8 ms initial highlight; later geometry fails |
+
+Every diagnostic after sample parses 27,455 initial code units, independent of file size.
+The after 200 MiB screenshot shows consistent tokens across the visible viewport; grammar and
+coverage controls supplement the harness's first-token clock. The diagnostic verifier accepts
+all 27 after profiles and confirms matching comparison identities. First end-edit mutation costs
+at 10 MiB are 4.7 / 5.2 / 4.7 ms before and 4.7 / 4.4 / 7.2 ms after; noisy middle-edit variation
+is retained without a responsiveness claim.
+
+The original matrix ran unchanged with 40 trusted keys at each position and 120 scroll frames.
+At 200 MiB, Singapore opens highlighted, then fails the existing geometry check at the document
+end: 13 mounted rows and no visible text style. A separate syntax-disabled control reproduces
+identical end geometry in the frozen baseline and the implementation. This is an existing layout
+failure, not evidence of a full 200 MiB editing/scroll pass; its fix is outside this syntax lane.
+No geometry assertion was relaxed.
+
+Fregat `agent:browser look --doctor` reports healthy, with no errors. The isolated fast-scroll
+scenario completes at 1 MiB and 10 MiB. Reviewed screenshots confirm syntax colors at 1 MiB and
+an intact large-file layout at 10 MiB. The 10 MiB screenshots show plain text alongside LSP
+annotations; they do not prove large-file syntax coloring in Fregat. Its analysis and color-provider
+policies were left unchanged. Screenshot capture records GPU warnings and a
+1 MiB LSP socket-close warning, with no structured warning/error log entries.
+
+Evidence: `editor/docs/performance/singapore-viewport-first-2026-10-08/` retains compressed
+before/after experiments, raw diagnostic traces, comparison JSON, geometry controls and reviewed
+screenshots. Reproduction from a built checkout with comparison dependencies installed:
+
+```sh
+node editor/bench/compare/build.mjs
+node editor/bench/compare/run.mjs --profile-open --open-only --sizes 1,10,200 --repetitions 3 --condition noisy --timeout 180000 --output <diagnostic-directory>
+node editor/bench/compare/summarize-open.mjs <after>/experiment.json --compare <before>/experiment.json
+node editor/bench/compare/run.mjs --sizes 1,10,200 --repetitions 3 --condition noisy --timeout 180000 --output <original-directory>
+```
+
+Retained trial directories contain `experiment.json.gz`; the summarizer also reads gzip directly.
+The original 200 MiB geometry failure remains a blocker for publishing a full comparison result.
 
 ## Kickoff prompt for an executing coordinator
 

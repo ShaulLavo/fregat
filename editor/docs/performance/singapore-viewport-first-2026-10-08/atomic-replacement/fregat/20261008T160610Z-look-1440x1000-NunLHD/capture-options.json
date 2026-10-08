@@ -1,0 +1,17 @@
+{
+  "url": "http://localhost:57051/",
+  "consoleCapture": true,
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "deviceScaleFactor": 1,
+  "touch": false,
+  "screenshotPixels": {
+    "width": 1440,
+    "height": 1000
+  },
+  "staticDirectory": null,
+  "productWallpaper": null,
+  "userAgentOverride": null
+}

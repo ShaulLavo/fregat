@@ -1,0 +1,500 @@
+[wave-heavy] started 'viewport atomic replacement final hooks' on local after 0s: 5617 MiB free covers 5120 MiB
+$ lefthook run pre-commit
+╭──────────────────────────────────────────╮
+│ 🥊 lefthook  v2.1.15   hook:  pre-commit │
+╰──────────────────────────────────────────╯
+┃  format staged files ❯
+Finished in 198ms on 26 files using 28 threads.
+
+┃  lint fix staged files ❯
+
+┃  lint check staged files ❯
+editor/packages/editor/src/virtualization/virtualizedTextViewHighlights.ts:706:24: warning unicorn(no-useless-spread): Using a spread operator here creates a new array unnecessarily. help: `for…of` can iterate over iterable, it's unnecessary to convert to an array.
+
+┃  format check staged files ❯
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 213ms on 26 files using 28 threads.
+
+│  settings registry checks (skip) no matching staged files
+┃  whole-tree gates ❯
+$ bun run workspace:check && bun run plans:check && bun run dupes:functions && bun run dupes && bun run design:census && bun run compiler:census && bun run errors:census && bun run query:check && bun run documents:check && bun run unused:check
+$ bun scripts/workspace-tooling.mjs
+Shared tooling agrees across 50 package manifests.
+$ bun scripts/check-editor-backlog.mjs
+Plan index: all 220 top-level documents indexed; roadmap and index local links valid.
+Editor backlog: 63 entries; all 33 wishlist topics covered; dependencies acyclic; metadata and local links valid.
+$ bun scripts/lint/duplicate-functions.mjs
+4012 files; 0 duplicate function groups; 0 inline clock fallbacks; 0 parse errors
+$ jscpd apps packages scripts --threshold 0
+Using config from .jscpd.json
+No duplicates found.
+┌────────────┬────────────────┬─────────────┬──────────────┬──────────────┬──────────────────┬───────────────────┐
+│ Format     │ Files analyzed │ Total lines │ Total tokens │ Clones found │ Duplicated lines │ Duplicated tokens │
+├────────────┼────────────────┼─────────────┼──────────────┼──────────────┼──────────────────┼───────────────────┤
+│ tsx        │ 911            │ 79275       │ 423094       │ 0            │ 0 (0.00%)        │ 0 (0.00%)         │
+├────────────┼────────────────┼─────────────┼──────────────┼──────────────┼──────────────────┼───────────────────┤
+│ typescript │ 2986           │ 381873      │ 2231076      │ 0            │ 0 (0.00%)        │ 0 (0.00%)         │
+├────────────┼────────────────┼─────────────┼──────────────┼──────────────┼──────────────────┼───────────────────┤
+│ Total:     │ 3897           │ 461148      │ 2654170      │ 0            │ 0 (0.00%)        │ 0 (0.00%)         │
+└────────────┴────────────────┴─────────────┴──────────────┴──────────────┴──────────────────┴───────────────────┘
+Found 0 clones.
+time: 160.528ms
+$ node scripts/lint/web-design-census.mjs --check
+Web design census — 2335 .ts/.tsx files, tests excluded: apps/web/src 2231, packages/markdown/src 28, packages/ui/src 76
+
+totals
+  radius steps                                    389
+  radius on <Button>                                1
+  'compact:' utilities                              0
+  density variables                               592
+  bar heights                                      11
+  hairline borders                                  0
+  arbitrary text sizes                              3
+  elevation steps                                  34
+  raw form controls                                 8
+  hover fills                                      19
+  icon sizes                                      281
+  text alpha                                        1
+  icon-only controls without a Tooltip              0
+  raw palette colours                               0
+  hand-made status dots                             2
+  hand-styled scrollbars                            6
+  keys drawn outside Kbd                            0
+  capped scrollers without overscroll-contain       0
+  truncation with no title on the row              37
+  bare 'rounded'                                    0
+  redundant 'rounded-none'                          2
+
+radius steps
+  rounded-md         305
+  rounded-lg          54
+  rounded-full        24
+  rounded-l-full       2
+  rounded-none         2
+  rounded-t-md         2
+  total              389
+
+density variables
+  (--density-control-gap)                         103
+  (--density-section-padding)                      77
+  (--density-gap-tight)                            55
+  (--density-control-padding-x)                    53
+  (--density-row-padding-x)                        53
+  (--density-section-gap)                          51
+  (--density-control-height-sm)                    38
+  (--density-row-height)                           27
+  (--bar-height)                                   13
+  (--density-popover-padding)                      13
+  (--density-control-height)                       12
+  (--density-menu-item-padding-y)                  12
+  (--density-row-padding-y)                        11
+  (--density-gap)                                   7
+  (--density-control-padding-x-tight)               6
+  (--density-input-group-block-padding-y)           6
+  (--density-command-item-padding-x)                4
+  (--density-command-item-padding-y)                4
+  (--rail-width)                                    4
+  (--density-command-item-gap)                      3
+  (--density-dialog-padding)                        3
+  (--density-sheet-padding)                         3
+  (--density-accordion-padding-y)                   2
+  (--density-chip-height)                           2
+  (--density-command-heading-padding-top)           2
+  (--density-command-heading-padding-x)             2
+  (--density-control-height-lg)                     2
+  (--density-copy-paragraph-gap)                    2
+  (--density-input-group-addon-gap)                 2
+  (--density-input-group-block-padding)             2
+  (--density-input-group-inline-padding)            2
+  (--density-input-group-input-block-padding)       2
+  (--density-popover-gap)                           2
+  (--density-alert-padding-y)                       1
+  (--density-command-input-height)                  1
+  (--density-command-input-padding-x)               1
+  (--density-dialog-gap)                            1
+  (--density-input-group-addon-padding-y)           1
+  (--density-padding)                               1
+  (--density-textarea-min-height)                   1
+  (--density-textarea-padding-y)                    1
+  (--density-tooltip-gap)                           1
+  (--density-tooltip-kbd-padding-right)             1
+  (--density-tooltip-padding-x)                     1
+  (--density-tooltip-padding-y)                     1
+  total                                           592
+
+bar heights
+  h-(--bar-height)      11
+  total                 11
+
+arbitrary text sizes
+  text-[0.9em]       3
+  total              3
+
+elevation steps
+  shadow-md                   16
+  shadow-(--shadow-key)        5
+  shadow-none                  5
+  shadow-(--shadow-well)       4
+  shadow-xl                    4
+  total                       34
+
+hover fills
+  hover:bg-muted                4
+  hover:bg-row-hover            3
+  hover:bg-foreground/10        2
+  hover:bg-input/50             2
+  hover:bg-muted/50             2
+  hover:bg-primary/80           2
+  hover:bg-secondary/80         2
+  hover:bg-accent               1
+  hover:bg-destructive/20       1
+  total                        19
+
+icon sizes
+  size-(--icon-size-sm)     183
+  size-(--icon-size)         98
+  total                     281
+
+hairline borders: none
+
+arbitrary text sizes: 3
+  apps/web/src/features/chat/components/assistant-markdown-file-link.tsx:47  text-[0.9em]
+  apps/web/src/features/chat/components/chat-input-mention-chip.tsx:13  text-[0.9em]
+  apps/web/src/features/chat/components/terminal-context-chip.tsx:28  text-[0.9em]
+
+raw form controls: 8
+  apps/web/src/features/chat/components/chat-input-attach-button.tsx:60  <input>
+  apps/web/src/features/chat/components/model-picker-rail-item.tsx:27  <button>
+  apps/web/src/features/chat/components/timeline-minimap.tsx:77  <button>
+  apps/web/src/features/theme-studio/components/color-field.tsx:38  <input>
+  apps/web/src/features/workbench/components/bottom-panel.tsx:104  <button>
+  apps/web/src/features/workbench/components/editor-tab-button.tsx:80  <button>
+  apps/web/src/features/workspace/components/tree-row.tsx:173  role="button"
+  packages/ui/src/components/textarea.tsx:7  <textarea>
+
+hover fills: 19
+  apps/web/src/features/chat/components/assistant-markdown-file-link.tsx:47  hover:bg-accent
+  apps/web/src/features/workspace/components/tree-row.tsx:73  hover:bg-row-hover
+  packages/ui/src/components/badge-variants.ts:8  hover:bg-primary/80
+  packages/ui/src/components/badge-variants.ts:9  hover:bg-secondary/80
+  packages/ui/src/components/badge-variants.ts:11  hover:bg-destructive/20
+  packages/ui/src/components/badge-variants.ts:12  hover:bg-muted
+  packages/ui/src/components/badge-variants.ts:13  hover:bg-muted
+  packages/ui/src/components/badge-variants.ts:13  hover:bg-muted/50
+  packages/ui/src/components/button-variants.ts:9  hover:bg-primary/80
+  packages/ui/src/components/button-variants.ts:11  hover:bg-muted
+  packages/ui/src/components/button-variants.ts:11  hover:bg-input/50
+  packages/ui/src/components/button-variants.ts:13  hover:bg-secondary/80
+  packages/ui/src/components/button-variants.ts:15  hover:bg-muted
+  packages/ui/src/components/button-variants.ts:15  hover:bg-muted/50
+  packages/ui/src/components/combobox.tsx:20  hover:bg-input/50
+  packages/ui/src/components/resizable.tsx:71  hover:bg-foreground/10
+  packages/ui/src/patterns/bar-tabs.ts:13  hover:bg-row-hover
+  packages/ui/src/patterns/list-row-classes.ts:20  hover:bg-row-hover
+  packages/ui/src/patterns/width-handle.tsx:77  hover:bg-foreground/10
+
+icon sizes: 281
+  apps/web/src/components/chat-draft-rail.tsx:168  size-(--icon-size-sm)
+  apps/web/src/components/chat-draft-rail.tsx:182  size-(--icon-size-sm)
+  apps/web/src/components/copy-button.tsx:61  size-(--icon-size-sm)
+  apps/web/src/components/copy-button.tsx:68  size-(--icon-size-sm)
+  apps/web/src/components/empty-workspace.tsx:10  size-(--icon-size)
+  apps/web/src/components/file-label.tsx:48  size-(--icon-size-sm)
+  apps/web/src/components/file-picker-dialog.tsx:564  size-(--icon-size-sm)
+  apps/web/src/components/logging-error-boundary.tsx:74  size-(--icon-size)
+  apps/web/src/components/machine-connection-option.tsx:27  size-(--icon-size)
+  apps/web/src/components/machine-form.tsx:87  size-(--icon-size-sm)
+  apps/web/src/components/machine-form.tsx:145  size-(--icon-size-sm)
+  apps/web/src/components/pair-device.tsx:39  size-(--icon-size)
+  apps/web/src/components/panel-tab-icon.tsx:14  size-(--icon-size)
+  apps/web/src/components/panel-tab-icon.tsx:15  size-(--icon-size)
+  apps/web/src/components/panel-tab-icon.tsx:16  size-(--icon-size)
+  apps/web/src/components/panel-tab-icon.tsx:17  size-(--icon-size)
+  apps/web/src/components/panel-tab-icon.tsx:18  size-(--icon-size)
+  apps/web/src/components/panel-tab-icon.tsx:19  size-(--icon-size)
+  apps/web/src/components/panel-tab-icon.tsx:20  size-(--icon-size)
+  apps/web/src/components/panel-tab-icon.tsx:22  size-(--icon-size)
+  apps/web/src/components/session-actions-button.tsx:45  size-(--icon-size)
+  apps/web/src/components/tool-pane-header.tsx:89  size-(--icon-size-sm)
+  apps/web/src/components/tool-pane-header.tsx:109  size-(--icon-size-sm)
+  apps/web/src/components/tool-pane-header.tsx:111  size-(--icon-size-sm)
+  apps/web/src/components/tool-pane-header.tsx:131  size-(--icon-size-sm)
+  apps/web/src/components/ui-mode-toggle.tsx:47  size-(--icon-size)
+  apps/web/src/components/ui-mode-toggle.tsx:60  size-(--icon-size-sm)
+  apps/web/src/components/ui-mode-toggle.tsx:67  size-(--icon-size-sm)
+  apps/web/src/components/workspace-project-menu.tsx:97  size-(--icon-size)
+  apps/web/src/components/workspace-project-menu.tsx:107  size-(--icon-size-sm)
+  apps/web/src/components/workspace-project-menu.tsx:132  size-(--icon-size-sm)
+  apps/web/src/components/workspace-project-menu.tsx:147  size-(--icon-size)
+  apps/web/src/components/workspace-project-menu.tsx:157  size-(--icon-size)
+  apps/web/src/components/workspace-rail.tsx:47  size-(--icon-size)
+  apps/web/src/features/chat/components/active-file-chip.tsx:19  size-(--icon-size-sm)
+  apps/web/src/features/chat/components/active-file-chip.tsx:36  size-(--icon-size-sm)
+  apps/web/src/features/chat/components/activity-group-row.tsx:38  size-(--icon-size-sm)
+  apps/web/src/features/chat/components/activity-icon.tsx:26  size-(--icon-size-sm)
+  apps/web/src/features/chat/components/activity-row.tsx:37  size-(--icon-size-sm)
+  apps/web/src/features/chat/components/activity-summary.tsx:33  size-(--icon-size-sm)
+  … and 241 more
+
+text alpha: 1
+  apps/web/src/features/chat/components/timeline-row.tsx:44  opacity-50
+
+icon-only controls without a Tooltip: none
+
+raw palette colours: none
+
+hand-made status dots: 2
+  apps/web/src/features/chat/components/context-segments-meter.tsx:56  rounded-full
+  apps/web/src/features/settings/components/usage-model-row.tsx:52  rounded-full
+
+hand-styled scrollbars: 6
+  apps/web/src/features/chat/components/chat-input-dictation-status.tsx:35  no-scrollbar
+  apps/web/src/features/chat/components/model-picker-rail.tsx:27  no-scrollbar
+  apps/web/src/features/theme-studio/components/dock-tabs.tsx:15  no-scrollbar
+  apps/web/src/features/workbench/components/breadcrumbs-bar.tsx:69  no-scrollbar
+  apps/web/src/lib/wallpapers/components/section.tsx:28  no-scrollbar
+  packages/ui/src/patterns/bar-tabs.ts:4  no-scrollbar
+
+keys drawn outside Kbd: none
+
+capped scrollers without overscroll-contain: none
+
+truncation with no title on the row: 37
+  apps/web/src/components/file-label.tsx:51  truncate
+  apps/web/src/features/chat/components/activity-group-row.tsx:42  truncate
+  apps/web/src/features/chat/components/agents-row.tsx:27  truncate
+  apps/web/src/features/chat/components/assistant-changed-files-section.tsx:97  truncate
+  apps/web/src/features/chat/components/assistant-markdown-mermaid.tsx:63  truncate
+  apps/web/src/features/chat/components/chat-panel-status.tsx:39  truncate
+  apps/web/src/features/chat/components/composer-controls-menu.tsx:124  truncate
+  apps/web/src/features/chat/components/live-activity-row.tsx:30  truncate
+  apps/web/src/features/chat/components/message-completion-divider.tsx:42  truncate
+  apps/web/src/features/chat/components/model-options-summary.tsx:13  truncate
+  apps/web/src/features/chat/components/model-picker-sign-in-item.tsx:28  truncate
+  apps/web/src/features/chat/components/model-picker-sign-in-item.tsx:31  truncate
+  apps/web/src/features/chat/components/model-picker-trigger.tsx:47  truncate
+  apps/web/src/features/chat/components/model-picker-trigger.tsx:63  truncate
+  apps/web/src/features/chat-mode/components/session-bulk-bar.tsx:41  truncate
+  apps/web/src/features/chat-mode/components/session-rail.tsx:282  truncate
+  apps/web/src/features/command-palette/components/goto-line-groups.tsx:38  truncate
+  apps/web/src/features/command-palette/components/row-label.tsx:25  truncate
+  apps/web/src/features/command-palette/components/row-label.tsx:30  truncate
+  apps/web/src/features/file-picker/components/sortable-column-header.tsx:41  truncate
+  apps/web/src/features/git/components/change-group-header.tsx:48  truncate
+  apps/web/src/features/logs/components/timeline-loading.tsx:14  truncate
+  apps/web/src/features/logs/components/timeline-metric.tsx:15  truncate
+  apps/web/src/features/logs/components/timeline-metric.tsx:23  truncate
+  apps/web/src/features/search/components/highlight.tsx:20  truncate
+  apps/web/src/features/search/components/highlight.tsx:29  truncate
+  apps/web/src/features/search/components/highlight.tsx:32  truncate
+  apps/web/src/features/search/components/highlight.tsx:45  truncate
+  apps/web/src/features/theme-studio/components/color-field.tsx:35  truncate
+  apps/web/src/features/workbench/components/editor-tab-button.tsx:137  truncate
+  apps/web/src/features/workbench/components/editor-tab-button.tsx:139  truncate
+  apps/web/src/features/workspace/components/tree-overflow-text.tsx:19  truncate
+  apps/web/src/features/workspace/components/tree-overflow-text.tsx:31  truncate
+  apps/web/src/features/workspace/components/tree-overflow-text.tsx:44  truncate
+  apps/web/src/features/workspace/components/tree-truncate.tsx:16  truncate
+  packages/ui/src/components/widest-label.tsx:17  truncate
+  packages/ui/src/components/widest-label.tsx:21  truncate
+
+bare 'rounded': none
+
+redundant 'rounded-none': 2
+  packages/ui/src/components/input-group.tsx:124  rounded-none
+  packages/ui/src/components/input-group.tsx:137  rounded-none
+
+gate: every measure is on target
+$ node scripts/lint/react-compiler-census.mjs --check
+React Compiler census — 3290 .ts/.tsx files: apps/web/src 3095, packages/markdown/src 34, packages/tree/src 52, packages/ui/src 109
+
+diagnostic causes
+  (none)
+
+files by compiler outcome
+  nothing to memoize          2044
+  memoized                    1243
+  refused                        2
+  memoized, partly refused       1
+  total                       3290
+
+diagnostics in tests
+  unreorderable-expression       2
+  immutable-write                1
+  logical-assignment             1
+  reassignment                   1
+  total                          5
+
+refused components outside the allow-list: none
+
+unclassified diagnostics: none
+
+gate: every measure is on target
+$ node scripts/lint/error-context-census.mjs --check
+error context census: 377 constant-message throw sites
+  with runtime context: 377
+  bare:                 0 (0 excused)
+error catalog copy: 0 contrast phrases
+gate: every constant-message error carries runtime context; catalog copy says what things are
+$ node scripts/lint/query-api.mjs
+query API gate: no deprecated method access
+$ node scripts/lint/document-contributions.mjs
+document contribution gate: ownership boundaries pass
+$ knip
+Configuration hints (5)
+typescript-api                                                    knip.json  Remove from ignoreDependencies
+@singapore-editor/gutters            editor/examples/stress       knip.json  Remove from ignoreDependencies
+tree-sitter-cli                      …ages/tree-sitter-languages  knip.json  Remove from ignoreDependencies
+scripts/generate-settings-schema.ts  packages/contracts           knip.json  Remove from ignoreUnresolved
+.mdx                                 ghostty-webgpu/site          knip.json  Compiled extension excluded by project (im…
+
+┃  typecheck repo ❯
+$ bun run build:workspaces && bun run --sequential --filter '*' typecheck
+$ turbo run build --filter='./editor/packages/*' --filter=ghostty-webgpu --filter=ghostty-webgpu-line-editor --filter='@fregat/*'
+
+   • turbo 2.11.5
+   • Packages in scope: @fregat/hotkeys, @fregat/react-hotkeys, @singapore-editor/collab, @singapore-editor/collaboration, @singapore-editor/core, @singapore-editor/decode, @singapore-editor/diff, @singapore-editor/find, @singapore-editor/gutters, @singapore-editor/highlighting, @singapore-editor/lsp, @singapore-editor/lsp-plugin, @singapore-editor/markdown, @singapore-editor/minimap, @singapore-editor/paged, @singapore-editor/panes, @singapore-editor/plugin-ui, @singapore-editor/react, @singapore-editor/scope-lines, @singapore-editor/solid, @singapore-editor/spellcheck, @singapore-editor/textbuffer, @singapore-editor/tree-sitter, @singapore-editor/tree-sitter-languages, @singapore-editor/typescript-lsp, ghostty-webgpu, ghostty-webgpu-line-editor
+   • Running build in 27 packages
+   • Remote caching disabled, using shared worktree cache
+
+@singapore-editor/collaboration:build: cache hit, replaying logs f1735d194aa56107
+@singapore-editor/collaboration:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/textbuffer:build: cache hit, replaying logs e8396cba2a6c8a15
+@fregat/hotkeys:build: cache hit, replaying logs 5dd495de0c2ed2ff
+@singapore-editor/lsp:build: cache hit, replaying logs 8f44133ef527e754
+@singapore-editor/lsp:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/textbuffer:build: $ node scripts/build.mjs
+@fregat/hotkeys:build: $ bun build src/index.ts --outdir dist --target browser --format esm --packages external && tsc -p tsconfig.build.json
+@fregat/hotkeys:build: Bundled 37 modules in 6ms
+@fregat/hotkeys:build:
+@fregat/hotkeys:build:   index.js  92.98 KB  (entry point)
+@fregat/hotkeys:build:
+ghostty-webgpu-line-editor:build: cache hit, replaying logs 820a35e14005e754
+ghostty-webgpu-line-editor:build: $ tsc -p tsconfig.build.json
+@singapore-editor/panes:build: cache hit, replaying logs 6cf870a46418728d
+@singapore-editor/panes:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/collab:build: cache hit, replaying logs 7b81f37351f4cc61
+@singapore-editor/collab:build: $ bun ../../scripts/build-package.ts
+@fregat/react-hotkeys:build: cache hit, replaying logs 674af157811078cf
+@fregat/react-hotkeys:build: $ bun build src/index.ts --outdir dist --target browser --format esm --packages external --external '@fregat/hotkeys*' && tsc -p tsconfig.build.json
+@fregat/react-hotkeys:build: Bundled 14 modules in 17ms
+@fregat/react-hotkeys:build:
+@fregat/react-hotkeys:build:   index.js  17.33 KB  (entry point)
+@fregat/react-hotkeys:build:
+ghostty-webgpu:build: cache hit, replaying logs 7b04c6d6ac4f950f
+ghostty-webgpu:build: $ bun run clean && tsc -p tsconfig.build.json && bun run build:worker
+ghostty-webgpu:build: $ bun scripts/clean-dist.ts
+ghostty-webgpu:build: $ bun run scripts/build-worker.ts
+@singapore-editor/core:build: cache hit, replaying logs 834daeae9a27fbbb
+@singapore-editor/core:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/tree-sitter:build: cache miss, executing 7916c862f387242b
+@singapore-editor/decode:build: cache hit, replaying logs 0ec1f0d25607b3d2
+@singapore-editor/decode:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/solid:build: cache hit, replaying logs 430c75bce9efbd85
+@singapore-editor/react:build: cache hit, replaying logs 0baae38a02fb191a
+@singapore-editor/find:build: cache hit, replaying logs de26f6dfa296ba63
+@singapore-editor/tree-sitter:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/gutters:build: cache hit, replaying logs 80345f37acd2ccc1
+@singapore-editor/diff:build: cache hit, replaying logs 9f937aa7433d7779
+@singapore-editor/solid:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/react:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/find:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/scope-lines:build: cache hit, replaying logs 4eebde15f1256707
+@singapore-editor/gutters:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/scope-lines:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/diff:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/paged:build: cache hit, replaying logs 7ccd190efb657fa8
+@singapore-editor/paged:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/plugin-ui:build: cache hit, replaying logs 2a35b2552154a193
+@singapore-editor/minimap:build: cache hit, replaying logs 0b7d48bd1ce4e1de
+@singapore-editor/markdown:build: cache hit, replaying logs f6cfca55fdc2ec43
+@singapore-editor/plugin-ui:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/minimap:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/markdown:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/lsp-plugin:build: cache hit, replaying logs df658b4b6ee1c3fb
+@singapore-editor/lsp-plugin:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/typescript-lsp:build: cache hit, replaying logs 46c1c23277103d07
+@singapore-editor/typescript-lsp:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/tree-sitter:build: [plugin rolldown:vite-resolve] Module "node:fs/promises" has been externalized for browser compatibility, imported by "/work/worktrees/platform/singapore-viewport-first/node_modules/.bun/tree-sitter-md@github+ShaulLavo+tree-sitter-md+f7263d7+561ad0bba2b10533/node_modules/tree-sitter-md/js/index.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+@singapore-editor/tree-sitter:build:
+@singapore-editor/tree-sitter:build: new URL("../lib/web-tree-sitter.wasm", import.meta.url) doesn't exist at build time, it will remain unchanged to be resolved at runtime. If this is intended, you can use the /* @vite-ignore */ comment to suppress this warning.
+@singapore-editor/tree-sitter-languages:build: cache miss, executing 1b2fed20bfc4a0ef
+@singapore-editor/tree-sitter-languages:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/spellcheck:build: cache miss, executing b3c7ec8c38997911
+@singapore-editor/highlighting:build: cache miss, executing d4f806b05ece2d1d
+@singapore-editor/spellcheck:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/highlighting:build: $ bun ../../scripts/build-package.ts
+
+ Tasks:    27 successful, 27 total
+Cached:    23 cached, 27 total
+  Time:    2.505s
+
+@fregat/hotkeys:typecheck                         | Done in 239ms
+@fregat/react-hotkeys:typecheck                   | Done in 200ms
+@singapore-editor/collab:typecheck                | Done in 41ms
+@singapore-editor/collaboration:typecheck         | Done in 88ms
+@singapore-editor/core:typecheck                  | Done in 1.28s
+@singapore-editor/decode:typecheck                | Done in 87ms
+@singapore-editor/diff:typecheck                  | Done in 148ms
+@singapore-editor/example-app:typecheck           | Done in 90ms
+@singapore-editor/find:typecheck                  | Done in 117ms
+@singapore-editor/gutters:typecheck               | Done in 71ms
+@singapore-editor/highlighting:typecheck          | Done in 146ms
+@singapore-editor/lsp:typecheck                   | Done in 93ms
+@singapore-editor/lsp-plugin:typecheck            | Done in 178ms
+@singapore-editor/markdown:typecheck              | Done in 160ms
+@singapore-editor/minimap:typecheck               | Done in 136ms
+@singapore-editor/paged:typecheck                 | Done in 71ms
+@singapore-editor/panes:typecheck                 | Done in 97ms
+@singapore-editor/plugin-ui:typecheck             | Done in 123ms
+@singapore-editor/react:typecheck                 | Done in 116ms
+@singapore-editor/scope-lines:typecheck           | Done in 130ms
+@singapore-editor/solid:typecheck                 | Done in 102ms
+@singapore-editor/spellcheck:typecheck            | Done in 584ms
+@singapore-editor/stress:typecheck                | Done in 102ms
+@singapore-editor/textbuffer:typecheck            | Done in 65ms
+@singapore-editor/tree-sitter:typecheck           | Done in 666ms
+@singapore-editor/tree-sitter-languages:typecheck | Done in 126ms
+@singapore-editor/typescript-lsp:typecheck        | Done in 152ms
+@workspace/client-core:typecheck                  | Done in 1.52s
+@workspace/contracts:typecheck                    | Done in 406ms
+@workspace/markdown:typecheck                     | Done in 107ms
+@workspace/observability:typecheck                | Done in 77ms
+@workspace/pty:typecheck                          | Done in 80ms
+@workspace/push:typecheck                         | Done in 50ms
+@workspace/tree:typecheck                         | Done in 103ms
+@workspace/ui:typecheck                           | Done in 361ms
+@workspace/utils:typecheck                        | Done in 60ms
+desktop:typecheck                                 | Done in 518ms
+ghostty-webgpu:typecheck                          | Done in 590ms
+ghostty-webgpu-demo:typecheck                     | Done in 85ms
+ghostty-webgpu-line-editor:typecheck              | Done in 95ms
+ghostty-webgpu-site:typecheck                     | Done in 345ms
+scripts:typecheck                                 | Done in 1.95s
+server:typecheck                                  | Done in 1.99s
+singapore-editor-site:typecheck                   | $ bun scripts/check-samples.ts
+singapore-editor-site:typecheck                   | Checked 14 inline samples and 4 example files with TypeScript 7.
+singapore-editor-site:typecheck                   | Done in 398ms
+site:typecheck                                    | 19:36:57 [types] Generated 238ms
+site:typecheck                                    | 19:36:57 [check] Getting diagnostics for Astro files in /work/worktrees/platform/singapore-viewport-first/apps/site...
+site:typecheck                                    | Result (3 files):
+site:typecheck                                    | - 0 errors
+site:typecheck                                    | - 0 warnings
+site:typecheck                                    | - 0 hints
+site:typecheck                                    |
+site:typecheck                                    | Done in 1.82s
+tui:typecheck                                     | Done in 1.71s
+web:typecheck                                     | Done in 13.61s
+
+  ────────────────────────────────────
+summary: (done in 55.83 seconds)
+✔️ format staged files (0.27 seconds)
+✔️ lint fix staged files (0.13 seconds)
+✔️ lint check staged files (0.10 seconds)
+✔️ format check staged files (0.26 seconds)
+✔️ whole-tree gates (21.05 seconds)
+✔️ typecheck repo (33.96 seconds)
+
+[exited with code 0]

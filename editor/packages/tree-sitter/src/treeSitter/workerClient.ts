@@ -59,7 +59,7 @@ export type TreeSitterParsePayload = {
   readonly source: DocumentWorkerReadReference
 }
 export type TreeSitterParseOnlyPayload = Omit<TreeSitterParsePayload, 'resultMode'> & {
-  readonly resultMode: 'parseOnly'
+  readonly resultMode: 'parseOnly' | 'bootstrap'
 }
 export type TreeSitterBackendParsePayload = TreeSitterParsePayload | TreeSitterParseOnlyPayload
 
@@ -802,10 +802,12 @@ const isTreeSitterParseResult = (result: TreeSitterWorkerResult): result is Tree
 const isTreeSitterParseAckResult = (
   result: TreeSitterWorkerResult,
 ): result is TreeSitterParseAckResult =>
-  Boolean(result && 'status' in result && result.status === 'parsed')
+  Boolean(
+    result && 'status' in result && (result.status === 'parsed' || result.status === 'cancelled'),
+  )
 
 const isTreeSitterRangeResult = (result: TreeSitterWorkerResult): result is TreeSitterRangeResult =>
-  Boolean(result && 'range' in result && 'tokens' in result)
+  Boolean(result && 'range' in result && 'captures' in result && 'folds' in result)
 
 const isTreeSitterSelectionResult = (
   result: TreeSitterWorkerResult,

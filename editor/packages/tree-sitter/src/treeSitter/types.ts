@@ -1,5 +1,9 @@
 import type { TextEdit } from '@singapore-editor/core/document'
-import type { EditorToken, PackedEditorTokens } from '@singapore-editor/core/syntax'
+import type {
+  EditorToken,
+  PackedEditorTokens,
+  EditorSyntaxAnalysis,
+} from '@singapore-editor/core/syntax'
 import type { TreeSitterLanguageDescriptor, TreeSitterLanguageId } from './registry'
 import type {
   DocumentWorkerReadReference,
@@ -71,6 +75,8 @@ export type TreeSitterDegradedState = {
 }
 
 export type TreeSitterParseResult = {
+  readonly source?: Pick<DocumentWorkerReadReference, 'identity' | 'point'>
+  readonly analysis?: EditorSyntaxAnalysis
   readonly documentId: string
   readonly snapshotVersion: number
   readonly languageId: TreeSitterLanguageId
@@ -94,16 +100,25 @@ export type TreeSitterSyntaxRange = {
 }
 
 export type TreeSitterParseAckResult = {
+  readonly source?: Pick<DocumentWorkerReadReference, 'identity' | 'point'>
   readonly documentId: string
   readonly snapshotVersion: number
   readonly languageId: TreeSitterLanguageId
-  readonly status: 'parsed'
   readonly changedRanges: readonly TreeSitterSyntaxRange[]
   readonly degraded?: readonly TreeSitterDegradedState[]
   readonly statistics?: Readonly<Record<string, number>>
   readonly missingLanguages?: readonly string[]
   readonly timings: readonly TreeSitterTimingMeasurement[]
-}
+} & (
+  | {
+      readonly status: 'parsed'
+      readonly analysis?: Exclude<EditorSyntaxAnalysis, { kind: 'cancelled' }>
+    }
+  | {
+      readonly status: 'cancelled'
+      readonly analysis: Extract<EditorSyntaxAnalysis, { kind: 'cancelled' }>
+    }
+)
 
 export type TreeSitterRangeResult = TreeSitterParseResult & {
   readonly range: TreeSitterSyntaxRange
@@ -131,7 +146,7 @@ export type TreeSitterParseRequest = {
   readonly languageId: TreeSitterLanguageId
   readonly includeHighlights: boolean
   readonly includeCaptures?: boolean
-  readonly resultMode?: 'full' | 'parseOnly'
+  readonly resultMode?: 'full' | 'parseOnly' | 'bootstrap'
   readonly source: DocumentWorkerReadReference
   readonly generation: number
   readonly cancellationBuffer?: SharedArrayBuffer

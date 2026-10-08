@@ -17,6 +17,7 @@ export {
   type EditorSyntaxLanguageConfiguration,
   type EditorSyntaxMode,
   type EditorSyntaxProjectionTag,
+  type EditorSyntaxAnalysis,
   type EditorSyntaxProvider,
   type EditorSyntaxRange,
   type EditorSyntaxResult,

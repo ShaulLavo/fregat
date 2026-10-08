@@ -88,7 +88,7 @@ function CommandInput({
       data-slot='command-input-wrapper'
       className='focus-within:border-ring border-b border-transparent pb-0 transition-colors'
     >
-      <InputGroup className='bg-input/30 h-(--density-command-input-height) border-none shadow-none! *:data-[slot=input-group-addon]:pl-(--density-command-input-padding-x)!'>
+      <InputGroup className='bg-input/30 h-(--density-command-input-height) border-none shadow-none! *:data-[slot=input-group-addon]:pl-(--density-command-input-padding-x)! has-[>[data-align=inline-start]]:[&>input]:pl-(--density-control-gap)!'>
         <CommandPrimitive.Input
           data-slot='command-input'
           className={cn(
@@ -171,7 +171,7 @@ function CommandItem({
       data-slot='command-item'
       className={listRowClassName({
         className: cn(
-          "group/command-item cursor-default [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-(--icon-size-sm)",
+          "group/command-item cursor-default px-(--density-command-input-padding-x) [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-(--icon-size)",
           className,
         ),
       })}

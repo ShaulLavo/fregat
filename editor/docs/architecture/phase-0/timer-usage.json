@@ -516,18 +516,34 @@
     },
     {
       "api": "setTimeout",
+      "file": "packages/tree-sitter/src/session.ts",
+      "id": "packages/tree-sitter/src/session.ts:setTimeout:1c763d7a4e",
+      "justification": "Yields one macrotask so the visible result reaches its caller before complete analysis enters the worker queue; it only resolves the awaited promise, and the abort signal is checked before source preparation.",
+      "line": 276,
+      "snippet": "await new Promise<void>((resolve) => setTimeout(resolve, 0))"
+    },
+    {
+      "api": "setTimeout",
       "file": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts",
       "id": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts:setTimeout:00a37bab4d",
       "justification": "Yields one macrotask between warm-up compiles so a parse or edit message queued meanwhile runs before the next language; worker-task tracking keeps idle fences behind warm-up.",
-      "line": 253,
+      "line": 272,
       "snippet": "const yieldToMessages = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))"
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts",
+      "id": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts:setTimeout:73df9747ea",
+      "justification": "Yields a macrotask between parse slices and injection batches so queued edits and cancellation messages can run; it only resolves the awaited promise, and cancellation, staleness and the request budget are checked before work resumes.",
+      "line": 1198,
+      "snippet": "const yieldWorker = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))"
     },
     {
       "api": "setTimeout",
       "file": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts",
       "id": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts:setTimeout:74252f76bf",
       "justification": "Runs once after the parse answer is posted; it re-checks that the document is still cached and idle, so a late or stale callback does nothing.",
-      "line": 730,
+      "line": 777,
       "snippet": "setTimeout(() => reparseIdleDocument(runtimeSessionId, document, runtime), 0)"
     },
     {

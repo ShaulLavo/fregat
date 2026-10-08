@@ -216,6 +216,28 @@ function reconcileRows(
     return
   }
   removeReusableRows(view, reusableRows, onRemoveSlot)
+  updateReadingOrder(view, items)
+}
+
+// Separate package instances share the page, so each module owns a distinct id namespace.
+const readingRowPrefix = `singapore-row-${Math.random().toString(36).slice(2)}`
+let nextReadingRowId = 0
+
+function updateReadingOrder(
+  view: VirtualizedTextViewInternal,
+  items: readonly FixedRowVirtualItem[],
+): void {
+  const ids: string[] = []
+  for (const item of items) {
+    const row = view.rowElements.get(item.index)
+    if (!row) continue
+    if (!row.element.id) row.element.id = `${readingRowPrefix}-${nextReadingRowId++}`
+    ids.push(row.element.id)
+  }
+  if (view.spacer.getAttribute('role') !== 'group') view.spacer.setAttribute('role', 'group')
+  const order = ids.join(' ')
+  // Accessibility ownership changes reading order while retained row DOM and paint stay in place.
+  if (view.spacer.getAttribute('aria-owns') !== order) view.spacer.setAttribute('aria-owns', order)
 }
 
 function mountOrUpdateRow(

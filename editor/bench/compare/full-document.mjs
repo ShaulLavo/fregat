@@ -20,8 +20,8 @@ export function fullDocumentTransform(code, id) {
   if (id.endsWith('/tree-sitter/src/session.ts')) {
     code = replaceRequired(
       code,
-      'return this.parsedSnapshotVersion !== 0 && this.parsedSnapshotVersion === this.snapshotVersion',
-      "return this.syntaxMode === 'range' && this.parsedSnapshotVersion !== 0 && this.parsedSnapshotVersion === this.snapshotVersion",
+      "this.result.projection.analysis?.kind !== 'cancelled' &&",
+      "this.syntaxMode === 'range' && this.result.projection.analysis?.kind !== 'cancelled' &&",
     )
     return replaceRequired(
       code,
