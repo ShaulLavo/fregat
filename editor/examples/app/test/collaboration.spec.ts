@@ -20,6 +20,26 @@ test('participants, hosts and the final peer can leave the example', async ({ pa
   expect(errors).toEqual([])
 })
 
+test('peers with the same base names have distinct visible names across tabs', async ({ page }) => {
+  await page.goto('/collaboration.html')
+  await page.locator('#start').click()
+  await expect(page.locator('.peer-header span').filter({ hasText: '2 peers' })).toHaveCount(2)
+  const other = await page.context().newPage()
+  try {
+    await other.goto(await page.locator('#invitation').inputValue())
+    await other.locator('#start').click()
+    await expect(page.locator('.peer-header span').filter({ hasText: '4 peers' })).toHaveCount(2)
+    const names = [
+      ...(await page.locator('.peer-header strong').allTextContents()),
+      ...(await other.locator('.peer-header strong').allTextContents()),
+    ]
+    expect(new Set(names).size).toBe(4)
+    for (const name of names) expect(name).toMatch(/^Peer (one|two) · [\da-f]{8}$/)
+  } finally {
+    await other.close()
+  }
+})
+
 test('the host hands off to its connected successor', async ({ page }) => {
   await page.goto('/collaboration.html')
   await page.locator('#start').click()

@@ -14,7 +14,7 @@ import {
   type EditorTextTransaction,
 } from '../src/public/document'
 import { resolveSelection } from '../src/selections'
-import { applyCharIdEdit, charIdAt } from '@singapore-editor/textbuffer'
+import { applyBatchToPieceTable, applyCharIdEdit, charIdAt } from '@singapore-editor/textbuffer'
 import { setHighlightRegistry } from '../src/public/testing'
 
 const editors: Editor[] = []
@@ -536,6 +536,65 @@ describe('atomic reconcile', () => {
     expect(materializePieceTableFullText(before)).toBe('abc')
     expect(charIdAt(session.getSnapshot(), 0)).toEqual({ bunch: 'remote', counter: 0 })
     expect(charIdAt(before, 0)).toEqual({ bunch: 'base', counter: 0 })
+  })
+
+  it('routes shared-view history through its author and waits for mutation leases', () => {
+    const buffer = createEditorTextBuffer('seedown')
+    const first = createEditorBufferSession(buffer)
+    const second = createEditorBufferSession(buffer)
+    const actions: string[] = []
+    const registration = buffer.setEditAuthor(
+      Object.assign(
+        (
+          before: Parameters<typeof applyBatchToPieceTable>[0],
+          edits: Parameters<typeof applyBatchToPieceTable>[1],
+        ) => applyBatchToPieceTable(before, edits),
+        {
+          canUndo: () => buffer.getSnapshot().length === 7,
+          canRedo: () => buffer.getSnapshot().length === 4,
+          undo: () => {
+            actions.push('undo')
+            buffer.reconcile(createPieceTableSnapshot('seed'), [], {
+              edits: [{ from: 4, to: 7, text: '' }],
+            })
+          },
+          redo: () => {
+            actions.push('redo')
+            buffer.reconcile(createPieceTableSnapshot('seedown'), [], {
+              edits: [{ from: 4, to: 4, text: 'own' }],
+            })
+          },
+        },
+      ),
+    )
+    expect(second.canUndo()).toBe(true)
+    const lease = acquireDocumentMutationLease(
+      buffer,
+      buffer.getRevision(),
+      buffer.getSnapshot(),
+      'history',
+    )
+    expect(lease.status).toBe('acquired')
+    if (lease.status === 'acquired') {
+      second.undo()
+      expect(actions).toEqual([])
+      releaseDocumentMutationLease(buffer, lease.lease)
+    }
+    second.undo()
+    expect(actions).toEqual(['undo'])
+    expect(first.materializeFullText()).toBe('seed')
+    expect(second.canUndo()).toBe(false)
+    expect(first.canRedo()).toBe(true)
+    first.redo()
+    expect(actions).toEqual(['undo', 'redo'])
+    expect(second.materializeFullText()).toBe('seedown')
+    registration.dispose()
+    expect(first.canUndo()).toBe(false)
+    expect(second.canRedo()).toBe(false)
+    second.applyEdits([{ from: 7, to: 7, text: 'native' }])
+    first.undo()
+    expect(second.materializeFullText()).toBe('seedown')
+    expect(actions).toEqual(['undo', 'redo'])
   })
 
   it('keeps existing undo graph entries and rejects reentrant mutation leases', () => {
