@@ -120,6 +120,8 @@ test.skipIf(processObservationUnavailable).each([0, 0.2])(
     )
     try {
       await expect.poll(() => existsSync(nestedPid), { timeout: 2_000 }).toBe(true)
+      // PID publication precedes suspension, so Bash can still reap an exiting child.
+      await expect.poll(() => processObservation(parent.pid).state, { timeout: 2_000 }).toBe('T')
       const original = processObservation(pidIn(nestedPid))
       expect(executing(original, original.start)).toBe(true)
       const owner = processObservation(parent.pid)
@@ -134,6 +136,7 @@ test.skipIf(processObservationUnavailable).each([0, 0.2])(
       )
       expect(alive(zombie.pid)).toBe(true)
       expect(zombie.start).toBe(original.start)
+      expect(zombie.parent).toBe(String(parent.pid))
       expect(executing(zombie, original.start)).toBe(false)
       expect(executing(processObservation(parent.pid), owner.start)).toBe(true)
     } finally {
@@ -141,6 +144,7 @@ test.skipIf(processObservationUnavailable).each([0, 0.2])(
       parent.kill('SIGCONT')
       await parent.exited
     }
+    expect(processObservation(pidIn(nestedPid)).state).toBeNull()
   },
 )
 
