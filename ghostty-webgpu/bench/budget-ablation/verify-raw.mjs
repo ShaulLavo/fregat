@@ -9,6 +9,16 @@ const lane = resolve(process.argv[2])
 const record = { windows: [], failures: [] }
 const sha = (value) => createHash('sha256').update(value).digest('hex')
 const oneValue = (values, message) => assert.equal(new Set(values).size, 1, message)
+function assertGeometry(row, protocol) {
+  for (const target of row.geometry) {
+    const backing = target.geometry.filter((canvas) => canvas.renderingCanvas)
+    assert.equal(backing.length, arms[row.actor].parserOnly ? 0 : 1)
+    for (const canvas of backing) {
+      assert.deepEqual([canvas.width, canvas.height], protocol.expectedDrawingBacking)
+      assert.equal(canvas.visible, true)
+    }
+  }
+}
 for (const name of await readdir(lane)) {
   if (!name.startsWith('mac-')) continue
   const protocolPath = join(lane, name, 'protocol.json')
@@ -83,14 +93,7 @@ for (const name of await readdir(lane)) {
       assert.equal(cells.columns, 40)
       assert.equal(cells.mode2027, false)
     }
-    for (const target of row.geometry) {
-      const backing = target.geometry.filter((canvas) => canvas.renderingCanvas)
-      assert.equal(backing.length, arms[row.actor].parserOnly ? 0 : 1)
-      for (const canvas of backing) {
-        assert.deepEqual([canvas.width, canvas.height], protocol.expectedDrawingBacking)
-        assert.equal(canvas.visible, true)
-      }
-    }
+    assertGeometry(row, protocol)
     const imagePath = join(
       lane,
       name,
