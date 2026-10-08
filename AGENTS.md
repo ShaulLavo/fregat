@@ -75,6 +75,16 @@ Read the applicable skills before writing or reviewing code, or running their wo
 - Imperative reads use `client.query` / `client.infiniteQuery`; `bun run query:check` fails on the deprecated `fetchQuery`, `prefetchQuery` and `ensureQueryData` families.
 - Exceptions carry a comment: streaming transports (terminal input, orchestration frames) and intent queues (`runIntent`, `runTreeIntent`, `runWorkspaceMutation`). They still settle the cache.
 
+## Changesets
+
+- Public package behavior and API changes need a patch changeset until launch, including breaking changes. Docs, tests, benchmarks, CI, and internal refactors alone need none.
+- Write one to three sentences for someone upgrading the package. Start with Added, Fixed, Improved, Changed, Deprecated, or Removed. Name public APIs in backticks and describe the observed behavior. Keep implementation details and review evidence in the PR. For a breaking change, start with `Breaking:` and say how to update calling code.
+- Good: "Added the `DEFAULT_OVERSCAN` export, the default number of rows the editor renders beyond the visible area."
+- Bad: "Expose the default row overscan so benchmark tooling can bound retained rows against the editor's viewport policy."
+- Good: "Added `scrollbackByteLimit` to limit terminal scrollback by allocated page bytes, including the active screen. `0` clears history and disables further scrollback."
+- Bad: "Document scrollback as native page-granular retention and expose its byte budget through core, session, and appearance APIs."
+- Follow [Releasing packages](docs/releasing.md) for package selection, version PRs, and local checks.
+
 ## Logs And Errors
 
 - Read structured `logs/<date>.jsonl` before forming a theory (`.N.jsonl` continuations, highest newest). Fields: `timestamp`, `level`, `source` (`be`, `client`, `keyboard`), `requestId`, `area`, `version`, `commitHash`. If a failure is unexplained, add missing fields first. Filter with `bun run logs --since 5m`.

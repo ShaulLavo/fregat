@@ -1117,7 +1117,7 @@ function settleParsedResult<TSchema extends v.GenericSchema>({
       code: 'ORCHESTRATION_RPC_INVALID_RESULT',
       message: 'The chat server sent an answer the app could not read.',
       status: 502,
-      why: 'The server and this page may run different versions of Platform.',
+      why: 'The server and this page may run different versions of Fregat.',
       fix: 'Reload the app. If it keeps happening, open the Logs panel to see what went wrong.',
       cause: parsed.issues,
     }),

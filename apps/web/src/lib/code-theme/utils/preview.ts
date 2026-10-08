@@ -7,5 +7,5 @@ export const CODE_THEME_PREVIEW_SAMPLE = [
   '  return `${name} has ${stars} stars`;',
   '}',
   '',
-  'formatProject({ name: "Platform", stars: 128 });',
+  'formatProject({ name: "Fregat", stars: 128 });',
 ].join('\n')

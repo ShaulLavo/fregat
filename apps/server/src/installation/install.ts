@@ -33,7 +33,7 @@ export async function installServerLauncher(options: {
     throw createStructuredError({
       code: 'installation.WRITE_FAILED',
       status: 500,
-      message: 'The Platform server launcher could not be installed.',
+      message: 'The Fregat server launcher could not be installed.',
       why: 'The per-user launcher could not be written atomically.',
       fix: `Check write permissions for ${path.dirname(destination)} and run server:install again.`,
       cause,
@@ -60,7 +60,7 @@ function launcherSource(installation: ServerInstallation) {
   const directory = shellQuote(installation.directory)
   const executable = shellQuote(installation.executable)
   const missing = shellQuote(
-    'Platform server installation is unavailable. Run bun run server:install from a prepared Platform checkout on this machine.',
+    'Fregat server installation is unavailable. Run bun run server:install from a prepared Fregat checkout on this machine.',
   )
   return `#!/bin/sh
 if ! test -x ${executable} || ! test -f ${directory}/apps/server/src/index.ts; then
@@ -84,7 +84,7 @@ export function releaseLauncherSource(installation: ReleaseInstallation) {
     .join(' ')
   const executable = shellQuote(installation.executable)
   const missing = shellQuote(
-    'Platform server release is unavailable. Install the server again from the Platform that connects to this machine.',
+    'Fregat server release is unavailable. Install the server again from the Fregat that connects to this machine.',
   )
   return `#!/bin/sh
 if ! test -x ${executable} || ! test -f ${entry}; then

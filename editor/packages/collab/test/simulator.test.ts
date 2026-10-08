@@ -1,9 +1,70 @@
 import { characters, createEngine } from './engine-fixture'
 import type { TestEngine } from './engine-fixture'
 import { expect, test } from 'vitest'
-import { ReferenceEngine, simulate } from '../src/index'
+import { ReferenceEngine, TextbufferEngine, simulate } from '../src/index'
+import type { LeftOrigin } from '../src/index'
 
 const rounds = process.env.COLLAB_STRESS === '1' ? 10_000 : 500
+
+test.each([0, 1, 2])(
+  'custom factory converges without an identity projector for seed %s',
+  (seed) => {
+    const expected = simulate({ seed, participants: 3 })
+    expect(simulate({ seed, participants: 3, createEngine: () => new TextbufferEngine() })).toEqual(
+      expected,
+    )
+  },
+)
+
+test.each(['inventory', 'liveness', 'order'] as const)(
+  'custom factory detects %s divergence with identical visible text',
+  (difference) => {
+    let instance = 0
+    const createEngine = () => {
+      const engine = new TextbufferEngine()
+      const diverging = instance++ === 1
+      const insert = (bunch: string, left: LeftOrigin) =>
+        engine.apply({
+          document: 'simulation',
+          epoch: '1',
+          id: { actor: bunch, seq: 1 },
+          lamport: 1,
+          deps: [],
+          change: {
+            kind: 'insert',
+            start: { bunch, counter: 0 },
+            originLeft: left,
+            originRight: 'end',
+            text: 'x',
+          },
+        })
+      const hide = (bunch: string) =>
+        engine.apply({
+          document: 'simulation',
+          epoch: '1',
+          id: { actor: bunch, seq: 2 },
+          lamport: 2,
+          deps: [],
+          change: { kind: 'delete', spans: [{ start: { bunch, counter: 0 }, count: 1 }] },
+        })
+      if (difference === 'inventory' && !diverging) return engine
+      if (difference === 'inventory') {
+        insert('hidden', 'start')
+        hide('hidden')
+        return engine
+      }
+      const first = difference === 'order' && diverging ? 'b' : 'a'
+      const second = first === 'a' ? 'b' : 'a'
+      insert(first, 'start')
+      insert(second, { bunch: first, counter: 0 })
+      if (difference === 'liveness') hide(diverging ? second : first)
+      return engine
+    }
+    expect(() => simulate({ seed: 0, participants: 3, edits: 0, createEngine })).toThrow(
+      'identity-seed-0',
+    )
+  },
+)
 
 function run(seed: number, participants: number, edits: number, factory: () => TestEngine) {
   let identity: unknown

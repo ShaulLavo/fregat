@@ -9,6 +9,7 @@ const workflow = YAML.parse(
 test('version workflow executes the package script without shell operators', () => {
   const action = workflow.jobs.version.steps.find((step) => step.with?.['version-script'])
   expect(action.with['version-script']).toBe('bun run version-packages')
+  expect(action.env.GITHUB_TOKEN).toBe('${{ secrets.GITHUB_TOKEN }}')
 })
 
 function runs(job, enabled, pending) {

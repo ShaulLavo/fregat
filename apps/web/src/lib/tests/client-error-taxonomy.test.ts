@@ -138,8 +138,8 @@ test('a connection failure keeps the catalog code, why and fix', () => {
     code: 'ENVIRONMENT_PROTOCOL_MISMATCH',
     message:
       'The server at https://mac.example/platform speaks protocol 6, and this client needs protocol 7.',
-    why: 'That server runs an older version of Platform than this page.',
-    fix: 'Update the Platform server at https://mac.example/platform to this page’s version, then press Retry.',
+    why: 'That server runs an older version of Fregat than this page.',
+    fix: 'Update the Fregat server at https://mac.example/platform to this page’s version, then press Retry.',
   })
   expect(toConnectionError(new Error('plain'), 'fallback')).toEqual({
     code: 'CONNECTION_FAILED',

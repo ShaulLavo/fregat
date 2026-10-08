@@ -75,7 +75,7 @@ export function ProjectDeleteDialog() {
         </ul>
         {managedCount > 0 ? (
           <p className='text-warning text-sm tabular-nums'>
-            Clean up or release the {managedCount} Platform worktrees before deleting this project.
+            Clean up or release the {managedCount} Fregat worktrees before deleting this project.
           </p>
         ) : null}
         {error ? (

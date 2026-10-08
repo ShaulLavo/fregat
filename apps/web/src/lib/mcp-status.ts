@@ -18,7 +18,7 @@ const SOURCES: Record<string, string> = {
   managed: 'Managed',
   plugin: 'Plugin',
   project: 'Project',
-  sdk: 'Platform',
+  sdk: 'Fregat',
   session: 'This session',
   system: 'System',
   user: 'User',

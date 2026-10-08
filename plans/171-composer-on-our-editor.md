@@ -263,3 +263,38 @@ removing Lexical. Keep the original breakdown here for its implementation detail
    dependencies deleted in the same pass.
 4. **Platform + Editor: rich text.** Markdown source with priority below chips, list continuation,
    then `composerRichTextEnabled`.
+
+## October 2026 issue follow-ups
+
+Status: Approved, retained by [Plan 336 closeout](issue-closeout-2026-10.md).
+These are remaining execution items. Closing their tracker records does not certify a fix
+or change acceptance of an earlier delivered milestone. Each original thread retains its
+full reproduction, comments and historical artifacts. Source links below pin the reviewed
+main revision; recheck them before implementation.
+
+### Issue 701
+
+Source: [#701: Important research: Mac gets hot minutes after sending two chat messages](https://github.com/ShaulLavo/fregat/issues/701), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/701).
+Current owner: [apps/web/src/features/chat/components/chat-input.tsx](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/web/src/features/chat/components/chat-input.tsx).
+
+The owner reported the Mac became hot minutes after two chat messages. No matching process, energy or temperature baseline exists, so highlighting is not an established cause. When the terminal wave releases the host, compare bounded idle, active and settled states with process attribution, CPU/energy, render and background-work receipts. Use fixture messages first and retain machine/version/load identity. No live model calls or Mac access are authorized by this backlog transfer.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 857
+
+Source: [#857: Explore a persistent composer host across chat switches without losing per-session state isolation](https://github.com/ShaulLavo/fregat/issues/857), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/857).
+Current owner: [apps/web/src/features/chat/components/chat-input.tsx](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/web/src/features/chat/components/chat-input.tsx).
+
+LexicalComposer is keyed by environment/root/draft to isolate sessions. That key is a valid ownership boundary, not by itself a bug. Measure editor/plugin construction separately from transcript rendering before prototyping a retained host with swappable owned documents. Preserve text, mentions, attachments, model/action choice, selection, history, IME, focus and late async ownership across switches. Keep the contract through the Singapore composer migration. Do not mount a hidden editor for every session without a bounded measured benefit.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 858
+
+Source: [#858: Explore a pre-React editable composer on reload with a lossless, visually stable handoff](https://github.com/ShaulLavo/fregat/issues/858), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/858).
+Current owner: [apps/web/src/main.tsx](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/web/src/main.tsx).
+
+Reload currently reaches editable input through React createRoot. Evaluate a native input or lightweight owned-editor bootstrap only after measuring unthrottled real startup. Define draft restoration conflicts, exact owner, text/selection/focus/IME/undo/event-order handoff and generated shared styling. Exercise continuous typing and geometry across adoption. No early provider submission can happen before session ownership resolves. Keep this separate from a retained navigation composer and avoid building a second rich editor.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.

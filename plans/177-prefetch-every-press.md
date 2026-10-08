@@ -393,3 +393,20 @@ The cap keeps a held arrow key from flooding: a guess is skipped while four are 
   inside its preparation; Plan 170 removes that.
 - No offscreen render of chat sessions.
 - The file picker's directory cap belongs to Plan 175 Phase 6; Phase 1 only moves the counter.
+
+## October 2026 issue follow-ups
+
+Status: Approved, retained by [Plan 336 closeout](issue-closeout-2026-10.md).
+These are remaining execution items. Closing their tracker records does not certify a fix
+or change acceptance of an earlier delivered milestone. Each original thread retains its
+full reproduction, comments and historical artifacts. Source links below pin the reviewed
+main revision; recheck them before implementation.
+
+### Issue 859
+
+Source: [#859: Re-evaluate speculative chat preparation: session data, owned Markdown analysis, and highlight adoption](https://github.com/ShaulLavo/fregat/issues/859), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/859).
+Current owner: [apps/web/src/features/chat/transport/create-chat-transport.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/web/src/features/chat/transport/create-chat-transport.ts).
+
+Chat address-cache preparation shipped; speculative chat-detail leases and semantic/token adoption did not. The earlier firstSnapshot p90 greater than 50 ms gate covers a narrower interval than Markdown parsing/highlighting. Optimize the normal path, then measure bounded session-data, owned-semantic and highlight preparation with explicit adoption. Identify session/revision/theme/language, cap wasted work and prioritize the foreground. Do not default to a fully mounted hidden transcript. Plans 171, 176, 197 and 198 supply composer, parser and analysis contracts.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.

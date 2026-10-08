@@ -115,8 +115,8 @@ test('a real SSH server on an older protocol ends blocked with its fix, and focu
     phase: 'blocked',
     lastError: {
       code: 'machines.SSH_PROTOCOL',
-      message: `The remote server speaks protocol ${running}, and this Platform needs protocol ${ORCHESTRATION_WS_PROTOCOL_VERSION}.`,
-      fix: "Update the Platform checkout at /work/space ' $(touch unwanted) to this server’s version, run bun install there, then Retry.",
+      message: `The remote server speaks protocol ${running}, and this Fregat needs protocol ${ORCHESTRATION_WS_PROTOCOL_VERSION}.`,
+      fix: "Update the Fregat checkout at /work/space ' $(touch unwanted) to this server’s version, run bun install there, then Retry.",
     },
   })
   const commands = h.boundary.commands.length

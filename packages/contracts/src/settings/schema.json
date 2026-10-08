@@ -80,8 +80,8 @@
     },
     "chat.keepImportedSessionsUpdated": {
       "default": true,
-      "description": "Imported chats keep getting new messages from the Claude or Codex history on this machine until you send a message in them from Platform. New chats are imported only when you click Import.",
-      "markdownDescription": "Imported chats keep getting new messages from the Claude or Codex history on this machine until you send a message in them from Platform. New chats are imported only when you click Import.\n\nThe server rescans local Claude and Codex history every minute and brings imported chats up to date. A chat stops updating once it has a turn sent from Platform.",
+      "description": "Imported chats keep getting new messages from the Claude or Codex history on this machine until you send a message in them from Fregat. New chats are imported only when you click Import.",
+      "markdownDescription": "Imported chats keep getting new messages from the Claude or Codex history on this machine until you send a message in them from Fregat. New chats are imported only when you click Import.\n\nThe server rescans local Claude and Codex history every minute and brings imported chats up to date. A chat stops updating once it has a turn sent from Fregat.",
       "type": "boolean"
     },
     "chat.notificationMode": {
@@ -847,7 +847,7 @@
     "files.watchDirectoryLimit": {
       "default": 200000,
       "description": "How many folders all open workspaces may watch for live changes together. A workspace that would pass it updates its top level and open files only.",
-      "markdownDescription": "How many folders all open workspaces may watch for live changes together. A workspace that would pass it updates its top level and open files only.\n\nEach watched folder uses one inotify watch from a per-user pool that every watcher on the machine shares (524,288 on the owner's machine). Opening /work took 484,687 watches and other apps began failing with ENOSPC. 200,000 fits four roots the size of the Platform checkout (45,036 folders) and leaves 62% of the pool free.",
+      "markdownDescription": "How many folders all open workspaces may watch for live changes together. A workspace that would pass it updates its top level and open files only.\n\nEach watched folder uses one inotify watch from a per-user pool that every watcher on the machine shares (524,288 on the owner's machine). Opening /work took 484,687 watches and other apps began failing with ENOSPC. 200,000 fits four roots the size of the Fregat checkout (45,036 folders) and leaves 62% of the pool free.",
       "maximum": 2000000,
       "minimum": 0,
       "type": "integer"

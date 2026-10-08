@@ -70,15 +70,15 @@ export function worktreeActions(
       kind: 'run',
       value: 'adopt',
       command: 'worktree.adopt',
-      name: 'Manage in Platform',
-      description: 'Let Platform manage this worktree and remove it later',
+      name: 'Manage in Fregat',
+      description: 'Let Fregat manage this worktree and remove it later',
     })
   if (canReleaseWorktree(worktree))
     actions.push({
       kind: 'confirm',
       value: 'release',
       name: 'Stop managing…',
-      description: 'Keep the worktree on disk and stop Platform from managing it',
+      description: 'Keep the worktree on disk and stop Fregat from managing it',
     })
   if (!current && worktree.cleanupEligibility.canResolveMissing)
     actions.push({

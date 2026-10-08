@@ -38,10 +38,7 @@ function requireOutdated(text: string, url: string, where: string) {
     text.includes(`speaks protocol ${running}`),
     `${where} does not name protocol ${running}: ${text}`,
   )
-  ok(
-    text.includes(`Update the Platform server at ${url}`),
-    `${where} does not show the fix: ${text}`,
-  )
+  ok(text.includes(`Update the Fregat server at ${url}`), `${where} does not show the fix: ${text}`)
 }
 
 /**

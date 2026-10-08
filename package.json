@@ -117,6 +117,7 @@
     "build-release": "bun scripts/build-release.ts"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "1.0.1",
     "@changesets/cli": "3.0.3",
     "@types/node": "26.6.3",
     "bippy": "^0.7.3",

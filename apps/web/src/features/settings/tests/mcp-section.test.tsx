@@ -154,7 +154,7 @@ test('refuses the reserved name before anything is written', async () => {
     await userEvent.type(within(dialog).getByLabelText('Command'), 'npx')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Add server' }))
 
-    expect(await within(dialog).findByText(/reserved for Platform/)).toBeVisible()
+    expect(await within(dialog).findByText(/reserved for Fregat/)).toBeVisible()
     expect(adapter.writes).toEqual([])
   } finally {
     rendered.unmount()

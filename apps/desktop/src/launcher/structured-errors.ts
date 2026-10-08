@@ -40,7 +40,7 @@ export const launcherErrors = defineErrorCatalog('desktop.launcher', {
   VERSION_UNSUPPORTED: {
     status: 400,
     message: 'The browser engine needs an update.',
-    why: 'Platform requires Chromium 126 or newer.',
+    why: 'Fregat requires Chromium 126 or newer.',
     fix: 'Update the browser or choose a newer executable in Window settings.',
   },
   LAUNCH_FAILED: {

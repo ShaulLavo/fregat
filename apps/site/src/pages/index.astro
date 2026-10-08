@@ -70,7 +70,7 @@ const demoUrl = import.meta.env.DEV
           <div class="actions">
             <a class="button" href="https://github.com/ShaulLavo/fregat">get the source</a>
             <a class="button ghost" href="#try">run it locally</a>
-            <span class="status">no releases yet</span>
+            <span class="status">desktop app available from source; no public downloads yet</span>
           </div>
         </div>
         <figure class="shot">
@@ -113,8 +113,7 @@ const demoUrl = import.meta.env.DEV
           <div class="pane-body">
             <h2 id="window-heading">the chat and the editor are one app</h2>
             <p>
-              cursor keeps its agent view and its editor in separate windows. antigravity does the
-              same. fregat puts the conversation first and keeps the editor inside it: open the
+              fregat puts the conversation first and keeps the editor inside it: open the
               diff an agent just wrote, search the workspace, jump to a definition, run it in the
               terminal, and land back in the chat where you left it.
             </p>
@@ -129,7 +128,7 @@ const demoUrl = import.meta.env.DEV
         <section class="pane" id="parts" aria-labelledby="parts-heading">
           <div class="bar"><span>what's inside</span><span class="count">6</span></div>
           <div class="pane-body">
-            <h2 id="parts-heading">hand-rolled, so it's fast</h2>
+            <h2 id="parts-heading">built from our own parts</h2>
             <dl class="parts">
               <div>
                 <dt>editor</dt>
@@ -144,7 +143,7 @@ const demoUrl = import.meta.env.DEV
                 <dd>
                   <a href="https://github.com/ShaulLavo/tree-sitter-x">tree-sitter-x</a>, our fork
                   of tree-sitter. built without emscripten, it keeps the text inside the parser and
-                  reparses a 1 mb file after a keystroke in 0.35 ms, down from 0.8.
+                  reparses edits incrementally.
                 </dd>
               </div>
               <div>
@@ -168,7 +167,8 @@ const demoUrl = import.meta.env.DEV
                 <dt>anywhere</dt>
                 <dd>
                   a small server runs on each machine. every workspace opens from a browser, the
-                  desktop app, a terminal, or your phone.
+                  desktop app on macos and linux, or a terminal. a phone browser connects through
+                  an https proxy on your tailnet after device pairing.
                 </dd>
               </div>
             </dl>
@@ -176,7 +176,7 @@ const demoUrl = import.meta.env.DEV
         </section>
 
         <section class="pane" id="next" aria-labelledby="next-heading">
-          <div class="bar"><span>on the way</span><span class="count">4</span></div>
+          <div class="bar"><span>on the way</span><span class="count">3</span></div>
           <div class="pane-body">
             <h2 id="next-heading">what we're building now</h2>
             <dl class="parts">
@@ -200,10 +200,6 @@ const demoUrl = import.meta.env.DEV
               <div>
                 <dt>github</dt>
                 <dd>pull requests, reviews and checks, next to the diff they're about.</dd>
-              </div>
-              <div>
-                <dt>phone</dt>
-                <dd>a native app for checking on agents and answering them from anywhere.</dd>
               </div>
             </dl>
           </div>
@@ -232,9 +228,8 @@ const demoUrl = import.meta.env.DEV
               </div>
             </div>
             <p>
-              cursor is the harness. fregat runs yours: claude code and codex today, opencode and
-              cursor's own agent next. sign in from inside the app against your own account. no
-              accounts here, nothing proxied, run as many at once as you like.
+              fregat runs claude code and codex. sign in from inside the app against your own
+              account and run several sessions side by side.
             </p>
           </div>
         </section>
@@ -244,14 +239,12 @@ const demoUrl = import.meta.env.DEV
           <div class="pane-body">
             <h2 id="where-heading">owning every layer is what makes it smooth</h2>
             <p>
-              cursor is a fork of vs code, so the chat is a panel bolted onto someone else's
-              editor, and the agent view had to become a second app. fregat owns the editor, the
-              terminal, the tree and the shell around them, so an agent is a pane the same way the
+              fregat owns the editor, the terminal, the tree and the shell around them, so an
+              agent is a pane the same way the
               terminal is, and a diff opens in the chat without a context switch.
             </p>
             <p>
-              it's also why it's fast: every hot path is code we wrote and can tune, and the
-              dependency list shrinks every week.
+              owning these parts lets us tune the editor, terminal and workspace together.
             </p>
           </div>
         </section>
@@ -308,7 +301,7 @@ const demoUrl = import.meta.env.DEV
             <div class="terminal">
               <div class="bar"><span>terminal</span><span class="mode">bash</span></div>
               <pre><code>git clone https://github.com/ShaulLavo/fregat
-<span class="c"># singapore and ghostty-webgpu go beside it, linked. the readme has the steps</span>
+<span class="c"># singapore and ghostty-webgpu are included in this repo</span>
 cd fregat
 bun install
 bun run dev
@@ -335,7 +328,7 @@ bun run dev
         </div>
         <div>
           <dt>revision</dt>
-          <dd>0.0.1, no releases</dd>
+          <dd>source builds; public downloads pending</dd>
         </div>
         <div>
           <dt>made by</dt>

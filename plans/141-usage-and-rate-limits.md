@@ -339,13 +339,14 @@ timestamps. Missing historical presence or turn metadata stays unknown. Show the
 recorded chat turns in the existing context usage details, through the existing session TanStack
 query. Label any share precisely as writes divided by reported cache reads plus writes.
 
-- [ ] Preserve future provider cache counter presence and value through recorder restart and
+- [x] Preserve future provider cache counter presence and value through recorder restart and
       contribution aggregation, including optional Codex counters and incomplete Claude auxiliary use.
-- [ ] Query recent chat turns with their identities, models, usage observation times, and retained
+- [x] Query recent chat turns with their identities, models, usage observation times, and retained
       turn timestamps. Keep utility generation totals in existing billing totals and out of this display.
-- [ ] Show reported reads/writes and dates, with explicit unknown values. Verify actual fixture
+- [x] Show reported reads/writes and dates, with explicit unknown values. Verify actual fixture
       provider/recorder/API/UI behavior and read back the browser screenshot.
-- [ ] Deliver an independently reviewed PR related to #349. This partial delivery keeps #349 open.
+- [x] Deliver the factual counter/history feature in [PR #419](https://github.com/ShaulLavo/fregat/pull/419).
+      The repeated-write detector remains Phase 7 work; its tracker record moves to the follow-up below.
 
 ## Phase 7: Calibrate repeated cache-write detection (Approved, awaiting observations)
 
@@ -363,3 +364,20 @@ query. Label any share precisely as writes divided by reported cache reads plus 
 No phase creates inference turns, launches agents automatically, adds a usage datastore, rewrites
 retained owner data, or reads credentials to manufacture attribution. Plans 308/309 continue to own
 account collection and native transcript history; this work stays in session diagnostics.
+
+## October 2026 issue follow-ups
+
+Status: Approved, retained by [Plan 336 closeout](issue-closeout-2026-10.md).
+These are remaining execution items. Closing their tracker records does not certify a fix
+or change acceptance of an earlier delivered milestone. Each original thread retains its
+full reproduction, comments and historical artifacts. Source links below pin the reviewed
+main revision; recheck them before implementation.
+
+### Issue 349
+
+Source: [#349: Usage: flag sessions whose prompt cache keeps being rebuilt](https://github.com/ShaulLavo/fregat/issues/349), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/349#issuecomment-5964164757).
+Current owner: [apps/server/src/provider/usage-recorder.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/server/src/provider/usage-recorder.ts).
+
+PR #419 delivered factual nullable cache counters and five dated recent turns. The requested repeated-rebuild warning is still uncalibrated. Missing historical counter presence, auxiliary requests, first-turn creation and proxy account identity prevent a cause claim. Phase 7 owns a bounded observation set, a measured window and threshold, and one diagnostic field in the existing turn event. Preserve unknown values. Do not generate live-provider turns or infer TTL expiry from idle time.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.

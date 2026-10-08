@@ -1,7 +1,10 @@
+import { ChangeSet, Text } from '@codemirror/state'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { upstreamRoot } from './support.mjs'
+
+export const comparisonEngines = ['singapore', 'vscode', 'codemirror']
 
 // When the Singapore adapter retains a snapshot, which decides how much of the
 // tree an edit may mutate in place:
@@ -15,6 +18,7 @@ export async function loadAdapter(name, roots = {}, retention = 'always') {
   if (!retentions.includes(retention)) throw new Error(`Unknown retention: ${retention}`)
   if (name === 'singapore') return singaporeAdapter(roots.singapore, retention)
   if (name === 'vscode') return vscodeAdapter(roots.vscode)
+  if (name === 'codemirror') return codemirrorAdapter()
   throw new Error(`Unknown engine: ${name}`)
 }
 
@@ -113,6 +117,38 @@ function vscodeAdapter(root) {
         },
         offset: (point) => tree.getOffsetAt(point.row + 1, point.column + 1),
         full: () => range(0, tree.getLength()),
+        issues: () => [],
+        stats: () => ({}),
+      }
+    },
+  }
+}
+
+function codemirrorAdapter() {
+  return {
+    create(text) {
+      let doc = Text.of(text.split('\n'))
+      return {
+        length: () => doc.length,
+        lineCount: () => doc.lines,
+        edit(change) {
+          doc = doc.replace(change.from, change.to, Text.of(change.text.split('\n')))
+        },
+        batch(edits) {
+          doc = ChangeSet.of(
+            edits.map(({ from, to, text }) => ({ from, to, insert: text })),
+            doc.length,
+            '\n',
+          ).apply(doc)
+        },
+        line: (row) => doc.line(row + 1).text,
+        range: (from, to) => doc.sliceString(from, to, '\n'),
+        point(offset) {
+          const line = doc.lineAt(offset)
+          return { row: line.number - 1, column: offset - line.from }
+        },
+        offset: (point) => doc.line(point.row + 1).from + point.column,
+        full: () => doc.toString(),
         issues: () => [],
         stats: () => ({}),
       }

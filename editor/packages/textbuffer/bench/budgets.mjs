@@ -12,7 +12,7 @@ import { prepareState, runOperations, validate } from './worker.mjs'
 
 // Structural counters are exact executed events in the instrumented build, so
 // a ceiling per workload fails CI deterministically where a timing never can.
-export const budgetsFile = path.join(benchRoot, 'budgets.json')
+const budgetsFile = path.join(benchRoot, 'budgets.json')
 
 export function readBudgets() {
   return JSON.parse(readFileSync(budgetsFile, 'utf8'))
