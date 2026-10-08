@@ -255,6 +255,32 @@ describe('link cursor writes', () => {
     },
   )
 
+  it.each([
+    { name: 'matching', cursors: ['pointer'] },
+    { name: 'wait-to-pointer', cursors: ['wait', 'pointer'] },
+  ])(
+    'restores the saved declaration on leave after a $name host cursor write',
+    async ({ cursors }) => {
+      const view = await harness(undefined, 'text')
+      view.session.registerLinkProvider({
+        provideLinks: () => [{ range: { start: 0, end: 9 }, activate: () => {} }],
+      })
+      view.move()
+      await expect.poll(() => view.controller.currentHit !== undefined).toBe(true)
+      const writes = observeCursorWrites(view.canvas)
+      for (const cursor of cursors) view.canvas.style.setProperty('cursor', cursor, 'important')
+      expect(view.canvas.style.cursor).toBe('pointer')
+      expect(view.canvas.style.getPropertyPriority('cursor')).toBe('important')
+      writes.mockClear()
+      view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
+      expect(view.controller.currentHit).toBeUndefined()
+      expect(view.root.querySelector('[role="link"]')).toBeNull()
+      expect(view.canvas.style.cursor).toBe('text')
+      expect(view.canvas.style.getPropertyPriority('cursor')).toBe('')
+      expect(writes.mock.calls).toEqual([['text', '']])
+    },
+  )
+
   it('preserves a host priority-only cursor takeover during hover', async () => {
     const view = await harness(undefined, 'text')
     view.session.registerLinkProvider({
