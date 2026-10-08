@@ -66,7 +66,8 @@ test.each([undefined, 'live text'])(
       activate: (context) =>
         context.registerViewContribution({
           createContribution: (view) => {
-            initialTexts.push(view.getSnapshot().textSnapshot.materializeFullText())
+            const text = view.getSnapshot().textSnapshot
+            initialTexts.push(text.readRange(0, text.length))
             return {
               snapshotKey: 'initial-layer:1',
               captureVisiblePaint: () => ({
