@@ -14,7 +14,7 @@ async function write(path, text) {
   await writeFile(path, text)
 }
 
-async function fixture() {
+async function fixture(exports = { '.': './dist/index.js' }) {
   const root = await mkdtemp(join(tmpdir(), 'package-set-'))
   roots.push(root)
   const core = join(root, 'source', 'core')
@@ -23,7 +23,7 @@ async function fixture() {
     JSON.stringify({
       name: '@singapore-editor/core',
       version: '0.0.0',
-      exports: { '.': './dist/index.js' },
+      exports,
       dependencies: { 'tiny-dep': '1.0.0' },
     }),
   )
@@ -59,6 +59,75 @@ test('a frozen set records the bytes of its transitive external dependencies', a
     'tiny-sub',
   ])
   expect(set.externalHash).toBe(set.manifest.external.sha256)
+})
+
+test('a browser snapshot keeps the package and explains its unavailable Bun server export', async () => {
+  const exports = {
+    '.': { types: './dist/index.d.ts', import: './dist/index.js' },
+    './server': { types: './server/signaling.ts', bun: './server/signaling.ts' },
+  }
+  const { set } = await fixture(exports)
+  expect(set.manifest.packages[0].exports).toEqual(exports)
+  expect(set.aliases).toEqual([
+    {
+      find: /^@singapore-editor\/core(?=$|[?#])/,
+      replacement: join(set.directory, 'core/dist/index.js'),
+    },
+    {
+      find: /^@singapore-editor\/core\/server(?=$|[?#])/,
+      replacement: '@singapore-editor/core/server',
+      reason: 'No target for browser, module, production, import, default conditions',
+    },
+  ])
+  expect(set.skippedExports).toEqual([
+    {
+      specifier: '@singapore-editor/core/server',
+      reason: 'No target for browser, module, production, import, default conditions',
+    },
+  ])
+  expect((await loadPackageSet(set.directory)).skippedExports).toEqual(set.skippedExports)
+})
+
+test.each([
+  { browser: { import: './dist/index.js' }, import: './server/signaling.ts' },
+  { production: './dist/index.js', default: './server/signaling.ts' },
+  { module: './dist/index.js', default: './server/signaling.ts' },
+  { default: './dist/index.js', import: './server/signaling.ts' },
+  {
+    node: './server/signaling.ts',
+    development: './server/signaling.ts',
+    default: './dist/index.js',
+  },
+  { import: { browser: './dist/index.js', default: './server/signaling.ts' } },
+  [{ bun: './server/signaling.ts' }, './dist/index.js'],
+])('resolves nested browser conditions and fallback arrays: %j', async (target) => {
+  const { set } = await fixture({ '.': target })
+  expect(set.aliases[0].replacement).toBe(join(set.directory, 'core/dist/index.js'))
+  expect(set.skippedExports).toEqual([])
+})
+
+test.each(['./dist/index.js', { import: './dist/index.js' }, ['./dist/index.js']])(
+  'resolves root export shorthand: %j',
+  async (exports) => {
+    const { set } = await fixture(exports)
+    expect(set.aliases[0].find).toEqual(/^@singapore-editor\/core(?=$|[?#])/)
+  },
+)
+
+test('a matching null condition blocks later defaults', async () => {
+  const { set } = await fixture({
+    '.': './dist/index.js',
+    './blocked': { browser: null, default: './dist/index.js' },
+  })
+  expect(set.aliases).toHaveLength(2)
+  expect(set.skippedExports[0].specifier).toBe('@singapore-editor/core/blocked')
+  expect(set.aliases[1].reason).toBe(set.skippedExports[0].reason)
+})
+
+test('conditional resolution still rejects browser exports outside the frozen build', async () => {
+  await expect(fixture({ '.': { browser: './server/signaling.ts' } })).rejects.toThrow(
+    'Unsupported frozen export: @singapore-editor/core.',
+  )
 })
 
 test('reload rejects a one-byte change in a direct or transitive external dependency', async () => {
