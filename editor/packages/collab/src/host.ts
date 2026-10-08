@@ -1,4 +1,4 @@
-import { CollabFailure } from './failure'
+import { CollabFailure, rethrowObserverErrors } from './failure'
 import { editKey, insertionOf } from './types'
 import type { EditId, Engine, Envelope } from './types'
 
@@ -18,11 +18,13 @@ export type HostOptions<Snapshot> = {
   readonly unknownDeps?: 'defer' | 'reject'
 }
 
+type Subscription = { readonly listener: (message: HostMessage) => void }
+
 export class Host<Snapshot = unknown> {
   private sequence = 0
   private outcomes = new Map<string, HostMessage>()
   private deferred = new Map<string, Envelope>()
-  private listeners = new Set<(message: HostMessage) => void>()
+  private listeners = new Set<Subscription>()
   private draining = false
   private broadcasts: HostMessage[] = []
 
@@ -36,9 +38,10 @@ export class Host<Snapshot = unknown> {
   }
 
   subscribe(listener: (message: HostMessage) => void): () => void {
-    this.listeners.add(listener)
+    const subscription = { listener }
+    this.listeners.add(subscription)
     return () => {
-      this.listeners.delete(listener)
+      this.listeners.delete(subscription)
     }
   }
 
@@ -71,13 +74,15 @@ export class Host<Snapshot = unknown> {
     } finally {
       this.draining = false
     }
-    if (errors.length) throw errors[0]
+    rethrowObserverErrors('host.broadcast', errors)
   }
 
   private deliver(message: HostMessage, errors: unknown[]): void {
-    for (const listener of this.listeners) {
+    const subscriptions = [...this.listeners]
+    for (const subscription of subscriptions) {
+      if (!this.listeners.has(subscription)) continue
       try {
-        listener(message)
+        subscription.listener(message)
       } catch (error) {
         errors.push(error)
       }
