@@ -171,3 +171,33 @@ test('cyclic arrays in internal context retain shared arrays', () => {
     error: { internal: { items: ['ready', '[circular]'], shared: ['ready', '[circular]'] } },
   })
 })
+
+test('array-element getters become diagnostic placeholders', () => {
+  const items = ['ready']
+  Object.defineProperty(items, 1, {
+    get: () => {
+      throw createError('Synthetic getter failure')
+    },
+  })
+  const failure = createError({ message: 'Synthetic failure', internal: { items } })
+  expect(sanitizeRecord({ failure })).toMatchObject({
+    failure: { internal: { items: ['ready', '[unreadable: getter threw]'] } },
+  })
+})
+
+test.each(['message', 'name', 'stack', 'cause'])(
+  'nested error %s getters become diagnostic placeholders',
+  (field) => {
+    const nested = createError('Synthetic nested failure')
+    void nested.stack
+    Object.defineProperty(nested, field, {
+      get: () => {
+        throw createError('Synthetic getter failure')
+      },
+    })
+    const failure = createError({ message: 'Synthetic failure', internal: { nested } })
+    expect(sanitizeRecord({ failure })).toMatchObject({
+      failure: { internal: { nested: { [field]: '[unreadable: getter threw]' } } },
+    })
+  },
+)

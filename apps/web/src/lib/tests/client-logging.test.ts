@@ -337,3 +337,26 @@ test.each(['getter', 'array'])(
     expect(emittedEvents[0]?.event).toMatchObject({ error: { message: 'Synthetic failure' } })
   },
 )
+
+test.each(['element', 'message', 'name', 'stack', 'cause'])(
+  'logs unreadable internal %s getters and preserves the rejection',
+  async (field) => {
+    const nested = createError('Synthetic nested failure')
+    void nested.stack
+    const items = [nested]
+    const target = field === 'element' ? items : nested
+    Object.defineProperty(target, field === 'element' ? 0 : field, {
+      get: () => {
+        throw createError('Synthetic getter failure')
+      },
+    })
+    const failure = createError({ message: 'Synthetic failure', internal: { items } })
+    await expect(
+      observeClientOperation({ action: 'synthetic.getter', area: 'test' }, async () => {
+        throw failure
+      }),
+    ).rejects.toBe(failure)
+    expect(emittedEvents).toHaveLength(1)
+    expect(JSON.stringify(emittedEvents[0]?.event)).toContain('[unreadable: getter threw]')
+  },
+)

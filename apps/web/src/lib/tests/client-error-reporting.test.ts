@@ -352,3 +352,29 @@ test('reports internal context through the shared sanitizer', () => {
   })
   expect(JSON.stringify(emittedEvents)).not.toContain('PRIVATE_TOKEN')
 })
+
+test.each(['element', 'message', 'name', 'stack', 'cause', 'code', 'statusCode', 'why', 'fix'])(
+  'reports unreadable internal %s getters',
+  (field) => {
+    const nested = createError('Synthetic nested failure')
+    void nested.stack
+    const items = [nested]
+    Object.defineProperty(field === 'element' ? items : nested, field === 'element' ? 0 : field, {
+      get: () => {
+        throw createError('Synthetic getter failure')
+      },
+    })
+    const failure = createError({ message: 'Synthetic failure', internal: { items } })
+    expect(() =>
+      reportClientError({
+        area: 'test',
+        operation: 'synthetic.getter',
+        message: 'Synthetic failure',
+        cause: failure,
+      }),
+    ).not.toThrow()
+    expect(emittedEvents).toHaveLength(1)
+    if (field !== 'statusCode')
+      expect(JSON.stringify(emittedEvents[0]?.event)).toContain('[unreadable: getter threw]')
+  },
+)

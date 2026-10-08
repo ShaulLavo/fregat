@@ -38,6 +38,45 @@ afterEach(async () => {
 })
 
 describe('observability runtime', () => {
+  it.each(['element', 'message', 'name', 'stack', 'cause'])(
+    'writes unreadable internal %s getters and preserves the server rejection',
+    async (field) => {
+      const logDir = await fixtureRoot()
+      initializeObservability(testObservabilityEnv(logDir))
+      const nested = createStructuredError({ message: 'Synthetic nested failure' })
+      void nested.stack
+      const items = [nested]
+      Object.defineProperty(field === 'element' ? items : nested, field === 'element' ? 0 : field, {
+        enumerable: true,
+        get: () => {
+          throw createStructuredError({ message: 'Synthetic getter failure' })
+        },
+      })
+      const failure = createStructuredError({ message: 'Synthetic failure', internal: { items } })
+      let rejection: unknown
+      const app = new Elysia()
+      applyObservability(app)
+      app.get('/unreadable-getters', async () => {
+        try {
+          await observeRequestOperation(
+            { area: 'test', operation: 'synthetic.getter' },
+            async () => {
+              throw failure
+            },
+          )
+        } catch (error) {
+          rejection = error
+        }
+        return { ok: true }
+      })
+      expect((await app.handle(new Request('http://local/unreadable-getters'))).status).toBe(200)
+      expect(rejection).toBe(failure)
+      const events = await flushedEvents(logDir)
+      expect(events).toHaveLength(1)
+      expect(JSON.stringify(events[0])).toContain('[unreadable: getter threw]')
+    },
+  )
+
   it('keeps root and nested internal context out of the session import success response', async () => {
     const root = await fixtureRoot()
     const logDir = await fixtureRoot()

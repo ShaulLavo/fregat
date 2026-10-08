@@ -1,4 +1,4 @@
-import { isRecord } from '@workspace/utils/objects'
+import { isObject, isRecord } from '@workspace/utils/objects'
 const maxStringLength = 2_000
 const redactedDiagnosticValue = '[redacted]'
 // Server logs already retain stack traces, so the client keeps them for the
@@ -71,14 +71,24 @@ export function errorInternalContext(error: unknown): Record<string, unknown> | 
 }
 
 /** Diagnostic getters are optional evidence; their failures cannot replace the operation's error. */
-export function readDiagnosticField(record: unknown, key: string): unknown {
-  if (!isRecord(record)) return undefined
+export function readDiagnosticField(record: unknown, key: string | number): unknown {
+  if (!isObject(record)) return undefined
 
   try {
     return record[key]
   } catch {
-    return undefined
+    return '[unreadable: getter threw]'
   }
+}
+
+export function readDiagnosticStringField(record: unknown, key: string) {
+  const value = readDiagnosticField(record, key)
+  return typeof value === 'string' ? value : undefined
+}
+
+export function readDiagnosticNumberField(record: unknown, key: string) {
+  const value = readDiagnosticField(record, key)
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 export function sanitizeRecord(record: Record<string, unknown>) {
@@ -126,9 +136,12 @@ function sanitizeArray(values: readonly unknown[], depth: number, walk: Walk) {
   if (depth >= walk.limits.maxDepth) return '[truncated]'
 
   walk.seen.add(values)
-  const safe = values
-    .slice(0, walk.limits.maxArrayItems)
-    .map((item) => sanitizeDiagnosticValue(item, depth + 1, walk))
+  const length = readDiagnosticField(values, 'length')
+  const count = typeof length === 'number' ? Math.min(length, walk.limits.maxArrayItems) : 0
+  const safe: unknown[] = []
+  for (let index = 0; index < count; index++) {
+    safe.push(sanitizeDiagnosticValue(readDiagnosticField(values, index), depth + 1, walk))
+  }
   walk.seen.delete(values)
   return safe
 }
@@ -140,9 +153,9 @@ function sanitizeError(error: Error, depth: number, walk: Walk) {
   const internal = errorInternalContext(error)
   const safe: Record<string, unknown> = {
     cause: sanitizeDiagnosticValue(readDiagnosticField(error, 'cause'), depth + 1, walk),
-    message: walk.policy.formatString(error.message),
-    name: error.name,
-    ...(walk.sensitiveFields.has('stack') ? {} : { stack: error.stack }),
+    message: walk.policy.formatString(readDiagnosticStringField(error, 'message') ?? ''),
+    name: readDiagnosticStringField(error, 'name') ?? 'Error',
+    ...(walk.sensitiveFields.has('stack') ? {} : { stack: readDiagnosticField(error, 'stack') }),
     ...walk.policy.errorFields?.(error),
   }
   if (internal !== undefined) {

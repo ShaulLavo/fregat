@@ -8,7 +8,11 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 
 import { errorSummary, type ErrorSummaryOptions } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
-import { errorInternalContext, readDiagnosticField } from '@workspace/observability/sanitize'
+import {
+  errorInternalContext,
+  readDiagnosticField,
+  readDiagnosticStringField as diagnosticStringField,
+} from '@workspace/observability/sanitize'
 import type { RequestLogger } from 'evlog'
 import { useLogger as getRequestLogger } from 'evlog/elysia'
 
@@ -230,7 +234,11 @@ export function sanitizeErrorCause(cause: unknown, seen = new WeakSet<object>())
     if (seen.has(cause)) return '[circular]'
 
     seen.add(cause)
-    const safe = cause.map((value) => sanitizeErrorCause(value, seen))
+    const length = readDiagnosticField(cause, 'length')
+    const safe: unknown[] = []
+    for (let index = 0; typeof length === 'number' && index < length; index++) {
+      safe.push(sanitizeErrorCause(readDiagnosticField(cause, index), seen))
+    }
     seen.delete(cause)
     return safe
   }
@@ -290,11 +298,6 @@ function safeErrorInternal(error: unknown, seen = new WeakSet<object>()) {
 
   seen.add(internal)
   return sanitizeRecord(internal, seen)
-}
-
-function diagnosticStringField(error: Error, key: string) {
-  const value = readDiagnosticField(error, key)
-  return typeof value === 'string' ? value : undefined
 }
 
 function errorCause(error: Error) {

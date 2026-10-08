@@ -1,6 +1,9 @@
 import { isCancelledError } from '@tanstack/react-query'
-import { createDiagnosticSanitizer } from '@workspace/observability/sanitize'
-import { errorNumberField, errorStringField } from '@workspace/contracts'
+import {
+  createDiagnosticSanitizer,
+  readDiagnosticStringField,
+  readDiagnosticNumberField,
+} from '@workspace/observability/sanitize'
 
 import { log } from './client-logging'
 
@@ -17,10 +20,11 @@ const sanitizeDiagnosticValue = createDiagnosticSanitizer({
   // No limit here: `safeClientEvent` keeps the head 2000 characters of every string.
   formatString: (value) => value,
   errorFields: (error) => ({
-    code: errorStringField(error, 'code'),
-    fix: errorStringField(error, 'fix'),
-    status: errorNumberField(error, 'statusCode') ?? errorNumberField(error, 'status'),
-    why: errorStringField(error, 'why'),
+    code: readDiagnosticStringField(error, 'code'),
+    fix: readDiagnosticStringField(error, 'fix'),
+    status:
+      readDiagnosticNumberField(error, 'statusCode') ?? readDiagnosticNumberField(error, 'status'),
+    why: readDiagnosticStringField(error, 'why'),
   }),
 })
 
