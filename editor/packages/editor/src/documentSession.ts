@@ -1,4 +1,11 @@
 import {
+  captureIdentitySelections,
+  resolveIdentitySelections,
+  repairIdentitySelections,
+  type AuthoredHistoryEdge,
+  type DocumentAuthoredHistory,
+} from './authoredHistory'
+import {
   createAnchorSelection,
   createSelectionIdFactory,
   createSelectionSet,
@@ -24,9 +31,11 @@ import {
   commitEditorHistory,
   createEditorHistory,
   editorHistoryNodes,
+  editorHistoryPath,
   preferEditorHistoryBranch,
   redoEditorHistory,
   replaceEditorHistoryState,
+  restoreEditorHistory,
   undoEditorHistory,
   type EditorHistory,
   type HistoryNodeId,
@@ -229,6 +238,7 @@ export type DocumentEditAuthor = {
     edits: readonly TextEdit[],
     options?: Pick<DocumentSessionApplyEditsOptions, 'history'>,
   ): PieceTableSnapshot
+  readonly history?: DocumentAuthoredHistory
   readonly canUndo?: () => boolean
   readonly canRedo?: () => boolean
   readonly undo?: () => void
@@ -402,6 +412,7 @@ export type DocumentTransactionMetadata = {
 }
 
 export type DocumentTransaction = {
+  readonly authored?: AuthoredHistoryEdge
   readonly edits: readonly TextEdit[]
   readonly inverseEdits: readonly TextEdit[]
   readonly snapshotBefore: PieceTableSnapshot
@@ -892,6 +903,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
         { view, selections: reconcileSelections(before, snapshot, view.getSelections(), edits) },
       ]
     })
+    this.settleAuthoredHistory(snapshot)
     this.history = replaceEditorHistoryState(this.history, snapshot, selections)
     this.typingRun = null
     for (const mapped of mappedViews) mapped.view.acceptBufferSelections(mapped.selections)
@@ -965,6 +977,8 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     const start = nowMs()
     if (this.mutationLease)
       return appendTiming(this.createChange('none', []), 'session.undo', start)
+    if (this.applyLocalEdits.history)
+      return this.moveAuthoredHistory(undoEditorHistory(this.history), 'undo', sourceView)
     if (this.applyLocalEdits.undo) {
       // The document author publishes its history transition through reconciliation.
       this.applyLocalEdits.undo()
@@ -1004,6 +1018,8 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     const start = nowMs()
     if (this.mutationLease)
       return appendTiming(this.createChange('none', []), 'session.redo', start)
+    if (this.applyLocalEdits.history)
+      return this.moveAuthoredHistory(redoEditorHistory(this.history), 'redo', sourceView)
     if (this.applyLocalEdits.redo) {
       // The document author publishes its history transition through reconciliation.
       this.applyLocalEdits.redo()
@@ -1123,6 +1139,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
       return appendTiming(this.createChange('none', []), 'session.checkout', start)
     }
     const next = checkoutEditorHistory(this.history, id)
+    if (this.applyLocalEdits.history) return this.moveAuthoredHistory(next, 'checkout', sourceView)
     this.typingRun = null
     if (next === this.history) {
       return appendTiming(this.createChange('none', []), 'session.checkout', start)
@@ -1161,11 +1178,153 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     return change
   }
 
+  private moveAuthoredHistory(
+    next: DocumentHistory,
+    kind: 'undo' | 'redo' | 'checkout',
+    sourceView: EditorViewSession | null,
+  ): DocumentSessionChange {
+    if (next === this.history) return this.createChange('none', [])
+    const previous = this.history
+    const from = editorHistoryPath(previous, previous.currentId)
+    const to = editorHistoryPath(previous, next.currentId)
+    let common = 0
+    while (common < from.length && from[common] === to[common]) common++
+    const changes = [
+      ...from
+        .slice(common)
+        .reverse()
+        .map((id) => ({
+          transaction: previous.nodes.get(id)!.transaction!.authored!,
+          active: false,
+        })),
+      ...to.slice(common).map((id) => ({
+        transaction: previous.nodes.get(id)!.transaction!.authored!,
+        active: true,
+      })),
+    ]
+    const snapshot = this.applyLocalEdits.history!.apply(changes)
+    const selectionEdge =
+      kind === 'undo'
+        ? previous.nodes.get(previous.currentId)!.transaction!.authored!
+        : next.nodes.get(next.currentId)!.transaction?.authored
+    const baselineEdge = previous.nodes.get(from[common]!)?.transaction?.authored
+    const identitySelections =
+      kind === 'undo' ? selectionEdge?.before : (selectionEdge?.after ?? baselineEdge?.before)
+    const selections = identitySelections
+      ? resolveIdentitySelections(snapshot, identitySelections)
+      : reconcileSelections(previous.current, snapshot, next.selections, [])
+    const edit = diffPieceTableSnapshots(previous.current, snapshot)
+    const edits = edit ? [edit] : []
+    this.history = replaceEditorHistoryState(next, snapshot, selections)
+    this.settleAuthoredHistory(snapshot)
+    this.typingRun = null
+    this.mapViewSelections(previous.current, snapshot, edits)
+    const transaction: DocumentTransaction = {
+      edits,
+      inverseEdits: invertTextEdits(previous.current, edits),
+      snapshotBefore: previous.current,
+      snapshotAfter: snapshot,
+      selectionBefore: previous.selections,
+      selectionAfter: selections,
+      metadata: ordinaryTransactionMetadata('history', kind),
+    }
+    return this.publish({
+      revision: {
+        edits,
+        logicalRevisionCount: 1,
+        logicalRevisionScope: null,
+        textChanged: edits.length > 0,
+      },
+      createChange: () => this.createChange(kind, edits, transaction),
+      sourceView,
+      updateSelections: true,
+      origin: kind === 'checkout' ? 'undo' : kind,
+    })
+  }
+
+  private settleAuthoredHistory(snapshot: PieceTableSnapshot): void {
+    const effects = this.applyLocalEdits.history?.settlement()
+    if (!effects) return
+    const active = new Map(effects.map(({ op, active }) => [operationKey(op), active]))
+    const nodes = new Map(this.history.nodes)
+    const parents = new Map<number, number>()
+    for (const node of editorHistoryNodes(this.history)) {
+      const edge = node.transaction?.authored
+      if (!edge || node.parentId === null) continue
+      const parentId = parents.get(node.parentId) ?? node.parentId
+      const edits = edge.edits.filter((id) => active.has(operationKey(id)))
+      if (edits.length === 0) {
+        parents.set(node.id, parentId)
+        nodes.delete(node.id)
+        continue
+      }
+      nodes.set(node.id, {
+        ...node,
+        parentId,
+        transaction: {
+          ...node.transaction!,
+          authored: {
+            ...edge,
+            id: edits[0]!,
+            edits,
+            before: repairIdentitySelections(snapshot, edge.before),
+            after: repairIdentitySelections(snapshot, edge.after),
+          },
+        },
+      })
+    }
+    const pathMatches = (id: number): boolean => {
+      const path = new Set(editorHistoryPath({ ...this.history, nodes }, id))
+      return [...nodes.values()].every(
+        (node) =>
+          !node.transaction?.authored ||
+          node.transaction.authored.edits.every(
+            (op) => active.get(operationKey(op)) === path.has(node.id),
+          ),
+      )
+    }
+    const current = parents.get(this.history.currentId) ?? this.history.currentId
+    const target = pathMatches(current)
+      ? current
+      : [...nodes.values()]
+          .toSorted((a, b) => b.visitedAt - a.visitedAt)
+          .find((node) => pathMatches(node.id))?.id
+    if (target === undefined)
+      throw new TypeError('author effects do not match a retained history path')
+    const restored = restoreEditorHistory(
+      [...nodes.values()].map((node) => ({
+        ...node,
+        preferredChildId:
+          node.preferredChildId !== null && nodes.has(node.preferredChildId)
+            ? node.preferredChildId
+            : null,
+      })),
+      { ...this.history, currentId: target },
+    )
+    this.history = { ...restored, graphRevision: this.history.graphRevision + 1 }
+  }
+
+  private mapViewSelections(
+    before: PieceTableSnapshot,
+    after: PieceTableSnapshot,
+    edits: readonly TextEdit[],
+  ): void {
+    for (const reference of bufferViews.get(this) ?? []) {
+      const view = reference.deref()
+      if (!view) {
+        bufferViews.get(this)?.delete(reference)
+        continue
+      }
+      view.acceptBufferSelections(reconcileSelections(before, after, view.getSelections(), edits))
+    }
+  }
+
   public clearHistory(sourceView: EditorViewSession | null = null): DocumentSessionChange {
     const start = nowMs()
     if (this.mutationLease || this.history.nodes.size === 1) {
       return appendTiming(this.createChange('none', []), 'session.clearHistory', start)
     }
+    this.applyLocalEdits.history?.seal()
     this.history = this.createHistory(this.history.current, this.history.selections)
     this.typingRun = null
     this.storageMaintenance.request(0, true)
@@ -1181,13 +1340,14 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
 
   public serializeHistory(): SerializedEditorHistory | null {
     if (this.history.nodes.size === 1) return null
-    return serializeDocumentHistory(this.history)
+    return serializeDocumentHistory(this.history, this.applyLocalEdits.history?.identity())
   }
 
   public restoreHistory(data: SerializedEditorHistory): boolean {
     if (this.mutationLease || this.currentBarrier || this.history.nodes.size !== 1) return false
     const restored = restoreDocumentHistory(data, this.history.current, {
       retainedStates: this.retainedHistoryStates,
+      authored: this.applyLocalEdits.history,
     })
     if (!restored) return false
 
@@ -1239,6 +1399,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
 
   public breakTypingRun(): void {
     this.typingRun = null
+    this.applyLocalEdits.history?.seal()
   }
 
   public subscribe(listener: EditorTextBufferChangeListener): () => void {
@@ -1811,7 +1972,10 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
       edits,
       options.metadata,
     )
-    if (options.history === 'record' && this.applyLocalEdits === applyBatchToPieceTable) {
+    if (
+      options.history === 'record' &&
+      (this.applyLocalEdits === applyBatchToPieceTable || this.applyLocalEdits.history)
+    ) {
       this.commitRecordedEdit(snapshot, selections, edits, options, transaction)
     } else {
       this.history = replaceEditorHistoryState(this.history, snapshot, selections)
@@ -1845,8 +2009,32 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
   ): void {
     const previous = this.history.undo?.transaction
     const kind = typingRunKind(options.metadata.intent)
+    if (
+      transaction.authored &&
+      previous?.authored &&
+      sameOperationGroup(transaction.authored, previous.authored)
+    ) {
+      this.history = amendEditorHistory(
+        this.history,
+        snapshot,
+        selections,
+        {
+          ...transaction,
+          snapshotBefore: previous.snapshotBefore,
+          selectionBefore: previous.selectionBefore,
+          authored: { ...transaction.authored, before: previous.authored.before },
+        },
+        { committedAt: this.now() },
+      )
+      return
+    }
 
-    if (kind && previous && this.shouldAmendTypingRun(kind, edits, transaction, previous)) {
+    if (
+      !transaction.authored &&
+      kind &&
+      previous &&
+      this.shouldAmendTypingRun(kind, edits, transaction, previous)
+    ) {
       this.history = amendEditorHistory(
         this.history,
         snapshot,
@@ -1902,7 +2090,17 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     edits: readonly TextEdit[],
     metadata: DocumentTransactionMetadata,
   ): DocumentTransaction {
+    const captured = this.applyLocalEdits.history?.capture()
     return {
+      ...(captured
+        ? {
+            authored: {
+              ...captured,
+              before: captureIdentitySelections(this.history.current, selectionBefore),
+              after: captureIdentitySelections(snapshot, selections),
+            },
+          }
+        : {}),
       edits,
       inverseEdits: invertTextEdits(this.history.current, edits),
       snapshotBefore: this.history.current,
@@ -3058,3 +3256,10 @@ function appendTiming(
     { name, durationMs: nowMs() - startMs },
   ])
 }
+
+function sameOperationGroup(left: AuthoredHistoryEdge, right: AuthoredHistoryEdge): boolean {
+  return left.id.actor === right.id.actor && left.id.seq === right.id.seq
+}
+
+const operationKey = (id: { readonly actor: string; readonly seq: number }): string =>
+  JSON.stringify([id.actor, id.seq])
