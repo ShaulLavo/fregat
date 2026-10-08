@@ -6,41 +6,59 @@ import { fileURLToPath } from 'node:url'
 import type { TestProject } from 'vitest/node'
 import { isolatedServerEnv } from '../../../../scripts/agent/isolated-server'
 import { fixtureReadiness } from '../../../../scripts/agent/fixture-readiness'
+import { isPortAvailable, selectAvailablePort } from '../../../../scripts/runtime-network'
 import { createScriptError } from '../../../../scripts/structured-errors'
 import { stopTerminalHost } from '../../../server/src/terminal-host/identity'
 import { DEFAULT_PROVIDER_INSTANCES } from '../../../server/src/provider/drivers/built-in'
 
-const launches = new Map<string, { users: number; ready: Promise<() => Promise<void>> }>()
-
-export default async function setupLayoutServers(project: TestProject) {
-  const peer = project.getProvidedContext().layoutPeerOrigin
-  let shared = launches.get(peer)
-  if (!shared) {
-    shared = { users: 0, ready: startLayoutServers(peer) }
-    launches.set(peer, shared)
-  }
-  shared.users += 1
-  const stop = await shared.ready
-  return async () => {
-    shared.users -= 1
-    if (shared.users > 0) return
-    launches.delete(peer)
-    await stop()
+declare module 'vitest' {
+  interface ProvidedContext {
+    layoutPeerOrigin: string
   }
 }
 
-async function startLayoutServers(peer: string) {
+type LayoutServers = { peer: string; stop: () => Promise<void> }
+const launches = new Map<string, { users: number; ready: Promise<LayoutServers> }>()
+
+export async function selectLayoutPeerOrigin(preferred: URL, primary: URL, web: URL) {
+  const port = await selectAvailablePort({
+    preferredPort: Number(preferred.port),
+    blockedPorts: [Number(primary.port), Number(web.port)],
+    isAvailable: (candidate) => isPortAvailable('127.0.0.1', candidate),
+  })
+  return new URL(`http://127.0.0.1:${port}`)
+}
+
+export default async function setupLayoutServers(
+  project: Pick<TestProject, 'getProvidedContext' | 'provide'>,
+) {
+  const peer = project.getProvidedContext().layoutPeerOrigin
   const primary = process.env.VITEST_BROWSER_FILE_SERVER_URL ?? 'http://127.0.0.1:33201'
+  let shared = launches.get(primary)
+  if (!shared) {
+    shared = { users: 0, ready: startLayoutServers(peer, primary) }
+    launches.set(primary, shared)
+  }
+  shared.users += 1
+  const servers = await shared.ready
+  project.provide('layoutPeerOrigin', servers.peer)
+  return async () => {
+    shared.users -= 1
+    if (shared.users > 0) return
+    launches.delete(primary)
+    await servers.stop()
+  }
+}
+
+export async function startLayoutServers(preferredPeer: string, primary: string) {
   const web = new URL(`http://127.0.0.1:${process.env.VITEST_BROWSER_PORT ?? '5179'}`)
   const stopPrimary = await startLayoutServer(new URL(primary), web, 'primary')
   try {
-    const stopPeer = await startLayoutServer(new URL(peer), web, 'peer')
-    return async () => {
-      try {
-        await stopPeer()
-      } finally {
-        await stopPrimary()
-      }
+    const peer = await selectLayoutPeerOrigin(new URL(preferredPeer), new URL(primary), web)
+    const stopPeer = await startLayoutServer(peer, web, 'peer')
+    return {
+      peer: peer.origin,
+      stop: () => stopLayoutPair(stopPeer, stopPrimary),
     }
   } catch (error) {
     await stopPrimary()
@@ -48,17 +66,16 @@ async function startLayoutServers(peer: string) {
   }
 }
 
+async function stopLayoutPair(stopPeer: () => Promise<void>, stopPrimary: () => Promise<void>) {
+  try {
+    await stopPeer()
+  } finally {
+    await stopPrimary()
+  }
+}
+
 async function startLayoutServer(origin: URL, web: URL, label: string) {
-  const answered = await fetch(new URL('/health', origin), {
-    headers: { origin: web.origin },
-  }).then(
-    () => true,
-    () => false,
-  )
-  if (answered)
-    throw createScriptError('Layout fixture port is already serving', {
-      internal: { port: origin.port },
-    })
+  await assertLayoutPortFree(origin)
   const directory = await mkdtemp(join(tmpdir(), `retention-layout-${label}-`))
   const home = join(directory, 'home')
   const root = join(directory, 'root')
@@ -151,6 +168,13 @@ async function startLayoutServer(origin: URL, web: URL, label: string) {
     await stop()
     throw error
   }
+}
+
+export async function assertLayoutPortFree(origin: URL) {
+  if (!(await isPortAvailable('127.0.0.1', Number(origin.port))))
+    throw createScriptError('Layout fixture port is occupied', {
+      internal: { port: Number(origin.port), hostname: '127.0.0.1', phase: 'before-spawn' },
+    })
 }
 
 const fixtureSource =
