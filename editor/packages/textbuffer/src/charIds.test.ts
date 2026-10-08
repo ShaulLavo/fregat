@@ -17,12 +17,15 @@ import {
   deleteByCharId,
   insertByCharId,
   locateCharId,
+  setCharIdVisibility,
 } from './charIds'
 import type { CharId } from './identityRuns'
 import { compactPieceTableTombstones } from './compaction'
 import { reclaimPieceTableText, reclaimSnapshotStorage } from './reclamation'
 import { validatePieceTreeInvariants } from './inspection'
 import { BUFFER_CHUNK_SIZE } from './buffers'
+import { retainCharIdPayloads } from './payloadRetention'
+import { ReclaimedTextError } from './textSpans'
 
 const id = (counter: number, bunch = 'seed:0'): CharId => ({ bunch, counter })
 const make = (text = 'abcd', transient = false) =>
@@ -515,3 +518,143 @@ it('normalizes exhausted split orders within one atomic replacement', () => {
   expect(locateCharId(changed, id(98))!.liveness).toBe('deleted')
   valid(changed)
 })
+
+it.each([false, true])(
+  'visibility edits revive retained payloads and IDs with transient=%s',
+  (transient) => {
+    const original = make('a😀\nbcdef', transient)
+    retainPieceTableSnapshot(original)
+    const hidden = deleteByCharId(original, [{ start: id(1), count: 7 }])
+    retainPieceTableSnapshot(hidden)
+    const revived = setCharIdVisibility(hidden, [
+      { start: id(2), count: 2, visible: true },
+      { start: id(5), count: 2, visible: true },
+      { start: id(0), count: 1, visible: false },
+    ])
+    expect(text(revived)).toBe('\ude00\ncd' + 'f')
+    expect(ids(revived)).toEqual([id(2), id(3), id(5), id(6), id(8)])
+    expect(text(original)).toBe('a😀\nbcdef')
+    expect(text(hidden)).toBe('af')
+    expect(revived.buffers).toBe(original.buffers)
+    valid(original)
+    valid(hidden)
+    valid(revived)
+  },
+)
+
+it('visibility batches validate all spans before touching transient storage', () => {
+  const original = make('abcdef', true)
+  const invalid = [
+    { start: id(0), count: 1, visible: false },
+    { start: id(99), count: 1, visible: true },
+  ]
+  expect(() => setCharIdVisibility(original, invalid)).toThrow('unknown')
+  expect(text(original)).toBe('abcdef')
+  valid(original)
+  expect(() =>
+    setCharIdVisibility(original, [
+      { start: id(1), count: 3, visible: false },
+      { start: id(2), count: 1, visible: true },
+    ]),
+  ).toThrow('overlapping')
+  expect(setCharIdVisibility(original, [{ start: id(0), count: 6, visible: true }])).toBe(original)
+})
+
+it.each([false, true])(
+  'seeded visibility flips preserve structure, payload and identities with transient=%s',
+  (transient) => {
+    const source = 'ab\nc😀def\nghij'.repeat(4)
+    let snapshot = make(source, transient)
+    const original = snapshot
+    retainPieceTableSnapshot(original)
+    const live = Array.from({ length: source.length }, () => true)
+    let random = 12345
+    for (let step = 0; step < 150; step++) {
+      random = (Math.imul(random, 1664525) + 1013904223) >>> 0
+      const from = random % source.length
+      const count = 1 + ((random >>> 8) % (source.length - from))
+      const visible = (random & 0x8000) !== 0
+      snapshot = setCharIdVisibility(snapshot, [{ start: id(from), count, visible }])
+      live.fill(visible, from, from + count)
+      expect(text(snapshot)).toBe(
+        source
+          .split('')
+          .filter((_, index) => live[index])
+          .join(''),
+      )
+      expect(ids(snapshot)).toEqual(live.flatMap((visible, index) => (visible ? [id(index)] : [])))
+      valid(snapshot)
+    }
+    expect(text(original)).toBe(source)
+    expect(snapshot.buffers).toBe(original.buffers)
+  },
+)
+
+function collectPayloads(snapshots: readonly ReturnType<typeof make>[]) {
+  const job = reclaimSnapshotStorage(snapshots)
+  let step = job.next()
+  while (!step.done) step = job.next()
+  return step.value
+}
+
+it.each([false, true])(
+  'expired revival rejects wholly reclaimed payloads atomically with transient=%s',
+  (transient) => {
+    const original = make('abcdef', transient)
+    retainPieceTableSnapshot(original)
+    const hidden = deleteByCharId(original, [{ start: id(0), count: 6 }])
+    expect(collectPayloads([original, hidden]).codeUnits).toBe(0)
+    expect(text(setCharIdVisibility(hidden, [{ start: id(0), count: 6, visible: true }]))).toBe(
+      'abcdef',
+    )
+    expect(collectPayloads([hidden]).codeUnits).toBe(6)
+    const epoch = hidden.buffers.lineage.epoch
+    expect(() => setCharIdVisibility(hidden, [{ start: id(0), count: 6, visible: true }])).toThrow(
+      'expired',
+    )
+    expect(hidden.buffers.lineage.epoch).toBe(epoch)
+    expect(text(hidden)).toBe('')
+    expect(locateCharId(hidden, id(3))!.liveness).toBe('deleted')
+  },
+)
+
+it.each([false, true])(
+  'expired revival checks sparse holes and rejects a complete batch with transient=%s',
+  (transient) => {
+    const original = make('abcdef', transient)
+    retainPieceTableSnapshot(original)
+    const hidden = deleteByCharId(original, [{ start: id(1), count: 3 }])
+    expect(collectPayloads([hidden]).codeUnits).toBe(3)
+    const epoch = hidden.buffers.lineage.epoch
+    expect(() => setCharIdVisibility(hidden, [{ start: id(0), count: 6, visible: true }])).toThrow(
+      'expired',
+    )
+    expect(() =>
+      setCharIdVisibility(hidden, [
+        { start: id(0), count: 1, visible: false },
+        { start: id(1), count: 3, visible: true },
+      ]),
+    ).toThrow('expired')
+    expect(text(hidden)).toBe('aef')
+    expect(hidden.buffers.lineage.epoch).toBe(epoch)
+    expect(locateCharId(hidden, id(0))!.liveness).toBe('live')
+    expect(locateCharId(hidden, id(2))!.liveness).toBe('deleted')
+  },
+)
+
+it.each([false, true])(
+  'payload roots retain only reachable hidden spans with transient=%s',
+  (transient) => {
+    const hidden = deleteByCharId(make('abcdef', transient), [{ start: id(1), count: 3 }])
+    retainCharIdPayloads(hidden, [{ start: id(1), count: 1 }])
+    const fork = reclaimPieceTableText(hidden)
+    expect(fork).not.toBe(hidden)
+    expect(text(setCharIdVisibility(fork, [{ start: id(1), count: 1, visible: true }]))).toBe(
+      'abef',
+    )
+    expect(() => setCharIdVisibility(fork, [{ start: id(2), count: 2, visible: true }])).toThrow(
+      ReclaimedTextError,
+    )
+    expect(text(hidden)).toBe('aef')
+  },
+)

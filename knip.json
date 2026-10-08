@@ -340,6 +340,10 @@
         "test/broker-process.ts"
       ],
       "project": ["src/**/*.ts", "server/**/*.ts", "examples/**/*.ts", "test/**/*.ts"]
+    },
+    "editor/site": {
+      "entry": ["src/examples/*.tsx"],
+      "ignoreDependencies": ["@singapore-editor/*", "satteri"]
     }
   },
   "ignore": ["editor/**/*.d.css.ts"],

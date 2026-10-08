@@ -3,6 +3,11 @@ export type EditId = { readonly actor: string; readonly seq: number }
 export type LeftOrigin = CharId | 'start'
 export type RightOrigin = CharId | 'end'
 export type IdSpan = { readonly start: CharId; readonly count: number }
+export type CharacterIdentity = {
+  readonly id: CharId
+  readonly deleted: boolean
+  readonly offset: number
+}
 export type Insert = {
   readonly start: CharId
   readonly originLeft: LeftOrigin
@@ -40,6 +45,8 @@ export type AuthorContext = Omit<Envelope, 'change'> & {
 /** Snapshots are immutable and reusable; the engine owns their representation. */
 export interface Engine<Snapshot = unknown> {
   text(): string
+  /** Diagnostic inventory sorted by bunch/counter; hidden IDs retain their visible gap. */
+  characters(): readonly CharacterIdentity[]
   /** Applies text edits and atomic effect states, retaining provenance in snapshots. */
   apply(envelope: Envelope): void
   /** Author against the current projection, reserve IDs once, and leave text unchanged. */

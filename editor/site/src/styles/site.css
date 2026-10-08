@@ -1,0 +1,13 @@
+/* Site-specific styling stays here while the landing page design is chosen. */
+.placeholder-home {
+  max-width: 48rem;
+  margin: 4rem auto;
+  padding: 1.5rem;
+  font-family: system-ui, sans-serif;
+}
+.live-editor {
+  display: flex;
+  flex-direction: column;
+  height: 20rem;
+  margin-block: 1.5rem;
+}

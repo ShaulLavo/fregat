@@ -1,0 +1,17 @@
+{
+  "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    "types": ["astro/client", "bun"],
+    "skipLibCheck": true
+  },
+  "include": [
+    ".astro/types.d.ts",
+    "astro.config.ts",
+    "vitest.browser.config.ts",
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "src/content.config.ts",
+    "src/env.d.ts"
+  ],
+  "exclude": ["dist"]
+}

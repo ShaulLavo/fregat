@@ -1,4 +1,8 @@
+import { createHmac, randomBytes } from 'node:crypto'
 import { defineErrorCatalog } from 'evlog'
+
+// A process-local key keeps predictable settings content from being guessed through logs.
+const revisionFingerprintKey = randomBytes(32)
 
 /**
  * Settings failures the client has to branch on.
@@ -112,6 +116,52 @@ export function rawRevisionStaleError(metadata: {
   return Object.assign(settingsErrors.RAW_REVISION_STALE({ target: metadata.target }), metadata)
 }
 
-export function settingsWriteContendedError(attempts: number, coordinatorWaitMs: number) {
-  return Object.assign(settingsErrors.WRITE_CONTENDED({}), { attempts, coordinatorWaitMs })
+export type SettingsRevisionMismatch = {
+  readonly source: 'settings' | 'secrets'
+  readonly expectedRevision: string | null
+  readonly observedRevision: string | null
+}
+
+export type SettingsWriteContentionContext = {
+  readonly reason:
+    | 'attempt-limit'
+    | 'time-budget'
+    | 'aborted'
+    | 'coordinator-held'
+    | 'revision-mismatch'
+    | 'prune-protected'
+  readonly attemptLimit: number | null
+  readonly budgetMs: number | null
+  readonly elapsedMs: number
+  readonly lastRevisionMismatch: SettingsRevisionMismatch | null
+}
+
+export function settingsWriteContendedError(
+  attempts: number,
+  coordinatorWaitMs: number,
+  context: SettingsWriteContentionContext,
+) {
+  return Object.assign(
+    settingsErrors.WRITE_CONTENDED({
+      internal: {
+        ...context,
+        attempts,
+        coordinatorWaitMs,
+        lastRevisionMismatch: context.lastRevisionMismatch
+          ? {
+              source: context.lastRevisionMismatch.source,
+              expectedRevision: revisionFingerprint(context.lastRevisionMismatch.expectedRevision),
+              observedRevision: revisionFingerprint(context.lastRevisionMismatch.observedRevision),
+            }
+          : null,
+      },
+    }),
+    { attempts, coordinatorWaitMs },
+  )
+}
+
+function revisionFingerprint(revision: string | null): string | null {
+  if (revision === null) return null
+
+  return createHmac('sha256', revisionFingerprintKey).update(revision).digest('hex').slice(0, 8)
 }

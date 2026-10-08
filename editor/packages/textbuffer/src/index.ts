@@ -60,6 +60,8 @@ export {
 export type { CreatePieceTableSnapshotOptions } from './snapshot'
 export type { PieceTableBufferOptions } from './buffers'
 export { snapBatchEditRanges } from './edits'
+export { retainCharIdPayloads } from './payloadRetention'
+export { ReclaimedTextError } from './textSpans'
 
 export {
   CharIdAllocator,
@@ -69,6 +71,7 @@ export {
   deleteByCharId,
   insertByCharId,
   locateCharId,
+  setCharIdVisibility,
 } from './charIds'
 export type {
   CharId,
@@ -77,4 +80,5 @@ export type {
   CharIdBoundary,
   CharIdInsertion,
   CharIdEdit,
+  CharIdVisibility,
 } from './charIds'
