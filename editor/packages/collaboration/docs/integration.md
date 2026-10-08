@@ -365,7 +365,7 @@ const roomCrypto = await RoomCrypto.create(room, session.peer, invitationSecret)
 const signaling = new WebSocketSignaling({
   urls: config.signalingUrls,
   room,
-  credentials: { protocols: config.webSocketProtocols },
+  credentials: { protocols: config.supplySignalingCredentials },
   reconnectInterval: config.signalingReconnectInterval,
   onError,
 })
@@ -485,7 +485,7 @@ unchanged. Publish traffic consumes the frame/byte budget and refreshes the idle
 The example reads `member token` lines from a private admission file. Each member
 gets a unique random token, compared in constant time; a successful check returns
 that configured member identity. The example rejects shared-token files and duplicate
-members or tokens at startup. It requires the token as a WebSocket subprotocol credential. `WebSocketSignaling` also offers
+members or tokens at startup. It requires the token as a WebSocket subprotocol credential. `WebSocketSignaling` requests admission credentials from its abortable supplier before each initial connection and reconnect. It also offers
 the public `singapore-collaboration` protocol, which is the only protocol the broker
 selects in its response. Custom clients offering credentials must include that public
 protocol. The broker refuses credential-only upgrades. Keep TLS enabled and scrub

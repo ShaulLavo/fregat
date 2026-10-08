@@ -205,10 +205,10 @@
     {
       "api": "setTimeout",
       "file": "packages/collaboration/src/signaling.ts",
-      "id": "packages/collaboration/src/signaling.ts:setTimeout:2fa18ecddb",
+      "id": "packages/collaboration/src/signaling.ts:setTimeout:de990fade1",
       "justification": "Remote broker readiness has no notification; one retry per URL spaces reconnect attempts, connect checks closed, and close clears every pending retry.",
-      "line": 90,
-      "snippet": "setTimeout(() => this.connect(url), this.options.reconnectInterval),"
+      "line": 114,
+      "snippet": "setTimeout(() => void this.connect(url), this.options.reconnectInterval),"
     },
     {
       "api": "setInterval",

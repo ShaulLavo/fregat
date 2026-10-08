@@ -10,6 +10,7 @@ import {
   layerAllowsScope,
   resolveSettings,
   SETTING_IDS,
+  type CollaborationSecretRef,
   type SettingId,
   type SettingsDiagnostic,
   type SettingsEvent,
@@ -286,7 +287,7 @@ export class SettingsStore {
     return this.nonEmptySecretRefs.has(ref)
   }
 
-  async readSecret(ref: ServerSecretRef): Promise<string | null> {
+  async readSecret(ref: ServerSecretRef | CollaborationSecretRef): Promise<string | null> {
     this.assertOperational()
     return (await this.secretStore.read()).get(ref) ?? null
   }

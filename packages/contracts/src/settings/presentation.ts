@@ -361,6 +361,26 @@ export const SETTINGS_PRESENTATION = {
     widget: 'string',
     category: 'Editor',
   },
+  'editor.collaboration.signalingUrls': {
+    widget: 'list',
+    category: 'Editor',
+  },
+  'editor.collaboration.iceServers': {
+    widget: 'complex',
+    category: 'Editor',
+  },
+  'editor.collaboration.transportPolicy': {
+    widget: 'enum',
+    category: 'Editor',
+  },
+  'editor.collaboration.displayName': {
+    widget: 'string',
+    category: 'Editor',
+  },
+  'editor.collaboration.colour': {
+    widget: 'string',
+    category: 'Editor',
+  },
   'editor.largeFile.analysisLimitMiCodeUnits': {
     widget: 'number',
     category: 'Editor',

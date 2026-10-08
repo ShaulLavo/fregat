@@ -86,6 +86,16 @@ sourceTest('identifies a missing workspace package and a missing generated asset
   expect(() => readDevSources(web)).toThrow('Run bun install at the repository root.')
 })
 
+sourceTest('leaves Bun-only editor exports out of browser aliases', ({ web }) => {
+  const file = path.join(web, 'node_modules/@singapore-editor/core/package.json')
+  const manifest = JSON.parse(fs.readFileSync(file, 'utf8'))
+  manifest.exports['./server'] = { types: './server/signaling.ts', bun: './server/signaling.ts' }
+  fs.writeFileSync(file, JSON.stringify(manifest))
+  const paths = sourcePaths(readDevSources(web))
+  expect(paths['@singapore-editor/core']).toBeDefined()
+  expect(paths['@singapore-editor/core/server']).toBeUndefined()
+})
+
 function writeFile(root: string, relative: string, content = '') {
   const file = path.join(root, relative)
   fs.mkdirSync(path.dirname(file), { recursive: true })
