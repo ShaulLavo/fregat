@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { InstanceByteRange } from './types.js'
-import { planUploadRanges } from './upload-ranges.js'
+import { planSparseUploadRanges, planUploadRanges } from './upload-ranges.js'
 
 const empty = { byteOffset: 0, byteLength: 0 }
 
@@ -82,5 +82,33 @@ describe('bounding upload ranges', () => {
     planUploadRanges([update(range(0, 256))])
     expect(first).toEqual({ cell: [range(0, 128)], glyph: [] })
     expect(input).toEqual([update(range(0, 64)), update(range(64, 64))])
+  })
+})
+
+describe('sparse WebGPU upload ranges', () => {
+  it('merges touching and overlapping records while preserving resident gaps', () => {
+    const input = Object.freeze([
+      Object.freeze(update(Object.freeze(range(320, 64)), Object.freeze(range(384, 96)))),
+      Object.freeze(update(Object.freeze(range(64, 128)), Object.freeze(range(192, 96)))),
+      Object.freeze(update(Object.freeze(range(0, 128)))),
+      Object.freeze(update(Object.freeze(range(192, 64)))),
+      Object.freeze(update(empty, range(4096, 0))),
+    ])
+    expect(planSparseUploadRanges(input)).toEqual({
+      cell: [range(0, 256), range(320, 64)],
+      glyph: [range(192, 96), range(384, 96)],
+    })
+    expect(planUploadRanges(input)).toEqual({ cell: [range(0, 384)], glyph: [range(192, 288)] })
+    expect(input[0]!.cell).toEqual(range(320, 64))
+  })
+
+  it('preserves empty moves, four-byte erasures and independent plans', () => {
+    expect(planSparseUploadRanges([update()])).toEqual({ cell: [], glyph: [] })
+    const first = planSparseUploadRanges([
+      update(range(4, 4), range(12, 4)),
+      update(range(20, 4), range(16, 4)),
+    ])
+    planSparseUploadRanges([update(range(0, 256), range(0, 384))])
+    expect(first).toEqual({ cell: [range(4, 4), range(20, 4)], glyph: [range(12, 8)] })
   })
 })

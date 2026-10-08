@@ -84,6 +84,57 @@ function expectNativeRecords(frame: ZigFrameBuilder): void {
 }
 
 describe('WASM frame records', () => {
+  it('reports every logical row moved by a physical instance ring', async () => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('\x1b[?25la0\r\na1\r\na2\r\na3')
+    state.update()
+    builder = state.createFrameBuilder(24, 4)
+    readyFrame({ ...options, stableRows: true })
+    state.acknowledge()
+    terminal.write('\r\na0')
+    state.update()
+    readyFrame({ ...options, stableRows: true, full: false })
+    expect(builder.rowOffset).toBe(1)
+    expect(builder.changedRanges().map((range) => range.row)).toEqual([0, 1, 2, 3])
+    expect(
+      builder
+        .changedRanges()
+        .slice(0, 3)
+        .every((range) => range.cell.byteLength === 0 && range.glyph.byteLength === 0),
+    ).toBe(true)
+    expect(builder.changedRanges().at(-1)?.glyph.byteOffset).toBe(0)
+  })
+
+  it('rebuilds all records when a replacement device changes the physical row layout', async () => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('\x1b[?25la0\r\na1\r\na2\r\na3')
+    state.update()
+    builder = state.createFrameBuilder(24, 4)
+    readyFrame({ ...options, stableRows: true })
+    state.acknowledge()
+    terminal.write('\r\na0')
+    state.update()
+    readyFrame({ ...options, stableRows: true, full: false })
+    expect(builder.rowOffset).toBe(1)
+    readyFrame({ ...options, stableRows: false, full: false })
+    expect(builder.rowOffset).toBe(0)
+    const cells = builder.cellData.slice()
+    const glyphs = builder.glyphData.slice()
+    readyFrame(options)
+    expect(builder.cellData).toEqual(cells)
+    expect(builder.glyphData).toEqual(glyphs)
+    readyFrame({ ...options, stableRows: true, full: false })
+    const physicalCells = builder.cellData.slice()
+    const physicalGlyphs = builder.glyphData.slice()
+    readyFrame({ ...options, stableRows: true })
+    expect(builder.cellData).toEqual(physicalCells)
+    expect(builder.glyphData).toEqual(physicalGlyphs)
+  })
+
   it('retains each cached row’s appearance across an unchanged partial build', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
