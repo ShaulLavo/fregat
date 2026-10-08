@@ -155,7 +155,7 @@ Qualification work in progress, 2026-10-08:
 ### Phase 1: Remove the largest single-worker cost
 
 - [ ] Profile the dominant phase. Split query engine, predicates, materialization and normalization when the coarse phase bundles them.
-- [ ] Take one candidate at a time, preserve canonical output, and retain before/after traces and counter deltas.
+- [x] Retain the first correctness- and counter-backed candidate with unqualified timing, canonical output and all traces. Continue one candidate at a time toward M1.
 - [ ] Implement tree-sitter-x improvements in that repository, test its bindings/native correctness, then pin the reviewed package artifact in Fregat. Other changes stay in their owning Singapore package. Normal package patch changesets apply to future package-code PRs.
 - [ ] Meet M1 or record the next bounded experiment with a measured ceiling. Delete rejected experiments.
 
