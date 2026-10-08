@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { beforeAll, beforeEach, expect, test } from 'vitest'
 import { startSignalingServer, type SignalingServerOptions } from '../server/signaling'
 import { probe, type BrokerProbe } from './broker-probe'
 
@@ -17,6 +17,25 @@ const options = {
     bytesPerSecond: 2 * 1024 * 1024,
   },
 }
+
+let distinctLoopback = true
+beforeAll(async () => {
+  const server = startSignalingServer(options)
+  try {
+    const client = await probe(server.port!, '127.0.0.2')
+    client.socket.destroy()
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'EADDRNOTAVAIL')
+      distinctLoopback = false
+    else throw error
+  } finally {
+    await server.stop(true)
+  }
+})
+beforeEach((context) => {
+  if (!distinctLoopback && !context.task.name.startsWith('invalid '))
+    context.skip('This host cannot bind distinct 127.0.0.x client addresses')
+})
 
 async function subscribe(client: BrokerProbe, topic = crypto.randomUUID()) {
   client.send({ type: 'subscribe', topic })
