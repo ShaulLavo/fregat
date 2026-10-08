@@ -1,5 +1,6 @@
 import { isCancelledError, QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, vi } from 'vitest'
+import { createError } from 'evlog'
 
 import { expect, test } from '../../../test/fixtures'
 import { reportClientError } from '@/lib/client-error-reporting'
@@ -333,4 +334,21 @@ test('genuine query errors named like cancellation still produce a report and to
   ])
   expect(toastError).toHaveBeenCalledOnce()
   client.clear()
+})
+
+test('reports internal context through the shared sanitizer', () => {
+  const failure = createError({
+    message: 'Synthetic failure',
+    internal: { observed: 'stopped', token: 'PRIVATE_TOKEN' },
+  })
+  reportClientError({
+    area: 'test',
+    cause: failure,
+    message: 'Synthetic failure',
+    operation: 'test.failure',
+  })
+  expect(emittedEvents[0]?.event.cause).toMatchObject({
+    internal: { observed: 'stopped', token: '[redacted]' },
+  })
+  expect(JSON.stringify(emittedEvents)).not.toContain('PRIVATE_TOKEN')
 })

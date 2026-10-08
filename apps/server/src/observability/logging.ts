@@ -8,6 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 
 import { errorStringField, errorSummary, type ErrorSummaryOptions } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
+import { errorInternalContext } from '@workspace/observability/sanitize'
 import type { RequestLogger } from 'evlog'
 import { useLogger as getRequestLogger } from 'evlog/elysia'
 
@@ -142,7 +143,11 @@ const operatorSummaryOptions: ErrorSummaryOptions = {
 
 /** Contracts' `errorSummary` for server logs: adds `fix` and `why`, and keeps each string's tail. */
 export function operatorErrorSummary(error: unknown) {
-  return errorSummary(error, operatorSummaryOptions)
+  const internal = safeErrorInternal(error)
+  return {
+    ...errorSummary(error, operatorSummaryOptions),
+    ...(internal === undefined ? {} : { internal }),
+  }
 }
 
 export function limitText(value: string, maxLength: number) {
@@ -207,6 +212,7 @@ function sanitizedErrorForLogger(error: Error) {
   const cause = errorCause(error)
   const clone = createStructuredError({
     code: errorStringField(error, 'code'),
+    internal: safeErrorInternal(error, new WeakSet([error])),
     message: error.message,
   })
   clone.name = error.name
@@ -237,6 +243,8 @@ function sanitizeErrorObject(error: Error, seen: WeakSet<object>) {
     message: sanitizeErrorMessage(error.message),
     name: error.name,
   }
+  const internal = safeErrorInternal(error, seen)
+  if (internal !== undefined) summary.internal = internal
   copySafeErrorFields(error, summary, seen)
   if (cause !== undefined) summary.cause = sanitizeErrorCause(cause, seen)
 
@@ -261,11 +269,19 @@ function copySafeErrorFields(
   seen = new WeakSet<object>(),
 ) {
   for (const [key, value] of Object.entries(source)) {
-    if (key === 'cause') continue
+    if (key === 'cause' || key === 'internal') continue
     target[key] = sensitiveErrorFields.has(key)
       ? redactedDiagnosticValue
       : sanitizeErrorCause(value, seen)
   }
+}
+
+function safeErrorInternal(error: unknown, seen = new WeakSet<object>()) {
+  const internal = errorInternalContext(error)
+  if (internal === undefined) return undefined
+
+  seen.add(internal)
+  return sanitizeRecord(internal, seen)
 }
 
 function errorCause(error: Error) {

@@ -63,6 +63,13 @@ export function createRecordSanitizer(policy: DiagnosticPolicy) {
     sanitizeFields(record, 0, { ...resolved, seen: new WeakSet() })
 }
 
+export function errorInternalContext(error: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(error)) return undefined
+
+  const internal = error.internal
+  return isRecord(internal) ? internal : undefined
+}
+
 export function sanitizeRecord(record: Record<string, unknown>) {
   return sanitizeFields(record, 0, { ...logPolicy, seen: new WeakSet() })
 }
@@ -115,12 +122,18 @@ function sanitizeError(error: Error, depth: number, walk: Walk) {
   if (walk.seen.has(error)) return '[circular]'
 
   walk.seen.add(error)
-  const safe = {
+  const internal = errorInternalContext(error)
+  const safe: Record<string, unknown> = {
     cause: sanitizeDiagnosticValue(error.cause, depth + 1, walk),
     message: walk.policy.formatString(error.message),
     name: error.name,
     ...(walk.sensitiveFields.has('stack') ? {} : { stack: error.stack }),
     ...walk.policy.errorFields?.(error),
+  }
+  if (internal !== undefined) {
+    safe.internal = walk.sensitiveFields.has('internal')
+      ? redactedDiagnosticValue
+      : sanitizeDiagnosticValue(internal, depth + 1, walk)
   }
   walk.seen.delete(error)
   return safe

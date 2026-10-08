@@ -106,3 +106,20 @@ test('log sanitization retains non-enumerable internal context and sanitizes it 
   expect(failure.internal).toBe(internal)
   expect(JSON.stringify(failure)).not.toContain('internal')
 })
+
+test('internal context obeys the diagnostic policy limits and sensitive fields', () => {
+  const failure = createError({
+    message: 'Synthetic failure',
+    internal: { state: { observed: 'stopped' }, token: 'PRIVATE_TOKEN' },
+  })
+  const bounded = createDiagnosticSanitizer({
+    formatString: (value) => value,
+    limits: { maxArrayItems: 2, maxDepth: 1, maxObjectKeys: 2 },
+  })
+  const privateContext = createDiagnosticSanitizer({
+    formatString: (value) => value,
+    extraSensitiveFields: ['internal'],
+  })
+  expect(bounded(failure)).toMatchObject({ internal: '[truncated]' })
+  expect(privateContext(failure)).toMatchObject({ internal: '[redacted]' })
+})
