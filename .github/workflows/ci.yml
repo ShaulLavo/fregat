@@ -453,6 +453,8 @@ jobs:
           browsers: chromium
       - name: Test Singapore editor history restoration
         run: bun run --cwd editor/site test:browser
+      - name: Check landing page focus, contrast and motion controls
+        run: bun run --cwd apps/site verify:a11y
       - name: Build ghostty site
         run: bun run --cwd ghostty-webgpu/site build --base /${{ github.event.repository.name }}/ghostty-webgpu/
 

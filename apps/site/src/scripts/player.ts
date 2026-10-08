@@ -1,6 +1,7 @@
 // Scripted replica player. An element marked data-at="n" appears at step n; data-until="n" hides
 // it from step n on. data-timeline on .rep lists the times (ms) of steps 1..N. Reduced motion and
 // a press on the replica jump to the final step; the story pauses off-screen and in hidden tabs.
+// A [data-motion-for] button pauses, resumes and replays its plate; an ended plate stops moving.
 const reduce = matchMedia('(prefers-reduced-motion: reduce)')
 
 for (const stage of document.querySelectorAll<HTMLElement>('[data-replica]')) setup(stage)
@@ -28,6 +29,7 @@ function setup(stage: HTMLElement): void {
   let step = 0
   let timer = 0
   let visible = false
+  let held = false
   let elapsedAt = 0
   let clock = 0
 
@@ -49,6 +51,10 @@ function setup(stage: HTMLElement): void {
     element.textContent = ''
     element.classList.add('caret')
     const tick = (): void => {
+      if (rep!.classList.contains('paused')) {
+        setTimeout(tick, 30)
+        return
+      }
       shown += Math.max(1, Math.round(text.length / (duration / 30)))
       element.textContent = text.slice(0, shown)
       if (shown < text.length) {
@@ -99,15 +105,22 @@ function setup(stage: HTMLElement): void {
     }
     if (pointer && next >= last) pointer.style.opacity = '0'
     rep!.classList.toggle('settled', next >= last)
+    render()
+  }
+
+  function running(): boolean {
+    return visible && !document.hidden && !held
   }
 
   function schedule(): void {
     clearTimeout(timer)
-    if (!visible || document.hidden || step >= last) return
+    timer = 0
+    if (!running() || step >= last) return
     const due = (times[step] ?? 0) - clock
     elapsedAt = performance.now()
     timer = window.setTimeout(
       () => {
+        timer = 0
         clock = times[step] ?? clock
         apply(step + 1, true)
         schedule()
@@ -116,31 +129,38 @@ function setup(stage: HTMLElement): void {
     )
   }
 
-  function pause(): void {
-    if (!timer) return
+  function halt(): void {
+    if (timer) clock += performance.now() - elapsedAt
     clearTimeout(timer)
     timer = 0
-    clock += performance.now() - elapsedAt
     rep!.classList.add('paused')
+    render()
   }
 
-  function resume(): void {
+  function proceed(): void {
+    if (!running()) return
     rep!.classList.remove('paused')
+    render()
     schedule()
   }
 
   function end(): void {
     clearTimeout(timer)
     timer = 0
+    held = false
+    rep!.classList.remove('paused')
     apply(last, false)
   }
 
   function replay(): void {
     clearTimeout(timer)
+    timer = 0
+    held = false
     for (const element of rep!.querySelectorAll<HTMLElement>('[data-full]')) {
       element.textContent = element.dataset.full ?? ''
     }
     clock = 0
+    rep!.classList.remove('paused')
     apply(0, false)
     if (reduce.matches) {
       end()
@@ -149,26 +169,39 @@ function setup(stage: HTMLElement): void {
     schedule()
   }
 
+  function toggle(): void {
+    if (step >= last) return replay()
+    held = !held
+    if (held) halt()
+    else proceed()
+  }
+
+  function render(): void {
+    for (const button of buttons) {
+      button.hidden = reduce.matches
+      button.textContent = step >= last ? 'Replay' : held ? 'Play' : 'Pause'
+    }
+  }
+
+  const buttons = document.querySelectorAll<HTMLButtonElement>(`[data-motion-for="${stage.id}"]`)
+  for (const button of buttons) button.addEventListener('click', toggle)
   fit()
   new ResizeObserver(fit).observe(stage)
   apply(0, false)
   if (reduce.matches) end()
 
   rep.addEventListener('pointerdown', end)
-  for (const button of document.querySelectorAll(`[data-replay-for="${stage.id}"]`)) {
-    button.addEventListener('click', replay)
-  }
   new IntersectionObserver(
     ([entry]) => {
       visible = entry?.isIntersecting ?? false
       if (reduce.matches) return
-      if (visible) resume()
-      else pause()
+      if (visible) proceed()
+      else halt()
     },
     { threshold: 0.25 },
   ).observe(stage)
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) pause()
-    else if (visible) resume()
+    if (document.hidden) halt()
+    else proceed()
   })
 }

@@ -76,7 +76,7 @@ const ogImage = new URL(`${base}og.jpg`, Astro.site)
             their tests. Shown in the {hero.name} bundle: its palette, code theme, winding-road wallpaper
             and glass.</span
           >
-          <button type="button" data-replay-for="hero">Replay</button>
+          <button type="button" data-motion-for="hero" aria-controls="hero">Pause</button>
         </figcaption>
       </figure>
 
@@ -90,7 +90,10 @@ const ogImage = new URL(`${base}og.jpg`, Astro.site)
         </div>
         <div>
           <Plate id="s-review" bundle="rose-pine" replica="review" />
-          <div class="plate-cap"><span>Rosé Pine bundle, sunset-lake wallpaper.</span></div>
+          <div class="plate-cap">
+            <span>Rosé Pine bundle, sunset-lake wallpaper.</span>
+            <button type="button" data-motion-for="s-review" aria-controls="s-review">Pause</button>
+          </div>
         </div>
       </section>
 
@@ -106,7 +109,10 @@ const ogImage = new URL(`${base}og.jpg`, Astro.site)
         </div>
         <div>
           <Plate id="s-update" bundle="sage" replica="update" />
-          <div class="plate-cap"><span>Sage bundle, fern wallpaper.</span></div>
+          <div class="plate-cap">
+            <span>Sage bundle, fern wallpaper.</span>
+            <button type="button" data-motion-for="s-update" aria-controls="s-update">Pause</button>
+          </div>
         </div>
       </section>
 
@@ -120,7 +126,10 @@ const ogImage = new URL(`${base}og.jpg`, Astro.site)
         </div>
         <div>
           <Plate id="s-undo" bundle="catppuccin" replica="undo" />
-          <div class="plate-cap"><span>Catppuccin bundle, waves wallpaper.</span></div>
+          <div class="plate-cap">
+            <span>Catppuccin bundle, waves wallpaper.</span>
+            <button type="button" data-motion-for="s-undo" aria-controls="s-undo">Pause</button>
+          </div>
         </div>
       </section>
 
@@ -134,7 +143,10 @@ const ogImage = new URL(`${base}og.jpg`, Astro.site)
         </div>
         <div>
           <Plate id="s-agents" bundle="graphite" replica="agents" />
-          <div class="plate-cap"><span>Graphite bundle, layers wallpaper.</span></div>
+          <div class="plate-cap">
+            <span>Graphite bundle, layers wallpaper.</span>
+            <button type="button" data-motion-for="s-agents" aria-controls="s-agents">Pause</button>
+          </div>
         </div>
       </section>
 

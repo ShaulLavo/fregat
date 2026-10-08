@@ -9,7 +9,8 @@
     "typecheck": "astro check",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
-    "format:check": "oxfmt --check ."
+    "format:check": "oxfmt --check .",
+    "verify:a11y": "bun scripts/verify-a11y.ts"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
@@ -22,6 +23,7 @@
     "@astrojs/check": "^0.9.10",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
+    "playwright": "catalog:",
     "sharp": "^0.35.4",
     "typescript": "npm:typescript@6.0.3"
   }

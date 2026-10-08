@@ -97,6 +97,7 @@
         "@astrojs/check": "^0.9.10",
         "oxfmt": "catalog:",
         "oxlint": "catalog:",
+        "playwright": "catalog:",
         "sharp": "^0.35.4",
         "typescript": "npm:typescript@6.0.3",
       },

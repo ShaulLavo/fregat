@@ -841,7 +841,13 @@ svg.i.sm {
     transition: none !important;
   }
 }
-.rep.paused * {
+/* An ended story holds still: no blinking cursors or pulsing status squares. */
+.rep.settled *,
+.rep.settled *::after {
+  animation: none !important;
+}
+.rep.paused *,
+.rep.paused *::after {
   animation-play-state: paused !important;
 }
 
