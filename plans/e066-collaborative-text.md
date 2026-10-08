@@ -154,9 +154,11 @@ Types' and Fugue's test suites. The research settles the rest:
   budget (#1010: 100 pending edits on 100,000 lines from ~75 ms to under 1 ms, experiment);
   editor binding (#1026).
 - Reconcile takes the exact edits as input; there is no character-diff fallback (#963 review).
-- Step 5 is delivered for author-selective undo with deletion provenance and `setEffects`
-  (#971, #993). The E017 branching graph driving collaborative undo, ID-gap selections and
-  identity-keyed E018 persistence remain.
+- Step 5 is delivered: author-selective undo with deletion provenance and `setEffects`
+  (#971, #993), driven by the E017 branching graph with the E019 viewer, character-ID-gap
+  selections and E018 persistence keyed by document identity (#1078).
+- All seven steps are delivered. Open follow-ups: the host-free upgrade gate below, identity
+  compaction for long sessions, and Fregat's server as host (Delta DB).
 
 ## Risks and decisions
 
