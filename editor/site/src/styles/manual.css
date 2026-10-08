@@ -488,6 +488,15 @@ body[data-mode='editor'] .pane {
   .search-open kbd {
     display: none;
   }
+  /* The summary sits mid-header, so the list spans the screen below it. */
+  .menu nav {
+    position: fixed;
+    top: calc(var(--hh) - 4px);
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: none;
+  }
   .pathrow {
     padding-left: var(--gw);
     width: 100%;
