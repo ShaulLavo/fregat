@@ -117,6 +117,13 @@ fn writeOpaque(destination: *[4]u8, rgba: u32) void {
     destination[3] = 255;
 }
 
+noinline fn blendOpaque(destination: *[4]u8, rgba: u32, alpha: u32, inverse: u32) void {
+    for (0..3) |c| {
+        const channel = (rgba >> @as(u5, @intCast(c * 8))) & 255;
+        destination[c] = @intCast(divide255(channel * alpha + @as(u32, destination[c]) * inverse));
+    }
+}
+
 fn blendScalar(destination: *[4]u8, rgba: u32, alpha: u32, ad: u32, inverse: u32, denominator: u32) void {
     for (0..3) |c| {
         const channel = (rgba >> @as(u5, @intCast(c * 8))) & 255;
@@ -147,6 +154,7 @@ fn over(destination: *[4]u8, rgba: u32, alpha: u32) void {
     if (alpha == 255) return writeOpaque(destination, rgba);
     const ad: u32 = destination[3];
     const inverse = 255 - alpha;
+    if (ad == 255) return blendOpaque(destination, rgba, alpha, inverse);
     const denominator = alpha * 255 + ad * inverse;
     if (comptime simd) return blendSimd(destination, rgba, alpha, ad, inverse, denominator);
     blendScalar(destination, rgba, alpha, ad, inverse, denominator);
