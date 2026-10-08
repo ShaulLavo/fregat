@@ -266,6 +266,8 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private readonly emitters = createHostEmitters()
   private fit?: TerminalFitController
   private fittedFont?: TerminalFittedFont
+  private preeditFont?: TerminalFittedFont
+  private preeditTheme?: TerminalRendererTheme
   private workerCanvasSize?: {
     readonly canvas: HTMLCanvasElement
     readonly width: number
@@ -975,8 +977,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     )
     this.fittedFont = font
     this.execution.commitLayout(font, elements.padding)
-    const compositionView = elements.compositionView
-    if (compositionView) applyPreeditAppearance(compositionView, font, appearance.rendererTheme)
+    this.updatePreeditAppearance(font, appearance.rendererTheme)
     return this.execution.createRenderer(
       this.rendererFactory,
       {
@@ -1017,8 +1018,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     )
     this.fittedFont = font
     this.execution.commitLayout(font, elements.padding)
-    const compositionView = elements.compositionView
-    if (compositionView) applyPreeditAppearance(compositionView, font, appearance.rendererTheme)
+    this.updatePreeditAppearance(font, appearance.rendererTheme)
     this.renderer?.setCursorBlinkEnabled(appearance.cursor.blink)
     this.renderer?.setFont(font)
     this.renderer?.setTheme(appearance.rendererTheme)
@@ -1641,7 +1641,10 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   ): void {
     const compositionView = this.elementsValue?.compositionView
     if (!compositionView || !font) return
+    if (font === this.preeditFont && theme === this.preeditTheme) return
     applyPreeditAppearance(compositionView, font, theme)
+    this.preeditFont = font
+    this.preeditTheme = theme
   }
 
   private reportError(cause: unknown, operation: string): void {
