@@ -127,7 +127,9 @@
     },
     ".": {
       "ignoreDependencies": ["typescript-api"],
-      "vitest": { "config": ["vitest.scripts.config.mjs"] }
+      "vitest": {
+        "config": ["vitest.scripts.config.mjs"]
+      }
     },
     "apps/tui": {
       "entry": [
@@ -327,6 +329,17 @@
     "ghostty-webgpu/site": {
       "entry": ["src/main.ts", "scripts/*.ts"],
       "project": ["src/**/*.{ts,astro}", "scripts/**/*.ts"]
+    },
+    "editor/packages/collaboration": {
+      "entry": [
+        "src/index.ts",
+        "src/transports.ts",
+        "server/signaling.ts",
+        "examples/signaling-server.ts",
+        "test/peer.html",
+        "test/broker-process.ts"
+      ],
+      "project": ["src/**/*.ts", "server/**/*.ts", "examples/**/*.ts", "test/**/*.ts"]
     }
   },
   "ignore": ["editor/**/*.d.css.ts"],
