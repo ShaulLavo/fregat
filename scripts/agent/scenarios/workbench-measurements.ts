@@ -61,18 +61,6 @@ export const workbenchMeasurements: Scenario = {
     })
     await installCaptureTerminalNamespace(page, prefix)
     await page.addInitScript((queries) => {
-      // Vite pages need a release identity for the isolated server's update control.
-      document.addEventListener(
-        'DOMContentLoaded',
-        () => {
-          if (document.querySelector('meta[name="platform-release"]')) return
-          const meta = document.createElement('meta')
-          meta.name = 'platform-release'
-          meta.content = 'initial-release'
-          document.head.append(meta)
-        },
-        { once: true },
-      )
       const state = { workspaceMs: null as number | null, terminalMs: null as number | null }
       Object.assign(window, { workbenchPaint: state })
       let workspaceSeen = false
