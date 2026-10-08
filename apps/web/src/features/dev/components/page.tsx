@@ -1,3 +1,4 @@
+import { OverlaysTab } from '@/features/dev/components/overlays-tab'
 import { BAR_TAB_STRIP_CLASS, barTabClassName } from '@workspace/ui/patterns/bar-tabs'
 import { LoadersTab } from '@/features/dev/components/loaders-tab'
 import { PhysicalTab } from '@/features/dev/components/physical-tab'
@@ -31,6 +32,7 @@ export function DevPage() {
       <main className='bg-content-well min-h-0 flex-1 overflow-auto'>
         {active === 'loaders' && <LoadersTab />}
         {active === 'physical' && <PhysicalTab />}
+        {active === 'overlays' && <OverlaysTab />}
         {active === 'shortcuts' && <ShortcutsTab />}
         {active === 'handles' && <HandlesTab />}
         {active === 'icons' && <IconsTab />}

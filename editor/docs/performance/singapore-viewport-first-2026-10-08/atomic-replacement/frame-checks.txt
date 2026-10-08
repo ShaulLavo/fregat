@@ -1,0 +1,94 @@
+[wave-heavy] 'viewport convergence generation correction' is waiting: 6 job(s) ahead in the queue
+[wave-heavy] started 'viewport convergence generation correction' on local after 28s: 7559 MiB free covers 4096 MiB
+$ turbo run build --filter='./editor/packages/*' --filter=ghostty-webgpu --filter=ghostty-webgpu-line-editor --filter='@fregat/*'
+
+   • turbo 2.11.5
+   • Packages in scope: @fregat/hotkeys, @fregat/react-hotkeys, @singapore-editor/collab, @singapore-editor/collaboration, @singapore-editor/core, @singapore-editor/decode, @singapore-editor/diff, @singapore-editor/find, @singapore-editor/gutters, @singapore-editor/highlighting, @singapore-editor/lsp, @singapore-editor/lsp-plugin, @singapore-editor/markdown, @singapore-editor/minimap, @singapore-editor/paged, @singapore-editor/panes, @singapore-editor/plugin-ui, @singapore-editor/react, @singapore-editor/scope-lines, @singapore-editor/solid, @singapore-editor/spellcheck, @singapore-editor/textbuffer, @singapore-editor/tree-sitter, @singapore-editor/tree-sitter-languages, @singapore-editor/typescript-lsp, ghostty-webgpu, ghostty-webgpu-line-editor
+   • Running build in 27 packages
+   • Remote caching disabled, using shared worktree cache
+
+@singapore-editor/collaboration:build: cache hit, replaying logs f1735d194aa56107
+@singapore-editor/collaboration:build: $ bun ../../scripts/build-package.ts
+ghostty-webgpu-line-editor:build: cache hit, replaying logs 820a35e14005e754
+@singapore-editor/lsp:build: cache hit, replaying logs 8f44133ef527e754
+@singapore-editor/lsp:build: $ bun ../../scripts/build-package.ts
+@fregat/hotkeys:build: cache hit, replaying logs 5dd495de0c2ed2ff
+ghostty-webgpu-line-editor:build: $ tsc -p tsconfig.build.json
+@fregat/hotkeys:build: $ bun build src/index.ts --outdir dist --target browser --format esm --packages external && tsc -p tsconfig.build.json
+@fregat/hotkeys:build: Bundled 37 modules in 6ms
+@fregat/hotkeys:build:
+@fregat/hotkeys:build:   index.js  92.98 KB  (entry point)
+@fregat/hotkeys:build:
+@singapore-editor/panes:build: cache hit, replaying logs 6cf870a46418728d
+@singapore-editor/panes:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/textbuffer:build: cache hit, replaying logs e8396cba2a6c8a15
+@fregat/react-hotkeys:build: cache hit, replaying logs 674af157811078cf
+@singapore-editor/textbuffer:build: $ node scripts/build.mjs
+@fregat/react-hotkeys:build: $ bun build src/index.ts --outdir dist --target browser --format esm --packages external --external '@fregat/hotkeys*' && tsc -p tsconfig.build.json
+@fregat/react-hotkeys:build: Bundled 14 modules in 17ms
+@fregat/react-hotkeys:build:
+@fregat/react-hotkeys:build:   index.js  17.33 KB  (entry point)
+@fregat/react-hotkeys:build:
+@singapore-editor/core:build: cache miss, executing 834daeae9a27fbbb
+@singapore-editor/collab:build: cache hit, replaying logs 7b81f37351f4cc61
+@singapore-editor/collab:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/core:build: $ bun ../../scripts/build-package.ts
+ghostty-webgpu:build: cache hit, replaying logs 7b04c6d6ac4f950f
+ghostty-webgpu:build: $ bun run clean && tsc -p tsconfig.build.json && bun run build:worker
+ghostty-webgpu:build: $ bun scripts/clean-dist.ts
+ghostty-webgpu:build: $ bun run scripts/build-worker.ts
+@singapore-editor/solid:build: cache miss, executing 430c75bce9efbd85
+@singapore-editor/tree-sitter:build: cache miss, executing 1976cf1c4ca4a917
+@singapore-editor/find:build: cache miss, executing de26f6dfa296ba63
+@singapore-editor/diff:build: cache miss, executing 9f937aa7433d7779
+@singapore-editor/react:build: cache miss, executing 0baae38a02fb191a
+@singapore-editor/decode:build: cache miss, executing 0ec1f0d25607b3d2
+@singapore-editor/scope-lines:build: cache miss, executing 4eebde15f1256707
+@singapore-editor/gutters:build: cache miss, executing 80345f37acd2ccc1
+@singapore-editor/solid:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/find:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/diff:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/decode:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/plugin-ui:build: cache miss, executing 2a35b2552154a193
+@singapore-editor/paged:build: cache miss, executing 7ccd190efb657fa8
+@singapore-editor/tree-sitter:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/scope-lines:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/react:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/gutters:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/paged:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/plugin-ui:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/tree-sitter:build: [plugin rolldown:vite-resolve] Module "node:fs/promises" has been externalized for browser compatibility, imported by "/work/worktrees/platform/singapore-viewport-first/node_modules/.bun/tree-sitter-md@github+ShaulLavo+tree-sitter-md+f7263d7+561ad0bba2b10533/node_modules/tree-sitter-md/js/index.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+@singapore-editor/tree-sitter:build:
+@singapore-editor/tree-sitter:build: new URL("../lib/web-tree-sitter.wasm", import.meta.url) doesn't exist at build time, it will remain unchanged to be resolved at runtime. If this is intended, you can use the /* @vite-ignore */ comment to suppress this warning.
+@singapore-editor/minimap:build: cache miss, executing 0b7d48bd1ce4e1de
+@singapore-editor/markdown:build: cache miss, executing f6cfca55fdc2ec43
+@singapore-editor/markdown:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/minimap:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/lsp-plugin:build: cache miss, executing df658b4b6ee1c3fb
+@singapore-editor/lsp-plugin:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/tree-sitter-languages:build: cache miss, executing ba9d74ce7dca5716
+@singapore-editor/tree-sitter-languages:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/typescript-lsp:build: cache miss, executing 46c1c23277103d07
+@singapore-editor/typescript-lsp:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/spellcheck:build: cache miss, executing 46d77f06d357df6d
+@singapore-editor/highlighting:build: cache miss, executing 04eea5889871b387
+@singapore-editor/highlighting:build: $ bun ../../scripts/build-package.ts
+@singapore-editor/spellcheck:build: $ bun ../../scripts/build-package.ts
+
+ Tasks:    27 successful, 27 total
+Cached:    9 cached, 27 total
+  Time:    4.698s
+
+$ tsc --noEmit
+
+ RUN  v5.0.2 /work/worktrees/platform/singapore-viewport-first/editor/packages/tree-sitter
+      API started at http://localhost:63315/
+
+
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+   Start at  19:30:39
+   Duration  5.95s (tests 95%, import 3%, worker 1%)
+
+
+[exited with code 0]

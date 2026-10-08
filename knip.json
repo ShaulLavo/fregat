@@ -173,7 +173,8 @@
         "src/shiki/index.ts",
         "src/**/*.worker.ts",
         "bench/**/*.ts",
-        "test/types/**/*.ts"
+        "test/types/**/*.ts",
+        "test/reading-order.proof.mjs"
       ],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"],
       "ignoreDependencies": ["@playwright/test"]
@@ -217,7 +218,7 @@
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
     },
     "editor/packages/markdown": {
-      "entry": ["src/index.ts"],
+      "entry": ["src/index.ts", "test/reading-order.fixture.ts"],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
     },
     "editor/packages/minimap": {
@@ -313,7 +314,7 @@
       "ignoreDependencies": ["@singapore-editor/gutters"]
     },
     "editor/examples/app": {
-      "entry": ["index.html", "src/jumpHistoryDemo.ts"],
+      "entry": ["src/collaboration.ts", "index.html", "src/jumpHistoryDemo.ts"],
       "project": ["src/**/*.{ts,tsx}"]
     },
     "ghostty-webgpu": {

@@ -4,6 +4,7 @@ import type { PieceTableSnapshot } from '@singapore-editor/textbuffer'
 import type { TextEdit } from '../tokens'
 import type { EditorTokenInput } from './tokenStore'
 import type { DocumentRead } from '../editor/documentDelivery'
+import type { DocumentWorkerReadReference } from '../document/workerReader'
 import type { EditorStructuralOperation } from '../document/operations'
 
 export type EditorSyntaxLanguageId = string
@@ -78,7 +79,27 @@ export type EditorSyntaxServiceRequest = {
   readonly textSnapshot: DocumentTextSnapshot
 }
 
+type EditorSyntaxCancellation = {
+  readonly kind: 'cancelled'
+  readonly coveredRange: EditorSyntaxRange
+  readonly reason: 'budget' | 'superseded'
+  readonly elapsedMs: number
+  readonly budgetMs: number
+  readonly timings?: readonly { readonly name: string; readonly durationMs: number }[]
+}
+
+export type EditorSyntaxAnalysis =
+  | { readonly kind: 'full'; readonly coveredRange: EditorSyntaxRange }
+  | {
+      readonly kind: 'partial'
+      readonly coveredRange: EditorSyntaxRange
+      readonly background?: EditorSyntaxCancellation
+    }
+  | EditorSyntaxCancellation
+
 export type EditorSyntaxProjectionTag = {
+  readonly source?: Pick<DocumentWorkerReadReference, 'identity' | 'point'>
+  readonly analysis?: EditorSyntaxAnalysis
   readonly language: EditorSyntaxLanguageConfiguration
   readonly requestedRanges: readonly EditorSyntaxRange[]
   readonly snapshot: EditorSyntaxSnapshotTag
@@ -174,6 +195,7 @@ export type EditorSyntaxRuntime = Omit<
   EditorSyntaxSession,
   'refresh' | 'applyChange' | 'queryRange'
 > & {
+  subscribeResults?(listener: (read: DocumentRead, result: EditorSyntaxResult) => void): () => void
   analyze(read: DocumentRead, signal: AbortSignal): Promise<EditorSyntaxResult>
   queryRange?(range: EditorSyntaxRange, signal: AbortSignal): Promise<EditorSyntaxResult>
 }
@@ -231,6 +253,19 @@ export const createEmptySyntaxResult = (
   projection: createSyntaxProjectionTag(options),
   tokens: [],
 })
+
+export function syntaxResultCoversRange(
+  result: EditorSyntaxResult,
+  range?: EditorSyntaxRange | null,
+): boolean {
+  const analysis = result.projection.analysis
+  if (analysis?.kind === 'cancelled' || result.degraded?.kind === 'range-unavailable') return false
+  if (!range || !analysis) return true
+  return (
+    analysis.coveredRange.startIndex <= range.startIndex &&
+    analysis.coveredRange.endIndex >= range.endIndex
+  )
+}
 
 export const isEditorSyntaxLanguage = (
   languageId: string | null | undefined,

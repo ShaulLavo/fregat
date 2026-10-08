@@ -1,5 +1,6 @@
 import {
   applyBatchToPieceTable,
+  retainPieceTableSnapshot,
   pieceTableSnapshotsHaveSameText,
   type PieceTableAnchor,
   type PieceTableSnapshot,
@@ -28,7 +29,7 @@ export function reconciledEdits(
       internal: { previousLength: before.length, nextLength: after.length },
     })
   }
-  if (pieceTableSnapshotsHaveSameText(applyBatchToPieceTable(before, supplied), after))
+  if (pieceTableSnapshotsHaveSameText(projectReconciliationEdits(before, supplied), after))
     return supplied
   throw createError({
     code: 'EDITOR_RECONCILE_EDITS_MISMATCH',
@@ -41,6 +42,18 @@ export function reconciledEdits(
       nextLength: after.length,
     },
   })
+}
+
+export function projectReconciliationEdits(
+  before: PieceTableSnapshot,
+  edits: readonly TextEdit[],
+): PieceTableSnapshot {
+  // Offset projection checks visible text; the final snapshot owns authored identities.
+  // Retaining the shared tree makes this constant-size scratch fork persistent.
+  const projection = before.charIds
+    ? { ...retainPieceTableSnapshot(before), charIds: null }
+    : before
+  return applyBatchToPieceTable(projection, edits)
 }
 
 export function reconcileSelections(

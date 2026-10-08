@@ -2,9 +2,9 @@ import type {
   EditorPlugin,
   EditorInlineReplacementContext,
 } from '@singapore-editor/core/extensions'
-import type { InlineReplacementSpec } from '@singapore-editor/core/rendering'
 import { markdownInlineReplacements } from './replacements'
 import type { MarkdownLinkOptions } from './linkRender'
+import { headingContribution, markdownHeadings, type MarkdownHeadings } from './headings'
 import './style.css'
 
 export { markdownInlineReplacements } from './replacements'
@@ -29,24 +29,52 @@ export function createMarkdownPreviewPlugin(
 
   return {
     name: 'markdown-preview',
-    activate: (context) =>
-      context.registerInlineReplacementProvider(
-        (replacementContext) => replacementsForContext(replacementContext, languageIds, options),
-        { trigger: 'edit', requiresSyntax: true },
-      ),
+    activate(context) {
+      let headings: MarkdownHeadings | null = null
+      let records: Uint32Array | undefined
+      const provide = (replacementContext: EditorInlineReplacementContext) => {
+        if (!appliesToContext(replacementContext, languageIds) || !replacementContext.records) {
+          headings = null
+          records = undefined
+          return []
+        }
+        const replacements = markdownInlineReplacements(
+          replacementContext.textSnapshot,
+          replacementContext.records.data,
+          {
+            ...options,
+            registerKeymapNode: replacementContext.registerKeymapNode,
+          },
+        )
+        if (
+          headings?.source !== replacementContext.textSnapshot ||
+          records !== replacementContext.records.data
+        ) {
+          headings = markdownHeadings(replacementContext, replacements)
+          records = replacementContext.records.data
+        }
+        return replacements
+      }
+      return [
+        context.registerInlineReplacementProvider(provide, {
+          trigger: 'edit',
+          requiresSyntax: true,
+        }),
+        context.registerViewContribution({
+          createContribution: (view) => headingContribution(view, () => headings),
+        }),
+      ]
+    },
   }
 }
 
-const replacementsForContext = (
+function appliesToContext(
   context: EditorInlineReplacementContext,
   languageIds: ReadonlySet<string>,
-  options: MarkdownLinkOptions,
-): readonly InlineReplacementSpec[] => {
-  if (context.languageId === null) return []
-  if (!languageIds.has(context.languageId)) return []
-  if (context.records?.languageId !== context.languageId) return []
-  return markdownInlineReplacements(context.textSnapshot, context.records.data, {
-    ...options,
-    registerKeymapNode: context.registerKeymapNode,
-  })
+): boolean {
+  return (
+    context.languageId !== null &&
+    languageIds.has(context.languageId) &&
+    context.records?.languageId === context.languageId
+  )
 }

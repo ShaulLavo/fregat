@@ -226,6 +226,8 @@
       "name": "@singapore-editor/example-app",
       "version": "0.0.1",
       "dependencies": {
+        "@singapore-editor/collab": "workspace:*",
+        "@singapore-editor/collaboration": "workspace:*",
         "@singapore-editor/core": "workspace:*",
         "@singapore-editor/diff": "workspace:*",
         "@singapore-editor/find": "workspace:*",
@@ -292,10 +294,12 @@
       "name": "@singapore-editor/collaboration",
       "version": "0.0.1",
       "dependencies": {
+        "@noble/hashes": "2.4.0",
         "@singapore-editor/collab": "workspace:*",
+        "@singapore-editor/core": "workspace:*",
+        "@singapore-editor/textbuffer": "workspace:*",
       },
       "devDependencies": {
-        "@singapore-editor/core": "workspace:*",
         "@types/bun": "1.4.2",
         "@types/node": "26.6.3",
         "@vitest/browser-playwright": "5.0.2",
@@ -304,12 +308,6 @@
         "typescript": "7.0.2",
         "vitest": "5.0.2",
       },
-      "peerDependencies": {
-        "@singapore-editor/core": "workspace:*",
-      },
-      "optionalPeers": [
-        "@singapore-editor/core",
-      ],
     },
     "editor/packages/decode": {
       "name": "@singapore-editor/decode",
@@ -362,6 +360,7 @@
         "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#f7263d7f7b1593270b348f007c80eddb3916c761",
         "typescript": "7.0.2",
         "typescript-api": "npm:typescript@6.0.3",
+        "vite": "8.3.1",
         "vitest": "5.0.2",
       },
     },
@@ -1643,6 +1642,8 @@
     "@napi-rs/canvas-win32-x64-msvc": ["@napi-rs/canvas-win32-x64-msvc@1.0.10", "", { "os": "win32", "cpu": "x64" }, "sha512-9WtzW85PaIhtB27iXaR/9RrLCqHLbqD3Z8Q+kh17NjFxwQXFXU5vWbYH4vEH+drM307TTyK3hidZgpt09G5T3g=="],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.2.4", "", { "dependencies": { "@tybys/wasm-util": "^0.10.3" }, "peerDependencies": { "@emnapi/core": "^1.7.1 || ^2.0.0-alpha.4", "@emnapi/runtime": "^1.7.1 || ^2.0.0-alpha.4" } }, "sha512-AJxoUD2/15ESHbvpcyjU274nsAPLuOtPHCk0vKJM5pj//Fg/B1FXNWjPnXTT9PymCYYiHo4zPj0ZomXBKhoy7g=="],
+
+    "@noble/hashes": ["@noble/hashes@2.4.0", "", {}, "sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA=="],
 
     "@nodable/entities": ["@nodable/entities@3.1.0", "", {}, "sha512-LsS/DjHr+uDM647Gru/cA8+J3a3HfhttwCKLyuoyN7yXTFCxKBtSgMQBvrW9yNPa2/zDRUNuGPaH5QUFoa4arQ=="],
 

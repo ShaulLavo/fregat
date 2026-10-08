@@ -222,7 +222,21 @@ export type EditorHistoryGraph = {
   readonly barrier: EditorHistoryBarrier | null
 }
 
+/** Supplies authored identities before native input mutates an identity-enabled document. */
+export type DocumentEditAuthor = {
+  (
+    before: PieceTableSnapshot,
+    edits: readonly TextEdit[],
+    options?: Pick<DocumentSessionApplyEditsOptions, 'history'>,
+  ): PieceTableSnapshot
+  readonly canUndo?: () => boolean
+  readonly canRedo?: () => boolean
+  readonly undo?: () => void
+  readonly redo?: () => void
+}
+
 export type EditorTextBuffer = {
+  setEditAuthor(author: DocumentEditAuthor): { dispose(): void }
   getStorageMaintenanceStats(): Readonly<TextStorageMaintenanceStats>
   applyText(
     selections: SelectionSet<PieceTableAnchor>,
@@ -655,12 +669,18 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     action: 'editor.buffer.lease_listener_failed',
   })
   private readonly editChain = new DocumentEditChain(0, 0)
+  private applyLocalEdits: DocumentEditAuthor = applyBatchToPieceTable
   private history: DocumentHistory
   private cleanSnapshot: PieceTableSnapshot
   private dirtyCacheSnapshot: PieceTableSnapshot
   private dirtyCacheValue = false
   private revision = 0
   private mutationLease: DocumentMutationLease | null = null
+  private deferredReconcile: {
+    readonly snapshot: PieceTableSnapshot
+    readonly options: DocumentSessionReconcileOptions
+    readonly sourceView: EditorViewSession | null
+  } | null = null
   private currentBarrier: DocumentBarrierState | null = null
   private typingRun: TypingRun | null = null
   private textSnapshot: DocumentTextSnapshot
@@ -685,6 +705,28 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     this.tooLargeForHeapOperation = exceedsHeapOperationBudget(snapshot.length)
   }
 
+  public setEditAuthor(author: DocumentEditAuthor): { dispose(): void } {
+    if (this.applyLocalEdits !== applyBatchToPieceTable)
+      throw new TypeError('document already has an edit author')
+    // Snapshot history cannot cross into selective history after remote text changes its base.
+    this.history = this.createHistory(this.history.current, this.history.selections)
+    this.typingRun = null
+    this.applyLocalEdits = author
+    return {
+      dispose: () => {
+        if (this.applyLocalEdits !== author) return
+        this.applyLocalEdits = applyBatchToPieceTable
+        this.history = this.createHistory(this.history.current, this.history.selections)
+        this.typingRun = null
+      },
+    }
+  }
+
+  public assertNativeTransactions(): void {
+    if (this.applyLocalEdits !== applyBatchToPieceTable)
+      throw new TypeError('authored documents require local edits or reconcile')
+  }
+
   public applyText(
     selections: SelectionSet<PieceTableAnchor>,
     rawText: string,
@@ -700,7 +742,12 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
       return appendTiming(this.createChange('none', []), 'session.applyText', start)
     }
 
-    const result = applyTextToSelections(this.history.current, selections, text)
+    const result = applyTextToSelections(
+      this.history.current,
+      selections,
+      text,
+      this.applyLocalEdits,
+    )
     return appendTiming(
       this.commitEdit(result.snapshot, result.selections, result.edits, {
         history: 'record',
@@ -722,7 +769,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     if (this.mutationLease) {
       return appendTiming(this.createChange('none', []), 'session.indentSelection', start)
     }
-    const result = indentSelections(this.history.current, selections, text)
+    const result = indentSelections(this.history.current, selections, text, this.applyLocalEdits)
     return appendTiming(
       this.commitEdit(result.snapshot, result.selections, result.edits, {
         history: 'record',
@@ -744,7 +791,12 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     if (this.mutationLease) {
       return appendTiming(this.createChange('none', []), 'session.outdentSelection', start)
     }
-    const result = outdentSelections(this.history.current, selections, tabSize)
+    const result = outdentSelections(
+      this.history.current,
+      selections,
+      tabSize,
+      this.applyLocalEdits,
+    )
     return appendTiming(
       this.commitEdit(result.snapshot, result.selections, result.edits, {
         history: 'record',
@@ -767,6 +819,13 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     if (this.mutationLease) {
       return appendTiming(this.createChange('none', []), 'session.applyEdits', start)
     }
+    if (
+      options.origin &&
+      options.origin !== 'local' &&
+      options.origin !== 'view' &&
+      this.applyLocalEdits !== applyBatchToPieceTable
+    )
+      throw new TypeError('authored documents require reconcile for non-local updates')
     const normalizedEdits = normalizeTextEdits(edits)
     if (normalizedEdits.length === 0) {
       return appendTiming(this.createChange('none', []), 'session.applyEdits', start)
@@ -777,7 +836,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     // undo inversion, incremental re-render, decoration remapping, the LSP's
     // copy of the document — has to be told what actually happened.
     const appliedEdits = snapBatchEditRanges(this.history.current, normalizedEdits)
-    const nextSnapshot = applyBatchToPieceTable(this.history.current, appliedEdits)
+    const nextSnapshot = this.applyLocalEdits(this.history.current, appliedEdits, options)
     const effectiveEdits = appliedEdits.filter(isEffectiveTextEdit)
     if (effectiveEdits.length === 0) {
       return appendTiming(this.createChange('none', []), 'session.applyEdits', start)
@@ -809,12 +868,15 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     options: DocumentSessionReconcileOptions,
     sourceView: EditorViewSession | null = null,
   ): DocumentSessionChange {
-    if (this.mutationLease) return this.createChange('none', [])
     const before = this.history.current
     let snapshot = retainPieceTableSnapshot(base)
     for (const batch of batches) {
       const edits = snapBatchEditRanges(snapshot, normalizeTextEdits(batch))
       snapshot = applyBatchToPieceTable(snapshot, edits)
+    }
+    if (this.mutationLease) {
+      this.deferredReconcile = { snapshot, options, sourceView }
+      return this.createChange('none', [])
     }
     const supplied =
       options?.edits && snapBatchEditRanges(before, normalizeTextEdits(options.edits))
@@ -860,7 +922,12 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     if (this.mutationLease) {
       return appendTiming(this.createChange('none', []), 'session.backspace', start)
     }
-    const result = backspaceSelections(this.history.current, selections, tabSize)
+    const result = backspaceSelections(
+      this.history.current,
+      selections,
+      tabSize,
+      this.applyLocalEdits,
+    )
     return appendTiming(
       this.commitEdit(result.snapshot, result.selections, result.edits, {
         history: 'record',
@@ -881,7 +948,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     if (this.mutationLease) {
       return appendTiming(this.createChange('none', []), 'session.delete', start)
     }
-    const result = deleteSelections(this.history.current, selections)
+    const result = deleteSelections(this.history.current, selections, this.applyLocalEdits)
     return appendTiming(
       this.commitEdit(result.snapshot, result.selections, result.edits, {
         history: 'record',
@@ -898,6 +965,11 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     const start = nowMs()
     if (this.mutationLease)
       return appendTiming(this.createChange('none', []), 'session.undo', start)
+    if (this.applyLocalEdits.undo) {
+      // The document author publishes its history transition through reconciliation.
+      this.applyLocalEdits.undo()
+      return appendTiming(this.createChange('none', []), 'session.undo', start)
+    }
     const transaction = this.history.undo?.transaction ?? null
     const next = undoEditorHistory(this.history)
     this.typingRun = null
@@ -932,6 +1004,11 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     const start = nowMs()
     if (this.mutationLease)
       return appendTiming(this.createChange('none', []), 'session.redo', start)
+    if (this.applyLocalEdits.redo) {
+      // The document author publishes its history transition through reconciliation.
+      this.applyLocalEdits.redo()
+      return appendTiming(this.createChange('none', []), 'session.redo', start)
+    }
     const transaction = this.history.redo?.transaction ?? null
     const next = redoEditorHistory(this.history)
     this.typingRun = null
@@ -1002,7 +1079,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
   }
 
   public canUndo(): boolean {
-    return this.history.undo !== null
+    return this.applyLocalEdits.canUndo?.() ?? this.history.undo !== null
   }
 
   public getHistoryGraph(): EditorHistoryGraph {
@@ -1140,7 +1217,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
   }
 
   public canRedo(): boolean {
-    return this.history.redo !== null
+    return this.applyLocalEdits.canRedo?.() ?? this.history.redo !== null
   }
 
   public isDirty(): boolean {
@@ -1220,6 +1297,18 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     if (this.mutationLease !== lease) return { status: 'already-released' }
 
     this.mutationLease = null
+    const deferred = this.deferredReconcile
+    this.deferredReconcile = null
+    if (deferred) {
+      // A lease may have committed another edit; derive the transition from the actual buffer.
+      const edit = diffPieceTableSnapshots(this.history.current, deferred.snapshot)
+      this.reconcile(
+        deferred.snapshot,
+        [],
+        { ...deferred.options, edits: edit ? [edit] : [] },
+        deferred.sourceView,
+      )
+    }
     this.leaseChanges.fire(this.getMutationLeaseState())
     return { status: 'released' }
   }
@@ -1242,7 +1331,8 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     options: DocumentTransactionCommitOptions,
     existingReceipt: DocumentTransactionReceipt | null = null,
   ): PreparedDocumentCommitResult {
-    if (!this.canUsePrepared(target, prepared)) return { status: 'stale' }
+    if (this.applyLocalEdits !== applyBatchToPieceTable || !this.canUsePrepared(target, prepared))
+      return { status: 'stale' }
     if (!prepared.hasTextChange) {
       const cumulativeBarrier = this.cumulativeBarrier(existingReceipt)
       if (existingReceipt && !cumulativeBarrier) return { status: 'stale' }
@@ -1721,7 +1811,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
       edits,
       options.metadata,
     )
-    if (options.history === 'record') {
+    if (options.history === 'record' && this.applyLocalEdits === applyBatchToPieceTable) {
       this.commitRecordedEdit(snapshot, selections, edits, options, transaction)
     } else {
       this.history = replaceEditorHistoryState(this.history, snapshot, selections)
@@ -2342,6 +2432,7 @@ export function prepareDocumentTransaction(
   logicalRevisionCount: number,
   logicalRevisionScope: DocumentLogicalRevisionScope | null,
 ): PreparedDocumentTransaction {
+  pieceTableBuffer(buffer).assertNativeTransactions()
   assertLogicalRevisionCount(logicalRevisionCount)
   return prepareDocumentTransactionForSnapshot(
     buffer.getRevision(),
@@ -2356,6 +2447,7 @@ export function prepareDocumentTransactionSequence(
   buffer: EditorTextBuffer,
   segments: readonly DocumentTransactionSequenceSegmentInput[],
 ): PreparedDocumentTransactionSequence {
+  pieceTableBuffer(buffer).assertNativeTransactions()
   let snapshot = buffer.getSnapshot()
   const expectedRevision = buffer.getRevision()
   const preparedSegments: PreparedDocumentTransaction[] = []
