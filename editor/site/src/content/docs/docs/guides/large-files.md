@@ -1,0 +1,39 @@
+# Large files
+
+Choose a loading path based on whether the user needs editing and language analysis. You need representative files and a production browser build to measure your integration.
+
+## 1. Decide which work the file needs
+
+The core stores a fully loaded editable document. A file that fits memory may still cost too much to parse, tokenize or analyze on each edit. A plain core editor has no language analysis until you attach providers or plugins. Singapore's tree-sitter and TypeScript plugins have no automatic document-size cutoff.
+
+Choose and enforce an analysis policy in your host application. You can keep large documents editable while leaving expensive analysis plugins detached. Fregat's host defaults to a 10 Mi UTF-16 code-unit cutoff for syntax and language-server analysis. That cutoff belongs to Fregat's settings and host policy.
+
+The `paged` package provides a read-only path for files you want to inspect without loading the whole file into the editable buffer. Editable paging remains planned work.
+
+## 2. Measure the editable path
+
+Load your file in a plain core editor first. Measure open time, typing, scroll and retained memory. Add syntax, language servers, minimap and host subscriptions one at a time to find the cost your application adds.
+
+A code-unit count differs from file bytes. Emoji occupy two UTF-16 units, and UTF-8 byte counts depend on the characters. Include both when reporting results.
+
+## 3. Use the paged viewer when it fits the task
+
+Consult the generated `@singapore-editor/paged` reference for its file source and loading APIs. Keep the file source alive for the view lifetime. Verify decoding, navigation and cleanup with your actual file format.
+
+## Result and limits
+
+The editable core and read-only paged viewer solve different tasks. A size ceiling says that a test file opened; it says nothing about whether language analysis or typing met an interactive budget. Existing measurements show large-file typing can miss a 60 Hz frame, and analysis can add substantial latency.
+
+There is no supported universal 1 GB editable-file claim. Public editor-level comparisons with Monaco and CodeMirror are still missing. The [research report](https://github.com/ShaulLavo/fregat/blob/main/docs/research/packages-as-products/singapore.md) records the measured ceilings and their limitations.
+
+## If it doesn't work
+
+### Typing stalls after adding language features
+
+Check the cutoff your host enforces, and measure each plugin's work separately. Detach expensive analysis above the file size your measurements support. For log inspection, the read-only paged view may fit better.
+
+### The file opens but memory keeps growing
+
+Check document, worker and file-source disposal. Compare retained memory after closing the view against a plain-text baseline.
+
+Continue with [performance](../concepts/performance.md) and [workers](../concepts/workers.md).
