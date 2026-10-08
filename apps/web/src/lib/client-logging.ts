@@ -1,6 +1,6 @@
 import { isAbortError } from '@/lib/abort-error'
 import { elapsedMs } from '@workspace/utils/timing'
-import { sanitizeRecord } from '@workspace/observability/sanitize'
+import { errorInternalContext, sanitizeRecord } from '@workspace/observability/sanitize'
 import { initLogger, isLevelEnabled, log as evlog, type DrainContext, type LogLevel } from 'evlog'
 import { errorSummary } from '@workspace/contracts'
 import { observabilityEnabledFromEnv } from '@workspace/observability/env'
@@ -113,11 +113,15 @@ export async function observeClientOperation<T>(
     // input stream"), which no error-shape check can tell apart from a real
     // network failure. The signal is ground truth.
     if (!isAbortError(error) && !signal?.aborted) {
+      const internal = errorInternalContext(error)
       log[failedOperationLevel(level)]({
         ...baseEvent,
         durationMs: elapsedMs(startedAt),
         // No limit here: `safeClientEvent` keeps the head 2000 characters of every string.
-        error: errorSummary(error),
+        error: {
+          ...errorSummary(error),
+          ...(internal === undefined ? {} : { internal }),
+        },
         outcome: classifyError?.(error) ?? 'error',
       })
     }

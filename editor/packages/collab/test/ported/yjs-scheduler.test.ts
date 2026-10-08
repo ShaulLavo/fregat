@@ -8,6 +8,7 @@
 // Chair of Computer Science 5. See ../../THIRD_PARTY_TEST_NOTICES.md.
 import { expect, test } from 'vitest'
 import { network, randomSource } from './adapter'
+import { stressSeeds } from '../stress-seeds'
 
 const counts =
   process.env.COLLAB_STRESS === '1'
@@ -65,6 +66,6 @@ test.each(counts)(
 
 if (process.env.COLLAB_STRESS === '1') {
   test('Yjs five-user scheduler converges across 10,000 seeded short rounds', () => {
-    for (let seed = 0; seed < 10_000; seed++) runScheduler(6, seed)
+    for (const seed of stressSeeds(10_000)) runScheduler(6, seed)
   }, 120_000)
 }

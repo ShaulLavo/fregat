@@ -19,8 +19,6 @@ Upstream-main comparison found renderer/native-frame changes, not additional wor
 | PDF.js viewer                    | Dependency-owned browser Worker configured through workerSrc              | Preserve PDF.js protocol; lifecycle/telemetry adapter only                    |
 | Native filesystem watch          | Lazy Bun Worker, ref:false, batches and watch attachment acknowledgements | Lifecycle plus bounded event stream; domain watch reattachment                |
 | Push notifications               | Browser-managed service worker                                            | Leave browser lifecycle and push permission policy with settings              |
-| Demo MSW                         | Mocking service worker launched by setupWorker                            | Keep demo-only interception/mocking lifecycle                                 |
-| Demo parent frame                | Window postMessage readiness/error messages                               | Window origin/identity protocol, optional channel adapter only                |
 | Native desktop shell             | WKWebView/WebKitGTK message handler and injected response callback        | Native IPC with origin/token/document identity; separate adapter if justified |
 | Terminal                         | Main-thread public terminal and OffscreenCanvas-capable renderers         | Dedicated execution worker is planned, not shipped by inspected source        |
 | Server serial/sweep/reactor work | Same-event-loop FIFO, timers and draining                                 | Scheduler contracts; no Worker lifecycle conversion                           |
@@ -45,12 +43,10 @@ Local anchors:
 - `apps/server/src/fs/native-watch-host.ts:75`, `apps/server/src/fs/watch-worker.ts:67`.
 - `apps/web/src/lib/pdf-viewer/engine.ts:1-56`, `apps/web/src/components/pdf-viewer/tests/lifecycle.browser.tsx:35,127`.
 - `apps/web/public/sw.js:1-91`, `apps/web/src/features/settings/utils/push-browser.ts:69-76`.
-- `apps/web/src/demo/start.ts:30-59`, `apps/web/src/demo-entry.ts:60-72`.
 - `apps/desktop/src/launcher/shell-bridge.ts:59-82` validates document identity and rejects pending chooser calls at pagehide.
 
 Push SW has push/subscription/notification handlers, no fetch cache or page compute RPC.
 Its browser lifetime cannot be represented as an app-owned dedicated worker that the package terminates.
-MSW uses `mockServiceWorker.js`, its own asset-base scope and HTTP/socket demo interception.
 Native shell operations can stay open for human interaction; compute deadlines would be the wrong default.
 
 ## Work in flight, freshly verified through gh
@@ -131,7 +127,7 @@ Clipboard user activation and OSC52 permission policy remain host/domain respons
 6. Expand dual-entry common coverage for selection/clipboard/IME/accessibility/scrollback under phase2.
 7. Integrate landed Plan286 hooks and cost gates; ship public API only after its recorded release-version approval.
 8. Phase4 switches Platform/site, captures visual evidence and deploys under Plan287.
-9. Server-watch migration can follow independently once Bun lifecycle/stream guarantees pass; SW/MSW/native IPC stay scoped.
+9. Server-watch migration can follow independently once Bun lifecycle/stream guarantees pass; SW/native IPC stay scoped.
 
 Existing ghostty package emits through tsc, has no worker export today, and publishes dist/types/wasm assets.
 Shared runtime must resolve from a packed standalone ghostty consumer without Platform aliases or checkout-only workspace links.

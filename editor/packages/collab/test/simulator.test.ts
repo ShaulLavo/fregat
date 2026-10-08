@@ -3,12 +3,15 @@ import type { TestEngine } from './engine-fixture'
 import { expect, test } from 'vitest'
 import { ReferenceEngine, TextbufferEngine, simulate } from '../src/index'
 import type { LeftOrigin } from '../src/index'
+import { stressSeeds } from './stress-seeds'
 
 const stress = process.env.COLLAB_STRESS === '1'
 const rounds = stress ? 10_000 : 16
 const edits = stress ? 32 : 24
 const singleAuthorRounds = stress ? 200 : 16
 const singleAuthorEdits = stress ? 48 : 24
+const seeds = stressSeeds(rounds)
+const singleAuthorSeeds = stressSeeds(singleAuthorRounds)
 const timeout = stress ? 300_000 : undefined
 
 test.each([0, 1, 2])('custom factory mixes engine implementations for seed %s', (seed) => {
@@ -105,9 +108,9 @@ function run(
 }
 
 test(
-  `${rounds} seeded rounds converge with three to five participants and match the reference IDs`,
+  `${seeds.length} seeded rounds converge with three to five participants and match the reference IDs`,
   () => {
-    for (let seed = 0; seed < rounds; seed++) {
+    for (const seed of seeds) {
       const participants = 3 + (seed % 3)
       const actual = run(seed, participants, edits, createEngine)
       expect(actual.result.hostSequence, `seed ${seed}`).toBe(edits)
@@ -122,7 +125,7 @@ test(
 test(
   'single-author rounds match the plain string model and reference IDs',
   () => {
-    for (let seed = 0; seed < singleAuthorRounds; seed++) {
+    for (const seed of singleAuthorSeeds) {
       const actual = run(seed, 1, singleAuthorEdits, createEngine)
       expect(actual.result.hostSequence).toBe(singleAuthorEdits)
       expect(actual, `seed ${seed}`).toEqual(
@@ -133,11 +136,11 @@ test(
   timeout,
 )
 test(
-  `${rounds} seeded rounds converge with random undo, redo and duplicate delivery`,
+  `${seeds.length} seeded rounds converge with random undo, redo and duplicate delivery`,
   () => {
     let undos = 0
     let redos = 0
-    for (let seed = 0; seed < rounds; seed++) {
+    for (const seed of seeds) {
       const actual = run(seed, 3 + (seed % 3), edits, createEngine, true)
       expect(actual).toEqual(run(seed, 3 + (seed % 3), edits, () => new ReferenceEngine(), true))
       const result = actual.result
@@ -145,14 +148,14 @@ test(
       undos += result.undoCommands
       redos += result.redoCommands
     }
-    expect(undos).toBeGreaterThan(rounds)
-    expect(redos).toBeGreaterThan(rounds / 4)
+    expect(undos).toBeGreaterThan(seeds.length)
+    expect(redos).toBeGreaterThan(seeds.length / 4)
   },
   timeout,
 )
 
 test('single-author undo and redo match an independent snapshot history model', () => {
-  for (let seed = 0; seed < singleAuthorRounds; seed++)
+  for (const seed of singleAuthorSeeds)
     expect(run(seed, 1, singleAuthorEdits, createEngine, true)).toEqual(
       run(seed, 1, singleAuthorEdits, () => new ReferenceEngine(), true),
     )

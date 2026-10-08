@@ -1,0 +1,208 @@
+{
+  "date": "2026-10-08",
+  "qualification": "Local shared-machine suite execution, eight shards run sequentially through suite admission. CI estimates multiply local elapsed time by two; estimates are not measurements on GitHub runners. No timeouts increased.",
+  "command": "COLLAB_STRESS=1 COLLAB_STRESS_SHARD=i/8 bun run test --reporter=default --reporter=json --outputFile=<scratch>/shard-i.json",
+  "coverage": "Every partitioned seed appears exactly once across eight shards; both engine projects run each partition. Nonpartitioned tests, including known-good mutation controls and ported test.each cases, repeat in every shard. No new skips or retries.",
+  "shards": [
+    {
+      "shard": "1/8",
+      "seeds": {
+        "simulatorAndYjs": {
+          "from": 0,
+          "toExclusive": 1250
+        },
+        "singleAuthor": {
+          "from": 0,
+          "toExclusive": 25
+        },
+        "differential": {
+          "from": 0,
+          "toExclusive": 12
+        }
+      },
+      "passedTests": 1490,
+      "existingSkips": 4,
+      "suiteSeconds": 78.41,
+      "ciEstimate2xSeconds": 156.82,
+      "maximumTestSeconds": 28.366,
+      "simulatorMaxSeconds": 16.255,
+      "differentialMaxSeconds": 5.838,
+      "singleAuthorUndoMaxSeconds": 0.277
+    },
+    {
+      "shard": "2/8",
+      "seeds": {
+        "simulatorAndYjs": {
+          "from": 1250,
+          "toExclusive": 2500
+        },
+        "singleAuthor": {
+          "from": 25,
+          "toExclusive": 50
+        },
+        "differential": {
+          "from": 12,
+          "toExclusive": 25
+        }
+      },
+      "passedTests": 1490,
+      "existingSkips": 4,
+      "suiteSeconds": 79.61,
+      "ciEstimate2xSeconds": 159.22,
+      "maximumTestSeconds": 28.802,
+      "simulatorMaxSeconds": 16.617,
+      "differentialMaxSeconds": 6.26,
+      "singleAuthorUndoMaxSeconds": 0.28
+    },
+    {
+      "shard": "3/8",
+      "seeds": {
+        "simulatorAndYjs": {
+          "from": 2500,
+          "toExclusive": 3750
+        },
+        "singleAuthor": {
+          "from": 50,
+          "toExclusive": 75
+        },
+        "differential": {
+          "from": 25,
+          "toExclusive": 37
+        }
+      },
+      "passedTests": 1490,
+      "existingSkips": 4,
+      "suiteSeconds": 77.09,
+      "ciEstimate2xSeconds": 154.18,
+      "maximumTestSeconds": 27.947,
+      "simulatorMaxSeconds": 16.318,
+      "differentialMaxSeconds": 5.714,
+      "singleAuthorUndoMaxSeconds": 0.268
+    },
+    {
+      "shard": "4/8",
+      "seeds": {
+        "simulatorAndYjs": {
+          "from": 3750,
+          "toExclusive": 5000
+        },
+        "singleAuthor": {
+          "from": 75,
+          "toExclusive": 100
+        },
+        "differential": {
+          "from": 37,
+          "toExclusive": 50
+        }
+      },
+      "passedTests": 1490,
+      "existingSkips": 4,
+      "suiteSeconds": 77.42,
+      "ciEstimate2xSeconds": 154.84,
+      "maximumTestSeconds": 27.804,
+      "simulatorMaxSeconds": 15.734,
+      "differentialMaxSeconds": 6.137,
+      "singleAuthorUndoMaxSeconds": 0.271
+    },
+    {
+      "shard": "5/8",
+      "seeds": {
+        "simulatorAndYjs": {
+          "from": 5000,
+          "toExclusive": 6250
+        },
+        "singleAuthor": {
+          "from": 100,
+          "toExclusive": 125
+        },
+        "differential": {
+          "from": 50,
+          "toExclusive": 62
+        }
+      },
+      "passedTests": 1490,
+      "existingSkips": 4,
+      "suiteSeconds": 76.86,
+      "ciEstimate2xSeconds": 153.72,
+      "maximumTestSeconds": 27.736,
+      "simulatorMaxSeconds": 16.15,
+      "differentialMaxSeconds": 5.166,
+      "singleAuthorUndoMaxSeconds": 0.282
+    },
+    {
+      "shard": "6/8",
+      "seeds": {
+        "simulatorAndYjs": {
+          "from": 6250,
+          "toExclusive": 7500
+        },
+        "singleAuthor": {
+          "from": 125,
+          "toExclusive": 150
+        },
+        "differential": {
+          "from": 62,
+          "toExclusive": 75
+        }
+      },
+      "passedTests": 1490,
+      "existingSkips": 4,
+      "suiteSeconds": 77.42,
+      "ciEstimate2xSeconds": 154.84,
+      "maximumTestSeconds": 27.338,
+      "simulatorMaxSeconds": 16.171,
+      "differentialMaxSeconds": 6.729,
+      "singleAuthorUndoMaxSeconds": 0.274
+    },
+    {
+      "shard": "7/8",
+      "seeds": {
+        "simulatorAndYjs": {
+          "from": 7500,
+          "toExclusive": 8750
+        },
+        "singleAuthor": {
+          "from": 150,
+          "toExclusive": 175
+        },
+        "differential": {
+          "from": 75,
+          "toExclusive": 87
+        }
+      },
+      "passedTests": 1490,
+      "existingSkips": 4,
+      "suiteSeconds": 77.82,
+      "ciEstimate2xSeconds": 155.64,
+      "maximumTestSeconds": 27.957,
+      "simulatorMaxSeconds": 16.316,
+      "differentialMaxSeconds": 5.693,
+      "singleAuthorUndoMaxSeconds": 0.28
+    },
+    {
+      "shard": "8/8",
+      "seeds": {
+        "simulatorAndYjs": {
+          "from": 8750,
+          "toExclusive": 10000
+        },
+        "singleAuthor": {
+          "from": 175,
+          "toExclusive": 200
+        },
+        "differential": {
+          "from": 87,
+          "toExclusive": 100
+        }
+      },
+      "passedTests": 1490,
+      "existingSkips": 4,
+      "suiteSeconds": 77.17,
+      "ciEstimate2xSeconds": 154.34,
+      "maximumTestSeconds": 27.752,
+      "simulatorMaxSeconds": 16.193,
+      "differentialMaxSeconds": 6.16,
+      "singleAuthorUndoMaxSeconds": 0.275
+    }
+  ]
+}

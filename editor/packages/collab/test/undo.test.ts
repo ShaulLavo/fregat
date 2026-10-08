@@ -3,7 +3,7 @@ import { submitAsAuthor } from './host-fixtures'
 import { expect, test } from 'vitest'
 import { Host, InMemoryTransport } from '../src/index'
 import type { Envelope } from '../src/index'
-import { authority, replica } from './fixtures'
+import { authority, replica, subscribeText } from './fixtures'
 import { undoRoom } from './undo-fixtures'
 
 test('time grouping, empty boundaries and replacement boundaries', () => {
@@ -188,7 +188,7 @@ test('1: a graph can switch sibling transactions atomically while retaining remo
   room.edit(1, 0, 0, 'R')
   room.sync()
   const states: string[] = []
-  room.users[0]!.participant.subscribe((state) => states.push(state.text))
+  subscribeText(room.users[0]!.participant, (text) => states.push(text))
   room.users[0]!.history.setTransactions([
     { transaction: c, active: false },
     { transaction: b, active: true },
@@ -209,7 +209,7 @@ test('2: grouped replacement withdraws insertion and deletion effects atomically
   room.sync()
   expect(room.text()).toBe('AbC')
   const seen: string[] = []
-  room.users[0]!.participant.subscribe((state) => seen.push(state.text))
+  subscribeText(room.users[0]!.participant, (text) => seen.push(text))
   const envelope = room.undo()
   expect(envelope.change).toMatchObject({
     kind: 'setEffects',
@@ -336,8 +336,8 @@ test('publication-created local work clears redo before rejection recovery repla
   room.edit(0, 0, 0, 'x')
   room.sync()
   let inserted = false
-  room.users[0]!.participant.subscribe((state) => {
-    if (inserted || state.text !== '') return
+  subscribeText(room.users[0]!.participant, (text) => {
+    if (inserted || text !== '') return
     inserted = true
     room.edit(0, 0, 0, 'y')
   })
@@ -363,7 +363,7 @@ test('a capture observer failure still publishes the edit and closes its boundar
     },
   })
   const published: string[] = []
-  room.users[0]!.participant.subscribe((state) => published.push(state.text))
+  subscribeText(room.users[0]!.participant, (text) => published.push(text))
   expect(() => room.edit(0, 0, 0, 'x', { boundary: true })).toThrow('observer')
   expect(published).toEqual(['x'])
   fail = false

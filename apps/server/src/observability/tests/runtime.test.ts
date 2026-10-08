@@ -4,13 +4,21 @@ import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Elysia } from 'elysia'
 import { applyObservability, httpStatusLevel } from '../elysia'
-import { captureRequestLogger, recordRequestError, recordRequestWarning } from '../logging'
-import { createInternalError } from '../structured-errors'
+import {
+  captureRequestLogger,
+  observeRequestOperation,
+  recordRequestError,
+  recordRequestWarning,
+} from '../logging'
+import { createInternalError, createStructuredError } from '../structured-errors'
 import { readFsLogs } from 'evlog/fs'
 import type { WideEvent } from 'evlog'
 
 import { closeTestApps, createTestApp } from '../../../test/server'
-import { closeApp } from '../../app'
+import { closeApp, orchestrationForApp } from '../../app'
+import { MockProviderAdapter } from '../../provider/adapters/mock'
+import type { ProviderDiscoveredSession } from '../../provider/types'
+import { mockRuntime } from '../../../test/factories/orchestration'
 import { createPushSubscriber } from '../../../test/factories/push-subscriber'
 import { createPushSessionFixture } from '../../../test/factories/push-sessions'
 import { createInProcessOrchestrationSocket } from '../../../test/orchestration-socket'
@@ -30,6 +38,240 @@ afterEach(async () => {
 })
 
 describe('observability runtime', () => {
+  it.each(['element', 'message', 'name', 'stack', 'cause'])(
+    'writes unreadable internal %s getters and preserves the server rejection',
+    async (field) => {
+      const logDir = await fixtureRoot()
+      initializeObservability(testObservabilityEnv(logDir))
+      const nested = createStructuredError({ message: 'Synthetic nested failure' })
+      void nested.stack
+      const items = [nested]
+      Object.defineProperty(field === 'element' ? items : nested, field === 'element' ? 0 : field, {
+        enumerable: true,
+        get: () => {
+          throw createStructuredError({ message: 'Synthetic getter failure' })
+        },
+      })
+      const failure = createStructuredError({ message: 'Synthetic failure', internal: { items } })
+      let rejection: unknown
+      const app = new Elysia()
+      applyObservability(app)
+      app.get('/unreadable-getters', async () => {
+        try {
+          await observeRequestOperation(
+            { area: 'test', operation: 'synthetic.getter' },
+            async () => {
+              throw failure
+            },
+          )
+        } catch (error) {
+          rejection = error
+        }
+        return { ok: true }
+      })
+      expect((await app.handle(new Request('http://local/unreadable-getters'))).status).toBe(200)
+      expect(rejection).toBe(failure)
+      const events = await flushedEvents(logDir)
+      expect(events).toHaveLength(1)
+      expect(JSON.stringify(events[0])).toContain('[unreadable: getter threw]')
+    },
+  )
+
+  it('keeps root and nested internal context out of the session import success response', async () => {
+    const root = await fixtureRoot()
+    const logDir = await fixtureRoot()
+    initializeObservability(testObservabilityEnv(logDir))
+    const failure = createStructuredError({
+      message: 'Synthetic discovery failure',
+      internal: { observed: 'BACKEND_ONLY_ROOT' },
+      cause: createStructuredError({
+        message: 'Synthetic child failure',
+        internal: { observed: 'BACKEND_ONLY_CHILD' },
+      }),
+    })
+    const adapter = new FailingDiscoveryAdapter(failure)
+    const app = createTestApp({
+      auth: { allowedOrigins: [TRUSTED_ORIGIN] },
+      settings: testSettingsOptions(root),
+      watch: false,
+      workspaceRoot: root,
+      orchestration: {
+        providerRuntime: true,
+        providerAdapterRegistry: mockRuntime(adapter).adapterRegistry,
+      },
+    })
+    await orchestrationForApp(app).dispatchClientCommand({
+      type: 'project.create',
+      commandId: 'register-import-diagnostics',
+      title: 'Synthetic project',
+      workspaceRoot: root,
+    })
+    const response = await app.handle(
+      new Request('http://local/orchestration/session-import', {
+        method: 'POST',
+        headers: trustedOriginHeaders({ 'content-type': 'application/json' }),
+        body: JSON.stringify({ providerInstanceId: adapter.adapterKey }),
+      }),
+    )
+    expect(response.status).toBe(200)
+    const body = await response.text()
+    expect(JSON.parse(body)).toMatchObject({
+      failures: [{ error: { message: 'Synthetic discovery failure' } }],
+    })
+    expect(body).not.toContain('internal')
+    expect(body).not.toContain('BACKEND_ONLY_')
+    const events = await flushedEvents(logDir)
+    expect(
+      events.find(
+        (event) =>
+          event.action === 'chat.pipeline.discovery.scan' &&
+          Array.isArray(event.failures) &&
+          event.failures.length,
+      ),
+    ).toMatchObject({
+      failures: [
+        {
+          error: {
+            internal: { observed: 'BACKEND_ONLY_ROOT' },
+            cause: { internal: { observed: 'BACKEND_ONLY_CHILD' } },
+          },
+        },
+      ],
+    })
+  })
+
+  it('preserves the operation rejection when internal cannot be read', async () => {
+    initializeObservability(testObservabilityEnv(await fixtureRoot()))
+    const error = createStructuredError({ message: 'Synthetic operation failure' })
+    const getterFailure = createStructuredError({ message: 'Synthetic getter failure' })
+    Object.defineProperty(error, 'internal', {
+      get: () => {
+        throw getterFailure
+      },
+    })
+    await expect(
+      observeRequestOperation({ area: 'test', operation: 'synthetic.failure' }, async () => {
+        throw error
+      }),
+    ).rejects.toBe(error)
+  })
+
+  it.each([false, true])('reads diagnostic getters once with cyclic arrays %s', async (cyclic) => {
+    const logDir = await fixtureRoot()
+    initializeObservability(testObservabilityEnv(logDir))
+    const items: unknown[] = []
+    if (cyclic) items.push(items)
+    const error = createStructuredError({ message: 'Synthetic failure' })
+    let internalReads = 0
+    let causeReads = 0
+    Object.defineProperties(error, {
+      internal: {
+        enumerable: true,
+        get: () => {
+          internalReads++
+          return { items }
+        },
+      },
+      cause: {
+        enumerable: true,
+        get: () => {
+          causeReads++
+          return undefined
+        },
+      },
+      unavailable: {
+        enumerable: true,
+        get: () => {
+          throw error
+        },
+      },
+    })
+    const app = new Elysia()
+    applyObservability(app)
+    app.get('/diagnostic-getters', () => {
+      recordRequestError(error)
+      return { ok: true }
+    })
+    expect((await app.handle(new Request('http://local/diagnostic-getters'))).status).toBe(200)
+    expect(internalReads).toBe(1)
+    expect(causeReads).toBe(1)
+    const events = await flushedEvents(logDir)
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({
+      error: { message: 'Synthetic failure', internal: { items: cyclic ? ['[circular]'] : [] } },
+    })
+  })
+
+  it('writes sanitized internal context for handled errors and nested causes', async () => {
+    const logDir = await fixtureRoot()
+    initializeObservability(testObservabilityEnv(logDir))
+    const cause = createStructuredError({
+      message: 'Synthetic child failure',
+      internal: { exitCode: 7, token: 'PRIVATE_NESTED_TOKEN' },
+    })
+    const error = createStructuredError({
+      cause,
+      code: 'server.INTERNAL_ERROR',
+      message: 'Synthetic context failure',
+      internal: { expected: 'ready', observed: 'stopped', password: 'PRIVATE_PASSWORD' },
+    })
+    expect(Object.keys(error)).not.toContain('internal')
+    const app = new Elysia()
+    applyObservability(app)
+    app.get('/internal-context', () => {
+      recordRequestError(error)
+      return error.toJSON()
+    })
+
+    const response = await app.handle(new Request('http://local/internal-context'))
+    const body = await response.text()
+    expect(body).not.toContain('internal')
+    expect(body).not.toContain('PRIVATE_')
+    expect(error.internal).toEqual({
+      expected: 'ready',
+      observed: 'stopped',
+      password: 'PRIVATE_PASSWORD',
+    })
+    const event = eventForPath(await flushedEvents(logDir), '/internal-context')
+    expect(event).toMatchObject({
+      error: {
+        internal: { expected: 'ready', observed: 'stopped', password: '[redacted]' },
+        cause: { internal: { exitCode: 7, token: '[redacted]' } },
+      },
+    })
+    const text = await readLogText(logDir)
+    expect(text).not.toContain('PRIVATE_')
+    expect(text).toContain('"observed":"stopped"')
+  })
+
+  it('keeps internal context out of application error responses', async () => {
+    const root = await fixtureRoot()
+    const logDir = await fixtureRoot()
+    initializeObservability(testObservabilityEnv(logDir))
+    const app = testApp(root)
+    app.get('/internal-response', () => {
+      throw createStructuredError({
+        code: 'server.INTERNAL_ERROR',
+        message: 'Synthetic response failure',
+        internal: { observed: 'BACKEND_ONLY_STATE' },
+      })
+    })
+
+    const response = await app.handle(
+      new Request('http://local/internal-response', {
+        headers: trustedOriginHeaders(),
+      }),
+    )
+    expect(response.status).toBe(500)
+    const body = await response.text()
+    expect(body).toContain('Synthetic response failure')
+    expect(body).not.toContain('internal')
+    expect(body).not.toContain('BACKEND_ONLY_STATE')
+    expect(eventForPath(await flushedEvents(logDir), '/internal-response')).toMatchObject({
+      error: { internal: { observed: 'BACKEND_ONLY_STATE' } },
+    })
+  })
+
   it('redacts credential properties on errors and nested causes in the file drain', async () => {
     const logDir = await fixtureRoot()
     initializeObservability(testObservabilityEnv(logDir))
@@ -1030,4 +1272,21 @@ type PostHogPayload = {
       path?: string
     }
   }>
+}
+
+class FailingDiscoveryAdapter extends MockProviderAdapter {
+  private readonly failure: Error
+
+  constructor(failure: Error) {
+    super()
+    this.failure = failure
+  }
+
+  async discoverSessions(): Promise<ProviderDiscoveredSession[]> {
+    throw this.failure
+  }
+
+  async readSessionHistory() {
+    return []
+  }
 }
