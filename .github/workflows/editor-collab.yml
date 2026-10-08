@@ -26,6 +26,11 @@ concurrency:
 
 jobs:
   verify:
+    name: Stress shard ${{ matrix.shard }}/8
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -50,4 +55,5 @@ jobs:
       - name: Verify both engines, differential replay and independent visibility
         env:
           COLLAB_STRESS: '1'
+          COLLAB_STRESS_SHARD: '${{ matrix.shard }}/8'
         run: bun run --cwd editor/packages/collab test

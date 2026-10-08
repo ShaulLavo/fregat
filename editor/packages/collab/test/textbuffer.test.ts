@@ -15,6 +15,7 @@ import type {
   TextbufferSnapshot,
 } from '../src/index'
 import { characters, liveIds } from './engine-fixture'
+import { stressSeeds } from './stress-seeds'
 
 function envelope(change: Envelope['change']): Envelope {
   const insert = change.kind === 'insert' ? change : null
@@ -135,7 +136,7 @@ test('large bootstrap and interior edits use compact runs without document trave
 test.each([false, true])(
   'seeded arrivals and pending replay match after every operation with undo=%s',
   (undoRedo) => {
-    for (let seed = 0; seed < (process.env.COLLAB_STRESS === '1' ? 100 : 25); seed++) {
+    for (const seed of stressSeeds(process.env.COLLAB_STRESS === '1' ? 100 : 25)) {
       const result = simulate({
         seed,
         participants: 3 + (seed % 3),

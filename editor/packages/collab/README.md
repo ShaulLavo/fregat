@@ -108,6 +108,13 @@ bun run bench
 The shared fixture runs every unit, simulator and ported upstream suite against
 both engines. A paired simulator checks authored envelopes, text, live IDs, hidden
 IDs and visible offsets after every apply and restore, including pending replay, undo and redo. An independent scalar visibility model checks each ID before and after deliveries under both engines. `COLLAB_STRESS=1 bun run test` expands the seeded workloads to 10,000 rounds.
+Set `COLLAB_STRESS_SHARD=1/8` through `8/8` to divide the simulator, differential
+replay, independent visibility and Yjs short-round seed ranges between jobs. The
+eight stress CI jobs cover each seed exactly once in those loops, including the
+200-seed single-author history comparisons. Other tests run in every job. An
+unsharded stress run retains the complete workload; ordinary runs ignore the shard.
+`bench/stress-shard-evidence.json` records full-suite shard durations and qualified
+CI estimates at twice the local elapsed time.
 
 `Engine.characters()` returns a diagnostic inventory sorted by bunch and counter.
 Each record contains the ID, deletion state and visible offset. Hidden IDs retain
