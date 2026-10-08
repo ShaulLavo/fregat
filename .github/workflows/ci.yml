@@ -145,7 +145,8 @@ jobs:
           FILES: ${{ needs.changes.outputs.docs_files }}
         run: |
           version=$(jq -r '.workspaces.catalog.oxfmt' package.json)
-          jq -r '.[] | "./" + .' <<<"$FILES" | xargs -d '\n' bunx "oxfmt@$version" --check
+          jq -j '.[] | select(test("\\.(md|mdx|json|jsonc|yml|yaml|ts|tsx|mts|cts|js|jsx|mjs|cjs|css|scss|less|html|vue|astro|graphql|gql)$")) | "./" + . + "\u0000"' <<<"$FILES" |
+            xargs -0 -r bunx "oxfmt@$version" --check
 
   # Jobs instead of one runner doing everything in turn: each pays for setup once,
   # and no suite shares four cores with another.
