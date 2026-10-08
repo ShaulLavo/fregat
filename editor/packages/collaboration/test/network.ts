@@ -24,6 +24,8 @@ export type Link = {
   readonly drop: number
   readonly duplicate: number
   readonly tailDelay?: number
+  readonly reverse?: boolean
+  readonly dropTypes?: readonly Message['type'][]
 }
 
 export class Network {
@@ -42,6 +44,7 @@ export class Network {
     reconnectReorder: 0,
   }
   readonly replay = { uniqueDelivery: 0, duplicateDrop: 0, staleDrop: 0, maxReorderDistance: 0 }
+  readonly staleByType: Partial<Record<Message['type'], number>> = {}
   private readonly deliveries = new Map<string, { highWater: number; ids: Set<number> }>()
   private readonly generations = new Map<string, number>()
   private readonly deliveredGeneration = new Map<string, number>()
@@ -56,6 +59,7 @@ export class Network {
     readonly seed: number,
     count: number,
     readonly replayWindowSize = 8192,
+    readonly historyChunkRecords = 5,
   ) {
     this.randomState = seed
 
@@ -205,7 +209,12 @@ export class Network {
       const packets = this.packets.get(this.clock) ?? []
       this.packets.delete(this.clock)
       const reordered = packets
-        .map((packet) => ({ packet, order: this.random() }))
+        .map((packet) => ({
+          packet,
+          order: this.links.get(`${packet.from}:${packet.to}`)?.reverse
+            ? -packet.message.messageId
+            : this.random(),
+        }))
         .sort((a, b) => a.order - b.order)
       for (const { packet } of reordered) {
         const from = this.nodes[packet.from]!
@@ -249,7 +258,10 @@ export class Network {
     )
     if (!eligible) return
     if (duplicate) this.replay.duplicateDrop++
-    if (!duplicate && stale) this.replay.staleDrop++
+    if (!duplicate && stale) {
+      this.replay.staleDrop++
+      this.staleByType[message.type] = (this.staleByType[message.type] ?? 0) + 1
+    }
     if (!duplicate && !stale) this.replay.uniqueDelivery++
     if (!duplicate)
       this.replay.maxReorderDistance = Math.max(
@@ -310,7 +322,7 @@ export class Network {
       pulseInterval: 30,
       suspicionTimeout: 300,
       dependencyTimeout: 900,
-      historyChunkRecords: 5,
+      historyChunkRecords: this.historyChunkRecords,
       replayWindowSize: this.replayWindowSize,
       send: (peer, message) => this.send(index, peer, message),
     })
@@ -322,7 +334,7 @@ export class Network {
     const to = this.nodes.findIndex((node) => node.session.peer === peer)
     if (to < 0 || !this.edges.has(`${from}:${to}`)) return
     const link = this.links.get(`${from}:${to}`)!
-    if (this.random() < link.drop) return
+    if (link.dropTypes?.includes(message.type) || this.random() < link.drop) return
     const generation = this.generations.get(`${from}:${to}`)!
     const delay =
       link.delay + this.integer(link.jitter) + (this.random() < 0.01 ? (link.tailDelay ?? 80) : 0)
@@ -375,7 +387,7 @@ export class Network {
 export function runSeed(
   seed: number,
   replayWindowSize?: number,
-): Network['hits'] & Network['replay'] {
+): Network['hits'] & Network['replay'] & { staleByType: Network['staleByType'] } {
   const scenario = seed % 3
   const count = scenario === 1 ? 4 : 3 + (Math.floor(seed / 3) % 6)
   const network = new Network(seed, count, replayWindowSize)
@@ -430,5 +442,5 @@ export function runSeed(
   network.stabilize()
   network.reconnectTraffic()
   network.stabilize()
-  return { ...network.hits, ...network.replay }
+  return { ...network.hits, ...network.replay, staleByType: network.staleByType }
 }

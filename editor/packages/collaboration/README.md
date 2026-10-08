@@ -65,6 +65,41 @@ process restarted with a fresh peer-session ID. Retired IDs stay excluded from f
 membership. An admitted `LEAVE` releases the sender's window automatically. A local
 session releases all its windows when it completes its own departure.
 
+## History recovery
+
+`HISTORY_REQUEST` identifies one missing chunk with its required `index` field.
+Its `from` checkpoint offers a verified prefix the requester already holds. The sender
+uses that prefix when it belongs to the requested history, or replies from genesis
+for a divergent branch. Chunk indices and counts describe the remaining suffix.
+A reply contains up to `historyChunkRecords` records.
+
+The requester retains received chunks and keeps at most half its replay window's
+size in outstanding chunk indices, with a minimum of one. The first chunk establishes
+the suffix length. Receipt of a new chunk returns one request credit; repeated replies
+for cached chunks return no credit. Each outstanding index gets at most one request
+per pulse interval. Discovery and phase retries request missing indices with fresh
+message IDs.
+
+Each peer has one active download. Advertisements and confirmations from one authority
+advance its synchronization target, retaining a verified contiguous prefix from the
+previous target. Older advertisements keep recovery aimed at that newer target. Frozen
+offers and handoff bases retain their own recovery targets.
+
+This selective-repeat flow keeps each response to one chunk regardless of the total
+history size. Reversed delivery and a lost prefix therefore leave a smaller set of
+missing chunks on each successful retry. The engine verifies the complete hash chain
+before a history becomes available for reconciliation, synchronization or handoff.
+
+Election and reconciliation offers carry one branch descriptor per message. Commit
+and host-claim messages carry their branch list and replay edits in one message.
+Handoff carries its pending edits in one message. Submitted edits and confirmations
+use individual messages. Submission retries rotate through retained pending edits,
+with a per-pulse batch bounded by the replay window divided by the member count.
+History downloads serve current synchronization and the coordinator's frozen offers;
+participants fetch the chosen base for installation. Confirmed outcomes and retained
+pending intents recover through history transfer and fresh submissions. Transport
+framing still owns byte limits for these payloads.
+
 ## State and convergence
 
 Membership is the current set of direct authenticated links. `HELLO` and `HOST_PULSE`
@@ -83,7 +118,9 @@ Terms fence authority traffic and never rank history.
 The coordinator distributes a base and the union of losing branches' unique original
 intents. Peers archive their replaced branch and install the base. The chosen host
 waits for every round member's `HAVE` before claiming authority and sequencing pending
-work. Replay follows dependencies and preserves IDs. A membership change invalidates
+work. Its subsequent `HOST_PULSE` also activates installed followers after a lost claim.
+The installed host keeps renewing pulses while roster discovery pauses sequencing. Replay follows
+dependencies and preserves IDs. A membership change invalidates
 the round. A third partition therefore starts another frozen round rather than
 accepting a partially discovered pairwise result as globally final.
 
@@ -93,10 +130,11 @@ announcements carry pending edits authored throughout the transfer. `HAVE` ident
 the handoff stage and the retained EditIds. Departure waits for the successor to retain
 every pending edit and for every member to install the successor announcement.
 Installing a handoff base settles pending IDs already present in its confirmed history.
-The outgoing host continues pulses and retransmits its preceding authority announcement
-throughout preparation. Members relay preparation and
+The outgoing host continues pulses throughout preparation. Members relay preparation and
 commit announcements to the successor across delayed direct links. The successor
 retains the union of transferred edits and relays the committed announcement.
+Handoff acknowledgements go to the connected outgoing host. After its links close,
+retained announcements continue fencing old authority without generating acknowledgements.
 
 The requested departure survives an intervening election. A re-elected outgoing host
 retries its handoff, choosing a connected successor if the requested one disconnected.
@@ -147,6 +185,15 @@ while preserving every existing convergence invariant. The default-window run re
 zero stale first deliveries. The replay-window tests also exhaust all 40,320 orderings
 of eight IDs, and a surviving session receives one million pulses while retaining a
 1,024-byte bitmap.
+
+Reversed-delivery regressions transfer 8,193 single-record chunks with the default
+window and recover dropped prefix, middle and final chunks with the eight-ID window.
+Prefix fixtures assert that only missing suffix records cross the wire. The simulator
+also reverses reliable traffic during large divergent-branch recovery,
+bulk submissions and handoff. It checks every authored outcome and every existing
+convergence invariant. Separate 100-seed handoff runs use both window sizes and require
+positive stale `HANDOFF` losses at size eight. Seeded runs report stale losses by message
+type alongside their scenario counts.
 
 Full-mesh quiescence checks require identical confirmed history and text, EditId
 uniqueness, one host per component, and settlement of every authored edit as accepted
