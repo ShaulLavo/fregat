@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { textFileVersion } from '../../fs/version'
 import { isEvlogError } from '../../observability/structured-errors'
 import { SettingsStore, type SettingsStoreOptions } from '../store'
+import { settingsWriteContendedError } from '../structured-errors'
 import {
   activeSettingsWriteCoordinatorCount,
   withSettingsWriteCoordinator,
@@ -233,14 +234,51 @@ describe('semantic write coordination', () => {
         reason: 'attempt-limit',
         lastRevisionMismatch: {
           source: 'settings',
-          expectedRevision: textFileVersion('{ "editor.lineHeight": 31 }\n'),
-          observedRevision: textFileVersion('{ "editor.lineHeight": 32 }\n'),
+          expectedRevision: expect.stringMatching(/^[a-f0-9]{8}$/),
+          observedRevision: expect.stringMatching(/^[a-f0-9]{8}$/),
         },
       },
     })
 
     expect((await readdir(root)).filter((name) => name.endsWith('.tmp'))).toEqual([])
   })
+
+  it.each(['settings', 'secrets'] as const)(
+    'fingerprints %s revisions only within this process',
+    (source) => {
+      const expectedRevision = textFileVersion('{ "editor.lineHeight": 31 }\n')
+      const observedRevision = textFileVersion('{ "editor.lineHeight": 32 }\n')
+      const context = {
+        reason: 'revision-mismatch' as const,
+        attemptLimit: 1,
+        budgetMs: null,
+        elapsedMs: 0,
+        lastRevisionMismatch: { source, expectedRevision, observedRevision },
+      }
+      const first = settingsWriteContendedError(1, 0, context)
+      const second = settingsWriteContendedError(1, 0, context)
+
+      expect(first.internal).toEqual(second.internal)
+      expect(first.internal).toMatchObject({
+        lastRevisionMismatch: {
+          source,
+          expectedRevision: expect.stringMatching(/^[a-f0-9]{8}$/),
+          observedRevision: expect.stringMatching(/^[a-f0-9]{8}$/),
+        },
+      })
+      expect(JSON.stringify(first.internal)).not.toContain(expectedRevision)
+      expect(JSON.stringify(first.internal)).not.toContain(observedRevision)
+      expect(context.lastRevisionMismatch).toEqual({ source, expectedRevision, observedRevision })
+      expect(
+        settingsWriteContendedError(1, 0, {
+          ...context,
+          lastRevisionMismatch: { source, expectedRevision: null, observedRevision: null },
+        }).internal,
+      ).toMatchObject({
+        lastRevisionMismatch: { source, expectedRevision: null, observedRevision: null },
+      })
+    },
+  )
 
   it('reports cancellation without a revision mismatch', async () => {
     const root = await tempRoot()
