@@ -359,7 +359,7 @@
       "file": "packages/editor/src/virtualization/virtualizedTextViewRows.ts",
       "id": "packages/editor/src/virtualization/virtualizedTextViewRows.ts:setTimeout:3bd76fd727",
       "justification": "Leaving the current frame is the entire content of this delay: it is what keeps the repaint out of the resize delivery and out of the row paint that ask for it. The one outstanding handle per view makes a second request in the same frame a no-op, and `cancelInlineWidgetRepaint` withdraws it when the view goes away.",
-      "line": 1675,
+      "line": 1697,
       "snippet": "const handle = win.setTimeout(() => {"
     },
     {

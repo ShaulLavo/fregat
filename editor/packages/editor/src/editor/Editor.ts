@@ -875,10 +875,11 @@ export class Editor {
         this.logPluginFailure('editor.plugin.install_failed', ambient.demand.id, error, 0),
     )
     this.inputSelection.install()
-    this.setSnapshot(options.snapshot ?? null, options.documentKey ?? null)
+    // Authors bind initialized text; saved paint must see every installed layer's identity.
     this.initializeDefaultText()
     for (const provider of this.pluginHost.getViewContributionProviders())
       this.addViewContributionProvider(provider)
+    this.setSnapshot(options.snapshot ?? null, options.documentKey ?? null)
     this.setRangeDecorations(options.rangeDecorations ?? [])
     const mountDurationMs = nowMs() - mountStart
     recordEditorMountTiming(mountDurationMs)
