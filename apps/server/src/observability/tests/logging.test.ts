@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { operatorErrorSummary } from '../logging'
+import { createStructuredError } from '../structured-errors'
 
 describe('operatorErrorSummary', () => {
   it('keeps the tail of the message and fix, adds why, and prefers statusCode', () => {
@@ -22,5 +23,15 @@ describe('operatorErrorSummary', () => {
       status: 503,
       why: 'The disk is full.',
     })
+  })
+})
+
+it('keeps sanitized internal context in operator error summaries', () => {
+  const error = createStructuredError({
+    message: 'Synthetic failure',
+    internal: { exitCode: 7, token: 'PRIVATE_TOKEN' },
+  })
+  expect(operatorErrorSummary(error)).toMatchObject({
+    internal: { exitCode: 7, token: '[redacted]' },
   })
 })

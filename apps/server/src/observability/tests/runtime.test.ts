@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Elysia } from 'elysia'
 import { applyObservability, httpStatusLevel } from '../elysia'
 import { captureRequestLogger, recordRequestError, recordRequestWarning } from '../logging'
-import { createInternalError } from '../structured-errors'
+import { createInternalError, createStructuredError } from '../structured-errors'
 import { readFsLogs } from 'evlog/fs'
 import type { WideEvent } from 'evlog'
 
@@ -30,6 +30,76 @@ afterEach(async () => {
 })
 
 describe('observability runtime', () => {
+  it('writes sanitized internal context for handled errors and nested causes', async () => {
+    const logDir = await fixtureRoot()
+    initializeObservability(testObservabilityEnv(logDir))
+    const cause = createStructuredError({
+      message: 'Synthetic child failure',
+      internal: { exitCode: 7, token: 'PRIVATE_NESTED_TOKEN' },
+    })
+    const error = createStructuredError({
+      cause,
+      code: 'server.INTERNAL_ERROR',
+      message: 'Synthetic context failure',
+      internal: { expected: 'ready', observed: 'stopped', password: 'PRIVATE_PASSWORD' },
+    })
+    expect(Object.keys(error)).not.toContain('internal')
+    const app = new Elysia()
+    applyObservability(app)
+    app.get('/internal-context', () => {
+      recordRequestError(error)
+      return error.toJSON()
+    })
+
+    const response = await app.handle(new Request('http://local/internal-context'))
+    const body = await response.text()
+    expect(body).not.toContain('internal')
+    expect(body).not.toContain('PRIVATE_')
+    expect(error.internal).toEqual({
+      expected: 'ready',
+      observed: 'stopped',
+      password: 'PRIVATE_PASSWORD',
+    })
+    const event = eventForPath(await flushedEvents(logDir), '/internal-context')
+    expect(event).toMatchObject({
+      error: {
+        internal: { expected: 'ready', observed: 'stopped', password: '[redacted]' },
+        cause: { internal: { exitCode: 7, token: '[redacted]' } },
+      },
+    })
+    const text = await readLogText(logDir)
+    expect(text).not.toContain('PRIVATE_')
+    expect(text).toContain('"observed":"stopped"')
+  })
+
+  it('keeps internal context out of application error responses', async () => {
+    const root = await fixtureRoot()
+    const logDir = await fixtureRoot()
+    initializeObservability(testObservabilityEnv(logDir))
+    const app = testApp(root)
+    app.get('/internal-response', () => {
+      throw createStructuredError({
+        code: 'server.INTERNAL_ERROR',
+        message: 'Synthetic response failure',
+        internal: { observed: 'BACKEND_ONLY_STATE' },
+      })
+    })
+
+    const response = await app.handle(
+      new Request('http://local/internal-response', {
+        headers: trustedOriginHeaders(),
+      }),
+    )
+    expect(response.status).toBe(500)
+    const body = await response.text()
+    expect(body).toContain('Synthetic response failure')
+    expect(body).not.toContain('internal')
+    expect(body).not.toContain('BACKEND_ONLY_STATE')
+    expect(eventForPath(await flushedEvents(logDir), '/internal-response')).toMatchObject({
+      error: { internal: { observed: 'BACKEND_ONLY_STATE' } },
+    })
+  })
+
   it('redacts credential properties on errors and nested causes in the file drain', async () => {
     const logDir = await fixtureRoot()
     initializeObservability(testObservabilityEnv(logDir))

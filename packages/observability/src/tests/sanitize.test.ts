@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+import { createError } from 'evlog'
 import {
   createDiagnosticSanitizer,
   createRecordSanitizer,
@@ -84,4 +85,24 @@ test('an object two fields share is logged at both, and only a cycle is circular
     selected: shared,
     cycle: { name: 'loop', self: '[circular]' },
   })
+})
+
+test('log sanitization retains non-enumerable internal context and sanitizes it recursively', () => {
+  const nested = createError({ message: 'child failure', internal: { exitCode: 7 } })
+  const internal = { observed: 'stopped', token: 'PRIVATE_TOKEN', failure: nested }
+  const failure = createError({ message: 'failure', internal })
+  internal.failure.cause = failure
+
+  expect(Object.keys(failure)).not.toContain('internal')
+  expect(sanitizeRecord({ error: failure })).toMatchObject({
+    error: {
+      internal: {
+        observed: 'stopped',
+        token: '[redacted]',
+        failure: { internal: { exitCode: 7 }, cause: '[circular]' },
+      },
+    },
+  })
+  expect(failure.internal).toBe(internal)
+  expect(JSON.stringify(failure)).not.toContain('internal')
 })

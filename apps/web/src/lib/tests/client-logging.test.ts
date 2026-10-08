@@ -7,6 +7,7 @@ import { createTestQueryClient } from '../../../test/render'
 import { DEFAULT_PROVIDER_DRIVER_KIND, providerInstanceIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { afterEach, beforeEach, vi } from 'vitest'
+import { createError } from 'evlog'
 
 import { expect, test } from '../../../test/fixtures'
 import type { ActiveSettingsIntent } from '@workspace/client-core/settings/intent-store'
@@ -291,5 +292,26 @@ test('a settings stream keeps its primary owner when it finishes under a remote 
     queryClient.clear()
     useEnvironmentsStore.setState(previous, true)
     setActiveServerOrigin(previousOrigin)
+  }
+})
+
+test('retains sanitized internal context in client operation failures and raw errors', async () => {
+  const failure = createError({
+    message: 'Synthetic client failure',
+    internal: { observed: 'stopped', token: 'PRIVATE_TOKEN' },
+  })
+  await expect(
+    observeClientOperation({ action: 'test.failure', area: 'test' }, async () =>
+      Promise.reject(failure),
+    ),
+  ).rejects.toBe(failure)
+  log.error({ action: 'test.raw', area: 'test', error: failure })
+
+  expect(emittedEvents).toHaveLength(2)
+  for (const { event } of emittedEvents) {
+    expect(event.error).toMatchObject({
+      internal: { observed: 'stopped', token: '[redacted]' },
+    })
+    expect(JSON.stringify(event)).not.toContain('PRIVATE_TOKEN')
   }
 })
