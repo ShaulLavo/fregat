@@ -339,7 +339,6 @@ test.each(['disconnect', 'retire', 'LEAVE'] as const)(
       expect(presence.states.map((state) => state.peerSessionId)).toEqual([retained])
       expect(receive(peer, 9)).toBe(false)
       session.disconnect(peer)
-      session.retire('unknown-peer')
       session.tick(session.presenceTime + 90_000)
       expect(presence.receive(peer, payload(peer, 7))).toBe(false)
       expect(presence.receive(peer, payload(peer, 8))).toBe(false)

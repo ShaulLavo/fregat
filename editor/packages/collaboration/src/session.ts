@@ -178,6 +178,7 @@ export class Session<E extends EditEnvelope> {
   disconnect(peer: string): void {
     if (!this.members.delete(peer) || this.phase.kind === 'left') return
     this.observed.delete(peer)
+    for (const observer of this.presenceObservers) observer.leave(peer)
     if (this.phase.kind === 'stable' && peer !== this.authority.host) return
     this.negotiate()
   }
