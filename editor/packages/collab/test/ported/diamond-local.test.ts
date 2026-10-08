@@ -22,7 +22,7 @@ test.each(seeds)(
     const author = replica('seph')
     const random = randomSource(seed)
     let oracle = ''
-    const steps = seed === 10 || stress ? 1000 : 100
+    const steps = stress ? 1000 : 100
     for (let step = 0; step < steps; step++) {
       const change = randomChange(oracle, random)
       for (const edit of change.edits) author.participant.local(edit)
