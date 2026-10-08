@@ -2,7 +2,9 @@ import { afterEach, expect, test, vi } from 'vitest'
 import { page, commands } from 'vitest/browser'
 import { Editor } from '@singapore-editor/core/editor'
 import type { EditorPlugin } from '@singapore-editor/core/extensions'
-import { Presence } from '../src/presence'
+import { Presence, type PresenceChannel } from '../src/presence'
+import { Session } from '../src/session'
+import { BrowserEngine, browserGenesis } from './browser-engine'
 import { createPresencePlugin } from '../src/presence-plugin'
 import { ReferenceResolver, remoteState } from './presence-fixtures'
 import '@singapore-editor/core/style.css'
@@ -21,13 +23,18 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function mount(text: string, wordWrap = true, extra: readonly EditorPlugin[] = []) {
+function mount(
+  text: string,
+  wordWrap = true,
+  extra: readonly EditorPlugin[] = [],
+  channel?: PresenceChannel,
+) {
   const host = document.createElement('div')
   host.style.cssText =
     'display:flex;flex-direction:column;width:500px;height:340px;margin:30px;background:#fafafa'
   document.body.append(host)
   hosts.push(host)
-  const presence = new Presence('local', 'document')
+  const presence = new Presence('local', 'document', channel)
   const resolver = new ReferenceResolver(text)
   const editor = new Editor(host, {
     wordWrap,
@@ -104,6 +111,71 @@ test('paints two named remote carets and a selection across wrapped rows on the 
     expect(rect.right).toBeLessThan(host.getBoundingClientRect().right)
   }
   await page.screenshot({ element: host, path: '../.vitest/evidence/presence-wrapped.png' })
+})
+
+test('membership removal clears the crashed peer caret, name and selection before awareness expiry', async () => {
+  const session = new Session({
+    peer: 'local',
+    room: 'room',
+    document: 'document',
+    genesis: browserGenesis,
+    engine: new BrowserEngine(),
+    send() {},
+    pulseInterval: 100,
+    suspicionTimeout: 300,
+    dependencyTimeout: 500,
+    historyChunkRecords: 10,
+  })
+  session.connect('crashed')
+  session.connect('retained')
+  const { host, presence, resolver } = mount(TEXT, true, [], session)
+  let messageId = 0
+  const receive = (peer: string, clock: number, anchor: number, head: number) =>
+    session.receive({
+      version: 1,
+      room: 'room',
+      document: 'document',
+      sender: peer,
+      epoch: 'epoch',
+      messageId: ++messageId,
+      type: 'PRESENCE',
+      payload: {
+        clock,
+        state: {
+          ...remoteState(peer, clock),
+          displayName: peer === 'crashed' ? 'Ada' : 'Grace',
+          selections: [{ anchor: resolver.gap(anchor), head: resolver.gap(head) }],
+        },
+      },
+    })
+  try {
+    expect(receive('crashed', 7, 25, 120)).toBe(true)
+    expect(receive('retained', 1, 170, 170)).toBe(true)
+    await expect.poll(() => carets(host).length).toBe(2)
+    const highlightNames = Array.from(CSS.highlights.keys()).filter((name) =>
+      name.includes('presence'),
+    )
+    expect(highlightNames.length).toBeGreaterThan(0)
+    expect(host.querySelector('.editor-remote-name')?.textContent).toBe('Ada')
+    await page.screenshot({ element: host, path: '../.vitest/evidence/presence-crash-before.png' })
+    expect(receive('crashed', 8, 30, 140)).toBe(true)
+    session.disconnect('crashed')
+    expect(session.members.has('crashed')).toBe(false)
+    await page.screenshot({ element: host, path: '../.vitest/evidence/presence-crash-removed.png' })
+    await expect
+      .poll(() => carets(host).map((caret) => caret.dataset.peerSessionId))
+      .toEqual(['retained'])
+    expect(
+      Array.from(host.querySelectorAll('.editor-remote-name'), (name) => name.textContent),
+    ).toEqual(['Grace'])
+    for (const name of highlightNames) expect(CSS.highlights.has(name)).toBe(false)
+    session.tick(50)
+    expect(presence.states.map((state) => state.peerSessionId)).toEqual(['retained'])
+    expect(receive('crashed', 9, 30, 140)).toBe(false)
+    await page.screenshot({ element: host, path: '../.vitest/evidence/presence-crash-after.png' })
+  } finally {
+    presence.dispose()
+  }
 })
 
 test('folding hides an interior caret and keeps a selection and both names aligned after unfolding', async () => {
