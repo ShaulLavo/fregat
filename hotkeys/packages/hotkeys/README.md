@@ -1,95 +1,48 @@
 # @fregat/hotkeys
 
-keyboard shortcuts for editors and apps, with no framework and no dom in the core. it parses and matches keys, runs chords, resolves bindings against the focused context the way [zed](https://zed.dev) does, and formats shortcuts for display. adapters turn browser and terminal input into its key events. it ships no keymap
+Keyboard shortcut registration, chords, context-aware keymaps, and display formatting for browser and terminal apps.
 
-react hooks live in [`@fregat/react-hotkeys`](../react-hotkeys)
+Part of [Fregat hotkeys](https://github.com/ShaulLavo/fregat/tree/main/hotkeys).
 
-## try it
+## Install
 
-clone the repo and `bun link`, or depend on it as `workspace:*` inside Fregat
+```sh
+npm install @fregat/hotkeys
+```
 
-### one-call shortcuts
+## Usage
 
-the registry listens on the document. arrays are chords
+Register shortcuts while your view is active, then unregister them when it closes.
 
 ```ts
 import { getHotkeyRegistry } from '@fregat/hotkeys'
 
 const hotkeys = getHotkeyRegistry()
-const save = hotkeys.register('Mod+S', () => saveFile())
-hotkeys.register(['G', 'G'], () => scrollToTop(), { ignoreInputs: true })
-save.unregister()
+const save = hotkeys.register('Mod+S', () => console.log('Save requested'))
+const top = hotkeys.register(['G', 'G'], () => window.scrollTo(0, 0))
+export function disposeShortcuts() {
+  save.unregister()
+  top.unregister()
+}
 ```
 
-a callback that returns `false` passes the key on to the next registration
+`Mod` is Command on macOS and Control elsewhere.
 
-### a keymap with focus
+## API highlights
 
-a dispatcher holds a keymap and a tree of focus nodes. bindings name commands; nodes handle them. a key from inside an attached element resolves against that node's context and its ancestors'
+- `getHotkeyRegistry()` registers shortcuts and chords.
+- `createBrowserDispatcher()` routes commands through focused contexts.
+- `formatForDisplay()` formats labels for the current platform.
+- `HotkeyRecorder` records a shortcut.
 
-```ts
-import { createBrowserDispatcher } from '@fregat/hotkeys'
+[Exported API](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/src/index.ts) · [Keymap guide](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/keymaps.md)
 
-const keys = createBrowserDispatcher({
-  keymap: [
-    { keys: 'Mod+Shift+P', command: 'palette.open' },
-    { keys: 'Mod+K Mod+C', command: 'comment.add', context: 'Editor' },
-  ],
-})
-const app = keys.createNode({ commands: { 'palette.open': () => openPalette() } })
-const editor = keys.createNode({ parent: app, context: 'Editor' })
-editor.handle('comment.add', () => addComment())
+## In the hotkeys family
 
-keys.attachElement(app, document.body)
-keys.attachElement(editor, editorElement)
-```
+The core package has framework-neutral key matching and browser and terminal adapters. Add `@fregat/react-hotkeys` to register shortcuts through React hooks.
 
-`keys.setKeymap(entries)` swaps the table, e.g. after the user edits their bindings
+[Main README](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/README.md)
 
-use `readContext` for values that change with editor or plugin state. the dispatcher reads it once per node when it captures context for a key, including chord continuations and timeout replay
+## License
 
-```ts
-const editor = keys.createNode({
-  parent: app,
-  readContext: () => ({
-    identifiers: canComment() ? ['Editor', 'canComment'] : ['Editor'],
-    values: { mode: currentMode() },
-  }),
-})
-```
-
-`editor.context()` also reads the current context. `readContext` supplies the full context; nodes with static context can update it through `setContext`
-
-multiple nodes can attach to the same element. the deepest live node wins; later attachments break equal-depth ties. removing a node or attachment restores the remaining registrations
-
-hosts can subscribe to the existing browser key pipeline with `keys.observeKeys({ beforeKey, reset })`. `beforeKey(event)` runs once per event offered through `claimKeybinding` or the DOM listeners, before matching consumes claimed releases. a terminal can use it to deliver a release for a press its command sent through native encoding. `reset(reason)` clears held-key bookkeeping on blur, a hidden document, `releaseAll` and disposal. the returned function removes the subscription. subscriptions added during delivery begin with the next notification; those removed before their turn are skipped
-
-elements with an attached `EditContext` count as text input. buffered printable chord prefixes replay through a cancellable `beforeinput` event with `inputType: 'insertText'`, letting the host apply them through its typing handler
-
-use `capture: true` when a shared window dispatcher must hear idle keys before descendant input handlers. the default listens while events bubble. declined bindings, native navigation and composition continue to the input owner
-
-menus can retain their origin element before focus moves. `keys.nodeForElement(origin)` finds its live attached node; `keys.dispatchCommandFrom(node, command, args)` runs along that node's path while preserving the current focus and pending chord. `keys.hasNode(node)` checks ownership of the complete path without reading context. removed or foreign nodes and disposed dispatchers decline the command
-
-each command captures handler registrations across its whole node path before delivery. registrations added during a handler wait for the next command; removed registrations and nodes are skipped. each `node.handle` call has its own removal, even when two registrations use the same function
-
-### display and recording
-
-```ts
-import { HotkeyRecorder, formatForDisplay } from '@fregat/hotkeys'
-
-formatForDisplay('Mod+Shift+S', { platform: 'mac' }) // '⇧ ⌘ S'
-formatForDisplay('Mod+Shift+S', { platform: 'windows' }) // 'Ctrl+Shift+S'
-
-const recorder = new HotkeyRecorder({ onRecord: (hotkey) => saveBinding(hotkey) })
-recorder.start() // Ctrl+Shift+K on linux records 'Mod+Shift+[KeyK]'
-```
-
-`Mod` is Command on mac and Control elsewhere. `[KeyK]` is a physical key, matched by position whatever the layout; the recorder writes these unless you pass `recordBy: 'key'`. logical keys on non-latin layouts fall back to `event.code`
-
-## more
-
-- [keymaps](docs/keymaps.md): context predicates, ranking, unbinding, declining handlers, chord rules, terminals
-- [performance](docs/performance.md): lookup and compile benchmarks
-- also exported: `parseHotkey`, `validateHotkey`, `areHotkeysEqual`, `findHotkeyConflicts`, `formatHotkeySequence`, `HotkeySequenceRecorder`, `KeyStateTracker`, `detectPlatform`
-
-forked from [TanStack Hotkeys](https://github.com/TanStack/hotkeys), MIT. license in [LICENSE](LICENSE)
+MIT. Forked from [TanStack Hotkeys](https://github.com/TanStack/hotkeys). [License](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/LICENSE)

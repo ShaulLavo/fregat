@@ -15,6 +15,7 @@ import { MachineService } from '../../src/machines/service'
 import type { ReleaseInstallation, ServerInstallation } from '../../src/installation/descriptor'
 import {
   IMAGE_WORKER,
+  PAIR_COMMAND,
   PTY_HOST,
   REMOTE_SUPPORT,
   THIRD_PARTY_NOTICES,
@@ -319,6 +320,7 @@ export async function writeRelease(
   await mkdir(server, { recursive: true })
   await writeFile(path.join(server, 'index.js'), healthServerSource(protocolVersion, name))
   await writeFile(path.join(server, PTY_HOST), `// ${name} terminal host\n`)
+  await writeFile(path.join(server, PAIR_COMMAND), '')
   await writeFile(path.join(server, WATCH_WORKER), '')
   await writeFile(path.join(server, IMAGE_WORKER), '')
   await writeFile(path.join(server, THIRD_PARTY_NOTICES), 'fixture notices')

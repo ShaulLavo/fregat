@@ -379,7 +379,7 @@ function renderCaretNow(view: VirtualizedTextViewInternal): void {
 
   const primary = selections[0]!
   const primaryPositions = caretPosition(view, primary.head, primary.affinity)
-  renderCaretElement(view.caretElement, primaryPositions?.[0] ?? null, false)
+  renderCaretElement(view, view.caretElement, primaryPositions?.[0] ?? null, false)
 
   let secondaryIndex = 0
   const primaryOther = primaryPositions?.[1]
@@ -404,11 +404,30 @@ function renderPooledCaret(
   position: VirtualizedCaretPosition,
   bidiSecondary: boolean,
 ): number {
-  renderCaretElement(secondaryCaretElementAt(view, index), position, bidiSecondary)
+  renderCaretElement(view, secondaryCaretElementAt(view, index), position, bidiSecondary)
   return index + 1
 }
 
+// Retain logical geometry so an origin shift can repaint every caret before deferred layout reads.
+const caretPaintPositions = new WeakMap<HTMLElement, VirtualizedCaretPosition>()
+
+export function rebaseCaretPaint(view: VirtualizedTextViewInternal): void {
+  positionCaretPaint(view, view.caretElement)
+  for (const element of view.secondaryCaretElements) positionCaretPaint(view, element)
+}
+
+function positionCaretPaint(view: VirtualizedTextViewInternal, element: HTMLElement): void {
+  const position = caretPaintPositions.get(element)
+  if (!position || element.hidden) return
+  setStyleValue(
+    element,
+    'transform',
+    `translate(${position.left}px, ${position.top + view.viewport.paintOffsetY}px)`,
+  )
+}
+
 function renderCaretElement(
+  view: VirtualizedTextViewInternal,
   element: HTMLElement,
   position: VirtualizedCaretPosition | null,
   bidiSecondary: boolean,
@@ -422,7 +441,8 @@ function renderCaretElement(
   element.classList.toggle('editor-virtualized-caret-bidi-secondary', bidiSecondary)
   const height = bidiSecondary ? position.height * 0.85 : position.height
   setStyleValue(element, 'height', `${height}px`)
-  setStyleValue(element, 'transform', `translate(${position.left}px, ${position.top}px)`)
+  caretPaintPositions.set(element, position)
+  positionCaretPaint(view, element)
 }
 
 export function clampStoredSelection(view: VirtualizedTextViewInternal): void {

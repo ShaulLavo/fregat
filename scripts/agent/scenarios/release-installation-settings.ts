@@ -15,7 +15,7 @@ export const releaseInstallationSettings: Scenario = {
     await target.waitFor()
     const targetText = await target.innerText()
     ok(targetText.includes('Installation target'))
-    ok(targetText.includes('Install releases and pair through Mesh and systemd.'))
+    ok(targetText.includes('Install releases through Mesh and systemd.'))
     await step('installation-target')
 
     await selectors.settingsSearch(page).fill('developer.deployRestartWaitMinutes')

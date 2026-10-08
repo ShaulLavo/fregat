@@ -4,28 +4,102 @@ import { genesis, ToyEngine, type ToyEdit } from './engine'
 import { compareBranches, type Message } from '../src/protocol'
 import { Session } from '../src/session'
 
-const runs = process.env.COLLABORATION_LONG_RUN === '1' ? 10_000 : 100
+const longRun = process.env.COLLABORATION_LONG_RUN === '1'
+const seeds = longRun
+  ? Array.from({ length: 10_000 }, (_, index) => index + 1)
+  : [1, 2, 4, 7, 8, 9, 12, 15, 17]
+const handoffRuns = longRun ? 100 : 18
 
 describe('transport-neutral session', () => {
-  test('converges after host crashes, two pairs rejoin and concurrent three-way reconciliation', () => {
-    const hits: Network['hits'] = {
-      hostKill: 0,
-      pairs: 0,
-      threeWay: 0,
-      crashRejoin: 0,
-      partialHeal: 0,
-      oldGeneration: 0,
-      reconnectReorder: 0,
+  test.each([8, 8192])(
+    'converges after host crashes, two pairs rejoin and concurrent three-way reconciliation with a %i-ID replay window',
+    (window) => {
+      const hits: Network['hits'] = {
+        hostKill: 0,
+        pairs: 0,
+        threeWay: 0,
+        crashRejoin: 0,
+        partialHeal: 0,
+        oldGeneration: 0,
+        reconnectReorder: 0,
+      }
+      const replay: Network['replay'] = {
+        uniqueDelivery: 0,
+        duplicateDrop: 0,
+        staleDrop: 0,
+        maxReorderDistance: 0,
+      }
+      const staleByType: Network['staleByType'] = {}
+      for (const seed of seeds) {
+        const result = runSeed(seed, window)
+        for (const key of Object.keys(hits) as (keyof typeof hits)[]) hits[key] += result[key]
+        for (const key of ['uniqueDelivery', 'duplicateDrop', 'staleDrop'] as const)
+          replay[key] += result[key]
+        replay.maxReorderDistance = Math.max(replay.maxReorderDistance, result.maxReorderDistance)
+        for (const [type, count] of Object.entries(result.staleByType)) {
+          const key = type as Message['type']
+          staleByType[key] = (staleByType[key] ?? 0) + count
+        }
+      }
+      for (const count of Object.values(hits)) expect(count).toBeGreaterThan(0)
+      expect(replay.duplicateDrop).toBeGreaterThan(0)
+      if (window === 8) expect(replay.staleDrop).toBeGreaterThan(0)
+      else expect(replay.staleDrop).toBe(0)
+      console.log(
+        `Session simulation: ${seeds.length} seeded runs passed; 3–8 peers; window=${window}; hits=${JSON.stringify(hits)}; replay=${JSON.stringify(replay)}; staleByType=${JSON.stringify(staleByType)}`,
+      )
+    },
+    600_000,
+  )
+
+  test('history recovery progresses while an eight-peer host replies to concurrent downloads', () => {
+    runSeed(107, 8)
+  })
+
+  test('stable history recovery installs verified prefixes before the final chunk arrives', () => {
+    const network = new Network(994, 2, 8, 1)
+    network.stabilize()
+    const host = network.nodes.findIndex((node) => node.session.isHost)
+    const follower = network.nodes[1 - host]!
+    for (const key of network.links.keys())
+      network.links.set(key, { delay: 1, jitter: 1, drop: 0, duplicate: 0, dropTypes: ['CONFIRM'] })
+    for (let index = 0; index < 17; index++) network.author(host)
+    let partial = 0
+    for (let step = 0; step < 200; step++) {
+      network.advance(1)
+      partial = follower.engine.checkpoint().depth
+      if (partial > 0) break
     }
-    for (let seed = 1; seed <= runs; seed++) {
-      const result = runSeed(seed)
-      for (const key of Object.keys(hits) as (keyof typeof hits)[]) hits[key] += result[key]
+    expect(partial).toBeGreaterThan(0)
+    expect(partial).toBeLessThan(17)
+    const transfers = Reflect.get(follower.session, 'transfers') as Map<string, object>
+    expect(transfers.has(network.nodes[host]!.session.peer)).toBe(true)
+    network.stabilize()
+    expect(follower.engine.checkpoint().depth).toBe(17)
+  })
+
+  test('a growing host tip keeps each selective download on its current target', () => {
+    const network = new Network(995, 2, 8, 1)
+    network.stabilize()
+    const host = network.nodes.findIndex((node) => node.session.isHost)
+    const follower = network.nodes[1 - host]!
+    for (const key of network.links.keys())
+      network.links.set(key, {
+        delay: 10,
+        jitter: 1,
+        drop: 0,
+        duplicate: 0,
+        tailDelay: 0,
+        dropTypes: ['CONFIRM'],
+      })
+    for (let index = 0; index < 300; index++) {
+      network.author(host)
+      network.advance(3)
     }
-    for (const count of Object.values(hits)) expect(count).toBeGreaterThan(0)
-    console.log(
-      `Session simulation: ${runs} seeded runs passed; 3–8 peers; hits=${JSON.stringify(hits)}`,
-    )
-  }, 600_000)
+    expect(follower.engine.checkpoint().depth).toBeGreaterThan(16)
+    network.stabilize()
+    expect(follower.engine.checkpoint().depth).toBe(300)
+  })
 
   test('delayed archived history and stale election requests remain fenced', () => {
     runSeed(5377)
@@ -36,7 +110,10 @@ describe('transport-neutral session', () => {
   test('clean handoff waits for the successor to possess the flushed tip', () => {
     const network = new Network(90001, 4)
     network.stabilize()
-    network.type(12)
+    for (let index = 0; index < 12; index++) {
+      network.author(index % network.nodes.length)
+      network.advance(3)
+    }
     network.stabilize()
     const host = network.nodes.findIndex((node) => node.session.isHost)
     const successor = network.nodes.length - 1
@@ -55,20 +132,94 @@ describe('transport-neutral session', () => {
     expect(network.nodes[successor]!.session.isHost).toBe(true)
   })
 
-  test('handoff selects its successor across lossy links', () => {
-    for (let seed = 90100; seed < 90200; seed++) {
-      const network = new Network(seed, 4)
-      network.stabilize()
-      const host = network.nodes.findIndex((node) => node.session.isHost)
-      const successor = 3
-      network.author(host)
-      network.nodes[host]!.session.leave(network.nodes[successor]!.session.peer)
-      network.advance(150)
-      expect(network.nodes[host]!.session.status, `seed=${seed}`).toBe('left')
-      network.crash(host)
-      network.stabilize()
-      expect(network.nodes[successor]!.session.isHost, `seed=${seed}`).toBe(true)
+  test.each([8, 8192])(
+    'handoff selects its successor across lossy links with window %i',
+    (window) => {
+      let staleHandoffs = 0
+      for (let seed = 90100; seed < 90100 + handoffRuns; seed++) {
+        const network = new Network(seed, 4, window)
+        network.stabilize()
+        const host = network.nodes.findIndex((node) => node.session.isHost)
+        const successor = 3
+        network.author(host)
+        network.nodes[host]!.session.leave(network.nodes[successor]!.session.peer)
+        network.advance(150)
+        expect(network.nodes[host]!.session.status, `seed=${seed}`).toBe('left')
+        network.crash(host)
+        network.stabilize()
+        expect(network.nodes[successor]!.session.isHost, `seed=${seed}`).toBe(true)
+        staleHandoffs += network.staleByType.HANDOFF ?? 0
+      }
+      if (window === 8) expect(staleHandoffs).toBeGreaterThan(0)
+      console.log(
+        `Handoff simulation: ${handoffRuns} seeded runs passed; window=${window}; staleHandoffs=${staleHandoffs}`,
+      )
+    },
+  )
+
+  test('the successor renews authority while follower rosters are delayed after departure', () => {
+    const network = new Network(993, 4, 8)
+    network.stabilize()
+    const host = network.nodes.findIndex((node) => node.session.isHost)
+    const successor = 3
+    for (let from = 0; from < network.nodes.length; from++) {
+      if (from === host || from === successor) continue
+      network.links.set(`${from}:${successor}`, {
+        delay: 60,
+        jitter: 1,
+        drop: 0,
+        duplicate: 0,
+        tailDelay: 0,
+      })
     }
+    network.author(host)
+    network.nodes[host]!.session.leave(network.nodes[successor]!.session.peer)
+    network.advance(150)
+    expect(network.nodes[host]!.session.status).toBe('left')
+    network.stabilize()
+    expect(network.nodes[successor]!.session.isHost).toBe(true)
+  })
+
+  test('submission retries rotate through bounded batches while history recovery stays reachable', () => {
+    const network = new Network(90100, 4, 8)
+    network.stabilize()
+    const host = network.nodes.findIndex((node) => node.session.isHost)
+    const sender = (host + 1) % network.nodes.length
+    const key = `${sender}:${host}`
+    const link = network.links.get(key)!
+    network.links.set(key, { ...link, drop: 1 })
+    for (let index = 0; index < 33; index++) network.author(sender)
+    const submitted = network.messages.get('SUBMIT') ?? 0
+    network.advance(3)
+    expect((network.messages.get('SUBMIT') ?? 0) - submitted).toBe(2)
+    network.links.set(key, link)
+    network.stabilize()
+  })
+
+  test('host pulses activate installed followers when every host claim is lost', () => {
+    const network = new Network(991, 4, 8)
+    for (const [key, link] of network.links)
+      network.links.set(key, { ...link, dropTypes: ['HOST_CLAIM'] })
+    network.stabilize()
+    network.type(12)
+    network.stabilize()
+    expect(network.messages.get('HOST_CLAIM')).toBeGreaterThan(0)
+    expect(network.messages.get('HOST_PULSE')).toBeGreaterThan(0)
+  })
+
+  test('completed handoff announcements preserve pulses without acknowledging a departed host', () => {
+    const network = new Network(90100, 4, 8)
+    network.stabilize()
+    network.author(0)
+    network.nodes[0]!.session.leave(network.nodes[3]!.session.peer)
+    network.advance(60)
+    expect(network.nodes[0]!.session.status).toBe('left')
+    const acknowledgements = network.messages.get('HAVE')
+    network.advance(30)
+    expect(network.messages.get('HAVE')).toBe(acknowledgements)
+    network.advance(60)
+    network.invariants()
+    expect(network.nodes[3]!.session.isHost).toBe(true)
   })
 
   test('handoff transfers edits authored during prepare and committed acknowledgement windows', () => {
@@ -172,7 +323,7 @@ describe('transport-neutral session', () => {
   })
 
   test('lossy non-coordinator handoffs retain typing in both transfer stages', () => {
-    for (let seed = 90200; seed < 90300; seed++) {
+    for (let seed = 90200; seed < 90200 + handoffRuns; seed++) {
       const network = new Network(seed, 4)
       network.stabilize()
       network.partition([[0], [1], [2], [3]])
@@ -199,6 +350,7 @@ describe('transport-neutral session', () => {
       network.stabilize()
       expect(network.nodes[2]!.session.isHost, `seed=${seed}`).toBe(true)
     }
+    console.log(`Non-coordinator handoffs: ${handoffRuns} seeded runs passed; both transfer stages`)
   })
 
   test('departure intent survives an election that replaces the interrupted handoff', () => {

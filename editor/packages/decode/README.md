@@ -1,14 +1,16 @@
 # @singapore-editor/decode
 
-an editor plugin that makes a file look like it's being written when it opens. the text reveals itself as if a model were generating it in front of you
+Text reveal animations for documents opened in the Singapore editor.
 
-add the plugin to turn it on, remove it to turn it off. there's no setting or command
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
 
-## try it
+## Install
 
 ```sh
 npm install @singapore-editor/core @singapore-editor/decode
 ```
+
+## Usage
 
 ```ts
 import { Editor } from '@singapore-editor/core/editor'
@@ -16,7 +18,11 @@ import { createDecodePlugin } from '@singapore-editor/decode'
 import '@singapore-editor/core/style.css'
 import '@singapore-editor/decode/style.css'
 
-const editor = new Editor(document.querySelector('#editor')!, {
+const host = document.createElement('div')
+host.style.height = '400px'
+document.body.append(host)
+
+const editor = new Editor(host, {
   plugins: [createDecodePlugin({ mode: 'parallel' })],
 })
 editor.openDocument({
@@ -26,26 +32,20 @@ editor.openDocument({
 })
 ```
 
-## modes
+## API highlights
 
-- `autoregressive` (default) writes line by line from the top, with a caret riding the edge
-- `parallel` writes every line left to right at once, each starting at a random offset
-- `token` reveals one word-ish token at a time, at a steady rate
-- `diffusion` fills the rows with noisy glyphs that settle into the real text
+- `createDecodePlugin()` adds a reveal animation.
+- `mode` selects line, parallel, token, or diffusion reveals.
+- `maxDurationMs` caps the animation duration.
 
-## options
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/decode/overview/)
 
-all optional, all in milliseconds unless noted
+## In the Singapore family
 
-- `perCharMs` per character, default 20
-- `perTokenMs` per token in `token` mode, default 65
-- `speed` multiplies whichever mode is active, default 1
-- `maxDurationMs` caps the whole reveal, default 1400
-- `staggerMs` is the random start window in `parallel` mode, default 420
-- `maxRows` caps how many visible rows animate, default 400
+`@singapore-editor/core` owns the editor view. Add this plugin to animate newly opened documents.
 
-## behavior
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
 
-rows stay hidden from open until the first highlight settles, so the reveal is already colored. a document with no highlighter starts at once, and a failed highlight reveals uncolored
+## License
 
-a keypress, click, wheel or any scroll cancels the reveal and shows the text. reduced motion turns the animation off
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)

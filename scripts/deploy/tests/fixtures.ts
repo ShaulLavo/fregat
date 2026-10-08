@@ -29,6 +29,7 @@ return new Response('fixture');}})`,
   )
   for (const file of [
     'remote-support.js',
+    'pair.js',
     'pty-host.js',
     'watch-worker.ts',
     'image-worker.ts',

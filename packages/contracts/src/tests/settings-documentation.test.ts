@@ -54,7 +54,7 @@ test('quiet concurrency presents its accepted copy with the advanced machine pol
 test('installation metadata preserves its execution policy and copy', () => {
   expect(presentSetting('developer.deployTarget')).toMatchObject({
     title: 'Installation target',
-    description: 'Install releases and pair through Mesh and systemd.',
+    description: 'Install releases through Mesh and systemd.',
     default: null,
     scope: 'machine',
     widget: 'complex',

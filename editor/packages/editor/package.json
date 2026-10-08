@@ -1,6 +1,19 @@
 {
   "name": "@singapore-editor/core",
   "version": "0.2.6",
+  "description": "The browser editor at the core of Singapore, with text editing, selections, undo history, themes, and plugins.",
+  "keywords": [
+    "browser",
+    "code-editor",
+    "editor",
+    "singapore",
+    "typescript",
+    "undo"
+  ],
+  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/core/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

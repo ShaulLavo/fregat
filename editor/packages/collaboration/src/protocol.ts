@@ -89,7 +89,7 @@ export interface Payloads<E extends EditEnvelope> {
     | { readonly handoffStage?: never; readonly pending?: never }
     | { readonly handoffStage: 'prepare' | 'commit'; readonly pending: readonly EditId[] }
   )
-  HISTORY_REQUEST: { readonly tip: Checkpoint; readonly from: Checkpoint }
+  HISTORY_REQUEST: { readonly tip: Checkpoint; readonly from: Checkpoint; readonly index: number }
   HISTORY_CHUNK: {
     readonly tip: Checkpoint
     readonly from: Checkpoint

@@ -257,6 +257,48 @@ test('presence travels on PRESENCE without entering document history; remote LEA
   detach()
 })
 
+test('session replay bounds presence while its clock floor admits fresh reordered state', () => {
+  const network = new Network(997, 2, 8)
+  const session = network.nodes[0]!.session
+  const peer = network.nodes[1]!.session.peer
+  const presence = new Presence(session.peer, 'document', session)
+  const detach = presence.attach()
+  const base = {
+    version: 1 as const,
+    room: 'room',
+    document: 'document',
+    sender: peer,
+    epoch: 'epoch',
+  }
+  const receive = (messageId: number, clock: number) =>
+    session.receive({ ...base, messageId, type: 'PRESENCE', payload: payload(peer, clock) })
+  try {
+    expect(
+      session.receive({
+        ...base,
+        messageId: 32,
+        type: 'HAVE',
+        payload: { tip: genesis, epoch: 'epoch' },
+      }),
+    ).toBe(true)
+    expect(receive(31, 1)).toBe(true)
+    expect(presence.states[0]?.presenceClock).toBe(1)
+    expect(receive(31, 2)).toBe(false)
+    expect(receive(24, 3)).toBe(false)
+    expect(receive(25, 2)).toBe(true)
+    session.tick(50)
+    expect(presence.states[0]?.presenceClock).toBe(2)
+    expect(receive(33, 1)).toBe(true)
+    expect(presence.states[0]?.presenceClock).toBe(2)
+    expect(receive(34, 3)).toBe(true)
+    session.tick(100)
+    expect(presence.states[0]?.presenceClock).toBe(3)
+  } finally {
+    detach()
+    presence.dispose()
+  }
+})
+
 test('detach preserves clocks across reattachment and room disposal clears retained state', () => {
   const channel = wire()
   const presence = new Presence('local', 'document', channel.channel)
@@ -350,6 +392,8 @@ test('coalesces each inbound peer to latest state, preserves clocks and removes 
 test('completed local host handoff clears remote awareness on the readable final document', () => {
   const network = new Network(90001, 4)
   network.stabilize()
+  for (const [key, link] of network.links)
+    network.links.set(key, { ...link, delay: 1, jitter: 1, drop: 0, duplicate: 0, tailDelay: 0 })
   const host = network.nodes.findIndex((node) => node.session.isHost)
   const successor = (host + 1) % network.nodes.length
   const departed = network.nodes[host]!
