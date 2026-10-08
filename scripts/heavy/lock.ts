@@ -6,10 +6,18 @@ import path from 'node:path'
 const LOCK_SH = 1
 const LOCK_EX = 2
 const LOCK_NB = 4
+const F_DUPFD_CLOEXEC = 1030
 // NOT-PORTABLE: Eager libc.so.6 loading prevents test collection on macOS and musl Linux.
 const libc = dlopen('libc.so.6', {
   flock: { args: [FFIType.i32, FFIType.i32], returns: FFIType.i32 },
+  fcntl: { args: [FFIType.i32, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
 })
+
+// F_DUPFD_CLOEXEC keeps the source above stdio 0–7 so child remapping cannot overwrite it.
+export function duplicateDescriptor(fd: number): number | null {
+  const copy = libc.symbols.fcntl(fd, F_DUPFD_CLOEXEC, 8)
+  return copy < 0 ? null : copy
+}
 
 export type LockMode = 'shared' | 'exclusive'
 

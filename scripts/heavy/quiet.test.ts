@@ -1172,6 +1172,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
     const box = quietBox(600)
     const releaseQuiet = path.join(box.root, 'release-quiet')
     const payload = path.join(box.root, 'ordinary-payload')
+    const successorPayload = path.join(box.root, 'successor-payload')
     const preload = path.join(box.root, 'disconnected.ts')
     const diagnostic = 'Failed to start transient scope unit: Transport endpoint is not connected'
     writeFileSync(
@@ -1188,6 +1189,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
       quiet: true,
     })
     let ordinary: ReturnType<typeof start> | undefined
+    let successor: ReturnType<typeof start> | undefined
     try {
       await expect.poll(quiet.stdout).toContain('started')
       ordinary = start(box, 'ordinary', ['touch', payload], {
@@ -1201,10 +1203,15 @@ describe.skipIf(!userScopes)('quiet holds', () => {
       writeFileSync(releaseQuiet, '')
       expect((await quiet.done).code).toBe(0)
       const result = await ordinary.done
-      expect(result.code, result.stderr).toBe(1)
+      expect(result.code, result.stderr).toBe(2)
       expect(result.stderr).toContain(diagnostic)
       const record = recordOf(box, 'ordinary')!
-      expect(record).toMatchObject({ exitCode: 1, quiet: false })
+      expect(record).toMatchObject({
+        exitCode: 1,
+        quiet: false,
+        launchFailure: 'manager-transport',
+        recovery: { initialExitCode: 1, exitCode: 1 },
+      })
       expect(existsSync(payload)).toBe(false)
       expect(sliceState(box.sliceRoot, record.slice!)).not.toBe('running')
       for (const place of ['jobs', 'queue']) {
@@ -1218,10 +1225,17 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         if (fd !== null) unlock(fd)
         expect(fd).not.toBeNull()
       }
+      successor = start(box, 'after-disconnection', ['touch', successorPayload], {
+        jobClass: 'suite',
+        machine: true,
+      })
+      expect((await successor.done).code).toBe(0)
+      expect(existsSync(successorPayload)).toBe(true)
     } finally {
       writeFileSync(releaseQuiet, '')
       ordinary?.child.kill('SIGTERM')
-      await Promise.all([quiet.done, ordinary?.done])
+      successor?.child.kill('SIGTERM')
+      await Promise.all([quiet.done, ordinary?.done, successor?.done])
     }
   })
 
