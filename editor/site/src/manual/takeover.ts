@@ -225,13 +225,21 @@ function headingLine(text: string, hash: string): number | null {
   return null
 }
 
-function revealFragment(hash: string) {
+/** A heading the fragment names, else the place a history entry recorded, else the top. */
+function reveal(hash: string, place?: number) {
   const line = headingLine(tabs.get(current)?.text ?? '', hash)
-  if (line === null) return
-  scrollToLine(line)
+  if (line !== null) scrollToLine(line)
+  else docs?.editor.setScrollPosition({ top: place ?? 0 })
 }
 
-async function openFile(file: string, push: boolean, hash = '') {
+// Back must return to where the reader was, so the outgoing entry keeps its scroll position.
+function pushEntry(file: string, hash: string, url: string) {
+  const place = docs?.editor.getScrollPosition().top
+  history.replaceState({ ...(history.state as object | null), place }, '')
+  history.pushState({ file, hash }, '', url)
+}
+
+async function openFile(file: string, push: boolean, hash = '', place?: number) {
   const id = ++navigation
   const page = pages.get(file)
   if (!page) return
@@ -240,8 +248,9 @@ async function openFile(file: string, push: boolean, hash = '') {
     return
   }
   if (file === current) {
-    if (push && hash) history.pushState({ file, hash }, '', page.url + hash)
-    revealFragment(hash)
+    if (push && hash) pushEntry(file, hash, page.url + hash)
+    if (push && !hash) return
+    reveal(hash, place)
     return
   }
   const previous = tabs.get(current)
@@ -264,7 +273,7 @@ async function openFile(file: string, push: boolean, hash = '') {
   docs.element.setAttribute('aria-label', label(file))
   body.dataset.file = file
   document.title = `${page.title} · Singapore docs`
-  if (push) history.pushState({ file, hash }, '', page.url + hash)
+  if (push) pushEntry(file, hash, page.url + hash)
   const [directory, name] = splitPath(file)
   document.querySelector('.path')!.innerHTML = `docs/${directory}<b></b>`
   document.querySelector('.path b')!.textContent = name
@@ -281,7 +290,7 @@ async function openFile(file: string, push: boolean, hash = '') {
     if (id === navigation) location.href = page.url + hash
     return
   }
-  if (id === navigation) revealFragment(hash)
+  if (id === navigation) reveal(hash, place)
 }
 
 const splitPath = (file: string) => {
@@ -308,8 +317,8 @@ document.addEventListener('click', (event) => {
 })
 
 window.addEventListener('popstate', (event) => {
-  const state = event.state as { file?: string; hash?: string } | null
-  if (state?.file) void openFile(state.file, false, state.hash ?? location.hash)
+  const state = event.state as { file?: string; hash?: string; place?: number } | null
+  if (state?.file) void openFile(state.file, false, state.hash ?? location.hash, state.place)
 })
 history.replaceState({ file: current, hash: location.hash }, '')
 
