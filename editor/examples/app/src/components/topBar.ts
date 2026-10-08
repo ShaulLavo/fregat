@@ -23,7 +23,10 @@ class TopBarController implements TopBar {
   private readonly diffButton = toolbarButton('Diff')
 
   constructor() {
-    this.element.append(this.repositoryName, this.editButton, this.diffButton)
+    const collaboration = document.createElement('a')
+    collaboration.href = './collaboration.html'
+    collaboration.textContent = 'Edit together'
+    this.element.append(this.repositoryName, this.editButton, this.diffButton, collaboration)
     this.setViewMode('edit')
   }
 

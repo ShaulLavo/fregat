@@ -1,6 +1,6 @@
 # @singapore-editor/collaboration
 
-Session protocols, transports, and remote cursor presence for host-ordered collaboration.
+Editor binding, session protocols, transports, and remote cursor presence for host-ordered collaboration.
 
 Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
 
@@ -26,6 +26,8 @@ presence.dispose()
 
 ## API highlights
 
+- `createCollaborationPlugin()` attaches shared editing and selective Undo to an editor view.
+- `CollaborationDocument` bridges the collab engine to session history.
 - `Session` runs the transport-neutral protocol with a host-supplied document engine.
 - `Presence` tracks remote selections and cursors.
 - `parsePresence()` validates received presence messages.

@@ -20,6 +20,7 @@
     "examples/**/*.ts",
     "vitest.browser.config.ts",
     "vitest.server.config.ts",
+    "vitest.editor.config.ts",
     "../../global.d.ts"
   ]
 }

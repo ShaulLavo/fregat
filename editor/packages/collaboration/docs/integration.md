@@ -5,10 +5,48 @@ It chooses an ordering host, recovers after host failure, and preserves both bra
 edits when network partitions rejoin. A confirmation means acceptance on the current
 branch. Reconciliation can return a branch-confirmed edit to pending.
 
-The default entry contains the runtime-neutral session protocol and character-based
-presence. The `/transports` entry adds native WebRTC, encrypted WebSocket signaling
+The default entry contains the runtime-neutral session protocol, character-based
+presence and the opt-in editor binding. The `/transports` entry adds native WebRTC, encrypted WebSocket signaling
 and same-origin BroadcastChannel links. The optional `presence-plugin` entry point
 paints remote carets and selections in an editor view.
+
+## Editor attachment
+
+The simple API needs no `openDocument` call:
+
+```ts
+import { Editor } from '@singapore-editor/core/editor'
+import { createCollaborationPlugin } from '@singapore-editor/collaboration'
+
+const plugin = createCollaborationPlugin({
+  session: {
+    peer: crypto.randomUUID(),
+    room,
+    document: 'code',
+    epoch: room,
+    text: initialText,
+  },
+  transport: { send: (peer, message) => router.send(peer, message) },
+  onReady: ({ session }) => {
+    // Connect an authenticated transport to receive/connect/disconnect on this session.
+    router = connectTransport(session)
+    return () => router.close()
+  },
+})
+const editor = new Editor(element, { defaultText: initialText, plugins: [plugin] })
+```
+
+Every room peer supplies the same document, epoch and bootstrap text. Every attachment uses a fresh peer ID. `onReady` exposes the transport-neutral Session and the document adapter. Production attachments tick automatically; simulations can supply `manualClock: true` and call `session.tick` explicitly. Timing and history-chunk bounds can be configured through `timing`. Import `@singapore-editor/collaboration/style.css` alongside the editor stylesheet. Supply `presence: { displayName, colour }` to publish this view’s identity-based selections and paint its peers. `onReady` also exposes the attached Presence. Presence has no view hooks when this option is absent.
+
+The plugin owns one document, including the anonymous document created by `new Editor(element)`. Local snapshot authoring gives inserted UTF-16 units their Participant identities before the editor applies them. Only exact committed local transactions submit those envelopes to Session. Confirmations and remote updates use Participant's effective edits in one `reconcile` publication, mapping selections and notifying syntax and decoration consumers without authored echoes or remote undo entries. Protocol elections select which peer's Host sequences the document.
+
+Every view attached to this buffer executes Undo and Redo through the participant's author-selective history and shares its availability. A different active document retains native editor history. Removing the plugin keeps the current text editable and releases its author, hooks and clock. Attachment starts a fresh selective-history boundary. Detachment starts native history from the latest merged engine text, so native snapshot Undo cannot restore an obsolete pre-session document. When a mutation lease holds the visible buffer, detachment queues that merged identity-free snapshot for lease release and publishes the actual current-to-final edits. Collaborative edits use effect history without adding native snapshots. A visual branching graph for collaborative effect history is a follow-up; the editor's existing graph is not a representation of collaborative undo branches.
+
+Run the editor example app and open `/collaboration.html` for two local editors and an invitation link. Same-origin peers use encrypted BroadcastChannel. To connect browsers, configure explicit signaling URLs, your own member’s broker admission token, ICE servers (including TURN credentials when needed) and transport policy on each browser before joining. The invitation secret remains in the fragment and does not enter signaling. The page has no public signaling or ICE defaults.
+
+## Core authoring contract
+
+`scope.authorEdits((before, edits, options) => snapshot)` registers one document-owned snapshot author and returns a disposable. The optional capture policy carries `history: 'skip'` for networked edits that stay outside selective Undo. The author supplies `canUndo` and `canRedo` callbacks for public editor state and `undo` and `redo` actions for every shared view. History actions publish their transitions through `reconcile`; mutation leases fence both author-owned and native history execution. Registration and disposal establish fresh native-history boundaries. The callback must apply the exact batch atomically, preserve its visible edit semantics, and return the identity-bearing snapshot. Native typing, IME commit, paste, indentation, deletion and programmatic edits use the same boundary. Network delivery remains in `onDidTransaction`; remote updates use `reconcile`. Non-local `applyEdits` and prepared transactions are rejected before mutation while an author is registered. Remote reconciliation held behind a mutation lease commits when the lease releases. Reconciliation validates visible edits through a persistent, identity-free structural fork, without reading or copying the whole document. Ordinary editors keep the existing piece-table mutation path and create no collaboration session, timer or transaction subscription.
 
 ## Integration boundary
 
@@ -28,8 +66,9 @@ dependencies wait for the explicit `dependencyTimeout`; after that bound, their
 original edits become rejected conflicts. A later-arriving dependency leaves that
 recorded outcome unchanged. The toy engine in
 `test/engine.ts` is deliberately an ordered ID/text list, independent of a text CRDT.
-The adapter for `@singapore-editor/collab`'s Host and Participant is follow-up work.
+`CollaborationDocument` bridges this interface to `@singapore-editor/collab`'s Host, Participant and identity-enabled TextbufferEngine.
 
+Call `leave()` for participant or final-peer departure, and `leave(successor)` for host handoff.
 After `status` becomes `left`, the caller closes the session's links and reports those
 closures to the surviving peers. Departure keeps its final document readable while
 later confirmations continue on the survivors.
@@ -141,7 +180,8 @@ retained announcements continue fencing old authority without generating acknowl
 
 The requested departure survives an intervening election. A re-elected outgoing host
 retries its handoff, choosing a connected successor if the requested one disconnected.
-A host with no connected successor retains its document until a peer connects.
+A requested handoff with no connected successor retains its document until a peer connects.
+Calling `leave()` closes the final peer after its pending work receives outcomes.
 An outgoing host that becomes a follower leaves after its pending
 work receives confirmed outcomes from the elected host. The election chooses authority
 using the same history rules. Calling `submit` after the session has left throws a

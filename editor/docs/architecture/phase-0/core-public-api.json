@@ -4768,6 +4768,12 @@
         },
         {
           "kind": "type",
+          "name": "DocumentEditAuthor",
+          "source": "packages/editor/src/documentSession.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
           "name": "DocumentSessionApplyEditsOptions",
           "source": "packages/editor/src/documentSession.ts",
           "via": "packages/editor/src/public/extensions.ts"

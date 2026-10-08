@@ -155,6 +155,13 @@
     "singapore-editor-site#typecheck": {
       "dependsOn": ["^build", "build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/package.json"]
+    },
+    "@singapore-editor/collaboration#test:editor": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/editor/src/**"],
+      "env": ["COLLABORATION_MEASURE", "COLLABORATION_EVIDENCE_DIR"],
+      "outputs": [],
+      "cache": false
     }
   },
   "agentGuidance": false
