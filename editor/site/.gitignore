@@ -1,0 +1,4 @@
+.astro/
+dist/
+src/content/docs/docs/reference/api/
+.samples-*/

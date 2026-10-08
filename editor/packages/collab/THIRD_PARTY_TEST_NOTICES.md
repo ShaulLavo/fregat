@@ -8,7 +8,14 @@ notices remain in `THIRD_PARTY_LICENSES`. No Fugue B4 editing trace is included.
 
 Source: https://github.com/loro-dev/loro
 Revision: `c00c9fa501f8d32f68d6255eacb7035a67fb6ab6`.
-Adapted placement, tombstone-origin, Unicode, cursor and plain-text generator tests.
+Adapted placement, tombstone-origin, Unicode, cursor, plain-text generator and undo tests.
+
+`test/ported/loro-undo.test.ts` covers all 15 undo scenarios listed in
+`docs/collab-editing/c-undo.md` §5. Rich-text marks are excluded. Provenance-only
+steps advance history, and revival reuses original IDs. The cursor scenario keeps
+its two remote insertions and captured endpoint identities. Tombstone origins
+place the remote insertion before the revived original span; endpoint offsets
+therefore differ from Loro's fresh-ID restoration.
 
 MIT License
 
@@ -36,7 +43,17 @@ SOFTWARE.
 
 Source: https://github.com/yjs/yjs
 Revision: `d01eefc997cf12d29d5aabea804df5f69c659a79`.
-Adapted basic text, character-array, relative-position and message scheduler tests.
+Adapted basic text, character-array, relative-position, message scheduler and undo tests.
+
+`test/ported/yjs-undo.test.ts` ports the plain-text aspects of `testUndoText`,
+`testUndoEvents`, `testTrackClass`, `testTypeScope`,
+`testUndoUntilChangePerformed`, `testConsecutiveRedoBug`,
+`testSpecialDeletionCase` and `testUndoDoingStackItem`. Scope is one document,
+origins are captured local edits, and metadata stays caller-owned. No-visible-change
+undo advances one transaction. `testUndoDeleteFilter` and
+`testUndoNestedUndoIssue` are explicitly skipped because protected targets and
+nested shared objects have no plain-text counterpart. Attribute/formatting tests
+remain outside the package's scope.
 
 The MIT License (MIT)
 
@@ -123,3 +140,60 @@ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
 WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
 OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+## Zed undo semantics
+
+Source: https://github.com/zed-industries/zed/tree/dc3fb21676457b84d2233ac4c6bec5cebc698ec3/crates/text
+Revision: `dc3fb21676457b84d2233ac4c6bec5cebc698ec3`.
+`crates/text` is GPL-3.0-or-later, as stated in its `Cargo.toml` and `LICENSE-GPL`.
+No Zed code, fixtures, comments or translated implementation are included.
+`test/ported/zed-undo.test.ts` independently implements the documented semantic
+scenarios for `test_undo_redo`, `test_finalize_last_transaction`,
+`test_concurrent_edits`, `test_edit_partially_intersecting_a_deleted_fragment`,
+`test_random_concurrent_edits` and `test_edit_undo_after_split` using Singapore's
+public API and fresh fixtures. The provenance header identifies this distinction.
+
+## Singapore scenario coverage and follow-ups
+
+`test/undo.test.ts` exercises the package-layer behavior from the 14 cases in
+`docs/collab-editing/c-undo.md` §5. The following remain with their owning layers.
+
+| Case | Package coverage or follow-up                                                                                                                |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Atomic transaction activation switches sibling effects and preserves remote work. Editor graph traversal follows in the editor lane.         |
+| 2    | Grouped replacements reverse insertion and deletion together.                                                                                |
+| 3    | Initiating-view multi-cursor selection restoration requires the editor view layer.                                                           |
+| 4    | Same-ID revival and retained positions are covered. Jump history integration requires the editor.                                            |
+| 5    | Pending edit, undo, redo and remote replay capture local history once. Editor graph-node counting follows in the editor lane.                |
+| 6    | Repeated confirmations and command retransmission are deduplicated.                                                                          |
+| 7    | Deletes arriving at already-hidden spans retain independent provenance.                                                                      |
+| 8    | Save/reopen graph and anchor persistence requires editor storage.                                                                            |
+| 9    | Identity-keyed persistence rejection requires the editor persistence format.                                                                 |
+| 10   | Clearing retained undo entries leaves baseline effects active. Graph pruning follows in the editor lane.                                     |
+| 11   | Engine snapshots preserve provenance and command identities. Full host outcome/frontier transfer belongs to the collaboration session layer. |
+| 12   | Rejected commands and blocked dependants recover prior local history. Editor graph recovery follows in the editor lane.                      |
+| 13   | Provenance-only undo is accepted, sequenced and retained in snapshots. Durable storage follows in the persistence lane.                      |
+| 14   | File-tree shared-head undo integration belongs to Fregat's app layer.                                                                        |
+
+## Concurrent undo verification
+
+`src/visibility-model.ts` is an independently written scalar model. Every retained
+UTF-16 code unit has its insertion operation and all deletion operations, including
+deletes applied while hidden. Accepted host envelopes build the confirmed model.
+Each participant check uses that participant's confirmed host prefix and replays
+its pending, unblocked envelopes. Every simulation step checks visible text and
+visibility per identity before and after delivery. Placement order is inspected
+separately from the model's visibility decisions.
+
+`test/review-regressions.test.ts` includes the transport impersonation and remote
+capture reproductions. Its mutation control replaces visibility with a deliberately
+incorrect last-deletion-only rule and requires the simulator's scalar oracle to
+reject it. Remote effect commands resolve their original operations' identity spans
+for capture grouping; intersecting undo and redo seal the group, while disjoint
+commands keep it open.
+
+`Host.submit(envelope, sender)` requires the submitting author's authenticated
+session identity. A network adapter must get this value from its registered peer
+session. `InMemoryTransport.submit(participant, envelope, delay)` binds the sender
+to a participant registered when the transport was created, independently of the
+envelope. Missing, unregistered and mismatched senders fail before sequencing.

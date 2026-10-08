@@ -1,11 +1,10 @@
-import type { DocumentSession } from '../documentSession'
+import { createEditorDocumentSession, type DocumentSession } from '../documentSession'
 import {
   createStringTextSnapshot,
   type DocumentTextSnapshot,
   type TextSnapshot,
 } from '../documentTextSnapshot'
 import {
-  createEditorDocumentSession,
   normalizeEditorDocumentMode,
   normalizeEditorEditability,
   type ResetOwnedDocumentOptions,
@@ -146,7 +145,7 @@ export class EditorDocumentController {
   resetOwnedDocument(
     document: EditorOpenDocumentOptions,
     options: ResetOwnedDocumentOptions,
-  ): EditorDocumentAttachment {
+  ): EditorDocumentAttachment & { readonly text: string } {
     this.currentDocumentVersion += 1
     this.currentDocumentId =
       options.documentId ??
@@ -155,7 +154,8 @@ export class EditorDocumentController {
       document.documentMode ?? this.defaultDocumentMode,
     )
     this.currentLanguageId = document.languageId ?? null
-    this.currentSession = createEditorDocumentSession(document.text, this.currentDocumentMode)
+    const created = createEditorDocumentSession(document.text, this.currentDocumentMode)
+    this.currentSession = created.session
     this.currentSessionOptions = {}
     this.setRenderedTextSnapshot(this.currentSession.getTextSnapshot())
 
@@ -165,6 +165,7 @@ export class EditorDocumentController {
       languageId: this.currentLanguageId,
       session: this.currentSession,
       textSnapshot: this.currentSession.getTextSnapshot(),
+      text: created.text,
     }
   }
 

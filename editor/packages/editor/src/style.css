@@ -101,6 +101,8 @@
   --editor-row-height: 24px;
 
   flex: 1;
+  /* Constrain the scrollport before its document spacer sizes a block host's child. */
+  height: 100%;
   position: relative;
   overflow: auto;
   /* Written by the editor from its `fontSize` and `fontFamily` options. */

@@ -373,10 +373,9 @@ const placedPieces = (
   return pieces
 }
 
-// Hides [from, to) of an owned node's visible piece. The node keeps the first
-// part, so its reverse-index key stands; later parts become its successors.
-// A replacement's text goes where the hidden part begins.
-const hidePieceRange = (
+// Keep the first part's reverse-index key; splits become its successors.
+// Replacement text lands at the changed range's start.
+const setPieceRangeVisibility = (
   next: PieceTreeNode,
   from: number,
   to: number,
@@ -386,11 +385,12 @@ const hidePieceRange = (
   epoch: number,
   upperOrder: number | null,
   pending: InsertContext | null,
+  visible = false,
 ): PieceTreeNode | null => {
   const piece = next.piece
   const length = piece.length
   if (from === 0 && to === length) {
-    next.piece = { ...piece, visible: false }
+    next.piece = { ...piece, visible }
     return right
   }
 
@@ -398,7 +398,7 @@ const hidePieceRange = (
   const breaksBeforeTo = to === length ? piece.lineBreaks : lineBreaksBefore(buffers, piece, to)
   const tail: Piece[] = []
   if (from === 0) {
-    next.piece = slicePiece(piece, 0, to, piece.order, 0, breaksBeforeTo, false)
+    next.piece = slicePiece(piece, 0, to, piece.order, 0, breaksBeforeTo, visible)
     tail.push(
       slicePiece(
         piece,
@@ -407,15 +407,15 @@ const hidePieceRange = (
         orderAfter(piece.order, upper, context),
         breaksBeforeTo,
         piece.lineBreaks - breaksBeforeTo,
-        true,
+        piece.visible,
       ),
     )
   } else {
     const keptBreaks = lineBreaksBefore(buffers, piece, from)
     const hiddenOrder = orderAfter(piece.order, upper, context)
-    next.piece = slicePiece(piece, 0, from, piece.order, 0, keptBreaks, true)
+    next.piece = slicePiece(piece, 0, from, piece.order, 0, keptBreaks, piece.visible)
     tail.push(
-      slicePiece(piece, from, to, hiddenOrder, keptBreaks, breaksBeforeTo - keptBreaks, false),
+      slicePiece(piece, from, to, hiddenOrder, keptBreaks, breaksBeforeTo - keptBreaks, visible),
     )
     if (to < length) {
       tail.push(
@@ -426,7 +426,7 @@ const hidePieceRange = (
           orderAfter(hiddenOrder, upper, context),
           breaksBeforeTo,
           piece.lineBreaks - breaksBeforeTo,
-          true,
+          piece.visible,
         ),
       )
     }
@@ -567,7 +567,17 @@ export const hideVisibleRange = (
     const lower = left ? lastOrder(left) : lowerOrder
     left = appendRun(left, placedPieces(buffers, here, lower, order), epoch)
   }
-  right = hidePieceRange(next, cutFrom, cutTo, right, buffers, context, epoch, upperOrder, here)
+  right = setPieceRangeVisibility(
+    next,
+    cutFrom,
+    cutTo,
+    right,
+    buffers,
+    context,
+    epoch,
+    upperOrder,
+    here,
+  )
   return join(left, next, right, epoch)
 }
 
@@ -922,7 +932,11 @@ export const insertAtPieceBoundary = (
   return insertAtLanding(node, offset, node.piece.length, buffers, context, epoch, [lower, upper])
 }
 
-export type PieceHideRange = { readonly from: number; readonly to: number }
+export type PieceVisibilityRange = {
+  readonly from: number
+  readonly to: number
+  readonly visible?: boolean
+}
 
 const firstTargetAtOrAfter = (
   orders: readonly number[],
@@ -939,10 +953,10 @@ const firstTargetAtOrAfter = (
 }
 
 // Only descend toward targeted orders. Every range is relative to the original
-// piece, and hiding right to left keeps the remaining prefix's coordinates fixed.
-export const hideAtPieceRanges = (
+// piece; changing right to left keeps the remaining prefix's coordinates fixed.
+export const setAtPieceRanges = (
   node: PieceTreeNode | null,
-  targets: ReadonlyMap<number, readonly PieceHideRange[]>,
+  targets: ReadonlyMap<number, readonly PieceVisibilityRange[]>,
   orders: readonly number[],
   buffers: PieceTableBuffers,
   context: EditContext,
@@ -954,7 +968,7 @@ export const hideAtPieceRanges = (
   if (!node || from === to) return node
   const split = firstTargetAtOrAfter(orders, node.piece.order, from, to)
   const ranges = targets.get(node.piece.order)
-  let right = hideAtPieceRanges(
+  let right = setAtPieceRanges(
     node.right,
     targets,
     orders,
@@ -965,7 +979,7 @@ export const hideAtPieceRanges = (
     to,
     upper,
   )
-  const left = hideAtPieceRanges(
+  const left = setAtPieceRanges(
     node.left,
     targets,
     orders,
@@ -980,7 +994,7 @@ export const hideAtPieceRanges = (
   if (ranges) {
     for (let index = ranges.length - 1; index >= 0; index--) {
       const range = ranges[index]!
-      right = hidePieceRange(
+      right = setPieceRangeVisibility(
         next,
         range.from,
         range.to,
@@ -990,6 +1004,7 @@ export const hideAtPieceRanges = (
         epoch,
         upper,
         null,
+        range.visible ?? false,
       )
     }
   }
