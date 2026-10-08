@@ -161,8 +161,10 @@ class DomSurface implements RowRendererSurface {
     const declarations = this.container.style
     const leftDeclaration = `${left}px`
     const topDeclaration = `${top}px`
-    if (declarations.left !== leftDeclaration) declarations.left = leftDeclaration
-    if (declarations.top !== topDeclaration) declarations.top = topDeclaration
+    if (declarations.left !== leftDeclaration || declarations.getPropertyPriority('left') !== '')
+      declarations.left = leftDeclaration
+    if (declarations.top !== topDeclaration || declarations.getPropertyPriority('top') !== '')
+      declarations.top = topDeclaration
   }
 }
 

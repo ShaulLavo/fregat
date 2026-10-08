@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DomTerminalRenderer } from '../../render/dom/renderer.js'
 import { TerminalSession } from '../../term/session.js'
+import { Terminal as WorkerTerminal } from '../../worker/index.js'
 import { createTerminalElements, type TerminalElements } from '../elements.js'
 import { createGhosttyWebGpuTerminalFromSession } from '../terminal.js'
 
-const cleanups: (() => void)[] = []
-afterEach(() => {
+const cleanups: (() => void | Promise<void>)[] = []
+afterEach(async () => {
   vi.restoreAllMocks()
-  for (const cleanup of cleanups.splice(0).reverse()) cleanup()
+  for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
 })
 
 function mountedHost(): HTMLDivElement {
@@ -27,10 +28,14 @@ function observeStyles(element: HTMLElement): () => MutationRecord[] {
   return () => records.splice(0).concat(observer.takeRecords())
 }
 
-async function compositionProbe() {
+async function compositionProbe(inert = false, active = true) {
   const host = mountedHost()
+  host.style.fontSize = '31px'
   const elements = createTerminalElements(host)
-  let composition = elements.compositionView!
+  let composition: HTMLDivElement | undefined = inert
+    ? document.implementation.createHTMLDocument().createElement('div')
+    : elements.compositionView!
+  let peer: (() => void) | undefined
   const supplied: TerminalElements = {
     root: elements.root,
     textarea: elements.textarea,
@@ -48,6 +53,7 @@ async function compositionProbe() {
     setPadding: (padding) => elements.setPadding(padding),
     positionTextarea: (position) => {
       elements.positionTextarea(position)
+      if (!composition) return
       composition.style.left = elements.textarea.style.left
       composition.style.top = elements.textarea.style.top
     },
@@ -63,15 +69,40 @@ async function compositionProbe() {
     accessibility: false,
     autoFit: false,
     elements: supplied,
-    rendererFactory: (options) => DomTerminalRenderer.create(options),
+    rendererFactory: (options) =>
+      DomTerminalRenderer.create({ ...options, onFrame: () => peer?.() }),
   })
   cleanups.push(() => terminal.dispose())
   await terminal.open(host)
+  terminal.focus()
+  if (active) {
+    elements.textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+    elements.textarea.value = '漢'
+    elements.textarea.dispatchEvent(
+      new InputEvent('input', {
+        bubbles: true,
+        data: '漢',
+        inputType: 'insertCompositionText',
+        isComposing: true,
+      }),
+    )
+    expect(composition!.style.fontSize).toBe('15px')
+  }
   const frame = host.querySelector<HTMLDivElement>('.ghostty-webgpu-frame')!
   terminal.write('\x1b[6;1H\x1b[2Kedit 0000')
   await vi.waitFor(() => expect(frame.textContent).toContain('edit 0000'))
   return {
-    composition: () => composition,
+    terminal,
+    elements,
+    host,
+    setPeer: (callback: () => void) => {
+      peer = callback
+    },
+    composition: () => composition!,
+    remove: () => {
+      composition?.remove()
+      composition = undefined
+    },
     update: async () => {
       terminal.write('\x1b[6;1H\x1b[2Kedit 0001')
       await vi.waitFor(() => expect(frame.textContent).toContain('edit 0001'))
@@ -80,7 +111,7 @@ async function compositionProbe() {
       const next = document.createElement('div')
       next.className = 'ghostty-webgpu-composition'
       next.hidden = true
-      composition.replaceWith(next)
+      composition?.replaceWith(next)
       composition = next
       return next
     },
@@ -88,6 +119,145 @@ async function compositionProbe() {
 }
 
 describe('terminal UI declarations', () => {
+  it('styles the first visible preedit synchronously and leaves idle appearance untouched', async () => {
+    const probe = await compositionProbe(false, false)
+    const composition = probe.composition()
+    expect(composition.hidden).toBe(true)
+    expect(composition.style.fontSize).toBe('')
+    probe.elements.textarea.dispatchEvent(
+      new CompositionEvent('compositionstart', { bubbles: true }),
+    )
+    expect(composition.hidden).toBe(true)
+    probe.elements.textarea.value = '漢'
+    probe.elements.textarea.dispatchEvent(
+      new InputEvent('input', {
+        bubbles: true,
+        data: '漢',
+        inputType: 'insertCompositionText',
+        isComposing: true,
+      }),
+    )
+    expect(composition.hidden).toBe(false)
+    expect(composition.style.fontSize).toBe('15px')
+    expect(composition.style.minHeight).not.toBe('')
+    probe.elements.textarea.dispatchEvent(
+      new CompositionEvent('compositionend', {
+        bubbles: true,
+        data: '漢',
+      }),
+    )
+    expect(composition.hidden).toBe(true)
+    composition.style.fontSize = '31px'
+    await probe.update()
+    expect(composition.style.fontSize).toBe('31px')
+  })
+
+  it('styles the first worker preedit when input becomes ready', async () => {
+    const family = 'PreeditWorker'
+    const source = new URL(
+      '../../../site/public/fonts/jetbrains-mono-latin-400-normal.woff2',
+      import.meta.url,
+    ).href
+    const face = await new FontFace(family, `url(${JSON.stringify(source)})`).load()
+    document.fonts.add(face)
+    cleanups.push(() => {
+      document.fonts.delete(face)
+    })
+    let observed = false
+    const terminal = await WorkerTerminal.create({
+      accessibility: {},
+      autoFit: false,
+      appearance: { font: { family, size: 15 }, cursor: { blink: false } },
+      backend: 'webgl',
+      fonts: [{ family, source: { url: source } }],
+      workerUrl: new URL('../../../dist/worker/entry.js', import.meta.url),
+      inputHooks: {
+        inputReady: () => {
+          const textarea = terminal.textarea!
+          textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+          textarea.value = '漢'
+          textarea.dispatchEvent(
+            new InputEvent('input', {
+              bubbles: true,
+              data: '漢',
+              inputType: 'insertCompositionText',
+              isComposing: true,
+            }),
+          )
+          const composition = terminal.element!.querySelector<HTMLElement>(
+            '.ghostty-webgpu-composition',
+          )!
+          expect(composition.hidden).toBe(false)
+          expect(composition.style.fontSize).toBe('15px')
+          expect(composition.style.minHeight).not.toBe('')
+          console.info('First worker preedit', {
+            submittedFrameAvailable: terminal.submittedFrame !== undefined,
+          })
+          observed = true
+        },
+      },
+    })
+    cleanups.push(() => terminal.dispose())
+    await terminal.open(mountedHost())
+    expect(observed).toBe(true)
+  })
+
+  it('restores active preedit after a renderer peer in the same callback', async () => {
+    const probe = await compositionProbe()
+    let first = true
+    probe.setPeer(() => {
+      if (!first) return
+      first = false
+      probe.composition().style.removeProperty('font-size')
+    })
+    await probe.update()
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    expect(probe.composition().hidden).toBe(false)
+    expect(probe.composition().style.fontSize).toBe('15px')
+    expect(getComputedStyle(probe.composition()).fontSize).toBe('15px')
+  })
+
+  it('restores priority-only changes to owned preedit and caret declarations', async () => {
+    const probe = await compositionProbe()
+    const composition = probe.composition()
+    const rules = document.createElement('style')
+    rules.textContent = '.priority-font { font-size: 25px !important }'
+    document.head.append(rules)
+    cleanups.push(() => rules.remove())
+    composition.classList.add('priority-font')
+    expect(getComputedStyle(composition).fontSize).toBe('25px')
+    composition.style.setProperty('font-size', composition.style.fontSize, 'important')
+    for (const property of ['left', 'top']) {
+      probe.elements.textarea.style.setProperty(
+        property,
+        probe.elements.textarea.style.getPropertyValue(property),
+        'important',
+      )
+    }
+    await probe.update()
+    expect(composition.style.getPropertyPriority('font-size')).toBe('')
+    expect(getComputedStyle(composition).fontSize).toBe('25px')
+    expect(probe.elements.textarea.style.getPropertyPriority('left')).toBe('')
+    expect(probe.elements.textarea.style.getPropertyPriority('top')).toBe('')
+  })
+
+  it('supports active preedit in a supplied inert-document element', async () => {
+    const probe = await compositionProbe(true)
+    expect(probe.composition().ownerDocument.defaultView).toBeNull()
+    expect(probe.composition().style.fontSize).toBe('15px')
+    probe.composition().style.removeProperty('font-size')
+    await probe.update()
+    expect(probe.composition().style.fontSize).toBe('15px')
+  })
+
+  it('releases preedit cache and observer ownership when the optional element disappears', async () => {
+    const probe = await compositionProbe()
+    probe.remove()
+    await probe.update()
+    expect(Reflect.get(probe.terminal, 'preeditAppearance')).toBeUndefined()
+    expect(Reflect.get(probe.terminal, 'preeditObserver')).toBeUndefined()
+  })
+
   it('restores caret declarations after exposed inline styles change', () => {
     const elements = createTerminalElements(mountedHost())
     cleanups.push(() => elements.dispose())
@@ -131,7 +301,7 @@ describe('terminal UI declarations', () => {
       },
     })
     const terminal = createGhosttyWebGpuTerminalFromSession(session, {
-      accessibility: false,
+      accessibility: {},
       autoFit: false,
       rendererFactory: (options) => DomTerminalRenderer.create(options),
     })
@@ -148,6 +318,8 @@ describe('terminal UI declarations', () => {
     const styleReads = vi.spyOn(preedit, 'style', 'get')
     expect(preedit.style).toBe(declaration)
     styleReads.mockClear()
+    expect(terminal.measure('漢')).toBe(2)
+    expect(styleReads).not.toHaveBeenCalled()
     terminal.write('\x1b[6;1H\x1b[2Kedit 0001')
     await vi.waitFor(() => expect(frame.textContent).toContain('edit 0001'))
     expect(preedit.getAttribute('style')).toBe(before)

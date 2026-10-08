@@ -182,10 +182,13 @@ class OwnedTerminalElements implements TerminalElements {
     const top = `${y}px`
     const inputStyle = this.textarea.style
     const compositionStyle = this.compositionView.style
-    if (inputStyle.left !== left) inputStyle.left = left
-    if (inputStyle.top !== top) inputStyle.top = top
-    if (compositionStyle.left !== left) compositionStyle.left = left
-    if (compositionStyle.top !== top) compositionStyle.top = top
+    if (inputStyle.left !== left || inputStyle.getPropertyPriority('left') !== '')
+      inputStyle.left = left
+    if (inputStyle.top !== top || inputStyle.getPropertyPriority('top') !== '') inputStyle.top = top
+    if (compositionStyle.left !== left || compositionStyle.getPropertyPriority('left') !== '')
+      compositionStyle.left = left
+    if (compositionStyle.top !== top || compositionStyle.getPropertyPriority('top') !== '')
+      compositionStyle.top = top
   }
 
   replaceCanvas(): HTMLCanvasElement {

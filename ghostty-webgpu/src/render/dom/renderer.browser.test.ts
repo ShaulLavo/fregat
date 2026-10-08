@@ -690,14 +690,36 @@ it('isolates fixed-grid layout through theme and font changes', async () => {
   const probe = await rendererProbe('dom')
   const frame = () =>
     probe.canvas.parentElement!.querySelector<HTMLElement>('.ghostty-webgpu-frame')!
-  expect(frame().style.contain).toBe('strict')
+  expect(frame().style.contain).toBe('layout paint')
   probe.renderer.setTheme({ background: { r: 1, g: 2, b: 3 } })
   probe.clock.flush()
-  expect(frame().style.contain).toBe('strict')
+  expect(frame().style.contain).toBe('layout paint')
   probe.renderer.setFont({ ...probeFont, cssCellWidth: 12, deviceCellWidth: 12 })
   probe.clock.flush()
-  expect(frame().style.contain).toBe('strict')
+  expect(frame().style.contain).toBe('layout paint')
   expect(frame().getBoundingClientRect().width).toBe(144)
+})
+
+it('preserves row-derived frame height when the host overrides height to auto', async () => {
+  const probe = await rendererProbe('dom')
+  const frame = probe.canvas.parentElement!.querySelector<HTMLElement>('.ghostty-webgpu-frame')!
+  const height = 3 * probeFont.cssCellHeight
+  expect(frame.getBoundingClientRect().height).toBe(height)
+  frame.style.height = 'auto'
+  expect(frame.getBoundingClientRect().height).toBe(height)
+})
+
+it('restores priority-only changes to owned overlay positions', async () => {
+  const probe = await rendererProbe('dom')
+  const container = probe.canvas.nextElementSibling as HTMLElement
+  for (const property of ['left', 'top']) {
+    container.style.setProperty(property, container.style.getPropertyValue(property), 'important')
+  }
+  probe.terminal.write('\rnext')
+  probe.renderer.notifyWrite()
+  probe.clock.flush()
+  expect(container.style.getPropertyPriority('left')).toBe('')
+  expect(container.style.getPropertyPriority('top')).toBe('')
 })
 
 it('restores overlay declarations after exposed inline styles change', async () => {

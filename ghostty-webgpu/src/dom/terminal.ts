@@ -196,45 +196,11 @@ function cssRgb(color: TerminalRendererTheme['foreground']): string {
   return `rgb(${color.r} ${color.g} ${color.b})`
 }
 
-type PreeditAppearance = Readonly<
-  Pick<
-    CSSStyleDeclaration,
-    | 'backgroundColor'
-    | 'color'
-    | 'fontFamily'
-    | 'fontSize'
-    | 'fontWeight'
-    | 'letterSpacing'
-    | 'lineHeight'
-    | 'minHeight'
-    | 'minWidth'
-  >
-> & {
-  readonly element: HTMLElement
-  readonly font: TerminalFittedFont
-  readonly theme: TerminalRendererTheme
-}
-
-function preeditDeclarationsMatch(previous: PreeditAppearance): boolean {
-  const style = previous.element.style
-  return (
-    style.backgroundColor === previous.backgroundColor &&
-    style.color === previous.color &&
-    style.fontFamily === previous.fontFamily &&
-    style.fontSize === previous.fontSize &&
-    style.fontWeight === previous.fontWeight &&
-    style.letterSpacing === previous.letterSpacing &&
-    style.lineHeight === previous.lineHeight &&
-    style.minHeight === previous.minHeight &&
-    style.minWidth === previous.minWidth
-  )
-}
-
 function applyPreeditAppearance(
   element: HTMLElement,
   font: TerminalFittedFont,
   theme: TerminalRendererTheme,
-): PreeditAppearance {
+): void {
   element.style.backgroundColor = cssRgb(theme.background)
   element.style.color = cssRgb(theme.foreground)
   element.style.fontFamily = font.settings.family
@@ -244,21 +210,6 @@ function applyPreeditAppearance(
   element.style.lineHeight = `${font.cssCellHeight}px`
   element.style.minHeight = `${font.cssCellHeight}px`
   element.style.minWidth = `${font.cssCellWidth}px`
-  const style = element.style
-  return {
-    element,
-    font,
-    theme,
-    backgroundColor: style.backgroundColor,
-    color: style.color,
-    fontFamily: style.fontFamily,
-    fontSize: style.fontSize,
-    fontWeight: style.fontWeight,
-    letterSpacing: style.letterSpacing,
-    lineHeight: style.lineHeight,
-    minHeight: style.minHeight,
-    minWidth: style.minWidth,
-  }
 }
 
 function owningWindow(element: HTMLElement): Window {
@@ -315,8 +266,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private readonly emitters = createHostEmitters()
   private fit?: TerminalFitController
   private fittedFont?: TerminalFittedFont
-  private preeditAppearance?: PreeditAppearance
-  private preeditObserver?: MutationObserver
+  private preeditActive = false
   private workerCanvasSize?: {
     readonly canvas: HTMLCanvasElement
     readonly width: number
@@ -953,9 +903,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.accessibility = undefined
     this.fit = undefined
     this.fittedFont = undefined
-    this.preeditObserver?.disconnect()
-    this.preeditObserver = undefined
-    this.preeditAppearance = undefined
+    this.preeditActive = false
     this.input = undefined
     this.inputLifecycle = undefined
     this.lastFrame = undefined
@@ -1680,33 +1628,36 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   }
 
   private updatePreedit(value: string): void {
+    this.preeditActive = value.length > 0
     const compositionView = this.elementsValue?.compositionView
     if (!compositionView) return
+    if (this.preeditActive) {
+      const summary = this.execution.submittedFrame
+      const appearance = this.execution.appearance
+      const canvas = this.elementsValue!.canvas
+      const font =
+        summary?.font ??
+        this.fittedFont ??
+        fitTerminalFont(
+          canvas.ownerDocument,
+          appearance.font,
+          effectivePixelRatio(canvas, this.fitEnvironment),
+        )
+      this.updatePreeditAppearance(font, summary?.theme ?? appearance.rendererTheme)
+    }
     compositionView.textContent = value
-    compositionView.classList.toggle('active', value.length > 0)
-    compositionView.hidden = value.length === 0
+    compositionView.classList.toggle('active', this.preeditActive)
+    compositionView.hidden = !this.preeditActive
   }
 
   private updatePreeditAppearance(
     font: TerminalFittedFont | undefined,
     theme: TerminalRendererTheme,
   ): void {
+    if (!this.preeditActive || !font) return
     const compositionView = this.elementsValue?.compositionView
-    if (!compositionView || !font) return
-    const previous = this.preeditAppearance
-    if (previous?.element === compositionView && previous.font === font && previous.theme === theme)
-      return
-    this.preeditObserver?.disconnect()
-    this.preeditAppearance = applyPreeditAppearance(compositionView, font, theme)
-    const Observer = compositionView.ownerDocument.defaultView!.MutationObserver
-    this.preeditObserver = new Observer(() => {
-      const current = this.preeditAppearance
-      if (current && !preeditDeclarationsMatch(current)) this.preeditAppearance = undefined
-    })
-    this.preeditObserver.observe(compositionView, {
-      attributes: true,
-      attributeFilter: ['style'],
-    })
+    if (!compositionView) return
+    applyPreeditAppearance(compositionView, font, theme)
   }
 
   private reportError(cause: unknown, operation: string): void {

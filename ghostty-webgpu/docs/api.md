@@ -110,6 +110,15 @@ and [undershoot test](https://github.com/ghostty-org/ghostty/blob/7b11f3dca034d8
 define this retention behavior. A line budget describes that native policy; `lineCount()` supplies
 the available row count.
 
+## DOM frame sizing
+
+The DOM renderer owns the frame's inline width and height, calculated from the terminal grid
+and fitted cell dimensions. Host layout and canvas padding determine the overlay's live position.
+The frame uses `contain: layout paint` and clips painting to its bounds. Host styles that override
+the frame's dimensions also change that clipping boundary; update the terminal grid or fitted font
+when changing its viewport. An explicit `height: auto` override derives height from the rendered
+rows. Layout and paint containment preserve this row-derived height.
+
 ## first frames and damage
 
 `renderFrameToHtml(snapshot, { font, columns, rows, theme })` produces the DOM backend's
