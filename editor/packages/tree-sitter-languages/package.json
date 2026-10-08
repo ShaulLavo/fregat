@@ -70,10 +70,12 @@
     "tree-sitter-html": "0.23.2",
     "tree-sitter-java": "0.23.5",
     "tree-sitter-javascript": "0.25.0",
+    "tree-sitter-jsdoc": "0.25.0",
     "tree-sitter-json": "0.24.8",
     "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#f7263d7f7b1593270b348f007c80eddb3916c761",
     "tree-sitter-php": "0.24.2",
     "tree-sitter-python": "0.25.0",
+    "tree-sitter-regex": "0.25.0",
     "tree-sitter-rust": "0.24.0",
     "tree-sitter-svelte": "0.11.0",
     "tree-sitter-typescript": "0.23.2"

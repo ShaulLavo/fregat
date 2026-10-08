@@ -14,6 +14,8 @@ export type EditorSyntaxCapture = {
   readonly endIndex: number
   readonly captureName: string
   readonly languageId?: EditorSyntaxLanguageId
+  /** Nonnegative nesting level; deeper injected syntax overrides its parent captures. */
+  readonly injectionDepth?: number
 }
 
 export type FoldRange = {
