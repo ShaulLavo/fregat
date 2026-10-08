@@ -1205,8 +1205,11 @@ export const selectors = {
   modelSwitch: (page: Page) => page.locator('[data-model-switch]').first(),
   chatAlignment: (page: Page) => ({
     assistant: selectors.chatAssistantMarkdown(page).last(),
+    nestedRow: page.locator('[data-timeline-row-type="turn-fold"] [data-timeline-row-id]').first(),
+    nestedIcon: page
+      .locator('[data-timeline-row-type="turn-fold"] [data-timeline-row-id] button svg')
+      .first(),
     composer: selectors.chatMessage(page),
-    attachIcon: selectors.chatAttach(page).locator('svg'),
     workIcon: selectors.completedWorkGroup(page).locator('svg').first(),
     rowTitle: selectors.sessionRows(page).first().locator('span.truncate').first(),
     rowContext: selectors.sessionRows(page).first().locator('[data-worktree-id]').first(),
@@ -1527,7 +1530,9 @@ export async function waitForSessionWorkspace(
       // Lexical's rendered owner can lag the session URL during a workspace switch.
       const namespace = composer?.__lexicalEditor?._config.namespace
       const workspaceReady = title === rootPath || title?.startsWith(`${rootPath} ·`)
-      return workspaceReady && namespace === expectedNamespace
+      // The phone header has no project switcher; Lexical names the exact workspace there.
+      const phone = document.documentElement.dataset.shell === 'phone'
+      return (phone || workspaceReady) && namespace === expectedNamespace
     },
     {
       composerSelector: chatComposerSelector,

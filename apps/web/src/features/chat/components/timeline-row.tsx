@@ -20,10 +20,12 @@ import type { CheckpointRestoreRole } from '@/features/chat/utils/checkpoint-res
 
 export function TimelineRow({
   checkpointRevertPending = false,
+  className,
   item,
   restoreRole,
 }: {
   checkpointRevertPending?: boolean
+  className?: string
   item: ChatTimelineItem
   restoreRole?: CheckpointRestoreRole
 }) {
@@ -39,8 +41,8 @@ export function TimelineRow({
   return (
     <div
       className={cn(
-        // Match the composer’s section inset and 1px border after each row’s 4px inset.
-        'mx-auto w-full max-w-3xl min-w-0 px-[calc(var(--density-section-padding)-3px)] transition-opacity',
+        'mx-auto w-full max-w-3xl min-w-0 transition-opacity',
+        className,
         timelineRowSpacing(item),
         restoreRole === 'receding' && 'opacity-50',
         revealed && 'bg-info/10',
