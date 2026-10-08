@@ -17,6 +17,7 @@ async function freshSettingsCheckout(root: string): Promise<void> {
     'scripts/target-argument.ts',
     'packages/contracts/src',
     'packages/contracts/package.json',
+    'packages/contracts/tsconfig.json',
     'packages/contracts/vitest.config.ts',
     'hotkeys/packages/hotkeys/src',
     'hotkeys/packages/hotkeys/package.json',
