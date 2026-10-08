@@ -2453,10 +2453,8 @@ const walkTreeCursorRange = (
       if (!advanceCursorPastSubtree(cursor)) return
       continue
     }
-    if (cursor.startIndex >= range.endIndex) {
-      if (!advanceCursorPastSubtree(cursor)) return
-      continue
-    }
+    // Following subtrees start at or after this position in tree-sitter's source order.
+    if (cursor.startIndex >= range.endIndex) return
 
     collectCursorDiagnostics(cursor, visitors, bracketStack)
     if (cursor.gotoFirstChild()) continue

@@ -92,6 +92,49 @@ describe('tree-sitter worker internals', () => {
     expect(collectTreeData(fakeTree(root)).errors).toHaveLength(1)
   })
 
+  it('keeps nested diagnostics and bracket depths inside a middle range', () => {
+    const nested = Object.assign(node('block', 20, 40), {
+      children: [
+        node('{', 21),
+        node('ERROR', 26, 27, { isError: true }),
+        node('}', 28),
+        node('ERROR', 31, 32, { isError: true }),
+      ],
+    })
+    const root = Object.assign(node('document', 0, 100), {
+      children: [node('ERROR', 1, 2, { isError: true }), nested, node('identifier', 50, 60)],
+    })
+
+    expect(collectTreeData(fakeTree(root), { startIndex: 20, endIndex: 30 })).toEqual({
+      brackets: [
+        { index: 21, char: '{', depth: 1 },
+        { index: 28, char: '}', depth: 1 },
+      ],
+      errors: [{ startIndex: 26, endIndex: 27, isMissing: false, message: 'ERROR' }],
+    })
+  })
+
+  it('stops a range walk before the trailing document siblings', () => {
+    let trailingReads = 0
+    const trailing = node('ERROR', 20, 100, { isError: true })
+    Object.defineProperty(trailing, 'endIndex', {
+      get() {
+        trailingReads += 1
+        return 100
+      },
+    })
+    const root = Object.assign(node('document', 0, 100), {
+      children: [node('ERROR', 1, 2, { isError: true }), node('identifier', 10, 11), trailing],
+    })
+
+    const result = collectTreeData(fakeTree(root), { startIndex: 0, endIndex: 10 })
+
+    expect(result.errors).toEqual([
+      { startIndex: 1, endIndex: 2, isMissing: false, message: 'ERROR' },
+    ])
+    expect(trailingReads).toBe(0)
+  })
+
   it('returns empty diagnostics when tree-sitter provides no tree cursor', () => {
     expect(collectTreeData(null)).toEqual({ brackets: [], errors: [] })
     expect(collectTreeData({ walk: () => null } as unknown as Tree)).toEqual({

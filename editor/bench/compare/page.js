@@ -59,9 +59,12 @@ window.bench = {
     const text = preparedText
     preparedText = undefined
     const start = performance.now()
+    performance.mark('compare-open-start')
     editor = mount(host, text, HIGHLIGHTED)
+    performance.mark('compare-open-mounted')
     await painted()
     const firstFrameMs = performance.now() - start
+    performance.mark('compare-open-first-frame')
     if (HIGHLIGHTED) {
       while (!editor.highlighted()) {
         if (performance.now() - start > 30000)
@@ -69,8 +72,10 @@ window.bench = {
         await frame()
       }
     }
+    performance.mark('compare-open-visible')
     await painted()
     const highlightedFrameMs = performance.now() - start
+    performance.mark('compare-open-settled')
     return {
       firstFrameMs,
       highlightedFrameMs,
