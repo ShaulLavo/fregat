@@ -247,12 +247,34 @@ async function run(options: Options) {
   try {
     // Read before launch: the job, or another session, may commit while it runs.
     const checkout = repositoryOf(cwd)
+    const wrapper = wrapperCommit()
     const job = startJob(
       placed.spec,
       () => duplicateDescriptor(2),
       (launch) => (placed.entry ? beginRun(options.stateDir, placed.entry, launch) : launch()),
       () => {
         if (placed.entry?.quiet) stopRunConcurrency(options.stateDir, placed.entry.id)
+      },
+      (level, unit, recovery) => {
+        console.error(
+          JSON.stringify({
+            timestamp: new Date().toISOString(),
+            level,
+            source: 'heavy',
+            area: 'heavy-jobs',
+            action: 'heavy.scope-recovery',
+            requestId: id,
+            unit,
+            version: wrapper.slice(0, 9),
+            commitHash: checkout.commitHash,
+            reason: 'manager-transport',
+            initialExitCode: recovery.initialExitCode,
+            retries: recovery.retries,
+            ...(level === 'info'
+              ? { status: recovery.status, exitCode: recovery.exitCode }
+              : { retryLimit: 1 }),
+          }),
+        )
       },
     )
     // A signal to this PID alone reaches the job only through its slice. A terminal's Ctrl-C
@@ -294,13 +316,19 @@ async function run(options: Options) {
       queuedMs,
       serversAtAdmission: placed.serversAtAdmission,
     })
+    if (holdExpired) return RETRY_EXIT
     if (outcome.launchFailure === 'manager-transport') {
       throw scriptErrors.HEAVY_SCOPE_TRANSPORT({
         unit: outcome.unit,
         internal: { unit: outcome.unit, exitCode: outcome.exitCode },
       })
     }
-    return holdExpired ? RETRY_EXIT : outcome.exitCode
+    if (outcome.stderrFailure) {
+      throw scriptErrors.HEAVY_STDERR_RELAY({
+        internal: { unit: outcome.unit, exitCode: outcome.exitCode, ...outcome.stderrFailure },
+      })
+    }
+    return outcome.exitCode
   } finally {
     try {
       if (placed.entry) finishRun(options.stateDir, id)
@@ -811,8 +839,11 @@ function jobRecord(
     host: options.host,
     label: options.label,
     leftoverProcesses: outcome.leftoverProcesses,
-    level: outcome.launchFailure ? 'error' : level,
+    level: outcome.launchFailure || outcome.stderrFailure ? 'error' : level,
     ...(outcome.launchFailure ? { launchFailure: outcome.launchFailure } : {}),
+    ...(outcome.recovery ? { recovery: outcome.recovery } : {}),
+    ...(outcome.stderrFailure ? { stderrFailure: outcome.stderrFailure } : {}),
+    ...(outcome.diagnosticsTruncated ? { diagnosticsTruncated: true } : {}),
     memoryPeakBytes: outcome.memoryPeakBytes,
     oomKills: outcome.oomKills,
     queuedMs,

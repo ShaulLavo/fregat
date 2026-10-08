@@ -2,6 +2,8 @@ import { appendFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 
 import type { Entry } from './queue'
+import type { ScopeRecovery } from './job'
+import type { StderrFailure } from './scope-diagnostics'
 
 export type ServerAtAdmission = Pick<Entry, 'id' | 'label' | 'pid' | 'cwd' | 'sliceRoot'> & {
   readonly allowedCpus: readonly number[]
@@ -20,6 +22,9 @@ export type HeavyJobRecord = {
   readonly timestamp: string
   readonly level: 'info' | 'warn' | 'error'
   readonly launchFailure?: 'manager-transport'
+  readonly recovery?: ScopeRecovery
+  readonly stderrFailure?: StderrFailure
+  readonly diagnosticsTruncated?: boolean
   readonly source: 'heavy'
   readonly area: 'heavy-jobs'
   readonly action: 'heavy.job'

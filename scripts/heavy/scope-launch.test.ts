@@ -4,6 +4,8 @@ import { afterEach, expect, test } from 'vitest'
 
 import {
   recordOf,
+  records,
+  firstDecision,
   removeSandboxes,
   sandbox,
   start,
@@ -77,7 +79,7 @@ test.for([
     expect(result.stderr).toContain('journalctl --user')
     expect(result.stderr).toContain(transport)
     if (split) expect(result.stderr).toContain('relay α\n'.repeat(8192))
-    expect(readFileSync(calls, 'utf8')).toBe('launch\n')
+    expect(readFileSync(calls, 'utf8')).toBe('launch\nlaunch\n')
     expect(existsSync(payload)).toBe(false)
     expect(recordOf(box, 'transport-failure')).toMatchObject({
       exitCode: 1,
@@ -132,7 +134,7 @@ test('a launched payload retains the caller stderr descriptor and closes the han
   )
   try {
     await expect.poll(job.stdout, { timeout: 5000 }).toContain('ready')
-    expect(job.stderr()).toContain(readlinkSync(`/proc/${job.child.pid}/fd/2`))
+    await expect.poll(job.stderr).toContain(readlinkSync(`/proc/${job.child.pid}/fd/2`))
     writeFileSync(release, '')
     expect((await job.done).code).toBe(0)
     released(box)
@@ -142,3 +144,235 @@ test('a launched payload retains the caller stderr descriptor and closes the han
     await job.done
   }
 })
+
+function recoveryBox(
+  options: {
+    helper?: boolean
+    cleanupFailure?: boolean
+    cleanupWait?: boolean
+    active?: boolean
+    wait?: boolean
+  } = {},
+) {
+  const fixture = launchBox(transport, 1)
+  const { box, calls } = fixture
+  const manager = path.join(box.root, 'manager')
+  const attempts = path.join(box.root, 'attempts')
+  const release = path.join(box.root, 'release-launch')
+  const helper = path.join(box.root, 'helper.pid')
+  writeSettings(box, {
+    'developer.heavyJobQuietHoldSeconds': 600,
+    'developer.heavyJobStopGraceSeconds': 1,
+  })
+  writeFileSync(
+    path.join(box.root, 'bin', 'systemctl'),
+    `#!/bin/bash
+printf '%s\\n' "$*" >> ${JSON.stringify(manager)}
+${options.cleanupFailure ? '[[ "$2" != stop ]] || exit 1' : ''}
+${options.cleanupWait ? `[[ "$2" != stop ]] || { exec >/dev/null; ${until(release)}; }` : ''}
+if [[ "$2" == show ]]; then
+  if [[ "$*" == *LoadState* ]]; then echo loaded; else echo ${options.active ? 'active' : 'inactive'}; fi
+fi
+exit 0
+`,
+    { mode: 0o755 },
+  )
+  writeFileSync(
+    path.join(box.root, 'bin', 'systemd-run'),
+    `#!/bin/bash
+printf 'launch\\n' >> ${JSON.stringify(calls)}
+printf '%s\\n' "$*" >> ${JSON.stringify(attempts)}
+if [[ $(wc -l < ${JSON.stringify(calls)}) == 1 ]]; then
+  ${options.helper ? `(exec >/dev/null 3<&- 4<&- 5<&- 6<&- 7<&-; sleep 30) & echo $! > ${JSON.stringify(helper)}` : ''}
+  printf '%s\\n' ${JSON.stringify(transport)} >&2
+  ${options.wait ? until(release) : ''}
+  exit 1
+fi
+while [[ "$1" != *.accounting ]]; do shift; done
+accounting=$1
+shift
+exec 6<&- 2>&7 7>&-
+"$@" 3<&- 4<&- 5<&-
+rc=$?
+printf 'exit %s\\n' "$rc" > "$accounting"
+exit "$rc"
+`,
+    { mode: 0o755 },
+  )
+  return { ...fixture, manager, attempts, release, helper }
+}
+
+test('a transport retry retains admission until its single payload execution finishes', async (context) => {
+  if (!locks) context.skip('Requires Bun FFI and a libc flock implementation')
+  const { box, calls, env, manager, attempts, release: launchGate } = recoveryBox({ wait: true })
+  const payload = path.join(box.root, 'payload')
+  const release = path.join(box.root, 'release-payload')
+  const job = start(
+    box,
+    'recovered',
+    ['bash', '-c', `echo run >> ${payload}; echo ready; ${until(release)}`],
+    { env, quiet: true, machine: true, jobClass: 'light' },
+  )
+  let successor: ReturnType<typeof start> | undefined
+  try {
+    await expect.poll(job.stderr).toContain(transport)
+    const originalEntry = queue!.live(box.state, 'jobs')[0]
+    writeFileSync(launchGate, '')
+    await expect.poll(job.stdout).toContain('ready')
+    expect(queue!.live(box.state, 'jobs')[0]).toEqual(originalEntry)
+    expect(readFileSync(payload, 'utf8')).toBe('run\n')
+    expect(readFileSync(calls, 'utf8')).toBe('launch\nlaunch\n')
+    const commands = readFileSync(attempts, 'utf8').trim().split('\n')
+    expect(commands[1]).toBe(commands[0])
+    expect(readFileSync(manager, 'utf8')).toContain('--user stop')
+    expect(readFileSync(manager, 'utf8').match(/set-property/g)).toHaveLength(2)
+    expect(queue!.live(box.state, 'jobs')).toHaveLength(1)
+    expect(readFileSync(path.join(box.state, 'queue', 'sequence'), 'utf8')).toBe('1')
+    for (const name of ['slot1.lock', 'slot2.lock', 'slot3.lock']) {
+      const fd = locks!.tryLock(path.join(box.state, name))
+      if (fd !== null) locks!.unlock(fd)
+      expect(fd).toBeNull()
+    }
+    successor = start(box, 'successor', ['true'], {
+      env,
+      quiet: true,
+      machine: true,
+      jobClass: 'light',
+    })
+    expect(await firstDecision(successor)).toBe('waiting')
+    expect(readFileSync(calls, 'utf8')).toBe('launch\nlaunch\n')
+    writeFileSync(release, '')
+    expect((await job.done).code).toBe(0)
+    const recoveryLogs = job
+      .stderr()
+      .split('\n')
+      .filter((line) => line.startsWith('{'))
+      .map((line) => JSON.parse(line))
+      .filter((event) => event.action === 'heavy.scope-recovery')
+    expect(recoveryLogs).toMatchObject([
+      { level: 'warn', retryLimit: 1 },
+      { level: 'info', retries: 1, status: 'recovered' },
+    ])
+    expect(records(box)).toHaveLength(1)
+    expect(recordOf(box, 'recovered')).toMatchObject({
+      exitCode: 0,
+      recovery: { retries: 1, initialExitCode: 1, status: 'recovered' },
+    })
+    expect((await successor.done).code).toBe(0)
+    released(box)
+  } finally {
+    writeFileSync(launchGate, '')
+    writeFileSync(release, '')
+    job.child.kill('SIGTERM')
+    successor?.child.kill('SIGTERM')
+    await job.done
+    await successor?.done
+  }
+})
+
+test('an external diagnostic writer cannot retain admission beyond the stop grace', async (context) => {
+  if (!locks) context.skip('Requires Bun FFI and a libc flock implementation')
+  const { box, calls, env, helper } = recoveryBox({ helper: true, cleanupFailure: true })
+  const job = start(box, 'external-writer', ['true'], { env, machine: true, jobClass: 'light' })
+  try {
+    await expect.poll(() => recordOf(box, 'external-writer'), { timeout: 3000 }).toBeDefined()
+    expect((await job.done).code).toBe(2)
+    expect(readFileSync(calls, 'utf8')).toBe('launch\n')
+    expect(process.kill(Number(readFileSync(helper, 'utf8')), 0)).toBe(true)
+    released(box)
+    const successor = await start(box, 'writer-successor', ['true'], {
+      env,
+      quiet: true,
+      machine: true,
+      jobClass: 'light',
+    }).done
+    expect(successor.code).toBe(0)
+  } finally {
+    if (existsSync(helper)) process.kill(Number(readFileSync(helper, 'utf8')), 'SIGKILL')
+    job.child.kill('SIGTERM')
+    await job.done
+  }
+})
+
+test.for(['ENOSPC', undefined])(
+  'a forwarding failure preserves the transport diagnosis and the completed receipt (%s)',
+  async (code, context) => {
+    if (!locks) context.skip('Requires Bun FFI and a libc flock implementation')
+    const { box, calls, env } = recoveryBox({ cleanupFailure: true })
+    const preload = path.join(box.root, 'write-failure.ts')
+    writeFileSync(
+      preload,
+      `const original = Bun.write; Bun.write = (target, ...args) => { if (target === Bun.stderr) return Promise.reject(${code === undefined ? 'undefined' : JSON.stringify({ code })}); return original(target, ...args) }`,
+    )
+    const result = await start(box, 'write-failure', ['true'], {
+      env,
+      preload,
+      machine: true,
+      jobClass: 'light',
+    }).done
+    expect(result.code).toBe(2)
+    expect(result.stderr).toContain('systemd lost its connection')
+    expect(records(box)).toHaveLength(1)
+    expect(recordOf(box, 'write-failure')).toMatchObject({
+      exitCode: 1,
+      launchFailure: 'manager-transport',
+      stderrFailure: { kind: 'write', code: code ?? null },
+    })
+    expect(readFileSync(calls, 'utf8')).toBe('launch\n')
+    released(box)
+  },
+)
+
+test('an expired quiet deadline prevents a transport retry and keeps expiry accounting', async (context) => {
+  if (!locks) context.skip('Requires Bun FFI and a libc flock implementation')
+  const { box, calls, env, release } = recoveryBox({ wait: true })
+  writeSettings(box, {
+    'developer.heavyJobQuietHoldSeconds': 1,
+    'developer.heavyJobStopGraceSeconds': 1,
+  })
+  const job = start(box, 'expired-recovery', ['true'], {
+    env,
+    quiet: true,
+    machine: true,
+    jobClass: 'light',
+  })
+  try {
+    const result = await job.done
+    expect(result.code).toBe(75)
+    expect(readFileSync(calls, 'utf8')).toBe('launch\n')
+    expect(recordOf(box, 'expired-recovery')).toMatchObject({ quietHoldExpired: true })
+    expect(recordOf(box, 'expired-recovery')?.recovery).toBeUndefined()
+    released(box)
+  } finally {
+    writeFileSync(release, '')
+    job.child.kill('SIGTERM')
+    await job.done
+  }
+})
+
+test.for([{ cleanupWait: true }, { active: true }])(
+  'unconfirmed cleanup prevents a fresh launch (%j)',
+  async (options, context) => {
+    if (!locks) context.skip('Requires Bun FFI and a libc flock implementation')
+    const { box, calls, env, release } = recoveryBox(options)
+    const job = start(box, 'unconfirmed-cleanup', ['true'], {
+      env,
+      machine: true,
+      jobClass: 'light',
+    })
+    try {
+      const result = await job.done
+      expect(result.code).toBe(2)
+      expect(readFileSync(calls, 'utf8')).toBe('launch\n')
+      expect(recordOf(box, 'unconfirmed-cleanup')).toMatchObject({
+        exitCode: 1,
+        recovery: { retries: 0, status: 'cleanup-failed' },
+      })
+      released(box)
+    } finally {
+      writeFileSync(release, '')
+      job.child.kill('SIGTERM')
+      await job.done
+    }
+  },
+)

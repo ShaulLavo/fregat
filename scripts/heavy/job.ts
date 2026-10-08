@@ -4,6 +4,8 @@ import path from 'node:path'
 
 import { scriptErrors } from '../structured-errors'
 import { DEFAULT_LIMITS } from './pi/lane-command'
+import { bootSeconds } from './admission'
+import { scopeDiagnostics, type StderrFailure } from './scope-diagnostics'
 
 // Startup measured 8–17 ms; 10 seconds leaves scheduler headroom with a bounded READY wait.
 // The complete lease is startup + runtime + grace + 3 seconds for stop and slice cleanup.
@@ -125,6 +127,9 @@ export type JobOutcome = JobAccounting & {
   readonly exitCode: number
   readonly wallMs: number
   readonly launchFailure: 'manager-transport' | null
+  readonly stderrFailure: StderrFailure | null
+  readonly diagnosticsTruncated: boolean
+  readonly recovery?: ScopeRecovery
 }
 
 type JobBase = {
@@ -170,16 +175,135 @@ export function startJob(
   copyStderr: () => number | null,
   publish = (launch: () => ReturnType<typeof Bun.spawn>) => launch(),
   onExit = () => {},
+  onRecovery: (level: 'warn' | 'info', unit: string, recovery: ScopeRecovery) => void = () => {},
 ) {
   const unit = `${job.host === 'local' ? job.sliceRoot : 'heavy'}-${job.id}.scope`
   const accountingFile = path.join(process.env.XDG_RUNTIME_DIR ?? tmpdir(), `${unit}.accounting`)
   const slice = job.host === 'local' ? jobSlice(job) : null
   const started = performance.now()
   let child: ReturnType<typeof Bun.spawn>
+  try {
+    child = spawnJob(job, launchCommand(job, unit, accountingFile), copyStderr, publish)
+  } catch (error) {
+    if (slice) removeJobSlice(slice)
+    throw error
+  }
+  let stopped = false
+  let recoveryController: AbortController | undefined
+  let escalation: ReturnType<typeof setTimeout> | undefined
+  const signalJob = (signal: NodeJS.Signals) => {
+    child.kill(signal)
+    if (slice) systemctl(['kill', `--signal=${signal}`, slice])
+  }
+  const stop = (signal: NodeJS.Signals) => {
+    stopped = true
+    recoveryController?.abort()
+    signalJob(signal)
+    escalation ??= setTimeout(() => signalJob('SIGKILL'), job.graceSeconds * 1000)
+  }
+  const settle = async (): Promise<JobOutcome> => {
+    const diagnostics = scopeDiagnostics(child.stderr)
+    await child.exited
+    onExit()
+    const exitCode =
+      child.exitCode ?? 128 + (child.signalCode ? constants.signals[child.signalCode] : 0)
+    const accounted = existsSync(accountingFile)
+    const accounting = readAccounting(accountingFile)
+    const diagnostic = await diagnostics.finish(lifecycleBudget(job))
+    return {
+      ...accounting,
+      exitCode,
+      slice,
+      unit,
+      wallMs: Math.round(performance.now() - started),
+      launchFailure:
+        diagnostic.transportFailed && exitCode !== 0 && !accounted ? 'manager-transport' : null,
+      stderrFailure: diagnostic.failure,
+      diagnosticsTruncated: diagnostic.truncated,
+    }
+  }
+  const done = (async (): Promise<JobOutcome> => {
+    const first = await settle()
+    if (job.host !== 'local' || first.launchFailure === null || stopped || expired(job))
+      return first
+    recoveryController = new AbortController()
+    const signal = recoveryController.signal
+    const timer = setTimeout(() => recoveryController!.abort(), lifecycleBudget(job))
+    let recovery: ScopeRecovery = {
+      retries: 0,
+      initialExitCode: first.exitCode,
+      exitCode: first.exitCode,
+      status: 'cleanup-failed',
+    }
+    onRecovery('warn', unit, recovery)
+    try {
+      if (!(await recoverScope(job, unit, signal)) || signal.aborted || stopped || expired(job)) {
+        return { ...first, recovery }
+      }
+      recovery = { ...recovery, retries: 1, status: 'launch-failed' }
+      const command = localCommand({ ...job, slice: slice!, unit, accountingFile })
+      try {
+        // Keep the existing publication and its quiet journal; a retry is the same admitted run.
+        child = spawnJob(job, command, copyStderr)
+      } catch {
+        return { ...first, recovery }
+      }
+      clearTimeout(timer)
+      const second = await settle()
+      recovery = {
+        ...recovery,
+        exitCode: second.exitCode,
+        status: second.launchFailure ? 'transport-failed' : 'recovered',
+      }
+      return {
+        ...second,
+        stderrFailure: first.stderrFailure ?? second.stderrFailure,
+        diagnosticsTruncated: first.diagnosticsTruncated || second.diagnosticsTruncated,
+        recovery,
+      }
+    } finally {
+      clearTimeout(timer)
+      onRecovery('info', unit, recovery)
+    }
+  })().finally(async () => {
+    clearTimeout(escalation)
+    if (!slice) return
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), job.graceSeconds * 1000)
+    try {
+      await removeSlice(slice, controller.signal)
+    } finally {
+      clearTimeout(timer)
+    }
+  })
+  return { done, stop }
+}
+
+export type ScopeRecovery = {
+  readonly retries: number
+  readonly initialExitCode: number
+  readonly exitCode: number
+  readonly status: 'recovered' | 'transport-failed' | 'cleanup-failed' | 'launch-failed'
+}
+
+function lifecycleBudget(job: JobSpec) {
+  const graceMs = job.graceSeconds * 1000
+  if (job.host !== 'local' || job.runtimeDeadline === undefined) return graceMs
+  return Math.max(0, Math.min(graceMs, (job.runtimeDeadline - bootSeconds()) * 1000))
+}
+
+function expired(job: LocalJob) {
+  return job.runtimeDeadline !== undefined && bootSeconds() >= job.runtimeDeadline
+}
+
+function spawnJob(
+  job: JobSpec,
+  command: string[],
+  copyStderr: () => number | null,
+  publish = (launch: () => ReturnType<typeof Bun.spawn>) => launch(),
+) {
   let stderrDescriptor: number | null = null
   try {
-    // Manager preparation and refused-launch cleanup must stay outside the publication lock.
-    const command = launchCommand(job, unit, accountingFile)
     if (job.host === 'local') {
       stderrDescriptor = copyStderr()
       if (stderrDescriptor === null) {
@@ -188,97 +312,62 @@ export function startJob(
         })
       }
     }
-    child = publish(() =>
+    return publish(() =>
       Bun.spawn({
         cmd: command,
         cwd: job.cwd,
         env: {
           ...process.env,
-          ...(slice ? { HEAVY_JOB_SLICE: slice } : {}),
+          ...(job.host === 'local' ? { HEAVY_JOB_SLICE: jobSlice(job) } : {}),
           VITEST_MAX_WORKERS: process.env.VITEST_MAX_WORKERS ?? VITEST_WORKERS,
         },
         stdio: [
           'inherit',
           'inherit',
           job.host === 'local' ? 'pipe' : 'inherit',
-          // Server jobs hold no slot locks; the entry lock must still arrive on fd 6.
           ...(job.host === 'local'
             ? [
                 job.slotLocks[0] ?? 'ignore',
                 job.slotLocks[1] ?? 'ignore',
                 job.slotLocks[2] ?? 'ignore',
                 job.entryLock,
-                // The shim restores fd 2 from fd 7, preserving the payload's terminal stream.
                 stderrDescriptor!,
               ]
             : []),
         ],
       }),
     )
-  } catch (error) {
-    if (slice) removeJobSlice(slice)
-    throw error
   } finally {
     if (stderrDescriptor !== null) closeSync(stderrDescriptor)
   }
-
-  // Before systemd-run has made the scope, the signal ends systemd-run itself; the Pi
-  // launcher forwards it to the Pi.
-  const signalJob = (signal: NodeJS.Signals) => {
-    child.kill(signal)
-    if (slice) systemctl(['kill', `--signal=${signal}`, slice])
-  }
-  let escalation: ReturnType<typeof setTimeout> | undefined
-  const stop = (signal: NodeJS.Signals) => {
-    signalJob(signal)
-    escalation ??= setTimeout(() => signalJob('SIGKILL'), job.graceSeconds * 1000)
-  }
-
-  const diagnostics = relayScopeDiagnostics(child.stderr).then(
-    (transportFailed) => ({ transportFailed, error: undefined }),
-    (error: unknown) => ({ transportFailed: false, error }),
-  )
-  let accounted = false
-  const settled = child.exited
-    .then(() => {
-      onExit()
-      const signalCode = child.signalCode
-      const exitCode = child.exitCode ?? 128 + (signalCode ? constants.signals[signalCode] : 0)
-      const wallMs = Math.round(performance.now() - started)
-      accounted = existsSync(accountingFile)
-      return { exitCode, slice, unit, wallMs, ...readAccounting(accountingFile) }
-    })
-    .finally(() => {
-      clearTimeout(escalation)
-      if (slice) removeJobSlice(slice)
-    })
-  const done = settled.then(async (outcome): Promise<JobOutcome> => {
-    const diagnostic = await diagnostics
-    if (diagnostic.error !== undefined) throw diagnostic.error
-    return {
-      ...outcome,
-      launchFailure:
-        diagnostic.transportFailed && outcome.exitCode !== 0 && !accounted
-          ? 'manager-transport'
-          : null,
-    }
-  })
-  return { done, stop }
 }
 
-async function relayScopeDiagnostics(stderr: Bun.Subprocess['stderr']) {
-  if (!stderr || typeof stderr === 'number') return false
-  const diagnostic = 'Failed to start transient scope unit: Transport endpoint is not connected'
-  const decoder = new TextDecoder()
-  let tail = ''
-  let transportFailed = false
-  for await (const chunk of stderr) {
-    const text = tail + decoder.decode(chunk, { stream: true })
-    transportFailed ||= text.includes(diagnostic)
-    tail = text.slice(1 - diagnostic.length)
-    await Bun.write(Bun.stderr, chunk)
-  }
-  return transportFailed
+async function recoverScope(job: LocalJob, unit: string, signal: AbortSignal) {
+  const slice = jobSlice(job)
+  const absent = await reaperSystemctl(
+    ['show', unit, '-p', 'LoadState', '--value'],
+    signal,
+    'not-found',
+  )
+  if (!absent && !(await reaperSystemctl(['stop', unit], signal))) return false
+  if (!(await removeSlice(slice, signal))) return false
+  if (!(await inactiveUnit(unit, signal)) || !(await inactiveUnit(slice, signal))) return false
+  return reaperSystemctl(
+    [
+      'set-property',
+      '--runtime',
+      slice,
+      `MemoryMax=${job.ceilingBytes}`,
+      `MemorySwapMax=${Math.floor((job.ceilingBytes * 2) / 7)}`,
+    ],
+    signal,
+  )
+}
+
+async function inactiveUnit(unit: string, signal: AbortSignal) {
+  if (await reaperSystemctl(['show', unit, '-p', 'LoadState', '--value'], signal, 'not-found'))
+    return true
+  return reaperSystemctl(['show', unit, '-p', 'ActiveState', '--value'], signal, 'inactive')
 }
 
 /** How long systemd waits for a stopped scope: the shim's TERM grace, then its KILL settle. */
@@ -353,7 +442,7 @@ async function reaperSystemctl(
     stdout: expectedOutput === undefined ? 'ignore' : 'pipe',
   })
   const output =
-    expectedOutput === undefined ? Promise.resolve('') : new Response(child.stdout).text()
+    expectedOutput === undefined ? Promise.resolve('') : managerOutput(child.stdout!, signal)
   const cancel = () => child.kill('SIGKILL')
   signal.addEventListener('abort', cancel, { once: true })
   try {
@@ -361,8 +450,33 @@ async function reaperSystemctl(
     return (
       exitCode === 0 &&
       !signal.aborted &&
-      (expectedOutput === undefined || text.trim() === expectedOutput)
+      (expectedOutput === undefined || text?.trim() === expectedOutput)
     )
+  } finally {
+    signal.removeEventListener('abort', cancel)
+  }
+}
+
+async function managerOutput(stdout: ReadableStream<Uint8Array>, signal: AbortSignal) {
+  const reader = stdout.getReader()
+  const decoder = new TextDecoder()
+  let text = ''
+  let cancel = () => {}
+  const aborted = new Promise<null>((resolve) => {
+    cancel = () => {
+      resolve(null)
+      void reader.cancel().catch(() => {})
+    }
+    signal.addEventListener('abort', cancel, { once: true })
+    if (signal.aborted) cancel()
+  })
+  try {
+    for (;;) {
+      const read = await Promise.race([reader.read().catch(() => null), aborted])
+      if (read === null) return null
+      if (read.done) return text
+      text += decoder.decode(read.value, { stream: true })
+    }
   } finally {
     signal.removeEventListener('abort', cancel)
   }

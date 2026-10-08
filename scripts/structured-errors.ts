@@ -83,6 +83,12 @@ export const scriptErrors = defineErrorCatalog('scripts', {
     why: 'Local launch diagnostics and job output need separate file descriptors.',
     fix: 'Check the process file-descriptor limit with `ulimit -n` and submit the job again.',
   },
+  HEAVY_STDERR_RELAY: {
+    status: 500,
+    message: 'The runner could not forward all launcher diagnostics.',
+    why: 'The job outcome was recorded, but the stderr stream failed during forwarding.',
+    fix: 'Check the output destination and its available storage, then read the job record.',
+  },
   HEAVY_SCOPE_TRANSPORT: {
     status: 502,
     message: ({ unit }: { unit: string }) => `systemd lost its connection while launching ${unit}.`,
