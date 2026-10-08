@@ -1,4 +1,10 @@
 import { deployTargetSchema } from './deploy-target'
+import {
+  collaborationSignalingUrlsSchema,
+  collaborationIceServersSchema,
+  collaborationDisplayNameSchema,
+  collaborationColourSchema,
+} from './collaboration'
 import { LOG_TIME_RANGES } from '../log-dashboard'
 import { modelSelectionSchema } from '../orchestration-runtime'
 import { DEFAULT_CODEX_PROVIDER_SETTINGS } from '../provider'
@@ -526,6 +532,32 @@ export const SETTINGS_REGISTRY = {
     schema: v.string(),
     default: '',
     scope: 'window',
+  }),
+  // Consumed by the editor's collaboration-options resolver.
+  'editor.collaboration.signalingUrls': defineSetting({
+    schema: collaborationSignalingUrlsSchema,
+    default: [],
+    scope: 'application',
+  }),
+  'editor.collaboration.iceServers': defineSetting({
+    schema: collaborationIceServersSchema,
+    default: [],
+    scope: 'application',
+  }),
+  'editor.collaboration.transportPolicy': defineSetting({
+    schema: v.picklist(['all', 'relay-only']),
+    default: 'all',
+    scope: 'application',
+  }),
+  'editor.collaboration.displayName': defineSetting({
+    schema: collaborationDisplayNameSchema,
+    default: '',
+    scope: 'application',
+  }),
+  'editor.collaboration.colour': defineSetting({
+    schema: collaborationColourSchema,
+    default: '',
+    scope: 'application',
   }),
   'editor.largeFile.analysisLimitMiCodeUnits': defineSetting({
     schema: v.pipe(v.number(), v.minValue(0), v.maxValue(1024)),

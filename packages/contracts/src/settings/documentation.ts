@@ -548,6 +548,32 @@ export const SETTINGS_DOCUMENTATION = {
       'Characters allowed without Unicode highlighting. Paste the characters here, for example an en dash.',
     keywords: ['unicode', 'allowed', 'exclude', 'characters'],
   },
+  'editor.collaboration.signalingUrls': {
+    title: 'Collaboration signaling servers',
+    description:
+      'WebSocket broker URLs used to discover editing peers. Configure ws or wss URLs with a host and path. An empty list leaves collaboration unavailable.',
+  },
+  'editor.collaboration.iceServers': {
+    title: 'Collaboration ICE servers',
+    description:
+      'STUN and TURN servers used to connect editing peers. Each object supplies urls as a URI or list of URIs. TURN usernames and passwords come from the secret store. An empty list leaves collaboration unavailable.',
+  },
+  'editor.collaboration.transportPolicy': {
+    title: 'Collaboration connection policy',
+    optionTitles: { all: 'Direct and relay connections', 'relay-only': 'Relay connections' },
+    description:
+      'Choose direct and relay connections, or require every WebRTC connection to use a configured TURN relay.',
+  },
+  'editor.collaboration.displayName': {
+    title: 'Collaboration display name',
+    description:
+      'The name editing peers see beside your cursor and selection. Enter a printable name of up to 128 characters.',
+  },
+  'editor.collaboration.colour': {
+    title: 'Collaboration presence colour',
+    description:
+      'The colour editing peers see on your cursor and selection. Enter a six-digit hex colour such as #5684ff.',
+  },
   'editor.largeFile.analysisLimitMiCodeUnits': {
     title: 'Analysis size limit',
     description:
