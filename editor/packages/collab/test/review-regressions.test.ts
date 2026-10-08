@@ -4,6 +4,10 @@ import type { Envelope } from '../src/index'
 import { Effects } from '../src/effects'
 import { undoRoom } from './undo-fixtures'
 
+const stress = process.env.COLLAB_STRESS === '1'
+const randomRounds = stress ? 100 : 8
+const randomSteps = stress ? 64 : 24
+
 test('review: undo middle deletion through deleted surroundings retains original IDs', () => {
   const room = undoRoom({ groupDelay: 0 }, 3)
   room.edit(2, 0, 0, 'abcde')
@@ -110,8 +114,10 @@ test('review: concurrent simulator detects last-delete-wins visibility mutant', 
   }
   let failure: unknown
   let seeds = 0
+  // Seed 6 reaches overlapping deletion effects at step 27.
+  const seedsToCheck = stress ? Array.from({ length: 500 }, (_, seed) => seed) : [6]
   try {
-    for (let seed = 0; seed < 500; seed++) {
+    for (const seed of seedsToCheck) {
       seeds++
       simulate({ seed, participants: 3 + (seed % 3), undoRedo: true })
     }
@@ -219,7 +225,7 @@ function independentlyCheck(seed: number) {
     submit(participants[0]!.undoManager.undo()!)
     submit(participants[1]!.undoManager.undo()!)
     submit(participants[0]!.undoManager.redo()!)
-    for (let step = 0; step < 64; step++) {
+    for (let step = 0; step < randomSteps; step++) {
       const p = participants[random(3)]!
       const action = random(5)
       let env = action === 0 ? p.undoManager.undo() : null
@@ -248,7 +254,7 @@ function independentlyCheck(seed: number) {
 }
 
 test('review: independent per-character oracle checks concurrent random edits and undo', () => {
-  for (let seed = 0; seed < 100; seed++) independentlyCheck(seed)
+  for (let seed = 0; seed < randomRounds; seed++) independentlyCheck(seed)
 })
 
 test('review: independent per-character oracle kills last-delete-wins mutant', () => {

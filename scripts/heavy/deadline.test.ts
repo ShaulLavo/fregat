@@ -5,7 +5,7 @@ import { afterEach, describe, expect, test } from 'vitest'
 
 import { live } from './queue'
 import { bootSeconds, sliceState } from './admission'
-import { DEADLINE_START_SECONDS, removeSlice } from './job'
+import { DEADLINE_START_SECONDS, removeSlice, SCOPE_SHIM } from './job'
 import { tryLock, unlock } from './lock'
 import { serviceState } from './service-state-query'
 import {
@@ -778,9 +778,18 @@ kill -STOP $$
     const blocked = path.join(box.root, 'blocked')
     const go = path.join(box.root, 'go')
     const marker = path.join(box.root, 'command-ran')
+    const entered = path.join(box.root, 'scope-entry.pid')
+    const pausedShim = path.join(box.root, 'paused-scope.sh')
+    writeFileSync(
+      pausedShim,
+      readFileSync(SCOPE_SHIM, 'utf8').replace(
+        'exec 6<&-',
+        () => `exec 6<&-\nprintf '%s\\n' "$$" > ${JSON.stringify(entered)}\nkill -STOP $$`,
+      ),
+    )
     const env = launcher(
       box,
-      `case " $* " in *" --scope "*) touch ${blocked}; until [ -e ${go} ]; do sleep 0.02; done;; esac`,
+      `case " $* " in *" --scope "*) touch ${blocked}; until [ -e ${go} ]; do sleep 0.02; done; args=("$@"); for i in "\${!args[@]}"; do if [ "\${args[i]}" = "${SCOPE_SHIM}" ]; then args[i]="${pausedShim}"; fi; done; set -- "\${args[@]}";; esac`,
     )
     const owned = start(
       box,
@@ -824,12 +833,21 @@ kill -STOP $$
       expect(existsSync(marker)).toBe(false)
       expect(serviceState(watchdogOf(slice))).toBe('not-found')
       writeFileSync(go, '')
+      await expect.poll(() => existsSync(entered), { timeout: 6_000 }).toBe(true)
+      await expect
+        .poll(() => processObservation(pidIn(entered)).state, { timeout: 6_000 })
+        .toBe('T')
       await expect
         .poll(() => live(box.state, 'jobs').map((entry) => entry.id), { timeout: 6_000 })
         .not.toContain(owner!.id)
+      // Entry ownership ends before the scope checks its expired deadline.
+      expect(sliceState(box.sliceRoot, slice)).toBe('running')
+      process.kill(pidIn(entered), 'SIGCONT')
+      await expect
+        .poll(() => sliceState(box.sliceRoot, slice!), { timeout: 6_000 })
+        .not.toBe('running')
       expect(existsSync(marker)).toBe(false)
       expect(serviceState(watchdogOf(slice))).toBe('not-found')
-      expect(sliceState(box.sliceRoot, slice)).not.toBe('running')
       expect(slotsFree(box)).toBe(true)
       const reaper = start(box, 'after-delayed', ['touch', successorMarker], {
         jobClass: 'light',
