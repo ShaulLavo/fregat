@@ -269,6 +269,16 @@
         "vitest": "5.0.2",
       },
     },
+    "editor/packages/collab": {
+      "name": "@singapore-editor/collab",
+      "version": "0.0.1",
+      "devDependencies": {
+        "oxfmt": "0.70.0",
+        "oxlint": "1.85.0",
+        "typescript": "7.0.2",
+        "vitest": "5.0.2",
+      },
+    },
     "editor/packages/decode": {
       "name": "@singapore-editor/decode",
       "version": "0.2.6",
@@ -1834,6 +1844,8 @@
     "@shikijs/vscode-textmate": ["@shikijs/vscode-textmate@10.0.2", "", {}, "sha512-83yeghZ2xxin3Nj8z1NMd/NCuca+gsYXswywDy5bHvwlWL8tpTQmzGeUuHd9FC3E/SBEMvzJRwWEOz5gGes9Qg=="],
 
     "@sinclair/typebox": ["@sinclair/typebox@0.34.52", "", {}, "sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw=="],
+
+    "@singapore-editor/collab": ["@singapore-editor/collab@workspace:editor/packages/collab"],
 
     "@singapore-editor/core": ["@singapore-editor/core@workspace:editor/packages/editor"],
 
