@@ -1,6 +1,12 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@4.0.1/schema.json",
-  "changelog": "@changesets/cli/changelog",
+  "changelog": [
+    "@changesets/changelog-github",
+    {
+      "repo": "ShaulLavo/fregat",
+      "disableThanks": true
+    }
+  ],
   "commit": false,
   "fixed": [
     [
@@ -33,6 +39,7 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
+  "bumpVersionsWithWorkspaceProtocolOnly": true,
   "ignore": [],
   "privatePackages": {
     "version": false,

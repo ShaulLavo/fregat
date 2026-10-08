@@ -5,9 +5,6 @@ import { createTuiError } from '@/host/utils/structured-errors'
 export function useAgentNavigation() {
   const navigation = use(AgentNavigationContext)
   if (!navigation)
-    throw createTuiError(
-      'Agent navigation is unavailable.',
-      'Open the agent screen inside Platform.',
-    )
+    throw createTuiError('Agent navigation is unavailable.', 'Open the agent screen inside Fregat.')
   return navigation
 }

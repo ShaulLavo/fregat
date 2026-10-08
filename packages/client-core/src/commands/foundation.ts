@@ -22,22 +22,18 @@ export const foundationCommandMetadata = {
   'workspace.openAddress': foundation(
     'workspace.openAddress',
     'Open address',
-    'Navigate to a Platform address.',
+    'Navigate to a Fregat address.',
   ),
   'workspace.reconnect': foundation(
     'workspace.reconnect',
     'Reconnect',
     'Reconnect and reload the current environment.',
   ),
-  'workspace.quit': foundation(
-    'workspace.quit',
-    'Quit',
-    'Close Platform and restore the terminal.',
-  ),
+  'workspace.quit': foundation('workspace.quit', 'Quit', 'Close Fregat and restore the terminal.'),
   'workspace.suspend': foundation(
     'workspace.suspend',
     'Suspend',
-    'Restore the terminal and suspend until the shell resumes Platform.',
+    'Restore the terminal and suspend until the shell resumes Fregat.',
   ),
   'workspace.focusNextPane': foundation(
     'workspace.focusNextPane',

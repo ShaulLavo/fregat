@@ -95,3 +95,20 @@ Paths in this section are relative to `apps/web/src/features/settings/`, except 
 This plan adds a reference view, not a second settings engine. It does not compute a hypothetical effective environment, preview defaults in the app, offer Apply all defaults, or add a comparison/diff mode. Reset and editing remain explicit actions in writable scopes.
 
 Planning is complete when this file and its index entry are pushed. Runtime work starts in a separate task. Implementation is complete when the transition table, exact registry values, read-only behavior, and mobile/desktop evidence pass, and the committed change runs on Mesh.
+
+## October 2026 issue follow-ups
+
+Status: Approved, retained by [Plan 336 closeout](issue-closeout-2026-10.md).
+These are remaining execution items. Closing their tracker records does not certify a fix
+or change acceptance of an earlier delivered milestone. Each original thread retains its
+full reproduction, comments and historical artifacts. Source links below pin the reviewed
+main revision; recheck them before implementation.
+
+### Issue 946
+
+Source: [#946: Unconfirmed: appearance Reset leaves a saved opacity override](https://github.com/ShaulLavo/fregat/issues/946), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/946#issuecomment-6050629364).
+Current owner: [apps/web/src/features/settings/tests/appearance-rows.test.tsx](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/web/src/features/settings/tests/appearance-rows.test.tsx).
+
+PR #943 CI 37712886021 job 113102652349 retained workbench.surface.contentOpacity after Reset under a theme. Ten full-file controls passed. An actual trace showed theme.uncustomize and scalar reset serialized by settings-document scope; after acknowledged sequence 4 both cache and persisted data lacked the key. No cause fix was justified. Reproduce the exact theme/reset composition with mutation owner, scope, revision, acknowledgement and post-settlement observation. Preserve Reset behavior and assertions. This follow-up expands the Settings plan to that integration boundary; the separately claimed backend #563 remains untouched.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.

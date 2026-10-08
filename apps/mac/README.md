@@ -1,6 +1,6 @@
 # mac
 
-Native macOS client. Second frontend beside `apps/web` — the web app stays for cross-platform; the Bun server stays the brain. Editor-first: see `plans/native-plan-of-plans.md` for the doctrine, the gate, and the plan queue.
+Scaffold and benchmarks for a planned native macOS client. `MacApp` opens a stub window. The shipped Fregat desktop app uses the WebKit host in [`apps/desktop`](../desktop/). See the [native client plan](../../plans/native-plan-of-plans.md) for the editor-first gate and work queue.
 
 ## Toolchain
 

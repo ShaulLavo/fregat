@@ -262,7 +262,7 @@
     },
     "editor/packages/textbuffer": {
       "entry": ["src/*.ts", "src/debug.ts", "src/diagnostics.ts", "src/index.ts"],
-      "project": ["src/**/*.{ts,tsx}"]
+      "project": ["src/**/*.{ts,tsx}", "bench/{adapters,run}.mjs"]
     },
     "editor/packages/tree-sitter": {
       "entry": ["src/index.ts", "src/**/*.worker.ts", "bench/**/*.ts"],

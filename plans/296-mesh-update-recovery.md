@@ -37,6 +37,28 @@ This plan does not increase deadlines based on historical receipts, replace heal
 - [ ] Verify recovery in disposable Darwin and Linux service-manager fixtures. Confirm worker PIDs and terminal input/output persist through daemon recovery. Run the affected tests, required Mesh lifecycle gates, and release-transition checks before shipping.
 - [ ] Commit and push the change in Mesh, pass CI, publish a patch release, and verify its installed executing build through the supported updater. Record recovery evidence and unresolved #87 diagnosis separately.
 
+## Remaining helper readiness and idle CPU
+
+Approved follow-up, 2026-10-08. Plan 336 Track H transfers [Mesh #158](https://github.com/ShaulLavo/mesh/issues/158) and [Mesh #256](https://github.com/ShaulLavo/mesh/issues/256) here. Reviewed Mesh main `9b7a47cfc05e349e42e816cc72720a1787d138f3` and their complete discussions. Their bounded repairs shipped; neither establishes the remaining live-process behavior.
+
+### Activation readiness
+
+#158's command-failure and interrupted-promotion gap shipped in [Mesh PR #217](https://github.com/ShaulLavo/mesh/pull/217), commit `b7f9f16894195e163d5ab8dfb689acce7bf50b98`, v0.1.187. Current `internal/updateinstall/helper.go` records `activation-pending` separately from the immutable receipt and retries failed promotion. `activateHelper` clears that marker after `restartHelper` returns. A successful `systemctl restart --no-block` request can still precede a later process startup failure. The five fail-first manager fixtures prove command-error retry, not asynchronous readiness.
+
+- [ ] Preserve the shipped receipt/digest/trust and activation retry tests in `internal/updateinstall/helper_activation_test.go`. Reproduce successful manager acknowledgment followed by missing, exited or wrong-build helper using disposable service-manager/process fixtures. No installed manager or owner state is needed.
+- [ ] Define the intended executing helper's incarnation and readiness acknowledgment separately from file promotion and manager request acceptance. Retry or reconcile the unsettled activation within bounded ownership, with cancellation and a truthful give-up result. Do not infer readiness from an identical digest on disk.
+- [ ] Add the narrow fail-first regression supported by the fixture. Verify repeated success stays idle, stale acknowledgments cannot settle a newer candidate, and retained workers and installation provenance remain unchanged. Run affected helper/installer race tests and Mesh lifecycle gates before delivery.
+
+### Pi idle CPU
+
+#256 reported a Debian 13 Pi 4 helper on v0.1.196 using 101% CPU, with 55m37s CPU over 54m44s elapsed, kernel `6.18.39+rpt-rpi-v8`. Browser cleanup and governor restoration had been checked. [Mesh PR #257](https://github.com/ShaulLavo/mesh/pull/257), commit `ba94267aa18b9541bdb3667b9782c738fe706672`, shipped in v0.1.208 and starts a fresh one-second wait after each check finishes. Current `internal/cli/update_helper.go` and `TestUpdateHelperWaitsAfterSlowDiagnostic` preserve that scheduling repair and prompt cancellation. A slow diagnostic fixture proved the old immediate-next-check behavior; no live Pi cause or cure was established.
+
+- [ ] Establish helper idle CPU on fresh owned state with ordinary binaries, exact executing digest, interval, completed-check count and cancellation latency. Compare the original scheduling path and current source using a controlled slow writer. Separate diagnostics/storage time from waiting; preserve trust, signatures and recovery behavior.
+- [ ] If an authorized isolated Pi run is needed, schedule it separately from other Pi work and preserve TV headroom. Any tracing, restart, update or configuration change to the existing Pi service needs separate authorization. This plan does not infer the installed helper's version from the CLI version.
+- [ ] On a genuine live recurrence, retain sanitized executing-image identity, CPU interval and bounded stack/profile evidence before selecting another fix. If no reproduction exists, record live diagnosis pending rather than declaring PR #257 the cure. A passing local scheduler fixture is insufficient to settle the original Pi report.
+
+Acceptance for these additions requires observed intended-helper readiness after asynchronous startup and measured idle behavior in the relevant isolated environment. Historical live diagnosis stays pending until supported by actual evidence. Closing the tracker entries transfers these obligations here; it does not claim either remainder fixed.
+
 ## Acceptance and verification
 
 Run the focused CLI, installer-engine, and bootstrap tests first. Add an integration case only for the old-helper gap or a demonstrated socket lifecycle defect. All retained tests use temporary state and controlled processes. Run `go mod tidy -diff`, `go vet ./...`, `go test -race ./...`, and `./scripts/verify.sh` before delivering lifecycle changes. Use disposable service-manager environments for activation checks.

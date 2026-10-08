@@ -45,6 +45,119 @@ test('pending changesets target versioned workspace manifests', async () => {
   await expectPublicChangesets(checkout)
 })
 
+test('versions the current pending changesets offline in a disposable workspace', async () => {
+  const rootManifest = JSON.parse(await readFile(join(checkout, 'package.json'), 'utf8'))
+  const patterns = rootManifest.workspaces.packages
+  const pending = await readChangesets(checkout)
+  await withWorkspace(async ({ root, put, read }) => {
+    await put('', { name: rootManifest.name, private: true, workspaces: patterns })
+    await writeFile(join(root, 'bun.lock'), await readFile(join(checkout, 'bun.lock')))
+    const packages = new Map()
+    for (const pattern of patterns) {
+      for await (const file of new Glob(`${pattern}/package.json`).scan({ cwd: checkout })) {
+        const manifest = JSON.parse(await readFile(join(checkout, file), 'utf8'))
+        await put(dirname(file), manifest)
+        packages.set(manifest.name, { directory: dirname(file), manifest })
+      }
+    }
+    await symlink(join(checkout, 'node_modules'), join(root, 'node_modules'), 'junction')
+    await mkdir(join(root, '.changeset'))
+    await writeFile(
+      join(root, '.changeset/config.json'),
+      await readFile(join(checkout, '.changeset/config.json')),
+    )
+    for (const { id } of pending) {
+      const file = `.changeset/${id}.md`
+      await writeFile(join(root, file), await readFile(join(checkout, file)))
+    }
+    const result = spawnSync(
+      'node',
+      [join(checkout, 'node_modules/@changesets/cli/bin.js'), 'version'],
+      { cwd: root, encoding: 'utf8', env: { ...process.env, GITHUB_TOKEN: '' } },
+    )
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
+    expect(await readChangesets(root)).toEqual([])
+    for (const { releases, summary } of pending) {
+      for (const { name, type } of releases) {
+        expect(type).toBe('patch')
+        const { directory, manifest } = packages.get(name)
+        const after = await read(directory)
+        expect(after.version).not.toBe(manifest.version)
+        expect(after.version.split('.').slice(0, 2)).toEqual(
+          manifest.version.split('.').slice(0, 2),
+        )
+        expect(await readFile(join(root, directory, 'CHANGELOG.md'), 'utf8')).toContain(summary)
+      }
+    }
+  })
+})
+
+test('reports catalog dependencies without dependency-range warnings', async () => {
+  await withWorkspace(async ({ root, put }) => {
+    await put('', {
+      name: 'catalog-release-fixture',
+      private: true,
+      workspaces: {
+        packages: ['packages/*'],
+        catalog: { '@release-fixture/example': '0.0.1' },
+      },
+    })
+    await put('packages/example', { name: '@release-fixture/example', version: '0.0.1' })
+    await put('packages/consumer', {
+      name: '@release-fixture/consumer',
+      version: '0.0.1',
+      dependencies: { '@release-fixture/example': 'catalog:' },
+    })
+    await writeFile(join(root, 'bun.lock'), '{}\n')
+    await mkdir(join(root, '.changeset'))
+    const config = JSON.parse(await readFile(join(checkout, '.changeset/config.json'), 'utf8'))
+    await writeFile(
+      join(root, '.changeset/config.json'),
+      JSON.stringify({ ...config, fixed: [], linked: [], baseBranch: 'HEAD' }),
+    )
+    await writeFile(
+      join(root, '.changeset/example-patch.md'),
+      '---\n"@release-fixture/example": patch\n---\n\nRelease fix.\n',
+    )
+    for (const args of [
+      ['init', '--initial-branch=fixture', '--template='],
+      ['add', '.'],
+      [
+        '-c',
+        'user.name=Release fixture',
+        '-c',
+        'user.email=fixture@example.invalid',
+        '-c',
+        'commit.gpgsign=false',
+        '-c',
+        'core.hooksPath=.git/no-hooks',
+        'commit',
+        '-m',
+        'Fixture baseline',
+      ],
+      ['checkout', '--detach'],
+    ]) {
+      const git = spawnSync('git', args, { cwd: root, encoding: 'utf8' })
+      expect(git.status, `${git.stdout}\n${git.stderr}`).toBe(0)
+    }
+    const result = spawnSync(
+      'node',
+      [join(checkout, 'node_modules/@changesets/cli/bin.js'), 'status', '--output=plan.json'],
+      { cwd: root, encoding: 'utf8' },
+    )
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
+    expect(result.stderr).toBe('')
+    const plan = JSON.parse(await readFile(join(root, 'plan.json'), 'utf8'))
+    expect(plan.releases).toEqual([
+      expect.objectContaining({
+        name: '@release-fixture/example',
+        type: 'patch',
+        newVersion: '0.0.2',
+      }),
+    ])
+  })
+})
+
 test('accepts compact empty changesets', async () => {
   await withWorkspace(async ({ root, put }) => {
     await put('', { name: 'empty-release-fixture', private: true, workspaces: ['packages/*'] })

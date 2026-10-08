@@ -1,6 +1,7 @@
 {
   "name": "@singapore-editor/highlighting",
   "version": "0.2.6",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ShaulLavo/fregat.git",

@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import ts from 'typescript-api'
-import { retentions } from './adapters.mjs'
+import { comparisonEngines, retentions } from './adapters.mjs'
 import { makeFixtures, profiles } from './fixtures.mjs'
 import { prepare } from './prepare.mjs'
 import { benchRoot, consume, fileHashes, packageRoot, sha256, statistics } from './support.mjs'
@@ -55,6 +56,13 @@ function sourceIdentity() {
   }
 }
 
+export function engineOrder(sample, workloadIndex = 0) {
+  const index = sample + workloadIndex
+  const start = index % comparisonEngines.length
+  const order = comparisonEngines.slice(start).concat(comparisonEngines.slice(0, start))
+  return Math.floor(sample / comparisonEngines.length) % 2 ? order.reverse() : order
+}
+
 export function markdown(report) {
   const lines = [
     '# Textbuffer comparison',
@@ -62,18 +70,21 @@ export function markdown(report) {
     `Profile: ${report.options.profile}, retention ${report.options.retention}. Node ${report.environment.node}, V8 ${report.environment.v8}.`,
     `Source commit: ${report.source.commit ?? 'unavailable (see source hashes)'}.`,
     `Microsoft standalone revision: ${report.upstream.commit}.`,
+    `CodeMirror @codemirror/state: ${report.codemirror.version}.`,
+    `Measured: ${report.createdAt}. CPU: ${report.environment.cpu}. OS: ${report.environment.platform} ${report.environment.release} ${report.environment.arch}.`,
+    `Samples: ${report.options.samples}; fresh-buffer warmups per sample: ${report.options.warmups}; seed: ${report.options.seed}.`,
     '',
-    '**Ratios are Singapore / vscode-textbuffer: below 1 is faster. No overall score.**',
+    '**Ratios are Singapore / each control: below 1 is faster. No overall score.**',
     'Times are milliseconds for the entire workload, not individual-operation p95 latency.',
     '',
-    '| Workload | Logical ops | Singapore median / p95 ms | VS Code median / p95 ms | Ratio |',
-    '| --- | ---: | ---: | ---: | ---: |',
+    '| Workload | Logical ops | Singapore median / p95 ms | VS Code median / p95 ms | CodeMirror median / p95 ms | S / VS Code | S / CodeMirror |',
+    '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
   ]
   const format = (value) =>
     value ? `${value.median.toFixed(3)} / ${value.p95.toFixed(3)}` : 'not equivalent'
   for (const row of report.workloads) {
     lines.push(
-      `| ${row.name} | ${row.operations} | ${format(row.engines.singapore?.timeMs)} | ${format(row.engines.vscode?.timeMs)} | ${row.ratio === null ? 'separate lane' : row.ratio.toFixed(2) + 'x'} |`,
+      `| ${row.name} | ${row.operations} | ${format(row.engines.singapore?.timeMs)} | ${format(row.engines.vscode?.timeMs)} | ${format(row.engines.codemirror?.timeMs)} | ${row.ratio === null ? 'separate lane' : row.ratio.toFixed(2) + 'x'} | ${row.codemirrorRatio === null ? 'separate lane' : row.codemirrorRatio.toFixed(2) + 'x'} |`,
     )
   }
   lines.push(
@@ -97,12 +108,13 @@ export function markdown(report) {
     '',
     '## Interpretation',
     '',
-    '- This is a Node text-buffer microbenchmark, not browser input-to-paint or a claim about current full VS Code.',
+    '- This is a Node text-buffer microbenchmark, not browser input-to-paint or a claim about current full VS Code, Monaco or CodeMirror editors.',
     '- LF-normalized input, UTF-16 offsets, code-point-safe edit boundaries, no editor diagnostics.',
+    '- CodeMirror loads through Text.of, single edits through Text.replace, and batches through ChangeSet.of(...).apply(doc). Splitting inserted strings and constructing changes are timed. Reads use sliceString, line and lineAt.',
     '- Range reads include two offset-to-position conversions on the VS Code adapter; Singapore line reads include line-boundary lookup. These are API-level costs, not equal primitive counts.',
-    '- Each sample is a fresh process. Warmups use fresh buffers. Pair order alternates. Fixture generation, setup edits, validation, forced GC and process startup are outside the timer.',
+    '- Each sample is a fresh process. Warmups use fresh buffers. Engine order rotates and reverses across samples and workloads. Fixture generation, setup edits, validation, forced GC and process startup are outside the timer.',
     '- Normal GC during operations remains inside the measured time. Read-result sampling is included; exact read validation is outside it.',
-    '- Persistent history and anchor resolution are Singapore-only capabilities, with no fabricated VS Code equivalence.',
+    '- Persistent history and anchor resolution are Singapore-only capabilities, with no fabricated control equivalence. CodeMirror persistence is outside these Singapore-specific history and anchor lanes.',
     '- Raw samples, fixture hashes, source/build hashes, toolchain and machine metadata are in the adjacent JSON.',
     report.options.profile === 'smoke'
       ? '- Smoke results validate the harness only; do not use these tiny samples to rank engines.'
@@ -120,6 +132,16 @@ async function main() {
     stdio: 'inherit',
   })
   const upstream = await prepare()
+  const codemirrorRoot = path.dirname(
+    path.dirname(createRequire(import.meta.url).resolve('@codemirror/state')),
+  )
+  const codemirror = {
+    version: JSON.parse(readFileSync(path.join(codemirrorRoot, 'package.json'), 'utf8')).version,
+    identity: fileHashes(
+      codemirrorRoot,
+      (name) => path.basename(name) === 'package.json' || name.endsWith('.js'),
+    ),
+  }
   const identity = sourceIdentity()
   let fixtures = makeFixtures(options.profile, options.seed)
   if (options.only) {
@@ -135,7 +157,7 @@ async function main() {
   mkdirSync(cache, { recursive: true })
   const temporary = mkdtempSync(path.join(cache, 'traces-'))
   const report = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     createdAt: new Date().toISOString(),
     options,
     environment: {
@@ -156,6 +178,7 @@ async function main() {
       identity,
     },
     upstream,
+    codemirror,
     workloads: [],
   }
   try {
@@ -164,10 +187,9 @@ async function main() {
       const hash = sha256(encoded)
       const filename = path.join(temporary, fixture.name + '.json')
       writeFileSync(filename, encoded)
-      const samples = { singapore: [], vscode: [] }
+      const samples = Object.fromEntries(comparisonEngines.map((engine) => [engine, []]))
       for (let sample = 0; sample < options.samples; sample += 1) {
-        let engines =
-          (sample + workloadIndex) % 2 ? ['vscode', 'singapore'] : ['singapore', 'vscode']
+        let engines = engineOrder(sample, workloadIndex)
         if (fixture.category === 'singapore-only') engines = ['singapore']
         for (const engine of engines) {
           const output = execFileSync(
@@ -209,12 +231,9 @@ async function main() {
             samples: values,
           }
         }
-      if (engines.vscode)
-        assert.equal(
-          samples.singapore[0].checksum,
-          samples.vscode[0].checksum,
-          'shared result checksum',
-        )
+      for (const values of Object.values(samples))
+        for (const value of values)
+          assert.equal(samples.singapore[0].checksum, value.checksum, 'shared result checksum')
       const row = {
         name: fixture.name,
         category: fixture.category,
@@ -237,10 +256,13 @@ async function main() {
         ratio: engines.vscode
           ? engines.singapore.timeMs.median / engines.vscode.timeMs.median
           : null,
+        codemirrorRatio: engines.codemirror
+          ? engines.singapore.timeMs.median / engines.codemirror.timeMs.median
+          : null,
       }
       report.workloads.push(row)
       console.log(
-        `${row.name}: Singapore ${engines.singapore.timeMs.median.toFixed(3)} ms${engines.vscode ? `; VS Code ${engines.vscode.timeMs.median.toFixed(3)} ms; ratio ${row.ratio.toFixed(2)}x` : '; separate capability lane'}`,
+        `${row.name}: Singapore ${engines.singapore.timeMs.median.toFixed(3)} ms${engines.vscode ? `; VS Code ${engines.vscode.timeMs.median.toFixed(3)} ms; S / VS Code ${row.ratio.toFixed(2)}x; CodeMirror ${engines.codemirror.timeMs.median.toFixed(3)} ms; S / CodeMirror ${row.codemirrorRatio.toFixed(2)}x` : '; separate capability lane'}`,
       )
     }
     assert.deepEqual(sourceIdentity(), identity, 'Source or build changed during benchmark')

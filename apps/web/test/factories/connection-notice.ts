@@ -13,7 +13,7 @@ import { installTestEnvironment } from './client-binding'
 
 export const MACHINE_SETUP_ERROR = {
   code: 'machines.SSH_NOT_INSTALLED',
-  message: 'Platform server is not installed for this SSH user.',
+  message: 'Fregat server is not installed for this SSH user.',
   why: 'The probe found no platform-server on PATH or in ~/.local/bin.',
   fix: 'Select Install server to put this server’s release on that machine.',
   action: 'install',
@@ -21,8 +21,8 @@ export const MACHINE_SETUP_ERROR = {
 
 export const MACHINE_PROTOCOL_ERROR = {
   code: 'machines.SSH_PROTOCOL',
-  message: 'The remote server speaks protocol 6, and this Platform needs protocol 7.',
-  why: 'The server on that machine was started from a different Platform version.',
+  message: 'The remote server speaks protocol 6, and this Fregat needs protocol 7.',
+  why: 'The server on that machine was started from a different Fregat version.',
   fix: 'Select Update server to install this server’s release on that machine and reconnect.',
   action: 'update',
 } satisfies ConnectionError
@@ -30,9 +30,9 @@ export const MACHINE_PROTOCOL_ERROR = {
 // The server withholds `action` from a newer remote: updating it would install an older release.
 export const MACHINE_NEWER_PROTOCOL_ERROR = {
   code: 'machines.SSH_PROTOCOL',
-  message: 'The remote server speaks protocol 8, and this Platform needs protocol 7.',
-  why: 'The server on that machine was started from a different Platform version.',
-  fix: 'Update this Platform server to the version on that machine, then Retry.',
+  message: 'The remote server speaks protocol 8, and this Fregat needs protocol 7.',
+  why: 'The server on that machine was started from a different Fregat version.',
+  fix: 'Update this Fregat server to the version on that machine, then Retry.',
 } satisfies ConnectionError
 
 export async function createConnectionNoticeFixture(

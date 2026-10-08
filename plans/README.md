@@ -25,6 +25,9 @@ work transferred into execution plans, the original issue links, and remaining i
 pass and its verification limits. [August log-audit follow-ups](log-audit-follow-ups.md) retain
 14 historical reports for current reproduction.
 
+[October issue closeout](issue-closeout-2026-10.md) records the Plan 336 tracker migration
+and links each retained failure or experiment to its owning execution plan.
+
 [Wave readiness review](wave-readiness-2026-10-03.md) records the large-program ordering and
 corrected launch dependencies. Upcoming wave order remains in root `PLAN.md`.
 
@@ -200,6 +203,7 @@ delivered acceptance, monitoring/draft check, named follow-ons and owner-only re
 | [333](333-async-terminal-and-server-adapters.md)      | Terminal streams, Bun watch and same-thread server adapters                     |
 | [334](334-async-runtime-verification.md)              | Bounded async qualification, measurements and product acceptance                |
 | [335](335-stroke-icons.md)                            | Stroke icons only, Hugeicons by default, morphing icons, icon packs later       |
+| [336](336-packages-as-products.md)                    | Our packages look and read like products: READMEs, sites, docs, releases        |
 
 ## Package and client plans
 

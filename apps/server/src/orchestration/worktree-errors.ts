@@ -64,7 +64,7 @@ export const worktreeLifecycleErrors = defineErrorCatalog('worktree', {
     status: 409,
     message: ({ worktreeId, reason }: { worktreeId: string; reason: string }) =>
       `Worktree cleanup is blocked by ${reason}: ${worktreeId}`,
-    why: 'Platform removes a worktree only when it created it, no session uses it, and nothing runs in it.',
+    why: 'Fregat removes a worktree only when it created it, no session uses it, and nothing runs in it.',
     fix: 'Deal with what the message names, or let go of the worktree and remove it yourself.',
   },
   PROJECT_HAS_WORKTREES: {

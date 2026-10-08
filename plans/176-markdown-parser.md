@@ -423,3 +423,20 @@ Chat: no phase while question 2 stands at (a).
 - Plans 170/177 own general warm-up and prefetch infrastructure; Phase 1 integrates this parser
   with those paths and verifies its cold behaviour.
 - No change to chat rendering before the decision.
+
+## October 2026 issue follow-ups
+
+Status: Approved, retained by [Plan 336 closeout](issue-closeout-2026-10.md).
+These are remaining execution items. Closing their tracker records does not certify a fix
+or change acceptance of an earlier delivered milestone. Each original thread retains its
+full reproduction, comments and historical artifacts. Source links below pin the reviewed
+main revision; recheck them before implementation.
+
+### Issue 856
+
+Source: [#856: Investigate history-scaled Markdown streaming work and carry incremental-work gates into the owned-parser migration](https://github.com/ShaulLavo/fregat/issues/856), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/856).
+Current owner: [packages/markdown/src/utils/session.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/packages/markdown/src/utils/session.ts).
+
+createMarkdownSession already reuses settled blocks and the React path retains HAST/JSX caches. Current reusableBlocks still validates every settled prefix with startsWith, and a growing open fence can repeatedly parse its growing tail. Characterize settled-history and growing-tail work before migration, then carry delta/document ownership through tree-sitter parsing, transfer and token projection. Compare each result to a fresh parse, including link definitions, footnotes, Unicode, sanitization and scroll anchoring. A parser swap alone does not prove bounded incremental work.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.

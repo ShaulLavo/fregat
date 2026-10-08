@@ -38,7 +38,7 @@ fi
 if test -x "$HOME/.local/bin/${launcher}"; then
   exec "$HOME/.local/bin/${launcher}" --describe
 fi
-printf '%s\\n' '{"code":"machines.SSH_NOT_INSTALLED","message":"Platform server is not installed for this SSH user."}' >&2
+printf '%s\\n' '{"code":"machines.SSH_NOT_INSTALLED","message":"Fregat server is not installed for this SSH user."}' >&2
 exit 127`
 }
 
@@ -219,7 +219,7 @@ async function emit(record, descriptor) {
 }
 ${layout.protocolSource}
 function protocolFail(record, descriptor, installed, otherLeases) {
-  fail('The remote server speaks protocol ' + descriptor.protocolVersion + ', and this Platform needs protocol ' + config.expectedProtocol + '.', 'machines.SSH_PROTOCOL', { expected: config.expectedProtocol, running: descriptor.protocolVersion, installed, installation: config.installation, kind: record.kind, otherLeases, port: record.port, directory: process.cwd() });
+  fail('The remote server speaks protocol ' + descriptor.protocolVersion + ', and this Fregat needs protocol ' + config.expectedProtocol + '.', 'machines.SSH_PROTOCOL', { expected: config.expectedProtocol, running: descriptor.protocolVersion, installed, installation: config.installation, kind: record.kind, otherLeases, port: record.port, directory: process.cwd() });
 }
 async function replaceStale(record, descriptor) {
   if (descriptor.protocolVersion === config.expectedProtocol) return false;
