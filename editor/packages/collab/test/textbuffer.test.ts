@@ -135,7 +135,7 @@ test('large bootstrap and interior edits use compact runs without document trave
 test.each([false, true])(
   'seeded arrivals and pending replay match after every operation with undo=%s',
   (undoRedo) => {
-    for (let seed = 0; seed < 25; seed++) {
+    for (let seed = 0; seed < (process.env.COLLAB_STRESS === '1' ? 100 : 25); seed++) {
       const result = simulate({
         seed,
         participants: 3 + (seed % 3),
@@ -177,10 +177,17 @@ class DifferentialEngine {
     expect(envelope).toEqual(expected)
     return envelope
   }
+  changesBetween(snapshot: TextbufferSnapshot & { reference: ReferenceSnapshot }) {
+    const edits = this.buffer.changesBetween(snapshot)
+    expect(edits).toEqual(this.reference.changesBetween(snapshot.reference))
+    return edits
+  }
   apply(edit: Envelope) {
+    const before = this.snapshot()
     this.reference.apply(edit)
     this.buffer.apply(edit)
     compare(this.reference, this.buffer)
+    this.changesBetween(before)
   }
   snapshot(): TextbufferSnapshot & { reference: ReferenceSnapshot } {
     return { ...this.buffer.snapshot(), reference: this.reference.snapshot() }
