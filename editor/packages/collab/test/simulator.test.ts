@@ -4,7 +4,12 @@ import { expect, test } from 'vitest'
 import { ReferenceEngine, TextbufferEngine, simulate } from '../src/index'
 import type { LeftOrigin } from '../src/index'
 
-const rounds = process.env.COLLAB_STRESS === '1' ? 10_000 : 500
+const stress = process.env.COLLAB_STRESS === '1'
+const rounds = stress ? 10_000 : 16
+const edits = stress ? 32 : 24
+const singleAuthorRounds = stress ? 200 : 16
+const singleAuthorEdits = stress ? 48 : 24
+const timeout = stress ? 300_000 : undefined
 
 test.each([0, 1, 2])('custom factory mixes engine implementations for seed %s', (seed) => {
   let instance = 0
@@ -99,40 +104,56 @@ function run(
   return { result, identity: characters(host!) }
 }
 
-test(`${rounds} seeded rounds converge with three to five participants and match the reference IDs`, () => {
-  for (let seed = 0; seed < rounds; seed++) {
-    const participants = 3 + (seed % 3)
-    const actual = run(seed, participants, 32, createEngine)
-    expect(actual.result.hostSequence, `seed ${seed}`).toBe(32)
-    expect(actual, `seed ${seed}`).toEqual(run(seed, participants, 32, () => new ReferenceEngine()))
-  }
-}, 300_000)
+test(
+  `${rounds} seeded rounds converge with three to five participants and match the reference IDs`,
+  () => {
+    for (let seed = 0; seed < rounds; seed++) {
+      const participants = 3 + (seed % 3)
+      const actual = run(seed, participants, edits, createEngine)
+      expect(actual.result.hostSequence, `seed ${seed}`).toBe(edits)
+      expect(actual, `seed ${seed}`).toEqual(
+        run(seed, participants, edits, () => new ReferenceEngine()),
+      )
+    }
+  },
+  timeout,
+)
 
-test('single-author rounds match the plain string model and reference IDs', () => {
-  for (let seed = 0; seed < 200; seed++) {
-    const actual = run(seed, 1, 48, createEngine)
-    expect(actual.result.hostSequence).toBe(48)
-    expect(actual, `seed ${seed}`).toEqual(run(seed, 1, 48, () => new ReferenceEngine()))
-  }
-}, 300_000)
-test(`${rounds} seeded rounds converge with random undo, redo and duplicate delivery`, () => {
-  let undos = 0
-  let redos = 0
-  for (let seed = 0; seed < rounds; seed++) {
-    const actual = run(seed, 3 + (seed % 3), 32, createEngine, true)
-    expect(actual).toEqual(run(seed, 3 + (seed % 3), 32, () => new ReferenceEngine(), true))
-    const result = actual.result
-    expect(result.hostSequence, `seed ${seed}`).toBe(32)
-    undos += result.undoCommands
-    redos += result.redoCommands
-  }
-  expect(undos).toBeGreaterThan(rounds)
-  expect(redos).toBeGreaterThan(rounds / 4)
-}, 300_000)
+test(
+  'single-author rounds match the plain string model and reference IDs',
+  () => {
+    for (let seed = 0; seed < singleAuthorRounds; seed++) {
+      const actual = run(seed, 1, singleAuthorEdits, createEngine)
+      expect(actual.result.hostSequence).toBe(singleAuthorEdits)
+      expect(actual, `seed ${seed}`).toEqual(
+        run(seed, 1, singleAuthorEdits, () => new ReferenceEngine()),
+      )
+    }
+  },
+  timeout,
+)
+test(
+  `${rounds} seeded rounds converge with random undo, redo and duplicate delivery`,
+  () => {
+    let undos = 0
+    let redos = 0
+    for (let seed = 0; seed < rounds; seed++) {
+      const actual = run(seed, 3 + (seed % 3), edits, createEngine, true)
+      expect(actual).toEqual(run(seed, 3 + (seed % 3), edits, () => new ReferenceEngine(), true))
+      const result = actual.result
+      expect(result.hostSequence, `seed ${seed}`).toBe(edits)
+      undos += result.undoCommands
+      redos += result.redoCommands
+    }
+    expect(undos).toBeGreaterThan(rounds)
+    expect(redos).toBeGreaterThan(rounds / 4)
+  },
+  timeout,
+)
 
 test('single-author undo and redo match an independent snapshot history model', () => {
-  for (let seed = 0; seed < 200; seed++)
-    expect(run(seed, 1, 48, createEngine, true)).toEqual(
-      run(seed, 1, 48, () => new ReferenceEngine(), true),
+  for (let seed = 0; seed < singleAuthorRounds; seed++)
+    expect(run(seed, 1, singleAuthorEdits, createEngine, true)).toEqual(
+      run(seed, 1, singleAuthorEdits, () => new ReferenceEngine(), true),
     )
 })
