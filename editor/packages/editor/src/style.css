@@ -98,6 +98,11 @@
   --editor-gutter-width: 0px;
   /* Written by the editor from `gutterLeadingInset`; part of `--editor-gutter-width`. */
   --editor-gutter-inset: 0px;
+  --editor-gutter-scroll-left: 0px;
+  --editor-visible-gutter-width: max(
+    0px,
+    calc(var(--editor-gutter-width) - var(--editor-gutter-scroll-left))
+  );
   --editor-row-height: 24px;
 
   flex: 1;
@@ -136,11 +141,11 @@
 }
 
 .editor-virtualized-text-clip {
-  clip-path: inset(0 0 0 var(--editor-gutter-width));
+  clip-path: inset(0 0 0 var(--editor-visible-gutter-width));
 }
 
 .editor-virtualized-gutter-clip {
-  clip-path: inset(0 max(0px, calc(100% - var(--editor-gutter-width))) 0 0);
+  clip-path: inset(0 max(0px, calc(100% - var(--editor-visible-gutter-width))) 0 0);
   pointer-events: none;
   z-index: var(--editor-z-gutter);
 }

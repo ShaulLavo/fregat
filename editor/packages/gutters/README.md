@@ -35,6 +35,19 @@ editor.setText('const value = 1\n')
 
 [Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/gutters/overview/)
 
+## Scroll gutters with the text
+
+Gutters stay at the viewport's left edge by default. Set the editor's `gutterScroll` option to
+`'content'` to move line numbers, fold arrows and other gutter lanes with horizontal text scrolling.
+This is useful for code blocks in documentation and other reading views.
+
+Pass `gutterScroll: 'content'` alongside the editor's `plugins` option. Call
+`editor.setGutterScroll('fixed')` to switch an open editor back to fixed gutters.
+
+The option applies to every gutter lane, including `gutterLeadingInset`. Vertical scrolling keeps
+lanes aligned with their rows. Word wrap keeps its usual text width and continuation-row labels.
+Use `'fixed'` to keep gutters at the left edge.
+
 ## In the Singapore family
 
 `@singapore-editor/core` owns the editor view. Add these plugins for line numbers and fold controls.

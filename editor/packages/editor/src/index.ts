@@ -299,6 +299,7 @@ export type {
   EditorOptions,
   EditorRangeDecoration,
   EditorScrollMode,
+  EditorGutterScroll,
   EditorScrollPosition,
   EditorSelectionSyncMode,
   EditorSetSelectionOptions,
