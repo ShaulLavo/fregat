@@ -31,7 +31,8 @@
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
-    "bench": "node bench/engine.mjs"
+    "bench": "node bench/engine.mjs",
+    "bench:fragmented": "node bench/fragmented.mjs"
   },
   "dependencies": {
     "@singapore-editor/textbuffer": "workspace:*"

@@ -204,18 +204,24 @@ export class Participant<Snapshot = unknown> {
     this.publications.push({ change, listeners: [...this.listeners] })
     if (this.publishing) return
     this.publishing = true
+    const errors: unknown[] = []
     try {
-      while (this.publications.length) this.deliver(this.publications.shift()!)
+      while (this.publications.length) this.deliver(this.publications.shift()!, errors)
     } finally {
       this.publications = []
       this.publishing = false
     }
+    if (errors.length) throw errors[0]
   }
 
-  private deliver({ change, listeners }: Publication): void {
+  private deliver({ change, listeners }: Publication, errors: unknown[]): void {
     for (const subscription of listeners) {
       if (!this.listeners.has(subscription)) continue
-      subscription.listener(change)
+      try {
+        subscription.listener(change)
+      } catch (error) {
+        errors.push(error)
+      }
     }
   }
 }

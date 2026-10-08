@@ -74,7 +74,9 @@ contract. The reference engine uses a string diff as its oracle. The textbuffer
 engine diffs persistent trees, skipping shared subtrees and identical storage
 ranges before reading changed text. Subscribers incur one diff after the entire
 confirmed-prefix apply and pending replay. Unsubscribed participants retain no
-publication snapshot and perform no diff.
+publication snapshot and perform no diff. Subscriber failures are surfaced after
+all entitled subscribers receive the committed changes in order; the first thrown
+value is preserved.
 
 ## Undo and retained provenance
 
@@ -120,7 +122,7 @@ validation stay outside timers. Results are 21 in-process samples after five
 warmups. These are storage/protocol experiments; browser rendering and editor
 consumer costs need separate input verification.
 
-`node bench/fragmented.mjs "experiment, shared machine"` measures the fragmented
+`bun run bench:fragmented "experiment, shared machine"` measures the fragmented
 100,000-line workload at 5,000 and 50,000 retained inserts: five concurrent authors,
 scattered or deep-tail placement, and exact-ID tombstones. It reports typing and
 reconcile medians/p99 at 1, 10 and 100 pending edits, subscribed publication, method

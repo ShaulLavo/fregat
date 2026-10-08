@@ -2,6 +2,18 @@ import { Host, Participant } from '../src/index'
 import type { Envelope, HostMessage, OffsetEdit } from '../src/index'
 import { createEngine } from './engine-fixture'
 
+export function subscribeText<Snapshot>(
+  participant: Participant<Snapshot>,
+  listener: (text: string) => void,
+): () => void {
+  let projection = participant.text()
+  return participant.subscribe(({ edits }) => {
+    for (const edit of [...edits].reverse())
+      projection = projection.slice(0, edit.from) + edit.text + projection.slice(edit.to)
+    listener(projection)
+  })
+}
+
 export function replica(actor: string) {
   const engine = createEngine()
   const participant = new Participant({ actor, document: 'test', epoch: '1', engine })

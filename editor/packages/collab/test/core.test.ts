@@ -3,7 +3,7 @@ import { submitAsAuthor } from './host-fixtures'
 import { expect, test } from 'vitest'
 import { CollabFailure, Host, InMemoryTransport, Participant } from '../src/index'
 import type { Envelope, HostMessage } from '../src/index'
-import { accept, authority, replica } from './fixtures'
+import { accept, authority, replica, subscribeText } from './fixtures'
 
 function accepted(
   message: HostMessage | { status: 'deferred' },
@@ -450,3 +450,38 @@ test('subscriptions created during delivery start at their current projection', 
   a.participant.local({ offset: 2, deleteCount: 0, text: 'c' })
   expect(states).toEqual(['abc'])
 })
+
+test.each([false, true])(
+  'throwing subscribers preserve healthy projections with nested=%s',
+  (nested) => {
+    const a = replica('a')
+    const failure = new TypeError('observer failure')
+    let authored = false
+    const stop = a.participant.subscribe(() => {
+      if (nested && !authored) {
+        authored = true
+        a.participant.local({ offset: 1, deleteCount: 0, text: 'b' })
+      }
+      throw failure
+    })
+    let projection = ''
+    const states: string[] = []
+    subscribeText(a.participant, (text) => {
+      projection = text
+      states.push(text)
+    })
+    let caught: unknown
+    try {
+      a.participant.local({ offset: 0, deleteCount: 0, text: 'a' })
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBe(failure)
+    expect(states).toEqual(nested ? ['a', 'ab'] : ['a'])
+    expect(projection).toBe(a.participant.text())
+    stop()
+    a.participant.local({ offset: nested ? 2 : 1, deleteCount: 0, text: 'c' })
+    expect(projection).toBe(nested ? 'abc' : 'ac')
+    expect(projection).toBe(a.participant.text())
+  },
+)
