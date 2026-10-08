@@ -1,0 +1,60 @@
+Terminal instruction lab — Linux/x86_64 research tooling
+
+Validated model: real optimized WASM plus baseline-tier JavaScript and recording
+WebGL commands. Three fresh processes gave 0.014% instruction CV. A programmed
+1% increase measured B/A 1.010005, 95% CI [1.009947, 1.010063]. This is structural
+work, not production optimized-JS or Mac energy. Canvas missed the noise target.
+
+Prerequisites: Node and matching headers (tested 26.7.0), Bun, Python 3.12+, C
+compiler, git history for both arms and user-space perf_event access. Use the
+host's quiet/admission rules. No server, product files or settings are changed.
+
+Build frozen arms; supply paths and use a new evidence directory:
+  lab=ghostty-webgpu/bench/measure-lab
+  out=/path/to/new/evidence
+  python3 "$lab/build-arms.py" --output "$out/artifacts" \
+    --fixture-source /path/to/frozen/fixtures.ts --logs /path/to/frozen/logs.txt \
+    --arm A=BASE_REVISION --arm B=CANDIDATE_REVISION
+Optional frozen bridge override: --arm B=REVISION,/path/to/candidate/bridge.wasm
+The manifest identifies input, module, core, bridge and counter binaries. Runtime
+imports target the historical APIs tested in this research. Supply frozen R07
+inputs for the recorded cases; a different corpus is a different experiment.
+
+Run the qualified WebGL structural model and analyze all registered windows:
+  node --expose-gc --predictable --single-threaded --max-semi-space-size=64 \
+    --no-maglev --no-turbofan --no-liftoff --no-wasm-tier-up --random-seed=42 \
+    "$lab/run.mjs" --artifacts "$out/artifacts" --arms A,B --reuse-actors true \
+    --warm-ticks 5000 --repetitions 6 --ticks 900 --count 1 \
+    --output "$out/samples.jsonl"
+  python3 "$lab/analyze.py" "$out/samples.jsonl" --output "$out/summary.json"
+Turnkey equivalent: bash "$lab/compare.sh" "$out/artifacts" A,B "$out/compare"
+The wrapper fails its gate when work/output or precision is unqualified.
+Keep every valid window. Require work/output, calibration and coverage gates,
+plus each arm CV <=0.3%. Infer from whole ABBA blocks. Recheck noise for each new
+candidate/workload; the current proof covers line scrolling and interactive edits.
+
+Controls: --arms control-A,control-B --sources B,B compares identical code.
+--extra-loop-arm control-B --extra-loop-iterations N adds 3*N loop instructions
+and one native call inside B. It tests sensitivity, not a product optimization.
+--backend canvas uses the real CanvasRowPainter with recording commands; its
+observed CV was too high. DOM projection is absent. --phase parse|frame|gl-commands|
+canvas-commands|publication isolates stages with extra per-tick boundary work.
+
+Attribution: bash "$lab/profile.sh" "$out/artifacts" B "$out/profile" [perf] [event]
+uses owned Node main-TID instruction sampling, original V8 JIT labels and raw
+perf-ips.py/jit-attribution.py decoders. Unknown/conflicting addresses remain
+unknown. It samples loop, proof and cleanup, not an exclusive work partition.
+WASM indices can repeat between modules; exported names need separate identity
+proof. wasm-names.py refuses debug names when executable sections differ.
+
+Browser: chrome-trace.mjs captures timing/V8 controls with an owned binary and
+fresh profile. Headed mode requires the host's private-compositor wrapper; never
+use a person's display. Chrome154 has no per-slice instructions. trace-summary.py
+reports timing separately. mac-power.py analyzes existing valid Mac summaries;
+it acquires nothing. Run portable fixtures with python3 "$lab/test-tools.py".
+
+Limits: fixed glyph bitmaps; no font, real Canvas raster, browser GL validation,
+DOM/Blink, driver/GPU or physical energy. JS optimizing compilers are disabled in
+the precise model; ordinary optimized-JS runs were noisy. Mac instruction signs
+agreed on known winners but magnitudes differed, and a rejected guard candidate
+still improved here. Final acceptance stays with the full Mac energy/guard check.
