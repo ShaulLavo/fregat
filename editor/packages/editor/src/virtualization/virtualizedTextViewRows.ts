@@ -216,6 +216,24 @@ function reconcileRows(
     return
   }
   removeReusableRows(view, reusableRows, onRemoveSlot)
+  updateReadingOrder(view, items)
+}
+
+function updateReadingOrder(
+  view: VirtualizedTextViewInternal,
+  items: readonly FixedRowVirtualItem[],
+): void {
+  const ids: string[] = []
+  for (const item of items) {
+    const row = view.rowElements.get(item.index)
+    if (!row) continue
+    if (!row.element.id) row.element.id = `singapore-row-${crypto.randomUUID()}`
+    ids.push(row.element.id)
+  }
+  if (view.spacer.getAttribute('role') !== 'group') view.spacer.setAttribute('role', 'group')
+  const order = ids.join(' ')
+  // Accessibility ownership changes reading order while retained row DOM and paint stay in place.
+  if (view.spacer.getAttribute('aria-owns') !== order) view.spacer.setAttribute('aria-owns', order)
 }
 
 function mountOrUpdateRow(

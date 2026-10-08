@@ -562,6 +562,55 @@ describe('VirtualizedTextView', () => {
     })
   })
 
+  it('owns reused rows in document reading order through forward and backward scroll', () => {
+    view.setText(createLines(100))
+    for (const top of [0, 20, 80, 400, 380, 60, 0]) {
+      view.setScrollMetrics(top, 100)
+      const indexes = [...container.querySelectorAll<HTMLElement>('[data-editor-virtual-row]')].map(
+        (row) => Number(row.dataset.editorVirtualRow),
+      )
+      const parent = view.getState().mountedRows[0]!.element.parentElement!
+      const ids = parent.getAttribute('aria-owns')?.split(' ') ?? []
+      expect(ids).toEqual(view.getState().mountedRows.map((row) => row.element.id))
+      expect(ids).toHaveLength(indexes.length)
+      expect(parent.getAttribute('role')).toBe('group')
+    }
+  })
+
+  it('keeps accessibility ownership unchanged for an unchanged mounted window', () => {
+    view.setText(createLines(100))
+    view.setScrollMetrics(100, 100)
+    const parent = view.getState().mountedRows[0]!.element.parentElement!
+    const observer = new MutationObserver(() => {})
+    observer.observe(parent, { attributes: true, attributeFilter: ['aria-owns'] })
+    view.setScrollMetrics(101, 100)
+    expect(observer.takeRecords()).toEqual([])
+    observer.disconnect()
+  })
+
+  it('leaves retained row nodes in place during forward and backward scroll', () => {
+    view.setText(createLines(100))
+    view.setScrollMetrics(100, 100)
+    const parent = view.getState().mountedRows[0]!.element.parentElement!
+    const observer = new MutationObserver(() => {})
+    observer.observe(parent, { childList: true })
+    for (const top of [120, 100, 80, 100]) {
+      const previous = new Map(view.getState().mountedRows.map((row) => [row.element, row.index]))
+      view.setScrollMetrics(top, 100)
+      const retained = new Set<Node>(
+        view
+          .getState()
+          .mountedRows.filter((row) => previous.get(row.element) === row.index)
+          .map((row) => row.element),
+      )
+      const moved = observer
+        .takeRecords()
+        .flatMap((record) => [...record.addedNodes, ...record.removedNodes])
+      expect(moved.filter((node) => retained.has(node))).toEqual([])
+    }
+    observer.disconnect()
+  })
+
   it('renders gutter rows with CSS counter line numbers', () => {
     view.dispose()
     view = new VirtualizedTextView(container, {

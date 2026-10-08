@@ -116,16 +116,30 @@ try {
     const reading = await page.locator('main').ariaSnapshot()
     await writeFile(resolve(output, `aria-scroll-${orders.length}.yaml`), reading)
     if (values.baseline || values['headings-only']) continue
+    const session = await page.context().newCDPSession(page)
+    const tree = await session.send('Accessibility.getFullAXTree')
+    await session.detach()
+    await writeFile(
+      resolve(output, `ax-scroll-${orders.length}.json`),
+      JSON.stringify(tree, null, 2),
+    )
+    const byId = new Map(tree.nodes.map((node) => [node.nodeId, node]))
+    const accessibleRows = []
+    function visit(id) {
+      const node = byId.get(id)
+      if (!node) return
+      const match =
+        node.role.value === 'StaticText' && node.name?.value.match(/^Reading row (\d+)$/)
+      if (match) accessibleRows.push(Number(match[1]))
+      for (const child of node.childIds ?? []) visit(child)
+    }
+    const readingGroup = tree.nodes.find((node) => node.role.value === 'group')
+    assert(readingGroup, 'Mounted rows have an accessibility group')
+    visit(readingGroup.nodeId)
     assert.deepEqual(
-      rows,
+      accessibleRows,
       [...rows].sort((a, b) => a - b),
     )
-    let previous = -1
-    for (const row of rows) {
-      const position = reading.indexOf(`Reading row ${String(row).padStart(3, '0')}`)
-      assert(position > previous, `Accessible row ${row} follows the previous row`)
-      previous = position
-    }
   }
   await page.evaluate((text) => window.readingProof.loadPlain(text), fixture(1))
   const samples = []
