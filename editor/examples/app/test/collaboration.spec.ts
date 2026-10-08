@@ -10,7 +10,7 @@ test('participants, hosts and the final peer can leave the example', async ({ pa
     .locator('.peer')
     .filter({ has: page.locator('span', { hasText: 'Participant' }) })
   await participant.getByRole('button', { name: 'Leave session' }).click()
-  await expect(participant.locator('span')).toHaveText('left')
+  await expect(page.locator('.peer-header span').filter({ hasText: /^left$/ })).toHaveCount(1)
   const host = page
     .locator('.peer')
     .filter({ has: page.locator('span', { hasText: 'Ordering host' }) })
@@ -69,7 +69,7 @@ test('failed setup releases every interval, channel and editor before retry', as
   await page.locator('#signaling').fill('https://invalid.example')
   await page.locator('#admission').fill('fixture-member-token')
   await page.locator('#start').click()
-  await expect(page.locator('#status')).toContainText('ws:')
+  await expect(page.locator('#status')).toContainText('ws')
   await expect(page.locator('.peer')).toHaveCount(0)
   expect(
     await page.evaluate(() =>

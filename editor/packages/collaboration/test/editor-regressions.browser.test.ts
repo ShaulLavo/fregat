@@ -214,7 +214,9 @@ test('review: session retains one confirmation object per edit, shared by tip hi
     JSON.stringify({ edits: 100, tips: histories.size, retainedRecords: objects.size }),
   )
   expect(objects.size).toBeLessThanOrEqual(100)
-  expect([...histories.values()].reduce((sum, history) => sum + history.length, 0)).toBeLessThanOrEqual(100)
+  expect(
+    [...histories.values()].reduce((sum, history) => sum + history.length, 0),
+  ).toBeLessThanOrEqual(100)
 })
 
 test('failed competing binding leaves the existing author and shared buffer unchanged', () => {
