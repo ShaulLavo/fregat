@@ -1,6 +1,6 @@
 import { createServer, request, type IncomingMessage, type ServerResponse } from 'node:http'
 import { once } from 'node:events'
-import { connect } from 'node:net'
+import { connect, Socket } from 'node:net'
 import { spawn, spawnSync } from 'node:child_process'
 import { delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -278,6 +278,131 @@ test.skipIf(Boolean(process.versions.bun))(
     await forwarding.close()
     await once(socket, 'close')
     expect(socket.destroyed).toBe(true)
+  },
+)
+
+test.skipIf(Boolean(process.versions.bun)).for(['upstream', 'downstream'] as const)(
+  'upgraded $0 TCP reset closes only its owned tunnel and leaves the peer live',
+  async (mode, { onTestFinished }) => {
+    const runner = await endpoint((_req, res) => res.end('runner'))
+    const entry = await endpoint((_req, res) => res.end('peer'))
+    let runnerSocket: Socket | undefined
+    const fixtureSockets = new Set<Socket>()
+    runner.server.on('upgrade', (_req, socket) => {
+      if (!(socket instanceof Socket)) return socket.destroy()
+      runnerSocket = socket
+      fixtureSockets.add(socket)
+      socket.on('error', () => socket.destroy())
+      socket.once('end', () => socket.destroy())
+      socket.once('close', () => fixtureSockets.delete(socket))
+      socket.write(
+        'HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n',
+      )
+    })
+    const transport = createRetentionReloadTransport(),
+      peerTransport = createRetentionReloadTransport()
+    const forwarding = await createRetentionReloadHttp({
+      runnerOrigin: runner.url,
+      entryOrigin: entry.url,
+      apiOrigin: entry.url,
+      signal: new AbortController().signal,
+    })
+    const peer = await createRetentionReloadHttp({
+      runnerOrigin: runner.url,
+      entryOrigin: entry.url,
+      apiOrigin: entry.url,
+      signal: new AbortController().signal,
+    })
+    onTestFinished(async () => {
+      await forwarding.close()
+      await peer.close()
+      for (const socket of fixtureSockets) socket.destroy()
+      await runner.close()
+      await entry.close()
+    })
+    forwarding.bind({ transport, beforeFetch: async () => {} })
+    peer.bind({ transport: peerTransport, beforeFetch: async () => {} })
+    const address = new URL(forwarding.proxy.server)
+    const socket = connect({ host: address.hostname, port: Number(address.port) })
+    socket.on('error', () => {})
+    const ended = new Promise<void>((resolve) => socket.once('close', resolve))
+    await once(socket, 'connect')
+    const headers = once(socket, 'data')
+    socket.write(
+      `GET ${runner.url}/hmr HTTP/1.1\r\nHost: ${new URL(runner.url).host}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n`,
+    )
+    expect((await headers)[0].toString()).toContain('101 Switching Protocols')
+    if (!runnerSocket) throw { code: 'UPGRADE_FIXTURE_UNAVAILABLE' }
+    if (mode === 'upstream') runnerSocket.resetAndDestroy()
+    if (mode === 'downstream') socket.resetAndDestroy()
+    await ended
+    await forwarding.close()
+    await forwarding.close()
+    expect(transport.requests).toEqual([])
+    expect(transport.hasFailure).toBe(false)
+    interceptor.use(http.all(peer.proxy.server + '/*', passthrough))
+    expect((await through(peer.proxy.server, runner.url + '/live')).body.toString()).toBe('peer')
+    expect(peerTransport.requests).toHaveLength(1)
+    expect(peerTransport.hasFailure).toBe(false)
+    await peer.close()
+    expect(fixtureSockets.size).toBe(0)
+  },
+)
+
+test.skipIf(Boolean(process.versions.bun)).for([
+  { method: 'GET', status: 303, selected: 'GET' },
+  { method: 'HEAD', status: 303, selected: 'HEAD' },
+  { method: 'POST', status: 301, selected: 'GET' },
+  { method: 'POST', status: 302, selected: 'GET' },
+  { method: 'POST', status: 303, selected: 'GET' },
+  { method: 'POST', status: 307, selected: 'POST' },
+  { method: 'POST', status: 308, selected: 'POST' },
+] as const)(
+  '$method through $status keeps the pinned redirect method and body contract',
+  async ({ method, status, selected }, { onTestFinished }) => {
+    const calls: { method: string | undefined; body: Buffer }[] = []
+    const entry = await endpoint((req, res) => {
+      const chunks: Buffer[] = []
+      req.on('data', (chunk: Buffer) => chunks.push(chunk))
+      req.on('end', () => {
+        calls.push({ method: req.method, body: Buffer.concat(chunks) })
+        if (req.url === '/redirect') {
+          res.writeHead(status, { location: '/selected' })
+          res.end()
+          return
+        }
+        res.writeHead(200, { 'x-observed-method': req.method })
+        res.end('selected')
+      })
+    })
+    const runner = await endpoint((_req, res) => res.end())
+    const transport = createRetentionReloadTransport()
+    const forwarding = await createRetentionReloadHttp({
+      runnerOrigin: runner.url,
+      entryOrigin: entry.url,
+      apiOrigin: entry.url,
+      signal: new AbortController().signal,
+    })
+    onTestFinished(async () => {
+      await forwarding.close()
+      await runner.close()
+      await entry.close()
+    })
+    interceptor.use(http.all(forwarding.proxy.server + '/*', passthrough))
+    forwarding.bind({ transport, beforeFetch: async () => {} })
+    const payload = method === 'POST' ? Buffer.from([0, 255, 13, 10]) : Buffer.alloc(0)
+    const response = await through(
+      forwarding.proxy.server,
+      runner.url + '/redirect',
+      method,
+      payload,
+    )
+    expect(response.status).toBe(200)
+    expect(response.headers['x-observed-method']).toBe(selected)
+    expect(calls.map((call) => call.method)).toEqual([method, selected])
+    expect(calls[1]?.body).toEqual(selected === 'POST' ? payload : Buffer.alloc(0))
+    if (method === 'HEAD') expect(response.body.length).toBe(0)
+    expect(transport.requests).toHaveLength(1)
   },
 )
 

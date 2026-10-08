@@ -71,6 +71,26 @@ function handshake(response: IncomingMessage) {
   return status + headers.join('') + '\r\n'
 }
 
+function ownUpgrade(socket: Duplex, upstream: Duplex, upgraded: Set<Duplex>) {
+  upgraded.add(socket)
+  upgraded.add(upstream)
+  let retired = false
+  const closeTunnel = () => {
+    if (retired) return
+    retired = true
+    socket.destroy()
+    upstream.destroy()
+  }
+  const release = (closed: Duplex) => {
+    upgraded.delete(closed)
+    closeTunnel()
+  }
+  socket.on('error', closeTunnel)
+  upstream.on('error', closeTunnel)
+  socket.once('close', () => release(socket))
+  upstream.once('close', () => release(upstream))
+}
+
 export async function createRetentionReloadHttp(options: {
   readonly runnerOrigin: string
   readonly entryOrigin: string
@@ -132,7 +152,7 @@ export async function createRetentionReloadHttp(options: {
           internal: { stage: 'redirect' },
         })
       if (
-        response.statusCode === 303 ||
+        (response.statusCode === 303 && method !== 'GET' && method !== 'HEAD') ||
         ((response.statusCode === 301 || response.statusCode === 302) && method === 'POST')
       ) {
         method = 'GET'
@@ -233,16 +253,7 @@ export async function createRetentionReloadHttp(options: {
       socket.destroy()
     })
     outgoing.once('upgrade', (response, upstream, upstreamHead) => {
-      upgraded.add(socket)
-      upgraded.add(upstream)
-      socket.once('close', () => {
-        upgraded.delete(socket)
-        upstream.destroy()
-      })
-      upstream.once('close', () => {
-        upgraded.delete(upstream)
-        socket.destroy()
-      })
+      ownUpgrade(socket, upstream, upgraded)
       socket.write(handshake(response))
       if (upstreamHead.length) socket.write(upstreamHead)
       if (head.length) upstream.write(head)
