@@ -243,9 +243,11 @@ a single one-megabyte line.
 - Engine string ceilings were measured, including the Chromium trap where decoding past 512 MiB
   returns an empty string with no error.
 
-**Status.** Shipped, with limits: syntax and language servers are capped at 10 Mi code units by
-default; typing with analysis on at 10 MiB TypeScript is p95 about 250 ms; the 10, 50 and 150 MiB
-plain-text rows miss one 60 Hz frame (23–32 ms p95). Editing in the paged view is not built.
+**Status.** Shipped, with limits: Fregat's host policy defaults to a 10 Mi UTF-16 code-unit
+cutoff for syntax and language-server analysis. Singapore's standalone tree-sitter and TypeScript
+plugins have no automatic document-size cutoff; their hosts choose and enforce one. Typing with
+analysis on at 10 MiB TypeScript is p95 about 250 ms in the measured composition; the 10, 50 and
+150 MiB plain-text rows miss one 60 Hz frame (23–32 ms p95). Editing in the paged view is not built.
 No 1 GB result exists.
 
 **Demo idea.** A "load the big one" button that streams a generated 300 MiB log into the paged
@@ -540,7 +542,8 @@ What the site and READMEs must not overclaim.
   52 partial). Milestones M1–M16 closed much of it (sticky scroll, column selection, grapheme
   movement, EditContext, cut and drop handling now exist in code), but no recount has been
   published. Track B should recount before any parity claim.
-- Large files: syntax and language servers stop at 10 Mi code units by default; with analysis on,
+- Large files: Fregat defaults to a 10 Mi UTF-16 code-unit analysis cutoff. Standalone Singapore
+  plugins have no automatic document-size cutoff. With analysis on in the measured composition,
   a 10 MiB TypeScript file types at about 250 ms p95. Plain-text typing at 10, 50 and 150 MiB
   misses a 60 Hz frame. No 1 GB claim.
 - Collaboration, vim mode, multibuffers and editable paging are plans, not features.
@@ -562,5 +565,5 @@ What the site and READMEs must not overclaim.
 - [ ] Label collaboration, vim, multibuffers and editable paging as planned, linked to plans.
 - [ ] Home-page "edit this" demo: TypeScript worker (rename across two files), branching undo
       panel, anchors that survive deletion, main-thread meter during a big paste.
-- [ ] Large-file page: 200 MiB editable and 600 MiB paged numbers, with the 10 Mi analysis cap
+- [ ] Large-file page: 200 MiB editable and 600 MiB paged numbers, with Fregat's 10 Mi analysis cutoff
       stated beside them.

@@ -9,6 +9,7 @@
   },
   "files": [
     "dist",
+    "README.md",
     "THIRD_PARTY_LICENSES"
   ],
   "type": "module",
@@ -29,7 +30,11 @@
     "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
-    "format:check": "oxfmt --check ."
+    "format:check": "oxfmt --check .",
+    "bench": "node bench/engine.mjs"
+  },
+  "dependencies": {
+    "@singapore-editor/textbuffer": "workspace:*"
   },
   "devDependencies": {
     "oxfmt": "0.70.0",

@@ -2,6 +2,7 @@ export type {
   AuthorContext,
   Change,
   CharId,
+  CharacterIdentity,
   EditId,
   Effect,
   SetEffects,
@@ -23,6 +24,8 @@ export type { ParticipantOptions, ParticipantState } from './participant'
 export { InMemoryTransport } from './transport'
 export { simulate } from './simulator'
 export type { SimulationOptions, SimulationResult } from './simulator'
+export { TextbufferEngine } from './textbuffer'
+export type { TextbufferSnapshot } from './textbuffer'
 
 export { UndoManager } from './undo'
 export type { UndoTransaction, UndoState, UndoOptions, UndoEvent, CaptureOptions } from './undo'

@@ -1,3 +1,4 @@
+import { createEngine } from '../engine-fixture'
 // yjs/yjs @ d01eefc997cf12d29d5aabea804df5f69c659a79.
 // tests/relativePositions.tests.js, testRelativePositionCase1 through Case7,
 // checkRelativePositions and testRelativePositionAssociationDifference.
@@ -6,7 +7,6 @@
 // MIT, Copyright (c) 2023 Kevin Jahns and RWTH Aachen University, Germany,
 // Chair of Computer Science 5. See ../../THIRD_PARTY_TEST_NOTICES.md.
 import { expect, test } from 'vitest'
-import { ReferenceEngine } from '../../src/index'
 import { replica } from '../fixtures'
 import { liveIds } from './adapter'
 
@@ -24,7 +24,7 @@ test.each(cases)('Yjs relative-position case $number', ({ number, insertions, te
   const author = replica('0')
   for (const value of insertions) author.insert(0, value)
   expect(author.engine.text()).toBe(text)
-  const restored = new ReferenceEngine()
+  const restored = createEngine()
   restored.restore(author.engine.snapshot())
   const ids = liveIds(author.engine)
   for (let index = 0; index <= text.length; index++) {

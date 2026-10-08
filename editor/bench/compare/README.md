@@ -70,6 +70,49 @@ clock starts. The browser uses the same pure fixture module as the Node-side
 identity calculation. Only the size crosses Playwright's channel, keeping large
 files below Chromium's DevTools message-size limit.
 
+## Profile highlighted open
+
+```sh
+bun run build
+bun run bench --profile-open --open-only --sizes 1,10,200 --repetitions 3 \
+  --condition noisy --timeout 180000 --output ./results/open-profile
+node summarize-open.mjs ./results/open-profile/experiment.json
+# Compare a repeated diagnostic matrix against its baseline.
+node summarize-open.mjs ./results/open-profile-after/experiment.json \
+  --compare ./results/open-profile/experiment.json
+```
+
+This diagnostic run uses the same mount code, fixture, geometry checks and
+30-second visible-highlighting deadline as the comparison. It skips typing,
+scroll and post-open heap observations. Every attempt saves an open trace,
+including visible-highlighting deadline failures. A whole-sample timeout can
+still interrupt trace collection and fails profile verification.
+
+The trace includes main-thread work, frame markers and V8 CPU samples. An
+opt-in page probe records Singapore's existing worker phase timings, request
+round trips, initial source chunk size and synchronous `postMessage` time.
+It also enables the existing editor performance diagnostics. The probe keeps
+message metadata and preserves worker send arguments. Document text stays out
+of the message records.
+
+Open markers delimit mount, the first frame opportunity, the first detected
+syntax and the settled frame opportunity. `mainWorkMs` unions nested script,
+event, style, layout and paint spans on the marked renderer thread.
+`mainRenderingMs` is the rendering subset. These named spans are a subtotal;
+the DevTools-evaluated constructor is not covered by a script span in these
+traces. Its wall time is recorded separately by the mount marker.
+`structuralApplyMs` measures the first main-thread application of structural
+syntax, including mounted token-range painting. Worker phase durations are nested
+inside request round trips, so adding both would count work twice. A round trip
+includes queueing, serialization, worker execution and delivery. It cannot
+isolate transfer latency.
+
+These are instrumented experiments. The comparison summarizer rejects them;
+use `summarize-open.mjs`. They do not replace the uninstrumented comparison
+matrix or establish a performance improvement. `--compare` checks identical fixture,
+configuration, browser, machine, package versions and competitor bundle identities
+before reporting diagnostic median differences. Failed groups retain null timings.
+
 ## Measurements and differences
 
 - Every browser page uses the same ASCII TypeScript fixture, viewport, DPR,
@@ -84,7 +127,8 @@ files below Chromium's DevTools message-size limit.
 - Singapore uses its `typeScript()` Tree-sitter plugin and CSS Custom
   Highlights. Monaco uses its TypeScript Monarch tokenizer. CodeMirror uses
   `basicSetup` and its Lezer TypeScript language mode. Language servers,
-  diagnostics and semantic tokens are absent in all three.
+  diagnostic UI and semantic tokens are absent in all three. Singapore's worker
+  still computes structural errors, brackets and folds.
 - Monaco's `largeFileOptimizations` is explicitly off to preserve lexical
   highlighting. Its minimap, gutter, folding and current-line tint are off.
   CodeMirror's `basicSetup` retains its other default features, with the
@@ -93,12 +137,14 @@ files below Chromium's DevTools message-size limit.
 - Open records constructor/model creation to two animation-frame callbacks,
   then visible syntax readiness to another two callbacks. The first number
   is a frame opportunity after mount. The second includes visible syntax
-  startup. Readiness checks nonempty CSS Highlight ranges in Singapore,
-  colored token spans in Monaco and language spans in CodeMirror. Singapore
-  must finish its initial full-document parse before querying viewport tokens;
-  Monaco and CodeMirror can highlight the viewport first. The highlighted-open
-  row compares user-visible startup, with different prerequisite work. It is
-  not a like-for-like full-document highlighting or parser-speed comparison.
+  startup. Readiness checks one nonempty token CSS Highlight collection in
+  Singapore, one colored token span in Monaco and one classed line span in
+  CodeMirror. This fixture uses language spans for the CodeMirror check.
+  Whole-viewport coverage and token correctness require separate checks.
+  Monaco and CodeMirror can satisfy the detector before whole-document
+  analysis. Singapore's current range-query path first awaits a full root
+  parse and injection discovery.
+  Parser throughput and whole-document completion need separate measurements.
 - Typing sends trusted Playwright `q` presses at the end and `z` presses in the middle. A capture
   listener reads the key event timestamp for the clock; a MutationObserver waits for document length
   to grow; two subsequent animation-frame callbacks end it. Each sample

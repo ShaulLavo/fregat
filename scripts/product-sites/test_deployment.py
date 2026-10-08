@@ -1,4 +1,7 @@
+import os
 import re
+import subprocess
+import tempfile
 from pathlib import Path
 import unittest
 
@@ -32,6 +35,33 @@ class DeploymentTests(unittest.TestCase):
         self.assertIn('      - editor/scripts/build-package.ts\n', workflow)
         self.assertIn("      - '!**/*.test.*'\n", workflow)
         self.assertNotIn("      - '!**/*.md'\n", workflow)
+
+    def test_build_keeps_docs_and_repository_demo_at_separate_routes(self):
+        with tempfile.TemporaryDirectory(prefix='product-sites-build-') as directory:
+            root = Path(directory)
+            scripts = root / 'scripts/product-sites'
+            scripts.mkdir(parents=True)
+            source = Path(__file__).parent
+            (scripts / 'build.sh').write_text((source / 'build.sh').read_text())
+            (scripts / 'index.html').write_text('Project index')
+            for folder in ('apps/site', 'editor/site', 'editor/examples/app', 'ghostty-webgpu/site'):
+                (root / folder / 'dist').mkdir(parents=True)
+                (root / folder / 'package.json').write_text('{}')
+                (root / folder / 'dist/index.html').write_text(folder)
+            binary = root / 'bin'
+            binary.mkdir()
+            bun = binary / 'bun'
+            bun.write_text('#!/bin/sh\nprintf "%s %s %s\\n" "$SITE_ORIGIN" "$VITE_BASE_PATH" "$*" >> "$BUILD_LOG"\n')
+            bun.chmod(0o755)
+            log = root / 'build.log'
+            env = {**os.environ, 'PATH': f'{binary}{os.pathsep}{os.environ["PATH"]}', 'BUILD_LOG': str(log)}
+            output = root / 'output'
+            subprocess.run(['bash', str(scripts / 'build.sh'), str(output)], env=env, check=True)
+            commands = log.read_text()
+            self.assertIn('/singapore/demo/ x turbo run build --filter=@singapore-editor/example-app', commands)
+            self.assertIn('run --cwd editor/site build --base /singapore/', commands)
+            self.assertEqual((output / 'singapore/index.html').read_text(), 'editor/site')
+            self.assertEqual((output / 'singapore/demo/index.html').read_text(), 'editor/examples/app')
 
     def test_dotfile_deny_precedes_site_location(self):
         config = Path(__file__).with_name('nginx.conf').read_text()

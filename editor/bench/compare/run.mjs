@@ -9,6 +9,7 @@ import { parseArgs } from 'node:util'
 import { chromium } from 'playwright'
 import { root, output } from './build.mjs'
 import { readServedBuilds, verifyResume } from './provenance.mjs'
+import { installOpenProbe, summarizeOpenProfile } from './open-profile.mjs'
 import {
   fixtureIdentity,
   order,
@@ -31,6 +32,8 @@ const { values } = parseArgs({
     timeout: { type: 'string', default: '60000' },
     'delay-ms': { type: 'string', default: '0' },
     'executable-path': { type: 'string' },
+    'profile-open': { type: 'boolean', default: false },
+    'open-only': { type: 'boolean', default: false },
   },
 })
 const selected = values.sizes.split(',').map(Number)
@@ -39,6 +42,7 @@ const keys = Number(values.keys)
 const frames = Number(values['scroll-frames'])
 const timeout = Number(values.timeout)
 if (
+  (values['open-only'] && !values['profile-open']) ||
   !['quiet', 'noisy', 'unspecified'].includes(values.condition) ||
   selected.some((size) => !sizes.includes(size)) ||
   new Set(selected).size !== selected.length ||
@@ -134,7 +138,9 @@ let results = {
             'protocol.mjs',
             'provenance.mjs',
             'run.mjs',
+            'open-profile.mjs',
             'summarize.mjs',
+            'summarize-open.mjs',
             'verify-control.mjs',
             'bun.lock',
           ].map((file) => readFile(resolve(root, file))),
@@ -147,6 +153,8 @@ let results = {
   git: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
   config: {
     condition: values.condition,
+    profileOpen: values['profile-open'],
+    openOnly: values['open-only'],
     selected,
     repetitions,
     keys,
@@ -162,9 +170,11 @@ let results = {
   samples: [],
 }
 
-async function trace(cdp, operation) {
+async function trace(cdp, operation, profile = false) {
   await cdp.send('Tracing.start', {
-    categories: 'devtools.timeline,blink.user_timing',
+    categories: profile
+      ? 'devtools.timeline,blink.user_timing,disabled-by-default-v8.cpu_profiler'
+      : 'devtools.timeline,blink.user_timing',
     transferMode: 'ReturnAsStream',
   })
   const completed = new Promise((resolve) => cdp.once('Tracing.tracingComplete', resolve))
@@ -247,6 +257,35 @@ async function heap(cdp) {
   }
 }
 
+async function profileOpen(page, cdp, row) {
+  const captured = await trace(
+    cdp,
+    () =>
+      page.evaluate(async () => {
+        try {
+          return { ok: true, value: await window.bench.open() }
+        } catch (error) {
+          return { ok: false, error: error.message }
+        } finally {
+          performance.mark('compare-open-capture-end')
+        }
+      }),
+    true,
+  )
+  const file = `${row.editor}-${row.mib}-${row.repetition}-open.trace.json.gz`
+  await writeFile(
+    resolve(values.output, file),
+    gzipSync(JSON.stringify({ traceEvents: captured.events })),
+  )
+  const probe = await page.evaluate(() => ({
+    ...globalThis.__compareOpenProbe,
+    startedAtMs: performance.getEntriesByName('compare-open-start').at(-1).startTime,
+  }))
+  row.openProfile = { trace: file, ...summarizeOpenProfile(captured.events, probe) }
+  if (!captured.result.ok) throw new RangeError(captured.result.error)
+  return captured.result.value
+}
+
 async function sample(editor, mib, repetition) {
   const row = { editor, mib, repetition, status: 'failed', errors: [] }
   const context = await browser.newContext({
@@ -264,6 +303,7 @@ async function sample(editor, mib, repetition) {
       row.console.push({ type: message.type(), text: message.text().slice(0, 500) })
   })
   try {
+    if (values['profile-open']) await page.addInitScript(installOpenProbe)
     await page.goto(
       `http://127.0.0.1:${port}/${editor}-typescript/index.html?delay=${results.config.delayMs}`,
     )
@@ -271,9 +311,16 @@ async function sample(editor, mib, repetition) {
     row.heapBefore = await heap(cdp)
     row.heapBeforeBytes = row.heapBefore.usedSize
     await page.evaluate((mib) => window.bench.prepare(mib), mib)
-    row.open = await page.evaluate(() => window.bench.open())
+    row.open = values['profile-open']
+      ? await profileOpen(page, cdp, row)
+      : await page.evaluate(() => window.bench.open())
     verifyGeometry(row.open)
     if (row.open.length !== mib * 1024 * 1024) throw new RangeError('Open changed document length')
+    if (values['open-only']) {
+      await page.screenshot({ path: resolve(values.output, `${editor}-${mib}-${repetition}.png`) })
+      row.status = row.errors.length ? 'page-error' : 'ok'
+      return row
+    }
     await page.waitForTimeout(1000)
     row.heapAfter = await heap(cdp)
     row.heapAfterBytes = row.heapAfter.usedSize

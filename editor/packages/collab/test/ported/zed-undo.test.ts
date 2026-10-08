@@ -1,3 +1,4 @@
+import { createEngine } from '../engine-fixture'
 // Independently implemented semantic scenarios from Zed crates/text/src/tests.rs
 // at dc3fb21676457b84d2233ac4c6bec5cebc698ec3. No GPL source is copied or translated.
 // Scenario inventory and source licence are recorded in THIRD_PARTY_TEST_NOTICES.md.
@@ -74,7 +75,7 @@ test('Zed test_edit_partially_intersecting_a_deleted_fragment: retain partial hi
   room.undo()
   room.converged()
   expect(room.text()).toBe('abcdefgh')
-  expect(room.engine.snapshot().nodes.map((node) => node.id.bunch)).toEqual(
+  expect(room.engine.characters().map((node) => node.id.bunch)).toEqual(
     Array(8).fill(first.change.kind === 'insert' ? first.change.start.bunch : ''),
   )
 })
@@ -87,7 +88,8 @@ test.each(concurrentUndoSeeds)(
   'Zed test_random_concurrent_edits: edits, undo, redo and asynchronous delivery converge, seed %s',
   (seed) => {
     expect(
-      simulate({ seed, participants: 3, edits: concurrentUndoEdits, undoRedo: true }).hostSequence,
+      simulate({ seed, participants: 3, edits: concurrentUndoEdits, undoRedo: true, createEngine })
+        .hostSequence,
     ).toBe(concurrentUndoEdits)
   },
 )
@@ -96,7 +98,7 @@ test('Zed test_edit_undo_after_split: reverse a long replacement across identity
   const room = undoRoom()
   room.edit(1, 0, 0, 'left right')
   room.sync()
-  const ids = room.engine.snapshot().nodes.map((node) => node.id)
+  const ids = room.engine.characters().map((node) => node.id)
   room.edit(0, 4, 1, 'Q'.repeat(64))
   room.sync()
   room.edit(1, 12, 0, '!')
@@ -106,8 +108,8 @@ test('Zed test_edit_undo_after_split: reverse a long replacement across identity
   expect(room.text()).toBe('left! right')
   expect(
     room.engine
-      .snapshot()
-      .nodes.filter((node) =>
+      .characters()
+      .filter((node) =>
         ids.some((id) => id.bunch === node.id.bunch && id.counter === node.id.counter),
       )
       .every((node) => !node.deleted),

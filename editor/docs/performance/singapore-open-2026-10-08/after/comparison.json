@@ -1,0 +1,1024 @@
+{
+  "label": "Diagnostic experiment comparison; instrumented clocks do not establish a headline speedup.",
+  "beforeDate": "2026-10-08T10:16:57.267Z",
+  "afterDate": "2026-10-08T11:07:44.129Z",
+  "groups": [
+    {
+      "editor": "singapore",
+      "mib": 1,
+      "beforeCompleted": 3,
+      "afterCompleted": 3,
+      "medians": {
+        "highlightedMs": {
+          "before": 309.7999999523163,
+          "after": 308.80000001192093,
+          "delta": -0.9999999403953552
+        },
+        "mountMs": {
+          "before": 29.843,
+          "after": 30.867,
+          "delta": 1.024000000000001
+        },
+        "firstFrameMs": {
+          "before": 33.5,
+          "after": 34.80000001192093,
+          "delta": 1.300000011920929
+        },
+        "sourceStartMs": {
+          "before": 60.799999952316284,
+          "after": 59.39999997615814,
+          "delta": -1.399999976158142
+        },
+        "sourceResetMs": {
+          "before": 2,
+          "after": 2,
+          "delta": 0
+        },
+        "sourcePostMs": {
+          "before": 0.3999999761581421,
+          "after": 0.3999999761581421,
+          "delta": 0
+        },
+        "parseStartMs": {
+          "before": 63.5,
+          "after": 62,
+          "delta": -1.5
+        },
+        "parseRoundTripMs": {
+          "before": 162.39999997615814,
+          "after": 162.80000001192093,
+          "delta": 0.40000003576278687
+        },
+        "parseMs": {
+          "before": 155.30000001192093,
+          "after": 155.19999998807907,
+          "delta": -0.10000002384185791
+        },
+        "parseRootMs": {
+          "before": 89,
+          "after": 89.80000001192093,
+          "delta": 0.800000011920929
+        },
+        "injectionDiscoveryMs": {
+          "before": 64.5,
+          "after": 64.40000003576279,
+          "delta": -0.09999996423721313
+        },
+        "queryStartMs": {
+          "before": 233.5,
+          "after": 235.39999997615814,
+          "delta": 1.899999976158142
+        },
+        "queryRoundTripMs": {
+          "before": 40.80000001192093,
+          "after": 31.400000035762787,
+          "delta": -9.399999976158142
+        },
+        "queryMs": {
+          "before": 40.40000003576279,
+          "after": 31.19999998807907,
+          "delta": -9.200000047683716
+        },
+        "structuralWalkMs": {
+          "before": 14.600000023841858,
+          "after": 4.699999988079071,
+          "delta": -9.900000035762787
+        },
+        "highlightQueryMs": {
+          "before": 4.5,
+          "after": 4.5,
+          "delta": 0
+        },
+        "packingMs": {
+          "before": 0.3999999761581421,
+          "after": 0.30000001192092896,
+          "delta": -0.09999996423721313
+        },
+        "structuralApplyMs": {
+          "before": 3.400000035762787,
+          "after": 4,
+          "delta": 0.5999999642372131
+        },
+        "visibleMs": {
+          "before": 277.824,
+          "after": 275.483,
+          "delta": -2.341000000000008
+        },
+        "mainWorkMs": {
+          "before": 9.824,
+          "after": 9.607,
+          "delta": -0.21700000000000053
+        },
+        "mainRenderingMs": {
+          "before": 8.264,
+          "after": 7.982,
+          "delta": -0.28199999999999914
+        }
+      }
+    },
+    {
+      "editor": "monaco",
+      "mib": 1,
+      "beforeCompleted": 3,
+      "afterCompleted": 3,
+      "medians": {
+        "highlightedMs": {
+          "before": 131.19999998807907,
+          "after": 141.69999998807907,
+          "delta": 10.5
+        },
+        "mountMs": {
+          "before": 44.968,
+          "after": 50.243,
+          "delta": 5.274999999999999
+        },
+        "firstFrameMs": {
+          "before": 57.80000001192093,
+          "after": 62.80000001192093,
+          "delta": 5
+        },
+        "sourceStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "sourceResetMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "sourcePostMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseRoundTripMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseRootMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "injectionDiscoveryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryRoundTripMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "structuralWalkMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "highlightQueryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "packingMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "structuralApplyMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "visibleMs": {
+          "before": 97.747,
+          "after": 109.639,
+          "delta": 11.891999999999996
+        },
+        "mainWorkMs": {
+          "before": 79.574,
+          "after": 79.448,
+          "delta": -0.12600000000000477
+        },
+        "mainRenderingMs": {
+          "before": 9.891,
+          "after": 9.893,
+          "delta": 0.002000000000000668
+        }
+      }
+    },
+    {
+      "editor": "codemirror",
+      "mib": 1,
+      "beforeCompleted": 3,
+      "afterCompleted": 3,
+      "medians": {
+        "highlightedMs": {
+          "before": 45.59999996423721,
+          "after": 71.5,
+          "delta": 25.900000035762787
+        },
+        "mountMs": {
+          "before": 19.163,
+          "after": 18.482,
+          "delta": -0.6810000000000009
+        },
+        "firstFrameMs": {
+          "before": 27,
+          "after": 38.19999998807907,
+          "delta": 11.199999988079071
+        },
+        "sourceStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "sourceResetMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "sourcePostMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseRoundTripMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseRootMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "injectionDiscoveryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryRoundTripMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "structuralWalkMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "highlightQueryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "packingMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "structuralApplyMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "visibleMs": {
+          "before": 27.042,
+          "after": 38.196,
+          "delta": 11.153999999999996
+        },
+        "mainWorkMs": {
+          "before": 10.511,
+          "after": 10.633,
+          "delta": 0.12199999999999989
+        },
+        "mainRenderingMs": {
+          "before": 4.43,
+          "after": 4.257,
+          "delta": -0.17300000000000004
+        }
+      }
+    },
+    {
+      "editor": "singapore",
+      "mib": 10,
+      "beforeCompleted": 3,
+      "afterCompleted": 3,
+      "medians": {
+        "highlightedMs": {
+          "before": 1576,
+          "after": 1464,
+          "delta": -112
+        },
+        "mountMs": {
+          "before": 28.678,
+          "after": 29.133,
+          "delta": 0.4549999999999983
+        },
+        "firstFrameMs": {
+          "before": 32.5,
+          "after": 32.80000001192093,
+          "delta": 0.30000001192092896
+        },
+        "sourceStartMs": {
+          "before": 57.89999997615814,
+          "after": 56.30000001192093,
+          "delta": -1.5999999642372131
+        },
+        "sourceResetMs": {
+          "before": 6.699999988079071,
+          "after": 8.400000035762787,
+          "delta": 1.7000000476837158
+        },
+        "sourcePostMs": {
+          "before": 1.7000000476837158,
+          "after": 1.5999999642372131,
+          "delta": -0.10000008344650269
+        },
+        "parseStartMs": {
+          "before": 64.70000004768372,
+          "after": 63.40000003576279,
+          "delta": -1.300000011920929
+        },
+        "parseRoundTripMs": {
+          "before": 1275.5,
+          "after": 1258.5999999642372,
+          "delta": -16.900000035762787
+        },
+        "parseMs": {
+          "before": 1268.2999999523163,
+          "after": 1250.800000011921,
+          "delta": -17.499999940395355
+        },
+        "parseRootMs": {
+          "before": 783.8999999761581,
+          "after": 767,
+          "delta": -16.899999976158142
+        },
+        "injectionDiscoveryMs": {
+          "before": 477.19999998807907,
+          "after": 476.39999997615814,
+          "delta": -0.800000011920929
+        },
+        "queryStartMs": {
+          "before": 1409.7999999523163,
+          "after": 1385.300000011921,
+          "delta": -24.499999940395355
+        },
+        "queryRoundTripMs": {
+          "before": 125.59999996423721,
+          "after": 30.099999964237213,
+          "delta": -95.5
+        },
+        "queryMs": {
+          "before": 125.30000001192093,
+          "after": 29.80000001192093,
+          "delta": -95.5
+        },
+        "structuralWalkMs": {
+          "before": 100,
+          "after": 4.599999964237213,
+          "delta": -95.40000003576279
+        },
+        "highlightQueryMs": {
+          "before": 4.5,
+          "after": 4.300000011920929,
+          "delta": -0.19999998807907104
+        },
+        "packingMs": {
+          "before": 0.3999999761581421,
+          "after": 0.3999999761581421,
+          "delta": 0
+        },
+        "structuralApplyMs": {
+          "before": 4,
+          "after": 3.300000011920929,
+          "delta": -0.699999988079071
+        },
+        "visibleMs": {
+          "before": 1542.655,
+          "after": 1430.661,
+          "delta": -111.99399999999991
+        },
+        "mainWorkMs": {
+          "before": 12.484,
+          "after": 11.123,
+          "delta": -1.3610000000000007
+        },
+        "mainRenderingMs": {
+          "before": 10.164,
+          "after": 9.166,
+          "delta": -0.9979999999999993
+        }
+      }
+    },
+    {
+      "editor": "monaco",
+      "mib": 10,
+      "beforeCompleted": 3,
+      "afterCompleted": 3,
+      "medians": {
+        "highlightedMs": {
+          "before": 169.5999999642372,
+          "after": 179.9000000357628,
+          "delta": 10.300000071525574
+        },
+        "mountMs": {
+          "before": 86.803,
+          "after": 90.25,
+          "delta": 3.4470000000000027
+        },
+        "firstFrameMs": {
+          "before": 98.69999998807907,
+          "after": 102.5,
+          "delta": 3.800000011920929
+        },
+        "sourceStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "sourceResetMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "sourcePostMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseRoundTripMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseRootMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "injectionDiscoveryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryRoundTripMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "structuralWalkMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "highlightQueryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "packingMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "structuralApplyMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "visibleMs": {
+          "before": 135.81,
+          "after": 145.332,
+          "delta": 9.521999999999991
+        },
+        "mainWorkMs": {
+          "before": 77.55,
+          "after": 79.004,
+          "delta": 1.4540000000000077
+        },
+        "mainRenderingMs": {
+          "before": 10.717,
+          "after": 10.268,
+          "delta": -0.44899999999999984
+        }
+      }
+    },
+    {
+      "editor": "codemirror",
+      "mib": 10,
+      "beforeCompleted": 3,
+      "afterCompleted": 3,
+      "medians": {
+        "highlightedMs": {
+          "before": 76,
+          "after": 77,
+          "delta": 1
+        },
+        "mountMs": {
+          "before": 32.624,
+          "after": 30.366,
+          "delta": -2.2580000000000027
+        },
+        "firstFrameMs": {
+          "before": 42.700000047683716,
+          "after": 43.60000002384186,
+          "delta": 0.8999999761581421
+        },
+        "sourceStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "sourceResetMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "sourcePostMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseRoundTripMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseRootMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "injectionDiscoveryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryRoundTripMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "structuralWalkMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "highlightQueryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "packingMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "structuralApplyMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "visibleMs": {
+          "before": 42.768,
+          "after": 43.59,
+          "delta": 0.8220000000000027
+        },
+        "mainWorkMs": {
+          "before": 10.347,
+          "after": 10.092,
+          "delta": -0.254999999999999
+        },
+        "mainRenderingMs": {
+          "before": 4.216,
+          "after": 4.444,
+          "delta": 0.22799999999999976
+        }
+      }
+    },
+    {
+      "editor": "singapore",
+      "mib": 200,
+      "beforeCompleted": 0,
+      "afterCompleted": 0,
+      "medians": {
+        "highlightedMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "mountMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "firstFrameMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "sourceStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "sourceResetMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "sourcePostMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseRoundTripMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseRootMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "injectionDiscoveryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryRoundTripMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "structuralWalkMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "highlightQueryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "packingMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "structuralApplyMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "visibleMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "mainWorkMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "mainRenderingMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        }
+      }
+    },
+    {
+      "editor": "monaco",
+      "mib": 200,
+      "beforeCompleted": 3,
+      "afterCompleted": 3,
+      "medians": {
+        "highlightedMs": {
+          "before": 1106.1000000238419,
+          "after": 1258.5999999642372,
+          "delta": 152.49999994039536
+        },
+        "mountMs": {
+          "before": 1014.078,
+          "after": 1165.44,
+          "delta": 151.36200000000008
+        },
+        "firstFrameMs": {
+          "before": 1027.199999988079,
+          "after": 1185.0999999642372,
+          "delta": 157.89999997615814
+        },
+        "sourceStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "sourceResetMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "sourcePostMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseRoundTripMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseRootMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "injectionDiscoveryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryRoundTripMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "structuralWalkMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "highlightQueryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "packingMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "structuralApplyMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "visibleMs": {
+          "before": 1073.162,
+          "after": 1224.815,
+          "delta": 151.65300000000002
+        },
+        "mainWorkMs": {
+          "before": 79.57,
+          "after": 90.947,
+          "delta": 11.37700000000001
+        },
+        "mainRenderingMs": {
+          "before": 9.134,
+          "after": 12.685,
+          "delta": 3.551
+        }
+      }
+    },
+    {
+      "editor": "codemirror",
+      "mib": 200,
+      "beforeCompleted": 3,
+      "afterCompleted": 3,
+      "medians": {
+        "highlightedMs": {
+          "before": 285.30000001192093,
+          "after": 351.10000002384186,
+          "delta": 65.80000001192093
+        },
+        "mountMs": {
+          "before": 256.327,
+          "after": 312.724,
+          "delta": 56.39699999999999
+        },
+        "firstFrameMs": {
+          "before": 264,
+          "after": 325.80000001192093,
+          "delta": 61.80000001192093
+        },
+        "sourceStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "sourceResetMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "sourcePostMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseRoundTripMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "parseRootMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "injectionDiscoveryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryStartMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryRoundTripMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "queryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "structuralWalkMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "highlightQueryMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "packingMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "structuralApplyMs": {
+          "before": null,
+          "after": null,
+          "delta": null
+        },
+        "visibleMs": {
+          "before": 264.112,
+          "after": 325.919,
+          "delta": 61.80699999999996
+        },
+        "mainWorkMs": {
+          "before": 10.276,
+          "after": 10.542,
+          "delta": 0.266
+        },
+        "mainRenderingMs": {
+          "before": 4.298,
+          "after": 4.748,
+          "delta": 0.4500000000000002
+        }
+      }
+    }
+  ]
+}

@@ -1,10 +1,11 @@
+import { CharIdAllocator } from '@singapore-editor/textbuffer'
 import { CollabFailure } from './failure'
 import { cloneEnvelope } from './host'
 import { UndoManager } from './undo'
 import type { CaptureOptions, UndoOptions } from './undo'
 import type { HostMessage } from './host'
-import { editKey, sameChar } from './types'
-import type { CharId, EditId, Effect, Engine, Envelope, LeftOrigin, OffsetEdit } from './types'
+import { editKey } from './types'
+import type { EditId, Effect, Engine, Envelope, OffsetEdit } from './types'
 
 export type ParticipantOptions<Snapshot> = {
   readonly actor: string
@@ -34,12 +35,12 @@ export class Participant<Snapshot = unknown> {
   private sequence = 0
   private editSequence = 0
   private lamport = 0
-  private runSequence = 0
-  private lastId: CharId | null = null
+  private readonly allocator: CharIdAllocator
   private listeners = new Set<(state: ParticipantState) => void>()
 
   constructor(private readonly options: ParticipantOptions<Snapshot>) {
     if (!options.actor) throw new CollabFailure('invalid-actor')
+    this.allocator = new CharIdAllocator(options.actor)
     this.actor = options.actor
     this.confirmed = options.engine.snapshot()
     this.undoManager = new UndoManager(
@@ -78,7 +79,7 @@ export class Participant<Snapshot = unknown> {
       id: { actor: this.options.actor, seq: this.editSequence + 1 },
       lamport: this.lamport + 1,
       deps: this.pendingFrontier(),
-      allocate: (left, count) => this.allocate(left, count),
+      allocate: (left, count) => this.allocator.generateAfter(left, count),
     })
     this.options.engine.apply(envelope)
     this.editSequence++
@@ -174,15 +175,6 @@ export class Participant<Snapshot = unknown> {
       frontier.set(editKey(envelope.id), envelope.id)
     }
     return [...frontier.values()]
-  }
-
-  private allocate(left: LeftOrigin, count: number): CharId {
-    const start =
-      this.lastId && sameChar(left, this.lastId)
-        ? { bunch: this.lastId.bunch, counter: this.lastId.counter + 1 }
-        : { bunch: `${this.options.actor}:${++this.runSequence}`, counter: 0 }
-    this.lastId = { bunch: start.bunch, counter: start.counter + count - 1 }
-    return start
   }
 
   private publish(): void {

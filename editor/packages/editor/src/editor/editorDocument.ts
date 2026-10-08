@@ -1,5 +1,3 @@
-import type { DocumentSession } from '../documentSession'
-import { createDocumentSession, createStaticDocumentSession } from '../documentSession'
 import type {
   EditorDocumentMode,
   EditorEditability,
@@ -15,14 +13,6 @@ export type ResetOwnedDocumentOptions = {
   readonly documentId: string | null
   readonly persistentIdentity: boolean
   readonly scrollPosition?: EditorScrollPosition
-}
-
-export function createEditorDocumentSession(
-  text: string,
-  documentMode: EditorDocumentMode,
-): DocumentSession {
-  if (documentMode === 'static') return createStaticDocumentSession(text)
-  return createDocumentSession(text)
 }
 
 export function normalizeEditorEditability(

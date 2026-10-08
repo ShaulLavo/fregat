@@ -8,6 +8,8 @@ import {
 } from './buffers'
 import type { TextPageOwner, TextPageRegistry } from './textPages'
 import type { TextRange } from './textSpans'
+import { identityRunAtId, validateCharIdSpan, type CharIdSpan } from './identityRuns'
+import { retainCharIdPayloads, retainedCharIdPayloads } from './payloadRetention'
 import type { PieceTableBuffers, PieceTableSnapshot, PieceTreeNode } from './pieceTableTypes'
 import { createSnapshot, publishSnapshotStorage, retainPieceTableSnapshot } from './snapshot'
 
@@ -18,6 +20,7 @@ export function reclaimPieceTableText(snapshot: PieceTableSnapshot): PieceTableS
   const next = retainPieceTableSnapshot(
     createSnapshot(snapshot.buffers, snapshot.root, snapshot.reverseIndex, snapshot.charIds),
   )
+  if (snapshot.charIds) retainCharIdPayloads(next, retainedCharIdPayloads(snapshot))
   const job = reclaimSnapshotStorage([next])
   while (!job.next().done) {
     /* Drain the same incremental collector for synchronous callers. */
@@ -61,6 +64,37 @@ function* markLiveRanges(
   }
 }
 
+function* markPayloadRange(
+  { snapshot, buffers }: Source,
+  span: CharIdSpan,
+  live: Map<number, TextRange[]>,
+): Generator<void> {
+  validateCharIdSpan(span.start, span.count)
+  let counter = span.start.counter
+  const end = counter + span.count
+  while (counter < end) {
+    const run = identityRunAtId(snapshot.charIds!, { bunch: span.start.bunch, counter })
+    if (!run) throw new RangeError('retained payload identity is missing')
+    const count = Math.min(end - counter, run.counter + run.count - counter)
+    const start = run.offset + counter - run.counter
+    const chunk = chunkOfBuffer(buffers, run.buffer)
+    const ranges = live.get(chunk) ?? []
+    ranges.push({ start, end: start + count })
+    live.set(chunk, ranges)
+    counter += count
+    yield
+  }
+}
+
+function* markPayloadRoots(
+  sources: readonly Source[],
+  live: Map<number, TextRange[]>,
+): Generator<void> {
+  for (const source of sources)
+    for (const span of retainedCharIdPayloads(source.snapshot))
+      yield* markPayloadRange(source, span, live)
+}
+
 export function* reclaimSnapshotStorage(
   snapshots: Iterable<PieceTableSnapshot>,
 ): Generator<void, TextReclamationResult> {
@@ -85,6 +119,7 @@ export function* reclaimSnapshotStorage(
     if (retainLineIndexes) yield* indexRetainedPieces(sources)
     const live = new Map<number, TextRange[]>()
     yield* markLiveRanges(sources, live)
+    yield* markPayloadRoots(sources, live)
     const seenBuffers = new Set<PieceTableBuffers>()
     const buffers: PieceTableBuffers[] = []
     for (const source of sources) {
