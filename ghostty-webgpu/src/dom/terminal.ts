@@ -215,20 +215,8 @@ type PreeditAppearance = Readonly<
   readonly theme: TerminalRendererTheme
 }
 
-function preeditAppearanceMatches(
-  previous: PreeditAppearance | undefined,
-  element: HTMLElement,
-  font: TerminalFittedFont,
-  theme: TerminalRendererTheme,
-): boolean {
-  if (
-    !previous ||
-    previous.element !== element ||
-    previous.font !== font ||
-    previous.theme !== theme
-  )
-    return false
-  const style = element.style
+function preeditDeclarationsMatch(previous: PreeditAppearance): boolean {
+  const style = previous.element.style
   return (
     style.backgroundColor === previous.backgroundColor &&
     style.color === previous.color &&
@@ -328,6 +316,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   private fit?: TerminalFitController
   private fittedFont?: TerminalFittedFont
   private preeditAppearance?: PreeditAppearance
+  private preeditObserver?: MutationObserver
   private workerCanvasSize?: {
     readonly canvas: HTMLCanvasElement
     readonly width: number
@@ -964,6 +953,8 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     this.accessibility = undefined
     this.fit = undefined
     this.fittedFont = undefined
+    this.preeditObserver?.disconnect()
+    this.preeditObserver = undefined
     this.preeditAppearance = undefined
     this.input = undefined
     this.inputLifecycle = undefined
@@ -1702,8 +1693,20 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
   ): void {
     const compositionView = this.elementsValue?.compositionView
     if (!compositionView || !font) return
-    if (preeditAppearanceMatches(this.preeditAppearance, compositionView, font, theme)) return
+    const previous = this.preeditAppearance
+    if (previous?.element === compositionView && previous.font === font && previous.theme === theme)
+      return
+    this.preeditObserver?.disconnect()
     this.preeditAppearance = applyPreeditAppearance(compositionView, font, theme)
+    const Observer = compositionView.ownerDocument.defaultView!.MutationObserver
+    this.preeditObserver = new Observer(() => {
+      const current = this.preeditAppearance
+      if (current && !preeditDeclarationsMatch(current)) this.preeditAppearance = undefined
+    })
+    this.preeditObserver.observe(compositionView, {
+      attributes: true,
+      attributeFilter: ['style'],
+    })
   }
 
   private reportError(cause: unknown, operation: string): void {

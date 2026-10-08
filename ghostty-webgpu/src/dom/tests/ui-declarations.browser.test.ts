@@ -107,6 +107,13 @@ describe('terminal UI declarations', () => {
     expect(probe.composition().style.fontSize).toBe('15px')
   })
 
+  it('restores preedit appearance after a peer callback in the same native frame', async () => {
+    const probe = await compositionProbe()
+    requestAnimationFrame(() => probe.composition().style.removeProperty('font-size'))
+    await probe.update()
+    expect(probe.composition().style.fontSize).toBe('15px')
+  })
+
   it('applies appearance to a replacement supplied composition element', async () => {
     const probe = await compositionProbe()
     expect(probe.composition().style.fontSize).toBe('15px')
@@ -137,10 +144,16 @@ describe('terminal UI declarations', () => {
     await vi.waitFor(() => expect(frame.textContent).toContain('edit 0000'))
     const before = preedit.getAttribute('style')
     const changes = observeStyles(preedit)
+    const declaration = preedit.style
+    const styleReads = vi.spyOn(preedit, 'style', 'get')
+    expect(preedit.style).toBe(declaration)
+    styleReads.mockClear()
     terminal.write('\x1b[6;1H\x1b[2Kedit 0001')
     await vi.waitFor(() => expect(frame.textContent).toContain('edit 0001'))
     expect(preedit.getAttribute('style')).toBe(before)
     expect(changes()).toEqual([])
+    // The one read belongs to caret positioning; appearance does no declaration work.
+    expect(styleReads).toHaveBeenCalledTimes(1)
   })
 
   it('keeps owned caret declarations until validated coordinates change', () => {
