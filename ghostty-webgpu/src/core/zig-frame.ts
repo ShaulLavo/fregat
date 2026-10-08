@@ -148,6 +148,9 @@ export class ZigFrameBuilder {
 
   build(options: ZigFrameOptions): number {
     this.ensureActive()
+    const layoutChanged = this.stableRows !== Boolean(options.stableRows)
+    const full = options.full || layoutChanged
+    if (layoutChanged) this.setUint(124, 0)
     this.setUint(128, options.stableRows ? 1 : 0)
     const { memory } = this.runtime
     memory.bytes.fill(0, this.mask, this.mask + this.rows)
@@ -181,9 +184,9 @@ export class ZigFrameBuilder {
         this.state,
         this.iterator,
         this.cells,
-        options.full ? 0 : this.mask,
+        full ? 0 : this.mask,
         this.rows,
-        options.full ? 0 : 1,
+        full ? 0 : 1,
         this.frame,
       ),
     )

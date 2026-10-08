@@ -164,16 +164,16 @@ export class WebGpuTextPass {
     updates: readonly RowInstanceUpdate[],
   ): number {
     this.frameUploadedBytesValue = 0
-    const metadataOperations = this.uploadRows(data)
+    this.uploadRows(data)
     const plan = planUploadRanges(updates)
     const cellData = data.cellData
     const glyphData = data.glyphData
     for (const range of plan.cell) this.writeRange(this.cellBuffer, cellData, range)
     if (this.glyphBatches.length === 1) {
       for (const range of plan.glyph) this.writeRange(this.glyphBuffer, glyphData, range)
-      return metadataOperations + plan.cell.length + plan.glyph.length
+      return plan.cell.length + plan.glyph.length
     }
-    let operations = metadataOperations + plan.cell.length
+    let operations = plan.cell.length
     for (const range of plan.glyph) operations += this.writeGlyphRange(glyphData, range)
     return operations
   }

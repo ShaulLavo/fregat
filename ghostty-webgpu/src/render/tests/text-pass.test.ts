@@ -240,6 +240,25 @@ it('counts only changed sparse spans', () => {
   ])
 })
 
+it('counts row-remap uniform writes separately from instance uploads', () => {
+  const fixture = gpuFixture()
+  const data = { ...frame(), columns: 40, rowHeight: 16, rowOffset: 1, stableRows: true }
+  expect(fixture.pass.uploadFrame(data, [])).toBe(0)
+  expect(fixture.writes).toHaveLength(1)
+  expect(fixture.writes[0]!.offset).toBe(8)
+  expect(fixture.writes[0]!.bytes.byteLength).toBe(24)
+  const mapping = new DataView(fixture.writes[0]!.bytes.buffer)
+  expect(mapping.getUint32(0, true)).toBe(40)
+  expect(mapping.getFloat32(4, true)).toBe(16)
+  expect(mapping.getUint32(8, true)).toBe(1)
+  expect(mapping.getUint32(12, true)).toBe(480)
+  expect(fixture.pass.metrics.uploadOperations).toBe(1)
+  expect(fixture.pass.frameUploadedBytes).toBe(24)
+  expect(fixture.pass.uploadFrame(data, [])).toBe(0)
+  expect(fixture.pass.frameUploadedBytes).toBe(0)
+  expect(fixture.writes).toHaveLength(1)
+})
+
 it('reads each frame view once even when several rows change', () => {
   const fixture = gpuFixture(),
     data = frame()
