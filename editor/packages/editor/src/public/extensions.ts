@@ -1,4 +1,5 @@
 export type {
+  DocumentEditAuthor,
   DocumentSessionApplyEditsOptions,
   DocumentSessionReconcileOptions,
   EditorTextOrigin,

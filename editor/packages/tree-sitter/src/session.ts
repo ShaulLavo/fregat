@@ -1,3 +1,4 @@
+import { TREE_SITTER_BOOTSTRAP_UNITS } from './treeSitter/source'
 import { waitForDocumentWork } from '@singapore-editor/core/internal/document-worker'
 import { type TextEdit, type TextReadSnapshot } from '@singapore-editor/core/document'
 import {
@@ -83,6 +84,13 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
     string,
     Promise<readonly TreeSitterLanguageDescriptor[]>
   >()
+  private background: {
+    readonly controller: AbortController
+    readonly promise: Promise<void>
+  } | null = null
+  private readonly resultListeners = new Set<
+    (read: DocumentRead, result: EditorSyntaxResult) => void
+  >()
   private disposed = false
   private onFirstParse: (() => void) | undefined
 
@@ -105,6 +113,8 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
   }
 
   public get foldingSupport(): EditorSyntaxFoldingSupport {
+    if (this.result.projection.analysis && this.result.projection.analysis.kind !== 'full')
+      return 'pending'
     return this.currentFoldingSupport
   }
 
@@ -139,6 +149,7 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
     source: DocumentWorkerReadReference,
     signal?: AbortSignal,
   ): Promise<EditorSyntaxResult> {
+    if (this.analysedRead !== read) this.background?.controller.abort()
     const changed = this.analysedRead
       ? this.source.changesBetween(this.analysedRead.revision, read.revision)
       : null
@@ -146,7 +157,12 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
       this.analysedRead = read
       return this.result
     }
-    if (this.parsedSnapshotVersion > 0 && changed?.edits && this.analysedRead) {
+    if (
+      this.parsedSnapshotVersion > 0 &&
+      changed?.edits &&
+      this.analysedRead &&
+      this.result.projection.analysis?.kind !== 'partial'
+    ) {
       const payload = {
         documentId: this.documentId,
         runtimeSessionId: this.runtimeSessionId,
@@ -173,6 +189,8 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
     source: DocumentWorkerReadReference,
     signal?: AbortSignal,
   ): Promise<EditorSyntaxResult> {
+    this.background?.controller.abort()
+    this.background = null
     const snapshotVersion = ++this.snapshotVersion
     const parsePayload = {
       documentId: this.documentId,
@@ -185,7 +203,7 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
     }
     let result = await this.backend.parse(
       this.syntaxMode === 'range'
-        ? { ...parsePayload, resultMode: 'parseOnly' }
+        ? { ...parsePayload, resultMode: this.initialParseMode(read) }
         : { ...parsePayload, resultMode: 'full' },
       signal,
     )
@@ -200,15 +218,116 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
       if (this.disposed || !this.isCurrentSnapshotVersion(snapshotVersion)) return this.result
       result = await this.backend.parse(
         this.syntaxMode === 'range'
-          ? { ...parsePayload, resultMode: 'parseOnly' }
+          ? { ...parsePayload, resultMode: this.initialParseMode(read) }
           : { ...parsePayload, resultMode: 'full' },
         signal,
       )
     }
     signal?.throwIfAborted()
     const next = this.updateFromTreeSitterResult(result, snapshotVersion, read)
-    if (result && !this.disposed) this.notifyFirstParse()
+    if (result && !this.disposed && result.analysis?.kind !== 'partial') this.notifyFirstParse()
     return next
+  }
+
+  private initialParseMode(read: DocumentRead): 'parseOnly' | 'bootstrap' {
+    if (
+      read.text.length <= TREE_SITTER_BOOTSTRAP_UNITS ||
+      this.languageId === 'markdown' ||
+      this.languageId === 'mdx'
+    )
+      return 'parseOnly'
+    return 'bootstrap'
+  }
+
+  public subscribeResults(
+    listener: (read: DocumentRead, result: EditorSyntaxResult) => void,
+  ): () => void {
+    this.resultListeners.add(listener)
+    return () => this.resultListeners.delete(listener)
+  }
+
+  private startCompleteAnalysis(): Promise<void> {
+    if (this.background) return this.background.promise
+    const read = this.analysedRead
+    if (!read || this.disposed || this.result.projection.analysis?.kind !== 'partial')
+      return Promise.resolve()
+    const controller = new AbortController()
+    const version = this.snapshotVersion
+    const promise = this.completeAnalysis(read, version, controller.signal).catch(
+      (error: unknown) => {
+        if (controller.signal.aborted || this.disposed || this.snapshotVersion !== version) return
+        this.result = {
+          ...this.result,
+          degraded: { kind: 'request-failed', message: String(error) },
+        }
+        this.notifyResults(read, this.result)
+      },
+    )
+    this.background = { controller, promise }
+    return promise
+  }
+
+  private async completeAnalysis(
+    read: DocumentRead,
+    version: number,
+    signal: AbortSignal,
+  ): Promise<void> {
+    // The visible response is delivered before the complete analysis enters the worker queue.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    signal.throwIfAborted()
+    const prepared = await this.source.prepareReader(this.backend.sourceEndpoint, read, signal)
+    if (!prepared) return
+    try {
+      const payload: import('./treeSitter/workerClient').TreeSitterParseOnlyPayload = {
+        documentId: this.documentId,
+        runtimeSessionId: this.runtimeSessionId,
+        snapshotVersion: version,
+        languageId: this.languageId,
+        includeHighlights: this.includeHighlights,
+        includeCaptures: this.includeCaptures,
+        source: prepared.reference,
+        resultMode: 'parseOnly',
+      }
+      const result = await this.parseCompleteLanguages(payload, version, signal)
+      signal.throwIfAborted()
+      if (this.disposed || this.snapshotVersion !== version || !result) return
+      if (
+        result.analysis?.kind === 'cancelled' &&
+        this.result.projection.analysis?.kind === 'partial'
+      ) {
+        this.result = {
+          ...this.result,
+          projection: {
+            ...this.result.projection,
+            analysis: { ...this.result.projection.analysis, background: result.analysis },
+          },
+        }
+        this.notifyResults(read, this.result)
+        return
+      }
+      const next = this.updateFromTreeSitterResult(result, version, read)
+      this.notifyResults(read, next)
+    } finally {
+      await prepared.dispose()
+    }
+  }
+
+  private async parseCompleteLanguages(
+    payload: import('./treeSitter/workerClient').TreeSitterParseOnlyPayload,
+    version: number,
+    signal: AbortSignal,
+  ): Promise<TreeSitterParseAckResult | TreeSitterParseResult | undefined> {
+    let result = await this.backend.parse(payload, signal)
+    for (let depth = 0; depth < 8 && result?.missingLanguages?.length; depth++) {
+      if (!(await this.registerMissingLanguages(result.missingLanguages, version))) break
+      signal.throwIfAborted()
+      result = await this.backend.parse(payload, signal)
+    }
+    return result
+  }
+
+  private notifyResults(read: DocumentRead, result: EditorSyntaxResult): void {
+    for (const listener of this.resultListeners) listener(read, result)
   }
 
   private notifyFirstParse(): void {
@@ -237,7 +356,7 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
       return this.createRangeUnavailableResult(range, 'Tree-sitter document has not been parsed')
     }
 
-    const result = await this.backend.queryRange(
+    let result = await this.backend.queryRange(
       {
         documentId: this.documentId,
         runtimeSessionId: this.runtimeSessionId,
@@ -251,12 +370,71 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
     )
 
     signal?.throwIfAborted()
+    for (let depth = 0; depth < 8 && result?.missingLanguages?.length; depth++) {
+      if (!(await this.registerMissingLanguages(result.missingLanguages, this.snapshotVersion)))
+        break
+      signal?.throwIfAborted()
+      result = await this.backend.queryRange(
+        {
+          documentId: this.documentId,
+          runtimeSessionId: this.runtimeSessionId,
+          snapshotVersion: this.parsedSnapshotVersion,
+          languageId: this.languageId,
+          includeHighlights: this.includeHighlights,
+          includeCaptures: this.includeCaptures,
+          range,
+        },
+        signal,
+      )
+    }
 
-    return this.updateFromTreeSitterRangeResult(result, range)
+    if (!result && this.result.projection.analysis?.kind === 'partial') {
+      await this.startCompleteAnalysis()
+      signal?.throwIfAborted()
+      result = await this.backend.queryRange(
+        {
+          documentId: this.documentId,
+          runtimeSessionId: this.runtimeSessionId,
+          snapshotVersion: this.parsedSnapshotVersion,
+          languageId: this.languageId,
+          includeHighlights: this.includeHighlights,
+          includeCaptures: this.includeCaptures,
+          range,
+        },
+        signal,
+      )
+    }
+    if (!result)
+      return this.createRangeUnavailableResult(range, 'Complete syntax analysis is pending')
+    const background = this.result.projection.analysis
+    const next = this.updateFromTreeSitterRangeResult(result, range)
+    if (next.projection.analysis?.kind === 'cancelled') return next
+    if (
+      background?.kind === 'partial' &&
+      background.background &&
+      next.projection.analysis?.kind === 'partial'
+    ) {
+      this.result = {
+        ...next,
+        projection: {
+          ...next.projection,
+          analysis: { ...next.projection.analysis, background: background.background },
+        },
+      }
+    }
+    if (result?.analysis?.kind === 'partial') {
+      this.notifyFirstParse()
+      void this.startCompleteAnalysis()
+    }
+    return this.result
   }
 
   public canQueryRange(): boolean {
-    return this.parsedSnapshotVersion !== 0 && this.parsedSnapshotVersion === this.snapshotVersion
+    return (
+      this.result.projection.analysis?.kind !== 'cancelled' &&
+      this.parsedSnapshotVersion !== 0 &&
+      this.parsedSnapshotVersion === this.snapshotVersion
+    )
   }
 
   public getResult(): EditorSyntaxResult {
@@ -274,6 +452,8 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
   public dispose(): void {
     if (this.disposed) return
 
+    this.background?.controller.abort()
+    this.resultListeners.clear()
     this.disposed = true
     this.backend.disposeDocument(this.runtimeSessionId)
   }
@@ -447,6 +627,17 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
         length: read.text.length,
         snapshotVersion: result.snapshotVersion,
       })
+      this.result = {
+        ...this.result,
+        projection: {
+          ...this.result.projection,
+          source: result.source,
+          analysis: result.analysis ?? {
+            kind: 'full',
+            coveredRange: { startIndex: 0, endIndex: read.text.length },
+          },
+        },
+      }
       return this.result
     }
 
@@ -467,23 +658,34 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
     if (result.snapshotVersion !== this.parsedSnapshotVersion) return this.result
     if (!sameSyntaxRange(result.range, range)) return this.result
 
-    this.result = treeSitterParseResultToEditorSyntaxResult(
+    const next = treeSitterParseResultToEditorSyntaxResult(
       result,
       this.resultContext(this.analysedRead?.text.length ?? this.initialLength, [range]),
     )
-    return this.result
+    // A failed range operation does not retire the document's usable tree or colors.
+    if (next.projection.analysis?.kind === 'cancelled') return next
+    this.result = next
+    return next
   }
 
   private createRangeUnavailableResult(
     range: EditorSyntaxRange,
     message: string,
   ): EditorSyntaxResult {
-    return this.createEmptyResult({
+    const result = this.createEmptyResult({
       degraded: { kind: 'range-unavailable', message },
       requestedRanges: [range],
       length: this.analysedRead?.text.length ?? this.initialLength,
       snapshotVersion: this.parsedSnapshotVersion,
     })
+    return {
+      ...result,
+      projection: {
+        ...result.projection,
+        source: this.result.projection.source,
+        analysis: this.result.projection.analysis,
+      },
+    }
   }
 
   private createEmptyResult(options: {
@@ -604,6 +806,11 @@ const treeSitterParseResultToEditorSyntaxResultInner = (
   errors: result.errors,
   injections: result.injections,
   projection: {
+    source: result.source,
+    analysis: result.analysis ?? {
+      kind: 'full',
+      coveredRange: { startIndex: 0, endIndex: context.snapshotLength },
+    },
     language: {
       includeCaptures: context.includeCaptures,
       includeHighlights: context.includeHighlights,
@@ -669,7 +876,8 @@ const treeSitterDegradedStateToEditorSyntaxState = (
 
 const isTreeSitterParseAckResult = (
   result: TreeSitterParseResult | TreeSitterParseAckResult,
-): result is TreeSitterParseAckResult => 'status' in result && result.status === 'parsed'
+): result is TreeSitterParseAckResult =>
+  'status' in result && (result.status === 'parsed' || result.status === 'cancelled')
 
 const sameSyntaxRange = (left: EditorSyntaxRange, right: EditorSyntaxRange): boolean =>
   left.startIndex === right.startIndex && left.endIndex === right.endIndex

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import type { Browser, BrowserContextOptions, Page } from 'playwright'
+import type { Browser, BrowserContext, BrowserContextOptions, Page, Route } from 'playwright'
 import { hasChromium, startPreview, type Preview } from './preview'
 
 const desktop: BrowserContextOptions = { viewport: { width: 1440, height: 900 } }
@@ -50,8 +50,13 @@ describe.skipIf(!hasChromium())(
       await preview?.stop()
     })
 
-    async function open(path: string, options: BrowserContextOptions = desktop) {
+    async function open(
+      path: string,
+      options: BrowserContextOptions = desktop,
+      prepare?: (context: BrowserContext) => Promise<unknown>,
+    ) {
       const context = await browser.newContext(options)
+      await prepare?.(context)
       const page = await context.newPage()
       const problems: string[] = []
       page.on('pageerror', (error) => problems.push(error.message))
@@ -201,6 +206,178 @@ describe.skipIf(!hasChromium())(
         }
       },
     )
+
+    const WORKER = /treeSitter\.worker/
+    const delayed = (pattern: RegExp, ms: number) => async (context: BrowserContext) => {
+      await context.route(pattern, async (route: Route) => {
+        await new Promise((resolve) => setTimeout(resolve, ms))
+        await route.continue()
+      })
+    }
+    const takenOver = (page: Page) => page.locator('body[data-mode="editor"]')
+    const staticVisible = (page: Page) =>
+      page.locator('#doc').evaluate((element) => getComputedStyle(element).display !== 'none')
+    /** The viewport top of a source line in the editor, read from its gutter label. */
+    const editorLineTop = (page: Page, line: number) =>
+      page.evaluate((line) => {
+        const label = [
+          ...document.querySelectorAll<HTMLElement>(
+            '.editor-host .editor-virtualized-line-number:not([hidden])',
+          ),
+        ].find((cell) => cell.style.counterSet === `editor-line ${line}`)
+        const view = document.querySelector('.editor-host')!.getBoundingClientRect()
+        return label ? Math.round(label.getBoundingClientRect().top - view.top) : null
+      }, line)
+
+    test('a parser that never starts leaves the readable page in place', async () => {
+      const { context, page } = await open('/docs/start-here/quick-start/', desktop, (context) =>
+        context.route(WORKER, (route) => route.abort()),
+      )
+      try {
+        await page.getByRole('button', { name: 'Open in editor' }).waitFor({ timeout: 20_000 })
+        expect(await takenOver(page).count()).toBe(0)
+        expect(await page.locator('.editor-host').count()).toBe(0)
+        expect(await staticVisible(page)).toBe(true)
+        expect(await page.getByRole('heading', { level: 1 }).innerText()).toBe('Quick start')
+      } finally {
+        await context.close()
+      }
+    })
+
+    test('slow syntax swaps in only a painted preview, at the place the reader scrolled to', async () => {
+      const { context, page } = await open(
+        '/docs/start-here/quick-start/',
+        desktop,
+        delayed(WORKER, 1500),
+      )
+      try {
+        await page.locator('.editor-host[data-state="mounting"]').waitFor({ state: 'attached' })
+        await page.evaluate(() => (document.getElementById('doc')!.scrollTop = 500))
+        await page.waitForTimeout(100)
+        const before = await lineBoxes(page, 'static')
+        await takenOver(page).waitFor({ timeout: 20_000 })
+        expect(
+          await page.locator('.editor-host [class*="editor-inline-"]').count(),
+        ).toBeGreaterThan(0)
+        await expect
+          .poll(async () => {
+            const after = await lineBoxes(page, 'editor')
+            return Object.entries(before)
+              .filter(([line, box]) => after[Number(line)] !== box)
+              .map(([line, box]) => `${line}: ${box} became ${after[Number(line)]}`)
+          })
+          .toEqual([])
+      } finally {
+        await context.close()
+      }
+    })
+
+    test('the latest page choice wins over a slower earlier one', async () => {
+      const { context, page, problems } = await open(
+        '/docs/start-here/introduction/',
+        desktop,
+        delayed(/start-here\/quick-start\.md$/, 1500),
+      )
+      try {
+        await takenOver(page).waitFor({ timeout: 20_000 })
+        const pages = page.getByRole('navigation', { name: 'Documentation' })
+        await pages.getByRole('link', { name: 'Quick start' }).click()
+        await pages.getByRole('link', { name: 'Coming from Monaco' }).click()
+        await page.waitForURL(/\/monaco\/$/)
+        await page.waitForTimeout(2500)
+        expect(page.url()).toMatch(/\/monaco\/$/)
+        expect(await page.title()).toBe('Coming from Monaco · Singapore docs')
+        expect(await page.locator('.path b').innerText()).toBe('monaco.md')
+        await page.goBack()
+        await page.waitForURL(/\/introduction\/$/)
+        await expect.poll(() => page.title()).toBe('Introduction · Singapore docs')
+        expect(problems).toEqual([])
+      } finally {
+        await context.close()
+      }
+    })
+
+    test.each([800, 1000])(
+      'at %i px every section stays reachable and the header fits',
+      async (width) => {
+        for (const mode of ['off', 'on']) {
+          const { context, page } = await open(`/docs/start-here/quick-start/?editor=${mode}`, {
+            viewport: { width, height: 800 },
+          })
+          try {
+            if (mode === 'on') await takenOver(page).waitFor({ timeout: 20_000 })
+            const right = await page.evaluate(() =>
+              Math.max(
+                ...[...document.querySelectorAll('header.top *')].map(
+                  (element) => element.getBoundingClientRect().right,
+                ),
+              ),
+            )
+            expect(right, `header at ${width} px, editor ${mode}`).toBeLessThanOrEqual(width)
+            await page.getByText('Pages', { exact: true }).click()
+            await page
+              .getByRole('navigation', { name: 'All pages' })
+              .getByRole('link', { name: 'Architecture' })
+              .click()
+            await page.waitForURL(/\/docs\/concepts\/architecture\/$/)
+            await expect.poll(() => page.title()).toMatch(/^Architecture\b/)
+          } finally {
+            await context.close()
+          }
+        }
+      },
+    )
+
+    test('fragment links scroll the editor to their heading', async () => {
+      const source = await (await fetch(`${base}/docs/start-here/quick-start.md`)).text()
+      const heading = source.split('\n').indexOf("## If it doesn't work") + 1
+      expect(heading).toBeGreaterThan(1)
+      const { context, page, problems } = await open('/docs/start-here/introduction/')
+      try {
+        await takenOver(page).waitFor({ timeout: 20_000 })
+        await page
+          .locator('.editor-host a.editor-markdown-link', { hasText: 'troubleshooting section' })
+          .click()
+        await page.waitForURL(/\/quick-start\/#if-it-doesnt-work$/)
+        await expect.poll(() => editorLineTop(page, heading)).toBe(0)
+        await page.locator('.editor-host').hover()
+        await page.mouse.wheel(0, -5000)
+        await expect.poll(() => editorLineTop(page, 1)).toBe(0)
+        await page.mouse.wheel(0, 300)
+        await page.waitForTimeout(200)
+        await page
+          .locator('.editor-host a.editor-markdown-link', { hasText: "If it doesn't work" })
+          .click()
+        await expect.poll(() => editorLineTop(page, heading)).toBe(0)
+        expect(problems).toEqual([])
+      } finally {
+        await context.close()
+      }
+    })
+
+    test('the editor keeps heading roles in reading order', async () => {
+      const { context, page } = await open('/docs/start-here/quick-start/')
+      try {
+        await takenOver(page).waitFor({ timeout: 20_000 })
+        const session = await context.newCDPSession(page)
+        // Playwright's snapshot ignores aria-owns, which orders the editor's rows; ask Chromium.
+        const { nodes } = (await session.send('Accessibility.getFullAXTree')) as {
+          nodes: { role?: { value?: string }; name?: { value?: string } }[]
+        }
+        const headings = nodes
+          .filter((node) => node.role?.value === 'heading')
+          .map((node) => node.name?.value)
+        const start = headings.indexOf('Quick start')
+        expect(headings.slice(start, start + 4)).toEqual([
+          'Quick start',
+          '1. Install the core',
+          '2. Give the editor a container',
+          '3. Mount it',
+        ])
+      } finally {
+        await context.close()
+      }
+    })
 
     test('the theme toggle repaints the editor', async () => {
       const { context, page } = await open('/docs/start-here/introduction/', {

@@ -30,7 +30,7 @@ export function HeaderButton({
             aria-label={label}
             disabled={disabled}
             focusableWhenDisabled
-            size='icon'
+            size='icon-sm'
             type='button'
             variant='ghost'
             onClick={onClick}

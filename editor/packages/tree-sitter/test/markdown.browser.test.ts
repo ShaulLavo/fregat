@@ -170,7 +170,10 @@ it('edits and undoes EOF definitions and moving fences with all outputs matching
     (source) => client.parse({ ...identity, snapshotVersion: 1, source }),
     oldRead,
   )
-  expect(staleParse).toBeUndefined()
+  expect(staleParse).toMatchObject({
+    status: 'cancelled',
+    analysis: { kind: 'cancelled', reason: 'superseded' },
+  })
   const current = await client.queryRange({
     ...identity,
     snapshotVersion: 5,

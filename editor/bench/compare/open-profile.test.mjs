@@ -145,6 +145,61 @@ test('profile verification preserves failed opens and rejects invented parse evi
   assert.throws(() => verifyOpenProfiles(result), /duplicate profile matrix/)
 })
 
+test('provisional profiles require a measured bounded bootstrap query', async () => {
+  const { verifyOpenProfiles, openProfileRows } = await import('./summarize-open.mjs')
+  const { editors } = await import('./protocol.mjs')
+  const result = {
+    config: { profileOpen: true, openOnly: true, selected: [200], repetitions: 1 },
+    samples: editors.map((editor) => ({
+      editor,
+      mib: 200,
+      repetition: 0,
+      status: 'failed',
+      errors: ['deadline'],
+      openProfile: { trace: 'trace.json.gz', mainWorkMs: 1, marksMs: {}, requests: [] },
+    })),
+  }
+  const row = result.samples[0]
+  row.status = 'ok'
+  row.open = {
+    highlightedFrameMs: 100,
+    geometry: {
+      width: 1280,
+      height: 720,
+      scrollViewport: { width: 1265, height: 720 },
+      renderedRows: 50,
+      visibleStyle: { fontFamily: 'monospace', fontSize: '14px', lineHeight: '20px' },
+    },
+  }
+  row.openProfile.completed = true
+  row.openProfile.requests = [{ resultMode: 'bootstrap' }]
+  assert.throws(() => verifyOpenProfiles(result), /no worker parse measurement/)
+  row.openProfile.requests.push({
+    type: 'queryRange',
+    analysis: { kind: 'partial' },
+    statistics: { tokens: 40, bootstrapUnits: 4096 },
+    timings: [{ name: 'treeSitter.bootstrapRoot', durationMs: 3 }],
+  })
+  assert.equal(verifyOpenProfiles(result), '3 open profiles retained; 1 completed')
+  assert.equal(openProfileRows(result)[0].bootstrapRootMs, 3)
+  assert.equal(openProfileRows(result)[0].bootstrapUnits, 4096)
+
+  result.config.fullDocument = true
+  row.openProfile.requests = [
+    {
+      resultMode: 'full',
+      returnedResult: true,
+      statistics: { rangeStart: 0, rangeEnd: 200 * 1024 * 1024, tokens: 100 },
+      timings: [{ name: 'treeSitter.parseRoot', durationMs: 80 }],
+    },
+  ]
+  assert.equal(verifyOpenProfiles(result), '3 open profiles retained; 1 completed')
+  assert.equal(openProfileRows(result)[0].parseRootMs, 80)
+  assert.equal(openProfileRows(result)[0].queryTokens, 100)
+  row.openProfile.requests[0].degraded = [{ kind: 'timeout' }]
+  assert.throws(() => verifyOpenProfiles(result), /degraded phases/)
+})
+
 test('profile rows keep the request timeline separate from nested worker phases', async () => {
   const { openProfileRows } = await import('./summarize-open.mjs')
   const { editors } = await import('./protocol.mjs')

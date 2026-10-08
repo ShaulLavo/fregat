@@ -104,7 +104,12 @@
         "@singapore-editor/scope-lines#build",
         "@singapore-editor/tree-sitter-languages#build"
       ],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/examples/stress/src/fixtures.ts"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/editor/examples/stress/src/fixtures.ts",
+        "$TURBO_ROOT$/editor/bench/compare/fixture.mjs",
+        "$TURBO_ROOT$/editor/bench/compare/protocol.mjs"
+      ]
     },
     "@singapore-editor/react#typecheck": {
       "dependsOn": ["^build", "build", "@singapore-editor/tree-sitter-languages#build"]
@@ -218,6 +223,13 @@
     "singapore-editor-site#typecheck": {
       "dependsOn": ["^typecheck"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/package.json"]
+    },
+    "@singapore-editor/collaboration#test:editor": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/packages/editor/src/**"],
+      "env": ["COLLABORATION_MEASURE", "COLLABORATION_EVIDENCE_DIR"],
+      "outputs": [],
+      "cache": false
     }
   },
   "agentGuidance": false,

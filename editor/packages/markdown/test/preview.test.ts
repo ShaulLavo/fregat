@@ -98,6 +98,68 @@ describe('markdown preview plugin', () => {
     expect(rowTexts()).toEqual(['Title', 'a bold b'])
   })
 
+  it('exposes parsed headings and links in live preview', async () => {
+    editor.setText('# Title\n## Read [docs](https://example.com)\nSetext\n======\nplain', {
+      languageId: 'markdown',
+    })
+    editor.setSelection(editor.materializeFullText().length)
+    await flush()
+    const headings = [...container.querySelectorAll('[role="heading"]')]
+    expect(headings.map((row) => row.getAttribute('aria-level'))).toEqual(['1', '2', '1'])
+    expect(headings.map((row) => row.textContent)).toEqual(['Title', 'Read docs', 'Setext'])
+    expect(container.querySelector('a')?.getAttribute('href')).toBe('https://example.com')
+    editor.setText('plain\nsecond', { languageId: 'markdown' })
+    await flush()
+    expect(container.querySelector('[role="heading"]')).toBeNull()
+  })
+
+  it('names a multiline Setext heading with its full rendered title', async () => {
+    editor.setText('First **line**\nsecond [line](https://example.com)\n===========\nplain', {
+      languageId: 'markdown',
+    })
+    editor.setSelection(editor.materializeFullText().length)
+    await flush()
+    const headings = container.querySelectorAll('[role="heading"]')
+    expect(headings).toHaveLength(1)
+    expect(headings[0]?.getAttribute('aria-label')).toBe('First line second line')
+  })
+
+  it('names a wrapped ATX heading with its full rendered title', async () => {
+    const title = 'Start ' + 'long title '.repeat(40) + 'END'
+    editor.setText('# ' + title + '\nplain', { languageId: 'markdown' })
+    editor.setSelection(editor.materializeFullText().length)
+    editor.setWordWrap(true)
+    await flush()
+    editor.setScrollPosition({ top: 0 })
+    const headings = container.querySelectorAll('[role="heading"]')
+    expect(headings).toHaveLength(1)
+    expect(headings[0]?.getAttribute('aria-label')).toBe(title)
+  })
+
+  it('clears heading semantics before recycling rows and when preview is removed', async () => {
+    const source =
+      '# Title\n' + Array.from({ length: 80 }, (_, index) => `plain ${index}`).join('\n')
+    editor.setText(source, { languageId: 'markdown' })
+    editor.setSelection(source.length)
+    await flush()
+    editor.setScrollPosition({ top: 0 })
+    expect(container.querySelector('[role="heading"]')?.textContent).toBe('Title')
+    editor.setScrollPosition({ top: 600 })
+    expect(container.querySelector('[role="heading"]')).toBeNull()
+    editor.setScrollPosition({ top: 0 })
+    expect(container.querySelector('[role="heading"]')?.getAttribute('aria-level')).toBe('1')
+    editor.setPlugins([markdownSyntaxPlugin])
+    expect(container.querySelector('[role="heading"]')).toBeNull()
+    expect(container.querySelector('[data-editor-virtual-row][aria-label]')).toBeNull()
+  })
+
+  it('keeps heading semantics when the caret reveals its source', async () => {
+    await openMarkdown()
+    editor.setSelection(3)
+    await flush()
+    expect(container.querySelector('[role="heading"]')?.getAttribute('aria-level')).toBe('1')
+  })
+
   it('authors through a plain Editor with one undo entry and restores the selection', async () => {
     editor.setText('hello', { languageId: 'markdown' })
     editor.setSelection(0, 5)

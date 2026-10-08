@@ -4,6 +4,7 @@
  * its live preview has painted, at the same scroll position. Docs links then open in the same
  * editor and update the address bar.
  */
+import GithubSlugger from 'github-slugger'
 import type { DocsEditor } from './editor'
 import { resolveDocsLink, type ManualPage } from './links'
 import { setUpSearch } from './search'
@@ -30,6 +31,8 @@ const tabs = new Map<string, { text: string; original: string }>()
 let current = body.dataset.file!
 let docs: DocsEditor | null = null
 let host: HTMLElement | null = null
+// Only the latest navigation may open a document or touch history.
+let navigation = 0
 
 const readerPreferred = () => {
   try {
@@ -79,7 +82,6 @@ async function takeOver() {
   host.setAttribute('aria-label', 'Page source')
   host.dataset.state = 'mounting'
   viewport.append(host)
-  const anchor = topLine()
   docs = mountDocsEditor(host, {
     documentId: current,
     languageId: 'markdown',
@@ -94,6 +96,8 @@ async function takeOver() {
   // A caret touching a construct reveals its Markdown source, focused or not; park it at the end.
   docs.editor.setSelection(text.length)
   metrics.previewMs = await docs.ready()
+  // The reader may have scrolled the static page while the editor loaded.
+  const anchor = topLine()
   scrollToLine(anchor.line, anchor.offset)
   await new Promise((resolve) => requestAnimationFrame(resolve))
   host.dataset.state = 'ready'
@@ -172,7 +176,8 @@ function setReaderPreference(page: boolean) {
   } catch {}
 }
 
-// Readers who prefer the plain page (for example with a screen reader) keep it on every page.
+// Readers who prefer the plain page keep it on every page. The editor exposes only its mounted
+// rows to assistive technology, while the static article holds the whole page.
 function offerPage() {
   modeButton('Read as page', () => {
     setReaderPreference(true)
@@ -189,27 +194,67 @@ function offerEditor() {
 }
 
 function openLink(href: string) {
-  const target = resolveDocsLink(current, href, base, files)
-  if (target.md) {
-    void openFile(target.md, true)
+  if (href.startsWith('#')) {
+    void openFile(current, true, href)
     return
   }
+  const target = resolveDocsLink(current, href, base, files)
   const url = new URL(target.href, location.href)
+  if (target.md) {
+    void openFile(target.md, true, url.hash)
+    return
+  }
   if (url.origin === location.origin) location.href = url.href
   else window.open(url.href, '_blank', 'noopener')
 }
 
-async function openFile(file: string, push: boolean) {
+/** The source line of the heading a fragment names, with the ids the static page gives them. */
+function headingLine(text: string, hash: string): number | null {
+  const id = decodeURIComponent(hash.replace(/^#/, ''))
+  if (!id) return null
+  const slugger = new GithubSlugger()
+  let fence = false
+  const lines = text.split('\n')
+  for (const [index, line] of lines.entries()) {
+    if (/^\s*(```|~~~)/.test(line)) fence = !fence
+    const heading = fence ? null : line.match(/^#{1,6}\s+(.*?)\s*#*\s*$/)
+    if (!heading) continue
+    const visible = heading[1]!.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[`*]/g, '')
+    if (slugger.slug(visible.trim()) === id) return index + 1
+  }
+  return null
+}
+
+function revealFragment(hash: string) {
+  const line = headingLine(tabs.get(current)?.text ?? '', hash)
+  if (line === null) return
+  scrollToLine(line)
+}
+
+async function openFile(file: string, push: boolean, hash = '') {
+  const id = ++navigation
   const page = pages.get(file)
   if (!page) return
   if (!docs) {
-    location.href = page.url
+    location.href = page.url + hash
     return
   }
-  if (file === current) return
+  if (file === current) {
+    if (push && hash) history.pushState({ file, hash }, '', page.url + hash)
+    revealFragment(hash)
+    return
+  }
   const previous = tabs.get(current)
   if (previous) previous.text = docs.text()
-  const text = await source(file)
+  let text: string
+  try {
+    text = await source(file)
+  } catch (error) {
+    console.error(`Loading ${file} failed; opening its page.`, error)
+    if (id === navigation) location.href = page.url + hash
+    return
+  }
+  if (id !== navigation || !docs) return
   if (!tabs.has(file)) tabs.set(file, { text, original: text })
   current = file
   const tab = tabs.get(file)!
@@ -219,7 +264,7 @@ async function openFile(file: string, push: boolean) {
   docs.element.setAttribute('aria-label', label(file))
   body.dataset.file = file
   document.title = `${page.title} · Singapore docs`
-  if (push) history.pushState({ file }, '', page.url)
+  if (push) history.pushState({ file, hash }, '', page.url + hash)
   const [directory, name] = splitPath(file)
   document.querySelector('.path')!.innerHTML = `docs/${directory}<b></b>`
   document.querySelector('.path b')!.textContent = name
@@ -228,7 +273,15 @@ async function openFile(file: string, push: boolean) {
     else link.removeAttribute('aria-current')
   }
   updateDirty()
-  await docs.ready()
+  try {
+    await docs.ready()
+  } catch (error) {
+    // The static page for this file still reads correctly.
+    console.error(`The preview for ${file} did not paint; opening its page.`, error)
+    if (id === navigation) location.href = page.url + hash
+    return
+  }
+  if (id === navigation) revealFragment(hash)
 }
 
 const splitPath = (file: string) => {
@@ -250,14 +303,15 @@ document.addEventListener('click', (event) => {
   if (!link?.dataset.md || !pages.has(link.dataset.md)) return
   event.preventDefault()
   link.closest('dialog')?.close()
-  void openFile(link.dataset.md, true)
+  link.closest('details')?.removeAttribute('open')
+  void openFile(link.dataset.md, true, link.hash)
 })
 
 window.addEventListener('popstate', (event) => {
-  const file = (event.state as { file?: string } | null)?.file
-  if (file) void openFile(file, false)
+  const state = event.state as { file?: string; hash?: string } | null
+  if (state?.file) void openFile(state.file, false, state.hash ?? location.hash)
 })
-history.replaceState({ file: current }, '')
+history.replaceState({ file: current, hash: location.hash }, '')
 
 // The column has no scrollbar of its own; a wheel anywhere in the margins scrolls it.
 viewport.addEventListener(
@@ -289,6 +343,7 @@ setUpSearch(
 function start() {
   return takeOver().catch((error: unknown) => {
     console.error('Singapore takeover failed; the static page stays.', error)
+    docs?.dispose()
     host?.remove()
     host = null
     docs = null
@@ -303,3 +358,14 @@ if (shouldTakeOver()) {
 } else {
   offerEditor()
 }
+
+// The header page menu closes on Escape and on a press outside it.
+const menu = document.querySelector<HTMLDetailsElement>('details.menu')
+document.addEventListener('pointerdown', (event) => {
+  if (menu?.open && !menu.contains(event.target as Node)) menu.open = false
+})
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || !menu?.open) return
+  menu.open = false
+  menu.querySelector('summary')?.focus()
+})

@@ -1,0 +1,48 @@
+[wave-heavy] 'viewport injection-free resolved style verification' is waiting: 11 job(s) ahead in the queue
+[wave-heavy] 'viewport injection-free resolved style verification' is waiting: 1 job(s) ahead in the queue
+[wave-heavy] started 'viewport injection-free resolved style verification' on local after 92s: 6509 MiB free covers 4096 MiB
+$ tsc --noEmit
+$ vitest run --exclude '**/*.browser.test.ts' && bun run test:browser
+
+ RUN  v5.0.2 /work/worktrees/platform/singapore-viewport-first/editor/packages/tree-sitter
+
+
+ Test Files  15 passed (15)
+      Tests  107 passed (107)
+   Start at  17:47:11
+   Duration  1.88s (transform 50%, environment 23%, import 17%, tests 9%, worker 1%)
+
+  Transform  transforming modules took 3.24s · 50% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+$ vitest run --browser.enabled --browser.headless test/viewport-first.browser.test.ts test/treeSitter-workerClient.browser.test.ts test/native-coverage.browser.test.ts test/markdown.browser.test.ts test/capture-address.browser.test.ts
+
+ RUN  v5.0.2 /work/worktrees/platform/singapore-viewport-first/editor/packages/tree-sitter
+      API started at http://localhost:63315/
+
+
+ Test Files  5 passed (5)
+      Tests  95 passed (95)
+   Start at  17:47:13
+   Duration  7.50s (tests 81%, worker 10%, import 9%)
+
+✔ open work unions nested spans, clips the clock and separates rendering from workers (0.569318ms)
+✔ worker round trips match worker identity and preserve incomplete requests (0.434318ms)
+✔ missing clock boundaries fail instead of reporting zero work (0.211847ms)
+✔ probe preserves worker send arguments and retains timing metadata without document text (0.546971ms)
+✔ diagnostic profiles stay out of the comparison ranking (0.786882ms)
+✔ profile verification preserves failed opens and rejects invented parse evidence (0.661442ms)
+✔ provisional profiles require a measured bounded bootstrap query (0.286327ms)
+✔ profile rows keep the request timeline separate from nested worker phases (0.228182ms)
+✔ diagnostic comparison retains failed groups and rejects changed measurement contracts (11.43651ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 49.476789
+
+[exited with code 0]

@@ -20,6 +20,7 @@ export function installOpenProbe() {
           hasResult: data?.result !== undefined,
           timings: data?.result?.timings,
           statistics: data?.result?.statistics,
+          analysis: data?.result?.analysis,
           degraded: data?.result?.degraded,
           workerReceivedAt: data?.__compareReceivedAt,
           workerPostedAt: data?.__comparePostedAt,
@@ -112,6 +113,7 @@ export function summarizeOpenProfile(events, probe) {
         roundTripMs: received ? received.at - sent.at : null,
         timings: received?.timings,
         statistics: received?.statistics,
+        analysis: received?.analysis,
         degraded: received?.degraded,
         outboundMs:
           received?.workerReceivedAt === undefined

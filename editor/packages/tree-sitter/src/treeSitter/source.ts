@@ -1,5 +1,7 @@
 import type { DocumentWorkerRead } from '@singapore-editor/core/internal/document-worker'
 
+export const TREE_SITTER_BOOTSTRAP_UNITS = 65_536
+
 export type TreeSitterPieceTableInput = {
   readonly read: DocumentWorkerRead
   readonly length: number
@@ -62,4 +64,17 @@ export function readTreeSitterInputRange(
 function assertSource(input: TreeSitterPieceTableInput): void {
   if (!input.read.isValid())
     throw new DOMException('Document source scope was released', 'AbortError')
+}
+
+export function limitTreeSitterInput(
+  source: TreeSitterPieceTableInput,
+  length: number,
+): TreeSitterPieceTableInput {
+  const owner = source.retain()
+  return {
+    read: owner.read,
+    length: Math.min(length, source.length),
+    retain: () => limitTreeSitterInput(owner, length),
+    dispose: () => owner.dispose(),
+  }
 }

@@ -43,5 +43,10 @@
     "file": "packages/collab/src/textbuffer.ts",
     "function": "TextbufferEngine.text",
     "reason": "Explicit whole-document string projection for Host.text, Participant.text/state and subscribed participant views. Identity-native authoring and application read the piece table directly."
+  },
+  {
+    "file": "packages/collaboration/src/plugin.ts",
+    "function": "collaborationBoundaryText",
+    "reason": "One-time attachment validates bootstrap text; detachment creates a plain editable snapshot. Remote reconciliation and local mutations never call this extraction."
   }
 ]

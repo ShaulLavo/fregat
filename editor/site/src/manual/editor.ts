@@ -123,11 +123,16 @@ export function mountDocsEditor(host: HTMLElement, options: DocsEditorOptions) {
       listeners.add(listener)
       return () => listeners.delete(listener)
     },
-    /** Resolves once the preview for the current text has painted; Markdown only. */
-    async ready(timeoutMs = 4000) {
+    /**
+     * Resolves once the preview for the current text has painted; Markdown only. Rejects when
+     * syntax or the preview does not arrive in time, so callers keep the static page.
+     */
+    async ready(timeoutMs = 8000) {
       const started = performance.now()
-      while (performance.now() - started < timeoutMs) {
-        if (editor.getSyntaxRecords() && element.querySelector('[class*="editor-inline-"]')) break
+      while (!(editor.getSyntaxRecords() && element.querySelector('[class*="editor-inline-"]'))) {
+        const waited = performance.now() - started
+        if (waited >= timeoutMs)
+          throw new TypeError(`The Markdown preview did not paint within ${Math.round(waited)} ms`)
         await nextFrame()
       }
       decorate()
@@ -135,10 +140,15 @@ export function mountDocsEditor(host: HTMLElement, options: DocsEditorOptions) {
       await nextFrame()
       return performance.now() - started
     },
-    /** Resolves once code highlighting has painted. */
-    async highlighted(timeoutMs = 4000) {
+    /** Resolves once code highlighting has painted; rejects when it does not arrive in time. */
+    async highlighted(timeoutMs = 8000) {
       const started = performance.now()
-      while (performance.now() - started < timeoutMs && CSS.highlights.size === 0) await nextFrame()
+      while (CSS.highlights.size === 0) {
+        const waited = performance.now() - started
+        if (waited >= timeoutMs)
+          throw new TypeError(`Code highlighting did not paint within ${Math.round(waited)} ms`)
+        await nextFrame()
+      }
       await nextFrame()
       return performance.now() - started
     },

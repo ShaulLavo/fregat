@@ -121,7 +121,7 @@ a {
 }
 .top .right a,
 .top button,
-.pages-inline a {
+.menu summary {
   color: var(--muted);
   text-decoration: none;
   font: inherit;
@@ -132,18 +132,59 @@ a {
 }
 .top .right a:hover,
 .top button:hover,
-.pages-inline a:hover {
+.menu summary:hover,
+.menu[open] summary {
   color: var(--sg-title);
 }
 .theme-toggle[aria-pressed='true'] {
   color: var(--sg-title);
 }
-.pages-inline {
+/* Every page, from the header, when the margin list has no room. */
+.menu {
   display: none;
-  gap: 4px;
+  position: relative;
 }
-.pages-inline a[aria-current] {
-  color: var(--sg-title);
+.menu summary {
+  list-style: none;
+}
+.menu summary::-webkit-details-marker {
+  display: none;
+}
+.menu nav {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  max-height: min(70dvh, 640px);
+  overflow: auto;
+  padding: 10px 18px 4px;
+  background: var(--sg-bg);
+  border-radius: 8px;
+  box-shadow: 0 18px 60px rgb(0 0 0 / 0.22);
+  white-space: normal;
+}
+.menu h2 {
+  margin: 8px 0 4px;
+  font: 11px/1.5 var(--chrome);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.menu ul {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+.menu nav a {
+  display: block;
+  padding: 3px 0;
+  color: var(--sg-fg);
+  text-decoration: none;
+}
+.menu nav a[aria-current] {
+  color: var(--sg-link);
 }
 kbd {
   font: 11px var(--mono);
@@ -416,13 +457,13 @@ body[data-mode='editor'] .pane {
   color: var(--muted);
 }
 
-/* Without room for the margin list, its section moves into the header. */
+/* Without room for the margin list, the header menu lists every page. */
 @media (max-width: 1199px) {
   .pages {
     display: none;
   }
-  .pages-inline {
-    display: flex;
+  .menu {
+    display: block;
   }
   .top {
     padding: 0 24px;
@@ -443,7 +484,6 @@ body[data-mode='editor'] .pane {
     padding: 0 8px 0 14px;
     gap: 8px;
   }
-  .pages-inline,
   .top .right a,
   .search-open kbd {
     display: none;
@@ -477,42 +517,6 @@ body[data-mode='editor'] .pane {
   }
   .editor-host {
     width: 100%;
-  }
-}
-
-/* The page list again under the article, for widths without the margin list. */
-.pages-foot {
-  display: none;
-  padding: 0 0 48px var(--gw);
-  font: 15px/1.55 var(--chrome);
-}
-.pages-foot h2 {
-  margin: 22px 0 6px;
-  font: 11px/1.5 var(--chrome);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.pages-foot ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.pages-foot a {
-  display: inline-block;
-  padding: 3px 0;
-  color: var(--sg-fg);
-  text-decoration: none;
-}
-.pages-foot a[aria-current] {
-  color: var(--sg-link);
-}
-@media (max-width: 1199px) {
-  .pages-foot {
-    display: block;
-  }
-  .src {
-    padding-bottom: 24px;
   }
 }
 
