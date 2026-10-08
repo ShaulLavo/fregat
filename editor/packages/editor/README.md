@@ -25,6 +25,8 @@ editor.openDocument({
 })
 ```
 
+Give the host element a definite height, such as `height: 400px`. The editor fills that height and scrolls its document within it. Block, flex and grid hosts are supported.
+
 call `editor.dispose()` when you're done with it
 
 plugins go in `plugins` when you construct the editor. a plugin is an object with a `name` and an `activate(context)` that registers what it adds
