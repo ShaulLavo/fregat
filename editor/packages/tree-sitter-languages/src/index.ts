@@ -78,10 +78,27 @@ function createLanguagePlugin(
   name: string,
   options: TreeSitterLanguagePluginOptions = {},
 ): EditorPlugin {
-  return createTreeSitterLanguagePlugin([contribution], {
+  return createTreeSitterLanguagePlugin(withBundledInjections(contribution), {
     ...options,
     name: options.name ?? name,
   })
+}
+
+function withBundledInjections(
+  root: TreeSitterLanguageContribution,
+): readonly TreeSitterLanguageContribution[] {
+  const contributions = [root]
+  const seen = new Set([root.id])
+  for (const contribution of contributions) {
+    for (const id of contribution.injectionDependencies ?? []) {
+      if (seen.has(id)) continue
+      const dependency = TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === id)
+      if (!dependency) continue
+      seen.add(id)
+      contributions.push(dependency)
+    }
+  }
+  return contributions
 }
 
 function createJavaScriptContribution(jsx: boolean): TreeSitterLanguageContribution {

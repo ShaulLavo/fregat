@@ -20,5 +20,6 @@
  ; Parse JSDoc annotations in comments
 
 ((comment) @injection.content
+ (#match? @injection.content "^/\\*\\*")
  (#set! injection.language "jsdoc"))
 

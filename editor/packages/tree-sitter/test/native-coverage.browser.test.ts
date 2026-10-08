@@ -21,10 +21,7 @@ import { markdownInlineReplacements } from '../../markdown/src/replacements'
 import { NATIVE_FIXTURES } from '../../tree-sitter-languages/test/fixtures/native'
 import { MDX_CATEGORIES, MDX_FIXTURE } from '../../tree-sitter-languages/test/fixtures/mdx'
 import { SQL_CATEGORIES, SQL_FIXTURE } from '../../tree-sitter-languages/test/fixtures/sql'
-import {
-  TREE_SITTER_LANGUAGE_CONTRIBUTIONS,
-  TREE_SITTER_LANGUAGE_METADATA,
-} from '../../tree-sitter-languages/src/index'
+import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '../../tree-sitter-languages/src/index'
 
 const browserTest = it.skipIf(typeof Worker === 'undefined')
 
@@ -63,6 +60,118 @@ browserTest(
       expect(loads).toEqual(['typescript'])
       expect(result.errors).toEqual([])
       expect(result.captures.some((capture) => capture.captureName === 'type.builtin')).toBe(true)
+    } finally {
+      session.dispose()
+      await backend.dispose()
+    }
+  },
+)
+
+browserTest.each(['full', 'range'] as const)(
+  'loads documentation and regex grammars when TypeScript injects them in %s mode',
+  async (syntaxMode) => {
+    const backend = new TreeSitterWorkerClient()
+    const loads: string[] = []
+    const text = '/** @param {string} value */\nconst pattern = /[a-z]+/;\n'
+    const session = createTreeDocument({
+      documentId: 'injections.ts',
+      languageId: 'typescript',
+      languageResolver: registry(loads),
+      backend,
+      syntaxMode,
+      text,
+    })
+    try {
+      let result = await session.run()
+      if (syntaxMode === 'range')
+        result = await session.runtime.queryRange({ startIndex: 0, endIndex: text.length })
+      expect(result.degraded).toBeNull()
+      expect(new Set(loads)).toEqual(new Set(['typescript', 'jsdoc', 'regex']))
+      expect(result.captures.some((capture) => capture.languageId === 'jsdoc')).toBe(true)
+      expect(result.captures.some((capture) => capture.languageId === 'regex')).toBe(true)
+      for (const [needle, captureName] of [
+        ['@param', 'keyword'],
+        ['a', 'constant.character'],
+      ]) {
+        const start = text.indexOf(needle!, needle === 'a' ? text.indexOf('/[') : 0)
+        const token = tokenValues(result).find((value) => value.start <= start && value.end > start)
+        expect(token?.style).toEqual(styleForTreeSitterCapture(captureName!))
+      }
+    } finally {
+      session.dispose()
+      await backend.dispose()
+    }
+  },
+)
+
+browserTest.each(['full', 'range'] as const)(
+  'covers every documentation and regex injection beyond 256 layers in %s mode',
+  async (syntaxMode) => {
+    const backend = new TreeSitterWorkerClient()
+    const languageResolver = registry([])
+    const text = '/** @param {string} value */\nconst pattern = /[a-z]+/;\n'.repeat(150)
+    const document = createDocumentSession(text)
+    const options = { languageId: 'typescript', languageResolver, backend, syntaxMode }
+    const session = createTreeDocument({ ...options, documentId: 'many-injections.ts', text })
+    try {
+      let result = await session.run()
+      if (syntaxMode === 'range')
+        result = await session.runtime.queryRange({ startIndex: 0, endIndex: text.length })
+      expect(result.degraded).toBeNull()
+      expect(result.injections).toHaveLength(300)
+      const tokens = tokenValues(result)
+      for (const [start, capture] of [
+        [text.lastIndexOf('@param'), 'keyword'],
+        [text.lastIndexOf('[a-z]') + 1, 'constant.character'],
+      ] as const) {
+        expect(tokens.find((token) => token.start <= start && token.end > start)?.style).toEqual(
+          styleForTreeSitterCapture(capture),
+        )
+      }
+      const change = document.applyEdits([{ from: 4, to: 10, text: '@returns' }])
+      const updated = await session.edit(change.edits)
+      const actual =
+        syntaxMode === 'full'
+          ? updated
+          : await session.runtime.queryRange({ startIndex: 0, endIndex: change.snapshot.length })
+      expect(actual.degraded).toBeNull()
+      expect(actual.injections).toHaveLength(300)
+      await assertFreshSyntax(options, change.snapshot, actual, change.snapshot.length)
+    } finally {
+      session.dispose()
+      await backend.dispose()
+    }
+  },
+)
+
+browserTest(
+  'reports incomplete syntax when injection nesting exceeds the depth limit',
+  async () => {
+    const backend = new TreeSitterWorkerClient()
+    const languageResolver = new TreeSitterLanguageRegistry()
+    const contribution = TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((value) => value.id === 'html')!
+    languageResolver.registerLanguage({
+      ...contribution,
+      async load() {
+        return {
+          ...(await contribution.load!()),
+          injectionQuerySource:
+            '((element (start_tag) (element) @injection.content (end_tag)) (#set! injection.language "html") (#set! injection.include-children))',
+        }
+      },
+    })
+    const session = createTreeDocument({
+      documentId: 'nested.html',
+      languageId: 'html',
+      languageResolver,
+      backend,
+      syntaxMode: 'full',
+      text: '<div>'.repeat(12) + 'text' + '</div>'.repeat(12),
+    })
+    try {
+      const result = await session.run()
+      expect(result.degraded?.kind).toBe('injection-failed')
+      expect(result.degraded?.message).toContain('nesting exceeds')
     } finally {
       session.dispose()
       await backend.dispose()
@@ -211,7 +320,11 @@ browserTest.each(NATIVE_FIXTURES)(
       expect(incremental.folds).toEqual(expected.folds)
       expect(incremental.injections).toEqual(expected.injections)
       expect(loads.length).toBe(new Set(loads).size)
-      expect(new Set(loads)).toEqual(requiredLanguages(fixture.id))
+      const injected: Readonly<Record<string, readonly string[]>> = {
+        astro: ['typescript'],
+        svelte: ['typescript', 'css'],
+      }
+      expect(new Set(loads)).toEqual(new Set([fixture.id, ...(injected[fixture.id] ?? [])]))
       fresh.dispose()
     } finally {
       session.dispose()
@@ -243,7 +356,7 @@ browserTest.each(['full', 'range'] as const)(
           ? initial
           : await session.runtime.queryRange({ startIndex: 0, endIndex: text.length })
       expect(result.degraded).toBeNull()
-      expect(new Set(loads)).toEqual(new Set([...requiredLanguages('markdown'), 'sql']))
+      expect(new Set(loads)).toEqual(new Set(['markdown', 'sql']))
       assertPaint(result, text, SQL_CATEGORIES)
       for (const [before, after] of [
         ['42', "'42'"],
@@ -302,7 +415,7 @@ browserTest.each([
           ? initial
           : await session.runtime.queryRange({ startIndex: 0, endIndex: text.length })
       expect(result.degraded).toBeNull()
-      expect(new Set(loads)).toEqual(new Set([...requiredLanguages('mdx'), 'sql']))
+      expect(new Set(loads)).toEqual(new Set([languageId, 'mdx', 'sql']))
       assertPaint(result, text, MDX_CATEGORIES)
       if (languageId === 'markdown') {
         expect(
@@ -418,16 +531,4 @@ browserTest('reports unsupported style preprocessors without treating them as CS
 
 function tokenValues(result: EditorSyntaxResult) {
   return 'toTokens' in result.tokens ? result.tokens.toTokens() : result.tokens
-}
-
-function requiredLanguages(id: string): Set<string> {
-  const required = new Set<string>()
-  const pending = [id]
-  for (let index = 0; index < pending.length; index += 1) {
-    const entry = TREE_SITTER_LANGUAGE_METADATA.find((language) => language.id === pending[index])
-    if (!entry || required.has(entry.id)) continue
-    required.add(entry.id)
-    pending.push(...entry.injectionDependencies)
-  }
-  return required
 }
