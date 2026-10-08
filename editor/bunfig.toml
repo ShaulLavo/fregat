@@ -1,0 +1,3 @@
+# Keep dependency resolution inside the standalone checkout, including TypeDoc plugins.
+[install]
+globalStore = false
