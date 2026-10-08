@@ -7,25 +7,41 @@ import { Session } from '../src/session'
 const runs = process.env.COLLABORATION_LONG_RUN === '1' ? 10_000 : 100
 
 describe('transport-neutral session', () => {
-  test('converges after host crashes, two pairs rejoin and concurrent three-way reconciliation', () => {
-    const hits: Network['hits'] = {
-      hostKill: 0,
-      pairs: 0,
-      threeWay: 0,
-      crashRejoin: 0,
-      partialHeal: 0,
-      oldGeneration: 0,
-      reconnectReorder: 0,
-    }
-    for (let seed = 1; seed <= runs; seed++) {
-      const result = runSeed(seed)
-      for (const key of Object.keys(hits) as (keyof typeof hits)[]) hits[key] += result[key]
-    }
-    for (const count of Object.values(hits)) expect(count).toBeGreaterThan(0)
-    console.log(
-      `Session simulation: ${runs} seeded runs passed; 3–8 peers; hits=${JSON.stringify(hits)}`,
-    )
-  }, 600_000)
+  test.each([8, 8192])(
+    'converges after host crashes, two pairs rejoin and concurrent three-way reconciliation with a %i-ID replay window',
+    (window) => {
+      const hits: Network['hits'] = {
+        hostKill: 0,
+        pairs: 0,
+        threeWay: 0,
+        crashRejoin: 0,
+        partialHeal: 0,
+        oldGeneration: 0,
+        reconnectReorder: 0,
+      }
+      const replay: Network['replay'] = {
+        uniqueDelivery: 0,
+        duplicateDrop: 0,
+        staleDrop: 0,
+        maxReorderDistance: 0,
+      }
+      for (let seed = 1; seed <= runs; seed++) {
+        const result = runSeed(seed, window)
+        for (const key of Object.keys(hits) as (keyof typeof hits)[]) hits[key] += result[key]
+        for (const key of ['uniqueDelivery', 'duplicateDrop', 'staleDrop'] as const)
+          replay[key] += result[key]
+        replay.maxReorderDistance = Math.max(replay.maxReorderDistance, result.maxReorderDistance)
+      }
+      for (const count of Object.values(hits)) expect(count).toBeGreaterThan(0)
+      expect(replay.duplicateDrop).toBeGreaterThan(0)
+      if (window === 8) expect(replay.staleDrop).toBeGreaterThan(0)
+      else expect(replay.staleDrop).toBe(0)
+      console.log(
+        `Session simulation: ${runs} seeded runs passed; 3–8 peers; window=${window}; hits=${JSON.stringify(hits)}; replay=${JSON.stringify(replay)}`,
+      )
+    },
+    600_000,
+  )
 
   test('delayed archived history and stale election requests remain fenced', () => {
     runSeed(5377)

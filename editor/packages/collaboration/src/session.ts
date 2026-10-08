@@ -19,6 +19,7 @@ import {
   type Payloads,
   type Round,
 } from './protocol'
+import { ReplayWindow } from './replay-window'
 
 export interface SessionOptions<E extends EditEnvelope> {
   readonly peer: string
@@ -31,6 +32,7 @@ export interface SessionOptions<E extends EditEnvelope> {
   readonly suspicionTimeout: number
   readonly dependencyTimeout: number
   readonly historyChunkRecords: number
+  readonly replayWindowSize?: number
   readonly onPresence?: (peer: string, payload: Payloads<E>['PRESENCE']) => void
 }
 
@@ -68,7 +70,8 @@ export class Session<E extends EditEnvelope> {
   private lastTick = -Infinity
   private lastHostPulse = -Infinity
   private now = 0
-  private readonly seen = new Map<string, Set<number>>()
+  private readonly replayWindowSize: number
+  private readonly seen = new Map<string, ReplayWindow>()
   private readonly histories = new Map<string, readonly Confirmation<E>[]>()
   private readonly latestRounds = new Map<string, number>()
   private readonly chunks = new Map<string, Map<number, readonly Confirmation<E>[]>>()
@@ -98,6 +101,9 @@ export class Session<E extends EditEnvelope> {
       throw new RangeError('Dependency timeout must be positive and finite')
     if (!Number.isSafeInteger(options.historyChunkRecords) || options.historyChunkRecords < 1)
       throw new RangeError('History chunk size must be a positive record count')
+    this.replayWindowSize = options.replayWindowSize ?? 8192
+    if (!Number.isSafeInteger(this.replayWindowSize) || this.replayWindowSize < 1)
+      throw new RangeError('Replay window size must be a positive safe integer')
     this.authority = { host: options.peer, term: 0, epoch: options.genesis.hash }
     this.members.add(options.peer)
     this.rememberLocal()
@@ -143,6 +149,13 @@ export class Session<E extends EditEnvelope> {
     this.negotiate()
   }
 
+  retire(peer: string): void {
+    if (peer === this.peer) throw new TypeError('A session can retire only a remote peer')
+    this.departed.add(peer)
+    this.disconnect(peer)
+    this.seen.delete(peer)
+  }
+
   submit(edit: E): void {
     if (this.phase.kind === 'left') throw new TypeError('The session has left the room')
     if (edit.document !== this.options.document)
@@ -167,18 +180,19 @@ export class Session<E extends EditEnvelope> {
     this.resumeDeparture()
   }
 
-  receive(message: Message<E>): void {
+  receive(message: Message<E>): boolean {
     if (
       this.phase.kind === 'left' ||
       message.version !== 1 ||
       message.room !== this.options.room ||
-      message.document !== this.options.document
+      message.document !== this.options.document ||
+      !Number.isSafeInteger(message.messageId) ||
+      message.messageId < 1
     )
-      return
-    if (!this.members.has(message.sender) || message.sender === this.peer) return
-    const seen = this.seen.get(message.sender) ?? new Set<number>()
-    if (seen.has(message.messageId)) return
-    seen.add(message.messageId)
+      return false
+    if (!this.members.has(message.sender) || message.sender === this.peer) return false
+    const seen = this.seen.get(message.sender) ?? new ReplayWindow(this.replayWindowSize)
+    if (!seen.accept(message.messageId)) return false
     this.seen.set(message.sender, seen)
     switch (message.type) {
       case 'HELLO':
@@ -236,6 +250,7 @@ export class Session<E extends EditEnvelope> {
         this.departed.add(message.sender)
         this.members.delete(message.sender)
         this.observed.delete(message.sender)
+        this.seen.delete(message.sender)
         if (
           this.authority.host === message.sender ||
           this.phase.kind === 'collecting' ||
@@ -247,6 +262,7 @@ export class Session<E extends EditEnvelope> {
         this.options.onPresence?.(message.sender, message.payload)
         break
     }
+    return true
   }
 
   leave(successor: string): void {
@@ -305,6 +321,7 @@ export class Session<E extends EditEnvelope> {
     if (this.pending.size) return
     this.broadcast('LEAVE', { successor: this.departure })
     this.phase = { kind: 'left' }
+    this.seen.clear()
     this.departure = undefined
   }
   private coordinator(): string {
@@ -493,6 +510,7 @@ export class Session<E extends EditEnvelope> {
     this.broadcast('LEAVE', { successor })
     this.pending.clear()
     this.phase = { kind: 'left' }
+    this.seen.clear()
     this.departure = undefined
   }
 

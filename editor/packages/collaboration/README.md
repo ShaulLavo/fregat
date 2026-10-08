@@ -37,6 +37,34 @@ and pending work durably if crashes must preserve unsent work, and reconnects us
 that new identity. A surviving peer's branch retains edits authored by departed peers.
 The session has no timer, editor hook or browser dependency of its own.
 
+## Message replay window
+
+`SessionOptions.replayWindowSize` defaults to 8,192 sender message IDs. It must be a
+positive safe integer. Each sender has a highest received ID and a circular bitmap
+covering that ID and the preceding `replayWindowSize - 1` IDs. The default bitmap
+uses 1,024 bytes per sender. Reordered first deliveries inside that range reach their
+handlers once. Every duplicate, including an arbitrarily old duplicate, is rejected.
+Sender IDs are positive safe integers and increase across all recipients and across
+short reconnects. Gaps caused by messages addressed to other peers consume window
+space too.
+
+A first delivery below the window floor counts as message loss. The session recovers
+document work through fresh submissions, advertisements, history requests and phase
+retries. These retries carry new message IDs and preserve the original EditIds.
+Presence producers renew their current state. An integration with large message bursts
+or heavily reordered delivery can increase `replayWindowSize` to retain more delayed
+first deliveries. `receive` returns `true` when it admits a message to its handler,
+and `false` for unrelated traffic, duplicates, invalid IDs and deliveries below the
+floor. Admission can still leave a handler's authority or history checks unsatisfied.
+
+`disconnect` retains the sender's window throughout that sender session's lifetime,
+so queued packets from an old connection remain fenced after reconnect. When an
+authenticated peer-session ID is permanently retired, call `retire(peer)` to close
+its membership and release its window. The caller uses this after learning that a
+process restarted with a fresh peer-session ID. Retired IDs stay excluded from future
+membership. An admitted `LEAVE` releases the sender's window automatically. A local
+session releases all its windows when it completes its own departure.
+
 ## State and convergence
 
 Membership is the current set of direct authenticated links. `HELLO` and `HOST_PULSE`
@@ -111,6 +139,14 @@ short disconnect and reconnect with packets still queued. Packets carry the link
 generation at send time. Counters require both delivery from an older generation and
 its arrival after traffic from the new generation. The suite prints and asserts
 positive counts for every required scenario.
+
+Each seed runs with an eight-ID window to force below-floor loss and with the default
+8,192-ID window. An independent delivery ledger checks every message's admission and
+every duplicate rejection. The small-window run requires positive stale-loss counts
+while preserving every existing convergence invariant. The default-window run requires
+zero stale first deliveries. The replay-window tests also exhaust all 40,320 orderings
+of eight IDs, and a surviving session receives one million pulses while retaining a
+1,024-byte bitmap.
 
 Full-mesh quiescence checks require identical confirmed history and text, EditId
 uniqueness, one host per component, and settlement of every authored edit as accepted
