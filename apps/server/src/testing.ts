@@ -45,6 +45,7 @@ export type {
   ProviderTurnInput,
 } from './provider/types'
 export { LspSessionPool } from './lsp/proxy-session'
+export { resolveLspServer } from './lsp/registry'
 export { spawnTypeScript } from './lsp/typescript/runtime'
 export type { LspProxyClientSession } from './lsp/proxy-session'
 export type { TerminalPtyFactory } from './terminal/service'
