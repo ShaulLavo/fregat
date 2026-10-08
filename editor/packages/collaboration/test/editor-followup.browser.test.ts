@@ -9,6 +9,7 @@ import {
 import {
   applyBatchToPieceTable,
   materializePieceTableFullText,
+  retainPieceTableSnapshot,
   type PieceTableEdit,
   type PieceTableSnapshot,
 } from '@singapore-editor/textbuffer'
@@ -74,7 +75,10 @@ test('detachment during a lease retains confirmed text and coherent native histo
   for (const publication of publications) {
     expect(
       materializePieceTableFullText(
-        applyBatchToPieceTable({ ...publication.before, charIds: null }, publication.edits),
+        applyBatchToPieceTable(
+          { ...retainPieceTableSnapshot(publication.before), charIds: null },
+          publication.edits,
+        ),
       ),
     ).toBe(materializePieceTableFullText(publication.after))
   }
