@@ -1235,6 +1235,22 @@ export const selectors = {
   agentTreeChild: (page: Page, threadId: string) =>
     page.locator(`[data-agent-tree-level="child"] [data-agent-thread-id="${threadId}"]`),
   modelSwitch: (page: Page) => page.locator('[data-model-switch]').first(),
+  chatAlignment: (page: Page) => ({
+    assistant: selectors.chatAssistantMarkdown(page).last(),
+    nestedRow: page.locator('[data-timeline-row-type="turn-fold"] [data-timeline-row-id]').first(),
+    nestedIcon: page
+      .locator('[data-timeline-row-type="turn-fold"] [data-timeline-row-id] button svg')
+      .first(),
+    composer: selectors.chatMessage(page),
+    workIcon: selectors.completedWorkGroup(page).locator('svg').first(),
+    rowTitle: selectors.sessionRows(page).first().locator('span.truncate').first(),
+    rowContext: selectors.sessionRows(page).first().locator('[data-worktree-id]').first(),
+    stageHeader: page
+      .locator('[data-slot="tool-pane-header"]')
+      .filter({ has: page.getByRole('navigation', { name: 'Session', exact: true }) }),
+    toolHeader: page.locator('[data-chat-mode] [data-workbench-tool-pane-header]'),
+    toolbarIcons: selectors.composerActions(page).locator('button > svg'),
+  }),
   composerActions: (page: Page) => page.locator('[data-composer-actions]'),
   draftContext: (page: Page) => page.getByRole('group', { name: 'Session workspace', exact: true }),
   draftSetup: (page: Page) => page.getByRole('button', { name: /^Session setup: / }),
@@ -1545,8 +1561,10 @@ export async function waitForSessionWorkspace(
         | null
       // Lexical's rendered owner can lag the session URL during a workspace switch.
       const namespace = composer?.__lexicalEditor?._config.namespace
-      const workspaceReady = title === rootPath || title?.startsWith(`${rootPath} ·`)
-      return workspaceReady && namespace === expectedNamespace
+      const workspaceReady = title === rootPath || title?.startsWith(`${rootPath} ·`) === true
+      // The phone header has no project switcher; Lexical names the exact workspace there.
+      const phone = document.documentElement.dataset.shell === 'phone'
+      return (phone || workspaceReady) && namespace === expectedNamespace
     },
     {
       composerSelector: chatComposerSelector,
