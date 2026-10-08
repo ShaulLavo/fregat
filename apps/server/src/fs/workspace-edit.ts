@@ -343,10 +343,11 @@ export class WorkspaceEditController {
     await this.ensureInitialized()
     const canonical = await this.resolveWorkspace(workspace)
     await this.ensureJournalLoaded((await this.journals.forPath(canonical)).journal)
+    const relativeWorkspace = toPosix(path.relative(this.paths.workspaceRootReal, canonical))
     const operations = this.manifests().filter((manifest) => manifest.state === 'partial')
     const summaries = []
     for (const manifest of operations) {
-      if ((await this.driver.realpath(this.workspaceAbsolute(manifest))) !== canonical) continue
+      if (manifest.workspace !== relativeWorkspace) continue
       summaries.push({
         generation: manifest.generation,
         operationId: manifest.operationId,
