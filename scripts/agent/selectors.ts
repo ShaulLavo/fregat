@@ -1089,6 +1089,11 @@ export const selectors = {
   chatWelcome: (page: Page) =>
     page.getByText('Ask about your workspace', { exact: true }).locator('../..'),
   chatNewSession: (page: Page) => page.getByRole('button', { name: 'New session', exact: true }),
+  chatFolderRetry: (page: Page) => page.getByRole('button', { name: 'Try again', exact: true }),
+  chatPhoneFolder: (page: Page, name: string) =>
+    page.locator('[data-phone-shell] header').getByText(name, { exact: true }),
+  chatClosedConnection: (page: Page) =>
+    page.getByText('The chat connection is closed.', { exact: true }),
   chatCorrection: (page: Page) =>
     page.getByRole('button', { name: 'Send correction', exact: true }),
   chatStop: (page: Page) => page.getByRole('button', { name: 'Stop current turn', exact: true }),

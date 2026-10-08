@@ -51,7 +51,7 @@ export function useWorkspaceChatProject({
   const project = worktree ? (slice.projectById[worktree.projectId] ?? null) : null
 
   useEffect(() => {
-    if (!slice.bootstrapComplete || worktree) return
+    if (transport.closed || !slice.bootstrapComplete || worktree) return
     if (dispatched.current?.rootPath === rootPath && dispatched.current.transport === transport)
       return
     dispatched.current = { rootPath, transport }
