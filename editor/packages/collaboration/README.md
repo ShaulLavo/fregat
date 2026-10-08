@@ -36,6 +36,30 @@ presence.dispose()
 
 [Integration guide](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/collaboration/docs/integration.md)
 
+## Transport status
+
+Transport options accept an optional `onRecovery` callback. Match all scope arguments
+with `onError` when tracking outstanding failures:
+
+- `BroadcastTransport` reports `send` after a successful channel send and `receive` after
+  accepting an authenticated packet for the document. Recovery in one direction clears
+  failures in that direction.
+- `WebSocketSignaling` reports `(url, direction)`. A successful publication reports `send`;
+  a subscription acknowledgement or publication received from that broker reports `receive`.
+  Credential, subscription-send, and socket errors use the broker's `send` scope.
+- `WebRTCTransport` reports the remote peer ID when its current data channel opens and the
+  router accepts the link. Signaling reports `(undefined, 'send')` after publication succeeds
+  and `(undefined, 'receive')` after an authenticated packet is accepted. The matching
+  `onError` arguments include the error first. Peer-scoped failures remain until that peer's
+  link opens again.
+
+Receive recovery preserves outstanding send failures, and send recovery preserves outstanding
+receive failures. A healthy broker or peer leaves failures at other brokers or peers intact.
+
+`WebRTCTransport.onPeerLeft(peer)` reports an authenticated departure. Applications can
+remove that departed peer's outstanding failures. Discovery-record expiry leaves
+outstanding failures intact until a matching recovery or authenticated departure.
+
 ## Connection lifecycle
 
 `Session.disconnect(peer)` records loss of the last transport path. Membership and presence remain during `suspicionTimeout`; caller-driven `Session.tick(now)` evicts the peer when that deadline passes. `Session.connect(peer)` cancels pending eviction and refreshes local presence. `Session.retire(peer)` and received `LEAVE` messages remove presence immediately and fence the departed incarnation.

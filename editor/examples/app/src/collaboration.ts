@@ -32,9 +32,27 @@ const linked = fragment.has('room') && fragment.has('secret')
 if (linked) start.textContent = 'Join session'
 
 const mounted: (() => Promise<void>)[] = []
+const connections = new Set<CollaborationConnection>()
+const failures = new Map<string, string>()
+const readyStatus = 'Session ready. Share the invitation link to add peers.'
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : 'The connection failed.'
+}
 
 function report(error: unknown): void {
-  status.textContent = error instanceof Error ? error.message : 'The connection failed.'
+  status.textContent = errorText(error)
+}
+
+function refreshStatus(): void {
+  const failure = [...failures.values()].at(-1)
+  if (failure !== undefined) {
+    status.textContent = failure
+    return
+  }
+  const active = [...connections].filter(({ session }) => session.status !== 'left')
+  if (active.length && active.every(({ session }) => session.status === 'stable'))
+    status.textContent = readyStatus
 }
 
 async function mountPeer(
@@ -48,13 +66,37 @@ async function mountPeer(
 ): Promise<void> {
   const peer = crypto.randomUUID()
   const displayName = `${name} · ${peer.slice(0, 8)}`
+  let connection!: CollaborationConnection
+  const failureKeys = new Set<string>()
+  const clearFailures = () => {
+    for (const key of failureKeys) failures.delete(key)
+    failureKeys.clear()
+    refreshStatus()
+  }
+  const transportStatus = (transport: string) => ({
+    onError(error: unknown, target = '', direction = '') {
+      if (connection?.session.status === 'left') return
+      const key = `${peer}/${transport}/${target}/${direction}`
+      failureKeys.add(key)
+      failures.delete(key)
+      failures.set(key, errorText(error))
+      refreshStatus()
+    },
+    onRecovery(target = '', direction = '') {
+      const key = `${peer}/${transport}/${target}/${direction}`
+      failureKeys.delete(key)
+      failures.delete(key)
+      refreshStatus()
+    },
+  })
+  const rtcStatus = transportStatus('webrtc')
   const signalingClient = urls.length
     ? new WebSocketSignaling({
         urls,
         room,
         credentials: { protocols: () => signalingProtocols },
         reconnectInterval: 1000,
-        onError: report,
+        ...transportStatus('signaling'),
       })
     : undefined
   const cleanups: (() => void | Promise<void>)[] = []
@@ -65,6 +107,7 @@ async function mountPeer(
         .reverse()
         .map((cleanup) => Promise.resolve().then(cleanup)),
     )
+    clearFailures()
   }
   mounted.push(dispose)
   if (signalingClient) cleanups.push(() => signalingClient.close())
@@ -86,7 +129,6 @@ async function mountPeer(
     panel.append(header, element)
     peers.append(panel)
     cleanups.push(() => panel.remove())
-    let connection!: CollaborationConnection
     let router: TransportRouter<Envelope> | undefined
     const editor = new Editor(element, {
       defaultText: initialText,
@@ -102,14 +144,18 @@ async function mountPeer(
         }),
       ],
     })
-    cleanups.push(() => editor.dispose())
+    connections.add(connection)
+    cleanups.push(() => {
+      connections.delete(connection)
+      editor.dispose()
+    })
     router = new TransportRouter({ room, document: 'example-document', peer }, connection.session)
     const broadcast = new BroadcastTransport({
       router,
       crypto: roomCrypto,
       heartbeatInterval: 500,
       peerTimeout: 2000,
-      onError: report,
+      ...transportStatus('broadcast'),
     })
     cleanups.push(() => broadcast.close())
     const rtc = signalingClient
@@ -122,7 +168,8 @@ async function mountPeer(
           credentials: {},
           announceInterval: 1000,
           connectionTimeout: 10_000,
-          onError: report,
+          ...rtcStatus,
+          onPeerLeft: rtcStatus.onRecovery,
         })
       : undefined
     if (rtc) cleanups.push(() => rtc.close())
@@ -133,8 +180,10 @@ async function mountPeer(
       const role = session.isHost ? 'Ordering host' : 'Participant'
       state.textContent =
         session.status === 'stable' ? `${role} · ${session.members.size} peers` : session.status
+      refreshStatus()
       if (session.status !== 'left') return
       clearInterval(timer)
+      clearFailures()
       editor.setPlugins([])
       leave.disabled = true
       void broadcast.close().catch(report)
@@ -200,7 +249,7 @@ async function begin(): Promise<void> {
       servers,
       policy.value as RTCIceTransportPolicy,
     )
-    status.textContent = 'Session ready. Share the invitation link to add peers.'
+    refreshStatus()
   } catch (error) {
     await close()
     peers.replaceChildren()

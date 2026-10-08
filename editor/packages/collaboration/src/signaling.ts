@@ -13,7 +13,8 @@ export interface WebSocketSignalingOptions {
     readonly protocols: (signal: AbortSignal) => readonly string[] | Promise<readonly string[]>
   }
   readonly reconnectInterval: number
-  readonly onError: (error: unknown) => void
+  readonly onError: (error: unknown, url: string, direction: 'send' | 'receive') => void
+  readonly onRecovery?: (url: string, direction: 'send' | 'receive') => void
 }
 
 export class WebSocketSignaling implements SignalingClient {
@@ -44,13 +45,18 @@ export class WebSocketSignaling implements SignalingClient {
       throw new TypeError('Packet belongs to another signaling room')
     const frame = JSON.stringify({ type: 'publish', topic: this.options.room, payload: packet })
     if (frame.length > 1024 * 1024) throw new RangeError('Signaling frame exceeds the broker limit')
-    for (const socket of this.sockets.values()) {
+    for (const [url, socket] of this.sockets) {
       if (socket.readyState !== WebSocket.OPEN) continue
       if (socket.bufferedAmount > 1024 * 1024) {
         socket.close(1013, 'Signaling backpressure')
         continue
       }
-      socket.send(frame)
+      try {
+        socket.send(frame)
+        this.options.onRecovery?.(url, 'send')
+      } catch (error) {
+        this.options.onError(error, url, 'send')
+      }
     }
   }
 
@@ -75,7 +81,7 @@ export class WebSocketSignaling implements SignalingClient {
       this.openSocket(url, protocols)
     } catch (error) {
       if (abort.signal.aborted) return
-      this.options.onError(error)
+      this.options.onError(error, url, 'send')
       this.reconnect(url)
     } finally {
       this.pending.delete(url)
@@ -85,21 +91,43 @@ export class WebSocketSignaling implements SignalingClient {
   private openSocket(url: string, protocols: readonly string[]): void {
     const socket = new WebSocket(url, [...new Set(['singapore-collaboration', ...protocols])])
     this.sockets.set(url, socket)
-    socket.onopen = () =>
-      socket.send(JSON.stringify({ type: 'subscribe', topic: this.options.room }))
+    socket.onopen = () => {
+      if (this.closed || this.sockets.get(url) !== socket) return
+      try {
+        socket.send(JSON.stringify({ type: 'subscribe', topic: this.options.room }))
+      } catch (error) {
+        this.options.onError(error, url, 'send')
+      }
+    }
     socket.onmessage = (event) => {
-      if (this.closed || typeof event.data !== 'string' || event.data.length > 1024 * 1024) return
+      if (
+        this.closed ||
+        this.sockets.get(url) !== socket ||
+        typeof event.data !== 'string' ||
+        event.data.length > 1024 * 1024
+      )
+        return
       try {
         const frame = JSON.parse(event.data)
         if (frame.topic !== this.options.room) return
-        if (frame.type === 'subscribed') this.callbacks?.ready()
-        if (frame.type === 'publish') this.callbacks?.receive(frame.payload)
+        if (frame.type === 'subscribed') {
+          this.callbacks?.ready()
+          this.options.onRecovery?.(url, 'receive')
+        }
+        if (frame.type === 'publish') {
+          this.callbacks?.receive(frame.payload)
+          this.options.onRecovery?.(url, 'receive')
+        }
       } catch (error) {
-        this.options.onError(error)
+        this.options.onError(error, url, 'receive')
       }
     }
-    socket.onerror = () => this.options.onError(new TypeError('Signaling connection failed'))
+    socket.onerror = () => {
+      if (this.closed || this.sockets.get(url) !== socket) return
+      this.options.onError(new TypeError('Signaling connection failed'), url, 'send')
+    }
     socket.onclose = () => {
+      if (this.sockets.get(url) !== socket) return
       this.sockets.delete(url)
       this.reconnect(url)
     }
