@@ -84,6 +84,12 @@ test.each([
   { browser: { import: './dist/index.js' }, import: './server/signaling.ts' },
   { production: './dist/index.js', default: './server/signaling.ts' },
   { module: './dist/index.js', default: './server/signaling.ts' },
+  { default: './dist/index.js', import: './server/signaling.ts' },
+  {
+    node: './server/signaling.ts',
+    development: './server/signaling.ts',
+    default: './dist/index.js',
+  },
   { import: { browser: './dist/index.js', default: './server/signaling.ts' } },
   [{ bun: './server/signaling.ts' }, './dist/index.js'],
 ])('resolves nested browser conditions and fallback arrays: %j', async (target) => {
