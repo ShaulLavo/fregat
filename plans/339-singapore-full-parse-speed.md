@@ -65,6 +65,14 @@ The browser run uses `editor/bench/compare --profile-open --open-only --full-doc
 
 Worker times use their own monotonic clock. Boundary delays use `performance.timeOrigin + performance.now()` on both threads. Text outbound time includes cloning, dispatch and scheduling. Source reset round-trip also includes replica construction and the acknowledgment. Return delay includes structured cloning of structural output, transferable token delivery and main-thread scheduling. These clocks do not isolate copy bandwidth. The first-frame and highlighted-frame values are rAF opportunity proxies in headless Chromium, not physical presentation latency. Medians of nested phases do not add up to an end-to-end median.
 
+### Reconcile the earlier highlighted-open result
+
+The earlier [open-time summary](../editor/docs/performance/singapore-open-2026-10-08/after/open-summary.json) and [raw samples](../editor/docs/performance/singapore-open-2026-10-08/after/experiment.json.gz) recorded a 1,464.0 ms median for first visible highlighting of the same 10 MiB fixture. That noisy run was measured on the same machine and Chromium build at 2026-10-08T11:07:44.129Z, from source commit `308f5e514573c6cee874ad63201bbb17151b5c36`.
+
+Its `parseOnly` request parsed the complete root and discovered injections. Its subsequent `queryRange` request walked, highlighted, normalized and packed only the requested visible scope, 0..23,359 code units, returning 2,672 tokens. The benchmark's highlighted-open clock ended after visible syntax settled and a frame opportunity passed. It did not wait for whole-file token production, delivery or store settlement.
+
+The new `full` request queries and returns the entire 0..10,485,760 scope with 1,198,376 tokens. The 5,395.2 ms median ends after that complete result settles and the first complete highlighted-frame opportunity passes. Root-parse medians are similar, 767.0 ms earlier and 794.8 ms here. Query medians describe different workloads, 29.8 ms for the earlier visible-range query and 3,888.5 ms for the new whole-document query. These experiments do not measure a regression. Subtracting their medians would not establish a phase delta. The earlier visible-highlight result cannot satisfy this plan's complete-file acceptance gate.
+
 ### Native and competitor reference
 
 Native root parse took 442.603 / 381.483 / 353.156 ms, median 381.483 ms, on the same machine. The browser root-parse median is about 2.08 times that native median. Native compiler was GCC 16.2.1 with `-O3 -std=c11`; all roots covered 10,485,760 bytes and reported no syntax error. Fixture SHA-256 is `512348577405c01df6f57142fb6c0d9123211797b9349b5af05047174adeece0` in both series.
@@ -83,13 +91,15 @@ VS Code's TextMate path is a separate reference. A full-document run would carry
 
 On the reference i7-14700K, use the same 10 MiB fixture, headless Chromium build, viewport, package versions and complete-result assertions. These are execution targets, not forecasts or measured claims.
 
-| Milestone | Complete worker parse plus full query | Open to complete highlighted frame | Additional gate                                                                                        |
-| --------- | ------------------------------------: | ---------------------------------: | ------------------------------------------------------------------------------------------------------ |
-| M0        |               Retain today's baseline |            Retain today's baseline | All three full-document samples complete with equal token output                                       |
-| M1        |                      At most 4,000 ms |                   At most 4,500 ms | At least 25% less total work than the qualified baseline; no phase regression beyond measurement noise |
-| M2        |                      At most 3,000 ms |                   At most 3,500 ms | Full result and main-thread settlement, including mixed-language cases                                 |
-| M3        |                      At most 2,000 ms |                   At most 2,500 ms | Target for this plan, five paired repetitions and tail report                                          |
-| Stretch   |                      At most 1,000 ms |                   At most 1,500 ms | Attempt after M3; stop when the next change fails the cost/gain test                                   |
+| Milestone | Worker parse plus full query diagnostic | Open to complete highlighted frame | Additional gate                                                                                        |
+| --------- | --------------------------------------: | ---------------------------------: | ------------------------------------------------------------------------------------------------------ |
+| M0        |                 Retain today's baseline |            Retain today's baseline | All three full-document samples complete with equal token output                                       |
+| M1        |                        At most 4,000 ms |                   At most 4,500 ms | At least 25% less total work than the qualified baseline; no phase regression beyond measurement noise |
+| M2        |                        At most 3,000 ms |                   At most 3,500 ms | Full result and main-thread settlement, including mixed-language cases                                 |
+| M3        |                        At most 2,000 ms |                   At most 2,000 ms | Target for this plan, five paired repetitions and tail report                                          |
+| Stretch   |                        At most 1,000 ms |                   At most 1,000 ms | Attempt after M3; stop when the next change fails the cost/gain test                                   |
+
+M3 requires complete-result settlement within 2,000 ms of open, including delivery, token-store construction and structural apply. The first highlighted frame using that complete result must also pass within 2,000 ms. The stretch uses 1,000 ms for both gates. Worker parse/query budgets are intermediate diagnostics; meeting them alone cannot pass a milestone. Delivery and settlement consume part of the same completion budget, with no extra frame allowance.
 
 A milestone already passed by the measured baseline requires a tighter next budget, rather than claiming an improvement for meeting an existing result. Freeze M1's exact threshold after the quiet M0 qualification. Keep return delivery plus token-store construction below 100 ms at M3, and report the largest main-thread task. Do not move work outside the measured interval to pass. Track process RSS and WASM memory alongside JavaScript heap. Reject a latency win that doubles total peak memory unless a smaller-memory variant meets the target.
 
@@ -158,6 +168,6 @@ Exit with a checked full-document baseline and the ranked bottleneck. Leave view
 
 ## Acceptance and stop conditions
 
-The plan completes at M3 when all qualified repetitions return complete, equal syntax and structural output, memory stays within the agreed budget, and the full-file highlighted-frame target passes. The stretch goal is a later optimization target, not a prerequisite for layering incremental work.
+The plan completes at M3 when all qualified repetitions return complete, equal syntax and structural output, memory stays within the agreed budget, complete-result settlement finishes within 2,000 ms of open, and the first highlighted frame using that complete result also passes within 2,000 ms. Delivery, token-store construction and structural apply are included. The stretch applies the same gates within 1,000 ms. The stretch goal is a later optimization target, not a prerequisite for layering incremental work.
 
 Stop an experiment when it needs a second text owner, SAB/transferable-text redesign, unsafe tree sharing, silent capture/layer truncation, a reduced-language shortcut, a public API expansion without a consumer need, or substantially more complexity than the measured gain warrants. A failed technique changes the ranking, not the owner's approval to make the complete file faster. Record the evidence and try the next bounded candidate.

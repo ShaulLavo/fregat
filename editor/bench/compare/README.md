@@ -214,8 +214,9 @@ node full-document.mjs --native <tree-sitter-source-checkout> ./results/full
 
 The runner rejects a build/run mode mismatch, range queries, parse-only work,
 degraded phases and a result covering less than the full fixture. Source-transform
-tests fail when instrumentation targets drift. Worker clocks share
-`performance.timeOrigin` with the page. Outbound time includes structured cloning,
+tests fail when instrumentation targets drift. Worker and page clocks use
+`performance.timeOrigin + performance.now()` to compare absolute timestamps;
+their time origins can differ. Outbound time includes structured cloning,
 delivery and scheduling; inbound time includes reply cloning, delivery and
 scheduling. These are boundary delays, not isolated memory-copy measurements.
 `sourcePostMs` measures the synchronous `postMessage` call separately.
