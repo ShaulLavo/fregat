@@ -12,7 +12,8 @@
   },
   "scripts": {
     "build": "turbo run build --filter='@fregat/*'",
-    "typecheck": "turbo run typecheck --filter='@fregat/*'",
+    "typecheck": "turbo run typecheck --filter='@fregat/*' && bun run docs:check",
+    "docs:check": "bun scripts/check-samples.mjs",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",

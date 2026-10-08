@@ -15,7 +15,7 @@ const packageMode = process.argv[2] === '--packages'
 const sourceDirectory = packageMode
   ? undefined
   : (process.argv[2] ?? join(root, 'src/content/docs'))
-const packageRoots = [join(root, '../packages'), join(root, '../../hotkeys/packages')]
+const packageRoot = join(root, '../packages')
 const modulePaths: Record<string, string[]> = {}
 const temporary = await mkdtemp(join(root, '.samples-'))
 const origins = new Map<string, string>()
@@ -35,15 +35,13 @@ async function pages(directory: string): Promise<string[]> {
 
 async function packagePages(): Promise<string[]> {
   const readmes: string[] = []
-  for (const directory of packageRoots) {
-    const entries = await readdir(directory, { withFileTypes: true })
-    for (const entry of entries.filter((item) => item.isDirectory())) {
-      const packageRoot = join(directory, entry.name)
-      const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
-      if (manifest.private) continue
-      readmes.push(join(packageRoot, 'README.md'))
-      addExports(manifest.name, manifest.exports, packageRoot)
-    }
+  const entries = await readdir(packageRoot, { withFileTypes: true })
+  for (const entry of entries.filter((item) => item.isDirectory())) {
+    const directory = join(packageRoot, entry.name)
+    const manifest = JSON.parse(await readFile(join(directory, 'package.json'), 'utf8'))
+    if (manifest.private) continue
+    readmes.push(join(directory, 'README.md'))
+    addExports(manifest.name, manifest.exports, directory)
   }
   return readmes
 }

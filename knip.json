@@ -69,6 +69,7 @@
     "scripts": {
       "entry": [
         "check-editor-backlog.mjs",
+        "check-package-pages.mjs",
         "agent/browser.ts",
         "agent/scenarios/editor-retention-count-policy-driver.ts",
         "agent/desktop-display.ts",
@@ -126,6 +127,7 @@
       "ignoreBinaries": ["ssh-keygen", "systemd-run", "taskset"]
     },
     ".": {
+      "entry": ["hotkeys/scripts/check-samples.mjs"],
       "ignoreDependencies": ["typescript-api"],
       "vitest": {
         "config": ["vitest.scripts.config.mjs"]
