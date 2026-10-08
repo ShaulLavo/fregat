@@ -50,7 +50,9 @@ setUpSearch(new Map())
 const start = () =>
   takeOver().catch((error: unknown) => {
     console.error('Singapore editor failed to load; the sample stays static.', error)
+    docs?.dispose()
     box.querySelector('.editor-host')?.remove()
+    box.removeAttribute('data-mode')
     docs = null
     offer()
   })

@@ -1,0 +1,45 @@
+[wave-heavy] 'viewport declaration failing-first' is waiting: 5 job(s) ahead in the queue
+[wave-heavy] 'viewport declaration failing-first' is waiting: 5 job(s) ahead in the queue
+[wave-heavy] 'viewport declaration failing-first' is waiting: 5 job(s) ahead in the queue
+[wave-heavy] 'viewport declaration failing-first' is waiting: 5 job(s) ahead in the queue
+[wave-heavy] 'viewport declaration failing-first' is waiting: 5 job(s) ahead in the queue
+[wave-heavy] 'viewport declaration failing-first' is waiting: 2 job(s) ahead in the queue
+[wave-heavy] 'viewport declaration failing-first' is waiting: 2 job(s) ahead in the queue
+[wave-heavy] started 'viewport declaration failing-first' on local after 369s: 8836 MiB free covers 4096 MiB
+
+ RUN  v5.0.2 /work/worktrees/platform/singapore-viewport-first/editor/packages/tree-sitter
+      API started at http://localhost:63315/
+
+ ❯ |chromium| test/viewport-first.browser.test.ts (21 tests | 1 failed | 20 skipped) 243ms
+   × paints function declarations provisionally without a statement-kind whitelist 242ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |chromium| test/viewport-first.browser.test.ts > paints function declarations provisionally without a statement-kind whitelist
+AssertionError: expected 'full' to be 'partial' // Object.is equality
+
+Failure screenshot:
+  - .vitest/attachments/failure-screenshots/viewport-first.browser.test.ts/paints-function-declarations-provisionally-without-a-statement-kind-whitelist.png
+
+Expected: [32m"[7mpartia[27ml"[39m
+Received: [31m"[7mful[27ml"[39m
+
+ ❯ test/viewport-first.browser.test.ts:210:45
+    208|   const range = { startIndex: 0, endIndex: prefix.length }
+    209|   const initial = await doc.runtime.queryRange(range)
+    210|   expect(initial.projection.analysis?.kind).toBe('partial')
+       |                                             ^
+    211|   expect(initial.projection.analysis?.coveredRange.endIndex).toBe(pref…
+    212|   expect(initial.folds).toEqual([])
+ ❯ node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/deps/plugins.Cigb0uSy-D3-MQlbH.js?v=916a8e18:4951:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 20 skipped (21)
+   Start at  18:22:00
+   Duration  1.02s (worker 45%, tests 33%, import 23%)
+
+
+[exited with code 1]

@@ -160,6 +160,8 @@ export default defineConfig({
   },
   test: {
     include: ['test/**/*.browser.test.ts'],
+    // Editor bindings use source aliases and native input/evidence commands in vitest.editor.config.ts.
+    exclude: ['test/editor*.browser.test.ts'],
     testTimeout: 90_000,
     fileParallelism: false,
     browser: {

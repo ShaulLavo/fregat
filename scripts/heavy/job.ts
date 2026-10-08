@@ -53,6 +53,9 @@ export function localCommand({
   readonly runtimeDeadline?: number
 }) {
   return [
+    ...(runtimeDeadline === undefined
+      ? []
+      : ['bash', '-p', SCOPE_SHIM, '--launch-deadline', String(Math.floor(runtimeDeadline * 100))]),
     'systemd-run',
     '--user',
     '--scope',
@@ -202,7 +205,9 @@ export function startJob(
     stopped = true
     recoveryController?.abort()
     signalJob(signal)
-    escalation ??= setTimeout(() => signalJob('SIGKILL'), job.graceSeconds * 1000)
+    // The local shim still needs its KILL-settle and accounting budget after TERM grace.
+    const stopSeconds = slice ? stopTimeoutSeconds(job.graceSeconds) : job.graceSeconds
+    escalation ??= setTimeout(() => signalJob('SIGKILL'), stopSeconds * 1000)
   }
   const settle = async (): Promise<JobOutcome> => {
     const diagnostics = scopeDiagnostics(child.stderr)

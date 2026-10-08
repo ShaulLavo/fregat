@@ -31,7 +31,7 @@ window.addEventListener('pagehide', (event) => {
 })
 ```
 
-You should see one line of text and be able to move the caret, select text and type. Undo returns to an earlier edit. Syntax colours need a highlighting plugin.
+You should see one line of text and be able to move the caret, select text and type. Undo returns to an earlier edit. Syntax colours need a highlighting plugin. If nothing shows, see [If it doesn't work](#if-it-doesnt-work).
 
 On a desktop browser this page is itself a Singapore editor with Markdown and TypeScript plugins. Click into the sample above and type.
 

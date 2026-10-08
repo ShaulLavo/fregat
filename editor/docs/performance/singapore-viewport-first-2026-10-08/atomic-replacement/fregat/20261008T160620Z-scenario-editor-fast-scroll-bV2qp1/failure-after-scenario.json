@@ -1,0 +1,11 @@
+{
+  "phase": "after-scenario",
+  "startedAt": "2026-10-08T16:06:38.418Z",
+  "finishedAt": "2026-10-08T16:06:38.563Z",
+  "urlBefore": "http://localhost:57051/~viewport-atomic-ui.PlCvC45dY2O0UXrM/workbench?tabs=-",
+  "urlAfter": "http://localhost:57051/~viewport-atomic-ui.PlCvC45dY2O0UXrM/workbench?tabs=-",
+  "screenshot": {
+    "status": "captured",
+    "file": "failure-after-scenario.png"
+  }
+}

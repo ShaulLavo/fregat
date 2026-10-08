@@ -21,6 +21,54 @@ import {
 } from '../src/syntax/session'
 
 describe('active range retention', () => {
+  it.each(['cancelled', 'partial', 'range-unavailable'] as const)(
+    'returns an unusable %s reply without retaining it as range coverage',
+    async (kind) => {
+      const buffer = createEditorTextBuffer('alpha beta')
+      const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'incomplete-range' })
+      const parser = provider()
+      const range = { startIndex: 0, endIndex: 5 }
+      const incomplete = createEmptySyntaxResult({ requestedRanges: [range] })
+      const result: EditorSyntaxResult = {
+        ...incomplete,
+        degraded: kind === 'range-unavailable' ? { kind: 'range-unavailable' } : null,
+        projection: {
+          ...incomplete.projection,
+          analysis:
+            kind === 'cancelled'
+              ? {
+                  kind,
+                  reason: 'budget',
+                  coveredRange: { startIndex: 0, endIndex: 0 },
+                  elapsedMs: 20_001,
+                  budgetMs: 20_000,
+                }
+              : {
+                  kind: 'partial',
+                  coveredRange: { startIndex: 0, endIndex: kind === 'partial' ? 3 : 5 },
+                },
+        },
+      }
+      parser.ranges.mockResolvedValueOnce(result)
+      const lease = analysis.borrowStructural({
+        provider: parser.provider,
+        languageId: 'typescript',
+      })!
+      try {
+        expect(await lease.queryRange(range)).toBe(result)
+        expect(analysis.inspectRetention().entries[0]?.cachedRangeCount).toBe(0)
+        expect(lease.read(range).kind).toBe('pending')
+        const recovered = await lease.queryRange({ startIndex: 0, endIndex: 3 })
+        expect(recovered).not.toBe(result)
+        expect(parser.ranges).toHaveBeenCalledTimes(2)
+        expect(analysis.inspectRetention().entries[0]?.cachedRangeCount).toBe(1)
+      } finally {
+        lease.dispose()
+        analysis.dispose()
+      }
+    },
+  )
+
   it('keeps optional retirement on the source generation across compatible lease reborrow', async () => {
     const fixture = await optionalRetirementFixture()
     const { analysis, buffer, request, lease, current, optional } = fixture
