@@ -106,6 +106,7 @@ async function inspect(page, viewportWidth) {
     for (const element of document.querySelectorAll('body *')) {
       const rect = element.getBoundingClientRect()
       if (!rect.width || !rect.height || (rect.left >= 0 && rect.right <= width)) continue
+      const position = getComputedStyle(element).position
       let contained = false
       for (
         let parent = element.parentElement;
@@ -115,6 +116,8 @@ async function inspect(page, viewportWidth) {
         const style = getComputedStyle(parent)
         const bounds = parent.getBoundingClientRect()
         if (
+          position !== 'fixed' &&
+          (position !== 'sticky' || ['auto', 'scroll'].includes(style.overflowX)) &&
           ['auto', 'scroll', 'hidden', 'clip'].includes(style.overflowX) &&
           bounds.left >= 0 &&
           bounds.right <= width
@@ -141,7 +144,8 @@ async function record(page, engine, url, width, state) {
   await page.setViewportSize({ width, height: width >= 667 ? 390 : 844 })
   await page.evaluate(() => document.fonts.ready)
   const result = { url, engine, requestedWidth: width, state, ...(await inspect(page, width)) }
-  const ok = result.scrollWidth <= width && result.width === width
+  const ok =
+    result.scrollWidth <= width && result.width === width && result.overflowing.length === 0
   checked++
   if (!ok) failed++
   if (evidence && (screenshots || !ok)) {
@@ -150,7 +154,10 @@ async function record(page, engine, url, width, state) {
     result.screenshotAttempts = await captureScreenshot(page, join(evidence, result.screenshot))
   }
   if (evidence) await appendFile(join(evidence, 'results.jsonl'), `${JSON.stringify(result)}\n`)
-  if (!ok) console.log(`FAIL ${engine} ${width} ${state} ${url}: ${result.scrollWidth}`)
+  if (!ok)
+    console.log(
+      `FAIL ${engine} ${width} ${state} ${url}: root ${result.scrollWidth}, ${result.overflowing.length} overflowing elements`,
+    )
 }
 
 async function captureScreenshot(page, path) {

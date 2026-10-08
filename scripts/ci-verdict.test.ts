@@ -94,6 +94,35 @@ function fixture() {
   return { changes, needs, jobs, run, evaluate, identity, metadata }
 }
 
+test.each([
+  'bunfig.toml',
+  '.npmrc',
+  '.env.production',
+  'tsconfig.json',
+  'package.json',
+  'bun.lock',
+  'turbo.json',
+  'apps/site/astro.config.ts',
+  'editor/site/astro.config.ts',
+  'editor/examples/app/vite.config.ts',
+  'ghostty-webgpu/site/src/docs-theme.js',
+  'packages/ui/src/styles/theme.css',
+  'hotkeys/packages/core/src/index.ts',
+  'scripts/product-sites/build.sh',
+  'scripts/build-site.ts',
+  'scripts/dev-sources.ts',
+  'scripts/runtime-network.ts',
+  'scripts/structured-errors.ts',
+  '.github/actions/setup/action.yml',
+  '.github/actions/install-browsers/action.yml',
+])('site path selection covers build input %s', (file) => {
+  const config = read('.github/workflows/ci.yml') as {
+    jobs: { changes: { steps: { with: { filters: string } }[] } }
+  }
+  const filters = Bun.YAML.parse(config.jobs.changes.steps[0].with.filters) as { site: string[] }
+  expect(filters.site.some((pattern) => new Bun.Glob(pattern).match(file))).toBe(true)
+})
+
 test('actual required graph accepts completed successful jobs and its docs skip', () => {
   expect(fixture().run()).toEqual({ passed: true, issues: [] })
 })

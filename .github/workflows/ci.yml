@@ -101,6 +101,10 @@ jobs:
               - '.github/workflows/ci.yml'
               - 'package.json'
               - 'bun.lock'
+              - 'bunfig.toml'
+              - '.npmrc'
+              - '.env*'
+              - 'tsconfig*.json'
               - 'turbo.json'
               - '.github/workflows/site.yml'
             # Root tooling and Turbo's cross-family global inputs invalidate every family.

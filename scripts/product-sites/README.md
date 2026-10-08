@@ -38,7 +38,9 @@ The mobile check visits every built HTML page in touch-enabled Chromium and WebK
 320, 360 and 390 CSS pixels, with a device pixel ratio of 2. It also opens the documentation
 search dialog and the repository demo's piece-tree inspector. A page fails if its root scroll
 width exceeds the requested CSS width or its mobile layout viewport expands, with no pixel
-tolerance. Code and tables can scroll inside a box that fits the page.
+tolerance. Elements extending beyond the viewport also fail, including root-clipped content
+and off-screen fixed or sticky controls. Code, tables and sticky editor content can scroll
+inside an inner scroll box that fits the page.
 
 ```sh
 scripts/node_modules/.bin/playwright install --with-deps chromium webkit
