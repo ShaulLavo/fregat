@@ -6,7 +6,11 @@ import {
   DocumentWorkerReader,
   type DocumentSourceConnection,
 } from '@singapore-editor/core/internal/document-worker'
-import { createTreeSitterInput, readTreeSitterInputRange } from '../src/treeSitter/source'
+import {
+  createTreeSitterInput,
+  readTreeSitterInputRange,
+  readTreeSitterPieceTableInput,
+} from '../src/treeSitter/source'
 
 const UNIT = 'const 名前 = "emoji 🎉🚀 tail"; // ünïcødé\n'
 const TEXT = UNIT.repeat(2_000)
@@ -58,6 +62,20 @@ async function resolve(text: string, edit?: { from: number; to: number; text: st
 }
 
 describe('ordinary source reads', () => {
+  it('bounds predicate reads while preserving parser batches', async () => {
+    const { input } = await resolve('alpha' + ' '.repeat(10_000))
+    expect(readTreeSitterPieceTableInput(input, 0, 5)).toBe('alpha')
+    expect(readTreeSitterPieceTableInput(input, 0)).toHaveLength(4096)
+    expect(readTreeSitterPieceTableInput(input, 2, 2)).toBe('')
+  })
+
+  it('preserves exact bounded UTF-16 ranges at surrogate boundaries', async () => {
+    const { input } = await resolve('a🎉z' + ' '.repeat(5_000))
+    expect(readTreeSitterPieceTableInput(input, 1, 3)).toBe('🎉')
+    expect(readTreeSitterPieceTableInput(input, 1, 2)).toBe('\ud83c')
+    expect(readTreeSitterPieceTableInput(input, 2, 3)).toBe('\udf89')
+  })
+
   it('keeps the parser callback source alive until its cached input retires', async () => {
     const { input } = await resolve('const mdx = "😀"')
     const cached = input.retain()

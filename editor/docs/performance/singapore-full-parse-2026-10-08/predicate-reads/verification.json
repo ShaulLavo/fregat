@@ -1,0 +1,40 @@
+{
+  "runtimePr": "https://github.com/ShaulLavo/tree-sitter-x/pull/24",
+  "runtimeSource": "89300c9e82946c9bc59b16ca1415afa86fcdbdb9",
+  "artifact": "a052adf5c2c34ef78f97d1631c41ca83db9816d3",
+  "wasmBeforeAndAfterSha256": "65aa79c497fe2172b9d635af91f7004129ba2728eeb41eb226c17de208ed5eed",
+  "commands": [
+    {
+      "command": "bun run build:workspaces --concurrency=2",
+      "result": "27 successful packages"
+    },
+    {
+      "command": "bun run --cwd editor/bench/compare test",
+      "result": "39 tests passed"
+    },
+    {
+      "command": "vitest run test/source-chunks.test.ts test/treeSitter-worker.test.ts test/runtime-identity.test.ts",
+      "cwd": "editor/packages/tree-sitter",
+      "result": "34 tests passed"
+    },
+    {
+      "command": "tsc --noEmit",
+      "cwd": "editor/packages/tree-sitter",
+      "result": "passed"
+    },
+    {
+      "command": "bun run --cwd apps/web typecheck",
+      "result": "passed"
+    }
+  ],
+  "runtimeCi": [
+    "https://github.com/ShaulLavo/tree-sitter-x/actions/runs/37857260101",
+    "https://github.com/ShaulLavo/tree-sitter-x/actions/runs/37857259729"
+  ],
+  "limitations": [
+    "Timing qualification failed on the original warm overlap phase.",
+    "Counter timings are overhead-heavy and excluded from acceptance.",
+    "Runtime artifact updates additional binding fixes from master; WASM is unchanged.",
+    "Counter captureArrays records unmarshal calls; returned source units do not measure allocated bytes."
+  ]
+}

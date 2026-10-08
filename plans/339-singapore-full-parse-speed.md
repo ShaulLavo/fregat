@@ -156,7 +156,7 @@ Qualification work in progress, 2026-10-08:
 
 - [ ] Profile the dominant phase. Split query engine, predicates, materialization and normalization when the coarse phase bundles them.
 - [x] Retain the first correctness- and counter-backed candidate with unqualified timing, canonical output and all traces. Continue one candidate at a time toward M1.
-- [ ] Implement tree-sitter-x improvements in that repository, test its bindings/native correctness, then pin the reviewed package artifact in Fregat. Other changes stay in their owning Singapore package. Normal package patch changesets apply to future package-code PRs.
+- [x] Implement tree-sitter-x improvements in that repository, test its bindings/native correctness, then pin the reviewed package artifact in Fregat. Other changes stay in their owning Singapore package. Normal package patch changesets apply to future package-code PRs.
 - [ ] Meet M1 or record the next bounded experiment with a measured ceiling. Delete rejected experiments.
 
 ### Phase 2: Reach the complete-file target
@@ -168,7 +168,7 @@ Qualification work in progress, 2026-10-08:
 ### Phase 3: Publish evidence, then add incremental work
 
 - [ ] Record qualified full-file timing/memory results, toolchain, fixtures, method and reproducible scripts under the editor performance docs. Keep wins and losses together.
-- [ ] Check installed package exports and one framework consumer after any public API or artifact change.
+- [x] Check installed package exports and one framework consumer after any public API or artifact change.
 - [ ] Review browser screenshots and frame traces. Confirm the first highlighted frame receives a complete store and that later scrolling needs no extra syntax query for that version.
 - [ ] Attempt the stretch target if measured cost and implementation complexity justify it. Otherwise close with the achieved M3 numbers and a bounded follow-up.
 - [ ] Only after the complete-file gate, layer viewport-first and incremental behavior on top. Keep the full mode in the benchmark permanently so those features cannot hide a throughput regression.
@@ -397,3 +397,81 @@ protocol. The native profile attributes about 0.4 s each to the query engine
 and predicate callbacks, with the rest still bundled in decoding/materialization.
 Any tree-sitter-x source change needs its own reviewed repository PR before
 pinning; none is included in this cursor-read change.
+
+### Bounded predicate reads and query-local reuse — 2026-10-09
+
+[tree-sitter-x #24](https://github.com/ShaulLavo/tree-sitter-x/pull/24) is reviewed
+and merged at `89300c9e82946c9bc59b16ca1415afa86fcdbdb9`. Singapore pins its
+published artifact `a052adf5c2c34ef78f97d1631c41ca83db9816d3` through the package
+dependency and root override. Root and injection callbacks forward the optional
+exclusive UTF-16 end index. Ordinary parser reads retain the 4,096-unit chunk
+limit and surrogate-safe boundaries; exact bounded reads preserve the requested
+range. Each query invocation owns its text reuse, with fresh reads on subsequent
+calls and other trees.
+
+**Timing qualification failed; M1 remains unpassed.** The prospective window
+was declared before any measurement, with five baseline/candidate pairs for
+each startup condition and alternating order. Its baseline is the structural
+candidate at `9d78f3e84f683325d57ebcb4b3b1b1b86518f407`. Every original attempt
+completed. No failed sample was replaced, no acceptance rerun was made, and no
+threshold was widened. The complete declaration, twenty timing traces, thirty-two
+control traces, counter diagnostics and fifty-two matched scheduler receipts are
+in [the preserved evidence](../editor/docs/performance/singapore-full-parse-2026-10-08/predicate-reads/comparison.json).
+
+The following are original instrumented experiment medians, in milliseconds.
+They describe headless frame opportunities, not physical presentation or CPU
+seconds, and do not establish a qualified speedup.
+
+| Startup | Metric                         | Baseline | Candidate |
+| ------- | ------------------------------ | -------: | --------: |
+| Cold    | Complete highlighted frame     |   4652.3 |    4523.8 |
+| Cold    | Full worker work               |   4470.0 |    4337.4 |
+| Cold    | Highlight query and predicates |   1345.1 |    1172.7 |
+| Cold    | Diagnostic work proxy          |   4489.5 |    4358.2 |
+| Warm    | Complete highlighted frame     |   4659.9 |    4413.4 |
+| Warm    | Full worker work               |   4520.3 |    4286.0 |
+| Warm    | Highlight query and predicates |   1256.4 |    1146.9 |
+| Warm    | Diagnostic work proxy          |   4532.2 |    4298.2 |
+
+Cold phases pass the frozen guards. Warm overlap resolution increased from
+163.7 to 210.9 ms, a 47.2 ms increase against the unchanged 7.0 ms allowance.
+The five candidate observations span 207.9–214.7 ms; this is retained as a failed
+window. The cause of that phase increase is unconfirmed. The original-M0 phase
+comparison also fails that guard. All twenty timing samples preserve canonical
+tokens, palette/style, structural output, actual root coverage and query-limit
+proof. Candidate worker work and the original work-proxy ceilings still miss M1.
+
+All sixteen matched 1 MiB/10 MiB controls preserve complete canonical output:
+realistic TypeScript, long lines, Unicode, malformed source, injections, dense
+injections, dense recovery and HTML. The matched dense-injection lifecycle
+control passes edits, multiple documents, cancellation and disposal checks.
+Every matched whole-job memory peak stays below twice its baseline. Retained
+process RSS, WASM sizes, JavaScript heap observations, all samples and p95 values
+are in the raw experiments and comparison. Markdown qualification, allocator-live
+bytes and byte-identical grammar rebuilds remain incomplete.
+
+The separate overhead-heavy counter diagnostic preserves canonical output. Its
+highlight query still evaluates 748,985 predicates, but node text/source reads
+fall from 748,985 to 149,797. Returned source units fall from 3,067,241,055 to
+748,985; the latter equals the consumed node-text units. Repeated reads are
+eliminated within that invocation. These are callback-returned UTF-16 units,
+not a measurement of allocated or copied bytes. Diagnostic durations are
+inclusive and overhead-heavy; they are excluded from acceptance timing.
+
+Capture materialization remains the next bounded candidate: the diagnostic
+still records 1,947,361 capture-unmarshal passes and node wrappers. Counters
+measure calls, not allocator totals. Profile that production path and preserve
+all query/predicate/capture ordering and canonical output before changing its
+representation. Any runtime change again needs its own reviewed tree-sitter-x
+PR, followed by a new prospective paired window. The failed current window
+cannot be rescued with unchanged-code reruns.
+
+Verification: the runtime's binding suite and compatibility CI pass with the
+reviewed source; Fregat builds 27 workspace packages; all 39 benchmark probe
+tests and 34 source/worker/runtime-identity tests pass; tree-sitter TypeScript
+and the React web consumer typecheck pass. Node resolution confirms Markdown
+and its host use the same pinned runtime. Its WASM remains byte-identical to the
+qualified artifact: SHA-256
+`65aa79c497fe2172b9d635af91f7004129ba2728eeb41eb226c17de208ed5eed`.
+The temporary diagnostic transform was removed and the ordinary benchmark
+build restored.

@@ -42,12 +42,14 @@ function inputHandle(shared: {
 export function readTreeSitterPieceTableInput(
   input: TreeSitterPieceTableInput,
   index: number,
+  endIndex?: number,
 ): string | undefined {
   assertSource(input)
   if (index < 0 || index >= input.length) return undefined
-  const end = Math.min(input.length, index + PARSER_READ_BATCH_CODE_UNITS)
+  const end = Math.min(input.length, index + PARSER_READ_BATCH_CODE_UNITS, endIndex ?? input.length)
+  if (end <= index) return ''
   const text = input.read.text.readRange(index, end)
-  if (end === input.length || text.length <= 1) return text
+  if (end === endIndex || end === input.length || text.length <= 1) return text
   const last = text.charCodeAt(text.length - 1)
   return last >= 0xd800 && last <= 0xdbff ? text.slice(0, -1) : text
 }

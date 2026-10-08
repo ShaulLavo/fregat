@@ -1,0 +1,41 @@
+function replace(code, before, after) {
+  if (!code.includes(before)) throw new RangeError(`Worker cost target drifted: ${before}`)
+  return code.replace(before, after)
+}
+export function workerCostTransform(code, id) {
+  if (id.endsWith('/web-tree-sitter/web-tree-sitter.js')) {
+    code = `const compareCosts = globalThis.__compareWorkerCosts ??= { getters: {}, query: {} };\n` + code
+    for (const name of ['nodeType', 'nodeIsMissing', 'startIndex', 'endIndex']) {
+      code = replace(code, `get ${name}() {`, `get ${name}() {\n if (compareCosts.phase === 'structuralWalk') compareCosts.getters.${name} = (compareCosts.getters.${name} ?? 0) + 1;`)
+    }
+    for (const [method, count] of [['matches', 'rawCount'], ['captures', 'count']]) {
+      code = replace(code, `C._ts_query_${method}_wasm(`, `const compareEngineStart = performance.now();\n C._ts_query_${method}_wasm(`)
+      code = replace(code, `const ${count} = C.getValue(TRANSFER_BUFFER, "i32");`, `const comparePhase = compareCosts.phase ?? 'unattributed';\n const comparePhaseCosts = compareCosts.query[comparePhase] ??= { engineMs: 0, predicateMs: 0, predicateCalls: 0, calls: 0 };\n comparePhaseCosts.engineMs += performance.now() - compareEngineStart;\n comparePhaseCosts.calls++;\n const ${count} = C.getValue(TRANSFER_BUFFER, "i32");`)
+    }
+    code = replace(code, 'this.textPredicates = textPredicates;', `this.textPredicates = textPredicates.map(predicates => predicates.map(predicate => (captures, readText) => {
+ const start = performance.now();
+ try { return predicate(captures, readText); }
+ finally {
+ const phase = compareCosts.phase ?? 'unattributed';
+ const costs = compareCosts.query[phase] ??= { engineMs: 0, predicateMs: 0, predicateCalls: 0, calls: 0 };
+ costs.predicateMs += performance.now() - start;
+ costs.predicateCalls++;
+ }
+ }));`)
+    return code
+  }
+  if (id.endsWith('/tree-sitter/src/treeSitter/treeSitter.worker.ts')) {
+    code = replace(code, 'const start = nowMs()\n  try {\n    return run()\n  } finally {', `const start = nowMs()
+ const costs = (globalThis as any).__compareWorkerCosts ??= { getters: {}, query: {} }
+ const previousPhase = costs.phase
+ costs.phase = name
+ try {
+ return run()
+ } finally {
+ costs.phase = previousPhase`)
+    code = replace(code, 'layers: document.layers.length,', `layers: document.layers.length,
+ __compareWorkerCosts: JSON.parse(JSON.stringify((globalThis as any).__compareWorkerCosts)),`)
+    return code
+  }
+  return code
+}

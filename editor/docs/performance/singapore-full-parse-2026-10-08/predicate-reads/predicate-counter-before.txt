@@ -1,0 +1,50 @@
+import { workerCostTransform } from './worker-cost.mjs'
+
+function replace(code, before, after) {
+  if (!code.includes(before)) throw new RangeError(`Predicate diagnostic target drifted: ${before}`)
+  return code.replace(before, after)
+}
+
+export function predicateCostTransform(code, id) {
+  code = workerCostTransform(code, id)
+  if (!id.endsWith('/web-tree-sitter/web-tree-sitter.js')) return code
+  code = replace(code, 'const compareCosts = globalThis.__compareWorkerCosts', `const comparePredicateNodes = new Map();
+function comparePredicateCosts() {
+  const phase = compareCosts.phase ?? 'unattributed';
+  return compareCosts.query[phase] ??= { engineMs: 0, predicateMs: 0, predicateCalls: 0, calls: 0 };
+}
+function compareTextCallback(tree, index, point) {
+  const start = performance.now();
+  const value = tree.textCallback(index, point);
+  const costs = comparePredicateCosts();
+  costs.sourceCallbackMs = (costs.sourceCallbackMs ?? 0) + performance.now() - start;
+  costs.sourceCallbackCalls = (costs.sourceCallbackCalls ?? 0) + 1;
+  costs.sourceReturnedUnits = (costs.sourceReturnedUnits ?? 0) + (typeof value === 'string' ? value.length : 0);
+  return value;
+}
+const compareCosts = globalThis.__compareWorkerCosts`)
+  code = replace(code, 'get text() {\n    return getText(this.tree, this.startIndex, this.endIndex, this.startPosition);', `get text() {
+    const start = performance.now();
+    const value = getText(this.tree, this.startIndex, this.endIndex, this.startPosition);
+    const costs = comparePredicateCosts();
+    costs.nodeTextCalls = (costs.nodeTextCalls ?? 0) + 1;
+    costs.nodeTextUnits = (costs.nodeTextUnits ?? 0) + value.length;
+    costs.nodeTextMs = (costs.nodeTextMs ?? 0) + performance.now() - start;
+    const phase = compareCosts.phase ?? 'unattributed';
+    const nodes = comparePredicateNodes.get(phase) ?? new Set();
+    comparePredicateNodes.set(phase, nodes);
+    const identity = this.tree[0] + ':' + this.id;
+    if (nodes.has(identity)) costs.repeatedNodeTextCalls = (costs.repeatedNodeTextCalls ?? 0) + 1;
+    nodes.add(identity);
+    costs.uniqueTextNodes = nodes.size;
+    return value;`)
+  code = replace(code, 'function unmarshalCaptures(query, tree, address, patternIndex, result) {', `function unmarshalCaptures(query, tree, address, patternIndex, result) {
+  const costs = comparePredicateCosts();
+  costs.captureArrays = (costs.captureArrays ?? 0) + 1;
+  costs.materializedCaptures = (costs.materializedCaptures ?? 0) + result.length;`)
+  code = replace(code, 'const result = new Node(INTERNAL, {', `const costs = comparePredicateCosts();
+  costs.nodeWrappers = (costs.nodeWrappers ?? 0) + 1;
+  const result = new Node(INTERNAL, {`)
+  code = code.replaceAll('tree.textCallback(startIndex, startPosition)', 'compareTextCallback(tree, startIndex, startPosition)')
+  return code
+}
