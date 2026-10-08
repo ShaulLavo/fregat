@@ -15,6 +15,16 @@ const encoder = new TextEncoder()
 const decoder = new TextDecoder('utf-8', { fatal: true })
 const PACKET_LIFETIME = 60_000
 const REPLAY_WINDOW = 4096
+const PACKET_FIELDS = new Set<PropertyKey>([
+  'version',
+  'room',
+  'sender',
+  'generation',
+  'sequence',
+  'sentAt',
+  'iv',
+  'ciphertext',
+])
 
 type ReplayWindow = {
   readonly bits: Uint8Array
@@ -159,6 +169,10 @@ function associatedData(
 
 function validPacket(value: unknown): value is SealedPacket {
   if (!value || typeof value !== 'object') return false
+  // Unused fields can retain data that the admission estimate cannot account for.
+  const fields = Reflect.ownKeys(value)
+  if (fields.length !== PACKET_FIELDS.size || fields.some((field) => !PACKET_FIELDS.has(field)))
+    return false
   const packet = value as Partial<SealedPacket>
   return (
     packet.version === 1 &&

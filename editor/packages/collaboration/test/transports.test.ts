@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { frameMessage, FrameReceiver, MESSAGE_LIMIT, sendFrames } from '../src/framing'
-import { createRoomInvitation, RoomCrypto } from '../src/room-crypto'
+import { createRoomInvitation, RoomCrypto, sealedPacketSize } from '../src/room-crypto'
 import { WebSocketSignaling } from '../src/signaling'
 
 const encoder = new TextEncoder()
@@ -112,6 +112,19 @@ describe('ordered binary framing', () => {
 })
 
 describe('authenticated room packets', () => {
+  test('rejects unused packet fields before queue accounting and decryption', async () => {
+    const { room, secret } = createRoomInvitation()
+    const sender = await RoomCrypto.create(room, 'a', secret)
+    const receiver = await RoomCrypto.create(room, 'b', secret)
+    const packet = await sender.seal('generation', 'legitimate')
+    expect(sealedPacketSize(packet)).toBeGreaterThan(0)
+    const padded = { ...packet, padding: 'x'.repeat(65_536) }
+    const size = sealedPacketSize(padded)
+    const opened = await receiver.open(padded)
+    expect({ size, opened: Boolean(opened) }).toEqual({ size: undefined, opened: false })
+    expect((await receiver.open(packet))?.payload).toBe('legitimate')
+  })
+
   test('binds sender, room, generation and sequence and rejects replay', async () => {
     const { room, secret } = createRoomInvitation()
     const sender = await RoomCrypto.create(room, 'a', secret)
