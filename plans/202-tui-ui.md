@@ -283,3 +283,20 @@ remain available for recovery while F1 proves their replacement; this plan does 
 archive a repository or release. Do not ship an unnoticed fallback parser, incompatible asset
 pair, private-internals workaround chain or lost drafts/history. A future maintained fork requires
 its own evidence-backed decision. Singapore and parser delivery continue independently.
+
+## October 2026 issue follow-ups
+
+Status: Approved, retained by [Plan 336 closeout](issue-closeout-2026-10.md).
+These are remaining execution items. Closing their tracker records does not certify a fix
+or change acceptance of an earlier delivered milestone. Each original thread retains its
+full reproduction, comments and historical artifacts. Source links below pin the reviewed
+main revision; recheck them before implementation.
+
+### Issue 623
+
+Source: [#623: TUI: unconfirmed asynchronous settlement warnings flood a passing CI test job](https://github.com/ShaulLavo/fregat/issues/623), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/623#issuecomment-5996055131).
+Current owner: [apps/tui/src/agent-rail/tests/rail.test.tsx](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/tui/src/agent-rail/tests/rail.test.tsx).
+
+A passing TUI job emitted 1,498 act-warning matching lines. PR #763 fixed one rail case but 1,165 wider warnings remained; PR #771 later settled Undo/Redo selection inside act. A separate later archive Undo palette assertion expected a non-null value and got null, with no proven shared cause. Inventory the remaining warning owners and capture that assertion with its actual state transition. Keep current assertions and deadlines. This is test-settlement work in the terminal-first redesign, not a request to port web notices or dialogs.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
