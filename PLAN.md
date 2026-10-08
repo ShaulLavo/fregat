@@ -152,6 +152,11 @@ work can proceed independently where their files and contracts do not overlap.
 look like products: research, pitch with proof, READMEs, Astro sites on our own domains, docs,
 a release cycle, and closing the issue backlog. It touches docs, sites and package metadata,
 so it runs alongside product work; Track E waits for the owner's domains.
+[338](plans/338-singapore-docs-load-speed.md) is Approved for the chosen Singapore
+docs-in-editor site. Profile its startup first, then slim the entry, load grammars by page
+and visible demand, and improve asset delivery alongside Plan 336's site implementation.
+Worker/Markdown changes follow measured need; token reuse and visible-region takeover follow
+correctness proofs and unmet load targets. Preserve Plan 336's accessibility and phone gates.
 
 [335](plans/335-stroke-icons.md) retains the current stroke-icon migration, shared registry
 and selected morph sites. Its broad swap takes the structural window after the keymap
