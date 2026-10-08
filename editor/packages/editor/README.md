@@ -31,6 +31,58 @@ call `editor.dispose()` when you're done with it
 
 plugins go in `plugins` when you construct the editor. a plugin is an object with a `name` and an `activate(context)` that registers what it adds
 
+## transactions and reconciliation
+
+`createPlugin` scopes can subscribe to each text transaction, including typing, an IME
+commit, paste, commands, undo/redo, `editor.edit`, and `setText`. This works with
+`new Editor(element)` and plain plugin options. A transaction carries the immutable
+before/after snapshots, the actual normalized atomic edits, its origin, the local
+source view ID, and an optional opaque author tag. Buffer revision numbers are local
+to each buffer; `setText` replaces that buffer. Document attachment itself emits no
+text transaction. Scopes release their subscriptions when removed, and plugins that
+do not subscribe incur no transaction fan-out. Transactions are captured in commit
+order and delivered once after view acceptance, including edits and replacements
+authored by change callbacks or transaction listeners. If an outgoing document is
+swapped or detached before acceptance, its captured commits finish delivery to the
+remaining subscriptions. Disposing the editor or removing the final transaction
+subscription drops pending commits and releases their snapshot references.
+
+```ts
+import { createPlugin } from '@singapore-editor/core/extensions'
+
+const plugin = createPlugin({
+  name: 'shared-text',
+  view(scope) {
+    scope.onDidTransaction((transaction) => {
+      // Send transaction.edits against transaction.snapshotBefore.
+    })
+    scope.applyEdits([{ from: 0, to: 0, text: 'peer text' }], undefined, {
+      history: 'skip',
+      origin: 'remote',
+      author: 'peer',
+    })
+  },
+})
+```
+
+`scope.reconcile(baseSnapshot, sequentialBatches, options)` (also available on
+`Editor` and `DocumentSession`) builds the final snapshot before publishing one
+content transition. It maps all attached selections, ends active composition,
+projects tracked decorations, and keeps the existing history graph. It adds no undo
+entry and emits no transaction echo. Its origin defaults to `remote`; `replay` is
+also supported. Collaborative undo policy belongs to the caller.
+
+Every batch uses offsets into the preceding batch's resulting snapshot. Required
+`options.edits` describes the current-to-final transition for selection and consumer
+projection; reconciliation validates it before changing state. Supply the precise
+edits known by the collaboration layer, including an empty array for unchanged text.
+This preserves unchanged interior spans without computing a character diff.
+Offsets allow an identity-aware caller to use this same API.
+
+The 128-entry synchronization chain is a bounded consumer aid. Consumers that cannot
+bridge their cursor to the current snapshot reset from the new snapshot. It does not
+replace an authored-operation log.
+
 ## entry points
 
 - `/editor`: the `Editor` class and its option types

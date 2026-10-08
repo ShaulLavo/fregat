@@ -99,6 +99,8 @@ export function createTestViewContributionContext(
     getSnapshot: () => missing('getSnapshot'),
     getDocumentContributions: () => null,
     requestViewUpdate: () => undefined,
+    onDidTransaction: () => noDisposal,
+    reconcile: () => undefined,
     onDidType: () => noDisposal,
     registerPressParticipant: () => noDisposal,
     registerKeymapNode: () => noDisposal,
