@@ -1,0 +1,26 @@
+{
+  "label": "Noisy experiment. Native UTF-8 contiguous input; browser uses UTF-16 piece-table callbacks. Ratio is not pure WASM overhead.",
+  "date": "2026-10-08T17:04:05.422Z",
+  "sourceCommit": "3569e367267ef536e29e859a875530b7d80416bd",
+  "compiler": "cc (GCC) 16.2.1 20260810",
+  "flags": ["-O3", "-std=c11"],
+  "grammarVersion": "0.23.2",
+  "fixtureSha256": "512348577405c01df6f57142fb6c0d9123211797b9349b5af05047174adeece0",
+  "samples": [
+    {
+      "parseMs": 442.603,
+      "bytes": 10485760,
+      "hasError": false
+    },
+    {
+      "parseMs": 381.483,
+      "bytes": 10485760,
+      "hasError": false
+    },
+    {
+      "parseMs": 353.156,
+      "bytes": 10485760,
+      "hasError": false
+    }
+  ]
+}
