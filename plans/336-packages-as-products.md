@@ -7,11 +7,10 @@
 - Scope: Fregat, Singapore, ghostty-webgpu and hotkeys, plus tree-sitter-x and tree-sitter-md as the
   parsers behind Singapore. Their GitHub repositories, npm pages, websites, documentation, release
   cycle and issue tracker. Mesh, fast-ulid and the other owned repos stay out until the owner adds them.
-- Priority: P1. Effort: XL in total, split into tracks that run in parallel after Track 0.
-- Owner inputs (asked once, when the track that needs them starts): the license for fregat and
-  Singapore (Track 0); npm trusted-publisher setup and the `@fregat` npm scope (Track 0); the domain
-  names and a Cloudflare API token (Track E); whether launch goes to 1.0.0 (Track G). Everything
-  else runs without the owner.
+- Priority: P1. Effort: XL in total, split into tracks that mostly run in parallel.
+- Owner decisions 2026-10-08: MIT for everything (done: `LICENSE` files and `license` fields). npm
+  publishing setup and the domains/Cloudflare token come last, once everything else is done. Versions
+  stay as they are: patch bumps only, no 1.0.0, no version-policy changes while we are setting up.
 - Planned against Fregat `0df5eb872`.
 
 ## Outcome
@@ -141,16 +140,20 @@ under 0.2 µs. Keep the MIT notice from its TanStack origin.
 Markdown in 0.35 ms instead of 0.82 ms; tree-sitter-md passes 676/676 CommonMark and GFM examples.
 Sold through Singapore's pages and their own READMEs.
 
-## Track 0: Prerequisites (starts now, blocks publishing copy)
+## Track 0: Prerequisites (starts now)
 
-1. Owner picks the license for fregat and Singapore. Add `LICENSE` files and `license` fields to every
-   published package.
-2. Make npm publishing work: fix `ghostty-webgpu`'s `repository.url`, pin npm 11.21.0+, pass
-   `GITHUB_TOKEN` to the release script, owner configures the npm trusted publisher and confirms the
-   `@fregat` scope, set `NPM_TRUSTED_PUBLISHING=true`. Publish current versions; confirm on npm.
-3. Fix wrong live copy: the site's native phone app and "no releases yet", the README's "native mac",
+1. Done 2026-10-08: MIT `LICENSE` at the root, in `editor/` and in every published package, with
+   `license` fields.
+2. Fix wrong live copy: the site's native phone app and "no releases yet", the README's "native mac",
    remaining "Platform" names in `apps/mac` and `apps/tui`.
-4. Make the mirrors read-only (decision 7).
+3. Make the mirrors read-only (decision 7).
+
+## Track N: npm publishing (last, with Track E)
+
+Owner decision: after everything else is done. Then: fix `ghostty-webgpu`'s `repository.url`, pin npm
+11.21.0+, pass `GITHUB_TOKEN` to the release script, owner configures the npm trusted publisher and
+confirms the `@fregat` scope, set `NPM_TRUSTED_PUBLISHING=true`, publish current versions and confirm
+on npm. Until then, READMEs and docs install from npm as written; the published 0.1.2 is known stale.
 
 ## Track P: Proof (starts now; benchmarks run through the heavy-job runner)
 
@@ -208,7 +211,7 @@ Follow the [landing-sites report](../docs/research/packages-as-products/landing-
 5. Every site: under 1 MB on first load, readable without JavaScript, reduced motion, Open Graph
    images, sitemap, 404, `llms.txt`. Screenshots at desktop and phone widths go to the owner.
 
-## Track E: Hosting (needs the domains; build work does not wait)
+## Track E: Hosting (last, with Track N; site builds do not wait)
 
 1. Owner chooses the domains (DNS on Cloudflare) and grants a Cloudflare API token as a GitHub
    Actions secret.
@@ -232,20 +235,17 @@ checklist:
 4. Verify StackBlitz runs WebGPU, wasm and workers before any example links there; keep live WebGL
    embeds per page under Chrome's context limit.
 
-## Track G: Release cycle (after Track 0)
+## Track G: Release cycle (after Track 0; no version changes)
 
-Follow the [release report](../docs/research/packages-as-products/release-cycles.md) proposal and
-checklist:
+Owner decision: versions are untouched while we set up. Patch bumps only, no 1.0.0, no new version
+policy. This track improves how releases read, not how they are numbered. Follow the
+[release report](../docs/research/packages-as-products/release-cycles.md):
 
-1. `docs/releasing.md`: before launch, patch only, `latest` weekly, `next` snapshots from every main
-   push, pkg.pr.new previews on PRs labeled `preview`. After launch: minors carry features,
-   deprecate in a minor and remove in the next major with a migration guide, a release post per minor
-   and major.
+1. `docs/releasing.md` describes today's cycle: Changesets, patch only, fixed groups, the version PR.
+   Channels (`next` snapshots, pkg.pr.new previews) wait for Track N.
 2. `@changesets/changelog-github`; changeset summaries describe what a package user sees, in plain
    words, with the good/bad examples from the report added to `AGENTS.md`.
-3. One GitHub Release per product family with a short summary on top; matching tags and Releases in
-   the mirrors; a changelog page on each docs site.
-4. At launch: owner decides 1.0.0, then the release posts.
+3. GitHub Releases per product family and matching mirror releases wait for Track N.
 
 ## Track H: Close out the issue backlog (independent, starts now)
 
@@ -258,22 +258,22 @@ checklist:
 
 ## Acceptance
 
-- npm serves the current version of every published package, from CI with provenance.
-- Every repository, package and site has a license.
+- Every repository and published package has an MIT license.
+- After Track N: npm serves the current version of every published package, from CI with provenance.
 - Each repository front page, npm page and site passes the research checklists, with screenshots sent
   to the owner.
 - Every performance claim links a reproducible, like-for-like benchmark.
 - Docs builds fail on a broken code sample or internal link.
 - Sites serve from our domains on Cloudflare; GitHub Pages is off.
-- `docs/releasing.md` exists and a `next` release has been published.
+- `docs/releasing.md` exists and changesets read for package users.
 - Zero agent-filed issues remain open.
 
 ## Kickoff prompt for an executing coordinator
 
 > Execute Plan 336 (`plans/336-packages-as-products.md`) in fregat. Load the `orchestrate` and
 > `fregat-local` skills, and read `docs/research/packages-as-products/README.md` and the report each
-> lane needs. Start Track 0, Track P and Track H now in parallel; ask the owner for the license and
-> npm setup once, at the start of Track 0. When Track P's first results land, run Track B and send the
-> owner the pitch as a private Mesh app link. After the owner approves it, run Tracks C, D, F and G in
-> parallel lanes. Track E waits for the owner's domains and Cloudflare token; ask once, when the first
-> site is ready to deploy. Send screenshots of every site and README at each milestone.
+> lane needs. Start Track 0, Track P and Track H now in parallel. When Track P's first results land,
+> run Track B and send the owner the pitch as a private Mesh app link. After the owner approves it,
+> run Tracks C, D, F and G in parallel lanes. Do not change package versions. Tracks N and E come last:
+> ask the owner for npm setup, domains and the Cloudflare token only when everything else is done.
+> Send screenshots of every site and README at each milestone.

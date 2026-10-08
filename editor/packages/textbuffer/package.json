@@ -2,6 +2,7 @@
   "name": "@singapore-editor/textbuffer",
   "version": "0.2.6",
   "description": "Persistent balanced-tree text buffer with snapshots, stable anchors, and line mapping",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ShaulLavo/fregat.git",
