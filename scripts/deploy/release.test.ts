@@ -91,7 +91,7 @@ test.each([
 })
 
 test.each(
-  ['pty-host.js', 'image-worker.ts', 'THIRD_PARTY_NOTICES.txt'].flatMap((missing) =>
+  ['pty-host.js', 'pair.js', 'image-worker.ts', 'THIRD_PARTY_NOTICES.txt'].flatMap((missing) =>
     ['/', '/demo/', '/platform-api/'].map((base) => ({ missing, base })),
   ),
 )('a candidate with base $base without $missing fails verification', async ({ missing, base }) => {
@@ -106,6 +106,7 @@ test.each(
     for (const file of [
       'index.js',
       'remote-support.js',
+      'pair.js',
       'watch-worker.ts',
       'runtime/package.json',
       'runtime/bun.lock',

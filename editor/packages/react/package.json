@@ -1,6 +1,19 @@
 {
   "name": "@singapore-editor/react",
   "version": "0.2.6",
+  "description": "React components and hooks for mounting and controlling the Singapore editor.",
+  "keywords": [
+    "browser",
+    "editor",
+    "hooks",
+    "react",
+    "singapore",
+    "typescript"
+  ],
+  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/react/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

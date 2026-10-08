@@ -11,7 +11,12 @@ const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(new URL('../../package.json', import.meta.url))
 const compiler = join(dirname(require.resolve('typescript/package.json')), 'bin/tsc')
 const parser = unified().use(remarkParse).use(remarkMdx)
-const sourceDirectory = process.argv[2] ?? join(root, 'src/content/docs')
+const packageMode = process.argv[2] === '--packages'
+const sourceDirectory = packageMode
+  ? undefined
+  : (process.argv[2] ?? join(root, 'src/content/docs'))
+const packageRoot = join(root, '../packages')
+const modulePaths: Record<string, string[]> = {}
 const temporary = await mkdtemp(join(root, '.samples-'))
 const origins = new Map<string, string>()
 const files: string[] = []
@@ -28,8 +33,34 @@ async function pages(directory: string): Promise<string[]> {
   return nested.flat()
 }
 
+async function packagePages(): Promise<string[]> {
+  const readmes: string[] = []
+  const entries = await readdir(packageRoot, { withFileTypes: true })
+  for (const entry of entries.filter((item) => item.isDirectory())) {
+    const directory = join(packageRoot, entry.name)
+    const manifest = JSON.parse(await readFile(join(directory, 'package.json'), 'utf8'))
+    if (manifest.private) continue
+    readmes.push(join(directory, 'README.md'))
+    addExports(manifest.name, manifest.exports, directory)
+  }
+  return readmes
+}
+
+function addExports(
+  name: string,
+  exports: Record<string, string | { types?: string }>,
+  directory: string,
+): void {
+  for (const [subpath, target] of Object.entries(exports)) {
+    if (typeof target === 'string' || !target.types) continue
+    const specifier = subpath === '.' ? name : `${name}${subpath.slice(1)}`
+    modulePaths[specifier] = [join(directory, target.types)]
+  }
+}
+
 try {
-  for (const path of await pages(sourceDirectory)) {
+  const sources = packageMode ? await packagePages() : await pages(sourceDirectory!)
+  for (const path of sources) {
     const tree = parser.parse(await readFile(path, 'utf8'))
     const snippets: { name: string; value: string }[] = []
     visit(tree, 'code', (node) => {
@@ -57,6 +88,7 @@ try {
     jsx: 'react-jsx',
     lib: ['ES2022', 'DOM', 'DOM.Iterable'],
     types: ['react'],
+    ...(packageMode ? { paths: modulePaths } : {}),
   }
   async function check(name: string, examples: readonly string[], solid = false): Promise<void> {
     const config = join(temporary, `${name}.json`)
@@ -86,13 +118,22 @@ try {
     }
   }
   const sampleCount = files.length
-  files.push(join(root, 'src/env.d.ts'))
-  await check('docs', [
-    ...files,
-    ...['basic.ts', 'playground.ts', 'react.tsx'].map((file) => join(root, 'src/examples', file)),
-  ])
-  await check('solid', [join(root, 'src/env.d.ts'), join(root, 'src/examples/solid.tsx')], true)
-  console.log(`Checked ${sampleCount} inline samples and 4 example files with TypeScript 7.`)
+  if (packageMode) {
+    const solid = files.filter((file) => origins.get(file)?.includes('/solid/README.md'))
+    const other = files.filter((file) => !solid.includes(file))
+    await check('packages', [join(root, 'src/env.d.ts'), ...other])
+    await check('solid-package', [join(root, 'src/env.d.ts'), ...solid], true)
+    console.log(`Checked ${sampleCount} package README samples across ${sources.length} packages.`)
+  }
+  if (!packageMode) {
+    files.push(join(root, 'src/env.d.ts'))
+    await check('docs', [
+      ...files,
+      ...['basic.ts', 'playground.ts', 'react.tsx'].map((file) => join(root, 'src/examples', file)),
+    ])
+    await check('solid', [join(root, 'src/env.d.ts'), join(root, 'src/examples/solid.tsx')], true)
+    console.log(`Checked ${sampleCount} inline samples and 4 example files with TypeScript 7.`)
+  }
 } finally {
   await rm(temporary, { recursive: true, force: true })
 }

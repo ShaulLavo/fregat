@@ -8,27 +8,41 @@ import { isoDateTimeSchema } from './chat-model'
  */
 export const PAIRING_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 export const PAIRING_CODE_LENGTH = 12
+/** The app path a pairing link opens, relative to the app's base. */
+export const PAIRING_LINK_PATH = 'pair'
 export const pairingCodeSchema = v.pipe(
   v.string(),
   v.regex(new RegExp(`^[${PAIRING_CODE_ALPHABET}]{${PAIRING_CODE_LENGTH}}$`)),
 )
 
-/** How a request reached this server: from this machine, from a paired device, or neither. */
-export const pairingTrustSchema = v.picklist(['host', 'device', 'unpaired'])
+/**
+ * How a request reached this server: from this machine, from a paired device, from a Tailscale
+ * device signed in as this machine's own user, or none of these.
+ */
+export const pairingTrustSchema = v.picklist(['host', 'device', 'tailnet', 'unpaired'])
 export type PairingTrust = v.InferOutput<typeof pairingTrustSchema>
 
 export const pairingStatusSchema = v.object({
   trust: pairingTrustSchema,
   /** False when this machine lets any device in without pairing. */
   required: v.boolean(),
+  /** This machine's hostname, so a device about to pair can name it. */
+  machine: v.string(),
 })
 export type PairingStatus = v.InferOutput<typeof pairingStatusSchema>
 
 export const pairingLinkSchema = v.object({
   code: pairingCodeSchema,
   expiresAt: isoDateTimeSchema,
+  /** The link that pairs a device, when this server knows the public address devices open. */
+  url: v.nullable(v.string()),
 })
 export type PairingLink = v.InferOutput<typeof pairingLinkSchema>
+
+/** The link a device opens to pair: the code rides in the fragment, which no server ever sees. */
+export function pairingLink(appBase: string, code: string) {
+  return `${new URL(PAIRING_LINK_PATH, appBase).href}#token=${code}`
+}
 
 export const pairingClaimSchema = v.object({
   code: pairingCodeSchema,

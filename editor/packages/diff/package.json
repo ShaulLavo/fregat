@@ -1,6 +1,19 @@
 {
   "name": "@singapore-editor/diff",
   "version": "0.2.6",
+  "description": "Stacked and split diffs with inline changes for the Singapore editor.",
+  "keywords": [
+    "browser",
+    "diff",
+    "editor",
+    "git",
+    "singapore",
+    "typescript"
+  ],
+  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/diff/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

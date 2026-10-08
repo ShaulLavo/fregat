@@ -112,8 +112,8 @@ function unpairedDeviceError(auth: AuthConfig, header: HeaderReader) {
   if (!auth.devices || auth.devices.allows(header)) return null
 
   return new FsError('DEVICE_NOT_PAIRED', undefined, undefined, {
-    why: 'This machine lets another device in once a pairing link from this machine has paired it.',
-    fix: 'On this machine, open Settings › Machines, make a pairing link, and open it on this device.',
+    why: 'This machine lets another device in once a pairing code from this machine or a paired device has paired it.',
+    fix: 'On this machine or a paired device, open Settings › Machines › Pair a device, and open the link or type the code on this device.',
   })
 }
 

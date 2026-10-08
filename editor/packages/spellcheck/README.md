@@ -1,54 +1,43 @@
 # @singapore-editor/spellcheck
 
-english spellcheck for text the editor paints itself. a worker holds the dictionary, and one `SpellcheckService` per page serves every editor
+Worker-based English spellchecking for the Singapore editor and standalone text.
 
-it accepts us and british spellings plus common software words. plain text and markdown prose get checked by default. the word you're typing stays unmarked until the caret leaves it
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
 
-## try it
+## Install
 
 ```sh
-npm install @singapore-editor/core @singapore-editor/spellcheck
+npm install @singapore-editor/spellcheck
 ```
 
-```ts
-import { Editor } from '@singapore-editor/core/editor'
-import {
-  createSpellcheckPlugin,
-  EDITOR_SPELLCHECK_FEATURE,
-  SpellcheckService,
-} from '@singapore-editor/spellcheck'
-
-const service = new SpellcheckService()
-const editor = new Editor(element, { plugins: [createSpellcheckPlugin({ service })] })
-
-const spelling = editor.getFeature(EDITOR_SPELLCHECK_FEATURE)
-const issue = spelling?.issueAt(offset) // { start, end, word } or null
-if (spelling && issue) {
-  const [best] = await spelling.suggestions(offset)
-  if (best) spelling.replace(offset, best) // one undoable edit
-}
-```
-
-`scope: 'proseAndCode'` also checks comments and strings in code
-
-without an editor
+## Usage
 
 ```ts
 import { SpellcheckService, tokenizeSpellWords } from '@singapore-editor/spellcheck'
 
-const spellcheck = new SpellcheckService()
+const service = new SpellcheckService()
 const words = tokenizeSpellWords('the list settles befor the cursor')
-const misspelled = await spellcheck.check(words.map((w) => w.word)) // ['befor']
-const suggestions = await spellcheck.suggest('befor') // includes 'before'
-spellcheck.setAcceptedWords(['fregat'])
-spellcheck.dispose()
+console.log(await service.check(words.map((word) => word.word)))
+console.log(await service.suggest('befor'))
+service.dispose()
 ```
 
-`tokenizeSpellWords` returns words with their offsets. it skips acronyms, camelCase, urls, paths and anything else shaped like an identifier. `mode: 'code'` splits camelCase and snake_case into words
+## API highlights
 
-## more
+- `SpellcheckService.check()` finds misspelled words.
+- `suggest()` returns corrections.
+- `createSpellcheckPlugin()` marks spelling issues in an editor.
 
-- [limits, failures and benchmarks](docs/engine.md): which words get checked, how worker failures recover, adding languages, reading `bench:engine`
-- `bun run build:dictionaries` rebuilds the dictionary from scowl and cspell word lists
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/spellcheck/overview/)
 
-dictionary sources and the cspell-trie-lib license are in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES)
+## In the Singapore family
+
+You can use this package on its own. `@singapore-editor/core` owns editor views; optional packages add syntax, search, gutters, and language features.
+Use a bundler that serves the package worker and data assets. See the [hosting guide](https://shaulavo.dev/singapore/docs/guides/bundling/).
+
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+
+## License
+
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)
+Dictionary licenses are listed in [THIRD_PARTY_NOTICES](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/spellcheck/THIRD_PARTY_NOTICES).

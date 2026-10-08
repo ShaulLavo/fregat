@@ -1,6 +1,19 @@
 {
   "name": "@singapore-editor/lsp",
   "version": "0.2.6",
+  "description": "A Language Server Protocol client with WebSocket and worker transports.",
+  "keywords": [
+    "browser",
+    "editor",
+    "json-rpc",
+    "lsp",
+    "singapore",
+    "typescript"
+  ],
+  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/lsp/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

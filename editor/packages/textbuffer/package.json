@@ -1,7 +1,19 @@
 {
   "name": "@singapore-editor/textbuffer",
   "version": "0.2.6",
-  "description": "Persistent balanced-tree text buffer with snapshots, stable anchors, and line mapping",
+  "description": "A persistent piece-table text buffer with snapshots, stable anchors, and line mapping.",
+  "keywords": [
+    "browser",
+    "editor",
+    "piece-table",
+    "singapore",
+    "snapshots",
+    "typescript"
+  ],
+  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/textbuffer/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

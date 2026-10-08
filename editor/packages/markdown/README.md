@@ -1,16 +1,19 @@
 # @singapore-editor/markdown
 
-live preview and editing commands for markdown in `@singapore-editor/core`
+Markdown preview and editing commands for the Singapore editor.
 
-the buffer keeps holding markdown. the preview hides the syntax and paints formatted text over it, so `**bold**` shows as **bold**, `# Title` loses its `#`, and links become anchors. put the caret inside a construct and its source comes back for editing. undo, selections, folds, find and anchors all work on the markdown itself
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
 
-## try it
+## Install
 
 ```sh
-npm install @singapore-editor/core @singapore-editor/tree-sitter @singapore-editor/tree-sitter-languages @singapore-editor/markdown
+npm install @singapore-editor/core @singapore-editor/markdown @singapore-editor/tree-sitter @singapore-editor/tree-sitter-languages
 ```
 
+## Usage
+
 ```ts
+import '@singapore-editor/core/style.css'
 import { Editor } from '@singapore-editor/core/editor'
 import { markdown } from '@singapore-editor/tree-sitter-languages'
 import {
@@ -19,7 +22,11 @@ import {
 } from '@singapore-editor/markdown'
 import '@singapore-editor/markdown/style.css'
 
-const editor = new Editor(element, {
+const host = document.createElement('div')
+host.style.height = '400px'
+document.body.append(host)
+
+const editor = new Editor(host, {
   plugins: [markdown(), createMarkdownPreviewPlugin(), createMarkdownAuthoringPlugin()],
 })
 editor.openDocument({
@@ -29,14 +36,19 @@ editor.openDocument({
 })
 ```
 
-both plugins read the markdown grammar's parse, so `markdown()` has to be there too
+## API highlights
 
-`createMarkdownPreviewPlugin({ openLink })` lets the host open link targets through its own navigation. `languageIds` widens it past plain `markdown`
+- `createMarkdownPreviewPlugin()` renders formatted Markdown over the source.
+- `createMarkdownAuthoringPlugin()` adds editing commands.
 
-`createMarkdownAuthoringPlugin()` adds commands for bold, italic, links, lists, tasks, quotes and code. Import `markdownPack` from `@singapore-editor/core/keymap` and pass `keymap: { packs: [...defaultEditorPacks, markdownPack] }` to enable Mod+B, Mod+I, Mod+Shift+K and list indentation with Tab
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/markdown/overview/)
 
-## more
+## In the Singapore family
 
-- [authoring commands](docs/authoring.md): the full list and how they edit
-- [display transforms](../../docs/display/transforms.md), the editor feature the preview paints with
-- `markdownInlineReplacements(text, records, options)` returns the preview's replacements without the plugin
+`@singapore-editor/core` owns the editor view. This optional package adds Markdown display and commands. Choose the other plugins your app needs.
+
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+
+## License
+
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)

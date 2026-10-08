@@ -1,13 +1,20 @@
 {
   "name": "@fregat/react-hotkeys",
   "version": "0.0.3",
-  "description": "React hooks for @fregat/hotkeys. A fork of TanStack React Hotkeys.",
+  "description": "React hooks for registering, recording, and displaying keyboard shortcuts with @fregat/hotkeys.",
   "keywords": [
+    "chords",
     "hotkeys",
+    "keybindings",
     "keyboard",
     "react",
-    "shortcuts"
+    "shortcuts",
+    "typescript"
   ],
+  "homepage": "https://github.com/ShaulLavo/fregat/tree/main/hotkeys",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
