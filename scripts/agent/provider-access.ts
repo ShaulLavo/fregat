@@ -17,7 +17,7 @@ export function providerAccessRefusal({
   if (realProviders || !scenario) return null
   if (scenario.realProviders)
     return `Scenario ${scenario.name} drives a real Codex or Claude account and spends real turns. It runs only when the owner passes --real-providers.`
-  // Reads cannot start a turn, and site and demo pages answer from a static preview or a mock backend.
+  // Reads cannot start a turn, and site pages answer from a static preview.
   if (isolatedServer || scenario.readOnly || scenario.surface) return null
 
   return `Scenario ${scenario.name} would drive a server whose providers are real accounts. Drop --shared-dev and --url so the run gets a throwaway server with fixture providers; only the owner passes --real-providers.`

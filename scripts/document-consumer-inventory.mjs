@@ -140,8 +140,8 @@ function notes(file, category) {
     return 'Word-service worker; carries words, outside document source synchronization'
   if (/apps\/tui\//.test(file))
     return 'Terminal viewer owns separate text; outside Editor buffer runtime'
-  if (/demo-entry|demo\/state\/orchestration|native-watch-host/.test(file))
-    return 'Host/demo messaging; outside document source synchronization'
+  if (/native-watch-host/.test(file))
+    return 'Host messaging; outside document source synchronization'
   if (
     /orchestration\/|features\/chat\/|chat\/commands|command-summary|orchestration-commands/.test(
       file,

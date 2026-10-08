@@ -53,3 +53,10 @@ revision where the original measurements or decisions still matter.
 Keep generated references with their generators, source-specific READMEs beside their packages,
 and raw evidence beside the investigation that uses it. Empty scaffolding and disposable logs
 belong outside tracked documentation.
+
+## Product site
+
+The [Fregat landing page](https://shaulavo.dev/fregat/) uses the Plates animated replica
+shipped in [PR #1012](https://github.com/ShaulLavo/fregat/pull/1012).
+[Plan 155](../plans/155-site-demo-replica.md) records the decision to delete the live-app demo.
+See [production product sites](../scripts/product-sites/README.md) for builds and publishing.
