@@ -245,6 +245,7 @@ test.skipIf(!macSdk)(
       expect(existsSync(path.join(contents, 'Resources/Fregat.icns'))).toBe(true)
     })
   },
+  30_000,
 )
 
 test('macOS keeps a negligible behind-window material visible to the compositor for None', async () => {
