@@ -851,6 +851,107 @@ test('a real fetch error after admission closes still wins before request cancel
   }
 })
 
+test.for(['fulfill', 'continue'] as const)(
+  'forwarding records the $0 action and joins it once',
+  async (kind) => {
+    const owner = createRetentionReloadTransport()
+    const calls: string[] = []
+    await owner.run(
+      'synthetic-forward-action',
+      async (forward) => {
+        await forward(async () => {
+          calls.push(kind)
+        })
+      },
+      async () => {
+        calls.push('abort')
+      },
+      kind,
+    )
+    expect(calls).toEqual([kind])
+    expect(owner.requests[0]).toMatchObject({
+      action: { kind, error: null },
+      terminal: { kind: 'succeeded' },
+      settlement: { kind: 'succeeded', error: null },
+    })
+    owner.stopAdmission()
+    await owner.cancelPending()
+    await owner.drain()
+    expect(calls).toEqual([kind])
+    expect(owner.hasFailure).toBe(false)
+  },
+)
+
+test.for(['operation', 'restoration', 'admission-closed', 'shutdown'] as const)(
+  'native failure after a continue acknowledgement respects $0 ownership',
+  async (phase) => {
+    const owner = createRetentionReloadTransport()
+    const primary = createScriptError('Controlled native request failed', {
+      internal: { phase },
+    })
+    const url = 'synthetic-native-request'
+    if (phase === 'restoration') owner.beginRestoration()
+    await owner.run(
+      url,
+      async (forward) => forward(async () => {}),
+      async () => {},
+      'continue',
+    )
+    owner.failNativeRequest('synthetic-unowned-request', primary)
+    expect(owner.hasFailure).toBe(false)
+    if (phase === 'admission-closed' || phase === 'shutdown') owner.stopAdmission()
+    if (phase === 'shutdown') await owner.cancelPending()
+    owner.failNativeRequest(url, primary)
+    expect(owner.requests[0]).toMatchObject({
+      action: { kind: 'continue', error: null },
+      terminal: { kind: 'succeeded' },
+      settlement: { kind: 'succeeded', error: null },
+    })
+    if (phase === 'shutdown') {
+      expect(await owner.race(Promise.resolve('complete'))).toBe('complete')
+      expect(owner.failures).toEqual([])
+      return
+    }
+    await expect(owner.race(new Promise<never>(() => {}))).rejects.toBe(primary)
+    expect(owner.firstError).toBe(primary)
+    expect(owner.failures).toEqual([
+      expect.objectContaining({ requestId: 1, url, stage: 'native-request' }),
+    ])
+    owner.stopAdmission()
+    await owner.cancelPending()
+    await owner.drain()
+  },
+)
+
+test('native cancellation belongs to earlier requests and leaves later forwarding live', async () => {
+  const owner = createRetentionReloadTransport()
+  const primary = createScriptError('Controlled later native request failed', {
+    internal: { request: 'later' },
+  })
+  const url = 'synthetic-repeated-native-request'
+  const forward = () =>
+    owner.run(
+      url,
+      async (continueRoute) => continueRoute(async () => {}),
+      async () => {},
+      'continue',
+    )
+  await forward()
+  await owner.cancelPending()
+  owner.failNativeRequest(url, primary)
+  expect(owner.hasFailure).toBe(false)
+  expect(owner.requests[0]?.nativeCancellationRequestedAt).toBeTypeOf('number')
+  await forward()
+  owner.failNativeRequest(url, primary)
+  await expect(owner.race(new Promise<never>(() => {}))).rejects.toBe(primary)
+  expect(owner.failures).toEqual([
+    expect.objectContaining({ requestId: 2, url, stage: 'native-request' }),
+  ])
+  owner.stopAdmission()
+  await owner.cancelPending()
+  await owner.drain()
+})
+
 test.for(['abort-pending', 'abort-rejected', 'fulfill-pending'] as const)(
   'terminal action $0 leaves disposal and context close reachable before joining',
   async (mode, { annotate }) => {
