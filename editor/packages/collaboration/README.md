@@ -38,17 +38,23 @@ presence.dispose()
 
 ## Transport status
 
-Transport options accept an optional `onRecovery` callback. Match its scope to the second
-argument of `onError` when tracking outstanding failures:
+Transport options accept an optional `onRecovery` callback. Match all scope arguments
+with `onError` when tracking outstanding failures:
 
 - `BroadcastTransport` reports `send` after a successful channel send and `receive` after
   accepting an authenticated packet for the document. Recovery in one direction clears
   failures in that direction.
-- `WebSocketSignaling` reports the broker URL after a subscription acknowledgement or a
-  published frame from that broker.
+- `WebSocketSignaling` reports `(url, direction)`. A successful publication reports `send`;
+  a subscription acknowledgement or publication received from that broker reports `receive`.
+  Credential, subscription-send, and socket errors use the broker's `send` scope.
 - `WebRTCTransport` reports the remote peer ID when its current data channel opens and the
-  router accepts the link. An authenticated signaling packet reports `undefined` for the
-  transport-wide scope. Peer-scoped failures remain until that peer's link opens again.
+  router accepts the link. Signaling reports `(undefined, 'send')` after publication succeeds
+  and `(undefined, 'receive')` after an authenticated packet is accepted. The matching
+  `onError` arguments include the error first. Peer-scoped failures remain until that peer's
+  link opens again.
+
+Receive recovery preserves outstanding send failures, and send recovery preserves outstanding
+receive failures. A healthy broker or peer leaves failures at other brokers or peers intact.
 
 `WebRTCTransport.onPeerLeft(peer)` reports an authenticated departure. Applications can
 remove that departed peer's outstanding failures. Discovery-record expiry leaves

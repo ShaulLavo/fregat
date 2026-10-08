@@ -145,7 +145,7 @@ test('signaling retries a failed credential request before opening a socket', as
     signaling.start(vi.fn(), vi.fn())
     await vi.advanceTimersByTimeAsync(0)
     expect(socket).not.toHaveBeenCalled()
-    expect(onError).toHaveBeenCalledWith(failure)
+    expect(onError).toHaveBeenCalledWith(failure, 'ws://localhost:12345', 'send')
     await vi.advanceTimersByTimeAsync(100)
     expect(socket).toHaveBeenCalledTimes(1)
     expect(credentials).toHaveBeenCalledTimes(2)

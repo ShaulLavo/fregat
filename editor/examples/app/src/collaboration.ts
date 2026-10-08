@@ -74,16 +74,16 @@ async function mountPeer(
     refreshStatus()
   }
   const transportStatus = (transport: string) => ({
-    onError(error: unknown, target = '') {
+    onError(error: unknown, target = '', direction = '') {
       if (connection?.session.status === 'left') return
-      const key = `${peer}/${transport}/${target}`
+      const key = `${peer}/${transport}/${target}/${direction}`
       failureKeys.add(key)
       failures.delete(key)
       failures.set(key, errorText(error))
       refreshStatus()
     },
-    onRecovery(target = '') {
-      const key = `${peer}/${transport}/${target}`
+    onRecovery(target = '', direction = '') {
+      const key = `${peer}/${transport}/${target}/${direction}`
       failureKeys.delete(key)
       failures.delete(key)
       refreshStatus()

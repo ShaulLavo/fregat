@@ -88,16 +88,16 @@ test('signaling failures and recovery identify the affected broker URL', async (
     signaling.start(receive, vi.fn())
     await expect.poll(() => sockets.length).toBe(2)
     sockets[0]!.onerror?.()
-    expect(onError).toHaveBeenCalledWith(expect.any(TypeError), sockets[0]!.url)
+    expect(onError).toHaveBeenCalledWith(expect.any(TypeError), sockets[0]!.url, 'send')
     const subscribed = { data: JSON.stringify({ type: 'subscribed', topic: room }) }
     sockets[1]!.onmessage?.(subscribed)
-    expect(onRecovery).toHaveBeenCalledExactlyOnceWith(sockets[1]!.url)
+    expect(onRecovery).toHaveBeenCalledExactlyOnceWith(sockets[1]!.url, 'receive')
     sockets[0]!.onmessage?.(subscribed)
-    expect(onRecovery).toHaveBeenLastCalledWith(sockets[0]!.url)
+    expect(onRecovery).toHaveBeenLastCalledWith(sockets[0]!.url, 'receive')
     sockets[0]!.onmessage?.({ data: '{' })
-    expect(onError).toHaveBeenLastCalledWith(expect.any(SyntaxError), sockets[0]!.url)
+    expect(onError).toHaveBeenLastCalledWith(expect.any(SyntaxError), sockets[0]!.url, 'receive')
     sockets[0]!.onmessage?.({ data: JSON.stringify({ type: 'publish', topic: room, payload: {} }) })
-    expect(onRecovery).toHaveBeenLastCalledWith(sockets[0]!.url)
+    expect(onRecovery).toHaveBeenLastCalledWith(sockets[0]!.url, 'receive')
     expect(receive).toHaveBeenCalledExactlyOnceWith({})
   } finally {
     signaling.close()
@@ -161,7 +161,9 @@ test('WebRTC recovery and departure identify the failed link and fence its old c
     announceInterval: 100_000,
     connectionTimeout: 200_000,
     onError,
-    onRecovery,
+    onRecovery(peer) {
+      if (peer !== undefined) onRecovery(peer)
+    },
     onPeerLeft,
   })
   const discoveryClock = interval.mock.calls.at(-1)![0] as () => void

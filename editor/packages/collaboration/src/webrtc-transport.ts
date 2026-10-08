@@ -16,8 +16,8 @@ export interface WebRTCTransportOptions<E extends EditEnvelope> {
   }
   readonly announceInterval: number
   readonly connectionTimeout: number
-  readonly onError: (error: unknown, peer?: string) => void
-  readonly onRecovery?: (peer?: string) => void
+  readonly onError: (error: unknown, peer?: string, direction?: 'send' | 'receive') => void
+  readonly onRecovery?: (peer?: string, direction?: 'send' | 'receive') => void
   readonly onPeerLeft?: (peer: string) => void
 }
 
@@ -107,7 +107,7 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
         this.inbound = this.inbound
           .then(() => this.receive(packet))
           .catch(async (error) => {
-            options.onError(error)
+            options.onError(error, undefined, 'receive')
             if (error instanceof DuplicatePeerSessionError) await this.close()
           })
           .finally(() => {
@@ -171,9 +171,11 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
     this.outbound = this.outbound
       .then(async () => {
         const packet = await this.options.crypto.seal(generation, payload)
-        if (!this.closed) this.options.signaling.publish(packet)
+        if (this.closed) return
+        this.options.signaling.publish(packet)
+        this.options.onRecovery?.(undefined, 'send')
       })
-      .catch(this.options.onError)
+      .catch((error) => this.options.onError(error, undefined, 'send'))
   }
 
   private async receive(input: unknown): Promise<void> {
@@ -186,7 +188,7 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
       opened.payload.document !== this.options.router.identity.document
     )
       return
-    this.options.onRecovery?.()
+    this.options.onRecovery?.(undefined, 'receive')
     const { sender, generation } = opened.packet
     const payload = opened.payload
     if (payload.type === 'leave') {
