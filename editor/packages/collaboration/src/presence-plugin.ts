@@ -78,6 +78,8 @@ class PresenceView implements EditorViewContribution {
 
   private scheduleUpdate(): void {
     if (this.frame !== undefined) return
+    // @justification Remote presence changes between editor updates; one frame coalesces its
+    // notifications into a paint, and disposal cancels the pending frame.
     this.frame = window.requestAnimationFrame(() => {
       this.frame = undefined
       this.context.requestViewUpdate()
@@ -110,6 +112,8 @@ class PresenceView implements EditorViewContribution {
       if (expires > now) next = Math.min(next, expires)
     }
     if (!Number.isFinite(next)) return
+    // @justification Peer events cannot signal elapsed idle time; each view keeps one deadline
+    // for the next visible name's idle transition, and clear or disposal cancels it.
     this.labelDeadline = window.setTimeout(
       () => {
         this.labelDeadline = undefined

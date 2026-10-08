@@ -171,6 +171,22 @@
       "snippet": "this.timer = setInterval(() => {"
     },
     {
+      "api": "requestAnimationFrame",
+      "file": "packages/collaboration/src/presence-plugin.ts",
+      "id": "packages/collaboration/src/presence-plugin.ts:requestAnimationFrame:9b743b037a",
+      "justification": "Remote presence changes between editor updates; one frame coalesces its notifications into a paint, and disposal cancels the pending frame.",
+      "line": 83,
+      "snippet": "this.frame = window.requestAnimationFrame(() => {"
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/collaboration/src/presence-plugin.ts",
+      "id": "packages/collaboration/src/presence-plugin.ts:setTimeout:e13f563da7",
+      "justification": "Peer events cannot signal elapsed idle time; each view keeps one deadline for the next visible name's idle transition, and clear or disposal cancels it.",
+      "line": 117,
+      "snippet": "this.labelDeadline = window.setTimeout("
+    },
+    {
       "api": "setTimeout",
       "file": "packages/collaboration/src/signaling.ts",
       "id": "packages/collaboration/src/signaling.ts:setTimeout:2fa18ecddb",
