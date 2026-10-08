@@ -54,9 +54,15 @@ export async function resolveCollaborationOptions(
   const colour = values['editor.collaboration.colour']
   if (!displayName.trim() || !colour) throw collaborationConfigurationError('presence')
 
-  const token = await readSecret(secrets, COLLABORATION_ADMISSION_TOKEN_REF)
-  if (!token || !/^[a-z\d_-]{43,128}$/i.test(token))
-    throw collaborationConfigurationError('admission')
+  const admission: WebSocketSignalingOptions['credentials']['protocols'] = async (signal) => {
+    signal.throwIfAborted()
+    const token = await readSecret(secrets, COLLABORATION_ADMISSION_TOKEN_REF)
+    signal.throwIfAborted()
+    if (!token || !/^[a-z\d_-]{43,128}$/i.test(token))
+      throw collaborationConfigurationError('admission')
+    return [token]
+  }
+  await admission(new AbortController().signal)
 
   const turn = async (_peer: string, signal: AbortSignal): Promise<readonly RTCIceServer[]> => {
     signal.throwIfAborted()
@@ -72,8 +78,8 @@ export async function resolveCollaborationOptions(
   // Read again per connection so a renewed TURN password takes effect on the next handshake.
   if (turnUrls.length > 0) await turn('', new AbortController().signal)
 
-  return {
-    signaling: { urls, credentials: { protocols: [token] } },
+  const resolved: ResolvedCollaborationOptions = {
+    signaling: { urls, credentials: { protocols: admission } },
     transport: {
       iceServers: iceUrls.filter((url) => /^stuns?:/i.test(url)).map((url) => ({ urls: url })),
       transportPolicy: transportPolicy === 'relay-only' ? 'relay' : 'all',
@@ -81,6 +87,11 @@ export async function resolveCollaborationOptions(
     },
     presence: { displayName, colour },
   }
+  // Credential capabilities stay local: snapshots and log serializers see configuration only.
+  Object.defineProperty(resolved.signaling.credentials, 'protocols', { enumerable: false })
+  if (turnUrls.length > 0)
+    Object.defineProperty(resolved.transport.credentials, 'turn', { enumerable: false })
+  return resolved
 }
 
 async function readSecret(secrets: CollaborationSecretReader, ref: CollaborationSecretRef) {

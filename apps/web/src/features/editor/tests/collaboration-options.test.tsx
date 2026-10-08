@@ -89,19 +89,22 @@ test('real settings and secret stores resolve the plugin and adapter options', a
   try {
     writeBootMirror(settings.snapshot().values)
     const resolved = await resolveCollaborationOptions(settings)
-    expect(resolved.signaling).toEqual({
-      urls: configured['editor.collaboration.signalingUrls'],
-      credentials: { protocols: [admissionToken] },
-    })
+    expect(resolved.signaling.urls).toEqual(configured['editor.collaboration.signalingUrls'])
     expect(resolved.presence).toEqual({ displayName: 'Test participant', colour: '#5684ff' })
     expect(resolved.transport.iceServers).toEqual([{ urls: 'stun:stun.example.test:3478' }])
     expect(resolved.transport.transportPolicy).toBe('relay')
+    expect({ ...resolved.signaling }.credentials.protocols).toBe(
+      resolved.signaling.credentials.protocols,
+    )
+    expect({ ...resolved.transport }.credentials.turn).toBe(resolved.transport.credentials.turn)
     const signal = new AbortController().signal
+    expect(await resolved.signaling.credentials.protocols(signal)).toEqual([admissionToken])
     expect(await resolved.transport.credentials.turn!('peer', signal)).toEqual([
       { urls: turnUrl, username: 'fixture-user', credential: 'fixture-password' },
     ])
     await secrets.write(
       new Map([
+        [COLLABORATION_ADMISSION_TOKEN_REF, 'renewed_broker_admission_token_01234567890123456789'],
         [
           COLLABORATION_TURN_CREDENTIALS_REF,
           JSON.stringify({
@@ -113,16 +116,29 @@ test('real settings and secret stores resolve the plugin and adapter options', a
     expect(await resolved.transport.credentials.turn!('peer', signal)).toEqual([
       { urls: turnUrl, username: 'renewed-user', credential: 'renewed-password' },
     ])
+    expect(await resolved.signaling.credentials.protocols(signal)).toEqual([
+      'renewed_broker_admission_token_01234567890123456789',
+    ])
     const aborted = new AbortController()
     aborted.abort()
     await expect(
       resolved.transport.credentials.turn!('peer', aborted.signal),
     ).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(resolved.signaling.credentials.protocols(aborted.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    })
     const raw = await client.settings.raw.get({ query: { target: 'user' } })
     const serialized = JSON.stringify(raw.data)
     const mirrored = localStorage.getItem(BOOT_MIRROR_KEY)!
     expect(raw.error).toBeNull()
-    for (const secret of [admissionToken, 'fixture-user', 'fixture-password', 'renewed-password']) {
+    for (const secret of [
+      admissionToken,
+      'renewed_broker_admission_token_01234567890123456789',
+      'fixture-user',
+      'fixture-password',
+      'renewed-user',
+      'renewed-password',
+    ]) {
       expect(serialized).not.toContain(secret)
       expect(mirrored).not.toContain(secret)
       expect(JSON.stringify(settings.snapshot())).not.toContain(secret)
@@ -151,6 +167,11 @@ test.for(['JSON', 'structuredClone', 'evlog'])(
     try {
       writeBootMirror(configured)
       const resolved = await resolveCollaborationOptions(settings)
+      const signal = new AbortController().signal
+      expect(await resolved.signaling.credentials.protocols(signal)).toEqual([admissionToken])
+      expect(await resolved.transport.credentials.turn!('peer', signal)).toEqual([
+        { urls: turnUrl, username: 'fixture-user', credential: 'fixture-password' },
+      ])
       let serialized: string
       if (format === 'evlog') {
         const events: Record<string, unknown>[] = []

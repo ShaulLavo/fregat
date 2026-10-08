@@ -9,13 +9,16 @@ export interface SignalingClient {
 export interface WebSocketSignalingOptions {
   readonly urls: readonly string[]
   readonly room: string
-  readonly credentials: { readonly protocols: readonly string[] }
+  readonly credentials: {
+    readonly protocols: (signal: AbortSignal) => readonly string[] | Promise<readonly string[]>
+  }
   readonly reconnectInterval: number
   readonly onError: (error: unknown) => void
 }
 
 export class WebSocketSignaling implements SignalingClient {
   private readonly sockets = new Map<string, WebSocket>()
+  private readonly pending = new Map<string, AbortController>()
   private readonly retries = new Map<string, ReturnType<typeof setTimeout>>()
   private callbacks: { receive: (packet: unknown) => void; ready: () => void } | undefined
   private closed = false
@@ -33,7 +36,7 @@ export class WebSocketSignaling implements SignalingClient {
   start(receive: (packet: unknown) => void, ready: () => void): void {
     if (this.closed || this.callbacks) throw new TypeError('Signaling client can be started once')
     this.callbacks = { receive, ready }
-    for (const url of new Set(this.options.urls)) this.connect(url)
+    for (const url of new Set(this.options.urls)) void this.connect(url)
   }
 
   publish(packet: SealedPacket): void {
@@ -53,18 +56,34 @@ export class WebSocketSignaling implements SignalingClient {
 
   close(): void {
     this.closed = true
+    for (const abort of this.pending.values()) abort.abort()
+    this.pending.clear()
     for (const retry of this.retries.values()) clearTimeout(retry)
     this.retries.clear()
     for (const socket of this.sockets.values()) socket.close()
     this.sockets.clear()
   }
 
-  private connect(url: string): void {
+  private async connect(url: string): Promise<void> {
     if (this.closed) return
     this.retries.delete(url)
-    const socket = new WebSocket(url, [
-      ...new Set(['singapore-collaboration', ...this.options.credentials.protocols]),
-    ])
+    const abort = new AbortController()
+    this.pending.set(url, abort)
+    try {
+      const protocols = await this.options.credentials.protocols(abort.signal)
+      if (abort.signal.aborted) return
+      this.openSocket(url, protocols)
+    } catch (error) {
+      if (abort.signal.aborted) return
+      this.options.onError(error)
+      this.reconnect(url)
+    } finally {
+      this.pending.delete(url)
+    }
+  }
+
+  private openSocket(url: string, protocols: readonly string[]): void {
+    const socket = new WebSocket(url, [...new Set(['singapore-collaboration', ...protocols])])
     this.sockets.set(url, socket)
     socket.onopen = () =>
       socket.send(JSON.stringify({ type: 'subscribe', topic: this.options.room }))
@@ -82,13 +101,17 @@ export class WebSocketSignaling implements SignalingClient {
     socket.onerror = () => this.options.onError(new TypeError('Signaling connection failed'))
     socket.onclose = () => {
       this.sockets.delete(url)
-      if (!this.closed)
-        this.retries.set(
-          url,
-          // @justification Remote broker readiness has no notification; one retry per URL spaces
-          // reconnect attempts, connect checks closed, and close clears every pending retry.
-          setTimeout(() => this.connect(url), this.options.reconnectInterval),
-        )
+      this.reconnect(url)
     }
+  }
+
+  private reconnect(url: string): void {
+    if (this.closed) return
+    this.retries.set(
+      url,
+      // @justification Remote broker readiness has no notification; one retry per URL spaces
+      // reconnect attempts, connect checks closed, and close clears every pending retry.
+      setTimeout(() => void this.connect(url), this.options.reconnectInterval),
+    )
   }
 }
