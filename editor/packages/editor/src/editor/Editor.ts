@@ -803,7 +803,7 @@ export class Editor {
     })
     this.view.onReservedOverlayWidthChange((side) => this.notifyReservedWidth(side))
     this.viewContributions = new EditorViewContributionController(
-      this.createInitialViewContributions(this.pluginHost.getViewContributionProviders()),
+      [],
       () => this.createViewSnapshot(),
       (_contribution, phase, error) => this.logContributionFailure('view', phase, error),
       () => {
@@ -876,6 +876,8 @@ export class Editor {
     this.inputSelection.install()
     this.setSnapshot(options.snapshot ?? null, options.documentKey ?? null)
     this.initializeDefaultText()
+    for (const provider of this.pluginHost.getViewContributionProviders())
+      this.addViewContributionProvider(provider)
     this.setRangeDecorations(options.rangeDecorations ?? [])
     const mountDurationMs = nowMs() - mountStart
     recordEditorMountTiming(mountDurationMs)
@@ -2724,21 +2726,6 @@ export class Editor {
 
   private currentSessionDocumentId(): string {
     return this.document.currentSessionDocumentId()
-  }
-
-  private createInitialViewContributions(
-    providers: readonly EditorViewContributionProvider[],
-  ): EditorViewContribution[] {
-    const contributions: EditorViewContribution[] = []
-    for (const provider of providers) {
-      const contribution = this.createViewContribution(provider)
-      if (!contribution) continue
-
-      contributions.push(contribution)
-      this.viewContributionsByProvider.set(provider, contribution)
-    }
-
-    return contributions
   }
 
   private addViewContributionProvider(provider: EditorViewContributionProvider): void {

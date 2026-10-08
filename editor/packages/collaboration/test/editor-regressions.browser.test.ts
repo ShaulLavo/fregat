@@ -6,7 +6,7 @@ import {
   acquireDocumentMutationLease,
   releaseDocumentMutationLease,
   prepareDocumentTransaction,
-} from '../../editor/src/documentSession'
+} from '@singapore-editor/core/document'
 import { CollaborationDocument } from '../src/document'
 import { createCollaborationPlugin } from '../src/plugin'
 import { EditorRoom } from './editor-fixture'

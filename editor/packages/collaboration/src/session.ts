@@ -275,7 +275,17 @@ export class Session<E extends EditEnvelope> {
     }
   }
 
-  leave(successor: string): void {
+  leave(successor?: string): void {
+    if (this.status === 'left') return
+    if (successor === undefined) {
+      for (const observer of this.presenceObservers) observer.leave(this.peer)
+      this.departure = this.peer
+      if (this.pending.size === 0) {
+        this.broadcast('LEAVE', { successor: null })
+        this.completeDeparture()
+      }
+      return
+    }
     if (!this.isHost || !this.members.has(successor) || successor === this.peer)
       throw new TypeError('Handoff needs a connected successor and a stable host')
     for (const observer of this.presenceObservers) observer.leave(this.peer)
@@ -328,6 +338,12 @@ export class Session<E extends EditEnvelope> {
 
   private resumeDeparture(): void {
     if (!this.departure || this.phase.kind !== 'stable' || !this.host) return
+    if (this.departure === this.peer) {
+      if (this.pending.size) return
+      this.broadcast('LEAVE', { successor: null })
+      this.completeDeparture()
+      return
+    }
     if (this.isHost) {
       const successor = this.members.has(this.departure)
         ? this.departure
@@ -415,15 +431,15 @@ export class Session<E extends EditEnvelope> {
     const { round, offers } = this.phase
     if (round.roster.some((peer) => !offers.has(peer))) return
     const entries = round.roster.map((peer) => ({ peer, branch: offers.get(peer)!.branch }))
-    if (entries.some((entry) => !this.histories.has(tipKey(entry.branch.tip)))) return
-    const histories = entries.map((entry) => this.histories.get(tipKey(entry.branch.tip))!)
+    if (entries.some((entry) => !this.historyAt(entry.branch.tip))) return
+    const histories = entries.map((entry) => this.historyAt(entry.branch.tip)!)
     const linear = inOneLineage(histories)
     const sorted = entries.toSorted((a, b) => {
       if (linear) return b.branch.tip.depth - a.branch.tip.depth || compareIds(a.peer, b.peer)
       return compareBranches(a.branch, b.branch) || compareIds(a.peer, b.peer)
     })
     const winner = sorted[0]!
-    const base = this.histories.get(tipKey(winner.branch.tip))!
+    const base = this.historyAt(winner.branch.tip)!
     const represented = new Set(base.map((record) => editKey(record.id)))
     const replay = new Map<string, E>()
     for (const history of histories) {
@@ -465,7 +481,7 @@ export class Session<E extends EditEnvelope> {
   }
 
   private tryCommit(): void {
-    if (!this.commitWaiting || !this.histories.has(tipKey(this.commitWaiting.base.tip))) return
+    if (!this.commitWaiting || !this.historyAt(this.commitWaiting.base.tip)) return
     if (!this.validCommit(this.commitWaiting)) {
       this.commitWaiting = undefined
       return
@@ -477,10 +493,10 @@ export class Session<E extends EditEnvelope> {
   private installCommit(commit: Commit<E>): void {
     const engine = this.options.engine
     const old = engine.exportHistory(this.options.genesis)!
-    const base = this.histories.get(tipKey(commit.base.tip))!
+    const base = this.historyAt(commit.base.tip)!
     if (!sameTip(this.branch.tip, commit.base.tip))
       this.archives.push({ branch: this.branch, history: old })
-    engine.install(base)
+    engine.install(base, commit.replay)
     for (const edit of engine.uniquePending(old)) this.pending.set(editKey(edit.id), edit)
     for (const edit of commit.replay) this.pending.set(editKey(edit.id), edit)
     this.settlePending()
@@ -574,7 +590,7 @@ export class Session<E extends EditEnvelope> {
     if (this.phase.kind !== 'stable' || !this.compatibleMembership()) return
     if (this.lastHandoff?.branch.authority.host === peer) return
     if (!sameAuthority(this.authority, branch.authority)) {
-      const history = this.histories.get(tipKey(branch.tip))
+      const history = this.historyAt(branch.tip)
       if (!history) return
       // Retired branches already absorbed into the base or replay cannot reopen reconciliation.
       if (
@@ -592,7 +608,7 @@ export class Session<E extends EditEnvelope> {
   }
 
   private sync(branch: Branch): void {
-    const history = this.histories.get(tipKey(branch.tip))
+    const history = this.historyAt(branch.tip)
     if (!history) return
     const engine = this.options.engine
     const own = engine.exportHistory(this.options.genesis)!
@@ -714,16 +730,35 @@ export class Session<E extends EditEnvelope> {
 
   private rememberLocal(): void {
     const history = this.options.engine.exportHistory(this.options.genesis)!
-    this.histories.set(tipKey(this.branch.tip), history)
+    this.rememberHistory(this.branch.tip, history)
+  }
+
+  private historyAt(tip: Checkpoint): readonly Confirmation<E>[] | undefined {
+    const exact = this.histories.get(tipKey(tip))
+    if (exact) return exact
+    for (const history of this.histories.values()) {
+      const point = tip.depth === 0 ? this.options.genesis : history[tip.depth - 1]
+      if (point && sameTip(point, tip)) return history.slice(0, tip.depth)
+    }
+  }
+
+  private rememberHistory(tip: Checkpoint, history: readonly Confirmation<E>[]): void {
+    if (this.historyAt(tip)) return
+    for (const [key, retained] of this.histories) {
+      const last = retained.at(-1) ?? this.options.genesis
+      const point = last.depth === 0 ? this.options.genesis : history[last.depth - 1]
+      if (point && sameTip(point, last)) this.histories.delete(key)
+    }
+    this.histories.set(tipKey(tip), history)
   }
 
   private request(peer: string, tip: Checkpoint): void {
-    if (this.histories.has(tipKey(tip)) || peer === this.peer) return
+    if (this.historyAt(tip) || peer === this.peer) return
     this.send(peer, 'HISTORY_REQUEST', { tip, from: this.options.genesis })
   }
 
   private exportTo(peer: string, payload: Payloads<E>['HISTORY_REQUEST']): void {
-    const history = this.histories.get(tipKey(payload.tip))
+    const history = this.historyAt(payload.tip)
     if (!history || !sameTip(payload.from, this.options.genesis)) return
     const size = this.options.historyChunkRecords
     const count = Math.max(1, Math.ceil(history.length / size))
@@ -752,7 +787,7 @@ export class Session<E extends EditEnvelope> {
     const history = Array.from({ length: payload.count }, (_, index) => chunks.get(index)!).flat()
     this.chunks.delete(key)
     if (!this.options.engine.verify(history, payload.tip)) return
-    this.histories.set(tipKey(payload.tip), history)
+    this.rememberHistory(payload.tip, history)
     this.finishRound()
     this.tryCommit()
     this.tryHandoff()
@@ -800,10 +835,10 @@ export class Session<E extends EditEnvelope> {
   private tryHandoff(): void {
     const handoff = this.incomingHandoff
     if (!handoff) return
-    const history = this.histories.get(tipKey(handoff.branch.tip))
+    const history = this.historyAt(handoff.branch.tip)
     if (!history) return
     const old = this.options.engine.exportHistory(this.options.genesis)!
-    this.options.engine.install(history)
+    this.options.engine.install(history, handoff.pending)
     this.settlePending()
     for (const edit of this.options.engine.uniquePending(old)) this.submit(edit)
     for (const edit of handoff.pending) this.submit(edit)

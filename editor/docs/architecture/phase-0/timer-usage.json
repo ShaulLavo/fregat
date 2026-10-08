@@ -7,7 +7,7 @@
       "file": "examples/app/src/collaboration.ts",
       "id": "examples/app/src/collaboration.ts:setInterval:f2c35bb1c2",
       "justification": "Session roles change outside editor events; this small status clock is cleared on departure and page teardown.",
-      "line": 118,
+      "line": 130,
       "snippet": "const timer = setInterval(() => {"
     },
     {
@@ -181,10 +181,10 @@
     {
       "api": "setInterval",
       "file": "packages/collaboration/src/plugin.ts",
-      "id": "packages/collaboration/src/plugin.ts:setInterval:fc4d38db09",
+      "id": "packages/collaboration/src/plugin.ts:setInterval:7071949d81",
       "justification": "The protocol needs elapsed time for failure detection; this opt-in clock is configurable, manual in simulations, and cleared when its view detaches.",
-      "line": 198,
-      "snippet": "const timer = setInterval("
+      "line": 215,
+      "snippet": "timer = setInterval("
     },
     {
       "api": "requestAnimationFrame",

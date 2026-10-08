@@ -35,7 +35,7 @@ export interface DocumentEngine<E extends EditEnvelope> {
   apply(record: Confirmation<E>): boolean
   exportHistory(from: Checkpoint): readonly Confirmation<E>[] | undefined
   verify(history: readonly Confirmation<E>[], tip: Checkpoint): boolean
-  install(history: readonly Confirmation<E>[]): void
+  install(history: readonly Confirmation<E>[], recovered?: readonly E[]): void
   uniquePending(history: readonly Confirmation<E>[]): readonly E[]
 }
 

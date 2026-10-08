@@ -31,14 +31,7 @@ const fragment = new URLSearchParams(location.hash.slice(1))
 const linked = fragment.has('room') && fragment.has('secret')
 if (linked) start.textContent = 'Join session'
 
-type Peer = {
-  readonly editor: Editor
-  readonly connection: CollaborationConnection
-  readonly broadcast: BroadcastTransport<Envelope>
-  readonly rtc?: WebRTCTransport<Envelope>
-  readonly timer: ReturnType<typeof setInterval>
-}
-const mounted: Peer[] = []
+const mounted: (() => Promise<void>)[] = []
 
 function report(error: unknown): void {
   status.textContent = error instanceof Error ? error.message : 'The connection failed.'
@@ -54,86 +47,110 @@ async function mountPeer(
   transportPolicy: RTCIceTransportPolicy,
 ): Promise<void> {
   const peer = crypto.randomUUID()
-  const roomCrypto = await RoomCrypto.create(room, peer, secret)
-  const panel = document.createElement('article')
-  panel.className = 'peer'
-  const header = document.createElement('div')
-  header.className = 'peer-header'
-  const label = document.createElement('strong')
-  label.textContent = name
-  const state = document.createElement('span')
-  const leave = document.createElement('button')
-  leave.textContent = 'Leave session'
-  const element = document.createElement('div')
-  element.className = 'peer-editor'
-  element.setAttribute('aria-label', `${name} editor`)
-  header.append(label, state, leave)
-  panel.append(header, element)
-  peers.append(panel)
-  let connection!: CollaborationConnection
-  let router: TransportRouter<Envelope> | undefined
-  const editor = new Editor(element, {
-    defaultText: initialText,
-    wordWrap: true,
-    plugins: [
-      createCollaborationPlugin({
-        session: { peer, room, document: 'example-document', epoch: room, text: initialText },
-        presence: { displayName: name, colour: name === 'Peer one' ? '#a8ddc4' : '#e8be82' },
-        transport: { send: (target, message) => router?.send(target, message) },
-        onReady: (ready) => {
-          connection = ready
-        },
-      }),
-    ],
-  })
-  router = new TransportRouter({ room, document: 'example-document', peer }, connection.session)
-  const broadcast = new BroadcastTransport({
-    router,
-    crypto: roomCrypto,
-    heartbeatInterval: 500,
-    peerTimeout: 2000,
-    onError: report,
-  })
-  const rtc = urls.length
-    ? new WebRTCTransport({
-        router,
-        crypto: roomCrypto,
-        signaling: new WebSocketSignaling({
-          urls,
-          room,
-          credentials: { protocols: signalingProtocols },
-          reconnectInterval: 1000,
-          onError: report,
-        }),
-        iceServers,
-        transportPolicy,
-        credentials: {},
-        announceInterval: 1000,
-        connectionTimeout: 10_000,
+  const signalingClient = urls.length
+    ? new WebSocketSignaling({
+        urls,
+        room,
+        credentials: { protocols: signalingProtocols },
+        reconnectInterval: 1000,
         onError: report,
       })
     : undefined
-  // @justification Session roles change outside editor events; this small status clock
-  // is cleared on departure and page teardown.
-  const timer = setInterval(() => {
-    const session = connection.session
-    const role = session.isHost ? 'Ordering host' : 'Participant'
-    state.textContent =
-      session.status === 'stable' ? `${role} · ${session.members.size} peers` : session.status
-    if (session.status !== 'left') return
-    clearInterval(timer)
-    editor.setPlugins([])
-    leave.disabled = true
-    void broadcast.close().catch(report)
-    void rtc?.close().catch(report)
-  }, 100)
-  leave.addEventListener('click', () => {
-    const successor = [...connection.session.members].filter((id) => id !== peer).sort()[0]
-    if (!successor) return
-    connection.session.leave(successor)
-    leave.disabled = true
-  })
-  mounted.push({ editor, connection, broadcast, rtc, timer })
+  const cleanups: (() => void | Promise<void>)[] = []
+  const dispose = async () => {
+    await Promise.allSettled(
+      cleanups
+        .splice(0)
+        .reverse()
+        .map((cleanup) => Promise.resolve().then(cleanup)),
+    )
+  }
+  mounted.push(dispose)
+  if (signalingClient) cleanups.push(() => signalingClient.close())
+  try {
+    const roomCrypto = await RoomCrypto.create(room, peer, secret)
+    const panel = document.createElement('article')
+    panel.className = 'peer'
+    const header = document.createElement('div')
+    header.className = 'peer-header'
+    const label = document.createElement('strong')
+    label.textContent = name
+    const state = document.createElement('span')
+    const leave = document.createElement('button')
+    leave.textContent = 'Leave session'
+    const element = document.createElement('div')
+    element.className = 'peer-editor'
+    element.setAttribute('aria-label', `${name} editor`)
+    header.append(label, state, leave)
+    panel.append(header, element)
+    peers.append(panel)
+    cleanups.push(() => panel.remove())
+    let connection!: CollaborationConnection
+    let router: TransportRouter<Envelope> | undefined
+    const editor = new Editor(element, {
+      defaultText: initialText,
+      wordWrap: true,
+      plugins: [
+        createCollaborationPlugin({
+          session: { peer, room, document: 'example-document', epoch: room, text: initialText },
+          presence: { displayName: name, colour: name === 'Peer one' ? '#a8ddc4' : '#e8be82' },
+          transport: { send: (target, message) => router?.send(target, message) },
+          onReady: (ready) => {
+            connection = ready
+          },
+        }),
+      ],
+    })
+    cleanups.push(() => editor.dispose())
+    router = new TransportRouter({ room, document: 'example-document', peer }, connection.session)
+    const broadcast = new BroadcastTransport({
+      router,
+      crypto: roomCrypto,
+      heartbeatInterval: 500,
+      peerTimeout: 2000,
+      onError: report,
+    })
+    cleanups.push(() => broadcast.close())
+    const rtc = signalingClient
+      ? new WebRTCTransport({
+          router,
+          crypto: roomCrypto,
+          signaling: signalingClient,
+          iceServers,
+          transportPolicy,
+          credentials: {},
+          announceInterval: 1000,
+          connectionTimeout: 10_000,
+          onError: report,
+        })
+      : undefined
+    if (rtc) cleanups.push(() => rtc.close())
+    // @justification Session roles change outside editor events; this small status clock
+    // is cleared on departure and page teardown.
+    const timer = setInterval(() => {
+      const session = connection.session
+      const role = session.isHost ? 'Ordering host' : 'Participant'
+      state.textContent =
+        session.status === 'stable' ? `${role} · ${session.members.size} peers` : session.status
+      if (session.status !== 'left') return
+      clearInterval(timer)
+      editor.setPlugins([])
+      leave.disabled = true
+      void broadcast.close().catch(report)
+      void rtc?.close().catch(report)
+    }, 100)
+    leave.addEventListener('click', () => {
+      const successor = [...connection.session.members].filter((id) => id !== peer).sort()[0]
+      connection.session.leave(connection.session.isHost ? successor : undefined)
+      leave.disabled = true
+    })
+    cleanups.push(() => clearInterval(timer))
+  } catch (error) {
+    await dispose()
+    const index = mounted.indexOf(dispose)
+    if (index >= 0) mounted.splice(index, 1)
+    throw error
+  }
 }
 
 form.addEventListener('submit', (event) => {
@@ -191,14 +208,7 @@ async function begin(): Promise<void> {
 }
 
 async function close(): Promise<void> {
-  await Promise.allSettled(
-    mounted.splice(0).map(async (peer) => {
-      clearInterval(peer.timer)
-      peer.editor.dispose()
-      await peer.broadcast.close()
-      await peer.rtc?.close()
-    }),
-  )
+  await Promise.allSettled(mounted.splice(0).map((dispose) => dispose()))
 }
 window.addEventListener('pagehide', () => {
   void close()

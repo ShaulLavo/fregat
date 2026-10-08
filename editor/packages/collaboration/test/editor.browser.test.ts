@@ -215,7 +215,9 @@ test('switching documents releases collaborative commands and preserves native h
   expect(room.editors[0]!.getTextSnapshot().materializeFullText()).toBe('own')
   room.editors[0]!.dispatchCommand('redo')
   expect(room.editors[0]!.getTextSnapshot().materializeFullText()).toBe('own history')
-  expect(room.connections[0]!.document.engine.text()).toBe('shared remote')
+  expect(room.connections[0]!.session.status).toBe('left')
+  expect(room.connections[0]!.document.engine.text()).toBe('shared')
+  expect(room.connections[1]!.document.engine.text()).toBe('shared remote')
 })
 
 test('unattached collaboration and inert extensions leave native history and typing untouched', () => {

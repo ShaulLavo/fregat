@@ -5,11 +5,14 @@ import {
   type EditorInput,
   type EditorPlugin,
 } from '@singapore-editor/core/extensions'
-import type { Envelope } from '@singapore-editor/collab'
+import { CollabFailure, type Envelope } from '@singapore-editor/collab'
 import type { Editor } from '@singapore-editor/core/editor'
 import {
   createPieceTableSnapshot,
   snapBatchEditRanges,
+  readPieceTableTextRange,
+  type PieceTableSnapshot,
+  type PieceTableEdit,
   charIdAt,
   locateCharId,
 } from '@singapore-editor/textbuffer'
@@ -60,72 +63,86 @@ export function createCollaborationPlugin(options: CollaborationPluginOptions): 
         historyChunkRecords: 64,
         ...options.timing,
       })
-      const documentId = scope.editor.getState().documentId
-      const attached = () => scope.editor.getState().documentId === documentId
+      let timer: ReturnType<typeof setInterval> | undefined
       let authoring = false
+      const authored: Envelope[] = []
+      const author: Parameters<typeof scope.authorEdits>[0] = Object.assign(
+        (
+          before: PieceTableSnapshot,
+          edits: readonly PieceTableEdit[],
+          capture?: { readonly history?: 'record' | 'skip' },
+        ) => {
+          const batch = identityEdits(before, edits)
+            .filter((edit) => edit.from !== edit.to || edit.text)
+            .toSorted((a, b) => b.from - a.from || b.to - a.to)
+          authoring = true
+          try {
+            const envelopes = participant.localBatch(
+              batch.map((edit) => ({
+                offset: edit.from,
+                deleteCount: edit.to - edit.from,
+                text: edit.text,
+              })),
+              { history: capture?.history !== 'skip' },
+            )
+            authored.push(...envelopes)
+            return document.engine.snapshot().buffer
+          } finally {
+            authoring = false
+          }
+        },
+        {
+          canUndo: () => participant.undoManager.canUndo,
+          canRedo: () => participant.undoManager.canRedo,
+        },
+      )
+      // Claim the document before any bootstrap reconciliation can mutate a shared buffer.
+      const registration = scope.authorEdits(author)
+      const buffer = scope.editor.getBufferSession()!.buffer
+      const attached = () => scope.editor.getBufferSession()?.buffer === buffer
       const unsubscribe = participant.subscribe(({ edits }) => {
         if (authoring || !attached()) return
         scope.reconcile(document.engine.snapshot().buffer, [], { origin: 'remote', edits })
       })
       scope.onDispose(unsubscribe)
-      const authored: Envelope[] = []
-      const author: Parameters<typeof scope.authorEdits>[0] = (before, edits) => {
-        const batch = snapBatchEditRanges(before, edits).toSorted((a, b) => b.from - a.from)
-        authoring = true
-        if (batch.length > 1) participant.undoManager.beginTransaction()
-        try {
-          for (const edit of batch) {
-            if (edit.from === edit.to && !edit.text) continue
-            authored.push(
-              participant.local({
-                offset: edit.from,
-                deleteCount: edit.to - edit.from,
-                text: edit.text,
-              }),
-            )
-          }
-          return document.engine.snapshot().buffer
-        } finally {
-          if (batch.length > 1) participant.undoManager.endTransaction()
-          authoring = false
-        }
-      }
       scope.onDidTransaction((event) => {
         if (!attached() || (event.origin !== 'local' && event.origin !== 'view')) return
         // Identity authoring runs before mutation; only committed transactions enter the network.
         for (const envelope of authored.splice(0)) session.submit(envelope)
       })
-      scope.onDispose(() => {
-        if (!attached()) return
-        const text = collaborationBoundaryText(scope.editor)
-        scope.reconcile(createPieceTableSnapshot(text), [], { origin: 'replay', edits: [] })
-      })
-      let commands: { dispose(): void }[] = []
+      const commands = (['undo', 'redo'] as const).map((direction) =>
+        scope.handle(direction, () => {
+          const edit = participant.undoManager[direction]()
+          if (edit) session.submit(edit)
+          return true
+        }),
+      )
+      let detached = false
+      const detach = () => {
+        if (detached) return
+        detached = true
+        clearInterval(timer)
+        unsubscribe()
+        for (const command of commands) command.dispose()
+        registration.dispose()
+        const text = collaborationBoundaryText(buffer)
+        buffer.reconcile(createPieceTableSnapshot(text), [], { origin: 'replay', edits: [] })
+        session.leave()
+      }
+      scope.onDispose(detach)
       const bufferInput: EditorInput<object | null> = {
         id: 'collaboration.buffer',
         kinds: [],
         read: (_snapshot, editor) => (editor as Editor).getBufferSession()?.buffer ?? null,
       }
       scope.watch(bufferInput, () => {
-        for (const command of commands) command.dispose()
-        commands = []
-        if (!attached()) return
-        for (const direction of ['undo', 'redo'] as const) {
-          commands.push(
-            scope.handle(direction, () => {
-              const edit = participant.undoManager[direction]()
-              if (edit) session.submit(edit)
-              return true
-            }),
-          )
-        }
-        const before = collaborationBoundaryText(scope.editor)
-        const after = document.engine.text()
-        scope.reconcile(document.engine.snapshot().buffer, [], {
-          origin: 'replay',
-          edits: before === after ? [] : [{ from: 0, to: before.length, text: after }],
-        })
-        commands.push(scope.authorEdits(author))
+        if (!attached()) detach()
+      })
+      const before = collaborationBoundaryText(scope.editor)
+      const after = document.engine.text()
+      scope.reconcile(document.engine.snapshot().buffer, [], {
+        origin: 'replay',
+        edits: before === after ? [] : [{ from: 0, to: before.length, text: after }],
       })
       const presence = options.presence
         ? new Presence(options.session.peer, options.session.document, session)
@@ -192,10 +209,10 @@ export function createCollaborationPlugin(options: CollaborationPluginOptions): 
       }
       const cleanup = options.onReady?.({ document, session, presence })
       if (cleanup) scope.onDispose(cleanup)
-      if (!options.manualClock) {
+      if (!options.manualClock && !detached) {
         // @justification The protocol needs elapsed time for failure detection; this opt-in
         // clock is configurable, manual in simulations, and cleared when its view detaches.
-        const timer = setInterval(
+        timer = setInterval(
           () => session.tick(performance.now()),
           options.timing?.pulseInterval ?? 50,
         )
@@ -207,4 +224,39 @@ export function createCollaborationPlugin(options: CollaborationPluginOptions): 
 
 function collaborationBoundaryText(editor: Pick<Editor, 'getTextSnapshot'>): string {
   return editor.getTextSnapshot().materializeFullText()
+}
+
+// Native edits may repair one half of a surrogate pair. Identity edits must name the whole pair.
+function identityEdits(
+  before: PieceTableSnapshot,
+  edits: readonly PieceTableEdit[],
+): readonly PieceTableEdit[] {
+  const groups: { from: number; to: number; edits: PieceTableEdit[] }[] = []
+  for (const edit of snapBatchEditRanges(before, edits)) {
+    const from = edit.from - Number(pairSeam(before, edit.from))
+    const to = edit.to + Number(pairSeam(before, edit.to))
+    const previous = groups.at(-1)
+    if (previous && from < previous.to) {
+      previous.to = Math.max(previous.to, to)
+      previous.edits.push(edit)
+      continue
+    }
+    groups.push({ from, to, edits: [edit] })
+  }
+  return groups.map((group) => {
+    let cursor = group.from
+    let text = ''
+    for (const edit of group.edits) {
+      text += readPieceTableTextRange(before, cursor, edit.from) + edit.text
+      cursor = edit.to
+    }
+    text += readPieceTableTextRange(before, cursor, group.to)
+    if (/[\ud800-\udfff]/u.test(text)) throw new CollabFailure('split-surrogate')
+    return { from: group.from, to: group.to, text }
+  })
+}
+
+function pairSeam(before: PieceTableSnapshot, offset: number): boolean {
+  if (offset === 0 || offset === before.length || !before.buffers.containsSurrogates) return false
+  return readPieceTableTextRange(before, offset - 1, offset + 1).codePointAt(0)! > 0xffff
 }

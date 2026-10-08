@@ -375,6 +375,15 @@ function createScopeContribution(
     watcher.listener(next, snapshot)
   }
 
+  const ownRegistration = (disposable: EditorDisposable): EditorDisposable => {
+    const registration = {
+      dispose: () => {
+        disposable.dispose()
+        owned.delete(registration)
+      },
+    }
+    return owned.add(registration)
+  }
   const scope: EditorViewScope = {
     editor: context.unstableEditor as Editor,
     view: context,
@@ -411,11 +420,13 @@ function createScopeContribution(
       if (input) scope.watch(input, (next) => provided.set(next))
     },
     handle: (command, run) =>
-      owned.add(context.registerCommand(typeof command === 'string' ? command : command.id, run)),
+      ownRegistration(
+        context.registerCommand(typeof command === 'string' ? command : command.id, run),
+      ),
     getSelections: () => context.getSelections(),
     applyEdits: (edits, selection, options) =>
       context.applyEdits(edits, 'editor.plugin.applyEdits', selection, options),
-    authorEdits: (author) => owned.add(context.authorEdits(author)),
+    authorEdits: (author) => ownRegistration(context.authorEdits(author)),
     onDidTransaction: (listener) => owned.add(context.onDidTransaction(listener)),
     reconcile: (base, batches, options) => context.reconcile(base, batches, options),
     textGate: (accepts) => void owned.add(context.registerTextGate(accepts)),

@@ -92,24 +92,47 @@ export class Participant<Snapshot = unknown> {
   }
 
   local(edit: OffsetEdit, capture: CaptureOptions = {}): Envelope {
-    const envelope = this.options.engine.author(edit, {
-      document: this.options.document,
-      epoch: this.options.epoch,
-      id: { actor: this.options.actor, seq: this.editSequence + 1 },
-      lamport: this.lamport + 1,
-      deps: this.pendingFrontier(),
-      allocate: (left, count) => this.allocator.generateAfter(left, count),
-    })
-    this.options.engine.apply(envelope)
-    this.editSequence++
-    this.lamport++
-    this.pending.push(cloneEnvelope(envelope))
+    return this.localBatch([edit], capture)[0]!
+  }
+
+  /** Author the entire offset batch before recording history or publishing it. */
+  localBatch(edits: readonly OffsetEdit[], capture: CaptureOptions = {}): readonly Envelope[] {
+    const before = this.options.engine.snapshot()
+    const pending = this.pending.length
+    const sequence = this.editSequence
+    const lamport = this.lamport
+    const envelopes: Envelope[] = []
     try {
-      this.undoManager.record(envelope, capture)
+      for (const edit of edits) {
+        const envelope = this.options.engine.author(edit, {
+          document: this.options.document,
+          epoch: this.options.epoch,
+          id: { actor: this.options.actor, seq: this.editSequence + 1 },
+          lamport: this.lamport + 1,
+          deps: this.pendingFrontier(),
+          allocate: (left, count) => this.allocator.generateAfter(left, count),
+        })
+        this.options.engine.apply(envelope)
+        this.editSequence++
+        this.lamport++
+        this.pending.push(cloneEnvelope(envelope))
+        envelopes.push(envelope)
+      }
+    } catch (error) {
+      this.options.engine.restore(before)
+      this.pending.length = pending
+      this.editSequence = sequence
+      this.lamport = lamport
+      throw error
+    }
+    if (envelopes.length > 1) this.undoManager.beginTransaction()
+    try {
+      for (const envelope of envelopes) this.undoManager.record(envelope, capture)
     } finally {
+      if (envelopes.length > 1) this.undoManager.endTransaction()
       this.publish()
     }
-    return envelope
+    return envelopes
   }
 
   setEffects(effects: readonly Effect[]): Envelope {
@@ -158,7 +181,15 @@ export class Participant<Snapshot = unknown> {
   }
 
   /** Installs a verified branch while retaining authored pending work and local undo. */
-  install(base: Snapshot, messages: readonly HostMessage[]): void {
+  install(
+    base: Snapshot,
+    messages: readonly HostMessage[],
+    recovered: readonly Envelope[] = [],
+  ): void {
+    const pending = new Map<string, Envelope>()
+    for (const edit of [...recovered, ...this.pending])
+      pending.set(editKey(edit.id), cloneEnvelope(edit))
+    this.pending = [...pending.values()]
     this.confirmed = base
     this.sequence = 0
     this.frontier.clear()
@@ -170,6 +201,7 @@ export class Participant<Snapshot = unknown> {
     }
     this.options.engine.restore(base)
     this.replay()
+    this.undoManager.reject(this.blocked)
     this.publish()
   }
 
@@ -197,7 +229,13 @@ export class Participant<Snapshot = unknown> {
         this.blocked.push(envelope.id)
         continue
       }
-      this.options.engine.apply(envelope)
+      try {
+        this.options.engine.apply(envelope)
+      } catch (error) {
+        if (!(error instanceof CollabFailure) || error.code !== 'unknown-character') throw error
+        blocked.add(editKey(envelope.id))
+        this.blocked.push(envelope.id)
+      }
     }
   }
 

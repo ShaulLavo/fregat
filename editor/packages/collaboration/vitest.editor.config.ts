@@ -2,12 +2,17 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
+import { workspaceRoot } from '../../scripts/workspace-root.ts'
 
 export default defineConfig({
   // This config resolves editor source; transport tests resolve its built package.
   cacheDir: resolve(import.meta.dirname, 'node_modules/.vite-editor'),
   resolve: {
     alias: {
+      '@singapore-editor/core/document': resolve(
+        import.meta.dirname,
+        '../editor/src/public/document.ts',
+      ),
       '@singapore-editor/core/editor': resolve(import.meta.dirname, '../editor/src/editor.ts'),
       '@singapore-editor/core/extensions': resolve(
         import.meta.dirname,
@@ -21,7 +26,7 @@ export default defineConfig({
     },
   },
   define: { __COLLABORATION_MEASURE__: JSON.stringify(Boolean(process.env.COLLABORATION_MEASURE)) },
-  server: { fs: { allow: [resolve(import.meta.dirname, '../../../..')] } },
+  server: { fs: { allow: [workspaceRoot] } },
   test: {
     include: ['test/editor*.browser.test.ts'],
     fileParallelism: false,
@@ -41,7 +46,7 @@ export default defineConfig({
           await iframe
             .locator('body')
             .evaluate(async (_body, value) => navigator.clipboard.writeText(value), text)
-          await page.keyboard.press('Control+V')
+          await page.keyboard.press('ControlOrMeta+V')
         },
         editorIME: async ({ page }, text: string, commit: boolean) => {
           const cdp = await page.context().newCDPSession(page)

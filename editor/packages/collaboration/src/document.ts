@@ -132,7 +132,7 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
 
   private append(record: Confirmation<Envelope>): void {
     // Keep the verified wire history independent of caller-owned message objects.
-    const owned = structuredClone(record)
+    const owned = freezeRecord(structuredClone(record))
     this.history.push(owned)
     this.records.set(editKey(owned.id), owned)
   }
@@ -140,7 +140,7 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
   exportHistory(from: Checkpoint): readonly Confirmation<Envelope>[] | undefined {
     const point = from.depth === 0 ? this.genesis : this.history[from.depth - 1]
     if (!point || !sameTip(point, from)) return undefined
-    return structuredClone(this.history.slice(from.depth))
+    return Object.freeze(this.history.slice(from.depth))
   }
 
   verify(history: readonly Confirmation<Envelope>[], tip: Checkpoint): boolean {
@@ -184,14 +184,14 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
     )
   }
 
-  install(history: readonly Confirmation<Envelope>[]): void {
+  install(history: readonly Confirmation<Envelope>[], recovered: readonly Envelope[] = []): void {
     if (!this.verify(history, history.at(-1) ?? this.genesis))
       throw new TypeError('Invalid collaboration history')
     this.history = []
     this.records.clear()
     for (const record of history) this.append(record)
     this.restoreHost()
-    this.participant.install(this.base, history.map(hostMessage))
+    this.participant.install(this.base, history.map(hostMessage), recovered)
   }
 
   private restoreHost(): void {
@@ -209,4 +209,10 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
   uniquePending(history: readonly Confirmation<Envelope>[]): readonly Envelope[] {
     return history.filter((record) => !this.outcome(record.id)).map((record) => record.edit)
   }
+}
+
+function freezeRecord<T>(value: T): T {
+  if (value === null || typeof value !== 'object' || Object.isFrozen(value)) return value
+  for (const child of Object.values(value)) freezeRecord(child)
+  return Object.freeze(value)
 }
