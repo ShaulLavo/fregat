@@ -109,6 +109,15 @@ export function createRetentionReloadCases() {
   }
 }
 
+type ForwardAction = 'fulfill' | 'continue' | 'abort'
+type ForwardHttpStage =
+  | 'headersStartedAt'
+  | 'headersCompletedAt'
+  | 'fetchStartedAt'
+  | 'fetchCompletedAt'
+  | 'continueStartedAt'
+  | 'continueCompletedAt'
+
 type ForwardObservation = {
   readonly requestId: number
   readonly url: string
@@ -116,19 +125,15 @@ type ForwardObservation = {
   readonly operationInvoked: boolean
   readonly registeredAt: number
   action: {
-    kind: 'fulfill' | 'abort'
+    kind: ForwardAction
     selectedAt: number
     settledAt: number | null
     error: string | null
   } | null
-  skippedActions: ('fulfill' | 'abort')[]
+  skippedActions: ForwardAction[]
+  nativeCancellationRequestedAt?: number
   terminal: { kind: ForwardOutcome['kind']; at: number } | null
-  http?: Partial<
-    Record<
-      'headersStartedAt' | 'headersCompletedAt' | 'fetchStartedAt' | 'fetchCompletedAt',
-      number
-    >
-  >
+  http?: Partial<Record<ForwardHttpStage, number>>
   settlement: {
     kind: 'succeeded' | 'failed' | 'not-started'
     at: number
@@ -138,15 +143,16 @@ type ForwardObservation = {
 
 type RecordForwardError = (observation: ForwardObservation, stage: string, error: unknown) => void
 
-type FulfillForward = (action: () => Promise<void>) => Promise<void>
+type ForwardRoute = (action: () => Promise<void>) => Promise<void>
 
 function createRetentionRouteAction(
   observation: ForwardObservation,
   abort: () => Promise<void>,
   record: RecordForwardError,
+  forwardKind: Exclude<ForwardAction, 'abort'>,
 ) {
   let owned: Promise<void> | null = null
-  const claim = (kind: 'fulfill' | 'abort', action: () => Promise<void>) => {
+  const claim = (kind: ForwardAction, action: () => Promise<void>) => {
     if (observation.action) {
       observation.skippedActions.push(kind)
       return Promise.resolve()
@@ -166,7 +172,7 @@ function createRetentionRouteAction(
     return owned
   }
   return {
-    fulfill: (action: () => Promise<void>) => claim('fulfill', action),
+    forward: (action: () => Promise<void>) => claim(forwardKind, action),
     abort: () => claim('abort', abort),
     join: () => owned ?? Promise.resolve(),
   }
@@ -296,6 +302,18 @@ export function createRetentionReloadTransport(
     get hasFailure() {
       return firstFailure !== null
     },
+    failNativeRequest(url: string, error: unknown) {
+      const observation = requests.findLast((request) => request.url === url)
+      if (
+        !observation ||
+        observation.terminal?.kind === 'cancelled' ||
+        observation.nativeCancellationRequestedAt !== undefined
+      )
+        return
+      // Continued routes settle before the browser reports their network result.
+      record(observation, 'native-request', error)
+      failed(error)
+    },
     get needsContextClose() {
       return requests.some(
         (request) =>
@@ -312,6 +330,9 @@ export function createRetentionReloadTransport(
     },
     async cancelPending() {
       await Promise.resolve()
+      const at = Date.now()
+      for (const request of requests)
+        if (request.action?.kind === 'continue') request.nativeCancellationRequestedAt ??= at
       for (const cancel of pending) cancel()
     },
     async race<T>(operation: Promise<T>): Promise<T> {
@@ -325,11 +346,12 @@ export function createRetentionReloadTransport(
     run(
       url: string,
       operation: (
-        fulfill: FulfillForward,
+        forward: ForwardRoute,
         headersCompleted: () => void,
-        markHttp: (stage: 'headersStartedAt' | 'fetchStartedAt' | 'fetchCompletedAt') => void,
+        markHttp: (stage: Exclude<ForwardHttpStage, 'headersCompletedAt'>) => void,
       ) => Promise<void>,
       abort: () => Promise<void>,
+      forwardKind: Exclude<ForwardAction, 'abort'> = 'fulfill',
     ) {
       const observation: ForwardObservation = {
         requestId: requests.length + 1,
@@ -343,7 +365,7 @@ export function createRetentionReloadTransport(
         settlement: null,
       }
       requests.push(observation)
-      const markHttp = (stage: 'headersStartedAt' | 'fetchStartedAt' | 'fetchCompletedAt') => {
+      const markHttp = (stage: Exclude<ForwardHttpStage, 'headersCompletedAt'>) => {
         observation.http ??= {}
         observation.http[stage] = Date.now()
       }
@@ -353,7 +375,7 @@ export function createRetentionReloadTransport(
         if (timings) timings.headersCompleted = { requestId: observation.requestId, at: Date.now() }
       }
       const request = createRetentionForward(observation, record, failed)
-      const routeAction = createRetentionRouteAction(observation, abort, record)
+      const routeAction = createRetentionRouteAction(observation, abort, record, forwardKind)
       routeActions.push(routeAction)
       const cancel = () => {
         if (!request.cancel()) return
@@ -365,8 +387,8 @@ export function createRetentionReloadTransport(
         ? observeRetentionForward(
             () =>
               observer?.run(observation, () =>
-                operation(routeAction.fulfill, headersCompleted, markHttp),
-              ) ?? operation(routeAction.fulfill, headersCompleted, markHttp),
+                operation(routeAction.forward, headersCompleted, markHttp),
+              ) ?? operation(routeAction.forward, headersCompleted, markHttp),
             (outcome) => {
               const selected = request.select(outcome)
               guardRetentionEntryObservation(() => observer?.settled(observation))
