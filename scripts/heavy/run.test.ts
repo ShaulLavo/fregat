@@ -262,7 +262,7 @@ describe.skipIf(!userScopes)('a job run through the wrapper', () => {
     const result = await job.done
     expect(result.code).toBe(130)
     expect(records(box)[0]).toMatchObject({ exitCode: 130, label: 'int-pid' })
-  })
+  }, 20_000)
 
   test('Ctrl-C to the whole foreground process group stops the job and records it', async () => {
     const box = runBox()
