@@ -14,7 +14,7 @@ The browser lays out visible text. Singapore paints syntax colours with the CSS 
 
 ## Choose an integration path
 
-Start with the [quick start](quick-start.md). It mounts an editor and shows the source that does it. The [React and Solid guide](../guides/frameworks.mdx) shows each framework's adapter.
+Start with the [quick start](quick-start.md). It mounts an editor and shows the source that does it. Its [troubleshooting section](quick-start.md#if-it-doesnt-work) covers the usual first problems. The [React and Solid guide](../guides/frameworks.mdx) shows each framework's adapter.
 
 The [Monaco](monaco.md) and [CodeMirror](codemirror.md) migration pages map familiar APIs to Singapore and list the differences to check before moving an application.
 

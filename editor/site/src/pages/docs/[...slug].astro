@@ -49,24 +49,6 @@ const slash = file.lastIndexOf('/') + 1
     </nav>
     <main id="doc" class="pane" tabindex="-1">
       <article class="src" data-pagefind-body set:html={page.html} />
-      <nav class="pages-foot" aria-label="All pages">
-        {
-          NAV.map((section) => (
-            <section>
-              <h2>{section.label}</h2>
-              <ul>
-                {section.pages.map((entry) => (
-                  <li>
-                    <a href={entry.href} aria-current={entry.md === file ? 'page' : undefined}>
-                      {entry.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))
-        }
-      </nav>
     </main>
   </div>
   <script is:inline type="application/json" id="manual-pages" set:html={JSON.stringify(MANUAL_PAGES)} />
