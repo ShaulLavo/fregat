@@ -8,9 +8,22 @@ const runs = process.env.COLLABORATION_LONG_RUN === '1' ? 10_000 : 100
 
 describe('transport-neutral session', () => {
   test('converges after host crashes, two pairs rejoin and concurrent three-way reconciliation', () => {
-    for (let seed = 1; seed <= runs; seed++) runSeed(seed)
+    const hits: Network['hits'] = {
+      hostKill: 0,
+      pairs: 0,
+      threeWay: 0,
+      crashRejoin: 0,
+      partialHeal: 0,
+      oldGeneration: 0,
+      reconnectReorder: 0,
+    }
+    for (let seed = 1; seed <= runs; seed++) {
+      const result = runSeed(seed)
+      for (const key of Object.keys(hits) as (keyof typeof hits)[]) hits[key] += result[key]
+    }
+    for (const count of Object.values(hits)) expect(count).toBeGreaterThan(0)
     console.log(
-      `Session simulation: ${runs} seeded runs passed; host-crash, 2+2 and three-way partitions; 3–8 peers.`,
+      `Session simulation: ${runs} seeded runs passed; 3–8 peers; hits=${JSON.stringify(hits)}`,
     )
   }, 600_000)
 
@@ -54,6 +67,113 @@ describe('transport-neutral session', () => {
       network.crash(host)
       network.stabilize()
       expect(network.nodes[successor]!.session.isHost, `seed=${seed}`).toBe(true)
+    }
+  })
+
+  test('handoff transfers edits authored during prepare and committed acknowledgement windows', () => {
+    const network = new Network(90001, 4)
+    network.stabilize()
+    network.nodes[0]!.session.leave(network.nodes[3]!.session.peer)
+    network.author(0)
+    for (let step = 0; step < 100 && !network.handoffCommits.has(0); step++) network.advance(1)
+    expect(network.handoffCommits.has(0)).toBe(true)
+    expect(network.nodes[0]!.session.status).toBe('handoff')
+    network.author(0)
+    network.advance(200)
+    expect(network.nodes[0]!.session.status).toBe('left')
+    for (const edit of network.nodes[0]!.authored)
+      for (const node of network.nodes.slice(1))
+        expect(node.engine.outcome(edit.id)).toEqual({ kind: 'accepted' })
+    expect(network.nodes[0]!.session.pending.size).toBe(0)
+    network.crash(0)
+    network.stabilize()
+  })
+
+  test('handoff installation settles follower work already confirmed in the base', () => {
+    const network = new Network(90001, 4)
+    network.stabilize()
+    const links = new Map(network.links)
+    for (const key of network.links.keys())
+      if (key.endsWith(':1'))
+        network.links.set(key, { delay: 150, jitter: 1, drop: 0, duplicate: 0 })
+    network.author(1)
+    network.advance(25)
+    const edit = network.nodes[1]!.authored[0]!
+    expect(network.nodes[0]!.engine.outcome(edit.id)).toEqual({ kind: 'accepted' })
+    expect(network.nodes[1]!.session.pending.size).toBe(1)
+    for (const [key, link] of links) network.links.set(key, link)
+    network.nodes[0]!.session.leave(network.nodes[3]!.session.peer)
+    network.advance(200)
+    expect(network.nodes[0]!.session.status).toBe('left')
+    expect(network.nodes[1]!.engine.outcome(edit.id)).toEqual({ kind: 'accepted' })
+    expect(network.nodes[1]!.session.pending.size).toBe(0)
+    network.crash(0)
+    network.stabilize()
+  })
+
+  test('an asymmetric bridge freezes both incumbent hosts until full-mesh discovery', () => {
+    const network = new Network(90004, 4)
+    network.stabilize()
+    network.partition([[0], [1], [2], [3]])
+    network.stabilize()
+    network.author(1)
+    network.author(1)
+    network.author(3)
+    network.author(3)
+    network.author(3)
+    network.stabilize()
+    network.partition([
+      [0, 1],
+      [2, 3],
+    ])
+    network.stabilize()
+    expect(network.nodes[1]!.session.isHost).toBe(true)
+    expect(network.nodes[3]!.session.isHost).toBe(true)
+    network.edge(0, 2, true)
+    network.edge(2, 0, true)
+    network.advance(240)
+    expect(network.components()).toHaveLength(1)
+    network.safety()
+    const tips = network.nodes.map((node) => node.engine.checkpoint())
+    network.author(1)
+    network.author(3)
+    network.advance(30)
+    expect(network.nodes.map((node) => node.engine.checkpoint())).toEqual(tips)
+    network.heal()
+    network.stabilize()
+  })
+
+  test('a non-coordinator host completes departure after a delayed prepare', () => {
+    const network = new Network(90006, 4)
+    network.stabilize()
+    network.partition([[0], [1], [2], [3]])
+    network.stabilize()
+    network.author(3)
+    network.author(3)
+    network.stabilize()
+    network.heal()
+    network.stabilize()
+    expect(network.nodes[3]!.session.isHost).toBe(true)
+    const link = network.links.get('3:2')!
+    network.links.set('3:2', { ...link, drop: 1 })
+    network.nodes[3]!.session.leave(network.nodes[2]!.session.peer)
+    network.advance(45)
+    network.links.set('3:2', link)
+    network.advance(240)
+    expect(network.nodes[3]!.session.status).toBe('left')
+    network.crash(3)
+    network.stabilize()
+    expect(network.nodes[2]!.session.isHost).toBe(true)
+  })
+
+  test('short reconnects deliver old-generation traffic after new-generation traffic', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const network = new Network(seed, 4)
+      network.stabilize()
+      network.reconnectTraffic()
+      expect(network.hits.oldGeneration).toBeGreaterThan(0)
+      expect(network.hits.reconnectReorder).toBeGreaterThan(0)
+      network.stabilize()
     }
   })
 

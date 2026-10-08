@@ -16,6 +16,7 @@ type Packet = {
   readonly to: number
   readonly sender: string
   readonly message: Message<ToyEdit>
+  readonly generation: number
 }
 export type Link = {
   readonly delay: number
@@ -29,19 +30,31 @@ export class Network {
   readonly authored = new Map<string, ToyEdit>()
   readonly messages = new Map<string, number>()
   readonly links = new Map<string, Link>()
+  readonly handoffCommits = new Set<number>()
+  readonly hits = {
+    hostKill: 0,
+    pairs: 0,
+    threeWay: 0,
+    crashRejoin: 0,
+    partialHeal: 0,
+    oldGeneration: 0,
+    reconnectReorder: 0,
+  }
+  private readonly generations = new Map<string, number>()
+  private readonly deliveredGeneration = new Map<string, number>()
   private readonly packets = new Map<number, Packet[]>()
   private edges = new Set<string>()
   private clock = 0
   private readonly trace: string[] = []
   private randomState: number
-  private groups: number[][]
+  private topology = new Set<string>()
 
   constructor(
     readonly seed: number,
     count: number,
   ) {
     this.randomState = seed
-    this.groups = [Array.from({ length: count }, (_, index) => index)]
+
     for (let index = 0; index < count; index++) {
       const engine = new ToyEngine()
       this.nodes.push({
@@ -62,7 +75,7 @@ export class Network {
           duplicate: 0.08,
         })
     }
-    this.reconnect()
+    this.heal()
   }
 
   random(): number {
@@ -98,11 +111,67 @@ export class Network {
     }
   }
   partition(groups: number[][]): void {
-    this.groups = groups
+    this.topology = new Set(
+      groups.flatMap((group) =>
+        group.flatMap((from) => group.filter((to) => from !== to).map((to) => `${from}:${to}`)),
+      ),
+    )
     this.reconnect()
   }
   heal(): void {
     this.partition([this.nodes.map((_, index) => index)])
+  }
+  edge(from: number, to: number, connected: boolean): void {
+    const key = `${from}:${to}`
+    if (connected) this.topology.add(key)
+    else this.topology.delete(key)
+    this.reconnect()
+  }
+  components(): number[][] {
+    const remaining = new Set(
+      this.nodes.flatMap((node, index) =>
+        node.alive && node.session.status !== 'left' ? [index] : [],
+      ),
+    )
+    const result: number[][] = []
+    while (remaining.size) {
+      const group = [remaining.values().next().value!]
+      remaining.delete(group[0]!)
+      for (const from of group) {
+        for (const to of remaining) {
+          if (!this.edges.has(`${from}:${to}`) && !this.edges.has(`${to}:${from}`)) continue
+          remaining.delete(to)
+          group.push(to)
+        }
+      }
+      result.push(group)
+    }
+    return result
+  }
+  safety(): void {
+    for (const group of this.components())
+      assert.ok(
+        group.filter((index) => this.nodes[index]!.session.isHost).length <= 1,
+        `At most one sequencing host: seed=${this.seed} component=${group}`,
+      )
+  }
+  reconnectTraffic(): void {
+    const from = 0
+    const to = 1
+    const key = `${from}:${to}`
+    const link = this.links.get(key)!
+    this.links.set(key, { delay: 18, jitter: 1, drop: 0, duplicate: 0 })
+    this.advance(3)
+    this.edge(from, to, false)
+    this.edge(to, from, false)
+    this.advance(2)
+    this.links.set(key, { delay: 1, jitter: 1, drop: 0, duplicate: 0 })
+    this.edge(from, to, true)
+    this.edge(to, from, true)
+    this.advance(30)
+    this.links.set(key, link)
+    assert.ok(this.hits.oldGeneration > 0, `Old-generation delivery: seed=${this.seed}`)
+    assert.ok(this.hits.reconnectReorder > 0, `Reordering across reconnect: seed=${this.seed}`)
   }
   crash(index: number): void {
     this.nodes[index]!.alive = false
@@ -137,7 +206,17 @@ export class Network {
         const from = this.nodes[packet.from]!
         const to = this.nodes[packet.to]!
         if (!from.alive || !to.alive || !this.edges.has(`${packet.from}:${packet.to}`)) continue
-        // Old channels can drain after reconnect; the application must fence their authority.
+        const edge = `${packet.from}:${packet.to}`
+        const generation = this.generations.get(edge)!
+        if (packet.generation < generation) {
+          this.hits.oldGeneration++
+          if ((this.deliveredGeneration.get(edge) ?? -1) > packet.generation)
+            this.hits.reconnectReorder++
+        }
+        this.deliveredGeneration.set(
+          edge,
+          Math.max(packet.generation, this.deliveredGeneration.get(edge) ?? -1),
+        )
         const before = `${to.session.status}/${to.session.branch.authority.epoch}`
         to.session.receive(packet.message)
         const after = `${to.session.status}/${to.session.branch.authority.epoch}`
@@ -151,9 +230,7 @@ export class Network {
     }
   }
   invariants(): void {
-    const components = this.groups
-      .map((group) => group.filter((index) => this.nodes[index]!.alive))
-      .filter((group) => group.length)
+    const components = this.components()
     for (const group of components) {
       const nodes = group.map((index) => this.nodes[index]!)
       const first = nodes[0]!
@@ -207,18 +284,22 @@ export class Network {
   }
   private send(from: number, peer: string, message: Message<ToyEdit>): void {
     this.messages.set(message.type, (this.messages.get(message.type) ?? 0) + 1)
+    if (message.type === 'HANDOFF' && message.payload.stage === 'commit')
+      this.handoffCommits.add(from)
     const to = this.nodes.findIndex((node) => node.session.peer === peer)
     if (to < 0 || !this.edges.has(`${from}:${to}`)) return
     const link = this.links.get(`${from}:${to}`)!
     if (this.random() < link.drop) return
+    const generation = this.generations.get(`${from}:${to}`)!
     const delay = link.delay + this.integer(link.jitter) + (this.random() < 0.01 ? 80 : 0)
-    this.queue(this.clock + delay, { from, to, sender: message.sender, message })
+    this.queue(this.clock + delay, { from, to, sender: message.sender, message, generation })
     if (this.random() < link.duplicate)
       this.queue(this.clock + delay + 1 + this.integer(10), {
         from,
         to,
         sender: message.sender,
         message,
+        generation,
       })
   }
   private queue(time: number, packet: Packet): void {
@@ -227,31 +308,32 @@ export class Network {
     this.packets.set(time, packets)
   }
   private reconnect(): void {
-    const next = new Set<string>()
-    for (const group of this.groups) {
-      for (const from of group) {
-        for (const to of group) {
-          if (from === to || !this.nodes[from]!.alive || !this.nodes[to]!.alive) continue
-          next.add(`${from}:${to}`)
-        }
-      }
-    }
-    for (const edge of this.edges) {
-      if (next.has(edge)) continue
-      const [from, to] = edge.split(':').map(Number)
-      this.nodes[from!]!.session.disconnect(this.nodes[to!]!.session.peer)
-    }
+    const next = new Set(
+      [...this.topology].filter((edge) => {
+        const [from, to] = edge.split(':').map(Number)
+        return this.nodes[from!]!.alive && this.nodes[to!]!.alive
+      }),
+    )
     const old = this.edges
     this.edges = next
     for (const edge of next) {
-      if (old.has(edge)) continue
-      const [from, to] = edge.split(':').map(Number)
-      this.nodes[from!]!.session.connect(this.nodes[to!]!.session.peer)
+      if (!old.has(edge)) this.generations.set(edge, (this.generations.get(edge) ?? 0) + 1)
+    }
+    for (let from = 0; from < this.nodes.length; from++) {
+      for (let to = 0; to < this.nodes.length; to++) {
+        if (from === to) continue
+        const connected = next.has(`${from}:${to}`) || next.has(`${to}:${from}`)
+        const wasConnected = old.has(`${from}:${to}`) || old.has(`${to}:${from}`)
+        if (wasConnected && !connected)
+          this.nodes[from]!.session.disconnect(this.nodes[to]!.session.peer)
+        if (connected && !wasConnected)
+          this.nodes[from]!.session.connect(this.nodes[to]!.session.peer)
+      }
     }
   }
 }
 
-export function runSeed(seed: number): void {
+export function runSeed(seed: number): Network['hits'] {
   const scenario = seed % 3
   const count = scenario === 1 ? 4 : 3 + (Math.floor(seed / 3) % 6)
   const network = new Network(seed, count)
@@ -261,13 +343,16 @@ export function runSeed(seed: number): void {
     const host = network.nodes.findIndex((node) => node.session.isHost)
     network.author(host)
     for (let index = 0; index < count; index++) network.author(index)
+    network.hits.hostKill++
     network.crash(host)
     network.type(10)
     network.stabilize()
     network.rejoin(host)
+    network.hits.crashRejoin++
     network.type(8)
   }
   if (scenario === 1) {
+    network.hits.pairs++
     network.partition([
       [0, 1],
       [2, 3],
@@ -275,10 +360,18 @@ export function runSeed(seed: number): void {
     network.stabilize()
     network.type(12)
     network.advance(30)
+    network.edge(0, 2, true)
+    network.advance(40)
+    network.safety()
+    network.edge(2, 0, true)
+    network.advance(40)
+    network.safety()
+    network.hits.partialHeal++
     network.heal()
     network.type(8)
   }
   if (scenario === 2) {
+    network.hits.threeWay++
     const groups = [[], [], []] as number[][]
     for (let index = 0; index < count; index++) groups[index % 3]!.push(index)
     network.partition(groups)
@@ -293,4 +386,7 @@ export function runSeed(seed: number): void {
     network.type(8)
   }
   network.stabilize()
+  network.reconnectTraffic()
+  network.stabilize()
+  return network.hits
 }
