@@ -217,9 +217,7 @@ jobs:
         run: bun run dev:web -- --dry-run=json > /dev/null
 
       - name: Install Linux webview build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev
+        uses: ./.github/actions/linux-webview-deps
 
       - name: Build Linux webview host
         run: bun run --cwd apps/desktop build:native
