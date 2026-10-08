@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 import unittest
 
@@ -11,7 +12,9 @@ class DeploymentTests(unittest.TestCase):
         self.assertIn('actions/upload-artifact@v4', build)
         self.assertIn('needs: build', deploy)
         self.assertIn('environment: production', deploy)
-        self.assertIn('actions/download-artifact@v4', deploy)
+        self.assertIn('actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093', deploy)
+        for action in re.findall(r'uses: ([^\s]+)', deploy):
+            self.assertRegex(action, r'@[0-9a-f]{40}$')
         self.assertNotIn('actions/checkout', deploy)
         self.assertNotIn('bun ', deploy)
         self.assertNotIn('tar -x', deploy)

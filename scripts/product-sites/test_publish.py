@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from publish import MAX_BYTES, KEEP_RELEASES, HASHED_ASSET, tree_usage, publish
+from publish import MAX_BYTES, KEEP_RELEASES, HASHED_ASSET, TreeBudget, evict_rollbacks, tree_usage, publish
 
 
 def archive(extra=None, omit=None):
@@ -220,7 +220,7 @@ class PublishTests(unittest.TestCase):
             publish(root, archive())
             previous = (root / 'current').resolve()
             _, inodes = tree_usage(root)
-            with patch('publish.MAX_TREE_INODES', inodes + 16), self.assertRaisesRegex(ValueError, 'aggregate'):
+            with patch('publish.MAX_TREE_INODES', inodes + 10), self.assertRaisesRegex(ValueError, 'aggregate'):
                 publish(root, archive((tarfile.TarInfo('fregat/a/b/c/d/e/f/g/file'), b'')))
             self.assertEqual(previous, (root / 'current').resolve())
             self.assertEqual(tree_usage(root)[1], inodes)
@@ -238,6 +238,80 @@ class PublishTests(unittest.TestCase):
             self.assertLess(after_size - size, 4096)
             (root / 'loop').symlink_to(root)
             self.assertEqual(tree_usage(root)[1], inodes + 1)
+
+    def test_budget_pressure_evicts_rollbacks_and_finishes_upload(self):
+        for constraint in ('MAX_TREE_BYTES', 'MAX_TREE_INODES'):
+            with self.subTest(constraint=constraint), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                for index in range(3):
+                    member = tarfile.TarInfo(f'fregat/assets/main-{index:08d}.js')
+                    member.size = 64 * 1024
+                    publish(root, archive((member, bytes([index]) * member.size)))
+                previous = (root / 'current').resolve()
+                size, inodes = tree_usage(root)
+                limit = size + 32 * 1024 if constraint == 'MAX_TREE_BYTES' else inodes + 3
+                member = tarfile.TarInfo('fregat/assets/main-98765432.js')
+                member.size = 64 * 1024
+                with patch('publish.' + constraint, limit), patch('publish.evict_rollbacks', wraps=evict_rollbacks) as evict:
+                    publish(root, archive((member, b'x' * member.size)))
+                self.assertEqual(evict.call_count, 1)
+                self.assertNotEqual(previous, (root / 'current').resolve())
+                self.assertTrue(previous.exists())
+                self.assertEqual(len(list((root / 'releases').iterdir())), 2)
+                self.assertFalse((root / 'immutable/fregat/assets/main-00000000.js').exists())
+
+    def test_budget_retries_eviction_only_once(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            publish(root, archive())
+            budget = TreeBudget(root)
+            with patch('publish.evict_rollbacks', wraps=evict_rollbacks) as evict:
+                for _ in range(2):
+                    with self.assertRaisesRegex(ValueError, 'aggregate'):
+                        budget.reserve(4 * 1024 * 1024 * 1024, 0)
+            self.assertEqual(evict.call_count, 1)
+            self.assertTrue((root / 'current/index.html').exists())
+
+    def test_symlinked_root_preserves_active_release_after_switch_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            root = parent / 'sites'
+            root.mkdir()
+            alias = parent / 'alias'
+            alias.symlink_to(root, target_is_directory=True)
+            original = Path.replace
+            def interrupt_after_switch(path, target):
+                original(path, target)
+                raise TimeoutError('Signal after atomic switch')
+            with patch('publish.Path.replace', interrupt_after_switch), self.assertRaises(TimeoutError):
+                publish(alias, archive())
+            self.assertEqual((alias / 'current/index.html').read_text(), 'ok')
+
+    def test_symlinked_root_preserves_old_current_during_pruning(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            root = parent / 'sites'
+            root.mkdir()
+            alias = parent / 'alias'
+            alias.symlink_to(root, target_is_directory=True)
+            publish(alias, archive())
+            previous = (alias / 'current').resolve()
+            for index in range(2):
+                publish(alias, archive((tarfile.TarInfo(f'fregat/{index}'), b'')))
+            (root / 'current').unlink()
+            (root / 'current').symlink_to(previous.relative_to(root))
+            publish(alias, archive())
+            self.assertEqual((alias / 'current').resolve(), previous)
+            self.assertTrue(previous.exists())
+
+    def test_admin_import_with_bytecode_disabled_leaves_no_cache(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = Path(__file__).with_name('publish.py').read_bytes()
+            (root / 'publish.py').write_bytes(source)
+            result = subprocess.run([sys.executable, '-B', '-c', 'import publish'], cwd=root, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((root / '__pycache__').exists())
 
     def test_forced_command_rejects_shell(self):
         result = subprocess.run(

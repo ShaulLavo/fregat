@@ -1,3 +1,4 @@
+import { submitAsAuthor } from '../host-fixtures'
 import { expect } from 'vitest'
 import { Host, Participant, ReferenceEngine } from '../../src/index'
 import type { CharId, Envelope, HostMessage, OffsetEdit } from '../../src/index'
@@ -44,7 +45,7 @@ function sameEdit(a: Envelope, b: Envelope) {
 export function mergeCausal(groups: readonly (readonly Envelope[])[]) {
   const engine = new ReferenceEngine()
   const host = new Host({ document: 'test', epoch: '1', engine })
-  for (const group of groups) for (const edit of group) host.submit(edit)
+  for (const group of groups) for (const edit of group) submitAsAuthor(host, edit)
   const unique = new Map(groups.flat().map((edit) => [JSON.stringify(edit.id), edit]))
   expect(host.hostSequence).toBe(unique.size)
   for (const edit of unique.values()) expect(host.outcome(edit.id)?.status).toBe('accepted')
@@ -89,7 +90,7 @@ export function network(size: number) {
     const chosen = candidates[Math.floor(random() * candidates.length)]!
     if (chosen.direction === 'out') {
       const packet = outbound.splice(chosen.index, 1)[0]!
-      host.submit(packet.envelope)
+      submitAsAuthor(host, packet.envelope)
       return true
     }
     const packet = inbound.splice(chosen.index, 1)[0]!
@@ -136,7 +137,7 @@ export function network(size: number) {
     // A peer sync becomes submission to the host followed by its complete log prefix.
     for (let index = outbound.length - 1; index >= 0; index--) {
       if (!selected.includes(outbound[index]!.user)) continue
-      host.submit(outbound.splice(index, 1)[0]!.envelope)
+      submitAsAuthor(host, outbound.splice(index, 1)[0]!.envelope)
     }
     for (const user of selected) users[user]!.participant.receive(log)
     for (let index = inbound.length - 1; index >= 0; index--) {

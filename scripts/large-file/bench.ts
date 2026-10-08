@@ -10,12 +10,14 @@ import { comparisonReport } from './report'
 import { runCaseScope } from './case-scope'
 import { defaultOutput } from './output'
 import { captureRevision, recordedBuildSource } from './provenance'
+import { buildBenchmarkWeb } from './build'
 
 const { values } = parseArgs({
   options: {
     sizes: { type: 'string', default: '1,10,50,100,150,200' },
     ext: { type: 'string', default: 'txt' },
     highlighting: { type: 'string', default: 'default' },
+    analysis: { type: 'string', default: 'default' },
     out: { type: 'string' },
     'web-root': { type: 'string' },
     'two-byte': { type: 'boolean', default: false },
@@ -30,16 +32,19 @@ const { values } = parseArgs({
 
 if (values.help) {
   console.log(
-    'bun run bench:large-file [--sizes 1,10,50,100,150,200] [--ext txt|ts] [--highlighting shiki,tree-sitter] [--two-byte] [--profile] [--out DIR] [--web-root BUILT_WEB] [--keys 30] [--settle-ms 10000] [--memory-mib 8192]',
+    'bun run bench:large-file [--sizes 0.0625,1,10,50,100,150,200] [--analysis default|on|off] [--ext txt|ts] [--highlighting shiki,tree-sitter] [--two-byte] [--profile] [--out DIR] [--web-root BUILT_WEB] [--keys 30] [--settle-ms 10000] [--memory-mib 8192]',
   )
   process.exit(0)
 }
 if (values.ext !== 'txt' && values.ext !== 'ts') throw createScriptError('--ext must be txt or ts')
 const highlightingModes = values.highlighting.split(',').map(highlightingMode)
+if (!['default', 'on', 'off'].includes(values.analysis))
+  throw createScriptError('--analysis accepts default, on or off')
+const analysis = values.analysis as 'default' | 'on' | 'off'
 const keys = positiveInteger(values.keys, '--keys')
 const settleMs = positiveInteger(values['settle-ms'], '--settle-ms')
 const memoryMiB = positiveInteger(values['memory-mib'], '--memory-mib')
-const sizes = values.sizes.split(',').map((size) => positiveInteger(size, '--sizes'))
+const sizes = values.sizes.split(',').map((size) => fileSize(size))
 const output = path.resolve(values.out ?? defaultOutput())
 await mkdir(output, { recursive: true })
 if (!process.env.PLAYWRIGHT_BROWSERS_PATH && existsSync('/work/cache/ms-playwright'))
@@ -48,7 +53,8 @@ const webRoot = path.resolve(values['web-root'] ?? path.join(output, 'web'))
 
 if (values.case) {
   const result = await runCase({
-    sizeMiB: positiveInteger(values.case, '--case'),
+    sizeMiB: fileSize(values.case),
+    analysis,
     extension: values.ext,
     highlighting: highlightingModes[0]!,
     twoByte: values['two-byte'],
@@ -64,7 +70,7 @@ if (values.case) {
 }
 
 const beforeBuild = await sourceRevisions('before')
-if (!values['web-root']) await buildWeb()
+if (!values['web-root']) await buildBenchmarkWeb(webRoot, path.join(output, 'build.log'))
 if (!existsSync(path.join(webRoot, 'index.html')))
   throw createScriptError(`No production web build at ${webRoot}`)
 const revisions = await sourceRevisions('after')
@@ -116,6 +122,8 @@ for (const { size, highlighting } of cases) {
     values.ext,
     '--highlighting',
     highlighting,
+    '--analysis',
+    analysis,
     '--keys',
     String(keys),
     '--settle-ms',
@@ -178,12 +186,10 @@ async function sourceRevisions(phase: string) {
   }
 }
 
-async function buildWeb() {
-  const child = Bun.spawn(['bun', '--bun', 'vite', 'build', '--base', '/', '--outDir', webRoot], {
-    cwd: path.join(checkoutRoot, 'apps/web'),
-    env: { ...process.env, NODE_ENV: 'production', VITE_SERVER_URL: undefined },
-    stdout: Bun.file(path.join(output, 'build.log')),
-    stderr: 'inherit',
-  })
-  if (await child.exited) throw createScriptError(`Web build failed; see ${output}/build.log`)
+function fileSize(raw: string) {
+  const size = Number(raw)
+  if (Number.isFinite(size) && size > 0 && Number.isSafeInteger(size * 1024 * 1024)) return size
+  throw createScriptError(
+    '--sizes and --case require positive MiB sizes with an integral byte count',
+  )
 }

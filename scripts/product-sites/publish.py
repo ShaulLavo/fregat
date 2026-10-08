@@ -38,25 +38,37 @@ class TreeBudget:
         self.root = root
         self.size, self.inodes = tree_usage(root)
         self.block_size = max(4096, os.statvfs(root).f_frsize)
+        self.retried = False
         self.reserve(0, 0)
 
     def reserve(self, size, inodes):
-        if self.size + size > MAX_TREE_BYTES or self.inodes + inodes > MAX_TREE_INODES:
+        if self.exceeds(size, inodes) and not self.retried:
+            self.retried = True
+            evict_rollbacks(self.root)
+            self.size, self.inodes = tree_usage(self.root)
+        if self.exceeds(size, inodes):
             raise ValueError('Sites tree exceeds aggregate storage limit')
         self.size += size
         self.inodes += inodes
 
-    def directories(self, path):
+    def exceeds(self, size, inodes):
+        return self.size + size > MAX_TREE_BYTES or self.inodes + inodes > MAX_TREE_INODES
+
+    def missing_directories(self, path):
         missing = 0
         while path != self.root and not path.exists():
             missing += 1
             path = path.parent
+        return missing
+
+    def directories(self, path):
+        missing = self.missing_directories(path)
         self.reserve(missing * self.block_size * 2, missing)
 
     def file(self, path, size):
-        self.directories(path.parent)
+        missing = self.missing_directories(path.parent)
         blocks = (size + self.block_size - 1) // self.block_size
-        self.reserve((blocks + 1) * self.block_size, 1)
+        self.reserve((blocks + 1 + missing * 2) * self.block_size, missing + 1)
 
 
 def extract_release(release, stream, budget):
@@ -103,6 +115,7 @@ def sync_directory(directory):
 
 
 def prune(root):
+    root = root.resolve()
     current = (root / 'current').resolve()
     complete = sorted((path for path in (root / 'releases').glob('release-*')
                        if (path / '.complete').is_file()), key=lambda path: path.stat().st_mtime_ns, reverse=True)
@@ -112,6 +125,20 @@ def prune(root):
     for path in (root / 'releases').glob('release-*'):
         if path not in retained:
             shutil.rmtree(path)
+    prune_assets(root, retained)
+    return retained
+
+
+def evict_rollbacks(root):
+    current = (root / 'current').resolve()
+    for release in (root / 'releases').glob('release-*'):
+        if release != current and (release / '.complete').is_file():
+            shutil.rmtree(release)
+    remaining = list((root / 'releases').glob('release-*'))
+    prune_assets(root, remaining)
+
+
+def prune_assets(root, retained):
     referenced = {path for release in retained for path in hashed_assets(release)}
     immutable = root / 'immutable'
     for asset in immutable.rglob('*'):
@@ -120,7 +147,6 @@ def prune(root):
     for directory in sorted((path for path in immutable.rglob('*') if path.is_dir()), reverse=True):
         if not any(directory.iterdir()):
             directory.rmdir()
-    return retained
 
 
 def retain_assets(root, release, budget):
@@ -148,6 +174,7 @@ def release_digest(release):
 
 
 def publish(root, stream):
+    root = root.resolve()
     os.umask(0o022)
     root.mkdir(parents=True, exist_ok=True)
     releases = root / 'releases'
@@ -187,7 +214,8 @@ def publish(root, stream):
             pending = root / 'current.next'
             pending.unlink(missing_ok=True)
             pending.symlink_to(release.relative_to(root))
-            TreeBudget(root)
+            budget.size, budget.inodes = tree_usage(root)
+            budget.reserve(0, 0)
             pending.replace(root / 'current')
             sync_directory(root)
             prune(root)

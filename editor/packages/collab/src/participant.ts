@@ -1,14 +1,17 @@
 import { CollabFailure } from './failure'
 import { cloneEnvelope } from './host'
+import { UndoManager } from './undo'
+import type { CaptureOptions, UndoOptions } from './undo'
 import type { HostMessage } from './host'
 import { editKey, sameChar } from './types'
-import type { CharId, EditId, Engine, Envelope, LeftOrigin, OffsetEdit } from './types'
+import type { CharId, EditId, Effect, Engine, Envelope, LeftOrigin, OffsetEdit } from './types'
 
 export type ParticipantOptions<Snapshot> = {
   readonly actor: string
   readonly document: string
   readonly epoch: string
   readonly engine: Engine<Snapshot>
+  readonly undo?: UndoOptions
 }
 export type ParticipantState = {
   readonly text: string
@@ -19,6 +22,9 @@ export type ParticipantState = {
 }
 
 export class Participant<Snapshot = unknown> {
+  readonly actor: string
+  readonly undoManager: UndoManager
+  private historyRejected: EditId[] = []
   private confirmed: Snapshot
   private frontier = new Map<string, EditId>()
   private pending: Envelope[] = []
@@ -34,7 +40,14 @@ export class Participant<Snapshot = unknown> {
 
   constructor(private readonly options: ParticipantOptions<Snapshot>) {
     if (!options.actor) throw new CollabFailure('invalid-actor')
+    this.actor = options.actor
     this.confirmed = options.engine.snapshot()
+    this.undoManager = new UndoManager(
+      options.actor,
+      (effects) => this.enqueueEffects(effects),
+      options.undo,
+      () => this.publish(),
+    )
   }
 
   text(): string {
@@ -58,7 +71,7 @@ export class Participant<Snapshot = unknown> {
     }
   }
 
-  local(edit: OffsetEdit): Envelope {
+  local(edit: OffsetEdit, capture: CaptureOptions = {}): Envelope {
     const envelope = this.options.engine.author(edit, {
       document: this.options.document,
       epoch: this.options.epoch,
@@ -71,8 +84,35 @@ export class Participant<Snapshot = unknown> {
     this.editSequence++
     this.lamport++
     this.pending.push(cloneEnvelope(envelope))
+    try {
+      this.undoManager.record(envelope, capture)
+    } finally {
+      this.publish()
+    }
+    return envelope
+  }
+
+  setEffects(effects: readonly Effect[]): Envelope {
+    const envelope = this.enqueueEffects(effects)
     this.publish()
     return envelope
+  }
+
+  private enqueueEffects(effects: readonly Effect[]): Envelope {
+    const id = { actor: this.options.actor, seq: this.editSequence + 1 }
+    const envelope: Envelope = {
+      document: this.options.document,
+      epoch: this.options.epoch,
+      id,
+      lamport: this.lamport + 1,
+      deps: this.pendingFrontier(),
+      change: { kind: 'setEffects', command: id, effects },
+    }
+    this.options.engine.apply(envelope)
+    this.editSequence++
+    this.lamport++
+    this.pending.push(cloneEnvelope(envelope))
+    return cloneEnvelope(envelope)
   }
 
   receive(messages: readonly HostMessage[]): void {
@@ -84,6 +124,7 @@ export class Participant<Snapshot = unknown> {
       if (message.sequence > this.sequence) this.incoming.set(message.sequence, message)
     }
     if (!this.incoming.has(this.sequence + 1)) return
+    this.historyRejected = []
     this.options.engine.restore(this.confirmed)
     while (this.incoming.has(this.sequence + 1)) {
       const message = this.incoming.get(this.sequence + 1)!
@@ -92,6 +133,7 @@ export class Participant<Snapshot = unknown> {
     }
     this.confirmed = this.options.engine.snapshot()
     this.replay()
+    this.undoManager.reject([...this.historyRejected, ...this.blocked])
     this.publish()
   }
 
@@ -100,9 +142,11 @@ export class Participant<Snapshot = unknown> {
     this.pending = this.pending.filter((envelope) => editKey(envelope.id) !== editKey(id))
     if (message.status === 'rejected') {
       this.rejected.add(editKey(id))
+      this.historyRejected.push(id)
       return
     }
     this.options.engine.apply(message.envelope)
+    this.undoManager.remote(message.envelope)
     this.lamport = Math.max(this.lamport, message.envelope.lamport)
     for (const dependency of message.envelope.deps) this.frontier.delete(editKey(dependency))
     this.frontier.set(editKey(id), { ...id })
