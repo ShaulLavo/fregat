@@ -3,6 +3,8 @@
 import {
   applyCharIdEdit,
   charIdAt,
+  charIdAfter,
+  diffPieceTableSnapshots,
   charIdSpansInRange,
   createPieceTableSnapshot,
   locateCharId,
@@ -38,12 +40,19 @@ import type {
 } from './types'
 
 type Side = 'L' | 'R'
+type Ancestor = { readonly id: CharId; readonly depth: number }
+type Ancestry = {
+  readonly start: CharId
+  readonly depth: number
+  readonly jumps: readonly Ancestor[]
+}
 export type PlacementRun = {
   readonly start: CharId
   readonly count: number
   readonly parent: LeftOrigin
   readonly side: Side
   readonly rightOrigin: RightOrigin
+  readonly ancestry: Ancestry
 }
 type Children = { readonly L: readonly CharId[]; readonly R: readonly CharId[] }
 export type TextbufferSnapshot = {
@@ -81,7 +90,14 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
       throw new CollabFailure('invalid-bootstrap')
     const span = spans[0]
     const run: PlacementRun | null = span
-      ? { start: span.start, count: span.count, parent: 'start', side: 'R', rightOrigin: 'end' }
+      ? {
+          start: span.start,
+          count: span.count,
+          parent: 'start',
+          side: 'R',
+          rightOrigin: 'end',
+          ancestry: { start: span.start, depth: 1, jumps: [] },
+        }
       : null
     this.state = {
       buffer,
@@ -93,6 +109,10 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
     this.retainPayloads(this.state)
   }
 
+  changesBetween(snapshot: TextbufferSnapshot) {
+    const edit = diffPieceTableSnapshots(snapshot.buffer, this.state.buffer)
+    return edit ? [edit] : []
+  }
   text(): string {
     return materializePieceTableFullText(this.state.buffer)
   }
@@ -267,21 +287,42 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
     if (!left || !right) throw new CollabFailure('unknown-character')
     return left.piece.order - right.piece.order || left.unit - right.unit
   }
+  private depth(id: CharId): number {
+    const { ancestry } = this.run(id)
+    return ancestry.depth + id.counter - ancestry.start.counter
+  }
+  private ancestry(start: CharId, parent: LeftOrigin): Ancestry {
+    if (parent === 'start') return { start, depth: 1, jumps: [] }
+    const depth = this.depth(parent)
+    const jumps: Ancestor[] = [{ id: parent, depth }]
+    for (let level = 0; ; level++) {
+      const next = this.run(jumps[level]!.id).ancestry.jumps[level]
+      if (!next) break
+      jumps.push(next)
+    }
+    return { start, depth: depth + 1, jumps }
+  }
   private ancestor(ancestor: LeftOrigin, descendant: CharId): boolean {
     if (ancestor === 'start') return true
-    let current: LeftOrigin = descendant
-    while (current !== 'start') {
-      const run = this.run(current)
-      if (
-        ancestor.bunch === current.bunch &&
-        ancestor.counter >= run.start.counter &&
-        ancestor.counter < current.counter
-      )
-        return true
-      if (sameChar(ancestor, run.parent)) return true
-      current = run.parent
+    const depth = this.depth(ancestor)
+    if (depth >= this.depth(descendant)) return false
+    let current = descendant
+    while (true) {
+      const { ancestry } = this.run(current)
+      if (depth >= ancestry.depth)
+        return sameChar(ancestor, {
+          bunch: current.bunch,
+          counter: ancestry.start.counter + depth - ancestry.depth,
+        })
+      let jump = ancestry.jumps[0]!
+      for (let level = ancestry.jumps.length - 1; level > 0; level--) {
+        const candidate = ancestry.jumps[level]!
+        if (candidate.depth < depth) continue
+        jump = candidate
+        break
+      }
+      current = jump.id
     }
-    return false
   }
   private first(id: CharId): CharId {
     let current = id
@@ -295,24 +336,7 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
     return current
   }
   private successor(id: LeftOrigin): CharId | null {
-    if (id === 'start') {
-      const child = this.state.roots.R[0]
-      return child ? this.first(child) : null
-    }
-    const initial = this.run(id)
-    if (id.counter < endId(initial).counter) return { bunch: id.bunch, counter: id.counter + 1 }
-    const child = this.children(id).R[0]
-    if (child) return this.first(child)
-    let run = initial
-    while (true) {
-      const siblings = this.children(run.parent)[run.side]
-      const index = siblings.findIndex((sibling) => sameChar(sibling, run.start))
-      const next = siblings[index + 1]
-      if (next) return this.first(next)
-      if (run.side === 'L' && run.parent !== 'start') return run.parent
-      if (run.parent === 'start') return null
-      run = this.run(run.parent)
-    }
+    return charIdAfter(this.state.buffer, id)
   }
 
   private integrate(insert: Insert): CharIdBoundary {
@@ -357,6 +381,7 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
       count: insert.text.length,
       parent,
       side,
+      ancestry: this.ancestry(start, parent),
       rightOrigin: insert.originRight === 'end' ? 'end' : { ...insert.originRight },
     })
     return at

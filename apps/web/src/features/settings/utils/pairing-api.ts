@@ -1,30 +1,16 @@
 import { queryOptions, type QueryClient } from '@tanstack/react-query'
-import type { PairedDevice, PairingLink, PairingStatus } from '@workspace/contracts'
+import type { PairedDevice, PairingLink } from '@workspace/contracts'
 
 import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { createRpcError } from '@/lib/structured-errors'
 import { settingsQueryKeys } from '@/features/settings/utils/query-keys'
 
-/** Whether this browser is the machine itself, a paired device, or neither. */
-export function pairingStatusQueryOptions() {
-  return queryOptions({
-    queryKey: settingsQueryKeys.pairingStatus,
-    queryFn: ({ client }) => fetchPairingStatus(clientForQueryClient(client)),
-  })
-}
-
 export function pairedDevicesQueryOptions() {
   return queryOptions({
     queryKey: settingsQueryKeys.pairedDevices,
     queryFn: ({ client }) => fetchPairedDevices(clientForQueryClient(client)),
   })
-}
-
-async function fetchPairingStatus(client: Client): Promise<PairingStatus> {
-  const { data, error } = await client.pairing.status.get()
-  if (error || !data) throw createRpcError(error)
-  return data
 }
 
 async function fetchPairedDevices(client: Client): Promise<readonly PairedDevice[]> {

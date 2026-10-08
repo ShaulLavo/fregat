@@ -1,0 +1,133 @@
+<div class="rep" data-timeline="800,2300,3300,4300,6200,7600,9000,10400,11600" role="img" aria-label="Fregat workbench: one prompt goes to three models, each in its own git worktree. Their results arrive side by side with test counts, and one diff opens in the editor.">
+  <div class="rep-title">
+    {i:folder:sm}<span class="ws">fregat</span><span class="dot"></span><span class="mfg">omarchy</span>{i:down:sm}
+    <span class="sp"></span>
+    <span class="ic">{i:layout:sm}{i:grid:sm}{i:chat:sm}</span>
+  </div>
+  <div class="rep-body">
+    <aside class="rep-side">
+      <div class="row new">{i:plus:sm}<span class="grow">New session</span><span class="mfg">{i:fork:sm}</span></div>
+      <div class="row mfg"><span class="grow">All projects</span><span class="mono">1</span></div>
+      <div class="search">{i:search:sm}Search sessions</div>
+      <div class="cap">Active</div>
+      <div class="row mfg">{i:down:sm}<span class="sq ok"></span><span class="grow" style="color:var(--fg)">fregat</span><span>omarchy</span></div>
+      <div class="row sess sel" data-at="4">
+        <div class="l1"><span class="sq run" data-until="7"></span><span class="sq ok" data-at="7"></span><span class="t">Dismissible large-file notice</span><span class="mfg">now</span></div>
+        <div class="l2">Claude Opus · {i:branch:sm} opus/notice</div>
+      </div>
+      <div class="row sess" data-at="4">
+        <div class="l1"><span class="sq run" data-until="6"></span><span class="sq ask" data-at="6"></span><span class="t">Dismissible large-file notice</span><span class="mfg">now</span></div>
+        <div class="l2">Claude Sonnet · {i:branch:sm} sonnet/notice</div>
+      </div>
+      <div class="row sess" data-at="4">
+        <div class="l1"><span class="sq run" data-until="5"></span><span class="sq ok" data-at="5"></span><span class="t">Dismissible large-file notice</span><span class="mfg">now</span></div>
+        <div class="l2">Codex · {i:branch:sm} codex/notice</div>
+      </div>
+      <div class="cap">Settled</div>
+      <div class="row sess"><div class="l1"><span class="sq ok"></span><span class="t">Move settings registry into contracts</span><span class="mfg">1h</span></div></div>
+      <div class="row sess"><div class="l1"><span class="sq ok"></span><span class="t">Terminal reattach after restart</span><span class="mfg">3h</span></div></div>
+      <div class="row sess"><div class="l1"><span class="sq ok"></span><span class="t">Wallpaper picker keyboard nav</span><span class="mfg">1d</span></div></div>
+    </aside>
+
+    <main class="rep-chat">
+      <div class="rep-bar">
+        <span class="crumb">fregat</span>{i:right:sm}<span class="chip">{i:branch:sm}main</span>{i:right:sm}<span class="here" data-until="4">New session</span><span class="here" data-at="4">Dismissible large-file notice</span>
+        <span class="sp"></span>
+        <span class="chip ghost" data-at="4">3 worktrees</span>
+      </div>
+      <div class="rep-thread">
+        <div data-until="4" style="margin:auto 0;text-align:center;color:var(--mfg)">
+          <div style="font-weight:500;color:var(--fg);font-size:14px">Ask about your workspace</div>
+          <div style="margin-top:4px">Reference files, run commands, or just start typing.</div>
+        </div>
+        <div class="you" data-at="4">Make the large-file notice dismissible per file, and remember it across reloads.</div>
+        <div class="tool" data-at="4">{i:fork:sm}<b>Sent to 3 models</b><span class="mfg">each in a new worktree from main</span></div>
+
+        <div class="card" data-at="4">
+          <div class="hd"><span class="sq run" data-until="7"></span><span class="sq ok" data-at="7"></span>Claude Opus<span class="mono mfg" style="font-weight:400">opus/notice</span><span class="sp"></span>
+            <span class="mfg" style="font-weight:400" data-until="7">Editing large-file-notice.tsx</span>
+            <span data-at="7" class="tab-num" style="font-weight:400">3 files <span class="add-n">+58</span> <span class="del-n">−6</span> · <span style="color:var(--success)">12 pass</span></span></div>
+        </div>
+        <div class="card" data-at="4">
+          <div class="hd"><span class="sq run" data-until="6"></span><span class="sq ask" data-at="6"></span>Claude Sonnet<span class="mono mfg" style="font-weight:400">sonnet/notice</span><span class="sp"></span>
+            <span class="mfg" style="font-weight:400" data-until="6">Reading notice-store.ts</span>
+            <span data-at="6" class="tab-num" style="font-weight:400">2 files <span class="add-n">+41</span> <span class="del-n">−3</span> · <span style="color:var(--danger)">1 failing</span></span></div>
+        </div>
+        <div class="card" data-at="4">
+          <div class="hd"><span class="sq run" data-until="5"></span><span class="sq ok" data-at="5"></span>Codex<span class="mono mfg" style="font-weight:400">codex/notice</span><span class="sp"></span>
+            <span class="mfg" style="font-weight:400" data-until="5">Running vitest</span>
+            <span data-at="5" class="tab-num" style="font-weight:400">3 files <span class="add-n">+49</span> <span class="del-n">−5</span> · <span style="color:var(--success)">12 pass</span></span></div>
+          <div class="btns" data-at="7" style="margin-top:6px"><span class="btn ghost">{i:eye:sm}Ask Opus to review</span><span class="btn pri press-target" data-point="8" data-press>Open diff</span></div>
+        </div>
+      </div>
+      <div class="rep-composer">
+        <div class="input" data-until="1">Use @ to mention, / for commands.</div>
+        <div class="input typed" data-at="1" data-until="4" data-type="1200">Make the large-file notice dismissible per file, and remember it across reloads.</div>
+        <div class="input" data-at="4">Use @ to mention, / for commands.</div>
+        <div class="tools">
+          <span class="m" data-until="2">Claude Opus{i:down:sm}</span>
+          <span class="m" data-at="2">Opus, Sonnet, Codex{i:down:sm}</span>
+          <span>{i:branch:sm} <span data-until="2">Current checkout</span><span data-at="2">New worktree each</span></span><span class="hide-narrow">Medium</span>
+          <span class="sp"></span><span class="send press-target" data-point="3" data-press>{i:up:sm}</span>
+        </div>
+      </div>
+      <div class="pop" data-at="2" data-until="3" style="left:420px;bottom:96px;width:260px;padding:6px">
+        <div class="cap" style="font:500 10px/1 'JetBrains Mono',monospace;letter-spacing:.08em;color:var(--mfg);padding:8px 8px 6px;text-transform:uppercase">Send to</div>
+        <div class="hunk" style="background:var(--row-sel)">{i:check:sm}<span class="f" style="font-family:Inter">Claude Opus</span><span class="mfg">High</span></div>
+        <div class="hunk" style="background:var(--row-sel)">{i:check:sm}<span class="f" style="font-family:Inter">Claude Sonnet</span><span class="mfg">Medium</span></div>
+        <div class="hunk" style="background:var(--row-sel)">{i:check:sm}<span class="f" style="font-family:Inter">Codex</span><span class="mfg">Medium</span></div>
+      </div>
+    </main>
+
+    <section class="rep-pane">
+      <div class="rep-tabs">
+        <span class="tb on" data-until="9"><span class="ts">TS</span>large-file-notice.tsx</span>
+        <span class="tb" data-at="9"><span class="ts">TS</span>large-file-notice.tsx</span>
+        <span class="tb on" data-at="9">{i:branch:sm}codex/notice · diff</span>
+      </div>
+      <div class="rep-code">
+        <div data-until="9">
+          <div class="ln"><i>12</i><span class="k">export function</span> <span class="f">LargeFileNotice</span>({ file }: <span class="t">Props</span>) {</div>
+          <div class="ln"><i>13</i>  <span class="k">const</span> tier = <span class="f">sizeTier</span>(file.size)</div>
+          <div class="ln"><i>14</i>  <span class="k">if</span> (tier === <span class="s">'normal'</span>) <span class="k">return</span> <span class="k">null</span></div>
+          <div class="ln cur"><i>15</i>  <span class="k">return</span> (</div>
+          <div class="ln"><i>16</i>    &lt;<span class="t">NoticeRow</span> tone=<span class="s">"info"</span>&gt;</div>
+          <div class="ln"><i>17</i>      {tier === <span class="s">'paged'</span></div>
+          <div class="ln"><i>18</i>        ? <span class="s">'Opened read-only in pages.'</span></div>
+          <div class="ln"><i>19</i>        : <span class="s">'Analysis paused above 10 Mi code units.'</span>}</div>
+          <div class="ln"><i>20</i>    &lt;/<span class="t">NoticeRow</span>&gt;</div>
+          <div class="ln"><i>21</i>  )</div>
+          <div class="ln"><i>22</i>}</div>
+        </div>
+        <div data-at="9">
+          <div class="ln"><i>12</i><span class="k">export function</span> <span class="f">LargeFileNotice</span>({ file }: <span class="t">Props</span>) {</div>
+          <div class="ln"><i>13</i>  <span class="k">const</span> tier = <span class="f">sizeTier</span>(file.size)</div>
+          <div class="ln add"><i>14</i>  <span class="k">const</span> dismissed = <span class="f">useNoticeDismissed</span>(file.id, file.hash)</div>
+          <div class="ln del"><i>15</i>  <span class="k">if</span> (tier === <span class="s">'normal'</span>) <span class="k">return</span> <span class="k">null</span></div>
+          <div class="ln add"><i>15</i>  <span class="k">if</span> (tier === <span class="s">'normal'</span> || dismissed.value) <span class="k">return</span> <span class="k">null</span></div>
+          <div class="ln"><i>16</i>  <span class="k">return</span> (</div>
+          <div class="ln del"><i>17</i>    &lt;<span class="t">NoticeRow</span> tone=<span class="s">"info"</span>&gt;</div>
+          <div class="ln add"><i>17</i>    &lt;<span class="t">NoticeRow</span> tone=<span class="s">"info"</span> onDismiss={dismissed.<span class="f">set</span>}&gt;</div>
+          <div class="ln"><i>18</i>      {tier === <span class="s">'paged'</span></div>
+          <div class="ln"><i>19</i>        ? <span class="s">'Opened read-only in pages.'</span></div>
+          <div class="ln"><i>20</i>        : <span class="s">'Analysis paused above 10 Mi code units.'</span>}</div>
+        </div>
+        <div class="mini"><span style="width:60%"></span><span style="width:80%"></span><span class="a" style="width:40%"></span><span style="width:90%"></span><span class="a" style="width:70%"></span><span style="width:85%"></span></div>
+      </div>
+      <div class="rep-tabs">
+        <span class="tb on">{i:term:sm}Terminal</span><span class="tb">{i:alert:sm}Problems <span class="mono">0</span></span>
+      </div>
+      <div class="rep-term">
+        <div class="l"><span class="b">fregat</span> <span class="m">main</span> <span class="g">❯</span> <span data-until="5"><span class="cursor"></span></span><span data-at="5">git worktree list</span></div>
+        <div class="l" data-at="5"><span class="d">/work/fregat</span>                 523ccf5 [main]</div>
+        <div class="l" data-at="5"><span class="d">/work/fregat-wt/opus-notice</span>   523ccf5 [opus/notice]</div>
+        <div class="l" data-at="5"><span class="d">/work/fregat-wt/sonnet-notice</span> 523ccf5 [sonnet/notice]</div>
+        <div class="l" data-at="5"><span class="d">/work/fregat-wt/codex-notice</span>  523ccf5 [codex/notice]</div>
+        <div class="l" data-at="5"><span class="b">fregat</span> <span class="m">main</span> <span class="g">❯</span> <span class="cursor"></span></div>
+      </div>
+    </section>
+
+    <nav class="rep-rail">{i:branch:sm}{i:files:sm}{i:code:sm}{i:search:sm}<span class="on">{i:term:sm}</span>{i:alert:sm}{i:history:sm}</nav>
+  </div>
+  <div class="pointer"><svg viewBox="0 0 24 24" width="18" height="18"><use href="#i-pointer"/></svg></div>
+</div>

@@ -79,6 +79,8 @@ export type VirtualizedTextViewOptions = {
   readonly gutterWidth?: number | ((context: EditorGutterWidthContext) => number)
   /** Empty pixels at the gutter's leading edge, before the first lane. Defaults to 0. */
   readonly gutterLeadingInset?: number
+  /** Horizontal gutter placement. Defaults to fixed at the viewport edge. */
+  readonly gutterScroll?: 'fixed' | 'content'
   readonly longLineChunkSize?: number
   readonly longLineChunkThreshold?: number
   readonly horizontalOverscanColumns?: number

@@ -98,9 +98,16 @@
   --editor-gutter-width: 0px;
   /* Written by the editor from `gutterLeadingInset`; part of `--editor-gutter-width`. */
   --editor-gutter-inset: 0px;
+  --editor-gutter-scroll-left: 0px;
+  --editor-visible-gutter-width: max(
+    0px,
+    calc(var(--editor-gutter-width) - var(--editor-gutter-scroll-left))
+  );
   --editor-row-height: 24px;
 
   flex: 1;
+  /* Constrain the scrollport before its document spacer sizes a block host's child. */
+  height: 100%;
   position: relative;
   overflow: auto;
   /* Written by the editor from its `fontSize` and `fontFamily` options. */
@@ -134,11 +141,11 @@
 }
 
 .editor-virtualized-text-clip {
-  clip-path: inset(0 0 0 var(--editor-gutter-width));
+  clip-path: inset(0 0 0 var(--editor-visible-gutter-width));
 }
 
 .editor-virtualized-gutter-clip {
-  clip-path: inset(0 max(0px, calc(100% - var(--editor-gutter-width))) 0 0);
+  clip-path: inset(0 max(0px, calc(100% - var(--editor-visible-gutter-width))) 0 0);
   pointer-events: none;
   z-index: var(--editor-z-gutter);
 }
@@ -157,7 +164,8 @@
      the spacer's size depend on every mounted row's text, which disqualifies
      rows as relayout boundaries and forces document-rooted layout on every
      recycle frame. */
-  contain: layout paint style;
+  /* Remapped rows can lie beyond the capped spacer height; the viewport clips their paint. */
+  contain: layout style;
   position: relative;
 }
 

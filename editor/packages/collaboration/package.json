@@ -1,6 +1,20 @@
 {
   "name": "@singapore-editor/collaboration",
   "version": "0.0.1",
+  "description": "Session protocols, transports, and remote cursor presence for host-ordered collaboration.",
+  "keywords": [
+    "browser",
+    "collaboration",
+    "editor",
+    "presence",
+    "singapore",
+    "typescript"
+  ],
+  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/collaboration/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ShaulLavo/fregat.git",
@@ -8,15 +22,33 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "server",
+    "examples/signaling-server.ts"
   ],
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "**/*.css"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./presence-plugin": {
+      "types": "./dist/presence-plugin.d.ts",
+      "import": "./dist/presence-plugin.js",
+      "default": "./dist/presence-plugin.js"
+    },
+    "./transports": {
+      "types": "./dist/transports.d.ts",
+      "import": "./dist/transports.js",
+      "default": "./dist/transports.js"
+    },
+    "./server": {
+      "types": "./server/signaling.ts",
+      "bun": "./server/signaling.ts"
     }
   },
   "publishConfig": {
@@ -29,13 +61,29 @@
     "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
-    "format:check": "oxfmt --check ."
+    "format:check": "oxfmt --check .",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:server": "bun --bun vitest run --config vitest.server.config.ts"
+  },
+  "dependencies": {
+    "@singapore-editor/collab": "workspace:*"
   },
   "devDependencies": {
+    "@singapore-editor/core": "workspace:*",
+    "@types/bun": "1.4.2",
     "@types/node": "26.6.3",
+    "@vitest/browser-playwright": "5.0.2",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
     "typescript": "7.0.2",
     "vitest": "5.0.2"
+  },
+  "peerDependencies": {
+    "@singapore-editor/core": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@singapore-editor/core": {
+      "optional": true
+    }
   }
 }

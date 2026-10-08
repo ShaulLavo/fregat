@@ -5,6 +5,7 @@ import path from 'node:path'
 import { expect, test } from 'vitest'
 import {
   missingReleaseFiles,
+  PAIR_COMMAND,
   PTY_HOST,
   reachablePackages,
   REMOTE_SUPPORT,
@@ -130,6 +131,7 @@ test('a built server directory reports the release files it lacks', async () => 
       'runtime/package.json',
       'runtime/bun.lock',
       REMOTE_SUPPORT,
+      PAIR_COMMAND,
       PTY_HOST,
       WATCH_WORKER,
       IMAGE_WORKER,
@@ -142,6 +144,7 @@ test('a built server directory reports the release files it lacks', async () => 
     )
     await writeRuntimeManifest(server, lockfile)
     await writeFile(path.join(server, REMOTE_SUPPORT), '')
+    await writeFile(path.join(server, PAIR_COMMAND), '')
     expect(await missingReleaseFiles(server)).toEqual([
       PTY_HOST,
       WATCH_WORKER,

@@ -1,49 +1,45 @@
 # @fregat/react-hotkeys
 
-react hooks for [`@fregat/hotkeys`](../hotkeys). a hook registers a shortcut while its component is mounted and always calls the latest callback, so it sees current props and state. everything from the core is re-exported, so one import is enough
+React hooks for registering, recording, and displaying keyboard shortcuts with @fregat/hotkeys.
 
-## try it
+Part of [Fregat hotkeys](https://github.com/ShaulLavo/fregat/tree/main/hotkeys).
 
-clone the repo and `bun link`, or depend on it as `workspace:*` inside Fregat. needs React 18 or newer
+## Install
+
+```sh
+npm install @fregat/react-hotkeys react react-dom
+```
+
+## Usage
+
+Render this component in your React app.
 
 ```tsx
-import { formatForDisplay, useHotkey, useHotkeySequence } from '@fregat/react-hotkeys'
+import { useHotkey, formatForDisplay } from '@fregat/react-hotkeys'
 
-function Document({ onSave }: { onSave: () => void }) {
-  useHotkey('Mod+S', () => onSave())
-  useHotkeySequence(['G', 'G'], () => window.scrollTo(0, 0))
-
+export function SaveButton({ onSave }: { onSave: () => void }) {
+  useHotkey('Mod+S', onSave)
   return <button onClick={onSave}>Save {formatForDisplay('Mod+S')}</button>
 }
 ```
 
-`Mod` is Command on mac and Control elsewhere. `formatForDisplay` prints `⌘ S` or `Ctrl+S` to match
+`Mod` is Command on macOS and Control elsewhere.
 
-scope a shortcut to an element, or switch it off without unregistering
+## API highlights
 
-```tsx
-import { useRef } from 'react'
-import { useHotkey } from '@fregat/react-hotkeys'
+- `useHotkey()` registers a shortcut for the component lifetime.
+- `useHotkeySequence()` registers a chord.
+- `useHotkeyRecorder()` records a shortcut for a settings field.
+- `HotkeysProvider` sets hook defaults.
 
-function Modal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const ref = useRef<HTMLDivElement>(null)
-  useHotkey('Escape', () => onClose(), { enabled: open, target: ref })
-  return open ? <div ref={ref}>…</div> : null
-}
-```
+[Exported API](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/react-hotkeys/src/index.ts) · [Keymap guide](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/keymaps.md)
 
-## other hooks
+## In the hotkeys family
 
-- `useHotkeys([{ hotkey, callback, options }])` and `useHotkeySequences`, for a list that changes length
-- `useHotkeyRecorder({ onRecord })` and `useHotkeySequenceRecorder`, for a "press a shortcut" settings field
-- `useKeyHold('Shift')`, `useHeldKeys()`, `useHeldKeyCodes()`, for what is held right now
-- `useHotkeyHint('Mod+S')`, true while held modifiers reveal that shortcut, for badge overlays
-- `useHotkeyRegistrations()`, every live registration, for a shortcut list or palette
-- `<HotkeysProvider defaultOptions={{ hotkey: { preventDefault: false } }}>` sets defaults for the hooks below it
+`@fregat/hotkeys` owns shortcut matching and dispatch. This optional package adds React hooks and re-exports the core API. Use React 18 or newer.
 
-## more
+[Main README](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/README.md)
 
-- [core README](../hotkeys/README.md): the registry, focus-aware keymaps, display and recording
-- [keymaps](../hotkeys/docs/keymaps.md): contexts, ranking and chord rules
+## License
 
-forked from [TanStack React Hotkeys](https://github.com/TanStack/hotkeys), MIT. license in [LICENSE](LICENSE)
+MIT. Forked from [TanStack Hotkeys](https://github.com/TanStack/hotkeys). [License](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/react-hotkeys/LICENSE)

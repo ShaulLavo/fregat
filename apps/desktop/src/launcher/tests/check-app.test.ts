@@ -32,6 +32,7 @@ const files = [
   'Contents/Resources/release/server/index.js',
   'Contents/Resources/release/server/claude-discovery-worker.ts',
   'Contents/Resources/release/server/remote-support.js',
+  'Contents/Resources/release/server/pair.js',
   'Contents/Resources/release/server/pty-host.js',
   'Contents/Resources/release/server/watch-worker.ts',
   'Contents/Resources/release/server/image-worker.ts',

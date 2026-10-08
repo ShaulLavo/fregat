@@ -74,6 +74,7 @@ import {
   deleteTokenRangesForRow,
   flushDeferredCaret,
   rebuildStyleRules,
+  rebaseCaretPaint,
   renderRangeHighlight,
   renderSelectionHighlight,
   renderTokenHighlights,
@@ -89,7 +90,11 @@ import {
   renderHiddenCharacters,
   setSuspiciousCharacters,
 } from './virtualizedTextViewHiddenCharacters'
-import { compositionCharacterRects, setCompositionPreedit } from './virtualizedTextViewComposition'
+import {
+  compositionCharacterRects,
+  refreshCompositionPreedit,
+  setCompositionPreedit,
+} from './virtualizedTextViewComposition'
 import { attachEditContext, createEditContext, type EditorEditContext } from './editContext'
 import { createVirtualizedTextViewModel } from './virtualizedTextViewModel'
 import {
@@ -147,6 +152,7 @@ import {
   ensureOffsetMounted,
   getMountedRows,
   gutterWidth,
+  visibleGutterWidth,
   setGutterLeadingInsetProperty,
   horizontalViewportColumns,
   pageRowDelta,
@@ -347,6 +353,7 @@ export class VirtualizedTextView {
       options.inputKind,
     )
     const viewport = new ScrollViewport(scrollElement)
+    viewport.gutterScroll = options.gutterScroll ?? 'fixed'
     const contentElement = viewport.textContent
     const spacer = viewport.textSpacer
     const gutterElement = container.ownerDocument.createElement('div')
@@ -557,6 +564,7 @@ export class VirtualizedTextView {
     return JSON.stringify({
       rowGap: view.rowGap,
       gutterLeadingInset: view.gutterLeadingInset,
+      gutterScroll: view.viewport.gutterScroll,
       rowPositioning: view.rowPositioning,
       scrollMode: view.scrollMode,
       hiddenCharacters: view.hiddenCharacters,
@@ -579,7 +587,7 @@ export class VirtualizedTextView {
       return [
         {
           left: bounds.left - origin.left,
-          top: bounds.top - origin.top,
+          top: bounds.top - origin.top - this.view.viewport.paintOffsetY,
           width: bounds.width,
           height: bounds.height,
           backgroundColor: window?.getComputedStyle(element).backgroundColor ?? '',
@@ -940,6 +948,14 @@ export class VirtualizedTextView {
     return this.setLineHeight(rowHeight)
   }
 
+  public setGutterScroll(mode: NonNullable<VirtualizedTextViewOptions['gutterScroll']>): boolean {
+    if (this.view.viewport.gutterScroll === mode) return false
+    this.view.viewport.gutterScroll = mode
+    this.view.lastRenderedRowsKey = ''
+    this.renderSnapshot(this.view.virtualizer.getSnapshot())
+    return true
+  }
+
   public setGutterLeadingInset(inset: number): boolean {
     const view = this.view
     const next = normalizeGutterLeadingInset(inset)
@@ -1177,10 +1193,10 @@ export class VirtualizedTextView {
     return this.view.viewport.reserveOverlayWidth(side, width)
   }
 
-  /** Overlay padding and the sticky gutter inside the native scroll viewport. */
+  /** Overlay padding and the visible gutter inside the native scroll viewport. */
   public textViewportInsets(): { readonly left: number; readonly right: number } {
     const padding = scrollElementPadding(this.scrollElement)
-    return { left: padding.left + gutterWidth(this.view), right: padding.right }
+    return { left: padding.left + visibleGutterWidth(this.view), right: padding.right }
   }
 
   public reservedOverlayWidth(side: 'left' | 'right'): number {
@@ -1425,7 +1441,10 @@ export class VirtualizedTextView {
     const displayRow = row.index
     const view = this.view
     const base = { bufferRow: row.bufferRow, displayRow, source: row.source }
-    if ((clientX - bounds.left) / bounds.scale < gutterWidth(view))
+    if (
+      (clientX - bounds.left) / bounds.scale <
+      visibleGutterWidth(view, view.scrollElement.scrollLeft)
+    )
       return { ...base, region: 'gutter', offset: null }
     const mounted = view.rowElements.get(displayRow)
     const extent =
@@ -1441,7 +1460,11 @@ export class VirtualizedTextView {
   public markerAtPoint(clientX: number, clientY: number): EditorMarkerHit | null {
     const point = locatePoint(this.view, clientX, clientY)
     if (!point) return null
-    if ((clientX - point.bounds.left) / point.bounds.scale < gutterWidth(this.view)) return null
+    if (
+      (clientX - point.bounds.left) / point.bounds.scale <
+      visibleGutterWidth(this.view, this.scrollElement.scrollLeft)
+    )
+      return null
     const row = this.view.rowElements.get(point.row.index)
     return row?.kind === 'text' ? markerAtRowX(row, point.metrics.x) : null
   }
@@ -1638,7 +1661,9 @@ export class VirtualizedTextView {
       view.model.projection.clearCache()
     }
 
+    const previousPaintOffsetY = view.viewport.paintOffsetY
     updateSpacerHeight(view, snapshot)
+    if (view.viewport.paintOffsetY !== previousPaintOffsetY) rebaseCaretPaint(view)
     updateSpacerWidth(view, snapshot.viewportWidth)
     const key = rowsKey(view, snapshot)
     if (key === view.lastRenderedRowsKey) {
@@ -1654,6 +1679,7 @@ export class VirtualizedTextView {
     renderTokenHighlights(view)
     for (const name of view.rangeHighlightGroups.keys()) renderRangeHighlight(view, name)
     renderSelectionHighlight(view)
+    refreshCompositionPreedit(view)
     this.reportViewportChange()
     this.flushPendingReveal()
   }
@@ -2326,10 +2352,22 @@ function hitTestRowOffsetAtLocalX(row: MountedVirtualizedTextRow, localX: number
 function rowClientPointAtLocalX(
   row: MountedVirtualizedTextRow,
   localX: number,
-): { readonly x: number; readonly y: number; readonly scale: number } {
+): {
+  readonly x: number
+  readonly y: number
+  readonly scale: number
+  readonly top: number
+  readonly bottom: number
+} {
   const rect = row.element.getBoundingClientRect()
   const scale = row.element.offsetWidth > 0 ? rect.width / row.element.offsetWidth : 1
-  return { x: rect.left + localX * scale, y: rect.top + rect.height / 2, scale }
+  return {
+    x: rect.left + localX * scale,
+    y: rect.top + rect.height / 2,
+    scale,
+    top: rect.top,
+    bottom: rect.bottom,
+  }
 }
 
 function hitTestBidiVisualProbeAtLocalX(
@@ -2338,18 +2376,22 @@ function hitTestBidiVisualProbeAtLocalX(
   localX: number,
 ): number | null {
   const point = rowClientPointAtLocalX(row, localX)
-  const hit = hitTestRowOffset(row, point.x, point.y)
-  if (hit !== null) return hit
+  const viewport = bidiVisualProbeViewport(view, point)
+  if (viewport === null) return null
 
-  const viewportX = bidiVisualProbeViewportX(view, point.y)
-  if (viewportX === null) return null
-  return hitTestBidiVisualProbeWithTranslatedRow(row, point, viewportX)
+  const probe = { x: point.x, y: viewport.y, scale: point.scale }
+  // Native caret APIs can return a nearby row for a point outside its scrollport.
+  if (point.x >= viewport.left && point.x <= viewport.right) {
+    const hit = hitTestRowOffset(row, probe.x, probe.y)
+    if (hit !== null) return hit
+  }
+  return hitTestBidiVisualProbeWithTranslatedRow(row, probe, (viewport.left + viewport.right) / 2)
 }
 
-function bidiVisualProbeViewportX(
+function bidiVisualProbeViewport(
   view: VirtualizedTextViewInternal,
-  clientY: number,
-): number | null {
+  point: { readonly y: number; readonly top: number; readonly bottom: number },
+): { readonly left: number; readonly right: number; readonly y: number } | null {
   const element = view.scrollElement
   const rect = element.getBoundingClientRect()
   const scale = element.offsetWidth > 0 ? rect.width / element.offsetWidth : 1
@@ -2358,16 +2400,18 @@ function bidiVisualProbeViewportX(
   const viewportRight = viewportLeft + element.clientWidth * scale
   const viewportBottom = viewportTop + element.clientHeight * scale
   const documentViewport = bidiVisualProbeDocumentViewport(element.ownerDocument)
-  const top = Math.max(viewportTop, documentViewport.top)
-  const bottom = Math.min(viewportBottom, documentViewport.bottom)
-  if (clientY < top || clientY > bottom) return null
+  const top = Math.max(viewportTop, documentViewport.top, point.top)
+  const bottom = Math.min(viewportBottom, documentViewport.bottom, point.bottom)
+  if (bottom <= top) return null
+  const inset = Math.min(BIDI_VISUAL_PROBE_VIEWPORT_INSET, (bottom - top) / 2)
+  const y = Math.max(top + inset, Math.min(point.y, bottom - inset))
 
   const gutterRight = gutterWidth(view) > 0 ? view.gutterElement.getBoundingClientRect().right : 0
   const left =
     Math.max(viewportLeft, documentViewport.left, gutterRight) + BIDI_VISUAL_PROBE_VIEWPORT_INSET
   const right = Math.min(viewportRight, documentViewport.right) - BIDI_VISUAL_PROBE_VIEWPORT_INSET
   if (right <= left) return null
-  return (left + right) / 2
+  return { left, right, y }
 }
 
 function bidiVisualProbeDocumentViewport(document: Document): {

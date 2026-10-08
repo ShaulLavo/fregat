@@ -31,7 +31,7 @@
       "file": "examples/stress/src/browser.ts",
       "id": "examples/stress/src/browser.ts:requestAnimationFrame:dffa87e548",
       "justification": "Benchmark observation of the first animation frame after an applied key; it records a timestamp only, tracks the frame handle, and cancels pending frames on disposal.",
-      "line": 269,
+      "line": 276,
       "snippet": "const frame = requestAnimationFrame(() => {"
     },
     {
@@ -39,7 +39,7 @@
       "file": "examples/stress/src/browser.ts",
       "id": "examples/stress/src/browser.ts:setTimeout:e5c148c176",
       "justification": "The bounded churn benchmark yields to the browser every ten iterations so cancellation and rendering can run. The timer only resolves the awaited promise; the next iteration checks cancellation before editing.",
-      "line": 338,
+      "line": 345,
       "snippet": "if (index % 10 === 0) await new Promise((resolve) => setTimeout(resolve, 0))"
     },
     {
@@ -147,6 +147,86 @@
       "snippet": "if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs))"
     },
     {
+      "api": "setTimeout",
+      "file": "packages/collaboration/server/signaling.ts",
+      "id": "packages/collaboration/server/signaling.ts:setTimeout:2017a2146d",
+      "justification": "Authorization may never settle; the deadline bounds reserved quota, and finally clears it and releases the reservation when upgrade fails.",
+      "line": 154,
+      "snippet": "timeout = setTimeout(() => resolve(false), options.limits.subscribeTimeout)"
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/collaboration/server/signaling.ts",
+      "id": "packages/collaboration/server/signaling.ts:setTimeout:a47f4f735b",
+      "justification": "Silent clients emit no progress event; one deadline per socket bounds subscription and application idle time, is replaced by progress, and is cleared on close.",
+      "line": 97,
+      "snippet": "socket.data.deadline = setTimeout(() => {"
+    },
+    {
+      "api": "setInterval",
+      "file": "packages/collaboration/src/broadcast-transport.ts",
+      "id": "packages/collaboration/src/broadcast-transport.ts:setInterval:3a6db814f1",
+      "justification": "BroadcastChannel has no remote-close or crash event; this heartbeat expires silent peers and advertises membership, and close clears the interval.",
+      "line": 62,
+      "snippet": "this.timer = setInterval(() => {"
+    },
+    {
+      "api": "requestAnimationFrame",
+      "file": "packages/collaboration/src/presence-plugin.ts",
+      "id": "packages/collaboration/src/presence-plugin.ts:requestAnimationFrame:9b743b037a",
+      "justification": "Remote presence changes between editor updates; one frame coalesces its notifications into a paint, and disposal cancels the pending frame.",
+      "line": 83,
+      "snippet": "this.frame = window.requestAnimationFrame(() => {"
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/collaboration/src/presence-plugin.ts",
+      "id": "packages/collaboration/src/presence-plugin.ts:setTimeout:e13f563da7",
+      "justification": "Peer events cannot signal elapsed idle time; each view keeps one deadline for the next visible name's idle transition, and clear or disposal cancels it.",
+      "line": 117,
+      "snippet": "this.labelDeadline = window.setTimeout("
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/collaboration/src/signaling.ts",
+      "id": "packages/collaboration/src/signaling.ts:setTimeout:2fa18ecddb",
+      "justification": "Remote broker readiness has no notification; one retry per URL spaces reconnect attempts, connect checks closed, and close clears every pending retry.",
+      "line": 90,
+      "snippet": "setTimeout(() => this.connect(url), this.options.reconnectInterval),"
+    },
+    {
+      "api": "setInterval",
+      "file": "packages/collaboration/src/webrtc-transport.ts",
+      "id": "packages/collaboration/src/webrtc-transport.ts:setInterval:f477778391",
+      "justification": "Signaling has no peer-roster notification; discovery announcements and retries expire silent peers on this protocol clock, which close clears.",
+      "line": 119,
+      "snippet": "this.timer = setInterval(() => {"
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/collaboration/src/webrtc-transport.ts",
+      "id": "packages/collaboration/src/webrtc-transport.ts:setTimeout:4302f06a3f",
+      "justification": "A TURN supplier may never settle; abort bounds the wait, finally clears the deadline, and close aborts pending requests.",
+      "line": 336,
+      "snippet": "const credentialTimeout = setTimeout(() => abort.abort(), this.options.connectionTimeout)"
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/collaboration/src/webrtc-transport.ts",
+      "id": "packages/collaboration/src/webrtc-transport.ts:setTimeout:f246bd882a",
+      "justification": "Native connection setup can stall without a terminal event; channel open or removal clears this deadline, and failure checks the current link generation.",
+      "line": 357,
+      "snippet": "timeout: setTimeout("
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/collaboration/vitest.browser.config.ts",
+      "id": "packages/collaboration/vitest.browser.config.ts:setTimeout:aa312d20fb",
+      "justification": "A child can emit neither readiness nor exit; this bounds startup failure, while stdout readiness, error, and exit notifications each clear the deadline.",
+      "line": 25,
+      "snippet": "const timeout = setTimeout("
+    },
+    {
       "api": "queueMicrotask",
       "file": "packages/decode/src/diffusion.ts",
       "id": "packages/decode/src/diffusion.ts:queueMicrotask:a60528563a",
@@ -247,7 +327,7 @@
       "file": "packages/editor/src/virtualization/virtualizedTextView.ts",
       "id": "packages/editor/src/virtualization/virtualizedTextView.ts:requestIdleCallback:14458bc40c",
       "justification": "Measuring every row's width is the work the horizontal scroll extent needs and nothing on screen is waiting for, so it is deliberately given whatever the frame has left rather than a place in the queue. `cancelContentWidthMeasurement` withdraws it when the content it would measure has already changed.",
-      "line": 1738,
+      "line": 1764,
       "snippet": "const handle = win.requestIdleCallback(run)"
     },
     {
@@ -255,7 +335,7 @@
       "file": "packages/editor/src/virtualization/virtualizedTextView.ts",
       "id": "packages/editor/src/virtualization/virtualizedTextView.ts:setTimeout:25021385fc",
       "justification": "The same deferral for an engine with no idle callback. Zero rather than a delay, because the point is only to leave the current frame, and the same cancel withdraws it.",
-      "line": 1747,
+      "line": 1773,
       "snippet": "const handle = win.setTimeout(run, 0)"
     },
     {
@@ -436,18 +516,34 @@
     },
     {
       "api": "setTimeout",
+      "file": "packages/tree-sitter/src/session.ts",
+      "id": "packages/tree-sitter/src/session.ts:setTimeout:1c763d7a4e",
+      "justification": "Yields one macrotask so the visible result reaches its caller before complete analysis enters the worker queue; it only resolves the awaited promise, and the abort signal is checked before source preparation.",
+      "line": 276,
+      "snippet": "await new Promise<void>((resolve) => setTimeout(resolve, 0))"
+    },
+    {
+      "api": "setTimeout",
       "file": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts",
       "id": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts:setTimeout:00a37bab4d",
       "justification": "Yields one macrotask between warm-up compiles so a parse or edit message queued meanwhile runs before the next language; worker-task tracking keeps idle fences behind warm-up.",
-      "line": 253,
+      "line": 272,
       "snippet": "const yieldToMessages = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))"
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts",
+      "id": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts:setTimeout:73df9747ea",
+      "justification": "Yields a macrotask between parse slices and injection batches so queued edits and cancellation messages can run; it only resolves the awaited promise, and cancellation, staleness and the request budget are checked before work resumes.",
+      "line": 1198,
+      "snippet": "const yieldWorker = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))"
     },
     {
       "api": "setTimeout",
       "file": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts",
       "id": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts:setTimeout:74252f76bf",
       "justification": "Runs once after the parse answer is posted; it re-checks that the document is still cached and idle, so a late or stale callback does nothing.",
-      "line": 730,
+      "line": 777,
       "snippet": "setTimeout(() => reparseIdleDocument(runtimeSessionId, document, runtime), 0)"
     },
     {

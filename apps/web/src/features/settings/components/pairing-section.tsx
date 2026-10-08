@@ -11,14 +11,14 @@ import { usePairingLink } from '@/features/settings/hooks/use-pairing-link'
 import { usePairingStatus } from '@/features/settings/hooks/use-pairing-status'
 
 /**
- * The devices that may reach this machine from elsewhere, such as a phone over the mesh. Links
- * are made here, in this machine's own browser; any paired device can remove the others.
+ * The devices that may reach this machine from elsewhere, such as a phone over the mesh. This
+ * machine and any paired device can make links and remove the other devices.
  */
 export function PairingSection() {
   const status = usePairingStatus()
   const devices = usePairedDevices()
   const link = usePairingLink()
-  const onThisMachine = status.data?.trust === 'host'
+  const canPair = status.data !== undefined && status.data.trust !== 'unpaired'
 
   return (
     <section
@@ -33,7 +33,7 @@ export function PairingSection() {
           keyboard. Pair a phone once, and remove it here to shut it out.
         </p>
       </div>
-      {onThisMachine ? (
+      {canPair ? (
         <div>
           <Button
             disabled={link.isPending}
@@ -44,11 +44,6 @@ export function PairingSection() {
             {link.data ? 'Make another link' : 'Pair a device'}
           </Button>
         </div>
-      ) : null}
-      {status.data && !onThisMachine ? (
-        <p className='text-muted-foreground text-xs'>
-          Pairing links are made in this machine’s own browser.
-        </p>
       ) : null}
       {link.data ? <PairingLinkPanel link={link.data} key={link.data.code} /> : null}
       {link.isError ? (

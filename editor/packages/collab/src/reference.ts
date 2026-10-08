@@ -44,6 +44,27 @@ export class ReferenceEngine implements Engine<ReferenceSnapshot> {
   private nodes = new Map<string, Node>()
   private effects = new Effects()
 
+  changesBetween(snapshot: ReferenceSnapshot) {
+    const previous = new ReferenceEngine()
+    previous.restore(snapshot)
+    const before = previous.text(),
+      after = this.text()
+    let from = 0
+    while (
+      from < before.length &&
+      from < after.length &&
+      before.charCodeAt(from) === after.charCodeAt(from)
+    )
+      from++
+    if (from === before.length && from === after.length) return []
+    let suffix = 0
+    while (
+      suffix < Math.min(before.length, after.length) - from &&
+      before.charCodeAt(before.length - suffix - 1) === after.charCodeAt(after.length - suffix - 1)
+    )
+      suffix++
+    return [{ from, to: before.length - suffix, text: after.slice(from, after.length - suffix) }]
+  }
   text(): string {
     return this.ordered()
       .filter((node) => this.effects.visible(node.id as CharId))

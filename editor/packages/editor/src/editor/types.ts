@@ -1,5 +1,5 @@
 import type { EditorDocumentAnalysis } from './documentAnalysis'
-import type { DocumentSessionChange } from '../documentSession'
+import type { DocumentSessionApplyEditsOptions, DocumentSessionChange } from '../documentSession'
 import type { EditorSyntaxLanguageId } from '../syntax/session'
 import type {
   EditorInitialHighlightStatus,
@@ -12,6 +12,7 @@ import type {
   HiddenCharactersMode,
   VirtualizedTextViewRowPositioning,
   VirtualizedTextViewScrollMode,
+  VirtualizedTextViewOptions,
 } from '../virtualization/virtualizedTextViewTypes'
 import type { BrowserTextMetrics } from '../virtualization/browserMetrics'
 import type {
@@ -44,6 +45,8 @@ export type EditorDocumentMode = 'session' | 'static'
 export type EditorSelectionSyncMode = 'sync' | 'none'
 
 export type EditorScrollMode = VirtualizedTextViewScrollMode
+
+export type EditorGutterScroll = NonNullable<VirtualizedTextViewOptions['gutterScroll']>
 
 type EditorRowPositioning = VirtualizedTextViewRowPositioning
 
@@ -129,6 +132,8 @@ export type EditorOptions = {
    * and the line numbers. Row decorations and diff tints cover it. Defaults to 0.
    */
   readonly gutterLeadingInset?: number
+  /** `fixed` keeps gutters at the viewport edge; `content` scrolls them with text. Defaults to `fixed`. */
+  readonly gutterScroll?: EditorGutterScroll
   readonly rowGap?: number
   readonly rowPositioning?: EditorRowPositioning
   /**
@@ -209,9 +214,6 @@ export type EditorEditSelection = {
   readonly head?: number
 }
 
-export type EditorEditOptions = {
-  readonly history?: EditorEditHistoryMode
-  readonly selection?: EditorEditSelection
-}
+export type EditorEditOptions = DocumentSessionApplyEditsOptions
 
 export type EditorEditInput = TextEdit | readonly TextEdit[]

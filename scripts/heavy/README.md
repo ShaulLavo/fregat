@@ -65,6 +65,14 @@ A server admitted earlier stays eligible to launch and appears in `serversAtAdmi
 
 External tools can write `drain.request` in the state directory, then take `slot1.lock`, `slot2.lock` and `slot3.lock` exclusively. Finite jobs retain these locks until their processes drain; declared servers hold none. A drain request blocks every new admission, including light work, for at most one quiet hold. Waiting or held exclusive slot locks also block light work. An external lock holder owns its cleanup and duration; `status.js` reports its age. External holders have no wrapper measurement record, so this change adds no attribution or concurrency exception to their holds.
 
+## Scope launch transport failures
+
+A local launcher that exits unsuccessfully with `Failed to start transient scope unit: Transport endpoint is not connected` and leaves no accounting receipt is eligible for one recovery attempt. In systemd v255 scope mode, this diagnostic precedes payload execution. The runner awaits the failed launcher, stops the old scope and slice, confirms both are inactive or absent, restores the slice's limits, and launches once more. The same entry, ticket, slot ownership and absolute quiet deadline remain held throughout. Light eligibility stays disabled during cleanup and resumes with the fresh quiet launch; its original interval and overlap journal are retained. A refused fresh spawn keeps eligibility disabled. A signal, expired deadline or unconfirmed cleanup prevents the fresh launch. Other failures keep their original exit behavior.
+
+Recovery emits one starting `warn` and one ending `info` with the retry count and outcome. The single job record includes the final launch outcome and `recovery.initialExitCode`. A repeated transport failure or refused recovery returns wrapper exit 2 with manager/scope guidance; its record retains the failed launch's original exit and `launchFailure: "manager-transport"`. Quiet expiry retains exit 75 and its existing accounting.
+
+Launcher stderr is forwarded unchanged while the output destination works. Diagnostic draining after launcher exit is bounded by the configured stop grace and remaining quiet deadline; external pipe writers cannot hold admission indefinitely. Forwarding failures and a matched transport marker survive in the completed job record. The in-scope shim restores the caller's stderr descriptor before payload execution and closes the handoff descriptor. Check `journalctl --user -n 50` and `systemctl --user status`, confirm the named scope and its parent slice are stopped, then submit a fresh job after a failed recovery.
+
 ## Status, records and installation
 
 ```sh
@@ -74,7 +82,16 @@ bun /work/platform-production/heavy/current/report.js --since 1d --by command
 
 Finished jobs append JSONL to `developer.heavyJobLogDirectory`, including queue time, admission reason, `server`, `serversAtAdmission`, `jobsDuringRun`, `allowedCpus`, class budget, checkout commit, wall time, CPU time, peak memory and exit code. Fix repeated heavy consumers at their cause.
 
-The installed bundle stays pinned until explicitly replaced from a clean checkout with `bun scripts/heavy/install.ts`. Source changes and pulls leave the live runner unchanged. Existing running and queued wrappers keep their launch-time behavior. After installing the updated runner, restart private servers with `--server`. Cancel each existing queued quiet wrapper before invoking its request again through the updated runner, so its old FIFO ticket is released. Existing finite jobs can finish normally.
+Install from a clean checkout at the commit you want to run. Choose the wrapper installation directory used by your sessions:
+
+```sh
+bun install --frozen-lockfile
+bun scripts/heavy/install.ts --root=<directory>
+```
+
+The installer bundles workspace source, including `@fregat/hotkeys`, so dependency installation is its only build prerequisite. A complete source checkout is required. Its source alias applies only to this install bundle; application builds keep using the package exports.
+
+The installed bundle stays pinned until explicitly replaced from a clean checkout with `bun scripts/heavy/install.ts --root=<directory>`. Source changes and pulls leave the live runner unchanged. Existing running and queued wrappers keep their launch-time behavior. After installing the updated runner, restart private servers with `--server`. Cancel each existing queued quiet wrapper before invoking its request again through the updated runner, so its old FIFO ticket is released. Existing finite jobs can finish normally.
 
 The [Pi lane](pi/README.md) runs independently under its own ceiling and wall limit.
 

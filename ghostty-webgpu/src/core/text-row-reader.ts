@@ -19,6 +19,62 @@ function cellText(words: Uint32Array, offset: number, graphemes: Uint32Array): s
   return text
 }
 
+function copiedAsciiCells(text: string, start: number, blanks: Uint32Array): readonly string[] {
+  return Object.freeze(
+    Array.from({ length: text.length }, (_, column) => {
+      const index = start + column
+      return (blanks[index >>> 5]! & (1 << (index & 31))) !== 0 ? '' : text[column]!
+    }),
+  )
+}
+
+function copiedAsciiRow(
+  y: number,
+  text: string,
+  start: number,
+  blanks: Uint32Array,
+): RenderTextRow {
+  let cells: readonly string[] | undefined
+  let continuations: readonly boolean[] | undefined
+  return Object.freeze({
+    y,
+    text,
+    get cells() {
+      return (cells ??= copiedAsciiCells(text, start, blanks))
+    },
+    get continuations() {
+      return (continuations ??= Object.freeze(Array.from({ length: text.length }, () => false)))
+    },
+  })
+}
+
+function copiedAsciiRows(
+  metadata: Uint32Array,
+  words: Uint32Array,
+  bytes: Uint8Array,
+  decoder: TextDecoder,
+): readonly RenderTextRow[] {
+  const length = words.length / cellWords
+  const blanks = new Uint32Array(Math.ceil(length / 32))
+  let index = 0
+  for (let offset = 0; offset < words.length; offset += cellWords) {
+    const codepoint = words[offset]!
+    bytes[index] = codepoint || 0x20
+    if (codepoint === 0) blanks[index >>> 5]! |= 1 << (index & 31)
+    index += 1
+  }
+  // The owned string and private bitmap outlive native records and scratch reuse.
+  const packet = decoder.decode(bytes.subarray(0, length))
+  const rows: RenderTextRow[] = []
+  for (let offset = 0; offset < metadata.length; offset += rowWords) {
+    const y = metadata[offset]!
+    const start = metadata[offset + 1]!
+    const length = metadata[offset + 2]!
+    rows.push(copiedAsciiRow(y, packet.slice(start, start + length), start, blanks))
+  }
+  return Object.freeze(rows)
+}
+
 function copiedTextRow(y: number, words: Uint32Array, graphemes: Uint32Array): RenderTextRow {
   let text = ''
   for (let offset = 0; offset < words.length; offset += cellWords) {
@@ -50,6 +106,8 @@ function copiedTextRow(y: number, words: Uint32Array, graphemes: Uint32Array): R
 
 export class TextRowReader {
   private readonly snapshots: SnapshotReader
+  private readonly decoder = new TextDecoder()
+  private asciiBytes: Uint8Array = new Uint8Array(0)
 
   constructor(runtime: GhosttyRuntime) {
     this.snapshots = new SnapshotReader(runtime, {
@@ -69,13 +127,19 @@ export class TextRowReader {
   ): readonly RenderTextRow[] {
     if (grid.rows === 0) return Object.freeze([])
     const snapshot = this.snapshots.read(state, iterator, cells, grid, options)
+    if (snapshot.graphemes.length === 0 && (this.snapshots.codepointMask & ~0x7f) === 0) {
+      const length = snapshot.cells.length / cellWords
+      if (this.asciiBytes.length < length) this.asciiBytes = new Uint8Array(length)
+      return copiedAsciiRows(snapshot.rows, snapshot.cells, this.asciiBytes, this.decoder)
+    }
     const records = snapshot.cells.slice()
     const graphemes = snapshot.graphemes.slice()
     const rows: RenderTextRow[] = []
     for (let offset = 0; offset < snapshot.rows.length; offset += rowWords) {
+      const y = snapshot.rows[offset]!
       const start = snapshot.rows[offset + 1]! * cellWords
       const end = start + snapshot.rows[offset + 2]! * cellWords
-      rows.push(copiedTextRow(snapshot.rows[offset]!, records.subarray(start, end), graphemes))
+      rows.push(copiedTextRow(y, records.subarray(start, end), graphemes))
     }
     return Object.freeze(rows)
   }

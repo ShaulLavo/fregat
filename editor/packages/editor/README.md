@@ -1,53 +1,43 @@
 # @singapore-editor/core
 
-the editor itself. it holds the text, runs editing, selections and undo, paints rows through the css highlight api, and owns keymaps, themes and the plugin api
+The browser editor at the core of Singapore, with text editing, selections, undo history, themes, and plugins.
 
-gutters, find, minimap, tree-sitter and lsp are separate packages that plug into this one
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
 
-## try it
+## Install
 
 ```sh
 npm install @singapore-editor/core
 ```
 
+## Usage
+
 ```ts
 import { Editor } from '@singapore-editor/core/editor'
 import '@singapore-editor/core/style.css'
 
-const editor = new Editor(document.querySelector('#editor')!, {
-  theme: { type: 'dark', backgroundColor: '#1e1e1e', foregroundColor: '#d4d4d4' },
-})
-
-editor.openDocument({
-  documentId: 'example.ts',
-  text: 'const value = 1;\n',
-  languageId: 'typescript',
-})
+const host = document.createElement('div')
+host.style.height = '400px'
+document.body.append(host)
+const editor = new Editor(host)
+editor.setText('const value = 1\n')
+// Call editor.dispose() when removing the view.
 ```
 
-call `editor.dispose()` when you're done with it
+## API highlights
 
-plugins go in `plugins` when you construct the editor. a plugin is an object with a `name` and an `activate(context)` that registers what it adds
+- `Editor.setText()` loads text into a view.
+- `openDocument()` gives a document its own identity.
+- `dispose()` releases the view and its plugins.
 
-## entry points
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/core/overview/)
 
-- `/editor`: the `Editor` class and its option types
-- `/document`: document sessions, snapshots, anchors and text edits
-- `/extensions`: the plugin api
-- `/rendering`: themes and `registerEditorColor`
-- `/syntax`: syntax provider contracts and token helpers
-- `/keymap`: named pack data and command metadata, for hosts that share keys with the editor
-- `/shiki`: a shiki highlighter plugin and vscode theme conversion
-- `/style.css`: the base stylesheet
+## In the Singapore family
 
-`/testing`, `/debug`, `/logging` and `/secondary-views` are for tests, diagnostics and embedders
+Start with `@singapore-editor/core`. Add optional packages for gutters, search, syntax, or language server features.
 
-## more
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
 
-- [themes and the gutter inset](docs/appearance.md)
-- [keymaps and chords](docs/keymap.md)
-- [row presentation handles](docs/row-presentation.md), for plugins that touch mounted rows
-- [the singapore repo](../../README.md), with the demo and the other packages
-- benchmarks are the `bench:*` scripts in `package.json`
+## License
 
-bundles unicode bidi data under the [unicode license v3](scripts/unicode/LICENSE.txt)
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)

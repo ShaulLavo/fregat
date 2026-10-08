@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+import { createError } from 'evlog'
 import {
   createDiagnosticSanitizer,
   createRecordSanitizer,
@@ -85,3 +86,118 @@ test('an object two fields share is logged at both, and only a cycle is circular
     cycle: { name: 'loop', self: '[circular]' },
   })
 })
+
+test('log sanitization retains non-enumerable internal context and sanitizes it recursively', () => {
+  const nested = createError({ message: 'child failure', internal: { exitCode: 7 } })
+  const internal = { observed: 'stopped', token: 'PRIVATE_TOKEN', failure: nested }
+  const failure = createError({ message: 'failure', internal })
+  internal.failure.cause = failure
+
+  expect(Object.keys(failure)).not.toContain('internal')
+  expect(sanitizeRecord({ error: failure })).toMatchObject({
+    error: {
+      internal: {
+        observed: 'stopped',
+        token: '[redacted]',
+        failure: { internal: { exitCode: 7 }, cause: '[circular]' },
+      },
+    },
+  })
+  expect(failure.internal).toBe(internal)
+  expect(JSON.stringify(failure)).not.toContain('internal')
+})
+
+test('internal context obeys the diagnostic policy limits and sensitive fields', () => {
+  const failure = createError({
+    message: 'Synthetic failure',
+    internal: { state: { observed: 'stopped' }, token: 'PRIVATE_TOKEN' },
+  })
+  const bounded = createDiagnosticSanitizer({
+    formatString: (value) => value,
+    limits: { maxArrayItems: 2, maxDepth: 1, maxObjectKeys: 2 },
+  })
+  const privateContext = createDiagnosticSanitizer({
+    formatString: (value) => value,
+    extraSensitiveFields: ['internal'],
+  })
+  expect(bounded(failure)).toMatchObject({ internal: '[truncated]' })
+  expect(privateContext(failure)).toMatchObject({ internal: '[redacted]' })
+})
+
+test('diagnostics omit throwing getters and read retained getters once', () => {
+  let reads = 0
+  const error = createError({ message: 'Synthetic failure' })
+  Object.defineProperty(error, 'internal', {
+    get: () => {
+      throw error
+    },
+  })
+  const context = Object.defineProperties(
+    {},
+    {
+      observed: {
+        enumerable: true,
+        get: () => {
+          reads++
+          return 'stopped'
+        },
+      },
+      unavailable: {
+        enumerable: true,
+        get: () => {
+          throw error
+        },
+      },
+      token: {
+        enumerable: true,
+        get: () => {
+          throw error
+        },
+      },
+    },
+  )
+  expect(sanitizeRecord({ error, context })).toMatchObject({
+    error: { message: 'Synthetic failure' },
+    context: { observed: 'stopped', token: '[redacted]' },
+  })
+  expect(reads).toBe(1)
+})
+
+test('cyclic arrays in internal context retain shared arrays', () => {
+  const items: unknown[] = ['ready']
+  items.push(items)
+  const error = createError({ message: 'Synthetic failure', internal: { items, shared: items } })
+  expect(sanitizeRecord({ error })).toMatchObject({
+    error: { internal: { items: ['ready', '[circular]'], shared: ['ready', '[circular]'] } },
+  })
+})
+
+test('array-element getters become diagnostic placeholders', () => {
+  const items = ['ready']
+  Object.defineProperty(items, 1, {
+    get: () => {
+      throw createError('Synthetic getter failure')
+    },
+  })
+  const failure = createError({ message: 'Synthetic failure', internal: { items } })
+  expect(sanitizeRecord({ failure })).toMatchObject({
+    failure: { internal: { items: ['ready', '[unreadable: getter threw]'] } },
+  })
+})
+
+test.each(['message', 'name', 'stack', 'cause'])(
+  'nested error %s getters become diagnostic placeholders',
+  (field) => {
+    const nested = createError('Synthetic nested failure')
+    void nested.stack
+    Object.defineProperty(nested, field, {
+      get: () => {
+        throw createError('Synthetic getter failure')
+      },
+    })
+    const failure = createError({ message: 'Synthetic failure', internal: { nested } })
+    expect(sanitizeRecord({ failure })).toMatchObject({
+      failure: { internal: { nested: { [field]: '[unreadable: getter threw]' } } },
+    })
+  },
+)

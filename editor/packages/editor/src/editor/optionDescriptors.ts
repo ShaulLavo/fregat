@@ -16,6 +16,7 @@ import type { EditorKeymapOptions } from '../keymap/presets'
 import type { EditorSetSelectionOptions } from './selectionReveal'
 import type {
   EditorEditability,
+  EditorGutterScroll,
   EditorRangeDecoration,
   EditorScrollMode,
   EditorScrollPosition,
@@ -36,6 +37,7 @@ type EditorControlledOptions = {
   readonly fontFamily?: string
   readonly fontSize?: number
   readonly gutterLeadingInset?: number
+  readonly gutterScroll?: EditorGutterScroll
   readonly hiddenCharacters?: HiddenCharactersMode
   readonly keymap?: EditorKeymapOptions
   readonly lineHeight?: number
@@ -172,6 +174,16 @@ export const EDITOR_OPTION_DESCRIPTORS: readonly EditorOptionDescriptor[] = [
     equals: Object.is,
     applyTo: (editor, inset) => {
       editor.setGutterLeadingInset(inset ?? 0)
+      return true
+    },
+  }),
+  defineOption({
+    name: 'gutterScroll',
+    defaultValue: 'fixed',
+    validate: (input) => (input === 'content' ? 'content' : 'fixed'),
+    equals: Object.is,
+    applyTo: (editor, mode) => {
+      editor.setGutterScroll(mode ?? 'fixed')
       return true
     },
   }),

@@ -20,6 +20,7 @@
     "*.patch",
     "references/**",
     "apps/server/src/provider/adapters/codex-protocol/upstream/**",
-    "editor/packages/textbuffer/bench/vscode-textbuffer/**"
+    "editor/packages/textbuffer/bench/vscode-textbuffer/**",
+    "apps/site/src/replicas/*.html"
   ]
 }

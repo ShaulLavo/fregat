@@ -38,6 +38,7 @@ import { FontCatalogService } from './fonts/catalog'
 import { errorPayload, FsError, isFsError } from './fs/errors'
 import { fsRoutes, nativePickerRoutes } from './fs/routes'
 import { NativePicker } from './fs/native-picker'
+import { isLoopbackAddress } from './system/locality'
 import { readMachineId } from './system/machine-id'
 import { defaultNativePickerHelper, hasDesktopSession } from './system/native-helper'
 import { systemRoutes } from './system/routes'
@@ -126,6 +127,8 @@ import type { PushFetcher } from './push/delivery'
 import { pushRoutes } from './push/routes'
 import { DeviceStore } from './devices/device-store'
 import { pairingRoutes } from './devices/routes'
+import { noTailnet, tailscaleCli, TailnetOwners, type TailnetLookup } from './devices/tailnet-owner'
+import { headersReader } from './devices/trust'
 import { DevicePairing } from './devices/service'
 import { PushService } from './push/service'
 import { sessionLink } from './push/session-link'
@@ -214,6 +217,8 @@ export type AppOptions = FileSystemServiceOptions & {
     readonly filePath?: string
     readonly cookieName?: string
     readonly ownAddresses?: () => ReadonlySet<string>
+    /** How this machine asks Tailscale who a device is; tests inject it. */
+    readonly tailnet?: TailnetLookup
   }
 }
 
@@ -623,9 +628,17 @@ export function createApp(options: AppOptions) {
     required: () => settings.snapshot().values['environments.devicePairing'],
     cookieName: options.devices?.cookieName ?? 'platform_device',
     ownAddresses: options.devices?.ownAddresses,
+    tailnet: new TailnetOwners({
+      lookup: options.devices?.tailnet ?? defaultTailnetLookup(),
+      enabled: () => settings.snapshot().values['environments.tailnetOwnerDevices'],
+    }),
+    appUrl: publicAppUrl(options.webOrigin, options.system?.webBase ?? '/'),
   })
   const auth = createAuthConfig(options.auth, devices)
   const stopDeviceSweep = devices.startSweeping()
+  settings.onChange(() => {
+    runDetached(() => devices.recheckTailnet(), { area: 'pairing', operation: 'recheck_tailnet' })
+  })
   const push = new PushService({ database, settings, fetcher: options.push?.fetcher })
   const presence = new ClientPresence()
   const sessionPush = new SessionNoticePush({
@@ -705,6 +718,8 @@ export function createApp(options: AppOptions) {
     websocket: { maxPayloadLength: requestBodyLimit(fs.info().maxTextFileBytes) },
   })
   applyObservability(app)
+  // Every request, WebSocket upgrades included: admission reads the answer synchronously.
+  app.onRequest(({ request }) => devices.identify(headersReader(request.headers)))
 
   const configured = app
     .use(
@@ -1014,8 +1029,21 @@ function definedOnly(values: Record<string, string | undefined>) {
 
 function noop() {}
 
+/** A test that names no lookup must never ask the real Tailscale on the machine running it. */
+function defaultTailnetLookup() {
+  return isTestProcess() ? noTailnet : tailscaleCli
+}
+
 /** A test that names no file must never write the real state home's paired devices. */
 function defaultDeviceFile() {
   if (!isTestProcess()) return platformHomePath('devices.json')
   return path.join(tmpdir(), `platform-test-devices-${process.pid}.json`)
+}
+
+/** The app's base URL as other devices open it: an HTTP(S) origin other devices can reach. */
+function publicAppUrl(origin: string | undefined, webBase: string) {
+  const url = origin ? URL.parse(webBase, origin) : null
+  if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:')) return null
+  const host = url.hostname.replace(/^\[|\]$/g, '')
+  return host === 'localhost' || isLoopbackAddress(host) ? null : url.href
 }

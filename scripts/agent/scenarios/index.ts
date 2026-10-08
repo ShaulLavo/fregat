@@ -38,6 +38,7 @@ import { primaryIdentityReplacement } from './primary-identity-replacement'
 import { editorLspTabSwitch } from './editor-lsp-tab-switch'
 import { editorLspServerExit } from './editor-lsp-server-exit'
 import { editorTypography } from './editor-typography'
+import { editorWrappedGutter } from './editor-wrapped-gutter'
 import { editorDecodeReveal } from './editor-decode-reveal'
 import { responseDelivery } from './response-delivery'
 import { draftRecovery } from './draft-recovery'
@@ -377,7 +378,7 @@ type ScenarioContext = {
 }
 
 export type Scenario = {
-  readonly surface?: 'site' | 'demo'
+  readonly surface?: 'site'
   /** Only reads, so it may run against production (`--url …/platform/`). */
   readonly readOnly?: boolean
   /** Runs full Chromium with notification permission granted; the headless shell denies it. */
@@ -459,12 +460,6 @@ import { fileIconHues } from './file-icon-hues'
 import { filterFields } from './filter-fields'
 import { inlineRenameTree } from './inline-rename-tree'
 import { treeParityBehaviour } from './tree-parity-behaviour'
-import { demoWorkspace } from './demo-workspace'
-import { demoAgentGit } from './demo-agent-git'
-import { demoReset } from './demo-reset'
-import { demoStartup } from './demo-startup'
-import { demoThemeStartup } from './demo-theme-startup'
-import { demoWallpaperStartup } from './demo-wallpaper-startup'
 
 import { devPackageUpdates } from './dev-package-updates'
 
@@ -741,6 +736,7 @@ export const scenarios: readonly Scenario[] = [
   editorLspTabSwitch,
   editorLspServerExit,
   editorTypography,
+  editorWrappedGutter,
   editorDecodeReveal,
   editorDefinitionCrlf,
   editorExternalDeletion,
@@ -807,12 +803,6 @@ export const scenarios: readonly Scenario[] = [
   sidebarSettingsButton,
   fontPicker,
   fontPickerHover,
-  demoWorkspace,
-  demoAgentGit,
-  demoReset,
-  demoStartup,
-  demoThemeStartup,
-  demoWallpaperStartup,
   gitHistory,
   gitHistoryNoFlicker,
   editorLargePaste,

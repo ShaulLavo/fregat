@@ -4,6 +4,7 @@ import { Host, InMemoryTransport, Participant, ReferenceEngine, simulate } from 
 import type { Envelope } from '../src/index'
 import { Effects } from '../src/effects'
 import { undoRoom } from './undo-fixtures'
+import { stressSeeds } from './stress-seeds'
 
 const stress = process.env.COLLAB_STRESS === '1'
 const randomRounds = stress ? 100 : 8
@@ -260,7 +261,7 @@ function independentlyCheck(seed: number, factory = createEngine) {
 }
 
 test('review: independent per-character oracle checks concurrent random edits and undo', () => {
-  for (let seed = 0; seed < randomRounds; seed++) independentlyCheck(seed)
+  for (const seed of stressSeeds(randomRounds)) independentlyCheck(seed)
 })
 
 test('review: independent per-character oracle kills last-delete-wins mutant', () => {

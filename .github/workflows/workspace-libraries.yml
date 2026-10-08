@@ -48,6 +48,8 @@ jobs:
         run: bun x turbo run test --filter='./editor/packages/*' --filter='./editor/examples/*' --concurrency=1
       - name: Test tree-sitter browser worker
         run: bun run --cwd editor/packages/tree-sitter test:browser
+      - name: Test collaboration presence in Chromium
+        run: bun x turbo run test:browser --filter=@singapore-editor/collaboration --concurrency=1 -- test/presence.browser.test.ts
 
   ghostty:
     name: Ghostty tests

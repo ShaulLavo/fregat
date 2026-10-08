@@ -3,7 +3,7 @@ import { submitAsAuthor } from './host-fixtures'
 import { expect, test } from 'vitest'
 import { CollabFailure, Host, InMemoryTransport, Participant } from '../src/index'
 import type { Envelope, HostMessage } from '../src/index'
-import { accept, authority, replica } from './fixtures'
+import { accept, authority, replica, subscribeText } from './fixtures'
 
 function accepted(
   message: HostMessage | { status: 'deferred' },
@@ -197,7 +197,12 @@ test('remote-before-ack replays dependent pending edits with unchanged origins',
   submitAsAuthor(host, remote)
   const before = a.participant.state().pending
   const changes: string[] = []
-  a.participant.subscribe((state) => changes.push(state.text))
+  let projection = a.participant.text()
+  a.participant.subscribe((change) => {
+    for (const edit of [...change.edits].reverse())
+      projection = projection.slice(0, edit.from) + edit.text + projection.slice(edit.to)
+    changes.push(projection)
+  })
   a.participant.receive(messages)
   expect(a.participant.state().pending).toEqual(before)
   expect(changes).toEqual(['abx'])
@@ -222,7 +227,12 @@ test('one batch with remote and local acknowledgments publishes one coherent cha
   submitAsAuthor(host, remote)
   submitAsAuthor(host, local)
   const states: string[] = []
-  a.participant.subscribe((state) => states.push(state.text))
+  let projection = a.participant.text()
+  a.participant.subscribe((change) => {
+    for (const edit of [...change.edits].reverse())
+      projection = projection.slice(0, edit.from) + edit.text + projection.slice(edit.to)
+    states.push(projection)
+  })
   a.participant.receive(messages)
   expect(states).toEqual(['ab'])
   expect(a.participant.state().pending).toHaveLength(0)
@@ -237,7 +247,12 @@ test('host sequence gaps buffer until a contiguous confirmed prefix arrives', ()
   submitAsAuthor(host, b.insert(0, 'b'))
   submitAsAuthor(host, b.insert(1, 'c'))
   const states: string[] = []
-  a.participant.subscribe((state) => states.push(state.text))
+  let projection = a.participant.text()
+  a.participant.subscribe((change) => {
+    for (const edit of [...change.edits].reverse())
+      projection = projection.slice(0, edit.from) + edit.text + projection.slice(edit.to)
+    states.push(projection)
+  })
   a.participant.receive([messages[1]!])
   expect(a.participant.text()).toBe('')
   expect(states).toHaveLength(0)
@@ -390,3 +405,83 @@ test('host restores its snapshot when a supplied engine fails after changing sta
   })
   expect(host.text()).toBe('base')
 })
+
+test('reentrant local edits publish effective edits in order to every subscriber', () => {
+  const a = replica('a')
+  let nested = false
+  a.participant.subscribe(() => {
+    if (nested) return
+    nested = true
+    a.participant.local({ offset: 1, deleteCount: 0, text: 'b' })
+  })
+  let projection = ''
+  const states: string[] = []
+  a.participant.subscribe((change) => {
+    for (const edit of [...change.edits].reverse())
+      projection = projection.slice(0, edit.from) + edit.text + projection.slice(edit.to)
+    states.push(projection)
+  })
+  a.participant.local({ offset: 0, deleteCount: 0, text: 'a' })
+  expect(states).toEqual(['a', 'ab'])
+})
+
+test('subscriptions created during delivery start at their current projection', () => {
+  const a = replica('a')
+  let projection = ''
+  const states: string[] = []
+  const listener = (change: import('../src/index').ParticipantChange) => {
+    for (const edit of [...change.edits].reverse())
+      projection = projection.slice(0, edit.from) + edit.text + projection.slice(edit.to)
+    states.push(projection)
+  }
+  let nested = false
+  let unsubscribe = () => {}
+  a.participant.subscribe(() => {
+    if (nested) return
+    nested = true
+    a.participant.local({ offset: 1, deleteCount: 0, text: 'b' })
+    unsubscribe()
+    projection = a.participant.text()
+    a.participant.subscribe(listener)
+  })
+  unsubscribe = a.participant.subscribe(listener)
+  a.participant.local({ offset: 0, deleteCount: 0, text: 'a' })
+  expect(states).toEqual([])
+  a.participant.local({ offset: 2, deleteCount: 0, text: 'c' })
+  expect(states).toEqual(['abc'])
+})
+
+test.each([false, true])(
+  'throwing subscribers preserve healthy projections with nested=%s',
+  (nested) => {
+    const a = replica('a')
+    const failure = new TypeError('observer failure')
+    let authored = false
+    const stop = a.participant.subscribe(() => {
+      if (nested && !authored) {
+        authored = true
+        a.participant.local({ offset: 1, deleteCount: 0, text: 'b' })
+      }
+      throw failure
+    })
+    let projection = ''
+    const states: string[] = []
+    subscribeText(a.participant, (text) => {
+      projection = text
+      states.push(text)
+    })
+    let caught: unknown
+    try {
+      a.participant.local({ offset: 0, deleteCount: 0, text: 'a' })
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBe(failure)
+    expect(states).toEqual(nested ? ['a', 'ab'] : ['a'])
+    expect(projection).toBe(a.participant.text())
+    stop()
+    a.participant.local({ offset: nested ? 2 : 1, deleteCount: 0, text: 'c' })
+    expect(projection).toBe(nested ? 'abc' : 'ac')
+    expect(projection).toBe(a.participant.text())
+  },
+)
