@@ -22,7 +22,8 @@
       "ghostty-webgpu",
       "ghostty-webgpu-line-editor",
       "ghostty-webgpu/demo",
-      "ghostty-webgpu/site"
+      "ghostty-webgpu/site",
+      "editor/site"
     ],
     "catalog": {
       "@opentui/core": "0.5.12",

@@ -1,0 +1,26 @@
+---
+title: Packages
+description: Find each Singapore package and its generated API reference.
+---
+
+import Packages from '../../../../components/Packages.astro'
+
+Install the core and add the packages your application uses. These packages ship independently as ESM. Their public APIs are still changing. Bundle size has no published measurement.
+
+This table comes from the current workspace manifests. Every public declaration entry point appears in the generated reference. CSS exports are assets, and internal entry points stay outside the public reference.
+
+<Packages />
+
+## Core entry points
+
+`@singapore-editor/core/editor` exposes the editor constructor and options. `/document` covers document sessions and snapshots. `/extensions` covers plugin contributions. `/rendering`, `/syntax` and `/keymap` expose those integration contracts. `/shiki` supplies Shiki highlighting and theme conversion. `/testing` provides testing helpers. The reference also documents other exported public declaration entry points.
+
+## Stylesheets
+
+Import `@singapore-editor/core/style.css` for the editor. Packages with visual UI, including gutters, find, minimap, diff, Markdown, scope lines and panes, expose their own stylesheets. Check the package manifest and guide for the entry point to import.
+
+## Status
+
+The editable core, worker syntax, language-server integrations, framework adapters and read-only paged viewer exist today. The `collab` package contains a host-ordered text core; full collaborative editor and network integration remain separate planned work. Vim mode, multibuffers and editable paging remain plans.
+
+Follow the [roadmap](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md) for planned work and send contributions to [Fregat](https://github.com/ShaulLavo/fregat).
