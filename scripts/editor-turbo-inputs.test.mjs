@@ -294,3 +294,154 @@ test('an unused split config does not create phantom cached tasks', async () => 
     expect(check().status).toBe(0)
   })
 })
+
+test.each(['./configs', './configs/*'])(
+  'directory project %s loads its config',
+  async (project) => {
+    await withEditor(async ({ put, write, configure, check }) => {
+      await put('editor/packages/reader', {
+        name: 'reader',
+        scripts: { test: 'vitest run --project browser' },
+      })
+      await write(
+        'packages/reader/vitest.config.ts',
+        `export default { test: { projects: ['${project}'] } }\n`,
+      )
+      const config = project.endsWith('*')
+        ? 'configs/browser/vitest.config.ts'
+        : 'configs/vitest.config.ts'
+      await write(
+        `packages/reader/${config}`,
+        `import '${project.endsWith('*') ? '../../../../' : '../../../'}shared.ts'\n`,
+      )
+      const failed = check()
+      expect(failed.status, failed.stdout + failed.stderr).toBe(1)
+      expect(failed.stderr).toContain(`${config} reads shared.ts`)
+      expect(failed.stderr).toContain('cached by test\n')
+      await configure({ test: { inputs: ['$TURBO_DEFAULT$', '$TURBO_ROOT$/editor/shared.ts'] } })
+      const passed = check()
+      expect(passed.status, passed.stdout + passed.stderr).toBe(0)
+    })
+  },
+)
+
+test.each(['projects', 'projects: projects', 'projects: [...projects]'])(
+  'local project binding %s is resolved',
+  async (property) => {
+    await withEditor(async ({ put, write, configure, check }) => {
+      await put('editor/packages/reader', { name: 'reader', scripts: { test: 'vitest run' } })
+      await write(
+        'packages/reader/vitest.config.ts',
+        `const projects = ['configs/vitest.browser.config.ts']; export default { test: { ${property} } }\n`,
+      )
+      await write(
+        'packages/reader/configs/vitest.browser.config.ts',
+        "import '../../../shared.ts'\n",
+      )
+      const failed = check()
+      expect(failed.status, failed.stdout + failed.stderr).toBe(1)
+      expect(failed.stderr).toContain('configs/vitest.browser.config.ts reads shared.ts')
+      await configure({ test: { inputs: ['$TURBO_DEFAULT$', '$TURBO_ROOT$/editor/shared.ts'] } })
+      expect(check().status).toBe(0)
+    })
+  },
+)
+
+test.each([
+  'projects: makeProjects()',
+  'projects',
+  'projects: [loadProject()]',
+  'projects: [{ extends: configPath }]',
+  "projects: ['./missing/*.ts']",
+])('unresolved project wiring %s fails closed', async (property) => {
+  await withEditor(async ({ put, write, configure, check }) => {
+    await put('editor/packages/reader', {
+      name: 'reader',
+      scripts: { 'test:browser': 'vitest run --config configs/browser.ts' },
+    })
+    await write('packages/reader/configs/browser.ts', `export default { test: { ${property} } }\n`)
+    await configure({
+      'test:browser': { inputs: ['$TURBO_DEFAULT$', '$TURBO_ROOT$/editor/shared.ts'] },
+    })
+    const result = check()
+    expect(result.status, result.stdout + result.stderr).toBe(1)
+    expect(result.stderr).toContain('reader#test:browser')
+    expect(result.stderr).toContain('configs/browser.ts')
+    expect(result.stderr).toContain('Resolve')
+  })
+})
+
+test('an explicitly selected missing config fails closed', async () => {
+  await withEditor(async ({ put, check }) => {
+    await put('editor/packages/reader', {
+      name: 'reader',
+      scripts: { test: 'vitest run --config missing.ts' },
+    })
+    const result = check()
+    expect(result.status, result.stdout + result.stderr).toBe(1)
+    expect(result.stderr).toContain('reader#test')
+    expect(result.stderr).toContain('missing.ts')
+  })
+})
+
+test.each(['bun test:browser', 'bun run test:browser', 'bun --bun test:browser'])(
+  'parent task calling %s hashes child config reads',
+  async (command) => {
+    await withEditor(async ({ put, write, configure, check }) => {
+      await put('editor/packages/reader', {
+        name: 'reader',
+        scripts: { test: command, 'test:browser': 'vitest run --config vitest.browser.config.ts' },
+      })
+      await write('packages/reader/vitest.browser.config.ts', externalRead)
+      const inputs = ['$TURBO_DEFAULT$', '$TURBO_ROOT$/editor/shared.ts']
+      await configure({ test: {}, 'test:browser': { inputs } })
+      const failed = check()
+      expect(failed.status, failed.stdout + failed.stderr).toBe(1)
+      expect(failed.stderr).toContain('cached by test\n')
+      await configure({ test: { inputs }, 'test:browser': { inputs } })
+      expect(check().status).toBe(0)
+    })
+  },
+)
+
+test('script names used as command arguments do not create parent consumers', async () => {
+  await withEditor(async ({ put, write, configure, check }) => {
+    await put('editor/packages/reader', {
+      name: 'reader',
+      scripts: {
+        test: 'echo bun test:browser',
+        'test:browser': 'vitest run --config vitest.browser.config.ts',
+      },
+    })
+    await write('packages/reader/vitest.browser.config.ts', externalRead)
+    await configure({
+      test: {},
+      'test:browser': { inputs: ['$TURBO_DEFAULT$', '$TURBO_ROOT$/editor/shared.ts'] },
+    })
+    expect(check().status).toBe(0)
+  })
+})
+
+test('config-only helpers in a scanned tree keep the config consumers', async () => {
+  await withEditor(async ({ put, write, configure, check }) => {
+    await put('editor/packages/reader', {
+      name: 'reader',
+      scripts: {
+        build: 'vite build',
+        typecheck: 'tsc --noEmit',
+        test: 'vitest run',
+        'test:browser': 'vitest run --config vitest.browser.config.ts',
+      },
+    })
+    await write('packages/reader/vitest.browser.config.ts', "import './scripts/helper.ts'\n")
+    await write('packages/reader/scripts/helper.ts', "import '../../../shared.ts'\n")
+    await configure({
+      build: {},
+      typecheck: {},
+      test: {},
+      'test:browser': { inputs: ['$TURBO_DEFAULT$', '$TURBO_ROOT$/editor/shared.ts'] },
+    })
+    const result = check()
+    expect(result.status, result.stdout + result.stderr).toBe(0)
+  })
+})
