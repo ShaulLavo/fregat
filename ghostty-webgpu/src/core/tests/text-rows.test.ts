@@ -38,6 +38,30 @@ function countNumericAllocations<T extends Uint8ArrayConstructor | Uint32ArrayCo
   })
 }
 
+function observedWords(words: Uint32Array, onRead: () => void): Uint32Array {
+  return new Proxy(words, {
+    get(target, property) {
+      if (typeof property === 'string' && /^\d+$/.test(property)) onRead()
+      const value = Reflect.get(target, property, target)
+      return typeof value === 'function' ? value.bind(target) : value
+    },
+  })
+}
+
+function countedWordViews(
+  length: number,
+  onAllocation: () => void,
+  onRead: () => void,
+): Uint32ArrayConstructor {
+  return new Proxy(Uint32Array, {
+    construct(target, args, newTarget) {
+      if (typeof args[0] === 'number') onAllocation()
+      const words = Reflect.construct(target, args, newTarget)
+      return args[2] === length ? observedWords(words, onRead) : words
+    },
+  })
+}
+
 describe('text-only render rows', () => {
   it('advances snapshotVersion on damaged updates and preserves it across reads and clean updates', async () => {
     runtime = await GhosttyRuntime.create()
@@ -166,9 +190,11 @@ describe('text-only render rows', () => {
     { text: 'plain prefix then 日本語', allocations: 0 },
   ])('allocates ASCII storage only for ASCII packets ($text)', async ({ text, allocations }) => {
     runtime = await GhosttyRuntime.create()
-    const terminal = runtime.createTerminal({ columns: 80, rows: 3 })
+    const grid = { columns: 80, rows: 3 }
+    const cellCount = grid.columns * grid.rows
+    const terminal = runtime.createTerminal(grid)
     const state = runtime.createRenderState(terminal)
-    terminal.write('é')
+    terminal.write('é界')
     state.update()
     state.readTextRows()
     terminal.write(`\x1b[H\x1b[2J${text}`)
@@ -177,13 +203,18 @@ describe('text-only render rows', () => {
     const extract = vi.spyOn(runtime.bridge, 'readTextRows')
     let scratchAllocations = 0
     let bitmapAllocations = 0
+    let wordReads = 0
     vi.stubGlobal(
       'Uint8Array',
       countNumericAllocations(Uint8Array, () => (scratchAllocations += 1)),
     )
     vi.stubGlobal(
       'Uint32Array',
-      countNumericAllocations(Uint32Array, () => (bitmapAllocations += 1)),
+      countedWordViews(
+        cellCount * 3,
+        () => (bitmapAllocations += 1),
+        () => (wordReads += 1),
+      ),
     )
     let rows: readonly RenderTextRow[]
     try {
@@ -197,6 +228,9 @@ describe('text-only render rows', () => {
       scratchAllocations: allocations,
       bitmapAllocations: allocations * 2,
     })
+    expect(wordReads).toBe(allocations * cellCount * 2)
+    const codepointMask = runtime.memory.view.getUint32(extract.mock.calls[0]![6] + 36, true)
+    expect((codepointMask & ~0x7f) === 0).toBe(allocations === 1)
     expect(materialize(rows)).toEqual(expected)
     terminal.write('\x1b[H\x1b[2Jchanged')
     state.update()

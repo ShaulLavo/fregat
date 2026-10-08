@@ -19,13 +19,6 @@ function cellText(words: Uint32Array, offset: number, graphemes: Uint32Array): s
   return text
 }
 
-function isAsciiPacket(words: Uint32Array): boolean {
-  for (let offset = 0; offset < words.length; offset += cellWords) {
-    if (words[offset]! > 0x7f || words[offset + 2] !== 0) return false
-  }
-  return true
-}
-
 function copiedAsciiCells(text: string, start: number, blanks: Uint32Array): readonly string[] {
   return Object.freeze(
     Array.from({ length: text.length }, (_, column) => {
@@ -134,7 +127,7 @@ export class TextRowReader {
   ): readonly RenderTextRow[] {
     if (grid.rows === 0) return Object.freeze([])
     const snapshot = this.snapshots.read(state, iterator, cells, grid, options)
-    if (snapshot.graphemes.length === 0 && isAsciiPacket(snapshot.cells)) {
+    if (snapshot.graphemes.length === 0 && (this.snapshots.codepointMask & ~0x7f) === 0) {
       const length = snapshot.cells.length / cellWords
       if (this.asciiBytes.length < length) this.asciiBytes = new Uint8Array(length)
       return copiedAsciiRows(snapshot.rows, snapshot.cells, this.asciiBytes, this.decoder)
