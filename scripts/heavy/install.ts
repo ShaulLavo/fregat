@@ -41,7 +41,7 @@ function install() {
   if (!values.root)
     throw createScriptError('An installation root is required for the heavy-job wrapper.', {
       why: 'The wrapper uses its own installation directory selected by --root.',
-      fix: 'Run bun scripts/heavy/install.ts --root=<directory> with the wrapper directory used by your sessions.',
+      fix: 'Run `bun scripts/heavy/install.ts --root=<directory>` as documented in `scripts/heavy/README.md`, using the wrapper directory used by your sessions.',
       internal: { rootSpecified: false },
     })
   const root = path.resolve(values.root)
@@ -75,6 +75,8 @@ function build(source: string, root: string, commit: string) {
       'build',
       ...ENTRIES.map((entry) => path.join(heavy, entry)),
       '--target=bun',
+      '--tsconfig-override',
+      path.join(heavy, 'tsconfig.install.json'),
       '--outdir',
       staging,
     ],
