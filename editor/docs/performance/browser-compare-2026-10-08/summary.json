@@ -1,0 +1,589 @@
+{
+  "rows": [
+    {
+      "editor": "singapore",
+      "mib": 1,
+      "successful": 3,
+      "attempted": 3,
+      "openMs": 299.9000000357628,
+      "firstFrameMs": 29.299999952316284,
+      "endMs": {
+        "n": 60,
+        "p50": 31.69999998807907,
+        "p95": 32.30000001192093,
+        "max": 33.299999952316284
+      },
+      "middleMs": {
+        "n": 60,
+        "p50": 31.19999998807907,
+        "p95": 31.5,
+        "max": 32.69999998807907
+      },
+      "scrollRenderingMs": {
+        "n": 180,
+        "p50": 1.539,
+        "p95": 2.694,
+        "max": 4.737
+      },
+      "scrollIntervalMs": {
+        "n": 180,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "heapMiB": 7.056446075439453,
+      "backingMiB": 1.4890546798706055,
+      "failures": []
+    },
+    {
+      "editor": "monaco",
+      "mib": 1,
+      "successful": 3,
+      "attempted": 3,
+      "openMs": 123.80000001192093,
+      "firstFrameMs": 49.19999998807907,
+      "endMs": {
+        "n": 60,
+        "p50": 48.40000003576279,
+        "p95": 48.89999997615814,
+        "max": 48.90000003576279
+      },
+      "middleMs": {
+        "n": 60,
+        "p50": 48.5,
+        "p95": 48.90000003576279,
+        "max": 49.19999998807907
+      },
+      "scrollRenderingMs": {
+        "n": 180,
+        "p50": 1.457,
+        "p95": 2.265,
+        "max": 5.324
+      },
+      "scrollIntervalMs": {
+        "n": 180,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "heapMiB": 10.50454330444336,
+      "backingMiB": 3.90358829498291,
+      "failures": []
+    },
+    {
+      "editor": "codemirror",
+      "mib": 1,
+      "successful": 3,
+      "attempted": 3,
+      "openMs": 52.39999997615814,
+      "firstFrameMs": 28.399999976158142,
+      "endMs": {
+        "n": 60,
+        "p50": 31.900000035762787,
+        "p95": 33.30000001192093,
+        "max": 102.80000001192093
+      },
+      "middleMs": {
+        "n": 60,
+        "p50": 31.799999952316284,
+        "p95": 32.40000003576279,
+        "max": 32.5
+      },
+      "scrollRenderingMs": {
+        "n": 180,
+        "p50": 0.52,
+        "p95": 4.129,
+        "max": 6.623
+      },
+      "scrollIntervalMs": {
+        "n": 180,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "heapMiB": 4.765491485595703,
+      "backingMiB": 0.7115507125854492,
+      "failures": []
+    },
+    {
+      "editor": "singapore",
+      "mib": 10,
+      "successful": 3,
+      "attempted": 3,
+      "openMs": 1517.699999988079,
+      "firstFrameMs": 29.600000023841858,
+      "endMs": {
+        "n": 60,
+        "p50": 32,
+        "p95": 32.30000001192093,
+        "max": 32.60000002384186
+      },
+      "middleMs": {
+        "n": 60,
+        "p50": 32,
+        "p95": 32.40000003576279,
+        "max": 32.60000002384186
+      },
+      "scrollRenderingMs": {
+        "n": 180,
+        "p50": 0.269,
+        "p95": 0.507,
+        "max": 0.781
+      },
+      "scrollIntervalMs": {
+        "n": 180,
+        "p50": 16.699999999999818,
+        "p95": 16.800000000000182,
+        "max": 16.800000000000182
+      },
+      "heapMiB": 25.194656372070312,
+      "backingMiB": 2.4271697998046875,
+      "failures": []
+    },
+    {
+      "editor": "monaco",
+      "mib": 10,
+      "successful": 3,
+      "attempted": 3,
+      "openMs": 169.4000000357628,
+      "firstFrameMs": 89.69999998807907,
+      "endMs": {
+        "n": 60,
+        "p50": 48.700000047683716,
+        "p95": 49,
+        "max": 49.200000047683716
+      },
+      "middleMs": {
+        "n": 60,
+        "p50": 48.799999952316284,
+        "p95": 49.09999996423721,
+        "max": 49.30000001192093
+      },
+      "scrollRenderingMs": {
+        "n": 180,
+        "p50": 1.27,
+        "p95": 1.829,
+        "max": 2.169
+      },
+      "scrollIntervalMs": {
+        "n": 180,
+        "p50": 16.699999999999818,
+        "p95": 16.799999999999272,
+        "max": 16.800000000000182
+      },
+      "heapMiB": 29.49862289428711,
+      "backingMiB": 13.675023078918457,
+      "failures": []
+    },
+    {
+      "editor": "codemirror",
+      "mib": 10,
+      "successful": 3,
+      "attempted": 3,
+      "openMs": 56.10000002384186,
+      "firstFrameMs": 31.5,
+      "endMs": {
+        "n": 60,
+        "p50": 32.299999952316284,
+        "p95": 32.69999998807907,
+        "max": 124.19999998807907
+      },
+      "middleMs": {
+        "n": 60,
+        "p50": 32,
+        "p95": 32.59999996423721,
+        "max": 32.60000002384186
+      },
+      "scrollRenderingMs": {
+        "n": 180,
+        "p50": 0.416,
+        "p95": 2.863,
+        "max": 31.848
+      },
+      "scrollIntervalMs": {
+        "n": 180,
+        "p50": 16.699999999999818,
+        "p95": 16.800000000000182,
+        "max": 16.800000000000182
+      },
+      "heapMiB": 17.36107635498047,
+      "backingMiB": 0.7127351760864258,
+      "failures": []
+    },
+    {
+      "editor": "singapore",
+      "mib": 50,
+      "successful": 3,
+      "attempted": 3,
+      "openMs": 7310.600000023842,
+      "firstFrameMs": 40.30000001192093,
+      "endMs": {
+        "n": 60,
+        "p50": 32.10000002384186,
+        "p95": 32.59999996423721,
+        "max": 32.80000001192093
+      },
+      "middleMs": {
+        "n": 60,
+        "p50": 32.09999996423721,
+        "p95": 32.39999997615814,
+        "max": 32.60000002384186
+      },
+      "scrollRenderingMs": {
+        "n": 180,
+        "p50": 0.998,
+        "p95": 1.634,
+        "max": 2.743
+      },
+      "scrollIntervalMs": {
+        "n": 180,
+        "p50": 16.69999999999891,
+        "p95": 16.700000000000728,
+        "max": 16.80000000000109
+      },
+      "heapMiB": 105.64410781860352,
+      "backingMiB": 5.427252769470215,
+      "failures": []
+    },
+    {
+      "editor": "monaco",
+      "mib": 50,
+      "successful": 3,
+      "attempted": 3,
+      "openMs": 340.5,
+      "firstFrameMs": 268,
+      "endMs": {
+        "n": 60,
+        "p50": 47.59999996423721,
+        "p95": 48.69999998807907,
+        "max": 49.59999996423721
+      },
+      "middleMs": {
+        "n": 60,
+        "p50": 48.40000003576279,
+        "p95": 48.90000003576279,
+        "max": 49.19999998807907
+      },
+      "scrollRenderingMs": {
+        "n": 180,
+        "p50": 1.261,
+        "p95": 1.568,
+        "max": 2.31
+      },
+      "scrollIntervalMs": {
+        "n": 180,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "heapMiB": 90.81949234008789,
+      "backingMiB": 27.34658718109131,
+      "failures": []
+    },
+    {
+      "editor": "codemirror",
+      "mib": 50,
+      "successful": 3,
+      "attempted": 3,
+      "openMs": 103.5,
+      "firstFrameMs": 76.30000001192093,
+      "endMs": {
+        "n": 60,
+        "p50": 32.19999998807907,
+        "p95": 32.80000001192093,
+        "max": 123.10000002384186
+      },
+      "middleMs": {
+        "n": 60,
+        "p50": 32.200000047683716,
+        "p95": 32.69999998807907,
+        "max": 32.80000001192093
+      },
+      "scrollRenderingMs": {
+        "n": 180,
+        "p50": 2.667,
+        "p95": 3.454,
+        "max": 3.928
+      },
+      "scrollIntervalMs": {
+        "n": 180,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "heapMiB": 72.74390411376953,
+      "backingMiB": 0.7127351760864258,
+      "failures": []
+    },
+    {
+      "editor": "singapore",
+      "mib": 100,
+      "successful": 3,
+      "attempted": 3,
+      "openMs": 16136.800000011921,
+      "firstFrameMs": 50.80000001192093,
+      "endMs": {
+        "n": 60,
+        "p50": 31.69999998807907,
+        "p95": 32.30000001192093,
+        "max": 32.5
+      },
+      "middleMs": {
+        "n": 60,
+        "p50": 32.10000002384186,
+        "p95": 32.5,
+        "max": 32.80000001192093
+      },
+      "scrollRenderingMs": {
+        "n": 180,
+        "p50": 1.195,
+        "p95": 2.135,
+        "max": 3.092
+      },
+      "scrollIntervalMs": {
+        "n": 180,
+        "p50": 16.700000000000728,
+        "p95": 16.700000000000728,
+        "max": 16.80000000000291
+      },
+      "heapMiB": 206.14513397216797,
+      "backingMiB": 9.42734432220459,
+      "failures": []
+    },
+    {
+      "editor": "monaco",
+      "mib": 100,
+      "successful": 3,
+      "attempted": 3,
+      "openMs": 559.1999999880791,
+      "firstFrameMs": 489.19999998807907,
+      "endMs": {
+        "n": 60,
+        "p50": 47,
+        "p95": 48.59999996423721,
+        "max": 49.10000002384186
+      },
+      "middleMs": {
+        "n": 60,
+        "p50": 46.69999998807907,
+        "p95": 48.39999997615814,
+        "max": 48.90000003576279
+      },
+      "scrollRenderingMs": {
+        "n": 180,
+        "p50": 16.536,
+        "p95": 17.13,
+        "max": 17.95
+      },
+      "scrollIntervalMs": {
+        "n": 180,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "heapMiB": 156.95008087158203,
+      "backingMiB": 30.372349739074707,
+      "failures": []
+    },
+    {
+      "editor": "codemirror",
+      "mib": 100,
+      "successful": 3,
+      "attempted": 3,
+      "openMs": 146.10000002384186,
+      "firstFrameMs": 125.79999995231628,
+      "endMs": {
+        "n": 60,
+        "p50": 31.80000001192093,
+        "p95": 32.59999996423721,
+        "max": 123.10000002384186
+      },
+      "middleMs": {
+        "n": 60,
+        "p50": 31.900000035762787,
+        "p95": 32.5,
+        "max": 123
+      },
+      "scrollRenderingMs": {
+        "n": 180,
+        "p50": 5.117,
+        "p95": 14.738,
+        "max": 16.271
+      },
+      "scrollIntervalMs": {
+        "n": 180,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "heapMiB": 142.00652313232422,
+      "backingMiB": 0.7127351760864258,
+      "failures": []
+    },
+    {
+      "editor": "singapore",
+      "mib": 200,
+      "successful": 0,
+      "attempted": 3,
+      "openMs": null,
+      "firstFrameMs": null,
+      "endMs": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "middleMs": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "scrollRenderingMs": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "scrollIntervalMs": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "max": null
+      },
+      "heapMiB": null,
+      "backingMiB": null,
+      "failures": [
+        {
+          "repetition": 0,
+          "status": "failed",
+          "errors": [
+            "page.evaluate: RangeError: Highlighting did not become visible in 30 seconds\n    at Object.open (http://127.0.0.1:44991/singapore-typescript/entry.js:147:1268)\n    at async <anonymous>:337:30"
+          ]
+        },
+        {
+          "repetition": 1,
+          "status": "failed",
+          "errors": [
+            "page.evaluate: RangeError: Highlighting did not become visible in 30 seconds\n    at Object.open (http://127.0.0.1:44991/singapore-typescript/entry.js:147:1268)\n    at async <anonymous>:337:30"
+          ]
+        },
+        {
+          "repetition": 2,
+          "status": "failed",
+          "errors": [
+            "page.evaluate: RangeError: Highlighting did not become visible in 30 seconds\n    at Object.open (http://127.0.0.1:44991/singapore-typescript/entry.js:147:1268)\n    at async <anonymous>:337:30"
+          ]
+        }
+      ]
+    },
+    {
+      "editor": "monaco",
+      "mib": 200,
+      "successful": 3,
+      "attempted": 3,
+      "openMs": 1050.5,
+      "firstFrameMs": 969.6999999880791,
+      "endMs": {
+        "n": 60,
+        "p50": 47,
+        "p95": 48.69999998807907,
+        "max": 49.39999997615814
+      },
+      "middleMs": {
+        "n": 60,
+        "p50": 46.89999997615814,
+        "p95": 48.30000001192093,
+        "max": 49.200000047683716
+      },
+      "scrollRenderingMs": {
+        "n": 180,
+        "p50": 16.591,
+        "p95": 17.214,
+        "max": 17.75
+      },
+      "scrollIntervalMs": {
+        "n": 180,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "heapMiB": 293.89720916748047,
+      "backingMiB": 35.24748706817627,
+      "failures": []
+    },
+    {
+      "editor": "codemirror",
+      "mib": 200,
+      "successful": 3,
+      "attempted": 3,
+      "openMs": 265.2000000476837,
+      "firstFrameMs": 232.80000001192093,
+      "endMs": {
+        "n": 60,
+        "p50": 32.09999996423721,
+        "p95": 32.5,
+        "max": 32.69999998807907
+      },
+      "middleMs": {
+        "n": 60,
+        "p50": 32.19999998807907,
+        "p95": 32.700000047683716,
+        "max": 32.80000001192093
+      },
+      "scrollRenderingMs": {
+        "n": 180,
+        "p50": 0.442,
+        "p95": 33.969,
+        "max": 38.633
+      },
+      "scrollIntervalMs": {
+        "n": 180,
+        "p50": 16.699999999999818,
+        "p95": 33.30000000000018,
+        "max": 33.400000000000546
+      },
+      "heapMiB": 285.3130798339844,
+      "backingMiB": 0.7127351760864258,
+      "failures": []
+    }
+  ],
+  "bundles": [
+    {
+      "id": "singapore-core",
+      "bytes": 908079,
+      "gzip": 239140,
+      "brotli": 196458
+    },
+    {
+      "id": "singapore-typescript",
+      "bytes": 31470083,
+      "gzip": 3147884,
+      "brotli": 2036271
+    },
+    {
+      "id": "monaco-core",
+      "bytes": 3106010,
+      "gzip": 791665,
+      "brotli": 628838
+    },
+    {
+      "id": "monaco-typescript",
+      "bytes": 3111608,
+      "gzip": 793890,
+      "brotli": 630768
+    },
+    {
+      "id": "codemirror-core",
+      "bytes": 199207,
+      "gzip": 63587,
+      "brotli": 55545
+    },
+    {
+      "id": "codemirror-typescript",
+      "bytes": 499580,
+      "gzip": 165280,
+      "brotli": 139350
+    }
+  ]
+}

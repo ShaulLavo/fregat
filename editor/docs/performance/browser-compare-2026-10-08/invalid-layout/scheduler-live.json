@@ -1,0 +1,38 @@
+{
+  "observedAt": "2026-10-08T08:01:56.064054+00:00",
+  "note": "Redacted live registry snapshot during the ordinary bench run. Paths, commands, process identifiers and unrelated job labels are excluded.",
+  "jobs": [
+    {
+      "id": "f522a6b3ca30",
+      "class": "light",
+      "server": true,
+      "quiet": false,
+      "since": "2026-10-08T07:27:27.874Z",
+      "benchmark": false
+    },
+    {
+      "id": "d52fd2621aff",
+      "class": "light",
+      "server": true,
+      "quiet": false,
+      "since": "2026-10-08T07:59:36.915Z",
+      "benchmark": false
+    },
+    {
+      "id": "75095bc87ecb",
+      "class": "bench",
+      "server": false,
+      "quiet": false,
+      "since": "2026-10-08T07:59:38.356Z",
+      "benchmark": true
+    },
+    {
+      "id": "b2bd8a6f0bda",
+      "class": "suite",
+      "server": false,
+      "quiet": false,
+      "since": "2026-10-08T08:01:19.860Z",
+      "benchmark": false
+    }
+  ]
+}

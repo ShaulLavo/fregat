@@ -73,6 +73,7 @@
         "agent/scenarios/editor-retention-count-policy-driver.ts",
         "agent/desktop-display.ts",
         "large-file/bench.ts",
+        "performance/fregat-measure.ts",
         "heavy/pi/launch.ts",
         "heavy/pi/run.ts",
         "heavy/pi/setup.ts",
@@ -324,7 +325,7 @@
       "project": ["src/**/*.ts"]
     },
     "ghostty-webgpu/site": {
-      "entry": ["src/main.ts", "scripts/*.ts"],
+      "entry": ["src/main.ts", "src/pages/**/*.{astro,ts}", "src/examples/**/*.ts", "scripts/*.ts"],
       "project": ["src/**/*.{ts,astro}", "scripts/**/*.ts"]
     }
   },

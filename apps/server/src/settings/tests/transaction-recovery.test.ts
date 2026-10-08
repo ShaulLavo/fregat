@@ -239,6 +239,9 @@ describe('settings and secrets transaction boundaries', () => {
         writeId: 'poison-live-store',
       }),
     ).rejects.toThrow('live store interrupted after settings fsync')
+    expect(() => store.snapshot()).toThrowError(
+      expect.objectContaining({ code: 'settings.TRANSACTION_RECOVERY_REQUIRED' }),
+    )
     await expect(
       store.write({
         mutationId: 'must-not-cross-pending-journal',

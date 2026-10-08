@@ -69,10 +69,10 @@ export function decideQuiet(running: number): Decision {
   return { admit: false, reason: `quiet: waiting for ${running} running job(s) to finish` }
 }
 
-type QuietEntry = Pick<Entry, 'id' | 'quiet' | 'jobClass'>
+type QuietEntry = Pick<Entry, 'id' | 'quiet' | 'server' | 'jobClass'>
 
 export function allowedDuringQuiet(entry: QuietEntry, allowedClasses: readonly string[]) {
-  return !entry.quiet && allowedClasses.includes(entry.jobClass)
+  return !entry.quiet && !entry.server && allowedClasses.includes(entry.jobClass)
 }
 
 /** During a wrapper hold, held classes yield their queue positions to eligible jobs only. */
