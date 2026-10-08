@@ -54,8 +54,6 @@ class DomSurface implements RowRendererSurface {
   private grid: RendererGridSize
   private theme: CanonicalRendererTheme
   private rows: MountedRow[] = []
-  private left?: number
-  private top?: number
 
   constructor(options: WebGpuTerminalRendererOptions) {
     if (!('ownerDocument' in options.canvas) || !options.canvas.parentElement) {
@@ -160,14 +158,11 @@ class DomSurface implements RowRendererSurface {
     const style = this.canvas.ownerDocument.defaultView!.getComputedStyle(this.canvas)
     const left = this.canvas.offsetLeft + (parseFloat(style.paddingLeft) || 0)
     const top = this.canvas.offsetTop + (parseFloat(style.paddingTop) || 0)
-    if (left !== this.left) {
-      this.container.style.left = `${left}px`
-      this.left = left
-    }
-    if (top !== this.top) {
-      this.container.style.top = `${top}px`
-      this.top = top
-    }
+    const declarations = this.container.style
+    const leftDeclaration = `${left}px`
+    const topDeclaration = `${top}px`
+    if (declarations.left !== leftDeclaration) declarations.left = leftDeclaration
+    if (declarations.top !== topDeclaration) declarations.top = topDeclaration
   }
 }
 

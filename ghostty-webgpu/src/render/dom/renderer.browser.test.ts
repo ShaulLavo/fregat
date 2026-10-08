@@ -700,14 +700,31 @@ it('isolates fixed-grid layout through theme and font changes', async () => {
   expect(frame().getBoundingClientRect().width).toBe(144)
 })
 
-it('reads live canvas geometry without repeating unchanged overlay declarations', async () => {
+it('restores overlay declarations after exposed inline styles change', async () => {
   const probe = await rendererProbe('dom')
   const container = probe.canvas.nextElementSibling as HTMLElement
-  const style = vi.spyOn(container, 'style', 'get')
+  const left = container.style.left
+  const top = container.style.top
+  expect(left).not.toBe('')
+  container.style.removeProperty('left')
+  container.style.top = '0px'
   probe.terminal.write('\rnext')
   probe.renderer.notifyWrite()
   probe.clock.flush()
-  expect(style).not.toHaveBeenCalled()
+  expect(container.style.left).toBe(left)
+  expect(container.style.top).toBe(top)
+})
+
+it('reads live canvas geometry without repeating unchanged overlay declarations', async () => {
+  const probe = await rendererProbe('dom')
+  const container = probe.canvas.nextElementSibling as HTMLElement
+  const styles = new MutationObserver(() => {})
+  styles.observe(container, { attributes: true, attributeFilter: ['style'] })
+  cleanups.push(() => styles.disconnect())
+  probe.terminal.write('\rnext')
+  probe.renderer.notifyWrite()
+  probe.clock.flush()
+  expect(styles.takeRecords()).toEqual([])
   probe.canvas.style.marginLeft = '23px'
   probe.canvas.style.paddingTop = '11px'
   probe.terminal.write('\ranother')
