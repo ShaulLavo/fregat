@@ -101,9 +101,9 @@ function publishChildPid(gate = '') {
   return `{ ${gate}printf '%s\\n' "$!"; } > "$2.pending" && mv -- "$2.pending" "$2"`
 }
 
-test.skipIf(processObservationUnavailable)(
-  'process execution observation distinguishes an unreaped child from its live owner',
-  async () => {
+test.skipIf(processObservationUnavailable).each([0, 0.2])(
+  'process execution observation distinguishes an unreaped child from its live owner (stop delay %s seconds)',
+  async (stopDelay) => {
     const box = sandbox()
     const nestedPid = path.join(box.root, 'child.pid')
     const release = path.join(box.root, 'release')
@@ -111,7 +111,7 @@ test.skipIf(processObservationUnavailable)(
       [
         'bash',
         '-c',
-        `bash -c 'until [ -e "$1" ]; do sleep 0.02; done' _ "$1" & ${publishChildPid()}; kill -STOP $$; wait`,
+        `bash -c 'until [ -e "$1" ]; do sleep 0.02; done' _ "$1" & ${publishChildPid()}; sleep ${stopDelay}; kill -STOP $$; wait`,
         '_',
         release,
         nestedPid,
@@ -120,6 +120,8 @@ test.skipIf(processObservationUnavailable)(
     )
     try {
       await expect.poll(() => existsSync(nestedPid), { timeout: 2_000 }).toBe(true)
+      // PID publication precedes suspension, so Bash can still reap an exiting child.
+      await expect.poll(() => processObservation(parent.pid).state, { timeout: 2_000 }).toBe('T')
       const original = processObservation(pidIn(nestedPid))
       expect(executing(original, original.start)).toBe(true)
       const owner = processObservation(parent.pid)
@@ -134,6 +136,7 @@ test.skipIf(processObservationUnavailable)(
       )
       expect(alive(zombie.pid)).toBe(true)
       expect(zombie.start).toBe(original.start)
+      expect(zombie.parent).toBe(String(parent.pid))
       expect(executing(zombie, original.start)).toBe(false)
       expect(executing(processObservation(parent.pid), owner.start)).toBe(true)
     } finally {
@@ -141,6 +144,7 @@ test.skipIf(processObservationUnavailable)(
       parent.kill('SIGCONT')
       await parent.exited
     }
+    expect(processObservation(pidIn(nestedPid)).state).toBeNull()
   },
 )
 
