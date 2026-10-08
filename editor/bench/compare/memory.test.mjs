@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { monitorProcessMemory, summarizeMemorySamples } from './memory.mjs'
+import { monitorProcessMemory, summarizeMemorySamples, processMemoryBytes } from './memory.mjs'
 
 test('peak RSS sums simultaneous samples and preserves unavailable observations', () => {
   const samples = [
@@ -29,4 +29,13 @@ test('memory monitoring stops and records the observed processes', async () => {
   assert.deepEqual(result.processIds, [1, 2])
   assert.equal(result.samples, 1)
   assert.equal(result.sampledSimultaneousPeakRssBytes, 300)
+})
+
+test('Linux process memory accepts tab-separated fields and preserves unknown values', () => {
+  const status = 'Name:\tchrome\nVmRSS:\t  12345 kB\nVmHWM:\t67890 kB\n'
+  assert.equal(processMemoryBytes(status, 'VmRSS'), 12345 * 1024)
+  assert.equal(processMemoryBytes(status, 'VmHWM'), 67890 * 1024)
+  assert.equal(processMemoryBytes('VmRSS: 10 kB', 'VmRSS'), 10 * 1024)
+  assert.equal(processMemoryBytes('', 'VmRSS'), null)
+  assert.equal(processMemoryBytes('VmHWM:	unavailable', 'VmHWM'), null)
 })

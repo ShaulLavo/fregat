@@ -1,6 +1,8 @@
 // Run after the settled frame so hashing does not enter the open clock.
 export async function outputProof() {
-  const result = globalThis.__compareOpenProbe.outputs.at(-1)
+  const probe = globalThis.__compareOpenProbe
+  const result = probe.outputs.at(-1)
+  if (!result && probe.proof) return probe.proof
   if (!result?.tokensPacked) throw new RangeError('Missing packed full output')
   const { starts, ends, styleIds, styles } = result.tokensPacked
   const end = result.statistics.rangeEnd
@@ -45,7 +47,7 @@ export async function outputProof() {
       .map((byte) => byte.toString(16).padStart(2, '0'))
       .join('')
   const encode = (value) => new TextEncoder().encode(JSON.stringify(value))
-  return {
+  const proof = {
     tokenCount: starts.length,
     injectionCount: result.injections.length,
     errorCount: result.errors.length,
@@ -70,6 +72,11 @@ export async function outputProof() {
     queryCalls: result.statistics.__compareQueryCalls,
     matchLimitExceeded: result.statistics.__compareMatchLimitExceeded,
   }
+  if (probe.outputs.at(-1) === result) {
+    probe.proof = proof
+    probe.outputs.length = 0
+  }
+  return proof
 }
 
 export function verifyOutputEquality(rows) {

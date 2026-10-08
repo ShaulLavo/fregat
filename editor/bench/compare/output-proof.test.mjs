@@ -25,15 +25,22 @@ test('canonical output hashes ignore palette numbering and include style and str
       outputs: [output([{ color: 'red' }, { color: 'blue' }], [0, 1])],
     }
     const first = await outputProof()
-    globalThis.__compareOpenProbe.outputs = [output([{ color: 'blue' }, { color: 'red' }], [1, 0])]
+    assert.equal(globalThis.__compareOpenProbe.outputs.length, 0)
     assert.deepEqual(await outputProof(), first)
-    globalThis.__compareOpenProbe.outputs[0].tokensPacked.styles[1].color = 'green'
+    const current = output([{ color: 'blue' }, { color: 'red' }], [1, 0])
+    globalThis.__compareOpenProbe.outputs = [current]
+    assert.deepEqual(await outputProof(), first)
+    globalThis.__compareOpenProbe.outputs = [current]
+    current.tokensPacked.styles[1].color = 'green'
     assert.notEqual((await outputProof()).stylesSha256, first.stylesSha256)
-    globalThis.__compareOpenProbe.outputs[0].records.data[1] = 8
+    globalThis.__compareOpenProbe.outputs = [current]
+    current.records.data[1] = 8
     assert.notEqual((await outputProof()).structuralSha256, first.structuralSha256)
-    globalThis.__compareOpenProbe.outputs[0].tokensPacked.ends[0] = 10
+    globalThis.__compareOpenProbe.outputs = [current]
+    current.tokensPacked.ends[0] = 10
     await assert.rejects(outputProof(), /Invalid complete token stream/)
-    globalThis.__compareOpenProbe.outputs[0].tokensPacked.ends = new Uint32Array([3])
+    globalThis.__compareOpenProbe.outputs = [current]
+    current.tokensPacked.ends = new Uint32Array([3])
     await assert.rejects(outputProof(), /array lengths/)
   } finally {
     globalThis.__compareOpenProbe = previous

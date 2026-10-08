@@ -1,5 +1,5 @@
 export function installOpenProbe() {
-  const probe = { diagnostics: [], messages: [], outputs: [] }
+  const probe = { diagnostics: [], messages: [], outputs: [], outputCount: 0 }
   globalThis.__compareOpenProbe = probe
   globalThis.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = (event) => {
     probe.diagnostics.push(event)
@@ -39,7 +39,11 @@ export function installOpenProbe() {
       this.probeId = ++nextWorker
       workers.push(this)
       this.addEventListener('message', ({ data }) => {
-        if (data?.result?.tokensPacked) probe.outputs.push(data.result)
+        if (data?.result?.tokensPacked) {
+          probe.outputCount++
+          probe.outputs[0] = data.result
+          probe.proof = undefined
+        }
         probe.messages.push({
           direction: 'received',
           worker: this.probeId,

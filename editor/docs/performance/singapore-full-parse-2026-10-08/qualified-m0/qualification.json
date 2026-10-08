@@ -4091,5 +4091,14 @@
     "Runtime WASM was rebuilt byte-identically; grammar WASMs were pinned and hashed but were not byte-identically rebuilt.",
     "Control runs precede the empty-process-list RSS guard and its formatting. Every recorded process list is nonempty, and all measured browser asset hashes equal the final baseline. Each control retains its own benchmark fingerprint.",
     "The final unused-export gate made readProcessRss private after these measurements. Its implementation, call sites and measured browser assets are unchanged."
-  ]
+  ],
+  "memoryStatus": {
+    "status": "Superseded instrumentation observations; timing baseline and M1 thresholds remain frozen",
+    "replacement": "../memory-correction/qualification.json",
+    "reasons": [
+      "Linux post-open RSS/high-water parsing omitted tab-separated fields",
+      "Lifecycle probe retained every full reply",
+      "Disposal gate checked only document counts"
+    ]
+  }
 }

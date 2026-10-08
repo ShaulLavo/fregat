@@ -1,9 +1,13 @@
 import { readFile } from 'node:fs/promises'
 
+export function processMemoryBytes(status, field) {
+  const match = status.match(new RegExp(`^${field}:\\s+([0-9]+) kB`, 'm'))
+  return match ? Number(match[1]) * 1024 : null
+}
+
 async function readProcessRss(id) {
   const status = await readFile(`/proc/${id}/status`, 'utf8').catch(() => '')
-  const match = status.match(/^VmRSS:\s+([0-9]+) kB/m)
-  return match ? Number(match[1]) * 1024 : null
+  return processMemoryBytes(status, 'VmRSS')
 }
 
 export function summarizeMemorySamples(samples) {

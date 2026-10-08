@@ -262,11 +262,12 @@ larger of 1 ms and that phase's frozen maximum-minus-minimum spread. Reject a
 latency win that doubles a matched whole-job peak unless the smaller-memory
 variant meets the target. M1 has not passed.
 
-The baseline batch's whole-job peak was 1,498,374,144 bytes. The 1 MiB controls
+The historical pre-review baseline batch's whole-job peak was 1,498,374,144 bytes. The 1 MiB controls
 and lifecycle batch peaked at 2,049,671,168 bytes, and the 10 MiB controls batch
 at 6,432,743,424 bytes. These include browser control, hashes, traces and
 retention inspection; they are separate from sampled browser RSS and committed
-WASM capacity. All three receipts show zero OOM kills and zero leftovers. The
+WASM capacity. These memory receipts are superseded by the correction below.
+The original raw measurements remain intact. All three receipts show zero OOM kills and zero leftovers. The
 1 MiB batch exited 1 because the final Markdown proof was correctly rejected.
 The 10 MiB batch completed all eight controls, including 313,006 grammar-valid
 injections with zero errors and 381,300 recovery injections with 571,950 error
@@ -303,3 +304,38 @@ structural walk is the other leading cost. Inspect `collectTreeData`,
 node visits and native getter counts before choosing a candidate. Keep the
 whole-tree traversal and all diagnostics. No optimization or measured ceiling
 has been accepted yet.
+
+### Memory review corrections, 2026-10-09
+
+[Corrected memory evidence](../editor/docs/performance/singapore-full-parse-2026-10-08/memory-correction/qualification.json)
+replaces the historical memory observations while preserving the frozen timing
+baseline and M1 thresholds. The probe now parses Linux RSS/high-water fields
+with tab or space separation, retains only the latest unproved reply, counts
+replies monotonically, and releases packed/structural payloads after hashing.
+The disposal gate compares worker/document/snapshot identities, tree and
+snapshot counts, and source reads, pins and UTF-16 units. Committed WASM
+capacity may remain allocated.
+
+All 28 refreshed samples passed: five cold and five warm 10 MiB repetitions,
+sixteen 1 MiB/10 MiB controls, and cold/warm 1 MiB smoke. Every canonical output
+and actual coverage list equals its historical counterpart. Linux per-process
+RSS and high-water values are now available for every observed process. The
+dense lifecycle returns to one document, four snapshots, 125,202 trees, four
+source reads, zero pins and 4,194,304 retained source units, with the same
+identities as after the edits. Post-disposal, post-GC JavaScript heap is
+91,100,436 bytes; simultaneous observed process RSS is 799,404,032 bytes. These
+remain distinct from allocator-live bytes, which are unmeasured.
+
+The corrected cold/warm batch peaked at 1,572,909,056 whole-job bytes. All ten
+samples completed before an invalid operator corpus argument stopped that
+batch with exit 1; no control sample was attempted in that invocation. The
+corrected controls/smoke batch exited 0 and peaked at 6,544,244,736 bytes. Both
+receipts show zero OOM kills, zero leftovers and no expired quiet hold. The
+required coverage metadata, hashes and traces still have diagnostic memory
+costs; these are memory qualification results, not memory-reduction claims.
+
+The three reviewer regressions fail with the original whitespace parser,
+append-only reply retention and document-count-only disposal gate. The fixed
+probe suite passes 39 tests, including proof release and rejection of unchanged
+document counts with leaked trees, snapshots, sources or changed identities.
+No shipping parser/editor source or open timing markers changed.

@@ -82,8 +82,7 @@ node summarize-open.mjs ./results/open-profile-after/experiment.json \
 ```
 
 This diagnostic run uses the same mount code, fixture, geometry checks and
-30-second visible-highlighting deadline as the comparison. It skips typing,
-scroll and post-open heap observations. Every attempt saves an open trace,
+30-second visible-highlighting deadline as the comparison. It skips typing and scroll, and collects post-GC heaps after complete output proof. Every attempt saves an open trace,
 including visible-highlighting deadline failures. A whole-sample timeout can
 still interrupt trace collection and fails profile verification.
 
@@ -312,3 +311,18 @@ each process's RSS. Keep the execution host's whole-job peak-memory receipt with
 the evidence. That receipt includes browser, controller and diagnostic overhead
 for the entire batch. Heap collection, hashing and retention inspection happen
 after the measured highlighted frame.
+
+### Diagnostic memory ownership
+
+The open probe retains one latest reply until its complete output is hashed,
+then releases its packed tokens and structural records. A monotonic reply
+counter settles edits without accumulating old payloads. Proofs and request
+metadata remain part of the diagnostic cost. Linux RSS/high-water readers
+accept tab-separated status fields; unavailable readings remain null.
+
+The lifecycle gate restores worker/document/snapshot identities, snapshot and
+tree counts, and source read/pin/unit counts after extra editors are disposed.
+Committed WASM capacity may stay allocated. Post-disposal JavaScript heap and
+process RSS/high-water observations are recorded separately from the sampled
+lifecycle peak. Historical pre-correction memory evidence stays available and
+is marked as superseded; its timing baseline and output proofs are unchanged.

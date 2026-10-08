@@ -1,6 +1,7 @@
 import { mount } from 'ACTOR'
 import { fixture } from 'FIXTURE'
 import { outputProof } from './output-proof.mjs'
+import { verifyDisposedRetention } from './retention.mjs'
 
 let preparedText
 const host = document.querySelector('#editor')
@@ -62,13 +63,13 @@ const waitFor = async (predicate) => {
 
 const settleMutation = async (mutate) => {
   const probe = globalThis.__compareOpenProbe
-  const before = probe.outputs.length
+  const before = probe.outputCount
   mutate()
   await waitFor(() => {
     const result = probe.outputs.at(-1)
     const root = result?.statistics?.__compareCoverage?.find((layer) => layer.kind === 'root')
     return (
-      probe.outputs.length > before &&
+      probe.outputCount > before &&
       !result.missingLanguages?.length &&
       result.analysis?.kind !== 'partial' &&
       result.analysis?.kind !== 'cancelled' &&
@@ -102,6 +103,7 @@ window.bench = {
     globalThis.__compareOpenProbe.diagnostics.length = 0
     globalThis.__compareOpenProbe.messages.length = 0
     globalThis.__compareOpenProbe.outputs.length = 0
+    globalThis.__compareOpenProbe.proof = undefined
     performance.clearMarks()
   },
   async open() {
@@ -201,9 +203,7 @@ window.bench = {
     }
     await painted()
     const afterDisposal = await probe.inspectRetention()
-    const total = (snapshots) => snapshots.reduce((sum, item) => sum + item.documentCount, 0)
-    if (total(multiple) < total(afterEdits) + 2 || total(afterDisposal) !== total(afterEdits))
-      throw new RangeError('Multiple-document retention did not return to baseline after disposal')
+    verifyDisposedRetention(afterEdits, multiple, afterDisposal)
     return {
       edits,
       afterEdits,

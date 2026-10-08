@@ -13,7 +13,7 @@ import { verifyFullDocumentRow } from './full-document.mjs'
 import { installOpenProbe, summarizeOpenProfile } from './open-profile.mjs'
 import { outputProof, verifyOutputEquality } from './output-proof.mjs'
 import { corpora } from './fixture.mjs'
-import { monitorProcessMemory } from './memory.mjs'
+import { monitorProcessMemory, processMemoryBytes } from './memory.mjs'
 import {
   fixtureIdentity,
   order,
@@ -150,6 +150,7 @@ let results = {
         await Promise.all(
           [
             'memory.mjs',
+            'retention.mjs',
             'output-proof.mjs',
             'full-document.mjs',
             'native-full-parse.c',
@@ -306,11 +307,11 @@ async function processMemory() {
           platform() === 'linux'
             ? await readFile(`/proc/${process.id}/status`, 'utf8').catch(() => '')
             : ''
-        const bytes = (field) => {
-          const match = status.match(new RegExp(`^${field}:[ ]+([0-9]+) kB`, 'm'))
-          return match ? Number(match[1]) * 1024 : null
+        return {
+          ...process,
+          rssBytes: processMemoryBytes(status, 'VmRSS'),
+          highWaterBytes: processMemoryBytes(status, 'VmHWM'),
         }
-        return { ...process, rssBytes: bytes('VmRSS'), highWaterBytes: bytes('VmHWM') }
       }),
     )
   } finally {
@@ -410,6 +411,8 @@ async function sample(editor, mib, repetition) {
         row.lifecycle = await page.evaluate((mib) => window.bench.lifecycle(mib), mib)
         row.lifecycleMemory = await stopMemory()
         stopMemory = undefined
+        row.lifecycleHeapAfter = await heap(cdp)
+        row.lifecycleProcessMemory = await processMemory()
       }
       row.status = row.errors.length ? 'page-error' : 'ok'
       return row

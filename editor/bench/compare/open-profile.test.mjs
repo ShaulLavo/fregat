@@ -364,3 +364,27 @@ test('retention inspection fences every observed worker with distinct request ID
     globalThis.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = diagnostics
   }
 })
+
+test('worker replies retain only the latest full payload with a monotonic counter', () => {
+  const originalWorker = globalThis.Worker
+  const previousProbe = globalThis.__compareOpenProbe
+  const diagnostics = globalThis.__EDITOR_PERFORMANCE_DIAGNOSTICS__
+  try {
+    globalThis.Worker = class extends EventTarget {}
+    installOpenProbe()
+    const worker = new Worker()
+    const replies = [1, 2, 3].map((id) => ({ tokensPacked: { starts: new Uint32Array([id]) } }))
+    for (const result of replies) {
+      const event = new Event('message')
+      event.data = { result }
+      worker.dispatchEvent(event)
+    }
+    assert.deepEqual(globalThis.__compareOpenProbe.outputs, [replies[2]])
+    assert.equal(globalThis.__compareOpenProbe.outputCount, 3)
+    assert.ok(globalThis.__compareOpenProbe.messages.every((message) => !message.tokensPacked))
+  } finally {
+    globalThis.Worker = originalWorker
+    globalThis.__compareOpenProbe = previousProbe
+    globalThis.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = diagnostics
+  }
+})
