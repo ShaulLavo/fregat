@@ -1,3 +1,4 @@
+import { createIdentityIndex, type CharId, type IdentityIndex } from './identityRuns'
 import type {
   Piece,
   PieceTableBuffers,
@@ -28,6 +29,7 @@ class StoredSnapshot implements PieceTableTreeSnapshot {
     public buffers: PieceTableBuffers,
     public root: PieceTreeNode | null,
     public reverseIndex: PieceTableReverseIndex,
+    readonly charIds: IdentityIndex | null = null,
   ) {
     this.length = getSubtreeVisibleLength(root)
     this.pieceCount = getSubtreePieces(root)
@@ -39,7 +41,8 @@ export const createSnapshot = (
   buffers: PieceTableBuffers,
   root: PieceTreeNode | null,
   reverseIndex: PieceTableReverseIndex,
-): PieceTableTreeSnapshot => new StoredSnapshot(buffers, root, reverseIndex)
+  charIds: IdentityIndex | null = null,
+): PieceTableTreeSnapshot => new StoredSnapshot(buffers, root, reverseIndex, charIds)
 
 // Only physical storage changes. Text, coordinates and snapshot identity stay fixed.
 export function publishSnapshotStorage(
@@ -77,6 +80,7 @@ export const createNormalizedSnapshot = (
   root: PieceTreeNode | null,
   previous: PieceTableReverseIndex,
   changes: readonly Piece[],
+  charIds: IdentityIndex | null = null,
 ): PieceTableTreeSnapshot => {
   const epoch = buffers.lineage.epoch
   const pieces: number[] = []
@@ -91,7 +95,12 @@ export const createNormalizedSnapshot = (
     },
   )
   const withChanges = applyReverseIndexChanges(previous, changes)
-  return createSnapshot(buffers, normalizedRoot, relabelReverseIndex(withChanges, pieces, standIns))
+  return createSnapshot(
+    buffers,
+    normalizedRoot,
+    relabelReverseIndex(withChanges, pieces, standIns),
+    charIds,
+  )
 }
 
 // Makes the snapshot persistent: nothing created before this call is ever
@@ -119,6 +128,8 @@ export type CreatePieceTableSnapshotOptions = PieceTableBufferOptions & {
   // Skip ingestion normalization when the caller already holds LF-only text
   // (snapshot round-trips, undo restores, worker-side reconstruction).
   readonly normalized?: boolean
+  // The original text's first ID; all later inserts supply authored IDs explicitly.
+  readonly charIds?: CharId
 }
 
 export const createPieceTableSnapshot = (
@@ -139,5 +150,8 @@ export const createPieceTableSnapshot = (
   const originalPiece = createOriginalPiece(buffers)
   const epoch = buffers.lineage.epoch
   const root = originalPiece ? createNode(originalPiece, null, null, epoch) : null
-  return createSnapshot(buffers, root, buildReverseIndex(root))
+  const charIds = options.charIds
+    ? createIdentityIndex(options.charIds, originalPiece?.length ?? 0)
+    : null
+  return createSnapshot(buffers, root, buildReverseIndex(root), charIds)
 }

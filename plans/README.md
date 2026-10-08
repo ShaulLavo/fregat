@@ -200,6 +200,7 @@ delivered acceptance, monitoring/draft check, named follow-ons and owner-only re
 | [333](333-async-terminal-and-server-adapters.md)      | Terminal streams, Bun watch and same-thread server adapters                     |
 | [334](334-async-runtime-verification.md)              | Bounded async qualification, measurements and product acceptance                |
 | [335](335-stroke-icons.md)                            | Stroke icons only, Hugeicons by default, morphing icons, icon packs later       |
+| [336](336-packages-as-products.md)                    | Our packages look and read like products: READMEs, sites, docs, releases        |
 
 ## Package and client plans
 

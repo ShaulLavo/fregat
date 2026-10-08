@@ -148,6 +148,11 @@ work can proceed independently where their files and contracts do not overlap.
 
 ## Next programs
 
+[336](plans/336-packages-as-products.md) makes Fregat, Singapore, ghostty-webgpu and hotkeys
+look like products: research, pitch with proof, READMEs, Astro sites on our own domains, docs,
+a release cycle, and closing the issue backlog. It touches docs, sites and package metadata,
+so it runs alongside product work; Track E waits for the owner's domains.
+
 [335](plans/335-stroke-icons.md) retains the current stroke-icon migration, shared registry
 and selected morph sites. Its broad swap takes the structural window after the keymap
 cutover and before broad new UI batches; registry/mapping preparation can proceed earlier.

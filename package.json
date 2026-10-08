@@ -2,6 +2,7 @@
   "name": "fregat",
   "version": "0.0.22",
   "private": true,
+  "license": "MIT",
   "workspaces": {
     "packages": [
       "apps/*",

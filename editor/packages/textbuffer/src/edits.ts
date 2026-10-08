@@ -175,10 +175,16 @@ const beginEdit = (snapshot: PieceTableTreeSnapshot): EditState => ({
 
 const finishEdit = (snapshot: PieceTableTreeSnapshot, state: EditState): PieceTableTreeSnapshot => {
   if (state.normalizeOrders) {
-    return createNormalizedSnapshot(state.buffers, state.root, snapshot.reverseIndex, state.changes)
+    return createNormalizedSnapshot(
+      state.buffers,
+      state.root,
+      snapshot.reverseIndex,
+      state.changes,
+      snapshot.charIds,
+    )
   }
   const reverseIndex = applyReverseIndexChanges(snapshot.reverseIndex, state.changes)
-  return createSnapshot(state.buffers, state.root, reverseIndex)
+  return createSnapshot(state.buffers, state.root, reverseIndex, snapshot.charIds)
 }
 
 const insertContext = (state: EditState, text: string, snap: boolean): InsertContext => ({
@@ -305,6 +311,8 @@ export const insertIntoPieceTable = (
   text: string,
 ): PieceTableTreeSnapshot => {
   if (text.length === 0) return snapshot
+  if (snapshot.charIds)
+    throw new RangeError('identity-enabled inserts require authored character IDs')
   if (offset < 0 || offset > snapshot.length) {
     throw new RangeError('invalid offset')
   }
@@ -362,6 +370,8 @@ export const applyBatchToPieceTable = (
   edits: readonly PieceTableEdit[],
 ): PieceTableTreeSnapshot => {
   if (edits.length === 0) return snapshot
+  if (snapshot.charIds && edits.some((edit) => edit.text.length > 0))
+    throw new RangeError('identity-enabled inserts require authored character IDs')
   if (edits.length === 1 && snappedAgainst.get(edits) !== snapshot) {
     return applyUnsnappedEdit(snapshot, edits[0]!)
   }

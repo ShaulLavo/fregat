@@ -60,3 +60,21 @@ export {
 export type { CreatePieceTableSnapshotOptions } from './snapshot'
 export type { PieceTableBufferOptions } from './buffers'
 export { snapBatchEditRanges } from './edits'
+
+export {
+  CharIdAllocator,
+  applyCharIdEdit,
+  charIdAt,
+  charIdSpansInRange,
+  deleteByCharId,
+  insertByCharId,
+  locateCharId,
+} from './charIds'
+export type {
+  CharId,
+  CharIdSpan,
+  CharIdLocation,
+  CharIdBoundary,
+  CharIdInsertion,
+  CharIdEdit,
+} from './charIds'

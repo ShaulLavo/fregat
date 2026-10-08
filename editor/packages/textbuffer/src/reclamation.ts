@@ -1,4 +1,5 @@
 import {
+  countPieceLineBreaksBefore,
   bufferStorageIdentity,
   bufferTextPages,
   retainedBufferTextOwners,
@@ -15,7 +16,7 @@ export function reclaimPieceTableText(snapshot: PieceTableSnapshot): PieceTableS
   if (snapshot.consumed) throw new RangeError('cannot reclaim a consumed transient snapshot')
   retainPieceTableSnapshot(snapshot)
   const next = retainPieceTableSnapshot(
-    createSnapshot(snapshot.buffers, snapshot.root, snapshot.reverseIndex),
+    createSnapshot(snapshot.buffers, snapshot.root, snapshot.reverseIndex, snapshot.charIds),
   )
   const job = reclaimSnapshotStorage([next])
   while (!job.next().done) {
@@ -80,6 +81,8 @@ export function* reclaimSnapshotStorage(
   let remainingGroups = groups.size
   for (const sources of groups.values()) {
     remainingGroups--
+    const retainLineIndexes = sources.some(({ snapshot }) => snapshot.charIds !== null)
+    if (retainLineIndexes) yield* indexRetainedPieces(sources)
     const live = new Map<number, TextRange[]>()
     yield* markLiveRanges(sources, live)
     const seenBuffers = new Set<PieceTableBuffers>()
@@ -89,7 +92,7 @@ export function* reclaimSnapshotStorage(
       seenBuffers.add(source.buffers)
       yield
     }
-    const replacements = yield* reclaimBufferGroup(buffers, live, result)
+    const replacements = yield* reclaimBufferGroup(buffers, live, result, retainLineIndexes)
     // A yield during publication lets cancellation permanently split a shared history log.
     for (const source of sources) {
       const next = replacements.get(source.buffers)
@@ -119,4 +122,25 @@ function* detachRetiredPages(snapshots: Iterable<PieceTableSnapshot>): Generator
     families.set(registry, retained)
   }
   for (const [registry, retained] of families) yield* registry.detachRetired(retained)
+}
+
+// Exact hidden splits still need line-break metadata after their text is freed.
+// Scan once during maintenance, including entirely hidden subtrees.
+function* indexRetainedPieces(sources: readonly Source[]): Generator<void> {
+  const visited = new Set<PieceTreeNode>()
+  let steps = 0
+  for (const { snapshot, buffers } of sources) {
+    const stack = snapshot.root ? [snapshot.root] : []
+    while (stack.length > 0) {
+      const node = stack.pop()!
+      if (visited.has(node)) continue
+      visited.add(node)
+      if (node.piece.lineBreaks > 0)
+        countPieceLineBreaksBefore(buffers, node.piece, node.piece.length)
+      if (node.left) stack.push(node.left)
+      if (node.right) stack.push(node.right)
+      if (++steps % 256 === 0) yield
+    }
+    yield
+  }
 }

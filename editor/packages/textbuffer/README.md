@@ -50,6 +50,42 @@ offsets count UTF-16 code units. rows and columns start at zero (`offsetToPoint`
 
 `/debug` has `validatePieceTreeInvariants` and other inspection helpers. `/diagnostics` takes an optional diagnostic sink. `/internal/*` is for tests and can change at any time
 
+## collaborative character identity
+
+opt in when loading a collaborative document. give every replica the same first ID for the original normalized text
+
+```ts
+import {
+  CharIdAllocator,
+  createPieceTableSnapshot,
+  insertByCharId,
+  deleteByCharId,
+  charIdAt,
+} from '@singapore-editor/textbuffer'
+
+const original = createPieceTableSnapshot('abc', {
+  normalized: true,
+  charIds: { bunch: 'document-bootstrap:0', counter: 0 },
+})
+// Supply a random session-unique actor. Keep this allocator outside snapshot history.
+const author = new CharIdAllocator(crypto.randomUUID())
+const left = charIdAt(original, 0)!
+const insertion = {
+  start: author.generateAfter(left, 2),
+  text: 'XY',
+  at: { after: left },
+} as const
+const edited = insertByCharId(original, insertion) // aXYbc
+const replay = insertByCharId(original, insertion) // same IDs after rollback
+const deleted = deleteByCharId(edited, [{ start: left, count: 2 }]) // XYc
+```
+
+`CharId { bunch, counter }` names one UTF-16 unit. `charIdAt` reads a visible unit's ID; `locateCharId` finds its piece, storage unit, visible gap and liveness, including hidden characters. `charIdSpansInRange` converts a visible selection into identity spans and rejects boundaries inside surrogate pairs
+
+`applyCharIdEdit(snapshot, { delete: spans, insert: insertion })` applies both halves of a replacement in one persistent edit. placement is `{ after: id | 'start' }` or `{ before: id | 'end' }`. the ordering engine chooses that exact structural boundary; it can name hidden characters. deletion hides only the supplied IDs, preserving other text inserted between them. already-hidden targets are harmless; unknown IDs and duplicate insertion IDs throw before changing the snapshot
+
+identity-enabled snapshots require authored IDs for every insertion. ordinary offset deletion still works. collaborative documents keep exact tombstone order and skip stand-in compaction; text reclamation remains available. retain every snapshot you still need before reclaiming shared storage. identity metadata and hidden line-break indexes survive freed text
+
 ## working on it
 
 from this folder, after `bun install` at the repo root
@@ -59,6 +95,12 @@ bun run verify
 ```
 
 `verify` typechecks, builds, runs the vitest suite and a smoke test against the built package
+
+the seeded structural-model test checks two seeds with 40 edits each by default. run the full six-seed, 1,800-edit sweep with the collaboration stress flag; each seed runs as a separate test with the default timeout
+
+```sh
+COLLAB_STRESS=1 bun run test src/charIds.test.ts
+```
 
 ## more
 
