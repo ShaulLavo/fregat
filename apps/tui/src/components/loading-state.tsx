@@ -4,7 +4,7 @@ import type { Theme } from '@/theme/utils/theme'
 
 export function LoadingState({
   theme,
-  label = 'Connecting to Platform…',
+  label = 'Connecting to Fregat…',
 }: {
   theme: Theme
   label?: string

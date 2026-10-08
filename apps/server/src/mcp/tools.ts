@@ -31,7 +31,7 @@ export function platformMcpServer(grant: McpGrant | null) {
   server.registerTool(
     platformReadTools.workspaceInfo,
     {
-      description: 'The Platform session and checkout this agent works in.',
+      description: 'The Fregat session and checkout this agent works in.',
       annotations: { readOnlyHint: true },
     },
     async () => {

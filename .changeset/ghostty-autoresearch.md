@@ -2,4 +2,4 @@
 'ghostty-webgpu': patch
 ---
 
-Add agent-facing autonomous performance research instructions and resumable checkpoint writes around the existing benchmark procedures.
+Added a guide for running resumable terminal performance investigations with `bun run autoresearch:checkpoint`. Saved checkpoints let a later run continue the investigation.

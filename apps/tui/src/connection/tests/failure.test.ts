@@ -6,7 +6,7 @@ import { connectionFailure } from '@/connection/utils/failure'
 
 const originFix = `Register ${TUI_CLIENT_ORIGIN} in SERVER_ALLOWED_ORIGINS and restart the server.`
 const retryFix = 'Check the server address and connection, then press Ctrl+R to retry.'
-const unreachable = 'Could not reach the Platform server.'
+const unreachable = 'Could not reach the Fregat server.'
 
 // Eden's EdenFetchError: an Error whose message is `String(value)`.
 function edenError(status: number, value: unknown) {

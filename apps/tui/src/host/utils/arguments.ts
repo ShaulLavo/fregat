@@ -53,11 +53,11 @@ function dimension(value: string, name: string, min: number, max: number) {
   throw createTuiError(`Invalid ${name}: ${value}`, `Choose ${name} between ${min} and ${max}.`)
 }
 
-export const usage = `Platform TUI
+export const usage = `Fregat TUI
 
 Usage: bun run dev:tui [options]
 
-  --origin <url>            Attach to an existing Platform server
+  --origin <url>            Attach to an existing Fregat server
   --headless-frame <path>   Write one rendered frame and exit
   --width <columns>        Frame width, default 100
   --height <rows>          Frame height, default 30

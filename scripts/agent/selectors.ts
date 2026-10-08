@@ -8,6 +8,13 @@ import type {
 import { createScriptError } from '../structured-errors'
 import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 
+export const workbenchPaintSelectors = {
+  terminal:
+    '[data-slot="tool-pane"][aria-label="Terminal"] [data-terminal-presentation="saved"] canvas, [data-slot="tool-pane"][aria-label="Terminal"] :not([inert]) > .ghostty-webgpu > canvas',
+  editor: '.editor-virtualized-row',
+  tree: '[aria-label="Folder tree"] [role="treeitem"]',
+}
+
 export const csvSelectors = {
   engineModule: '**/src/features/workbench/utils/csv.ts*',
   presentationModule: '**/src/features/workbench/utils/csv-presentation.ts*',
@@ -1256,6 +1263,8 @@ export const selectors = {
   terminalOpening: (page: Page) => page.getByRole('status', { name: 'Opening terminal' }),
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
+  terminalLiveCanvas: (page: Page) =>
+    selectors.terminalSurface(page).first().locator(':not([inert]) > .ghostty-webgpu > canvas'),
   terminalDomRows: (page: Page) =>
     selectors.terminalSurface(page).first().locator('.ghostty-webgpu-frame [data-row]'),
   paletteRowSelector: '[data-slot="command-list"] [role="option"]',

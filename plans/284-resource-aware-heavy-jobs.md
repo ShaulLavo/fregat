@@ -49,3 +49,31 @@ P4's measured consumer fixes remain ongoing work. Record phase receipts before c
 - No change to how CI runs on GitHub. This is local machine scheduling only.
 - Coordinate P2 and P3 with whichever session runs the quiet measurements (the foundations wave as of 2026-10-01); do not land a change to exclusive holds while that wave is mid-measurement.
 - The per-job memory ceiling stays; admission gets smarter, the safety net does not go away.
+
+## October 2026 issue follow-ups
+
+Status: Approved, retained by [Plan 336 closeout](issue-closeout-2026-10.md).
+These are remaining execution items. Closing their tracker records does not certify a fix
+or change acceptance of an earlier delivered milestone. Each original thread retains its
+full reproduction, comments and historical artifacts. Source links below pin the reviewed
+main revision; recheck them before implementation.
+
+### Issue 565
+
+Status: Idea. The affinity experiment keeps the source proposal's status.
+
+Source: [#565: heavy: run CPU-only jobs on E-cores during quiet holds (affinity pinning), pending a measured A/B](https://github.com/ShaulLavo/fregat/issues/565), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/565).
+Current owner: [scripts/heavy/job.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/scripts/heavy/job.ts).
+
+The original affinity proposal remains Idea. AllowedCPUs on user scopes was not enforced without cpuset delegation; taskset is an experiment candidate. No valid measured idle-versus-E-core-load A/B exists. Prior preflight failures and a stock workload longer than the 600-second quiet hold are not comparative evidence. First choose a bounded CPU-only workload, verify actual process affinity and cleanup, and compare quiet instrumentation validity plus finite-job progress. Do not change admission policy or claim throughput until that control passes.
+
+- [ ] Run the bounded experiment before approving an affinity policy.
+
+### Issue 575
+
+Source: [#575: Unconfirmed allocation source: cold Vite optimizer exceeds private light-server memory ceiling](https://github.com/ShaulLavo/fregat/issues/575), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/575).
+Current owner: [apps/web/vite.config.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/web/vite.config.ts).
+
+Cold lockfile-triggered Vite reoptimization exceeded the private light-server 2 GiB ceiling and was OOM-killed with exit 137. The allocation source remains unconfirmed. Running the preview in build class is a workaround, not a measured memory fix or proof of a wrapper defect. Capture cold/warm optimizer inputs, plugin phases and peak memory under the original ceiling. Attribute the largest retained allocation, fix it and compare the same workload before changing class estimates.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.

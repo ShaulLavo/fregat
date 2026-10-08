@@ -28,7 +28,7 @@ export function createCounters() {
   }
 }
 
-export function frameName(frame) {
+function frameName(frame) {
   let file = frame.url ?? ''
   if (file.startsWith('file:')) file = fileURLToPath(file)
   file = file.replace(upstreamRoot, 'vscode').replace(packageRoot, 'textbuffer')

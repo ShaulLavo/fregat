@@ -1,20 +1,24 @@
 import { strictEqual } from 'node:assert/strict'
+import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 import { copyFile, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium, type CDPSession, type Page } from 'playwright'
 import { startIsolatedServer } from '../agent/isolated-server'
 import { openFixtureWorkspace, releaseFixture } from '../agent/fixture-workspace'
-import { paintedTokenColors, selectors } from '../agent/selectors'
+import { paintedTokenColors, pressShortcut, selectors } from '../agent/selectors'
 import { createScriptError } from '../structured-errors'
 import { expectedEditedHash, fileHash, MARKER, writeFixture } from './fixture'
 import { hostLabel, renderingPath, type RenderingPath } from './host'
 import { collectKeyLatency, KEY_MEASURE } from './key-latency'
 import { sampleMemory } from './memory'
 import { workerHeaps } from './workers'
+import { typingCost } from './typing-cost'
+import { readTrace } from '../agent/trace-types'
 
 export type Highlighting = 'default' | 'shiki' | 'tree-sitter'
 
 export type CaseOptions = {
+  readonly analysis?: 'default' | 'on' | 'off'
   readonly highlighting: Highlighting
   readonly sizeMiB: number
   readonly extension: 'txt' | 'ts'
@@ -38,19 +42,30 @@ async function typeBurst(page: Page, keys: number) {
     .first()
     .click({ position: { x: 180, y: 12 } })
   await selectors.editorInput(page).first().focus()
-  await page.keyboard.press('Control+Home')
+  const platform = await page.evaluate(detectPlatform)
+  await page.keyboard.press(platform === 'mac' ? 'Meta+ArrowUp' : 'Control+Home')
   await page.evaluate((name) => {
     performance.clearMeasures(name)
+    let index = 0
     const input = document.activeElement
     input?.addEventListener('keydown', (event) => {
       if (!(event instanceof KeyboardEvent) || event.key !== 'x') return
+      const key = index++
       const start = event.timeStamp
-      requestAnimationFrame(() => performance.measure(name, { start, end: performance.now() }))
+      performance.mark(`large-file-key:start:${key}`)
+      requestAnimationFrame(() => {
+        performance.measure(name, { start, end: performance.now() })
+        requestAnimationFrame(() => performance.mark(`large-file-key:end:${key}`))
+      })
     })
   }, KEY_MEASURE)
   for (let index = 0; index < keys; index += 1) {
     await page.keyboard.press('x')
     await page.waitForTimeout(80)
+    await page.waitForFunction(
+      (key) => performance.getEntriesByName(`large-file-key:end:${key}`).length === 1,
+      index,
+    )
   }
   return collectKeyLatency(page, keys)
 }
@@ -65,6 +80,10 @@ async function copyLogs(logs: string, output: string) {
 
 async function highlightingReady(page: Page, options: CaseOptions, openedAt: number) {
   if (options.extension !== 'ts') return { state: 'plain' }
+  if (options.analysis === 'off') {
+    await selectors.editorLargeFileNotice(page).waitFor()
+    return { state: 'paused' }
+  }
   const notice = page.getByTestId('large-file-mode')
   if ((await notice.count()) && (await notice.innerText()).includes('syntax'))
     return { state: 'paused' }
@@ -170,7 +189,7 @@ async function exercise(
     page.waitForResponse((item) => new URL(item.url()).pathname.endsWith('/fs/write'), {
       timeout: 120_000,
     }),
-    page.keyboard.press('Control+s'),
+    pressShortcut(page, 'Mod+s'),
   ])
   const saveMs = performance.now() - savedAt
   strictEqual(saved.status(), 200, 'Save must succeed for every supported open size')
@@ -190,6 +209,8 @@ async function exercise(
     keyLatencyMs,
     saveMs,
     diskBytes: (await stat(file)).size,
+    expectedSha256: expected,
+    savedSha256: await fileHash(file),
     heapBeforeOpen,
     heapAfterOpen,
     heapAfterTyping,
@@ -212,8 +233,11 @@ export async function runCase(options: CaseOptions) {
   const server = await startIsolatedServer(new URL('http://localhost:5297'), {
     scratchRoot: options.output,
     webRoot: options.webRoot,
-    settings:
-      options.highlighting === 'default'
+    settings: {
+      ...(options.analysis === 'default' || !options.analysis
+        ? {}
+        : { 'editor.largeFile.analysisLimitMiCodeUnits': options.analysis === 'on' ? 20 : 0 }),
+      ...(options.highlighting === 'default'
         ? {}
         : {
             'workbench.colorTheme': 'light',
@@ -221,10 +245,14 @@ export async function runCase(options: CaseOptions) {
               options.highlighting === 'shiki' ? 'light-plus' : 'tree-sitter-light',
             'editor.codeTheme.dark':
               options.highlighting === 'shiki' ? 'dark-plus' : 'tree-sitter-dark',
-          },
+          }),
+    },
   })
   const memory = sampleMemory(process.pid)
-  const browser = await chromium.launch({ headless: true, args: ['--enable-precise-memory-info'] })
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--enable-precise-memory-info', '--disable-frame-rate-limit', '--disable-gpu-vsync'],
+  })
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
@@ -236,26 +264,37 @@ export async function runCase(options: CaseOptions) {
     host: hostLabel(),
     runtime: Bun.version,
     timestamp: new Date().toISOString(),
+    frameScheduling: 'unthrottled Chromium (--disable-frame-rate-limit --disable-gpu-vsync)',
   }
   let rendering: RenderingPath | null = null
   try {
     rendering = await renderingPath(browser)
     await page.goto(server.origin)
     await openFixtureWorkspace(page, fixture)
-    if (options.profile)
-      await browser.startTracing(page, {
-        path: path.join(options.output, 'trace.json'),
-        categories: [
-          'devtools.timeline',
-          'disabled-by-default-devtools.timeline',
-          'blink.user_timing',
-          'v8.execute',
-          'disabled-by-default-v8.cpu_profiler',
-        ],
-      })
+    await browser.startTracing(page, {
+      path: path.join(options.output, 'trace.json'),
+      categories: [
+        'devtools.timeline',
+        'disabled-by-default-devtools.timeline',
+        'blink.user_timing',
+        'v8.execute',
+        'disabled-by-default-v8.cpu_profiler',
+      ],
+    })
     const metrics = await exercise(page, options, file, memory)
+    await browser.stopTracing()
+    const mainThreadKeyMs = typingCost(
+      readTrace(await readFile(path.join(options.output, 'trace.json'), 'utf8')),
+      options.keys,
+    )
     if (errors.length > 0) throw createScriptError(`Browser errors: ${errors.join('; ')}`)
-    return { ...metadata, rendering, status: 'passed', metrics, errors }
+    return {
+      ...metadata,
+      rendering,
+      status: 'passed',
+      metrics: { ...metrics, mainThreadKeyMs },
+      errors,
+    }
   } catch (error) {
     await page
       .screenshot({ path: path.join(options.output, 'failed.png'), timeout: 5000 })
@@ -274,7 +313,7 @@ export async function runCase(options: CaseOptions) {
     }
   } finally {
     memory.stop()
-    if (options.profile) await browser.stopTracing().catch(() => {})
+    await browser.stopTracing().catch(() => {})
     await browser.close()
     await copyLogs(server.logs, options.output)
     await copyFile(

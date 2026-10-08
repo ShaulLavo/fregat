@@ -514,3 +514,20 @@ matching site/Platform consumers. Standalone package publication keeps the appli
   outside core, Platform loads them explicitly, and core no longer contains them.
 - Find and shell navigation ship as extensions on core semantics.
 - Fallback renderers load only when needed.
+
+## October 2026 issue follow-ups
+
+Status: Approved, retained by [Plan 336 closeout](issue-closeout-2026-10.md).
+These are remaining execution items. Closing their tracker records does not certify a fix
+or change acceptance of an earlier delivered milestone. Each original thread retains its
+full reproduction, comments and historical artifacts. Source links below pin the reviewed
+main revision; recheck them before implementation.
+
+### Issue 551
+
+Source: [#551: ghostty extensions: timing residual at N=1000 (fresh-use 1.15, creation curvature 0.43) with N-constant counters](https://github.com/ShaulLavo/fregat/issues/551), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/551#issuecomment-6029138003).
+Current owner: [ghostty-webgpu/src/extensions/manager.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/ghostty-webgpu/src/extensions/manager.ts).
+
+Installed-count scans were repaired, but the strict N=1,000 timing residual remains. Fresh-use ratio 1.152752443 had upper bound 1.169390396 against 1.10; creation curvature 0.430859745 had upper bound 0.614728428 against 0.10. PR #652 added public fresh-use and affine-creation counters at N=0,1,100,1,000 with a deliberate scan control. Constant counters do not prove constant engine allocation or time. Attribute the remaining engine cost with the unchanged failed windows and budgets before tuning. Avoid declaring this gate passed from counter evidence alone.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
