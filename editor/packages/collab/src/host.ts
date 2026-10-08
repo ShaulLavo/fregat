@@ -62,17 +62,26 @@ export class Host<Snapshot = unknown> {
     // A synchronous transport may submit during a broadcast; settle before notifying it.
     if (this.draining) return
     this.draining = true
+    const errors: unknown[] = []
     try {
-      this.settleReady()
-      while (this.broadcasts.length) {
-        const message = this.broadcasts.shift()!
-        for (const listener of this.listeners) listener(message)
-      }
+      do {
+        this.settleReady()
+        while (this.broadcasts.length) this.deliver(this.broadcasts.shift()!, errors)
+      } while ([...this.deferred.values()].some((envelope) => this.ready(envelope)))
     } finally {
       this.draining = false
     }
-    if (this.deferred.size && [...this.deferred.values()].some((envelope) => this.ready(envelope)))
-      this.drain()
+    if (errors.length) throw errors[0]
+  }
+
+  private deliver(message: HostMessage, errors: unknown[]): void {
+    for (const listener of this.listeners) {
+      try {
+        listener(message)
+      } catch (error) {
+        errors.push(error)
+      }
+    }
   }
 
   private settleReady(): void {
