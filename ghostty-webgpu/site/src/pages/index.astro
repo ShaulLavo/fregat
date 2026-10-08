@@ -13,6 +13,7 @@ const firstFrame = await firstGhostFrame()
 
 const version = __SITE_VERSION__
 const base = import.meta.env.BASE_URL
+const fontStyles = fontCss.replaceAll('/ghostty-webgpu/', `${base.replace(/\/$/, '')}/`)
 const roadmapLabels = { done: 'Done', progress: 'In progress' } as const
 ---
 
@@ -22,7 +23,7 @@ const roadmapLabels = { done: 'Done', progress: 'In progress' } as const
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ghostty-webgpu: Ghostty's terminal, in the browser</title>
-    <style is:inline set:html={pageCss + fontCss + firstFrameCss + sectionsCss}></style>
+    <style is:inline set:html={pageCss + fontStyles + firstFrameCss + sectionsCss}></style>
     <meta
       name="description"
       content="The real libghostty-vt core, unpatched, compiled to WebAssembly, with four renderers that draw only what changed. Try it live."
@@ -104,7 +105,7 @@ socket.binaryType <span class="tk-p">=</span> <span class="tk-s">'arraybuffer'</
 
 terminal.<span class="tk-f">onData</span><span class="tk-p">((</span>bytes<span class="tk-p">) =&gt;</span> <span class="tk-p">{'{'}</span>
   <span class="tk-k">if</span> <span class="tk-p">(</span>socket.readyState <span class="tk-p">!==</span> <span class="tk-t">WebSocket</span>.OPEN<span class="tk-p">)</span> <span class="tk-k">return</span>
-  socket.<span class="tk-f">send</span><span class="tk-p">(</span>bytes<span class="tk-p">)</span>
+  socket.<span class="tk-f">send</span><span class="tk-p">(</span><span class="tk-k">new</span> <span class="tk-t">Uint8Array</span><span class="tk-p">(</span>bytes<span class="tk-p">))</span>
 <span class="tk-p">{'}'})</span>
 
 socket.<span class="tk-f">addEventListener</span><span class="tk-p">(</span><span class="tk-s">'message'</span><span class="tk-p">,</span> <span class="tk-p">(</span><span class="tk-p">{'{'}</span> data <span class="tk-p">{'}'}</span><span class="tk-p">) =&gt;</span> <span class="tk-p">{'{'}</span>
