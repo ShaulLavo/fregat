@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Socket } from 'node:net'
-import type { BrowserContext } from 'playwright'
+import type { BrowserContext, Request } from 'playwright'
 import type { HotPayload, Plugin, ViteDevServer } from 'vite'
 import { stripVTControlCharacters } from 'node:util'
 import { createScriptError } from '../../scripts/structured-errors.ts'
@@ -196,7 +196,7 @@ async function performRetentionAcceptanceReload(
     (route) => {
       return transport.run(
         route.request().url(),
-        async (fulfill, headersCompleted, markHttp) => {
+        async (forward, _headersCompleted, markHttp) => {
           const request = new URL(route.request().url())
           if (
             reloading &&
@@ -208,22 +208,15 @@ async function performRetentionAcceptanceReload(
             await new Promise<void>((resolve) => setTimeout(resolve, 1000))
             delayedFonts.push({ url: request.href, heldAt, releasedAt: Date.now() })
           }
-          markHttp('headersStartedAt')
-          const headers =
-            route.request().method() === 'GET'
-              ? { ...(await route.request().allHeaders()), connection: 'close' }
-              : undefined
-          headersCompleted()
           signal.throwIfAborted()
-          markHttp('fetchStartedAt')
-          const response = await route.fetch({
-            url: new URL(request.pathname + request.search, entryOrigin).href,
-            headers,
-          })
-          markHttp('fetchCompletedAt')
-          await fulfill(() => route.fulfill({ response }))
+          markHttp('continueStartedAt')
+          await forward(() =>
+            route.continue({ url: new URL(request.pathname + request.search, entryOrigin).href }),
+          )
+          markHttp('continueCompletedAt')
         },
         () => route.abort('failed'),
+        'continue',
       )
     },
   )
@@ -240,18 +233,23 @@ async function performRetentionAcceptanceReload(
     })
   beginRetentionEntryCase(entryOrigin, output, timings)
   const errors: string[] = []
-  const pending = new Set<string>()
+  const pending = new Map<Request, string>()
   const consoleMessages: { readonly type: string; readonly text: string }[] = []
-  page.on('request', (request) => pending.add(request.url()))
-  page.on('requestfinished', (request) => pending.delete(request.url()))
+  page.on('request', (request) => pending.set(request, request.url()))
+  page.on('requestfinished', (request) => pending.delete(request))
   const requestFailures: { url: string; at: number; error: string | null }[] = []
   page.on('requestfailed', (request) => {
-    pending.delete(request.url())
-    requestFailures.push({
-      url: request.url(),
-      at: Date.now(),
-      error: request.failure()?.errorText ?? null,
-    })
+    const url = pending.get(request) ?? request.url()
+    pending.delete(request)
+    const code = request.failure()?.errorText ?? null
+    requestFailures.push({ url, at: Date.now(), error: code })
+    if (new URL(url).origin !== runnerOrigin) return
+    transport.failNativeRequest(
+      url,
+      createScriptError('Retention entry browser request failed', {
+        internal: { resourceType: request.resourceType(), code },
+      }),
+    )
   })
   profile('setup')
   if (profiling)
@@ -470,7 +468,7 @@ async function performRetentionAcceptanceReload(
             arm,
             timings,
             phase,
-            pending: [...pending],
+            pending: [...pending.values()],
             consoleMessages,
             setup,
             responses,
