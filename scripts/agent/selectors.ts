@@ -1529,7 +1529,7 @@ export async function waitForSessionWorkspace(
         | null
       // Lexical's rendered owner can lag the session URL during a workspace switch.
       const namespace = composer?.__lexicalEditor?._config.namespace
-      const workspaceReady = title === rootPath || title?.startsWith(`${rootPath} ·`)
+      const workspaceReady = title === rootPath || title?.startsWith(`${rootPath} ·`) === true
       // The phone header has no project switcher; Lexical names the exact workspace there.
       const phone = document.documentElement.dataset.shell === 'phone'
       return (phone || workspaceReady) && namespace === expectedNamespace
