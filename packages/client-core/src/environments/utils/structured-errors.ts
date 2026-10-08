@@ -17,12 +17,12 @@ export function createEnvironmentProtocolMismatchError(
 function protocolMismatchGuidance(origin: string, serverOlder: boolean) {
   if (serverOlder)
     return {
-      why: 'That server runs an older version of Platform than this page.',
-      fix: `Update the Platform server at ${origin} to this page’s version, then press Retry.`,
+      why: 'That server runs an older version of Fregat than this page.',
+      fix: `Update the Fregat server at ${origin} to this page’s version, then press Retry.`,
     }
   return {
-    why: 'That server runs a newer version of Platform than this page.',
-    fix: 'Reload this page. If the message stays, update Platform on the machine that serves this page.',
+    why: 'That server runs a newer version of Fregat than this page.',
+    fix: 'Reload this page. If the message stays, update Fregat on the machine that serves this page.',
   }
 }
 
@@ -35,7 +35,7 @@ export function createEnvironmentIdentityDriftError(
     code: 'ENVIRONMENT_IDENTITY_DRIFT',
     status: 403,
     message: `The server at ${origin} is a different installation than before.`,
-    why: 'The same address now answers with different app data, for example after Platform was reinstalled there.',
+    why: 'The same address now answers with different app data, for example after Fregat was reinstalled there.',
     fix: 'If you replaced that server on purpose, trust the new one to connect. This browser then forgets what it saved from the old one.',
     internal: { origin, expected, received },
   })

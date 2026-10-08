@@ -221,7 +221,7 @@ test('a server on another protocol blocks the connection at the protocol step', 
     phase: 'blocked',
     lastError: {
       code: 'machines.SSH_PROTOCOL',
-      message: `The remote server speaks protocol ${running}, and this Platform needs protocol ${ORCHESTRATION_WS_PROTOCOL_VERSION}.`,
+      message: `The remote server speaks protocol ${running}, and this Fregat needs protocol ${ORCHESTRATION_WS_PROTOCOL_VERSION}.`,
       fix: expect.stringContaining("/work/space ' $(touch unwanted)"),
     },
   })
@@ -249,7 +249,7 @@ test('a live connection whose server changes protocol is blocked on the next con
     phase: 'blocked',
     lastError: {
       code: 'machines.SSH_PROTOCOL',
-      fix: 'Update this Platform server to the version on that machine, then Retry.',
+      fix: 'Update this Fregat server to the version on that machine, then Retry.',
     },
   })
   expect(fixture.events.at(-1)?.fields).toMatchObject({ step: 'protocol', outcome: 'failed' })
@@ -267,7 +267,7 @@ test.for([
       kind: 'managed',
       otherLeases: 0,
     },
-    fix: `Update the Platform checkout at ${remoteDirectory} to this server’s version, run bun install there, then Retry.`,
+    fix: `Update the Fregat checkout at ${remoteDirectory} to this server’s version, run bun install there, then Retry.`,
   },
   {
     name: 'another lease',
@@ -287,7 +287,7 @@ test.for([
       kind: 'external',
       otherLeases: 0,
     },
-    fix: 'Restart the Platform server on remote port 31001 from a checkout at this server’s version, then Retry.',
+    fix: 'Restart the Fregat server on remote port 31001 from a checkout at this server’s version, then Retry.',
   },
   {
     name: 'an external server on a release machine',
@@ -297,7 +297,7 @@ test.for([
       kind: 'external',
       otherLeases: 0,
     },
-    fix: 'Restart the Platform server on remote port 31001 from this server’s release, then Retry.',
+    fix: 'Restart the Fregat server on remote port 31001 from this server’s release, then Retry.',
   },
 ] as const)(
   'a launch script refusing $name blocks at the protocol step and releases the lease',
@@ -306,7 +306,7 @@ test.for([
     const fixture = await fakeSsh({
       launchFailure: {
         code: 'machines.SSH_PROTOCOL',
-        message: `The remote server speaks protocol ${running}, and this Platform needs protocol ${expectedProtocol}.`,
+        message: `The remote server speaks protocol ${running}, and this Fregat needs protocol ${expectedProtocol}.`,
         expected: expectedProtocol,
         running,
         port: 31001,
@@ -319,7 +319,7 @@ test.for([
       phase: 'blocked',
       lastError: {
         code: 'machines.SSH_PROTOCOL',
-        message: `The remote server speaks protocol ${running}, and this Platform needs protocol ${expectedProtocol}.`,
+        message: `The remote server speaks protocol ${running}, and this Fregat needs protocol ${expectedProtocol}.`,
         fix,
       },
     })

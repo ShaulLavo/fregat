@@ -22,13 +22,13 @@ export function cleanupConfirmationText(
     case 'missing':
       return {
         title: 'Forget missing worktree',
-        description: `${label} is no longer on disk. Platform stops tracking it and deletes no files. Its branch and commits may still exist.`,
+        description: `${label} is no longer on disk. Fregat stops tracking it and deletes no files. Its branch and commits may still exist.`,
         action: 'Forget missing worktree',
       }
     case 'release':
       return {
         title: 'Stop managing worktree',
-        description: `${label} and its branch stay on disk. Platform stops managing it and never removes it, so remove it yourself when you are done.`,
+        description: `${label} and its branch stay on disk. Fregat stops managing it and never removes it, so remove it yourself when you are done.`,
         action: 'Stop managing worktree',
       }
   }

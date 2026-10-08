@@ -90,7 +90,7 @@ test('released failed or blocked checkouts offer no Platform retry or retain act
         worktree={worktree}
       />,
     )
-    expect(screen.getByText('This worktree is managed outside Platform.')).toBeInTheDocument()
+    expect(screen.getByText('This worktree is managed outside Fregat.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Keep worktree' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Stop managing…' })).not.toBeInTheDocument()

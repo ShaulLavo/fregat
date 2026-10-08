@@ -296,7 +296,7 @@ int main(int argc, char **argv) {
     NSMenuItem *appItem = [NSMenuItem new];
     [menu addItem:appItem];
     NSMenu *appMenu = [NSMenu new];
-    [appMenu addItemWithTitle:@"Quit Platform" action:@selector(terminate:) keyEquivalent:@"q"];
+    [appMenu addItemWithTitle:@"Quit Fregat" action:@selector(terminate:) keyEquivalent:@"q"];
     appItem.submenu = appMenu;
     NSMenuItem *editItem = [NSMenuItem new];
     [menu addItem:editItem];
@@ -325,7 +325,7 @@ int main(int argc, char **argv) {
     if (!text) { fprintf(stderr, "Native input unavailable\n"); return 2; }
     if ([mode isEqual:@"message"]) {
       NSAlert *alert = [NSAlert new];
-      alert.messageText = @"Platform could not open";
+      alert.messageText = @"Fregat could not open";
       alert.informativeText = text;
       [alert addButtonWithTitle:@"Close"];
       read_commands(host);
@@ -359,7 +359,7 @@ int main(int argc, char **argv) {
         backing:NSBackingStoreBuffered defer:NO];
     host.window = window;
     window.delegate = host;
-    window.title = @"Platform";
+    window.title = @"Fregat";
     window.titleVisibility = NSWindowTitleHidden;
     window.titlebarAppearsTransparent = YES;
     window.releasedWhenClosed = NO;

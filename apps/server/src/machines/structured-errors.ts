@@ -21,27 +21,27 @@ const machineErrors = defineErrorCatalog('machines', {
   SSH_PROBE: {
     status: 502,
     message: 'The SSH machine could not be reached.',
-    why: 'SSH refused the connection, or the installed Platform server could not describe itself.',
+    why: 'SSH refused the connection, or the installed Fregat server could not describe itself.',
     fix: 'Check that the primary server’s user can reach that machine over SSH, then connect again.',
   },
   SSH_NOT_INSTALLED: {
     status: 412,
-    message: 'Platform server is not installed for this SSH user.',
+    message: 'Fregat server is not installed for this SSH user.',
     why: 'No platform-server was found on that machine’s PATH or in ~/.local/bin.',
-    fix: 'Run bun run server:install from a prepared Platform checkout on that machine, then connect again.',
+    fix: 'Run bun run server:install from a prepared Fregat checkout on that machine, then connect again.',
   },
   SSH_LAUNCH: {
     status: 502,
     message: 'The remote server could not start.',
-    why: 'Platform could not start a server on that machine or reuse one already running there.',
+    why: 'Fregat could not start a server on that machine or reuse one already running there.',
     fix: 'Inspect logs/ssh-launch.log in the server’s working directory on that machine and verify its dependencies are installed, then Retry.',
   },
   SSH_PROTOCOL: {
     status: 409,
     message: ({ running, expected }: { running: number; expected: number }) =>
-      `The remote server speaks protocol ${running}, and this Platform needs protocol ${expected}.`,
-    why: 'The server on that machine was started from a different Platform version.',
-    fix: 'Update the Platform checkout on that machine to this server’s version, run bun install there, then Retry.',
+      `The remote server speaks protocol ${running}, and this Fregat needs protocol ${expected}.`,
+    why: 'The server on that machine was started from a different Fregat version.',
+    fix: 'Update the Fregat checkout on that machine to this server’s version, run bun install there, then Retry.',
   },
   SSH_FORWARD: {
     status: 502,
@@ -57,7 +57,7 @@ const machineErrors = defineErrorCatalog('machines', {
   },
   SSH_IDENTITY: {
     status: 409,
-    message: 'That machine is a different Platform installation than before.',
+    message: 'That machine is a different Fregat installation than before.',
     why: 'The server there has different app data than the one this app connected to last time.',
     fix: 'If you replaced it on purpose, trust the new one to connect. Otherwise put the old installation’s data back, then reconnect.',
   },
@@ -70,12 +70,12 @@ const machineErrors = defineErrorCatalog('machines', {
   SSH_STOP: {
     status: 502,
     message: 'The remote server could not be stopped.',
-    why: 'SSH could not stop the server Platform started on that machine.',
+    why: 'SSH could not stop the server Fregat started on that machine.',
     fix: 'Reconnect the SSH host and disconnect again, or inspect its .platform-ssh-launch record.',
   },
   SSH_UPDATE_NOT_A_RELEASE: {
     status: 409,
-    message: 'This Platform server has no release to install on another machine.',
+    message: 'This Fregat server has no release to install on another machine.',
     why: 'An update copies the running server’s own release with its runtime manifest, and this release was built before releases carried one.',
     fix: 'Deploy this server with bun run install-release --server, then press Update server again.',
   },
@@ -222,7 +222,7 @@ export function createSshProtocolError(report: ProtocolReport) {
 function protocolFix(report: ProtocolReport) {
   // The installation is what a relaunch would start, so it decides which side is newer.
   if ((report.installed ?? report.running) > report.expected)
-    return 'Update this Platform server to the version on that machine, then Retry.'
+    return 'Update this Fregat server to the version on that machine, then Retry.'
   if (report.kind === 'external' && report.port !== null)
     return externalFix(report.port, report.installation)
   const others = report.otherLeases ?? 0
@@ -233,13 +233,13 @@ function protocolFix(report: ProtocolReport) {
   if (report.installed === report.expected && report.directory)
     return `Run bun install in ${report.directory} so the server’s dependencies match that checkout, then Retry.`
   if (!report.directory) return machineErrors.SSH_PROTOCOL.fix
-  return `Update the Platform checkout at ${report.directory} to this server’s version, run bun install there, then Retry.`
+  return `Update the Fregat checkout at ${report.directory} to this server’s version, run bun install there, then Retry.`
 }
 
 function externalFix(port: number, installation: ProtocolReport['installation']) {
   if (installation === 'release')
-    return `Restart the Platform server on remote port ${port} from this server’s release, then Retry.`
-  return `Restart the Platform server on remote port ${port} from a checkout at this server’s version, then Retry.`
+    return `Restart the Fregat server on remote port ${port} from this server’s release, then Retry.`
+  return `Restart the Fregat server on remote port ${port} from a checkout at this server’s version, then Retry.`
 }
 
 const updateFixes = {

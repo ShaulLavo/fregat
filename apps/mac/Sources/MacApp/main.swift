@@ -14,7 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       backing: .buffered,
       defer: false
     )
-    window.title = "Platform"
+    window.title = "Fregat"
     window.titlebarAppearsTransparent = true
     window.center()
     window.makeKeyAndOrderFront(nil)

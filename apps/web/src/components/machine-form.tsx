@@ -51,7 +51,7 @@ export function MachineForm(props: MachineFormOptions) {
               onChange={(target) => update('target', target)}
             />
             <p className='text-muted-foreground text-xs sm:col-span-2'>
-              Platform finds its server automatically. Add projects after connecting.
+              Fregat finds its server automatically. Add projects after connecting.
             </p>
           </>
         ) : (

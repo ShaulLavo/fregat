@@ -6,7 +6,7 @@ export const themeErrors = defineErrorCatalog('themes', {
     status: 400,
     message: ({ detail }: { detail: string }) => `Theme bundle: ${detail}`,
     why: 'The theme could not be checked or added. A partial import is left out of the library.',
-    fix: 'Check the theme’s parts, use a theme name that is not taken, and import a complete Platform theme file.',
+    fix: 'Check the theme’s parts, use a theme name that is not taken, and import a complete Fregat theme file.',
   },
   PALETTE_INVALID: {
     status: 400,
