@@ -1,5 +1,8 @@
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
+import { createEnvironmentClient } from '@workspace/client-core/transport/client'
+import { installTestClient } from '../../../../test/factories/client-binding'
+import { directInProcessFetcher } from '../../../../test/client'
 import { createEnvironmentConnections } from '@/state/environment-connections'
 import { EnvironmentConnectionsContext } from '@/providers/environment-connections-context'
 import { orchestrationServerConfig } from '@workspace/client-core/test/orchestration-server-config'
@@ -143,3 +146,82 @@ test('gate Retry restarts the primary transport after a blocked startup', async 
     useEnvironmentsStore.setState(previous, true)
   }
 })
+
+test.for(['unknown', 'cached', 'admitted', 'pending'] as const)(
+  'failed startup health exposes owner Retry for %s identity while retaining admitted content',
+  async (identity, { client, server }) => {
+    const descriptor = v.parse(healthDescriptorSchema, (await client.health.get()).data)
+    const origin = primaryServerOrigin()
+    const previous = useEnvironmentsStore.getState()
+    const directFetch = directInProcessFetcher(server)
+    const health = Promise.withResolvers<void>()
+    const fetcher = Object.assign(
+      async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+        const request = new Request(input, init)
+        if (new URL(request.url).pathname !== '/health') return directFetch(request)
+        if (identity === 'pending') await health.promise
+        return Response.json({ message: 'Fixture health unavailable' }, { status: 503 })
+      },
+      { preconnect: fetch.preconnect },
+    )
+    const restoreClient = installTestClient(
+      createEnvironmentClient({ origin: server.origin, fetcher }),
+    )
+    useEnvironmentsStore.setState({
+      entries: { [origin]: createEnvironmentEntry(origin, origin) },
+      connectionByOrigin: {},
+    })
+    if (identity !== 'unknown')
+      useEnvironmentsStore.getState().restoreDescriptor(origin, descriptor)
+    if (identity === 'admitted')
+      useEnvironmentsStore
+        .getState()
+        .recordHandshake(
+          origin,
+          orchestrationServerConfig({ environmentId: descriptor.environmentId }),
+        )
+    const queryClient = primaryQueryClient()
+    const connections = createEnvironmentConnections()
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <EnvironmentConnectionsContext value={connections}>
+          <ConnectionGate origin={origin}>
+            <input aria-label='Retained workbench input' defaultValue='draft input' />
+          </ConnectionGate>
+        </EnvironmentConnectionsContext>
+      </QueryClientProvider>,
+    )
+    try {
+      const retained = screen.queryByRole('textbox', { name: 'Retained workbench input' })
+      if (identity === 'pending') {
+        await waitFor(() =>
+          expect(queryClient.getQueryState(environmentQueryKeys.descriptor)?.fetchStatus).toBe(
+            'fetching',
+          ),
+        )
+        expect(screen.getByRole('textbox', { name: 'Retained workbench input' })).toBe(retained)
+        expect(screen.queryByRole('button', { name: 'Retry connection' })).toBeNull()
+        return
+      }
+      if (identity === 'admitted')
+        act(() => useEnvironmentsStore.getState().markDisconnected(origin))
+      await waitFor(() =>
+        expect(queryClient.getQueryState(environmentQueryKeys.descriptor)?.status).toBe('error'),
+      )
+      if (identity === 'admitted') {
+        expect(screen.getByRole('textbox', { name: 'Retained workbench input' })).toBe(retained)
+        expect(retained).toHaveValue('draft input')
+        expect(screen.queryByRole('button', { name: 'Retry connection' })).toBeNull()
+        return
+      }
+      expect(screen.getByRole('button', { name: 'Retry connection' })).toBeVisible()
+      expect(screen.queryByRole('textbox', { name: 'Retained workbench input' })).toBeNull()
+    } finally {
+      view.unmount()
+      connections.stop()
+      health.resolve()
+      restoreClient()
+      useEnvironmentsStore.setState(previous, true)
+    }
+  },
+)
