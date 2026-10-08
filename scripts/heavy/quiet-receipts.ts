@@ -500,7 +500,7 @@ Bun.spawn = (options, ...rest) => {
   const index = options.cmd?.indexOf(${JSON.stringify(path.join(import.meta.dirname, 'scope.sh'))})
   const owner = options.cmd?.find(value => typeof value === 'string' && value.startsWith('--unit=${box.sliceRoot}-') && value.endsWith('.scope'))
   if (index === undefined || index < 0 || !owner) return spawn(options, ...rest)
-  const cmd = options.cmd.map((value, position) => position === index ? ${JSON.stringify(path.join(directory, 'scope.sh'))} : value)
+  const cmd = options.cmd.map(value => value === ${JSON.stringify(path.join(import.meta.dirname, 'scope.sh'))} ? ${JSON.stringify(path.join(directory, 'scope.sh'))} : value)
   const child = spawn({ ...options, cmd }, ...rest)
   pid = child.pid
   unit = owner.slice('--unit='.length)
