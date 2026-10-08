@@ -119,15 +119,22 @@ export default defineConfig({
             instances: [{ browser: 'chromium' }],
           },
           include: ['test/**/*.browser.test.ts'],
-          exclude: ['test/highlightPaint.browser.test.ts'],
+          exclude: [
+            'test/highlightPaint.browser.test.ts',
+            'test/markdownFencePaint.browser.test.ts',
+          ],
         },
       },
       {
         plugins: [browserTestResponses()],
+        optimizeDeps: { exclude: ['web-tree-sitter', 'tree-sitter-md'] },
         test: {
           name: 'highlight-paint',
           sequence: { groupOrder: 2 },
-          include: ['test/highlightPaint.browser.test.ts'],
+          include: [
+            'test/highlightPaint.browser.test.ts',
+            'test/markdownFencePaint.browser.test.ts',
+          ],
           browser: {
             enabled: true,
             headless: true,
@@ -135,6 +142,12 @@ export default defineConfig({
             fileParallelism: false,
             provider: playwright(),
             commands: {
+              proofMarkdownFenceScreenshot: async ({ iframe }, hostId: string, row: number) => {
+                const image = await iframe
+                  .locator(`#${hostId} [data-editor-virtual-row="${row}"]`)
+                  .screenshot({ animations: 'disabled' })
+                return image.toString('base64')
+              },
               proofHighlightPaintScreenshot: async ({ iframe }, hostId: string) => {
                 const image = await iframe
                   .locator(`#${hostId} [data-editor-virtual-row="0"]`)
