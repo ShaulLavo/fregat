@@ -5,9 +5,11 @@ import { recordRequestContext } from '../observability'
 import type { DeviceStore } from './device-store'
 import { PairingCodes } from './pairing-codes'
 import { pairingErrors } from './structured-errors'
+import type { TailnetOwners } from './tailnet-owner'
 import {
   deviceCredential,
   forwardedClient,
+  forwardedPeer,
   isThisMachine,
   ownAddresses,
   type HeaderReader,
@@ -25,14 +27,16 @@ const SWEEP_MS = 60 * 60_000
 type Admission = { readonly trust: PairingTrust; readonly deviceId: string | null }
 
 /**
- * Who may reach this machine. Requests from the machine itself pass; any other device needs the
- * cookie a one-time pairing link gave it. Pairing grants full access: there is one trust level.
+ * Who may reach this machine. Requests from the machine itself pass, and so do the owner's own
+ * Tailscale devices; any other device needs the cookie a one-time pairing link gave it. Pairing
+ * grants full access: there is one trust level.
  */
 export class DevicePairing {
   private readonly store: DeviceStore
   private readonly codes = new PairingCodes()
   private readonly required: () => boolean
   private readonly own: () => ReadonlySet<string>
+  private readonly tailnet: TailnetOwners | null
   private readonly now: () => number
   /** The close of every live socket, by the device it was admitted for. */
   private readonly live = new Map<string, Set<() => void>>()
@@ -43,12 +47,14 @@ export class DevicePairing {
     readonly required: () => boolean
     readonly cookieName: string
     readonly ownAddresses?: () => ReadonlySet<string>
+    readonly tailnet?: TailnetOwners
     readonly now?: () => number
   }) {
     this.store = options.store
     this.required = options.required
     this.cookieName = options.cookieName
     this.own = options.ownAddresses ?? ownAddresses
+    this.tailnet = options.tailnet ?? null
     this.now = options.now ?? Date.now
   }
 
@@ -61,14 +67,30 @@ export class DevicePairing {
     }
   }
 
+  /**
+   * Asks Tailscale who the forwarded client is, so `admit` can answer synchronously. Run it at the
+   * start of each request; it asks at most once a minute per address.
+   */
+  async identify(header: HeaderReader) {
+    const peer = forwardedPeer(header)
+    if (peer === null || !this.tailnet || isThisMachine(peer, this.own())) return
+    await this.tailnet.resolve(peer)
+  }
+
   admit(header: HeaderReader): Admission {
     const client = forwardedClient(header)
     if (client === null || isThisMachine(client, this.own()))
       return { trust: 'host', deviceId: null }
     const device = this.device(header)
-    if (!device) return { trust: 'unpaired', deviceId: null }
-    this.markSeen(device.id, device.lastSeenAt)
-    return { trust: 'device', deviceId: device.id }
+    if (device) {
+      this.markSeen(device.id, device.lastSeenAt)
+      return { trust: 'device', deviceId: device.id }
+    }
+    const peer = forwardedPeer(header)
+    const verdict = peer === null || !this.tailnet ? 'not-tailnet' : this.tailnet.verdict(peer)
+    recordRequestContext({ tailnetTrust: verdict })
+    if (verdict === 'same-user') return { trust: 'tailnet', deviceId: null }
+    return { trust: 'unpaired', deviceId: null }
   }
 
   /**

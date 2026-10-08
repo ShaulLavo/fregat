@@ -13,8 +13,11 @@ export const pairingCodeSchema = v.pipe(
   v.regex(new RegExp(`^[${PAIRING_CODE_ALPHABET}]{${PAIRING_CODE_LENGTH}}$`)),
 )
 
-/** How a request reached this server: from this machine, from a paired device, or neither. */
-export const pairingTrustSchema = v.picklist(['host', 'device', 'unpaired'])
+/**
+ * How a request reached this server: from this machine, from a paired device, from a Tailscale
+ * device signed in as this machine's own user, or none of these.
+ */
+export const pairingTrustSchema = v.picklist(['host', 'device', 'tailnet', 'unpaired'])
 export type PairingTrust = v.InferOutput<typeof pairingTrustSchema>
 
 export const pairingStatusSchema = v.object({

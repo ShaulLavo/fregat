@@ -126,6 +126,8 @@ import type { PushFetcher } from './push/delivery'
 import { pushRoutes } from './push/routes'
 import { DeviceStore } from './devices/device-store'
 import { pairingRoutes } from './devices/routes'
+import { noTailnet, tailscaleCli, TailnetOwners, type TailnetLookup } from './devices/tailnet-owner'
+import { headersReader } from './devices/trust'
 import { DevicePairing } from './devices/service'
 import { PushService } from './push/service'
 import { sessionLink } from './push/session-link'
@@ -214,6 +216,8 @@ export type AppOptions = FileSystemServiceOptions & {
     readonly filePath?: string
     readonly cookieName?: string
     readonly ownAddresses?: () => ReadonlySet<string>
+    /** How this machine asks Tailscale who a device is; tests inject it. */
+    readonly tailnet?: TailnetLookup
   }
 }
 
@@ -623,6 +627,10 @@ export function createApp(options: AppOptions) {
     required: () => settings.snapshot().values['environments.devicePairing'],
     cookieName: options.devices?.cookieName ?? 'platform_device',
     ownAddresses: options.devices?.ownAddresses,
+    tailnet: new TailnetOwners({
+      lookup: options.devices?.tailnet ?? defaultTailnetLookup(),
+      enabled: () => settings.snapshot().values['environments.tailnetOwnerDevices'],
+    }),
   })
   const auth = createAuthConfig(options.auth, devices)
   const stopDeviceSweep = devices.startSweeping()
@@ -705,6 +713,8 @@ export function createApp(options: AppOptions) {
     websocket: { maxPayloadLength: requestBodyLimit(fs.info().maxTextFileBytes) },
   })
   applyObservability(app)
+  // Every request, WebSocket upgrades included: admission reads the answer synchronously.
+  app.onRequest(({ request }) => devices.identify(headersReader(request.headers)))
 
   const configured = app
     .use(
@@ -1013,6 +1023,11 @@ function definedOnly(values: Record<string, string | undefined>) {
 }
 
 function noop() {}
+
+/** A test that names no lookup must never ask the real Tailscale on the machine running it. */
+function defaultTailnetLookup() {
+  return isTestProcess() ? noTailnet : tailscaleCli
+}
 
 /** A test that names no file must never write the real state home's paired devices. */
 function defaultDeviceFile() {
