@@ -9,6 +9,7 @@ import { parseArgs } from 'node:util'
 import { chromium } from 'playwright'
 import { root, output } from './build.mjs'
 import { readServedBuilds, verifyResume } from './provenance.mjs'
+import { verifyFullDocumentRow } from './full-document.mjs'
 import { installOpenProbe, summarizeOpenProfile } from './open-profile.mjs'
 import {
   fixtureIdentity,
@@ -33,6 +34,7 @@ const { values } = parseArgs({
     'delay-ms': { type: 'string', default: '0' },
     'executable-path': { type: 'string' },
     'profile-open': { type: 'boolean', default: false },
+    'full-document': { type: 'boolean', default: false },
     'open-only': { type: 'boolean', default: false },
   },
 })
@@ -42,6 +44,7 @@ const keys = Number(values.keys)
 const frames = Number(values['scroll-frames'])
 const timeout = Number(values.timeout)
 if (
+  (values['full-document'] && (!values['profile-open'] || !values['open-only'])) ||
   (values['open-only'] && !values['profile-open']) ||
   !['quiet', 'noisy', 'unspecified'].includes(values.condition) ||
   selected.some((size) => !sizes.includes(size)) ||
@@ -52,6 +55,9 @@ if (
 )
   throw new RangeError('Use positive integer counts and fixture sizes from 1,10,50,100,200')
 await mkdir(values.output, { recursive: true })
+const mode = JSON.parse(await readFile(resolve(output, 'mode.json'), 'utf8'))
+if (mode.fullDocument !== values['full-document'])
+  throw new RangeError('Rebuild with the requested full-document mode')
 const builds = await readServedBuilds(output)
 const server = createServer(async (request, response) => {
   const path = resolve(output, `.${new URL(request.url, 'http://localhost').pathname}`)
@@ -127,6 +133,8 @@ let results = {
       (
         await Promise.all(
           [
+            'full-document.mjs',
+            'native-full-parse.c',
             'build.mjs',
             'page.html',
             'package.json',
@@ -154,6 +162,7 @@ let results = {
   config: {
     condition: values.condition,
     profileOpen: values['profile-open'],
+    fullDocument: values['full-document'],
     openOnly: values['open-only'],
     selected,
     repetitions,
@@ -305,7 +314,7 @@ async function sample(editor, mib, repetition) {
   try {
     if (values['profile-open']) await page.addInitScript(installOpenProbe)
     await page.goto(
-      `http://127.0.0.1:${port}/${editor}-typescript/index.html?delay=${results.config.delayMs}`,
+      `http://127.0.0.1:${port}/${editor}-typescript/index.html?delay=${results.config.delayMs}&fullDocument=${results.config.fullDocument}`,
     )
     await page.waitForFunction(() => !!window.bench)
     row.heapBefore = await heap(cdp)
@@ -314,6 +323,7 @@ async function sample(editor, mib, repetition) {
     row.open = values['profile-open']
       ? await profileOpen(page, cdp, row)
       : await page.evaluate(() => window.bench.open())
+    if (values['full-document'] && editor === 'singapore') verifyFullDocumentRow(row)
     verifyGeometry(row.open)
     if (row.open.length !== mib * 1024 * 1024) throw new RangeError('Open changed document length')
     if (values['open-only']) {
