@@ -130,6 +130,12 @@
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"]
     },
+    "@singapore-editor/collaboration#test:browser": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/scripts/browser-test-responses.ts"],
+      "env": ["COLLABORATION_TEST_TURN"],
+      "outputs": []
+    },
     "@singapore-editor/react#test": {
       "dependsOn": ["^build", "build", "@singapore-editor/tree-sitter-languages#build"]
     },
