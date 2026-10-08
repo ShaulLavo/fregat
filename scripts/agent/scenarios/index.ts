@@ -358,6 +358,7 @@ import { paletteThemeNoFlicker, studioThemeNoFlicker } from './code-theme-no-fli
 import { quickOpenNoFlicker } from './quick-open-no-flicker'
 import { gitHistorySearchNoFlicker } from './git-history-search-no-flicker'
 import { logsSearchNoFlicker } from './logs-search-no-flicker'
+import { chromeAlignment } from './chrome-alignment'
 import { searchTypeDelete } from './search-type-delete'
 import { searchResultLinePick } from './search-result-line-pick'
 import { searchResultRecycleFocus } from './search-result-recycle-focus'
@@ -764,6 +765,7 @@ export const scenarios: readonly Scenario[] = [
   branchActionsNoFlicker,
   gitHistorySearchNoFlicker,
   logsSearchNoFlicker,
+  chromeAlignment,
   searchTypeDelete,
   searchResultLinePick,
   searchResultRecycleFocus,
