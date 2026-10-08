@@ -177,7 +177,7 @@ test('remote edits publish to syntax and tracked decorations and map selections'
   await commands.editorLook('remote-consumers')
 })
 
-test('detaching resumes pre-session native history and leaves snapshots editable', () => {
+test('detaching starts native history from the merged text and leaves snapshots editable', () => {
   const element = document.createElement('div')
   document.body.append(element)
   const editor = new Editor(element, { defaultText: 'seed' })
@@ -195,10 +195,13 @@ test('detaching resumes pre-session native history and leaves snapshots editable
   editor.dispatchCommand('undo')
   expect(editor.materializeFullText()).toBe('seedown')
   editor.removePlugin(plugin)
+  expect(editor.getState().canUndo).toBe(false)
   editor.dispatchCommand('undo')
-  expect(editor.materializeFullText()).toBe('seed')
-  editor.edit({ from: 4, to: 4, text: 'resumed' })
-  expect(editor.materializeFullText()).toBe('seedresumed')
+  expect(editor.materializeFullText()).toBe('seedown')
+  editor.edit({ from: 7, to: 7, text: 'resumed' })
+  expect(editor.materializeFullText()).toBe('seedownresumed')
+  editor.dispatchCommand('undo')
+  expect(editor.materializeFullText()).toBe('seedown')
 })
 
 test('switching documents releases collaborative commands and preserves native history', () => {

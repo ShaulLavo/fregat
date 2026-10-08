@@ -313,6 +313,18 @@ test('same-start insertions keep their native order when both ranges are empty',
   native.edit(edits)
   room.editors[0]!.edit(edits)
   room.flush()
-  expect(text(native)).toBe('XZab')
-  expect(room.texts()).toEqual(['XZab', 'XZab'])
+  expect(text(native)).toBe('ZXab')
+  expect(room.texts()).toEqual([text(native), text(native)])
+})
+
+test('constructor plugins retain authorship on the initialized default-text buffer', () => {
+  room = new EditorRoom(2, 'seed')
+  for (const [index, editor] of room.editors.entries()) {
+    expect(editor.getBufferSession()!.getSnapshot()).toBe(
+      room.connections[index]!.document.engine.snapshot().buffer,
+    )
+  }
+  room.editors[0]!.edit({ from: 4, to: 4, text: 'live' })
+  room.flush()
+  expect(room.texts()).toEqual(['seedlive', 'seedlive'])
 })
