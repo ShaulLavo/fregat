@@ -108,6 +108,7 @@ class PieceBufferChunkView implements PieceBufferChunks {
     sources: readonly PieceBufferChunkView[],
     liveRanges: ReadonlyMap<number, TextRange[]>,
     result: { chunks: number; codeUnits: number },
+    retainLineIndexes = false,
   ): Generator<void, Map<PieceBufferChunkView, PieceBufferChunkView>> {
     const tails = new Set<number>()
     for (const source of sources) {
@@ -139,7 +140,11 @@ class PieceBufferChunkView implements PieceBufferChunks {
     for (const [chunk, index] of this.log.lineIndexes) {
       if (++visitedIndexes % 256 === 0) yield
       const entry = chunks[chunk]
-      if (entry === undefined || (typeof entry !== 'string' && entry.retainedLength === 0)) continue
+      if (
+        !retainLineIndexes &&
+        (entry === undefined || (typeof entry !== 'string' && entry.retainedLength === 0))
+      )
+        continue
       lineIndexes.set(
         chunk,
         shareOrCopyLineIndex(index, this.chunkLength(chunk), chunk > 0 && chunk === this.size - 1),
@@ -557,6 +562,7 @@ export function* reclaimBufferGroup(
   sources: readonly PieceTableBuffers[],
   liveRanges: ReadonlyMap<number, TextRange[]>,
   result: { chunks: number; codeUnits: number },
+  retainLineIndexes = false,
 ): Generator<void, Map<PieceTableBuffers, PieceTableBuffers>> {
   const stores: PieceBufferChunkView[] = []
   let newest = storeOf(sources[0]!.chunks)
@@ -570,7 +576,7 @@ export function* reclaimBufferGroup(
       newest = store
     yield
   }
-  const views = yield* newest.reclaimGroup(stores, liveRanges, result)
+  const views = yield* newest.reclaimGroup(stores, liveRanges, result, retainLineIndexes)
   const buffers = new Map<PieceTableBuffers, PieceTableBuffers>()
   for (const source of sources) {
     const view = views.get(storeOf(source.chunks))
