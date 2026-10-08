@@ -408,6 +408,24 @@ function renderPooledCaret(
   return index + 1
 }
 
+// Retain logical geometry so an origin shift can repaint every caret before deferred layout reads.
+const caretPaintPositions = new WeakMap<HTMLElement, VirtualizedCaretPosition>()
+
+export function rebaseCaretPaint(view: VirtualizedTextViewInternal): void {
+  positionCaretPaint(view, view.caretElement)
+  for (const element of view.secondaryCaretElements) positionCaretPaint(view, element)
+}
+
+function positionCaretPaint(view: VirtualizedTextViewInternal, element: HTMLElement): void {
+  const position = caretPaintPositions.get(element)
+  if (!position || element.hidden) return
+  setStyleValue(
+    element,
+    'transform',
+    `translate(${position.left}px, ${position.top + view.viewport.paintOffsetY}px)`,
+  )
+}
+
 function renderCaretElement(
   view: VirtualizedTextViewInternal,
   element: HTMLElement,
@@ -423,11 +441,8 @@ function renderCaretElement(
   element.classList.toggle('editor-virtualized-caret-bidi-secondary', bidiSecondary)
   const height = bidiSecondary ? position.height * 0.85 : position.height
   setStyleValue(element, 'height', `${height}px`)
-  setStyleValue(
-    element,
-    'transform',
-    `translate(${position.left}px, ${position.top + view.viewport.paintOffsetY}px)`,
-  )
+  caretPaintPositions.set(element, position)
+  positionCaretPaint(view, element)
 }
 
 export function clampStoredSelection(view: VirtualizedTextViewInternal): void {

@@ -1,4 +1,3 @@
-import { refreshCompositionPreedit } from './virtualizedTextViewComposition'
 import { completeRowPresentation, invalidateRowPresentations } from '../rowPresentation'
 import { createError } from '../logging/errors'
 import { pointViewport } from './pointViewport'
@@ -2942,7 +2941,6 @@ function applyTotalHeight(
     positionRowElement(view, row.gutterElement, row.top)
   }
   view.lastRenderedRowsKey = ''
-  refreshCompositionPreedit(view)
 }
 
 export function getMountedRows(

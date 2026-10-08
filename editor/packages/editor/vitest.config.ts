@@ -119,7 +119,27 @@ export default defineConfig({
             instances: [{ browser: 'chromium' }],
           },
           include: ['test/**/*.browser.test.ts'],
-          exclude: ['test/highlightPaint.browser.test.ts'],
+          exclude: ['test/highlightPaint.browser.test.ts', 'test/paintOrigin.browser.test.ts'],
+        },
+      },
+      {
+        plugins: [browserTestResponses()],
+        test: {
+          name: 'paint-origin',
+          sequence: { groupOrder: 2 },
+          include: ['test/paintOrigin.browser.test.ts'],
+          browser: {
+            enabled: true,
+            headless: true,
+            viewport: { width: 800, height: 600 },
+            fileParallelism: false,
+            provider: playwright(),
+            instances: [
+              { browser: 'chromium', name: 'paint-origin-chromium' },
+              { browser: 'firefox', name: 'paint-origin-firefox' },
+              { browser: 'webkit', name: 'paint-origin-webkit' },
+            ],
+          },
         },
       },
       {
