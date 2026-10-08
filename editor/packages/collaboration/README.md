@@ -128,8 +128,10 @@ Create a fresh random peer-session ID for each tab or process. Share one `RoomCr
 instance between that tab's adapters. An authenticated packet from another tab using
 its own peer ID raises `DuplicatePeerSessionError` through `onError` and closes the
 affected adapter. Reconstruct the tab's session, router and adapters with a fresh
-random peer-session ID before retrying. Reflected local packets and unauthenticated
-forgeries are ignored. `createRoomInvitation()` returns an opaque room UUID and a 256-bit invitation secret. Share the invitation
+random peer-session ID before retrying. Reflected local packets, packets sealed at or
+before this `RoomCrypto` instance's creation, and unauthenticated forgeries are ignored.
+A tab may detach and reattach with the same peer ID and fresh crypto after closing its
+previous adapters. A previous instance still sending after reattachment counts as a collision. `createRoomInvitation()` returns an opaque room UUID and a 256-bit invitation secret. Share the invitation
 outside the broker. Every peer must use the same room, secret and document ID.
 
 The caller supplies all signaling URLs, ICE servers, transport policy and credentials.
@@ -188,8 +190,8 @@ with current username/credential values. It runs for every new connection,
 including reconnects. Static credentials can be included in `iceServers` and the
 required `credentials` object can be `{}`. The browser supports WebSocket
 subprotocols for admission credentials. The broker requires an explicit
-`authorize(request)` policy. The example uses a separate deployment admission token;
-include that token in `config.webSocketProtocols` and share it privately with members.
+`authorize(request)` policy. The example maps a separate token to each authenticated member;
+include the member's token in `config.webSocketProtocols` and give each member their own token privately.
 The room invitation secret stays outside the broker.
 
 ### Link and wire design
@@ -213,7 +215,8 @@ This non-trickle exchange keeps signaling small and avoids candidate-order races
 Decryption and discovery use a shared serialized queue. SDP, renewable TURN credentials
 and ICE gathering run in separate per-peer queues: a stalled peer leaves other links
 free to proceed. Each peer retains at most eight handshake operations, with a shared
-4 MiB retained-SDP budget. New offers cancel superseded credential/ICE work; stale
+4 MiB room-wide retained-SDP budget divided equally among the seven remote peers.
+A maximum-size SDP fits within each peer's share. New offers cancel superseded credential/ICE work; stale
 completions cannot replace the newer generation. Each replacement connection has a fresh random generation. Failed, disconnected,
 closed, timed-out or malformed links report `disconnect` to the session. A live
 BroadcastChannel path keeps that peer connected while the WebRTC path retires.
@@ -245,22 +248,46 @@ This is not an account or Byzantine-consensus system.
 
 The Bun-only `/server` entry is separate from the browser bundle. It forwards
 opaque publish frames to subscribed sockets and stores no history. Each socket
-subscribes to one room. Limits are eight subscribers per room, 1,024 active rooms
-and 1 MiB per WebSocket frame or buffered socket output. Connections must present
+subscribes to one room. Limits are eight subscribers per room, as many active rooms
+as `limits.connections`, and 1 MiB per WebSocket frame or buffered socket output. Connections must present
 an origin from the explicit allowlist and pass the required admission callback.
 The explicit `limits` option requires positive integer `connections`,
 `connectionsPerIP`, `subscribeTimeout` and `idleTimeout` values (timeouts in milliseconds),
 plus `framesPerSecond` and `bytesPerSecond` budgets per connection. Both pending
 asynchronous admissions and upgraded sockets count toward connection quotas;
-admission work has the subscribe deadline. IP accounting uses the direct socket
-address. Configure trusted proxy enforcement separately when deploying behind a proxy.
+admission work has the subscribe deadline. `authorize` returns `false` to refuse,
+`true` for shared admission, or `{ member: stableAuthenticatedId }` for a member-specific
+quota. `limits.connectionsPerMember` defaults to the smaller of 16 and the connection
+limit. Member quotas apply across addresses and rooms. Shared-token policies returning
+`true` use the global and per-address limits; `connectionsPerMember` applies only when
+the callback returns a verified member identity. Shared-token holders can exhaust
+global capacity by spreading across enough addresses. Use separate authenticated
+member identities to isolate their quotas. The authorization policy must derive each
+identity from verified credentials.
+
+IP accounting uses the direct socket address. IPv6 addresses share a /64 quota by
+default; `ipv6Prefix` accepts 0 through 128. IPv4-mapped IPv6 addresses share the IPv4
+address's quota. Forwarded headers have no effect by default. Deployers with a trusted
+proxy may supply `clientAddress(request, server)`. That hook must verify the direct
+proxy address with `server.requestIP(request)` before returning a forwarded client
+address, and the proxy must replace client-supplied forwarding headers. Missing or
+invalid addresses are refused. The resulting address still passes through prefix grouping.
 Subscribe and application-idle deadlines terminate sockets and release room and IP
 capacity. Incoming pings, pongs and repeated subscriptions leave those deadlines
 unchanged. Publish traffic consumes the frame/byte budget and refreshes the idle deadline.
 
-The example reads a separate random deployment admission token from a file and
-requires it as a WebSocket subprotocol. It permits 256 connections, 16 per IP, a
-5-second subscribe/admission deadline, a 120-second application-idle deadline and
+The example reads `member token` lines from a private admission file. Each member
+gets a unique random token, compared in constant time; a successful check returns
+that configured member identity. The example rejects shared-token files and duplicate
+members or tokens at startup. It requires the token as a WebSocket subprotocol credential. `WebSocketSignaling` also offers
+the public `singapore-collaboration` protocol, which is the only protocol the broker
+selects in its response. Custom clients offering credentials must include that public
+protocol. The broker refuses credential-only upgrades. Keep TLS enabled and scrub
+credential-bearing request headers from proxy logs.
+
+The example permits 256 connections overall, 16 per IP and 16 per authenticated
+member across all addresses and rooms, a 5-second subscribe/admission deadline,
+a 120-second application-idle deadline and
 64 frames / 2 MiB per second per connection. Keep the client's announce interval below
 the broker idle deadline. Unauthorized clients are refused before receiving room
 capacity. Authorized clients still share finite capacity: admission is a trust boundary,
@@ -269,14 +296,15 @@ Use a synchronous token check or authenticate before reaching an asynchronous po
 so strangers cannot occupy its pending-admission quota. The room's shared encryption
 secret alone provides no broker admission or service-availability guarantee.
 
-Generate a random token in a private file, then run with your bind address, port,
-file path and allowed origins. The token itself stays out of command arguments and logs:
+Generate one token for each member in a private file, then run with your bind address,
+port, file path and allowed origins. Tokens stay out of command arguments and logs.
+Give each member only their own token; member names are local quota identities:
 
 ```sh
 umask 077
-bun -e 'console.log(Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url"))' > admission-token
+bun -e 'for (const member of ["alice", "bob"]) console.log(member, Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url"))' > admission-members
 bun editor/packages/collaboration/examples/signaling-server.ts \
-  127.0.0.1 8789 ./admission-token http://localhost:5173
+  127.0.0.1 8789 ./admission-members http://localhost:5173
 ```
 
 Wire messages are `{ type: 'subscribe', topic }`, the acknowledgement

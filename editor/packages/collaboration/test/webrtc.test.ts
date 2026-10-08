@@ -78,9 +78,22 @@ for (const delay of ['credentials', 'ice'] as const) {
           type: 'offer',
           document: 'document',
           to: 'z',
-          description: { type: 'offer', sdp: 'a', padding: 'ignored'.repeat(1024) },
+          description: {
+            type: 'offer',
+            sdp: 'a',
+            ...(delay === 'credentials' ? { padding: 'ignored'.repeat(1024) } : {}),
+          },
         }),
       )
+      if (delay === 'ice')
+        await expect
+          .poll(() =>
+            created.some(
+              (connection) =>
+                connection.peer === 'a' && connection.iceGatheringState === 'gathering',
+            ),
+          )
+          .toBe(true)
       deliver(
         await fast.seal('fast-generation', {
           type: 'offer',
@@ -124,3 +137,93 @@ for (const delay of ['credentials', 'ice'] as const) {
     }
   })
 }
+
+test('a stalled member cannot spend another member handshake byte share', async () => {
+  const { room, secret } = createRoomInvitation()
+  const local = await RoomCrypto.create(room, 'z', secret)
+  const slow = await RoomCrypto.create(room, 'a', secret)
+  const fast = await RoomCrypto.create(room, 'b', secret)
+  const opened = vi.spyOn(local, 'open')
+  const publications: SealedPacket[] = []
+  let deliver: (packet: unknown) => void = () => {}
+  let release: () => void = () => {}
+  const stalled = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  class Connection extends EventTarget {
+    iceGatheringState: RTCIceGatheringState = 'complete'
+    signalingState: RTCSignalingState = 'stable'
+    ondatachannel = null
+    onconnectionstatechange = null
+    peer = ''
+    localDescription: { toJSON: () => RTCSessionDescriptionInit } | null = null
+    async setRemoteDescription(description: RTCSessionDescriptionInit) {
+      this.peer = description.sdp![0]!
+      if (this.peer === 'a') await stalled
+    }
+    async createAnswer(): Promise<RTCSessionDescriptionInit> {
+      return { type: 'answer', sdp: this.peer }
+    }
+    async setLocalDescription(description: RTCSessionDescriptionInit) {
+      this.localDescription = { toJSON: () => description }
+    }
+    close() {}
+  }
+  vi.stubGlobal('RTCPeerConnection', Connection)
+  const onError = vi.fn()
+  const transport = new WebRTCTransport({
+    router: new TransportRouter(
+      { room, peer: 'z', document: 'document' },
+      { connect() {}, disconnect() {}, receive() {} },
+    ),
+    crypto: local,
+    signaling: {
+      start(receive) {
+        deliver = receive
+      },
+      publish(packet) {
+        publications.push(packet)
+      },
+      close() {},
+    },
+    iceServers: [],
+    transportPolicy: 'all',
+    credentials: {},
+    announceInterval: 1000,
+    connectionTimeout: 5000,
+    onError,
+  })
+  try {
+    for (let index = 0; index < 8; index++) {
+      deliver(
+        await slow.seal(`slow-${index}`, {
+          type: 'offer',
+          document: 'document',
+          to: 'z',
+          description: { type: 'offer', sdp: 'a'.repeat(256 * 1024) },
+        }),
+      )
+      await expect.poll(() => opened.mock.calls.length).toBe(index + 1)
+      await opened.mock.results[index]!.value
+    }
+    deliver(
+      await fast.seal('fast', {
+        type: 'offer',
+        document: 'document',
+        to: 'z',
+        description: { type: 'offer', sdp: 'b'.repeat(256 * 1024) },
+      }),
+    )
+    await expect
+      .poll(() => publications.some((packet) => packet.generation === 'fast'), { timeout: 1000 })
+      .toBe(true)
+    expect(
+      (await fast.open(publications.find((packet) => packet.generation === 'fast')!))?.payload,
+    ).toMatchObject({ type: 'answer', to: 'b' })
+    expect(onError).not.toHaveBeenCalled()
+  } finally {
+    release()
+    await transport.close()
+    vi.unstubAllGlobals()
+  }
+})
