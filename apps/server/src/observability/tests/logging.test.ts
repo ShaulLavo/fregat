@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { operatorErrorSummary } from '../logging'
+import { operatorErrorSummary, sanitizeErrorCause } from '../logging'
 import { createStructuredError } from '../structured-errors'
 
 describe('operatorErrorSummary', () => {
@@ -34,4 +34,21 @@ it('keeps sanitized internal context in operator error summaries', () => {
   expect(operatorErrorSummary(error)).toMatchObject({
     internal: { exitCode: 7, token: '[redacted]' },
   })
+})
+
+it('omits an unreadable internal context without losing the original diagnostic', () => {
+  const error = createStructuredError({ message: 'Synthetic failure' })
+  Object.defineProperty(error, 'internal', {
+    get: () => {
+      throw error
+    },
+  })
+  expect(operatorErrorSummary(error)).toMatchObject({ message: 'Synthetic failure' })
+})
+
+it('sanitizes cyclic arrays in nested error context', () => {
+  const items: unknown[] = []
+  items.push(items)
+  const error = createStructuredError({ message: 'Synthetic failure', internal: { items } })
+  expect(sanitizeErrorCause(error)).toMatchObject({ internal: { items: ['[circular]'] } })
 })

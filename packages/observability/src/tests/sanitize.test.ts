@@ -123,3 +123,51 @@ test('internal context obeys the diagnostic policy limits and sensitive fields',
   expect(bounded(failure)).toMatchObject({ internal: '[truncated]' })
   expect(privateContext(failure)).toMatchObject({ internal: '[redacted]' })
 })
+
+test('diagnostics omit throwing getters and read retained getters once', () => {
+  let reads = 0
+  const error = createError({ message: 'Synthetic failure' })
+  Object.defineProperty(error, 'internal', {
+    get: () => {
+      throw error
+    },
+  })
+  const context = Object.defineProperties(
+    {},
+    {
+      observed: {
+        enumerable: true,
+        get: () => {
+          reads++
+          return 'stopped'
+        },
+      },
+      unavailable: {
+        enumerable: true,
+        get: () => {
+          throw error
+        },
+      },
+      token: {
+        enumerable: true,
+        get: () => {
+          throw error
+        },
+      },
+    },
+  )
+  expect(sanitizeRecord({ error, context })).toMatchObject({
+    error: { message: 'Synthetic failure' },
+    context: { observed: 'stopped', token: '[redacted]' },
+  })
+  expect(reads).toBe(1)
+})
+
+test('cyclic arrays in internal context retain shared arrays', () => {
+  const items: unknown[] = ['ready']
+  items.push(items)
+  const error = createError({ message: 'Synthetic failure', internal: { items, shared: items } })
+  expect(sanitizeRecord({ error })).toMatchObject({
+    error: { internal: { items: ['ready', '[circular]'], shared: ['ready', '[circular]'] } },
+  })
+})

@@ -4,13 +4,21 @@ import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Elysia } from 'elysia'
 import { applyObservability, httpStatusLevel } from '../elysia'
-import { captureRequestLogger, recordRequestError, recordRequestWarning } from '../logging'
+import {
+  captureRequestLogger,
+  observeRequestOperation,
+  recordRequestError,
+  recordRequestWarning,
+} from '../logging'
 import { createInternalError, createStructuredError } from '../structured-errors'
 import { readFsLogs } from 'evlog/fs'
 import type { WideEvent } from 'evlog'
 
 import { closeTestApps, createTestApp } from '../../../test/server'
-import { closeApp } from '../../app'
+import { closeApp, orchestrationForApp } from '../../app'
+import { MockProviderAdapter } from '../../provider/adapters/mock'
+import type { ProviderDiscoveredSession } from '../../provider/types'
+import { mockRuntime } from '../../../test/factories/orchestration'
 import { createPushSubscriber } from '../../../test/factories/push-subscriber'
 import { createPushSessionFixture } from '../../../test/factories/push-sessions'
 import { createInProcessOrchestrationSocket } from '../../../test/orchestration-socket'
@@ -30,6 +38,131 @@ afterEach(async () => {
 })
 
 describe('observability runtime', () => {
+  it('keeps root and nested internal context out of the session import success response', async () => {
+    const root = await fixtureRoot()
+    const logDir = await fixtureRoot()
+    initializeObservability(testObservabilityEnv(logDir))
+    const failure = createStructuredError({
+      message: 'Synthetic discovery failure',
+      internal: { observed: 'BACKEND_ONLY_ROOT' },
+      cause: createStructuredError({
+        message: 'Synthetic child failure',
+        internal: { observed: 'BACKEND_ONLY_CHILD' },
+      }),
+    })
+    const adapter = new FailingDiscoveryAdapter(failure)
+    const app = createTestApp({
+      auth: { allowedOrigins: [TRUSTED_ORIGIN] },
+      settings: testSettingsOptions(root),
+      watch: false,
+      workspaceRoot: root,
+      orchestration: {
+        providerRuntime: true,
+        providerAdapterRegistry: mockRuntime(adapter).adapterRegistry,
+      },
+    })
+    await orchestrationForApp(app).dispatchClientCommand({
+      type: 'project.create',
+      commandId: 'register-import-diagnostics',
+      title: 'Synthetic project',
+      workspaceRoot: root,
+    })
+    const response = await app.handle(
+      new Request('http://local/orchestration/session-import', {
+        method: 'POST',
+        headers: trustedOriginHeaders({ 'content-type': 'application/json' }),
+        body: JSON.stringify({ providerInstanceId: adapter.adapterKey }),
+      }),
+    )
+    expect(response.status).toBe(200)
+    const body = await response.text()
+    expect(JSON.parse(body)).toMatchObject({
+      failures: [{ error: { message: 'Synthetic discovery failure' } }],
+    })
+    expect(body).not.toContain('internal')
+    expect(body).not.toContain('BACKEND_ONLY_')
+    const events = await flushedEvents(logDir)
+    expect(
+      events.find(
+        (event) =>
+          event.action === 'chat.pipeline.discovery.scan' &&
+          Array.isArray(event.failures) &&
+          event.failures.length,
+      ),
+    ).toMatchObject({
+      failures: [
+        {
+          error: {
+            internal: { observed: 'BACKEND_ONLY_ROOT' },
+            cause: { internal: { observed: 'BACKEND_ONLY_CHILD' } },
+          },
+        },
+      ],
+    })
+  })
+
+  it('preserves the operation rejection when internal cannot be read', async () => {
+    initializeObservability(testObservabilityEnv(await fixtureRoot()))
+    const error = createStructuredError({ message: 'Synthetic operation failure' })
+    const getterFailure = createStructuredError({ message: 'Synthetic getter failure' })
+    Object.defineProperty(error, 'internal', {
+      get: () => {
+        throw getterFailure
+      },
+    })
+    await expect(
+      observeRequestOperation({ area: 'test', operation: 'synthetic.failure' }, async () => {
+        throw error
+      }),
+    ).rejects.toBe(error)
+  })
+
+  it.each([false, true])('reads diagnostic getters once with cyclic arrays %s', async (cyclic) => {
+    const logDir = await fixtureRoot()
+    initializeObservability(testObservabilityEnv(logDir))
+    const items: unknown[] = []
+    if (cyclic) items.push(items)
+    const error = createStructuredError({ message: 'Synthetic failure' })
+    let internalReads = 0
+    let causeReads = 0
+    Object.defineProperties(error, {
+      internal: {
+        enumerable: true,
+        get: () => {
+          internalReads++
+          return { items }
+        },
+      },
+      cause: {
+        enumerable: true,
+        get: () => {
+          causeReads++
+          return undefined
+        },
+      },
+      unavailable: {
+        enumerable: true,
+        get: () => {
+          throw error
+        },
+      },
+    })
+    const app = new Elysia()
+    applyObservability(app)
+    app.get('/diagnostic-getters', () => {
+      recordRequestError(error)
+      return { ok: true }
+    })
+    expect((await app.handle(new Request('http://local/diagnostic-getters'))).status).toBe(200)
+    expect(internalReads).toBe(1)
+    expect(causeReads).toBe(1)
+    const events = await flushedEvents(logDir)
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({
+      error: { message: 'Synthetic failure', internal: { items: cyclic ? ['[circular]'] : [] } },
+    })
+  })
+
   it('writes sanitized internal context for handled errors and nested causes', async () => {
     const logDir = await fixtureRoot()
     initializeObservability(testObservabilityEnv(logDir))
@@ -1100,4 +1233,21 @@ type PostHogPayload = {
       path?: string
     }
   }>
+}
+
+class FailingDiscoveryAdapter extends MockProviderAdapter {
+  private readonly failure: Error
+
+  constructor(failure: Error) {
+    super()
+    this.failure = failure
+  }
+
+  async discoverSessions(): Promise<ProviderDiscoveredSession[]> {
+    throw this.failure
+  }
+
+  async readSessionHistory() {
+    return []
+  }
 }

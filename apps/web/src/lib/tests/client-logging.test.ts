@@ -315,3 +315,25 @@ test('retains sanitized internal context in client operation failures and raw er
     expect(JSON.stringify(event)).not.toContain('PRIVATE_TOKEN')
   }
 })
+
+test.each(['getter', 'array'])(
+  'preserves the original rejection with a diagnostic %s failure',
+  async (kind) => {
+    const items: unknown[] = []
+    items.push(items)
+    const failure = createError({ message: 'Synthetic failure', internal: { items } })
+    if (kind === 'getter')
+      Object.defineProperty(failure, 'internal', {
+        get: () => {
+          throw createError({ message: 'Synthetic getter failure' })
+        },
+      })
+    await expect(
+      observeClientOperation({ action: 'synthetic.failure', area: 'test' }, async () => {
+        throw failure
+      }),
+    ).rejects.toBe(failure)
+    expect(emittedEvents).toHaveLength(1)
+    expect(emittedEvents[0]?.event).toMatchObject({ error: { message: 'Synthetic failure' } })
+  },
+)

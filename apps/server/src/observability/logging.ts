@@ -6,9 +6,9 @@ import {
 import { elapsedMs, roundMs } from '@workspace/utils/timing'
 import { AsyncLocalStorage } from 'node:async_hooks'
 
-import { errorStringField, errorSummary, type ErrorSummaryOptions } from '@workspace/contracts'
+import { errorSummary, type ErrorSummaryOptions } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
-import { errorInternalContext } from '@workspace/observability/sanitize'
+import { errorInternalContext, readDiagnosticField } from '@workspace/observability/sanitize'
 import type { RequestLogger } from 'evlog'
 import { useLogger as getRequestLogger } from 'evlog/elysia'
 
@@ -211,12 +211,12 @@ function errorForLogger(error: unknown) {
 function sanitizedErrorForLogger(error: Error) {
   const cause = errorCause(error)
   const clone = createStructuredError({
-    code: errorStringField(error, 'code'),
+    code: diagnosticStringField(error, 'code'),
     internal: safeErrorInternal(error, new WeakSet([error])),
-    message: error.message,
+    message: diagnosticStringField(error, 'message') ?? '',
   })
-  clone.name = error.name
-  clone.stack = error.stack
+  clone.name = diagnosticStringField(error, 'name') ?? 'Error'
+  clone.stack = diagnosticStringField(error, 'stack')
   copySafeErrorFields(error, clone as unknown as Error & Record<string, unknown>)
   if (cause !== undefined) clone.cause = sanitizeErrorCause(cause)
 
@@ -226,7 +226,14 @@ function sanitizedErrorForLogger(error: Error) {
 // Stays off the shared observability sanitizer, which keeps the quoted substrings this strips.
 export function sanitizeErrorCause(cause: unknown, seen = new WeakSet<object>()): unknown {
   if (cause instanceof Error) return sanitizeErrorObject(cause, seen)
-  if (Array.isArray(cause)) return cause.map((value) => sanitizeErrorCause(value, seen))
+  if (Array.isArray(cause)) {
+    if (seen.has(cause)) return '[circular]'
+
+    seen.add(cause)
+    const safe = cause.map((value) => sanitizeErrorCause(value, seen))
+    seen.delete(cause)
+    return safe
+  }
   if (!isRecord(cause)) return cause
   if (seen.has(cause)) return '[circular]'
 
@@ -240,8 +247,8 @@ function sanitizeErrorObject(error: Error, seen: WeakSet<object>) {
   seen.add(error)
   const cause = errorCause(error)
   const summary: Record<string, unknown> = {
-    message: sanitizeErrorMessage(error.message),
-    name: error.name,
+    message: sanitizeErrorMessage(diagnosticStringField(error, 'message') ?? ''),
+    name: diagnosticStringField(error, 'name') ?? 'Error',
   }
   const internal = safeErrorInternal(error, seen)
   if (internal !== undefined) summary.internal = internal
@@ -254,10 +261,10 @@ function sanitizeErrorObject(error: Error, seen: WeakSet<object>) {
 function sanitizeRecord(record: Record<string, unknown>, seen: WeakSet<object>) {
   const safe: Record<string, unknown> = {}
 
-  for (const [key, value] of Object.entries(record)) {
+  for (const key of Object.keys(record)) {
     safe[key] = sensitiveErrorFields.has(key)
       ? redactedDiagnosticValue
-      : sanitizeErrorCause(value, seen)
+      : sanitizeErrorCause(readDiagnosticField(record, key), seen)
   }
 
   return safe
@@ -268,11 +275,12 @@ function copySafeErrorFields(
   target: Record<string, unknown>,
   seen = new WeakSet<object>(),
 ) {
-  for (const [key, value] of Object.entries(source)) {
-    if (key === 'cause' || key === 'internal') continue
+  for (const key of Object.keys(source)) {
+    if (key === 'cause' || key === 'internal' || key === 'message' || key === 'name') continue
+    if ((key === 'code' || key === 'stack') && Object.hasOwn(target, key)) continue
     target[key] = sensitiveErrorFields.has(key)
       ? redactedDiagnosticValue
-      : sanitizeErrorCause(value, seen)
+      : sanitizeErrorCause(readDiagnosticField(source, key), seen)
   }
 }
 
@@ -284,8 +292,13 @@ function safeErrorInternal(error: unknown, seen = new WeakSet<object>()) {
   return sanitizeRecord(internal, seen)
 }
 
+function diagnosticStringField(error: Error, key: string) {
+  const value = readDiagnosticField(error, key)
+  return typeof value === 'string' ? value : undefined
+}
+
 function errorCause(error: Error) {
-  return 'cause' in error ? error.cause : undefined
+  return readDiagnosticField(error, 'cause')
 }
 
 function safeDiagnosticContext(context: Record<string, unknown>) {

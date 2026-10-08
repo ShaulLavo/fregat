@@ -63,7 +63,9 @@ test.each([
     })
     try {
       await fixture.register()
-      expect(await reconciler.scan()).toMatchObject({ skipped: { 'provider-scan-failed': 1 } })
+      const result = await reconciler.scan()
+      expect(result).toMatchObject({ skipped: { 'provider-scan-failed': 1 } })
+      expect(JSON.stringify(result)).not.toContain('internal')
       await flushObservability()
       const scans: WideEvent[] = []
       for await (const event of readFsLogs({ dir: logDir })) {

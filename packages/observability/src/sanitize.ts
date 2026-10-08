@@ -66,8 +66,19 @@ export function createRecordSanitizer(policy: DiagnosticPolicy) {
 export function errorInternalContext(error: unknown): Record<string, unknown> | undefined {
   if (!isRecord(error)) return undefined
 
-  const internal = error.internal
+  const internal = readDiagnosticField(error, 'internal')
   return isRecord(internal) ? internal : undefined
+}
+
+/** Diagnostic getters are optional evidence; their failures cannot replace the operation's error. */
+export function readDiagnosticField(record: unknown, key: string): unknown {
+  if (!isRecord(record)) return undefined
+
+  try {
+    return record[key]
+  } catch {
+    return undefined
+  }
 }
 
 export function sanitizeRecord(record: Record<string, unknown>) {
@@ -86,11 +97,11 @@ function sensitiveFieldsFor(policy: DiagnosticPolicy): ReadonlySet<string> {
 
 function sanitizeFields(record: Record<string, unknown>, depth: number, walk: Walk) {
   const safe: Record<string, unknown> = {}
-  const entries = Object.entries(record).slice(0, walk.limits.maxObjectKeys)
-  for (const [key, value] of entries) {
+  const keys = Object.keys(record).slice(0, walk.limits.maxObjectKeys)
+  for (const key of keys) {
     safe[key] = walk.sensitiveFields.has(key)
       ? redactedDiagnosticValue
-      : sanitizeDiagnosticValue(value, depth, walk)
+      : sanitizeDiagnosticValue(readDiagnosticField(record, key), depth, walk)
   }
   return safe
 }
@@ -111,11 +122,15 @@ function sanitizeDiagnosticValue(value: unknown, depth: number, walk: Walk): unk
 }
 
 function sanitizeArray(values: readonly unknown[], depth: number, walk: Walk) {
+  if (walk.seen.has(values)) return '[circular]'
   if (depth >= walk.limits.maxDepth) return '[truncated]'
 
-  return values
+  walk.seen.add(values)
+  const safe = values
     .slice(0, walk.limits.maxArrayItems)
     .map((item) => sanitizeDiagnosticValue(item, depth + 1, walk))
+  walk.seen.delete(values)
+  return safe
 }
 
 function sanitizeError(error: Error, depth: number, walk: Walk) {
@@ -124,7 +139,7 @@ function sanitizeError(error: Error, depth: number, walk: Walk) {
   walk.seen.add(error)
   const internal = errorInternalContext(error)
   const safe: Record<string, unknown> = {
-    cause: sanitizeDiagnosticValue(error.cause, depth + 1, walk),
+    cause: sanitizeDiagnosticValue(readDiagnosticField(error, 'cause'), depth + 1, walk),
     message: walk.policy.formatString(error.message),
     name: error.name,
     ...(walk.sensitiveFields.has('stack') ? {} : { stack: error.stack }),
