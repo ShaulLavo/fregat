@@ -6,7 +6,7 @@ import { Presence, type PresenceChannel } from '../src/presence'
 import { Session } from '../src/session'
 import { BrowserEngine, browserGenesis } from './browser-engine'
 import { createPresencePlugin } from '../src/presence-plugin'
-import { ReferenceResolver, remoteState } from './presence-fixtures'
+import { presenceNetwork, ReferenceResolver, remoteState } from './presence-fixtures'
 import '@singapore-editor/core/style.css'
 
 declare module 'vitest/browser' {
@@ -113,6 +113,39 @@ test('paints two named remote carets and a selection across wrapped rows on the 
   await page.screenshot({ element: host, path: '../.vitest/evidence/presence-wrapped.png' })
 })
 
+test('a one-second router link blip preserves the named caret and refreshes unchanged presence', async () => {
+  const network = presenceNetwork()
+  const receiver = network.peers[0]!
+  const sender = network.peers[1]!
+  const { host, presence, resolver } = mount(TEXT, true, [], receiver.session)
+  try {
+    network.connect()
+    sender.presence.setLocalState({
+      ...remoteState(),
+      selections: [{ anchor: resolver.gap(25), head: resolver.gap(120) }],
+    })
+    network.flush()
+    await expect.poll(() => carets(host).length).toBe(1)
+    const caret = carets(host)[0]!
+    const clock = presence.states[0]!.presenceClock
+    await page.screenshot({ element: host, path: '../.vitest/evidence/presence-blip-before.png' })
+    network.tick(1_000)
+    network.disconnect()
+    await page.screenshot({ element: host, path: '../.vitest/evidence/presence-blip-during.png' })
+    await expect.poll(() => carets(host).length).toBe(1)
+    expect(receiver.session.members.has(sender.session.peer)).toBe(true)
+    network.tick(2_000)
+    network.connect()
+    expect(presence.states[0]?.presenceClock).toBeGreaterThan(clock)
+    expect(carets(host)[0]).toBe(caret)
+    expect(host.querySelector('.editor-remote-name')?.textContent).toBe('Ada')
+    await page.screenshot({ element: host, path: '../.vitest/evidence/presence-blip-after.png' })
+  } finally {
+    presence.dispose()
+    network.dispose()
+  }
+})
+
 test('membership removal clears the crashed peer caret, name and selection before awareness expiry', async () => {
   const session = new Session({
     peer: 'local',
@@ -160,6 +193,8 @@ test('membership removal clears the crashed peer caret, name and selection befor
     await page.screenshot({ element: host, path: '../.vitest/evidence/presence-crash-before.png' })
     expect(receive('crashed', 8, 30, 140)).toBe(true)
     session.disconnect('crashed')
+    expect(session.members.has('crashed')).toBe(true)
+    session.tick(300)
     expect(session.members.has('crashed')).toBe(false)
     await page.screenshot({ element: host, path: '../.vitest/evidence/presence-crash-removed.png' })
     await expect
@@ -169,7 +204,7 @@ test('membership removal clears the crashed peer caret, name and selection befor
       Array.from(host.querySelectorAll('.editor-remote-name'), (name) => name.textContent),
     ).toEqual(['Grace'])
     for (const name of highlightNames) expect(CSS.highlights.has(name)).toBe(false)
-    session.tick(50)
+    session.tick(350)
     expect(presence.states.map((state) => state.peerSessionId)).toEqual(['retained'])
     expect(receive('crashed', 9, 30, 140)).toBe(false)
     await page.screenshot({ element: host, path: '../.vitest/evidence/presence-crash-after.png' })

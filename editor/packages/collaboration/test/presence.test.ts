@@ -5,7 +5,7 @@ import {
   type PresenceObserver,
   type PresenceMessage,
 } from '../src/presence'
-import { remoteState, ReferenceResolver } from './presence-fixtures'
+import { presenceNetwork, remoteState, ReferenceResolver } from './presence-fixtures'
 import { Session } from '../src/session'
 import { Network } from './network'
 import type { Message } from '../src/protocol'
@@ -257,7 +257,69 @@ test('presence travels on PRESENCE without entering document history; remote LEA
   detach()
 })
 
-test('crashed host awareness is gone before the 30-second expiry boundary', () => {
+test('a one-second last-path interruption preserves presence and membership', () => {
+  const network = presenceNetwork()
+  const receiver = network.peers[0]!
+  const sender = network.peers[1]!
+  try {
+    network.connect()
+    sender.presence.setLocalState(remoteState())
+    network.flush()
+    expect(receiver.presence.states).toHaveLength(1)
+    network.tick(1_000)
+    network.disconnect()
+    expect(receiver.presence.states).toHaveLength(1)
+    expect(receiver.session.members.has(sender.session.peer)).toBe(true)
+    network.tick(1_999)
+    expect(receiver.presence.states).toHaveLength(1)
+    network.tick(2_000)
+    network.connect()
+    expect(receiver.presence.states).toHaveLength(1)
+    expect(receiver.session.host).toBe('local')
+  } finally {
+    network.dispose()
+  }
+})
+
+test('reconnect republishes unchanged local presence before the regular renewal', () => {
+  const network = presenceNetwork()
+  const receiver = network.peers[0]!
+  const sender = network.peers[1]!
+  try {
+    network.connect()
+    sender.presence.setLocalState(remoteState())
+    network.flush()
+    const clock = receiver.presence.states[0]!.presenceClock
+    network.tick(1_000)
+    network.disconnect()
+    network.tick(2_000)
+    network.connect()
+    expect(receiver.presence.states[0]?.presenceClock).toBeGreaterThan(clock)
+  } finally {
+    network.dispose()
+  }
+})
+
+test('an overlapping transport keeps presence when the other path disappears', () => {
+  const network = presenceNetwork()
+  const receiver = network.peers[0]!
+  const sender = network.peers[1]!
+  try {
+    network.connect()
+    network.connect('broadcast')
+    sender.presence.setLocalState(remoteState())
+    network.flush()
+    network.tick(1_000)
+    network.disconnect('webrtc')
+    network.tick(10_000)
+    expect(receiver.presence.states).toHaveLength(1)
+    expect(receiver.session.members.has(sender.session.peer)).toBe(true)
+  } finally {
+    network.dispose()
+  }
+})
+
+test('crashed host awareness is gone on confirmed membership removal before the 30-second expiry', () => {
   const network = new Network(1071, 2)
   network.stabilize()
   const session = network.nodes[1]!.session
@@ -281,7 +343,14 @@ test('crashed host awareness is gone before the 30-second expiry boundary', () =
     expect(presence.states).toHaveLength(1)
     const receivedAt = session.presenceTime
     network.crash(0)
+    expect(session.members.has(host)).toBe(true)
+    expect(presence.states).toHaveLength(1)
+    session.tick(receivedAt + 299)
+    expect(session.members.has(host)).toBe(true)
+    session.tick(receivedAt + 300)
     expect(session.members.has(host)).toBe(false)
+    expect(session.status).toBe('stable')
+    expect(session.isHost).toBe(true)
     const counts = [presence.states.length]
     session.tick(receivedAt + 29_999)
     counts.push(presence.states.length)
@@ -294,7 +363,7 @@ test('crashed host awareness is gone before the 30-second expiry boundary', () =
   }
 })
 
-test.each(['disconnect', 'retire', 'LEAVE'] as const)(
+test.each(['timeout', 'retire', 'LEAVE'] as const)(
   '%s removes visible and queued awareness without forgetting the peer clock floor',
   (removal) => {
     const network = new Network(1072, 3)
@@ -332,7 +401,14 @@ test.each(['disconnect', 'retire', 'LEAVE'] as const)(
           type: 'LEAVE',
           payload: { successor: null },
         })
-      } else session[removal](peer)
+      }
+      if (removal === 'retire') session.retire(peer)
+      if (removal === 'timeout') {
+        session.disconnect(peer)
+        expect(presence.states).toHaveLength(2)
+        expect(session.members.has(peer)).toBe(true)
+        session.tick(session.presenceTime + 300)
+      }
       expect(session.members.has(peer)).toBe(false)
       expect(presence.states.map((state) => state.peerSessionId)).toEqual([retained])
       session.tick(session.presenceTime + 50)
@@ -342,7 +418,7 @@ test.each(['disconnect', 'retire', 'LEAVE'] as const)(
       session.tick(session.presenceTime + 90_000)
       expect(presence.receive(peer, payload(peer, 7))).toBe(false)
       expect(presence.receive(peer, payload(peer, 8))).toBe(false)
-      if (removal !== 'disconnect') return
+      if (removal !== 'timeout') return
       session.connect(peer)
       expect(receive(peer, 8)).toBe(true)
       expect(presence.states).toHaveLength(0)
