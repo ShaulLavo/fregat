@@ -33,7 +33,7 @@ export function verifyControl(baseline, control) {
       const baselineTimes = mutationTimes(baseline, editor, mib, 'baseline')
       const controlTimes = mutationTimes(control, editor, mib, 'control')
       const deltaMs = percentile(controlTimes, 0.5) - percentile(baselineTimes, 0.5)
-      if (deltaMs < delayMs * 0.8)
+      if (!Number.isFinite(deltaMs) || deltaMs < delayMs * 0.8)
         throw new RangeError(`${editor} detected ${deltaMs} ms for ${delayMs} ms injected delay`)
       return { editor, mib, deltaMs, delayMs }
     })

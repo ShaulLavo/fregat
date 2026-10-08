@@ -146,6 +146,10 @@ test('positive control exceeds a frame wait and detects injected handler work', 
   control.samples[0].typing.end.raw[0].mutationMs = 40
   control.samples[0].typing.middle.raw[0].mutationMs = 40
   assert.throws(() => verifyControl(baseline, control), /detected 24 ms/)
+  assert.throws(
+    () => verifyControl(sample(-Number.MAX_VALUE), sample(Number.MAX_VALUE)),
+    /detected Infinity ms/,
+  )
 })
 
 test('a genuine large-file failure remains a measured outcome', async () => {
