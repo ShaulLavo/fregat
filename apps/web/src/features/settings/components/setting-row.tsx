@@ -98,13 +98,13 @@ export function SettingRow({
       data-setting-row={id}
     >
       <div className='flex min-w-0 flex-col gap-1 @max-3xl/settings:wrap-anywhere'>
-        <div className='flex flex-wrap items-center gap-2'>
-          {/* A border, not a coloured dot: it reads in both themes without a
-              palette literal, which the theme tokens would otherwise forbid. */}
+        <div className='relative flex flex-wrap items-center gap-2'>
+          {/* Keep the change marker in the gutter so the title and description
+              retain their shared start edge after a setting changes. */}
           {isModified ? (
             <span
               aria-label='Modified'
-              className='bg-info h-3 w-0.5 shrink-0 rounded-full'
+              className='bg-info absolute right-full mr-(--density-control-gap) h-3 w-0.5 rounded-full'
               title='Modified from the default'
             />
           ) : null}

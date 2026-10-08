@@ -15,7 +15,10 @@
   <a href="https://github.com/ShaulLavo/fregat/discussions">Discussions</a>
 </p>
 
-![Fregat workbench with editor, terminals, and agent sessions](https://raw.githubusercontent.com/ShaulLavo/fregat/main/docs/images/workbench.webp)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ShaulLavo/fregat/main/docs/images/workbench-dark.webp" />
+  <img src="https://raw.githubusercontent.com/ShaulLavo/fregat/main/docs/images/workbench.webp" alt="Fregat workbench with editor, file tree, and terminal" />
+</picture>
 
 Open a folder and get an editor, terminals, Git, and language servers in one workspace.
 Run Claude Code and Codex beside your files. Everything runs on your machine.
