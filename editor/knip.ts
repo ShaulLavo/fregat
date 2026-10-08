@@ -7,8 +7,14 @@ type WorkspaceConfig = { entry: string[]; project: string[] }
 // Entries outside each package's exports map: workers are loaded by URL, benches and type tests run
 // directly.
 const extraEntries: Record<string, string[]> = {
-  editor: ['src/**/*.worker.ts', 'bench/**/*.ts', 'test/types/**/*.ts'],
+  editor: [
+    'src/**/*.worker.ts',
+    'bench/**/*.ts',
+    'test/types/**/*.ts',
+    'test/reading-order.proof.mjs',
+  ],
   find: ['bench/**/*.ts'],
+  markdown: ['test/reading-order.fixture.ts'],
   minimap: ['src/**/*.worker.ts', 'bench/**/*.ts'],
   spellcheck: ['src/**/*.worker.ts', 'bench/**/*.ts'],
   'tree-sitter': ['src/**/*.worker.ts', 'bench/**/*.ts'],
