@@ -99,6 +99,29 @@ try {
         assert(after.indexOf(`link ${index + 1}`) < after.indexOf(`Section ${index + 2}`))
     }
   }
+  if (!values.baseline) {
+    await page.evaluate(() =>
+      window.readingProof.loadMarkdown(
+        'First **line**\nsecond [line](https://example.com)\n===========\nplain',
+        false,
+      ),
+    )
+    await page.getByRole('heading', { name: 'First line second line', exact: true }).waitFor()
+    await writeFile(
+      resolve(output, 'aria-multiline.yaml'),
+      await page.locator('main').ariaSnapshot(),
+    )
+    await page.screenshot({ path: resolve(output, 'multiline-heading.png') })
+    const title = 'Start ' + 'long title '.repeat(80) + 'END'
+    await page.evaluate(
+      (title) => window.readingProof.loadMarkdown('# ' + title + '\nplain', true),
+      title,
+    )
+    await page.getByRole('heading', { name: title, exact: true }).waitFor()
+    assert.equal(await page.getByRole('heading').count(), 1)
+    await writeFile(resolve(output, 'aria-wrapped.yaml'), await page.locator('main').ariaSnapshot())
+    await page.screenshot({ path: resolve(output, 'wrapped-heading.png') })
+  }
   await page.evaluate(
     (text) => window.readingProof.loadPlain(text),
     Array.from({ length: 200 }, (_, index) => `Reading row ${String(index).padStart(3, '0')}`).join(

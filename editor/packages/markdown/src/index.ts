@@ -38,14 +38,7 @@ export function createMarkdownPreviewPlugin(
           records = undefined
           return []
         }
-        if (
-          headings?.source !== replacementContext.textSnapshot ||
-          records !== replacementContext.records?.data
-        ) {
-          headings = markdownHeadings(replacementContext)
-          records = replacementContext.records?.data
-        }
-        return markdownInlineReplacements(
+        const replacements = markdownInlineReplacements(
           replacementContext.textSnapshot,
           replacementContext.records.data,
           {
@@ -53,6 +46,14 @@ export function createMarkdownPreviewPlugin(
             registerKeymapNode: replacementContext.registerKeymapNode,
           },
         )
+        if (
+          headings?.source !== replacementContext.textSnapshot ||
+          records !== replacementContext.records.data
+        ) {
+          headings = markdownHeadings(replacementContext, replacements)
+          records = replacementContext.records.data
+        }
+        return replacements
       }
       return [
         context.registerInlineReplacementProvider(provide, {
