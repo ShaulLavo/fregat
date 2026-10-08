@@ -84,8 +84,10 @@ pick it: a modern Monaco, built the way Zed is built, for the browser.
 - Zed's ideas in the browser: persistent copy-on-write piece table, snapshots, stable anchors.
 - Large files and fast edits, with benchmarks against Monaco and CodeMirror.
 - Modular: core plus optional packages (tree-sitter, LSP, diff, minimap, markdown, React and Solid).
-- Planned: collaborative editing built on the event-graph approach of eg-walker and diamond-types
-  ([delta-db plan](delta-db-implementation-plan.md)), the modern alternative to classic CRDTs.
+- Planned: collaborative editing the way Matt Weidner describes in
+  [Collaborative Text Editing without CRDTs or OT](https://mattweidner.com/2025/05/21/text-without-crdts.html):
+  stable character IDs, "insert after ID" operations ordered by a server, clients rebasing their
+  pending edits. Simpler than CRDTs and OT, and a natural fit for our stable anchors.
 
 **ghostty-webgpu.** The easiest sell.
 
