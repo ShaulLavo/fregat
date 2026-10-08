@@ -92,9 +92,19 @@ jobs:
               - 'scripts/build-site.ts'
               - 'scripts/dev-sources.ts'
               - 'scripts/runtime-network.ts'
+              - 'scripts/structured-errors.ts'
+              - 'scripts/product-sites/**'
+              - 'hotkeys/**'
+              - 'patches/**'
               - '.github/actions/setup/**'
+              - '.github/actions/install-browsers/**'
+              - '.github/workflows/ci.yml'
               - 'package.json'
               - 'bun.lock'
+              - 'bunfig.toml'
+              - '.npmrc'
+              - '.env*'
+              - 'tsconfig*.json'
               - 'turbo.json'
               - '.github/workflows/site.yml'
             # Root tooling and Turbo's cross-family global inputs invalidate every family.
@@ -456,6 +466,58 @@ jobs:
       - name: Build ghostty site
         run: bun run --cwd ghostty-webgpu/site build --base /${{ github.event.repository.name }}/ghostty-webgpu/
 
+  mobile-layout:
+    name: Mobile layout (${{ matrix.shard }})
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [chromium-0, chromium-1, webkit-0, webkit-1]
+    needs: changes
+    if: ${{ needs.changes.outputs.site == 'true' || needs.changes.outputs.docs == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Build production sites
+        run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-mobile-${{ hashFiles('bun.lock') }}
+
+      - name: Install mobile check browsers
+        uses: ./.github/actions/install-browsers
+        with:
+          playwright: scripts/node_modules/.bin/playwright
+          browsers: chromium webkit
+
+      - name: Test mobile overflow detection
+        run: bun scripts/product-sites/test-mobile.mjs
+
+      - name: Check every built page on mobile
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          bun scripts/product-sites/verify-mobile.mjs --directory "$RUNNER_TEMP/product-sites" --evidence "$RUNNER_TEMP/mobile-layout" --engines "${SHARD%-*}" --shards 2 --shard "${SHARD##*-}"
+
+      - name: Upload mobile layout evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-layout-${{ matrix.shard }}
+          path: ${{ runner.temp }}/mobile-layout
+          if-no-files-found: ignore
+          retention-days: 7
+
   libraries:
     name: Libraries
     needs: changes
@@ -475,7 +537,19 @@ jobs:
   verdict:
     name: CI
     needs:
-      [changes, docs, lint, typecheck, test-web, test-server, test-tui, browser, site, libraries]
+      [
+        changes,
+        docs,
+        lint,
+        typecheck,
+        test-web,
+        test-server,
+        test-tui,
+        browser,
+        site,
+        mobile-layout,
+        libraries,
+      ]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
