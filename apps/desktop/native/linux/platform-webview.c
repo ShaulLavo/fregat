@@ -201,7 +201,7 @@ int main(int argc, char **argv) {
   if (!g_file_get_contents(argv[2], &text, NULL, NULL)) { fprintf(stderr, "Native input unavailable\n"); return 2; }
   if (strcmp(argv[1], "message") == 0) {
     GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE, "%s", text);
-    gtk_window_set_title(GTK_WINDOW(dialog), "Platform could not open");
+    gtk_window_set_title(GTK_WINDOW(dialog), "Fregat could not open");
     gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
     emit("{\"event\":\"closed\"}");
@@ -225,7 +225,7 @@ int main(int argc, char **argv) {
   g_free(cookies);
   g_free(cache_dir);
   window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-  gtk_window_set_title(GTK_WINDOW(window), "Platform");
+  gtk_window_set_title(GTK_WINDOW(window), "Fregat");
   gtk_window_set_default_size(GTK_WINDOW(window), 1440, 960);
   g_signal_connect(window, "destroy", G_CALLBACK(on_destroy), NULL);
   realize_gl_context();

@@ -5,9 +5,9 @@ type Unavailable = Extract<Awaited<ReturnType<typeof fetchTailnetHosts>>, { stat
 export function tailnetUnavailableMessage(reason: Unavailable['reason']): string {
   switch (reason) {
     case 'not-installed':
-      return 'Tailscale is not installed on the machine running Platform.'
+      return 'Tailscale is not installed on the machine running Fregat.'
     case 'not-running':
-      return 'Connect the machine running Platform to Tailscale to see its peers.'
+      return 'Connect the machine running Fregat to Tailscale to see its peers.'
     case 'failed':
       return 'Tailscale could not list peers. SSH config and manual addresses are still available.'
   }

@@ -28,7 +28,7 @@ export const gitWorktreeErrors = defineErrorCatalog('git', {
   WORKTREE_ADMIN_STALE: {
     status: 409,
     message: 'The worktree folder is gone, but Git still lists it',
-    why: 'A missing folder cannot be checked, so Platform leaves the entry for you to remove.',
+    why: 'A missing folder cannot be checked, so Fregat leaves the entry for you to remove.',
     fix: 'Remove this one entry by hand with `git worktree remove`.',
   },
   WORKTREE_BASE_BRANCH_MISSING: {
@@ -61,7 +61,7 @@ export const gitWorktreeErrors = defineErrorCatalog('git', {
     status: 400,
     message: ({ path }: { path: string }) => `${path} is the repository's main worktree`,
     why: "This is the repository's original checkout. Every other worktree reads its data from it, so Git refuses to remove it.",
-    fix: 'Pick a worktree that Platform created.',
+    fix: 'Pick a worktree that Fregat created.',
   },
   WORKTREE_NOT_FOUND: {
     status: 404,
@@ -73,8 +73,8 @@ export const gitWorktreeErrors = defineErrorCatalog('git', {
   WORKTREE_OUTSIDE_REPOSITORY: {
     status: 400,
     message: ({ path }: { path: string }) =>
-      `${path} is outside the folder where Platform keeps worktrees`,
-    why: 'Platform only removes worktrees it created, and those live in that folder.',
+      `${path} is outside the folder where Fregat keeps worktrees`,
+    why: 'Fregat only removes worktrees it created, and those live in that folder.',
     fix: 'Remove worktrees created elsewhere by hand.',
   },
 })

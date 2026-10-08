@@ -22,7 +22,7 @@ export function FormDialog(props: ComponentProps<typeof MachineForm>) {
           <DialogDescription>
             {props.name
               ? 'Update this machine’s connection details.'
-              : 'Connect to a Platform server on another machine.'}
+              : 'Connect to a Fregat server on another machine.'}
           </DialogDescription>
         </DialogHeader>
         <MachineForm {...props} />

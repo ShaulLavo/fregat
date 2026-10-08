@@ -957,14 +957,14 @@ class ClaudeAgentSession extends SessionContext {
             .then(
               (result) => {
                 if (Object.keys(result.errors).length > 0 || !result.added.includes(name))
-                  throw createInternalError('Platform MCP connection failed.')
+                  throw createInternalError('Fregat MCP connection failed.')
               },
               () => {
-                throw createInternalError('Platform MCP connection failed.')
+                throw createInternalError('Fregat MCP connection failed.')
               },
             ),
           CLAUDE_INIT_TIMEOUT_MS,
-          'Platform MCP connection timed out.',
+          'Fregat MCP connection timed out.',
         )
         session.platformMcpName = name
       }

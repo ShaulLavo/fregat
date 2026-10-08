@@ -6,7 +6,7 @@ an open cursor, built from scratch
 
 open a folder and get an editor, terminals, git, and language servers in panes, with claude code and codex beside them. agents use the subscriptions you already have. move between projects and their editors, terminals, and agent sessions from one workspace
 
-everything runs on your machine. open the same workspace from a browser, the desktop app, a terminal, or a phone over tailscale
+everything runs on your machine. open the same workspace from a browser, the desktop app, or a terminal. phone browsers connect through an https proxy on your tailnet after device pairing
 
 ## try it
 
@@ -24,7 +24,7 @@ open the url it prints and pick a folder. for agents, install [claude code](http
 - [singapore](https://github.com/ShaulLavo/singapore), a browser editor written from scratch, with multi-cursor editing, syntax highlighting, and language servers
 - [ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu), a terminal powered by libghostty-vt in wasm, with gpu rendering
 - claude code and codex sessions side by side, each with its own permissions
-- web, desktop, native mac, and terminal clients sharing one local server
+- web, desktop on macos and linux, and terminal clients sharing one local server
 
 ## benchmarks
 

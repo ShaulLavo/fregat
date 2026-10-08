@@ -9,8 +9,8 @@ export const sessionImportErrors = defineErrorCatalog('session-import', {
   },
   CONTINUED: {
     status: 409,
-    message: 'This chat has already been continued in Platform',
-    why: 'Once a chat continues in Platform, it stops copying new messages from outside so none appear twice.',
-    fix: 'Continue using the history saved in Platform.',
+    message: 'This chat has already been continued in Fregat',
+    why: 'Once a chat continues in Fregat, it stops copying new messages from outside so none appear twice.',
+    fix: 'Continue using the history saved in Fregat.',
   },
 })

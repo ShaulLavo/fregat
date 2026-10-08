@@ -40,14 +40,14 @@ scrollback uses native page-granular line and byte budgets. [retention and actua
 
 ## benchmarks
 
-recorded october 1, 2026 on an apple m1 in chromium, one terminal receiving bytes. parser throughput; higher is better
+recorded october 1, 2026 on an apple m1 in chromium 153.0.8010.12. isolated parser throughput, one unopened terminal receiving bytes; higher is better. xterm.js uses the same parser for its dom and webgl renderers
 
-| input    | ghostty-webgpu | xterm.js webgl | ghostty-web |
-| -------- | -------------: | -------------: | ----------: |
-| ascii    |    164.36 MB/s |     63.55 MB/s |  65.58 MB/s |
-| git logs |    360.42 MB/s |     69.67 MB/s |  65.71 MB/s |
+| input    | ghostty-webgpu 0.2.0 | xterm.js 6.0.0 | ghostty-web 0.4.0 |
+| -------- | -------------------: | -------------: | ----------------: |
+| ascii    |          164.36 MB/s |     63.55 MB/s |        65.58 MB/s |
+| git logs |          360.42 MB/s |     69.67 MB/s |        65.71 MB/s |
 
-[method and full results](docs/benchmarks.md), including latency, cpu, and memory
+[method, reproduce command, and full results](https://github.com/ShaulLavo/ghostty-webgpu/blob/main/docs/benchmarks.md), including latency, cpu, and memory. rendered output and input latency have separate results
 
 ## more
 

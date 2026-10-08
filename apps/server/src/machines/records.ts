@@ -21,7 +21,7 @@ export function parseInstallation(output: string) {
   } catch (cause) {
     throw createSshError(
       'probe',
-      'The Platform server returned an invalid installation descriptor. Run bun run server:install on that machine again.',
+      'The Fregat server returned an invalid installation descriptor. Run bun run server:install on that machine again.',
       cause,
     )
   }

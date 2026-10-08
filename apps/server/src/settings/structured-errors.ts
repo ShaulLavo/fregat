@@ -88,7 +88,7 @@ export const settingsErrors = defineErrorCatalog('settings', {
     status: 503,
     message: () => 'Settings are unavailable until an interrupted save is finished',
     why: 'A settings save was cut off partway, and changing settings now could make it impossible to finish safely.',
-    fix: 'Restart Platform so it can finish the interrupted save.',
+    fix: 'Restart Fregat so it can finish the interrupted save.',
   },
   POLICY_CONTROLLED: {
     status: 403,

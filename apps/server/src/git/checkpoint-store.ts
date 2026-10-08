@@ -44,9 +44,9 @@ export type CheckpointDeleteInput = {
  */
 const CHECKPOINT_IDENTITY = {
   GIT_AUTHOR_EMAIL: 'checkpoint@platform.local',
-  GIT_AUTHOR_NAME: 'Platform Checkpoint',
+  GIT_AUTHOR_NAME: 'Fregat Checkpoint',
   GIT_COMMITTER_EMAIL: 'checkpoint@platform.local',
-  GIT_COMMITTER_NAME: 'Platform Checkpoint',
+  GIT_COMMITTER_NAME: 'Fregat Checkpoint',
 } as const
 
 /**

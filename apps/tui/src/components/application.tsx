@@ -65,7 +65,7 @@ export function Application({
         flexDirection='row'
       >
         <text fg={theme.primary}>
-          <strong>PLATFORM</strong>
+          <strong>Fregat</strong>
         </text>
         <text fg={theme.mutedForeground}>workspace</text>
       </box>

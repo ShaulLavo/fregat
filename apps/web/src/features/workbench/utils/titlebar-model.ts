@@ -13,7 +13,7 @@ export function titlebarModel(
   uiMode: WorkspaceUiMode,
 ): TitlebarModel {
   if (!rootFolder) {
-    return { gridTemplateColumns: 'minmax(0, 1fr) auto', workspaceTitle: 'Platform' }
+    return { gridTemplateColumns: 'minmax(0, 1fr) auto', workspaceTitle: 'Fregat' }
   }
   if (uiMode === 'chat') {
     return { gridTemplateColumns: 'minmax(0, 1fr) auto', workspaceTitle: rootFolder.name }

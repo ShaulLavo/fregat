@@ -3,7 +3,7 @@ import type { OrchestrationWorktreeShell, WorktreeCleanupEligibility } from '@wo
 export function cleanupEligibilityLabel(eligibility: WorktreeCleanupEligibility): string {
   switch (eligibility.reason) {
     case 'eligible':
-      return 'Can be removed. Platform checks for changes and running processes first.'
+      return 'Can be removed. Fregat checks for changes and running processes first.'
     case 'referenced':
       return `${eligibility.nonDeletedSessionCount} sessions still use this worktree. Delete them before removing it.`
     case 'provider-stop-pending':
@@ -15,15 +15,15 @@ export function cleanupEligibilityLabel(eligibility: WorktreeCleanupEligibility)
     case 'active-terminal':
       return 'A terminal is still running. Close it and wait for it to exit.'
     case 'terminal-ownership-unknown':
-      return 'After the restart, Platform cannot tell whether a terminal still runs here. Stop managing this worktree and remove it yourself.'
+      return 'After the restart, Fregat cannot tell whether a terminal still runs here. Stop managing this worktree and remove it yourself.'
     case 'external-driver-unverified':
-      return 'An agent outside Platform may still be running here. Stop managing this worktree and remove it yourself.'
+      return 'An agent outside Fregat may still be running here. Stop managing this worktree and remove it yourself.'
     case 'protected':
       return 'The main checkout is protected from removal.'
     case 'external':
-      return 'This worktree is managed outside Platform.'
+      return 'This worktree is managed outside Fregat.'
     case 'unclaimed':
-      return 'Let Platform manage this worktree before it can remove it.'
+      return 'Let Fregat manage this worktree before it can remove it.'
     case 'missing':
       return 'This worktree folder is gone. Forget it to clear it from the list.'
     case 'not-ready':
