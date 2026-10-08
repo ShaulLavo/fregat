@@ -28,9 +28,11 @@ The existing Pages workflow keeps its defaults.
 library sources, build configuration or manifests, and on manual dispatch from main. Test-only
 changes do not trigger it. Markdown under site sources remains an input. The Fregat landing page
 uses its own animated replica. Web application source changes do not trigger this build.
-The normal CI workflow builds all production sites and runs the mobile checks on every pull
-request, main push and manual CI run. Its `Mobile layout` job is required by the final `CI`
-verdict and has no deployment secrets. Production deployment remains a separate main-only workflow.
+The normal CI workflow builds all production sites and runs the mobile checks when a pull
+request changes site, documentation, theme, imported library or site-build inputs. Other pull
+requests skip the job. Main pushes and manual CI runs check all sites. The final `CI` verdict
+requires the `Mobile layout` job when selected, and the job has no deployment secrets.
+Production deployment remains a separate main-only workflow.
 
 The mobile check visits every built HTML page in touch-enabled Chromium and WebKit at
 320, 360 and 390 CSS pixels, with a device pixel ratio of 2. It also opens the documentation
@@ -49,7 +51,8 @@ The last two widths use a landscape viewport. Each result records offending elem
 failed checks save screenshots even without `--screenshots`. For a published-site crawl, pass
 `--origin https://shaulavo.dev --sitemaps /singapore/sitemap-index.xml,/ghostty-webgpu/sitemap-index.xml`
 and `--paths /,/fregat/,/singapore/demo/`. Evidence is JSON Lines, with one row per page, engine,
-width and interaction state.
+width and interaction state. A navigation timeout or WebKit internal navigation error gets
+one retry before failing. Retried navigations are logged separately; layout failures always fail.
 
 The build job has no deployment secret. It uploads a gzip tar artifact with one-day retention.
 A fresh deploy job downloads that artifact and sends it directly over SSH. It runs in the

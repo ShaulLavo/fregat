@@ -92,7 +92,13 @@ jobs:
               - 'scripts/build-site.ts'
               - 'scripts/dev-sources.ts'
               - 'scripts/runtime-network.ts'
+              - 'scripts/structured-errors.ts'
+              - 'scripts/product-sites/**'
+              - 'hotkeys/**'
+              - 'patches/**'
               - '.github/actions/setup/**'
+              - '.github/actions/install-browsers/**'
+              - '.github/workflows/ci.yml'
               - 'package.json'
               - 'bun.lock'
               - 'turbo.json'
@@ -455,6 +461,7 @@ jobs:
   mobile-layout:
     name: Mobile layout
     needs: changes
+    if: ${{ needs.changes.outputs.site == 'true' || needs.changes.outputs.docs == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:

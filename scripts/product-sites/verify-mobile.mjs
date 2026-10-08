@@ -166,9 +166,28 @@ async function captureScreenshot(page, path) {
   }
 }
 
+async function navigate(page, engine, url) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await page.goto(url, { waitUntil: 'load', timeout: 45000 })
+    } catch (error) {
+      const interrupted =
+        error.name === 'TimeoutError' ||
+        error.message.includes('WebKit encountered an internal error')
+      if (!interrupted || attempt === 1) throw error
+      console.log(`RETRY ${engine} ${url}: ${error.message}`)
+      if (evidence)
+        await appendFile(
+          join(evidence, 'navigation-retries.jsonl'),
+          `${JSON.stringify({ url, engine, attempt: attempt + 1, error: error.message })}\n`,
+        )
+    }
+  }
+}
+
 async function checkPage(page, engine, url) {
   try {
-    const response = await page.goto(url, { waitUntil: 'load', timeout: 45000 })
+    const response = await navigate(page, engine, url)
     assert(response?.ok(), `${url}: HTTP ${response?.status()}`)
     if (readySelector) await page.locator(readySelector).waitFor({ timeout: 45000 })
     for (const width of widths) await record(page, engine, url, width, 'page')

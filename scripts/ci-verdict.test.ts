@@ -178,6 +178,16 @@ test('docs-only selection requires mobile layout and permits skipped or absent d
   expect(value.evaluate(jobs).passed).toBe(false)
 })
 
+test('non-site code selection permits a skipped mobile layout job', () => {
+  const value = fixture()
+  value.changes.outputs.site = 'false'
+  value.changes.outputs.docs = 'false'
+  value.needs.site = { result: 'skipped' }
+  value.needs['mobile-layout'] = { result: 'skipped' }
+  const jobs = value.jobs.filter((job) => !['Mobile layout', 'Site build'].includes(job.name))
+  expect(value.evaluate(jobs)).toEqual({ passed: true, issues: [] })
+})
+
 test('enabled work reported skipped rejects', () => {
   const value = fixture()
   value.needs.browser = { result: 'skipped' }
