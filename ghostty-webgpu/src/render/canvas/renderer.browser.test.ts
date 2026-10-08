@@ -453,6 +453,89 @@ describe('CanvasTerminalRenderer', () => {
     },
   )
 
+  it.each(['fill-text', 'pixels'] as const)(
+    'discards a failed background batch before repainting another row in %s mode',
+    async (mode) => {
+      const clock = new FakeClock()
+      const canvas = createCanvas()
+      const source = new FakeRenderState([
+        row(
+          0,
+          Array.from({ length: 40 }, (_, x) => cell(x, { text: 'A' })),
+        ),
+        row(
+          1,
+          Array.from({ length: 40 }, (_, x) =>
+            cell(x, { text: 'A', background: { r: 0, g: 0, b: 255 } }),
+          ),
+        ),
+      ])
+      source.cursor.visible = false
+      const renderer = await createRenderer(options(canvas, source, clock, { columns: 40 }), mode)
+      clock.flushFrame()
+      expectFullRepaint(canvas, source)
+      const before = { ...renderer.metrics }
+
+      source.rows[1]!.cells[8]!.text = 'B'
+      source.dirtyRow(1)
+      const fault = vi
+        .spyOn(CanvasRenderingContext2D.prototype, 'fillRect')
+        .mockImplementationOnce(() => {
+          throw new TypeError('Injected background batch failure')
+        })
+      renderer.notifyWrite()
+      expect(() => clock.flushFrame()).toThrow('Injected background batch failure')
+      expect(source.acknowledgements).toBe(1)
+      expect(renderer.metrics.submittedFrames).toBe(before.submittedFrames)
+      fault.mockRestore()
+
+      source.rows[0]!.cells[8]!.text = 'C'
+      source.dirtyRow(0)
+      renderer.notifyWrite()
+      clock.flushFrame()
+      expect(source.acknowledgements).toBe(2)
+      expect(renderer.metrics.submittedFrames).toBe(before.submittedFrames + 1)
+      expectFullRepaint(canvas, source)
+      expect(pixel(canvas, 1, 1)).toEqual([0, 0, 0, 0])
+    },
+  )
+
+  it('repairs identical direct painter retries after a glyph failure', () => {
+    const canvas = createCanvas()
+    canvas.width = 400
+    canvas.height = 40
+    const context = canvas.getContext('2d', { alpha: true, willReadFrequently: false })!
+    const painter = new CanvasRowPainter(
+      context,
+      fittedFont(),
+      canonicalRendererTheme(mergeRendererTheme({})),
+    )
+    painter.resetContext(fittedFont())
+    const source = new FakeRenderState([
+      row(
+        0,
+        Array.from({ length: 40 }, (_, x) => cell(x, { text: 'A' })),
+      ),
+    ])
+    source.cursor.visible = false
+    painter.paint(source.rows[0]!, undefined, canvas.width)
+    expectFullRepaint(canvas, source)
+
+    source.rows[0]!.cells[8]!.text = 'B'
+    painter.paint(source.rows[0]!, undefined, canvas.width)
+    expectFullRepaint(canvas, source)
+    source.rows[0]!.cells[8]!.text = 'C'
+    const fault = vi.spyOn(context, 'fillText').mockImplementationOnce(() => {
+      throw new TypeError('Injected direct painter failure')
+    })
+    expect(() => painter.paint(source.rows[0]!, undefined, canvas.width)).toThrow(
+      'Injected direct painter failure',
+    )
+    fault.mockRestore()
+    painter.paint(source.rows[0]!, undefined, canvas.width)
+    expectFullRepaint(canvas, source)
+  })
+
   it('keeps bulk plain-text updates on the full-row painter', async () => {
     const clock = new FakeClock()
     const canvas = createCanvas()

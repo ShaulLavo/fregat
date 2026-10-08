@@ -121,6 +121,7 @@ export class CanvasRowPainter {
   }
 
   invalidate(): void {
+    this.backgroundColor = undefined
     this.plainRows.clear()
   }
 
@@ -172,6 +173,9 @@ export class CanvasRowPainter {
       }
       this.paintBackgrounds(row, cursor, y)
       for (let index = 0; index < row.cells.length;) index += this.paintGlyph(row, index)
+    } catch (cause) {
+      this.invalidate()
+      throw cause
     } finally {
       this.context.restore()
     }
