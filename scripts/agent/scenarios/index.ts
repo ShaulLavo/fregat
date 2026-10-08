@@ -44,6 +44,7 @@ import { responseDelivery } from './response-delivery'
 import { draftRecovery } from './draft-recovery'
 import { composerDefaults } from './composer-defaults'
 import { sessionNotifications } from './session-notifications'
+import { workbenchAlignment } from './workbench-alignment'
 import { workbenchMeasurements } from './workbench-measurements'
 import { terminalHistory, terminalIdleShells } from './terminal-history'
 import { chatStream } from './chat-stream'
@@ -479,6 +480,7 @@ export const scenarios: readonly Scenario[] = [
   editorSavedSnapshot,
   historyComparisonNoFlicker,
   workbenchMeasurements,
+  workbenchAlignment,
   terminalHistory,
   terminalIdleShells,
   responseDelivery,
