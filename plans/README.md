@@ -205,6 +205,7 @@ delivered acceptance, monitoring/draft check, named follow-ons and owner-only re
 | [335](335-stroke-icons.md)                            | Stroke icons only, Hugeicons by default, morphing icons, icon packs later       |
 | [336](336-packages-as-products.md)                    | Our packages look and read like products: READMEs, sites, docs, releases        |
 | [337](337-device-pairing.md)                          | Pairing screen that explains itself, Tailscale sign-in, approve from a phone    |
+| [338](338-singapore-docs-load-speed.md)               | Measured startup and byte budgets for Singapore docs in the real editor         |
 
 ## Package and client plans
 
