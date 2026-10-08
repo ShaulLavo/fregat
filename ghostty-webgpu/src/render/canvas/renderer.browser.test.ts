@@ -358,6 +358,101 @@ describe('CanvasTerminalRenderer', () => {
     expectFullRepaint(canvas, source)
   })
 
+  it('does not rescan packed rows rejected during capture', async () => {
+    const clock = new FakeClock()
+    const canvas = createCanvas()
+    const source = new FakeRenderState([
+      row(
+        0,
+        Array.from({ length: 40 }, (_, x) => cell(x, { text: 'A' })),
+      ),
+    ])
+    source.cursor.visible = false
+    const renderer = await createRenderer(options(canvas, source, clock, { columns: 40, rows: 1 }))
+    clock.flushFrame()
+    expectFullRepaint(canvas, source)
+
+    const words = new Uint32Array(40 * PACKED_CELL_WORDS)
+    for (let x = 0; x < 40; x += 1) {
+      words[x * PACKED_CELL_WORDS] = 65
+      words[x * PACKED_CELL_WORDS + 1] = 0xffffffff
+      words[x * PACKED_CELL_WORDS + 2] = 0xffffffff
+      words[x * PACKED_CELL_WORDS + 3] = x === 39 ? 1 | 8 | (1 << 5) : 1
+    }
+    const packed = new PackedCells(words, new Uint32Array())
+    const decode = vi.spyOn(packed, 'read')
+    const materialize = vi.spyOn(packed, 'materialize')
+    let cells: readonly RenderCell[] | undefined
+    source.rows[0] = {
+      y: 0,
+      dirty: true,
+      packed,
+      get cells() {
+        cells ??= packed.materialize()
+        return cells
+      },
+    }
+    source.dirtyRow(0)
+    renderer.notifyWrite()
+    clock.flushFrame()
+    expect(materialize).toHaveBeenCalledTimes(1)
+    // One eligibility scan and one materialization for the fallback row key.
+    expect(decode).toHaveBeenCalledTimes(80)
+    expectFullRepaint(canvas, source)
+  })
+
+  it.each([
+    { name: 'plain glyph', style: undefined, method: 'fillText' },
+    { name: 'styled glyph', style: styled({ italic: true }), method: 'fillText' },
+    { name: 'dashed underline', style: styled({ underline: 5 }), method: 'stroke' },
+  ] as const)(
+    'restores the row clip after a failed $name paint and repairs both rows',
+    async ({ style, method }) => {
+      const clock = new FakeClock()
+      const canvas = createCanvas()
+      const source = new FakeRenderState(
+        Array.from({ length: 2 }, (_, y) =>
+          row(
+            y,
+            Array.from({ length: 40 }, (_, x) => cell(x, { text: 'A', style })),
+          ),
+        ),
+      )
+      source.cursor.visible = false
+      const renderer = await createRenderer(options(canvas, source, clock, { columns: 40 }))
+      clock.flushFrame()
+      expectFullRepaint(canvas, source)
+      const before = { ...renderer.metrics }
+
+      source.rows[0]!.cells[8]!.text = 'B'
+      source.dirtyRow(0)
+      renderer.notifyWrite()
+      clock.flushFrame()
+      expectFullRepaint(canvas, source)
+
+      source.rows[0]!.cells[8]!.text = 'D'
+      source.dirtyRow(0)
+      const fault = vi
+        .spyOn(CanvasRenderingContext2D.prototype, method)
+        .mockImplementationOnce(() => {
+          throw new TypeError('Injected row paint failure')
+        })
+      renderer.notifyWrite()
+      expect(() => clock.flushFrame()).toThrow('Injected row paint failure')
+      expect(source.acknowledgements).toBe(2)
+      expect(renderer.metrics.submittedFrames).toBe(before.submittedFrames + 1)
+      fault.mockRestore()
+
+      source.rows[1]!.cells[8]!.text = 'C'
+      source.dirtyRow(1)
+      renderer.notifyWrite()
+      clock.flushFrame()
+      expect(source.acknowledgements).toBe(3)
+      expect(renderer.metrics.submittedFrames).toBe(before.submittedFrames + 2)
+      expectFullRepaint(canvas, source)
+    },
+  )
+
   it('keeps bulk plain-text updates on the full-row painter', async () => {
     const clock = new FakeClock()
     const canvas = createCanvas()
