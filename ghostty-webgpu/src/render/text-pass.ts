@@ -87,6 +87,11 @@ export class WebGpuTextPass {
   private readonly resources: PipelineResources
   private readonly sampler: GPUSampler
   private readonly viewportBuffer: GPUBuffer
+  private readonly rowData = new ArrayBuffer(24)
+  private readonly rowView = new DataView(this.rowData)
+  private rowOffset = 0
+  private rowHeight = 0
+  private rowColumns = 0
 
   constructor(options: WebGpuTextPassOptions) {
     this.device = options.device
@@ -105,7 +110,7 @@ export class WebGpuTextPass {
       this.glyphBuffer = this.glyphBatches[0]!.buffer
       this.drawCount = 1 + this.glyphBatches.length
       this.viewportBuffer = options.device.createBuffer({
-        size: 16,
+        size: 32,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
       })
       this.ownedBuffers.push(this.viewportBuffer)
@@ -148,19 +153,27 @@ export class WebGpuTextPass {
   }
 
   uploadFrame(
-    data: { readonly cellData: Float32Array; readonly glyphData: Float32Array },
+    data: {
+      readonly cellData: Float32Array
+      readonly glyphData: Float32Array
+      readonly columns?: number
+      readonly rowHeight?: number
+      readonly rowOffset?: number
+      readonly stableRows?: boolean
+    },
     updates: readonly RowInstanceUpdate[],
   ): number {
     this.frameUploadedBytesValue = 0
+    const metadataOperations = this.uploadRows(data)
     const plan = planUploadRanges(updates)
     const cellData = data.cellData
     const glyphData = data.glyphData
     for (const range of plan.cell) this.writeRange(this.cellBuffer, cellData, range)
     if (this.glyphBatches.length === 1) {
       for (const range of plan.glyph) this.writeRange(this.glyphBuffer, glyphData, range)
-      return plan.cell.length + plan.glyph.length
+      return metadataOperations + plan.cell.length + plan.glyph.length
     }
-    let operations = plan.cell.length
+    let operations = metadataOperations + plan.cell.length
     for (const range of plan.glyph) operations += this.writeGlyphRange(glyphData, range)
     return operations
   }
@@ -212,6 +225,31 @@ export class WebGpuTextPass {
 
   destroy(): void {
     for (const buffer of this.ownedBuffers) buffer.destroy()
+  }
+
+  private uploadRows(data: {
+    readonly columns?: number
+    readonly rowHeight?: number
+    readonly rowOffset?: number
+    readonly stableRows?: boolean
+  }): number {
+    const columns = data.stableRows ? data.columns! : 0
+    const height = data.stableRows ? data.rowHeight! : 0
+    const offset = data.stableRows ? data.rowOffset! : 0
+    if (columns === this.rowColumns && height === this.rowHeight && offset === this.rowOffset)
+      return 0
+    this.rowColumns = columns
+    this.rowHeight = height
+    this.rowOffset = offset
+    this.rowView.setUint32(0, columns, true)
+    this.rowView.setFloat32(4, height, true)
+    this.rowView.setUint32(8, offset, true)
+    this.rowView.setUint32(12, this.instanceCount, true)
+    this.device.queue.writeBuffer(this.viewportBuffer, 8, this.rowData)
+    this.frameUploadedBytesValue += this.rowData.byteLength
+    this.metrics.uploadedBytes += this.rowData.byteLength
+    this.metrics.uploadOperations += 1
+    return 1
   }
 
   private createPipelines(format: GPUTextureFormat): PipelineResources {

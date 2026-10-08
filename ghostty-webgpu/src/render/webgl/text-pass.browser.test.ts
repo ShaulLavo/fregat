@@ -87,6 +87,7 @@ async function createGrid(options: {
   renderRows: readonly RenderRow[]
   rows: number
   theme?: RendererTheme
+  stableRows?: boolean
 }) {
   const width = options.columns * cellSize
   const height = options.rows * cellSize
@@ -104,6 +105,7 @@ async function createGrid(options: {
     theme,
     cursor: options.cursor,
     full: true,
+    stableRows: options.stableRows,
     overlayRows: new Set<number>(),
   }
   expect(buildZigFrame(builder, atlas, rasterizer, frameOptions)).toBe(0)
@@ -158,6 +160,39 @@ function coveredRowPixels(pixels: Uint8Array, width: number, left: number, y: nu
   }
   return covered
 }
+
+it('keeps exact pixels while physical rows wrap and partial regions move', async () => {
+  const renderRows = [0, 1, 2, 3].map((y) =>
+    row(y, [cell(0, { text: 'A', background: { r: y * 60, g: 80, b: 120 } })]),
+  )
+  const control = await createGrid({ columns: 4, rows: 4, renderRows })
+  const ring = await createGrid({ columns: 4, rows: 4, renderRows, stableRows: true })
+  const inputs = [
+    ...Array.from({ length: 9 }, () => '\r\nA'),
+    '\x1b[2;3r\x1b[3;1H\nA',
+    '\x1b[2;1H\x1b[L',
+    '\x1b[M',
+    '\x1b[2;1H\x1bM',
+    '\x1b[r\x1b[?1049hA\x1b[?1049l',
+  ]
+  for (const input of inputs) {
+    for (const grid of [control, ring]) {
+      grid.native.state.acknowledge()
+      grid.native.terminal.write(input)
+      grid.native.state.update()
+      expect(
+        buildZigFrame(grid.builder, grid.atlas, rasterizer, {
+          ...grid.frameOptions,
+          full: false,
+        }),
+      ).toBe(0)
+      grid.pass.syncAtlas(grid.atlas.consumeUploads())
+      grid.pass.uploadFrame(grid.builder, grid.builder.changedRanges())
+    }
+    expect(ring.pass.capturePixels()).toEqual(control.pass.capturePixels())
+    expect(ring.gl.getError()).toBe(ring.gl.NO_ERROR)
+  }
+})
 
 it('renders transparent defaults, explicit backgrounds, inverse and selected cells', async () => {
   const grid = await createGrid({
@@ -458,7 +493,7 @@ it('skips empty native ranges and counts cell-only and glyph-only uploads separa
   expect(grid.gl.getError()).toBe(grid.gl.NO_ERROR)
 })
 
-it('bounding uploads preserve bit patterns, erasures and authoritative gaps after WASM memory growth', async () => {
+it('sparse uploads preserve changed bits and resident gaps after WASM memory growth', async () => {
   const grid = await createGrid({ columns: 4, renderRows: [], rows: 3 })
   const memory = new WebAssembly.Memory({ initial: 1, maximum: 2 })
   const frame = {
@@ -483,10 +518,10 @@ it('bounding uploads preserve bit patterns, erasures and authoritative gaps afte
   const cellBits = new Uint32Array(memory.buffer, 0, frame.cellData.length)
   const glyphBits = new Uint32Array(memory.buffer, 2048, frame.glyphData.length)
   cellBits.fill(0x80000000, 16, 48)
-  cellBits.fill(0x7fc00003, 48, 64)
+  // The gap remains resident on the GPU.
   cellBits.fill(0x7fc00001, 64, 96)
   glyphBits.fill(0, 48, 72)
-  glyphBits.fill(0x80000000, 72, 240)
+  // The gap remains resident on the GPU.
   glyphBits.fill(0x7fc00002, 240, 264)
   const writes = vi.spyOn(grid.gl, 'bufferSubData')
   const binds = vi.spyOn(grid.gl, 'bindBuffer')
@@ -500,7 +535,7 @@ it('bounding uploads preserve bit patterns, erasures and authoritative gaps afte
       glyph: { byteOffset: 960, byteLength: 96 },
     },
   ])
-  const expected = { bytes: 1184, operations: 2 }
+  const expected = { bytes: 448, operations: 4 }
   expect(operations).toBe(expected.operations)
   expect(writes).toHaveBeenCalledTimes(expected.operations)
   expect(binds).toHaveBeenCalledTimes(2)

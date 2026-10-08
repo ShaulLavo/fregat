@@ -12,7 +12,11 @@ struct Instance {
 
 struct Viewport {
   size: vec2f,
-  padding: vec2f,
+  columns: u32,
+  rowHeight: f32,
+  rowOffset: u32,
+  instanceCount: u32,
+  padding: vec2u,
 }
 
 struct VertexOutput {
@@ -36,10 +40,18 @@ fn vertexMain(
     vec2f(0.0, 0.0), vec2f(1.0, 0.0), vec2f(0.0, 1.0),
     vec2f(0.0, 1.0), vec2f(1.0, 0.0), vec2f(1.0, 1.0),
   );
-  let instance = instances[instanceIndex];
+  var physicalIndex = instanceIndex;
+  if (viewport.columns != 0u) {
+    physicalIndex = (instanceIndex + viewport.rowOffset * viewport.columns) % viewport.instanceCount;
+  }
+  let instance = instances[physicalIndex];
+  var origin = instance.rect.xy;
+  if (viewport.columns != 0u && instance.rect.w != 0.0) {
+    origin.y = f32(instanceIndex / viewport.columns) * viewport.rowHeight + origin.y;
+  }
   let corner = corners[vertexIndex];
   let local = corner * instance.rect.zw;
-  let pixel = instance.rect.xy + local;
+  let pixel = origin + local;
   var output: VertexOutput;
   output.position = vec4f(
     pixel.x / viewport.size.x * 2.0 - 1.0,

@@ -9,7 +9,7 @@ import type {
   RowInstanceUpdate,
 } from '../render/instances/types.js'
 
-const frameBytes = 128
+const frameBytes = 144
 
 function packedColor(color: RgbColor): number {
   return color.r | (color.g << 8) | (color.b << 16)
@@ -26,6 +26,7 @@ export interface ZigFrameOptions {
   cursor?: CursorState
   full: boolean
   overlayRows: ReadonlySet<number>
+  stableRows?: boolean
 }
 
 // The bridge owns instance construction; views are recreated after calls that may grow memory.
@@ -53,6 +54,8 @@ export class ZigFrameBuilder {
     try {
       this.frame = this.allocate(frameBytes)
       this.setUint(112, 0)
+      this.setUint(124, 0)
+      this.setUint(128, 0)
       this.cellPointer = this.allocate(columns * rows * 64)
       this.glyphPointer = this.allocate(columns * rows * 96)
       this.index = this.runtime.bridge.createGlyphIndex()
@@ -102,6 +105,21 @@ export class ZigFrameBuilder {
     )
   }
 
+  get rowOffset(): number {
+    this.ensureActive()
+    return this.runtime.memory.view.getUint32(this.frame + 124, true)
+  }
+
+  get rowHeight(): number {
+    this.ensureActive()
+    return this.runtime.memory.view.getFloat32(this.frame + 52, true)
+  }
+
+  get stableRows(): boolean {
+    this.ensureActive()
+    return this.runtime.memory.view.getUint32(this.frame + 128, true) !== 0
+  }
+
   get rowRebuilds(): number {
     this.ensureActive()
     return this.runtime.memory.view.getUint32(this.frame + 116, true)
@@ -130,6 +148,7 @@ export class ZigFrameBuilder {
 
   build(options: ZigFrameOptions): number {
     this.ensureActive()
+    this.setUint(128, options.stableRows ? 1 : 0)
     const { memory } = this.runtime
     memory.bytes.fill(0, this.mask, this.mask + this.rows)
     for (const row of options.overlayRows) {
@@ -185,7 +204,8 @@ export class ZigFrameBuilder {
           byteOffset: view.getUint32(pointer + 8, true),
           byteLength: view.getUint32(pointer + 12, true),
         },
-        row: Math.floor(byteOffset / (this.columns * 64)),
+        row:
+          (Math.floor(byteOffset / (this.columns * 64)) + this.rows - this.rowOffset) % this.rows,
       })
     }
     return result

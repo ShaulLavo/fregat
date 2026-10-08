@@ -12,17 +12,17 @@ function range(byteOffset: number, byteLength: number): InstanceByteRange {
   return { byteOffset, byteLength }
 }
 
-describe('bounding upload ranges', () => {
-  it('uses one independent min-to-max span per nonempty buffer with unordered input', () => {
+describe('sparse upload ranges', () => {
+  it('keeps independent separated spans with unordered input', () => {
     expect(
       planUploadRanges([
         update(range(640, 64), range(192, 96)),
         update(range(64, 64), range(960, 96)),
       ]),
-    ).toEqual({ cell: [range(64, 640)], glyph: [range(192, 864)] })
+    ).toEqual({ cell: [range(64, 64), range(640, 64)], glyph: [range(192, 96), range(960, 96)] })
   })
 
-  it('bounds touching, overlapping and separated intervals', () => {
+  it('merges touching and overlapping intervals while preserving gaps', () => {
     expect(
       planUploadRanges([
         update(range(64, 128)),
@@ -30,7 +30,7 @@ describe('bounding upload ranges', () => {
         update(range(192, 64)),
         update(range(320, 64)),
       ]),
-    ).toEqual({ cell: [range(0, 384)], glyph: [] })
+    ).toEqual({ cell: [range(0, 256), range(320, 64)], glyph: [] })
   })
 
   it('ignores empty intervals even when their offsets lie outside the bound', () => {
@@ -73,7 +73,7 @@ describe('bounding upload ranges', () => {
   it('preserves four-byte granularity without wider alignment', () => {
     expect(
       planUploadRanges([update(range(4, 4), range(12, 4)), update(range(20, 4), range(16, 4))]),
-    ).toEqual({ cell: [range(4, 20)], glyph: [range(12, 8)] })
+    ).toEqual({ cell: [range(4, 4), range(20, 4)], glyph: [range(12, 8)] })
   })
 
   it('does not mutate earlier plans or inputs while planning another frame', () => {

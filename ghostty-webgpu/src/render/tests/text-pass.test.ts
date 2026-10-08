@@ -124,7 +124,7 @@ it.each([
       pageWidth: 8,
     })
     fixture.pass.syncAtlas(textures)
-    expect(fixture.buffers.map((buffer) => buffer.bytes.byteLength)).toEqual([256, 192, 192, 16])
+    expect(fixture.buffers.map((buffer) => buffer.bytes.byteLength)).toEqual([256, 192, 192, 32])
     expect(fixture.pass.glyphBindGroupCreationCount).toBe(2)
     expect(fixture.pass.uploadFrame(data, [update(0, 0, 256, 0, 384)])).toBe(3)
     expect(fixture.pass.frameUploadedBytes).toBe(640)
@@ -205,7 +205,7 @@ it('coalesces twelve full rows to two uploads with native glyph bytes and preser
   )
 })
 
-it('bounds unordered cell and glyph changes independently using resident gap bytes', () => {
+it('merges touching changes and keeps untouched resident gaps', () => {
   const fixture = gpuFixture(),
     data = frame()
   expect(
@@ -214,28 +214,29 @@ it('bounds unordered cell and glyph changes independently using resident gap byt
       update(0, 0, 64),
       update(1, 64, 64, 384, 96),
     ]),
-  ).toBe(2)
+  ).toBe(3)
   expect(fixture.writes.map((write) => [write.offset, write.bytes.byteLength])).toEqual([
     [0, 192],
-    [192, 288],
+    [192, 96],
+    [384, 96],
   ])
   const words = new Uint32Array(fixture.buffers[1]!.bytes.buffer)
-  expect(words.slice(72, 96)).toEqual(
-    new Uint32Array(data.glyphData.buffer, data.glyphData.byteOffset + 288, 24),
-  )
+  expect(words.slice(72, 96)).toEqual(new Uint32Array(24))
 })
 
-it('bounding mode counts the actual uploaded span, including safe resident gaps', () => {
+it('counts only changed sparse spans', () => {
   const fixture = gpuFixture(),
     data = frame()
   expect(
     fixture.pass.uploadFrame(data, [update(0, 64, 64, 96, 96), update(3, 256, 64, 384, 96)]),
-  ).toBe(2)
-  expect(fixture.pass.frameUploadedBytes).toBe(640)
-  expect(fixture.pass.metrics.uploadedBytes).toBe(640)
+  ).toBe(4)
+  expect(fixture.pass.frameUploadedBytes).toBe(320)
+  expect(fixture.pass.metrics.uploadedBytes).toBe(320)
   expect(fixture.writes.map((write) => [write.offset, write.bytes.byteLength])).toEqual([
-    [64, 256],
-    [96, 384],
+    [64, 64],
+    [256, 64],
+    [96, 96],
+    [384, 96],
   ])
 })
 

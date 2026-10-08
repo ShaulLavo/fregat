@@ -23,6 +23,9 @@ interface Pipeline {
   readonly buffer: WebGLBuffer
   readonly program: WebGLProgram
   readonly vertexArray: WebGLVertexArrayObject
+  readonly stride: number
+  readonly rowUniform: WebGLUniformLocation
+  readonly offsets: Map<number, WebGLVertexArrayObject>
 }
 
 function positiveInteger(name: string, value: number): void {
@@ -71,6 +74,18 @@ export class WebGlTextPass {
   private atlasUploadOperationsValue = 0
   private frameUploadedBytesValue = 0
   private disposed = false
+  private columns = 0
+  private rowHeight = 0
+  private rowOffset = 0
+  private mappingChanged = false
+
+  get frameChanged(): boolean {
+    return this.mappingChanged || this.frameUploadedBytesValue > 0
+  }
+
+  get drawCount(): number {
+    return this.rowOffset === 0 ? 2 : 4
+  }
 
   constructor(options: WebGlTextPassOptions) {
     validateOptions(options)
@@ -127,11 +142,20 @@ export class WebGlTextPass {
   }
 
   uploadFrame(
-    frame: Pick<ZigFrameBuilder, 'cellData' | 'glyphData'>,
+    frame: Pick<ZigFrameBuilder, 'cellData' | 'glyphData'> &
+      Partial<Pick<ZigFrameBuilder, 'columns' | 'rowHeight' | 'rowOffset' | 'stableRows'>>,
     updates: readonly { readonly cell: InstanceByteRange; readonly glyph: InstanceByteRange }[],
   ): number {
     this.ensureActive()
     this.frameUploadedBytesValue = 0
+    const previousOffset = this.rowOffset
+    this.mappingChanged =
+      previousOffset !== (frame.rowOffset ?? 0) ||
+      this.rowHeight !== (frame.rowHeight ?? 0) ||
+      this.columns !== (frame.stableRows ? frame.columns! : 0)
+    this.columns = frame.stableRows ? frame.columns! : 0
+    this.rowHeight = frame.rowHeight ?? 0
+    this.rowOffset = frame.rowOffset ?? 0
     const plan = planUploadRanges(updates)
     this.writeRanges(this.cells.buffer, frame.cellData, plan.cell)
     this.writeRanges(this.glyphs.buffer, frame.glyphData, plan.glyph)
@@ -247,7 +271,14 @@ export class WebGlTextPass {
     gl.bindVertexArray(null)
     gl.useProgram(program)
     gl.uniform2f(this.uniform(program, 'viewport'), this.width, this.height)
-    return { buffer, program, vertexArray }
+    return {
+      buffer,
+      program,
+      vertexArray,
+      stride,
+      rowUniform: this.uniform(program, 'rows'),
+      offsets: new Map([[0, vertexArray]]),
+    }
   }
 
   private uniform(program: WebGLProgram, name: string): WebGLUniformLocation {
@@ -353,11 +384,43 @@ export class WebGlTextPass {
     }
   }
 
+  private rowVertexArray(pipeline: Pipeline, first: number): WebGLVertexArrayObject {
+    const cached = pipeline.offsets.get(first)
+    if (cached) return cached
+    const gl = this.context
+    const vertexArray = this.own(gl.createVertexArray(), (resource) =>
+      gl.deleteVertexArray(resource),
+    )
+    gl.bindVertexArray(vertexArray)
+    gl.bindBuffer(gl.ARRAY_BUFFER, pipeline.buffer)
+    for (let attribute = 0; attribute < pipeline.stride / 16; attribute += 1) {
+      gl.enableVertexAttribArray(attribute)
+      gl.vertexAttribPointer(
+        attribute,
+        4,
+        gl.FLOAT,
+        false,
+        pipeline.stride,
+        first * pipeline.stride + attribute * 16,
+      )
+      gl.vertexAttribDivisor(attribute, 1)
+    }
+    pipeline.offsets.set(first, vertexArray)
+    return vertexArray
+  }
+
   private draw(pipeline: Pipeline): void {
     const gl = this.context
     gl.useProgram(pipeline.program)
+    const first = this.rowOffset * this.columns
+    const count = this.instanceCount - first
+    gl.bindVertexArray(this.rowVertexArray(pipeline, first))
+    gl.uniform4f(pipeline.rowUniform, this.columns, this.rowHeight, 0, 0)
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, count)
+    if (first === 0) return
     gl.bindVertexArray(pipeline.vertexArray)
-    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.instanceCount)
+    gl.uniform4f(pipeline.rowUniform, this.columns, this.rowHeight, count / this.columns, 0)
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, first)
   }
 
   private assertNoError(operation: string): void {

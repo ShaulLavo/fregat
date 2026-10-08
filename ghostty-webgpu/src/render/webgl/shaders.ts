@@ -2,6 +2,12 @@ const vertexHeader = `#version 300 es
 precision highp float;
 precision highp int;
 uniform vec2 viewport;
+uniform vec4 rows;
+vec2 instanceOrigin(vec4 rect) {
+  if (rows.x == 0.0 || rect.w == 0.0) return rect.xy;
+  float row = rows.z + floor(float(gl_InstanceID) / rows.x);
+  return vec2(rect.x, row * rows.y + rect.y);
+}
 const vec2 corners[6] = vec2[6](
   vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(0.0, 1.0),
   vec2(0.0, 1.0), vec2(1.0, 0.0), vec2(1.0, 1.0)
@@ -60,7 +66,7 @@ flat out vec2 v_size;
 
 void main() {
   vec2 local = corners[gl_VertexID] * rect.zw;
-  gl_Position = clipPosition(rect.xy + local);
+  gl_Position = clipPosition(instanceOrigin(rect) + local);
   v_foreground = foreground;
   v_background = background;
   v_metadata = metadata;
@@ -140,7 +146,7 @@ flat out vec4 v_atlas;
 
 void main() {
   vec2 corner = corners[gl_VertexID];
-  gl_Position = clipPosition(rect.xy + corner * rect.zw);
+  gl_Position = clipPosition(instanceOrigin(rect) + corner * rect.zw);
   v_color = color;
   v_uv = mix(uv.xy, uv.zw, corner);
   v_background = background;
