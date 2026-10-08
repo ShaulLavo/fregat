@@ -155,7 +155,7 @@ Qualification work in progress, 2026-10-08:
 ### Phase 1: Remove the largest single-worker cost
 
 - [ ] Profile the dominant phase. Split query engine, predicates, materialization and normalization when the coarse phase bundles them.
-- [ ] Take one candidate at a time, preserve canonical output, and retain before/after traces and counter deltas.
+- [x] Retain the first correctness- and counter-backed candidate with unqualified timing, canonical output and all traces. Continue one candidate at a time toward M1.
 - [ ] Implement tree-sitter-x improvements in that repository, test its bindings/native correctness, then pin the reviewed package artifact in Fregat. Other changes stay in their owning Singapore package. Normal package patch changesets apply to future package-code PRs.
 - [ ] Meet M1 or record the next bounded experiment with a measured ceiling. Delete rejected experiments.
 
@@ -339,3 +339,61 @@ append-only reply retention and document-count-only disposal gate. The fixed
 probe suite passes 39 tests, including proof release and rejection of unchanged
 document counts with leaked trees, snapshots, sources or changed identities.
 No shipping parser/editor source or open timing markers changed.
+
+### First retained structural candidate, 2026-10-09
+
+[Cursor-read evidence](../editor/docs/performance/singapore-full-parse-2026-10-08/cursor-reads/comparison.json)
+retains the normal timed experiments, both overhead-heavy native counter
+profiles, all control traces and the bounded replication intent. The shipping
+change reads a cursor's type and missing state once, and reads source offsets
+only when a bracket or error diagnostic needs them. Whole-tree traversal,
+bracket depth, error order and independent injection trees are preserved.
+
+The 10 MiB ordinary fixture's native structural counters confirm type reads
+drop from 4,194,318 to 2,097,159 and start-offset reads from 2,097,159 to zero.
+Missing-state reads remain 2,097,159. Highlight predicate calls remain 748,985.
+These counter profiles establish work shape. All twenty timing samples and
+eighteen controls/smokes preserve complete token, palette, structural and
+actual-coverage output. Lifecycle checks also pass.
+
+Timing qualification failed. The result below uses the original paired five
+baseline and five candidate samples per startup condition. The structural
+speedup is supported by the output and native counters, but the timing is
+unqualified.
+
+| Metric                     | Frozen cold median | Original candidate cold median | Frozen warm median | Original candidate warm median |
+| -------------------------- | -----------------: | -----------------------------: | -----------------: | -----------------------------: |
+| Complete highlighted frame |         4,877.9 ms |                     4,599.9 ms |         4,887.9 ms |                     4,669.4 ms |
+| Worker full work           |         4,700.7 ms |                     4,398.4 ms |         4,755.7 ms |                     4,519.4 ms |
+| Structural walk            |         1,185.7 ms |                       929.7 ms |         1,168.3 ms |                       924.6 ms |
+| Diagnostic work proxy      |         4,718.7 ms |                     4,426.3 ms |         4,768.5 ms |                     4,530.7 ms |
+
+Cold passed its phase guards. Warm overlap resolution rose from 160.4 ms to
+167.7 ms, an increase of 7.3 ms against the frozen 7.0 ms allowance. Both
+windows completed successfully, so adding five more samples and pooling them
+cannot turn that failure into acceptance. All confirmation artifacts, pooled
+distributions and the declared replication intent remain as exploratory
+evidence. No unchanged-code acceptance rerun will be performed.
+
+The retained windows also used baseline-first ordering. Future qualification
+must prospectively freeze the paired protocol and alternate baseline/candidate
+order. The next optimization will measure on top of this structural change.
+These are instrumented headless-frame experiments. They establish no physical
+presentation, CPU-seconds or uninstrumented headline claim.
+
+Matched whole-job peak memory is 1,906,339,840 bytes across the candidate timing
+batches versus 1,572,909,056 corrected baseline bytes. Controls/smoke peak at
+6,603,534,336 bytes versus 6,544,244,736 baseline bytes. Both remain below the
+2x rejection bound. Committed WASM capacity, heaps and sampled RSS are recorded
+separately. No memory-reduction claim is made.
+
+M1 is still unpassed: worker/frame maxima exceed 4,000/4,500 ms, and median
+diagnostic work falls only 6.2% cold and 5.0% warm in the original unqualified
+windows against the required 25%.
+The next bounded experiment is to split predicate text extraction and capture
+materialization in the remaining roughly 1.25 s highlight-query phase, count
+node wrappers/string reads, and test one change on the same complete-output
+protocol. The native profile attributes about 0.4 s each to the query engine
+and predicate callbacks, with the rest still bundled in decoding/materialization.
+Any tree-sitter-x source change needs its own reviewed repository PR before
+pinning; none is included in this cursor-read change.

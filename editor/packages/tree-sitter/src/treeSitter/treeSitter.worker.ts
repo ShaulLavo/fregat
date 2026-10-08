@@ -2800,17 +2800,26 @@ const collectCursorDiagnostics = (
   visitors: TreeWalkVisitors,
   bracketStack: { char: string; index: number }[],
 ): void => {
-  const bracket = collectCursorBracket(cursor, bracketStack)
-  if (bracket) visitors.onBracket(bracket)
+  const type = cursor.nodeType
+  const isMissing = cursor.nodeIsMissing
+  const isBracket = OPEN_BRACKETS.has(type) || CLOSE_BRACKETS.has(type)
+  const isError = type === 'ERROR' || isMissing
+  if (!isBracket && !isError) return
 
-  const error = collectCursorError(cursor)
-  if (error) visitors.onError(error)
+  const startIndex = cursor.startIndex
+  if (isBracket) {
+    const bracket = collectBracketInfo(type, startIndex, bracketStack)
+    if (bracket) visitors.onBracket(bracket)
+  }
+  if (!isError) return
+
+  visitors.onError({
+    startIndex,
+    endIndex: cursor.endIndex,
+    isMissing,
+    message: type,
+  })
 }
-
-const collectCursorBracket = (
-  cursor: TreeCursor,
-  bracketStack: { char: string; index: number }[],
-): BracketInfo | null => collectBracketInfo(cursor.nodeType, cursor.startIndex, bracketStack)
 
 const collectBracket = (
   node: Node,
@@ -2833,18 +2842,6 @@ const collectBracketInfo = (
   const last = bracketStack[bracketStack.length - 1]
   if (last && BRACKET_PAIRS[last.char] === type) bracketStack.pop()
   return { index: startIndex, char: type, depth }
-}
-
-const collectCursorError = (cursor: TreeCursor): TreeSitterError | null => {
-  const isError = cursor.nodeType === 'ERROR'
-  if (!isError && !cursor.nodeIsMissing) return null
-
-  return {
-    startIndex: cursor.startIndex,
-    endIndex: cursor.endIndex,
-    isMissing: cursor.nodeIsMissing,
-    message: cursor.nodeType,
-  }
 }
 
 const collectError = (node: Node): TreeSitterError | null => {

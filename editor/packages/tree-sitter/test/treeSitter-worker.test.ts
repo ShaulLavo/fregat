@@ -129,6 +129,47 @@ describe('tree-sitter worker internals', () => {
     expect(collectError(node('identifier', 0, 10))).toBeNull()
   })
 
+  it.each([
+    ['identifier', false, false],
+    ['(', false, true],
+    [')', false, true],
+    ['ERROR', false, true],
+    ['identifier', true, true],
+  ] as const)(
+    'reads cursor diagnostics once and delays offsets for %s',
+    (type, missing, needsStart) => {
+      const reads = { type: 0, isMissing: 0, startIndex: 0, endIndex: 0 }
+      const root = node(type, 4, 9, { isMissing: missing })
+      for (const [field, value] of Object.entries({
+        type,
+        isMissing: missing,
+        startIndex: 4,
+        endIndex: 9,
+      })) {
+        Object.defineProperty(root, field, {
+          get: () => {
+            reads[field as keyof typeof reads]++
+            return value
+          },
+        })
+      }
+      const result = collectTreeData(fakeTree(root))
+      const isError = type === 'ERROR' || missing
+      expect(result.errors).toEqual(
+        isError ? [{ startIndex: 4, endIndex: 9, isMissing: missing, message: type }] : [],
+      )
+      expect(result.brackets).toEqual(
+        type === '(' || type === ')' ? [{ index: 4, char: type, depth: 1 }] : [],
+      )
+      expect(reads).toEqual({
+        type: 1,
+        isMissing: 1,
+        startIndex: needsStart ? 1 : 0,
+        endIndex: isError ? 1 : 0,
+      })
+    },
+  )
+
   it('walks deeply nested trees without recursive stack overflow', () => {
     const root = nestedNode(12_000)
 
