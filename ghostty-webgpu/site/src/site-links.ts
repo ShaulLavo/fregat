@@ -51,19 +51,36 @@ export const docsIndex: readonly { readonly title: string; readonly links: reado
     },
   ]
 
+const plan = (file: string) => `https://github.com/ShaulLavo/fregat/blob/main/plans/${file}.md`
+
 export const roadmap: readonly {
-  readonly state: 'done' | 'progress' | 'planned'
+  readonly state: 'done' | 'progress'
   readonly text: string
+  readonly plan: string
 }[] = [
-  { state: 'progress', text: 'WebGL line scroll and Unicode cost, the two WebGL losses above.' },
-  { state: 'progress', text: 'DOM typing-like edit cost.' },
-  { state: 'planned', text: 'Search in scrollback, with decorations for highlights.' },
   {
-    state: 'planned',
-    text: 'Progress, working-directory and notification events. Ghostty already parses them.',
+    state: 'progress',
+    text: 'WebGL line scroll and Unicode cost, the two WebGL losses above.',
+    plan: plan('283-ghostty-output-and-input-latency'),
+  },
+  {
+    state: 'progress',
+    text: 'DOM typing-like edit cost.',
+    plan: plan('283-ghostty-output-and-input-latency'),
+  },
+  {
+    state: 'progress',
+    text: 'Worker mode: the whole terminal on an OffscreenCanvas, with every renderer.',
+    plan: plan('287-ghostty-worker-mode'),
+  },
+  {
+    state: 'progress',
+    text: 'Extensions: the addons xterm.js users expect, on a public API, starting with a line editor.',
+    plan: plan('286-ghostty-extensions'),
   },
   {
     state: 'done',
-    text: "Worker entry, first frame rendered into the page's HTML, shared GPU device across terminals.",
+    text: "First frame rendered into the page's HTML, with the live renderer taking over in place.",
+    plan: plan('285-ghostty-site-first-frame-and-real-shell'),
   },
 ]

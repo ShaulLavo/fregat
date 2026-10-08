@@ -13,7 +13,7 @@ const firstFrame = await firstGhostFrame()
 
 const version = __SITE_VERSION__
 const base = import.meta.env.BASE_URL
-const roadmapLabels = { done: 'Done', progress: 'In progress', planned: 'Planned' } as const
+const roadmapLabels = { done: 'Done', progress: 'In progress' } as const
 ---
 
 <!doctype html>
@@ -148,7 +148,7 @@ socket.<span class="tk-f">addEventListener</span><span class="tk-p">(</span><spa
         <h2 id="preview-heading">Roadmap</h2>
         <table class="roadmap">
           <tbody>{roadmap.map((item) => (
-            <tr><td class={`st-${item.state}`}>{roadmapLabels[item.state]}</td><td>{item.text}</td></tr>
+            <tr><td class={`st-${item.state}`}>{roadmapLabels[item.state]}</td><td><a class="roadmap-link" href={item.plan}>{item.text}</a></td></tr>
           ))}</tbody>
         </table>
       </section>

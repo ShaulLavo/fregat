@@ -466,16 +466,20 @@
   font-size: 12px;
 }
 
+.roadmap-link {
+  text-decoration-color: var(--fog-deep);
+}
+
+.roadmap-link:hover {
+  text-decoration-color: currentColor;
+}
+
 .st-done {
-  color: #2f7d5b;
+  color: #24684b;
 }
 
 .st-progress {
-  color: #9a6a12;
-}
-
-.st-planned {
-  color: var(--dusk);
+  color: #7f560c;
 }
 
 .footer-links {
@@ -486,6 +490,11 @@
 }
 
 @media (prefers-color-scheme: dark) {
+  /* Low specificity keeps the terminal tabs' own focus color. */
+  :where(:root:not([data-theme='light'])) :focus-visible {
+    outline-color: var(--pale);
+  }
+
   :root:not([data-theme='light']) .used-in a,
   :root:not([data-theme='light']) .bench-head h2,
   :root:not([data-theme='light']) .bench-title h3,

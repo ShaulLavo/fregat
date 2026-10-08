@@ -58,8 +58,9 @@ const workloads: Readonly<Record<string, string>> = {
   'interactive-edits': 'Typing-like edits',
 }
 
+const boundedRows = /\(([\d,]+) rows\)/.exec(snapshot.conditions.history['equal ~9k'])![1]
 const histories: Readonly<Record<string, string>> = {
-  'equal ~9k': '8,841 final rows',
+  'equal ~9k': `${boundedRows} final rows`,
   'full-stream': 'Full stream',
   'equal 889/0': 'Equal by construction',
 }
