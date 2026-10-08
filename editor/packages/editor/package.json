@@ -118,6 +118,7 @@
     "bench:fold-map": "bun bench/foldMap.ts",
     "bench:piece-table": "bun bench/pieceTable-insertions.ts",
     "bench:virtualization": "bun bench/virtualization.ts",
+    "test:reading": "node test/reading-order.proof.mjs",
     "bench:walker": "bun bench/pieceTable-walker.ts",
     "bench:tokens": "bun bench/tokenStore.ts",
     "bench:edit-commands": "EDIT_COMMAND_LATENCY=1 vitest run --project dom test/editCommandLatency.test.ts",
@@ -148,6 +149,7 @@
     "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#f7263d7f7b1593270b348f007c80eddb3916c761",
     "typescript": "7.0.2",
     "typescript-api": "npm:typescript@6.0.3",
+    "vite": "8.3.1",
     "vitest": "5.0.2"
   }
 }
