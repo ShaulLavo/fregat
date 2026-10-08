@@ -40,6 +40,7 @@ function deferred<T>() {
 async function harness(
   adapt?: (session: TerminalSession<Event>, getProjection: () => LinkProjection) => DomLinkSession,
   cursor = '',
+  priority = '',
 ) {
   const session = await TerminalSession.create<Event>({
     runtime: { kind: 'borrowed', runtime },
@@ -58,7 +59,7 @@ async function harness(
   canvas.width = 300
   canvas.height = 40
   canvas.style.cssText = 'display:block;width:300px;height:40px'
-  canvas.style.cursor = cursor
+  canvas.style.setProperty('cursor', cursor, priority)
   root.append(canvas)
   document.body.append(root)
   cleanups.push(() => root.remove())
@@ -112,13 +113,23 @@ async function harness(
 function observeCursorWrites(canvas: HTMLCanvasElement) {
   const style = canvas.style
   const original = Object.getOwnPropertyDescriptor(style, 'cursor')
-  const writes = vi.fn((value: string) => style.setProperty('cursor', value))
+  const setProperty = style.setProperty.bind(style)
+  const writes = vi.fn((value: string | null, priority: string) =>
+    setProperty('cursor', value, priority),
+  )
+  const properties = vi
+    .spyOn(style, 'setProperty')
+    .mockImplementation((property, value, priority) => {
+      if (property === 'cursor') return writes(value, priority ?? '')
+      setProperty(property, value, priority)
+    })
   Object.defineProperty(style, 'cursor', {
     configurable: true,
     get: () => style.getPropertyValue('cursor'),
-    set: writes,
+    set: (value: string) => writes(value, ''),
   })
   cleanups.push(() => {
+    properties.mockRestore()
     if (original) Object.defineProperty(style, 'cursor', original)
     else Reflect.deleteProperty(style, 'cursor')
   })
@@ -171,10 +182,15 @@ describe('link cursor writes', () => {
     expect(writes).not.toHaveBeenCalled()
   })
 
-  it.each(['', 'text', 'pointer'])(
-    'writes only changed cursor values on hover and leave with initial cursor %j',
-    async (cursor) => {
-      const view = await harness(undefined, cursor)
+  it.each([
+    { cursor: '', priority: '' },
+    { cursor: 'text', priority: '' },
+    { cursor: 'pointer', priority: '' },
+    { cursor: 'pointer', priority: 'important' },
+  ])(
+    'writes only changed declarations on hover and leave with $cursor $priority',
+    async ({ cursor, priority }) => {
+      const view = await harness(undefined, cursor, priority)
       view.session.registerLinkProvider({
         provideLinks: () => [{ range: { start: 0, end: 9 }, activate: () => {} }],
       })
@@ -190,9 +206,97 @@ describe('link cursor writes', () => {
       expect(view.canvas.style.cursor).toBe(cursor)
       view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
       view.controller.invalidate()
-      expect(writes.mock.calls.map(([value]) => value)).toEqual(
-        cursor === 'pointer' ? [] : ['pointer', cursor, 'pointer', cursor],
+      expect(view.canvas.style.getPropertyPriority('cursor')).toBe(priority)
+      const expected = [
+        ['pointer', 'important'],
+        [cursor, priority],
+        ['pointer', 'important'],
+        [cursor, priority],
+      ]
+      expect(writes.mock.calls).toEqual(
+        cursor === 'pointer' && priority === 'important' ? [] : expected,
       )
+    },
+  )
+
+  it('restores the host cursor set while idle after controller construction', async () => {
+    const view = await harness(undefined, 'text')
+    view.session.registerLinkProvider({
+      provideLinks: () => [{ range: { start: 0, end: 9 }, activate: () => {} }],
+    })
+    view.canvas.style.cursor = 'crosshair'
+    view.move()
+    await expect.poll(() => view.controller.currentHit !== undefined).toBe(true)
+    expect(view.canvas.style.cursor).toBe('pointer')
+    view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
+    expect(view.canvas.style.cursor).toBe('crosshair')
+  })
+
+  it.each(['leave', 'invalidate', 'dispose'] as const)(
+    'preserves a host cursor takeover during hover on %s',
+    async (change) => {
+      const view = await harness(undefined, 'text')
+      view.session.registerLinkProvider({
+        provideLinks: () => [{ range: { start: 0, end: 9 }, activate: () => {} }],
+      })
+      view.move()
+      await expect.poll(() => view.controller.currentHit !== undefined).toBe(true)
+      const writes = observeCursorWrites(view.canvas)
+      view.canvas.style.setProperty('cursor', 'wait', 'important')
+      writes.mockClear()
+      if (change === 'leave') view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
+      if (change === 'invalidate') view.controller.invalidate()
+      if (change === 'dispose') view.controller.dispose()
+      expect(view.controller.currentHit).toBeUndefined()
+      expect(view.root.querySelector('[role="link"]')).toBeNull()
+      expect(view.canvas.style.cursor).toBe('wait')
+      expect(view.canvas.style.getPropertyPriority('cursor')).toBe('important')
+      expect(writes).not.toHaveBeenCalled()
+    },
+  )
+
+  it('preserves a host priority-only cursor takeover during hover', async () => {
+    const view = await harness(undefined, 'text')
+    view.session.registerLinkProvider({
+      provideLinks: () => [{ range: { start: 0, end: 9 }, activate: () => {} }],
+    })
+    view.move()
+    await expect.poll(() => view.controller.currentHit !== undefined).toBe(true)
+    const writes = observeCursorWrites(view.canvas)
+    view.canvas.style.setProperty('cursor', 'pointer')
+    writes.mockClear()
+    view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
+    expect(view.canvas.style.cursor).toBe('pointer')
+    expect(view.canvas.style.getPropertyPriority('cursor')).toBe('')
+    expect(writes).not.toHaveBeenCalled()
+  })
+
+  it.each(['', 'important'])(
+    'shows pointer above author styles and restores the inline cursor priority %j',
+    async (priority) => {
+      const view = await harness(undefined, 'text', priority)
+      const stylesheet = document.createElement('style')
+      stylesheet.textContent = '.ghostty-link-priority-test { cursor: crosshair !important }'
+      view.canvas.classList.add('ghostty-link-priority-test')
+      view.root.append(stylesheet)
+      const before = getComputedStyle(view.canvas).cursor
+      view.session.registerLinkProvider({
+        provideLinks: () => [{ range: { start: 0, end: 9 }, activate: () => {} }],
+      })
+      const writes = observeCursorWrites(view.canvas)
+      view.move()
+      await expect.poll(() => view.controller.currentHit !== undefined).toBe(true)
+      expect(view.canvas.style.cursor).toBe('pointer')
+      expect(view.canvas.style.getPropertyPriority('cursor')).toBe('important')
+      expect(getComputedStyle(view.canvas).cursor).toBe('pointer')
+      view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
+      expect(view.canvas.style.cursor).toBe('text')
+      expect(view.canvas.style.getPropertyPriority('cursor')).toBe(priority)
+      expect(getComputedStyle(view.canvas).cursor).toBe(before)
+      expect(writes.mock.calls).toEqual([
+        ['pointer', 'important'],
+        ['text', priority],
+      ])
     },
   )
 
@@ -214,8 +318,8 @@ describe('link cursor writes', () => {
     view.canvas.style.cursor = 'wait'
     writes.mockClear()
     view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
-    expect(view.canvas.style.cursor).toBe('text')
-    expect(writes.mock.calls).toEqual([['text']])
+    expect(view.canvas.style.cursor).toBe('wait')
+    expect(writes).not.toHaveBeenCalled()
   })
 
   it('keeps hover and modifier-key activation after a host cursor change', async () => {
@@ -244,7 +348,7 @@ describe('link cursor writes', () => {
     })
     await expect.poll(() => activations).toBe(1)
     view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
-    expect(view.canvas.style.cursor).toBe('text')
+    expect(view.canvas.style.cursor).toBe('crosshair')
   })
 })
 

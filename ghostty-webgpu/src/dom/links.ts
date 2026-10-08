@@ -49,6 +49,11 @@ interface PointerPoint {
   readonly clientY: number
 }
 
+interface CursorDeclaration {
+  readonly priority: string
+  readonly value: string
+}
+
 interface LinkScope {
   readonly generation: number
   readonly projection: LinkProjection | undefined
@@ -193,11 +198,11 @@ class BrowserLinkController implements DomLinkController {
   private frameSnapshot?: RendererTextFrameSnapshot
   private frameProjection?: LinkProjection
   private generation = 0
-  private readonly initialCursor: string
   private lastPoint?: PointerPoint
   private lastQuery?: LinkQuery
   private readonly overlay: HTMLDivElement
   private pendingGeneration?: number
+  private replacedCursor?: CursorDeclaration
   private readonly view: Window
 
   constructor(private readonly options: DomLinkControllerOptions) {
@@ -207,7 +212,6 @@ class BrowserLinkController implements DomLinkController {
       throw new TypeError('root and canvas must belong to the same document')
     }
     this.view = view
-    this.initialCursor = options.canvas.style.cursor
     this.overlay = options.canvas.ownerDocument.createElement('div')
     this.overlay.className = 'ghostty-webgpu-link'
     this.overlay.setAttribute('role', 'link')
@@ -516,8 +520,15 @@ class BrowserLinkController implements DomLinkController {
     this.currentScope = undefined
     if (!changed) return
     this.overlay.remove()
-    if (this.options.canvas.style.cursor !== this.initialCursor) {
-      this.options.canvas.style.cursor = this.initialCursor
+    const cursor = this.replacedCursor
+    this.replacedCursor = undefined
+    const style = this.options.canvas.style
+    if (
+      cursor &&
+      style.getPropertyValue('cursor') === 'pointer' &&
+      style.getPropertyPriority('cursor') === 'important'
+    ) {
+      style.setProperty('cursor', cursor.value, cursor.priority)
     }
     this.options.onHitChange?.(undefined)
   }
@@ -674,8 +685,13 @@ class BrowserLinkController implements DomLinkController {
     this.currentResolution = resolution
     this.currentScope = scope
     this.positionOverlay(hit, layout)
-    if (this.options.canvas.style.cursor !== 'pointer') {
-      this.options.canvas.style.cursor = 'pointer'
+    const style = this.options.canvas.style
+    const value = style.getPropertyValue('cursor')
+    const priority = style.getPropertyPriority('cursor')
+    if (value !== 'pointer' || priority !== 'important') {
+      this.replacedCursor = { value, priority }
+      // Link hover must remain visible above important author cursor rules.
+      style.setProperty('cursor', 'pointer', 'important')
     }
     this.options.onHitChange?.(hit)
   }
