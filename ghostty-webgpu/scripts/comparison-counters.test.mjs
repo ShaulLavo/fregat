@@ -113,13 +113,13 @@ test('counter regression, absent fields and invalid decimal input are explicit f
 test('P-core time may exceed total time only by nanosecond tick rounding', () => {
   const rounded = delta(
     macSnapshot(),
-    macSnapshot({ ri_user_time: '1000366624', ri_user_ptime: '1000366626' }),
+    macSnapshot({ ri_user_time: '1000366624', ri_user_ptime: '1000366627' }),
   )
   assert.notEqual(rounded.status, 'incomplete')
-  assert.equal(rounded.channels.allChrome.pCoreSeconds, 0.000366626)
+  assert.equal(rounded.channels.allChrome.pCoreSeconds, 0.000366627)
   const excess = delta(
     macSnapshot(),
-    macSnapshot({ ri_user_time: '1000366624', ri_user_ptime: '1000366629' }),
+    macSnapshot({ ri_user_time: '1000366624', ri_user_ptime: '1000366628' }),
   )
   assert.equal(excess.status, 'incomplete')
 })
