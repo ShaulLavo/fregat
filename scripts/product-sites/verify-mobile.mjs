@@ -16,6 +16,8 @@ const base = option('--base', '/')
 const workers = Number(option('--workers', '3'))
 const limit = Number(option('--limit', 'Infinity'))
 const offset = Number(option('--offset', '0'))
+const shards = Number(option('--shards', '1'))
+const shard = Number(option('--shard', '0'))
 const readySelector = option('--ready-selector')
 const screenshots = args.includes('--screenshots')
 const engines = option('--engines', 'chromium,webkit').split(',')
@@ -23,6 +25,11 @@ assert(widths.every((width) => Number.isInteger(width) && width > 0))
 assert(Number.isInteger(workers) && workers > 0, 'Workers must be a positive integer')
 assert(limit === Infinity || (Number.isInteger(limit) && limit > 0), 'Limit must be positive')
 assert(Number.isInteger(offset) && offset >= 0, 'Offset must be a nonnegative integer')
+assert(Number.isInteger(shards) && shards > 0, 'Shards must be positive')
+assert(
+  Number.isInteger(shard) && shard >= 0 && shard < shards,
+  'Shard must be within the shard count',
+)
 assert(
   engines.every((engine) => ['chromium', 'webkit'].includes(engine)),
   'Unknown browser engine',
@@ -95,7 +102,10 @@ if (directory) {
     ...(await Promise.all(sitemaps.map((path) => sitemapPages(new URL(path, origin).href)))).flat(),
   ]
 }
-urls = [...new Set(urls)].sort().slice(offset, offset + limit)
+urls = [...new Set(urls)]
+  .sort()
+  .filter((_, index) => index % shards === shard)
+  .slice(offset, offset + limit)
 assert(urls.length > 0, 'No HTML pages selected')
 let failed = 0
 let checked = 0
@@ -235,18 +245,20 @@ async function checkInspector(page, engine, url) {
 }
 
 async function checkWorker(browser, engine, nextUrl) {
-  const context = await browser.newContext({
-    isMobile: true,
-    hasTouch: true,
-    deviceScaleFactor: 2,
-    viewport: { width: widths[0], height: 844 },
-    reducedMotion: 'reduce',
-  })
-  const page = await context.newPage()
-  try {
-    for (let url = nextUrl(); url; url = nextUrl()) await checkPage(page, engine, url)
-  } finally {
-    await context.close()
+  for (let url = nextUrl(); url; url = nextUrl()) {
+    const context = await browser.newContext({
+      isMobile: true,
+      hasTouch: true,
+      deviceScaleFactor: 2,
+      viewport: { width: widths[0], height: 844 },
+      reducedMotion: 'reduce',
+    })
+    try {
+      const page = await context.newPage()
+      await checkPage(page, engine, url)
+    } finally {
+      await context.close()
+    }
   }
 }
 

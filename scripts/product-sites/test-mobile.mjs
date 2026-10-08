@@ -84,7 +84,47 @@ try {
     assert.equal(row.scrollWidth, 600, 'The check must catch page overflow')
     assert(row.overflowing.some((element) => element.tag === 'DIV' && element.right === 600))
   }
+  const shardRows = []
+  for (const shard of ['0', '1']) {
+    const directory = join(root, `shard-${shard}`)
+    const selected = spawnSync(
+      process.execPath,
+      [
+        script,
+        '--directory',
+        root,
+        '--engines',
+        'chromium',
+        '--shards',
+        '2',
+        '--shard',
+        shard,
+        '--evidence',
+        directory,
+      ],
+      { encoding: 'utf8' },
+    )
+    assert.equal(selected.status, 1, selected.stdout + selected.stderr)
+    shardRows.push(
+      ...(await readFile(join(directory, 'results.jsonl'), 'utf8'))
+        .trim()
+        .split('\n')
+        .map(JSON.parse),
+    )
+  }
+  const key = (row) =>
+    `${new URL(row.url).pathname}/${row.engine}/${row.requestedWidth}/${row.state}`
+  assert.deepEqual(
+    shardRows.map(key).sort(),
+    rows
+      .filter((row) => row.engine === 'chromium')
+      .map(key)
+      .sort(),
+    'Disjoint shards must cover every page exactly once',
+  )
   for (const invalid of [
+    ['--shards', '0'],
+    ['--shards', '2', '--shard', '2'],
     ['--workers', '0'],
     ['--limit', '0'],
     ['--engines', 'firefox'],
@@ -96,7 +136,7 @@ try {
     assert.equal(rejected.status, 1, rejected.stdout + rejected.stderr)
     assert.match(rejected.stderr, /AssertionError/, 'Invalid selections must fail before checking')
   }
-  console.log('Mobile checker fixtures: 30 checks passed; 4 invalid selections rejected')
+  console.log('Mobile checker fixtures: 45 checks passed; 6 invalid selections rejected')
 } finally {
   await rm(root, { recursive: true, force: true })
 }

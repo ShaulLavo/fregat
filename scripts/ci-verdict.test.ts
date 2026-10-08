@@ -65,8 +65,10 @@ function fixture() {
     'Test (tui)',
     'Browser tests',
     'Site build',
-    'Mobile layout (chromium)',
-    'Mobile layout (webkit)',
+    'Mobile layout (chromium-0)',
+    'Mobile layout (chromium-1)',
+    'Mobile layout (webkit-0)',
+    'Mobile layout (webkit-1)',
     'Libraries / Editor tests',
     'Libraries / Ghostty tests',
     'Libraries / Standalone packages',
@@ -169,8 +171,10 @@ test.each([
   'Test (web 3/4)',
   'Libraries / Ghostty tests',
   'Browser tests',
-  'Mobile layout (chromium)',
-  'Mobile layout (webkit)',
+  'Mobile layout (chromium-0)',
+  'Mobile layout (chromium-1)',
+  'Mobile layout (webkit-0)',
+  'Mobile layout (webkit-1)',
 ])('missing required execution %s rejects a successful parent', (name) => {
   const value = fixture()
   const jobs = value.jobs.filter((job) => job.name !== name)
@@ -202,9 +206,14 @@ test('docs-only selection requires mobile layout and permits skipped or absent d
   value.needs.changes = value.changes
   const jobs = value.jobs
     .filter((job) =>
-      ['Changes', 'Docs format', 'Mobile layout (chromium)', 'Mobile layout (webkit)'].includes(
-        job.name,
-      ),
+      [
+        'Changes',
+        'Docs format',
+        'Mobile layout (chromium-0)',
+        'Mobile layout (chromium-1)',
+        'Mobile layout (webkit-0)',
+        'Mobile layout (webkit-1)',
+      ].includes(job.name),
     )
     .map((job) => ({ ...job, conclusion: 'success', runner_id: 1 }))
   expect(value.evaluate(jobs)).toEqual({
@@ -223,7 +232,13 @@ test('non-site code selection permits a skipped mobile layout job', () => {
   value.needs['mobile-layout'] = { result: 'skipped' }
   const jobs = value.jobs.filter(
     (job) =>
-      !['Mobile layout (chromium)', 'Mobile layout (webkit)', 'Site build'].includes(job.name),
+      ![
+        'Mobile layout (chromium-0)',
+        'Mobile layout (chromium-1)',
+        'Mobile layout (webkit-0)',
+        'Mobile layout (webkit-1)',
+        'Site build',
+      ].includes(job.name),
   )
   expect(value.evaluate(jobs)).toEqual({ passed: true, issues: [] })
 })

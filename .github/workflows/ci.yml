@@ -463,11 +463,11 @@ jobs:
         run: bun run --cwd ghostty-webgpu/site build --base /${{ github.event.repository.name }}/ghostty-webgpu/
 
   mobile-layout:
-    name: Mobile layout (${{ matrix.engine }})
+    name: Mobile layout (${{ matrix.shard }})
     strategy:
       fail-fast: false
       matrix:
-        engine: [chromium, webkit]
+        shard: [chromium-0, chromium-1, webkit-0, webkit-1]
     needs: changes
     if: ${{ needs.changes.outputs.site == 'true' || needs.changes.outputs.docs == 'true' }}
     runs-on: ubuntu-latest
@@ -500,13 +500,16 @@ jobs:
         run: bun scripts/product-sites/test-mobile.mjs
 
       - name: Check every built page on mobile
-        run: bun scripts/product-sites/verify-mobile.mjs --directory "$RUNNER_TEMP/product-sites" --evidence "$RUNNER_TEMP/mobile-layout" --engines "${{ matrix.engine }}"
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          bun scripts/product-sites/verify-mobile.mjs --directory "$RUNNER_TEMP/product-sites" --evidence "$RUNNER_TEMP/mobile-layout" --engines "${SHARD%-*}" --shards 2 --shard "${SHARD##*-}"
 
       - name: Upload mobile layout evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mobile-layout-${{ matrix.engine }}
+          name: mobile-layout-${{ matrix.shard }}
           path: ${{ runner.temp }}/mobile-layout
           if-no-files-found: ignore
           retention-days: 7
