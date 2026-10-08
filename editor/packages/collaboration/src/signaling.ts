@@ -33,7 +33,7 @@ export class WebSocketSignaling implements SignalingClient {
   start(receive: (packet: unknown) => void, ready: () => void): void {
     if (this.closed || this.callbacks) throw new TypeError('Signaling client can be started once')
     this.callbacks = { receive, ready }
-    for (const url of this.options.urls) this.connect(url)
+    for (const url of new Set(this.options.urls)) this.connect(url)
   }
 
   publish(packet: SealedPacket): void {

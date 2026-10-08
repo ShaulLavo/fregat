@@ -220,8 +220,10 @@ Signaling and BroadcastChannel use AES-256-GCM with fresh 96-bit random IVs.
 PBKDF2/SHA-256 derives the room key with 100,000 iterations and the opaque room
 ID as salt. Authenticated associated data binds version, room, peer-session ID,
 connection generation, sequence and timestamp. Packets expire after 60 seconds;
-peers need clocks within that allowance. Replay IDs stay bounded at 16,384
-unexpired entries and excess packets are refused. Signaling brokers see room IDs,
+peers need clocks within that allowance. Each peer/generation has a 4,096-sequence
+sliding replay window. At most 1,024 recently active windows are retained, with
+expired windows pruned. Fresh packets keep flowing as the window advances;
+duplicates and older sequences are refused. Signaling brokers see room IDs,
 traffic sizes and ciphertext. WebRTC document traffic uses endpoint-to-endpoint
 DTLS. Room members sharing the secret are trusted and can impersonate each other.
 This is not an account or Byzantine-consensus system.

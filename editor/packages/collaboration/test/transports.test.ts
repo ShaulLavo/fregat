@@ -1,8 +1,36 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { frameMessage, FrameReceiver, MESSAGE_LIMIT, sendFrames } from '../src/framing'
 import { createRoomInvitation, RoomCrypto } from '../src/room-crypto'
+import { WebSocketSignaling } from '../src/signaling'
 
 const encoder = new TextEncoder()
+
+test('signaling opens one socket per distinct configured URL', () => {
+  const urls: string[] = []
+  vi.stubGlobal(
+    'WebSocket',
+    class Socket {
+      constructor(url: string) {
+        urls.push(url)
+      }
+      close() {}
+    },
+  )
+  const signaling = new WebSocketSignaling({
+    urls: ['ws://localhost:12345', 'ws://localhost:12345'],
+    room: crypto.randomUUID(),
+    credentials: { protocols: [] },
+    reconnectInterval: 100,
+    onError: vi.fn(),
+  })
+  try {
+    signaling.start(vi.fn(), vi.fn())
+    expect(urls).toEqual(['ws://localhost:12345'])
+  } finally {
+    signaling.close()
+    vi.unstubAllGlobals()
+  }
+})
 
 describe('ordered binary framing', () => {
   test.each([256, 16_384, 65_536, 0])('round trips within negotiated maximum %s', async (limit) => {
@@ -23,6 +51,7 @@ describe('ordered binary framing', () => {
     )
     await expect(frameMessage(encoder.encode('x'), 68)).rejects.toThrow(RangeError)
     await expect(frameMessage(encoder.encode('x'), NaN)).rejects.toThrow(RangeError)
+    await expect(frameMessage(new Uint8Array(65_537), 69)).rejects.toThrow('chunk count')
   })
 
   test('rejects corruption, reordering and inconsistent bounds', async () => {
@@ -66,6 +95,19 @@ describe('ordered binary framing', () => {
     const blocked = sendFrames(channel, frames, abort.signal)
     abort.abort()
     await expect(blocked).rejects.toThrow('backpressure')
+    for (const event of ['close', 'error']) {
+      const stopped = new Channel()
+      const waiting = sendFrames(stopped, frames, new AbortController().signal)
+      stopped.readyState = 'closed'
+      stopped.dispatchEvent(new Event(event))
+      await expect(waiting).rejects.toThrow('backpressure')
+    }
+    const stopped = new Channel()
+    const waiting = sendFrames(stopped, frames, new AbortController().signal)
+    stopped.readyState = 'closed'
+    stopped.bufferedAmount = 0
+    stopped.dispatchEvent(new Event('bufferedamountlow'))
+    await expect(waiting).rejects.toThrow('closed')
   })
 })
 
@@ -89,6 +131,36 @@ describe('authenticated room packets', () => {
     expect(await receiver.open(packet)).toBeUndefined()
     expect(await sender.open(packet)).toBeUndefined()
   })
+
+  test('accepts reordered packets and independent connection generations', async () => {
+    const { room, secret } = createRoomInvitation()
+    const sender = await RoomCrypto.create(room, 'a', secret)
+    const receiver = await RoomCrypto.create(room, 'b', secret)
+    const packets = await Promise.all([0, 1, 2].map((value) => sender.seal('g', value)))
+    for (const index of [2, 0, 1])
+      expect((await receiver.open(packets[index]!))?.payload).toBe(index)
+    expect(await receiver.open(packets[0]!)).toBeUndefined()
+    const restartedAdapter = await RoomCrypto.create(room, 'a', secret)
+    const independent = await restartedAdapter.seal('another-generation', 'independent')
+    expect((await receiver.open(independent))?.payload).toBe('independent')
+  })
+
+  test('keeps accepting fresh packets after a busy room fills its replay window', async () => {
+    const { room, secret } = createRoomInvitation()
+    const sender = await RoomCrypto.create(room, 'a', secret)
+    const receiver = await RoomCrypto.create(room, 'b', secret)
+    const first = await sender.seal('generation', 'first')
+    expect(await receiver.open(first)).toBeDefined()
+    for (let index = 0; index < 16_400; index++) {
+      const packet = await sender.seal('generation', index)
+      expect((await receiver.open(packet))?.payload).toBe(index)
+    }
+    expect(await receiver.open(first)).toBeUndefined()
+    for (let index = 0; index < 4096; index++) await sender.seal('generation', index)
+    const afterGap = await sender.seal('generation', 'after-gap')
+    expect((await receiver.open(afterGap))?.payload).toBe('after-gap')
+    expect(await receiver.open(first)).toBeUndefined()
+  }, 30_000)
 
   test('rejects wrong secrets, corrupt ciphertext and malformed inputs', async () => {
     const { room, secret } = createRoomInvitation()

@@ -14,6 +14,13 @@ export interface SealedPacket {
 const encoder = new TextEncoder()
 const decoder = new TextDecoder('utf-8', { fatal: true })
 const PACKET_LIFETIME = 60_000
+const REPLAY_WINDOW = 4096
+
+type ReplayWindow = {
+  readonly bits: Uint8Array
+  sequence: number
+  sentAt: number
+}
 
 export function createRoomInvitation(): { readonly room: string; readonly secret: string } {
   return { room: crypto.randomUUID(), secret: toBase64(crypto.getRandomValues(new Uint8Array(32))) }
@@ -21,7 +28,7 @@ export function createRoomInvitation(): { readonly room: string; readonly secret
 
 export class RoomCrypto {
   private sequence = 0
-  private readonly seen = new Map<string, number>()
+  private readonly seen = new Map<string, ReplayWindow>()
   private constructor(
     readonly room: string,
     readonly peer: string,
@@ -75,9 +82,9 @@ export class RoomCrypto {
       Math.abs(Date.now() - input.sentAt) > PACKET_LIFETIME
     )
       return undefined
-    const replay = JSON.stringify([input.sender, input.generation, input.sequence])
+    const replay = JSON.stringify([input.sender, input.generation])
     this.prune()
-    if (this.seen.has(replay)) return undefined
+    if (replayed(this.seen.get(replay), input.sequence)) return undefined
     try {
       const iv = fromBase64(input.iv)
       if (iv.length !== 12) return undefined
@@ -88,19 +95,51 @@ export class RoomCrypto {
       )
       const payload: unknown = JSON.parse(decoder.decode(bytes))
       // Decryption can overlap across adapters; check again after the asynchronous boundary.
-      if (this.seen.has(replay)) return undefined
-      if (this.seen.size >= 16_384) return undefined
-      this.seen.set(replay, input.sentAt)
+      if (
+        Math.abs(Date.now() - input.sentAt) > PACKET_LIFETIME ||
+        !this.remember(replay, input.sequence, input.sentAt)
+      )
+        return undefined
       return { packet: input, payload }
     } catch {
       return undefined
     }
   }
 
+  private remember(key: string, sequence: number, sentAt: number): boolean {
+    const previous = this.seen.get(key)
+    if (replayed(previous, sequence) || (!previous && this.seen.size >= 1024)) return false
+    const window = previous ?? {
+      bits: new Uint8Array(REPLAY_WINDOW / 8),
+      sequence,
+      sentAt,
+    }
+    const start = Math.max(window.sequence + 1, sequence - REPLAY_WINDOW + 1)
+    for (let id = start; id <= sequence; id++) {
+      const position = id % REPLAY_WINDOW
+      window.bits[position >>> 3]! &= ~(1 << (position & 7))
+    }
+    const position = sequence % REPLAY_WINDOW
+    window.bits[position >>> 3]! |= 1 << (position & 7)
+    window.sequence = Math.max(window.sequence, sequence)
+    window.sentAt = Math.max(window.sentAt, sentAt)
+    this.seen.set(key, window)
+    return true
+  }
+
   private prune(): void {
     const threshold = Date.now() - PACKET_LIFETIME
-    for (const [key, time] of this.seen) if (time < threshold) this.seen.delete(key)
+    for (const [key, window] of this.seen) if (window.sentAt < threshold) this.seen.delete(key)
   }
+}
+
+function replayed(window: ReplayWindow | undefined, sequence: number): boolean {
+  if (!window || sequence > window.sequence) return false
+  const position = sequence % REPLAY_WINDOW
+  return (
+    sequence <= window.sequence - REPLAY_WINDOW ||
+    Boolean(window.bits[position >>> 3]! & (1 << (position & 7)))
+  )
 }
 
 function associatedData(
