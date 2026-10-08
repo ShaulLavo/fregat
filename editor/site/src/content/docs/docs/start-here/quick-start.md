@@ -1,46 +1,15 @@
----
-title: Quick start
-description: Install Singapore and mount your first editor.
----
-
-import { Code, Tabs, TabItem } from '@astrojs/starlight/components'
-import source from '../../../../examples/basic.ts?raw'
-import LiveEditor from '../../../../components/LiveEditor.astro'
+# Quick start
 
 Mount an editable text view in a browser application. You need a client-side JavaScript entry point and a bundler that resolves ESM and CSS imports, such as Vite.
 
 ## 1. Install the core
 
-<Tabs>
-  <TabItem label='npm'>
-
 ```sh
 npm install @singapore-editor/core
+# or: pnpm add @singapore-editor/core
+# or: bun add @singapore-editor/core
+# or: yarn add @singapore-editor/core
 ```
-
-  </TabItem>
-  <TabItem label='pnpm'>
-
-```sh
-pnpm add @singapore-editor/core
-```
-
-  </TabItem>
-  <TabItem label='Bun'>
-
-```sh
-bun add @singapore-editor/core
-```
-
-  </TabItem>
-  <TabItem label='Yarn'>
-
-```sh
-yarn add @singapore-editor/core
-```
-
-  </TabItem>
-</Tabs>
 
 ## 2. Give the editor a container
 
@@ -48,13 +17,9 @@ Add an HTML element with the id `editor`. Set `height: 20rem`, `display: flex` a
 
 ## 3. Mount it
 
-Save this as `basic.ts`. The same function mounts the example below.
+Save this as `main.ts`. Retain the editor so you can release it when the view closes.
 
-<Code code={source} lang='ts' title='basic.ts' />
-
-A browser entry point can mount the view directly. Retain the editor so you can release it when the view closes.
-
-```ts title="main.ts"
+```ts
 import { Editor } from '@singapore-editor/core/editor'
 import '@singapore-editor/core/style.css'
 
@@ -66,15 +31,15 @@ window.addEventListener('pagehide', (event) => {
 })
 ```
 
-<LiveEditor />
-
 You should see one line of text and be able to move the caret, select text and type. Undo returns to an earlier edit. Syntax colours need a highlighting plugin.
+
+On a desktop browser this page is itself a Singapore editor with Markdown and TypeScript plugins. Click into the sample above and type.
 
 ## Open a named document
 
 Use a document id when a view needs identity, such as a tab or a language-server URI. Plain `setText` remains useful for unnamed text.
 
-```ts title="document.ts"
+```ts
 import { Editor } from '@singapore-editor/core/editor'
 
 const editor = new Editor(document.querySelector<HTMLElement>('#editor')!)
@@ -93,10 +58,10 @@ Check the container's height, flex layout and the core stylesheet import. Mount 
 
 ### Highlighting is absent
 
-The core edits plain text. Follow the Languages and tree-sitter guide to load a syntax plugin.
+The core edits plain text. Follow the [languages and tree-sitter guide](../guides/languages.mdx) to load a syntax plugin.
 
 ### A server-rendered page fails to load
 
 Create the editor after client-side mount. The core uses browser DOM APIs.
 
-Continue with Documents and sessions, Themes, or the TypeScript playground tutorial in the sidebar.
+Continue with [documents and sessions](../guides/documents.mdx), [themes](../guides/themes.mdx), or the [TypeScript playground](playground.mdx).

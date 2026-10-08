@@ -10,7 +10,8 @@ import { visit } from 'unist-util-visit'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(new URL('../../package.json', import.meta.url))
 const compiler = join(dirname(require.resolve('typescript/package.json')), 'bin/tsc')
-const parser = unified().use(remarkParse).use(remarkMdx)
+const markdown = unified().use(remarkParse)
+const mdx = unified().use(remarkParse).use(remarkMdx)
 const packageMode = process.argv[2] === '--packages'
 const sourceDirectory = packageMode
   ? undefined
@@ -61,6 +62,7 @@ function addExports(
 try {
   const sources = packageMode ? await packagePages() : await pages(sourceDirectory!)
   for (const path of sources) {
+    const parser = path.endsWith('.mdx') ? mdx : markdown
     const tree = parser.parse(await readFile(path, 'utf8'))
     const snippets: { name: string; value: string }[] = []
     visit(tree, 'code', (node) => {
@@ -129,7 +131,7 @@ try {
     files.push(join(root, 'src/env.d.ts'))
     await check('docs', [
       ...files,
-      ...['basic.ts', 'playground.ts', 'react.tsx'].map((file) => join(root, 'src/examples', file)),
+      ...['hero.ts', 'playground.ts', 'react.tsx'].map((file) => join(root, 'src/examples', file)),
     ])
     await check('solid', [join(root, 'src/env.d.ts'), join(root, 'src/examples/solid.tsx')], true)
     console.log(`Checked ${sampleCount} inline samples and 4 example files with TypeScript 7.`)

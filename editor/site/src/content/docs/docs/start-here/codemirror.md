@@ -1,24 +1,21 @@
----
-title: Coming from CodeMirror
-description: Move a CodeMirror integration one feature at a time.
----
+# Coming from CodeMirror
 
 Start with the text view, then add each extension's equivalent. Singapore packages and CodeMirror extensions have different lifecycle and update models.
 
-| CodeMirror 6 concept    | Singapore integration                          |
-| ----------------------- | ---------------------------------------------- |
-| `EditorView`            | `Editor` from `@singapore-editor/core/editor`  |
-| `EditorState.doc`       | Versioned document reads from the piece table  |
-| `dispatch({ changes })` | The editor's `edit` method                     |
-| `extensions`            | `plugins` in editor options, plus core options |
-| Language support        | `tree-sitter` with language contributions      |
-| Theme extension         | `EditorTheme` and the core stylesheet          |
-| Decorations             | Text range decorations or view contributions   |
-| View cleanup            | `dispose()`                                    |
+## Concepts side by side
+
+- `EditorView` becomes `Editor` from `@singapore-editor/core/editor`.
+- `EditorState.doc` becomes versioned document reads from the piece table.
+- `dispatch({ changes })` becomes the editor's `edit` method.
+- `extensions` become `plugins` in editor options, plus core options.
+- Language support comes from `tree-sitter` with language contributions.
+- A theme extension becomes an `EditorTheme` and the core stylesheet.
+- Decorations become text range decorations or view contributions.
+- View cleanup becomes `dispose()`.
 
 ## Mount plain text
 
-```ts title="codemirror-migration.ts"
+```ts
 import { Editor } from '@singapore-editor/core/editor'
 import '@singapore-editor/core/style.css'
 
@@ -41,4 +38,4 @@ Lezer can parse on the main thread. Singapore's tree-sitter package parses in a 
 
 CodeMirror has a large community extension ecosystem and years of production use. Singapore's public API is still moving, and no published editor-level comparison proves a smaller bundle or faster editor. Keep the existing editor available until your application's required features pass integration tests.
 
-Continue with Languages and tree-sitter, Bundling and workers, and Write a plugin in the sidebar.
+Continue with [languages and tree-sitter](../guides/languages.mdx), [bundling and workers](../guides/bundling.mdx) and [writing a plugin](../guides/plugins.mdx).
