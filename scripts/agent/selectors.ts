@@ -1164,6 +1164,19 @@ export const selectors = {
   agentTreeChild: (page: Page, threadId: string) =>
     page.locator(`[data-agent-tree-level="child"] [data-agent-thread-id="${threadId}"]`),
   modelSwitch: (page: Page) => page.locator('[data-model-switch]').first(),
+  chatAlignment: (page: Page) => ({
+    assistant: selectors.chatAssistantMarkdown(page).last(),
+    composer: selectors.chatMessage(page),
+    attachIcon: selectors.chatAttach(page).locator('svg'),
+    workIcon: selectors.completedWorkGroup(page).locator('svg').first(),
+    rowTitle: selectors.sessionRows(page).first().locator('span.truncate').first(),
+    rowContext: selectors.sessionRows(page).first().locator('[data-worktree-id]').first(),
+    stageHeader: page
+      .locator('[data-slot="tool-pane-header"]')
+      .filter({ has: page.getByRole('navigation', { name: 'Session', exact: true }) }),
+    toolHeader: page.locator('[data-chat-mode] [data-workbench-tool-pane-header]'),
+    toolbarIcons: selectors.composerActions(page).locator('button > svg'),
+  }),
   composerActions: (page: Page) => page.locator('[data-composer-actions]'),
   draftContext: (page: Page) => page.getByRole('group', { name: 'Session workspace', exact: true }),
   draftSetup: (page: Page) => page.getByRole('button', { name: /^Session setup: / }),
