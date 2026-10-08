@@ -6,6 +6,17 @@ import type { LeftOrigin } from '../src/index'
 
 const rounds = process.env.COLLAB_STRESS === '1' ? 10_000 : 500
 
+test.each([0, 1, 2])('custom factory mixes engine implementations for seed %s', (seed) => {
+  let instance = 0
+  expect(
+    simulate({
+      seed,
+      participants: 3,
+      createEngine: () => (instance++ % 2 === 0 ? new TextbufferEngine() : new ReferenceEngine()),
+    }),
+  ).toEqual(simulate({ seed, participants: 3 }))
+})
+
 test.each([0, 1, 2])(
   'custom factory converges without an identity projector for seed %s',
   (seed) => {
@@ -67,20 +78,18 @@ test.each(['inventory', 'liveness', 'order'] as const)(
 )
 
 function run(seed: number, participants: number, edits: number, factory: () => TestEngine) {
-  let identity: unknown
+  let host: TestEngine | undefined
   const result = simulate({
-    createEngine: factory,
-    identity: (engine) => {
-      identity = characters(engine as TestEngine)
-        .slice()
-        .sort((a, b) => a.id.bunch.localeCompare(b.id.bunch) || a.id.counter - b.id.counter)
-      return identity
+    createEngine: () => {
+      const engine = factory()
+      host ??= engine
+      return engine
     },
     seed,
     participants,
     edits,
   })
-  return { result, identity }
+  return { result, identity: characters(host!) }
 }
 
 test(`${rounds} seeded rounds converge with three to five participants and match the reference IDs`, () => {

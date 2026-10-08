@@ -135,7 +135,6 @@ test('seeded arrivals and pending replay match reference text and IDs after ever
       participants: 3 + (seed % 3),
       edits: 48,
       createEngine: () => new DifferentialEngine(),
-      identity: (engine) => characters(engine as DifferentialEngine),
     })
     expect(result.hostSequence).toBe(48)
   }
@@ -146,6 +145,9 @@ class DifferentialEngine {
   private readonly buffer = new TextbufferEngine()
   text() {
     return this.buffer.text()
+  }
+  characters() {
+    return this.buffer.characters()
   }
   visibleOffset(id: CharId) {
     return this.buffer.visibleOffset(id)

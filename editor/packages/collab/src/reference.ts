@@ -5,6 +5,7 @@ import { charKey, insertionOf } from './types'
 import type {
   AuthorContext,
   CharId,
+  CharacterIdentity,
   Engine,
   Envelope,
   IdSpan,
@@ -43,6 +44,22 @@ export class ReferenceEngine implements Engine<ReferenceSnapshot> {
       .filter((node) => !node.deleted)
       .map((node) => node.value)
       .join('')
+  }
+
+  characters(): readonly CharacterIdentity[] {
+    let offset = 0
+    return this.ordered()
+      .map((node) => {
+        const id = node.id as CharId
+        const identity = {
+          id: { bunch: id.bunch, counter: id.counter },
+          deleted: node.deleted,
+          offset,
+        }
+        if (!node.deleted) offset++
+        return identity
+      })
+      .sort((a, b) => compareIds(a.id, b.id))
   }
 
   /** Hidden IDs resolve to their retained gap; only unknown IDs return null. */

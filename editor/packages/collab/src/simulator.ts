@@ -2,13 +2,13 @@ import { CollabFailure } from './failure'
 import { Host } from './host'
 import { Participant } from './participant'
 import { ReferenceEngine } from './reference'
+import { compareId } from './run-index'
 import { InMemoryTransport } from './transport'
 import type { Engine, OffsetEdit } from './types'
 
 export type SimulationOptions = {
   readonly seed: number
   readonly createEngine?: () => Engine
-  readonly identity?: (engine: Engine) => unknown
   readonly participants: number
   readonly edits?: number
 }
@@ -73,9 +73,15 @@ export function simulate(options: SimulationOptions): SimulationResult {
         throw new CollabFailure(`convergence-seed-${options.seed}`)
       }
     }
-    const readIdentity = options.identity ?? ((engine: Engine) => engine.snapshot())
-    const identity = JSON.stringify(readIdentity(hostEngine))
-    if (engines.some((engine) => JSON.stringify(readIdentity(engine)) !== identity))
+    const readIdentity = (engine: Engine) =>
+      JSON.stringify(
+        engine
+          .characters()
+          .toSorted((a, b) => compareId(a.id, b.id))
+          .map(({ id, deleted, offset }) => [id.bunch, id.counter, deleted, offset]),
+      )
+    const identity = readIdentity(hostEngine)
+    if (engines.some((engine) => readIdentity(engine) !== identity))
       throw new CollabFailure(`identity-seed-${options.seed}`)
     if (options.participants === 1 && expected !== model)
       throw new CollabFailure(`single-author-host-seed-${options.seed}`)

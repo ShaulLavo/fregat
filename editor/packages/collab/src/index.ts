@@ -2,6 +2,7 @@ export type {
   AuthorContext,
   Change,
   CharId,
+  CharacterIdentity,
   EditId,
   Engine,
   Envelope,

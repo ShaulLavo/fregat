@@ -72,6 +72,12 @@ The shared fixture runs every unit, simulator and ported upstream suite against
 both engines. A paired simulator checks authored envelopes, text, live IDs, hidden
 IDs and visible offsets after every apply and restore, including pending replay.
 
+`Engine.characters()` returns a diagnostic inventory sorted by bunch and counter.
+Each record contains the ID, deletion state and visible offset. Hidden IDs retain
+their visible gap. The simulator compares these fields and visible text for every
+engine factory. Snapshots remain engine-owned restoration data. The inventory
+expands IDs on request and stays outside authoring, application and snapshot work.
+
 `bench` requires built textbuffer and collab packages. It measures 500 local
 identity-enabled author/apply edits and a single remote arrival with 1, 10 and 100
 pending edits on 10,000-line and 100,000-line documents. Setup and exact output

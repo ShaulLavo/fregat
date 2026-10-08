@@ -17,6 +17,7 @@ import { insertionOf, sameChar } from './types'
 import type {
   AuthorContext,
   CharId,
+  CharacterIdentity,
   Engine,
   Envelope,
   Insert,
@@ -80,6 +81,25 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
 
   text(): string {
     return materializePieceTableFullText(this.state.buffer)
+  }
+  characters(): readonly CharacterIdentity[] {
+    const { buffer, runs } = this.state
+    const result: CharacterIdentity[] = []
+    const stack: Index<PlacementRun>[] = runs ? [runs] : []
+    while (stack.length) {
+      const node = stack.pop()!
+      if (node.left) stack.push(node.left)
+      if (node.right) stack.push(node.right)
+      for (let unit = 0; unit < node.value.count; unit++) {
+        const id = {
+          bunch: node.value.start.bunch,
+          counter: node.value.start.counter + unit,
+        }
+        const location = locateCharId(buffer, id)!
+        result.push({ id, deleted: location.liveness === 'deleted', offset: location.offset })
+      }
+    }
+    return result.sort((a, b) => compareId(a.id, b.id))
   }
   snapshot(): TextbufferSnapshot {
     retainPieceTableSnapshot(this.state.buffer)
