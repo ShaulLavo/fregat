@@ -9,7 +9,7 @@ import type { BrowserContext, Request } from 'playwright'
 import type { HotPayload, Plugin, ViteDevServer } from 'vite'
 import { stripVTControlCharacters } from 'node:util'
 import { createScriptError } from '../../scripts/structured-errors.ts'
-import { errorMessage } from '../../packages/contracts/src/error-fields'
+import { errorMessage } from '../../packages/contracts/src/error-fields.ts'
 import base from './vitest.browser.config.ts'
 import {
   createRetentionReloadTransport,
@@ -31,17 +31,17 @@ import {
   observeRetentionEntryForward,
   endRetentionEntryForward,
   type RetentionEntryPhase,
-} from './test/factories/retention-acceptance-reload-transport'
-import { createRetentionSocketProvenance } from './test/factories/retention-acceptance-socket-provenance'
+} from './test/factories/retention-acceptance-reload-transport.ts'
+import { createRetentionSocketProvenance } from './test/factories/retention-acceptance-socket-provenance.ts'
 import type {} from './test/factories/retention-acceptance-entry.tsx'
 import {
   beginColdProfile,
   markColdProfile,
   acceptColdFact,
   safeColdObserve,
-} from './test/factories/retention-cold-profile'
-import { retentionColdBrowser } from './test/factories/retention-cold-browser'
-import { retentionColdServer } from './test/factories/retention-cold-server'
+} from './test/factories/retention-cold-profile.ts'
+import { retentionColdBrowser } from './test/factories/retention-cold-browser.ts'
+import { retentionColdServer } from './test/factories/retention-cold-server.ts'
 
 export default defineConfig(({ mode }) =>
   mode === 'retention-acceptance-entry'

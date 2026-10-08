@@ -8,7 +8,7 @@ import {
   coldProfilePrefix,
   safeColdObserve,
   observeColdPromise,
-} from './retention-cold-profile'
+} from './retention-cold-profile.ts'
 
 type State = {
   finished: boolean
