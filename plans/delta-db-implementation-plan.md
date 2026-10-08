@@ -1,102 +1,84 @@
 # Delta DB — Implementation Plan
 
-Sub-commit, conflict-free, provenance-carrying version control for the platform.
+Sub-commit, provenance-carrying version control for Fregat, on one host-ordered edit log.
 
-The goal: every version of the code has an address, every change knows what caused
-it, annotations survive edits and rebases, and two writers (human or agent) can work
-the same file without a coordinator.
+- Status: Approved (revised 2026-10-08 onto [E066](e066-collaborative-text.md))
+- Research: [lane E](../docs/collab-editing/e-fregat-host-and-delta-db.md), with lanes A–D in
+  [collaborative editing research](../docs/collab-editing/README.md)
+
+The goal: every version of the code has an address, every change knows what caused it,
+annotations survive edits and rebases, and people and agents edit the same file at the same
+time. Fregat's machine server is the host for every open document. It orders edits by arrival,
+as in Matthew Weidner's
+[host-ordered model](https://mattweidner.com/2025/05/21/text-without-crdts.html). The Editor
+owns identity, placement, reconciliation and undo (E066); this plan owns the server host, disk
+and agent edits, provenance, and history.
 
 ---
 
 ## 1. Ground truth — what already exists
 
-This is not a greenfield build. Four of the load-bearing pieces are already in the
-repo, and they are the ones that are painful to retrofit.
+Corrected 2026-10-08 against Fregat `1e066d38b`.
 
-### The editor is already CRDT-shaped
+### The editor has most of the substrate
 
-`editor/packages/editor/src/pieceTable/` has the structural preconditions:
+| Property              | Where                                                                                                                  | Status for collaboration                                                                                          |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Piece identity        | `editor/packages/textbuffer/src/pieceTableTypes.ts`: `PieceBufferId` is a branded number from a snapshot-local counter | Local only; E066 adds global `CharId` runs beside it                                                              |
+| Tombstones            | Hidden pieces; E006 compacts runs into stand-ins (`standIns.ts`, `compaction.ts`)                                      | Anchors survive compaction, exact deleted order does not; E066 keeps exact tombstones for collaborative documents |
+| Text storage          | `buffers.ts`; E006 reclamation can free unreferenced text                                                              | Fine: ordering never needs reclaimed text                                                                         |
+| Persistent snapshots  | AVL join/balance (`join.ts`), structural sharing                                                                       | Cheap rollback for participant replay                                                                             |
+| Anchors with liveness | `anchors.ts`: `RealAnchor { buffer, offset, bias }` → `{ offset, liveness }`                                           | Become character-ID gaps for transport                                                                            |
 
-| Property              | Where                                                                    | Why it matters                                                                      |
-| --------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| Tombstones            | `edits.ts` — `markTreeInvisible` flips `visible: false`, never removes   | Hardest precondition to retrofit. Present.                                          |
-| Append-only buffers   | `buffers.ts` — content is never mutated                                  | Character identity is stable for the document's life. This _is_ the CRDT substrate. |
-| Persistent snapshots  | `tree.ts` — treap `split`/`merge`, structural sharing                    | Local time-travel already works.                                                    |
-| Anchors with liveness | `anchors.ts` — `RealAnchor{buffer, offset, bias}` → `{offset, liveness}` | A Yjs `RelativePosition` in all but name. Survives deletion and reports it.         |
+### The server is event-sourced, but not for keystrokes
 
-### The server is already event-sourced
+`apps/server/src/orchestration/` stores `orchestration_events` with event IDs, stream versions
+allocated under the write lock, causation, correlation and command metadata. Its aggregate kinds
+are project/worktree/session. Commands append, project and record receipts in one transaction.
+Its subscription pump waits for each acknowledgement before sending the next item
+(`ws-rpc.ts`). Reuse its principles, not the pipeline: documents get their own log and stream
+(§3).
 
-`apps/server/src/orchestration/` + `apps/server/src/db/schema.ts`:
+### Checkpoints and worktrees exist
 
-- `orchestration_events` carries `eventId`, `aggregateKind`, `aggregateId`,
-  `streamVersion`, `causationEventId`, `correlationId`, `commandId`, `actorKind`.
-  That is a textbook event store with causation tracking already wired.
-- `OrchestrationEventStore.append` computes `streamVersion` inside the INSERT under
-  the write lock — safe concurrent appends.
-- `projection-pipeline.ts` / `projector.ts` — an established read-model pattern.
-- `ws-rpc.ts` + `streams.ts` — live subscription transport.
+`checkpoint-reactor.ts` and `git/checkpoint-store.ts` capture the worktree at turn boundaries
+under `refs/platform/checkpoints/<session>/turn/<n>` (`orchestration/checkpoint-refs.ts`).
+`git/worktrees.ts` provides real git worktrees per thread.
 
-**We do not need to build an op log. We need a new aggregate kind on the one that
-exists.**
+### Who owns text today
 
-### Git checkpointing per turn already exists
-
-`checkpoint-reactor.ts`, `git/checkpoint-store.ts`, `checkpoint-refs.ts` capture the
-worktree to hidden refs (`refs/t3/checkpoints/<thread>/turn/N`) at turn boundaries,
-with a baseline capture before the agent's first edit. Turn-granularity version
-control is done. Delta DB is the same idea pushed below the turn.
-
-### Worktrees exist
-
-`git/worktrees.ts` (388 lines) — real git worktrees per thread. Phase 5 gets to ask
-whether virtualization beats this, rather than starting from nothing.
+Each client runtime's `WorkspaceDocumentService` owns live text for its views; the disk owns
+saved bytes. Saves upload whole text; external edits are compared on refresh and either adopted
+or raised as conflicts. Agents (Codex, Claude) write through native filesystem tools. The
+server's LSP copy is replaced by whichever client attaches last.
 
 ---
 
-## 2. The three real gaps
+## 2. The gaps
 
-**G1 — `PieceBufferId` is locally scoped.** Minted from `nextBufferSequence`, a
-per-document counter. Two replicas both mint buffer #7, so `{buffer: 'b7', offset: 3}`
-denotes different characters on different machines. Make it `(replicaId, sequence)`
-and every existing anchor becomes a globally-unique character ID.
-
-**G2 — `order` is a fractional index.** `orders.ts` allocates midpoints and, when the
-gap collapses below `PIECE_ORDER_MIN_GAP`, sets `normalizeOrders: true` → global
-renumber. Two failures, one fatal:
-
-- Concurrent inserts into the same gap allocate overlapping values, so two replicas
-  holding the _identical op set_ can derive _different sequences_. That is divergence,
-  not merely bad interleaving.
-- A global renumber is non-commutative and non-idempotent. It invalidates order
-  comparisons against any concurrent remote op.
-
-Ordering must become a deterministic function of op identity and origin neighbours.
-
-**G3 — Edits are expressed in document offsets.** `applyBatchToPieceTable` takes
-`{from, to, text}`, meaningful only against one snapshot. Remote ops need ID space
-(`insert after character X`, `delete span Y`) plus causal metadata.
+- **G1 — no global identity.** Closed by E066 (`CharId` runs allocated when an edit is written).
+- **G2 — fractional `order`.** Gone as a distributed problem: with host ordering, `order` stays a
+  local label and is never sent. Its renumbering cost is measured in E066.
+- **G3 — edits in offsets.** Closed by E066's edit envelope and authoring-edge conversion.
+- **G4 — no live authority.** Text lives in each client. The server must host each open document.
+- **G5 — disk and agents write behind the model.** Saves, external writers and agent tools must
+  feed the host, not replace text.
 
 ---
 
 ## 3. The architectural spine
 
-> **The op log is the source of truth. The live document stays a plain piece table.
-> CRDT machinery is materialized transiently at merge time, then discarded.**
+> **The host-ordered edit log owns accepted history. Each participant materializes the accepted
+> prefix plus its own pending edits on the textbuffer.**
 
-This is the eg-walker / diamond-types design, and it is the opposite of "make the
-piece table a CRDT". Rationale:
-
-- **The typing hot path stays untouched.** No per-character IDs, no origin pointers,
-  no widened `Piece`. The 90ms → 5.8ms typing work is not put at risk to serve a case
-  that is rare.
-- **Merge cost is proportional to divergence,** not to document size.
-- **The op log _is_ the product.** Model blame, every-version-has-an-address,
-  sub-commit comments, "why does this line exist" — all fall out of the log. The CRDT
-  is only what makes concurrent branches merge without a coordinator.
-
-Character ID = `(replicaId, bufferSeq, offset)` — which is exactly today's `RealAnchor`
-once G1 is fixed. The existing anchor type becomes the CRDT position type with a
-one-field change.
+- One host document service per machine server. A document has a stable ID distinct from its
+  path, and an epoch distinct from its revision.
+- A document-owned log in SQLite: per-document sequence, deduplicated participant edit IDs, E066
+  envelopes, trusted provenance (actor, session, turn, tool), optional links to orchestration
+  events, checkpoints, and the last materialized revision with its disk fingerprint.
+- A document stream with batches and cumulative acknowledgements, one subscription per document,
+  presence separate from the log. A durability acknowledgement is sent only after persisting.
+- The disk is a materialization of a host revision. Saving asks the host to write a revision.
 
 ---
 
@@ -104,180 +86,140 @@ one-field change.
 
 ```mermaid
 graph TD
-  P0["Phase 0<br/>Instrumentation & fuzz harness"] --> P1["Phase 1<br/>Identity"]
-  P1 --> P2["Phase 2<br/>Op log — ships value alone"]
-  P2 --> P3["Phase 3<br/>Ordering (Fugue)"]
-  P2 --> P6["Phase 6<br/>Annotations & git interop"]
-  P3 --> P4["Phase 4<br/>Replication"]
-  P4 --> P5["Phase 5<br/>Trees & work trees — highest risk"]
-  P2 -.-> P7["Phase 7<br/>Compaction (deferred)"]
-  P4 -.-> P7
+  P0["Phase 0<br/>Baselines & fuzz"] --> P1["Phase 1<br/>Host document service"]
+  E066["E066<br/>Editor collaboration core"] --> P1
+  P1 --> P2["Phase 2<br/>Disk and agent edits"]
+  P1 --> P3["Phase 3<br/>Provenance — ships value alone"]
+  P2 --> P4["Phase 4<br/>Shared editing delivered"]
+  P3 --> P6["Phase 6<br/>Annotations & git interop"]
+  P4 --> P5["Phase 5<br/>Trees & work trees"]
+  P3 -.-> P7["Phase 7<br/>Compaction (deferred)"]
 ```
 
-### Phase 0 — Instrumentation and ground truth
+### Phase 0 — Baselines and fuzz
 
-Prerequisite for evaluating everything after it.
+- Wide evlog events on edit application and reconciliation: piece count, tombstone ratio,
+  pending depth, replay duration, publication duration.
+- Baselines: typing p50/p99, remote arrival with 1/10/100 pending edits, snapshot memory, anchor
+  resolution, identity-run growth over a long session.
+- Fuzz: random edits against a string model, plus duplicate submission, reconnect, host restart,
+  external writes and a crash between persist and acknowledgement.
 
-- Wide evlog events on edit application: `editor.edit.applied` carrying `pieceCount`,
-  `tombstoneRatio`, `coalesced`, `cause`, `durationMs`. Enrich the existing event
-  rather than adding narrow lines.
-- Benchmark baseline: typing latency p50/p99, snapshot memory, anchor resolution p99,
-  piece count growth over a long session. **No phase 3–5 change is acceptable without
-  a before/after against this.**
-- Property/fuzz harness for the piece table: random edit sequences asserted against a
-  naive string model; anchors asserted to resolve monotonically and never cross. This
-  is the safety net for every phase after, and it pays for itself immediately.
+**Exit:** committed baselines and a fuzz suite that fails loudly on divergence.
 
-**Exit:** a committed benchmark run and a fuzz suite that fails loudly on divergence.
+### Phase 1 — Host document service
 
-### Phase 1 — Identity
+- Document identity (symlink aliases resolve to one document; worktree copies stay separate;
+  rename keeps identity, delete and recreate start a new epoch).
+- The document log and stream (§3). Clients become participants through E066's core API; the
+  host keeps no undo of its own.
+- The pooled LSP copy follows accepted host revisions. Workspace search reads host-held unsaved
+  text.
 
-Small, strictly additive, unblocks everything.
+**Exit:** two windows and a remote client edit one file concurrently and converge; a server
+restart loses no acknowledged edit.
 
-- `PieceBufferId` → `${replicaId}:${seq}`. `replicaId` minted per device+document
-  session and persisted.
-- Anchor wire format + valibot schema in `packages/contracts`.
-- **Gate `tryCoalesceInsert` on cause identity.** Today it extends the tail chunk and
-  grows a piece in place, welding two causally distinct inserts into one attributable
-  span — which silently destroys per-turn provenance. Refuse to coalesce across a
-  cause boundary.
-- **Preserve replace-intent** in `applyBatchToPieceTable`. It currently decomposes each
-  edit into delete-then-insert; a remote replica would see two independent ops and
-  could legally insert into the middle of what was meant as one atomic replacement.
+### Phase 2 — Disk and agent edits
 
-**Exit:** an anchor serialized in one process resolves correctly in another against the
-same document. No CRDT yet.
+- Saving writes an identified host revision to disk.
+- External writers: keep the last materialized text and revision; when the disk settles, diff
+  **last materialized → new disk** (not live text → disk), map the old ranges to IDs from that
+  revision, and submit the result as an edit. Stale whole-file rewrites and ambiguous overlaps go
+  to review, or to an isolated worktree for broad rewrites.
+- Host-native agent tools over the Platform MCP bridge: read returns document ID, epoch, revision,
+  text and IDs; edit names that revision or those IDs and carries a deduplicated edit ID. The
+  server attaches actor, session, turn and tool. Native tools and shell writes keep working
+  through the disk path.
 
-### Phase 2 — Op log
+**Exit:** an agent edits a file the user is typing in; both edits survive, and the agent's carry
+exact provenance while disk-imported ones are labelled inferred.
 
-The phase that ships user-visible value on its own. If everything after is cancelled,
-this was still worth building.
+### Phase 3 — Provenance
 
-- New aggregate kind `document` on `orchestration_events` (schema change: widen the
-  `aggregateKind` enum). Op events ride the existing store, replay, projection
-  pipeline and WS transport unchanged.
-- `DocumentOp` union in contracts: `insert{afterId, text}`, `delete{spans}`,
-  `replace{spans, text}` as an atomic unit.
-- Transform layer at the `documentSession` boundary: `PieceTableEdit[]` (offsets) →
-  `DocumentOp[]` (IDs).
-- Rehydration: replay ops → piece table snapshot, property-tested for equality with
-  the live snapshot.
-- **Wire causation.** An edit op caused by a provider tool call carries that event's
-  `causationEventId`; `correlationId` carries the turn. The plumbing already exists.
-- Projection `projection_document_blame`: span → (turnId, actorKind, model, prompt).
+Ships value on its own.
 
-**Exit:** model blame per span. "Why is this line here" jumps to the turn that wrote
-it. Time travel to any op, not just any commit.
+- Projection `projection_document_blame`: span → (turn, actor, model, prompt).
+- Provenance lives on character spans in the log, independent of storage pieces, so typing can
+  still coalesce storage.
+- Time travel to any accepted sequence number, not just any commit.
 
-### Phase 3 — Ordering
+**Exit:** "why is this line here" jumps to the turn that wrote it.
 
-The actual CRDT. New package `packages/crdt`, runtime-neutral, plain vitest.
+### Phase 4 — Shared editing delivered
 
-- Implement **Fugue** (Weidner), not RGA. Same difficulty, and it fixes the
-  interleaving pathology. That pathology is not academic here: two agents editing the
-  same function concurrently is the core use case, and RGA will shuffle their lines
-  into garbage.
-- Fractional `order` demoted to a local materialization cache for the treap index.
-  It is never the cross-replica ordering authority, and `normalizeOrders` must not
-  appear on any path that crosses a replica.
-- Merge = find the LCA in version-vector space, replay the diverged suffix on both
-  sides.
-- Property tests: N replicas × random concurrent op sets → convergence; plus explicit
-  non-interleaving assertions for the two-agents-one-function case.
+- Presence and remote cursors over the document stream.
+- Undo of one's own edits across collaborators (E066 step 5), persisted per document identity.
+- Reconnect from a checkpoint plus tail; edits from an older epoch are replayed or surfaced.
 
-**Exit:** convergence fuzz green at N=5 replicas; typing benchmark unregressed vs
-phase 0.
-
-### Phase 4 — Replication
-
-- Op sync over the existing WS RPC. Version vectors; delta sync sends only ops after
-  the peer's VV.
-- Server is the hub. No P2P — it buys nothing here and doubles the work.
-- Presence and remote cursors ride the same anchors.
-- Awareness UX: there is nothing to resolve, but _whose ops_ must be visible.
-
-**Exit:** two clients edit one file concurrently, converge, and both see attribution.
+**Exit:** the owner and two agents edit one file for an hour with no lost or duplicated edits,
+and each person's undo touches only their own edits.
 
 ### Phase 5 — Trees and work trees
 
-Highest risk in the project. Budget accordingly and do not start it early.
+- File-tree operations (create, rename, delete, move) are serialized by the host. A tree CRDT is
+  only for host-free use, and is optional.
+- Virtualized work trees only if measured against `git/worktrees.ts` (D2).
 
-- Tree CRDT for create/rename/delete/move — Kleppmann's highly-available move
-  operation for replicated trees. Do not re-derive it.
-- **Materialization and reconciliation with the real filesystem.** Agents, formatters,
-  compilers and `bun install` write behind the model. This collides directly with
-  `fs/watch.ts` and `fs/workspace-index.ts`. Atomic-rename saves, gitignore,
-  `node_modules`, large binaries. This is where projects of this shape die.
-- Virtualized work trees (O(1) clone) — **only if measured against the existing
-  `git/worktrees.ts`.** Decision point D2 below.
-
-**Exit:** an agent branch clones, diverges, and merges without touching the user's
-working tree unexpectedly.
+**Exit:** an agent branch clones, diverges and merges without touching the user's working tree
+unexpectedly.
 
 ### Phase 6 — Annotations and git interop
 
-Can run in parallel with 3–4; depends only on phase 2.
+Depends on phase 3.
 
-- Comments/annotations anchored to spans, resolvable in any version where the span
-  survives. The anchor machinery already handles the hard half.
-- Map document versions ↔ git commits; extend the existing checkpoint refs from
-  per-turn to per-op addressing.
-- **Rewrite policy.** Rebase, amend, force-push destroy the characters anchors point
-  at. Policy: degrade to `liveness: 'deleted'` plus a best-effort content-match
-  re-anchor, surfaced honestly in the UI rather than silently relocated.
+- Comments anchored to character-ID spans, resolvable wherever the span survives.
+- Map document versions ↔ git commits; extend checkpoint refs from per-turn to per-sequence.
+- Rewrites (rebase, amend) keep IDs when lineage is preserved. When an import discards identity,
+  anchors degrade to `liveness: 'deleted'` plus a content-match re-anchor shown in the UI.
 
 ### Phase 7 — Compaction
 
-Deliberately deferred. It is a scaling problem, not a correctness one, and premature
-compaction destroys the provenance that is the entire point.
-
-- Op log growth: keystroke granularity × agents rewriting whole files dwarfs the
-  content.
-- Snapshotting + shallow history + causal-stability-based tombstone GC. A tombstone
-  cannot be dropped until every replica has seen the delete.
+Deferred. Log snapshots and replay checkpoints come early (phase 1). Destructive history and
+tombstone compaction waits until pending edits, annotations, retained versions, undo and
+disconnected participants are accounted for.
 
 ---
 
 ## 5. Risk register
 
-| #   | Risk                                                    | Phase | Mitigation                                                                                                        |
-| --- | ------------------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------- |
-| R1  | FS reconciliation swamp — external writers vs the model | 5     | Sequenced last; existing `fs/watch.ts` reused rather than replaced; fall back to real git worktrees if D2 says so |
-| R2  | Op log / tombstone growth                               | 7     | Deferred by design; phase 0 instrumentation makes the growth curve visible early                                  |
-| R3  | Typing hot-path regression                              | 3     | Architectural: CRDT stays out of the live structure. Verified against phase 0 benchmarks                          |
-| R4  | Coalescing destroys provenance                          | 1     | Fixed in phase 1 (cause-gated coalescing)                                                                         |
-| R5  | Binary files have no CRDT                               | 5     | Content-address + last-writer-wins on a separate path                                                             |
-| R6  | Divergence bugs found late                              | 0     | Fuzz harness before any semantic change                                                                           |
+| #   | Risk                                | Phase | Mitigation                                                                                            |
+| --- | ----------------------------------- | ----- | ----------------------------------------------------------------------------------------------------- |
+| R1  | External writers vs the host        | 2     | Diff from the last materialized revision; review stale rewrites; isolated worktrees for broad ones    |
+| R2  | Log and tombstone growth            | 7     | Phase 0 growth curves; snapshots early, destructive compaction late                                   |
+| R3  | Typing hot-path regression          | 1     | E066 measures every step against the phase 0 baseline                                                 |
+| R4  | Provenance lost to coalescing       | 3     | Provenance on character spans, independent of storage                                                 |
+| R5  | Binary files                        | 5     | Content-addressed, last writer wins, on a separate path                                               |
+| R6  | Divergence found late               | 0     | Fuzz before any semantic change                                                                       |
+| R7  | Duplicate or rejected pending edits | 1     | Deduplicate by edit ID, including rejections; dependants of a rejected edit are rejected and surfaced |
+| R8  | Acknowledged edit lost on crash     | 1     | Persist before the durability acknowledgement                                                         |
 
 ---
 
 ## 6. Explicit non-goals
 
-- No P2P / coordinator-free topology. The server is the hub.
-- No custom B-tree or KV store. SQLite + drizzle already carries this.
-- No WASM/web client.
-- No custom text CRDT **if** D1 shows an existing library fits.
+- No peer-to-peer topology inside Fregat; the server is the host. The standalone editor's
+  peer-to-peer plugin is [E067](e067-webrtc-collaboration-plugin.md).
+- No custom B-tree or KV store; SQLite and drizzle carry the log.
+- No third-party CRDT engine owning the buffer.
 
 ---
 
 ## 7. Decision points
 
-**D1 — own Fugue implementation vs. an existing library (Loro).** Before phase 3.
-Criterion: can Loro accept our existing anchors and piece table, or does it insist on
-owning the buffer? If it demands ownership, the integration cost exceeds the
-implementation cost, because our anchor layer is already built. Timebox: 2-day spike.
+**D1 — identity index shape.** Before E066 step 2: a run ↔ storage index beside the textbuffer
+versus a separate ID list (Articulated-style). Criterion: typing cost and memory against the
+phase 0 baseline. Default: the index beside the textbuffer.
 
-**D2 — virtualized work trees vs. plain git worktrees.** Before phase 5. Criterion:
-measured clone cost and agent-branch spawn latency against `git/worktrees.ts` under a
-realistic repo. Only go virtual if the measurement demands it.
+**D2 — virtualized work trees vs plain git worktrees.** Before phase 5. Criterion: measured clone
+cost and agent-branch spawn latency against `git/worktrees.ts` on a realistic repository.
+
+**D3 — what compilers and shells read.** Before phase 2 ships: whether the host materializes
+accepted edits to disk continuously, on save only, or per agent turn.
 
 ---
 
 ## 8. Sequencing rationale
 
-Value ships at **phase 2**, before any CRDT exists. Risk concentrates at **phase 5**,
-last. Phases 0–2 are strictly additive and reversible; nothing before phase 3 changes
-existing edit semantics.
-
-The tempting order — build the DB first, then the features — inverts both the risk and
-the value curves.
+Value ships at phase 3 (provenance) once the host exists. Disk and agent correctness (phase 2)
+comes before shared editing is called delivered, because agents are the main second writer.
+Trees and virtualization stay last.
