@@ -14,8 +14,8 @@ import {
   type SelectionSet,
 } from './selections'
 
-export type HistoryOperationId = { readonly actor: string; readonly seq: number }
-export type HistoryOperationGroup = {
+type HistoryOperationId = { readonly actor: string; readonly seq: number }
+type HistoryOperationGroup = {
   readonly id: HistoryOperationId
   readonly edits: readonly HistoryOperationId[]
 }

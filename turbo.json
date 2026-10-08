@@ -226,7 +226,11 @@
     },
     "@singapore-editor/collaboration#test:editor": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/packages/editor/src/**"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/editor/packages/editor/src/**",
+        "$TURBO_ROOT$/editor/examples/app/src/**"
+      ],
       "env": ["COLLABORATION_MEASURE", "COLLABORATION_EVIDENCE_DIR"],
       "outputs": [],
       "cache": false

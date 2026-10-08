@@ -144,3 +144,32 @@ test('history identity accepts remote growth but refuses missing remote identiti
   expect(fresh.matchesHistoryIdentity(saved)).toBe(false)
   expect(fresh.matchesHistoryIdentity('invalid')).toBe(false)
 })
+
+test.each([
+  { outcome: 'accepted', restore: 'install' },
+  { outcome: 'accepted', restore: 'apply' },
+  { outcome: 'rejected', restore: 'install' },
+  { outcome: 'rejected', restore: 'apply' },
+] as const)(
+  'reopening $outcome insertion history with $restore reserves every authored character allocation',
+  ({ outcome, restore }) => {
+    const original = new CollaborationDocument({ ...options, text: '' })
+    const first = original.participant.local({ offset: 0, deleteCount: 0, text: 'A' })
+    original.sequence(first, outcome === 'rejected' ? 'test rejection' : undefined)
+    const reopened = new CollaborationDocument({ ...options, text: '' })
+    const records = original.exportHistory(original.genesis)!
+    if (restore === 'install') reopened.install(records)
+    if (restore === 'apply') {
+      for (const record of records) expect(reopened.apply(record)).toBe(true)
+    }
+    const second = reopened.participant.local({
+      offset: reopened.engine.snapshot().buffer.length,
+      deleteCount: 0,
+      text: 'B',
+    })
+    expect(second.id.seq).toBeGreaterThan(first.id.seq)
+    if (first.change.kind !== 'insert' || second.change.kind !== 'insert')
+      throw new TypeError('Expected insertion envelopes')
+    expect(second.change.start).not.toEqual(first.change.start)
+  },
+)

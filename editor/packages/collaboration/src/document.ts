@@ -156,7 +156,7 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
     const body = { depth: tip.depth + 1, predecessor: tip.hash, id: edit.id, edit, outcome }
     const record = { ...body, hash: digest(body) }
     this.append(record)
-    this.participant.receive([message])
+    this.participant.receive([message], message.status === 'rejected' ? [edit] : [])
     return record
   }
 
@@ -172,7 +172,10 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
       return false
     }
     this.append(record)
-    this.participant.receive([hostMessage(record)])
+    this.participant.receive(
+      [hostMessage(record)],
+      record.outcome.kind === 'rejected' ? [record.edit] : [],
+    )
     return true
   }
 
@@ -237,7 +240,12 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
     this.records.clear()
     for (const record of history) this.append(record)
     this.restoreHost()
-    this.participant.install(this.base, history.map(hostMessage), recovered)
+    this.participant.install(
+      this.base,
+      history.map(hostMessage),
+      recovered,
+      history.filter((record) => record.outcome.kind === 'rejected').map((record) => record.edit),
+    )
   }
 
   private restoreHost(): void {

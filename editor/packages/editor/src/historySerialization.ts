@@ -140,7 +140,14 @@ const serializeStep = (
     return { edits: transaction.edits, inverseEdits: transaction.inverseEdits }
   }
 
-  const edit = diffPieceTableSnapshots(parentSnapshot, node.snapshot)
+  return diffStep(parentSnapshot, node.snapshot)
+}
+
+const diffStep = (
+  parentSnapshot: PieceTableSnapshot,
+  snapshot: PieceTableSnapshot,
+): SerializedStep => {
+  const edit = diffPieceTableSnapshots(parentSnapshot, snapshot)
   if (!edit) return EMPTY_STEP
   const inverse: TextEdit = {
     from: edit.from,
@@ -328,6 +335,8 @@ const restoreNode = (
       ? restoreSelections(parentSnapshot, node.selectionsBefore)
       : selections
   const preferred = node.preferredChildId
+  // Authored execution uses effects; inspection edits come from today's parent/child previews.
+  const step = node.authored && parentSnapshot ? diffStep(parentSnapshot, snapshot) : node
   return {
     id: node.id,
     parentId: node.parentId,
@@ -344,8 +353,8 @@ const restoreNode = (
     transaction: parentSnapshot
       ? {
           ...(node.authored ? { authored: node.authored } : {}),
-          edits: node.edits,
-          inverseEdits: node.inverseEdits,
+          edits: step.edits,
+          inverseEdits: step.inverseEdits,
           snapshotBefore: parentSnapshot,
           snapshotAfter: snapshot,
           selectionBefore: selectionsBefore,

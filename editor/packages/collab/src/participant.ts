@@ -158,7 +158,9 @@ export class Participant<Snapshot = unknown> {
     return cloneEnvelope(envelope)
   }
 
-  receive(messages: readonly HostMessage[]): void {
+  receive(messages: readonly HostMessage[], allocated: readonly Envelope[] = []): void {
+    // Rejected wire records retain allocations that are absent from accepted engine state.
+    for (const envelope of allocated) this.reserveIdentities(envelope)
     for (const message of messages) {
       if (message.document !== this.options.document || message.epoch !== this.options.epoch)
         throw new CollabFailure('wrong-document-epoch')
@@ -185,6 +187,7 @@ export class Participant<Snapshot = unknown> {
     base: Snapshot,
     messages: readonly HostMessage[],
     recovered: readonly Envelope[] = [],
+    allocated: readonly Envelope[] = [],
   ): void {
     const pending = new Map<string, Envelope>()
     for (const edit of [...recovered, ...this.pending])
@@ -197,7 +200,7 @@ export class Participant<Snapshot = unknown> {
     this.rejected.clear()
     this.incoming.clear()
     if (messages.length) {
-      this.receive(messages)
+      this.receive(messages, allocated)
       return
     }
     this.options.engine.restore(base)
