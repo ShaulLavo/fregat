@@ -79,10 +79,7 @@ test('Zed test_edit_partially_intersecting_a_deleted_fragment: retain partial hi
   )
 })
 
-const concurrentUndoSeeds =
-  process.env.COLLAB_STRESS === '1'
-    ? Array.from({ length: 100 }, (_, index) => 400 + index)
-    : [400, 411, 422, 433, 444, 455, 466, 477, 488, 499]
+const concurrentUndoSeeds = Array.from({ length: 100 }, (_, index) => 400 + index)
 
 test.each(concurrentUndoSeeds)(
   'Zed test_random_concurrent_edits: edits, undo, redo and asynchronous delivery converge, seed %s',

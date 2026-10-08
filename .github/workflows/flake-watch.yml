@@ -44,11 +44,6 @@ jobs:
             }
           - { name: server, dir: apps/server, run: 'bun --bun vitest run' }
           - { name: tui, dir: apps/tui, run: 'bun --bun vitest run' }
-          - {
-              name: collaborative undo,
-              dir: editor/packages/collab,
-              run: 'env COLLAB_STRESS=1 bun run test test/ported/zed-undo.test.ts',
-            }
           # Plain Node, not `--bun`: Vitest browser orchestration breaks under Bun.
           - {
               name: web browser,
