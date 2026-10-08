@@ -27,6 +27,7 @@ function mount(text = 'abc', options: ConstructorParameters<typeof Editor>[1] = 
   document.body.append(host)
   const events: EditorTextTransaction[] = []
   let scope!: EditorViewScope
+  let recording!: ReturnType<EditorViewScope['onDidTransaction']>
   const editor = new Editor(host, {
     defaultText: text,
     ...options,
@@ -36,13 +37,13 @@ function mount(text = 'abc', options: ConstructorParameters<typeof Editor>[1] = 
         name: 'review',
         view(api) {
           scope = api
-          api.onDidTransaction((e) => events.push(e))
+          recording = api.onDidTransaction((e) => events.push(e))
         },
       }),
     ],
   })
   editors.push(editor)
-  return { editor, scope, events, host }
+  return { editor, scope, events, recording }
 }
 const transitions = (events: readonly EditorTextTransaction[]) =>
   events.map((e) => [
@@ -103,14 +104,6 @@ test('a pre-view buffer observer swaps sessions without stranding the captured c
     ready: boolean
     event: EditorTextTransaction
   }[]
-  console.log(
-    'review-queue',
-    JSON.stringify({
-      count: pending.length,
-      ready: pending.map((e) => e.ready),
-      snapshots: transitions(pending.map((e) => e.event)),
-    }),
-  )
   expect.soft(transitions(m.events)).toEqual([['abc', 'axbc']])
   expect(pending.length).toBe(0)
   subscription()
@@ -128,14 +121,6 @@ test('a pre-view buffer observer detaches without stranding the captured commit'
     ready: boolean
     event: EditorTextTransaction
   }[]
-  console.log(
-    'review-queue',
-    JSON.stringify({
-      count: pending.length,
-      ready: pending.map((e) => e.ready),
-      snapshots: transitions(pending.map((e) => e.event)),
-    }),
-  )
   expect.soft(transitions(m.events)).toEqual([['abc', 'axbc']])
   expect(pending.length).toBe(0)
   subscription()
@@ -242,13 +227,7 @@ test('successive pre-acceptance document swaps have bounded queued snapshot rete
     session.applyEdits([{ from: 0, to: 0, text: 'x' }])
     off()
   }
-  console.log(
-    'review-retention',
-    JSON.stringify({
-      delivered: m.events.length,
-      queued: (Reflect.get(m.editor, 'pendingTransactions') as unknown[]).length,
-    }),
-  )
+  expect(m.events).toHaveLength(100)
   expect((Reflect.get(m.editor, 'pendingTransactions') as unknown[]).length).toBe(0)
 })
 
@@ -272,4 +251,137 @@ test('another view onChange can attach a document without stranding this view tr
   expect(transitions(a.events)).toEqual([['abc', 'axbc']])
   expect(b.editor.materializeFullText()).toBe('next')
   expect(transitions(b.events)).toEqual(transitions(a.events))
+})
+
+type AttachmentQueue = {
+  readonly pending: ReadonlySet<unknown>
+  readonly pendingByChange: ReadonlyMap<unknown, unknown>
+}
+
+function attachmentQueue(editor: Editor): AttachmentQueue {
+  return Reflect.get(editor, 'transactionAttachment') as AttachmentQueue
+}
+
+function expectReleased(attachment: AttachmentQueue) {
+  expect(attachment.pending.size).toBe(0)
+  expect(attachment.pendingByChange.size).toBe(0)
+}
+
+test.each(['clear', 'open'] as const)('a pre-view %s drains the outgoing attachment', (action) => {
+  const session = createEditorBufferSession(createEditorTextBuffer('abc'))
+  const m = mount()
+  const off = session.buffer.subscribe(() => {
+    if (action === 'clear') m.editor.clearDocument()
+    else m.editor.openDocument({ text: 'next' })
+  })
+  m.editor.attachSession(session)
+  const outgoing = attachmentQueue(m.editor)
+  session.applyEdits([{ from: 1, to: 1, text: 'x' }])
+  expect(transitions(m.events)).toEqual([['abc', 'axbc']])
+  expect(m.editor.materializeFullText()).toBe(action === 'clear' ? '' : 'next')
+  expectReleased(outgoing)
+  expect((Reflect.get(m.editor, 'pendingTransactions') as unknown[]).length).toBe(0)
+  off()
+})
+
+test('removing the final listener drops pending snapshots before a new subscription', () => {
+  const session = createEditorBufferSession(createEditorTextBuffer('abc'))
+  const m = mount()
+  const off = session.buffer.subscribe(() => m.recording.dispose())
+  m.editor.attachSession(session)
+  const outgoing = attachmentQueue(m.editor)
+  session.applyEdits([{ from: 1, to: 1, text: 'x' }])
+  expect(m.events).toHaveLength(0)
+  expectReleased(outgoing)
+  expect(Reflect.get(m.editor, 'transactionAttachment')).toBeNull()
+  expect((Reflect.get(m.editor, 'pendingTransactions') as unknown[]).length).toBe(0)
+  off()
+  const next: EditorTextTransaction[] = []
+  m.scope.onDidTransaction((event) => next.push(event))
+  session.applyEdits([{ from: 2, to: 2, text: 'y' }])
+  expect(transitions(next)).toEqual([['axbc', 'axybc']])
+  expectReleased(attachmentQueue(m.editor))
+})
+
+test('removing one listener preserves the captured commit for remaining subscribers', () => {
+  const session = createEditorBufferSession(createEditorTextBuffer('abc'))
+  const m = mount()
+  const off = session.buffer.subscribe(() => m.recording.dispose())
+  m.editor.attachSession(session)
+  const seen: EditorTextTransaction[] = []
+  m.scope.onDidTransaction((event) => seen.push(event))
+  session.applyEdits([{ from: 1, to: 1, text: 'x' }])
+  expect(m.events).toHaveLength(0)
+  expect(transitions(seen)).toEqual([['abc', 'axbc']])
+  expectReleased(attachmentQueue(m.editor))
+  off()
+})
+
+test('disposal during delivery drops queued edits and stops remaining listeners', () => {
+  const session = createEditorBufferSession(createEditorTextBuffer('abc'))
+  const m = mount()
+  m.editor.attachSession(session)
+  const outgoing = attachmentQueue(m.editor)
+  m.editor.onDidTransaction(() => {
+    session.applyEdits([{ from: 2, to: 2, text: 'y' }])
+    m.editor.dispose()
+  })
+  const late: EditorTextTransaction[] = []
+  m.editor.onDidTransaction((event) => late.push(event))
+  session.applyEdits([{ from: 1, to: 1, text: 'x' }])
+  expect(transitions(m.events)).toEqual([['abc', 'axbc']])
+  expect(late).toHaveLength(0)
+  expectReleased(outgoing)
+  expect(Reflect.get(m.editor, 'transactionAttachment')).toBeNull()
+  expect((Reflect.get(m.editor, 'pendingTransactions') as unknown[]).length).toBe(0)
+})
+
+test('a disposed editor accepts no new transaction subscription', () => {
+  const m = mount()
+  m.editor.dispose()
+  const late = m.editor.onDidTransaction(() => {})
+  expect(Reflect.get(m.editor, 'transactionListeners').size).toBe(0)
+  expect(Reflect.get(m.editor, 'transactionAttachment')).toBeNull()
+  late.dispose()
+})
+
+test('reattaching the same session retires the old attachment exactly once', () => {
+  const session = createEditorBufferSession(createEditorTextBuffer('abc'))
+  const m = mount()
+  const off = session.buffer.subscribe(() => m.editor.attachSession(session))
+  m.editor.attachSession(session)
+  const outgoing = attachmentQueue(m.editor)
+  session.applyEdits([{ from: 1, to: 1, text: 'x' }])
+  session.applyEdits([{ from: 2, to: 2, text: 'y' }])
+  expect(transitions(m.events)).toEqual([
+    ['abc', 'axbc'],
+    ['axbc', 'axybc'],
+  ])
+  expect(attachmentQueue(m.editor)).not.toBe(outgoing)
+  expectReleased(outgoing)
+  expectReleased(attachmentQueue(m.editor))
+  off()
+})
+
+test('a surviving listener can edit the new attachment while the old commit drains', () => {
+  const session = createEditorBufferSession(createEditorTextBuffer('abc'))
+  const next = createDocumentSession('next')
+  const m = mount()
+  const off = session.buffer.subscribe(() => m.editor.attachSession(next))
+  m.editor.attachSession(session)
+  const outgoing = attachmentQueue(m.editor)
+  m.scope.onDidTransaction((event) => {
+    if (event.edits[0]?.text !== 'x') return
+    next.applyEdits([{ from: 4, to: 4, text: '!' }])
+  })
+  session.applyEdits([{ from: 1, to: 1, text: 'x' }])
+  expect(transitions(m.events)).toEqual([
+    ['abc', 'axbc'],
+    ['next', 'next!'],
+  ])
+  expect(m.editor.materializeFullText()).toBe('next!')
+  expectReleased(outgoing)
+  expectReleased(attachmentQueue(m.editor))
+  expect((Reflect.get(m.editor, 'pendingTransactions') as unknown[]).length).toBe(0)
+  off()
 })

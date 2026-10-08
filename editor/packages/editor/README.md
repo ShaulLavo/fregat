@@ -40,7 +40,10 @@ to each buffer; `setText` replaces that buffer. Document attachment itself emits
 text transaction. Scopes release their subscriptions when removed, and plugins that
 do not subscribe incur no transaction fan-out. Transactions are captured in commit
 order and delivered once after view acceptance, including edits and replacements
-authored by change callbacks or transaction listeners.
+authored by change callbacks or transaction listeners. If an outgoing document is
+swapped or detached before acceptance, its captured commits finish delivery to the
+remaining subscriptions. Disposing the editor or removing the final transaction
+subscription drops pending commits and releases their snapshot references.
 
 ```ts
 import { createPlugin } from '@singapore-editor/core/extensions'

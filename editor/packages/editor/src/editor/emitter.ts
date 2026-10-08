@@ -34,6 +34,10 @@ export class EditorEventSource<T> {
     }
   }
 
+  public clear(): void {
+    this.listeners.clear()
+  }
+
   public fire(event: T): void {
     // The listeners are the ones registered when the event happened: a listener
     // that subscribes mid-delivery has not seen the state this event describes,
