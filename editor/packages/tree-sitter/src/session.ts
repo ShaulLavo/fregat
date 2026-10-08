@@ -408,6 +408,7 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
       return this.createRangeUnavailableResult(range, 'Complete syntax analysis is pending')
     const background = this.result.projection.analysis
     const next = this.updateFromTreeSitterRangeResult(result, range)
+    if (next.projection.analysis?.kind === 'cancelled') return next
     if (
       background?.kind === 'partial' &&
       background.background &&
@@ -657,11 +658,14 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
     if (result.snapshotVersion !== this.parsedSnapshotVersion) return this.result
     if (!sameSyntaxRange(result.range, range)) return this.result
 
-    this.result = treeSitterParseResultToEditorSyntaxResult(
+    const next = treeSitterParseResultToEditorSyntaxResult(
       result,
       this.resultContext(this.analysedRead?.text.length ?? this.initialLength, [range]),
     )
-    return this.result
+    // A failed range operation does not retire the document's usable tree or colors.
+    if (next.projection.analysis?.kind === 'cancelled') return next
+    this.result = next
+    return next
   }
 
   private createRangeUnavailableResult(

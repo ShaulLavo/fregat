@@ -1291,6 +1291,62 @@ const parseBootstrapPreview = async (
   }
 }
 
+const bootstrapCoverageEnd = (preview: ParsedDocument): number => {
+  const language = preview.languageId
+  const statements = ['javascript', 'typescript', 'tsx'].includes(language)
+  if (!statements && language !== 'html') return 0
+  for (const node of preview.layers[0]!.tree.rootNode.namedChildren) {
+    if (node.type === 'comment' && bootstrapCommentTerminated(node, preview.source, language))
+      continue
+    if (statements && bootstrapStatementTerminated(node)) continue
+    if (language === 'html' && bootstrapElementTerminated(node)) continue
+    return node.startIndex
+  }
+  return preview.size
+}
+
+const bootstrapStatementTerminated = (node: Node): boolean => {
+  if (
+    ![
+      'expression_statement',
+      'lexical_declaration',
+      'variable_declaration',
+      'import_statement',
+      'export_statement',
+      'type_alias_declaration',
+    ].includes(node.type)
+  )
+    return false
+  let terminal = node
+  while (terminal.lastChild) terminal = terminal.lastChild
+  return terminal.type === ';'
+}
+
+const bootstrapElementTerminated = (node: Node): boolean => {
+  const terminal = node.lastNamedChild?.type
+  return terminal === 'end_tag' || terminal === 'self_closing_tag'
+}
+
+const bootstrapCommentTerminated = (
+  node: Node,
+  source: TreeSitterPieceTableInput,
+  language: string,
+): boolean => {
+  const tail = readTreeSitterInputRange(
+    source,
+    Math.max(node.startIndex, node.endIndex - 3),
+    node.endIndex,
+  )
+  if (language === 'html') return tail.endsWith('-->')
+  if (tail.endsWith('*/')) return true
+  const next = readTreeSitterInputRange(
+    source,
+    node.endIndex,
+    Math.min(source.length, node.endIndex + 1),
+  )
+  return next === '\n' || next === '\r'
+}
+
 const queryBootstrapRange = async (
   request: TreeSitterRangeRequest,
   context: CancellationContext,
@@ -1325,7 +1381,10 @@ const queryBootstrapRange = async (
   if (!preview) return undefined
   // Recovery in a truncated tree can reinterpret tokens before the error's range.
   if (preview.layers.some((layer) => layer.tree.rootNode.hasError)) return undefined
+  // A valid artificial EOF can still turn a future call into a plain identifier.
+  const coverageEnd = bootstrapCoverageEnd(preview)
   const range = normalizedSyntaxRange(request.range, staged.source.length)
+  if (range.endIndex > coverageEnd) return undefined
   const result = await flattenDocumentRange(preview, context, {
     range,
     includeHighlights: request.includeHighlights,
@@ -1346,7 +1405,7 @@ const queryBootstrapRange = async (
     languageId: request.languageId,
     range,
     source: sourceTag(staged.source),
-    analysis: { kind: 'partial', coveredRange: { startIndex: 0, endIndex: preview.size } },
+    analysis: { kind: 'partial', coveredRange: { startIndex: 0, endIndex: coverageEnd } },
     folds: [],
     errors: [],
     brackets: [],

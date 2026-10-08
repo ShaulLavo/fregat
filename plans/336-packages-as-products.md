@@ -494,7 +494,11 @@ by the pre-existing tail-layout failure recorded below.
 - A distant range waits for complete context. Any grammar recovery error in the preview or an
   injected layer also waits for complete context: truncation can reinterpret tokens before the
   error's reported range. Crossing-comment and long-template controls exposed incorrect provisional
-  tokens before this guard. Provisional highlighting requires a usable bounded parse.
+  tokens before this guard. Error-free parsing alone is insufficient: a distant call continuation
+  can change an identifier's color. Preview coverage stops before the first unterminated top-level
+  construct. JavaScript, TypeScript and TSX accept only explicit semicolon-terminated statement
+  kinds; HTML accepts closed elements. Comments need an observed terminator or newline. Other
+  grammars and unproven boundaries wait for complete context.
 - Partial trees occupy separate worker storage. Their replies carry the canonical source identity,
   sync point, snapshot version and coverage. They publish tokens and captures, with empty folds,
   diagnostics, brackets and injection structure. Structural selection reads complete trees only.
@@ -505,16 +509,33 @@ by the pre-existing tail-layout failure recorded below.
 - Background completion invalidates retained provisional range caches and notifies the mounted
   editor to request its current visible range again. Source changes and disposal cancel stale
   work. Budget cancellation retains its phase timings and structured outcome. Already produced
-  provisional tokens remain available when complete analysis exhausts its budget.
+  provisional tokens remain available when complete analysis exhausts its budget. Range-query
+  cancellation belongs to that operation: its reply retains cancellation details while the session
+  preserves its last usable tree and colors, allowing another range query without editing.
 - The noisy baseline measured acknowledgement-to-unpin gaps of 65.4, 66.2 and 67.9 ms at 10 MiB.
   The viewport-first complete path skips the unchanged idle reparse so it cannot block subsequent
   visible requests. Existing small-source and Markdown idle behavior is unchanged. First-edit
   behavior remains part of the original uninstrumented comparison matrix.
 - The frozen baseline at `66c8e8a68` failed all six initial preview controls. The complete real-worker
-  Chromium suite passes 88 controls, including 14 viewport-first cases, mounted replacement,
+  Chromium suite passes 92 controls, including 18 viewport-first cases, mounted replacement,
   canonical edit cancellation, disposal, TSX ambiguity and HTML script/style injections. Unit
-  controls pass 106 tests; diagnostic harness controls pass nine tests. Core and Tree-sitter
+  controls pass 107 tests; diagnostic harness controls pass nine tests. Core and Tree-sitter
   typechecks, workspace builds, retained syntax regressions and repository gates pass.
+
+#### Review fixes and verification
+
+Both blocking controls failed on `832edf887`: a distant call continuation changed first-screen
+capture interpretation, and a budget-cancelled range replaced the session's usable result. The
+committed controls compare resolved token styles as well as captures for the future call, arrow
+continuation and a terminated-call positive case. Another control checks that provisional coverage
+ends before a later open statement. The cancellation control checks preserved timings, retained
+session state and a successful third query without an edit or reopen.
+
+A fresh one-repetition 200 MiB diagnostic smoke after these fixes highlights in 375.9 ms with
+27,455 bootstrap units. Its screenshot was read back and shows colored text throughout the visible
+viewport. This is a noisy smoke check, not a replacement for the earlier balanced matrix or a
+full typing/scroll endorsement. The earlier matrices describe the pre-review implementation.
+Evidence is retained in the existing evidence directory's `review-fixes/` subdirectory.
 
 #### Viewport-first retained experiments
 

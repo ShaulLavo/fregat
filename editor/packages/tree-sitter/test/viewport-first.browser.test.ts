@@ -1,5 +1,6 @@
 import { afterEach, expect, it } from 'vitest'
 import { Editor } from '@singapore-editor/core/editor'
+import { toEditorTokenStore } from '@singapore-editor/core/syntax'
 import { createTreeSitterLanguagePlugin } from '../src/index'
 import { TreeSitterWorkerClient } from '../src/treeSitter/workerClient'
 import { TreeSitterLanguageRegistry } from '../src/treeSitter/registry'
@@ -181,4 +182,43 @@ it('replaces provisional syntax in a mounted editor without another edit or scro
     editor.dispose()
     host.remove()
   }
+}, 30_000)
+
+it.each([
+  ['terminated call', 'foo();\n', ' '.repeat(80_000), 'partial'],
+  ['distant call continuation', 'foo', ' '.repeat(80_000) + '(42);\n', 'full'],
+  ['distant arrow continuation', 'const foo = ', ' '.repeat(80_000) + '() => 42;\n', 'full'],
+])(
+  'keeps initial token styles stable for a %s',
+  async (_name, prefix, suffix, kind) => {
+    const doc = document(prefix + suffix)
+    await doc.run()
+    const range = { startIndex: 0, endIndex: prefix.length }
+    const initial = await doc.runtime.queryRange(range)
+    await expect.poll(() => doc.runtime.getResult().projection.analysis?.kind).toBe('full')
+    const complete = await doc.runtime.queryRange(range)
+    expect(toEditorTokenStore(initial.tokens).toTokens()).toEqual(
+      toEditorTokenStore(complete.tokens).toTokens(),
+    )
+    expect(initial.captures).toEqual(complete.captures)
+    expect(initial.projection.analysis?.kind).toBe(kind)
+  },
+  30_000,
+)
+
+it('limits provisional coverage before an unterminated trailing statement', async () => {
+  const prefix = 'const stable = 1;\n'
+  const doc = document(prefix + 'foo' + ' '.repeat(80_000) + '(42);\n')
+  await doc.run()
+  const range = { startIndex: 0, endIndex: prefix.length }
+  const initial = await doc.runtime.queryRange(range)
+  expect(initial.projection.analysis).toEqual({
+    kind: 'partial',
+    coveredRange: { startIndex: 0, endIndex: prefix.length },
+  })
+  await expect.poll(() => doc.runtime.getResult().projection.analysis?.kind).toBe('full')
+  const complete = await doc.runtime.queryRange(range)
+  expect(toEditorTokenStore(initial.tokens).toTokens()).toEqual(
+    toEditorTokenStore(complete.tokens).toTokens(),
+  )
 }, 30_000)
