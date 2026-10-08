@@ -183,7 +183,7 @@
       "file": "packages/collaboration/src/plugin.ts",
       "id": "packages/collaboration/src/plugin.ts:setInterval:7071949d81",
       "justification": "The protocol needs elapsed time for failure detection; this opt-in clock is configurable, manual in simulations, and cleared when its view detaches.",
-      "line": 218,
+      "line": 259,
       "snippet": "timer = setInterval("
     },
     {
