@@ -147,6 +147,70 @@
       "snippet": "if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs))"
     },
     {
+      "api": "setTimeout",
+      "file": "packages/collaboration/server/signaling.ts",
+      "id": "packages/collaboration/server/signaling.ts:setTimeout:2017a2146d",
+      "justification": "Authorization may never settle; the deadline bounds reserved quota, and finally clears it and releases the reservation when upgrade fails.",
+      "line": 117,
+      "snippet": "timeout = setTimeout(() => resolve(false), options.limits.subscribeTimeout)"
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/collaboration/server/signaling.ts",
+      "id": "packages/collaboration/server/signaling.ts:setTimeout:a47f4f735b",
+      "justification": "Silent clients emit no progress event; one deadline per socket bounds subscription and application idle time, is replaced by progress, and is cleared on close.",
+      "line": 74,
+      "snippet": "socket.data.deadline = setTimeout(() => {"
+    },
+    {
+      "api": "setInterval",
+      "file": "packages/collaboration/src/broadcast-transport.ts",
+      "id": "packages/collaboration/src/broadcast-transport.ts:setInterval:3a6db814f1",
+      "justification": "BroadcastChannel has no remote-close or crash event; this heartbeat expires silent peers and advertises membership, and close clears the interval.",
+      "line": 62,
+      "snippet": "this.timer = setInterval(() => {"
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/collaboration/src/signaling.ts",
+      "id": "packages/collaboration/src/signaling.ts:setTimeout:2fa18ecddb",
+      "justification": "Remote broker readiness has no notification; one retry per URL spaces reconnect attempts, connect checks closed, and close clears every pending retry.",
+      "line": 88,
+      "snippet": "setTimeout(() => this.connect(url), this.options.reconnectInterval),"
+    },
+    {
+      "api": "setInterval",
+      "file": "packages/collaboration/src/webrtc-transport.ts",
+      "id": "packages/collaboration/src/webrtc-transport.ts:setInterval:f477778391",
+      "justification": "Signaling has no peer-roster notification; discovery announcements and retries expire silent peers on this protocol clock, which close clears.",
+      "line": 116,
+      "snippet": "this.timer = setInterval(() => {"
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/collaboration/src/webrtc-transport.ts",
+      "id": "packages/collaboration/src/webrtc-transport.ts:setTimeout:4302f06a3f",
+      "justification": "A TURN supplier may never settle; abort bounds the wait, finally clears the deadline, and close aborts pending requests.",
+      "line": 329,
+      "snippet": "const credentialTimeout = setTimeout(() => abort.abort(), this.options.connectionTimeout)"
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/collaboration/src/webrtc-transport.ts",
+      "id": "packages/collaboration/src/webrtc-transport.ts:setTimeout:f246bd882a",
+      "justification": "Native connection setup can stall without a terminal event; channel open or removal clears this deadline, and failure checks the current link generation.",
+      "line": 350,
+      "snippet": "timeout: setTimeout("
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/collaboration/vitest.browser.config.ts",
+      "id": "packages/collaboration/vitest.browser.config.ts:setTimeout:aa312d20fb",
+      "justification": "A child can emit neither readiness nor exit; this bounds startup failure, while stdout readiness, error, and exit notifications each clear the deadline.",
+      "line": 23,
+      "snippet": "const timeout = setTimeout("
+    },
+    {
       "api": "queueMicrotask",
       "file": "packages/decode/src/diffusion.ts",
       "id": "packages/decode/src/diffusion.ts:queueMicrotask:a60528563a",
