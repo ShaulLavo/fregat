@@ -1,3 +1,4 @@
+import { createEngine } from './engine-fixture'
 import { expect, test } from 'vitest'
 import { Host, InMemoryTransport, Participant, ReferenceEngine, simulate } from '../src/index'
 import type { Envelope } from '../src/index'
@@ -12,7 +13,7 @@ test('review: undo middle deletion through deleted surroundings retains original
   const room = undoRoom({ groupDelay: 0 }, 3)
   room.edit(2, 0, 0, 'abcde')
   room.sync()
-  const ids = room.engine.snapshot().nodes.map((n) => n.id)
+  const ids = room.engine.characters().map((n) => n.id)
   room.edit(0, 1, 3, '')
   room.sync()
   room.edit(1, 0, 2, '')
@@ -20,7 +21,7 @@ test('review: undo middle deletion through deleted surroundings retains original
   room.undo(0)
   room.converged()
   expect(room.text()).toBe('bcd')
-  expect(room.engine.snapshot().nodes.map((n) => n.id)).toEqual(ids)
+  expect(room.engine.characters().map((n) => n.id)).toEqual(ids)
 })
 
 test('review: Bob replacement survives Alice insertion undo and redo', () => {
@@ -41,19 +42,19 @@ test('review: Bob replacement survives Alice insertion undo and redo', () => {
 })
 
 test('review: transport must reject impersonated effect commands', () => {
-  const engine = new ReferenceEngine()
+  const engine = createEngine()
   const host = new Host({ document: 'd', epoch: '1', engine })
   const alice = new Participant({
     actor: 'alice',
     document: 'd',
     epoch: '1',
-    engine: new ReferenceEngine(),
+    engine: createEngine(),
   })
   const bob = new Participant({
     actor: 'bob',
     document: 'd',
     epoch: '1',
-    engine: new ReferenceEngine(),
+    engine: createEngine(),
   })
   const transport = new InMemoryTransport(host, [alice, bob])
   const edit = alice.local({ offset: 0, deleteCount: 0, text: 'Alice' })
@@ -119,7 +120,12 @@ test('review: concurrent simulator detects last-delete-wins visibility mutant', 
   try {
     for (const seed of seedsToCheck) {
       seeds++
-      simulate({ seed, participants: 3 + (seed % 3), undoRedo: true })
+      simulate({
+        seed,
+        participants: 3 + (seed % 3),
+        undoRedo: true,
+        createEngine: () => new ReferenceEngine(),
+      })
     }
   } catch (error) {
     failure = error
@@ -137,8 +143,8 @@ test('review: concurrent simulator detects last-delete-wins visibility mutant', 
   })
 })
 
-function independentlyCheck(seed: number) {
-  const engine = new ReferenceEngine()
+function independentlyCheck(seed: number, factory = createEngine) {
+  const engine = factory()
   const host = new Host({ document: 'oracle', epoch: '1', engine })
   const participants = ['a', 'b', 'c'].map(
     (actor) =>
@@ -146,7 +152,7 @@ function independentlyCheck(seed: number) {
         actor,
         document: 'oracle',
         epoch: '1',
-        engine: new ReferenceEngine(),
+        engine: factory(),
         undo: { groupDelay: 0 },
       }),
   )
@@ -183,7 +189,7 @@ function independentlyCheck(seed: number) {
     }
     // Host drains ready dependants before publishing; inspect the completed batch.
     if (message.sequence !== host.hostSequence) return
-    const visible = engine.snapshot().nodes.flatMap((node) => {
+    const visible = engine.characters().flatMap((node) => {
       const item = chars.get(char(node.id))!
       let live = !!states.get(item.insert)
       for (const deletion of item.deletes) if (states.get(deletion)) live = false
@@ -272,7 +278,7 @@ test('review: independent per-character oracle kills last-delete-wins mutant', (
   }
   let failure: unknown
   try {
-    independentlyCheck(0)
+    independentlyCheck(0, () => new ReferenceEngine())
   } catch (error) {
     failure = error
     console.log('INDEPENDENT MUTATION CONTROL:', String(error))

@@ -84,6 +84,8 @@ const deleted = deleteByCharId(edited, [{ start: left, count: 2 }]) // XYc
 
 `applyCharIdEdit(snapshot, { delete: spans, insert: insertion })` applies both halves of a replacement in one persistent edit. placement is `{ after: id | 'start' }` or `{ before: id | 'end' }`. the ordering engine chooses that exact structural boundary; it can name hidden characters. deletion hides only the supplied IDs, preserving other text inserted between them. already-hidden targets are harmless; unknown IDs and duplicate insertion IDs throw before changing the snapshot
 
+`setCharIdVisibility(snapshot, spans)` atomically sets each disjoint identity span's `visible` state. it revives retained original IDs and payloads without copying text or reserving replacements. the whole batch is checked before mutation; unknown IDs, invalid spans and overlapping targets fail. revival fails with `ReclaimedTextError` when any required payload has expired, including holes inside sparse storage. `retainCharIdPayloads(snapshot, spans)` registers immutable, reusable undo-reachable identity spans for the collector; standalone reclamation forks preserve these roots
+
 identity-enabled snapshots require authored IDs for every insertion. ordinary offset deletion still works. collaborative documents keep exact tombstone order and skip stand-in compaction; text reclamation remains available. retain every snapshot you still need before reclaiming shared storage. identity metadata and hidden line-break indexes survive freed text
 
 ## working on it

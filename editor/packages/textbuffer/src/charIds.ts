@@ -17,7 +17,7 @@ import {
   type CharIdSpan,
   type IdentityIndex,
 } from './identityRuns'
-import { extendTailChunk } from './buffers'
+import { bufferSpanAt, extendTailChunk } from './buffers'
 import { ensureValidRange, splitsSurrogatePair } from './reads'
 import { applyReverseIndexChanges, lookupReverseIndex } from './reverseIndex'
 import { createNormalizedSnapshot, createSnapshot, editingEpoch } from './snapshot'
@@ -26,10 +26,10 @@ import {
   findPieceByOrder,
   findVisiblePieceContainingOffset,
   findVisiblePieceStartingAt,
-  hideAtPieceRanges,
+  setAtPieceRanges,
   insertAtPieceBoundary,
   type AnchorLocation,
-  type PieceHideRange,
+  type PieceVisibilityRange,
 } from './tree'
 import { ORIGINAL_BUFFER } from './node'
 
@@ -53,6 +53,7 @@ export type CharIdInsertion = {
   readonly text: string
   readonly at: CharIdBoundary
 }
+export type CharIdVisibility = CharIdSpan & { readonly visible: boolean }
 export type CharIdEdit = {
   readonly delete?: readonly CharIdSpan[]
   readonly insert?: CharIdInsertion
@@ -180,8 +181,8 @@ const boundaryOf = (snapshot: PieceTableSnapshot, boundary: CharIdBoundary): Bou
   return { piece: node.piece, offset: after ? 0 : node.piece.length }
 }
 
-const mergeRanges = (ranges: readonly PieceHideRange[]): readonly PieceHideRange[] => {
-  const merged: PieceHideRange[] = []
+const mergeRanges = (ranges: readonly PieceVisibilityRange[]): readonly PieceVisibilityRange[] => {
+  const merged: PieceVisibilityRange[] = []
   for (const range of ranges.toSorted((a, b) => a.from - b.from)) {
     const previous = merged.at(-1)
     if (previous && range.from <= previous.to) {
@@ -193,12 +194,23 @@ const mergeRanges = (ranges: readonly PieceHideRange[]): readonly PieceHideRange
   return merged
 }
 
+const ensureRetainedPayload = (
+  snapshot: PieceTableSnapshot,
+  buffer: PieceBufferId,
+  from: number,
+  to: number,
+): void => {
+  // Prove complete sparse coverage before editing the tree or advancing its epoch.
+  while (from < to) from = Math.min(to, bufferSpanAt(snapshot.buffers, buffer, from).end)
+}
+
 const collectStorageRanges = (
   snapshot: PieceTableSnapshot,
   buffer: PieceBufferId,
   from: number,
   count: number,
-  targets: Map<number, PieceHideRange[]>,
+  targets: Map<number, PieceVisibilityRange[]>,
+  visible = false,
 ): void => {
   const end = from + count
   while (from < end) {
@@ -206,9 +218,10 @@ const collectStorageRanges = (
     if (!found) throw new RangeError('deletion character storage is missing')
     const piece = found.piece
     const to = Math.min(end, piece.start + piece.length)
-    if (piece.visible) {
+    if (piece.visible !== visible) {
+      if (visible) ensureRetainedPayload(snapshot, buffer, from, to)
       const ranges = targets.get(piece.order) ?? []
-      ranges.push({ from: from - piece.start, to: to - piece.start })
+      ranges.push({ from: from - piece.start, to: to - piece.start, visible })
       targets.set(piece.order, ranges)
     }
     from = to
@@ -218,9 +231,9 @@ const collectStorageRanges = (
 const deletionTargets = (
   snapshot: PieceTableSnapshot,
   spans: readonly CharIdSpan[],
-): ReadonlyMap<number, readonly PieceHideRange[]> => {
+): ReadonlyMap<number, readonly PieceVisibilityRange[]> => {
   const index = identitiesOf(snapshot)
-  const targets = new Map<number, PieceHideRange[]>()
+  const targets = new Map<number, PieceVisibilityRange[]>()
   for (const { start, count } of spans) {
     validateCharIdSpan(start, count)
     const end = start.counter + count
@@ -265,7 +278,7 @@ export const applyCharIdEdit = (
   const epoch = editingEpoch(snapshot)
   const changes: Piece[] = []
   const hiding = { changes, normalizeOrders: false, snap: null }
-  let root = hideAtPieceRanges(
+  let root = setAtPieceRanges(
     snapshot.root,
     targets,
     Array.from(targets.keys()).sort((a, b) => a - b),
@@ -345,3 +358,69 @@ export const deleteByCharId = (
   snapshot: PieceTableSnapshot,
   spans: readonly CharIdSpan[],
 ): PieceTableSnapshot => applyCharIdEdit(snapshot, { delete: spans })
+
+/** Change retained IDs' visibility without allocating identities or copying their payloads.
+ * Spans must be disjoint, so contradictory visibility cannot depend on input order. */
+export const setCharIdVisibility = (
+  snapshot: PieceTableSnapshot,
+  spans: readonly CharIdVisibility[],
+): PieceTableSnapshot => {
+  const index = identitiesOf(snapshot)
+  const targets = new Map<number, PieceVisibilityRange[]>()
+  const sorted = spans.toSorted((a, b) => {
+    if (a.start.bunch !== b.start.bunch) return a.start.bunch < b.start.bunch ? -1 : 1
+    return a.start.counter - b.start.counter
+  })
+  let previous: CharIdVisibility | undefined
+  for (const span of sorted) {
+    validateCharIdSpan(span.start, span.count)
+    if (typeof span.visible !== 'boolean') throw new RangeError('invalid character visibility')
+    if (
+      previous &&
+      previous.start.bunch === span.start.bunch &&
+      previous.start.counter + previous.count > span.start.counter
+    )
+      throw new RangeError('overlapping character visibility spans')
+    previous = span
+    const end = span.start.counter + span.count
+    let counter = span.start.counter
+    while (counter < end) {
+      const run = identityRunAtId(index, { bunch: span.start.bunch, counter })
+      if (!run) throw new RangeError('visibility character is unknown')
+      const taken = Math.min(end - counter, run.counter + run.count - counter)
+      collectStorageRanges(
+        snapshot,
+        run.buffer,
+        run.offset + counter - run.counter,
+        taken,
+        targets,
+        span.visible,
+      )
+      counter += taken
+    }
+  }
+  if (!targets.size) return snapshot
+  for (const [order, ranges] of targets)
+    targets.set(
+      order,
+      ranges.toSorted((a, b) => a.from - b.from),
+    )
+  const changes: Piece[] = []
+  const context = { changes, normalizeOrders: false, snap: null }
+  const root = setAtPieceRanges(
+    snapshot.root,
+    targets,
+    [...targets.keys()].sort((a, b) => a - b),
+    snapshot.buffers,
+    context,
+    editingEpoch(snapshot),
+  )
+  if (context.normalizeOrders)
+    return createNormalizedSnapshot(snapshot.buffers, root, snapshot.reverseIndex, changes, index)
+  return createSnapshot(
+    snapshot.buffers,
+    root,
+    applyReverseIndexChanges(snapshot.reverseIndex, changes),
+    index,
+  )
+}

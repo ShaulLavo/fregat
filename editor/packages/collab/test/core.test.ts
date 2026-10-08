@@ -1,6 +1,7 @@
+import { createEngine, characters } from './engine-fixture'
 import { submitAsAuthor } from './host-fixtures'
 import { expect, test } from 'vitest'
-import { CollabFailure, Host, InMemoryTransport, Participant, ReferenceEngine } from '../src/index'
+import { CollabFailure, Host, InMemoryTransport, Participant } from '../src/index'
 import type { Envelope, HostMessage } from '../src/index'
 import { accept, authority, replica } from './fixtures'
 
@@ -38,7 +39,7 @@ test('offset lookup, origins and snapshots retain exact hidden nodes', () => {
 test('authoring uses UTF-16 IDs and rejects edits through a surrogate pair', () => {
   const a = replica('a')
   const insert = a.insert(0, 'a😀b')
-  expect(a.engine.snapshot().nodes).toHaveLength(4)
+  expect(characters(a.engine)).toHaveLength(4)
   expect(() => a.insert(2, 'x')).toThrow('split-surrogate')
   expect(() => a.remove(1, 1)).toThrow('split-surrogate')
   const remove = a.remove(1, 2)
@@ -54,8 +55,8 @@ test('straight typing extends its reserved bunch and replay retains the IDs', ()
   const a = replica('a')
   const first = a.insert(0, 'ab')
   const next = a.insert(2, 'c')
-  expect(first.change).toMatchObject({ start: { bunch: 'a:1', counter: 0 } })
-  expect(next.change).toMatchObject({ start: { bunch: 'a:1', counter: 2 } })
+  expect(first.change).toMatchObject({ start: { bunch: 'a:0', counter: 0 } })
+  expect(next.change).toMatchObject({ start: { bunch: 'a:0', counter: 2 } })
   const before = a.participant.state().pending
   const b = replica('b')
   b.insert(0, 'x')
@@ -63,7 +64,7 @@ test('straight typing extends its reserved bunch and replay retains the IDs', ()
   expect(a.participant.state().pending).toEqual(before)
   expect(a.participant.text()).toBe('abcx')
   const backwards = a.insert(0, 'z')
-  expect(backwards.change).toMatchObject({ start: { bunch: 'a:2', counter: 0 } })
+  expect(backwards.change).toMatchObject({ start: { bunch: 'a:1', counter: 0 } })
 })
 
 test('deleting a counter span preserves concurrent inserts between its fragments', () => {
@@ -73,7 +74,7 @@ test('deleting a counter span preserves concurrent inserts between its fragments
   accept(b.participant, a.edits)
   b.insert(2, 'XY')
   a.remove(1, 2)
-  const engine = new ReferenceEngine()
+  const engine = createEngine()
   engine.apply(a.edits[0]!)
   engine.apply(b.edits[0]!)
   engine.apply(a.edits[1]!)
@@ -88,7 +89,7 @@ test('replace targets authored IDs and preserves a concurrent insertion', () => 
   accept(b.participant, a.edits)
   b.insert(2, 'XY')
   a.replace(1, 2, 'Q')
-  const engine = new ReferenceEngine()
+  const engine = createEngine()
   engine.apply(a.edits[0]!)
   engine.apply(b.edits[0]!)
   engine.apply(a.edits[1]!)
@@ -290,7 +291,7 @@ test('host listener submissions preserve broadcast order for every subscriber', 
   const a = replica('a')
   const first = a.insert(0, 'a'),
     second = a.insert(1, 'b')
-  const host = new Host({ document: 'test', epoch: '1', engine: new ReferenceEngine() })
+  const host = new Host({ document: 'test', epoch: '1', engine: createEngine() })
   const received: number[][] = [[], []]
   host.subscribe((message) => {
     received[0]!.push(message.sequence)
@@ -357,7 +358,7 @@ test('FugueMax reverses right-origin sequence order before the ID tie-break', ()
     [initial, sibling, beforeSibling, toEnd],
     [initial, toEnd, sibling, beforeSibling],
   ]) {
-    const engine = new ReferenceEngine()
+    const engine = createEngine()
     for (const envelope of history) engine.apply(envelope)
     expect(engine.text()).toBe('bZAc')
     const snapshot = engine.snapshot()

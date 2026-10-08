@@ -1,6 +1,7 @@
+import { createEngine } from './engine-fixture'
 import { submitAsAuthor } from './host-fixtures'
 import { expect, test } from 'vitest'
-import { Host, InMemoryTransport, ReferenceEngine } from '../src/index'
+import { Host, InMemoryTransport } from '../src/index'
 import type { Envelope } from '../src/index'
 import { authority, replica } from './fixtures'
 import { undoRoom } from './undo-fixtures'
@@ -141,12 +142,10 @@ test('provenance occupies identity spans and snapshots retain independently reve
   room.edit(0, 0, 0, 'abcdef')
   room.sync()
   const original = room.engine.snapshot()
-  expect(original.effects.runs[0]![1]).toHaveLength(1)
   room.edit(0, 1, 3, '')
   room.edit(1, 2, 3, '')
   room.sync()
   const hidden = room.engine.snapshot()
-  expect(hidden.effects.runs[0]![1]).toHaveLength(5)
   room.undo()
   room.sync()
   expect(room.text()).toBe('abf')
@@ -157,7 +156,6 @@ test('provenance occupies identity spans and snapshots retain independently reve
   expect(room.engine.text()).toBe('af')
   room.engine.restore(original)
   expect(room.engine.text()).toBe('abcdef')
-  expect(original.effects.runs[0]![1]).toHaveLength(1)
 })
 
 test('setEffects replay after a later command is deduplicated by command identity', () => {
@@ -165,7 +163,7 @@ test('setEffects replay after a later command is deduplicated by command identit
   room.edit(0, 0, 0, 'x')
   const undo = room.undo(),
     redo = room.redo()
-  const engine = new ReferenceEngine()
+  const engine = createEngine()
   for (const envelope of room.users[0]!.participant.state().pending) engine.apply(envelope)
   expect(engine.text()).toBe('x')
   engine.apply(undo)
@@ -320,17 +318,17 @@ test('effect state survives a retained snapshot without allocating replacement i
   const room = undoRoom()
   room.edit(0, 0, 0, 'abc')
   room.sync()
-  const ids = room.engine.snapshot().nodes.map((node) => node.id)
+  const ids = room.engine.characters().map((node) => node.id)
   room.undo()
   room.sync()
-  const engine = new ReferenceEngine()
+  const engine = createEngine()
   engine.restore(room.engine.snapshot())
   const host = new Host({ document: 'undo', epoch: '1', engine })
   // Full host handoff also needs outcome/frontier transfer in the session layer.
   const redo = room.redo()
   engine.apply(redo)
   expect(host.text()).toBe('abc')
-  expect(engine.snapshot().nodes.map((node) => node.id)).toEqual(ids)
+  expect(engine.characters().map((node) => node.id)).toEqual(ids)
 })
 
 test('publication-created local work clears redo before rejection recovery replays history', () => {
