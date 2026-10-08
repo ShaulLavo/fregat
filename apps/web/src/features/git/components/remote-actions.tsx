@@ -26,7 +26,11 @@ export function RemoteActions({ rootPath }: { readonly rootPath: string }) {
   if (remoteState.data?.hasRemote === false)
     return (
       <>
-        <ToolbarButton label='Publish repository' onClick={() => setPublishing(true)}>
+        <ToolbarButton
+          size='icon-sm'
+          label='Publish repository'
+          onClick={() => setPublishing(true)}
+        >
           <CloudArrowUpIcon />
         </ToolbarButton>
         <PublishRepositoryDialog
@@ -40,6 +44,7 @@ export function RemoteActions({ rootPath }: { readonly rootPath: string }) {
   return (
     <>
       <ToolbarButton
+        size='icon-sm'
         disabled={fetchRemote.isPending}
         label='Fetch'
         onClick={() => fetchRemote.mutate()}
@@ -47,6 +52,7 @@ export function RemoteActions({ rootPath }: { readonly rootPath: string }) {
         <ArrowsClockwiseIcon />
       </ToolbarButton>
       <ToolbarButton
+        size='icon-sm'
         disabled={pullRemote.isPending}
         label='Pull'
         onClick={() => pullRemote.mutate()}
@@ -54,6 +60,7 @@ export function RemoteActions({ rootPath }: { readonly rootPath: string }) {
         <DownloadSimpleIcon />
       </ToolbarButton>
       <ToolbarButton
+        size='icon-sm'
         disabled={pushRemote.isPending}
         label='Push'
         onClick={() => pushRemote.mutate()}
