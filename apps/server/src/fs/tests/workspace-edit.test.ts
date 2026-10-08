@@ -903,6 +903,78 @@ describe('workspace edit transactions', () => {
     }
   })
 
+  it.each(['removed', 'file', 'dangling symlink'] as const)(
+    'discovers recovery when an unrelated workspace becomes a %s',
+    async (replacement) => {
+      const failure = { failCompensation: true, failSecondForward: true, firstRenameCount: 0 }
+      const fixture = await createFixture({
+        driver: (workspaceRoot) => partialWriteDriver(workspaceRoot, failure),
+      })
+      const partials: WorkspaceEditResult[] = []
+      for (const workspace of ['gone', 'active']) {
+        Object.assign(failure, { failSecondForward: true, firstRenameCount: 0 })
+        const first = await seedFile(fixture, `${workspace}/first.txt`, 'first-before')
+        const second = await seedFile(fixture, `${workspace}/second.txt`, 'second-before')
+        const prepared = await fixture.service.workspaceEditPrepare(
+          prepareRequest(
+            randomUUID(),
+            [
+              writeOperation(0, 'first.txt', first, 'first-after'),
+              writeOperation(1, 'second.txt', second, 'second-after'),
+            ],
+            workspace,
+          ),
+        )
+        const partial = await fixture.service.workspaceEditCommit(transition(prepared))
+        expect(partial.state).toBe('partial')
+        partials.push(partial)
+      }
+      const active = partials[1]!
+      const expected = {
+        operations: [
+          {
+            generation: active.generation,
+            operationId: active.operationId,
+            recoveryTarget: 'rolled-back',
+            unrecoveredPaths: ['first.txt'],
+            workspace: 'active',
+          },
+        ],
+      }
+      expect(await fixture.service.workspaceEditRecovery('active')).toMatchObject(expected)
+      const gone = workspacePath(fixture, 'gone')
+      await rm(gone, { recursive: true })
+      if (replacement === 'file') await writeFile(gone, 'replacement')
+      if (replacement === 'dangling symlink') await symlink(workspacePath(fixture, 'absent'), gone)
+      await fixture.service.close()
+      const restarted = restartedService(fixture)
+      const logDir = path.join(fixture.baseRoot, 'recovery-logs')
+      initializeObservability(testObservabilityEnv(logDir))
+
+      try {
+        const app = observedFsApp(restarted)
+        const response = await app.handle(
+          new Request('http://local/fs/workspace-edit/recovery?workspace=active', {
+            headers: { 'x-request-id': 'recovery-active' },
+          }),
+        )
+        expect(response.status).toBe(200)
+        expect(await response.json()).toMatchObject(expected)
+        const event = requestEvent(await flushedEvents(logDir), 'recovery-active')
+        expect(event).toMatchObject({ level: 'info', status: 200 })
+        expect(event).not.toHaveProperty('error')
+        expect(JSON.stringify(event)).not.toContain('stack')
+        expect(await restarted.workspaceEditStatus(partials[0]!.operationId)).toMatchObject({
+          found: true,
+          result: { state: 'partial' },
+        })
+      } finally {
+        await restarted.close()
+        await resetObservabilityForTests()
+      }
+    },
+  )
+
   it('rejects a prepared create after its workspace root becomes an outside symlink', async () => {
     const fixture = await createFixture()
     const project = workspacePath(fixture, 'project')
