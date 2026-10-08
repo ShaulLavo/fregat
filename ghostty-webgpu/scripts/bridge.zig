@@ -200,6 +200,11 @@ const CachedCell = struct {
     tag: c.GhosttyCellContentTag,
     key: ?*glyph_index.Entry,
 };
+const RenderedCell = struct {
+    raw: c.GhosttyCell,
+    key: ?*glyph_index.Entry,
+    reusable: bool,
+};
 const CachedRow = struct {
     id: c.GhosttyRenderStateRowId,
     cells: [*]CachedCell,
@@ -218,9 +223,11 @@ const FrameCache = struct {
     sources: [*]u32,
     used: [*]bool,
     inputs: [*]CachedCell,
+    rendered: [*]RenderedCell,
     cells: [*][16]f32,
     glyphs: [*][24]f32,
     moved: bool = false,
+    streaming: bool = false,
     appearance: [11]u32 = [_]u32{0} ** 11,
     default_style: c.GhosttyStyle,
 };
@@ -249,13 +256,15 @@ fn createFrameCacheFallible(columns: u32, rows: u32) error{OutOfMemory}!*FrameCa
     errdefer frameFree(bool, used, rows);
     const inputs = frameAllocate(CachedCell, columns * rows) orelse return error.OutOfMemory;
     errdefer frameFree(CachedCell, inputs, columns * rows);
+    const rendered = frameAllocate(RenderedCell, columns * rows) orelse return error.OutOfMemory;
+    errdefer frameFree(RenderedCell, rendered, columns * rows);
     const cells = frameAllocate([16]f32, columns * rows) orelse return error.OutOfMemory;
     errdefer frameFree([16]f32, cells, columns * rows);
     const glyphs = frameAllocate([24]f32, columns * rows) orelse return error.OutOfMemory;
     for (0..rows) |y| previous[y] = .{ .id = std.mem.zeroes(c.GhosttyRenderStateRowId), .cells = inputs + y * columns };
     var default_style: c.GhosttyStyle = undefined;
     c.ghostty_style_default(&default_style);
-    memory[0] = .{ .columns = columns, .rows = rows, .previous = previous, .next = next, .incoming = incoming, .sources = sources, .used = used, .inputs = inputs, .cells = cells, .glyphs = glyphs, .default_style = default_style };
+    memory[0] = .{ .columns = columns, .rows = rows, .previous = previous, .next = next, .incoming = incoming, .sources = sources, .used = used, .inputs = inputs, .rendered = rendered, .cells = cells, .glyphs = glyphs, .default_style = default_style };
     return &memory[0];
 }
 
@@ -270,6 +279,7 @@ export fn bridge_destroy_frame_cache(cache: *FrameCache) void {
     frameFree(u32, cache.sources, cache.rows);
     frameFree(bool, cache.used, cache.rows);
     frameFree(CachedCell, cache.inputs, cache.columns * cache.rows);
+    frameFree(RenderedCell, cache.rendered, cache.columns * cache.rows);
     frameFree([16]f32, cache.cells, cache.columns * cache.rows);
     frameFree([24]f32, cache.glyphs, cache.columns * cache.rows);
     ghostty_wasm_free(@ptrCast(cache), @sizeOf(FrameCache));
@@ -283,6 +293,7 @@ fn planFrameRows(frame: *Frame, state: c.GhosttyRenderState, iterator: c.Ghostty
     const cache = frame.row_cache.?;
     @memset(cache.used[0..cache.rows], false);
     cache.moved = false;
+    cache.streaming = true;
     const contrast: u64 = @bitCast(frame.glyph_minimum_contrast);
     const appearance = [11]u32{
         @bitCast(frame.cell_width), @bitCast(frame.cell_height), @bitCast(frame.minimum_contrast),
@@ -318,8 +329,10 @@ fn planFrameRows(frame: *Frame, state: c.GhosttyRenderState, iterator: c.Ghostty
         cache.next[destination] = cache.previous[source];
         cache.next[destination].id = cache.incoming[destination];
         cache.moved = cache.moved or source != destination;
+        // Forward writes preserve every reused source at or below its destination.
+        if (sameRowId(cache.previous[source].id, cache.incoming[destination]) and source < destination) cache.streaming = false;
     }
-    if (!cache.moved) return c.GHOSTTY_SUCCESS;
+    if (!cache.moved or cache.streaming) return c.GHOSTTY_SUCCESS;
     @memcpy(cache.cells[0 .. cache.columns * cache.rows], frame.cell_data[0 .. cache.columns * cache.rows]);
     @memcpy(cache.glyphs[0 .. cache.columns * cache.rows], frame.glyph_data[0 .. cache.columns * cache.rows]);
     return c.GHOSTTY_SUCCESS;
@@ -398,26 +411,34 @@ fn reuseFrameRow(frame: *Frame, y: u32) c.GhosttyResult {
     const source = cache.sources[y];
     const start = y * frame.columns;
     const source_start = source * frame.columns;
-    @memcpy(frame.cell_data[start .. start + frame.columns], cache.cells[source_start .. source_start + frame.columns]);
-    @memcpy(frame.glyph_data[start .. start + frame.columns], cache.glyphs[source_start .. source_start + frame.columns]);
+    const source_cells = if (cache.streaming) frame.cell_data else cache.cells;
+    const source_glyphs = if (cache.streaming) frame.glyph_data else cache.glyphs;
     var cell_first = frame.columns;
     var cell_end: u32 = 0;
     var glyph_first = frame.columns;
     var glyph_end: u32 = 0;
     const top = @as(f32, @floatFromInt(y)) * frame.cell_height;
     for (0..frame.columns) |x| {
-        const cell = &frame.cell_data[start + x];
-        const glyph = &frame.glyph_data[start + x];
+        const row = cache.next[y];
+        const selected = row.selected and x >= row.selection_start and x <= row.selection_end;
+        if (reuseRenderedCell(frame, row.cells[x].raw, @intCast(x), y, selected)) continue;
+        rememberRenderedCell(cache, start + x, cache.next[y].cells[x]);
+        var next_cell = source_cells[source_start + x];
+        var next_glyph = source_glyphs[source_start + x];
+        const cell = &next_cell;
+        const glyph = &next_glyph;
         if (cell[3] != 0) cell[1] = top;
         if (glyph[16] != 0) glyph[1] = top + cache.next[y].cells[x].key.?.glyph.offset_y;
-        if (!std.mem.eql(u8, std.mem.asBytes(cell), std.mem.asBytes(&cache.cells[start + x]))) {
+        if (!std.mem.eql(u8, std.mem.asBytes(cell), std.mem.asBytes(&frame.cell_data[start + x]))) {
             cell_first = @min(cell_first, @as(u32, @intCast(x)));
             cell_end = @intCast(x + 1);
         }
-        if (!std.mem.eql(u8, std.mem.asBytes(glyph), std.mem.asBytes(&cache.glyphs[start + x]))) {
+        if (!std.mem.eql(u8, std.mem.asBytes(glyph), std.mem.asBytes(&frame.glyph_data[start + x]))) {
             glyph_first = @min(glyph_first, @as(u32, @intCast(x)));
             glyph_end = @intCast(x + 1);
         }
+        frame.cell_data[start + x] = next_cell;
+        frame.glyph_data[start + x] = next_glyph;
     }
     if (frame.ranges_len == frame.ranges_cap) return c.GHOSTTY_OUT_OF_SPACE;
     frame.ranges[frame.ranges_len] = .{
@@ -616,6 +637,40 @@ fn buildCell(frame: *Frame, raws: []const c.GhosttyCell, cells: c.GhosttyRenderS
     }, style, fg, bg, selected);
 }
 
+fn rememberRenderedCell(cache: *FrameCache, slot: usize, input: CachedCell) void {
+    cache.rendered[slot] = .{
+        .raw = input.raw,
+        .key = input.key,
+        .reusable = !input.styled and input.tag == c.GHOSTTY_CELL_CONTENT_CODEPOINT and
+            (input.key == null or input.key.?.key.span == 1),
+    };
+}
+
+fn reuseRenderedCell(frame: *Frame, raw: c.GhosttyCell, x: u32, y: u32, selected: bool) bool {
+    const cache = frame.row_cache.?;
+    const previous = cache.previous[y];
+    if (!std.mem.eql(u32, &previous.appearance, &cache.appearance)) return false;
+    if (sameRowId(previous.id, std.mem.zeroes(c.GhosttyRenderStateRowId))) return false;
+    const old_selected = previous.selected and x >= previous.selection_start and x <= previous.selection_end;
+    if (selected != old_selected) return false;
+    const slot = y * frame.columns + x;
+    const input = cache.rendered[slot];
+    if (!input.reusable or input.raw != raw) return false;
+    const cursor = frame.cursor_visible != 0 and frame.cursor_x == x and frame.cursor_y == y;
+    const old_cursor = (@as(u32, @intFromFloat(frame.cell_data[slot][12])) & 1) != 0;
+    if (cursor != old_cursor or (cursor and frame.cell_data[slot][14] != @as(f32, @floatFromInt(frame.cursor_style)))) return false;
+    cache.next[y].cells[x] = .{
+        .raw = raw,
+        .foreground = 0xffffffff,
+        .background = 0xffffffff,
+        .style = 0,
+        .styled = false,
+        .tag = c.GHOSTTY_CELL_CONTENT_CODEPOINT,
+        .key = input.key,
+    };
+    return true;
+}
+
 fn buildRow(frame: *Frame, iterator: c.GhosttyRenderStateRowIterator, cells: *c.GhosttyRenderStateRowCells, y: u32, force: bool) c.GhosttyResult {
     var raw: c.GhosttyCellsView = undefined;
     var result = c.ghostty_render_state_row_get(iterator, c.GHOSTTY_RENDER_STATE_ROW_DATA_CELLS_RAW, &raw);
@@ -639,12 +694,14 @@ fn buildRow(frame: *Frame, iterator: c.GhosttyRenderStateRowIterator, cells: *c.
     var glyph_first = frame.columns;
     var glyph_end: u32 = 0;
     for (0..raw.len) |x| {
+        const selected = has_selection and x >= selection.start_x and x <= selection.end_x;
+        if (!force and reuseRenderedCell(frame, raw.ptr[x], @intCast(x), y, selected)) continue;
         const slot = y * frame.columns + x;
         const previous_cell = frame.cell_data[slot];
         const previous_glyph = frame.glyph_data[slot];
-        const selected = has_selection and x >= selection.start_x and x <= selection.end_x;
         result = buildCell(frame, raw.ptr[0..raw.len], cells.*, @intCast(x), y, selected);
         if (result != c.GHOSTTY_SUCCESS) return result;
+        rememberRenderedCell(frame.row_cache.?, slot, cached.cells[x]);
         if (force or !std.mem.eql(u8, std.mem.asBytes(&previous_cell), std.mem.asBytes(&frame.cell_data[slot]))) {
             cell_first = @min(cell_first, @as(u32, @intCast(x)));
             cell_end = @intCast(x + 1);
