@@ -1,5 +1,5 @@
 import { CaretRightIcon } from '@phosphor-icons/react'
-import { Button } from '@workspace/ui/components/button'
+import { TimelineAction } from '@/features/chat/components/timeline-action'
 import { cn } from '@workspace/ui/lib/utils'
 
 import { ActivityDetails } from '@/features/chat/components/activity-details'
@@ -22,10 +22,10 @@ export function ActivityRow({ activity }: { activity: ChatWorkLogEntry }) {
   return (
     <div className='min-w-0' data-work-log-entry-id={activity.id}>
       {expandable ? (
-        <Button
+        <TimelineAction
           aria-expanded={expanded}
           aria-label={failed ? `${label}, tool call failed` : label}
-          className='text-muted-foreground h-auto w-full min-w-0 justify-start gap-2 px-1 py-1 text-left text-xs font-normal'
+          className='text-muted-foreground h-auto w-full min-w-0 justify-start gap-2 py-1 text-left text-xs font-normal'
           data-scroll-anchor-ignore
           variant='ghost'
           onClick={() => toggle(activity.id)}
@@ -38,7 +38,7 @@ export function ActivityRow({ activity }: { activity: ChatWorkLogEntry }) {
               expanded && 'rotate-90',
             )}
           />
-        </Button>
+        </TimelineAction>
       ) : (
         <div className='text-muted-foreground flex min-w-0 items-center gap-2 px-1 py-1 text-xs'>
           {summary}

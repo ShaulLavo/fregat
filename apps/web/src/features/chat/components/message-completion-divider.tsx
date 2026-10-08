@@ -1,5 +1,5 @@
 import { CaretRightIcon } from '@phosphor-icons/react'
-import { Button } from '@workspace/ui/components/button'
+import { TimelineAction } from '@/features/chat/components/timeline-action'
 import { cn } from '@workspace/ui/lib/utils'
 import { TurnStatusFrame } from '@/features/chat/components/turn-status-frame'
 import { turnStatusLabel } from '@/features/chat/utils/turn-status-label'
@@ -25,9 +25,9 @@ export function MessageCompletionDivider({
   return (
     <TurnStatusFrame>
       {onToggle ? (
-        <Button
+        <TimelineAction
           aria-expanded={expanded}
-          className='text-muted-foreground h-auto max-w-full justify-start gap-1.5 px-1 py-1 text-xs font-normal'
+          className='text-muted-foreground h-auto max-w-full justify-start gap-1.5 py-1 text-xs font-normal'
           data-scroll-anchor-ignore
           variant='ghost'
           onClick={onToggle}
@@ -40,7 +40,7 @@ export function MessageCompletionDivider({
             )}
           />
           <span className='truncate'>{label}</span>
-        </Button>
+        </TimelineAction>
       ) : (
         <p className='px-1' role='status'>
           {label}
