@@ -9,6 +9,8 @@ import {
   createEditorTextBuffer,
   createPieceTableSnapshot,
   materializePieceTableFullText,
+  pieceTableContainsUnusualLineTerminators,
+  pieceTableDocumentText,
   type EditorTextTransaction,
 } from '../src/public/document'
 import { resolveSelection } from '../src/selections'
@@ -103,6 +105,41 @@ describe('exact plugin transactions on the simple API', () => {
     editor.setText('next\n')
     expect(transactions).toHaveLength(1)
   })
+
+  it.each(['session', 'static'] as const)(
+    'reuses canonical replacement input without a full-text read in %s mode',
+    (documentMode) => {
+      const { editor, transactions } = mount('abc')
+      const fullReads: string[] = []
+      vi.stubGlobal('__EDITOR_PERFORMANCE_DIAGNOSTICS__', (event: { name: string }) => {
+        if (event.name === 'textSnapshot.materializeFullText') fullReads.push(event.name)
+      })
+      expect(editor.materializeFullText()).toBe('abc')
+      expect(fullReads).toHaveLength(1)
+      fullReads.length = 0
+
+      const canonical = 'next\n'.repeat(10_000)
+      const incoming = '﻿' + 'next\r\n'.repeat(10_000)
+      editor.setText(incoming, { documentMode })
+      expect(fullReads).toEqual([])
+      expect(transactions).toHaveLength(1)
+      expect(transactions[0]!.edits).toEqual([{ from: 0, to: 3, text: canonical }])
+      expect(pieceTableDocumentText(transactions[0]!.snapshotAfter)).toBe(incoming)
+      expect(editor.getState().documentMode).toBe(documentMode)
+
+      editor.setText('﻿A\r\nB\r\nC\rD E ', { documentMode })
+      expect(fullReads).toEqual([])
+      expect(transactions[1]!.edits).toEqual([
+        { from: 0, to: canonical.length, text: 'A\nB\nC\nD\nE\n' },
+      ])
+      expect(pieceTableContainsUnusualLineTerminators(transactions[1]!.snapshotAfter)).toBe(true)
+      expect(pieceTableDocumentText(transactions[1]!.snapshotAfter)).toBe(
+        '﻿A\r\nB\r\nC\r\nD\r\nE\r\n',
+      )
+      editor.setText('A\nB\nC\nD\nE\n', { documentMode })
+      expect(transactions).toHaveLength(2)
+    },
+  )
 
   it('updates view state before a transaction listener authors the next edit', () => {
     const { editor, scope, transactions } = mount()
