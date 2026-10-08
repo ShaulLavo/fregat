@@ -53,3 +53,12 @@ jobs:
         env:
           COLLABORATION_LONG_RUN: ${{ inputs.long_run && '1' || '0' }}
         run: bun run --cwd editor/packages/collaboration test
+      - name: Verify self-hosted signaling broker
+        run: bun run --cwd editor/packages/collaboration test:server
+      - name: Install Chromium
+        uses: ./.github/actions/install-browsers
+        with:
+          playwright: apps/web/node_modules/.bin/playwright
+          browsers: chromium
+      - name: Verify native WebRTC and same-origin tabs
+        run: bun run --cwd editor/packages/collaboration test:browser

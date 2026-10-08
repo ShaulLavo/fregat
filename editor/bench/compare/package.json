@@ -5,7 +5,7 @@
   "scripts": {
     "build": "node build.mjs",
     "bench": "node run.mjs",
-    "test": "node --test protocol.test.mjs"
+    "test": "node --test protocol.test.mjs open-profile.test.mjs"
   },
   "dependencies": {
     "@codemirror/lang-javascript": "6.2.5",
