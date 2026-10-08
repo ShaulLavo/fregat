@@ -17,6 +17,7 @@ import {
   MockProviderAdapter,
   ProviderAdapterRegistry,
   releaseSource,
+  resolveLspServer,
   testSettingsOptions,
   type AppOptions,
   type MetadataDatabaseHandle,
@@ -49,8 +50,8 @@ export type TestServer = {
   cleanup: () => Promise<void>
 }
 
-// Boots a real server against a throwaway workspace. No network, no mocks: the
-// app routes, valibot contracts, and filesystem are the genuine article.
+// Real app routes, contracts, and filesystem against a throwaway workspace.
+// External providers and language-server processes use test boundaries.
 type TestServerOptions = Pick<
   AppOptions,
   | 'workspaceEditClock'
@@ -114,6 +115,15 @@ export async function makeTestServer({
         listInstalled: async () => '',
       }),
       metadataDatabase: database,
+      lsp: {
+        resolveServer: async (input) => {
+          const match = await resolveLspServer(input)
+          if (!match) return null
+
+          // UI tests keep real matching and pooling without installing or starting a binary.
+          return { ...match, server: { ...match.server, spawn: async () => null } }
+        },
+      },
       orchestration: {
         attachmentsDir: path.join(root, '.platform-test', 'attachments'),
         database: database.db,

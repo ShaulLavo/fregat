@@ -24,7 +24,7 @@ import {
   type LspSettings,
 } from './registry'
 import type { LspProxyClientSession, LspSessionSource } from './proxy-session'
-import { recordProcessInfo, recordProcessWarning } from '../observability'
+import { operatorErrorSummary, recordProcessInfo, recordProcessWarning } from '../observability'
 
 type LspRouteFileSystem = {
   readonly paths: WorkspacePaths
@@ -165,25 +165,28 @@ export function lspRoutes(fs: LspRouteFileSystem, auth: AuthConfig, deps: LspRou
         return
       }
 
-      const session = await deps.pool.acquire(
-        countedSocket(socket, pending),
-        match,
-        fs.paths.toRelative(match.root),
-      )
-      if (!session) {
+      const started = await deps.pool
+        .acquire(countedSocket(socket, pending), match, fs.paths.toRelative(match.root))
+        .then(
+          (session) => ({ session, error: null }),
+          (error: unknown) => ({ session: null, error }),
+        )
+      if (!started.session) {
+        const wasClosed = pending.closed
         rejectPendingLspSession(sessions, socket, pending)
         recordProcessWarning('lsp.session.rejected', {
           area: 'lsp',
+          error: started.error === null ? null : operatorErrorSummary(started.error),
           operation: 'open',
           outcome: 'spawn_failed',
           rootPath: fs.paths.toRelative(match.root),
           serverId: match.server.id,
         })
-        closeWithReason(socket, 'spawn_failed', match.server.id)
+        if (!wasClosed) closeWithReason(socket, 'spawn_failed', match.server.id)
         return
       }
 
-      attachPendingLspSession(pending, session)
+      attachPendingLspSession(pending, started.session)
     },
     message(ws: unknown, message: unknown) {
       const socket = websocketObject(ws)
