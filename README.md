@@ -28,9 +28,9 @@ Fregat is early. Expect bugs and changing APIs. You can run it from source today
 The reason to try Fregat is how your work survives, and how much control you have over an agent's changes.
 
 - **Our own editor and terminal.** [Singapore](https://shaulavo.dev/singapore/) keeps readable versions of your text. [ghostty-webgpu](https://shaulavo.dev/ghostty-webgpu/) brings Ghostty's terminal core into the browser.
-- **Work keeps going.** Browser and desktop windows share one machine server. Terminals survive server restarts and replay output. Updates wait for running agent turns, check the new release, and roll back a failed update. Read the [installed-app contracts](plans/114-installed-app.md).
+- **Work keeps going.** Browser and desktop windows share one machine server. On Linux, terminals survive server restarts and replay output. Updates wait for running agent turns, check the new release, and roll back a failed update. Read the [installed-app contracts](plans/114-installed-app.md).
 - **Review agents like pull requests.** Undo or reapply a hunk, collect line comments into a message, and fork a chat from a turn. Ask a second model to review, or send one prompt to several models in separate worktrees. See the [agent workbench](plans/139-acting-on-agent-diffs.md).
-- **Nothing is lost when you close a file.** The editor's undo graph survives closing its tab. File-tree undo restores a deleted folder with its tabs and unsaved edits. See [undo behavior](docs/research/packages-as-products/fregat-workbench.md#4-undo-that-goes-further-than-any-editor).
+- **Nothing is lost when you close a file.** The editor's undo graph survives closing its tab and restores when the saved content still matches. File-tree undo restores recent deleted folders with their tabs and unsaved edits. See [undo behavior](docs/research/packages-as-products/fregat-workbench.md#4-undo-that-goes-further-than-any-editor).
 - **Bring your own agents.** Sign in to Claude Code and Codex, run them side by side, and save permissions as each tool's own rules. Track usage and cost per chat. See [agent sessions](docs/session-domain.md) and [approval rules](plans/145-harness-controls.md).
 
 ## Proof from the parts
