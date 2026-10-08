@@ -673,10 +673,9 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     () => this.history.current,
   )
 
-  public constructor(rawText: string | PieceTableSnapshot, options: EditorTextBufferOptions = {}) {
+  public constructor(initial: InitialBufferSource, options: EditorTextBufferOptions = {}) {
     this.retainedHistoryStates = options.retainedHistoryStates
     this.now = options.now ?? Date.now
-    const initial = initialBufferSource(rawText)
     const snapshot = initial.snapshot
     const selections = createInitialSelectionSet(snapshot, createSelectionIdFactory())
     this.history = this.createHistory(snapshot, selections)
@@ -2221,8 +2220,8 @@ class StaticTextBuffer extends PieceTableEditorTextBuffer {
 }
 
 class StaticDocumentSession extends EditorBufferDocumentSession {
-  public constructor(rawText: string) {
-    const buffer = new StaticTextBuffer(rawText, { retainedHistoryStates: 0 })
+  public constructor(initial: InitialBufferSource) {
+    const buffer = new StaticTextBuffer(initial, { retainedHistoryStates: 0 })
     super(buffer, createEditorViewSession(buffer))
   }
 
@@ -2266,12 +2265,18 @@ class StaticDocumentSession extends EditorBufferDocumentSession {
   }
 }
 
-function initialBufferSource(source: string | PieceTableSnapshot): {
+type InitialBufferSource = {
   readonly snapshot: PieceTableSnapshot
   readonly text?: string
-} {
+}
+
+function initialBufferSource(source: string | PieceTableSnapshot): InitialBufferSource {
   if (typeof source !== 'string') return { snapshot: retainPieceTableSnapshot(source) }
-  const ingested = normalizeDocumentText(source)
+  return ingestBufferSource(source)
+}
+
+function ingestBufferSource(text: string): InitialBufferSource & { readonly text: string } {
+  const ingested = normalizeDocumentText(text)
   return {
     text: ingested.text,
     snapshot: createPieceTableSnapshot(ingested.text, {
@@ -2287,11 +2292,11 @@ export function createEditorTextBuffer(
   text: string,
   options: EditorTextBufferOptions = {},
 ): EditorTextBuffer {
-  return new PieceTableEditorTextBuffer(text, options)
+  return new PieceTableEditorTextBuffer(initialBufferSource(text), options)
 }
 
 export function createEditorSnapshotBuffer(snapshot: PieceTableSnapshot): EditorTextBuffer {
-  return new PieceTableEditorTextBuffer(snapshot)
+  return new PieceTableEditorTextBuffer(initialBufferSource(snapshot))
 }
 
 export function createEditorViewSession(
@@ -2316,7 +2321,19 @@ export function createDocumentSession(text: string): DocumentSession {
 }
 
 export function createStaticDocumentSession(text: string): DocumentSession {
-  return new StaticDocumentSession(text)
+  return new StaticDocumentSession(initialBufferSource(text))
+}
+
+export function createEditorDocumentSession(
+  text: string,
+  documentMode: 'session' | 'static',
+): { readonly session: DocumentSession; readonly text: string } {
+  const initial = ingestBufferSource(text)
+  const session =
+    documentMode === 'static'
+      ? new StaticDocumentSession(initial)
+      : createEditorBufferSession(new PieceTableEditorTextBuffer(initial))
+  return { session, text: initial.text }
 }
 
 export function prepareDocumentTransaction(

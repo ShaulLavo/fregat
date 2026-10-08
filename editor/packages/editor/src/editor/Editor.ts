@@ -1809,6 +1809,7 @@ export class Editor {
   private queueReplacementTransaction(
     before: ReplacementTransactionBefore | undefined,
     session: DocumentSession,
+    text: string,
   ): PendingTextTransaction | null {
     if (!before) return null
     const next = editorBufferSession(session)
@@ -1823,9 +1824,7 @@ export class Editor {
       event: {
         ...before,
         snapshotAfter: next.getSnapshot(),
-        edits: [
-          { from: 0, to: before.textSnapshotBefore.length, text: next.materializeFullText() },
-        ],
+        edits: [{ from: 0, to: before.textSnapshotBefore.length, text }],
         origin: 'local',
         revisionAfter: next.buffer.getRevision(),
       },
@@ -2559,7 +2558,11 @@ export class Editor {
     const replacingDocument = this.session !== null
     this.disposeBufferSubscriptions()
     const attachment = this.document.resetOwnedDocument(document, options)
-    const transaction = this.queueReplacementTransaction(transactionBefore, attachment.session)
+    const transaction = this.queueReplacementTransaction(
+      transactionBefore,
+      attachment.session,
+      attachment.text,
+    )
     this.wordWrapOwner = 'host'
     editorBufferSession(attachment.session)?.view.setWordWrap(this.isWordWrapEnabled())
     this.attachAnalysis(attachment.session)
