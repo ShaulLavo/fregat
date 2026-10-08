@@ -46,7 +46,10 @@ export class Host<Snapshot = unknown> {
     return this.outcomes.get(editKey(id))
   }
 
-  submit(envelope: Envelope): SubmitResult {
+  /** The transport supplies sender from its authenticated session, never from the frame. */
+  submit(envelope: Envelope, sender: string): SubmitResult {
+    if (typeof sender !== 'string' || !sender) throw new CollabFailure('missing-sender')
+    if (sender !== envelope.id.actor) throw new CollabFailure('sender-mismatch')
     const key = editKey(envelope.id)
     const outcome = this.outcomes.get(key)
     if (outcome) return outcome
@@ -118,8 +121,21 @@ export class Host<Snapshot = unknown> {
     return null
   }
 
+  private effectRejection(envelope: Envelope): string | null {
+    const change = envelope.change
+    if (change.kind !== 'setEffects') return null
+    if (editKey(change.command) !== editKey(envelope.id)) return 'invalid-effect-command'
+    for (const effect of change.effects) {
+      if (effect.op.actor !== envelope.id.actor) return 'foreign-effect'
+      const target = this.outcomes.get(editKey(effect.op))
+      if (target?.status !== 'accepted') return 'unknown-effect'
+      if (target.envelope.change.kind === 'setEffects') return 'invalid-effect-target'
+    }
+    return null
+  }
+
   private settle(envelope: Envelope, rejection: string | null): void {
-    let reason = rejection
+    let reason = rejection ?? this.effectRejection(envelope)
     if (reason === null) {
       const snapshot = this.options.engine.snapshot()
       try {
@@ -145,6 +161,17 @@ export class Host<Snapshot = unknown> {
 
 export function cloneEnvelope(envelope: Envelope): Envelope {
   const change = envelope.change
+  if (change.kind === 'setEffects')
+    return {
+      ...envelope,
+      id: { ...envelope.id },
+      deps: envelope.deps.map((id) => ({ ...id })),
+      change: {
+        kind: 'setEffects',
+        command: { ...change.command },
+        effects: change.effects.map((effect) => ({ op: { ...effect.op }, active: effect.active })),
+      },
+    }
   const insert = insertionOf(change)
   const copied = insert
     ? {

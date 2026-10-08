@@ -114,7 +114,7 @@ test('folding hides an interior caret and keeps a selection and both names align
       type: 'block',
     },
   ])
-  editor.setScrollPosition({ top: 160 })
+  editor.setScrollPosition({ top: 0 })
   show(presence, resolver, 'Ada', 'ada', start + 3, after)
   show(presence, resolver, 'Grace', 'grace', hidden, hidden, '#ad4385')
   await expect.poll(() => carets(host).length).toBe(2)

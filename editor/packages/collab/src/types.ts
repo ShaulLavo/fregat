@@ -9,7 +9,14 @@ export type Insert = {
   readonly originRight: RightOrigin
   readonly text: string
 }
+export type Effect = { readonly op: EditId; readonly active: boolean }
+export type SetEffects = {
+  readonly kind: 'setEffects'
+  readonly command: EditId
+  readonly effects: readonly Effect[]
+}
 export type Change =
+  | SetEffects
   | (Insert & { readonly kind: 'insert' })
   | { readonly kind: 'delete'; readonly spans: readonly IdSpan[] }
   | { readonly kind: 'replace'; readonly spans: readonly IdSpan[]; readonly insert: Insert }
@@ -33,6 +40,7 @@ export type AuthorContext = Omit<Envelope, 'change'> & {
 /** Snapshots are immutable and reusable; the engine owns their representation. */
 export interface Engine<Snapshot = unknown> {
   text(): string
+  /** Applies text edits and atomic effect states, retaining provenance in snapshots. */
   apply(envelope: Envelope): void
   /** Author against the current projection, reserve IDs once, and leave text unchanged. */
   author(edit: OffsetEdit, context: AuthorContext): Envelope

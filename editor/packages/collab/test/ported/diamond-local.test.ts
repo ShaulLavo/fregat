@@ -1,3 +1,4 @@
+import { submitAsAuthor } from '../host-fixtures'
 // josephg/diamond-types @ 89ae3a0ab8d941a2885e6ec89d094bc9ce9d2922.
 // src/listmerge/fuzzer.rs, random_single_document (seed 10, rope oracle).
 // src/listmerge/merge.rs, ins_back, backspace and test_concurrent_delete.
@@ -61,8 +62,8 @@ test('Diamond Types repeated concurrent deletion preserves one hidden ID per cha
   expect(net.settle()).toBe('')
   const snapshot = net.engine.snapshot()
   for (let repeat = 0; repeat < 10; repeat++) {
-    net.host.submit(a)
-    net.host.submit(b)
+    submitAsAuthor(net.host, a)
+    submitAsAuthor(net.host, b)
     net.engine.apply(a)
     net.engine.apply(b)
   }
