@@ -8,7 +8,9 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "server",
+    "examples/signaling-server.ts"
   ],
   "type": "module",
   "sideEffects": false,
@@ -17,6 +19,15 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./transports": {
+      "types": "./dist/transports.d.ts",
+      "import": "./dist/transports.js",
+      "default": "./dist/transports.js"
+    },
+    "./server": {
+      "types": "./server/signaling.ts",
+      "bun": "./server/signaling.ts"
     }
   },
   "publishConfig": {
@@ -29,10 +40,14 @@
     "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
-    "format:check": "oxfmt --check ."
+    "format:check": "oxfmt --check .",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:server": "bun --bun vitest run --config vitest.server.config.ts"
   },
   "devDependencies": {
+    "@types/bun": "1.4.2",
     "@types/node": "26.6.3",
+    "@vitest/browser-playwright": "5.0.2",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
     "typescript": "7.0.2",

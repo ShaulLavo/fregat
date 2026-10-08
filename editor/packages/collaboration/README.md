@@ -5,8 +5,9 @@ It chooses an ordering host, recovers after host failure, and preserves both bra
 edits when network partitions rejoin. A confirmation means acceptance on the current
 branch. Reconciliation can return a branch-confirmed edit to pending.
 
-This package currently contains the session protocol. WebRTC, BroadcastChannel,
-presence rendering and editor attachment follow separately.
+The default entry contains the runtime-neutral session protocol. The `/transports`
+entry adds native WebRTC, encrypted WebSocket signaling and same-origin
+BroadcastChannel links. Presence rendering and editor attachment follow separately.
 
 ## Integration boundary
 
@@ -84,3 +85,159 @@ Every run checks identical confirmed history and text, EditId uniqueness, one ho
 per component, and settlement of every authored edit as accepted or rejected after
 all peers rejoin. Rejected outcomes represent surfaced conflicts in this simulation.
 CI runs the default checks and offers the long run through workflow dispatch.
+
+## Browser transports
+
+Create a fresh random peer-session ID for each process. `createRoomInvitation()`
+returns an opaque room UUID and a 256-bit invitation secret. Share the invitation
+outside the broker. Every peer must use the same room, secret and document ID.
+
+The caller supplies all signaling URLs, ICE servers, transport policy and credentials.
+An empty ICE list is an explicit local-network choice. Remote deployments need their
+own TURN relay. The library has no public service defaults.
+
+```ts
+import { Session, type EditEnvelope } from '@singapore-editor/collaboration'
+import {
+  RoomCrypto,
+  TransportRouter,
+  WebRTCTransport,
+  WebSocketSignaling,
+  BroadcastTransport,
+} from '@singapore-editor/collaboration/transports'
+
+// sessionOptions includes the engine, identity and explicit session timing limits.
+let router: TransportRouter<EditEnvelope>
+const session = new Session({
+  ...sessionOptions,
+  send: (peer, message) => router.send(peer, message),
+})
+router = new TransportRouter({ room, document, peer: session.peer }, session)
+const roomCrypto = await RoomCrypto.create(room, session.peer, invitationSecret)
+const signaling = new WebSocketSignaling({
+  urls: config.signalingUrls,
+  room,
+  credentials: { protocols: config.webSocketProtocols },
+  reconnectInterval: config.signalingReconnectInterval,
+  onError,
+})
+const rtc = new WebRTCTransport({
+  router,
+  crypto: roomCrypto,
+  signaling,
+  iceServers: config.iceServers,
+  transportPolicy: config.transportPolicy,
+  credentials: { turn: config.supplyTurnCredentials },
+  announceInterval: config.announceInterval,
+  connectionTimeout: config.connectionTimeout,
+  onError,
+})
+const tabs = new BroadcastTransport({
+  router,
+  crypto: roomCrypto,
+  heartbeatInterval: config.tabHeartbeatInterval,
+  peerTimeout: config.tabPeerTimeout,
+  onError,
+})
+```
+
+Keep calling `session.tick(performance.now())` on the application's clock. Close
+both adapters with `await tabs.close()` and `await rtc.close()` when detaching.
+The TURN supplier receives `(peer, abortSignal)` and returns ICE server entries
+with current username/credential values. It runs for every new connection,
+including reconnects. Static credentials can be included in `iceServers` and the
+required `credentials` object can be `{}`. The browser supports WebSocket
+subprotocols for deployments that require them; the example broker's optional
+`authorize(request)` hook owns application admission.
+
+### Link and wire design
+
+`TransportRouter` owns the session boundary. It calls `connect` for the first
+reachable path, `disconnect` when the last path closes, and `receive` once per
+sender/message ID. It prefers BroadcastChannel when both paths exist. The WebRTC
+adapter closes an existing link when the same peer appears on BroadcastChannel,
+then reconnects if the tab heartbeat expires. A 4,096-message receive window
+rejects duplicates and older messages, including packets from a retired path.
+Session pulses and retained pending edits recover messages outside that window.
+There are no changes to the session protocol.
+
+WebRTC uses a full mesh of at most eight peer sessions. The lower peer ID initiates
+each pair. Each connection uses one reliable ordered channel, with no partial
+reliability options. Offers and answers include fully gathered ICE candidates.
+This non-trickle exchange keeps signaling small and avoids candidate-order races.
+Each replacement connection has a fresh random generation. Failed, disconnected,
+closed, timed-out or malformed links report `disconnect` to the session. A live
+BroadcastChannel path keeps that peer connected while the WebRTC path retires.
+
+Every data-channel frame is binary. Its 68-byte header contains a magic/version
+word, a random 128-bit transfer ID, index, chunk count, total byte length, chunk
+byte length and a SHA-256 digest of the complete UTF-8 JSON envelope. Frames are
+at most 16 KiB including their header and also respect negotiated
+`pc.sctp.maxMessageSize`; zero means SCTP places no size limit. Transfers are at
+most 8 MiB and 65,536 chunks. One incomplete ordered transfer occupies at most
+8 MiB. The send queue and queued received frames each have a 16 MiB limit per
+link. Sends stop above 256 KiB of buffered channel data and resume on
+`bufferedamountlow` at 128 KiB. Closing a link aborts a blocked send. Queue
+saturation closes the link so session replay can resume on a fresh connection.
+
+Signaling and BroadcastChannel use AES-256-GCM with fresh 96-bit random IVs.
+PBKDF2/SHA-256 derives the room key with 100,000 iterations and the opaque room
+ID as salt. Authenticated associated data binds version, room, peer-session ID,
+connection generation, sequence and timestamp. Packets expire after 60 seconds;
+peers need clocks within that allowance. Replay IDs stay bounded at 16,384
+unexpired entries and excess packets are refused. Signaling brokers see room IDs,
+traffic sizes and ciphertext. WebRTC document traffic uses endpoint-to-endpoint
+DTLS. Room members sharing the secret are trusted and can impersonate each other.
+This is not an account or Byzantine-consensus system.
+
+### Self-hosted broker
+
+The Bun-only `/server` entry is separate from the browser bundle. It forwards
+opaque publish frames to subscribed sockets and stores no history. Each socket
+subscribes to one room. Limits are eight subscribers per room, 1,024 active rooms
+and 1 MiB per WebSocket frame or buffered socket output. Connections must present
+an origin from the explicit allowlist. The optional admission callback can require
+an application credential. Deploy it behind TLS and application rate limits.
+
+Run the included example with your own bind address, port and allowed origins:
+
+```sh
+bun editor/packages/collaboration/examples/signaling-server.ts \
+  127.0.0.1 8789 http://localhost:5173
+```
+
+Wire messages are `{ type: 'subscribe', topic }`, the acknowledgement
+`{ type: 'subscribed', topic }`, and `{ type: 'publish', topic, payload }` in both
+directions. `payload` is a sealed room packet. Publishing requires a subscription.
+WebSocket reconnects re-subscribe and announce; they do not carry document edits.
+
+### Verification and TURN qualification
+
+```sh
+bun run --cwd editor/packages/collaboration test
+bun run --cwd editor/packages/collaboration test:server
+bun run --cwd editor/packages/collaboration test:browser
+```
+
+Chromium tests start a local Bun broker and use separate real pages. Three WebRTC
+peers exchange session submissions and confirmations, including an 80 KiB Unicode
+edit, lose the host, elect a replacement and rejoin with fresh connection
+generations and renewed credentials. Two same-origin pages exchange edits through
+BroadcastChannel. The combined test proves those pages use zero WebRTC links.
+
+The TURN-only case skips with a stated reason unless a relay is explicitly supplied.
+CI has no relay or TURN credentials. To run it against a local coturn instance,
+configure a UDP listener and a static test user, disable TLS/DTLS only for that
+local fixture, and allow loopback peers. Supply the resulting ICE entry:
+
+```sh
+COLLABORATION_TEST_TURN='[{"urls":"turn:127.0.0.1:3478?transport=udp","username":"test","credential":"test-secret"}]' \
+  bun run --cwd editor/packages/collaboration test:browser
+```
+
+That case uses `iceTransportPolicy: 'relay'`, so a passing connection requires TURN.
+Repeat with TCP/TLS TURN URLs for restrictive networks. Final remote qualification
+requires two machines joining the same private invitation through the self-hosted
+broker with relay-only policy and exchanging an edit in each direction. Local
+Chromium coverage does not establish cross-machine or Safari/Firefox support.
+Manual invitation-blob pairing is optional and is not included in this adapter.
