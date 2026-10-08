@@ -1,0 +1,13 @@
+{
+  "candidate": "Cache cursor type/missing state and read offsets only for actual bracket/error diagnostics",
+  "base": "d3870611dec2ca87ec9cea75b425bf82f0e225c8",
+  "reason": "The first five warm repetitions exceeded the frozen overlap-resolution phase-regression guard by 0.3 ms. The cursor source does not change overlap resolution. Preserve the failure and perform one bounded replication before deciding whether to retain this candidate.",
+  "additionalRepetitionsPerStartup": 5,
+  "sourceAndBuildMustRemainIdenticalToFirstCandidateSeries": true,
+  "finalSummaryIncludesAllTenCandidateSamplesPerStartup": true,
+  "retainAndReportFirstFiveSeriesFailure": true,
+  "discardSamples": false,
+  "changeFrozenBudgets": false,
+  "repeatAgainIfPooledGateFails": false,
+  "claimM1Passed": false
+}
