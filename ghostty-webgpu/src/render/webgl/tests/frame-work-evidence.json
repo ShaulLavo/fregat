@@ -2,7 +2,7 @@
   "schema": 1,
   "candidate": 3,
   "decision": "KEEP",
-  "scope": "Frozen research packet, not the subsequently rebuilt product binary; fresh xterm counterparts remain descriptive until independent review.",
+  "scope": "Historical original C3 evidence remains in the existing sections. reviewCorrection alone describes corrected source and fresh target/guard measurements. Research efficiency binaries remain distinct from the product binary.",
   "source": {
     "runtimeCommit": "59ea26764e7c3fca93bb11134bf7bab09d7dff76",
     "candidateResearchHead": "b1b6ca0c0fbdd8e7bbc24df22eac5940a83d7bf8",
@@ -14,7 +14,8 @@
     "C1": "Reuse unchanged unstyled scalar records in dirty display rows.",
     "C2": "Read live forward-safe source rows; preserve snapshots for backward or mixed movement.",
     "C3": "Keep identical display-slot scalar records in matched moved rows, bypassing record reads, writes, y correction and full-record comparisons.",
-    "unchanged": "Logical row matching, copied-text publication, shader/draw order, GPU upload extents and upload operations."
+    "unchanged": "Logical row matching, copied-text publication, shader/draw order, GPU upload extents and upload operations.",
+    "registrationCorrection": "Stable-key descriptor registration increments a per-key revision. Logical-row and display-slot caches retain and validate it before reusing records."
   },
   "operationCounts": {
     "baseline": {
@@ -1783,5 +1784,681 @@
         "Cell oracle is outside counters; twoRAF endpoint is logical settlement."
       ]
     }
+  },
+  "reviewCorrection": {
+    "revision": 2,
+    "recordedAt": "2026-10-08T20:46:15.478125+00:00",
+    "reviewedProductHead": "710f3a8cac464e46d88acd929b330e6d32a05762",
+    "researchHead": "ef880763dcde831e26826a7ccf4d2e3559d35d0b",
+    "decision": "KEEP",
+    "findings": {
+      "P2-1": "Stable-key descriptor registration increments a per-key revision. Logical-row and display-slot caches retain and validate it before reusing records.",
+      "P2-2": "Shared fixtures distinguish scalar and grapheme identity, span, weight and italic style. Color fixtures also distinguish foreground.",
+      "P2-3": "Unicode owners, tails, combining replacements and alternate-screen entry and exit each build and acknowledge their intermediate state. Each update replays uploads and compares with a forced rebuild.",
+      "P3-4": "Patch changeset begins Improved."
+    },
+    "failingFirst": {
+      "status": "EXPECTED_RED",
+      "head": "710f3a8cac464e46d88acd929b330e6d32a05762",
+      "bridgeSha256": "32c8e2848fe20864eb4614dd83c3768b2499ffe6b16d909b9387eee13e527d8d",
+      "failures": [
+        "uniform descriptors distinguish only 1 of 7 identities",
+        "stable-key descriptor mutation leaves stale stationary records",
+        "stable-key descriptor mutation leaves stale forward-moved records",
+        "stable-key descriptor mutation leaves stale backward-moved records"
+      ],
+      "testsPassed": 15,
+      "testsFailed": 4,
+      "logSha256": "5b37a5bdcbb3144764f4da8e9f4ac7b673f02e925919170d4fe0f3894e193417"
+    },
+    "sourceEquivalence": {
+      "status": "pass",
+      "frameRegionByteIdentical": true,
+      "glyphIndexByteIdentical": true,
+      "frameRegionSha256": "a5f5af0bfe64f9cab82a6eacc4bc39e31d775495cecc83185e5be7475641a55f",
+      "product": {
+        "bridgeSha256": "59b016c9d7a7da6ea96b92282fdd58903266c6af3743c7763eea6c67f59c1da8",
+        "frameSourceSha256": "ed1826268e4171cb05acb5c38e7804a54469ba3ca2b6cd32d6fecc5faab5ff37",
+        "glyphIndexSha256": "f34cf29a9cb11923b35d027b2f93fac017485d6abd43352cc27ef0fc89d524b3",
+        "copiedTextPrefixUnchanged": true,
+        "copiedTextPrefixSha256": "43a1512751f8f001841ca9f827f0d5093f86613e5470680fe86ec67683fe600e"
+      },
+      "research": {
+        "bridgeSha256": "34278748105f8f0f1440b4d5e5009d7a8429abd9c0f5dbe076af7acb13716c6d",
+        "frameSourceSha256": "1164d5b9571743f2f6fa609ceddb0fed3f410200c5821b1106d0a86ea98ff80b",
+        "glyphIndexSha256": "f34cf29a9cb11923b35d027b2f93fac017485d6abd43352cc27ef0fc89d524b3",
+        "copiedTextPrefixUnchanged": true,
+        "copiedTextPrefixSha256": "ecad22b86abe820b12c884a6c36e269af1f06a793203733b3d7cd2500908fdad"
+      }
+    },
+    "sealedPacket": {
+      "archiveSha256": "40da08e4af3f6233304e5fc113ffc6239b337d142333cf794387076b3c86b574",
+      "bridgeSha256": "34278748105f8f0f1440b4d5e5009d7a8429abd9c0f5dbe076af7acb13716c6d",
+      "controlBridgeSha256": "98b73bddb3039ed7592f9a713763d34798c9f09a6cdddf7dc4549069b577df29",
+      "sourceSha256": "1164d5b9571743f2f6fa609ceddb0fed3f410200c5821b1106d0a86ea98ff80b",
+      "glyphIndexSha256": "f34cf29a9cb11923b35d027b2f93fac017485d6abd43352cc27ef0fc89d524b3",
+      "changedPacketFiles": ["bridge.wasm", "manifest.json"],
+      "runtimeCommit": "59ea26764e7c3fca93bb11134bf7bab09d7dff76",
+      "candidate": 3,
+      "scope": "Corrected C3 research binary with frozen original runtime and unchanged R07 streams. Product and research frame regions and glyph-index source are byte-identical. Copied-text prefixes remain separate and unchanged."
+    },
+    "correctness": {
+      "nativeTestsPassed": 131,
+      "provenanceTestsPassed": 1,
+      "finalNativeAndProvenanceTestsPassed": 132,
+      "finalNativeAndProvenanceFilesPassed": 4,
+      "finalNativeCommand": "bun x vitest run src/core/tests/zig-frame.test.ts src/core/tests/text-rows.test.ts src/render/webgl/tests/frame-incremental.test.ts scripts/wasm-provenance.test.ts",
+      "bufferReplayCasesPassed": 52,
+      "differentialFramesPassed": 2413,
+      "descriptorRegistration": [
+        {
+          "name": "stock",
+          "oldGlyph": [
+            1, 2, 5, 6, 0.8666666746139526, 0.8666666746139526, 0.8666666746139526, 1, 0.6513671875,
+            0.80029296875, 0.65380859375, 0.80322265625, 0.06666667014360428, 0.06666667014360428,
+            0.06666667014360428, 1, 1, 0, 1, 0, 1, 1, 0, 0
+          ],
+          "partialGlyph": [
+            2, 3, 6, 7, 0.8666666746139526, 0.8666666746139526, 0.8666666746139526, 1,
+            0.65185546875, 0.80078125, 0.65478515625, 0.80419921875, 0.06666667014360428,
+            0.06666667014360428, 0.06666667014360428, 1, 1, 0, 1, 0, 1, 2, 0, 0
+          ],
+          "freshGlyph": [
+            2, 3, 6, 7, 0.8666666746139526, 0.8666666746139526, 0.8666666746139526, 1,
+            0.65185546875, 0.80078125, 0.65478515625, 0.80419921875, 0.06666667014360428,
+            0.06666667014360428, 0.06666667014360428, 1, 1, 0, 1, 0, 1, 2, 0, 0
+          ],
+          "partialRanges": [
+            {
+              "cell": {
+                "byteOffset": 0,
+                "byteLength": 0
+              },
+              "glyph": {
+                "byteOffset": 0,
+                "byteLength": 96
+              },
+              "row": 0
+            }
+          ],
+          "partialMatchesFresh": true
+        },
+        {
+          "name": "candidate",
+          "oldGlyph": [
+            1, 2, 5, 6, 0.8666666746139526, 0.8666666746139526, 0.8666666746139526, 1, 0.6513671875,
+            0.80029296875, 0.65380859375, 0.80322265625, 0.06666667014360428, 0.06666667014360428,
+            0.06666667014360428, 1, 1, 0, 1, 0, 1, 1, 0, 0
+          ],
+          "partialGlyph": [
+            2, 3, 6, 7, 0.8666666746139526, 0.8666666746139526, 0.8666666746139526, 1,
+            0.65185546875, 0.80078125, 0.65478515625, 0.80419921875, 0.06666667014360428,
+            0.06666667014360428, 0.06666667014360428, 1, 1, 0, 1, 0, 1, 2, 0, 0
+          ],
+          "freshGlyph": [
+            2, 3, 6, 7, 0.8666666746139526, 0.8666666746139526, 0.8666666746139526, 1,
+            0.65185546875, 0.80078125, 0.65478515625, 0.80419921875, 0.06666667014360428,
+            0.06666667014360428, 0.06666667014360428, 1, 1, 0, 1, 0, 1, 2, 0, 0
+          ],
+          "partialRanges": [
+            {
+              "cell": {
+                "byteOffset": 0,
+                "byteLength": 0
+              },
+              "glyph": {
+                "byteOffset": 0,
+                "byteLength": 96
+              },
+              "row": 0
+            }
+          ],
+          "partialMatchesFresh": true
+        }
+      ],
+      "browserTestsPassed": 159,
+      "browserTestsSkipped": 2,
+      "browserSkipReason": "Linux SwiftShader lacks independent replacement-device coverage.",
+      "sealedPacketPngs": 24,
+      "sealedPacketPngChecks": "All four workloads have exact stock/candidate initial, DPR2 and restored PNG equality, retained-text equality and equal logical work. Representative corrected PNGs read back.",
+      "newHardwareWebGpuRecovery": "Not rerun for this correction. The earlier hardware recovery proof belongs to the original frozen revision."
+    },
+    "receipts": {
+      "review-fix-r01/red.log": "5b37a5bdcbb3144764f4da8e9f4ac7b673f02e925919170d4fe0f3894e193417",
+      "review-fix-r01/red-specific.log": "9630d54dd29f474e32e6afacb85961ab424cae9cf6ef49dbaa5811ad45cff453",
+      "review-fix-r01/red-receipt.json": "786e8f28d8afba687ac88768d0379a88dd6d4c4a24c31a0018f56ba65e28951a",
+      "review-fix-r01/build.log": "6187a30a6ceb64f0bcbe91bcd3f7d141856853e2dfb5ed628fb3194d70f2dbd2",
+      "review-fix-r01/native.log": "68292325168e860e8e151f61dd999f095ce571401054bdea2ec1ba527265975a",
+      "review-fix-r01/final-proof.log": "10cf23eb0bc3bc712179b37c78db96c306be84e702eddce0363f6234805619a7",
+      "review-fix-r01/native-proof.mjs": "b763f6b3fa5d77d7cec6ff7209632d7ef88dfb6871341f380d31f372067fca95",
+      "review-fix-r01/native-proof.json": "ca24e013c8667154ed1bb59a80c83207ddf31f988b43c6bf4b0e3d49c5428276",
+      "review-fix-r01/browser.log": "e8a967d4d61275ca0442680418549ced9e0cf50093c6b8549efd33f10381c0d3",
+      "review-fix-r01/source-equivalence.json": "74898677a3283cad7282d5dbfeffa96a40f64c30ca5e30d1509369ec63320b8d",
+      "review-fix-r01/packet.json": "29ddaf78d4489750d4021f62f63ccf34e56e21ac7100df4434ef6a296f28b538",
+      "review-fix-r01/registration.json": "97716f1cea332a77b0271a83ba0fd7c9f39125fdc3f74aad39a9a844b80baf4f",
+      "review-fix-r01/quarantine.log": "b74cae6e9a3782172dfdaac7030d5279b690ea82d27bd74d14f444c18519ccf9",
+      "candidate03-corrected-local-proof-r01/index.json": "e668f40b3a58acaa8d0d86e1b898dceeb833d5fb793c82f6db19bc51184ae0d8"
+    },
+    "ownControlScreens": {
+      "line-scroll": {
+        "protocol": "tw-frame-r4-candidate03-corrected-webgl-line-scroll-r01",
+        "protocolSha256": "68e1e8f2e940a49e77e2e864e716ef65e928d60c8f86475d0257fe109fffab3e",
+        "summarySha256": "96e23d118e6c9b2c1896118414a73be543f62235a7cb118482e36a00d80aa187",
+        "rawIndexSha256": "9f8ef912ee6f32d4f1bf543b773ddc3aeb25762c38446a1d70679f4b4d40811a",
+        "status": "SCREEN_PASS",
+        "role": "target",
+        "channels": {
+          "renderer": {
+            "medianRatios": {
+              "cpuSeconds": 0.9497535821494143,
+              "instructions": 0.8445567861970025,
+              "cycles": 0.8785015439324161,
+              "energyJ": 0.8233156662176682
+            },
+            "pairedRatios": [
+              {
+                "cpuSeconds": 0.9633047440769129,
+                "instructions": 0.850074009743641,
+                "cycles": 0.9127077338525864,
+                "energyJ": 0.8529184111510876
+              },
+              {
+                "cpuSeconds": 0.9591028251640555,
+                "instructions": 0.8449750944216304,
+                "cycles": 0.8820165009132507,
+                "energyJ": 0.8186048434612849
+              },
+              {
+                "cpuSeconds": 0.940404339134773,
+                "instructions": 0.8441384779723745,
+                "cycles": 0.8700622338947409,
+                "energyJ": 0.8209125284024645
+              },
+              {
+                "cpuSeconds": 0.9263040142167562,
+                "instructions": 0.8358916211253407,
+                "cycles": 0.8749865869515815,
+                "energyJ": 0.8257188040328718
+              }
+            ]
+          },
+          "GPU": {
+            "medianRatios": {
+              "cpuSeconds": 1.0496952887275983,
+              "instructions": 1.0139494784294314,
+              "cycles": 0.976199338704387,
+              "energyJ": 0.9449596815930674
+            },
+            "pairedRatios": [
+              {
+                "cpuSeconds": 1.0643505247083207,
+                "instructions": 1.0100881685869307,
+                "cycles": 1.009919688003964,
+                "energyJ": 0.9794083985256145
+              },
+              {
+                "cpuSeconds": 1.0508329967687087,
+                "instructions": 1.0145627395970847,
+                "cycles": 0.9607436212376629,
+                "energyJ": 0.9317312365475129
+              },
+              {
+                "cpuSeconds": 1.0391421276028099,
+                "instructions": 1.016229009468574,
+                "cycles": 0.9542666180440572,
+                "energyJ": 0.9255791351068087
+              },
+              {
+                "cpuSeconds": 1.048557580686488,
+                "instructions": 1.0133362172617784,
+                "cycles": 0.991655056171111,
+                "energyJ": 0.958188126638622
+              }
+            ]
+          },
+          "rendererPlusGPU": {
+            "medianRatios": {
+              "cpuSeconds": 1.0110272235788766,
+              "instructions": 0.9218560994290357,
+              "cycles": 0.9411040914063376,
+              "energyJ": 0.8876471481380905
+            },
+            "pairedRatios": [
+              {
+                "cpuSeconds": 1.0278793507278627,
+                "instructions": 0.9233201140537824,
+                "cycles": 0.9750381297539642,
+                "energyJ": 0.920424808797476
+              },
+              {
+                "cpuSeconds": 1.0179005310450178,
+                "instructions": 0.922046939557567,
+                "cycles": 0.9326725191410692,
+                "energyJ": 0.8789538106837944
+              },
+              {
+                "cpuSeconds": 1.0029322472812847,
+                "instructions": 0.9216652593005045,
+                "cycles": 0.9237629405053507,
+                "energyJ": 0.8767223558427555
+              },
+              {
+                "cpuSeconds": 1.0041539161127357,
+                "instructions": 0.9164628188993673,
+                "cycles": 0.949535663671606,
+                "energyJ": 0.8963404855923867
+              }
+            ]
+          },
+          "allChrome": {
+            "medianRatios": {
+              "cpuSeconds": 1.0117530733453348,
+              "instructions": 0.9208975399874593,
+              "cycles": 0.941463759833512,
+              "energyJ": 0.8886333273515724
+            },
+            "pairedRatios": [
+              {
+                "cpuSeconds": 1.0257175790785702,
+                "instructions": 0.9195617826069638,
+                "cycles": 0.972836978951309,
+                "energyJ": 0.9172169922497334
+              },
+              {
+                "cpuSeconds": 1.0181636741825004,
+                "instructions": 0.9222332973679547,
+                "cycles": 0.9328002806763588,
+                "energyJ": 0.8790091834766239
+              },
+              {
+                "cpuSeconds": 1.0053424725081692,
+                "instructions": 0.9244992989212525,
+                "cycles": 0.9267494887766491,
+                "energyJ": 0.8805657024952758
+              },
+              {
+                "cpuSeconds": 1.0049335169877427,
+                "instructions": 0.9168970677181034,
+                "cycles": 0.9501272389906652,
+                "energyJ": 0.896700952207869
+              }
+            ]
+          },
+          "otherChrome": {
+            "medianRatios": {
+              "cpuSeconds": 1.0732395572295546,
+              "instructions": 0.9992921159558699,
+              "cycles": 0.9846787494257505,
+              "energyJ": 0.9288489632288074
+            },
+            "pairedRatios": [
+              {
+                "cpuSeconds": 0.8522845909238707,
+                "instructions": 0.5108700324142622,
+                "cycles": 0.7969280378046422,
+                "energyJ": 0.5945768434572561
+              },
+              {
+                "cpuSeconds": 1.047954634846391,
+                "instructions": 0.9667404357044445,
+                "cycles": 0.9474888048752452,
+                "energyJ": 0.8891921258928615
+              },
+              {
+                "cpuSeconds": 1.2741942264897486,
+                "instructions": 1.6025139290221815,
+                "cycles": 1.266972720449699,
+                "energyJ": 1.599099164851733
+              },
+              {
+                "cpuSeconds": 1.0985244796127178,
+                "instructions": 1.0318437962072953,
+                "cycles": 1.0218686939762558,
+                "energyJ": 0.9685058005647533
+              }
+            ]
+          }
+        },
+        "allChromeEnergyInstructionsLowerEveryPair": true,
+        "oldCpuRuleDiagnostic": {
+          "definition": "All-Chrome CPU seconds lower in every pair and median ratio <0.95; not an efficiency gate.",
+          "passes": false
+        },
+        "workAndOutputChecks": {
+          "exactCompletePngAcrossBothArms": true,
+          "sameVisibleAndFullRetainedText": true,
+          "sameRenderingCanvasBackingAttributesAndCssGeometry": true,
+          "equalPublicCoreRendererPublicationAtlasUploadCounters": true,
+          "allRebuiltRowCountersAlsoEqual": true,
+          "nativeArithmeticReconstructedFromRawDecimalEndpoints": true,
+          "stableEndpointPidTypeStart": true,
+          "positiveReaderCapabilityCalibrationBeforeEveryWindow": true,
+          "cleanOwnedProcessCustody": true
+        },
+        "wallSeconds": 207.55910800403217,
+        "screenshotsReadBack": {
+          "00-GL-line-scroll.png": "9216d1323089c67832c319566a19c100f526d59609a1591285d72e4c2a1ebce0",
+          "01-CGL-line-scroll.png": "9216d1323089c67832c319566a19c100f526d59609a1591285d72e4c2a1ebce0"
+        }
+      },
+      "interactive-edits": {
+        "protocol": "tw-frame-r4-candidate03-corrected-webgl-interactive-edits-r02",
+        "protocolSha256": "c13e28a7be0c2bdb58ae781b0af166d8ceb075463f42a3882ef549eb5e73a1fe",
+        "summarySha256": "c76d083672bb9df6756ac675145aa82f83149d34e2fae35313ac4f8f13414d1f",
+        "rawIndexSha256": "f5b0f44bec4d2f8fca809a2d61a36037e86eaca3ecda200e6707564ee9740101",
+        "status": "SCREEN_PASS",
+        "role": "guard",
+        "channels": {
+          "renderer": {
+            "medianRatios": {
+              "cpuSeconds": 0.9762450848994724,
+              "instructions": 0.926843970246634,
+              "cycles": 0.9878247904893203,
+              "energyJ": 0.9620109990365309
+            },
+            "pairedRatios": [
+              {
+                "cpuSeconds": 0.9511387132721576,
+                "instructions": 0.9473329760967426,
+                "cycles": 0.9968968771838539,
+                "energyJ": 1.0366224485078412
+              },
+              {
+                "cpuSeconds": 0.9888860440486218,
+                "instructions": 0.925170304223333,
+                "cycles": 0.986637970620252,
+                "energyJ": 0.9599760573833794
+              },
+              {
+                "cpuSeconds": 0.963604125750323,
+                "instructions": 0.9240453443026665,
+                "cycles": 0.9806901501418405,
+                "energyJ": 0.9640459406896824
+              },
+              {
+                "cpuSeconds": 1.0020646563396507,
+                "instructions": 0.9285176362699349,
+                "cycles": 0.9890116103583884,
+                "energyJ": 0.9521833024052201
+              }
+            ]
+          },
+          "GPU": {
+            "medianRatios": {
+              "cpuSeconds": 1.0111708554825656,
+              "instructions": 1.0067082038382718,
+              "cycles": 1.0083045595990041,
+              "energyJ": 1.0082084012178325
+            },
+            "pairedRatios": [
+              {
+                "cpuSeconds": 1.0154546567038638,
+                "instructions": 1.0088155939724297,
+                "cycles": 1.0461074379165498,
+                "energyJ": 1.0334318865390943
+              },
+              {
+                "cpuSeconds": 1.0069833682786695,
+                "instructions": 1.004600813704114,
+                "cycles": 0.9989303549460994,
+                "energyJ": 0.9958801169184911
+              },
+              {
+                "cpuSeconds": 1.0011104334408027,
+                "instructions": 1.011260726694636,
+                "cycles": 1.017678764251909,
+                "energyJ": 1.020536685517174
+              },
+              {
+                "cpuSeconds": 1.0153583426864616,
+                "instructions": 0.9894904854503221,
+                "cycles": 0.9859620628729182,
+                "energyJ": 0.9803571262150661
+              }
+            ]
+          },
+          "rendererPlusGPU": {
+            "medianRatios": {
+              "cpuSeconds": 1.0011834657053962,
+              "instructions": 0.9802950128858254,
+              "cycles": 1.002070621761447,
+              "energyJ": 0.9933484098210759
+            },
+            "pairedRatios": [
+              {
+                "cpuSeconds": 0.9996619502747086,
+                "instructions": 0.9887685933095733,
+                "cycles": 1.0335964476054893,
+                "energyJ": 1.0344208841934353
+              },
+              {
+                "cpuSeconds": 1.0027049811360838,
+                "instructions": 0.9784217701594745,
+                "cycles": 0.9958757133831166,
+                "energyJ": 0.9844154731380838
+              },
+              {
+                "cpuSeconds": 0.9920634246325079,
+                "instructions": 0.9821682556121764,
+                "cycles": 1.0082655301397776,
+                "energyJ": 1.0022813465040679
+              },
+              {
+                "cpuSeconds": 1.0122291033717865,
+                "instructions": 0.9693971829624374,
+                "cycles": 0.9867111538251118,
+                "energyJ": 0.9713504116917543
+              }
+            ]
+          },
+          "allChrome": {
+            "medianRatios": {
+              "cpuSeconds": 0.9998219383504577,
+              "instructions": 0.9801664416479888,
+              "cycles": 1.0035149315929406,
+              "energyJ": 0.9957854404851341
+            },
+            "pairedRatios": [
+              {
+                "cpuSeconds": 0.9973408797820911,
+                "instructions": 0.9820793131824693,
+                "cycles": 1.030212135591041,
+                "energyJ": 1.0285886056163493
+              },
+              {
+                "cpuSeconds": 1.0023029969188244,
+                "instructions": 0.9782535701135083,
+                "cycles": 0.9955932552891777,
+                "energyJ": 0.9842502711527502
+              },
+              {
+                "cpuSeconds": 0.9940204230474762,
+                "instructions": 0.986166507932779,
+                "cycles": 1.0114366078967032,
+                "energyJ": 1.007320609817518
+              },
+              {
+                "cpuSeconds": 1.0132443723490376,
+                "instructions": 0.9704941882113713,
+                "cycles": 0.9880327128321412,
+                "energyJ": 0.9727043343657682
+              }
+            ]
+          },
+          "otherChrome": {
+            "medianRatios": {
+              "cpuSeconds": 1.2348834885215638,
+              "instructions": 1.328562913728863,
+              "cycles": 1.3324783378136362,
+              "energyJ": 1.4268472174072147
+            },
+            "pairedRatios": [
+              {
+                "cpuSeconds": 0.6296996018676301,
+                "instructions": 0.2857913459957626,
+                "cycles": 0.5690968659461749,
+                "energyJ": 0.35540397569451343
+              },
+              {
+                "cpuSeconds": 0.8322639806526126,
+                "instructions": 0.8922374295846489,
+                "cycles": 0.8713137406536354,
+                "energyJ": 0.8995216043210829
+              },
+              {
+                "cpuSeconds": 1.9002089608364028,
+                "instructions": 3.293538804219937,
+                "cycles": 2.385952411902595,
+                "energyJ": 3.7609287300580423
+              },
+              {
+                "cpuSeconds": 1.637502996390515,
+                "instructions": 1.7648883978730772,
+                "cycles": 1.7936429349736371,
+                "energyJ": 1.9541728304933463
+              }
+            ]
+          }
+        },
+        "allChromeEnergyInstructionsLowerEveryPair": false,
+        "oldCpuRuleDiagnostic": {
+          "definition": "All-Chrome CPU seconds lower in every pair and median ratio <0.95; not an efficiency gate.",
+          "passes": false
+        },
+        "workAndOutputChecks": {
+          "exactCompletePngAcrossBothArms": true,
+          "sameVisibleAndFullRetainedText": true,
+          "sameRenderingCanvasBackingAttributesAndCssGeometry": true,
+          "equalPublicCoreRendererPublicationAtlasUploadCounters": true,
+          "allRebuiltRowCountersAlsoEqual": true,
+          "nativeArithmeticReconstructedFromRawDecimalEndpoints": true,
+          "stableEndpointPidTypeStart": true,
+          "positiveReaderCapabilityCalibrationBeforeEveryWindow": true,
+          "cleanOwnedProcessCustody": true
+        },
+        "wallSeconds": 206.06715953699313,
+        "screenshotsReadBack": {
+          "00-GL-interactive-edits.png": "671d9cc2737ff069dc2ff8e490afb352a3fbc60a248f07c8f4423249c89bc8d5",
+          "01-CGL-interactive-edits.png": "671d9cc2737ff069dc2ff8e490afb352a3fbc60a248f07c8f4423249c89bc8d5"
+        }
+      }
+    },
+    "acceptance": "Unmodified wave rule 5",
+    "freshXtermForCorrection": false,
+    "rejectedAcquisition": {
+      "protocol": "tw-frame-r4-candidate03-corrected-webgl-interactive-edits-r01",
+      "status": "INCOMPLETE_SCREEN_MACHINE_NOT_QUIET",
+      "confirmedOverlap": true,
+      "efficiencyScored": false,
+      "reason": "Peer orphan overlap confirmed. Quarantine every overlapping window, retain later valid raw windows. The partial first session cannot meet its registered eight-window same-session screen. A full r02 replacement was registered and acquired before this historical overlap confirmation, for missing quiet coverage, without reducing r01 efficiency.",
+      "quarantineInterval": {
+        "from": "2026-10-08T20:20:43+00:00",
+        "to": "2026-10-08T20:23:00+00:00"
+      },
+      "invalidWindows": [0, 1, 2, 3, 4],
+      "validWindowsRetained": [5, 6, 7],
+      "windows": [
+        {
+          "index": 0,
+          "actor": "GL",
+          "from": "2026-10-08T20:21:04.751000+00:00",
+          "to": "2026-10-08T20:21:30.186000+00:00",
+          "status": "INVALID_MACHINE_NOT_QUIET",
+          "overlap": true
+        },
+        {
+          "index": 1,
+          "actor": "CGL",
+          "from": "2026-10-08T20:21:30.213000+00:00",
+          "to": "2026-10-08T20:21:53.057000+00:00",
+          "status": "INVALID_MACHINE_NOT_QUIET",
+          "overlap": true
+        },
+        {
+          "index": 2,
+          "actor": "CGL",
+          "from": "2026-10-08T20:21:53.091000+00:00",
+          "to": "2026-10-08T20:22:15.882000+00:00",
+          "status": "INVALID_MACHINE_NOT_QUIET",
+          "overlap": true
+        },
+        {
+          "index": 3,
+          "actor": "GL",
+          "from": "2026-10-08T20:22:15.927000+00:00",
+          "to": "2026-10-08T20:22:38.707000+00:00",
+          "status": "INVALID_MACHINE_NOT_QUIET",
+          "overlap": true
+        },
+        {
+          "index": 4,
+          "actor": "CGL",
+          "from": "2026-10-08T20:22:38.752000+00:00",
+          "to": "2026-10-08T20:23:01.553000+00:00",
+          "status": "INVALID_MACHINE_NOT_QUIET",
+          "overlap": true
+        },
+        {
+          "index": 5,
+          "actor": "GL",
+          "from": "2026-10-08T20:23:01.596000+00:00",
+          "to": "2026-10-08T20:23:24.320000+00:00",
+          "status": "VALID_RETAINED_PARTIAL_SCREEN",
+          "overlap": false
+        },
+        {
+          "index": 6,
+          "actor": "GL",
+          "from": "2026-10-08T20:23:24.372000+00:00",
+          "to": "2026-10-08T20:23:47.119000+00:00",
+          "status": "VALID_RETAINED_PARTIAL_SCREEN",
+          "overlap": false
+        },
+        {
+          "index": 7,
+          "actor": "CGL",
+          "from": "2026-10-08T20:23:47.172000+00:00",
+          "to": "2026-10-08T20:24:09.887000+00:00",
+          "status": "VALID_RETAINED_PARTIAL_SCREEN",
+          "overlap": false
+        }
+      ],
+      "registrationTimeInvalidReceiptSha256": "de654b979ae37699fa5e9408d8215cdaa188fc143c7dd70ba353d562ca1f5366",
+      "receiptSha256": "17add6f0634473345df22ed7e9f9583e6190e186d28700ae6adbadef08969813",
+      "rawArchiveSha256": "2ed542dd6a61ad28d66608f2b8cc663abee12a0a2af4deed8614784af0435e00",
+      "recoveryHistoryReceiptSha256": "ee192b996edd7f7bf0899be7d0a5ef8b905250b756d4b455c83c38131a343dbe",
+      "replacementRegisteredAt": "2026-10-08T20:27:51.060144+00:00",
+      "chronology": "r01 was rejected for unknown foreign-process coverage before its efficiency was reduced. r02 was separately registered and acquired before the confirmed historical-overlap instruction arrived. r01 windows 5, 6 and 7 remain retained as valid partial-session data. They are excluded from screen scoring and are not pooled into r02."
+    },
+    "replacementQuietCoverage": {
+      "global-census-before.json": {
+        "sampledAt": "2026-10-08T20:27:51.478012+00:00",
+        "source": "Global ps full-argument census, same-user prefix roots and descendant closure",
+        "foreignPrefix": "/Users/shaul/tmp/ghostty-bench/m2-segments-a36ba3b05514",
+        "foreignProcesses": [],
+        "ownedProcesses": [],
+        "loadAverage": "{ 2.60 2.40 2.47 }",
+        "parserPositiveAndNegativeControl": true,
+        "redaction": "Only PID, parent PID and Chrome/helper type retained; command arguments omitted.",
+        "at": "2026-10-08T20:27:51.684864+00:00"
+      },
+      "global-census-after.json": {
+        "sampledAt": "2026-10-08T20:31:16.954659+00:00",
+        "source": "Global ps full-argument census, same-user prefix roots and descendant closure",
+        "foreignPrefix": "/Users/shaul/tmp/ghostty-bench/m2-segments-a36ba3b05514",
+        "foreignProcesses": [],
+        "ownedProcesses": [],
+        "loadAverage": "{ 2.37 2.50 2.50 }",
+        "parserPositiveAndNegativeControl": true,
+        "redaction": "Only PID, parent PID and Chrome/helper type retained; command arguments omitted.",
+        "at": "2026-10-08T20:31:17.162513+00:00"
+      }
+    },
+    "limits": [
+      "Original operation counts, five-screen results, xterm counterparts and hardware recovery are preserved as historical evidence for the pre-review revision. They are not rescored or relabeled as measurements of corrected source.",
+      "The correction adds registered-key revision checks. The old operation table does not count those extra checks.",
+      "Fresh correction screens cover WebGL line-scroll and interactive-edits only, as required by review. No xterm superiority claim.",
+      "Fresh independent re-review is required before merging this corrected product."
+    ]
   }
 }
