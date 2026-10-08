@@ -1,0 +1,27 @@
+<div class="rep win" style="--ww:660px" data-timeline="1200,2300,3700,6000,7000,9000" role="img" aria-label="A turn's diff card: one hunk is undone, a line comment is added, and Codex reviews the change.">
+  <div class="rep-title">{i:folder:sm}<span class="ws">fregat</span><span class="mfg">Dismissible large-file notice</span><span class="sp"></span><span class="mfg">Claude Code</span></div>
+  <div class="win-body"><div class="rep-thread">
+    <div class="you">Make the large-file notice dismissible per file.</div>
+    <div class="card">
+      <div class="hd">3 files changed <span class="add-n tab-num">+58</span><span class="del-n tab-num">−6</span><span class="sp"></span><span class="mfg" style="font-weight:400;font-size:12px">Turn 1 checkpoint</span></div>
+      <div class="hunks">
+        <div class="hunk"><span class="ts">TS</span><span class="f">large-file-notice.tsx</span><span class="tab-num"><span class="add-n">+14</span> <span class="del-n">−2</span></span><span class="u">{i:undo:sm}Undo</span></div>
+        <div class="hunk" data-until="2"><span class="ts">TS</span><span class="f">notice-store.ts</span><span class="add-n tab-num">+38</span><span class="u press-target" data-point="1" data-press>{i:undo:sm}Undo</span></div>
+        <div class="hunk undone" data-at="2"><span class="ts">TS</span><span class="f">notice-store.ts</span><span class="add-n tab-num">+38</span><span class="u">{i:redo:sm}Reapply</span></div>
+        <div class="hunk"><span class="ts">TS</span><span class="f">use-notice-dismissed.ts</span><span class="tab-num"><span class="add-n">+6</span> <span class="del-n">−4</span></span><span class="u">{i:undo:sm}Undo</span></div>
+      </div>
+      <div class="btns"><span class="btn ghost">{i:fork:sm}Fork</span><span class="btn">{i:msg:sm}Comment on lines</span><span class="btn pri press-target" data-point="4" data-press>{i:eye:sm}Review with Codex</span></div>
+    </div>
+    <div class="card" data-at="3">
+      <div class="hd">{i:msg:sm}<span class="mono" style="font-weight:400">use-notice-dismissed.ts:14</span><span class="sp"></span><span class="mfg" style="font-weight:400;font-size:12px">sent with your next message</span></div>
+      <div style="margin-top:6px" data-at="3" data-type="1000">Key this by file id, so a rename keeps the dismissal.</div>
+    </div>
+    <div class="working" data-at="5" data-until="6"><span class="shim">Codex is reviewing 2 hunks</span></div>
+    <div class="card" data-at="6">
+      <div class="hd">{i:eye:sm}Codex review<span class="sp"></span><span class="mfg" style="font-weight:400;font-size:12px">1 note</span></div>
+      <div style="margin-top:6px">The dismissed set never shrinks. Cap it, or clear entries when the file is deleted.</div>
+      <div class="btns"><span class="btn ghost">Dismiss</span><span class="btn pri">Send to Claude</span></div>
+    </div>
+  </div></div>
+  <div class="pointer"><svg viewBox="0 0 24 24" width="18" height="18"><use href="#i-pointer"/></svg></div>
+</div>
