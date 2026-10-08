@@ -101,9 +101,9 @@ function publishChildPid(gate = '') {
   return `{ ${gate}printf '%s\\n' "$!"; } > "$2.pending" && mv -- "$2.pending" "$2"`
 }
 
-test.skipIf(processObservationUnavailable)(
-  'process execution observation distinguishes an unreaped child from its live owner',
-  async () => {
+test.skipIf(processObservationUnavailable).each([0, 0.2])(
+  'process execution observation distinguishes an unreaped child from its live owner (stop delay %s seconds)',
+  async (stopDelay) => {
     const box = sandbox()
     const nestedPid = path.join(box.root, 'child.pid')
     const release = path.join(box.root, 'release')
@@ -111,7 +111,7 @@ test.skipIf(processObservationUnavailable)(
       [
         'bash',
         '-c',
-        `bash -c 'until [ -e "$1" ]; do sleep 0.02; done' _ "$1" & ${publishChildPid()}; kill -STOP $$; wait`,
+        `bash -c 'until [ -e "$1" ]; do sleep 0.02; done' _ "$1" & ${publishChildPid()}; sleep ${stopDelay}; kill -STOP $$; wait`,
         '_',
         release,
         nestedPid,
