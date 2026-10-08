@@ -65,6 +65,12 @@ A server admitted earlier stays eligible to launch and appears in `serversAtAdmi
 
 External tools can write `drain.request` in the state directory, then take `slot1.lock`, `slot2.lock` and `slot3.lock` exclusively. Finite jobs retain these locks until their processes drain; declared servers hold none. A drain request blocks every new admission, including light work, for at most one quiet hold. Waiting or held exclusive slot locks also block light work. An external lock holder owns its cleanup and duration; `status.js` reports its age. External holders have no wrapper measurement record, so this change adds no attribution or concurrency exception to their holds.
 
+## Scope launch transport failures
+
+A local launcher that exits unsuccessfully with `Failed to start transient scope unit: Transport endpoint is not connected` and leaves no accounting receipt returns wrapper exit 2 with guidance for checking the user manager, scope and slice. Its single job record keeps the launcher's original exit code and adds `level: "error"` and `launchFailure: "manager-transport"`. Launcher stderr is forwarded unchanged, including large output and messages split across reads. The in-scope shim restores the caller’s stderr descriptor before payload execution, preserving terminal behavior and closing the extra descriptor.
+
+Scope acceptance is uncertain after the manager connection closes. The runner performs its existing slice cleanup and releases admission before returning the failure. Check `journalctl --user -n 50` and `systemctl --user status`, confirm the named scope and its parent slice are stopped, then submit a fresh job. Automatic replay could overlap a scope accepted before the connection closed.
+
 ## Status, records and installation
 
 ```sh

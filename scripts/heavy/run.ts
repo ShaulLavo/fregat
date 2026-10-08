@@ -42,6 +42,7 @@ import {
 import {
   acquirePiLane,
   DEFAULT_STATE_DIR,
+  duplicateDescriptor,
   isProductionState,
   PRODUCTION,
   isSliceRoot,
@@ -248,6 +249,7 @@ async function run(options: Options) {
     const checkout = repositoryOf(cwd)
     const job = startJob(
       placed.spec,
+      () => duplicateDescriptor(2),
       (launch) => (placed.entry ? beginRun(options.stateDir, placed.entry, launch) : launch()),
       () => {
         if (placed.entry?.quiet) stopRunConcurrency(options.stateDir, placed.entry.id)
@@ -292,6 +294,12 @@ async function run(options: Options) {
       queuedMs,
       serversAtAdmission: placed.serversAtAdmission,
     })
+    if (outcome.launchFailure === 'manager-transport') {
+      throw scriptErrors.HEAVY_SCOPE_TRANSPORT({
+        unit: outcome.unit,
+        internal: { unit: outcome.unit, exitCode: outcome.exitCode },
+      })
+    }
     return holdExpired ? RETRY_EXIT : outcome.exitCode
   } finally {
     try {
@@ -786,6 +794,7 @@ function jobRecord(
   }: Finished,
 ): HeavyJobRecord {
   const wrapper = wrapperCommit()
+  const level = outcome.oomKills ? 'warn' : 'info'
   return {
     action: 'heavy.job',
     allowedCpus,
@@ -802,7 +811,8 @@ function jobRecord(
     host: options.host,
     label: options.label,
     leftoverProcesses: outcome.leftoverProcesses,
-    level: outcome.oomKills ? 'warn' : 'info',
+    level: outcome.launchFailure ? 'error' : level,
+    ...(outcome.launchFailure ? { launchFailure: outcome.launchFailure } : {}),
     memoryPeakBytes: outcome.memoryPeakBytes,
     oomKills: outcome.oomKills,
     queuedMs,

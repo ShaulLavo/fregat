@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { closeSync, existsSync, readFileSync, rmSync } from 'node:fs'
 import { constants, tmpdir } from 'node:os'
 import path from 'node:path'
 
@@ -78,6 +78,7 @@ export function localCommand({
     'bash',
     '-p',
     SCOPE_SHIM,
+    '--stderr',
     '--slice',
     '--grace',
     String(graceSeconds),
@@ -123,6 +124,7 @@ export type JobOutcome = JobAccounting & {
   readonly unit: string
   readonly exitCode: number
   readonly wallMs: number
+  readonly launchFailure: 'manager-transport' | null
 }
 
 type JobBase = {
@@ -165,6 +167,7 @@ export type JobSpec =
  */
 export function startJob(
   job: JobSpec,
+  copyStderr: () => number | null,
   publish = (launch: () => ReturnType<typeof Bun.spawn>) => launch(),
   onExit = () => {},
 ) {
@@ -173,9 +176,18 @@ export function startJob(
   const slice = job.host === 'local' ? jobSlice(job) : null
   const started = performance.now()
   let child: ReturnType<typeof Bun.spawn>
+  let stderrDescriptor: number | null = null
   try {
     // Manager preparation and refused-launch cleanup must stay outside the publication lock.
     const command = launchCommand(job, unit, accountingFile)
+    if (job.host === 'local') {
+      stderrDescriptor = copyStderr()
+      if (stderrDescriptor === null) {
+        throw scriptErrors.HEAVY_STDERR({
+          internal: { descriptor: 2, copiedDescriptor: stderrDescriptor },
+        })
+      }
+    }
     child = publish(() =>
       Bun.spawn({
         cmd: command,
@@ -188,7 +200,7 @@ export function startJob(
         stdio: [
           'inherit',
           'inherit',
-          'inherit',
+          job.host === 'local' ? 'pipe' : 'inherit',
           // Server jobs hold no slot locks; the entry lock must still arrive on fd 6.
           ...(job.host === 'local'
             ? [
@@ -196,6 +208,8 @@ export function startJob(
                 job.slotLocks[1] ?? 'ignore',
                 job.slotLocks[2] ?? 'ignore',
                 job.entryLock,
+                // The shim restores fd 2 from fd 7, preserving the payload's terminal stream.
+                stderrDescriptor!,
               ]
             : []),
         ],
@@ -204,6 +218,8 @@ export function startJob(
   } catch (error) {
     if (slice) removeJobSlice(slice)
     throw error
+  } finally {
+    if (stderrDescriptor !== null) closeSync(stderrDescriptor)
   }
 
   // Before systemd-run has made the scope, the signal ends systemd-run itself; the Pi
@@ -218,19 +234,51 @@ export function startJob(
     escalation ??= setTimeout(() => signalJob('SIGKILL'), job.graceSeconds * 1000)
   }
 
-  const done = child.exited
-    .then((): JobOutcome => {
+  const diagnostics = relayScopeDiagnostics(child.stderr).then(
+    (transportFailed) => ({ transportFailed, error: undefined }),
+    (error: unknown) => ({ transportFailed: false, error }),
+  )
+  let accounted = false
+  const settled = child.exited
+    .then(() => {
       onExit()
       const signalCode = child.signalCode
       const exitCode = child.exitCode ?? 128 + (signalCode ? constants.signals[signalCode] : 0)
       const wallMs = Math.round(performance.now() - started)
+      accounted = existsSync(accountingFile)
       return { exitCode, slice, unit, wallMs, ...readAccounting(accountingFile) }
     })
     .finally(() => {
       clearTimeout(escalation)
       if (slice) removeJobSlice(slice)
     })
+  const done = settled.then(async (outcome): Promise<JobOutcome> => {
+    const diagnostic = await diagnostics
+    if (diagnostic.error !== undefined) throw diagnostic.error
+    return {
+      ...outcome,
+      launchFailure:
+        diagnostic.transportFailed && outcome.exitCode !== 0 && !accounted
+          ? 'manager-transport'
+          : null,
+    }
+  })
   return { done, stop }
+}
+
+async function relayScopeDiagnostics(stderr: Bun.Subprocess['stderr']) {
+  if (!stderr || typeof stderr === 'number') return false
+  const diagnostic = 'Failed to start transient scope unit: Transport endpoint is not connected'
+  const decoder = new TextDecoder()
+  let tail = ''
+  let transportFailed = false
+  for await (const chunk of stderr) {
+    const text = tail + decoder.decode(chunk, { stream: true })
+    transportFailed ||= text.includes(diagnostic)
+    tail = text.slice(1 - diagnostic.length)
+    await Bun.write(Bun.stderr, chunk)
+  }
+  return transportFailed
 }
 
 /** How long systemd waits for a stopped scope: the shim's TERM grace, then its KILL settle. */

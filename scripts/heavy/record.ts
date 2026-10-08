@@ -18,7 +18,8 @@ export type JobDuringRun = ServerAtAdmission & {
 /** One finished heavy job, as one line of `<logDir>/<UTC date>.jsonl`. */
 export type HeavyJobRecord = {
   readonly timestamp: string
-  readonly level: 'info' | 'warn'
+  readonly level: 'info' | 'warn' | 'error'
+  readonly launchFailure?: 'manager-transport'
   readonly source: 'heavy'
   readonly area: 'heavy-jobs'
   readonly action: 'heavy.job'
