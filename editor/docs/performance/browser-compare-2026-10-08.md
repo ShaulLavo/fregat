@@ -37,7 +37,7 @@ Every page has lexical highlighting. Language servers, diagnostics and semantic 
 
 Monaco normally reduces large-file features. This comparison turns its large-file optimization off before constructing the model so TypeScript tokenization remains enabled. The raw sample records the model's large-file tokenization flag. CodeMirror retains the other defaults in `basicSetup`. Singapore retains its core defaults. The supporting feature sets differ.
 
-Three repetitions rotate editor order. Each editor occupies each run position once. Every sample uses a fresh browser context. Module loading and fixture transfer finish before the open clock starts. The default scan tests 1, 10, 50, 100 and 200 MiB.
+Three repetitions rotate editor order. Each editor occupies each run position once. Every sample uses a fresh browser context. Module loading and fixture generation finish before the open clock starts. The browser constructs its document with the same pure fixture module used by the Node-side identity calculation. Only the requested size crosses the Playwright channel. The default scan tests 1, 10, 50, 100 and 200 MiB.
 
 ## Measurement definitions
 
@@ -56,6 +56,8 @@ The capture listener records the browser key event timestamp. A MutationObserver
 The runner retains listener lag, time to the observed mutation and time to the frame opportunity. It also retains Event Timing entries associated with the exact keydown timestamp. Chromium's Event Timing threshold is 16 ms, so short interactions can have no entry.
 
 A separate positive control adds 120 ms in the capture listener before the editor handles the key. The verifier requires each editor's median mutation latency to grow by at least 96 ms. This checks that the clock includes delayed input work. The initial 30 ms control moved Monaco's median mutation clock by about 15 ms because the delay consumed an existing frame wait. The accepted control uses 120 ms to exceed that scheduling window. Both observations are retained.
+
+The 120 ms control passed for all three editors. Median mutation-latency increases were 116.2 ms for Singapore, 105.5 ms for Monaco and 119.9 ms for CodeMirror. These calibration observations validate detection of added synchronous work; they do not calibrate physical presentation latency.
 
 The measured matrix uses 20 keys per location and pools 60 keys per location across three successful repetitions and reports nearest-rank p50 and p95. Keys are isolated. They do not model sustained typing, a paste, composition or a held key. The two-frame observation adds scheduling overhead and frame quantization. Close values can reflect that quantization.
 
@@ -85,17 +87,23 @@ The compressed deployment total sums every emitted file, compressed independentl
 
 A 30-second visible-highlighting deadline and a 300-second whole-sample deadline for the measured matrix bound each attempt. The whole deadline includes heap collection, typing and scroll. A stuck sample closes Chromium and starts a new browser. Failures stay in the output. Resume keeps completed identities, including failures, and rejects a changed machine, browser, source or configuration.
 
+A returned failure can retain completed open and heap observations. The outer whole-sample timeout records the deadline and discards in-progress metrics; a saved screenshot alone cannot turn that timeout into a completed measurement.
+
 A successful size means this complete protocol passed at that size. An open can succeed while later input or scroll fails. The largest passing size is a tested bound under these deadlines and resource limits, not an editor's absolute file-size limit. A pass at 200 MiB leaves larger files unmeasured.
+
+The first matrix transferred the document through Playwright. At 100 and 200 MiB, Chromium's DevTools pipe closed before editor construction: `max_buffer_size=104857600` and `Connection closed, not enough capacity`. That is a harness transport limit, and those rows do not establish an editor's size limit. The failed matrix is retained as setup evidence; the corrected comparison generates the fixture inside the browser.
 
 The fixture does not cover one very long line, varied identifiers, mixed languages, diagnostics, completions, search, multiple cursors or accessibility. Repeating the same declaration can favor a tokenizer or parser differently from a real project file. Headless Chromium is one browser on one Linux machine. Firefox, WebKit and physical presentation remain unmeasured here.
 
-The summary verifier requires the complete sample matrix and usable 1 and 10 MiB rows for every editor. It checks trusted input, rendered text, key count and scroll evidence. Failed larger samples remain visible beside successful ones. Open and heap values use the median of successful repetitions. The tables must be read with their usable/attempted counts.
+The summary verifier requires the complete sample matrix and usable 1 MiB baseline rows for every editor. It checks trusted input, rendered text, key count and scroll evidence. Failed 10 MiB and larger attempts remain measured outcomes, with an explicit error required for each failure. Completed open observations also retain the geometry check when later work fails. Open and heap values in the aggregate tables use the median of fully successful repetitions; partial observations are identified separately. The tables must be read with their usable/attempted counts.
 
 ## Machine and versions
 
 The experiment ran on 2026-10-08 UTC on an Intel Core i7-14700K, 28 logical CPUs, with 31.1 GiB of usable RAM. The host ran Linux x64, kernel `7.2.8-arch1-2`. Playwright 1.63.0 used Chromium `153.0.8010.12` in headless mode. Node was 26.7.0, Bun 1.4.2 and Vite 8.3.1. No CPU affinity was applied.
 
-Singapore's core, textbuffer, Tree-sitter and language packages were 0.2.6. Monaco was 0.57.0. CodeMirror's `codemirror` package was 6.0.2, state 6.7.6, view 6.43.14 and JavaScript language package 6.2.5. The JSON records lockfile and benchmark source hashes.
+Singapore's core, textbuffer, Tree-sitter and language packages were 0.2.6. Monaco was 0.57.0. CodeMirror's `codemirror` package was 6.0.2, state 6.7.6, view 6.43.14 and JavaScript language package 6.2.5. Product source came from [baseline 523ccf51](https://github.com/ShaulLavo/fregat/commit/523ccf51c459dee0424cfb7829fd527f033b9a5a). The JSON records lockfile and benchmark source hashes.
+
+The ordinary bench job used the host scheduler's 9 GiB memory ceiling and no reserved CPU set. Other jobs and preview servers overlapped the experiment. A renderer crash or deadline is an outcome under this setup; this run does not determine its root cause.
 
 ## Compressed deployment experiment
 

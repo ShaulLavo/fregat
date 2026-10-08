@@ -61,8 +61,10 @@ this scan, not an absolute limit for an editor.
 
 Three rotating editor orders give each editor each run position once. Use
 repetitions in multiples of three for balanced order. Each sample gets a fresh
-browser context. Module loading and fixture transfer finish before the open
-clock starts.
+browser context. Module loading and fixture generation finish before the open
+clock starts. The browser uses the same pure fixture module as the Node-side
+identity calculation. Only the size crosses Playwright's channel, keeping large
+files below Chromium's DevTools message-size limit.
 
 ## Measurements and differences
 
@@ -125,9 +127,10 @@ is a win on this fixture and setup. It is not an editor-wide ranking.
 
 ## Evidence
 
-The runner writes raw samples, screenshots and representative 10 MiB scroll
+The runner writes raw samples, screenshots and representative 1 and 10 MiB scroll
 traces. `summarize.mjs` verifies complete sample accounting and requires usable
-1 and 10 MiB rows for every editor before it prints the summary. It pools
+1 MiB baseline rows for every editor. Larger failures require a retained error
+and remain measured outcomes. It pools
 keystrokes across usable repetitions and uses nearest-rank p50/p95. Open and
 heap columns use the median of repetitions. Failures remain separate.
 

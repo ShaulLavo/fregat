@@ -91,6 +91,7 @@ export async function buildAll() {
                 if (id === '\0compare')
                   return (minimal ? minimalEntry(editor, highlighted) : page)
                     .replace("'ACTOR'", JSON.stringify(resolve(root, `${editor}.js`)))
+                    .replace("'FIXTURE'", JSON.stringify(resolve(root, 'fixture.mjs')))
                     .replaceAll('HIGHLIGHTED', JSON.stringify(highlighted))
               },
               transform(code, id) {

@@ -9,7 +9,6 @@ import { parseArgs } from 'node:util'
 import { chromium } from 'playwright'
 import { root, output } from './build.mjs'
 import {
-  fixture,
   fixtureIdentity,
   order,
   sizes,
@@ -125,6 +124,7 @@ let results = {
             'page.html',
             'package.json',
             'page.js',
+            'fixture.mjs',
             'singapore.js',
             'monaco.js',
             'codemirror.js',
@@ -263,7 +263,8 @@ async function sample(editor, mib, repetition) {
     await page.waitForFunction(() => !!window.bench)
     row.heapBefore = await heap(cdp)
     row.heapBeforeBytes = row.heapBefore.usedSize
-    row.open = await page.evaluate((text) => window.bench.open(text), fixture(mib))
+    await page.evaluate((mib) => window.bench.prepare(mib), mib)
+    row.open = await page.evaluate(() => window.bench.open())
     verifyGeometry(row.open)
     if (row.open.length !== mib * 1024 * 1024) throw new RangeError('Open changed document length')
     await page.waitForTimeout(1000)
@@ -308,7 +309,7 @@ async function sample(editor, mib, repetition) {
     const captured = await trace(cdp, () =>
       page.evaluate((frames) => window.bench.scroll(frames), frames),
     )
-    if (repetition === 0 && mib === 10)
+    if (repetition === 0 && [1, 10].includes(mib))
       await writeFile(
         resolve(values.output, `${editor}-10-scroll.trace.json.gz`),
         gzipSync(JSON.stringify({ traceEvents: captured.events })),
@@ -338,7 +339,10 @@ async function sample(editor, mib, repetition) {
     row.errors.push(error.message)
     row.failureFacts = await page.evaluate(() => window.bench?.facts()).catch(() => null)
   } finally {
-    await context.close()
+    await context.close().catch((error) => {
+      row.errors.push(`Context cleanup: ${error.message}`)
+      row.status = 'failed'
+    })
   }
   return row
 }

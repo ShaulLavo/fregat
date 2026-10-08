@@ -64,7 +64,7 @@ export function verify(result) {
       }
     }
   }
-  for (const mib of [1, 10].filter((mib) => result.config.selected.includes(mib))) {
+  for (const mib of [1].filter((mib) => result.config.selected.includes(mib))) {
     for (const editor of editors) {
       const samples = result.samples.filter((row) => row.editor === editor && row.mib === mib)
       if (
@@ -73,6 +73,13 @@ export function verify(result) {
       )
         throw new RangeError(`Incomplete usable ${editor} ${mib} MiB comparison`)
     }
+  }
+  for (const sample of result.samples) {
+    if (!['ok', 'failed', 'timeout', 'page-error'].includes(sample.status))
+      throw new RangeError('Unknown sample outcome')
+    if (sample.status !== 'ok' && !sample.errors?.length)
+      throw new RangeError('Failed sample has no retained error')
+    if (sample.open) verifyGeometry(sample.open)
   }
   for (const sample of result.samples.filter((row) => row.status === 'ok')) {
     verifyGeometry(sample.open)

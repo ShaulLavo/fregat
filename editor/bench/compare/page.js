@@ -1,5 +1,7 @@
 import { mount } from 'ACTOR'
+import { fixture } from 'FIXTURE'
 
+let preparedText
 const host = document.querySelector('#editor')
 let editor
 const events = []
@@ -23,7 +25,12 @@ const painted = async () => {
 }
 
 window.bench = {
-  async open(text) {
+  prepare(mib) {
+    preparedText = fixture(mib)
+  },
+  async open() {
+    const text = preparedText
+    preparedText = undefined
     const start = performance.now()
     editor = mount(host, text, HIGHLIGHTED)
     await painted()

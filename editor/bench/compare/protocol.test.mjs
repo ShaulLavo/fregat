@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { fixture, fixtureIdentity, order, summarize, scrollCosts, editors } from './protocol.mjs'
+import { fixture } from './fixture.mjs'
+import { fixtureIdentity, order, summarize, scrollCosts, editors } from './protocol.mjs'
 
 test('fixtures are exact MiB, ASCII and deterministic', () => {
   for (const mib of [1, 10]) {
@@ -125,4 +126,26 @@ test('positive control exceeds a frame wait and detects injected handler work', 
   control.samples[0].typing.end.raw[0].mutationMs = 40
   control.samples[0].typing.middle.raw[0].mutationMs = 40
   assert.throws(() => verifyControl(baseline, control), /detected 24 ms/)
+})
+
+test('a genuine large-file failure remains a measured outcome', async () => {
+  const { summary, verify } = await import('./summarize.mjs')
+  const result = {
+    config: { selected: [10], repetitions: 1 },
+    bundles: [],
+    samples: editors.map((editor) => ({
+      editor,
+      mib: 10,
+      repetition: 0,
+      status: 'failed',
+      errors: ['keyboard.press: Target crashed'],
+    })),
+  }
+  assert.equal(verify(result), '3 samples retained; 0 usable')
+  assert.equal(summary(result).rows[0].attempted, 1)
+  assert.equal(summary(result).rows[0].successful, 0)
+  result.samples[0].errors = []
+  assert.throws(() => verify(result), /no retained error/)
+  result.samples[0].status = 'unreported'
+  assert.throws(() => verify(result), /Unknown sample outcome/)
 })
