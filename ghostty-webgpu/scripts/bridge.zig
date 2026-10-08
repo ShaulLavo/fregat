@@ -416,6 +416,9 @@ fn reuseFrameRow(frame: *Frame, y: u32) c.GhosttyResult {
     var glyph_end: u32 = 0;
     const top = @as(f32, @floatFromInt(y)) * frame.cell_height;
     for (0..frame.columns) |x| {
+        const row = cache.next[y];
+        const selected = row.selected and x >= row.selection_start and x <= row.selection_end;
+        if (reuseRenderedCell(frame, row.cells[x].raw, @intCast(x), y, selected)) continue;
         rememberRenderedCell(cache, start + x, cache.next[y].cells[x]);
         var next_cell = source_cells[source_start + x];
         var next_glyph = source_glyphs[source_start + x];
