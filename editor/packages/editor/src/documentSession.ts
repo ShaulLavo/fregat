@@ -231,6 +231,8 @@ export type DocumentEditAuthor = {
   ): PieceTableSnapshot
   readonly canUndo?: () => boolean
   readonly canRedo?: () => boolean
+  readonly undo?: () => void
+  readonly redo?: () => void
 }
 
 export type EditorTextBuffer = {
@@ -963,6 +965,11 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     const start = nowMs()
     if (this.mutationLease)
       return appendTiming(this.createChange('none', []), 'session.undo', start)
+    if (this.applyLocalEdits.undo) {
+      // The document author publishes its history transition through reconciliation.
+      this.applyLocalEdits.undo()
+      return appendTiming(this.createChange('none', []), 'session.undo', start)
+    }
     const transaction = this.history.undo?.transaction ?? null
     const next = undoEditorHistory(this.history)
     this.typingRun = null
@@ -997,6 +1004,11 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     const start = nowMs()
     if (this.mutationLease)
       return appendTiming(this.createChange('none', []), 'session.redo', start)
+    if (this.applyLocalEdits.redo) {
+      // The document author publishes its history transition through reconciliation.
+      this.applyLocalEdits.redo()
+      return appendTiming(this.createChange('none', []), 'session.redo', start)
+    }
     const transaction = this.history.redo?.transaction ?? null
     const next = redoEditorHistory(this.history)
     this.typingRun = null

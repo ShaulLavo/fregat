@@ -9,6 +9,8 @@ import { CollabFailure, type Envelope } from '@singapore-editor/collab'
 import type { Editor } from '@singapore-editor/core/editor'
 import {
   createPieceTableSnapshot,
+  diffPieceTableSnapshots,
+  materializePieceTableFullText,
   snapBatchEditRanges,
   readPieceTableTextRange,
   type PieceTableSnapshot,
@@ -66,6 +68,10 @@ export function createCollaborationPlugin(options: CollaborationPluginOptions): 
       let timer: ReturnType<typeof setInterval> | undefined
       let authoring = false
       const authored: Envelope[] = []
+      const changeHistory = (direction: 'undo' | 'redo') => {
+        const edit = participant.undoManager[direction]()
+        if (edit) session.submit(edit)
+      }
       const author: Parameters<typeof scope.authorEdits>[0] = Object.assign(
         (
           before: PieceTableSnapshot,
@@ -94,6 +100,8 @@ export function createCollaborationPlugin(options: CollaborationPluginOptions): 
         {
           canUndo: () => participant.undoManager.canUndo,
           canRedo: () => participant.undoManager.canRedo,
+          undo: () => changeHistory('undo'),
+          redo: () => changeHistory('redo'),
         },
       )
       // Claim the document before any bootstrap reconciliation can mutate a shared buffer.
@@ -110,23 +118,18 @@ export function createCollaborationPlugin(options: CollaborationPluginOptions): 
         // Identity authoring runs before mutation; only committed transactions enter the network.
         for (const envelope of authored.splice(0)) session.submit(envelope)
       })
-      const commands = (['undo', 'redo'] as const).map((direction) =>
-        scope.handle(direction, () => {
-          const edit = participant.undoManager[direction]()
-          if (edit) session.submit(edit)
-          return true
-        }),
-      )
       let detached = false
       const detach = () => {
         if (detached) return
         detached = true
         clearInterval(timer)
         unsubscribe()
-        for (const command of commands) command.dispose()
         registration.dispose()
-        const text = collaborationBoundaryText(buffer)
-        buffer.reconcile(createPieceTableSnapshot(text), [], { origin: 'replay', edits: [] })
+        // A leased view may still show an older snapshot than the confirmed engine state.
+        const text = collaborationBoundaryText(document.engine.snapshot().buffer)
+        const snapshot = createPieceTableSnapshot(text)
+        const edit = diffPieceTableSnapshots(buffer.getSnapshot(), snapshot)
+        buffer.reconcile(snapshot, [], { origin: 'replay', edits: edit ? [edit] : [] })
         session.leave()
       }
       scope.onDispose(detach)
@@ -138,7 +141,7 @@ export function createCollaborationPlugin(options: CollaborationPluginOptions): 
       scope.watch(bufferInput, () => {
         if (!attached()) detach()
       })
-      const before = collaborationBoundaryText(scope.editor)
+      const before = collaborationBoundaryText(buffer.getSnapshot())
       const after = document.engine.text()
       scope.reconcile(document.engine.snapshot().buffer, [], {
         origin: 'replay',
@@ -222,8 +225,8 @@ export function createCollaborationPlugin(options: CollaborationPluginOptions): 
   })
 }
 
-function collaborationBoundaryText(editor: Pick<Editor, 'getTextSnapshot'>): string {
-  return editor.getTextSnapshot().materializeFullText()
+function collaborationBoundaryText(snapshot: PieceTableSnapshot): string {
+  return materializePieceTableFullText(snapshot)
 }
 
 // Native edits may repair one half of a surrogate pair. Identity edits must name the whole pair.

@@ -47,6 +47,7 @@ async function mountPeer(
   transportPolicy: RTCIceTransportPolicy,
 ): Promise<void> {
   const peer = crypto.randomUUID()
+  const displayName = `${name} · ${peer.slice(0, 8)}`
   const signalingClient = urls.length
     ? new WebSocketSignaling({
         urls,
@@ -74,7 +75,7 @@ async function mountPeer(
     const header = document.createElement('div')
     header.className = 'peer-header'
     const label = document.createElement('strong')
-    label.textContent = name
+    label.textContent = displayName
     const state = document.createElement('span')
     const leave = document.createElement('button')
     leave.textContent = 'Leave session'
@@ -93,7 +94,7 @@ async function mountPeer(
       plugins: [
         createCollaborationPlugin({
           session: { peer, room, document: 'example-document', epoch: room, text: initialText },
-          presence: { displayName: name, colour: name === 'Peer one' ? '#a8ddc4' : '#e8be82' },
+          presence: { displayName, colour: name === 'Peer one' ? '#a8ddc4' : '#e8be82' },
           transport: { send: (target, message) => router?.send(target, message) },
           onReady: (ready) => {
             connection = ready
