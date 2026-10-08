@@ -8,6 +8,8 @@ import {
 import { mkdir, rm } from 'node:fs/promises'
 import * as v from 'valibot'
 import { afterEach } from 'vitest'
+import { initLogger } from 'evlog'
+import { createWideEventScope } from '@workspace/observability/scope'
 import { SettingsStore } from '../../../../../server/src/settings/store'
 import { SecretStore } from '../../../../../server/src/settings/secrets'
 import { testSettingsOptions } from 'server/testing'
@@ -129,6 +131,61 @@ test('real settings and secret stores resolve the plugin and adapter options', a
     settings.close()
   }
 })
+
+test.for(['JSON', 'structuredClone', 'evlog'])(
+  '%s serialization excludes collaboration credentials',
+  async (format, { server }) => {
+    const options = testSettingsOptions(server.root)
+    await new SecretStore(options.secretsFilePath!).write(
+      new Map([
+        [COLLABORATION_ADMISSION_TOKEN_REF, admissionToken],
+        [
+          COLLABORATION_TURN_CREDENTIALS_REF,
+          JSON.stringify({
+            [turnUrl]: { username: 'fixture-user', credential: 'fixture-password' },
+          }),
+        ],
+      ]),
+    )
+    const settings = new SettingsStore(options)
+    try {
+      writeBootMirror(configured)
+      const resolved = await resolveCollaborationOptions(settings)
+      let serialized: string
+      if (format === 'evlog') {
+        const events: Record<string, unknown>[] = []
+        initLogger({
+          enabled: true,
+          silent: true,
+          redact: true,
+          stringify: true,
+          drain: ({ event }) => {
+            events.push(event)
+          },
+        })
+        const scope = createWideEventScope({
+          enabled: true,
+          base: { action: 'collaboration.configuration', area: 'editor' },
+        })
+        scope.set({ options: resolved })
+        scope.end()
+        expect(events).toHaveLength(1)
+        serialized = JSON.stringify(events)
+      } else {
+        serialized = JSON.stringify(
+          format === 'structuredClone' ? structuredClone(resolved) : resolved,
+        )
+      }
+      expect(serialized).toContain('Test participant')
+      for (const secret of [admissionToken, 'fixture-user', 'fixture-password']) {
+        expect(serialized).not.toContain(secret)
+      }
+    } finally {
+      settings.close()
+      if (format === 'evlog') initLogger({ enabled: false })
+    }
+  },
+)
 
 test('an unavailable secret store produces safe guidance', async ({ server }) => {
   const options = testSettingsOptions(server.root)
