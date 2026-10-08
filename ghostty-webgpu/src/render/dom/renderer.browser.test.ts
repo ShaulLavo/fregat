@@ -632,3 +632,87 @@ it('packed DOM rows keep styled callbacks and lazy snapshots owned across writes
   expect(probe.renderer.metrics.paintedRows).toBe(count)
   expect(probe.renderer.metrics.paintedCells).toBe(cells)
 })
+
+it('keeps live geometry through fractional CSS, sibling flow, transforms and stylesheet rules', async () => {
+  const probe = await rendererProbe('dom')
+  const canvas = probe.canvas
+  const host = canvas.parentElement!
+  const container = canvas.nextElementSibling as HTMLElement
+  const oracle = document.createElement('div')
+  oracle.style.position = 'absolute'
+  host.append(oracle)
+  const expectPosition = () => {
+    probe.terminal.write('\rnext')
+    probe.renderer.notifyWrite()
+    probe.clock.flush()
+    const style = getComputedStyle(canvas)
+    oracle.style.left = `${canvas.offsetLeft + parseFloat(style.paddingLeft)}px`
+    oracle.style.top = `${canvas.offsetTop + parseFloat(style.paddingTop)}px`
+    const expected = oracle.getBoundingClientRect()
+    const actual = container.getBoundingClientRect()
+    expect(actual.left).toBeCloseTo(expected.left, 5)
+    expect(actual.top).toBeCloseTo(expected.top, 5)
+  }
+  expectPosition()
+  host.style.border = '2.25px solid transparent'
+  host.style.padding = '3.25px 4.5px'
+  canvas.style.margin = '2.5px 5.5px'
+  expectPosition()
+  const sibling = document.createElement('div')
+  sibling.style.height = '17.25px'
+  host.prepend(sibling)
+  expectPosition()
+  canvas.style.transform = 'translate(11.5px, 13.25px)'
+  expectPosition()
+  canvas.style.transform = ''
+  canvas.style.translate = '9px 12px'
+  expectPosition()
+  canvas.style.translate = ''
+  host.style.transform = 'scale(0.75)'
+  expectPosition()
+  canvas.setAttribute('data-dom-position-probe', '')
+  const sheet = document.createElement('style')
+  document.head.append(sheet)
+  cleanups.push(() => sheet.remove())
+  sheet.sheet!.insertRule(
+    'canvas[data-dom-position-probe] { anchor-name: --embedder !important; margin-top: 23.25px !important; padding-left: 19px !important }',
+  )
+  expectPosition()
+  sheet.remove()
+  canvas.style.padding = '5% 7%'
+  host.style.width = '400px'
+  expectPosition()
+  host.style.width = '350px'
+  expectPosition()
+})
+
+it('isolates fixed-grid layout through theme and font changes', async () => {
+  const probe = await rendererProbe('dom')
+  const frame = () =>
+    probe.canvas.parentElement!.querySelector<HTMLElement>('.ghostty-webgpu-frame')!
+  expect(frame().style.contain).toBe('strict')
+  probe.renderer.setTheme({ background: { r: 1, g: 2, b: 3 } })
+  probe.clock.flush()
+  expect(frame().style.contain).toBe('strict')
+  probe.renderer.setFont({ ...probeFont, cssCellWidth: 12, deviceCellWidth: 12 })
+  probe.clock.flush()
+  expect(frame().style.contain).toBe('strict')
+  expect(frame().getBoundingClientRect().width).toBe(144)
+})
+
+it('reads live canvas geometry without repeating unchanged overlay declarations', async () => {
+  const probe = await rendererProbe('dom')
+  const container = probe.canvas.nextElementSibling as HTMLElement
+  const style = vi.spyOn(container, 'style', 'get')
+  probe.terminal.write('\rnext')
+  probe.renderer.notifyWrite()
+  probe.clock.flush()
+  expect(style).not.toHaveBeenCalled()
+  probe.canvas.style.marginLeft = '23px'
+  probe.canvas.style.paddingTop = '11px'
+  probe.terminal.write('\ranother')
+  probe.renderer.notifyWrite()
+  probe.clock.flush()
+  expect(container.style.left).toBe('30px')
+  expect(container.style.top).toBe('11px')
+})

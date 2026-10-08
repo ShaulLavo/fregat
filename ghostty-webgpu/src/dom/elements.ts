@@ -142,6 +142,8 @@ function finitePosition(name: string, value: number): number {
 
 class OwnedTerminalElements implements TerminalElements {
   private committedPadding: TerminalElementPadding
+  private caretX?: number
+  private caretY?: number
   private disposed = false
 
   constructor(
@@ -178,10 +180,13 @@ class OwnedTerminalElements implements TerminalElements {
     if (this.disposed) return
     const x = finitePosition('caret x', position.x)
     const y = finitePosition('caret y', position.y)
+    if (x === this.caretX && y === this.caretY) return
     this.textarea.style.left = `${x}px`
     this.textarea.style.top = `${y}px`
     this.compositionView.style.left = `${x}px`
     this.compositionView.style.top = `${y}px`
+    this.caretX = x
+    this.caretY = y
   }
 
   replaceCanvas(): HTMLCanvasElement {
