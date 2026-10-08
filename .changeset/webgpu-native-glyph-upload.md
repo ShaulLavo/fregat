@@ -2,4 +2,4 @@
 'ghostty-webgpu': patch
 ---
 
-Upload native glyph records directly to WebGPU and read their existing layout in the glyph shader.
+Improved WebGPU glyph uploads by removing an intermediate copy of glyph data.

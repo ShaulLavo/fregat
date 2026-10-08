@@ -2,4 +2,4 @@
 'ghostty-webgpu': patch
 ---
 
-Document scrollback as native page-granular retention and expose its byte budget through core, session, and appearance APIs. Zero bytes disables history. Actual row counts remain shared by history reads, selection, scrolling, and accessibility, with selection observers updated after output, reflow, and budget-driven pruning. Bound output selection observation to native coordinates, eviction tracking, and the active selected rows. Validate complete appearance updates before native changes and keep state notifications current when observers perform nested mutations.
+Added `scrollbackByteLimit` to limit terminal scrollback by allocated page bytes, including the active screen. `0` clears history and disables further scrollback. Limits apply to whole pages, and positive byte limits have a minimum based on screen size.

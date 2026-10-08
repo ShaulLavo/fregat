@@ -2,4 +2,4 @@
 '@singapore-editor/core': patch
 ---
 
-Track the editor's final scroll update so retention samples wait for the viewport to settle.
+Fixed editor retention checks sampling the viewport before the final scroll update. The editor now includes that update in its tracked pending work.

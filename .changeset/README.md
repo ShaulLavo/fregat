@@ -1,9 +1,11 @@
 # Public package releases
 
 Run `bun run changeset` for a public package change and commit the resulting Markdown file.
-The Editor packages share one version; the two hotkeys packages share another.
+The Editor packages listed in `.changeset/config.json` share one version; the two hotkeys packages share another.
 `ghostty-webgpu` releases independently. Private workspaces are excluded from versioning and tags.
-The Editor and ghostty groups become active when their folders join the root workspaces.
+Use patch bumps until launch, including breaking API changes.
+Write summaries for package users. Follow the [changeset writing rules](../AGENTS.md#changesets)
+and [Releasing packages](../docs/releasing.md) for the current cycle and local checks.
 
 On main, `release.yml` opens or updates the version PR, including the Bun lockfile.
 After the owner configures every npm trusted publisher and sets the Fregat repository variable

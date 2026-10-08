@@ -2,4 +2,4 @@
 'ghostty-webgpu': patch
 ---
 
-Omit the disabled standalone WebSocket hook from the browser mock interceptor.
+Fixed browser tests registering an unused WebSocket server hook when standalone mock interception is disabled.
