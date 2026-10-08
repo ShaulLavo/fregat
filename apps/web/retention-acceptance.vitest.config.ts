@@ -60,6 +60,7 @@ export default defineConfig(({ mode }) =>
         root: import.meta.dirname,
         test: {
           ...base.test,
+          name: 'retention-reload',
           globalSetup: ['./test/env/retention-acceptance-file-server.ts'],
           provide: { retentionAcceptanceEntryUrl: 'http://127.0.0.1:52865' },
           include: ['src/features/editor/tests/retention-acceptance-reload.browser.tsx'],
