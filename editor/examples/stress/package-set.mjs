@@ -37,6 +37,28 @@ function browserExport(target) {
   return undefined
 }
 
+function frozenAlias(specifier, replacement, reason) {
+  const escaped = specifier
+    .split('*')
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('([^?#]*)')
+  const alias = {
+    // Leave Vite's asset queries on the replacement while matching the complete export name.
+    find: new RegExp(`^${escaped}(?=$|[?#])`),
+    replacement: replacement.replaceAll('*', '$1'),
+  }
+  if (reason) alias.reason = reason
+  return alias
+}
+
+function exportOrder(left, right) {
+  const leftPattern = left.specifier.indexOf('*')
+  const rightPattern = right.specifier.indexOf('*')
+  if (leftPattern < 0) return rightPattern < 0 ? 0 : -1
+  if (rightPattern < 0) return 1
+  return rightPattern - leftPattern || right.specifier.length - left.specifier.length
+}
+
 async function hashDirectory(directory) {
   const hash = createHash('sha256')
   const entries = await readdir(directory, { recursive: true, withFileTypes: true })
@@ -220,7 +242,7 @@ export async function loadPackageSet(path) {
     JSON.stringify(manifest.packages.map((entry) => entry.folder).sort())
   )
     fail('Frozen package set membership changed')
-  const aliases = []
+  const aliasEntries = []
   const skippedExports = []
   for (const expected of manifest.packages) {
     const packageDirectory = resolve(directory, expected.folder)
@@ -233,10 +255,9 @@ export async function loadPackageSet(path) {
       const entry = browserExport(target)
       const specifier = expected.name + (subpath === '.' ? '' : subpath.slice(1))
       if (entry == null) {
-        skippedExports.push({
-          specifier,
-          reason: `No target for ${[...browserConditions].join(', ')} conditions`,
-        })
+        const reason = `No target for ${[...browserConditions].join(', ')} conditions`
+        skippedExports.push({ specifier, reason })
+        aliasEntries.push({ specifier, alias: frozenAlias(specifier, specifier, reason) })
         continue
       }
       if (!entry.startsWith('./dist/'))
@@ -244,22 +265,12 @@ export async function loadPackageSet(path) {
       const replacement = resolve(packageDirectory, entry)
       if (!replacement.startsWith(resolve(packageDirectory, 'dist') + sep))
         fail('Frozen export escapes dist')
-      if (subpath.includes('*')) {
-        const escaped = specifier
-          .split('*')
-          .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-          .join('(.+)')
-        aliases.push({
-          find: new RegExp(`^${escaped}$`),
-          replacement: replacement.replace('*', '$1'),
-        })
-        continue
-      }
-      if (!(await stat(replacement)).isFile()) fail(`Missing frozen export: ${specifier}`)
-      aliases.push({ find: specifier, replacement })
+      if (!subpath.includes('*') && !(await stat(replacement)).isFile())
+        fail(`Missing frozen export: ${specifier}`)
+      aliasEntries.push({ specifier, alias: frozenAlias(specifier, replacement) })
     }
   }
-  aliases.sort((left, right) => String(right.find).length - String(left.find).length)
+  const aliases = aliasEntries.sort(exportOrder).map(({ alias }) => alias)
   const external = await externalReceipt(
     directory,
     manifest.packages.map((entry) => entry.folder),

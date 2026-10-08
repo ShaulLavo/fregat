@@ -69,7 +69,15 @@ test('a browser snapshot keeps the package and explains its unavailable Bun serv
   const { set } = await fixture(exports)
   expect(set.manifest.packages[0].exports).toEqual(exports)
   expect(set.aliases).toEqual([
-    { find: '@singapore-editor/core', replacement: join(set.directory, 'core/dist/index.js') },
+    {
+      find: /^@singapore-editor\/core(?=$|[?#])/,
+      replacement: join(set.directory, 'core/dist/index.js'),
+    },
+    {
+      find: /^@singapore-editor\/core\/server(?=$|[?#])/,
+      replacement: '@singapore-editor/core/server',
+      reason: 'No target for browser, module, production, import, default conditions',
+    },
   ])
   expect(set.skippedExports).toEqual([
     {
@@ -102,7 +110,7 @@ test.each(['./dist/index.js', { import: './dist/index.js' }, ['./dist/index.js']
   'resolves root export shorthand: %j',
   async (exports) => {
     const { set } = await fixture(exports)
-    expect(set.aliases[0].find).toBe('@singapore-editor/core')
+    expect(set.aliases[0].find).toEqual(/^@singapore-editor\/core(?=$|[?#])/)
   },
 )
 
@@ -111,8 +119,9 @@ test('a matching null condition blocks later defaults', async () => {
     '.': './dist/index.js',
     './blocked': { browser: null, default: './dist/index.js' },
   })
-  expect(set.aliases).toHaveLength(1)
+  expect(set.aliases).toHaveLength(2)
   expect(set.skippedExports[0].specifier).toBe('@singapore-editor/core/blocked')
+  expect(set.aliases[1].reason).toBe(set.skippedExports[0].reason)
 })
 
 test('conditional resolution still rejects browser exports outside the frozen build', async () => {

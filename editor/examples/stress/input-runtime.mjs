@@ -74,6 +74,24 @@ async function captureInputBuildRoot(directory, sources) {
   return buildRoot
 }
 
+function frozenExports(aliases) {
+  return {
+    name: 'frozen-package-exports',
+    enforce: 'pre',
+    async resolveId(id, importer, options) {
+      const alias = aliases.find(({ find }) => find.test(id))
+      if (!alias) return null
+      if (alias.reason) fail(`Skipped frozen export: ${id}. ${alias.reason}`)
+      const resolved = await this.resolve(id.replace(alias.find, alias.replacement), importer, {
+        ...options,
+        skipSelf: true,
+      })
+      if (!resolved) fail(`Missing frozen export: ${id}`)
+      return resolved
+    },
+  }
+}
+
 export async function buildInputRuntime(packageSet, directory, fixtures, manifest, instrument) {
   const buildRoot = await captureInputBuildRoot(directory, instrument.sources)
   const modules = new Set()
@@ -81,9 +99,11 @@ export async function buildInputRuntime(packageSet, directory, fixtures, manifes
     root: buildRoot,
     configFile: false,
     logLevel: 'warn',
-    resolve: { alias: packageSet.aliases },
-    plugins: [recordModules(modules)],
-    worker: { format: 'es', plugins: () => [recordModules(modules)] },
+    plugins: [frozenExports(packageSet.aliases), recordModules(modules)],
+    worker: {
+      format: 'es',
+      plugins: () => [frozenExports(packageSet.aliases), recordModules(modules)],
+    },
     build: { outDir: directory, emptyOutDir: true, sourcemap: 'hidden' },
   })
   const runtimeGraph = await verifyRuntimeGraph({

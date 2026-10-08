@@ -102,7 +102,12 @@ test.each([
       './*': './dist/*.js',
       [example.subpath]: { bun: './server/signaling.ts' },
     })
-    const valid = await buildImport('@singapore-editor/core/feature', 'valid', example.worker)
+    const suffix = example.imported.includes('?') ? '?import' : ''
+    const valid = await buildImport(
+      `@singapore-editor/core/feature${suffix}`,
+      'valid',
+      example.worker,
+    )
     expect(valid.runtimeGraph.escaped).toEqual([])
     const specifier = `@singapore-editor/core/${example.imported}`
     await expect(buildImport(specifier, 'skipped', example.worker)).rejects.toThrow(
@@ -183,7 +188,7 @@ test('both real builds use captured harness bytes after the live source changes'
   }
   const directory = join(root, 'packages')
   await write(join(directory, 'package-set.json'), JSON.stringify({ packages: [] }))
-  const packageSet = { directory, aliases: {}, manifest: { external: { packages: [] } } }
+  const packageSet = { directory, aliases: [], manifest: { external: { packages: [] } } }
   for (const side of ['baseline', 'candidate']) {
     await writeFile(live, `document.body.dataset.instrument = '${side}-changed-instrument'`)
     const output = join(root, side)
