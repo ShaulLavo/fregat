@@ -200,6 +200,12 @@ async function measureSeams(page: Page, { record, check }: Measure) {
     !!editorSurface && !!tabStrip && Math.abs(editorSurface.x - tabStrip.x) <= 0.5,
     'editor surface and tab strip left edge',
   )
+  for (const orientation of ['vertical', 'horizontal']) {
+    check(
+      handles.some((handle) => handle.orientation === orientation),
+      `${orientation} resize handle mounted`,
+    )
+  }
   for (const handle of handles) {
     const box = handle.bounds
     if (handle.orientation === 'vertical') {
@@ -253,6 +259,22 @@ async function measureTree(page: Page, { density, record, check, step }: Measure
     await scroll.hover()
     const previousTop = await scroll.evaluate((node) => node.scrollTop)
     await page.mouse.wheel(0, offset - previousTop)
+    // Wheel scrolling may be smooth; measure only once the requested offset is reached.
+    const reached = await scroll.evaluate(
+      (node, target) =>
+        new Promise<boolean>((resolve) => {
+          const deadline = performance.now() + 2_000
+          const settle = () => {
+            const max = node.scrollHeight - node.clientHeight
+            if (Math.abs(node.scrollTop - Math.min(target, max)) <= 0.5) return resolve(true)
+            if (performance.now() > deadline) return resolve(false)
+            requestAnimationFrame(settle)
+          }
+          settle()
+        }),
+      offset,
+    )
+    check(reached, `tree scrolled to ${offset}px`)
     await page.waitForTimeout(120)
     const rows = await alignment.flowRows(page).evaluateAll((nodes) =>
       nodes.map((node) => ({
