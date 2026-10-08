@@ -168,3 +168,92 @@ from `gh run view --json jobs`. Coverage does not shrink: every test and check t
 runs for the changes it can affect, and the nightly `flake-watch.yml` keeps running the full suites.
 For the Editor, the same before and after from singapore's `ci.yml`, plus one run with a cold turbo
 cache to show a miss still runs everything.
+
+## October 2026 issue follow-ups
+
+Status: Approved, retained by [Plan 336 closeout](issue-closeout-2026-10.md).
+These are remaining execution items. Closing their tracker records does not certify a fix
+or change acceptance of an earlier delivered milestone. Each original thread retains its
+full reproduction, comments and historical artifacts. Source links below pin the reviewed
+main revision; recheck them before implementation.
+
+### Issue 582
+
+Source: [#582: OpenSSH forwarding CI asks for the key secret again when reusing authentication](https://github.com/ShaulLavo/fregat/issues/582), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/582#issuecomment-5976379917).
+Current owner: [apps/server/test/openssh-scenario.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/server/test/openssh-scenario.ts).
+
+Forward close/rebind prompted for a secret again once at historical merge fe637719c868aa0c8d81368031d34c3b1d5e8c4d. Twenty isolated Ubuntu controls and two authentic historical server shards passed. A verbose EOF observer caused its own 60-second ControlPersist expiry and was rejected as a reproduction. PR #619 added bounded redacted failing-only diagnostics without changing production. A fresh failure must retain master/control command, exit, EOF and elapsed facts with secrets removed. Do not start more blind retry loops or infer an authentication regression from a passing control.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 621
+
+Source: [#621: Unconfirmed: isolated terminal host startup reached the connect bound in a Bun control](https://github.com/ShaulLavo/fregat/issues/621), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/621).
+Current owner: [apps/server/src/terminal/host-client.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/server/src/terminal/host-client.ts).
+
+One real isolated Bun server control reached HOST_UNREACHABLE at the terminal connect bound. The original packet lacks host stderr, systemd/socket state and structured internal facts. A separate initial Node control used a Bun Node shim and was invalid, then corrected. Keep that tooling error distinct from the Bun startup failure. Capture server import, host launch, socket creation and connect phases using a genuine runtime and fixture provider before any timeout change.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 693
+
+Source: [#693: Unconfirmed CI: cold Vite Settings startup never reaches app readiness](https://github.com/ShaulLavo/fregat/issues/693), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/693#issuecomment-5982644512).
+Current owner: [scripts/agent/vite-cold-start.test.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/scripts/agent/vite-cold-start.test.ts).
+
+The cold Vite Settings scenario reported app never became ready with empty error/reload arrays and no original screenshot artifact. An unchanged local control and failed-job rerun passed. There is no cause fix or source/deadline change. Add bounded failing-only boot phase, network, server and screenshot receipts to the actual Settings startup case, plus a known-good control. Locate the pending phase before tuning the readiness contract.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 766
+
+Source: [#766: agent: unconfirmed fixture cleanup reports an intentionally killed terminal as failed](https://github.com/ShaulLavo/fregat/issues/766), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/766#issuecomment-6036061147).
+Current owner: [scripts/agent/fixture-workspace.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/scripts/agent/fixture-workspace.ts).
+
+Healthy Markdown and search Replace/Undo/Redo scenarios reported a failed terminal during fixture cleanup, exit 137/SIGKILL. createGitFixture exposes a path, releaseFixture accepts a path, and openFixtureWorkspace does not return an owned terminal/API disposer. Give the fixture owner a supported close operation and migrate callers before the final reaper. Verify teardown on success, error, timeout and cancellation. Avoid global terminal-ID maps or hiding the warning before distinguishing intended cleanup from an unexpected terminal death.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 820
+
+Source: [#820: Loaded identical-build Undo comparisons produce false positives](https://github.com/ShaulLavo/fregat/issues/820), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/820).
+Current owner: [editor/examples/stress/input-paired.mjs](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/editor/examples/stress/input-paired.mjs).
+
+A loaded identical-build A/A Undo comparison used the same frozen candidate in both arms, 40 cases, 13 keys across 10 runs and 330 verdicts. Two selected and two auxiliary verdicts rejected unchanged budgets. Eight controlled busy/sleep workers had verified actual affinity and complete cleanup. This establishes false positives in that instrument, not a product regression. Qualify input-paired, stopping and budgets with frozen A/A plus deliberate regressions before changing acceptance. Keep failed windows, load profile and counters; do not chase zero rejections with retries.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 861
+
+Source: [#861: Design faster performance feedback: qualified work counters, user-journey contracts, and tiered verification](https://github.com/ShaulLavo/fregat/issues/861), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/861).
+Current owner: [scripts/agent/browser.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/scripts/agent/browser.ts).
+
+Design faster feedback around user-journey contracts, qualified work counters and verification tiers. Counters complement timings and require deliberate-regression controls; native and physical-presentation qualification remain separate. Preserve specialized coverage, explicit failed/cancelled/missing/partial states and reviewed baseline re-pins. Start with one bounded end-to-end case under the #863 instrument inventory, rather than replacing all benchmark tools or weakening gates.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 862
+
+Source: [#862: Explore region- and phase-aware layout stability checks with cross-browser geometry controls](https://github.com/ShaulLavo/fregat/issues/862), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/862).
+Current owner: [scripts/agent/trace-summary.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/scripts/agent/trace-summary.ts).
+
+Extend layout checks with named composer/sidebar/transcript/editor/toolbar regions and phase boundaries. Feature-detect LayoutShift; unsupported engines report unavailable, not zero. Add bounded cross-engine geometry controls for stable layout, injected shift, allowed movement, resize and unsupported instrumentation. Geometry and browser event callbacks do not replace physical terminal presentation. Record region/phase attribution without weakening existing layout assertions.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 863
+
+Source: [#863: Research: make performance tooling trustworthy, faster, and coverage-preserving before redesigning it](https://github.com/ShaulLavo/fregat/issues/863), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/863#issuecomment-6047346339).
+Current owner: [scripts/agent/browser.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/scripts/agent/browser.ts).
+
+Before a performance-tool redesign, inventory scripts/agent, web scripts, editor stress and terminal comparison tools by unique coverage and cost. Measure queue/build/start/warmup/capture/report/cleanup, run frozen A/A and deliberate-regression controls, record identities and missing/cancelled/partial states, and quantify observer overhead. Reclassify historical evidence only for affected metrics. Begin with a small coverage-preserving workflow and a vertical streaming-highlighting case. Preserve #855–862, #820 and terminal qualification dependencies. The October 8 Canvas packet had 111,328 ghostty-web history rows versus 10,000 xterm and 8,841 native; the equal-history gate failed, so it remains diagnostic with no headline ratio.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 873
+
+Source: [#873: CI: Git byte-cap control observes 1523712 bytes with a 1024-byte cap](https://github.com/ShaulLavo/fregat/issues/873), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/873#issuecomment-6034614108).
+Current owner: [apps/server/src/git/tests/process.test.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/server/src/git/tests/process.test.ts).
+
+CI 37459899866 job 112256612017 observed 1,523,712 bytes for a real 2,000,000-byte Git blob with maxOutputBytes=1,024, failing the less-than-1,000,000 assertion. Output-limit and empty-stdout assertions passed. Local real-pipe and stalled-consumer controls did not reproduce that overshoot. Retain first chunk size, cumulative observed bytes, read/cancel phase and exit/signal in the next failing original composition. Do not clamp observedBytes or weaken the cap/overshoot assertion to make the test green.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
