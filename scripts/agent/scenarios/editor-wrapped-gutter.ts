@@ -3,7 +3,12 @@ import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Page } from 'playwright'
 
-import { createGitFixture, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
+import {
+  createGitFixture,
+  fixtureGit,
+  openFixtureWorkspace,
+  releaseFixture,
+} from '../fixture-workspace'
 import { focusEditor, openFileFromTree, runPaletteCommand, selectors } from '../selectors'
 import type { Scenario } from './index'
 
@@ -17,6 +22,8 @@ export const editorWrappedGutter: Scenario = {
     const fixture = await createGitFixture('editor-wrapped-gutter')
     try {
       await writeFile(join(fixture, 'wrapped.txt'), `${'wrapped words '.repeat(80)}\nsecond line`)
+      await fixtureGit(fixture, ['add', '.'])
+      await fixtureGit(fixture, ['commit', '--quiet', '-m', 'fixture'])
       await openFixtureWorkspace(page, fixture)
       await openFileFromTree(page, 'wrapped.txt')
       await focusEditor(page)

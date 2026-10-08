@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from 'vitest'
+import { page } from 'vitest/browser'
 
 import { createLineGutterPlugin } from '../../gutters/src/lineGutter'
 import { Editor } from '../src/editor/Editor'
@@ -49,7 +50,10 @@ test.each([false, true])(
     const continuations = numbers.filter((number) => number.hidden)
     expect(continuations.length).toBeGreaterThan(0)
     expectNumbers(numbers)
-    for (const number of continuations) expect(paintsNumber(number)).toBe(false)
+    for (const number of continuations) {
+      expect(paintsNumber(number)).toBe(false)
+      expect(number.getBoundingClientRect().width).toBe(numbers[0]!.getBoundingClientRect().width)
+    }
 
     editor.setSelection(30, 30)
     await expect.poll(() => numbersIn(container).filter(paintsNumber).length).toBe(2)
@@ -63,5 +67,6 @@ test.each([false, true])(
     editor.setWordWrap(true)
     await expect.poll(() => numbersIn(container).length).toBeGreaterThan(2)
     expectNumbers(numbersIn(container))
+    await page.elementLocator(container).screenshot()
   },
 )
