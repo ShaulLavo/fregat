@@ -57,6 +57,8 @@ export class BroadcastTransport<E extends EditEnvelope = EditEnvelope> {
           this.inboundBytes -= size
         })
     }
+    // @justification BroadcastChannel has no remote-close or crash event; this heartbeat expires
+    // silent peers and advertises membership, and close clears the interval.
     this.timer = setInterval(() => {
       for (const [peer, state] of this.peers)
         if (Date.now() - state.time > peerTimeout) this.remove(peer)

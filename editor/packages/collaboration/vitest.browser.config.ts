@@ -18,6 +18,8 @@ const scenario: BrowserCommand<
   const pages: Awaited<ReturnType<typeof context.newPage>>[] = []
   try {
     const url = await new Promise<string>((resolve, reject) => {
+      // @justification A child can emit neither readiness nor exit; this bounds startup failure,
+      // while stdout readiness, error, and exit notifications each clear the deadline.
       const timeout = setTimeout(
         () => reject(new TypeError('Signaling test broker failed to start')),
         10_000,

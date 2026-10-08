@@ -83,6 +83,8 @@ export class WebSocketSignaling implements SignalingClient {
       if (!this.closed)
         this.retries.set(
           url,
+          // @justification Remote broker readiness has no notification; one retry per URL spaces
+          // reconnect attempts, connect checks closed, and close clears every pending retry.
           setTimeout(() => this.connect(url), this.options.reconnectInterval),
         )
     }

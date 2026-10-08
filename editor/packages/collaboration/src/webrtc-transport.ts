@@ -111,6 +111,8 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
       },
       () => this.announce(),
     )
+    // @justification Signaling has no peer-roster notification; discovery announcements and retries
+    // expire silent peers on this protocol clock, which close clears.
     this.timer = setInterval(() => {
       this.announce()
       for (const [peer, discovery] of this.discovered) {
@@ -322,6 +324,8 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
     if (this.pending.has(peer) || this.closed) return undefined
     const abort = new AbortController()
     this.pending.set(peer, abort)
+    // @justification A TURN supplier may never settle; abort bounds the wait, finally clears
+    // the deadline, and close aborts pending requests.
     const credentialTimeout = setTimeout(() => abort.abort(), this.options.connectionTimeout)
     try {
       const credentials = await supplyCredentials(this.options.credentials.turn, peer, abort.signal)
@@ -341,6 +345,8 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
         generation,
         pc,
         abort: new AbortController(),
+        // @justification Native connection setup can stall without a terminal event; channel open
+        // or removal clears this deadline, and failure checks the current link generation.
         timeout: setTimeout(
           () => this.fail(link, new TypeError('Peer connection timed out')),
           this.options.connectionTimeout,

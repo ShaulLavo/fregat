@@ -69,6 +69,8 @@ export function startSignalingServer(options: SignalingServerOptions) {
   }
   const arm = (socket: Subscriber, duration: number) => {
     clearTimeout(socket.data.deadline)
+    // @justification Silent clients emit no progress event; one deadline per socket bounds
+    // subscription and application idle time, is replaced by progress, and is cleared on close.
     socket.data.deadline = setTimeout(() => {
       remove(socket)
       socket.terminate()
@@ -110,6 +112,8 @@ export function startSignalingServer(options: SignalingServerOptions) {
         const accepted = await Promise.race([
           Promise.resolve(admission).catch(() => false),
           new Promise<boolean>((resolve) => {
+            // @justification Authorization may never settle; the deadline bounds reserved quota,
+            // and finally clears it and releases the reservation when upgrade fails.
             timeout = setTimeout(() => resolve(false), options.limits.subscribeTimeout)
           }),
         ])
