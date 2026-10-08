@@ -41,16 +41,20 @@ export function AppTitlebar() {
         }),
       }}
     >
+      {/* The edge icons sit on the rails' centre lines. The folder glyph is inset by the
+          menu button's row padding and its 1px border. */}
       <div
         className={cn(
-          'flex min-w-0 items-center px-(--bar-padding-x)',
-          !overlay && nativeMacOverlay && 'pl-[4.75rem]',
+          'flex min-w-0 items-center pr-(--bar-padding-x)',
+          !overlay && nativeMacOverlay
+            ? 'pl-[4.75rem]'
+            : 'pl-[calc((var(--rail-width)-var(--icon-size))/2-var(--density-row-padding-x)-1px)]',
         )}
       >
         <WorkspaceProjectMenu workspaceTitle={model.workspaceTitle} />
       </div>
       {model.gridTemplateColumns.includes('%') ? <div aria-hidden='true' /> : null}
-      <div className='flex items-center gap-(--density-gap-tight) px-(--bar-padding-x)'>
+      <div className='flex items-center gap-(--density-gap-tight) pr-[calc((var(--rail-width)-var(--density-control-height-sm))/2)] pl-(--bar-padding-x)'>
         <ServerUpdateStatus />
         <UiModeToggle />
       </div>
