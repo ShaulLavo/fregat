@@ -1,7 +1,9 @@
+import { captureCharacterGap, resolveCharacterGap, type CharacterGap } from '../authoredHistory'
 import {
   Anchor,
   anchorAt,
   resolveAnchor,
+  locateCharId,
   type PieceTableAnchor,
   type PieceTableSnapshot,
 } from '@singapore-editor/textbuffer'
@@ -11,6 +13,7 @@ import { sameCursorSelections } from './cursorHistory'
 export type JumpCause = 'pointer' | 'find' | 'go-to-line' | 'provider'
 
 type AnchoredPosition = {
+  readonly gap?: CharacterGap
   readonly before: PieceTableAnchor
   readonly after: PieceTableAnchor
 }
@@ -24,6 +27,7 @@ type AnchoredSelection = {
 export type JumpLocation = {
   readonly selections: readonly AnchoredSelection[]
   readonly lastAddedIndex: number
+  readonly viewportGap?: CharacterGap
   readonly viewport: PieceTableAnchor
   readonly topDelta: number
   readonly scrollLeft: number
@@ -47,6 +51,7 @@ export function captureJumpLocation(
       affinity: selection.affinity ?? 'after',
     })),
     lastAddedIndex: cursor.lastAddedIndex,
+    ...(snapshot.charIds ? { viewportGap: captureCharacterGap(snapshot, viewportOffset) } : {}),
     viewport: anchorAt(snapshot, viewportOffset, snapshot.length === 0 ? 'left' : 'right'),
     topDelta,
     scrollLeft: cursor.scrollLeft,
@@ -79,19 +84,28 @@ export function resolveJumpLocation(
     lastAddedIndex,
     scrollLeft: location.scrollLeft,
     scrollTop: 0,
-    viewportOffset: resolveAnchor(snapshot, location.viewport).offset,
+    viewportOffset: location.viewportGap
+      ? (resolveCharacterGap(snapshot, location.viewportGap) ?? 0)
+      : resolveAnchor(snapshot, location.viewport).offset,
     topDelta: location.topDelta,
   }
 }
 
 function capturePosition(snapshot: PieceTableSnapshot, offset: number): AnchoredPosition {
   return {
+    ...(snapshot.charIds ? { gap: captureCharacterGap(snapshot, offset) } : {}),
     before: offset === 0 ? Anchor.MIN : anchorAt(snapshot, offset, 'left'),
     after: offset === snapshot.length ? Anchor.MAX : anchorAt(snapshot, offset, 'right'),
   }
 }
 
 function resolvePosition(snapshot: PieceTableSnapshot, position: AnchoredPosition): number | null {
+  if (position.gap) {
+    const { left, right } = position.gap
+    const leftLive = left === 'start' || locateCharId(snapshot, left)?.liveness === 'live'
+    const rightLive = right === 'end' || locateCharId(snapshot, right)?.liveness === 'live'
+    return leftLive || rightLive ? resolveCharacterGap(snapshot, position.gap) : null
+  }
   const before = resolveAnchor(snapshot, position.before)
   if (before.liveness === 'live') return before.offset
   const after = resolveAnchor(snapshot, position.after)
@@ -126,7 +140,12 @@ export class JumpHistory {
     current: JumpLocation,
   ): ResolvedJumpLocation | null {
     if (this.index < 0) return null
-    if (!this.walking || !sameLocations(snapshot, this.entries[this.index]!, current))
+    if (
+      !this.walking ||
+      ((!this.entries[this.index]!.viewportGap ||
+        resolveJumpLocation(snapshot, this.entries[this.index]!) !== null) &&
+        !sameLocations(snapshot, this.entries[this.index]!, current))
+    )
       this.entries[this.index] = current
     const step = direction === 'back' ? -1 : 1
     for (let index = this.index + step; index >= 0 && index < this.entries.length; index += step) {

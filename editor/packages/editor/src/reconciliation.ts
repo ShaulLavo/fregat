@@ -1,4 +1,9 @@
 import {
+  captureIdentitySelections,
+  resolveCharacterGap,
+  resolveIdentitySelections,
+} from './authoredHistory'
+import {
   applyBatchToPieceTable,
   retainPieceTableSnapshot,
   pieceTableSnapshotsHaveSameText,
@@ -62,6 +67,18 @@ export function reconcileSelections(
   set: SelectionSet<PieceTableAnchor>,
   edits: readonly TextEdit[],
 ): SelectionSet<PieceTableAnchor> {
+  if (before.charIds && after.charIds) {
+    const identity = captureIdentitySelections(before, set)
+    if (
+      identity.selections.every(
+        (selection) =>
+          resolveCharacterGap(after, selection.anchor) !== null &&
+          resolveCharacterGap(after, selection.head) !== null,
+      )
+    ) {
+      return resolveIdentitySelections(after, identity)
+    }
+  }
   const descending = edits.toSorted((left, right) => right.from - left.from)
   const selections = set.selections.map((selection) => {
     const resolved = resolveSelection(before, selection)

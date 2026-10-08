@@ -124,3 +124,81 @@ test('unrecoverable branch origins surface a blocked conflict without partial re
   expect(losing.engine.text()).toBe('seed')
   expect(losing.participant.state().blocked).toEqual([dependent.id])
 })
+
+test('history identity accepts remote growth but refuses missing remote identities at equal text', () => {
+  const a = new CollaborationDocument({ ...options, text: '' })
+  const b = new CollaborationDocument({ ...options, peer: 'b', text: '' })
+  const remote = b.participant.local({ offset: 0, deleteCount: 0, text: 'R' })
+  a.sequence(remote)
+  const saved = a.historyIdentity()
+  expect(a.matchesHistoryIdentity(saved)).toBe(true)
+  const reopened = new CollaborationDocument({ ...options, text: '' })
+  reopened.install(a.exportHistory(a.genesis)!)
+  expect(reopened.matchesHistoryIdentity(saved)).toBe(true)
+  a.sequence(a.participant.local({ offset: 1, deleteCount: 0, text: 'A' }))
+  expect(a.matchesHistoryIdentity(saved)).toBe(false)
+  const fresh = new CollaborationDocument({ ...options, text: '' })
+  const replacement = new CollaborationDocument({ ...options, peer: 'other', text: '' })
+  fresh.sequence(replacement.participant.local({ offset: 0, deleteCount: 0, text: 'R' }))
+  expect(fresh.engine.text()).toBe(reopened.engine.text())
+  expect(fresh.matchesHistoryIdentity(saved)).toBe(false)
+  expect(fresh.matchesHistoryIdentity('invalid')).toBe(false)
+})
+
+test.each([
+  { outcome: 'accepted', restore: 'install' },
+  { outcome: 'accepted', restore: 'apply' },
+  { outcome: 'rejected', restore: 'install' },
+  { outcome: 'rejected', restore: 'apply' },
+] as const)(
+  'reopening $outcome insertion history with $restore reserves every authored character allocation',
+  ({ outcome, restore }) => {
+    const original = new CollaborationDocument({ ...options, text: '' })
+    const first = original.participant.local({ offset: 0, deleteCount: 0, text: 'A' })
+    original.sequence(first, outcome === 'rejected' ? 'test rejection' : undefined)
+    const reopened = new CollaborationDocument({ ...options, text: '' })
+    const records = original.exportHistory(original.genesis)!
+    if (restore === 'install') reopened.install(records)
+    if (restore === 'apply') {
+      for (const record of records) expect(reopened.apply(record)).toBe(true)
+    }
+    const second = reopened.participant.local({
+      offset: reopened.engine.snapshot().buffer.length,
+      deleteCount: 0,
+      text: 'B',
+    })
+    expect(second.id.seq).toBeGreaterThan(first.id.seq)
+    if (first.change.kind !== 'insert' || second.change.kind !== 'insert')
+      throw new TypeError('Expected insertion envelopes')
+    expect(second.change.start).not.toEqual(first.change.start)
+  },
+)
+
+test('malformed rejected character spans leave allocation recovery usable', () => {
+  const original = new CollaborationDocument({ ...options, text: '' })
+  expect(() =>
+    original.sequence(
+      {
+        document: options.document,
+        epoch: options.epoch,
+        id: { actor: options.peer, seq: 1 },
+        lamport: 1,
+        deps: [],
+        change: {
+          kind: 'insert',
+          start: { bunch: 'a:0', counter: -1 },
+          originLeft: 'start',
+          originRight: 'end',
+          text: 'A',
+        },
+      },
+      'invalid character identity',
+    ),
+  ).not.toThrow()
+  const reopened = new CollaborationDocument({ ...options, text: '' })
+  expect(() => reopened.install(original.exportHistory(original.genesis)!)).not.toThrow()
+  const next = reopened.participant.local({ offset: 0, deleteCount: 0, text: 'B' })
+  expect(next.id.seq).toBe(2)
+  reopened.sequence(next)
+  expect(reopened.engine.text()).toBe('B')
+})

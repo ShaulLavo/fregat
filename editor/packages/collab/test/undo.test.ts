@@ -451,3 +451,28 @@ test('disjoint remote undo and redo preserve an open local capture group', () =>
   room.converged()
   expect(room.text()).toBe('abc')
 })
+
+test('capture-only grouping feeds an external graph without linear traversal', () => {
+  const room = undoRoom({ captureOnly: true, groupDelay: 500, now: () => 0 })
+  room.edit(0, 0, 0, 'a')
+  room.edit(0, 1, 0, 'b')
+  room.sync()
+  const history = room.users[0]!.history
+  const group = history.lastRecordedTransaction!
+  expect(group.edits).toHaveLength(2)
+  expect(history.state()).toEqual({ undo: [], redo: [] })
+  expect(history.canUndo).toBe(false)
+  const command = history.setTransactions([{ transaction: group, active: false }])
+  expect(command.change.kind).toBe('setEffects')
+  room.sync()
+  expect(room.text()).toBe('')
+  room.edit(0, 0, 0, 'c')
+  expect(history.lastRecordedTransaction!.edits).toHaveLength(1)
+  history.setTransactions([
+    { transaction: history.lastRecordedTransaction!, active: false },
+    { transaction: group, active: true },
+  ])
+  room.converged()
+  expect(room.text()).toBe('ab')
+  expect(history.state()).toEqual({ undo: [], redo: [] })
+})

@@ -4,7 +4,7 @@ import { cloneEnvelope } from './host'
 import { UndoManager } from './undo'
 import type { CaptureOptions, UndoOptions } from './undo'
 import type { HostMessage } from './host'
-import { editKey } from './types'
+import { editKey, insertionOf } from './types'
 import type { EditId, Effect, EffectiveEdit, Engine, Envelope, OffsetEdit } from './types'
 
 export type ParticipantOptions<Snapshot> = {
@@ -158,7 +158,9 @@ export class Participant<Snapshot = unknown> {
     return cloneEnvelope(envelope)
   }
 
-  receive(messages: readonly HostMessage[]): void {
+  receive(messages: readonly HostMessage[], allocated: readonly Envelope[] = []): void {
+    // Rejected wire records retain allocations that are absent from accepted engine state.
+    for (const envelope of allocated) this.reserveIdentities(envelope, true)
     for (const message of messages) {
       if (message.document !== this.options.document || message.epoch !== this.options.epoch)
         throw new CollabFailure('wrong-document-epoch')
@@ -185,18 +187,20 @@ export class Participant<Snapshot = unknown> {
     base: Snapshot,
     messages: readonly HostMessage[],
     recovered: readonly Envelope[] = [],
+    allocated: readonly Envelope[] = [],
   ): void {
     const pending = new Map<string, Envelope>()
     for (const edit of [...recovered, ...this.pending])
       pending.set(editKey(edit.id), cloneEnvelope(edit))
     this.pending = [...pending.values()]
+    for (const envelope of this.pending) this.reserveIdentities(envelope)
     this.confirmed = base
     this.sequence = 0
     this.frontier.clear()
     this.rejected.clear()
     this.incoming.clear()
     if (messages.length) {
-      this.receive(messages)
+      this.receive(messages, allocated)
       return
     }
     this.options.engine.restore(base)
@@ -207,6 +211,8 @@ export class Participant<Snapshot = unknown> {
 
   private confirm(message: HostMessage): void {
     const id = message.status === 'accepted' ? message.envelope.id : message.id
+    if (id.actor === this.actor) this.editSequence = Math.max(this.editSequence, id.seq)
+    if (message.status === 'accepted') this.reserveIdentities(message.envelope)
     this.pending = this.pending.filter((envelope) => editKey(envelope.id) !== editKey(id))
     if (message.status === 'rejected') {
       this.rejected.add(editKey(id))
@@ -218,6 +224,19 @@ export class Participant<Snapshot = unknown> {
     this.lamport = Math.max(this.lamport, message.envelope.lamport)
     for (const dependency of message.envelope.deps) this.frontier.delete(editKey(dependency))
     this.frontier.set(editKey(id), { ...id })
+  }
+
+  private reserveIdentities(envelope: Envelope, rejected = false): void {
+    if (envelope.id.actor !== this.actor) return
+    this.editSequence = Math.max(this.editSequence, envelope.id.seq)
+    const insert = insertionOf(envelope.change)
+    if (!insert) return
+    try {
+      this.allocator.reserve(insert.start, insert.text.length)
+    } catch (error) {
+      // A malformed rejected span contains no allocatable character IDs.
+      if (!rejected || !(error instanceof RangeError)) throw error
+    }
   }
 
   private replay(): void {

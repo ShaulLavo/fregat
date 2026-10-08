@@ -4,8 +4,9 @@ import {
   type EditorViewSnapshot,
   type EditorInput,
   type EditorPlugin,
+  type DocumentEditAuthor,
 } from '@singapore-editor/core/extensions'
-import { CollabFailure, type Envelope } from '@singapore-editor/collab'
+import { CollabFailure, TextbufferEngine, type Envelope } from '@singapore-editor/collab'
 import type { Editor } from '@singapore-editor/core/editor'
 import {
   createPieceTableSnapshot,
@@ -50,7 +51,13 @@ export function createCollaborationPlugin(options: CollaborationPluginOptions): 
   return createPlugin({
     name: 'editor.collaboration',
     view(scope) {
-      const document = new CollaborationDocument(options.session)
+      let recoverHistory = false
+      const document = new CollaborationDocument(options.session, {
+        captureOnly: true,
+        onReject: (ids) => {
+          if (ids.some((id) => id.actor === options.session.peer)) recoverHistory = true
+        },
+      })
       const participant = document.participant
       const session = new Session({
         peer: options.session.peer,
@@ -68,10 +75,6 @@ export function createCollaborationPlugin(options: CollaborationPluginOptions): 
       let timer: ReturnType<typeof setInterval> | undefined
       let authoring = false
       const authored: Envelope[] = []
-      const changeHistory = (direction: 'undo' | 'redo') => {
-        const edit = participant.undoManager[direction]()
-        if (edit) session.submit(edit)
-      }
       const author: Parameters<typeof scope.authorEdits>[0] = Object.assign(
         (
           before: PieceTableSnapshot,
@@ -98,10 +101,48 @@ export function createCollaborationPlugin(options: CollaborationPluginOptions): 
           }
         },
         {
-          canUndo: () => participant.undoManager.canUndo,
-          canRedo: () => participant.undoManager.canRedo,
-          undo: () => changeHistory('undo'),
-          redo: () => changeHistory('redo'),
+          history: {
+            capture: () => participant.undoManager.lastRecordedTransaction,
+            settlement: () => {
+              if (!recoverHistory) return null
+              recoverHistory = false
+              return document.authoredEffects()
+            },
+            seal: () => participant.undoManager.seal(),
+            identity: () => document.historyIdentity(),
+            matchesIdentity: (saved) => document.matchesHistoryIdentity(saved),
+            preview: (changes) => {
+              if (changes.length === 0) return document.engine.snapshot().buffer
+              const engine = new TextbufferEngine()
+              engine.restore(document.engine.snapshot())
+              const id = { actor: options.session.peer, seq: Number.MAX_SAFE_INTEGER }
+              engine.apply({
+                document: options.session.document,
+                epoch: options.session.epoch,
+                id,
+                lamport: 0,
+                deps: [],
+                change: {
+                  kind: 'setEffects',
+                  command: id,
+                  effects: changes.flatMap(({ transaction, active }) =>
+                    transaction.edits.map((op) => ({ op, active })),
+                  ),
+                },
+              })
+              return engine.snapshot().buffer
+            },
+            apply: (changes) => {
+              authoring = true
+              try {
+                const command = participant.undoManager.setTransactions(changes)
+                session.submit(command)
+                return document.engine.snapshot().buffer
+              } finally {
+                authoring = false
+              }
+            },
+          } satisfies NonNullable<DocumentEditAuthor['history']>,
         },
       )
       // Claim the document before any bootstrap reconciliation can mutate a shared buffer.

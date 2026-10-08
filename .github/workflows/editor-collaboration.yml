@@ -6,6 +6,7 @@ on:
       - 'editor/packages/collaboration/**'
       - 'editor/packages/collab/**'
       - 'editor/packages/editor/**'
+      - 'editor/packages/diff/**'
       - 'editor/examples/app/**'
       - 'editor/scripts/build-package.ts'
       - 'editor/tsconfig.json'
@@ -17,6 +18,7 @@ on:
       - 'editor/packages/collaboration/**'
       - 'editor/packages/collab/**'
       - 'editor/packages/editor/**'
+      - 'editor/packages/diff/**'
       - 'editor/examples/app/**'
       - 'bun.lock'
       - '.github/workflows/editor-collaboration.yml'
@@ -49,7 +51,7 @@ jobs:
       - name: Install locked workspace dependencies
         run: bun install --frozen-lockfile
       - name: Build package and editor dependencies
-        run: bunx turbo run build --filter=@singapore-editor/collaboration...
+        run: bunx turbo run build --filter=@singapore-editor/collaboration... --filter=@singapore-editor/diff...
       - name: Check types, lint and formatting
         run: |
           bun run --cwd editor/packages/collaboration typecheck
