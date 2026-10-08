@@ -225,7 +225,7 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/package.json"]
     },
     "@singapore-editor/collaboration#test:editor": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "@singapore-editor/diff#build"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/editor/packages/editor/src/**",
@@ -236,12 +236,12 @@
       "cache": false
     },
     "@singapore-editor/collaboration#test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "@singapore-editor/diff#build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/examples/app/src/**"],
       "outputs": []
     },
     "@singapore-editor/collaboration#typecheck": {
-      "dependsOn": ["^typecheck"],
+      "dependsOn": ["^typecheck", "@singapore-editor/diff#build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/examples/app/src/**"]
     }
   },
