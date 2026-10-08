@@ -1,6 +1,6 @@
 {
   "name": "fregat",
-  "version": "0.0.22",
+  "version": "0.0.23",
   "private": true,
   "license": "MIT",
   "workspaces": {
@@ -76,10 +76,10 @@
     "generated:check": "bun run workspace:check && bun run icons:generate:check && bun run settings:schema:check && bun run settings:reference:check && bun run themes:palette-css:check && bun run --cwd apps/server codex-protocol:check && bun run syntax:coverage:check && bun run native:workflow:check",
     "native:workflow": "bun ghostty-webgpu/scripts/config-resolver-native/generate-workspace-workflow.ts --write",
     "native:workflow:check": "bun ghostty-webgpu/scripts/config-resolver-native/generate-workspace-workflow.ts --check",
-    "settings:reference": "bun scripts/generate-settings-reference.ts",
-    "settings:reference:check": "bun scripts/generate-settings-reference.ts --check",
-    "settings:schema": "bun scripts/generate-settings-schema.ts",
-    "settings:schema:check": "bun scripts/generate-settings-schema.ts --check",
+    "settings:reference": "bun --tsconfig-override scripts/tsconfig.settings.json scripts/generate-settings-reference.ts",
+    "settings:reference:check": "bun --tsconfig-override scripts/tsconfig.settings.json scripts/generate-settings-reference.ts --check",
+    "settings:schema": "bun --tsconfig-override scripts/tsconfig.settings.json scripts/generate-settings-schema.ts",
+    "settings:schema:check": "bun --tsconfig-override scripts/tsconfig.settings.json scripts/generate-settings-schema.ts --check",
     "app:mac": "bun apps/desktop/scripts/build-app.ts",
     "app-icon:generate": "bun scripts/app-icon/generate.ts",
     "icons:generate": "bun scripts/icons/generate.ts",

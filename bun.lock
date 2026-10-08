@@ -817,7 +817,7 @@
     },
     "packages/contracts": {
       "name": "@workspace/contracts",
-      "version": "0.0.10",
+      "version": "0.0.11",
       "dependencies": {
         "@fregat/hotkeys": "catalog:",
         "@workspace/observability": "workspace:*",
@@ -985,7 +985,7 @@
     },
     "scripts": {
       "name": "scripts",
-      "version": "0.0.51",
+      "version": "0.0.52",
       "dependencies": {
         "@workspace/utils": "workspace:*",
       },

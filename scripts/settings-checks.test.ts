@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { cp, mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -9,9 +9,11 @@ const repository = path.resolve(import.meta.dirname, '..')
 
 async function freshSettingsCheckout(root: string): Promise<void> {
   for (const relative of [
+    'package.json',
     'tsconfig.json',
     '.oxfmtrc.json',
     'scripts/tsconfig.json',
+    'scripts/tsconfig.settings.json',
     'scripts/generate-settings-schema.ts',
     'scripts/generate-settings-reference.ts',
     'scripts/target-argument.ts',
@@ -59,8 +61,10 @@ test('settings hook checks run without hotkeys build output', async () => {
     expect(existsSync(buildOutput)).toBe(false)
 
     for (const args of [
-      ['scripts/generate-settings-schema.ts', '--check'],
-      ['scripts/generate-settings-reference.ts', '--check'],
+      ['run', 'settings:schema', '--target', path.join(root, 'generated-schema.json')],
+      ['run', 'settings:reference', '--target', path.join(root, 'generated-reference.md')],
+      ['run', 'settings:schema:check'],
+      ['run', 'settings:reference:check'],
       [
         'run',
         '--cwd',
@@ -76,6 +80,43 @@ test('settings hook checks run without hotkeys build output', async () => {
     }
 
     expect(existsSync(buildOutput)).toBe(false)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+}, 60_000)
+
+test('production contracts bundles resolve the built hotkeys export', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'fregat-settings-consumer-'))
+  try {
+    await freshSettingsCheckout(root)
+    for (const args of [
+      [
+        'build',
+        'hotkeys/packages/hotkeys/src/index.ts',
+        '--outdir=hotkeys/packages/hotkeys/dist',
+        '--target=browser',
+        '--packages=external',
+      ],
+      [
+        'build',
+        'packages/contracts/src/settings.ts',
+        '--target=bun',
+        '--outfile=consumer.js',
+        '--metafile=consumer.json',
+      ],
+    ]) {
+      const result = spawnSync('bun', args, { cwd: root, encoding: 'utf8' })
+      expect(result.status, result.stdout + result.stderr).toBe(0)
+    }
+
+    const metadata = JSON.parse(await readFile(path.join(root, 'consumer.json'), 'utf8'))
+    const hotkeysInputs = Object.keys(metadata.inputs).filter((input) =>
+      input.replaceAll('\\', '/').includes('hotkeys/packages/hotkeys/'),
+    )
+    expect(hotkeysInputs).toHaveLength(1)
+    expect(hotkeysInputs[0]?.replaceAll('\\', '/')).toMatch(
+      /hotkeys\/packages\/hotkeys\/dist\/index\.js$/,
+    )
   } finally {
     await rm(root, { recursive: true, force: true })
   }

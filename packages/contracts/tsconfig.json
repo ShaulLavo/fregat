@@ -1,10 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "types": ["bun"],
-    "paths": {
-      "@fregat/hotkeys": ["../../hotkeys/packages/hotkeys/src/index.ts"]
-    }
+    "types": ["bun"]
   },
   "include": ["src"]
 }

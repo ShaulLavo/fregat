@@ -95,7 +95,7 @@ const sections = [...byCategory]
   .map(([category, ids]) => [`## ${category}`, table(ids), ...detailsList(ids)].join('\n\n'))
 
 const body = `> [!NOTE]
-> Generated from the settings registry by \`bun scripts/generate-settings-reference.ts\`.
+> Generated from the settings registry by \`bun run settings:reference\`.
 > Edit \`packages/contracts/src/settings/keys.ts\`, not this file.
 
 # Settings reference
