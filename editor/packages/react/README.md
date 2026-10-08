@@ -1,12 +1,18 @@
 # @singapore-editor/react
 
-react bindings for [`@singapore-editor/core`](../editor/README.md). `useEditor` builds a controller from props, `EditorHost` mounts it, and the editor follows your props as they change
+React components and hooks for mounting and controlling the Singapore editor.
 
-## try it
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+
+## Install
 
 ```sh
 npm install @singapore-editor/core @singapore-editor/react react react-dom
 ```
+
+## Usage
+
+Render this component in your app. Its host element gives the editor a fixed height.
 
 ```tsx
 import { EditorHost, useEditor } from '@singapore-editor/react'
@@ -25,19 +31,20 @@ export function EditorPanel() {
 }
 ```
 
-the editor reopens the document when `documentId`, `documentMode`, `languageId` or `revision` changes. bump `revision` to load new text under the same id, or set `textSyncMode: 'incremental'` to sync each new `text` into the open document
+## API highlights
 
-options like `theme`, `tabSize`, `wordWrap`, `selection` and `plugins` are props too, and update the live editor
+- `useEditor()` creates a controller from props.
+- `EditorHost` mounts its view.
+- `useEditorSelector()` subscribes to a state selection.
 
-## reading state
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/react/overview/)
 
-```tsx
-const isDirty = useEditorSelector(controller, (store) => store.state?.isDirty ?? false)
-```
+## In the Singapore family
 
-`useEditorSelector` re-renders only when its slice changes. `controller.commands` has `focus`, `setText`, `edit`, `setSelection`, `dispatchCommand` and the find commands. `controller.getEditor()` gives you the `Editor` itself
+`@singapore-editor/core` owns the editor view. This optional package adds React lifecycle and state bindings. Choose the other plugins your app needs.
 
-## more
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
 
-- [core](../editor/README.md), for what the editor and its options do
-- [solid bindings](../solid/README.md)
+## License
+
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)

@@ -1,6 +1,19 @@
 {
   "name": "@singapore-editor/lsp-plugin",
   "version": "0.2.6",
+  "description": "Language server diagnostics, completion, hover, and navigation for the Singapore editor.",
+  "keywords": [
+    "browser",
+    "completion",
+    "editor",
+    "lsp",
+    "singapore",
+    "typescript"
+  ],
+  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/lsp-plugin/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

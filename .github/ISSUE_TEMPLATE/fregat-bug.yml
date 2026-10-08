@@ -1,0 +1,44 @@
+name: Fregat bug report
+description: Report a reproducible problem in Fregat.
+title: '[Fregat] '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues first. Ask usage questions in [Discussions](https://github.com/ShaulLavo/fregat/discussions).
+        Report vulnerabilities through [private security advisories](https://github.com/ShaulLavo/fregat/security/advisories/new).
+        Remove credentials and personal data from logs, code, and screenshots.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Include the source commit or installed package version.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the OS, browser or terminal, and relevant dependency versions.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Give exact steps or a minimal example using synthetic data.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Include the error text, frequency, and relevant logs or screenshots.
+    validations:
+      required: true

@@ -1,8 +1,7 @@
-import type { PairingLink } from '@workspace/contracts'
+import { pairingLink, type PairingLink } from '@workspace/contracts'
 
 import { CopyButton } from '@/components/copy-button'
 import { PairingQr } from '@/features/settings/components/pairing-qr'
-import { pairingLink } from '@/lib/pairing/utils/link'
 
 const TIME = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
 

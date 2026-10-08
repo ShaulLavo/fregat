@@ -1,13 +1,21 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
-import type { PairedDevice, PairingClaim, PairingTrust } from '@workspace/contracts'
+import {
+  pairingLink,
+  type PairedDevice,
+  type PairingClaim,
+  type PairingLink,
+  type PairingTrust,
+} from '@workspace/contracts'
 
-import { recordRequestContext } from '../observability'
+import { recordRequestContext, runDetached } from '../observability'
 import type { DeviceStore } from './device-store'
 import { PairingCodes } from './pairing-codes'
 import { pairingErrors } from './structured-errors'
+import type { TailnetOwners } from './tailnet-owner'
 import {
   deviceCredential,
   forwardedClient,
+  forwardedPeer,
   isThisMachine,
   ownAddresses,
   type HeaderReader,
@@ -21,20 +29,28 @@ const LAST_SEEN_STEP_MS = 10 * 60_000
 const COOKIE_MAX_AGE_SECONDS = 400 * 24 * 60 * 60
 /** How often idle devices are dropped, closing what they still hold open. */
 const SWEEP_MS = 60 * 60_000
+/** How often sockets admitted by Tailscale identity are checked again; matches its cache. */
+const TAILNET_RECHECK_MS = 60_000
+/** Live sockets are kept by device id, or by this prefix and the Tailscale address. */
+const TAILNET_KEY = 'tailnet:'
+const RECHECK_CONTEXT = { area: 'pairing', operation: 'recheck_tailnet' }
 
 type Admission = { readonly trust: PairingTrust; readonly deviceId: string | null }
 
 /**
- * Who may reach this machine. Requests from the machine itself pass; any other device needs the
- * cookie a one-time pairing link gave it. Pairing grants full access: there is one trust level.
+ * Who may reach this machine. Requests from the machine itself pass, and so do the owner's own
+ * Tailscale devices; any other device needs the cookie a one-time pairing link gave it. Pairing
+ * grants full access: there is one trust level, so a paired device may make links too.
  */
 export class DevicePairing {
   private readonly store: DeviceStore
   private readonly codes = new PairingCodes()
   private readonly required: () => boolean
   private readonly own: () => ReadonlySet<string>
+  private readonly tailnet: TailnetOwners | null
   private readonly now: () => number
-  /** The close of every live socket, by the device it was admitted for. */
+  private readonly appUrl: string | null
+  /** The close of every live socket, by the device or Tailscale address it was admitted for. */
   private readonly live = new Map<string, Set<() => void>>()
   readonly cookieName: string
 
@@ -43,13 +59,18 @@ export class DevicePairing {
     readonly required: () => boolean
     readonly cookieName: string
     readonly ownAddresses?: () => ReadonlySet<string>
+    readonly tailnet?: TailnetOwners
     readonly now?: () => number
+    /** The app's public base URL that devices open, for links; null when only loopback serves it. */
+    readonly appUrl?: string | null
   }) {
     this.store = options.store
     this.required = options.required
     this.cookieName = options.cookieName
     this.own = options.ownAddresses ?? ownAddresses
+    this.tailnet = options.tailnet ?? null
     this.now = options.now ?? Date.now
+    this.appUrl = options.appUrl ?? null
   }
 
   /** A settings store that cannot answer leaves pairing on: it fails closed. */
@@ -61,37 +82,77 @@ export class DevicePairing {
     }
   }
 
+  /**
+   * Asks Tailscale who the forwarded client is, so `admit` can answer synchronously. Run it at the
+   * start of each request; it asks at most once a minute per address.
+   */
+  async identify(header: HeaderReader) {
+    const peer = forwardedPeer(header)
+    if (peer === null || !this.tailnet || isThisMachine(peer, this.own())) return
+    await this.tailnet.resolve(peer)
+  }
+
   admit(header: HeaderReader): Admission {
     const client = forwardedClient(header)
     if (client === null || isThisMachine(client, this.own()))
       return { trust: 'host', deviceId: null }
     const device = this.device(header)
-    if (!device) return { trust: 'unpaired', deviceId: null }
-    this.markSeen(device.id, device.lastSeenAt)
-    return { trust: 'device', deviceId: device.id }
+    if (device) {
+      this.markSeen(device.id, device.lastSeenAt)
+      return { trust: 'device', deviceId: device.id }
+    }
+    const peer = forwardedPeer(header)
+    const verdict = peer === null || !this.tailnet ? 'not-tailnet' : this.tailnet.verdict(peer)
+    recordRequestContext({ tailnetTrust: verdict })
+    if (verdict === 'same-user') return { trust: 'tailnet', deviceId: null }
+    return { trust: 'unpaired', deviceId: null }
   }
 
   /**
-   * Ties a live socket to the device it was admitted for: removing the device, or its going idle,
-   * closes the socket, so nothing already open keeps the access. Returns the release for its close.
+   * Ties a live socket to what admitted it: removing the device, its going idle, or its Tailscale
+   * identity no longer passing closes the socket, so nothing already open keeps the access.
+   * Returns the release for its close.
    */
   hold(header: HeaderReader, close: () => void) {
-    const { deviceId } = this.admit(header)
-    if (deviceId === null) return noop
-    const closes = this.live.get(deviceId) ?? new Set()
+    const key = this.holdKey(header)
+    if (key === null) return noop
+    const closes = this.live.get(key) ?? new Set()
     closes.add(close)
-    this.live.set(deviceId, closes)
+    this.live.set(key, closes)
     return () => {
       closes.delete(close)
-      if (closes.size === 0) this.live.delete(deviceId)
+      if (closes.size === 0) this.live.delete(key)
     }
   }
 
-  /** Sweeps every hour until the returned stop is called. */
+  /** Sweeps every hour, and checks Tailscale-admitted sockets every minute, until stopped. */
   startSweeping() {
-    const timer = setInterval(() => this.sweep(), SWEEP_MS)
-    timer.unref?.()
-    return () => clearInterval(timer)
+    const sweep = setInterval(() => this.sweep(), SWEEP_MS)
+    const recheck = setInterval(
+      () => runDetached(() => this.recheckTailnet(), RECHECK_CONTEXT),
+      TAILNET_RECHECK_MS,
+    )
+    sweep.unref?.()
+    recheck.unref?.()
+    return () => {
+      clearInterval(sweep)
+      clearInterval(recheck)
+    }
+  }
+
+  /**
+   * Asks Tailscale again about every address holding sockets open, and closes those it no longer
+   * vouches for. Run on a timer and whenever settings change.
+   */
+  async recheckTailnet() {
+    const addresses = [...this.live.keys()].flatMap((key) =>
+      key.startsWith(TAILNET_KEY) ? [key.slice(TAILNET_KEY.length)] : [],
+    )
+    for (const address of addresses) {
+      await this.tailnet?.resolve(address)
+      const verdict = this.tailnet?.verdict(address) ?? 'off'
+      if (verdict !== 'same-user' && this.isRequired()) this.closeSockets(TAILNET_KEY + address)
+    }
   }
 
   /** Drops the devices unseen for 30 days, and closes what they still had open. */
@@ -105,11 +166,15 @@ export class DevicePairing {
     return this.admit(header).trust !== 'unpaired' || !this.isRequired()
   }
 
-  issueLink(header: HeaderReader) {
+  /** Any device let in may let the next one in: pairing has one trust level, so this grants nothing. */
+  issueLink(header: HeaderReader): PairingLink {
     const { trust } = this.admit(header)
-    if (trust !== 'host') throw pairingErrors.HOST_ONLY({ internal: { trust } })
-    const link = this.codes.issue(this.now())
-    recordRequestContext({ pairing: { outcome: 'link-issued', expiresAt: link.expiresAt } })
+    if (trust === 'unpaired') throw pairingErrors.PAIRED_ONLY({ internal: { trust } })
+    const issued = this.codes.issue(this.now())
+    const link = { ...issued, url: this.appUrl ? pairingLink(this.appUrl, issued.code) : null }
+    recordRequestContext({
+      pairing: { outcome: 'link-issued', issuedBy: trust, expiresAt: link.expiresAt },
+    })
     return link
   }
 
@@ -154,6 +219,13 @@ export class DevicePairing {
         internal: { deviceId: id, pairedCount: this.store.list().length },
       })
     this.closeSockets(id)
+  }
+
+  private holdKey(header: HeaderReader) {
+    const { trust, deviceId } = this.admit(header)
+    if (deviceId !== null) return deviceId
+    const peer = forwardedPeer(header)
+    return trust === 'tailnet' && peer !== null ? TAILNET_KEY + peer : null
   }
 
   private forget(id: string) {

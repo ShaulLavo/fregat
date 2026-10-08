@@ -1,7 +1,20 @@
 {
   "name": "@singapore-editor/collab",
   "version": "0.0.1",
-  "description": "Runtime-neutral host-ordered collaborative text and a FugueMax reference engine",
+  "description": "Host-ordered text editing with persistent snapshots and character identities for collaboration engines.",
+  "keywords": [
+    "browser",
+    "collaboration",
+    "crdt",
+    "editor",
+    "singapore",
+    "typescript"
+  ],
+  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/collab/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ShaulLavo/fregat.git",

@@ -1,6 +1,19 @@
 {
   "name": "@singapore-editor/markdown",
   "version": "0.2.6",
+  "description": "Markdown preview and editing commands for the Singapore editor.",
+  "keywords": [
+    "browser",
+    "editor",
+    "markdown",
+    "preview",
+    "singapore",
+    "typescript"
+  ],
+  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/markdown/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

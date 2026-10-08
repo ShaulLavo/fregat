@@ -1,22 +1,28 @@
 # @singapore-editor/typescript-lsp
 
-typescript and javascript language features for the editor, all in the browser. the real typescript language service runs in a web worker and talks lsp to [`@singapore-editor/lsp-plugin`](../lsp-plugin/)
+TypeScript and JavaScript language services in a browser worker for the Singapore editor.
 
-you get diagnostics, completion, hover, signature help, go to definition, references, rename, code actions and formatting. the standard library `.d.ts` files ship with the package
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
 
-## try it
+## Install
 
 ```sh
 npm install @singapore-editor/core @singapore-editor/typescript-lsp
 ```
+
+## Usage
 
 ```ts
 import { Editor } from '@singapore-editor/core/editor'
 import { createTypeScriptLspPlugin } from '@singapore-editor/typescript-lsp'
 import '@singapore-editor/core/style.css'
 
+const host = document.createElement('div')
+host.style.height = '400px'
+document.body.append(host)
+
 const typescript = createTypeScriptLspPlugin()
-const editor = new Editor(document.querySelector<HTMLElement>('#editor')!, {
+const editor = new Editor(host, {
   plugins: [typescript],
 })
 
@@ -31,14 +37,21 @@ editor.openDocument({
 })
 ```
 
-the worker sees the open document plus whatever you hand `setWorkspaceFiles`, so imports resolve and `'2'` gets a red squiggle. update files with `upsertWorkspaceFiles` and `deleteWorkspaceFiles`
+## API highlights
 
-`compilerOptions` sets the compiler options. `onDiagnostics`, `onOpenDefinition` and `onApplyWorkspaceEdit` hand counts, cross-file jumps and multi-file edits to your app
+- `createTypeScriptLspPlugin()` connects the worker language service.
+- `setWorkspaceFiles()` supplies imported files.
+- `upsertWorkspaceFiles()` updates those files.
 
-## more
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/typescript-lsp/overview/)
 
-- [one project, many editors](docs/shared-project.md), sharing one worker and file set across tabs
-- `@singapore-editor/typescript-lsp/server`, `createTypeScriptLspServerSession({ send })` runs the same worker behind your own socket
-- `@singapore-editor/typescript-lsp/ts-diagnostics`, converts typescript diagnostics to lsp ones
-- `createTypeScriptLspWorkerOwner` for hosts that start and watch the worker themselves
-- [`@singapore-editor/lsp-plugin`](../lsp-plugin/), the generic plugin this one configures
+## In the Singapore family
+
+`@singapore-editor/core` owns the editor view. Add this plugin for TypeScript and JavaScript language features.
+Use a bundler that serves the package worker and data assets. See the [hosting guide](https://shaulavo.dev/singapore/docs/guides/bundling/).
+
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+
+## License
+
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)

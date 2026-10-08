@@ -111,7 +111,6 @@ test.each(
       script: '../install-release.ts',
       args,
     })),
-    { script: '../pair.ts', args: [] },
   ].flatMap((command) => [false, true].map((invalid) => ({ ...command, invalid }))),
 )(
   '$script $args stops before effects with an invalid target: $invalid',

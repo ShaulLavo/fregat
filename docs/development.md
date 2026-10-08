@@ -104,11 +104,17 @@ bun run build-release --output=./fregat-release --base=/fregat/
 
 Package publishing is separate: `bun run release` is the Package releases workflow's Changesets publishing step.
 
+## pairing another device
+
+A browser on another device, such as a phone reaching the machine over the tailnet, shows a pairing screen naming the machine until it is paired. Make a code on the machine or on any paired device in Settings › Machines › Pair a device, then scan it or type it on the new device.
+
+With no paired browser at hand, run the pair command on the machine, over SSH for example. In an installed release, run `bun current/server/pair.js` from the release folder: `server.releaseRoot`, by default `~/.local/share/fregat/releases` on Linux and `~/Library/Application Support/Fregat/releases` on macOS; an `install-release` installation uses its `productionRoot`. In a checkout, `bun run pair` runs the same command. It asks the server at the `server.address` setting over loopback (`--address=http://127.0.0.1:<port>` picks another server) and prints the code, plus a link when the server is served at an address other devices reach. A code works once, for 5 minutes.
+
 ## optional local release installation
 
 `bun run install-release` is an optional Linux integration with Mesh and user systemd. It builds first by default; `--from=<release-directory>` installs a previously built release. Installation additionally needs `mesh`, `systemctl`, `df`, Node and Playwright Chromium. This integration owns `platform-prod.service` on loopback port 3301. Run it on the machine serving the configured target.
 
-Configure `developer.deployTarget` in that machine's production settings (`~/.platform/settings.json`). Add the key to the existing JSON object, preserving other settings. The default is `null`; install-release, restart, rollback and pair refuse before effects with guidance for setting the target.
+Configure `developer.deployTarget` in that machine's production settings (`~/.platform/settings.json`). Add the key to the existing JSON object, preserving other settings. The default is `null`; install-release, restart and rollback refuse before effects with guidance for setting the target.
 
 ```json
 {
@@ -136,6 +142,6 @@ Web-only installation reuses the running server bundle, verifies the candidate, 
 
 `--server` alone stages the release and the app shows "Update available". `--restart` sends the Restart button's request, waits for busy sessions up to `developer.deployRestartWaitMinutes` (30 minutes by default), promotes and waits for the live check. Alone it builds nothing and restarts into the already staged release. `--interrupt` ends busy turns and restarts immediately; an installation run inside a Platform chat needs it because its own turn counts as busy. `--rollback` drops pending, moves current back one release and restarts when the server differs. `--skip-live-check` skips immediate and post-restart browser checks.
 
-The installed release records its configured page URL. Immediate, restart and rollback checks and their messages use the checked release's recorded URL for navigation, release polling, health evidence and observation. A standalone check requires `node scripts/deploy/live-check.mjs --target=<deployed-page-url>`. `bun run pair` prints a link for the configured target. The release endpoint under the configured application base reports the served release, commit, dirty-file count, pending update, phase and live-check result.
+The installed release records its configured page URL. Immediate, restart and rollback checks and their messages use the checked release's recorded URL for navigation, release polling, health evidence and observation. A standalone check requires `node scripts/deploy/live-check.mjs --target=<deployed-page-url>`. The release endpoint under the configured application base reports the served release, commit, dirty-file count, pending update, phase and live-check result.
 
 Adopting this setting for an existing installation requires recording its current root, host, origin and route before the next installation or pairing command. The command preserves the service identity, loopback port and existing release workflow. Portable release building needs none of these installation settings.

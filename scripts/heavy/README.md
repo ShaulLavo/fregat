@@ -82,7 +82,16 @@ bun /work/platform-production/heavy/current/report.js --since 1d --by command
 
 Finished jobs append JSONL to `developer.heavyJobLogDirectory`, including queue time, admission reason, `server`, `serversAtAdmission`, `jobsDuringRun`, `allowedCpus`, class budget, checkout commit, wall time, CPU time, peak memory and exit code. Fix repeated heavy consumers at their cause.
 
-The installed bundle stays pinned until explicitly replaced from a clean checkout with `bun scripts/heavy/install.ts`. Source changes and pulls leave the live runner unchanged. Existing running and queued wrappers keep their launch-time behavior. After installing the updated runner, restart private servers with `--server`. Cancel each existing queued quiet wrapper before invoking its request again through the updated runner, so its old FIFO ticket is released. Existing finite jobs can finish normally.
+Install from a clean checkout at the commit you want to run. Choose the wrapper installation directory used by your sessions:
+
+```sh
+bun install --frozen-lockfile
+bun scripts/heavy/install.ts --root=<directory>
+```
+
+The installer bundles workspace source, including `@fregat/hotkeys`, so dependency installation is its only build prerequisite. A complete source checkout is required. Its source alias applies only to this install bundle; application builds keep using the package exports.
+
+The installed bundle stays pinned until explicitly replaced from a clean checkout with `bun scripts/heavy/install.ts --root=<directory>`. Source changes and pulls leave the live runner unchanged. Existing running and queued wrappers keep their launch-time behavior. After installing the updated runner, restart private servers with `--server`. Cancel each existing queued quiet wrapper before invoking its request again through the updated runner, so its old FIFO ticket is released. Existing finite jobs can finish normally.
 
 The [Pi lane](pi/README.md) runs independently under its own ceiling and wall limit.
 

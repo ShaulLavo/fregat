@@ -91,6 +91,65 @@
       "dependsOn": ["^build", "build"],
       "cache": false,
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/docs/performance/e034-*.json.gz"]
+    },
+    "@singapore-editor/collaboration#test:browser": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/browser-test-responses.ts"],
+      "env": ["COLLABORATION_TEST_TURN"],
+      "outputs": []
+    },
+    "@singapore-editor/core#bench:edit-commands": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/browser-test-responses.ts"]
+    },
+    "@singapore-editor/highlighting#test:browser": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/browser-test-responses.ts"]
+    },
+    "@singapore-editor/highlighting#test:engines": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/browser-test-responses.ts"]
+    },
+    "@singapore-editor/typescript-lsp#test:browser": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/browser-test-responses.ts"]
+    },
+    "@singapore-editor/tree-sitter#test:browser": {
+      "dependsOn": [
+        "^build",
+        "build",
+        "@singapore-editor/markdown#build",
+        "@singapore-editor/tree-sitter-languages#build"
+      ]
+    },
+    "@singapore-editor/tree-sitter#test:runtime": {
+      "dependsOn": [
+        "^build",
+        "build",
+        "@singapore-editor/markdown#build",
+        "@singapore-editor/tree-sitter-languages#build"
+      ]
+    },
+    "singapore-editor-site#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/packages/*/package.json"
+      ]
+    },
+    "singapore-editor-site#test": {
+      "dependsOn": ["^build", "build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/packages/*/package.json"
+      ]
+    },
+    "singapore-editor-site#typecheck": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/package.json"]
     }
   },
   "agentGuidance": false

@@ -5,6 +5,7 @@ import { EvlogError } from 'evlog'
 import { createScriptError, scriptFailureText } from '../../../scripts/structured-errors'
 import {
   IMAGE_WORKER,
+  PAIR_COMMAND,
   PTY_HOST,
   REMOTE_SUPPORT,
   RUNTIME_LOCK,
@@ -23,6 +24,7 @@ const releaseFiles = [
     RUNTIME_MANIFEST,
     RUNTIME_LOCK,
     REMOTE_SUPPORT,
+    PAIR_COMMAND,
     PTY_HOST,
     WATCH_WORKER,
     IMAGE_WORKER,
