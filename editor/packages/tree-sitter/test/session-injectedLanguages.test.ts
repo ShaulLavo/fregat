@@ -17,12 +17,6 @@ import { createTreeSitterSyntaxProvider, createTreeSitterWorkerOwner } from '../
 import type { TreeSitterLanguageDescriptor } from '../src/treeSitter/registry.ts'
 import type { TreeSitterBackend } from '../src/treeSitter/workerClient.ts'
 
-/**
- * The worker cannot ask for a language it was never sent, so an injection whose grammar stayed on
- * the main thread silently drops its whole layer — embedded is an injection, which is why
- * container used to lose every inline construct.
- */
-
 const cleanup: Array<() => void | Promise<void>> = []
 afterEach(async () => {
   disposeTreeDocuments()
@@ -42,13 +36,13 @@ const DESCRIPTORS: Record<string, TreeSitterLanguageDescriptor> = {
 }
 
 describe('injected language registration', () => {
-  it('registers the languages an injection query names, transitively', async () => {
+  it('keeps declared injection assets unloaded until the worker requests them', async () => {
     const registered: string[][] = []
     const session = createSession('container', registered)
 
     await session.run()
 
-    expect(registered).toEqual([['container', 'embedded', 'html']])
+    expect(registered).toEqual([['container']])
   })
 
   it('registers only the document language when nothing is injected', async () => {
@@ -145,7 +139,7 @@ it('does not register or parse a delayed injection after disposal', async () => 
   release(descriptor('astro'))
   await refresh
   expect(parses).toBe(1)
-  expect(registered).toEqual([['container', 'embedded', 'html']])
+  expect(registered).toEqual([['container']])
 })
 
 it('shares a delayed language load with the newer document version', async () => {
@@ -195,7 +189,7 @@ it('shares a delayed language load with the newer document version', async () =>
   expect(loads).toBe(1)
   expect(session.runtime.getResult()).toBe(latest)
   expect(latest.projection.snapshot.length).toBe(session.buffer.getTextSnapshot().length)
-  expect(registered).toEqual([['container', 'embedded', 'html'], ['astro']])
+  expect(registered).toEqual([['container'], ['astro']])
   session.dispose()
 })
 

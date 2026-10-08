@@ -211,6 +211,7 @@ import { chatModelPicker } from './chat-model-picker'
 import { opencodeModelCatalog } from './opencode-model-catalog'
 import { chatUsageMeter } from './chat-usage-meter'
 import { chatUsageIdle } from './chat-usage-idle'
+import { chatAlignment } from './chat-alignment'
 import { chatComposerNarrow } from './chat-composer-narrow'
 import { settingsUsage } from './settings-usage'
 import { pushSubscribe } from './push-subscribe'
@@ -585,6 +586,7 @@ export const scenarios: readonly Scenario[] = [
   opencodeModelCatalog,
   chatUsageMeter,
   chatUsageIdle,
+  chatAlignment,
   chatComposerNarrow,
   restNoFlicker,
   settingsUsage,

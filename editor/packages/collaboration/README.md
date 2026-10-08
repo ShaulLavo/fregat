@@ -36,6 +36,26 @@ presence.dispose()
 
 [Integration guide](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/collaboration/docs/integration.md)
 
+## TURN verification
+
+The browser suite skips its TURN-only case until `COLLABORATION_TEST_TURN` contains an
+array of `RTCIceServer` objects for a relay you control. Run this from the package directory:
+
+```sh
+COLLABORATION_TEST_TURN='[{"urls":"turn:127.0.0.1:3478?transport=udp","username":"test-member","credential":"your-ephemeral-credential"}]' \
+  bun run test:browser -- test/transports.browser.test.ts -t TURN-only
+```
+
+Configure the relay's listening address, relay address, credentials and UDP port range.
+A loopback-only coturn instance also needs `--allow-loopback-peers` for two local browser
+peers. Keep that instance bound to loopback and stop it after the test. For checks across
+machines, use a private interface both machines can reach and allow its relay port range.
+
+The case uses two real browser pages with `iceTransportPolicy: 'relay'` and exchanges
+chunked edits. It checks that both peers select a `relay` local and remote ICE candidate
+and that the selected pairs send and receive bytes. A configured relay that fails to
+connect fails the test.
+
 ## In the Singapore family
 
 You can use this package on its own. `@singapore-editor/core` owns editor views; optional packages add syntax, search, gutters, and language features.

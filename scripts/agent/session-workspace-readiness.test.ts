@@ -8,16 +8,51 @@ const sessionId = 'fixture-session'
 const environmentId = 'fixture-environment'
 
 test.for([
-  { path: '/~fixture.address/chat/t/fixture-session', owner: 'other-environment', accepted: false },
-  { path: '/~fixture.address/chat/t/fixture-session', owner: environmentId, accepted: true },
+  {
+    path: '/~fixture.address/chat/t/fixture-session',
+    owner: 'other-environment',
+    shell: 'desktop',
+    switcher: true,
+    accepted: false,
+  },
+  {
+    path: '/~fixture.address/chat/t/fixture-session',
+    owner: environmentId,
+    shell: 'desktop',
+    switcher: true,
+    accepted: true,
+  },
   {
     path: '/@fixture-environment/~fixture.address/chat/t/fixture-session',
     owner: 'other-environment',
+    shell: 'desktop',
+    switcher: true,
+    accepted: false,
+  },
+  {
+    path: '/~fixture.address/chat/t/fixture-session',
+    owner: environmentId,
+    shell: 'phone',
+    switcher: false,
+    accepted: true,
+  },
+  {
+    path: '/~fixture.address/chat/t/fixture-session',
+    owner: 'other-environment',
+    shell: 'phone',
+    switcher: false,
+    accepted: false,
+  },
+  {
+    path: '/~fixture.address/chat/t/fixture-session',
+    owner: environmentId,
+    shell: 'desktop',
+    switcher: false,
     accepted: false,
   },
 ])(
-  'workspace readiness matches the independently resolved environment: $path / $owner',
-  async ({ path, owner, accepted }) => {
+  'workspace readiness matches the independently resolved environment: $path / $owner / $shell / switcher=$switcher',
+  async ({ path, owner, shell, switcher, accepted }) => {
     let observed: unknown
     // Execute the actual Playwright predicate; control only its browser document and URL.
     const page = {
@@ -26,8 +61,9 @@ test.for([
           argument,
           location: { pathname: path },
           document: {
+            documentElement: { dataset: { shell } },
             querySelector: (selector: string) => {
-              if (selector === '[aria-label="Switch project"]') {
+              if (selector === '[aria-label="Switch project"]' && switcher) {
                 return { getAttribute: () => `${root} · fixture` }
               }
               if (selector === '[data-testid="chat-input-editor"]') {

@@ -6,6 +6,7 @@ import type { EditorPluginContext } from '@singapore-editor/core/extensions'
 import type {
   TreeSitterLanguageAssets,
   TreeSitterLanguageContribution,
+  TreeSitterSyntaxProvider,
 } from '@singapore-editor/tree-sitter'
 import {
   JAVASCRIPT_TREE_SITTER_LANGUAGE,
@@ -46,6 +47,8 @@ describe('Tree-sitter language contributions', () => {
       'svelte',
       'sql',
       'mdx',
+      'jsdoc',
+      'regex',
     ])
     expect(TREE_SITTER_LANGUAGE_CONTRIBUTIONS.every((contribution) => 'load' in contribution)).toBe(
       true,
@@ -94,6 +97,22 @@ describe('Tree-sitter language contributions', () => {
     lease?.dispose()
     analysis.dispose()
   })
+
+  it.each([javaScript, typeScript, html])(
+    'registers bundled injection dependencies on the simple plugin path',
+    async (plugin) => {
+      const context = pluginContext()
+      const handles = plugin().activate(context)
+      const provider = vi.mocked(context.registerSyntaxProvider).mock
+        .calls[0]![0] as TreeSitterSyntaxProvider
+      try {
+        expect((await provider.resolveTreeSitterLanguage('jsdoc'))?.id).toBe('jsdoc')
+        expect((await provider.resolveTreeSitterLanguage('regex'))?.id).toBe('regex')
+      } finally {
+        for (const handle of Array.isArray(handles) ? handles : []) handle.dispose()
+      }
+    },
+  )
 
   it('loads JSX folds only for JSX-capable JavaScript and TypeScript assets', async () => {
     const [javascriptAssets, typescriptAssets, jsxJavascriptAssets, tsxTypescriptAssets] =

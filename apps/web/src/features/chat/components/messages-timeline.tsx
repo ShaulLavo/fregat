@@ -77,6 +77,8 @@ export function MessagesTimeline({
       contentClassName='[overflow-anchor:none]'
       renderRow={(item) => (
         <TimelineRow
+          // Only outer rows match the composer’s section inset and 1px border, less row padding.
+          className='px-[calc(var(--density-section-padding)-3px)]'
           checkpointRevertPending={checkpointRevertPending}
           item={item}
           restoreRole={restoreRoles?.get(item.id)}
