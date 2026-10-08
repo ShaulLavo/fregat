@@ -2,6 +2,7 @@ import { scheduleFrame, type ScheduledFrame } from './scheduleFrame'
 import type {
   DocumentSession,
   DocumentSessionChange,
+  DocumentSessionApplyEditsOptions,
   DocumentSessionSelectionRange,
 } from '../documentSession'
 import { previousDeleteBoundary } from '../graphemes'
@@ -1538,6 +1539,7 @@ export class InputSelectionController {
     edits: readonly TextEdit[],
     timingName: string,
     selection?: EditorSelectionRange | readonly EditorSelectionRange[],
+    options: DocumentSessionApplyEditsOptions = {},
   ): void {
     this.options.runInOperation(() => {
       const session = this.session
@@ -1548,7 +1550,12 @@ export class InputSelectionController {
       const start = nowMs()
       const change = session.applyEdits(
         edits,
-        isSelectionList(selection) ? { selections: selection } : { selection },
+        selection === undefined
+          ? options
+          : {
+              ...options,
+              ...(isSelectionList(selection) ? { selections: selection } : { selection }),
+            },
       )
       this.syncSessionSelectionHighlight()
       this.markSessionSelectionForNextInput()
@@ -1616,6 +1623,20 @@ export class InputSelectionController {
 
   private notifySelection(notify: boolean): void {
     if (notify) this.options.notifyViewContributions('selection', null)
+  }
+
+  acceptReconcile(): void {
+    if (this.inputState.compositionActive) {
+      this.compositionRange = null
+      this.editContextComposition = null
+      this.transitionInputState({ type: 'composition-end' })
+      this.options.view.setCompositionPreedit('')
+      const input = this.options.view.inputElement
+      const focused = input.ownerDocument.activeElement === input
+      input.blur()
+      if (focused) input.focus({ preventScroll: true })
+    }
+    this.markSessionSelectionForNextInput()
   }
 
   syncSessionSelectionHighlight(): void {

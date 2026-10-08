@@ -4,7 +4,13 @@ import type { EditorRowPresentation } from './rowPresentation'
 import type { EditorPointHit, EditorMarkerHit } from './pointQueries'
 import type { TextContent } from './textContent'
 import type { EditorDecorationRange, EditorDecorationStore } from './editor/decorationStore'
-import type { DocumentSessionChange } from './documentSession'
+import type {
+  DocumentSessionApplyEditsOptions,
+  DocumentSessionChange,
+  DocumentSessionReconcileOptions,
+  EditorTextTransaction,
+} from './documentSession'
+import type { PieceTableSnapshot } from '@singapore-editor/textbuffer'
 import type { TextReadSnapshot } from './documentTextSnapshot'
 import type { EditorCommandContext } from './editor/commands'
 import type {
@@ -539,6 +545,13 @@ export type EditorViewContributionContext = {
   getSnapshot(): EditorViewSnapshot
   getDocumentContributions(): EditorDocumentContributions | null
   requestViewUpdate(): void
+  /** Each authored text transaction, with its exact pre-edit snapshot and batch. */
+  onDidTransaction(listener: (event: EditorTextTransaction) => void): EditorDisposable
+  reconcile(
+    base: PieceTableSnapshot,
+    batches: readonly (readonly TextEdit[])[],
+    options: DocumentSessionReconcileOptions,
+  ): void
   /**
    * The character the user typed, after its edit has landed. A contribution that acts on a
    * keystroke reads it here rather than deducing it from the change: auto-closing turns a typed
@@ -782,6 +795,7 @@ export type EditorEditContributionContext = EditorDocumentContributionContext &
       edits: readonly TextEdit[],
       timingName: string,
       selection?: EditorSelectionRange,
+      options?: DocumentSessionApplyEditsOptions,
     ): void
     /**
      * Starts tab-stop navigation over the text just inserted: one entry per stop, carrying the
@@ -1059,6 +1073,7 @@ export type EditorInternalViewContributionContext = EditorViewContributionContex
     edits: readonly TextEdit[],
     timingName: string,
     selection?: EditorSelectionRange | readonly EditorSelectionRange[],
+    options?: DocumentSessionApplyEditsOptions,
   ): void
   /** While `accepts` answers false, typed, composed, pasted and dropped text is refused. */
   registerTextGate(accepts: () => boolean): EditorDisposable

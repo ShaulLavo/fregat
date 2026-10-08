@@ -1,5 +1,5 @@
 import type { EditorDocumentAnalysis } from './documentAnalysis'
-import type { DocumentSessionChange } from '../documentSession'
+import type { DocumentSessionApplyEditsOptions, DocumentSessionChange } from '../documentSession'
 import type { EditorSyntaxLanguageId } from '../syntax/session'
 import type {
   EditorInitialHighlightStatus,
@@ -209,9 +209,6 @@ export type EditorEditSelection = {
   readonly head?: number
 }
 
-export type EditorEditOptions = {
-  readonly history?: EditorEditHistoryMode
-  readonly selection?: EditorEditSelection
-}
+export type EditorEditOptions = DocumentSessionApplyEditsOptions
 
 export type EditorEditInput = TextEdit | readonly TextEdit[]

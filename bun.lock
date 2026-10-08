@@ -291,6 +291,7 @@
       },
       "devDependencies": {
         "@singapore-editor/core": "workspace:*",
+        "@types/bun": "1.4.2",
         "@types/node": "26.6.3",
         "@vitest/browser-playwright": "5.0.2",
         "oxfmt": "0.70.0",

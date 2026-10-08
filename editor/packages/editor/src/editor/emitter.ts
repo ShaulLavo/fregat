@@ -21,6 +21,10 @@ export class EditorEventSource<T> {
     this.action = options.action
   }
 
+  public get size(): number {
+    return this.listeners.size
+  }
+
   public subscribe(listener: EditorEventListener<T>): EditorEventSubscription {
     this.listeners.add(listener)
     return {
@@ -28,6 +32,10 @@ export class EditorEventSource<T> {
         this.listeners.delete(listener)
       },
     }
+  }
+
+  public clear(): void {
+    this.listeners.clear()
   }
 
   public fire(event: T): void {
