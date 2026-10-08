@@ -160,7 +160,7 @@ export class Participant<Snapshot = unknown> {
 
   receive(messages: readonly HostMessage[], allocated: readonly Envelope[] = []): void {
     // Rejected wire records retain allocations that are absent from accepted engine state.
-    for (const envelope of allocated) this.reserveIdentities(envelope)
+    for (const envelope of allocated) this.reserveIdentities(envelope, true)
     for (const message of messages) {
       if (message.document !== this.options.document || message.epoch !== this.options.epoch)
         throw new CollabFailure('wrong-document-epoch')
@@ -226,11 +226,17 @@ export class Participant<Snapshot = unknown> {
     this.frontier.set(editKey(id), { ...id })
   }
 
-  private reserveIdentities(envelope: Envelope): void {
+  private reserveIdentities(envelope: Envelope, rejected = false): void {
     if (envelope.id.actor !== this.actor) return
     this.editSequence = Math.max(this.editSequence, envelope.id.seq)
     const insert = insertionOf(envelope.change)
-    if (insert) this.allocator.reserve(insert.start, insert.text.length)
+    if (!insert) return
+    try {
+      this.allocator.reserve(insert.start, insert.text.length)
+    } catch (error) {
+      // A malformed rejected span contains no allocatable character IDs.
+      if (!rejected || !(error instanceof RangeError)) throw error
+    }
   }
 
   private replay(): void {

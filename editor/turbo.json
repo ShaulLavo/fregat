@@ -166,6 +166,14 @@
       "env": ["COLLABORATION_MEASURE", "COLLABORATION_EVIDENCE_DIR"],
       "outputs": [],
       "cache": false
+    },
+    "@singapore-editor/collaboration#test": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/examples/app/src/**"]
+    },
+    "@singapore-editor/collaboration#typecheck": {
+      "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/examples/app/src/**"]
     }
   },
   "agentGuidance": false

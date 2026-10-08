@@ -173,3 +173,32 @@ test.each([
     expect(second.change.start).not.toEqual(first.change.start)
   },
 )
+
+test('malformed rejected character spans leave allocation recovery usable', () => {
+  const original = new CollaborationDocument({ ...options, text: '' })
+  expect(() =>
+    original.sequence(
+      {
+        document: options.document,
+        epoch: options.epoch,
+        id: { actor: options.peer, seq: 1 },
+        lamport: 1,
+        deps: [],
+        change: {
+          kind: 'insert',
+          start: { bunch: 'a:0', counter: -1 },
+          originLeft: 'start',
+          originRight: 'end',
+          text: 'A',
+        },
+      },
+      'invalid character identity',
+    ),
+  ).not.toThrow()
+  const reopened = new CollaborationDocument({ ...options, text: '' })
+  expect(() => reopened.install(original.exportHistory(original.genesis)!)).not.toThrow()
+  const next = reopened.participant.local({ offset: 0, deleteCount: 0, text: 'B' })
+  expect(next.id.seq).toBe(2)
+  reopened.sequence(next)
+  expect(reopened.engine.text()).toBe('B')
+})
