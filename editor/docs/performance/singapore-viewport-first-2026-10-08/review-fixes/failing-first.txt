@@ -1,0 +1,140 @@
+[wave-heavy] started 'viewport review failing-first regressions' on local after 0s: 4621 MiB free covers 4096 MiB
+
+ RUN  v5.0.2 /work/worktrees/platform/singapore-viewport-first/editor/packages/tree-sitter
+
+ ❯ test/syntax.test.ts (33 tests | 1 failed | 32 skipped) 12ms
+   ❯ Tree-sitter syntax capture conversion (33)
+     × keeps the completed tree queryable after a range query exhausts its budget 11ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/syntax.test.ts > Tree-sitter syntax capture conversion > keeps the completed tree queryable after a range query exhausts its budget
+AssertionError: expected { captures: [], …(8) } to be { captures: [], …(8) } // Object.is equality
+
+- Expected
++ Received
+
+@@ -5,15 +5,24 @@
+    "errors": [],
+    "folds": [],
+    "injections": [],
+    "projection": {
+      "analysis": {
++       "budgetMs": 20000,
+        "coveredRange": {
+-         "endIndex": 12,
++         "endIndex": 0,
+          "startIndex": 0,
+        },
+-       "kind": "full",
++       "elapsedMs": 20001,
++       "kind": "cancelled",
++       "reason": "budget",
++       "timings": [
++         {
++           "durationMs": 20001,
++           "name": "treeSitter.highlights",
++         },
++       ],
+      },
+      "language": {
+        "includeCaptures": true,
+        "includeHighlights": true,
+        "languageId": "typescript",
+@@ -34,36 +43,15 @@
+    },
+    "records": undefined,
+    "tokens": EditorTokenStore {
+      "cursor": 0,
+      "derivedFrom": null,
+-     "length": 1,
++     "length": 0,
+      "maxEnds": null,
+      "monotonicEnd": true,
+      "nonOverlapping": true,
+-     "revision": 2,
+-     "segmentStarts": [
+-       0,
+-     ],
+-     "segments": [
+-       {
+-         "delta": 0,
+-         "ends": Uint32Array [
+-           5,
+-         ],
+-         "from": 0,
+-         "starts": Uint32Array [
+-           0,
+-         ],
+-         "styleIds": Uint32Array [
+-           0,
+-         ],
+-         "to": 1,
+-       },
+-     ],
+-     "styles": [
+-       {
+-         "color": "#123456",
+-       },
+-     ],
++     "revision": 1,
++     "segmentStarts": [],
++     "segments": [],
++     "styles": [],
+    },
+  }
+
+ ❯ test/syntax.test.ts:546:37
+    544|       timings: [{ name: 'treeSitter.highlights', durationMs: 20_001 }],
+    545|     })
+    546|     expect(doc.runtime.getResult()).toBe(successful)
+       |                                     ^
+    547|     expect(doc.runtime.canQueryRange()).toBe(true)
+    548|     const retried = await doc.runtime.queryRange({ startIndex: 0, endI…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 32 skipped (33)
+   Start at  17:11:51
+   Duration  1.92s (transform 71%, environment 20%, import 8%, tests 1%)
+
+
+ RUN  v5.0.2 /work/worktrees/platform/singapore-viewport-first/editor/packages/tree-sitter
+      API started at http://localhost:63315/
+
+ ❯ |chromium| test/viewport-first.browser.test.ts (17 tests | 1 failed | 14 skipped) 501ms
+   × keeps initial token styles stable for a distant call continuation 171ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |chromium| test/viewport-first.browser.test.ts > keeps initial token styles stable for a distant call continuation
+AssertionError: expected 'partial' to be 'full' // Object.is equality
+
+Failure screenshot:
+  - .vitest/attachments/failure-screenshots/viewport-first.browser.test.ts/keeps-initial-token-styles-stable-for-a-distant-call-continuation.png
+
+Expected: [32m"[7mful[27ml"[39m
+Received: [31m"[7mpartia[27ml"[39m
+
+ ❯ test/viewport-first.browser.test.ts:196:45
+    194|   const range = { startIndex: 0, endIndex: prefix.length }
+    195|   const initial = await doc.runtime.queryRange(range)
+    196|   expect(initial.projection.analysis?.kind).toBe(kind)
+       |                                             ^
+    197|   await expect.poll(() => doc.runtime.getResult().projection.analysis?…
+    198|   const complete = await doc.runtime.queryRange(range)
+ ❯ node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/deps/plugins.Cigb0uSy-D3-MQlbH.js?v=88eae93f:4951:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed | 14 skipped (17)
+   Start at  17:11:53
+   Duration  1.35s (tests 61%, import 26%, worker 13%)
+
+Failing-first statuses: unit=1 browser=1
+
+[exited with code 0]

@@ -1,0 +1,62 @@
+Constrained, measured viewport; exact original reviewer source. Provisional variable colors paint successfully, then fail to become the complete baseline function colors. Displayed contributors could repopulate cleared ranges because completion reused their analysis generation.
+
+[wave-heavy] 'viewport constrained real mount' is waiting: 14 job(s) ahead in the queue
+[wave-heavy] 'viewport constrained real mount' is waiting: 11 job(s) ahead in the queue
+[wave-heavy] 'viewport constrained real mount' is waiting: 8 job(s) ahead in the queue
+[wave-heavy] started 'viewport constrained real mount' on local after 171s: 6709 MiB free covers 4096 MiB
+$ tsc --noEmit
+
+ RUN  v5.0.2 /work/worktrees/platform/singapore-viewport-first/editor/packages/tree-sitter
+      API started at http://localhost:63315/
+
+ ❯ |chromium| test/viewport-replacement.browser.test.ts (15 tests | 1 failed | 14 skipped) 20494ms
+   × atomically replaces scope text predicate with the non-provisional baseline 20494ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > atomically replaces scope text predicate with the non-provisional baseline
+AssertionError: expected [ …(5) ] to deeply equal [ …(5) ]
+
+Failure screenshot:
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/atomically-replaces-scope-text-predicate-with-the-non-provisional-baseline.png
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[32m-   "var(--editor-syntax-function)",[39m
+[32m-   "var(--editor-syntax-function)",[39m
+[32m-   "var(--editor-syntax-function)",[39m
+[31m+   "var(--editor-syntax-variable)",[39m
+[31m+   "var(--editor-syntax-variable)",[39m
+[31m+   "var(--editor-syntax-variable)",[39m
+[2m    null,[22m
+[2m    null,[22m
+[2m  ][22m
+
+ ❯ Proxy.__VITEST_POLL_CHAIN__ node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/deps/index.DGdajAO2-qC8TxPz3.js?v=2f000a4f:5777:47
+ ❯ test/viewport-replacement.browser.test.ts:167:10
+    165|       await expect
+    166|         .poll(() => mountedColors(editor, prefix.length), { timeout: 2…
+    167|         .toEqual(finalColors)
+       |          ^
+    168|       await expect
+    169|         .poll(
+ ❯ node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/deps/plugins.Cigb0uSy-D3-MQlbH.js?v=2f000a4f:4951:20
+
+Caused by: Error: Matcher did not succeed in time.
+ ❯ throwWithCause node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/deps/index.DGdajAO2-qC8TxPz3.js?v=2f000a4f:5757:34
+ ❯ promise node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/deps/index.DGdajAO2-qC8TxPz3.js?v=2f000a4f:5842:7
+ ❯ test/viewport-replacement.browser.test.ts:165:7
+ ❯ node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/deps/plugins.Cigb0uSy-D3-MQlbH.js?v=2f000a4f:4951:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 skipped (15)
+   Start at  19:22:58
+   Duration  21.02s (tests 99%, import 1%)
+
+
+[exited with code 1]

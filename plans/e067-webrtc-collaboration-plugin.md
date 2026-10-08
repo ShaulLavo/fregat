@@ -2,7 +2,7 @@
 
 Source paths in this document are relative to [`editor/`](../editor/) unless qualified.
 
-- Status: Approved
+- Status: In progress
 - Kind: Implementation
 - Owner: Editor
 - Priority: P2
@@ -102,6 +102,15 @@ Not in scope: accounts, permissions, persistent rooms, a server peer, and rooms 
   folded and wrapped lines.
 - Plugin cost: 0, 100 and 1,000 inert plugins show zero collaboration callbacks for documents
   without a session.
+
+## Delivery (2026-10-08 wave)
+
+- Steps 1–4 and the example page are delivered: session protocol with election, handoff and
+  split/rejoin (#953); bounded replay window and selective-repeat history recovery (#990);
+  WebRTC and BroadcastChannel transports with an encrypted signaling client and a self-hostable
+  broker (#982), hardened with per-member admission tokens and per-member, per-address and IPv6
+  prefix limits (#1016); presence (#991); the Start/Join example (#1026).
+- Remaining: Fregat settings registration, and two-machine and relay-only (TURN) qualification.
 
 ## Risks and decisions
 

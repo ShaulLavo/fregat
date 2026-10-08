@@ -80,6 +80,38 @@ export const csvSelectors = {
     page.getByRole('status').getByRole('button', { name: 'Retry', exact: true }),
 }
 
+export const workbenchAlignmentSelectors = {
+  tabs: (page: Page) =>
+    page.locator(
+      '[data-editor-tab-strip] [role="tab"], [aria-label="Bottom panel tabs"] [role="tab"]',
+    ),
+  title: (page: Page) => workbenchAlignmentSelectors.header(page).locator('.font-medium').first(),
+  filterField: (page: Page) =>
+    selectors.folderTree(page).locator('[data-slot="input-group"]').first(),
+  lanes: (page: Page) =>
+    selectors
+      .folderTree(page)
+      .locator('[role="treeitem"]:not([data-item-parked]) [data-slot="tree-row-lane"]'),
+  gutter: (page: Page) => page.locator('.editor-virtualized-gutter').first(),
+  editor: (page: Page) => page.locator('.editor-virtualized').first(),
+  header: (page: Page) =>
+    page
+      .locator('[data-slot="resizable-panel"][id="sidebar"] [data-slot="tool-pane-header"]')
+      .first(),
+  bars: (page: Page) =>
+    page.locator(
+      '[data-workbench] [data-slot="tool-pane-header"], [data-workbench] [data-slot="filter-field"], [data-workbench] [data-editor-tab-strip], [data-workbench] [data-slot="pane-bar"]',
+    ),
+  filter: (page: Page) => page.getByRole('textbox', { name: 'Filter files', exact: true }),
+  scroll: (page: Page) => selectors.folderTree(page).locator('[data-file-tree-virtualized-scroll]'),
+  flowRows: (page: Page) =>
+    selectors.folderTree(page).locator('[role="treeitem"]:not([data-item-parked])'),
+  railTab: (page: Page, name: string) =>
+    page
+      .getByRole('navigation', { name: 'Sidebar tabs' })
+      .getByRole('button', { name, exact: true }),
+} as const
+
 export const treeScrollSelectors = {
   scroll: '[data-file-tree-virtualized-scroll]',
   flow: '[data-file-tree-virtualized-sticky]',

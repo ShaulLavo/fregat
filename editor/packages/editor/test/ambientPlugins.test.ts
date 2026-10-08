@@ -143,3 +143,27 @@ test('demand that goes away while the plugin is still loading installs nothing',
     registration.dispose()
   }
 })
+
+test('synchronous ambient view demand during construction mounts once', () => {
+  const view = vi.fn()
+  const dispose = vi.fn()
+  const registration = registerAmbientEditorPlugin({
+    demand: DEMAND,
+    load: () =>
+      createPlugin({
+        name: 'test.ambient.initial-view',
+        view: (scope) => {
+          view()
+          scope.onDispose(dispose)
+        },
+      }),
+  })
+  try {
+    const editor = mount([demanding()])
+    expect(view).toHaveBeenCalledOnce()
+    editor.setPlugins([])
+    expect(dispose).toHaveBeenCalledOnce()
+  } finally {
+    registration.dispose()
+  }
+})

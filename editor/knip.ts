@@ -94,9 +94,9 @@ const config: KnipConfig = {
       ],
       project: ['src/**/*.ts', '*.mjs'],
     },
-    // jump-history.html loads src/jumpHistoryDemo.ts.
+    // Standalone pages load their own entry modules.
     'examples/app': {
-      entry: ['index.html', 'src/jumpHistoryDemo.ts'],
+      entry: ['index.html', 'src/jumpHistoryDemo.ts', 'src/collaboration.ts'],
       project: ['src/**/*.{ts,tsx}'],
     },
   },

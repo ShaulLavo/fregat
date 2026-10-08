@@ -24,6 +24,49 @@ const {
 } = __treeSitterWorkerInternalsForTests
 
 describe('tree-sitter worker internals', () => {
+  it('retains phase timings when a stale request cancels', async () => {
+    const result = await __treeSitterWorkerInternalsForTests.runCancellableRequest(
+      {
+        type: 'parse',
+        documentId: 'worker-fixture',
+        runtimeSessionId: 'superseded-fixture',
+        languageId: 'typescript',
+        snapshotVersion: 1,
+        generation: 1,
+        includeHighlights: false,
+        source: messageSource,
+      },
+      async (context) => {
+        context.measurements?.set('parseRoot', 12)
+        context.counts?.set('parseSlices', 2)
+        __treeSitterWorkerInternalsForTests.assertNotCancelled(context)
+        return undefined
+      },
+    )
+    expect(result).toMatchObject({
+      status: 'cancelled',
+      analysis: { kind: 'cancelled', reason: 'superseded' },
+      timings: [{ name: 'treeSitter.parseRoot', durationMs: 12 }],
+      statistics: { parseSlices: 2 },
+    })
+  })
+
+  it('reports an exhausted work budget as a structured outcome', () => {
+    const result = __treeSitterWorkerInternalsForTests.cancellationAnalysis({
+      startedAt: performance.now() - 21_000,
+      budgetMs: 20_000,
+      flag: null,
+      measurements: new Map([['parseRoot', 19_000]]),
+    })
+    expect(result).toMatchObject({
+      kind: 'cancelled',
+      reason: 'budget',
+      budgetMs: 20_000,
+      timings: [{ name: 'treeSitter.parseRoot', durationMs: 19_000 }],
+    })
+    expect(result.elapsedMs).toBeGreaterThanOrEqual(21_000)
+  })
+
   it('applies text edits by replacing the old range', () => {
     expect(applyTextEdit('const a = 1;', 6, 7, 'answer')).toBe('const answer = 1;')
     expect(applyTextEdit('abcdef', 2, 4, '')).toBe('abef')
