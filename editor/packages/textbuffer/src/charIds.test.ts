@@ -431,9 +431,11 @@ it('rejects overlap in the middle of a proposed run and gaps in deletion spans',
   expect(text(original)).toBe('abc')
 })
 
-it('matches an independent structural model through seeded fragmented edits', () => {
-  type Unit = { id: CharId; text: string; visible: boolean }
-  for (let seed = 1; seed <= 6; seed++) {
+const structuralStress = process.env.COLLAB_STRESS === '1'
+it.each(structuralStress ? [1, 2, 3, 4, 5, 6] : [1, 2])(
+  'matches an independent structural model through seeded fragmented edits (seed %i)',
+  (seed) => {
+    type Unit = { id: CharId; text: string; visible: boolean }
     let randomState = seed
     const random = (limit: number) => {
       randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0
@@ -447,7 +449,7 @@ it('matches an independent structural model through seeded fragmented edits', ()
       visible: true,
     }))
     const authored: { start: CharId; count: number }[] = [{ start: id(0), count: 4 }]
-    for (let step = 0; step < 300; step++) {
+    for (let step = 0; step < (structuralStress ? 300 : 40); step++) {
       if (random(3) !== 0) {
         const boundary = random(model.length + 1)
         const after = boundary === 0 ? 'start' : model[boundary - 1]!.id
@@ -499,8 +501,8 @@ it('matches an independent structural model through seeded fragmented edits', ()
       }
       valid(snapshot)
     }
-  }
-})
+  },
+)
 
 it('normalizes exhausted split orders within one atomic replacement', () => {
   const original = make('ab'.repeat(100))

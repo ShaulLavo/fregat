@@ -96,6 +96,12 @@ bun run verify
 
 `verify` typechecks, builds, runs the vitest suite and a smoke test against the built package
 
+the seeded structural-model test checks two seeds with 40 edits each by default. run the full six-seed, 1,800-edit sweep with the collaboration stress flag; each seed runs as a separate test with the default timeout
+
+```sh
+COLLAB_STRESS=1 bun run test src/charIds.test.ts
+```
+
 ## more
 
 - [how it works](docs/design.md): the trees, the reverse index, the buffer log, anchors, compaction, line endings
