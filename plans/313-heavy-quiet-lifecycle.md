@@ -80,3 +80,20 @@ Current owner: [scripts/heavy/quiet.test.ts](https://github.com/ShaulLavo/fregat
 Distinct retained failures include a successor that missed its 5-second started poll, systemctl stop exit 5, launcher exit 1 transport failure, slice-property transport failure and an empty final watchdog query. PRs #707, #806 and #897 retain more diagnostics, without identifying one cause or changing original expectations. Capture manager transport status/stderr, launcher/child lifecycle and successor admission independently. Keep watchdog failure facts and deadlines; passing controls do not turn these different failures into one fixed lifecycle bug.
 
 - [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+## Stale-claim follow-up, 2026-10-08
+
+Status: Approved. [Plan 336's second-pass close-out](issue-closeout-2026-10.md#second-pass-stale-claims) releases the inactive #711 claim. Plan 312's private-namespace and peer-process safety rules remain binding.
+
+### Issue 711
+
+Source: [#711](https://github.com/ShaulLavo/fregat/issues/711). Current owners are `scripts/heavy/quiet-concurrency.test.ts`, `quiet-receipts.ts`, and the primary/shim/watchdog/owned-slice lifecycle.
+
+Repeated Ubuntu cancellation failures expected exit 143 and received 137. The latest claimed packet is main `87ac27a147dd99e0fe13b575d3211dc4bce4b5ae` in [job 112065184051](https://github.com/ShaulLavo/fregat/actions/runs/37400110592/job/112065184051). It records SIGTERM sent=true at 2026-10-06 01:42:51.049 UTC, then exit 137 while an independent late server remains alive. The systemd 255.4-1ubuntu8.17 journal records owned-slice TERM and roughly one second later KILL/cleanup. This is observed ordering, not a proven explanation of the 137 outcome. Earlier diagnostic TERM/expiry controls passed. Private forced SIGKILL calibrated a genuine 137 receipt but does not prove the natural CI cause.
+
+The abandoned `docwave/quiet711-main87` source head `1d05e45826b8f551ccbc26ec22991f33ff994f31`, published head `8d9cb144eabc63af136ba866f59960b653478877`, preserved a bounded failure-before-cleanup observer. PR #847 closed unmerged, but [PR #854](https://github.com/ShaulLavo/fregat/pull/854), squash `1fb0898d3f5921785716449d6d848920dfe6c306`, shipped the same three quiet test/helper files byte-for-byte. Main retains primary status, shim phase, direct signal attempts, watchdog identities and separate cleanup snapshots. The corrected IO accounting charges refused reads to the shared 64 KiB budget. The source packet reports seven observer controls and five malformed/oversized IO regressions passing. These are observer qualification, not a runner fix.
+
+Earlier abandoned `docwave/quiet-cancel`, head `9b8fa64fae5f6e33aeb985e351c4254a1f2f7e8d`, and `fix/night-quiet-cancel-711`, head `d611711d1c571b8a85f909c059a493ee615294df`, shipped in PRs #714 and #775. Preserve their historical failures and calibration limits. All original 143, timing, overlap, slice and cleanup assertions and production runner behavior remain.
+
+- [ ] Inspect the next bounded natural cancellation failure's immutable pre-cleanup observer packet and later cleanup separately. Compare actual primary/shim/watchdog identities, TERM return, manager record and escalation timestamps in the original private namespace. Calibrate on a known-good cancellation without touching peer leases, the installed manager or owner settings.
+- [ ] Reproduce a causal lifecycle defect before changing production. Preserve exit 143, grace/hold/memory/retention budgets, independent server overlap and complete owned cleanup. Do not translate exit 137, increase grace, restart the global manager or retry the failed CI unchanged.

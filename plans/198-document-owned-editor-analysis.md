@@ -419,3 +419,20 @@ Current owner: [apps/web/retention-acceptance.vitest.config.ts](https://github.c
 Original PR #795 bootstrap route.fetch ECONNRESET remains unexplained. PR #800 retained error/artifact/cleanup facts; later stale-idle-connection reuse evidence applies to its own packet. PRs #897/#906 were diagnostics. PR #928 framing experimentation closed unmerged. PR #939 replaced relay with native route continuation and repaired the current first-reload deadline, with natural CI 37709556303 passing five reload and three layout cases at unchanged 30 seconds, first case 23,006 ms. Preserve original and later failures separately. Capture native network failure and pending phase on the same navigation clock; do not sum before/after navigation clocks or claim the original reset was solved.
 
 - [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+## Stale-claim follow-up, 2026-10-08
+
+Status: Approved. [Plan 336's second-pass close-out](issue-closeout-2026-10.md#second-pass-stale-claims) releases the inactive #805 claim and retains its unresolved acceptance work here.
+
+### Issue 805
+
+Source: [#805](https://github.com/ShaulLavo/fregat/issues/805). Current owners are `apps/web/src/features/editor/tests/syntax-settings.browser.tsx`, syntax configuration and retained analysis attachment, plus the generic and serial syntax-settings browser configs.
+
+Keep two observations separate. Initial Tree readiness remained LOADING on main `fa1b6cfc359c359e0a60d5e57f6e8e4b759c84ef`. Later, the first ready poll saw PLAIN on PR #769 head `1ae7c84b81de2ed39c590b2bc3ccea606ad5b7da`, with confirmed, projected and mirrored highlighting false, no owner intents and matching canonical/native revision zero. The later PLAIN failure was causally reproduced through concurrent browser files sharing the real settings server. Configuration authority was not captured for the original LOADING failure, whose cause remains unknown.
+
+The abandoned `docwave/syntax-settings-isolation805` source head `8793bee73f430e9266bd97c5a3735dd86463d364`, published head `7a9166927bd53c6a74dcee83471a0a842e7ed362`, shipped in [PR #825](https://github.com/ShaulLavo/fregat/pull/825), squash `1dbf9ee44aa3aedc8d6469e515339bc2f6793541`. Main excludes the two settings-writer files from generic Browser and runs them serially with a fresh server lifecycle. Discovery covered the original 42 files exactly as 40 generic plus two serial. The original causal pair passed 2/2 with native readiness, paint and syntax authority true. These facts establish the PLAIN repair only.
+
+The earlier abandoned diagnostic branch `docwave/main-fa1-syntax198`, head `f957ba0e51c7961aa6fb92325a7669b4e9d2a015`, shipped initial-readiness observations in [PR #807](https://github.com/ShaulLavo/fregat/pull/807). `docwave/syntax-setup-805-plain`, head `1ae7c84b81de2ed39c590b2bc3ccea606ad5b7da`, preserves the later failed source. Reuse the existing caller observations, not a new readiness-forcing guard.
+
+- [ ] Capture a bounded natural LOADING recurrence with server/settings revision, confirmed/projected/mirrored syntax authority, document/native revision, analysis identity, worker request/result and accepted/painted tokens. First prove that the observer sees a known-good ready attachment. Distinguish configuration-disabled PLAIN from enabled-but-pending LOADING.
+- [ ] Fix only the demonstrated analysis, attachment or fixture cause. Preserve native gates, first-ready and paint assertions, original deadlines and generic browser parallelism. Retain the two-writer serial coverage and each original case action. A passing serial pair does not explain the historical LOADING failure.

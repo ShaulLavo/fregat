@@ -117,3 +117,57 @@ crash or product-reproduction loops. Existing controlled reproductions are attri
 issue comments and merged repairs. Dependency installation, documentation checks and normal
 commit hooks are this lane's verification. Closing unconfirmed records preserves their uncertainty
 and schedules the missing cause capture.
+
+## Second pass: stale claims
+
+Status: Approved. Reviewed on 2026-10-08 against main `13f34124df544f726a0482e7682437e3b09b5226`, after [PR #959](https://github.com/ShaulLavo/fregat/pull/959). The initial inventory above records the first pass. This section changes eight previously skipped decisions. Leave #654, #850, #893 and #940 with their active owners.
+
+### Ownership evidence
+
+The checks ran at 2026-10-08 06:50 UTC, before releasing any claim. `gh pr list --state open --limit 100 --json number,title,headRefName,body` returned five open PRs, none owning these eight issues. Per-issue all-state PR lookup confirmed that the earlier linked PRs had merged or closed. Fetched local and remote branch heads were inspected with `git for-each-ref`, and registered trees with `git worktree list --porcelain` and `git log --since='24 hours ago' HEAD`. None of their associated branches or worktrees had a commit in the preceding 24 hours.
+
+`ps -eo pid,lstart,args` found no process whose command line named an associated worktree. Direct `/proc/*/cwd` readback also found no process working in those trees. The original #563 and #574 worktrees were already absent. Existing trees were clean except #810's Mermaid observation edit, whose mtime was 2026-10-05 17:29:56 UTC. That dirty file and all peer trees, branches and evidence remain untouched. A stale claim releases ownership. It supplies no failure or fix evidence.
+
+Dates below are UTC. Branch heads identify the continuation work, including remote heads newer than their original source trees.
+
+| Issue                                                  | Last issue activity before review | Latest associated branch commit | Branch and head                                                                            | Claim release                                                                      |
+| ------------------------------------------------------ | --------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| [#563](https://github.com/ShaulLavo/fregat/issues/563) | 2026-10-06 09:50:08               | 2026-10-03 18:07:41             | `backlog/503-20261003-131439`, `8a7635ca8ad570ae890087fd4201ddb4c1464a49`                  | [Released](https://github.com/ShaulLavo/fregat/issues/563#issuecomment-6054242899) |
+| [#574](https://github.com/ShaulLavo/fregat/issues/574) | 2026-10-03 22:27:29               | 2026-10-03 22:17:51             | `backlog/574-20261003`, `4a292fcb92cc352a578bf88d1ad34b0db0a92e19`                         | [Released](https://github.com/ShaulLavo/fregat/issues/574#issuecomment-6054243148) |
+| [#665](https://github.com/ShaulLavo/fregat/issues/665) | 2026-10-04 19:36:03               | 2026-10-04 19:16:47             | `docwave/presets665`, `83c2b949012b39d8030f916faecedc79bd448b5c`                           | [Released](https://github.com/ShaulLavo/fregat/issues/665#issuecomment-6054243439) |
+| [#711](https://github.com/ShaulLavo/fregat/issues/711) | 2026-10-06 01:54:12               | 2026-10-06 03:54:40             | `origin/docwave/quiet711-main87`, `8d9cb144eabc63af136ba866f59960b653478877`               | [Released](https://github.com/ShaulLavo/fregat/issues/711#issuecomment-6054243735) |
+| [#805](https://github.com/ShaulLavo/fregat/issues/805) | 2026-10-05 20:29:51               | 2026-10-05 22:32:48             | `origin/docwave/syntax-settings-isolation805`, `7a9166927bd53c6a74dcee83471a0a842e7ed362`  | [Released](https://github.com/ShaulLavo/fregat/issues/805#issuecomment-6054244025) |
+| [#810](https://github.com/ShaulLavo/fregat/issues/810) | 2026-10-05 17:34:59               | 2026-10-05 16:54:03             | `docwave/main603-mermaid810`, `60313f9eae767694326b9b2e00bd398c549040af`                   | [Released](https://github.com/ShaulLavo/fregat/issues/810#issuecomment-6054244378) |
+| [#826](https://github.com/ShaulLavo/fregat/issues/826) | 2026-10-05 20:58:17               | 2026-10-05 23:43:55             | `origin/docwave/ci-aggregate-verdict826`, `2fa44ffa1accb7d65a6f2e6d989f8eade8c81000`       | [Released](https://github.com/ShaulLavo/fregat/issues/826#issuecomment-6054244980) |
+| [#833](https://github.com/ShaulLavo/fregat/issues/833) | 2026-10-05 22:49:58               | 2026-10-06 00:24:25             | `origin/docwave/browser-doctor-diagnostics200`, `eab0a406946d465371ed2208e361d422aca04e92` | [Released](https://github.com/ShaulLavo/fregat/issues/833#issuecomment-6054245283) |
+
+Process checks covered `docwave-presets665`, both quiet711 source and earlier quiet-cancel trees, `night-quiet-cancel-711`, `docwave-main-fa1-syntax198`, `docwave-syntax-setup-805-plain`, `docwave-syntax-settings-isolation805`, `docwave-main603-mermaid810`, both ci826 source/metadata trees and both browser-doctor source/current trees under the platform worktree group. The missing original backlog trees were checked separately. Earlier local and remote heads were also older than 24 hours. No live owner was found among the eight candidates.
+
+### Second-pass decisions
+
+| Issue | Decision                | Current evidence or owning plan                                                                                                                                                                     |
+| ----- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #563  | e: added to owning plan | [Plan 190, issue 563](190-faster-ci.md#issue-563). Real WRITE_CONTENDED recurrence, cause unknown. Preserve successful loaded controls and capture missing attempt/revision facts.                  |
+| #574  | e: added to owning plan | [Plan 190, issue 574](190-faster-ci.md#issue-574). Original timeout remains unexplained after 20 selected Ubuntu controls. Recover the diagnostic checkpoints without the dispatch-only workflow.   |
+| #665  | e: added to owning plan | [Plan 190, issue 665](190-faster-ci.md#issue-665). PR #698 reduced JSDoc AST work, while the full authority graph and duplicate compiler construction remain.                                       |
+| #711  | e: added to owning plan | [Plan 313, issue 711](313-heavy-quiet-lifecycle.md#issue-711). The closed PR #847 observer shipped through #854 with identical source. Preserve pre-cleanup facts and investigate natural exit 137. |
+| #805  | e: added to owning plan | [Plan 198, issue 805](198-document-owned-editor-analysis.md#issue-805). PR #825 fixes the later PLAIN shared-settings failure. The original LOADING case remains unconfirmed.                       |
+| #810  | e: added to owning plan | [Plan 190, issue 810](190-faster-ci.md#issue-810). Preserve the incomplete FontFace diagnostic sketch and capture actual held-request timing before changing behavior.                              |
+| #826  | a: already fixed        | [PR #830](https://github.com/ShaulLavo/fregat/pull/830), squash `de5caa55b8e8740173bfb81a44d15d9a84701fd8`. Current main checks both needs and effective required-job outcomes.                     |
+| #833  | e: added to owning plan | [Plan 190, issue 833](190-faster-ci.md#issue-833). PR #836 shipped the failure journal, while the original healthy-CLI timeout cause remains unknown.                                               |
+
+No obsolete record or category-d small safe fix was established. Seven closures move bounded work into existing plans. They do not claim those failures are fixed. The useful source, measurements and limits from every abandoned branch are retained in the linked sections.
+
+### Issue 826 fixed evidence
+
+The original [run 37365245563](https://github.com/ShaulLavo/fregat/actions/runs/37365245563) reported aggregate success with eleven required jobs cancelled. The earlier expression produced `FAILED: false`. Historical raw Fregat `needs` inputs were not captured, so the precise expression discrepancy remains unknown.
+
+The abandoned `docwave/ci-aggregate-verdict826` source head `2156f02f0fb2e4af66fc619979af1b77d1146b9d`, published head `2fa44ffa1accb7d65a6f2e6d989f8eade8c81000`, shipped in PR #830. Current `.github/workflows/ci.yml` fetches run identity and `filter=latest` jobs once, then invokes `scripts/ci-verdict.ts`. The helper validates the declared required graph, matrix shards, reusable children and run/source identity. It rejects missing, cancelled, unstarted, nonterminal and unknown outcomes, and permits skips only through the existing source conditions. Legitimate earlier-attempt success can remain valid during an aggregate-only retry. This is the required behavior repair, independent of the unknown historical projection cause.
+
+The branch's 37 portable controls and actual API packets covered eleven-cancelled-job rejection and a legitimate aggregate-only retry. The packets used explicitly synthetic benign parent needs, not reconstructed historical inputs. The current narrow verdict controls are checked in this documentation lane before closure. No Actions retry or replay of healthy suites is needed.
+
+### Delivery
+
+All second-pass plan sections and this appended record belong to one documentation PR. Close the eight issues only after that PR opens, with the exact plan section or shipped repair link. Remove `in progress` from every closed issue. Leave #654, #850, #893 and #940 untouched. Verification checks documentation format, plan inventory, local links and the current narrow aggregate verdict controls. This lane changes no product source, versions, settings or installed runtime.
+
+Second-pass checks passed: `bun run plans:check` validated 220 indexed documents and 63 Editor backlog entries. The added sections' ten local links and all full commit identities resolve. `bun x oxfmt --check` passed on the four changed files, and `git diff --check` passed. `bun --bun vitest run --config vitest.scripts.config.mjs scripts/ci-verdict.test.ts` passed all 37 controls through the required heavy runner. A second direct command-line and cwd check found no process in any of the twelve retained peer worktrees.
