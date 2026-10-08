@@ -10,7 +10,6 @@ import {
   acquireDocumentMutationLease,
   releaseDocumentMutationLease,
   prepareDocumentTransaction,
-  commitPreparedDocumentTransaction,
 } from '../../editor/src/documentSession'
 import { CollaborationDocument } from '../src/document'
 import { createCollaborationPlugin } from '../src/plugin'
@@ -166,13 +165,9 @@ test.each([
 ])('prepared edit cannot silently bypass author: %j', (edit) => {
   room = new EditorRoom(2, 'seed')
   const session = room.editors[0]!.getBufferSession()!
-  const prepared = prepareDocumentTransaction(session.buffer, [edit], 1, null)
-  const result = commitPreparedDocumentTransaction(
-    { buffer: session.buffer, sourceView: session.view },
-    prepared,
-    { history: { kind: 'record' }, metadata: {} } as any,
+  expect(() => prepareDocumentTransaction(session.buffer, [edit], 1, null)).toThrow(
+    'authored documents require local edits or reconcile',
   )
-  expect(result.status).toBe('stale')
   room.flush()
   expect(room.texts()).toEqual(['seed', 'seed'])
 })
@@ -219,6 +214,7 @@ test('review: session retains one confirmation object per edit, shared by tip hi
     JSON.stringify({ edits: 100, tips: histories.size, retainedRecords: objects.size }),
   )
   expect(objects.size).toBeLessThanOrEqual(100)
+  expect([...histories.values()].reduce((sum, history) => sum + history.length, 0)).toBeLessThanOrEqual(100)
 })
 
 test('failed competing binding leaves the existing author and shared buffer unchanged', () => {
