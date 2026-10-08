@@ -26,6 +26,11 @@ export default defineConfig({
             headless: true,
             viewport: { width: 900, height: 650 },
             provider: playwright(),
+            commands: {
+              presenceMotion: async ({ page }, reduced: boolean) => {
+                await page.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' })
+              },
+            },
             instances: [{ browser: 'chromium' }],
           },
         },

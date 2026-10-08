@@ -7,11 +7,13 @@ import {
 } from '../src/presence'
 import { remoteState, ReferenceResolver } from './presence-fixtures'
 import { Session } from '../src/session'
+import { Network } from './network'
 import type { Message } from '../src/protocol'
 import { ToyEngine, genesis, type ToyEdit } from './engine'
 
 function wire() {
   let observer: PresenceObserver | undefined
+  let clock: ((now: number) => void) | undefined
   const sendPresence = vi.fn<(payload: PresenceMessage) => void>()
   const subscribePresence = vi.fn((next: PresenceObserver) => {
     observer = next
@@ -19,8 +21,23 @@ function wire() {
       observer = undefined
     }
   })
+  const channel = {
+    presenceTime: 0,
+    sendPresence,
+    subscribePresence,
+    subscribePresenceClock: vi.fn((next: (now: number) => void) => {
+      clock = next
+      return () => {
+        clock = undefined
+      }
+    }),
+  }
   return {
-    channel: { sendPresence, subscribePresence },
+    channel,
+    tick(now: number) {
+      channel.presenceTime = now
+      clock?.(now)
+    },
     get observer() {
       return observer
     },
@@ -38,6 +55,7 @@ test('unattached awareness creates no timer, subscription or transport work', ()
   presence.setLocalState(state)
   presence.tick(60_000)
   expect(channel.channel.subscribePresence).not.toHaveBeenCalled()
+  expect(channel.channel.subscribePresenceClock).not.toHaveBeenCalled()
   expect(channel.channel.sendPresence).not.toHaveBeenCalled()
   expect(channel.observer).toBeUndefined()
 })
@@ -49,9 +67,9 @@ test('renews every 15 seconds through the session clock and sends null on final 
   const second = presence.attach()
   presence.setLocalState(remoteState())
   const first = channel.channel.sendPresence.mock.lastCall![0]
-  channel.observer!.tick(14_999)
+  channel.tick(14_999)
   expect(channel.channel.sendPresence).toHaveBeenCalledTimes(1)
-  channel.observer!.tick(15_000)
+  channel.tick(15_000)
   expect(channel.channel.sendPresence).toHaveBeenCalledTimes(2)
   expect(channel.channel.sendPresence.mock.lastCall![0].clock).toBe(first.clock + 1)
   detach()
@@ -275,4 +293,226 @@ test('gap bias chooses either side of concurrent insertions', () => {
   })
   expect(resolver.resolveGap(gap)).toBe(1)
   expect(resolver.resolveGap({ ...gap, bias: 'right' })).toBe(2)
+})
+
+test('coalesces local bursts at 20 sends per second and flushes the final state', () => {
+  const channel = wire()
+  const presence = new Presence('local', 'document', channel.channel)
+  const detach = presence.attach()
+  for (let clock = 1; clock <= 10_000; clock++)
+    presence.setLocalState({ ...remoteState(), displayName: `Latest ${clock}` })
+  expect(channel.channel.sendPresence).toHaveBeenCalledTimes(1)
+  presence.tick(49)
+  expect(channel.channel.sendPresence).toHaveBeenCalledTimes(1)
+  presence.tick(50)
+  expect(channel.channel.sendPresence).toHaveBeenCalledTimes(2)
+  expect(channel.channel.sendPresence.mock.lastCall![0].state?.displayName).toBe('Latest 10000')
+  presence.setLocalState({ ...remoteState(), displayName: 'Cancelled' })
+  detach()
+  const calls = channel.channel.sendPresence.mock.calls.length
+  presence.tick(100)
+  expect(channel.channel.sendPresence).toHaveBeenCalledTimes(calls)
+  expect(channel.channel.sendPresence.mock.lastCall![0].state).toBeNull()
+})
+
+test('coalesces each inbound peer to latest state, preserves clocks and removes leave promptly', () => {
+  const presence = new Presence('local', 'document')
+  const changed = vi.fn()
+  presence.subscribe(changed)
+  for (let clock = 1; clock <= 10_000; clock++)
+    presence.receive('remote', {
+      clock,
+      state: { ...remoteState('remote', clock), displayName: `Latest ${clock}` },
+    })
+  expect(changed).toHaveBeenCalledTimes(1)
+  expect(presence.receive('remote', payload('remote', 9_999))).toBe(false)
+  expect(
+    presence.receive('remote', {
+      clock: 20_000,
+      state: { ...remoteState('remote', 20_000), colour: 'bad' },
+    }),
+  ).toBe(false)
+  presence.tick(50)
+  expect(changed).toHaveBeenCalledTimes(2)
+  expect(presence.states[0]?.displayName).toBe('Latest 10000')
+  presence.receive('remote', payload('remote', 10_001))
+  presence.receive('remote', { clock: 10_001, state: null })
+  expect(presence.states).toHaveLength(0)
+  presence.tick(100)
+  expect(presence.states).toHaveLength(0)
+})
+
+test('completed local host handoff clears remote awareness on the readable final document', () => {
+  const network = new Network(90001, 4)
+  network.stabilize()
+  const host = network.nodes.findIndex((node) => node.session.isHost)
+  const successor = (host + 1) % network.nodes.length
+  const departed = network.nodes[host]!
+  const remote = network.nodes[successor]!
+  const presence = new Presence(departed.session.peer, 'document', departed.session)
+  const other = new Presence(remote.session.peer, 'document', remote.session)
+  const detach = presence.attach()
+  const tick = vi.spyOn(presence, 'tick')
+  const detachOther = other.attach()
+  other.setLocalState(remoteState())
+  network.advance(30)
+  expect(presence.states).toHaveLength(1)
+  const finalTip = departed.engine.checkpoint()
+  departed.session.leave(remote.session.peer)
+  network.advance(100)
+  expect(departed.session.status).toBe('left')
+  expect(departed.engine.checkpoint()).toEqual(finalTip)
+  expect(presence.states).toHaveLength(0)
+  tick.mockClear()
+  network.advance(4_000)
+  expect(presence.states).toHaveLength(0)
+  expect(tick).not.toHaveBeenCalled()
+  detach()
+  detachOther()
+})
+
+test('real Session-backed awareness has no empty, post-expiry or detached clock callbacks', () => {
+  const session = new Session({
+    peer: 'local',
+    room: 'room',
+    document: 'document',
+    genesis,
+    engine: new ToyEngine(),
+    send() {},
+    pulseInterval: 100,
+    suspicionTimeout: 300,
+    dependencyTimeout: 500,
+    historyChunkRecords: 10,
+  })
+  session.connect('remote')
+  const presence = new Presence('local', 'document', session)
+  const tick = vi.spyOn(presence, 'tick')
+  const receive = (clock: number) =>
+    session.receive({
+      version: 1,
+      room: 'room',
+      document: 'document',
+      sender: 'remote',
+      epoch: 'epoch',
+      messageId: clock,
+      type: 'PRESENCE',
+      payload: payload('remote', clock),
+    })
+  const detach = presence.attach()
+  for (let now = 1; now <= 1_000; now++) session.tick(now)
+  expect(tick).not.toHaveBeenCalled()
+  receive(1)
+  expect(presence.states).toHaveLength(1)
+  session.tick(31_000)
+  expect(presence.states).toHaveLength(0)
+  tick.mockClear()
+  for (let now = 31_001; now <= 32_000; now++) session.tick(now)
+  expect(tick).not.toHaveBeenCalled()
+  presence.setLocalState(remoteState())
+  session.tick(32_001)
+  expect(tick).toHaveBeenCalledTimes(1)
+  presence.leave()
+  tick.mockClear()
+  session.tick(32_002)
+  expect(tick).not.toHaveBeenCalled()
+  receive(2)
+  expect(presence.states).toHaveLength(1)
+  detach()
+  tick.mockClear()
+  for (let now = 32_003; now <= 33_000; now++) session.tick(now)
+  expect(tick).not.toHaveBeenCalled()
+})
+
+test('expires retained tombstone clocks lazily so idle rooms admit fresh peer incarnations', () => {
+  const presence = new Presence('local', 'document')
+  for (let peer = 0; peer < 256; peer++) presence.receive(`peer-${peer}`, { clock: 3, state: null })
+  expect(presence.receive('overflow', payload('overflow'))).toBe(false)
+  presence.tick(60_000)
+  expect(presence.receive('overflow', payload('overflow'))).toBe(true)
+  expect(presence.receive('peer-0', payload('peer-0', 1))).toBe(true)
+})
+
+test('disposal discards queued incoming and outgoing states without deferred callbacks', () => {
+  const channel = wire()
+  const presence = new Presence('local', 'document', channel.channel)
+  presence.attach()
+  const changed = vi.fn()
+  presence.subscribe(changed)
+  presence.setLocalState(remoteState())
+  presence.setLocalState({ ...remoteState(), displayName: 'Queued local' })
+  presence.receive('remote', payload('remote', 1))
+  presence.receive('remote', payload('remote', 2))
+  presence.dispose()
+  const notifications = changed.mock.calls.length
+  const sends = channel.channel.sendPresence.mock.calls.length
+  presence.tick(60_000)
+  expect(changed).toHaveBeenCalledTimes(notifications)
+  expect(channel.channel.sendPresence).toHaveBeenCalledTimes(sends)
+  expect(channel.channel.sendPresence.mock.lastCall![0].state).toBeNull()
+  expect(presence.states).toHaveLength(0)
+})
+
+test('final detach cancels the pending inbound latest state and stops notifications', () => {
+  const channel = wire()
+  const presence = new Presence('local', 'document', channel.channel)
+  const detach = presence.attach()
+  const changed = vi.fn()
+  presence.subscribe(changed)
+  presence.receive('remote', payload('remote', 1))
+  presence.receive('remote', {
+    clock: 2,
+    state: { ...remoteState('remote', 2), displayName: 'Pending' },
+  })
+  detach()
+  expect(presence.states).toHaveLength(0)
+  const notifications = changed.mock.calls.length
+  presence.tick(50)
+  expect(presence.states).toHaveLength(0)
+  expect(changed).toHaveBeenCalledTimes(notifications)
+})
+
+test('repeated leave and reappearance cannot bypass outgoing burst limits', () => {
+  const channel = wire()
+  const presence = new Presence('local', 'document', channel.channel)
+  const detach = presence.attach()
+  for (let i = 0; i < 10_000; i++) {
+    presence.setLocalState(remoteState())
+    presence.setLocalState(null)
+  }
+  presence.setLocalState({ ...remoteState(), displayName: 'Final' })
+  expect(channel.channel.sendPresence).toHaveBeenCalledTimes(2)
+  presence.tick(50)
+  expect(channel.channel.sendPresence).toHaveBeenCalledTimes(3)
+  expect(channel.channel.sendPresence.mock.lastCall![0].state?.displayName).toBe('Final')
+  detach()
+})
+
+test('prompt null removal cannot be used to bypass a peer inbound cadence', () => {
+  const presence = new Presence('local', 'document')
+  const changed = vi.fn()
+  presence.subscribe(changed)
+  for (let clock = 1; clock <= 10_000; clock++) {
+    presence.receive('remote', payload('remote', clock))
+    presence.receive('remote', { clock, state: null })
+  }
+  presence.receive('remote', payload('remote', 10_001))
+  expect(changed).toHaveBeenCalledTimes(2)
+  presence.tick(50)
+  expect(changed).toHaveBeenCalledTimes(3)
+  expect(presence.states[0]?.presenceClock).toBe(10_001)
+})
+
+test('attachment churn preserves the positive-state sending cadence', () => {
+  const channel = wire()
+  const presence = new Presence('local', 'document', channel.channel)
+  for (let i = 0; i < 100; i++) {
+    presence.setLocalState(remoteState())
+    presence.attach()()
+  }
+  expect(channel.channel.sendPresence.mock.calls.filter(([packet]) => packet.state)).toHaveLength(1)
+  presence.setLocalState(remoteState())
+  const detach = presence.attach()
+  channel.tick(50)
+  expect(channel.channel.sendPresence.mock.calls.filter(([packet]) => packet.state)).toHaveLength(2)
+  detach()
 })

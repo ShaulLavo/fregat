@@ -8,6 +8,13 @@
 .editor-remote-caret {
   position: absolute;
   width: 2px;
+  pointer-events: auto;
+}
+
+.editor-remote-caret::after {
+  content: '';
+  position: absolute;
+  inset: 0 -3px;
 }
 
 .editor-remote-name {
@@ -24,4 +31,27 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition-property: opacity;
+  transition-duration: 0s;
+  transition-timing-function: var(--ease-out-strong, cubic-bezier(0.23, 1, 0.32, 1));
+}
+
+.editor-remote-caret[data-idle='true'] .editor-remote-name {
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: var(--duration-exit, 150ms);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .editor-remote-caret:hover .editor-remote-name {
+    opacity: 1;
+    pointer-events: auto;
+    transition-duration: 0s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-remote-caret[data-idle='true'] .editor-remote-name {
+    transition-duration: 0s;
+  }
 }

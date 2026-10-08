@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest'
-import { page } from 'vitest/browser'
+import { page, commands } from 'vitest/browser'
 import { Editor } from '@singapore-editor/core/editor'
 import type { EditorPlugin } from '@singapore-editor/core/extensions'
 import { Presence } from '../src/presence'
@@ -7,11 +7,18 @@ import { createPresencePlugin } from '../src/presence-plugin'
 import { ReferenceResolver, remoteState } from './presence-fixtures'
 import '@singapore-editor/core/style.css'
 
+declare module 'vitest/browser' {
+  interface BrowserCommands {
+    presenceMotion(reduced: boolean): Promise<void>
+  }
+}
+
 const editors: Editor[] = []
 const hosts: HTMLElement[] = []
 afterEach(() => {
   for (const editor of editors.splice(0)) editor.dispose()
   for (const host of hosts.splice(0)) host.remove()
+  vi.restoreAllMocks()
 })
 
 function mount(text: string, wordWrap = true, extra: readonly EditorPlugin[] = []) {
@@ -205,3 +212,86 @@ test.each([0, 100, 1000])(
     expect(host.querySelector('.editor-remote-presence')).toBeNull()
   },
 )
+
+test('idle labels hide after two seconds, remain hidden on renewal and reveal on caret hover', async () => {
+  const { host, presence, resolver } = mount(TEXT)
+  show(presence, resolver, 'Ada', 'ada', 25, 120)
+  await expect.poll(() => carets(host).length).toBe(1)
+  const label = () => host.querySelector<HTMLElement>('.editor-remote-name')!
+  expect(getComputedStyle(label()).opacity).toBe('1')
+  await new Promise((resolve) => setTimeout(resolve, 2_250))
+  expect(getComputedStyle(label()).opacity).toBe('0')
+  expect(getComputedStyle(label()).transitionDuration).not.toBe('0s')
+  expect(getComputedStyle(label()).transitionProperty).toBe('opacity')
+  expect(carets(host)).toHaveLength(1)
+  await page.screenshot({ element: host, path: '../.vitest/evidence/presence-idle.png' })
+  presence.tick(15_000)
+  show(presence, resolver, 'Ada', 'ada', 25, 120, '#3775c5', 2)
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  expect(getComputedStyle(label()).opacity).toBe('0')
+  await page.elementLocator(carets(host)[0]!).hover()
+  await expect.poll(() => getComputedStyle(label()).opacity).toBe('1')
+  await page.screenshot({ element: host, path: '../.vitest/evidence/presence-hover.png' })
+  await page.getByText('Shared document', { exact: true }).hover()
+  presence.tick(15_050)
+  show(presence, resolver, 'Ada', 'ada', 25, 130, '#3775c5', 3)
+  await expect.poll(() => getComputedStyle(label()).opacity).toBe('1')
+  await new Promise((resolve) => setTimeout(resolve, 2_250))
+  expect(getComputedStyle(label()).opacity).toBe('0')
+  presence.tick(15_100)
+  show(presence, resolver, 'Ada', 'ada', 35, 130, '#3775c5', 4)
+  await expect.poll(() => getComputedStyle(label()).opacity).toBe('1')
+}, 10_000)
+
+test('presence bursts request at most one overlay repaint per animation frame', async () => {
+  const { host, presence, resolver } = mount(TEXT)
+  show(presence, resolver, 'Ada', 'ada', 25, 120)
+  await expect.poll(() => carets(host).length).toBe(1)
+  const root = host.querySelector('.editor-remote-presence')!
+  const replace = vi.spyOn(root, 'replaceChildren')
+  for (let clock = 2; clock <= 251; clock++) {
+    presence.tick(clock * 50)
+    show(presence, resolver, 'Ada', 'ada', 25, 120 + (clock % 10), '#3775c5', clock)
+  }
+  expect(replace).not.toHaveBeenCalled()
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  expect(replace.mock.calls.length).toBeLessThanOrEqual(1)
+  expect(presence.states[0]!.presenceClock).toBe(251)
+})
+
+test('reduced motion hides idle labels instantly while the caret stays visible', async () => {
+  await commands.presenceMotion(true)
+  try {
+    const { host, presence, resolver } = mount(TEXT)
+    show(presence, resolver, 'Ada', 'ada', 25, 120)
+    await expect.poll(() => carets(host).length).toBe(1)
+    const label = () => host.querySelector<HTMLElement>('.editor-remote-name')!
+    expect(getComputedStyle(label()).transitionDuration).toBe('0s')
+    await new Promise((resolve) => setTimeout(resolve, 2_010))
+    expect(label().isConnected).toBe(true)
+    expect(getComputedStyle(label()).opacity).toBe('0')
+    expect(getComputedStyle(label()).transitionDuration).toBe('0s')
+    expect(carets(host)).toHaveLength(1)
+    await page.screenshot({
+      element: host,
+      path: '../.vitest/evidence/presence-reduced-motion.png',
+    })
+  } finally {
+    await commands.presenceMotion(false)
+  }
+})
+
+test('disposing a view cancels pending presence frames and label deadlines', async () => {
+  const { host, editor, presence, resolver } = mount(TEXT)
+  show(presence, resolver, 'Ada', 'ada', 25, 120)
+  await expect.poll(() => carets(host).length).toBe(1)
+  const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame')
+  const cancelDeadline = vi.spyOn(window, 'clearTimeout')
+  presence.tick(50)
+  show(presence, resolver, 'Ada', 'ada', 25, 130, '#3775c5', 2)
+  editor.dispose()
+  expect(cancelFrame).toHaveBeenCalled()
+  expect(cancelDeadline).toHaveBeenCalled()
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  expect(host.querySelector('.editor-remote-presence')).toBeNull()
+})

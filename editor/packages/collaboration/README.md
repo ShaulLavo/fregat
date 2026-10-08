@@ -93,9 +93,11 @@ the later transport must also enforce its byte limit.
 `new Presence(peerSessionId, documentId, session)` keeps per-peer clocks and bounded
 remote state. The session supplies authenticated senders and its caller-driven clock.
 Presence uses `PRESENCE` messages and leaves document history unchanged. Each active
-editor attachment subscribes to that clock. The final attachment sends a null local
-state, unsubscribes, and hides remote state while retaining clocks. `dispose()` releases
-all state when the room closes. Presence creates no timers.
+editor attachment receives packets and departure events. Clock participation starts
+only while local renewal, a queued update or remote expiry needs work. An empty attached
+consumer receives no clock callbacks. The final attachment sends null for advertised
+local state, cancels queued work, unsubscribes and hides remote state. `dispose()` releases
+all state when the room closes. Runtime-neutral presence creates no timers.
 
 `setLocalState` accepts an epoch, a confirmed tip, a display name, a six-digit hex
 colour, a focused view ID or `null`, and selections. Each selection has an `anchor`
@@ -105,9 +107,21 @@ Deleted characters keep their retained position. A left-biased gap stays after i
 left character; a right-biased gap stays before its right character.
 
 Local state renews every 15 seconds. Remote state expires after 30 seconds of silence.
-Newer clocks win. Equal-clock null state removes a peer. Expiry retains clock metadata,
-so delayed packets cannot restore expired state. The room retains at most 256 peer
-incarnations until `dispose()`. Each state has at most 32 selections,
+Outgoing updates and each peer's incoming visible updates have a 50 ms cadence. A burst
+keeps one latest validated state per peer and flushes its final selection on the next
+eligible clock tick. Incoming fields are validated and copied for every decoded packet;
+transport byte limits and ingress backpressure still belong to the integration. Null
+state and authenticated leave remove visible state promptly and cancel queued state.
+Repeated leave/reappearance cannot bypass the positive-state cadence. View notifications
+coalesce to one repaint request per animation frame.
+
+Newer clocks win, including queued states. Equal-clock null state removes a peer. Expiry
+retains clock metadata for 60 seconds after removal, bounded to 256 peer incarnations.
+Expired tombstones are pruned on packet receipt or attachment, so an idle room performs
+no clock scans. Replay protection covers that retention window; a transport closes a
+departed incarnation's links, and a restarted peer uses a fresh session ID. Completed
+local departure clears remote awareness from the readable final document. Awareness
+clock dispatch is independent of the session's ordering-host role. Each state has at most 32 selections,
 128 display-name code units, and 256 code units per identifier. Names exclude control
 and formatting characters. Parsing copies validated fields and discards extra fields.
 
@@ -129,8 +143,13 @@ editor.setText(text)
 retains unresolved selections and retries them on content or layout updates. The view
 uses owner-scoped highlights and mounted range geometry, including wrapped rows and
 horizontal scroll. Folded or unmounted carets stay hidden until their text becomes
-visible. Name labels use text content, remain still, and expose the full name through
-`title`. An editor with zero remote peers creates no presence DOM or highlights.
+visible. Names use text content and expose the full name through `title`. A caret or
+selection change reveals the name for two seconds. The idle label fades using the host's
+exit-motion tokens; reduced motion hides it immediately at the deadline. Hovering the
+caret reveals the full label. Renewal-only packets keep idle labels hidden. Carets stay
+visible throughout. One view deadline handles visible active labels, and disposal cancels
+both that deadline and any pending animation frame. An editor with zero remote peers
+creates no presence DOM, highlights or label deadline.
 
 `Presence.attach()` also supports a headless consumer. Its returned function detaches
 that consumer. A transport-neutral consumer can omit `session`, deliver packets with

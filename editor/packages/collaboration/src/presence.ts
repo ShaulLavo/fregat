@@ -22,34 +22,50 @@ export type LocalPresence = Omit<PresenceState, 'peerSessionId' | 'presenceClock
 export type GapResolver = { resolveGap(gap: CharacterGap): number | undefined }
 export type PresenceObserver = {
   receive(peer: string, payload: unknown): void
-  tick(now: number): void
   leave(peer: string): void
+  departed(): void
 }
 export type PresenceChannel = {
+  readonly presenceTime: number
   sendPresence(payload: PresenceMessage): void
   subscribePresence(observer: PresenceObserver): () => void
+  subscribePresenceClock(listener: (now: number) => void): () => void
 }
 
 const RENEW_MS = 15_000
 const EXPIRE_MS = 30_000
+const UPDATE_MS = 50
+const TOMBSTONE_MS = 60_000
 const MAX_PEERS = 256
 const MAX_SELECTIONS = 32
 const MAX_ID = 256
 
-type Entry = { clock: number; updated: number; state: PresenceState | null }
+type Entry = {
+  clock: number
+  updated: number
+  applied: number
+  state: PresenceState | null
+  pending: PresenceState | undefined
+}
 
-/** Session-driven awareness has no scheduler of its own, including while detached. */
+/** Uses the caller's clock only while renewal, queued state or expiry needs work. */
 export class Presence {
   private readonly entries = new Map<string, Entry>()
+  private readonly workPeers = new Set<string>()
   private readonly listeners = new Set<() => void>()
   private remoteStates: readonly PresenceState[] = []
   private disposed = false
+  private departed = false
   private local: PresenceState | null = null
   private clock = 0
   private now = 0
-  private renewed = 0
+  private sent = -Infinity
+  private queued = false
+  private advertised = false
+  private pruneAt = Infinity
   private attachments = 0
   private unsubscribe: (() => void) | undefined
+  private unsubscribeClock: (() => void) | undefined
 
   constructor(
     readonly peerSessionId: string,
@@ -73,12 +89,20 @@ export class Presence {
   attach(): () => void {
     if (this.disposed) throw new TypeError('Presence has been disposed')
     if (++this.attachments === 1 && this.channel) {
+      this.readTime()
+      this.prune()
       this.unsubscribe = this.channel.subscribePresence({
         receive: (peer, payload) => this.receive(peer, payload),
-        tick: (now) => this.tick(now),
         leave: (peer) => this.remove(peer),
+        departed: () => {
+          this.departed = true
+          this.leave()
+          this.clearRemote()
+          this.updateClock()
+        },
       })
-      if (this.local) this.publish(this.local)
+      if (this.local && !this.departed) this.publish(this.local)
+      this.updateClock()
     }
     let attached = true
     return () => {
@@ -92,25 +116,28 @@ export class Presence {
       this.attachments = 0
       this.unsubscribe?.()
       this.unsubscribe = undefined
-      for (const entry of this.entries.values()) entry.state = null
-      this.changed()
+      this.clearRemote()
+      this.updateClock()
     }
   }
 
   dispose(): void {
     if (this.disposed) return
     this.leave()
+    this.disposed = true
     this.unsubscribe?.()
     this.unsubscribe = undefined
     this.attachments = 0
+    this.clearRemote()
     this.entries.clear()
-    this.changed()
     this.listeners.clear()
-    this.disposed = true
+    this.updateClock()
   }
 
   setLocalState(state: LocalPresence | null): void {
     if (this.disposed) throw new TypeError('Presence has been disposed')
+    if (state === null && this.local === null) return
+    this.readTime()
     const clock = this.nextClock()
     const payload = parsePresence(
       {
@@ -128,17 +155,23 @@ export class Presence {
     if (!payload) throw new TypeError('Invalid local presence state')
     this.clock = clock
     this.local = payload.state
-    this.renewed = this.now
-    if (this.attachments > 0) this.channel?.sendPresence(payload)
+    this.queued = false
+    if (this.attachments > 0 && this.channel && !this.departed) {
+      this.queued = this.local !== null
+      if (this.local && this.now - this.sent >= UPDATE_MS) this.sendCurrent()
+      if (!this.local && this.advertised) this.sendCurrent()
+    }
+    this.updateClock()
   }
 
   leave(): void {
-    if (!this.local) return
-    this.setLocalState(null)
+    if (this.local) this.setLocalState(null)
   }
 
   receive(peer: string, input: unknown): boolean {
-    if (this.disposed || peer === this.peerSessionId) return false
+    if (this.disposed || this.departed || peer === this.peerSessionId) return false
+    this.readTime()
+    this.prune()
     const payload = parsePresence(input, peer, this.documentId)
     if (!payload) return false
     const previous = this.entries.get(peer)
@@ -146,27 +179,56 @@ export class Presence {
     if (
       previous &&
       (payload.clock < previous.clock ||
-        (payload.clock === previous.clock && (payload.state !== null || previous.state === null)))
+        (payload.clock === previous.clock &&
+          (payload.state !== null || (previous.state === null && !previous.pending))))
     )
       return false
-    this.entries.set(peer, { clock: payload.clock, updated: this.now, state: payload.state })
+    const entry = previous ?? {
+      clock: payload.clock,
+      updated: this.now,
+      applied: -Infinity,
+      state: null,
+      pending: undefined,
+    }
+    entry.clock = payload.clock
+    entry.updated = this.now
+    this.entries.set(peer, entry)
+    if (payload.state && this.now - entry.applied < UPDATE_MS) {
+      entry.pending = payload.state
+      this.workPeers.add(peer)
+      this.updateClock()
+      return true
+    }
+    const changed = this.apply(peer, entry, payload.state)
     this.refreshStates()
-    if (visibleState(previous?.state ?? null) !== visibleState(payload.state)) this.changed()
+    if (changed) this.changed()
+    this.updateClock()
     return true
   }
 
   tick(now: number): void {
-    if (this.disposed || !Number.isFinite(now) || now < this.now) return
+    if (this.disposed || this.departed || !Number.isFinite(now) || now < this.now) return
     this.now = now
-    if (this.attachments > 0 && this.local && now - this.renewed >= RENEW_MS)
-      this.publish(this.local)
-    let removed = false
-    for (const entry of this.entries.values()) {
-      if (!entry.state || now - entry.updated < EXPIRE_MS) continue
-      entry.state = null
-      removed = true
+    if (this.attachments > 0 && this.local && this.channel) {
+      if (this.queued && now - this.sent >= UPDATE_MS) this.sendCurrent()
+      if (!this.queued && now - this.sent >= RENEW_MS) this.publish(this.local)
     }
-    if (removed) this.changed()
+    let changed = false
+    let applied = false
+    for (const peer of this.workPeers) {
+      const entry = this.entries.get(peer)!
+      if (now - entry.updated >= EXPIRE_MS) {
+        if (this.apply(peer, entry, null)) changed = true
+        applied = true
+        continue
+      }
+      if (!entry.pending || now - entry.applied < UPDATE_MS) continue
+      if (this.apply(peer, entry, entry.pending)) changed = true
+      applied = true
+    }
+    if (applied) this.refreshStates()
+    if (changed) this.changed()
+    this.updateClock()
   }
 
   private remove(peer: string): void {
@@ -175,15 +237,48 @@ export class Presence {
       return
     }
     const entry = this.entries.get(peer)
-    if (!entry?.state) return
-    entry.state = null
-    this.changed()
+    if (!entry || (!entry.state && !entry.pending)) return
+    this.readTime()
+    const changed = this.apply(peer, entry, null)
+    this.refreshStates()
+    if (changed) this.changed()
+    this.updateClock()
+  }
+
+  private apply(peer: string, entry: Entry, state: PresenceState | null): boolean {
+    const changed = visibleState(entry.state) !== visibleState(state)
+    entry.state = state
+    entry.pending = undefined
+    entry.applied = this.now
+    if (state) {
+      this.workPeers.add(peer)
+      return changed
+    }
+    entry.updated = this.now
+    this.pruneAt = Math.min(this.pruneAt, this.now + TOMBSTONE_MS)
+    this.workPeers.delete(peer)
+    return changed
+  }
+
+  private clearRemote(): void {
+    this.readTime()
+    const changed = this.remoteStates.length > 0
+    for (const peer of this.workPeers) this.apply(peer, this.entries.get(peer)!, null)
+    this.refreshStates()
+    if (changed) this.changed()
   }
 
   private publish(state: PresenceState): void {
     this.clock = this.nextClock()
     this.local = { ...state, presenceClock: this.clock }
-    this.renewed = this.now
+    this.queued = true
+    if (this.now - this.sent >= UPDATE_MS) this.sendCurrent()
+  }
+
+  private sendCurrent(): void {
+    this.sent = this.now
+    this.queued = false
+    this.advertised = this.local !== null
     this.channel?.sendPresence({ clock: this.clock, state: this.local })
   }
 
@@ -192,14 +287,46 @@ export class Presence {
     return this.clock + 1
   }
 
+  private readTime(): void {
+    if (this.channel) this.now = Math.max(this.now, this.channel.presenceTime)
+  }
+
+  private updateClock(): void {
+    const needed =
+      !this.disposed &&
+      !this.departed &&
+      this.attachments > 0 &&
+      (this.local !== null || this.workPeers.size > 0)
+    if (needed && !this.unsubscribeClock && this.channel) {
+      this.unsubscribeClock = this.channel.subscribePresenceClock((now) => this.tick(now))
+      return
+    }
+    if (needed) return
+    this.unsubscribeClock?.()
+    this.unsubscribeClock = undefined
+  }
+
+  private prune(): void {
+    if (this.now < this.pruneAt) return
+    this.pruneAt = Infinity
+    for (const [peer, entry] of this.entries) {
+      if (entry.state || entry.pending) continue
+      const expires = entry.updated + TOMBSTONE_MS
+      if (expires <= this.now) {
+        this.entries.delete(peer)
+        continue
+      }
+      this.pruneAt = Math.min(this.pruneAt, expires)
+    }
+  }
+
   private refreshStates(): void {
-    this.remoteStates = Array.from(this.entries.values(), (entry) => entry.state).filter(
+    this.remoteStates = Array.from(this.workPeers, (peer) => this.entries.get(peer)!.state).filter(
       (state): state is PresenceState => state !== null,
     )
   }
 
   private changed(): void {
-    this.refreshStates()
     for (const listener of this.listeners) listener()
   }
 }

@@ -62,6 +62,7 @@ export class Session<E extends EditEnvelope> {
     []
   readonly members = new Set<string>()
   private readonly presenceObservers = new Set<PresenceObserver>()
+  private readonly presenceClocks = new Set<(now: number) => void>()
   private phase: Phase<E> = { kind: 'waiting' }
   private authority: Authority
   private maxTerm = 0
@@ -123,14 +124,23 @@ export class Session<E extends EditEnvelope> {
     return { tip: this.options.engine.checkpoint(), authority: this.authority }
   }
 
+  get presenceTime(): number {
+    return this.now
+  }
+
   sendPresence(payload: PresenceMessage): void {
     if (this.phase.kind !== 'left') this.broadcast('PRESENCE', payload)
   }
 
   subscribePresence(observer: PresenceObserver): () => void {
     this.presenceObservers.add(observer)
-    observer.tick(this.now)
+    if (this.phase.kind === 'left') observer.departed()
     return () => this.presenceObservers.delete(observer)
+  }
+
+  subscribePresenceClock(listener: (now: number) => void): () => void {
+    this.presenceClocks.add(listener)
+    return () => this.presenceClocks.delete(listener)
   }
 
   connect(peer: string): void {
@@ -165,8 +175,7 @@ export class Session<E extends EditEnvelope> {
 
   tick(now: number): void {
     this.now = now
-    if (this.phase.kind !== 'left')
-      for (const observer of this.presenceObservers) observer.tick(now)
+    for (const listener of this.presenceClocks) listener(now)
     if (this.phase.kind === 'left' || now - this.lastTick < this.options.pulseInterval) return
     this.lastTick = now
     if (
@@ -311,6 +320,12 @@ export class Session<E extends EditEnvelope> {
         JSON.stringify(this.liveRoster(this.observed.get(peer)?.members ?? [])) === key,
     )
   }
+  private completeDeparture(): void {
+    this.phase = { kind: 'left' }
+    this.departure = undefined
+    for (const observer of this.presenceObservers) observer.departed()
+  }
+
   private resumeDeparture(): void {
     if (!this.departure || this.phase.kind !== 'stable' || !this.host) return
     if (this.isHost) {
@@ -322,8 +337,7 @@ export class Session<E extends EditEnvelope> {
     }
     if (this.pending.size) return
     this.broadcast('LEAVE', { successor: this.departure })
-    this.phase = { kind: 'left' }
-    this.departure = undefined
+    this.completeDeparture()
   }
   private coordinator(): string {
     return this.roster()[0]!
@@ -510,8 +524,7 @@ export class Session<E extends EditEnvelope> {
       return
     this.broadcast('LEAVE', { successor })
     this.pending.clear()
-    this.phase = { kind: 'left' }
-    this.departure = undefined
+    this.completeDeparture()
   }
 
   private activate(): void {

@@ -40,6 +40,9 @@ class PresenceView implements EditorViewContribution {
   private root: HTMLDivElement | undefined
   private readonly highlights = new Map<string, { name: string; signature: string }>()
   private nextHighlight = 0
+  private frame: number | undefined
+  private labelDeadline: number | undefined
+  private readonly activity = new Map<string, { signature: string; expires: number }>()
   private readonly unsubscribe: () => void
   private readonly detach: () => void
 
@@ -47,7 +50,7 @@ class PresenceView implements EditorViewContribution {
     private readonly context: EditorViewContributionContext,
     private readonly options: PresencePluginOptions,
   ) {
-    this.unsubscribe = options.presence.subscribe(() => context.requestViewUpdate())
+    this.unsubscribe = options.presence.subscribe(() => this.scheduleUpdate())
     this.detach = options.presence.attach()
   }
 
@@ -64,17 +67,72 @@ class PresenceView implements EditorViewContribution {
   }
 
   dispose(): void {
+    if (this.frame !== undefined) window.cancelAnimationFrame(this.frame)
+    this.frame = undefined
+    this.cancelLabelDeadline()
+    this.activity.clear()
     this.unsubscribe()
     this.detach()
     this.clear()
   }
 
+  private scheduleUpdate(): void {
+    if (this.frame !== undefined) return
+    this.frame = window.requestAnimationFrame(() => {
+      this.frame = undefined
+      this.context.requestViewUpdate()
+    })
+  }
+
+  private trackActivity(peers: readonly PresenceState[]): void {
+    const active = new Set(peers.map((peer) => peer.peerSessionId))
+    for (const peer of this.activity.keys()) {
+      if (!active.has(peer)) this.activity.delete(peer)
+    }
+    for (const peer of peers) {
+      const signature = JSON.stringify(peer.selections)
+      if (this.activity.get(peer.peerSessionId)?.signature === signature) continue
+      this.activity.set(peer.peerSessionId, {
+        signature,
+        expires: window.performance.now() + 2_000,
+      })
+    }
+  }
+
+  private scheduleLabels(): void {
+    this.cancelLabelDeadline()
+    const now = window.performance.now()
+    let next = Infinity
+    const carets = this.root?.querySelectorAll<HTMLElement>('[data-label-expires]') ?? []
+    for (const caret of carets) {
+      const expires = Number(caret.dataset.labelExpires)
+      caret.dataset.idle = String(expires <= now)
+      if (expires > now) next = Math.min(next, expires)
+    }
+    if (!Number.isFinite(next)) return
+    this.labelDeadline = window.setTimeout(
+      () => {
+        this.labelDeadline = undefined
+        this.scheduleLabels()
+      },
+      Math.max(1, next - now),
+    )
+  }
+
+  private cancelLabelDeadline(): void {
+    if (this.labelDeadline === undefined) return
+    window.clearTimeout(this.labelDeadline)
+    this.labelDeadline = undefined
+  }
+
   private paint(snapshot?: EditorViewSnapshot, forceHighlights = false): void {
     const peers = this.options.presence.states
+    if (peers.length === 0) this.activity.clear()
     if (peers.length === 0 || !this.context.hasDocument()) {
       if (this.root || this.highlights.size > 0) this.clear()
       return
     }
+    this.trackActivity(peers)
     const folds = (snapshot ?? this.context.getSnapshot()).foldMarkers
     const bounds = this.context.contentElement.getBoundingClientRect()
     const viewport = this.context.scrollElement.getBoundingClientRect()
@@ -144,6 +202,7 @@ class PresenceView implements EditorViewContribution {
     const fragment = document.createDocumentFragment()
     for (const caret of carets) fragment.append(this.caretElement(caret))
     this.root.replaceChildren(fragment)
+    this.scheduleLabels()
   }
 
   private caretElement(caret: Caret): HTMLElement {
@@ -155,6 +214,7 @@ class PresenceView implements EditorViewContribution {
     element.style.height = `${caret.height}px`
     element.style.backgroundColor = caret.peer.colour
     if (caret.index !== 0) return element
+    element.dataset.labelExpires = String(this.activity.get(caret.peer.peerSessionId)!.expires)
     const label = document.createElement('span')
     label.className = 'editor-remote-name'
     label.textContent = caret.peer.displayName
@@ -171,6 +231,7 @@ class PresenceView implements EditorViewContribution {
   }
 
   private clear(): void {
+    this.cancelLabelDeadline()
     for (const highlight of this.highlights.values())
       this.context.clearRangeHighlight(highlight.name)
     this.highlights.clear()
