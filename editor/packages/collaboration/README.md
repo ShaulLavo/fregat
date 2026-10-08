@@ -7,7 +7,7 @@ branch. Reconciliation can return a branch-confirmed edit to pending.
 
 The default entry exports the runtime-neutral session protocol and the opt-in editor binding. The `/transports`
 entry adds native WebRTC, encrypted WebSocket signaling and same-origin
-BroadcastChannel links. The editor binding is opt-in through `createCollaborationPlugin`. Presence rendering can attach separately.
+BroadcastChannel links. The editor binding is opt-in through `createCollaborationPlugin`; its optional `presence` identity enables remote selections, carets and names through the same Session. The standalone `presence-plugin` entry remains available.
 
 ## Editor attachment
 
@@ -35,13 +35,13 @@ const plugin = createCollaborationPlugin({
 const editor = new Editor(element, { defaultText: initialText, plugins: [plugin] })
 ```
 
-Every room peer supplies the same document, epoch and bootstrap text. Every attachment uses a fresh peer ID. `onReady` exposes the transport-neutral Session and the document adapter. Production attachments tick automatically; simulations can supply `manualClock: true` and call `session.tick` explicitly. Timing and history-chunk bounds can be configured through `timing`.
+Every room peer supplies the same document, epoch and bootstrap text. Every attachment uses a fresh peer ID. `onReady` exposes the transport-neutral Session and the document adapter. Production attachments tick automatically; simulations can supply `manualClock: true` and call `session.tick` explicitly. Timing and history-chunk bounds can be configured through `timing`. Import `@singapore-editor/collaboration/style.css` alongside the editor stylesheet. Supply `presence: { displayName, colour }` to publish this view’s identity-based selections and paint its peers. `onReady` also exposes the attached Presence. Presence has no view hooks when this option is absent.
 
 The plugin owns one document, including the anonymous document created by `new Editor(element)`. Local snapshot authoring gives inserted UTF-16 units their Participant identities before the editor applies them. Only exact committed local transactions submit those envelopes to Session. Confirmations and remote updates use Participant's effective edits in one `reconcile` publication, mapping selections and notifying syntax and decoration consumers without authored echoes or remote undo entries. Protocol elections select which peer's Host sequences the document.
 
 While this document is active, Undo and Redo call the participant's author-selective history. A different active document retains native editor history. Removing the plugin keeps the current text editable and releases its hooks, command registrations and clock. Native history from before attachment stays present; collaborative edits use effect history without adding native snapshots. A visual branching graph for collaborative effect history is a follow-up; the editor's existing graph is not a representation of collaborative undo branches.
 
-Run the editor example app and open `/collaboration.html` for two local editors and an invitation link. Same-origin peers use encrypted BroadcastChannel. To connect browsers, configure explicit signaling URLs, ICE servers (including TURN credentials when needed) and transport policy on each browser before joining. The invitation secret remains in the fragment and does not enter signaling. The page has no public signaling or ICE defaults.
+Run the editor example app and open `/collaboration.html` for two local editors and an invitation link. Same-origin peers use encrypted BroadcastChannel. To connect browsers, configure explicit signaling URLs, your own member’s broker admission token, ICE servers (including TURN credentials when needed) and transport policy on each browser before joining. The invitation secret remains in the fragment and does not enter signaling. The page has no public signaling or ICE defaults.
 
 ## Core authoring contract
 

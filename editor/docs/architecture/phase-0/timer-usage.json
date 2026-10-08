@@ -6,8 +6,8 @@
       "api": "setInterval",
       "file": "examples/app/src/collaboration.ts",
       "id": "examples/app/src/collaboration.ts:setInterval:f2c35bb1c2",
-      "justification": "The example polls session role for a small status label; its 100 ms interval is cleared on departure and page teardown.",
-      "line": 111,
+      "justification": "Session roles change outside editor events; this small status clock is cleared on departure and page teardown.",
+      "line": 118,
       "snippet": "const timer = setInterval(() => {"
     },
     {
@@ -39,7 +39,7 @@
       "file": "examples/stress/src/browser.ts",
       "id": "examples/stress/src/browser.ts:requestAnimationFrame:dffa87e548",
       "justification": "Benchmark observation of the first animation frame after an applied key; it records a timestamp only, tracks the frame handle, and cancels pending frames on disposal.",
-      "line": 269,
+      "line": 276,
       "snippet": "const frame = requestAnimationFrame(() => {"
     },
     {
@@ -47,8 +47,16 @@
       "file": "examples/stress/src/browser.ts",
       "id": "examples/stress/src/browser.ts:setTimeout:e5c148c176",
       "justification": "The bounded churn benchmark yields to the browser every ten iterations so cancellation and rendering can run. The timer only resolves the awaited promise; the next iteration checks cancellation before editing.",
-      "line": 338,
+      "line": 345,
       "snippet": "if (index % 10 === 0) await new Promise((resolve) => setTimeout(resolve, 0))"
+    },
+    {
+      "api": "requestAnimationFrame",
+      "file": "examples/stress/src/dispatch.ts",
+      "id": "examples/stress/src/dispatch.ts:requestAnimationFrame:58d943f6c1",
+      "justification": "Benchmark harness: one frame between batches keeps them apart.",
+      "line": 55,
+      "snippet": "await new Promise((resolve) => requestAnimationFrame(resolve))"
     },
     {
       "api": "requestAnimationFrame",
@@ -65,14 +73,6 @@
       "justification": "Benchmark harness: two frames let the editor mount before any pass is timed.",
       "line": 40,
       "snippet": "await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))"
-    },
-    {
-      "api": "requestAnimationFrame",
-      "file": "examples/stress/src/dispatch.ts",
-      "id": "examples/stress/src/dispatch.ts:requestAnimationFrame:58d943f6c1",
-      "justification": "Benchmark harness: one frame between batches keeps them apart.",
-      "line": 55,
-      "snippet": "await new Promise((resolve) => requestAnimationFrame(resolve))"
     },
     {
       "api": "requestAnimationFrame",
@@ -99,20 +99,20 @@
       "snippet": "return new Promise<void>((resolve) => setTimeout(resolve, 200))"
     },
     {
-      "api": "requestAnimationFrame",
-      "file": "examples/stress/src/inputLatency.ts",
-      "id": "examples/stress/src/inputLatency.ts:requestAnimationFrame:4be2a86626",
-      "justification": "Benchmark observation of the next animation frame after input dispatch. It records a timestamp only, tracks each frame handle, and cancels pending frames when the probe is disposed.",
-      "line": 90,
-      "snippet": "const frame = requestAnimationFrame(() => {"
-    },
-    {
       "api": "queueMicrotask",
       "file": "examples/stress/src/inputLatency.ts",
       "id": "examples/stress/src/inputLatency.ts:queueMicrotask:2bd1143d41",
       "justification": "Benchmark observation of input dispatch completion after synchronous edit callbacks return. The enabled guard drops observations after disposal; measuring this boundary through the editor scheduler would change the interval being measured.",
       "line": 103,
       "snippet": "queueMicrotask(() => finishDispatch(sample))"
+    },
+    {
+      "api": "requestAnimationFrame",
+      "file": "examples/stress/src/inputLatency.ts",
+      "id": "examples/stress/src/inputLatency.ts:requestAnimationFrame:4be2a86626",
+      "justification": "Benchmark observation of the next animation frame after input dispatch. It records a timestamp only, tracks each frame handle, and cancels pending frames when the probe is disposed.",
+      "line": 90,
+      "snippet": "const frame = requestAnimationFrame(() => {"
     },
     {
       "api": "setTimeout",
@@ -157,18 +157,18 @@
     {
       "api": "setTimeout",
       "file": "packages/collaboration/server/signaling.ts",
-      "id": "packages/collaboration/server/signaling.ts:setTimeout:a47f4f735b",
-      "justification": "Silent clients emit no progress event; one deadline per socket bounds subscription and application idle time, is replaced by progress, and is cleared on close.",
-      "line": 74,
-      "snippet": "socket.data.deadline = setTimeout(() => {"
+      "id": "packages/collaboration/server/signaling.ts:setTimeout:2017a2146d",
+      "justification": "Authorization may never settle; the deadline bounds reserved quota, and finally clears it and releases the reservation when upgrade fails.",
+      "line": 154,
+      "snippet": "timeout = setTimeout(() => resolve(false), options.limits.subscribeTimeout)"
     },
     {
       "api": "setTimeout",
       "file": "packages/collaboration/server/signaling.ts",
-      "id": "packages/collaboration/server/signaling.ts:setTimeout:2017a2146d",
-      "justification": "Authorization may never settle; the deadline bounds reserved quota, and finally clears it and releases the reservation when upgrade fails.",
-      "line": 117,
-      "snippet": "timeout = setTimeout(() => resolve(false), options.limits.subscribeTimeout)"
+      "id": "packages/collaboration/server/signaling.ts:setTimeout:a47f4f735b",
+      "justification": "Silent clients emit no progress event; one deadline per socket bounds subscription and application idle time, is replaced by progress, and is cleared on close.",
+      "line": 97,
+      "snippet": "socket.data.deadline = setTimeout(() => {"
     },
     {
       "api": "setInterval",
@@ -182,24 +182,24 @@
       "api": "setInterval",
       "file": "packages/collaboration/src/plugin.ts",
       "id": "packages/collaboration/src/plugin.ts:setInterval:fc4d38db09",
-      "justification": "The opt-in attachment drives the caller-configurable protocol pulse clock, performs no text mutation until protocol work is queued, and clears the interval with its view scope. Simulations can supply a manual clock.",
-      "line": 122,
+      "justification": "The protocol needs elapsed time for failure detection; this opt-in clock is configurable, manual in simulations, and cleared when its view detaches.",
+      "line": 198,
       "snippet": "const timer = setInterval("
     },
     {
       "api": "requestAnimationFrame",
-      "file": "packages/collaboration/src/presence-plugin.ts",
-      "id": "packages/collaboration/src/presence-plugin.ts:requestAnimationFrame:9b743b037a",
+      "file": "packages/collaboration/src/presence-view.ts",
+      "id": "packages/collaboration/src/presence-view.ts:requestAnimationFrame:a4cb086651",
       "justification": "Remote presence changes between editor updates; one frame coalesces its notifications into a paint, and disposal cancels the pending frame.",
-      "line": 83,
+      "line": 65,
       "snippet": "this.frame = window.requestAnimationFrame(() => {"
     },
     {
       "api": "setTimeout",
-      "file": "packages/collaboration/src/presence-plugin.ts",
-      "id": "packages/collaboration/src/presence-plugin.ts:setTimeout:e13f563da7",
+      "file": "packages/collaboration/src/presence-view.ts",
+      "id": "packages/collaboration/src/presence-view.ts:setTimeout:40e456fbf6",
       "justification": "Peer events cannot signal elapsed idle time; each view keeps one deadline for the next visible name's idle transition, and clear or disposal cancels it.",
-      "line": 117,
+      "line": 99,
       "snippet": "this.labelDeadline = window.setTimeout("
     },
     {
@@ -207,7 +207,7 @@
       "file": "packages/collaboration/src/signaling.ts",
       "id": "packages/collaboration/src/signaling.ts:setTimeout:2fa18ecddb",
       "justification": "Remote broker readiness has no notification; one retry per URL spaces reconnect attempts, connect checks closed, and close clears every pending retry.",
-      "line": 88,
+      "line": 90,
       "snippet": "setTimeout(() => this.connect(url), this.options.reconnectInterval),"
     },
     {
@@ -215,7 +215,7 @@
       "file": "packages/collaboration/src/webrtc-transport.ts",
       "id": "packages/collaboration/src/webrtc-transport.ts:setInterval:f477778391",
       "justification": "Signaling has no peer-roster notification; discovery announcements and retries expire silent peers on this protocol clock, which close clears.",
-      "line": 116,
+      "line": 119,
       "snippet": "this.timer = setInterval(() => {"
     },
     {
@@ -223,7 +223,7 @@
       "file": "packages/collaboration/src/webrtc-transport.ts",
       "id": "packages/collaboration/src/webrtc-transport.ts:setTimeout:4302f06a3f",
       "justification": "A TURN supplier may never settle; abort bounds the wait, finally clears the deadline, and close aborts pending requests.",
-      "line": 329,
+      "line": 336,
       "snippet": "const credentialTimeout = setTimeout(() => abort.abort(), this.options.connectionTimeout)"
     },
     {
@@ -231,7 +231,7 @@
       "file": "packages/collaboration/src/webrtc-transport.ts",
       "id": "packages/collaboration/src/webrtc-transport.ts:setTimeout:f246bd882a",
       "justification": "Native connection setup can stall without a terminal event; channel open or removal clears this deadline, and failure checks the current link generation.",
-      "line": 350,
+      "line": 357,
       "snippet": "timeout: setTimeout("
     },
     {
@@ -239,7 +239,7 @@
       "file": "packages/collaboration/vitest.browser.config.ts",
       "id": "packages/collaboration/vitest.browser.config.ts:setTimeout:aa312d20fb",
       "justification": "A child can emit neither readiness nor exit; this bounds startup failure, while stdout readiness, error, and exit notifications each clear the deadline.",
-      "line": 23,
+      "line": 25,
       "snippet": "const timeout = setTimeout("
     },
     {
@@ -285,10 +285,10 @@
     {
       "api": "setTimeout",
       "file": "packages/editor/src/editor/workScheduler.ts",
-      "id": "packages/editor/src/editor/workScheduler.ts:setTimeout:b45245407c",
-      "justification": "The scheduler owns delayed task starts and clamps repeated scheduling to the requested maximum delay. Cancellation and disposal clear the handle; task identity and stale-result checks guard execution and application.",
-      "line": 195,
-      "snippet": "work.timer = globalThis.setTimeout(() => this.start(work), delayMs)"
+      "id": "packages/editor/src/editor/workScheduler.ts:setTimeout:97308acba5",
+      "justification": "The scheduler owns this task budget deadline. Expiry checks task identity before aborting; completion, failure, cancellation, and disposal clear the budget timer.",
+      "line": 381,
+      "snippet": "work.budgetTimer = globalThis.setTimeout(() => this.timeoutWork(work), budgetMs)"
     },
     {
       "api": "setTimeout",
@@ -301,16 +301,16 @@
     {
       "api": "setTimeout",
       "file": "packages/editor/src/editor/workScheduler.ts",
-      "id": "packages/editor/src/editor/workScheduler.ts:setTimeout:97308acba5",
-      "justification": "The scheduler owns this task budget deadline. Expiry checks task identity before aborting; completion, failure, cancellation, and disposal clear the budget timer.",
-      "line": 381,
-      "snippet": "work.budgetTimer = globalThis.setTimeout(() => this.timeoutWork(work), budgetMs)"
+      "id": "packages/editor/src/editor/workScheduler.ts:setTimeout:b45245407c",
+      "justification": "The scheduler owns delayed task starts and clamps repeated scheduling to the requested maximum delay. Cancellation and disposal clear the handle; task identity and stale-result checks guard execution and application.",
+      "line": 195,
+      "snippet": "work.timer = globalThis.setTimeout(() => this.start(work), delayMs)"
     },
     {
       "api": "setTimeout",
       "file": "packages/editor/src/semanticTokenLayer.ts",
       "id": "packages/editor/src/semanticTokenLayer.ts:setTimeout:7075ce6e49",
-      "justification": "Coalesces the demand signal against the viewport rather than against rendering. `'viewport'` is fired once per scroll event and is not throttled at source, so a flung scroll is one update per frame; `cancel()` on every input is what turns that into one question per pause. The delay itself is the host's number \u2014 this editor names none.",
+      "justification": "Coalesces the demand signal against the viewport rather than against rendering. `'viewport'` is fired once per scroll event and is not throttled at source, so a flung scroll is one update per frame; `cancel()` on every input is what turns that into one question per pause. The delay itself is the host's number — this editor names none.",
       "line": 175,
       "snippet": "demandTimer = setTimeout(() => {"
     },
@@ -366,7 +366,7 @@
       "api": "setTimeout",
       "file": "packages/lsp-plugin/src/codeActions.ts",
       "id": "packages/lsp-plugin/src/codeActions.ts:setTimeout:add08e7112",
-      "justification": "Debounces a question to the language server against the caret and the diagnostics, not against rendering, and `clear()` withdraws it on every further change \u2014 so a fix is never computed against text the reader has already moved past.",
+      "justification": "Debounces a question to the language server against the caret and the diagnostics, not against rendering, and `clear()` withdraws it on every further change — so a fix is never computed against text the reader has already moved past.",
       "line": 186,
       "snippet": "this.timer = setTimeout(() => {"
     },
@@ -382,7 +382,7 @@
       "api": "setTimeout",
       "file": "packages/lsp-plugin/src/documentHighlightController.ts",
       "id": "packages/lsp-plugin/src/documentHighlightController.ts:setTimeout:72bc987661",
-      "justification": "Debounces a request to the language server against the caret, not against rendering, and `cancel()` clears it on every move \u2014 so the server sees one question per pause rather than one per keystroke.",
+      "justification": "Debounces a request to the language server against the caret, not against rendering, and `cancel()` clears it on every move — so the server sees one question per pause rather than one per keystroke.",
       "line": 71,
       "snippet": "this.timer = setTimeout(() => {"
     },
@@ -469,6 +469,14 @@
     {
       "api": "setTimeout",
       "file": "packages/plugin-ui/src/hoverController.ts",
+      "id": "packages/plugin-ui/src/hoverController.ts:setTimeout:017e4b5257",
+      "justification": "Enforces the hover dwell before paint; the pointer leaving the target clears it.",
+      "line": 235,
+      "snippet": "current.revealTimer = setTimeout(() => {"
+    },
+    {
+      "api": "setTimeout",
+      "file": "packages/plugin-ui/src/hoverController.ts",
       "id": "packages/plugin-ui/src/hoverController.ts:setTimeout:ceab8e0fd3",
       "justification": "Delays the loading row until the participants are observably slow; every target change cancels it.",
       "line": 221,
@@ -481,14 +489,6 @@
       "justification": "Starts server work midway through the pointer dwell so transient targets are skipped while network time overlaps the rest of the dwell.",
       "line": 230,
       "snippet": "current.dispatchTimer = setTimeout(() => {"
-    },
-    {
-      "api": "setTimeout",
-      "file": "packages/plugin-ui/src/hoverController.ts",
-      "id": "packages/plugin-ui/src/hoverController.ts:setTimeout:017e4b5257",
-      "justification": "Enforces the hover dwell before paint; the pointer leaving the target clears it.",
-      "line": 235,
-      "snippet": "current.revealTimer = setTimeout(() => {"
     },
     {
       "api": "setTimeout",
@@ -509,6 +509,14 @@
     {
       "api": "queueMicrotask",
       "file": "packages/react/src/index.tsx",
+      "id": "packages/react/src/index.tsx:queueMicrotask:021fec5f8c",
+      "justification": "Defers the callback past StrictMode's synchronous replay; the incarnation, document and state guards drop it when the editor moved on, and no editor work is scheduled.",
+      "line": 550,
+      "snippet": "queueMicrotask(() => {"
+    },
+    {
+      "api": "queueMicrotask",
+      "file": "packages/react/src/index.tsx",
       "id": "packages/react/src/index.tsx:queueMicrotask:0b4181030c",
       "justification": "Waits out React's synchronous StrictMode unmount and remount; the generation guard drops the disposal when the component came straight back.",
       "line": 316,
@@ -520,14 +528,6 @@
       "id": "packages/react/src/index.tsx:queueMicrotask:95e4ae90ae",
       "justification": "Defers delivery until the mount survives React's synchronous StrictMode replay; the incarnation guard cancels disposed mounts, and no editor work is scheduled.",
       "line": 507,
-      "snippet": "queueMicrotask(() => {"
-    },
-    {
-      "api": "queueMicrotask",
-      "file": "packages/react/src/index.tsx",
-      "id": "packages/react/src/index.tsx:queueMicrotask:021fec5f8c",
-      "justification": "Defers the callback past StrictMode's synchronous replay; the incarnation, document and state guards drop it when the editor moved on, and no editor work is scheduled.",
-      "line": 550,
       "snippet": "queueMicrotask(() => {"
     },
     {
@@ -549,9 +549,9 @@
     {
       "api": "setTimeout",
       "file": "packages/typescript-lsp/src/worker/session.ts",
-      "id": "packages/typescript-lsp/src/worker/session.ts:setTimeout:6a06183b86",
-      "justification": "Debounces diagnostics per document inside the worker, off the main thread; the handle is kept per URI and cleared on the next edit or close.",
-      "line": 596,
+      "id": "packages/typescript-lsp/src/worker/session.ts:setTimeout:334b7e5e6a",
+      "justification": "A request timeout inside the worker: it only rejects the pending request, and the answer clears it.",
+      "line": 859,
       "snippet": "const timer = setTimeout(() => {"
     },
     {
@@ -565,9 +565,9 @@
     {
       "api": "setTimeout",
       "file": "packages/typescript-lsp/src/worker/session.ts",
-      "id": "packages/typescript-lsp/src/worker/session.ts:setTimeout:334b7e5e6a",
-      "justification": "A request timeout inside the worker: it only rejects the pending request, and the answer clears it.",
-      "line": 859,
+      "id": "packages/typescript-lsp/src/worker/session.ts:setTimeout:6a06183b86",
+      "justification": "Debounces diagnostics per document inside the worker, off the main thread; the handle is kept per URI and cleared on the next edit or close.",
+      "line": 596,
       "snippet": "const timer = setTimeout(() => {"
     },
     {

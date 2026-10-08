@@ -1,4 +1,5 @@
 import '@singapore-editor/core/style.css'
+import '@singapore-editor/collaboration/style.css'
 import './collaboration.css'
 import { Editor } from '@singapore-editor/core/editor'
 import {
@@ -17,7 +18,7 @@ import type { Envelope } from '@singapore-editor/collab'
 
 const form = document.querySelector<HTMLFormElement>('#configuration')!
 const signaling = document.querySelector<HTMLInputElement>('#signaling')!
-const protocols = document.querySelector<HTMLTextAreaElement>('#protocols')!
+const admission = document.querySelector<HTMLInputElement>('#admission')!
 const ice = document.querySelector<HTMLTextAreaElement>('#ice')!
 const policy = document.querySelector<HTMLSelectElement>('#policy')!
 const invitation = document.querySelector<HTMLInputElement>('#invitation')!
@@ -77,6 +78,7 @@ async function mountPeer(
     plugins: [
       createCollaborationPlugin({
         session: { peer, room, document: 'example-document', epoch: room, text: initialText },
+        presence: { displayName: name, colour: name === 'Peer one' ? '#a8ddc4' : '#e8be82' },
         transport: { send: (target, message) => router?.send(target, message) },
         onReady: (ready) => {
           connection = ready
@@ -111,6 +113,8 @@ async function mountPeer(
         onError: report,
       })
     : undefined
+  // @justification Session roles change outside editor events; this small status clock
+  // is cleared on departure and page teardown.
   const timer = setInterval(() => {
     const session = connection.session
     const role = session.isHost ? 'Ordering host' : 'Participant'
@@ -148,13 +152,10 @@ async function begin(): Promise<void> {
     servers.some((server) => !server || typeof server !== 'object' || !('urls' in server))
   )
     throw new TypeError('ICE servers must be an array of objects with urls')
-  const signalingProtocols: unknown = JSON.parse(protocols.value)
-  if (
-    !Array.isArray(signalingProtocols) ||
-    signalingProtocols.some((value) => typeof value !== 'string')
-  )
-    throw new TypeError('Signaling protocols must be an array of strings')
   const urls = signaling.value.split(/\s+/).filter(Boolean)
+  if (urls.length && !admission.value.trim())
+    throw new TypeError('Enter your member’s broker token to use WebRTC')
+  const signalingProtocols = admission.value.trim() ? [admission.value.trim()] : []
   const identity = linked
     ? { room: fragment.get('room')!, secret: fragment.get('secret')! }
     : createRoomInvitation()

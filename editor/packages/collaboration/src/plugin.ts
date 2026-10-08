@@ -1,23 +1,34 @@
 import {
   createPlugin,
+  selectionInput,
+  type EditorViewSnapshot,
   type EditorInput,
   type EditorPlugin,
 } from '@singapore-editor/core/extensions'
 import type { Envelope } from '@singapore-editor/collab'
 import type { Editor } from '@singapore-editor/core/editor'
-import { createPieceTableSnapshot, snapBatchEditRanges } from '@singapore-editor/textbuffer'
+import {
+  createPieceTableSnapshot,
+  snapBatchEditRanges,
+  charIdAt,
+  locateCharId,
+} from '@singapore-editor/textbuffer'
 import { CollaborationDocument, type CollaborationDocumentOptions } from './document'
 import { Session, type SessionOptions } from './session'
 import type { Message } from './protocol'
+import { Presence, type CharacterGap } from './presence'
+import { PresenceView } from './presence-view'
 
 export interface CollaborationConnection {
   readonly document: CollaborationDocument
   readonly session: Session<Envelope>
+  readonly presence?: Presence
 }
 
 export interface CollaborationPluginOptions {
   readonly session: CollaborationDocumentOptions & { readonly room: string }
   readonly transport: { readonly send: (peer: string, message: Message<Envelope>) => void }
+  readonly presence?: { readonly displayName: string; readonly colour: string }
   readonly timing?: Partial<
     Pick<
       SessionOptions<Envelope>,
@@ -116,9 +127,74 @@ export function createCollaborationPlugin(options: CollaborationPluginOptions): 
         })
         commands.push(scope.authorEdits(author))
       })
-      const cleanup = options.onReady?.({ document, session })
+      const presence = options.presence
+        ? new Presence(options.session.peer, options.session.document, session)
+        : undefined
+      if (presence && options.presence) {
+        const identity = options.presence
+        const resolver = {
+          resolveGap(gap: CharacterGap): number | undefined {
+            const buffer = document.engine.snapshot().buffer
+            const left =
+              gap.left === 'start'
+                ? { offset: 0, liveness: 'deleted' }
+                : locateCharId(buffer, gap.left)
+            const right =
+              gap.right === 'end' ? { offset: buffer.length } : locateCharId(buffer, gap.right)
+            if (!left || !right) return
+            return gap.bias === 'left'
+              ? left.offset + Number(left.liveness === 'live')
+              : right.offset
+          },
+        }
+        const view = new PresenceView(scope.view, { presence, resolver })
+        scope.own(view)
+        scope.onDispose(() => presence.dispose())
+        const publish = () => {
+          if (!attached()) {
+            presence.leave()
+            return
+          }
+          const buffer = document.engine.snapshot().buffer
+          const gap = (offset: number): CharacterGap => ({
+            left: offset === 0 ? 'start' : charIdAt(buffer, offset - 1)!,
+            right: offset === buffer.length ? 'end' : charIdAt(buffer, offset)!,
+            bias: 'right',
+          })
+          presence.setLocalState({
+            ...identity,
+            epoch: options.session.epoch,
+            tip: document.checkpoint(),
+            focusedViewId: scope.view.container.contains(
+              scope.view.container.ownerDocument.activeElement,
+            )
+              ? options.session.peer
+              : null,
+            selections: scope.getSelections().map(({ anchorOffset, headOffset }) => ({
+              anchor: gap(anchorOffset),
+              head: gap(headOffset),
+            })),
+          })
+        }
+        scope.watch(selectionInput, publish)
+        const input: EditorInput<EditorViewSnapshot> = {
+          id: 'collaboration.presence-view',
+          kinds: ['content', 'viewport', 'layout'],
+          read: (snapshot) => snapshot,
+        }
+        scope.watch(input, (snapshot) => view.update(snapshot, attached() ? 'document' : 'clear'))
+        scope.view.container.addEventListener('focusin', publish)
+        scope.view.container.addEventListener('focusout', publish)
+        scope.onDispose(() => {
+          scope.view.container.removeEventListener('focusin', publish)
+          scope.view.container.removeEventListener('focusout', publish)
+        })
+      }
+      const cleanup = options.onReady?.({ document, session, presence })
       if (cleanup) scope.onDispose(cleanup)
       if (!options.manualClock) {
+        // @justification The protocol needs elapsed time for failure detection; this opt-in
+        // clock is configurable, manual in simulations, and cleared when its view detaches.
         const timer = setInterval(
           () => session.tick(performance.now()),
           options.timing?.pulseInterval ?? 50,

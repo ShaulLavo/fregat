@@ -11,7 +11,7 @@ export class EditorRoom {
   readonly host = document.createElement('section')
   clock = 0
 
-  constructor(count: number, text = '') {
+  constructor(count: number, text = '', presence = false) {
     this.host.id = 'collaboration-editors'
     this.host.style.cssText = 'display:flex;gap:24px;width:100%;height:420px;'
     document.body.append(this.host)
@@ -31,6 +31,7 @@ export class EditorRoom {
         transport: {
           send: (peer, message) => this.packets.push({ to: Number(peer.slice(5)), message }),
         },
+        presence: presence ? { displayName: `Peer ${index}`, colour: '#3775c5' } : undefined,
         manualClock: true,
         onReady: (connection) => {
           this.connections[index] = connection

@@ -1,5 +1,6 @@
+import '../src/presence.css'
 import { afterEach, expect, test } from 'vitest'
-import { commands } from 'vitest/browser'
+import { commands, page } from 'vitest/browser'
 import { Editor } from '@singapore-editor/core/editor'
 import { createPlugin, textInput, type EditorViewScope } from '@singapore-editor/core/extensions'
 import { EditorRoom } from './editor-fixture'
@@ -68,6 +69,23 @@ for (const count of [2, 3]) {
     })
   }
 }
+
+test('the binding publishes identity-based selections and renders peer labels', async () => {
+  room = new EditorRoom(2, 'word', true)
+  room.editors[0]!.focus()
+  room.editors[0]!.setSelection(1, 3)
+  room.flush()
+  await expect.element(page.getByText('Peer 0', { exact: true })).toBeVisible()
+  expect(room.connections[1]!.presence!.states[0]!.selections).toHaveLength(1)
+  room.editors[1]!.edit({ from: 0, to: 0, text: 'new ' })
+  room.flush()
+  converged('new word')
+  await commands.editorLook('bound-presence')
+  room.editors[0]!.setPlugins([])
+  room.flush()
+  expect(room.connections[1]!.presence!.states).toEqual([])
+  await expect.poll(() => room!.host.querySelectorAll('.editor-remote-name').length).toBe(0)
+})
 
 test('native typing, IME composition and paste settle without echoed transactions', async () => {
   room = new EditorRoom(2)

@@ -91,6 +91,13 @@
       "dependsOn": ["^build", "build"],
       "cache": false,
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/docs/performance/e034-*.json.gz"]
+    },
+    "@singapore-editor/collaboration#test:editor": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/editor/src/**"],
+      "env": ["COLLABORATION_MEASURE", "COLLABORATION_EVIDENCE_DIR"],
+      "outputs": [],
+      "cache": false
     }
   },
   "agentGuidance": false

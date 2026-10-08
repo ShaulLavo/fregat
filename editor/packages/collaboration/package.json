@@ -17,6 +17,7 @@
     "**/*.css"
   ],
   "exports": {
+    "./style.css": "./dist/presence.css",
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",

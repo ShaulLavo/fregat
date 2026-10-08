@@ -310,7 +310,7 @@
       "ignoreDependencies": ["@singapore-editor/gutters"]
     },
     "editor/examples/app": {
-      "entry": ["index.html", "src/jumpHistoryDemo.ts"],
+      "entry": ["src/collaboration.ts", "index.html", "src/jumpHistoryDemo.ts"],
       "project": ["src/**/*.{ts,tsx}"]
     },
     "ghostty-webgpu": {
