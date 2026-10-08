@@ -3,10 +3,12 @@ import { Host } from './host'
 import { Participant } from './participant'
 import { ReferenceEngine } from './reference'
 import { InMemoryTransport } from './transport'
-import type { OffsetEdit } from './types'
+import type { Engine, OffsetEdit } from './types'
 
 export type SimulationOptions = {
   readonly seed: number
+  readonly createEngine?: () => Engine
+  readonly identity?: (engine: Engine) => unknown
   readonly participants: number
   readonly edits?: number
 }
@@ -25,13 +27,14 @@ export function simulate(options: SimulationOptions): SimulationResult {
   )
     throw new CollabFailure('invalid-simulation')
   const random = seededRandom(options.seed)
-  const hostEngine = new ReferenceEngine()
+  const createEngine = options.createEngine ?? (() => new ReferenceEngine())
+  const hostEngine = createEngine()
   const host = new Host({ document: 'simulation', epoch: '1', engine: hostEngine })
   host.subscribe((message) => {
     if (message.status === 'rejected')
       throw new CollabFailure(`rejection-seed-${options.seed}-${message.reason}`)
   })
-  const engines = Array.from({ length: options.participants }, () => new ReferenceEngine())
+  const engines = Array.from({ length: options.participants }, () => createEngine())
   const participants = engines.map(
     (engine, index) =>
       new Participant({
@@ -70,8 +73,9 @@ export function simulate(options: SimulationOptions): SimulationResult {
         throw new CollabFailure(`convergence-seed-${options.seed}`)
       }
     }
-    const identity = JSON.stringify(hostEngine.snapshot())
-    if (engines.some((engine) => JSON.stringify(engine.snapshot()) !== identity))
+    const readIdentity = options.identity ?? ((engine: Engine) => engine.snapshot())
+    const identity = JSON.stringify(readIdentity(hostEngine))
+    if (engines.some((engine) => JSON.stringify(readIdentity(engine)) !== identity))
       throw new CollabFailure(`identity-seed-${options.seed}`)
     if (options.participants === 1 && expected !== model)
       throw new CollabFailure(`single-author-host-seed-${options.seed}`)

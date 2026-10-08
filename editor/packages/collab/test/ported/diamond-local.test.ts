@@ -6,6 +6,7 @@
 // seed numbers do not reproduce Rust SmallRng's exact operation stream.
 import { expect, test } from 'vitest'
 import { replica } from '../fixtures'
+import { characters } from '../engine-fixture'
 import { network, randomSource } from './adapter'
 import { randomChange } from './diamond-workload'
 
@@ -68,6 +69,6 @@ test('Diamond Types repeated concurrent deletion preserves one hidden ID per cha
   }
   expect(net.host.hostSequence).toBe(3)
   expect(net.engine.snapshot()).toEqual(snapshot)
-  expect(snapshot.nodes).toHaveLength(3)
-  expect(snapshot.nodes.every((node) => node.deleted)).toBe(true)
+  expect(characters(net.engine)).toHaveLength(3)
+  expect(characters(net.engine).every((node) => node.deleted)).toBe(true)
 })

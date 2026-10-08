@@ -1,11 +1,12 @@
+import { createEngine, liveIds } from '../engine-fixture'
 import { expect } from 'vitest'
-import { Host, Participant, ReferenceEngine } from '../../src/index'
-import type { CharId, Envelope, HostMessage, OffsetEdit } from '../../src/index'
+import { Host, Participant } from '../../src/index'
+import type { Envelope, HostMessage, OffsetEdit } from '../../src/index'
 import { replica } from '../fixtures'
 
 // Placement workloads observe causal subsets; protocol workloads consume one host log.
 export function causalAuthor(actor: string) {
-  const engine = new ReferenceEngine()
+  const engine = createEngine()
   const edits: Envelope[] = []
   let sequence = 0
   return {
@@ -42,7 +43,7 @@ function sameEdit(a: Envelope, b: Envelope) {
 }
 
 export function mergeCausal(groups: readonly (readonly Envelope[])[]) {
-  const engine = new ReferenceEngine()
+  const engine = createEngine()
   const host = new Host({ document: 'test', epoch: '1', engine })
   for (const group of groups) for (const edit of group) host.submit(edit)
   const unique = new Map(groups.flat().map((edit) => [JSON.stringify(edit.id), edit]))
@@ -51,16 +52,10 @@ export function mergeCausal(groups: readonly (readonly Envelope[])[]) {
   return engine
 }
 
-export function liveIds(engine: ReferenceEngine): readonly CharId[] {
-  return engine
-    .snapshot()
-    .nodes.filter((node) => !node.deleted)
-    .sort((a, b) => engine.visibleOffset(a.id)! - engine.visibleOffset(b.id)!)
-    .map((node) => node.id)
-}
+export { liveIds } from '../engine-fixture'
 
 export function network(size: number) {
-  const engine = new ReferenceEngine()
+  const engine = createEngine()
   const host = new Host({ document: 'test', epoch: '1', engine })
   const users = Array.from({ length: size }, (_, index) => replica(String(index)))
   const online = new Set(users.map((_, index) => index))
@@ -126,7 +121,7 @@ export function network(size: number) {
       actor: 'fresh',
       document: 'test',
       epoch: '1',
-      engine: new ReferenceEngine(),
+      engine: createEngine(),
     })
     fresh.receive(log)
     expect(fresh.text()).toBe(host.text())

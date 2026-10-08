@@ -272,6 +272,9 @@
     "editor/packages/collab": {
       "name": "@singapore-editor/collab",
       "version": "0.0.1",
+      "dependencies": {
+        "@singapore-editor/textbuffer": "workspace:*",
+      },
       "devDependencies": {
         "oxfmt": "0.70.0",
         "oxlint": "1.85.0",
