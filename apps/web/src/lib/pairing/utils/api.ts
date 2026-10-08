@@ -23,9 +23,11 @@ export function pairingStatusQueryOptions() {
 export function claimPairingMutationOptions() {
   return mutationOptions({
     mutationKey: pairingMutationKeys.claim,
-    mutationFn: async (claim: PairingClaim) => {
+    mutationFn: async (claim: PairingClaim, context) => {
       const { data, error } = await getClient().pairing.claim.post(claim)
       if (error || !data) throw createRpcError(error)
+      // Settings reads the same status to offer Pair a device; it is stale once this device pairs.
+      await context.client.invalidateQueries({ queryKey: pairingQueryKeys.status })
       return data
     },
   })
