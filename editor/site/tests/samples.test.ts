@@ -7,6 +7,12 @@ import { spawnSync } from 'node:child_process'
 
 const script = fileURLToPath(new URL('../scripts/check-samples.ts', import.meta.url))
 
+test('checks package README samples through declaration exports with each framework JSX mode', () => {
+  const result = spawnSync('bun', [script, '--packages'], { encoding: 'utf8' })
+  expect(result.status, result.stdout + result.stderr).toBe(0)
+  expect(result.stdout).toMatch(/Checked \d+ package README samples across \d+ packages\./)
+})
+
 async function check(content: string) {
   const directory = await mkdtemp(join(tmpdir(), 'singapore-doc-sample-'))
   try {

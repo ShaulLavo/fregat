@@ -1,6 +1,19 @@
 {
   "name": "@singapore-editor/gutters",
   "version": "0.2.6",
+  "description": "Line numbers and fold controls for the Singapore editor.",
+  "keywords": [
+    "browser",
+    "editor",
+    "folding",
+    "line-numbers",
+    "singapore",
+    "typescript"
+  ],
+  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/gutters/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
