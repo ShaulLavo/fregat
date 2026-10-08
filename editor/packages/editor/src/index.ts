@@ -414,6 +414,7 @@ export type {
   EditorSyntaxLanguageConfiguration,
   EditorSyntaxMode,
   EditorSyntaxProjectionTag,
+  EditorSyntaxAnalysis,
   EditorSyntaxProvider,
   EditorSyntaxRange,
   EditorSyntaxResult,

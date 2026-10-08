@@ -20,6 +20,7 @@ export function installOpenProbe() {
           hasResult: data?.result !== undefined,
           timings: data?.result?.timings,
           statistics: data?.result?.statistics,
+          analysis: data?.result?.analysis,
         })
       })
     }
@@ -107,6 +108,7 @@ export function summarizeOpenProfile(events, probe) {
         roundTripMs: received ? received.at - sent.at : null,
         timings: received?.timings,
         statistics: received?.statistics,
+        analysis: received?.analysis,
       }
     })
   return {

@@ -414,6 +414,8 @@ describe('Tree-sitter syntax capture conversion', () => {
 
     expect(result.degraded).toBeNull()
     expect(result.projection).toEqual({
+      source: undefined,
+      analysis: { kind: 'full', coveredRange: { startIndex: 0, endIndex: text.length } },
       language: {
         includeCaptures: true,
         includeHighlights: true,
@@ -623,7 +625,7 @@ describe('Tree-sitter syntax capture conversion', () => {
     await session.run()
     await session.runtime.queryRange({ startIndex: 1_000, endIndex: 2_000 })
 
-    expect(parsePayloads[0]?.resultMode).toBe('parseOnly')
+    expect(parsePayloads[0]?.resultMode).toBe('bootstrap')
     expect(rangePayloads).toMatchObject([
       {
         range: { startIndex: 1_000, endIndex: 2_000 },

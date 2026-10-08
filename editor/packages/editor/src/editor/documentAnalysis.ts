@@ -122,6 +122,7 @@ export type EditorAnalysisRead<T> =
 
 export type EditorRetainedSyntaxSession = Omit<EditorSyntaxSession, 'queryRange'> & {
   readonly runtimeSessionId: string
+  onDidProduceSyntax(listener: () => void): () => void
   setDisplayDemand(demand: EditorAnalysisDisplayDemand): void
   queryRange(
     range: EditorSyntaxRange,
@@ -213,6 +214,7 @@ export type EditorDocumentAnalysis = {
 }
 
 type AnalysisSession<T> = {
+  subscribeResults?(listener: (read: DocumentRead, result: T) => void): () => void
   analyze(read: DocumentRead, signal: AbortSignal): Promise<T>
   configurationKey?(): unknown
   dispose(): void
@@ -301,6 +303,7 @@ export class AnalysisEntry<T> {
   } | null = null
   private completion: Promise<T> | null = null
   private state: EditorAnalysisRead<T>
+  private readonly unsubscribeResults: (() => void) | undefined
 
   constructor(
     readonly buffer: EditorTextBuffer,
@@ -316,7 +319,24 @@ export class AnalysisEntry<T> {
     this.state = { kind: 'pending', revision: buffer.getRevision() }
     const read = delivery.current()
     if (read) this.enqueue(read)
+    this.unsubscribeResults = session.subscribeResults?.((read, result) => {
+      if (read.revision.point !== this.queuedPoint) return
+      const snapshot = delivery.snapshot(read)
+      if (!snapshot || this.signal.aborted) return
+      this.runtimeResultChanged()
+      this.publish(read.revision.point, this.generation, {
+        kind: 'ready',
+        revision: this.buffer.getRevision(),
+        snapshot,
+        result,
+      })
+      this.runtimeResultPublished()
+    })
   }
+
+  protected runtimeResultChanged(): void {}
+
+  protected runtimeResultPublished(): void {}
 
   get analysisGeneration(): number {
     return this.generation
@@ -473,6 +493,7 @@ export class AnalysisEntry<T> {
 
   protected stop(): boolean {
     if (this.cancellation.signal.aborted) return false
+    this.unsubscribeResults?.()
     this.cancellation.abort()
     this.pendingInterest.abort()
     this.scheduler.cancel(this.runtimeSessionId, 'scope-released')
@@ -752,6 +773,16 @@ export function retainedSyntaxCanWarm(session: EditorRetainedSyntaxSession): boo
 }
 
 export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
+  private readonly produced = new EditorEventSource<void>({ action: 'document.syntax.produced' })
+
+  onDidProduceSyntax(listener: () => void): () => void {
+    const subscription = this.produced.subscribe(listener)
+    return () => subscription.dispose()
+  }
+
+  protected override runtimeResultPublished(): void {
+    this.produced.fire()
+  }
   private readonly displayed = new Map<AbortSignal, EditorAnalysisDisplayDemand>()
   private readonly queryWaiters = new Map<
     AbortSignal,
@@ -1157,6 +1188,11 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
     )
   }
 
+  protected override runtimeResultChanged(): void {
+    this.ranges.clear()
+    for (const query of this.queries.values()) query.admission = 'return-only'
+  }
+
   override changed(read: DocumentRead): void {
     if (read.revision.point === this.rangePoint) return
     this.rangePoint = read.revision.point
@@ -1520,6 +1556,8 @@ function structuralLease(
   const refresh = refreshRetainedAnalysis(entry, result)
   const retained: EditorRetainedSyntaxSession = {
     runtimeSessionId: entry.runtimeSessionId,
+    onDidProduceSyntax: (listener) =>
+      observeRetainedEvent(lease.signal, (next) => entry.onDidProduceSyntax(next), listener),
     setDisplayDemand: (demand) => entry.setDisplayDemand(lease.signal, demand),
     get foldingSupport() {
       return entry.structuralSession.foldingSupport

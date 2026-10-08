@@ -479,6 +479,92 @@ node editor/bench/compare/summarize-open.mjs \
    and correctness controls in addition to the first-token detector. Publish any headline only after
    the full comparison protocol passes. Keep noisy trials labelled as experiments.
 
+#### Viewport-first execution decisions
+
+Status: Approved. Implemented and verified on `lane/singapore-viewport-first`; awaiting PR review.
+The 200 MiB initial-highlight requirement passes. Its full typing/scroll comparison remains blocked
+by the pre-existing tail-layout failure recorded below.
+
+- Bootstrap admission applies to range-mode sources larger than 65,536 UTF-16 code units.
+  Markdown and MDX keep their complete-context path. Their parser and injection contracts need
+  separate preview controls before changing that path.
+- The first demanded range chooses a canonical prefix ending 4,096 code units beyond demand,
+  capped at 65,536. Parsing starts at offset zero to preserve the grammar entry state. These are
+  fixed library work limits; this change adds no host execution setting.
+- A distant range waits for complete context. Any grammar recovery error in the preview or an
+  injected layer also waits for complete context: truncation can reinterpret tokens before the
+  error's reported range. Crossing-comment and long-template controls exposed incorrect provisional
+  tokens before this guard. Provisional highlighting requires a usable bounded parse.
+- Partial trees occupy separate worker storage. Their replies carry the canonical source identity,
+  sync point, snapshot version and coverage. They publish tokens and captures, with empty folds,
+  diagnostics, brackets and injection structure. Structural selection reads complete trees only.
+- Complete root and injected-language parses use dedicated resumable parsers, yielding after
+  approximately eight milliseconds of parser work. Injection discovery queries at most 262,144
+  source code units per interval and yields between intervals. Source-range bounds do not promise
+  a strict wall-time bound for grammar predicates or language compilation.
+- Background completion invalidates retained provisional range caches and notifies the mounted
+  editor to request its current visible range again. Source changes and disposal cancel stale
+  work. Budget cancellation retains its phase timings and structured outcome. Already produced
+  provisional tokens remain available when complete analysis exhausts its budget.
+- The noisy baseline measured acknowledgement-to-unpin gaps of 65.4, 66.2 and 67.9 ms at 10 MiB.
+  The viewport-first complete path skips the unchanged idle reparse so it cannot block subsequent
+  visible requests. Existing small-source and Markdown idle behavior is unchanged. First-edit
+  behavior remains part of the original uninstrumented comparison matrix.
+- The frozen baseline at `66c8e8a68` failed all six initial preview controls. The complete real-worker
+  Chromium suite passes 88 controls, including 14 viewport-first cases, mounted replacement,
+  canonical edit cancellation, disposal, TSX ambiguity and HTML script/style injections. Unit
+  controls pass 106 tests; diagnostic harness controls pass nine tests. Core and Tree-sitter
+  typechecks, workspace builds, retained syntax regressions and repository gates pass.
+
+#### Viewport-first retained experiments
+
+All numbers below are **noisy experiments**, measured on 2026-10-08 on the same Linux x64
+Intel Core i7-14700K host, 28 logical CPUs and 33,368,662,016 bytes of RAM. The retained JSON
+records browser/tool/package versions, fixture hashes, served bundle hashes and configuration.
+Both matrices use 1, 10 and 200 MiB, three repetitions, 1280 × 720, DPR 1 and the existing
+30-second highlighting deadline. No public speedup claim is authorized by these trials.
+
+| Size    | Diagnostic baseline visible highlight | Diagnostic after visible highlight | Original baseline           | Original after                                                   |
+| ------- | ------------------------------------- | ---------------------------------- | --------------------------- | ---------------------------------------------------------------- |
+| 1 MiB   | 416.2 / 342.0 / 295.2 ms              | 214.2 / 159.3 / 178.1 ms           | 544.1 / 269.7 / 275.2 ms    | 152.9 / 143.5 / 144.8 ms                                         |
+| 10 MiB  | 1540.5 / 1543.9 / 1507.0 ms           | 177.3 / 178.6 / 163.6 ms           | 1380.1 / 1413.6 / 1405.8 ms | 159.4 / 165.6 / 164.6 ms                                         |
+| 200 MiB | All three miss 30 seconds             | 354.7 / 356.7 / 354.1 ms           | All three miss 30 seconds   | 345.0 / 331.0 / 354.8 ms initial highlight; later geometry fails |
+
+Every diagnostic after sample parses 27,455 initial code units, independent of file size.
+The after 200 MiB screenshot shows consistent tokens across the visible viewport; grammar and
+coverage controls supplement the harness's first-token clock. The diagnostic verifier accepts
+all 27 after profiles and confirms matching comparison identities. First end-edit mutation costs
+at 10 MiB are 4.7 / 5.2 / 4.7 ms before and 4.7 / 4.4 / 7.2 ms after; noisy middle-edit variation
+is retained without a responsiveness claim.
+
+The original matrix ran unchanged with 40 trusted keys at each position and 120 scroll frames.
+At 200 MiB, Singapore opens highlighted, then fails the existing geometry check at the document
+end: 13 mounted rows and no visible text style. A separate syntax-disabled control reproduces
+identical end geometry in the frozen baseline and the implementation. This is an existing layout
+failure, not evidence of a full 200 MiB editing/scroll pass; its fix is outside this syntax lane.
+No geometry assertion was relaxed.
+
+Fregat `agent:browser look --doctor` reports healthy, with no errors. The isolated fast-scroll
+scenario completes at 1 MiB and 10 MiB. Reviewed screenshots confirm syntax colors at 1 MiB and
+an intact large-file layout at 10 MiB. The 10 MiB screenshots show plain text alongside LSP
+annotations; they do not prove large-file syntax coloring in Fregat. Its analysis and color-provider
+policies were left unchanged. Screenshot capture records GPU warnings and a
+1 MiB LSP socket-close warning, with no structured warning/error log entries.
+
+Evidence: `editor/docs/performance/singapore-viewport-first-2026-10-08/` retains compressed
+before/after experiments, raw diagnostic traces, comparison JSON, geometry controls and reviewed
+screenshots. Reproduction from a built checkout with comparison dependencies installed:
+
+```sh
+node editor/bench/compare/build.mjs
+node editor/bench/compare/run.mjs --profile-open --open-only --sizes 1,10,200 --repetitions 3 --condition noisy --timeout 180000 --output <diagnostic-directory>
+node editor/bench/compare/summarize-open.mjs <after>/experiment.json --compare <before>/experiment.json
+node editor/bench/compare/run.mjs --sizes 1,10,200 --repetitions 3 --condition noisy --timeout 180000 --output <original-directory>
+```
+
+Retained trial directories contain `experiment.json.gz`; the summarizer also reads gzip directly.
+The original 200 MiB geometry failure remains a blocker for publishing a full comparison result.
+
 ## Kickoff prompt for an executing coordinator
 
 > Execute Plan 336 (`plans/336-packages-as-products.md`) in fregat. Load the `orchestrate` and
