@@ -5,7 +5,6 @@ export interface BrokerProbe {
   readonly status: number
   readonly headers: string
   readonly messages: unknown[]
-  readonly closed: () => boolean
   send(frame: unknown): void
 }
 
@@ -17,12 +16,8 @@ export async function probe(
 ): Promise<BrokerProbe> {
   const socket = connect({ host: '127.0.0.1', port, localAddress: address })
   const messages: unknown[] = []
-  let closed = false
   let buffer = Buffer.alloc(0)
   let upgraded = false
-  socket.on('close', () => {
-    closed = true
-  })
   const response = await new Promise<{ status: number; headers: string }>((resolve, reject) => {
     const timeout = setTimeout(() => {
       socket.destroy()
@@ -37,7 +32,7 @@ export async function probe(
       if (!upgraded) reject(new TypeError('Broker closed before responding'))
     })
     socket.on('data', (chunk) => {
-      buffer = Buffer.concat([buffer, chunk])
+      buffer = Buffer.concat([buffer, typeof chunk === 'string' ? Buffer.from(chunk) : chunk])
       if (!upgraded) {
         const end = buffer.indexOf('\r\n\r\n')
         if (end < 0) return
@@ -94,7 +89,6 @@ export async function probe(
     socket,
     ...response,
     messages,
-    closed: () => closed,
     send(frame) {
       const payload = Buffer.from(JSON.stringify(frame))
       const size = payload.length < 126 ? 2 : 4

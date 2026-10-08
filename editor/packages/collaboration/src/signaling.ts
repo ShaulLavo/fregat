@@ -62,7 +62,9 @@ export class WebSocketSignaling implements SignalingClient {
   private connect(url: string): void {
     if (this.closed) return
     this.retries.delete(url)
-    const socket = new WebSocket(url, [...this.options.credentials.protocols])
+    const socket = new WebSocket(url, [
+      ...new Set(['singapore-collaboration', ...this.options.credentials.protocols]),
+    ])
     this.sockets.set(url, socket)
     socket.onopen = () =>
       socket.send(JSON.stringify({ type: 'subscribe', topic: this.options.room }))

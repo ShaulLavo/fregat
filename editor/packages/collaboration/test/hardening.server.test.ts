@@ -48,7 +48,7 @@ test('admission tokens never appear in any response header', async () => {
     },
     async (port, clients) => {
       const accepted = await probe(port, '127.0.0.2', {
-        'Sec-WebSocket-Protocol': `singapore-collaboration, ${token}`,
+        'Sec-WebSocket-Protocol': `${token}, singapore-collaboration`,
       })
       clients.push(accepted)
       expect(accepted.status).toBe(101)
