@@ -183,6 +183,21 @@ test('provisional profiles require a measured bounded bootstrap query', async ()
   assert.equal(verifyOpenProfiles(result), '3 open profiles retained; 1 completed')
   assert.equal(openProfileRows(result)[0].bootstrapRootMs, 3)
   assert.equal(openProfileRows(result)[0].bootstrapUnits, 4096)
+
+  result.config.fullDocument = true
+  row.openProfile.requests = [
+    {
+      resultMode: 'full',
+      returnedResult: true,
+      statistics: { rangeStart: 0, rangeEnd: 200 * 1024 * 1024, tokens: 100 },
+      timings: [{ name: 'treeSitter.parseRoot', durationMs: 80 }],
+    },
+  ]
+  assert.equal(verifyOpenProfiles(result), '3 open profiles retained; 1 completed')
+  assert.equal(openProfileRows(result)[0].parseRootMs, 80)
+  assert.equal(openProfileRows(result)[0].queryTokens, 100)
+  row.openProfile.requests[0].degraded = [{ kind: 'timeout' }]
+  assert.throws(() => verifyOpenProfiles(result), /degraded phases/)
 })
 
 test('profile rows keep the request timeline separate from nested worker phases', async () => {
