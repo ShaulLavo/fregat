@@ -1,31 +1,27 @@
-# hotkeys
+<h1 align="center">hotkeys</h1>
+<p align="center">Zed-style keymaps for the web.</p>
+<p align="center">
+  <a href="https://github.com/ShaulLavo/fregat/actions/workflows/workspace-libraries.yml"><img src="https://github.com/ShaulLavo/fregat/actions/workflows/workspace-libraries.yml/badge.svg" alt="Workspace library checks" /></a>
+  <a href="https://github.com/ShaulLavo/fregat/blob/main/hotkeys/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license" /></a>
+  <a href="https://github.com/ShaulLavo/fregat/tree/main/hotkeys"><img src="https://img.shields.io/badge/install-source%20%2F%20workspace-blue" alt="Install from source or workspace" /></a>
+</p>
+<p align="center">
+  <a href="https://shaulavo.dev/fregat/">Used in Fregat</a> ·
+  <a href="https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/README.md">API and examples</a> ·
+  <a href="https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/keymaps.md">Keymap rules</a> ·
+  <a href="https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/performance.md">Benchmarks</a>
+</p>
 
-Development happens in the [Fregat monorepo](https://github.com/ShaulLavo/fregat/tree/main/hotkeys).
-This repository mirrors its `hotkeys/` folder. Submit changes to Fregat.
+![Fregat, a browser app that uses hotkeys](https://raw.githubusercontent.com/ShaulLavo/fregat/main/docs/images/workbench.webp)
 
-[Fregat's roadmap](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md) schedules work.
+Bind keys to commands, then choose the binding that matches what has focus.
+The same keymap can drive a browser app and a terminal app.
+The core ships without a default keymap and keeps DOM access in its browser adapter.
 
-keyboard shortcuts for editors and apps. you bind keys to commands, it matches key presses, runs multi-key chords like `Mod+K Mod+C`, and picks the binding that fits whatever has focus, the way zed does
+## One key, two jobs
 
-it also formats shortcuts for display and records new ones from the keyboard. the core never touches the dom; small adapters feed it browser or terminal keys. it ships no keymap of its own
-
-## try it
-
-clone the repo and `bun link`, or use the workspaces in Fregat
-
-register a shortcut. `Mod` is Command on mac and Control everywhere else
-
-```ts
-import { getHotkeyRegistry } from '@fregat/hotkeys'
-
-const hotkeys = getHotkeyRegistry()
-const save = hotkeys.register('Mod+S', () => saveFile())
-hotkeys.register(['Mod+K', 'Mod+C'], () => addComment()) // a chord: Mod+K, then Mod+C
-
-save.unregister()
-```
-
-same key, different job depending on focus. the deepest focused context wins, so `Mod+B` bolds text in the editor and toggles the sidebar everywhere else
+`Mod+B` can bold text in the editor and toggle a sidebar elsewhere.
+`Mod` means Command on macOS and Control on other platforms.
 
 ```ts
 import { createBrowserDispatcher } from '@fregat/hotkeys'
@@ -36,45 +32,69 @@ const keys = createBrowserDispatcher({
     { keys: 'Mod+B', command: 'text.bold', context: 'Editor' },
   ],
 })
-const app = keys.createNode({ commands: { 'sidebar.toggle': () => toggleSidebar() } })
+const app = keys.createNode({ commands: { 'sidebar.toggle': () => {} } })
 const editor = keys.createNode({
   parent: app,
   context: 'Editor',
-  commands: { 'text.bold': () => bold() },
+  commands: { 'text.bold': () => {} },
 })
 keys.attachElement(app, document.body)
-keys.attachElement(editor, editorElement)
+keys.attachElement(editor, document.getElementById('editor')!)
 ```
 
-show it in a menu or tooltip
+Replace the empty handlers with your app's actions.
+The deepest matching focus context wins. [Keymap rules](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/keymaps.md) explain predicates, ranking, and unbinding.
 
-```ts
-import { formatForDisplay } from '@fregat/hotkeys'
+## What it gives you
 
-formatForDisplay('Mod+Shift+S', { platform: 'mac' }) // '⇧ ⌘ S'
-formatForDisplay('Mod+Shift+S', { platform: 'linux' }) // 'Ctrl+Shift+S'
-```
+- **Context predicates.** Match expressions such as `Workspace > !Terminal` against a focus tree. [Context rules](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/keymaps.md) define the operators.
+- **User overrides.** Layer user, pack, base, and default bindings. Users can remove a pack's binding or claim a key. Read the [source-ranking rules](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/keymaps.md).
+- **Multi-key chords.** A trie handles sequences such as `Mod+K Mod+C`, pending prefixes, and replay after a mismatch. See the [core API](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/README.md).
+- **Browser and terminal adapters.** Feed DOM keyboard events, terminal escapes, or Kitty keyboard input into the same core. See the [adapter examples](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/README.md).
+- **Display and recording.** Format platform-specific shortcut labels and record new shortcuts from input. [React hooks](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/react-hotkeys/README.md) manage registrations for a component's lifetime.
 
-in react, `useHotkey('Mod+S', () => saveFile())` registers for the life of the component
+## Quick start from source
 
-## packages
-
-- [`@fregat/hotkeys`](packages/hotkeys), the core: parsing, matching, chords, contexts, display, recorders, held-key state
-- [`@fregat/react-hotkeys`](packages/react-hotkeys), react hooks over the core
-
-## running the repo
+`@fregat/hotkeys` and `@fregat/react-hotkeys` are not on npm yet.
+Use the packages in the Fregat workspace:
 
 ```sh
-bun install
-bun run verify
+git clone https://github.com/ShaulLavo/fregat.git
+cd fregat
+bun install --frozen-lockfile
+bun run --cwd hotkeys build
 ```
 
-from inside fregat, `bun run --cwd hotkeys verify`
+Import `@fregat/hotkeys` from a workspace consumer.
+The [development guide](https://github.com/ShaulLavo/fregat/blob/main/docs/development.md#workspace-libraries) explains source builds.
 
-## more
+## Proof and limits
 
-- [core api: focus nodes, chords, terminals, recorders](packages/hotkeys/README.md)
-- [keymap rules: context predicates, ranking, unbinding](packages/hotkeys/docs/keymaps.md)
-- [lookup benchmarks](packages/hotkeys/docs/performance.md)
+Fregat uses this library for its browser and terminal keymaps.
+The [lookup benchmark](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/performance.md) records trie lookup, dispatcher context resolution, and keymap construction on an editor-shaped binding table.
+Run `bun bench/lookup.ts` from `hotkeys/packages/hotkeys` to reproduce it.
+The published benchmark has limited machine metadata. Treat its timings as local observations until a dated, fully specified rerun lands.
 
-forked from [TanStack Hotkeys](https://github.com/TanStack/hotkeys), MIT. license in [LICENSE](LICENSE)
+## Packages
+
+| Package                                                                                                         | Purpose                                                           |
+| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [@fregat/hotkeys](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/README.md)             | Core matching, contexts, chords, adapters, display, and recording |
+| [@fregat/react-hotkeys](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/react-hotkeys/README.md) | React hooks over the core                                         |
+
+## Planned work
+
+| Work           | Status                                 | Plan                                                                                                                                             |
+| -------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| npm publishing | Planned. Publishing setup is deferred. | [Packages as products](https://github.com/ShaulLavo/fregat/blob/main/plans/336-packages-as-products.md#track-n-npm-publishing-last-with-track-e) |
+
+The [Fregat roadmap](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md) owns scheduling.
+
+## Contributing and license
+
+Development happens in [Fregat](https://github.com/ShaulLavo/fregat/tree/main/hotkeys).
+This repository is a read-only mirror of its `hotkeys/` folder. Submit issues and pull requests to Fregat.
+Read the [contribution guide and AI policy](https://github.com/ShaulLavo/fregat/blob/main/CONTRIBUTING.md).
+
+Forked from [TanStack Hotkeys](https://github.com/TanStack/hotkeys).
+[MIT](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/LICENSE), with the original copyright notice retained.

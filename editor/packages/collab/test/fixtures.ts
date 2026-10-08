@@ -1,8 +1,21 @@
-import { Host, Participant, ReferenceEngine } from '../src/index'
-import type { Envelope, HostMessage, OffsetEdit, ReferenceSnapshot } from '../src/index'
+import { Host, Participant } from '../src/index'
+import type { Envelope, HostMessage, OffsetEdit } from '../src/index'
+import { createEngine } from './engine-fixture'
+
+export function subscribeText<Snapshot>(
+  participant: Participant<Snapshot>,
+  listener: (text: string) => void,
+): () => void {
+  let projection = participant.text()
+  return participant.subscribe(({ edits }) => {
+    for (const edit of [...edits].reverse())
+      projection = projection.slice(0, edit.from) + edit.text + projection.slice(edit.to)
+    listener(projection)
+  })
+}
 
 export function replica(actor: string) {
-  const engine = new ReferenceEngine()
+  const engine = createEngine()
   const participant = new Participant({ actor, document: 'test', epoch: '1', engine })
   const edits: Envelope[] = []
   return {
@@ -27,14 +40,14 @@ export function replica(actor: string) {
 }
 
 export function authority(options: { unknownDeps?: 'defer' | 'reject' } = {}) {
-  const engine = new ReferenceEngine()
+  const engine = createEngine()
   const host = new Host({ document: 'test', epoch: '1', engine, ...options })
   const messages: HostMessage[] = []
   host.subscribe((message) => messages.push(message))
   return { host, engine, messages }
 }
 
-export function accept(participant: Participant<ReferenceSnapshot>, edits: readonly Envelope[]) {
+export function accept(participant: Participant<unknown>, edits: readonly Envelope[]) {
   participant.receive(
     edits.map((envelope, index) => ({
       document: 'test',

@@ -24,7 +24,7 @@ import {
   type LspSettings,
 } from './registry'
 import type { LspProxyClientSession, LspSessionSource } from './proxy-session'
-import { recordProcessInfo, recordProcessWarning } from '../observability'
+import { operatorErrorSummary, recordProcessInfo, recordProcessWarning } from '../observability'
 
 type LspRouteFileSystem = {
   readonly paths: WorkspacePaths
@@ -146,12 +146,28 @@ export function lspRoutes(fs: LspRouteFileSystem, auth: AuthConfig, deps: LspRou
         return
       }
 
-      const match = await resolveExplicitLspRouteMatch(
-        target,
-        socket.serverId,
-        deps.settings(),
-        resolveServer,
-      )
+      let match: LspServerMatch | null
+      try {
+        match = await resolveExplicitLspRouteMatch(
+          target,
+          socket.serverId,
+          deps.settings(),
+          resolveServer,
+        )
+      } catch (error) {
+        const wasClosed = pending.closed
+        rejectPendingLspSession(sessions, socket, pending)
+        recordProcessWarning('lsp.session.rejected', {
+          area: 'lsp',
+          error: operatorErrorSummary(error),
+          operation: 'open',
+          outcome: 'resolve_failed',
+          rootPath: socket.root,
+          serverId: socket.serverId,
+        })
+        if (!wasClosed) closeWithReason(socket, 'resolve_failed', socket.serverId ?? 'unknown')
+        return
+      }
       if (!match) {
         rejectPendingLspSession(sessions, socket, pending)
         recordProcessWarning('lsp.session.rejected', {
@@ -165,25 +181,28 @@ export function lspRoutes(fs: LspRouteFileSystem, auth: AuthConfig, deps: LspRou
         return
       }
 
-      const session = await deps.pool.acquire(
-        countedSocket(socket, pending),
-        match,
-        fs.paths.toRelative(match.root),
-      )
-      if (!session) {
+      const started = await deps.pool
+        .acquire(countedSocket(socket, pending), match, fs.paths.toRelative(match.root))
+        .then(
+          (session) => ({ session, error: null }),
+          (error: unknown) => ({ session: null, error }),
+        )
+      if (!started.session) {
+        const wasClosed = pending.closed
         rejectPendingLspSession(sessions, socket, pending)
         recordProcessWarning('lsp.session.rejected', {
           area: 'lsp',
+          error: started.error === null ? null : operatorErrorSummary(started.error),
           operation: 'open',
           outcome: 'spawn_failed',
           rootPath: fs.paths.toRelative(match.root),
           serverId: match.server.id,
         })
-        closeWithReason(socket, 'spawn_failed', match.server.id)
+        if (!wasClosed) closeWithReason(socket, 'spawn_failed', match.server.id)
         return
       }
 
-      attachPendingLspSession(pending, session)
+      attachPendingLspSession(pending, started.session)
     },
     message(ws: unknown, message: unknown) {
       const socket = websocketObject(ws)
@@ -357,16 +376,12 @@ async function resolveExplicitLspRouteMatch(
 ): Promise<LspServerMatch | null> {
   if (!target || !serverId) return null
 
-  try {
-    return resolve({
-      filePath: target.filePath,
-      serverId,
-      settings,
-      workspaceRoot: target.workspaceRoot,
-    })
-  } catch {
-    return null
-  }
+  return resolve({
+    filePath: target.filePath,
+    serverId,
+    settings,
+    workspaceRoot: target.workspaceRoot,
+  })
 }
 
 function resolveRouteTarget(paths: WorkspacePaths, input: LspRouteMatchInput) {

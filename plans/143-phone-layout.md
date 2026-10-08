@@ -405,6 +405,9 @@ session model.
   through a forwarded address, the phone's browser opening the generated link, which strips it and
   pairs, the phone in the list, a second claim refused). The production server serves `/pair`.
 - Owner check pending: pairing a real phone through the mesh, and the MacBook once after deploy.
+- Next: [Plan 337](337-device-pairing.md) owns pairing changes from 2026-10-08: a pairing screen
+  that names the machine, codes from any paired device, Tailscale sign-in, and approval from a
+  notification.
 
 ### Q6: native app technology
 

@@ -1,0 +1,64 @@
+name: ghostty docs
+
+on:
+  pull_request:
+    paths:
+      - ghostty-webgpu/**
+      - hotkeys/packages/hotkeys/**
+      - package.json
+      - scripts/workspace-tooling.mjs
+      - bun.lock
+      - .github/actions/setup/**
+      - .github/workflows/ghostty-docs.yml
+  push:
+    branches: [main]
+    paths:
+      - ghostty-webgpu/**
+      - hotkeys/packages/hotkeys/**
+      - package.json
+      - scripts/workspace-tooling.mjs
+      - bun.lock
+      - .github/actions/setup/**
+      - .github/workflows/ghostty-docs.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Check samples, generate reference and validate links
+        run: bun run --cwd ghostty-webgpu/site build --base /fregat/ghostty-webgpu/
+      - name: Install browser
+        working-directory: ghostty-webgpu/site
+        run: bunx playwright install --with-deps chromium
+      - name: Verify docs, echo example and search
+        working-directory: ghostty-webgpu/site
+        run: |
+          bun run preview --ignore-lock --base /fregat/ghostty-webgpu/ --host 127.0.0.1 --port 4327 > "$RUNNER_TEMP/ghostty-preview.log" 2>&1 &
+          preview=$!
+          trap 'kill "$preview" || true' EXIT
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:4327/fregat/ghostty-webgpu/docs/ > /dev/null; then
+              ready=1
+              break
+            fi
+            kill -0 "$preview" || { cat "$RUNNER_TEMP/ghostty-preview.log"; exit 1; }
+            sleep 1
+          done
+          test "$ready" = 1 || { cat "$RUNNER_TEMP/ghostty-preview.log"; exit 1; }
+          bun scripts/verify-docs.ts http://127.0.0.1:4327/fregat/ghostty-webgpu/docs/ "$RUNNER_TEMP/ghostty-docs-evidence"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ghostty-docs-browser
+          path: ${{ runner.temp }}/ghostty-docs-evidence
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ghostty-docs
+          path: ghostty-webgpu/site/dist

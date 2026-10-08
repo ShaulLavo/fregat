@@ -8,6 +8,13 @@ import type {
 import { createScriptError } from '../structured-errors'
 import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 
+export const workbenchPaintSelectors = {
+  terminal:
+    '[data-slot="tool-pane"][aria-label="Terminal"] [data-terminal-presentation="saved"] canvas, [data-slot="tool-pane"][aria-label="Terminal"] :not([inert]) > .ghostty-webgpu > canvas',
+  editor: '.editor-virtualized-row',
+  tree: '[aria-label="Folder tree"] [role="treeitem"]',
+}
+
 export const csvSelectors = {
   engineModule: '**/src/features/workbench/utils/csv.ts*',
   presentationModule: '**/src/features/workbench/utils/csv-presentation.ts*',
@@ -50,7 +57,6 @@ export const rootSwitchRows = {
 export const transientAlertSelector =
   '[role="alert"], [data-sonner-toast], [role="status"].text-warning'
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
-export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
 export const wallpaperImageSelector = 'img[data-workbench-wallpaper-layer]'
 export const diffPaneSelector = '.editor-diff-pane'
 /** A diff pane whose syntax tokens for its current rows have landed. */
@@ -972,13 +978,6 @@ export const selectors = {
     page
       .getByRole('navigation', { name: mode === 'Workbench' ? 'Sidebar tabs' : 'Tool tabs' })
       .getByRole('button', { name: 'Settings', exact: true }),
-  demoPreview: (page: Page) => page.locator('#demo-frame .demo-preview'),
-  demoFrame: (page: Page) => page.locator('#demo-frame'),
-  demoReady: (page: Page) => page.locator('#demo-frame[aria-busy="false"]'),
-  demoReset: (page: Page) => page.getByRole('button', { name: 'reset demo', exact: true }),
-  demoEditor: (page: Page) =>
-    page.frameLocator('#workbench-demo').getByRole('textbox', { name: 'Editor input' }).first(),
-  demoIframe: (page: Page) => page.locator('#workbench-demo'),
   workspaceSearch: (page: Page) =>
     page.getByRole('searchbox', { name: 'Search workspace', exact: true }),
   searchEditorInput: (page: Page) =>
@@ -1248,6 +1247,9 @@ export const selectors = {
       .locator('[role="treeitem"][aria-level="2"]'),
   pendingChord: (page: Page) => page.locator('[data-slot="keymap-pending"]'),
   editorSurface: (page: Page) => page.locator('.editor-virtualized-viewport'),
+  editorLineNumberSelector:
+    '.editor-virtualized-gutter-row:not([hidden]) .editor-virtualized-line-number',
+  editorLineNumbers: (page: Page) => page.locator(selectors.editorLineNumberSelector),
   editorFindInput: (page: Page) => page.getByRole('textbox', { name: 'Find', exact: true }),
   editorFindCount: (page: Page) => page.locator('.editor-find-count'),
   editorFindWidget: (page: Page) => page.locator('.editor-find-widget'),
@@ -1256,6 +1258,8 @@ export const selectors = {
   terminalOpening: (page: Page) => page.getByRole('status', { name: 'Opening terminal' }),
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
+  terminalLiveCanvas: (page: Page) =>
+    selectors.terminalSurface(page).first().locator(':not([inert]) > .ghostty-webgpu > canvas'),
   terminalDomRows: (page: Page) =>
     selectors.terminalSurface(page).first().locator('.ghostty-webgpu-frame [data-row]'),
   paletteRowSelector: '[data-slot="command-list"] [role="option"]',

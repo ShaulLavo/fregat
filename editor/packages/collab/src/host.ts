@@ -1,4 +1,4 @@
-import { CollabFailure } from './failure'
+import { CollabFailure, rethrowObserverErrors } from './failure'
 import { editKey, insertionOf } from './types'
 import type { EditId, Engine, Envelope } from './types'
 
@@ -18,11 +18,13 @@ export type HostOptions<Snapshot> = {
   readonly unknownDeps?: 'defer' | 'reject'
 }
 
+type Subscription = { readonly listener: (message: HostMessage) => void }
+
 export class Host<Snapshot = unknown> {
   private sequence = 0
   private outcomes = new Map<string, HostMessage>()
   private deferred = new Map<string, Envelope>()
-  private listeners = new Set<(message: HostMessage) => void>()
+  private listeners = new Set<Subscription>()
   private draining = false
   private broadcasts: HostMessage[] = []
 
@@ -36,9 +38,10 @@ export class Host<Snapshot = unknown> {
   }
 
   subscribe(listener: (message: HostMessage) => void): () => void {
-    this.listeners.add(listener)
+    const subscription = { listener }
+    this.listeners.add(subscription)
     return () => {
-      this.listeners.delete(listener)
+      this.listeners.delete(subscription)
     }
   }
 
@@ -46,7 +49,10 @@ export class Host<Snapshot = unknown> {
     return this.outcomes.get(editKey(id))
   }
 
-  submit(envelope: Envelope): SubmitResult {
+  /** The transport supplies sender from its authenticated session, never from the frame. */
+  submit(envelope: Envelope, sender: string): SubmitResult {
+    if (typeof sender !== 'string' || !sender) throw new CollabFailure('missing-sender')
+    if (sender !== envelope.id.actor) throw new CollabFailure('sender-mismatch')
     const key = editKey(envelope.id)
     const outcome = this.outcomes.get(key)
     if (outcome) return outcome
@@ -59,17 +65,28 @@ export class Host<Snapshot = unknown> {
     // A synchronous transport may submit during a broadcast; settle before notifying it.
     if (this.draining) return
     this.draining = true
+    const errors: unknown[] = []
     try {
-      this.settleReady()
-      while (this.broadcasts.length) {
-        const message = this.broadcasts.shift()!
-        for (const listener of this.listeners) listener(message)
-      }
+      do {
+        this.settleReady()
+        while (this.broadcasts.length) this.deliver(this.broadcasts.shift()!, errors)
+      } while ([...this.deferred.values()].some((envelope) => this.ready(envelope)))
     } finally {
       this.draining = false
     }
-    if (this.deferred.size && [...this.deferred.values()].some((envelope) => this.ready(envelope)))
-      this.drain()
+    rethrowObserverErrors('host.broadcast', errors)
+  }
+
+  private deliver(message: HostMessage, errors: unknown[]): void {
+    const subscriptions = [...this.listeners]
+    for (const subscription of subscriptions) {
+      if (!this.listeners.has(subscription)) continue
+      try {
+        subscription.listener(message)
+      } catch (error) {
+        errors.push(error)
+      }
+    }
   }
 
   private settleReady(): void {
@@ -118,8 +135,21 @@ export class Host<Snapshot = unknown> {
     return null
   }
 
+  private effectRejection(envelope: Envelope): string | null {
+    const change = envelope.change
+    if (change.kind !== 'setEffects') return null
+    if (editKey(change.command) !== editKey(envelope.id)) return 'invalid-effect-command'
+    for (const effect of change.effects) {
+      if (effect.op.actor !== envelope.id.actor) return 'foreign-effect'
+      const target = this.outcomes.get(editKey(effect.op))
+      if (target?.status !== 'accepted') return 'unknown-effect'
+      if (target.envelope.change.kind === 'setEffects') return 'invalid-effect-target'
+    }
+    return null
+  }
+
   private settle(envelope: Envelope, rejection: string | null): void {
-    let reason = rejection
+    let reason = rejection ?? this.effectRejection(envelope)
     if (reason === null) {
       const snapshot = this.options.engine.snapshot()
       try {
@@ -145,6 +175,17 @@ export class Host<Snapshot = unknown> {
 
 export function cloneEnvelope(envelope: Envelope): Envelope {
   const change = envelope.change
+  if (change.kind === 'setEffects')
+    return {
+      ...envelope,
+      id: { ...envelope.id },
+      deps: envelope.deps.map((id) => ({ ...id })),
+      change: {
+        kind: 'setEffects',
+        command: { ...change.command },
+        effects: change.effects.map((effect) => ({ op: { ...effect.op }, active: effect.active })),
+      },
+    }
   const insert = insertionOf(change)
   const copied = insert
     ? {

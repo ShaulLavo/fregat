@@ -1,14 +1,18 @@
-import { CollabFailure } from './failure'
+import { CharIdAllocator } from '@singapore-editor/textbuffer'
+import { CollabFailure, rethrowObserverErrors } from './failure'
 import { cloneEnvelope } from './host'
+import { UndoManager } from './undo'
+import type { CaptureOptions, UndoOptions } from './undo'
 import type { HostMessage } from './host'
-import { editKey, sameChar } from './types'
-import type { CharId, EditId, Engine, Envelope, LeftOrigin, OffsetEdit } from './types'
+import { editKey } from './types'
+import type { EditId, Effect, EffectiveEdit, Engine, Envelope, OffsetEdit } from './types'
 
 export type ParticipantOptions<Snapshot> = {
   readonly actor: string
   readonly document: string
   readonly epoch: string
   readonly engine: Engine<Snapshot>
+  readonly undo?: UndoOptions
 }
 export type ParticipantState = {
   readonly text: string
@@ -18,7 +22,20 @@ export type ParticipantState = {
   readonly blocked: readonly EditId[]
 }
 
+export type ParticipantChange = Omit<ParticipantState, 'text'> & {
+  readonly edits: readonly EffectiveEdit[]
+}
+
+type Subscription = { readonly listener: (change: ParticipantChange) => void }
+type Publication = {
+  readonly change: ParticipantChange
+  readonly listeners: readonly Subscription[]
+}
+
 export class Participant<Snapshot = unknown> {
+  readonly actor: string
+  readonly undoManager: UndoManager
+  private historyRejected: EditId[] = []
   private confirmed: Snapshot
   private frontier = new Map<string, EditId>()
   private pending: Envelope[] = []
@@ -28,13 +45,23 @@ export class Participant<Snapshot = unknown> {
   private sequence = 0
   private editSequence = 0
   private lamport = 0
-  private runSequence = 0
-  private lastId: CharId | null = null
-  private listeners = new Set<(state: ParticipantState) => void>()
+  private readonly allocator: CharIdAllocator
+  private listeners = new Set<Subscription>()
+  private publication: { readonly snapshot: Snapshot } | null = null
+  private publications: Publication[] = []
+  private publishing = false
 
   constructor(private readonly options: ParticipantOptions<Snapshot>) {
     if (!options.actor) throw new CollabFailure('invalid-actor')
+    this.allocator = new CharIdAllocator(options.actor)
+    this.actor = options.actor
     this.confirmed = options.engine.snapshot()
+    this.undoManager = new UndoManager(
+      options.actor,
+      (effects) => this.enqueueEffects(effects),
+      options.undo,
+      () => this.publish(),
+    )
   }
 
   text(): string {
@@ -42,8 +69,11 @@ export class Participant<Snapshot = unknown> {
   }
 
   state(): ParticipantState {
+    return { ...this.metadata(), text: this.text() }
+  }
+
+  private metadata(): Omit<ParticipantState, 'text'> {
     return {
-      text: this.text(),
       frontier: [...this.frontier.values()].map((id) => ({ ...id })),
       hostSequence: this.sequence,
       pending: this.pending.map(cloneEnvelope),
@@ -51,28 +81,58 @@ export class Participant<Snapshot = unknown> {
     }
   }
 
-  subscribe(listener: (state: ParticipantState) => void): () => void {
-    this.listeners.add(listener)
+  subscribe(listener: (change: ParticipantChange) => void): () => void {
+    if (this.listeners.size === 0) this.publication = { snapshot: this.options.engine.snapshot() }
+    const subscription = { listener }
+    this.listeners.add(subscription)
     return () => {
-      this.listeners.delete(listener)
+      this.listeners.delete(subscription)
+      if (this.listeners.size === 0) this.publication = null
     }
   }
 
-  local(edit: OffsetEdit): Envelope {
+  local(edit: OffsetEdit, capture: CaptureOptions = {}): Envelope {
     const envelope = this.options.engine.author(edit, {
       document: this.options.document,
       epoch: this.options.epoch,
       id: { actor: this.options.actor, seq: this.editSequence + 1 },
       lamport: this.lamport + 1,
       deps: this.pendingFrontier(),
-      allocate: (left, count) => this.allocate(left, count),
+      allocate: (left, count) => this.allocator.generateAfter(left, count),
     })
     this.options.engine.apply(envelope)
     this.editSequence++
     this.lamport++
     this.pending.push(cloneEnvelope(envelope))
+    try {
+      this.undoManager.record(envelope, capture)
+    } finally {
+      this.publish()
+    }
+    return envelope
+  }
+
+  setEffects(effects: readonly Effect[]): Envelope {
+    const envelope = this.enqueueEffects(effects)
     this.publish()
     return envelope
+  }
+
+  private enqueueEffects(effects: readonly Effect[]): Envelope {
+    const id = { actor: this.options.actor, seq: this.editSequence + 1 }
+    const envelope: Envelope = {
+      document: this.options.document,
+      epoch: this.options.epoch,
+      id,
+      lamport: this.lamport + 1,
+      deps: this.pendingFrontier(),
+      change: { kind: 'setEffects', command: id, effects },
+    }
+    this.options.engine.apply(envelope)
+    this.editSequence++
+    this.lamport++
+    this.pending.push(cloneEnvelope(envelope))
+    return cloneEnvelope(envelope)
   }
 
   receive(messages: readonly HostMessage[]): void {
@@ -84,6 +144,7 @@ export class Participant<Snapshot = unknown> {
       if (message.sequence > this.sequence) this.incoming.set(message.sequence, message)
     }
     if (!this.incoming.has(this.sequence + 1)) return
+    this.historyRejected = []
     this.options.engine.restore(this.confirmed)
     while (this.incoming.has(this.sequence + 1)) {
       const message = this.incoming.get(this.sequence + 1)!
@@ -92,6 +153,7 @@ export class Participant<Snapshot = unknown> {
     }
     this.confirmed = this.options.engine.snapshot()
     this.replay()
+    this.undoManager.reject([...this.historyRejected, ...this.blocked])
     this.publish()
   }
 
@@ -100,9 +162,11 @@ export class Participant<Snapshot = unknown> {
     this.pending = this.pending.filter((envelope) => editKey(envelope.id) !== editKey(id))
     if (message.status === 'rejected') {
       this.rejected.add(editKey(id))
+      this.historyRejected.push(id)
       return
     }
     this.options.engine.apply(message.envelope)
+    this.undoManager.remote(message.envelope)
     this.lamport = Math.max(this.lamport, message.envelope.lamport)
     for (const dependency of message.envelope.deps) this.frontier.delete(editKey(dependency))
     this.frontier.set(editKey(id), { ...id })
@@ -132,18 +196,32 @@ export class Participant<Snapshot = unknown> {
     return [...frontier.values()]
   }
 
-  private allocate(left: LeftOrigin, count: number): CharId {
-    const start =
-      this.lastId && sameChar(left, this.lastId)
-        ? { bunch: this.lastId.bunch, counter: this.lastId.counter + 1 }
-        : { bunch: `${this.options.actor}:${++this.runSequence}`, counter: 0 }
-    this.lastId = { bunch: start.bunch, counter: start.counter + count - 1 }
-    return start
-  }
-
   private publish(): void {
     if (this.listeners.size === 0) return
-    const state = this.state()
-    for (const listener of this.listeners) listener(state)
+    const edits = this.options.engine.changesBetween(this.publication!.snapshot)
+    this.publication = { snapshot: this.options.engine.snapshot() }
+    const change = { ...this.metadata(), edits }
+    this.publications.push({ change, listeners: [...this.listeners] })
+    if (this.publishing) return
+    this.publishing = true
+    const errors: unknown[] = []
+    try {
+      while (this.publications.length) this.deliver(this.publications.shift()!, errors)
+    } finally {
+      this.publications = []
+      this.publishing = false
+    }
+    rethrowObserverErrors('participant.publish', errors)
+  }
+
+  private deliver({ change, listeners }: Publication, errors: unknown[]): void {
+    for (const subscription of listeners) {
+      if (!this.listeners.has(subscription)) continue
+      try {
+        subscription.listener(change)
+      } catch (error) {
+        errors.push(error)
+      }
+    }
   }
 }

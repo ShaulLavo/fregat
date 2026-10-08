@@ -1,12 +1,15 @@
 import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import {
+  cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
   readlinkSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -50,6 +53,107 @@ function repoWithCommits(count: number) {
   return repo
 }
 
+function sourceCheckout() {
+  const repo = temp('heavy-install-source-')
+  for (const relative of [
+    'tsconfig.json',
+    'scripts/tsconfig.json',
+    'scripts/heavy',
+    'scripts/agent/logs.ts',
+    'scripts/home-setting.ts',
+    'scripts/state-home.ts',
+    'scripts/structured-errors.ts',
+    'apps/server/src/settings/json-document.ts',
+    'apps/server/src/fs',
+    'apps/server/src/utils/shell.ts',
+    'packages/contracts/src',
+    'packages/contracts/package.json',
+    'packages/contracts/tsconfig.json',
+    'hotkeys/packages/hotkeys/src',
+    'hotkeys/packages/hotkeys/package.json',
+  ]) {
+    const destination = path.join(repo, relative)
+    mkdirSync(path.dirname(destination), { recursive: true })
+    cpSync(path.join(CHECKOUT, relative), destination, { recursive: true })
+  }
+  for (const workspace of [
+    '',
+    'scripts',
+    'packages/contracts',
+    'hotkeys/packages/hotkeys',
+    'apps/server',
+  ]) {
+    const source = path.join(CHECKOUT, workspace, 'node_modules')
+    if (!existsSync(source)) continue
+    const destination = path.join(repo, workspace, 'node_modules')
+    mkdirSync(destination, { recursive: true })
+    for (const dependency of readdirSync(source)) {
+      if (dependency === '@fregat') continue
+      symlinkSync(path.join(source, dependency), path.join(destination, dependency), 'dir')
+    }
+  }
+  const dependencies = path.join(repo, 'node_modules')
+  mkdirSync(path.join(dependencies, '@fregat'))
+  symlinkSync(
+    path.join(repo, 'hotkeys/packages/hotkeys'),
+    path.join(dependencies, '@fregat/hotkeys'),
+    'dir',
+  )
+  writeFileSync(path.join(repo, '.gitignore'), 'node_modules\n')
+  run('git', ['init', '-q'], repo)
+  run('git', ['add', '.'], repo)
+  const committed = run(
+    'git',
+    ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'source'],
+    repo,
+  )
+  expect(committed.code, committed.stderr).toBe(0)
+  return repo
+}
+
+test('installs a self-contained bundle from source without hotkeys dist', () => {
+  const repo = sourceCheckout()
+  const root = temp('heavy-install-root-')
+  const dist = path.join(repo, 'hotkeys/packages/hotkeys/dist')
+  expect(existsSync(dist)).toBe(false)
+  const installed = run('bun', [INSTALL, '--source', repo, '--root', root])
+  expect(installed.code, installed.stderr).toBe(0)
+  expect(existsSync(dist)).toBe(false)
+  const head = run('git', ['rev-parse', 'HEAD'], repo).stdout.trim()
+  expect(readlinkSync(path.join(root, 'current'))).toBe(head)
+  expect(readFileSync(path.join(root, 'current/run.js'), 'utf8')).toContain(
+    'hotkeys/packages/hotkeys/src/context/predicate.ts',
+  )
+  expect(readdirSync(path.join(root, 'current/pi'))).toEqual(['launch.js'])
+  rmSync(repo, { recursive: true, force: true })
+  const report = run(
+    'bun',
+    [path.join(root, 'current/report.js'), '--json', '--log-dir', root],
+    root,
+  )
+  expect(report.code, report.stderr).toBe(0)
+  expect(JSON.parse(report.stdout)).toEqual([])
+}, 60_000)
+
+test('names missing workspace source and removes the partial bundle', () => {
+  const repo = sourceCheckout()
+  const root = temp('heavy-install-root-')
+  rmSync(path.join(repo, 'hotkeys/packages/hotkeys/src/index.ts'))
+  run('git', ['add', '.'], repo)
+  const committed = run(
+    'git',
+    ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'missing source'],
+    repo,
+  )
+  expect(committed.code, committed.stderr).toBe(0)
+  const installed = run('bun', [INSTALL, '--source', repo, '--root', root])
+  expect(installed.code).toBe(2)
+  expect(installed.stderr).toContain('@fregat/hotkeys')
+  expect(installed.stderr).toContain('hotkeys/packages/hotkeys/src/index.ts')
+  expect(installed.stderr).toContain('Restore missing workspace source files')
+  expect(readdirSync(root)).toEqual([])
+}, 60_000)
+
 test.each([null, 'invalid', 'configured'])(
   'requires its own root before reading source with deploy target %s',
   (target) => {
@@ -81,7 +185,8 @@ test.each([null, 'invalid', 'configured'])(
     })
     expect(result.status).toBe(2)
     expect(result.stderr).toContain('An installation root is required for the heavy-job wrapper.')
-    expect(result.stderr).toContain('--root=<directory>')
+    expect(result.stderr).toContain('bun scripts/heavy/install.ts --root=<directory>')
+    expect(result.stderr).toContain('scripts/heavy/README.md')
     expect(result.stderr).not.toContain('git status')
     expect(readdirSync(home)).toEqual(['.platform'])
     expect(readdirSync(path.join(home, '.platform'))).toEqual(['settings.json'])

@@ -1,10 +1,13 @@
 // Adapted from mweidner037/fugue, fugue-max-simple/src/index.ts at 31e74fea67f23add13a5d10f781c0d78edcd14da.
 // Copyright (c) 2023 Matthew Weidner and Martin Kleppmann. MIT; see THIRD_PARTY_LICENSES.
 import { CollabFailure } from './failure'
+import { Effects } from './effects'
+import type { EffectsSnapshot } from './effects'
 import { charKey, insertionOf } from './types'
 import type {
   AuthorContext,
   CharId,
+  CharacterIdentity,
   Engine,
   Envelope,
   IdSpan,
@@ -22,7 +25,6 @@ type Node = {
   readonly rightOrigin: Node | null
   readonly left: Node[]
   readonly right: Node[]
-  deleted: boolean
 }
 type SavedNode = {
   readonly id: CharId
@@ -32,17 +34,63 @@ type SavedNode = {
   readonly rightOrigin: RightOrigin
   readonly deleted: boolean
 }
-export type ReferenceSnapshot = { readonly nodes: readonly SavedNode[] }
+export type ReferenceSnapshot = {
+  readonly nodes: readonly SavedNode[]
+  readonly effects: EffectsSnapshot
+}
 
 export class ReferenceEngine implements Engine<ReferenceSnapshot> {
   private root = rootNode()
   private nodes = new Map<string, Node>()
+  private effects = new Effects()
 
+  changesBetween(snapshot: ReferenceSnapshot) {
+    const previous = new ReferenceEngine()
+    previous.restore(snapshot)
+    const before = previous.text(),
+      after = this.text()
+    let from = 0
+    while (
+      from < before.length &&
+      from < after.length &&
+      before.charCodeAt(from) === after.charCodeAt(from)
+    )
+      from++
+    if (from === before.length && from === after.length) return []
+    let suffix = 0
+    while (
+      suffix < Math.min(before.length, after.length) - from &&
+      before.charCodeAt(before.length - suffix - 1) === after.charCodeAt(after.length - suffix - 1)
+    )
+      suffix++
+    return [{ from, to: before.length - suffix, text: after.slice(from, after.length - suffix) }]
+  }
   text(): string {
     return this.ordered()
-      .filter((node) => !node.deleted)
+      .filter((node) => this.effects.visible(node.id as CharId))
       .map((node) => node.value)
       .join('')
+  }
+
+  characters(): readonly CharacterIdentity[] {
+    let offset = 0
+    return this.ordered()
+      .map((node) => {
+        const id = node.id as CharId
+        const identity = {
+          id: { bunch: id.bunch, counter: id.counter },
+          deleted: !this.effects.visible(id),
+          offset,
+        }
+        if (this.effects.visible(id)) offset++
+        return identity
+      })
+      .sort((a, b) => compareIds(a.id, b.id))
+  }
+
+  /** Retained IDs in placement order, including hidden characters. */
+  orderedIds(): readonly CharId[] {
+    return this.ordered().map((node) => ({ ...(node.id as CharId) }))
   }
 
   /** Hidden IDs resolve to their retained gap; only unknown IDs return null. */
@@ -50,14 +98,14 @@ export class ReferenceEngine implements Engine<ReferenceSnapshot> {
     let offset = 0
     for (const node of this.ordered()) {
       if (charKey(node.id as CharId) === charKey(id)) return offset
-      if (!node.deleted) offset++
+      if (this.effects.visible(node.id as CharId)) offset++
     }
     return null
   }
 
   origins(offset: number): { readonly originLeft: LeftOrigin; readonly originRight: RightOrigin } {
     const ordered = this.ordered()
-    const visible = ordered.filter((node) => !node.deleted)
+    const visible = ordered.filter((node) => this.effects.visible(node.id as CharId))
     checkRange(offset, 0, visible.length)
     const left = offset === 0 ? this.root : visible[offset - 1]!
     const next = ordered[ordered.indexOf(left) + 1]
@@ -84,30 +132,37 @@ export class ReferenceEngine implements Engine<ReferenceSnapshot> {
   }
 
   apply(envelope: Envelope): void {
+    if (this.effects.applied(envelope.id)) return
     const change = envelope.change
+    if (change.kind === 'setEffects') {
+      if (change.command.actor !== envelope.id.actor || change.command.seq !== envelope.id.seq)
+        throw new CollabFailure('invalid-effect-command')
+      this.effects.set(envelope.id, change.effects)
+      return
+    }
     const insert = insertionOf(change)
     const spans = change.kind === 'insert' ? [] : change.spans
     // Validate the whole transaction before touching visibility or adding tree nodes.
     this.validateSpans(spans)
     if (insert) this.validateInsert(insert)
-    if (insert) this.insert(insert)
-    for (const span of spans) {
-      for (let counter = span.start.counter; counter < span.start.counter + span.count; counter++) {
-        this.get({ bunch: span.start.bunch, counter }).deleted = true
-      }
+    if (insert) {
+      this.insert(insert)
+      this.effects.insert(envelope.id, { start: insert.start, count: insert.text.length })
     }
+    if (change.kind !== 'insert') this.effects.delete(envelope.id, spans)
   }
 
   snapshot(): ReferenceSnapshot {
     // Creation order keeps parents and right origins before their dependants during restore.
     return {
+      effects: this.effects.snapshot(),
       nodes: [...this.nodes.values()].map((node) => ({
         id: { ...(node.id as CharId) },
         value: node.value,
         parent: copyLeft(node.parent!.id),
         side: node.side,
         rightOrigin: node.rightOrigin ? { ...(node.rightOrigin.id as CharId) } : 'end',
-        deleted: node.deleted,
+        deleted: !this.effects.visible(node.id as CharId),
       })),
     }
   }
@@ -115,6 +170,7 @@ export class ReferenceEngine implements Engine<ReferenceSnapshot> {
   restore(snapshot: ReferenceSnapshot): void {
     this.root = rootNode()
     this.nodes = new Map()
+    this.effects.restore(snapshot.effects)
     for (const saved of snapshot.nodes) {
       this.add(
         saved.id,
@@ -122,14 +178,13 @@ export class ReferenceEngine implements Engine<ReferenceSnapshot> {
         this.get(saved.parent),
         saved.side,
         saved.rightOrigin === 'end' ? null : this.get(saved.rightOrigin),
-        saved.deleted,
       )
     }
   }
 
   private spans(offset: number, count: number): readonly IdSpan[] {
     const selected = this.ordered()
-      .filter((node) => !node.deleted)
+      .filter((node) => this.effects.visible(node.id as CharId))
       .slice(offset, offset + count)
     const spans: { start: CharId; count: number }[] = []
     for (const node of selected) {
@@ -196,7 +251,6 @@ export class ReferenceEngine implements Engine<ReferenceSnapshot> {
         isLeft ? right! : left,
         isLeft ? 'L' : 'R',
         right,
-        false,
       )
     }
   }
@@ -207,7 +261,6 @@ export class ReferenceEngine implements Engine<ReferenceSnapshot> {
     parent: Node,
     side: 'L' | 'R',
     rightOrigin: Node | null,
-    deleted: boolean,
   ): Node {
     const node: Node = {
       id: { ...id },
@@ -215,7 +268,6 @@ export class ReferenceEngine implements Engine<ReferenceSnapshot> {
       parent,
       side,
       rightOrigin,
-      deleted,
       left: [],
       right: [],
     }
@@ -259,7 +311,6 @@ function rootNode(): Node {
     parent: null,
     side: 'R',
     rightOrigin: null,
-    deleted: true,
     left: [],
     right: [],
   }

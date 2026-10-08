@@ -20,3 +20,16 @@ export function deviceLabel(userAgent: string) {
   const browser = BROWSERS.find(([pattern]) => pattern.test(userAgent))?.[1]
   return browser ? `${system} · ${browser}` : system
 }
+
+export type DeviceKind = 'phone' | 'tablet' | 'browser'
+
+/**
+ * What the pairing screen calls this device. iPadOS reports itself as a Mac, so a Mac with a touch
+ * screen is a tablet.
+ */
+export function deviceKind(userAgent: string, touchPoints: number): DeviceKind {
+  if (/iPhone|Android.+Mobile|Mobile.+Firefox/.test(userAgent)) return 'phone'
+  if (/iPad|Android/.test(userAgent)) return 'tablet'
+  if (/Macintosh/.test(userAgent) && touchPoints > 1) return 'tablet'
+  return 'browser'
+}

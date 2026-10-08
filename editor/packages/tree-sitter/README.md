@@ -1,53 +1,48 @@
 # @singapore-editor/tree-sitter
 
-tree-sitter syntax for `@singapore-editor/core`. parses in a worker and gives the editor highlights, folds, brackets, injected languages and structural selection
+Worker-based Tree-sitter parsing for Singapore syntax colors, folds, and brackets.
 
-it ships no grammars. bring your own, or take the bundled set from [`@singapore-editor/tree-sitter-languages`](../tree-sitter-languages/)
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
 
-## try it
+## Install
 
 ```sh
 npm install @singapore-editor/core @singapore-editor/tree-sitter @singapore-editor/tree-sitter-languages
 ```
 
+## Usage
+
 ```ts
+import '@singapore-editor/core/style.css'
 import { Editor } from '@singapore-editor/core/editor'
 import { createTreeSitterLanguagePlugin } from '@singapore-editor/tree-sitter'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
 
-const editor = new Editor(element, {
+const host = document.createElement('div')
+host.style.height = '400px'
+document.body.append(host)
+
+const editor = new Editor(host, {
   plugins: [createTreeSitterLanguagePlugin(TREE_SITTER_LANGUAGE_CONTRIBUTIONS)],
 })
+editor.setText('const value = 1\n', { languageId: 'typescript' })
 ```
 
-grammars load the first time a document needs them. every editor using this plugin shares one worker
+## API highlights
 
-with your own grammar, make a provider and register languages on it
+- `createTreeSitterLanguagePlugin()` installs language contributions.
+- `createTreeSitterSyntaxProvider()` registers custom grammars.
+- `expandTreeSitterSelection()` selects a larger syntax node.
 
-```ts
-import {
-  createTreeSitterSyntaxPlugin,
-  createTreeSitterSyntaxProvider,
-} from '@singapore-editor/tree-sitter'
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/tree-sitter/overview/)
 
-const provider = createTreeSitterSyntaxProvider()
-provider.registerLanguage({
-  id: 'lua',
-  extensions: ['.lua'],
-  load: async () => ({
-    wasmUrl: '/grammars/tree-sitter-lua.wasm',
-    highlightQuerySource: await fetch('/grammars/lua-highlights.scm').then((r) => r.text()),
-  }),
-})
+## In the Singapore family
 
-const editor = new Editor(element, { plugins: [createTreeSitterSyntaxPlugin(provider)] })
-```
+`@singapore-editor/core` owns the editor view. This optional package adds syntax parsing. Choose the other plugins your app needs.
+Use a bundler that serves the package worker and data assets. See the [hosting guide](https://shaulavo.dev/singapore/docs/guides/bundling/).
 
-a contribution can also carry `foldQuerySource`, `injectionQuerySource`, `aliases` and `filenames`
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
 
-## more
+## License
 
-- [how the syntax system works](../../docs/syntax/tree-sitter.md): worker ownership, incremental parses, injections
-- `expandTreeSitterSelection`, `shrinkTreeSitterSelection` and `selectTreeSitterToken` drive structural selection commands
-- `bun run bench:syntax` runs the syntax benchmark in `bench/`
-- [`@singapore-editor/highlighting`](../highlighting/) pairs this with shiki for imported vs code themes
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)

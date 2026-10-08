@@ -27,6 +27,12 @@ import type { EditorTheme } from './theme'
 import type { EditorTokenStore } from './syntax/tokenStore'
 import type { TextReadSnapshot } from './documentTextSnapshot'
 import type { TextEdit } from './tokens'
+import type {
+  DocumentSessionApplyEditsOptions,
+  DocumentSessionReconcileOptions,
+  EditorTextTransaction,
+} from './documentSession'
+import type { PieceTableSnapshot } from '@singapore-editor/textbuffer'
 
 /**
  * A value the editor publishes, read from a view snapshot. `kinds` are the update kinds that can
@@ -148,10 +154,18 @@ export type EditorViewScope = {
     run: EditorCommandHandler,
   ): void
   getSelections(): readonly EditorResolvedSelection[]
-  /** One batch against one snapshot, one undo entry; `selection` may be one range or one per caret. */
+  /** One atomic batch; options choose history and origin, and selection may be one range per caret. */
   applyEdits(
     edits: readonly TextEdit[],
     selection?: EditorSelectionRange | readonly EditorSelectionRange[],
+    options?: DocumentSessionApplyEditsOptions,
+  ): void
+  /** Exact authored transactions. Reconciliation publishes content without creating an authored edit. */
+  onDidTransaction(listener: (event: EditorTextTransaction) => void): EditorDisposable
+  reconcile(
+    base: PieceTableSnapshot,
+    batches: readonly (readonly TextEdit[])[],
+    options: DocumentSessionReconcileOptions,
   ): void
   /** Experimental: while `accepts` answers false, text input (typing, IME, paste, drop) is refused. */
   textGate(accepts: () => boolean): void
@@ -398,8 +412,10 @@ function createScopeContribution(
         context.registerCommand(typeof command === 'string' ? command : command.id, run),
       ),
     getSelections: () => context.getSelections(),
-    applyEdits: (edits, selection) =>
-      context.applyEdits(edits, 'editor.plugin.applyEdits', selection),
+    applyEdits: (edits, selection, options) =>
+      context.applyEdits(edits, 'editor.plugin.applyEdits', selection, options),
+    onDidTransaction: (listener) => owned.add(context.onDidTransaction(listener)),
+    reconcile: (base, batches, options) => context.reconcile(base, batches, options),
     textGate: (accepts) => void owned.add(context.registerTextGate(accepts)),
     cursorStyle: (style) => {
       context.setCursorStyle(style)

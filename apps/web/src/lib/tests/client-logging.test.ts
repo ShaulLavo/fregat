@@ -7,6 +7,7 @@ import { createTestQueryClient } from '../../../test/render'
 import { DEFAULT_PROVIDER_DRIVER_KIND, providerInstanceIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { afterEach, beforeEach, vi } from 'vitest'
+import { createError } from 'evlog'
 
 import { expect, test } from '../../../test/fixtures'
 import type { ActiveSettingsIntent } from '@workspace/client-core/settings/intent-store'
@@ -293,3 +294,69 @@ test('a settings stream keeps its primary owner when it finishes under a remote 
     setActiveServerOrigin(previousOrigin)
   }
 })
+
+test('retains sanitized internal context in client operation failures and raw errors', async () => {
+  const failure = createError({
+    message: 'Synthetic client failure',
+    internal: { observed: 'stopped', token: 'PRIVATE_TOKEN' },
+  })
+  await expect(
+    observeClientOperation({ action: 'test.failure', area: 'test' }, async () =>
+      Promise.reject(failure),
+    ),
+  ).rejects.toBe(failure)
+  log.error({ action: 'test.raw', area: 'test', error: failure })
+
+  expect(emittedEvents).toHaveLength(2)
+  for (const { event } of emittedEvents) {
+    expect(event.error).toMatchObject({
+      internal: { observed: 'stopped', token: '[redacted]' },
+    })
+    expect(JSON.stringify(event)).not.toContain('PRIVATE_TOKEN')
+  }
+})
+
+test.each(['getter', 'array'])(
+  'preserves the original rejection with a diagnostic %s failure',
+  async (kind) => {
+    const items: unknown[] = []
+    items.push(items)
+    const failure = createError({ message: 'Synthetic failure', internal: { items } })
+    if (kind === 'getter')
+      Object.defineProperty(failure, 'internal', {
+        get: () => {
+          throw createError({ message: 'Synthetic getter failure' })
+        },
+      })
+    await expect(
+      observeClientOperation({ action: 'synthetic.failure', area: 'test' }, async () => {
+        throw failure
+      }),
+    ).rejects.toBe(failure)
+    expect(emittedEvents).toHaveLength(1)
+    expect(emittedEvents[0]?.event).toMatchObject({ error: { message: 'Synthetic failure' } })
+  },
+)
+
+test.each(['element', 'message', 'name', 'stack', 'cause'])(
+  'logs unreadable internal %s getters and preserves the rejection',
+  async (field) => {
+    const nested = createError('Synthetic nested failure')
+    void nested.stack
+    const items = [nested]
+    const target = field === 'element' ? items : nested
+    Object.defineProperty(target, field === 'element' ? 0 : field, {
+      get: () => {
+        throw createError('Synthetic getter failure')
+      },
+    })
+    const failure = createError({ message: 'Synthetic failure', internal: { items } })
+    await expect(
+      observeClientOperation({ action: 'synthetic.getter', area: 'test' }, async () => {
+        throw failure
+      }),
+    ).rejects.toBe(failure)
+    expect(emittedEvents).toHaveLength(1)
+    expect(JSON.stringify(emittedEvents[0]?.event)).toContain('[unreadable: getter threw]')
+  },
+)

@@ -2,10 +2,20 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { readFsLogs } from 'evlog/fs'
 
 import { createAuthConfig } from '../../auth'
+import { lspErrors } from '../../observability'
 import { createWorkspacePaths } from '../../fs/path'
 import { lspRouteMatch, lspRouteSemanticTokens, lspRoutes, type LspRouteDeps } from '../routes'
+import type { LspProxyClientSession } from '../proxy-session'
+import type { LspServerMatch } from '../registry'
+import {
+  flushObservability,
+  initializeObservability,
+  resetObservabilityForTests,
+} from '../../observability/runtime'
+import { settingsErrors } from '../../settings/structured-errors'
 
 const TRUSTED_ORIGIN = 'http://localhost:5173'
 const roots: string[] = []
@@ -24,6 +34,7 @@ class FakeLspProxySession {
 }
 
 afterEach(async () => {
+  await resetObservabilityForTests()
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
@@ -84,6 +95,171 @@ describe('LSP websocket routes', () => {
     await opening
 
     expect(createdSessions[0]?.clientMessages).toEqual([initializeRequest(1)])
+  })
+
+  it('settles a rejected installer and reports the failed backend to the socket', async () => {
+    const root = await fixtureRoot()
+    const deps = bufferedLspDeps(root, [])
+    const failure = lspErrors.PACKAGE_INSTALL_FAILED({
+      internal: { exitCode: 1 },
+      packageName: 'vscode-langservers-extracted',
+    })
+    const acquire = vi.fn().mockRejectedValue(failure)
+    const routes = lspRoutes({ paths: createWorkspacePaths(root) }, auth(), {
+      ...deps,
+      pool: { acquire },
+    })
+    const ws = fakeSocket({ path: 'settings.json', root: '', server: 'buffered-lsp' })
+    const send = vi.spyOn(ws, 'send')
+
+    await expect(routes.open(ws)).resolves.toBeUndefined()
+
+    expect(acquire).toHaveBeenCalledTimes(1)
+    expect(ws.closed).toBe(true)
+    expect(send).toHaveBeenCalledWith(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        method: '$/serverExited',
+        params: {
+          exitCode: null,
+          exitSignal: null,
+          outcome: 'spawn_failed',
+          serverId: 'buffered-lsp',
+        },
+      }),
+    )
+    routes.message(ws, JSON.stringify(initializeRequest(1)))
+    routes.close(ws)
+  })
+
+  it('settles an installer rejection after the client has disconnected', async () => {
+    const root = await fixtureRoot()
+    const starting = Promise.withResolvers<LspProxyClientSession | null>()
+    const acquired = Promise.withResolvers<void>()
+    const deps = bufferedLspDeps(root, [])
+    const routes = lspRoutes({ paths: createWorkspacePaths(root) }, auth(), {
+      ...deps,
+      pool: {
+        acquire: () => {
+          acquired.resolve()
+          return starting.promise
+        },
+      },
+    })
+    const ws = fakeSocket({ path: 'settings.json', root: '', server: 'buffered-lsp' })
+    const send = vi.spyOn(ws, 'send')
+    const opening = routes.open(ws)
+    const settled = expect(opening).resolves.toBeUndefined()
+    await acquired.promise
+    routes.close(ws)
+    starting.reject(
+      lspErrors.PACKAGE_INSTALL_FAILED({
+        internal: { exitCode: 1 },
+        packageName: 'vscode-langservers-extracted',
+      }),
+    )
+
+    await settled
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it.each(['async resolver', 'sync resolver', 'settings'] as const)(
+    'settles a failed %s and clears the pending socket',
+    async (source) => {
+      const root = await fixtureRoot()
+      const logDir = await fixtureRoot()
+      initializeObservability({
+        OBSERVABILITY_CONSOLE: 'false',
+        OBSERVABILITY_DIR: logDir,
+        OBSERVABILITY_ENABLED: 'true',
+        OBSERVABILITY_INFO_SAMPLE_RATE: '100',
+        NODE_ENV: 'production',
+      })
+      const failure = settingsErrors.TRANSACTION_RECOVERY_REQUIRED({
+        internal: { recoveryPending: true },
+      })
+      const deps = bufferedLspDeps(root, [])
+      const resolveServer = vi
+        .fn<NonNullable<LspRouteDeps['resolveServer']>>()
+        .mockImplementation(() => {
+          if (source === 'sync resolver') throw failure
+          return Promise.reject(failure)
+        })
+      const acquire = vi.fn()
+      const routes = lspRoutes({ paths: createWorkspacePaths(root) }, auth(), {
+        ...deps,
+        resolveServer,
+        settings: () => {
+          if (source === 'settings') throw failure
+          return deps.settings()
+        },
+        pool: { acquire },
+      })
+      const ws = fakeSocket({ path: 'src/file.fake', root: '', server: 'buffered-lsp' })
+      const send = vi.spyOn(ws, 'send')
+      const opening = routes.open(ws)
+      routes.message(ws, JSON.stringify(initializeRequest(1)))
+
+      await expect(opening).resolves.toBeUndefined()
+
+      expect(acquire).not.toHaveBeenCalled()
+      expect(ws.closed).toBe(true)
+      expect(send).toHaveBeenCalledExactlyOnceWith(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          method: '$/serverExited',
+          params: {
+            exitCode: null,
+            exitSignal: null,
+            outcome: 'resolve_failed',
+            serverId: 'buffered-lsp',
+          },
+        }),
+      )
+      routes.message(ws, JSON.stringify(initializeRequest(2)))
+      routes.close(ws)
+      await Bun.sleep(0)
+      await flushObservability()
+      const events = []
+      for await (const event of readFsLogs({ dir: logDir })) events.push(event)
+      expect(events).toEqual([
+        expect.objectContaining({
+          area: 'lsp',
+          level: 'warn',
+          action: 'lsp.session.rejected',
+          operation: 'open',
+          outcome: 'resolve_failed',
+          serverId: 'buffered-lsp',
+          error: expect.objectContaining({ code: 'settings.TRANSACTION_RECOVERY_REQUIRED' }),
+        }),
+      ])
+    },
+  )
+
+  it('settles a resolver rejection after the client has disconnected', async () => {
+    const root = await fixtureRoot()
+    const resolving = Promise.withResolvers<LspServerMatch | null>()
+    const acquire = vi.fn()
+    const routes = lspRoutes({ paths: createWorkspacePaths(root) }, auth(), {
+      ...bufferedLspDeps(root, []),
+      resolveServer: () => resolving.promise,
+      pool: { acquire },
+    })
+    const ws = fakeSocket({ path: 'src/file.fake', root: '', server: 'buffered-lsp' })
+    const send = vi.spyOn(ws, 'send')
+    const close = vi.spyOn(ws, 'close')
+    const opening = routes.open(ws)
+    const settled = expect(opening).resolves.toBeUndefined()
+    routes.message(ws, JSON.stringify(initializeRequest(1)))
+    routes.close(ws)
+    resolving.reject(
+      settingsErrors.TRANSACTION_RECOVERY_REQUIRED({ internal: { recoveryPending: true } }),
+    )
+
+    await settled
+    expect(acquire).not.toHaveBeenCalled()
+    expect(send).not.toHaveBeenCalled()
+    expect(close).not.toHaveBeenCalled()
   })
 
   it('rejects an unknown explicit server without acquiring a backend', async () => {

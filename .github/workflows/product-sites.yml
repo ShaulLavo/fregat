@@ -1,0 +1,104 @@
+name: Production product sites
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/site/**
+      - packages/client-core/src/**
+      - packages/contracts/src/**
+      - packages/markdown/src/**
+      - packages/observability/src/**
+      - packages/tree/src/**
+      - packages/ui/src/**
+      - packages/utils/src/**
+      - packages/*/package.json
+      - packages/*/tsconfig*.json
+      - hotkeys/packages/*/src/**
+      - hotkeys/packages/*/package.json
+      - hotkeys/packages/*/tsconfig*.json
+      - hotkeys/tsconfig.json
+      - hotkeys/package.json
+      - editor/packages/*/src/**
+      - editor/packages/*/package.json
+      - editor/packages/*/tsconfig*.json
+      - editor/packages/*/scripts/**
+      - editor/tsconfig*.json
+      - editor/scripts/build-package.ts
+      - editor/examples/app/**
+      - editor/site/**
+      - editor/package.json
+      - ghostty-webgpu/site/**
+      - ghostty-webgpu/src/**
+      - ghostty-webgpu/package.json
+      - ghostty-webgpu/tsconfig*.json
+      - ghostty-webgpu/scripts/**
+      - ghostty-webgpu/*.wasm
+      - scripts/product-sites/**
+      - scripts/build-site.ts
+      - scripts/dev-sources.ts
+      - scripts/runtime-network.ts
+      - scripts/structured-errors.ts
+      - .github/actions/setup/**
+      - .github/workflows/product-sites.yml
+      - package.json
+      - bun.lock
+      - turbo.json
+      - '!**/tests/**'
+      - '!**/*.test.*'
+      - '!**/*.spec.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-product-sites
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check archive publisher
+        run: python3 -m unittest discover -s scripts/product-sites -p 'test_*.py'
+      - uses: ./.github/actions/setup
+      - name: Build production sites
+        run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites"
+      - name: Package production sites
+        run: tar -czf "$RUNNER_TEMP/product-sites.tar.gz" -C "$RUNNER_TEMP/product-sites" index.html fregat singapore ghostty-webgpu
+      - uses: actions/upload-artifact@v4
+        with:
+          name: product-sites
+          path: ${{ runner.temp }}/product-sites.tar.gz
+          retention-days: 1
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: product-sites
+          path: ${{ runner.temp }}/product-sites
+      - name: Upload and activate production sites
+        shell: bash
+        env:
+          DEPLOY_KEY: ${{ secrets.PRODUCT_SITES_DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ vars.PRODUCT_SITES_DEPLOY_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.PRODUCT_SITES_KNOWN_HOSTS }}
+        run: |
+          key=$(mktemp "$RUNNER_TEMP/product-sites-key.XXXXXX")
+          known_hosts=$(mktemp "$RUNNER_TEMP/product-sites-hosts.XXXXXX")
+          trap 'rm -f "$key" "$known_hosts"' EXIT
+          chmod 600 "$key"
+          printf '%s\n' "$DEPLOY_KEY" > "$key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$known_hosts"
+          ssh -T -o BatchMode=yes -o ConnectTimeout=30 -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$known_hosts" -o IdentitiesOnly=yes -i "$key" \
+            "product-sites-deploy@$DEPLOY_HOST" publish < "$RUNNER_TEMP/product-sites/product-sites.tar.gz"

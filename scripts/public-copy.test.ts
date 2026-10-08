@@ -5,19 +5,17 @@ import { expect, test } from 'vitest'
 const root = path.resolve(import.meta.dirname, '..')
 const source = (file: string) => readFileSync(path.join(root, file), 'utf8')
 
-test('the landing page describes source-built desktop and phone browser access', () => {
+test('the landing page offers the source build and no downloads or native apps', () => {
   const page = source('apps/site/src/pages/index.astro')
-  expect(page).not.toMatch(/no releases|0\.0\.1|a native app/)
-  expect(page).toContain('desktop app')
-  expect(page).toContain('phone browser')
-  expect(page).toContain('https proxy')
-  expect(page).toContain('public downloads')
+  expect(page).not.toMatch(/no releases|0\.0\.1|native app|download|windows|open cursor/i)
+  expect(page).toContain('Run it from source')
+  expect(page).toContain('Linux and macOS')
 })
 
 test('the README names the shipped desktop client and phone setup', () => {
   const readme = source('README.md')
   expect(readme).not.toContain('native mac')
-  expect(readme).toContain('https proxy')
+  expect(readme).toMatch(/https proxy/i)
   expect(readme).toContain('pairing')
 })
 

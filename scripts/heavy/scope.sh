@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs inside a systemd scope, so the cgroup still exists when the command exits and its totals
 # can be read. Bash, not Bun: this process is counted in the memory peak.
-# Usage: scope.sh [--slice] [--grace <seconds>] [--runtime <seconds>] [--startup <seconds>] [--deadline <boot cs>] <accounting file> <command…>
+# Usage: scope.sh [--stderr] [--slice] [--grace <seconds>] [--runtime <seconds>] [--startup <seconds>] [--deadline <boot cs>] <accounting file> <command…>
 # --slice: the job is the scope's parent slice (this scope and the scopes nested-scope.sh opened
 # beside it). Without it the job is this scope alone, as for a bench case inside a job.
 # --grace: seconds the job's leftover processes get between TERM and KILL (default 10).
@@ -11,6 +11,11 @@
 # anything else runs (the wrapper starts this with `bash -p`): from now on the slice, not the
 # launcher, is what shows the job is running.
 exec 6<&-
+# Only launcher diagnostics use the pipe. Restore the caller's stderr before running the payload.
+if [ "${1:-}" = --stderr ]; then
+  exec 2>&7 7>&-
+  shift
+fi
 whole_slice=
 grace=10
 runtime=

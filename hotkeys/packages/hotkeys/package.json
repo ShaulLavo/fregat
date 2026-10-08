@@ -1,15 +1,20 @@
 {
   "name": "@fregat/hotkeys",
   "version": "0.0.3",
-  "description": "Keyboard shortcuts for editors: key parsing, chord tries and context resolution. A fork of TanStack Hotkeys.",
+  "description": "Keyboard shortcut registration, chords, context-aware keymaps, and display formatting for browser and terminal apps.",
   "keywords": [
+    "browser",
     "chords",
     "hotkeys",
     "keybindings",
     "keyboard",
-    "keymap",
-    "shortcuts"
+    "shortcuts",
+    "typescript"
   ],
+  "homepage": "https://github.com/ShaulLavo/fregat/tree/main/hotkeys",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

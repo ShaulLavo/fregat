@@ -61,7 +61,7 @@ export const scriptErrors = defineErrorCatalog('scripts', {
     message: ({ source, detail }: { source: string; detail: string }) =>
       `Bundling the heavy-job wrapper from ${source} failed: ${detail}`,
     why: 'The installed wrapper is a self-contained bundle, so every import must resolve in the source checkout.',
-    fix: 'Run `bun install --frozen-lockfile` in that checkout and run the install again.',
+    fix: 'Restore missing workspace source files, including `hotkeys/packages/hotkeys/src/index.ts` for `@fregat/hotkeys`. Run `bun install --frozen-lockfile` for missing third-party dependencies, then retry the install.',
   },
   HEAVY_SLICE_OUTSIDE_ROOT: {
     status: 500,
@@ -76,6 +76,24 @@ export const scriptErrors = defineErrorCatalog('scripts', {
       `Quiet lease '${label}' remains held by ${slice} (${state}); this admission reached its wait limit.`,
     why: 'A successor starts once the predecessor releases its bookkeeping lock and its slice is inactive and empty.',
     fix: 'Stop the listed slice with `systemctl --user stop <slice>`. Resume or stop its suspended wrapper, then submit the job again.',
+  },
+  HEAVY_STDERR: {
+    status: 500,
+    message: 'The runner could not preserve the job stderr stream.',
+    why: 'Local launch diagnostics and job output need separate file descriptors.',
+    fix: 'Check the process file-descriptor limit with `ulimit -n` and submit the job again.',
+  },
+  HEAVY_STDERR_RELAY: {
+    status: 500,
+    message: 'The runner could not forward all launcher diagnostics.',
+    why: 'The job outcome was recorded, but the stderr stream failed during forwarding.',
+    fix: 'Check the output destination and its available storage, then read the job record.',
+  },
+  HEAVY_SCOPE_TRANSPORT: {
+    status: 502,
+    message: ({ unit }: { unit: string }) => `systemd lost its connection while launching ${unit}.`,
+    why: 'The manager may have accepted the scope before the connection closed. Its launch outcome is uncertain.',
+    fix: 'Read `journalctl --user -n 50` and `systemctl --user status`. Check that the listed scope and its parent slice are stopped, then submit a fresh job.',
   },
   HEAVY_SLICE_FAILED: {
     status: 502,

@@ -3,11 +3,29 @@ import type { APIRequestContext, Page } from 'playwright'
 import { createScriptError } from '../structured-errors'
 import type { Evidence } from './evidence'
 
-type CaptureTerminal = {
+export type CaptureTerminal = {
   readonly socketUrl: string
   readonly killUrl: string
   readonly worktreeId: string
   readonly terminalId: string
+}
+
+export function capturedTerminal(socketUrl: string, prefix: string): CaptureTerminal | undefined {
+  const url = new URL(socketUrl)
+  const terminalId = url.searchParams.get('terminalId')
+  const worktreeId = url.searchParams.get('worktreeId')
+  if (
+    !url.pathname.endsWith('/terminal') ||
+    !terminalId?.startsWith(prefix) ||
+    !worktreeId ||
+    url.searchParams.has('agentSessionId')
+  )
+    return undefined
+  const kill = new URL(url)
+  kill.protocol = kill.protocol === 'wss:' ? 'https:' : 'http:'
+  kill.pathname += '/kill'
+  kill.search = ''
+  return { socketUrl, killUrl: kill.href, worktreeId, terminalId }
 }
 
 export async function isolateProductTerminals(page: Page, evidence: Evidence) {
@@ -18,17 +36,12 @@ export async function isolateProductTerminals(page: Page, evidence: Evidence) {
   page.on('websocket', (socket) => {
     const url = new URL(socket.url())
     if (!url.pathname.endsWith('/terminal')) return
-    const terminalId = url.searchParams.get('terminalId')
-    const worktreeId = url.searchParams.get('worktreeId')
-    if (!terminalId?.startsWith(prefix) || !worktreeId || url.searchParams.has('agentSessionId')) {
+    const session = capturedTerminal(socket.url(), prefix)
+    if (!session) {
       unexpected.push(socket.url())
       return
     }
-    url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:'
-    url.pathname += '/kill'
-    url.search = ''
-    const session = { socketUrl: socket.url(), killUrl: url.href, worktreeId, terminalId }
-    sessions.set(JSON.stringify([url.origin, worktreeId, terminalId]), session)
+    sessions.set(JSON.stringify([url.origin, session.worktreeId, session.terminalId]), session)
   })
   await installCaptureTerminalNamespace(page, prefix)
 

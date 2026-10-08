@@ -28,7 +28,12 @@ import {
 import { isRecord } from '@workspace/utils/objects'
 import * as v from 'valibot'
 import { AsyncQueue } from '../async-queue'
-import { operatorErrorSummary, recordRequestContext, recordRequestWarning } from '../observability'
+import {
+  isEvlogError,
+  operatorErrorSummary,
+  recordRequestContext,
+  recordRequestWarning,
+} from '../observability'
 import {
   discardStagedSettingsFile,
   editSettingsText,
@@ -59,6 +64,8 @@ import {
   rawRevisionStaleError,
   settingsErrors,
   settingsWriteContendedError,
+  type SettingsRevisionMismatch,
+  type SettingsWriteContentionContext,
 } from './structured-errors'
 import {
   commitSettingsSecretTransactionOwned,
@@ -149,7 +156,12 @@ type PreparedRawDocument = {
 type SemanticAttemptState = {
   current: LayerContents
   rebases: number
+  lastRevisionMismatch: SettingsRevisionMismatch | null
 }
+
+type SemanticCommitResult =
+  | { readonly kind: 'committed'; readonly revision: string }
+  | { readonly kind: 'revision-mismatch'; readonly mismatch: SettingsRevisionMismatch }
 
 /** Server-authoritative settings over layered JSON files. */
 export class SettingsStore {
@@ -445,7 +457,11 @@ export class SettingsStore {
     signal?: AbortSignal,
   ): Promise<WriteExecution> {
     this.assertOperational()
-    const state: SemanticAttemptState = { current: context.current, rebases: 0 }
+    const state: SemanticAttemptState = {
+      current: context.current,
+      rebases: 0,
+      lastRevisionMismatch: null,
+    }
 
     try {
       return await this.executeSemanticAttempts(
@@ -471,7 +487,19 @@ export class SettingsStore {
     state: SemanticAttemptState,
     signal?: AbortSignal,
   ): Promise<WriteExecution> {
-    while (this.canAttempt(state.rebases, startedAt, signal)) {
+    while (true) {
+      const elapsedMs = performance.now() - startedAt
+      const reason = this.attemptStopReason(state.rebases, elapsedMs, signal)
+      if (reason) {
+        this.acceptFreshIfNeeded(layer, state.current)
+        throw settingsWriteContendedError(state.rebases, context.coordinatorWaitMs, {
+          reason,
+          attemptLimit: this.rebaseAttempts,
+          budgetMs: this.rebaseBudgetMs,
+          elapsedMs,
+          lastRevisionMismatch: state.lastRevisionMismatch,
+        })
+      }
       this.acceptFreshIfNeeded(layer, state.current)
       this.assertCurrentDocumentValid(state.current)
       const prepared = this.prepareReduction(state.current.raw, request.operations)
@@ -509,11 +537,9 @@ export class SettingsStore {
       }
 
       state.rebases += 1
+      state.lastRevisionMismatch = outcome.mismatch
       state.current = await layer.readFresh()
     }
-
-    this.acceptFreshIfNeeded(layer, state.current)
-    throw settingsWriteContendedError(state.rebases, context.coordinatorWaitMs)
   }
 
   private async commitSemanticAttempt(
@@ -523,10 +549,7 @@ export class SettingsStore {
     secretEdits: ReadonlyMap<SecretRef, string | null>,
     request: SettingsMutationRequest,
     attempt: number,
-  ): Promise<
-    | { readonly kind: 'committed'; readonly revision: string }
-    | { readonly kind: 'revision-mismatch' }
-  > {
+  ): Promise<SemanticCommitResult> {
     if (secretEdits.size > 0) {
       return withSettingsSecretTransactionOwner(this.secretsPath, async () => {
         recoverSettingsTransactionSync(this.settingsFilePaths, this.secretsPath)
@@ -545,7 +568,17 @@ export class SettingsStore {
           settingsPath: destination,
           settingsText: text,
         })
-        if (outcome.kind === 'revision-mismatch') return { kind: 'revision-mismatch' }
+        if (outcome.kind === 'revision-mismatch') {
+          return {
+            kind: 'revision-mismatch',
+            mismatch: {
+              source: outcome.source,
+              expectedRevision:
+                outcome.source === 'settings' ? current.revision : secrets.expectedRevision,
+              observedRevision: outcome.foundRevision,
+            },
+          }
+        }
 
         return { kind: 'committed', revision: outcome.settingsRevision }
       })
@@ -560,10 +593,7 @@ export class SettingsStore {
     text: string,
     request: SettingsMutationRequest,
     attempt: number,
-  ): Promise<
-    | { readonly kind: 'committed'; readonly revision: string }
-    | { readonly kind: 'revision-mismatch' }
-  > {
+  ): Promise<SemanticCommitResult> {
     const staged = await stageSettingsFile(destination, text, await fileMode(destination))
     try {
       await this.writeHooks.afterStage?.({
@@ -577,7 +607,14 @@ export class SettingsStore {
       if (outcome.kind === 'committed') return outcome
 
       await discardStagedSettingsFile(staged)
-      return { kind: 'revision-mismatch' }
+      return {
+        kind: 'revision-mismatch',
+        mismatch: {
+          source: 'settings',
+          expectedRevision: current.revision,
+          observedRevision: outcome.foundRevision,
+        },
+      }
     } catch (error) {
       await discardStagedSettingsFile(staged)
       throw error
@@ -697,6 +734,7 @@ export class SettingsStore {
     destination: string,
     coordinatorWaitMs: number,
   ): Promise<string> {
+    const startedAt = performance.now()
     if (secrets.changed) {
       const outcome = await this.commitSecretTransaction({
         allowedSettingsPaths: this.settingsFilePaths,
@@ -709,7 +747,19 @@ export class SettingsStore {
         settingsText: document.text,
       })
       if (outcome.kind === 'committed') return outcome.settingsRevision
-      if (outcome.source === 'secrets') throw settingsWriteContendedError(1, coordinatorWaitMs)
+      if (outcome.source === 'secrets') {
+        throw settingsWriteContendedError(1, coordinatorWaitMs, {
+          reason: 'revision-mismatch',
+          attemptLimit: 1,
+          budgetMs: null,
+          elapsedMs: performance.now() - startedAt,
+          lastRevisionMismatch: {
+            source: 'secrets',
+            expectedRevision: secrets.expectedRevision,
+            observedRevision: outcome.foundRevision,
+          },
+        })
+      }
 
       await this.refreshAfterRawConflict(layer)
       throw rawRevisionStaleError({
@@ -1023,11 +1073,16 @@ export class SettingsStore {
     }
   }
 
-  private canAttempt(rebases: number, startedAt: number, signal?: AbortSignal) {
-    if (signal?.aborted) return false
-    if (rebases >= this.rebaseAttempts) return false
+  private attemptStopReason(
+    rebases: number,
+    elapsedMs: number,
+    signal?: AbortSignal,
+  ): SettingsWriteContentionContext['reason'] | null {
+    if (signal?.aborted) return 'aborted'
+    if (rebases >= this.rebaseAttempts) return 'attempt-limit'
+    if (elapsedMs <= this.rebaseBudgetMs) return null
 
-    return performance.now() - startedAt <= this.rebaseBudgetMs
+    return 'time-budget'
   }
 
   private publishLayerChange(change: LayerChange) {
@@ -1298,6 +1353,8 @@ function failureLogContext(error: unknown) {
   return {
     settings: {
       error: { code, status },
+      contention:
+        code === 'settings.WRITE_CONTENDED' && isEvlogError(error) ? error.internal : undefined,
       coordinatorWaitMs: numberErrorField(error, 'coordinatorWaitMs') ?? 0,
       outcome: failureOutcome(code),
       rebaseAttempts: numberErrorField(error, 'attempts') ?? 0,

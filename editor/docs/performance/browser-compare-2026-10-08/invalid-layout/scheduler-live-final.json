@@ -1,0 +1,38 @@
+{
+  "observedAt": "2026-10-08T08:33:30.785199+00:00",
+  "note": "Redacted live registry snapshot during the corrected matrix. Commands, paths, process identifiers and unrelated job labels are excluded.",
+  "jobs": [
+    {
+      "id": "d52fd2621aff",
+      "class": "light",
+      "server": true,
+      "quiet": false,
+      "since": "2026-10-08T07:59:36.915Z",
+      "benchmark": false
+    },
+    {
+      "id": "afc87ffc879d",
+      "class": "light",
+      "server": true,
+      "quiet": false,
+      "since": "2026-10-08T08:18:36.461Z",
+      "benchmark": false
+    },
+    {
+      "id": "d0c3843cf8e5",
+      "class": "bench",
+      "server": false,
+      "quiet": false,
+      "since": "2026-10-08T08:29:09.248Z",
+      "benchmark": true
+    },
+    {
+      "id": "4d94cf387db4",
+      "class": "suite",
+      "server": false,
+      "quiet": false,
+      "since": "2026-10-08T08:31:34.822Z",
+      "benchmark": false
+    }
+  ]
+}

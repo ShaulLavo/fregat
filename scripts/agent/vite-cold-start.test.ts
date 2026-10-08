@@ -29,7 +29,7 @@ it('cold dev startup loads Settings without replacing the optimizer graph', asyn
   const fontCache = path.join(scratch, '.platform', 'fonts', 'files')
   await mkdir(fontCache, { recursive: true })
   await copyFile(
-    path.join(checkoutRoot, 'apps/web/demo-assets/fonts/JetBrainsMonoNerdFont-Regular.ttf'),
+    path.join(checkoutRoot, 'scripts/agent/fixtures/fonts/JetBrainsMonoNerdFont-Regular.ttf'),
     path.join(fontCache, 'NerdFontsSymbolsOnly.ttf'),
   )
   const port = await selectAvailablePort({

@@ -1,52 +1,50 @@
 # @singapore-editor/plugin-ui
 
-the hover and popups that editor plugins share. language servers, diff hovers and character warnings all answer into one hover tooltip, rendered from markdown, so the editor shows one surface per position
+Shared hover tooltips and anchored popups for Singapore editor plugins.
 
-## try it
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+
+## Install
 
 ```sh
 npm install @singapore-editor/core @singapore-editor/plugin-ui
 ```
 
-a plugin adds to the hover by registering a participant. this one shows the word under the pointer
+## Usage
+
+Show a standalone tooltip. Editor plugins can also register shared hover participants.
 
 ```ts
-import type { EditorPlugin } from '@singapore-editor/core/extensions'
-import { EDITOR_HOVER_PARTICIPANT } from '@singapore-editor/plugin-ui/hover-participant'
+import { createTooltipController } from '@singapore-editor/plugin-ui/tooltip'
+import '@singapore-editor/core/style.css'
 
-export const wordHover: EditorPlugin = {
-  name: 'word-hover',
-  activate: (context) =>
-    context.registerViewContribution({
-      createContribution: (view) => {
-        const registration = view.registerProvider(
-          EDITOR_HOVER_PARTICIPANT,
-          { language: '*' },
-          {
-            computeSync: ({ anchor, snapshot }) => {
-              const word = snapshot.textSnapshot.readRange(anchor.range.start, anchor.range.end)
-              return [{ ordinal: 0, range: anchor.range, markdown: `**${word}**` }]
-            },
-          },
-        )
-        return { update: () => undefined, dispose: () => registration.dispose() }
-      },
-    }),
-}
+const tooltip = createTooltipController({
+  document,
+  themeSource: document.body,
+  reentryElement: document.body,
+})
+tooltip.show({
+  anchor: new DOMRect(24, 80, 100, 20),
+  hoverText: '**Hello** from a plugin',
+  theme: null,
+})
+// Call tooltip.dispose() when removing the popup.
 ```
 
-pass it in `plugins` when you create the editor. the hover itself loads the first time a participant registers, so importing the token costs little. slow answers go in `computeAsync`, which can emit parts as they arrive
+## API highlights
 
-## other pieces
+- `EDITOR_HOVER_PARTICIPANT` lets plugins answer into the shared hover.
+- `createTooltipController()` controls a tooltip.
+- `createAnchoredSurface()` places a popup beside an anchor.
 
-- `createTooltipController` draws the same tooltip anywhere you have a `DOMRect` to anchor it to
-- `createAnchoredSurface` places any popup next to an anchor. every surface it places carries `data-editor-popup`, so one selector styles them all
-- `renderTooltipMarkdown` is the markdown renderer the tooltip uses
-- `hoverTargetRange` and `identifierRangeAtOffset` find the text a hover is about
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/plugin-ui/overview/)
 
-each has its own subpath (`/tooltip`, `/anchored-surface`, `/markdown-tooltip`, `/offset-range`) as well as the root export
+## In the Singapore family
 
-## more
+`@singapore-editor/core` owns the editor view. Plugins use this package to share hover content and position popups.
 
-- [core](../editor/README.md), for the plugin api
-- [lsp-plugin](../lsp-plugin/README.md), the biggest participant
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+
+## License
+
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)

@@ -136,6 +136,12 @@
         },
         {
           "kind": "type",
+          "name": "DocumentSessionReconcileOptions",
+          "source": "packages/editor/src/public/document.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "type",
           "name": "DocumentSessionSelectionOptions",
           "source": "packages/editor/src/public/document.ts",
           "via": "packages/editor/src/index.ts"
@@ -1103,6 +1109,18 @@
         {
           "kind": "type",
           "name": "EditorTextBufferOptions",
+          "source": "packages/editor/src/public/document.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorTextOrigin",
+          "source": "packages/editor/src/public/document.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorTextTransaction",
           "source": "packages/editor/src/public/document.ts",
           "via": "packages/editor/src/index.ts"
         },
@@ -2656,6 +2674,12 @@
         },
         {
           "kind": "type",
+          "name": "DocumentSessionReconcileOptions",
+          "source": "packages/editor/src/documentSession.ts",
+          "via": "packages/editor/src/public/document.ts"
+        },
+        {
+          "kind": "type",
           "name": "DocumentSessionSelectionOptions",
           "source": "packages/editor/src/documentSession.ts",
           "via": "packages/editor/src/public/document.ts"
@@ -2807,6 +2831,18 @@
         {
           "kind": "type",
           "name": "EditorTextBufferOptions",
+          "source": "packages/editor/src/documentSession.ts",
+          "via": "packages/editor/src/public/document.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorTextOrigin",
+          "source": "packages/editor/src/documentSession.ts",
+          "via": "packages/editor/src/public/document.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorTextTransaction",
           "source": "packages/editor/src/documentSession.ts",
           "via": "packages/editor/src/public/document.ts"
         },
@@ -4714,6 +4750,18 @@
         },
         {
           "kind": "type",
+          "name": "DocumentSessionApplyEditsOptions",
+          "source": "packages/editor/src/documentSession.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
+          "name": "DocumentSessionReconcileOptions",
+          "source": "packages/editor/src/documentSession.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorAutoClosingPair",
           "source": "packages/editor/src/editor/languageConfiguration.ts",
           "via": "packages/editor/src/public/extensions.ts"
@@ -5232,6 +5280,18 @@
           "kind": "type",
           "name": "EditorTextAnchor",
           "source": "packages/editor/src/plugins.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorTextOrigin",
+          "source": "packages/editor/src/documentSession.ts",
+          "via": "packages/editor/src/public/extensions.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorTextTransaction",
+          "source": "packages/editor/src/documentSession.ts",
           "via": "packages/editor/src/public/extensions.ts"
         },
         {

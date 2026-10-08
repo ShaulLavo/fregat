@@ -2263,14 +2263,15 @@ function positionRowElement(
   element: HTMLElement,
   top: number,
 ): void {
+  const paintTop = top + view.viewport.paintOffsetY
   if (view.rowPositioning === 'top') {
     element.style.transform = ''
-    element.style.top = `${top}px`
+    element.style.top = `${paintTop}px`
     return
   }
 
   element.style.top = '0px'
-  element.style.transform = `translateY(${top}px)`
+  element.style.transform = `translateY(${paintTop}px)`
 }
 
 function updateGutterContributionCells(
@@ -2928,10 +2929,18 @@ function applyTotalHeight(
   view: VirtualizedTextViewInternal,
   snapshot: FixedRowVirtualizerSnapshot,
 ): void {
-  view.viewport.setDocumentHeight(
+  const originChanged = view.viewport.setDocumentHeight(
     snapshot.nativeScrollHeight,
     snapshot.nativeScrollTop - snapshot.scrollTop,
+    snapshot.scrollTop,
   )
+  if (!originChanged) return
+
+  for (const row of view.rowElements.values()) {
+    positionRowElement(view, row.element, row.top)
+    positionRowElement(view, row.gutterElement, row.top)
+  }
+  view.lastRenderedRowsKey = ''
 }
 
 export function getMountedRows(
