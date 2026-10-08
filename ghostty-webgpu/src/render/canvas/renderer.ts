@@ -146,6 +146,7 @@ class CanvasSurface implements RowRendererSurface {
   }
 
   invalidate(): void {
+    this.painter.invalidate()
     this.image = undefined
     this.nextImage = undefined
     this.plan = undefined
@@ -158,7 +159,12 @@ class CanvasSurface implements RowRendererSurface {
       if (!this.plan) this.prepare(cursor)
       if (!this.canReuse(row.y, cursor)) {
         this.pixelTarget?.beginRow(row.y)
-        this.painter.paint(row, cursor, this.canvas.width)
+        this.painter.paint(
+          row,
+          cursor,
+          this.canvas.width,
+          this.pending.size === 1 && this.plan!.offset === 0,
+        )
         this.pixelTarget?.finishRow(row.y)
         this.reuseMetrics.repaintedRows += 1
       }
@@ -213,7 +219,10 @@ class CanvasSurface implements RowRendererSurface {
     const keys = new Map(previous)
     for (const [y, key] of this.pending) keys.set(y, key)
     this.nextImage = { keys, cursor: cursor ? { ...cursor } : undefined }
-    if (this.plan.offset !== 0) this.copyRows(this.plan.offset)
+    if (this.plan.offset !== 0) {
+      this.painter.invalidate()
+      this.copyRows(this.plan.offset)
+    }
   }
 
   private canReuse(y: number, cursor: CursorState | undefined): boolean {

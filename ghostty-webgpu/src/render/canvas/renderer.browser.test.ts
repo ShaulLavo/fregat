@@ -222,6 +222,81 @@ async function createRenderer(
 }
 
 describe('CanvasTerminalRenderer', () => {
+  it('repaints only changed plain-text cells while keeping full-row pixels', async () => {
+    const clock = new FakeClock()
+    const canvas = createCanvas()
+    const text = 'edit 0000'.padEnd(40)
+    const source = new FakeRenderState([
+      row(
+        0,
+        [...text].map((text, x) => cell(x, { text })),
+      ),
+    ])
+    source.cursor.viewport = { wideTail: false, x: 9, y: 0 }
+    const renderer = await createRenderer(options(canvas, source, clock, { columns: 40, rows: 1 }))
+    clock.flushFrame()
+    expectFullRepaint(canvas, source)
+    const fillText = vi.spyOn(CanvasRenderingContext2D.prototype, 'fillText')
+    const clear = vi.spyOn(CanvasRenderingContext2D.prototype, 'clearRect')
+
+    source.rows[0]!.cells[8]!.text = '1'
+    source.dirtyRow(0)
+    renderer.notifyWrite()
+    clock.flushFrame()
+    const glyphs = fillText.mock.calls.length
+    const cleared = clear.mock.calls.reduce((sum, call) => sum + call[2] * call[3], 0)
+    expectFullRepaint(canvas, source)
+    expect(glyphs).toBeLessThan(10)
+    expect(cleared).toBeLessThan(canvas.width * 20)
+
+    for (const x of [10, 11, 9]) {
+      source.cursor.viewport = { wideTail: false, x, y: 0 }
+      source.rows[0]!.cells[9]!.text = x === 9 ? ' ' : 'a'
+      source.dirtyRow(0)
+      renderer.notifyWrite()
+      clock.flushFrame()
+      expectFullRepaint(canvas, source)
+    }
+    source.rows[0]!.cells[5]!.style = styled({ italic: true, overline: true })
+    source.rows[0]!.cells[5]!.text = 'j'
+    source.dirtyRow(0)
+    renderer.notifyWrite()
+    clock.flushFrame()
+    expectFullRepaint(canvas, source)
+    source.rows[0]!.cells[5]!.style = undefined
+    source.rows[0]!.cells[5]!.text = '0'
+    source.dirtyRow(0)
+    renderer.notifyWrite()
+    clock.flushFrame()
+    expectFullRepaint(canvas, source)
+  })
+
+  it('keeps bulk plain-text updates on the full-row painter', async () => {
+    const clock = new FakeClock()
+    const canvas = createCanvas()
+    const source = new FakeRenderState(
+      Array.from({ length: 2 }, (_, y) =>
+        row(
+          y,
+          Array.from({ length: 40 }, (_, x) => cell(x, { text: '0' })),
+        ),
+      ),
+    )
+    source.cursor.visible = false
+    const renderer = await createRenderer(options(canvas, source, clock, { columns: 40 }))
+    clock.flushFrame()
+    const fillText = vi.spyOn(CanvasRenderingContext2D.prototype, 'fillText')
+    for (const target of source.rows) {
+      target.cells[39]!.text = '1'
+      source.dirtyRow(target.y)
+    }
+    renderer.notifyWrite()
+    clock.flushFrame()
+    const glyphs = fillText.mock.calls.length
+    expectFullRepaint(canvas, source)
+    expect(glyphs).toBe(80)
+  })
+
   it('batches adjacent backgrounds and reuses text drawing state', async () => {
     const clock = new FakeClock()
     const canvas = createCanvas()
