@@ -33,16 +33,6 @@ The reason to try Fregat is how your work survives, and how much control you hav
 - **Nothing is lost when you close a file.** The editor's undo graph survives closing its tab and restores when the saved content still matches. File-tree undo restores recent deleted folders with their tabs and unsaved edits. See [undo behavior](docs/research/packages-as-products/fregat-workbench.md#4-undo-that-goes-further-than-any-editor).
 - **Bring your own agents.** Sign in to Claude Code and Codex, run them side by side, and save permissions as each tool's own rules. Track usage and cost per chat. See [agent sessions](docs/session-domain.md) and [approval rules](plans/145-harness-controls.md).
 
-## Proof from the parts
-
-The editor and terminal publish their methods, scripts, wins, and losses.
-These measurements describe the libraries and their tested workloads. Fregat itself has no published competitor speed comparison.
-
-| Project        | Evidence                                                                                                                                                                                                                                                                                               |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Singapore      | [Browser comparison experiment](editor/docs/performance/browser-compare-2026-10-08.md). At 10 MiB, highlighted open took 1,517.7 ms, versus Monaco's 169.4 ms and CodeMirror's 56.1 ms. This noisy experiment needs a quiet rerun.                                                                     |
-| ghostty-webgpu | [Terminal benchmarks](ghostty-webgpu/docs/benchmarks.md). WebGL's estimated CPU energy ratio against xterm.js was 0.751 for heavy logs and 1.361 for one ASCII line per tick. [Correctness](ghostty-webgpu/docs/correctness.md) records 167 passing and 2 failing cases in a fixed 169-case selection. |
-
 ## Quick start
 
 Install [Bun](https://bun.sh/) and [Git](https://git-scm.com/), then run:
@@ -67,7 +57,7 @@ Remote phone browsers need an HTTPS proxy and device pairing. Keep access privat
 | ------------------------------------------------------------- | ------------------------------------------------------- |
 | [Singapore](https://github.com/ShaulLavo/singapore)           | A code editor for the browser that keeps every version. |
 | [ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu) | Ghostty's terminal, in the browser.                     |
-| [hotkeys](https://github.com/ShaulLavo/hotkeys)               | Zed-style keymaps for the web.                          |
+| [hotkeys](https://github.com/ShaulLavo/hotkeys)               | Keyboard shortcuts for editors and complex apps.        |
 
 These projects live in this monorepo. Their standalone repositories are read-only mirrors.
 

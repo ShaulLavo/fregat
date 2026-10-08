@@ -1,5 +1,5 @@
 <h1 align="center">hotkeys</h1>
-<p align="center">Zed-style keymaps for the web.</p>
+<p align="center">Keyboard shortcuts for editors and complex apps.</p>
 <p align="center">
   <a href="https://github.com/ShaulLavo/fregat/actions/workflows/workspace-libraries.yml"><img src="https://github.com/ShaulLavo/fregat/actions/workflows/workspace-libraries.yml/badge.svg" alt="Workspace library checks" /></a>
   <a href="https://github.com/ShaulLavo/fregat/blob/main/hotkeys/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license" /></a>
@@ -12,11 +12,12 @@
   <a href="https://github.com/ShaulLavo/fregat/blob/main/hotkeys/packages/hotkeys/docs/performance.md">Benchmarks</a>
 </p>
 
-![Fregat, a browser app that uses hotkeys](https://raw.githubusercontent.com/ShaulLavo/fregat/main/docs/images/workbench.webp)
+Bind keys to commands and choose the binding that matches what has focus.
+Your app supplies the keymap, including bindings in the style of VS Code, Zed, or another editor.
+A DOM-free core handles contexts, chords, and user overrides, with browser and terminal adapters.
+Context predicates and chord dispatch follow Zed's model.
 
-Bind keys to commands, then choose the binding that matches what has focus.
-The same keymap can drive a browser app and a terminal app.
-The core ships without a default keymap and keeps DOM access in its browser adapter.
+Forked from [TanStack Hotkeys](https://github.com/TanStack/hotkeys) by Tanner Linsley, under the MIT license.
 
 ## One key, two jobs
 
@@ -96,5 +97,4 @@ Development happens in [Fregat](https://github.com/ShaulLavo/fregat/tree/main/ho
 This repository is a read-only mirror of its `hotkeys/` folder. Submit issues and pull requests to Fregat.
 Read the [contribution guide and AI policy](https://github.com/ShaulLavo/fregat/blob/main/CONTRIBUTING.md).
 
-Forked from [TanStack Hotkeys](https://github.com/TanStack/hotkeys).
-[MIT](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/LICENSE), with the original copyright notice retained.
+[MIT](https://github.com/ShaulLavo/fregat/blob/main/hotkeys/LICENSE), with Tanner Linsley's original copyright notice retained.

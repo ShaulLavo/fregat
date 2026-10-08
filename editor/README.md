@@ -1,8 +1,7 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ShaulLavo/fregat/main/editor/site/public/favicon.svg" width="96" alt="Singapore S mark" />
-</p>
-<h1 align="center">Singapore</h1>
-<p align="center">A code editor for the browser that keeps every version.</p>
+# Singapore
+
+A code editor for the browser that keeps every version.
+
 <p align="center">
   <a href="https://github.com/ShaulLavo/fregat/actions/workflows/workspace-libraries.yml"><img src="https://github.com/ShaulLavo/fregat/actions/workflows/workspace-libraries.yml/badge.svg" alt="Workspace library checks" /></a>
   <a href="https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license" /></a>
