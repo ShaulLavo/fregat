@@ -1,0 +1,134 @@
+{
+  "note": "Redacted scheduler evidence. Completed job intervals reconstructed as receipt timestamp minus wallMs. Active registry rows have no known end. Commands, paths and unrelated job labels are excluded. Overlap does not quantify interference.",
+  "benchmark": {
+    "class": "bench",
+    "quiet": false,
+    "queuedMs": 653586,
+    "wallMs": 452824,
+    "ceilingBytes": 9663676416,
+    "memoryPeakBytes": 5029466112,
+    "oomKills": 0,
+    "exitCode": 0,
+    "cpuUsageUsec": 386589085,
+    "allowedCpus": []
+  },
+  "start": "2026-10-08T08:57:43.964000+00:00",
+  "end": "2026-10-08T09:05:16.788000+00:00",
+  "serversAtAdmission": 0,
+  "completedOverlaps": [
+    {
+      "id": "20c89ed72359",
+      "class": "light",
+      "server": false,
+      "start": "2026-10-08T08:57:42.334000+00:00",
+      "end": "2026-10-08T08:57:45.250000+00:00",
+      "overlapSeconds": 1.286
+    },
+    {
+      "id": "27d23858e0ad",
+      "class": "suite",
+      "server": false,
+      "start": "2026-10-08T08:57:43.382000+00:00",
+      "end": "2026-10-08T08:57:45.564000+00:00",
+      "overlapSeconds": 1.6
+    },
+    {
+      "id": "b22bc16f996f",
+      "class": "light",
+      "server": false,
+      "start": "2026-10-08T08:57:45.445000+00:00",
+      "end": "2026-10-08T08:57:57.612000+00:00",
+      "overlapSeconds": 12.167
+    },
+    {
+      "id": "b92d9e798264",
+      "class": "build",
+      "server": false,
+      "start": "2026-10-08T08:56:09.215000+00:00",
+      "end": "2026-10-08T08:58:05.797000+00:00",
+      "overlapSeconds": 21.833
+    },
+    {
+      "id": "ea9969f57d12",
+      "class": "build",
+      "server": false,
+      "start": "2026-10-08T08:58:06.846000+00:00",
+      "end": "2026-10-08T08:58:16.249000+00:00",
+      "overlapSeconds": 9.403
+    },
+    {
+      "id": "4e16508f3ce6",
+      "class": "build",
+      "server": false,
+      "start": "2026-10-08T08:58:17.360000+00:00",
+      "end": "2026-10-08T08:58:18.759000+00:00",
+      "overlapSeconds": 1.399
+    },
+    {
+      "id": "7548519918e5",
+      "class": "suite",
+      "server": false,
+      "start": "2026-10-08T08:57:45.904000+00:00",
+      "end": "2026-10-08T08:59:50.301000+00:00",
+      "overlapSeconds": 124.397
+    },
+    {
+      "id": "86ed9e0ccdd2",
+      "class": "browser",
+      "server": false,
+      "start": "2026-10-08T08:59:51.161000+00:00",
+      "end": "2026-10-08T08:59:51.301000+00:00",
+      "overlapSeconds": 0.14
+    },
+    {
+      "id": "8e3d7d000355",
+      "class": "suite",
+      "server": false,
+      "start": "2026-10-08T08:59:52.354000+00:00",
+      "end": "2026-10-08T08:59:53.521000+00:00",
+      "overlapSeconds": 1.167
+    },
+    {
+      "id": "4e15d24501d9",
+      "class": "build",
+      "server": false,
+      "start": "2026-10-08T08:59:54.743000+00:00",
+      "end": "2026-10-08T08:59:55.013000+00:00",
+      "overlapSeconds": 0.27
+    },
+    {
+      "id": "532e7d898262",
+      "class": "browser",
+      "server": false,
+      "start": "2026-10-08T08:59:54.024000+00:00",
+      "end": "2026-10-08T08:59:55.508000+00:00",
+      "overlapSeconds": 1.484
+    },
+    {
+      "id": "ccb7b40fe8a9",
+      "class": "light",
+      "server": false,
+      "start": "2026-10-08T08:59:55.593000+00:00",
+      "end": "2026-10-08T08:59:55.914000+00:00",
+      "overlapSeconds": 0.321
+    }
+  ],
+  "activeOverlaps": [
+    {
+      "id": "54535b7fd3a8",
+      "class": "light",
+      "server": true,
+      "start": "2026-10-08T08:58:06.966Z",
+      "end": null,
+      "overlapSeconds": 429.822
+    },
+    {
+      "id": "1c248656673d",
+      "class": "browser",
+      "server": false,
+      "start": "2026-10-08T09:04:54.189Z",
+      "end": null,
+      "overlapSeconds": 22.599
+    }
+  ]
+}

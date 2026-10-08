@@ -1,0 +1,60 @@
+---
+title: Build a TypeScript playground
+description: Add syntax, search and a browser-based TypeScript language service.
+---
+
+import { Code } from '@astrojs/starlight/components'
+import source from '../../../../examples/playground.ts?raw'
+import Playground from '../../../../components/Playground.astro'
+
+Build a TypeScript editor with syntax colours, line numbers, find, a minimap and language diagnostics. Start with the Quick start container in a Vite browser application.
+
+## 1. Install the packages
+
+```sh
+npm install @singapore-editor/core @singapore-editor/tree-sitter @singapore-editor/tree-sitter-languages @singapore-editor/typescript-lsp @singapore-editor/gutters @singapore-editor/find @singapore-editor/minimap
+```
+
+## 2. Set a theme
+
+The example converts VS Code editor colours with `editorThemeFromVscodeTheme`. The background and foreground appear as soon as the editor mounts.
+
+## 3. Add tree-sitter
+
+Register the bundled language contributions with `createTreeSitterLanguagePlugin`. Open a document with `languageId: 'typescript'`. The grammar loads when needed, and the worker returns syntax tokens.
+
+## 4. Add line numbers and find
+
+Add `createLineGutterPlugin()` and `createEditorFindPlugin()` to `plugins`, and import their stylesheets. Line numbers appear on the left. Use Ctrl+F or Cmd+F to search the file.
+
+## 5. Give TypeScript another file
+
+Create the TypeScript plugin and call `setWorkspaceFiles` with `/src/math.ts`. The worker resolves the import in `/src/main.ts`. Passing a string to `twice` produces a diagnostic because `twice` takes a number.
+
+## 6. Add the minimap
+
+Add `createMinimapPlugin()` and its stylesheet. The minimap appears beside the text and can scroll the editor.
+
+## Run the complete file
+
+<Code code={source} lang='ts' title='playground.ts' />
+
+Call `mountPlayground` with your container and dispose the returned editor when the view closes. The live editor below runs that same file.
+
+<Playground />
+
+Change `'two'` to `2`. The TypeScript diagnostic should clear after the worker processes the edit. Hover over `twice` to inspect its type.
+
+You have built an editor with a second virtual file and a local language service. It needs no external language-server process. The guides cover worker hosting and sharing a project across editors.
+
+## If it doesn't work
+
+### Colours or diagnostics never arrive
+
+Check the browser network panel for failed worker, grammar or standard-library requests. Serve the production build and confirm those assets resolve under its base path.
+
+### The import is unresolved
+
+Use matching absolute virtual paths in `setWorkspaceFiles` and `documentId`. Include the imported files in the worker's workspace file set.
+
+Continue with Language servers and Bundling and workers in the sidebar.

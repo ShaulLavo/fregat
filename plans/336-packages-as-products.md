@@ -9,7 +9,8 @@
   cycle and issue tracker. Mesh, fast-ulid and the other owned repos stay out until the owner adds them.
 - Priority: P1. Effort: XL in total, split into tracks that mostly run in parallel.
 - Owner decisions 2026-10-08: MIT for everything (done: `LICENSE` files and `license` fields). npm
-  publishing setup and the domains/Cloudflare token come last, once everything else is done. Versions
+  publishing setup comes last. The owner authorized production sites on the Hetzner VPS at
+  `shaulavo.dev` on 2026-10-08. Cloudflare keeps DNS; hosting uses the existing Coolify proxy. Versions
   stay as they are: patch bumps only, no 1.0.0, no version-policy changes while we are setting up.
 - Planned against Fregat `0df5eb872`.
 
@@ -65,8 +66,11 @@ The facts that change the plan:
 5. **Every code sample in docs and READMEs is type-checked in CI.** Long examples are real files the
    page shows and the live demo runs; inline blocks are extracted and compiled. Internal links are
    checked per build, external links weekly.
-6. **Hosting is Cloudflare Workers with static assets**, one Worker per site, our own domains, PR
-   previews. GitHub Pages turns off after redirect pages cover all five old addresses.
+6. **Production sites use the Hetzner VPS at `shaulavo.dev`**, with `/fregat`, `/singapore` and
+   `/ghostty-webgpu`, plus a project index at `/`. A read-only Nginx container sits behind the
+   existing Coolify proxy, which handles TLS. CI builds main and atomically publishes through a
+   restricted SSH deploy key. GitHub Pages keeps running until redirects cover the old addresses.
+   PR previews remain separate work.
 7. **Mirrors are read-only and say so:** "[READ ONLY]" in the description, Issues off, a workflow that
    closes PRs with a pointer to fregat. Links inside mirrored folders are absolute URLs.
 8. **Lead with what only we have; keep table stakes as features.** "Use your Claude subscription" is a
@@ -211,14 +215,24 @@ Follow the [landing-sites report](../docs/research/packages-as-products/landing-
 5. Every site: under 1 MB on first load, readable without JavaScript, reduced motion, Open Graph
    images, sitemap, 404, `llms.txt`. Screenshots at desktop and phone widths go to the owner.
 
-## Track E: Hosting (last, with Track N; site builds do not wait)
+## Track E: Production hosting on the VPS
 
-1. Owner chooses the domains (DNS on Cloudflare) and grants a Cloudflare API token as a GitHub
-   Actions secret.
-2. One Worker with static assets per site; CI deploys main to production and PRs to previews,
-   replacing `.github/workflows/site.yml`'s Pages deploy.
-3. Redirect pages at the five old GitHub Pages addresses (two in the mirror repos), then disable
-   Pages. Update every link in READMEs, `package.json` and docs.
+Owner authorized this track now on 2026-10-08. It replaces the Cloudflare Workers proposal.
+
+1. Serve `https://shaulavo.dev/` and the `/fregat`, `/singapore` and `/ghostty-webgpu` paths from
+   one static directory on the owner's Hetzner VPS. Coolify's existing Traefik proxy terminates
+   TLS; a read-only Nginx container serves files. Leave Mesh and every subdomain untouched.
+2. `.github/workflows/product-sites.yml` builds main with the production base paths and uploads
+   in a secret-free job, then deploys through the `PRODUCT_SITES_DEPLOY_KEY` secret in the
+   main-only `production` environment. The dedicated SSH user can only
+   publish a validated archive to `/srv/product-sites`. A symlink swap activates all sites
+   together. Keep three complete releases, prune assets with their releases, and skip identical
+   content. HTML caches for 60 seconds; hashed assets cache for a year with `immutable`;
+   missing files return 404. See [deployment setup](../scripts/product-sites/README.md).
+3. Start with `apps/site`, `editor/examples/app` and `ghostty-webgpu/site`. The pipeline selects
+   `editor/site` when it lands. The new Astro sites replace current builds through this pipeline.
+4. Keep `.github/workflows/site.yml` and GitHub Pages running. Redirect the five old Pages
+   addresses before disabling them. Update published links then. PR previews are later work.
 
 ## Track F: Documentation (after Track 0; alongside D)
 
@@ -264,7 +278,7 @@ policy. This track improves how releases read, not how they are numbered. Follow
   to the owner.
 - Every performance claim links a reproducible, like-for-like benchmark.
 - Docs builds fail on a broken code sample or internal link.
-- Sites serve from our domains on Cloudflare; GitHub Pages is off.
+- Sites serve from `shaulavo.dev` on the VPS. GitHub Pages turns off after redirects ship.
 - `docs/releasing.md` exists and changesets read for package users.
 - Zero agent-filed issues remain open.
 
@@ -274,6 +288,7 @@ policy. This track improves how releases read, not how they are numbered. Follow
 > `fregat-local` skills, and read `docs/research/packages-as-products/README.md` and the report each
 > lane needs. Start Track 0, Track P and Track H now in parallel. When Track P's first results land,
 > run Track B and send the owner the pitch as a private Mesh app link. After the owner approves it,
-> run Tracks C, D, F and G in parallel lanes. Do not change package versions. Tracks N and E come last:
-> ask the owner for npm setup, domains and the Cloudflare token only when everything else is done.
+> run Tracks C, D, F and G in parallel lanes. Do not change package versions. Track E is authorized
+> now on the VPS. Track N comes last:
+> ask the owner for npm setup only when everything else is done.
 > Send screenshots of every site and README at each milestone.

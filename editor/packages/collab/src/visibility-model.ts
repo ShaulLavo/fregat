@@ -1,7 +1,6 @@
 import { CollabFailure } from './failure'
-import type { ReferenceEngine } from './reference'
 import { charKey, editKey, insertionOf } from './types'
-import type { Envelope } from './types'
+import type { Engine, Envelope } from './types'
 
 type Character = {
   readonly value: string
@@ -49,9 +48,12 @@ export class VisibilityModel {
       this.delete(span.start.bunch, span.start.counter, span.count, operation)
   }
 
-  check(engine: ReferenceEngine, context: string): void {
-    const nodes = engine.snapshot().nodes
-    if (nodes.length !== this.characters.size)
+  check(engine: Pick<Engine, 'text' | 'characters'>, context: string): void {
+    const nodes = engine.characters()
+    if (
+      nodes.length !== this.characters.size ||
+      new Set(nodes.map((node) => charKey(node.id))).size !== this.characters.size
+    )
       throw new CollabFailure(`oracle-identities-${context}`)
     const visible = new Map<string, string>()
     for (const node of nodes) {
@@ -66,10 +68,13 @@ export class VisibilityModel {
       visible.set(key, character.value)
     }
     // Placement has its own oracle; this model independently decides which IDs contribute text.
-    const ordered = engine.orderedIds().map(charKey)
+    const ordered = nodes
+      .filter((node) => !node.deleted)
+      .sort((a, b) => a.offset - b.offset)
+      .map((node) => charKey(node.id))
     if (
-      ordered.length !== this.characters.size ||
-      new Set(ordered).size !== this.characters.size ||
+      ordered.length !== visible.size ||
+      new Set(ordered).size !== visible.size ||
       ordered.some((key) => !this.characters.has(key))
     )
       throw new CollabFailure(`oracle-order-identities-${context}`)

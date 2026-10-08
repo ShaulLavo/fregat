@@ -1,0 +1,428 @@
+import { createHash } from 'node:crypto'
+import { gzipSync } from 'node:zlib'
+import { createServer } from 'node:http'
+import { readFile, mkdir, writeFile } from 'node:fs/promises'
+import { resolve, extname } from 'node:path'
+import { cpus, totalmem, platform, release, arch } from 'node:os'
+import { execFileSync } from 'node:child_process'
+import { parseArgs } from 'node:util'
+import { chromium } from 'playwright'
+import { root, output } from './build.mjs'
+import { readServedBuilds, verifyResume } from './provenance.mjs'
+import {
+  fixtureIdentity,
+  order,
+  sizes,
+  summarize,
+  scrollCosts,
+  scrollTraceName,
+  verifyGeometry,
+} from './protocol.mjs'
+
+const { values } = parseArgs({
+  options: {
+    output: { type: 'string', default: resolve(root, 'results') },
+    resume: { type: 'boolean', default: false },
+    condition: { type: 'string', default: 'unspecified' },
+    sizes: { type: 'string', default: sizes.join(',') },
+    repetitions: { type: 'string', default: '3' },
+    keys: { type: 'string', default: '40' },
+    'scroll-frames': { type: 'string', default: '120' },
+    timeout: { type: 'string', default: '60000' },
+    'delay-ms': { type: 'string', default: '0' },
+    'executable-path': { type: 'string' },
+  },
+})
+const selected = values.sizes.split(',').map(Number)
+const repetitions = Number(values.repetitions)
+const keys = Number(values.keys)
+const frames = Number(values['scroll-frames'])
+const timeout = Number(values.timeout)
+if (
+  !['quiet', 'noisy', 'unspecified'].includes(values.condition) ||
+  selected.some((size) => !sizes.includes(size)) ||
+  new Set(selected).size !== selected.length ||
+  !Number.isFinite(Number(values['delay-ms'])) ||
+  Number(values['delay-ms']) < 0 ||
+  ![repetitions, keys, frames, timeout].every((n) => Number.isSafeInteger(n) && n > 0)
+)
+  throw new RangeError('Use positive integer counts and fixture sizes from 1,10,50,100,200')
+await mkdir(values.output, { recursive: true })
+const builds = await readServedBuilds(output)
+const server = createServer(async (request, response) => {
+  const path = resolve(output, `.${new URL(request.url, 'http://localhost').pathname}`)
+  if (!path.startsWith(`${output}/`)) {
+    response.writeHead(403).end()
+    return
+  }
+  const content = await readFile(path).catch(() => null)
+  if (!content) {
+    response.writeHead(404).end()
+    return
+  }
+  response.setHeader(
+    'Content-Type',
+    {
+      '.html': 'text/html',
+      '.js': 'text/javascript',
+      '.css': 'text/css',
+      '.wasm': 'application/wasm',
+    }[extname(path)] ?? 'application/octet-stream',
+  )
+  response.end(content)
+})
+await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+const port = server.address().port
+let browser = await chromium.launch({ headless: true, executablePath: values['executable-path'] })
+let results = {
+  label: `${values.condition === 'noisy' ? 'Noisy experiment' : 'Experiment'}, headless Linux Chromium. Frame opportunity proxy, not physical presentation latency.`,
+  date: new Date().toISOString(),
+  machine: {
+    cpu: cpus()[0].model,
+    logicalCpus: cpus().length,
+    memoryBytes: totalmem(),
+    platform: platform(),
+    kernel: release(),
+    arch: arch(),
+  },
+  browser: browser.version(),
+  tooling: {
+    node: process.version,
+    bun: execFileSync('bun', ['--version'], { encoding: 'utf8' }).trim(),
+  },
+  versions: Object.fromEntries(
+    await Promise.all(
+      [
+        ['@singapore-editor/core', '../../packages/editor/package.json'],
+        ['@singapore-editor/textbuffer', '../../packages/textbuffer/package.json'],
+        ['@singapore-editor/tree-sitter', '../../packages/tree-sitter/package.json'],
+        [
+          '@singapore-editor/tree-sitter-languages',
+          '../../packages/tree-sitter-languages/package.json',
+        ],
+        ...[
+          'monaco-editor',
+          'codemirror',
+          '@codemirror/state',
+          '@codemirror/view',
+          '@codemirror/lang-javascript',
+          'playwright',
+          'vite',
+        ].map((name) => [name, `node_modules/${name}/package.json`]),
+      ].map(async ([name, file]) => [
+        name,
+        JSON.parse(await readFile(resolve(root, file), 'utf8')).version,
+      ]),
+    ),
+  ),
+  rootLockSha256: createHash('sha256')
+    .update(await readFile(resolve(root, '../../../bun.lock')))
+    .digest('hex'),
+  benchmarkSha256: createHash('sha256')
+    .update(
+      (
+        await Promise.all(
+          [
+            'build.mjs',
+            'page.html',
+            'package.json',
+            'page.js',
+            'fixture.mjs',
+            'singapore.js',
+            'monaco.js',
+            'codemirror.js',
+            'protocol.mjs',
+            'provenance.mjs',
+            'run.mjs',
+            'summarize.mjs',
+            'verify-control.mjs',
+            'bun.lock',
+          ].map((file) => readFile(resolve(root, file))),
+        )
+      )
+        .map((bytes) => bytes.toString())
+        .join('\0'),
+    )
+    .digest('hex'),
+  git: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+  config: {
+    condition: values.condition,
+    selected,
+    repetitions,
+    keys,
+    frames,
+    timeout,
+    delayMs: Number(values['delay-ms']),
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  },
+  fixtures: selected.map(fixtureIdentity),
+  builds,
+  bundles: JSON.parse(await readFile(resolve(output, 'bundles.json'), 'utf8')),
+  samples: [],
+}
+
+async function trace(cdp, operation) {
+  await cdp.send('Tracing.start', {
+    categories: 'devtools.timeline,blink.user_timing',
+    transferMode: 'ReturnAsStream',
+  })
+  const completed = new Promise((resolve) => cdp.once('Tracing.tracingComplete', resolve))
+  const result = await operation()
+  await cdp.send('Tracing.end')
+  const { stream } = await completed
+  let data = ''
+  while (true) {
+    const chunk = await cdp.send('IO.read', { handle: stream })
+    data += chunk.data
+    if (chunk.eof) break
+  }
+  await cdp.send('IO.close', { handle: stream })
+  return { result, events: JSON.parse(data).traceEvents }
+}
+
+async function workerRequest(connection, sessionId, method, id) {
+  let listener
+  let timer
+  const response = new Promise((resolve, reject) => {
+    listener = (event) => {
+      if (event.sessionId !== sessionId) return
+      const message = JSON.parse(event.message)
+      if (message.id !== id) return
+      if (message.error) reject(new RangeError(message.error.message))
+      else resolve(message.result)
+    }
+    connection.on('Target.receivedMessageFromTarget', listener)
+    timer = setTimeout(() => reject(new RangeError(`Worker ${method} exceeded deadline`)), timeout)
+  })
+  try {
+    const [, result] = await Promise.all([
+      connection.send('Target.sendMessageToTarget', {
+        sessionId,
+        message: JSON.stringify({ id, method }),
+      }),
+      response,
+    ])
+    return result
+  } finally {
+    clearTimeout(timer)
+    connection.off('Target.receivedMessageFromTarget', listener)
+  }
+}
+
+async function heap(cdp) {
+  await cdp.send('HeapProfiler.collectGarbage')
+  const main = await cdp.send('Runtime.getHeapUsage')
+  const connection = await browser.newBrowserCDPSession()
+  const workers = []
+  try {
+    const targets = (await connection.send('Target.getTargets')).targetInfos.filter(
+      (target) => target.type === 'worker',
+    )
+    for (const target of targets) {
+      const { sessionId } = await connection.send('Target.attachToTarget', {
+        targetId: target.targetId,
+        flatten: false,
+      })
+      try {
+        await workerRequest(connection, sessionId, 'HeapProfiler.collectGarbage', 1)
+        workers.push({
+          url: target.url,
+          ...(await workerRequest(connection, sessionId, 'Runtime.getHeapUsage', 2)),
+        })
+      } finally {
+        await connection.send('Target.detachFromTarget', { sessionId })
+      }
+    }
+  } finally {
+    await connection.detach()
+  }
+  return {
+    main,
+    workers,
+    usedSize: main.usedSize + workers.reduce((sum, worker) => sum + worker.usedSize, 0),
+    backingStorageSize:
+      (main.backingStorageSize ?? 0) +
+      workers.reduce((sum, worker) => sum + (worker.backingStorageSize ?? 0), 0),
+  }
+}
+
+async function sample(editor, mib, repetition) {
+  const row = { editor, mib, repetition, status: 'failed', errors: [] }
+  const context = await browser.newContext({
+    viewport: results.config.viewport,
+    deviceScaleFactor: 1,
+  })
+  const page = await context.newPage()
+  page.setDefaultTimeout(timeout)
+  const cdp = await context.newCDPSession(page)
+  page.on('pageerror', (error) => row.errors.push(error.message))
+  page.on('console', (message) => {
+    if (!['warning', 'error'].includes(message.type())) return
+    row.console ??= []
+    if (row.console.length < 20)
+      row.console.push({ type: message.type(), text: message.text().slice(0, 500) })
+  })
+  try {
+    await page.goto(
+      `http://127.0.0.1:${port}/${editor}-typescript/index.html?delay=${results.config.delayMs}`,
+    )
+    await page.waitForFunction(() => !!window.bench)
+    row.heapBefore = await heap(cdp)
+    row.heapBeforeBytes = row.heapBefore.usedSize
+    await page.evaluate((mib) => window.bench.prepare(mib), mib)
+    row.open = await page.evaluate(() => window.bench.open())
+    verifyGeometry(row.open)
+    if (row.open.length !== mib * 1024 * 1024) throw new RangeError('Open changed document length')
+    await page.waitForTimeout(1000)
+    row.heapAfter = await heap(cdp)
+    row.heapAfterBytes = row.heapAfter.usedSize
+    row.heapDeltaBytes = row.heapAfterBytes - row.heapBeforeBytes
+    await page.screenshot({ path: resolve(values.output, `${editor}-${mib}-${repetition}.png`) })
+    row.typing = {}
+    for (const where of ['end', 'middle']) {
+      const offset = await page.evaluate((where) => window.bench.position(where), where)
+      await page.waitForTimeout(250)
+      verifyGeometry({ geometry: await page.evaluate(() => window.bench.geometry()) })
+      const letter = where === 'end' ? 'q' : 'z'
+      const raw = []
+      for (let key = 0; key < keys; key++) {
+        await page.evaluate(({ letter, count }) => window.bench.arm(letter, count), {
+          letter,
+          count: key + 1,
+        })
+        await page.keyboard.press(letter)
+        const value = await page.evaluate(() => window.bench.inputResult)
+        if (!value.trusted) throw new RangeError('Key event was untrusted')
+        if (!value.rendered) throw new RangeError('Typed glyph is missing from rendered text')
+        raw.push(value)
+      }
+      if (
+        !(await page.evaluate(
+          ({ offset, keys, letter }) => window.bench.assertTyped(offset, keys, letter),
+          {
+            offset,
+            keys,
+            letter,
+          },
+        ))
+      )
+        throw new RangeError('Typed text differs from the input oracle')
+      row.typing[where] = {
+        inputToFrameMs: summarize(raw.map((value) => value.inputToFrameMs)),
+        mutationMs: summarize(raw.map((value) => value.mutationMs)),
+        raw,
+      }
+    }
+    const captured = await trace(cdp, () =>
+      page.evaluate((frames) => window.bench.scroll(frames), frames),
+    )
+    if (repetition === 0 && [1, 10].includes(mib))
+      await writeFile(
+        resolve(values.output, scrollTraceName(editor, mib)),
+        gzipSync(JSON.stringify({ traceEvents: captured.events })),
+      )
+    const starts = captured.events
+      .filter((event) => event.name === 'compare-scroll-frame')
+      .map((event) => event.ts)
+      .sort((a, b) => a - b)
+    const scrollMarker = captured.events.find((event) => event.name === 'compare-scroll-start')
+    const scrollStart = scrollMarker?.ts
+    const scrollEnd = captured.events.find((event) => event.name === 'compare-scroll-end')?.ts
+    row.scroll = {
+      intervalsMs: summarize(captured.result.intervalsMs),
+      rawIntervalsMs: captured.result.intervalsMs,
+      top: captured.result.top,
+      rendering: scrollCosts(
+        captured.events,
+        starts.filter((time) => time >= scrollStart && time <= scrollEnd),
+        scrollMarker,
+      ),
+    }
+    if (row.scroll.top < frames * 200 - 1000)
+      throw new RangeError('Scroll did not reach the requested region')
+    if (row.scroll.rendering.ms.n < frames - 5) throw new RangeError('Missing trace frame samples')
+    verifyGeometry({ geometry: await page.evaluate(() => window.bench.geometry()) })
+    row.status = row.errors.length ? 'page-error' : 'ok'
+  } catch (error) {
+    row.errors.push(error.message)
+    row.failureFacts = await page.evaluate(() => window.bench?.facts()).catch(() => null)
+  } finally {
+    await context.close().catch((error) => {
+      row.errors.push(`Context cleanup: ${error.message}`)
+      row.status = 'failed'
+    })
+  }
+  return row
+}
+
+try {
+  if (values.resume) {
+    const previous = JSON.parse(await readFile(resolve(values.output, 'experiment.json'), 'utf8'))
+    verifyResume(previous, results)
+    previous.resumedAt = [...(previous.resumedAt ?? []), results.date]
+    results = previous
+  }
+  for (const mib of selected) {
+    for (let repetition = 0; repetition < repetitions; repetition++) {
+      for (const editor of order(repetition)) {
+        if (
+          results.samples.some(
+            (row) => row.editor === editor && row.mib === mib && row.repetition === repetition,
+          )
+        )
+          continue
+        const measured = sample(editor, mib, repetition).catch((error) => ({
+          editor,
+          mib,
+          repetition,
+          status: 'failed',
+          errors: [error.message],
+        }))
+        let timer
+        const row = await Promise.race([
+          measured,
+          new Promise((resolve) => {
+            timer = setTimeout(
+              () =>
+                resolve({
+                  editor,
+                  mib,
+                  repetition,
+                  status: 'timeout',
+                  errors: ['Whole sample exceeded deadline'],
+                }),
+              timeout,
+            )
+          }),
+        ])
+        clearTimeout(timer)
+        results.samples.push(row)
+        await writeFile(resolve(values.output, 'experiment.json'), JSON.stringify(results, null, 2))
+        console.log(
+          JSON.stringify({
+            editor,
+            mib,
+            repetition,
+            status: row.status,
+            open: row.open?.highlightedFrameMs,
+            errors: row.errors,
+          }),
+        )
+        // A stuck evaluate cannot be cancelled safely on a shared browser process.
+        if (row.status === 'timeout' || !browser.isConnected()) {
+          await browser.close()
+          await measured
+          browser = await chromium.launch({
+            headless: true,
+            executablePath: values['executable-path'],
+          })
+        }
+      }
+    }
+  }
+} finally {
+  await browser.close()
+  await new Promise((resolve) => server.close(resolve))
+}
+console.log(`Experiment saved to ${resolve(values.output, 'experiment.json')}`)

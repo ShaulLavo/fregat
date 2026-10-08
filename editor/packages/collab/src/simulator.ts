@@ -3,13 +3,15 @@ import { Host } from './host'
 import type { HostMessage } from './host'
 import { Participant } from './participant'
 import { ReferenceEngine } from './reference'
+import { compareId } from './run-index'
 import { InMemoryTransport } from './transport'
 import { VisibilityModel } from './visibility-model'
 import { editKey } from './types'
-import type { OffsetEdit } from './types'
+import type { Engine, OffsetEdit } from './types'
 
 export type SimulationOptions = {
   readonly seed: number
+  readonly createEngine?: () => Engine
   readonly participants: number
   readonly edits?: number
   readonly undoRedo?: boolean
@@ -31,7 +33,8 @@ export function simulate(options: SimulationOptions): SimulationResult {
   )
     throw new CollabFailure('invalid-simulation')
   const random = seededRandom(options.seed)
-  const hostEngine = new ReferenceEngine()
+  const createEngine = options.createEngine ?? (() => new ReferenceEngine())
+  const hostEngine = createEngine()
   const host = new Host({ document: 'simulation', epoch: '1', engine: hostEngine })
   const log: HostMessage[] = []
   const hostModel = new VisibilityModel()
@@ -41,7 +44,7 @@ export function simulate(options: SimulationOptions): SimulationResult {
     if (message.status === 'rejected')
       throw new CollabFailure(`rejection-seed-${options.seed}-${message.reason}`)
   })
-  const engines = Array.from({ length: options.participants }, () => new ReferenceEngine())
+  const engines = Array.from({ length: options.participants }, () => createEngine())
   const participants = engines.map(
     (engine, index) =>
       new Participant({
@@ -117,8 +120,15 @@ export function simulate(options: SimulationOptions): SimulationResult {
         throw new CollabFailure(`convergence-seed-${options.seed}`)
       }
     }
-    const identity = JSON.stringify(hostEngine.snapshot())
-    if (engines.some((engine) => JSON.stringify(engine.snapshot()) !== identity))
+    const readIdentity = (engine: Engine) =>
+      JSON.stringify(
+        engine
+          .characters()
+          .toSorted((a, b) => compareId(a.id, b.id))
+          .map(({ id, deleted, offset }) => [id.bunch, id.counter, deleted, offset]),
+      )
+    const identity = readIdentity(hostEngine)
+    if (engines.some((engine) => readIdentity(engine) !== identity))
       throw new CollabFailure(`identity-seed-${options.seed}`)
     if (model && expected !== model.text)
       throw new CollabFailure(`single-author-host-seed-${options.seed}`)

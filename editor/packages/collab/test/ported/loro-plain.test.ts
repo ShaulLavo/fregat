@@ -1,3 +1,4 @@
+import { createEngine } from '../engine-fixture'
 // loro-dev/loro @ c00c9fa501f8d32f68d6255eacb7035a67fb6ab6.
 // loro-js/tests/richtext-differential.test.ts, random concurrent plain-text
 // edits converge with Rust, seeds 1–20, 80 steps; generator in
@@ -7,7 +8,6 @@
 // commit actions leave delivery queued. Undo and rich-text work are excluded.
 // Copyright (c) 2023 Loro. MIT; see ../../THIRD_PARTY_TEST_NOTICES.md.
 import { expect, test } from 'vitest'
-import { ReferenceEngine } from '../../src/index'
 import { liveIds, network } from './adapter'
 import { plainActions, scalarBoundaries } from './loro-plain-workload'
 
@@ -23,7 +23,7 @@ test.each(seeds)(
       if (action.type === 'commit') continue
       if (action.type === 'sync') {
         net.sync([action.from, action.to])
-        const restored = new ReferenceEngine()
+        const restored = createEngine()
         restored.restore(net.engine.snapshot())
         expect(restored.text()).toBe(net.host.text())
         expect(liveIds(restored)).toEqual(liveIds(net.engine))

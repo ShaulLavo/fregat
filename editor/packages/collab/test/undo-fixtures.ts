@@ -1,15 +1,16 @@
+import { createEngine } from './engine-fixture'
 import { submitAsAuthor } from './host-fixtures'
 import { expect } from 'vitest'
-import { Host, Participant, ReferenceEngine } from '../src/index'
+import { Host, Participant } from '../src/index'
 import type { CaptureOptions, Envelope, HostMessage, UndoOptions } from '../src/index'
 
 export function undoRoom(options: UndoOptions = { groupDelay: 0 }, count = 2) {
-  const engine = new ReferenceEngine()
+  const engine = createEngine()
   const host = new Host({ document: 'undo', epoch: '1', engine })
   const log: HostMessage[] = []
   host.subscribe((message) => log.push(message))
   const users = Array.from({ length: count }, (_, index) => {
-    const engine = new ReferenceEngine()
+    const engine = createEngine()
     const participant = new Participant({
       actor: String(index),
       document: 'undo',
@@ -50,7 +51,7 @@ export function undoRoom(options: UndoOptions = { groupDelay: 0 }, count = 2) {
     sync()
     for (const user of users) {
       expect(user.participant.text()).toBe(host.text())
-      expect(user.engine.snapshot()).toEqual(engine.snapshot())
+      expect(user.engine.characters()).toEqual(engine.characters())
       expect(user.participant.state()).toMatchObject({
         pending: [],
         blocked: [],

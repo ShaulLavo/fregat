@@ -13,7 +13,7 @@ import {
   tryCommitStagedSettingsFile,
   type SettingsFileContents,
 } from './json-document'
-import { settingsWriteContendedError } from './structured-errors'
+import { settingsWriteContendedError, type SettingsRevisionMismatch } from './structured-errors'
 
 export type SettingsPruneResult = {
   readonly contents: { readonly text: string; readonly revision: string }
@@ -51,13 +51,20 @@ export function pruneSettingsFileSync(
   const pruned = pruneSettingsText(current.text)
   if (!pruned) return null
 
+  const startedAt = performance.now()
   const mode = statSync(destination).mode & 0o777
   writeFileAtomicSync(destination, pruned.text, {
     durability: 'fsync-all',
     mode,
     beforeCommit: () => {
-      if (!eligible() || readSettingsFileSync(destination).revision !== current.revision) {
-        throw settingsWriteContendedError(1, 0)
+      if (!eligible()) throw pruneContentionError(startedAt, 0, null)
+      const observedRevision = readSettingsFileSync(destination).revision
+      if (observedRevision !== current.revision) {
+        throw pruneContentionError(startedAt, 0, {
+          source: 'settings',
+          expectedRevision: current.revision,
+          observedRevision,
+        })
       }
     },
   })
@@ -78,15 +85,20 @@ export async function pruneSettingsFile(
   const pruned = pruneSettingsText(current.text)
   if (!pruned) return null
 
+  const startedAt = performance.now()
   const mode = (await stat(destination)).mode & 0o777
   const staged = await stageSettingsFile(destination, pruned.text, mode)
   try {
     if (!eligible()) return null
     const outcome = await tryCommitStagedSettingsFile(staged, current.revision, () => {
-      if (!eligible()) throw settingsWriteContendedError(1, coordinatorWaitMs)
+      if (!eligible()) throw pruneContentionError(startedAt, coordinatorWaitMs, null)
     })
     if (outcome.kind === 'revision-mismatch') {
-      throw settingsWriteContendedError(1, coordinatorWaitMs)
+      throw pruneContentionError(startedAt, coordinatorWaitMs, {
+        source: 'settings',
+        expectedRevision: current.revision,
+        observedRevision: outcome.foundRevision,
+      })
     }
     return {
       contents: { text: pruned.text, revision: outcome.revision },
@@ -95,4 +107,18 @@ export async function pruneSettingsFile(
   } finally {
     await discardStagedSettingsFile(staged)
   }
+}
+
+function pruneContentionError(
+  startedAt: number,
+  coordinatorWaitMs: number,
+  lastRevisionMismatch: SettingsRevisionMismatch | null,
+) {
+  return settingsWriteContendedError(1, coordinatorWaitMs, {
+    reason: lastRevisionMismatch ? 'revision-mismatch' : 'prune-protected',
+    attemptLimit: 1,
+    budgetMs: null,
+    elapsedMs: performance.now() - startedAt,
+    lastRevisionMismatch,
+  })
 }

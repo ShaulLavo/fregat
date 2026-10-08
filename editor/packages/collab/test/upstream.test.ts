@@ -1,14 +1,14 @@
+import { createEngine, characters } from './engine-fixture'
 // Workloads ported from loro-dev/loro at c00c9fa501f8d32f68d6255eacb7035a67fb6ab6.
 // crates/loro-internal/tests/fugue.rs and src/container/richtext/tracker/crdt_rope.rs.
 // Copyright (c) 2023 Loro. MIT; see THIRD_PARTY_LICENSES.
 // Three-replica ab case from mweidner037/fugue, yjs-interleave/index.js at 31e74fea67f23add13a5d10f781c0d78edcd14da.
 // Copyright (c) 2023 Matthew Weidner and Martin Kleppmann. MIT; see THIRD_PARTY_LICENSES.
 import { expect, test } from 'vitest'
-import { ReferenceEngine } from '../src/index'
 import { accept, replica } from './fixtures'
 
 function merged(...replicas: ReturnType<typeof replica>[]) {
-  const engine = new ReferenceEngine()
+  const engine = createEngine()
   for (const author of replicas) for (const edit of author.edits) engine.apply(edit)
   return engine.text()
 }
@@ -107,7 +107,7 @@ test('Loro content insertion ignores a hidden run in visible offsets', () => {
   a.remove(5, 10)
   a.insert(10, 'ABCDEFGHIJ')
   expect(a.participant.text()).toBe('0123456789ABCDEFGHIJ')
-  expect(a.engine.snapshot().nodes.filter((node) => node.deleted)).toHaveLength(10)
+  expect(characters(a.engine).filter((node) => node.deleted)).toHaveLength(10)
 })
 
 test('Loro deleted inserted run supplies the structural right origin', () => {

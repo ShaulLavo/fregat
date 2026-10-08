@@ -1,5 +1,12 @@
 import type { TextPageOwner } from './textPages'
 
+export class ReclaimedTextError extends RangeError {
+  constructor() {
+    super('piece buffer text reclaimed (character payload expired)')
+    this.name = 'ReclaimedTextError'
+  }
+}
+
 export type TextRange = { readonly start: number; readonly end: number }
 export type BufferTextSpan = TextRange & { readonly text: string; readonly owner: TextPageOwner }
 export type SparseText = {
@@ -70,6 +77,6 @@ export function sparseSpanAt(entry: SparseText, offset: number): BufferTextSpan 
     else high = middle
   }
   const span = entry.spans[low]
-  if (!span || span.start > offset) throw new RangeError('piece buffer text reclaimed')
+  if (!span || span.start > offset) throw new ReclaimedTextError()
   return span
 }

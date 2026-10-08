@@ -236,8 +236,8 @@ test('Loro undo_transform_cursor_position: selection identities survive remote e
   expect(
     cursors.every((id) =>
       room.engine
-        .snapshot()
-        .nodes.some(
+        .characters()
+        .some(
           (node) => node.id.bunch === id.bunch && node.id.counter === id.counter && !node.deleted,
         ),
     ),
