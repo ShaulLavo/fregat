@@ -615,7 +615,7 @@ it('keeps live geometry through fractional CSS, sibling flow, transforms and sty
   document.head.append(sheet)
   cleanups.push(() => sheet.remove())
   sheet.sheet!.insertRule(
-    'canvas[data-dom-position-probe] { margin-top: 23.25px !important; padding-left: 19px !important }',
+    'canvas[data-dom-position-probe] { anchor-name: --embedder !important; margin-top: 23.25px !important; padding-left: 19px !important }',
   )
   expectPosition()
   sheet.remove()
@@ -624,6 +624,27 @@ it('keeps live geometry through fractional CSS, sibling flow, transforms and sty
   expectPosition()
   host.style.width = '350px'
   expectPosition()
+})
+
+it('preserves existing canvas anchor names and restores inline priority on disposal', async () => {
+  const runtime = await GhosttyRuntime.create()
+  cleanups.push(() => runtime.dispose())
+  const canvas = mountedCanvas()
+  canvas.style.setProperty('anchor-name', '--embedder', 'important')
+  const terminal = runtime.createTerminal({ columns: 12, rows: 3 })
+  const renderer = await DomTerminalRenderer.create({
+    canvas,
+    columns: 12,
+    rows: 3,
+    font: probeFont,
+    renderState: runtime.createRenderState(terminal),
+  })
+  cleanups.push(() => renderer.dispose())
+  expect(getComputedStyle(canvas).anchorName.split(/\s+/)).toContain('--embedder')
+  expect(canvas.style.getPropertyPriority('anchor-name')).toBe('important')
+  renderer.dispose()
+  expect(canvas.style.anchorName).toBe('--embedder')
+  expect(canvas.style.getPropertyPriority('anchor-name')).toBe('important')
 })
 
 it('avoids resolved padding reads for stable pixel-padded real-core repaint frames', async ({

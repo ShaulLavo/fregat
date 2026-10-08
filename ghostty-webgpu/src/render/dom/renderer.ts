@@ -51,6 +51,7 @@ class DomSurface implements RowRendererSurface {
   private readonly canvas: HTMLCanvasElement
   private readonly previousOpacity: string
   private readonly previousAnchorName: string
+  private readonly previousAnchorPriority: string
   private readonly anchorName: string
   private readonly canvasStyle: CSSStyleDeclaration
   private readonly computedStyle: StylePropertyMapReadOnly | undefined
@@ -68,6 +69,7 @@ class DomSurface implements RowRendererSurface {
     this.canvasStyle = view.getComputedStyle(this.canvas)
     this.computedStyle = this.canvas.computedStyleMap?.()
     this.previousAnchorName = this.canvas.style.anchorName
+    this.previousAnchorPriority = this.canvas.style.getPropertyPriority('anchor-name')
     this.anchorName = `--ghostty-dom-${view.crypto.getRandomValues(new Uint32Array(4)).join('-')}`
     const anchors = this.canvasStyle.anchorName === 'none' ? '' : this.canvasStyle.anchorName
     this.font = copyFittedFont(options.font)
@@ -78,7 +80,12 @@ class DomSurface implements RowRendererSurface {
     this.container.style.pointerEvents = 'none'
     this.previousOpacity = this.canvas.style.opacity
     this.resize(this.font, this.grid)
-    this.canvas.style.anchorName = `${anchors} ${this.anchorName}`.trim()
+    // Embedding stylesheet rules must leave the private positioning anchor available.
+    this.canvas.style.setProperty(
+      'anchor-name',
+      `${anchors} ${this.anchorName}`.trim(),
+      'important',
+    )
     // Transparency preserves the canvas as the terminal pointer target.
     this.canvas.style.opacity = '0'
     this.canvas.after(this.container)
@@ -88,7 +95,11 @@ class DomSurface implements RowRendererSurface {
     this.container.remove()
     this.rows = []
     this.canvas.style.opacity = this.previousOpacity
-    this.canvas.style.anchorName = this.previousAnchorName
+    this.canvas.style.setProperty(
+      'anchor-name',
+      this.previousAnchorName,
+      this.previousAnchorPriority,
+    )
   }
 
   beginFrame(): void {
