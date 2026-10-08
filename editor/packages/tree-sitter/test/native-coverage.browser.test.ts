@@ -105,6 +105,81 @@ browserTest.each(['full', 'range'] as const)(
 )
 
 browserTest.each(['full', 'range'] as const)(
+  'covers every documentation and regex injection beyond 256 layers in %s mode',
+  async (syntaxMode) => {
+    const backend = new TreeSitterWorkerClient()
+    const languageResolver = registry([])
+    const text = '/** @param {string} value */\nconst pattern = /[a-z]+/;\n'.repeat(150)
+    const document = createDocumentSession(text)
+    const options = { languageId: 'typescript', languageResolver, backend, syntaxMode }
+    const session = createTreeDocument({ ...options, documentId: 'many-injections.ts', text })
+    try {
+      let result = await session.run()
+      if (syntaxMode === 'range')
+        result = await session.runtime.queryRange({ startIndex: 0, endIndex: text.length })
+      expect(result.degraded).toBeNull()
+      expect(result.injections).toHaveLength(300)
+      const tokens = tokenValues(result)
+      for (const [start, capture] of [
+        [text.lastIndexOf('@param'), 'keyword'],
+        [text.lastIndexOf('[a-z]') + 1, 'constant.character'],
+      ] as const) {
+        expect(tokens.find((token) => token.start <= start && token.end > start)?.style).toEqual(
+          styleForTreeSitterCapture(capture),
+        )
+      }
+      const change = document.applyEdits([{ from: 4, to: 10, text: '@returns' }])
+      const updated = await session.edit(change.edits)
+      const actual =
+        syntaxMode === 'full'
+          ? updated
+          : await session.runtime.queryRange({ startIndex: 0, endIndex: change.snapshot.length })
+      expect(actual.degraded).toBeNull()
+      expect(actual.injections).toHaveLength(300)
+      await assertFreshSyntax(options, change.snapshot, actual, change.snapshot.length)
+    } finally {
+      session.dispose()
+      await backend.dispose()
+    }
+  },
+)
+
+browserTest(
+  'reports incomplete syntax when injection nesting exceeds the depth limit',
+  async () => {
+    const backend = new TreeSitterWorkerClient()
+    const languageResolver = new TreeSitterLanguageRegistry()
+    const contribution = TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((value) => value.id === 'html')!
+    languageResolver.registerLanguage({
+      ...contribution,
+      async load() {
+        return {
+          ...(await contribution.load!()),
+          injectionQuerySource:
+            '((element (start_tag) (element) @injection.content (end_tag)) (#set! injection.language "html") (#set! injection.include-children))',
+        }
+      },
+    })
+    const session = createTreeDocument({
+      documentId: 'nested.html',
+      languageId: 'html',
+      languageResolver,
+      backend,
+      syntaxMode: 'full',
+      text: '<div>'.repeat(12) + 'text' + '</div>'.repeat(12),
+    })
+    try {
+      const result = await session.run()
+      expect(result.degraded?.kind).toBe('injection-failed')
+      expect(result.degraded?.message).toContain('nesting exceeds')
+    } finally {
+      session.dispose()
+      await backend.dispose()
+    }
+  },
+)
+
+browserTest.each(['full', 'range'] as const)(
   'loads an Astro fence and its nested languages in %s mode',
   async (syntaxMode) => {
     const backend = new TreeSitterWorkerClient()
