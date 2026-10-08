@@ -189,11 +189,13 @@ describe('horizontal gutter scrolling', () => {
       const box = row.getBoundingClientRect()
       const x = Math.max(box.left, gutter.getBoundingClientRect().right) + 8
       const offset = editor.textOffsetFromPoint(x, box.top + 10)
+      const scrollLeftBeforeClick = scroller.scrollLeft
       await userEvent.click(row, { position: { x: x - box.left, y: 10 }, force: true })
       expect(editor.getSelections()[0]?.headOffset).toBe(offset)
       await frames()
       const caret = element(host, '.editor-virtualized-caret').getBoundingClientRect()
-      expect(Math.abs(caret.left - x)).toBeLessThan(8)
+      const expectedX = x + scrollLeftBeforeClick - scroller.scrollLeft
+      expect(Math.abs(caret.left - expectedX)).toBeLessThan(8)
       expect(caret.top).toBeCloseTo(row.getBoundingClientRect().top)
     },
   )
