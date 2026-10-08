@@ -175,7 +175,11 @@ describe('horizontal gutter scrolling', () => {
       const viewport = scroller.getBoundingClientRect()
       const row = [
         ...host.querySelectorAll<HTMLElement>('.editor-virtualized-row:not([hidden])'),
-      ].find((candidate) => candidate.getBoundingClientRect().top >= viewport.top)
+      ].find(
+        (candidate) =>
+          candidate.getBoundingClientRect().top >= viewport.top &&
+          (candidate.textContent?.length ?? 0) > 20,
+      )
       if (!row) throw new TypeError('Expected a visible wrapped row')
       const gutter = element(
         host,
@@ -188,6 +192,7 @@ describe('horizontal gutter scrolling', () => {
       )
       const box = row.getBoundingClientRect()
       const x = Math.max(box.left, gutter.getBoundingClientRect().right) + 8
+      expect(editor.rowAtPoint(x, box.top + 10)?.region).toBe('text')
       const offset = editor.textOffsetFromPoint(x, box.top + 10)
       const scrollLeftBeforeClick = scroller.scrollLeft
       await userEvent.click(row, { position: { x: x - box.left, y: 10 }, force: true })
