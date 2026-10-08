@@ -105,19 +105,43 @@ function copiedTextRow(y: number, words: Uint32Array, graphemes: Uint32Array): R
   })
 }
 
+const payloadKey = Symbol()
+
+class MovedTextRow implements RenderTextRow {
+  readonly text: string
+  readonly [payloadKey]: RenderTextRow
+
+  constructor(
+    readonly y: number,
+    payload: RenderTextRow,
+  ) {
+    this.text = payload.text
+    this[payloadKey] = payload
+    // Own enumerable accessors materialize during cloning and share getter functions.
+    Object.defineProperties(this, movedRowDescriptors)
+    Object.freeze(this)
+  }
+
+  get cells(): readonly string[] {
+    return this[payloadKey].cells
+  }
+
+  get continuations(): readonly boolean[] {
+    return this[payloadKey].continuations
+  }
+}
+
+const getters = Object.getOwnPropertyDescriptors(MovedTextRow.prototype)
+const movedRowDescriptors = {
+  cells: { get: getters.cells.get, enumerable: true },
+  continuations: { get: getters.continuations.get, enumerable: true },
+  [payloadKey]: { enumerable: false },
+}
+
 function movedRow(y: number, payload: RenderTextRow, previous: RenderTextRow): RenderTextRow {
   if (previous.y === y) return previous
   if (payload.y === y) return payload
-  return Object.freeze({
-    y,
-    text: payload.text,
-    get cells() {
-      return payload.cells
-    },
-    get continuations() {
-      return payload.continuations
-    },
-  })
+  return new MovedTextRow(y, payload)
 }
 
 export class TextRowReader {

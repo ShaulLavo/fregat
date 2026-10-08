@@ -65,6 +65,34 @@ describe('owned text row reuse', () => {
     },
   )
 
+  it('shares own moved getters while preserving enumerable records and immutable positions', async () => {
+    const { terminal, capture } = await fixture()
+    for (let index = 0; index < 12; index += 1) terminal.write(`${index} 界é\r\n`)
+    capture()
+    terminal.write('12 界é\r\n')
+    const first = capture()
+    terminal.write('13 界é\r\n')
+    const second = capture()
+    const held = first[1]!
+    const moved = second[0]!
+    for (const property of ['cells', 'continuations']) {
+      const oldDescriptor = Object.getOwnPropertyDescriptor(held, property)!
+      const newDescriptor = Object.getOwnPropertyDescriptor(moved, property)!
+      expect(newDescriptor.get).toBe(oldDescriptor.get)
+      expect(newDescriptor.enumerable).toBe(true)
+      expect(newDescriptor.configurable).toBe(false)
+    }
+    expect(Object.keys(moved)).toEqual(['y', 'text', 'cells', 'continuations'])
+    expect(Object.getOwnPropertySymbols(Object.assign({}, moved))).toEqual([])
+    expect(Object.isFrozen(moved)).toBe(true)
+    expect(Reflect.set(moved, 'y', 9)).toBe(false)
+    expect(held.y).toBe(1)
+    expect(moved.y).toBe(0)
+    expect(moved.cells).toBe(held.cells)
+    expect(moved.continuations).toBe(held.continuations)
+    expect(structuredClone(moved)).toEqual(materialize([moved])[0])
+  })
+
   it('captures scroll-region movement and an in-place edit of a moved row', async () => {
     const { terminal, capture } = await fixture()
     for (let index = 0; index < 12; index += 1)
