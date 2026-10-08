@@ -97,6 +97,8 @@ export function mountDocsEditor(host: HTMLElement, options: DocsEditorOptions) {
     tabSize: 2,
     wordWrap: true,
     wordWrapBreak: 'word',
+    // The gutter belongs to the page: it scrolls with the text, as the static rows do.
+    gutterScroll: 'content',
     theme: paletteTheme(host, options.background ?? 'bg'),
     onChange: () => {
       decorate()
