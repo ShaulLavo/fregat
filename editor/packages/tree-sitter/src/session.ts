@@ -24,11 +24,9 @@ import type {
   TreeSitterParseResult,
   TreeSitterRangeResult,
 } from './treeSitter/types'
-import {
-  resolveTreeSitterLanguageClosure,
-  withInjectedLanguages,
-  type TreeSitterLanguageDescriptor,
-  type TreeSitterLanguageResolver,
+import type {
+  TreeSitterLanguageDescriptor,
+  TreeSitterLanguageResolver,
 } from './treeSitter/registry'
 import {
   TreeSitterWorkerClient,
@@ -376,13 +374,8 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
     }
     this.currentFoldingSupport = descriptor.foldQuerySource?.trim() ? 'supported' : 'unsupported'
 
-    const descriptors = await withInjectedLanguages(
-      this.languageResolver,
-      descriptor,
-      () => this.disposed,
-    )
     if (this.disposed) return false
-    await this.backend.registerLanguages(descriptors)
+    await this.backend.registerLanguages([descriptor])
     return true
   }
 
@@ -395,7 +388,7 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
       if (this.disposed || !this.isCurrentSnapshotVersion(version)) return false
       let pending = this.pendingLanguages.get(id)
       if (!pending) {
-        pending = this.resolveLanguageDependencies(id)
+        pending = this.resolveRequestedLanguage(id)
         this.pendingLanguages.set(id, pending)
       }
       const descriptors = await pending
@@ -407,11 +400,12 @@ export class TreeSitterSyntaxSession implements EditorSyntaxRuntime {
     return loaded
   }
 
-  private async resolveLanguageDependencies(
+  private async resolveRequestedLanguage(
     id: string,
   ): Promise<readonly TreeSitterLanguageDescriptor[]> {
     if (!this.languageResolver) return []
-    return resolveTreeSitterLanguageClosure(this.languageResolver, id, () => this.disposed)
+    const descriptor = await this.languageResolver.resolveTreeSitterLanguage(id)
+    return descriptor && !this.disposed ? [descriptor] : []
   }
 
   private updateFromUnavailableLanguage(read: DocumentRead): EditorSyntaxResult {

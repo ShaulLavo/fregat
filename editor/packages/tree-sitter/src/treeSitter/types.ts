@@ -14,6 +14,7 @@ export type TreeSitterCapture = {
   readonly endIndex: number
   readonly captureName: string
   readonly languageId?: TreeSitterLanguageId
+  readonly injectionDepth?: number
 }
 
 export type FoldRange = {

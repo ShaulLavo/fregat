@@ -2198,8 +2198,11 @@ const flattenLayer = async (
   if (withCaptures) {
     appendItems(
       result.captures,
-      runOptionalWorkerPhase('collect highlights', [] as TreeSitterCapture[], result.degraded, () =>
-        collectCaptures(layer.tree, runtime, context),
+      runOptionalWorkerPhase(
+        'collect highlights',
+        [] as readonly TreeSitterCapture[],
+        result.degraded,
+        () => withInjectionDepth(collectCaptures(layer.tree, runtime, context), layer.depth),
       ),
     )
   }
@@ -2233,9 +2236,13 @@ const flattenLayerRange = async (
       result.captures,
       runOptionalWorkerPhase(
         'collect range highlights',
-        [] as TreeSitterCapture[],
+        [] as readonly TreeSitterCapture[],
         result.degraded,
-        () => collectCaptures(layer.tree, runtime, context, options.range),
+        () =>
+          withInjectionDepth(
+            collectCaptures(layer.tree, runtime, context, options.range),
+            layer.depth,
+          ),
       ),
     )
   }
@@ -2248,6 +2255,14 @@ const flattenLayerRange = async (
   appendItems(result.brackets, treeData.brackets)
   appendItems(result.errors, treeData.errors)
   if (layer.kind !== 'root') result.injections.push(injectionInfoForLayer(layer))
+}
+
+const withInjectionDepth = (
+  captures: readonly TreeSitterCapture[],
+  depth: number,
+): readonly TreeSitterCapture[] => {
+  if (depth === 0) return captures
+  return captures.map((capture) => ({ ...capture, injectionDepth: depth }))
 }
 
 type Writable<T> = {
