@@ -120,12 +120,19 @@ const leafHtml = (leaf: Leaf, text: string) => {
  * The editor wraps only at spaces; the browser also breaks after hyphens and slashes. Words
  * holding either stay in one `nowrap` span so both break in the same place.
  */
+const NARROWEST_COLUMNS = 32
+
 function leavesHtml(leaves: readonly Leaf[]): string {
   const text = leaves.map((leaf) => leaf.text).join('')
   const cuts = new Set<number>()
-  const words: { start: number; end: number }[] = []
+  const words: { start: number; end: number; wide: boolean }[] = []
   for (const match of text.matchAll(/\S*[-/]\S*/g)) {
-    words.push({ start: match.index, end: match.index + match[0].length })
+    words.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      // Wider than a 320 px phone row: phones may break it (`.nw.wide`), as the editor would.
+      wide: match[0].length > NARROWEST_COLUMNS,
+    })
     cuts.add(match.index).add(match.index + match[0].length)
   }
   let html = ''
@@ -134,7 +141,8 @@ function leavesHtml(leaves: readonly Leaf[]): string {
     let start = 0
     for (let index = 1; index <= leaf.text.length; index++) {
       if (index < leaf.text.length && !cuts.has(offset + index)) continue
-      if (words.some((word) => word.start === offset + start)) html += '<span class="nw">'
+      const word = words.find((candidate) => candidate.start === offset + start)
+      if (word) html += word.wide ? '<span class="nw wide">' : '<span class="nw">'
       html += leafHtml(leaf, leaf.text.slice(start, index))
       if (words.some((word) => word.end === offset + index)) html += '</span>'
       start = index

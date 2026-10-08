@@ -455,7 +455,14 @@ body[data-mode='editor'] .pane {
   .viewport {
     height: auto;
   }
-  /* Rows round their width up to whole columns, as the editor does; clip the last few pixels. */
+  /* Phones read the static page, so rows fit whole columns inside the screen instead of
+     rounding up the way the editor does. */
+  .src {
+    --wrap: round(down, 100cqw - var(--gw) - var(--cw) / 2, var(--cw));
+  }
+  .nw.wide {
+    white-space: inherit;
+  }
   .pane {
     position: static;
     overflow: visible;
@@ -596,7 +603,7 @@ body[data-mode='editor'] .pane {
   container-type: inline-size;
   padding: 0;
 }
-/* Rows round their width up to whole columns, as the editor does; clip the last few pixels. */
+/* Desktop rows round their width up to whole columns, as the editor does; clip the excess. */
 .hero-box,
 .install {
   overflow-x: clip;

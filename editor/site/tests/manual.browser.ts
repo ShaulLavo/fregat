@@ -156,14 +156,20 @@ describe.skipIf(!hasChromium())(
     })
 
     test.each([320, 360, 390])(
-      'phones %i px wide stay static with no sideways scroll',
+      'phones %i px wide stay static with no sideways scroll on every editor page',
+      { timeout: 120_000 },
       async (width) => {
-        for (const path of [
-          '/',
-          ...['introduction', 'quick-start', 'monaco', 'codemirror'].map(
-            (name) => `/docs/start-here/${name}/`,
-          ),
-        ]) {
+        const prefix = new URL(base).pathname.replace(/\/$/, '')
+        const listing = await open('/docs/start-here/introduction/?editor=off')
+        const pages = await listing.page.evaluate(() =>
+          (
+            JSON.parse(document.getElementById('manual-pages')!.textContent!) as {
+              url: string
+            }[]
+          ).map((page) => page.url),
+        )
+        await listing.context.close()
+        for (const path of ['/', ...pages.map((url) => url.slice(prefix.length))]) {
           const { context, page, problems } = await open(path, {
             viewport: { width, height: 800 },
             isMobile: true,
@@ -176,6 +182,17 @@ describe.skipIf(!hasChromium())(
               ),
               path,
             ).toBe(0)
+            // A row is as wide as the screen allows; text that overflows it is cut off.
+            const textRight = await page.evaluate(() => {
+              let past = -Infinity
+              for (const row of document.querySelectorAll<HTMLElement>('.r')) {
+                const box = row.getBoundingClientRect()
+                past = Math.max(past, box.right - document.documentElement.clientWidth)
+                past = Math.max(past, row.scrollWidth - row.clientWidth)
+              }
+              return past
+            })
+            expect(textRight, `${path} text past the right edge`).toBeLessThanOrEqual(0)
             expect(await page.locator('.editor-host').count(), path).toBe(0)
             expect(problems, path).toEqual([])
           } finally {
