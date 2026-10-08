@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
-import { copyFile, mkdir, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, symlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { withWorkspace } from './release/fixture.mjs'
 
@@ -19,6 +20,11 @@ async function withEditor(run, { standalone = false } = {}) {
         'test:server': 'bun --bun vitest run --config vitest.server.config.ts',
       },
     })
+    await symlink(
+      fileURLToPath(new URL('../node_modules', import.meta.url)),
+      join(editor, 'node_modules'),
+      'junction',
+    )
     await mkdir(join(editor, 'scripts'), { recursive: true })
     for (const file of ['check-turbo-inputs.mjs', 'workspace-root.ts']) {
       await copyFile(
@@ -175,6 +181,109 @@ test('Vitest project config files are checked through their parent config', asyn
     expect(result.status, result.stdout + result.stderr).toBe(1)
     expect(result.stderr).toContain('configs/browser.ts reads shared.ts')
     expect(result.stderr).toContain('cached by test\n')
+  })
+})
+
+test.each([
+  "'configs/browser.ts'",
+  "{ extends: './configs/browser.ts', test: { name: 'browser' } }",
+])('Vitest project wiring %s carries the parent task', async (project) => {
+  await withEditor(async ({ write, check }) => {
+    await write(
+      'packages/reader/vitest.config.ts',
+      `export default { test: { projects: [${project}] } }\n`,
+    )
+    await write('packages/reader/configs/browser.ts', "import '../../../shared.ts'\n")
+    expect(check().stderr).toContain('cached by test\n')
+  })
+})
+
+test('a config inside a scanned source tree retains its actual task', async () => {
+  await withEditor(async ({ put, write, configure, check }) => {
+    await put('editor/packages/reader', {
+      name: 'reader',
+      scripts: { 'test:browser': 'vitest run --config scripts/browser.ts' },
+    })
+    await write('packages/reader/scripts/browser.ts', "import '../../../shared.ts'\n")
+    await configure({
+      'test:browser': { inputs: ['$TURBO_DEFAULT$', '$TURBO_ROOT$/editor/shared.ts'] },
+    })
+    const result = check()
+    expect(result.status, result.stdout + result.stderr).toBe(0)
+  })
+})
+
+test('a project config inside a scanned tree retains its actual parent task', async () => {
+  await withEditor(async ({ write, configure, check }) => {
+    await write(
+      'packages/reader/vitest.browser.config.ts',
+      "export default { test: { projects: ['./scripts/project.ts'] } }\n",
+    )
+    await write('packages/reader/scripts/project.ts', "import '../../../shared.ts'\n")
+    await configure({
+      'test:browser': { inputs: ['$TURBO_DEFAULT$', '$TURBO_ROOT$/editor/shared.ts'] },
+    })
+    const result = check()
+    expect(result.status, result.stdout + result.stderr).toBe(0)
+  })
+})
+
+test('an input on the default test task cannot cover a browser-only config', async () => {
+  await withEditor(async ({ write, configure, check }) => {
+    await write('packages/reader/vitest.browser.config.ts', externalRead)
+    await configure({ test: { inputs: ['$TURBO_DEFAULT$', '$TURBO_ROOT$/editor/shared.ts'] } })
+    expect(check().stderr).toContain('cached by test:browser\n')
+  })
+})
+
+test('cyclic script calls settle and retain their config consumers', async () => {
+  await withEditor(async ({ put, write, configure, check }) => {
+    await put('editor/packages/reader', {
+      name: 'reader',
+      scripts: {
+        test: 'bun run test:browser',
+        'test:browser': 'vitest run --config vitest.browser.config.ts && bun run test',
+      },
+    })
+    await write('packages/reader/vitest.browser.config.ts', externalRead)
+    const inputs = ['$TURBO_DEFAULT$', '$TURBO_ROOT$/editor/shared.ts']
+    await configure({ test: { inputs }, 'test:browser': { inputs } })
+    const result = check()
+    expect(result.status, result.stdout + result.stderr).toBe(0)
+  })
+})
+
+test('a config outside the package must itself be hashed by its consuming task', async () => {
+  await withEditor(async ({ put, write, configure, check }) => {
+    await put('editor/packages/reader', {
+      name: 'reader',
+      scripts: { 'test:browser': 'vitest run --config ../../browser.ts' },
+    })
+    await write('browser.ts', 'export default {}\n')
+    expect(check().stderr).toContain('package.json reads browser.ts')
+    expect(check().stderr).toContain('cached by test:browser\n')
+    await configure({
+      'test:browser': { inputs: ['$TURBO_DEFAULT$', '$TURBO_ROOT$/editor/browser.ts'] },
+    })
+    const result = check()
+    expect(result.status, result.stdout + result.stderr).toBe(0)
+  })
+})
+
+test('exact workspace entries are checked alongside wildcard entries', async () => {
+  await withEditor(async ({ put, write, configure, check }) => {
+    await put('editor', { workspaces: ['packages/*', 'site'] })
+    await put('editor/site', { name: 'site', scripts: { test: 'vitest run' } })
+    await write('site/vitest.config.ts', "import '../shared.ts'\n")
+    const failed = check()
+    expect(failed.status, failed.stdout + failed.stderr).toBe(1)
+    expect(failed.stderr).toContain('site/vitest.config.ts reads shared.ts')
+    await configure({
+      'site#test': { inputs: ['$TURBO_DEFAULT$', '$TURBO_ROOT$/editor/shared.ts'] },
+    })
+    const passed = check()
+    expect(passed.status, passed.stdout + passed.stderr).toBe(0)
+    expect(passed.stdout).toContain('turbo inputs: 2 workspaces')
   })
 })
 

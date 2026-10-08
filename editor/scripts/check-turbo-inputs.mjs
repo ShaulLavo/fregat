@@ -10,12 +10,14 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript-api'
 import { workspacePatterns, workspaceRoot } from './workspace-root.ts'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const SCANNED_DIRECTORIES = ['src', 'test', 'scripts']
 const SOURCE_FILE = /\.(?:[cm]?[jt]sx?)$/
-const CONFIG_FILE = /^(?:vitest|vite)\.config\.[cm]?[jt]s$|^tsconfig.*\.json$/
+const TSCONFIG_FILE = /^tsconfig.*\.json$/
+const SCRIPT_TOKEN = /(?:[^\s"';&|]+|"[^"]*"|'[^']*')+|&&|\|\||[;&|]/g
 const SKIPPED_DIRECTORIES = new Set(['node_modules', 'dist', '.turbo', 'coverage'])
 const RESOLVED_SUFFIXES = ['', '.ts', '.tsx', '.js', '.mjs', '/index.ts', '/index.js']
 // A quoted path from the file (`./`, `../`) or from the package directory (`${process.cwd()}/`),
@@ -42,7 +44,7 @@ if (violations.length > 0) {
   console.error(`${violations.length} read(s) a cached turbo task cannot see:`)
   for (const violation of violations) console.error(`  ${violation}`)
   console.error(
-    "Fix in turbo.json: add `<package>#build` to the reader's task dependsOn, add a root file to `globalDependencies`, or set the task to `cache: false`.",
+    "Fix in turbo.json: declare the read in the task's `inputs`, add `<package>#build` to its `dependsOn`, or add a root file to `globalDependencies`.",
   )
   process.exit(1)
 }
@@ -51,32 +53,34 @@ console.log(`turbo inputs: ${workspaces.length} workspaces, every cross-package 
 function readWorkspaces() {
   const manifest = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
   return workspacePatterns(manifest.workspaces).flatMap((pattern) => {
-    const parent = path.join(repoRoot, pattern.replace(/\/\*$/, ''))
-    return readdirSync(parent)
-      .map((entry) => path.join(parent, entry))
-      .filter((directory) => existsSync(path.join(directory, 'package.json')))
-      .map((directory) => {
-        const packageJson = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'))
-        const declared = {
-          ...packageJson.dependencies,
-          ...packageJson.devDependencies,
-          ...packageJson.peerDependencies,
-        }
-        const workspaceDependencies = Object.keys(declared)
-        return { name: packageJson.name, directory, declared: workspaceDependencies }
-      })
+    const manifests = new Bun.Glob(`${pattern}/package.json`).scanSync({
+      cwd: repoRoot,
+      absolute: true,
+      onlyFiles: true,
+    })
+    return [...manifests].map((file) => {
+      const directory = path.dirname(file)
+      const packageJson = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'))
+      const declared = {
+        ...packageJson.dependencies,
+        ...packageJson.devDependencies,
+        ...packageJson.peerDependencies,
+      }
+      const workspaceDependencies = Object.keys(declared)
+      return {
+        name: packageJson.name,
+        directory,
+        declared: workspaceDependencies,
+        scripts: packageJson.scripts ?? {},
+      }
+    })
   })
 }
 
-// Which of the package's tasks load a file: tests only reach test files, tool configs reach
-// their tool, and sources and scripts reach everything.
 function readingTasks(workspace, file) {
   const relative = path.relative(workspace.directory, file)
   const name = path.basename(file)
-  if (name === 'package.json') return ['build', 'test']
   if (name.startsWith('tsconfig')) return ['typecheck', 'test']
-  if (name.startsWith('vitest.config')) return ['test']
-  if (name.startsWith('vite.config')) return ['build', 'test']
   if (relative.startsWith(`test${path.sep}`) || /\.(?:test|spec)\./.test(name)) {
     return ['typecheck', 'test']
   }
@@ -106,27 +110,33 @@ function checkWorkspace(workspace) {
   const found = []
   const manifest = path.join(workspace.directory, 'package.json')
   const reads = [
-    ...workspaceFiles(workspace.directory).flatMap((file) =>
+    ...[...workspaceFiles(workspace)].flatMap(([file, tasks]) =>
       relativeReads(file, RELATIVE_LITERAL, 2, workspace.directory).map((target) => ({
         file,
         target,
+        tasks: [...tasks],
       })),
     ),
-    ...relativeReads(manifest, RELATIVE_ARGUMENT, 0, workspace.directory).map((target) => ({
-      file: manifest,
-      target,
-    })),
+    ...Object.entries(workspace.scripts).flatMap(([name, command]) => {
+      const argumentsRead = [...command.matchAll(RELATIVE_ARGUMENT)]
+        .map((match) => readTarget(manifest, match[0], workspace.directory))
+        .filter(Boolean)
+      const configsRead = scriptConfigs(workspace, name)
+      return [...new Set([...argumentsRead, ...configsRead])].map((target) => ({
+        file: manifest,
+        target,
+        tasks: [name],
+      }))
+    }),
   ]
-  for (const { file, target } of reads) {
+  for (const { file, target, tasks: reading } of reads) {
     if (isInside(workspace.directory, target)) continue
     const where = `${path.relative(repoRoot, file)} reads ${path.relative(repoRoot, target) || '.'}`
     if (NOT_READS.has(where)) continue
     if (isGlobalDependency(target)) continue
     const owner = workspaces.find((candidate) => isInside(candidate.directory, target))
     // A directory nothing can import is walked at run time, so only running code reads it.
-    const tasks = isImportable(target)
-      ? readingTasks(workspace, file)
-      : readingTasks(workspace, file).filter((name) => name !== 'typecheck')
+    const tasks = isImportable(target) ? reading : reading.filter((name) => name !== 'typecheck')
     const cachedTasks = tasks.filter(
       (name) => task(workspace, name).cache !== false && !isDeclaredInput(workspace, name, target),
     )
@@ -185,23 +195,133 @@ function readTarget(file, literal, packageDirectory) {
   return existsSync(directory) ? directory : null
 }
 
-/**
- * Sources, tests, scripts and tool configs, plus every workspace file they import by relative
- * path (a test importing `../fallback-validation.mjs` reads what that module reads).
- */
-function workspaceFiles(directory) {
+function scriptConfigs(workspace, script) {
+  const configs = new Set()
+  const pending = [script]
+  const seen = new Set()
+  while (pending.length > 0) {
+    const name = pending.pop()
+    if (seen.has(name)) continue
+    seen.add(name)
+    const tokens = (workspace.scripts[name]?.match(SCRIPT_TOKEN) ?? []).map((token) =>
+      token.replace(/(["'])(.*?)\1/g, '$2'),
+    )
+    for (let index = 0; index < tokens.length; index++) {
+      const token = tokens[index]
+      if (['bun', 'npm', 'pnpm', 'yarn'].includes(token) && tokens[index + 1] === 'run')
+        pending.push(tokens[index + 2])
+    }
+    const discovered = tokens.flatMap((_, index) => toolConfigs(workspace.directory, tokens, index))
+    for (const file of discovered) configs.add(file)
+  }
+  return [...configs].filter(existsSync)
+}
+
+function toolConfigs(directory, tokens, index) {
+  const tool = path.basename(tokens[index])
+  if (tool !== 'vitest' && tool !== 'vite') return []
+  const end = tokens.findIndex((next, at) => at > index && /^[;&|]+$/.test(next))
+  const args = tokens.slice(index + 1, end === -1 ? undefined : end)
+  const flag = args.findIndex(
+    (arg) => arg === '--config' || arg === '-c' || arg.startsWith('--config='),
+  )
+  if (flag === -1) return defaultConfigs(directory, tool)
+  const config = args[flag].startsWith('--config=') ? args[flag].slice(9) : args[flag + 1]
+  return config ? [path.resolve(directory, config)] : []
+}
+
+function defaultConfigs(directory, tool) {
+  const files = readdirSync(directory)
+    .filter((entry) => entry.startsWith(`${tool}.config.`) && SOURCE_FILE.test(entry))
+    .map((entry) => path.join(directory, entry))
+  if (files.length === 0 && tool === 'vitest') return defaultConfigs(directory, 'vite')
+  return files
+}
+
+function projectConfigs(file, directory) {
+  const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest)
+  const configs = []
+  const visit = (node) => {
+    const elements = projectElements(node, source)
+    for (const element of elements) {
+      const pattern = projectPattern(element, source)
+      if (!pattern) continue
+      configs.push(
+        ...new Bun.Glob(pattern).scanSync({ cwd: directory, absolute: true, onlyFiles: true }),
+      )
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  return configs
+}
+
+function projectPattern(element, source) {
+  if (ts.isStringLiteralLike(element)) return element.text
+  if (!ts.isObjectLiteralExpression(element)) return null
+  const extension = element.properties.find(
+    (property) =>
+      ts.isPropertyAssignment(property) &&
+      property.name.getText(source).replace(/["']/g, '') === 'extends',
+  )
+  return extension && ts.isStringLiteralLike(extension.initializer)
+    ? extension.initializer.text
+    : null
+}
+
+function projectElements(node, source) {
+  if (
+    !ts.isPropertyAssignment(node) ||
+    node.name.getText(source).replace(/["']/g, '') !== 'projects'
+  )
+    return []
+  return ts.isArrayLiteralExpression(node.initializer) ? node.initializer.elements : []
+}
+
+function addFileTasks(files, pending, file, tasks) {
+  const previous = files.get(file) ?? new Set()
+  const size = previous.size
+  for (const task of tasks) previous.add(task)
+  if (previous.size === size) return
+  files.set(file, previous)
+  pending.push(file)
+}
+
+function workspaceFiles(workspace) {
+  const { directory } = workspace
   const configs = readdirSync(directory)
-    .filter((entry) => CONFIG_FILE.test(entry))
+    .filter((entry) => TSCONFIG_FILE.test(entry))
     .map((entry) => path.join(directory, entry))
   const trees = SCANNED_DIRECTORIES.map((entry) => path.join(directory, entry)).filter(existsSync)
-  const files = new Set([...configs, ...trees.flatMap(sourceFiles)])
-  for (const file of files) {
-    for (const target of relativeReads(file, RELATIVE_LITERAL, 2, directory)) {
-      const imported = importedFile(target)
-      if (imported && isInside(directory, imported)) files.add(imported)
+  const files = new Map()
+  const pending = []
+  for (const script of Object.keys(workspace.scripts)) {
+    for (const config of scriptConfigs(workspace, script))
+      addFileTasks(files, pending, config, [script])
+  }
+  while (pending.length > 0) {
+    const file = pending.pop()
+    for (const project of projectConfigs(file, directory)) {
+      if (isInside(directory, project)) addFileTasks(files, pending, project, files.get(file))
     }
   }
-  return [...files]
+  const configFiles = new Set(files.keys())
+  pending.push(...configFiles)
+  for (const file of [...configs, ...trees.flatMap(sourceFiles)]) {
+    if (!configFiles.has(file)) addFileTasks(files, pending, file, readingTasks(workspace, file))
+  }
+  while (pending.length > 0) {
+    const file = pending.pop()
+    const tasks = files.get(file)
+    const imports = relativeReads(file, RELATIVE_LITERAL, 2, directory)
+      .map(importedFile)
+      .filter(Boolean)
+    const projects = SOURCE_FILE.test(file) ? projectConfigs(file, directory) : []
+    for (const imported of [...imports, ...projects]) {
+      if (isInside(directory, imported)) addFileTasks(files, pending, imported, tasks)
+    }
+  }
+  return files
 }
 
 function importedFile(target) {
@@ -216,7 +336,7 @@ function sourceFiles(directory) {
     if (SKIPPED_DIRECTORIES.has(entry)) return []
     const file = path.join(directory, entry)
     if (statSync(file).isDirectory()) return sourceFiles(file)
-    return SOURCE_FILE.test(entry) || CONFIG_FILE.test(entry) ? [file] : []
+    return SOURCE_FILE.test(entry) || TSCONFIG_FILE.test(entry) ? [file] : []
   })
 }
 
