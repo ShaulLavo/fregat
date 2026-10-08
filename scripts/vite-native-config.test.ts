@@ -1,5 +1,8 @@
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 import path from 'node:path'
 import { chromium } from 'playwright'
 import { expect, test } from 'vitest'
@@ -24,6 +27,7 @@ const configurations = [
   'apps/web/vitest.config.ts',
   'apps/web/vitest.browser.config.ts',
   'apps/web/vitest.tree-browser.config.ts',
+  'apps/web/retention-acceptance.vitest.config.ts',
   'ghostty-webgpu/vitest.browser.config.ts',
   'editor/packages/editor/vitest.config.ts',
   'editor/packages/highlighting/vitest.config.ts',
@@ -56,3 +60,48 @@ for (const loader of ['bundle', 'native'] as const) {
     },
   )
 }
+
+test.for(['bundle', 'native'] as const)(
+  'reload config loads through Node with %s and preserves its test commands',
+  (loader) => {
+    const current = realpathSync(process.execPath)
+    const node = process.versions.bun
+      ? (process.env.PATH ?? '')
+          .split(path.delimiter)
+          .map((directory) => Bun.which('node', { PATH: directory }))
+          .find((candidate) => candidate !== null && realpathSync(candidate) !== current)
+      : process.execPath
+    assert(node, 'A Node executable is required for native config loading')
+    const result = spawnSync(
+      node,
+      [
+        // Node 22.12 requires an explicit opt-in to load TypeScript files.
+        '--experimental-strip-types',
+        '--input-type=module',
+        '--eval',
+        `
+          import assert from 'node:assert/strict';
+          assert.equal(process.versions.bun, undefined, 'config loading must run in Node');
+          const { createLogger, loadConfigFromFile } = await import(${JSON.stringify(pathToFileURL(require.resolve('vite')).href)});
+          const warnings = [];
+          const logger = createLogger();
+          logger.warn = (message) => warnings.push(message);
+          const result = await loadConfigFromFile(
+            { command: 'serve', mode: 'test' },
+            'retention-acceptance.vitest.config.ts', process.cwd(), 'warn', logger,
+            ${JSON.stringify(loader)},
+          );
+          assert.ok(result?.config.test);
+          assert.deepEqual(result.config.test.globalSetup, ['./test/env/retention-acceptance-file-server.ts']);
+          assert.deepEqual(result.config.test.include, ['src/features/editor/tests/retention-acceptance-reload.browser.tsx']);
+          assert.equal(typeof result.config.test.browser.commands.retentionAcceptanceReload, 'function');
+          assert.equal(typeof result.config.test.browser.commands.retentionAcceptanceReloadFinish, 'function');
+          assert.deepEqual(warnings.filter((message) => message.includes("configLoader: 'native'")), []);
+        `,
+      ],
+      { cwd: path.join(repository, 'apps/web'), encoding: 'utf8' },
+    )
+    expect(result.error).toBeUndefined()
+    expect(result.status, result.stderr || result.stdout).toBe(0)
+  },
+)
