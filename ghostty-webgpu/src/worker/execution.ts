@@ -25,6 +25,7 @@ import type {
 } from './protocol.js'
 import { TerminalWorkerError, workerError } from './structured-errors.js'
 import { freezeWorkerValue } from './owned.js'
+import { readOpeningFont } from './opening-font.js'
 import { workerOperationTimeout } from './protocol.js'
 
 interface Pending {
@@ -317,7 +318,7 @@ export class WorkerTerminalExecution {
 
   open(elements: TerminalElements, layout: WorkerLayout): Promise<TerminalFittedFont> {
     const canvas = elements.canvas.transferControlToOffscreen()
-    return this.request('open', [canvas, layout], [canvas])
+    return this.request('open', [canvas, layout], [canvas]).then(readOpeningFont)
   }
   layout(layout: WorkerLayout): Promise<void> {
     return this.request('layout', [layout])

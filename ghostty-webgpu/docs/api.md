@@ -17,6 +17,8 @@ The worker owns its native session, WASM, fitted font, Zig frame builder and Web
 renderer. Supply each font as an explicit URL or byte array with optional `FontFaceDescriptors`.
 The opening acknowledgment supplies the worker-fitted cell metrics before `inputReady` runs.
 First composed text uses these metrics even before a submitted frame reaches the host.
+An opening reply with incomplete font metrics fails with structured protocol guidance before
+`inputReady`. Host the worker and host entry from the same package build.
 
 ```ts
 import { Terminal } from 'ghostty-webgpu/worker'
