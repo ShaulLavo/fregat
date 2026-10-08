@@ -514,9 +514,12 @@ class BrowserLinkController implements DomLinkController {
     const changed = this.currentResolution?.hit !== undefined
     this.currentResolution = undefined
     this.currentScope = undefined
+    if (!changed) return
     this.overlay.remove()
-    this.options.canvas.style.cursor = this.initialCursor
-    if (changed) this.options.onHitChange?.(undefined)
+    if (this.options.canvas.style.cursor !== this.initialCursor) {
+      this.options.canvas.style.cursor = this.initialCursor
+    }
+    this.options.onHitChange?.(undefined)
   }
 
   private readFrame(): RendererTextFrameSnapshot | undefined {
@@ -671,7 +674,9 @@ class BrowserLinkController implements DomLinkController {
     this.currentResolution = resolution
     this.currentScope = scope
     this.positionOverlay(hit, layout)
-    this.options.canvas.style.cursor = 'pointer'
+    if (this.options.canvas.style.cursor !== 'pointer') {
+      this.options.canvas.style.cursor = 'pointer'
+    }
     this.options.onHitChange?.(hit)
   }
 

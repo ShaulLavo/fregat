@@ -1,7 +1,8 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import type { GhosttyTerminal } from '../../core/terminal.js'
+import { DomTerminalRenderer } from '../../render/dom/renderer.js'
 import {
   captureNativeLinkSnapshot,
   captureNativeLinkDiscovery,
@@ -38,6 +39,7 @@ function deferred<T>() {
 
 async function harness(
   adapt?: (session: TerminalSession<Event>, getProjection: () => LinkProjection) => DomLinkSession,
+  cursor = '',
 ) {
   const session = await TerminalSession.create<Event>({
     runtime: { kind: 'borrowed', runtime },
@@ -56,6 +58,7 @@ async function harness(
   canvas.width = 300
   canvas.height = 40
   canvas.style.cssText = 'display:block;width:300px;height:40px'
+  canvas.style.cursor = cursor
   root.append(canvas)
   document.body.append(root)
   cleanups.push(() => root.remove())
@@ -105,6 +108,145 @@ async function harness(
     },
   }
 }
+
+function observeCursorWrites(canvas: HTMLCanvasElement) {
+  const style = canvas.style
+  const original = Object.getOwnPropertyDescriptor(style, 'cursor')
+  const writes = vi.fn((value: string) => style.setProperty('cursor', value))
+  Object.defineProperty(style, 'cursor', {
+    configurable: true,
+    get: () => style.getPropertyValue('cursor'),
+    set: writes,
+  })
+  cleanups.push(() => {
+    if (original) Object.defineProperty(style, 'cursor', original)
+    else Reflect.deleteProperty(style, 'cursor')
+  })
+  return writes
+}
+
+describe('link cursor writes', () => {
+  it('makes no cursor writes on link-free terminal edit frames', async () => {
+    const root = document.createElement('div')
+    root.style.cssText = 'width:300px;height:80px'
+    document.body.append(root)
+    cleanups.push(() => root.remove())
+    const terminal = await Terminal.create({
+      appearance: { grid: { columns: 30, rows: 4 }, cursor: { blink: false } },
+      rendererFactory: DomTerminalRenderer.create,
+      runtime: { kind: 'borrowed', runtime },
+    })
+    cleanups.push(() => terminal.dispose())
+    await terminal.open(root)
+    expect(terminal.diagnostics.rendererBackend).toBe('dom')
+    terminal.write('ready')
+    await expect.poll(() => terminal.submittedFrame?.rows[0]?.text.startsWith('ready')).toBe(true)
+    const writes = observeCursorWrites(terminal.canvas!)
+    const counts: number[] = []
+    for (let tick = 0; tick < 8; tick += 1) {
+      const before = writes.mock.calls.length
+      const text = `edit ${tick}`
+      terminal.write(`\u001b[H${text}`)
+      await expect.poll(() => terminal.submittedFrame?.rows[0]?.text.startsWith(text)).toBe(true)
+      counts.push(writes.mock.calls.length - before)
+    }
+    expect(counts).toEqual(Array<number>(8).fill(0))
+  })
+
+  it('preserves host and author cursors while no link is visible', async () => {
+    const view = await harness()
+    view.root.style.cursor = 'crosshair'
+    const writes = observeCursorWrites(view.canvas)
+    view.controller.invalidate()
+    expect(writes).not.toHaveBeenCalled()
+    expect(getComputedStyle(view.canvas).cursor).toBe('crosshair')
+    view.canvas.style.cursor = 'wait'
+    writes.mockClear()
+    view.move()
+    view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
+    view.controller.invalidate()
+    expect(writes).not.toHaveBeenCalled()
+    expect(view.canvas.style.cursor).toBe('wait')
+    view.controller.dispose()
+    expect(writes).not.toHaveBeenCalled()
+  })
+
+  it.each(['', 'text', 'pointer'])(
+    'writes only changed cursor values on hover and leave with initial cursor %j',
+    async (cursor) => {
+      const view = await harness(undefined, cursor)
+      view.session.registerLinkProvider({
+        provideLinks: () => [{ range: { start: 0, end: 9 }, activate: () => {} }],
+      })
+      const writes = observeCursorWrites(view.canvas)
+      view.move()
+      await expect.poll(() => view.controller.currentHit !== undefined).toBe(true)
+      expect(view.canvas.style.cursor).toBe('pointer')
+      view.move(1)
+      await expect.poll(() => view.controller.hasPendingResolution).toBe(false)
+      view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
+      expect(view.controller.currentHit).toBeUndefined()
+      expect(view.root.querySelector('[role="link"]')).toBeNull()
+      expect(view.canvas.style.cursor).toBe(cursor)
+      view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
+      view.controller.invalidate()
+      expect(writes.mock.calls.map(([value]) => value)).toEqual(
+        cursor === 'pointer' ? [] : ['pointer', cursor, 'pointer', cursor],
+      )
+    },
+  )
+
+  it('reads the actual inline cursor after host changes during hover', async () => {
+    const view = await harness(undefined, 'text')
+    view.session.registerLinkProvider({
+      provideLinks: () => [{ range: { start: 0, end: 9 }, activate: () => {} }],
+    })
+    view.move()
+    await expect.poll(() => view.controller.currentHit !== undefined).toBe(true)
+    const writes = observeCursorWrites(view.canvas)
+    view.canvas.style.cursor = 'text'
+    writes.mockClear()
+    view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
+    expect(writes).not.toHaveBeenCalled()
+    view.move()
+    await expect.poll(() => view.controller.currentHit !== undefined).toBe(true)
+    expect(view.canvas.style.cursor).toBe('pointer')
+    view.canvas.style.cursor = 'wait'
+    writes.mockClear()
+    view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
+    expect(view.canvas.style.cursor).toBe('text')
+    expect(writes.mock.calls).toEqual([['text']])
+  })
+
+  it('keeps hover and modifier-key activation after a host cursor change', async () => {
+    const view = await harness(undefined, 'text')
+    let activations = 0
+    view.session.registerLinkProvider({
+      provideLinks: () => [
+        {
+          range: { start: 0, end: 9 },
+          activate: () => {
+            activations += 1
+          },
+        },
+      ],
+    })
+    view.canvas.style.cursor = 'crosshair'
+    view.move()
+    await expect.poll(() => view.controller.currentHit !== undefined).toBe(true)
+    expect(view.canvas.style.cursor).toBe('pointer')
+    await page.elementLocator(view.canvas).click({ position: { x: 5, y: 10 } })
+    expect(activations).toBe(0)
+    const apple = /^(Mac|iPhone|iPad|iPod)/iu.test(navigator.platform)
+    await page.elementLocator(view.canvas).click({
+      modifiers: [apple ? 'Meta' : 'Control'],
+      position: { x: 5, y: 10 },
+    })
+    await expect.poll(() => activations).toBe(1)
+    view.canvas.dispatchEvent(new PointerEvent('pointerleave'))
+    expect(view.canvas.style.cursor).toBe('text')
+  })
+})
 
 describe('committed link projection', () => {
   it('discovers and activates a real session provider link', async () => {
