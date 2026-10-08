@@ -77,6 +77,24 @@ export const scriptErrors = defineErrorCatalog('scripts', {
     why: 'A successor starts once the predecessor releases its bookkeeping lock and its slice is inactive and empty.',
     fix: 'Stop the listed slice with `systemctl --user stop <slice>`. Resume or stop its suspended wrapper, then submit the job again.',
   },
+  HEAVY_STDERR: {
+    status: 500,
+    message: 'The runner could not preserve the job stderr stream.',
+    why: 'Local launch diagnostics and job output need separate file descriptors.',
+    fix: 'Check the process file-descriptor limit with `ulimit -n` and submit the job again.',
+  },
+  HEAVY_STDERR_RELAY: {
+    status: 500,
+    message: 'The runner could not forward all launcher diagnostics.',
+    why: 'The job outcome was recorded, but the stderr stream failed during forwarding.',
+    fix: 'Check the output destination and its available storage, then read the job record.',
+  },
+  HEAVY_SCOPE_TRANSPORT: {
+    status: 502,
+    message: ({ unit }: { unit: string }) => `systemd lost its connection while launching ${unit}.`,
+    why: 'The manager may have accepted the scope before the connection closed. Its launch outcome is uncertain.',
+    fix: 'Read `journalctl --user -n 50` and `systemctl --user status`. Check that the listed scope and its parent slice are stopped, then submit a fresh job.',
+  },
   HEAVY_SLICE_FAILED: {
     status: 502,
     message: ({ slice, detail }: { slice: string; detail: string }) =>
