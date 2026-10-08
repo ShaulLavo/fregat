@@ -1,0 +1,153 @@
+{
+  "note": "Selected scheduler receipt fields. Each measurement also held the admission lock through its measured span. A declared preview server remained running.",
+  "jobs": [
+    {
+      "label": "compare-after-1021-build",
+      "timestamp": "2026-10-08T19:16:01.563Z",
+      "class": "build",
+      "host": "local",
+      "quiet": false,
+      "admission": "5564 MiB free covers 3072 MiB",
+      "queuedMs": 107095,
+      "wallMs": 39543,
+      "exitCode": 0,
+      "quietHoldExpired": false,
+      "estimateBytes": 3221225472,
+      "ceilingBytes": 4294967296,
+      "memoryPeakBytes": 1256726528,
+      "cpuUsageUsec": 45158160,
+      "oomKills": 0,
+      "leftoverProcesses": 0,
+      "allowedCpus": [],
+      "unit": "heavy-05818bb8255a.scope",
+      "requestId": "05818bb8255a",
+      "serversAtAdmission": [
+        {
+          "id": "3a4ee215cda3",
+          "label": "comfy-gallery",
+          "pid": 3971985,
+          "sliceRoot": "heavy",
+          "allowedCpus": []
+        }
+      ],
+      "jobsDuringRun": []
+    },
+    {
+      "label": "compare-after-1021-default",
+      "timestamp": "2026-10-08T19:22:04.572Z",
+      "class": "bench",
+      "host": "local",
+      "quiet": true,
+      "admission": "finite jobs drained; 1 server(s) running; 13887 MiB free covers 3072 MiB",
+      "queuedMs": 57482,
+      "wallMs": 224039,
+      "exitCode": 0,
+      "quietHoldExpired": false,
+      "estimateBytes": 3221225472,
+      "ceilingBytes": 9663676416,
+      "memoryPeakBytes": 1330315264,
+      "cpuUsageUsec": 162568245,
+      "oomKills": 0,
+      "leftoverProcesses": 0,
+      "allowedCpus": [],
+      "unit": "heavy-b13be609a16e.scope",
+      "requestId": "b13be609a16e",
+      "serversAtAdmission": [
+        {
+          "id": "3a4ee215cda3",
+          "label": "comfy-gallery",
+          "pid": 3971985,
+          "sliceRoot": "heavy",
+          "allowedCpus": []
+        }
+      ],
+      "jobsDuringRun": [
+        {
+          "allowedCpus": [],
+          "class": "light",
+          "endedAt": null,
+          "id": "3a4ee215cda3",
+          "label": "comfy-gallery",
+          "pid": 3971985,
+          "server": true,
+          "sliceRoot": "heavy",
+          "startedAt": "2026-10-08T13:27:12.978Z"
+        }
+      ]
+    },
+    {
+      "label": "compare-after-1021-full-build",
+      "timestamp": "2026-10-08T19:24:00.782Z",
+      "class": "build",
+      "host": "local",
+      "quiet": false,
+      "admission": "14291 MiB free covers 3072 MiB",
+      "queuedMs": 74076,
+      "wallMs": 39088,
+      "exitCode": 0,
+      "quietHoldExpired": false,
+      "estimateBytes": 3221225472,
+      "ceilingBytes": 4294967296,
+      "memoryPeakBytes": 1170407424,
+      "cpuUsageUsec": 47841235,
+      "oomKills": 0,
+      "leftoverProcesses": 0,
+      "allowedCpus": [],
+      "unit": "heavy-e82d17f9b310.scope",
+      "requestId": "e82d17f9b310",
+      "serversAtAdmission": [
+        {
+          "id": "3a4ee215cda3",
+          "label": "comfy-gallery",
+          "pid": 3971985,
+          "sliceRoot": "heavy",
+          "allowedCpus": []
+        }
+      ],
+      "jobsDuringRun": []
+    },
+    {
+      "label": "compare-after-1021-full",
+      "timestamp": "2026-10-08T19:24:24.282Z",
+      "class": "bench",
+      "host": "local",
+      "quiet": true,
+      "admission": "finite jobs drained; 1 server(s) running; 15418 MiB free covers 3072 MiB",
+      "queuedMs": 12,
+      "wallMs": 23266,
+      "exitCode": 0,
+      "quietHoldExpired": false,
+      "estimateBytes": 3221225472,
+      "ceilingBytes": 9663676416,
+      "memoryPeakBytes": 1467502592,
+      "cpuUsageUsec": 29184779,
+      "oomKills": 0,
+      "leftoverProcesses": 0,
+      "allowedCpus": [],
+      "unit": "heavy-36531b5fb7a7.scope",
+      "requestId": "36531b5fb7a7",
+      "serversAtAdmission": [
+        {
+          "id": "3a4ee215cda3",
+          "label": "comfy-gallery",
+          "pid": 3971985,
+          "sliceRoot": "heavy",
+          "allowedCpus": []
+        }
+      ],
+      "jobsDuringRun": [
+        {
+          "allowedCpus": [],
+          "class": "light",
+          "endedAt": null,
+          "id": "3a4ee215cda3",
+          "label": "comfy-gallery",
+          "pid": 3971985,
+          "server": true,
+          "sliceRoot": "heavy",
+          "startedAt": "2026-10-08T13:27:12.978Z"
+        }
+      ]
+    }
+  ]
+}
