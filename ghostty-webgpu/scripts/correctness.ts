@@ -57,6 +57,29 @@ async function screen(page: Page): Promise<Screen> {
   return value
 }
 
+async function setupStep<T>(variant: Variant, step: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run()
+  } catch (cause) {
+    throw new TypeError(`Failed to prepare ${variant}: ${step}`, { cause })
+  }
+}
+
+async function adapterReady(page: Page, variant: Variant) {
+  await setupStep(variant, 'adapter ready', () =>
+    page.waitForFunction(
+      () => typeof (window as unknown as { correctness?: unknown }).correctness === 'function',
+    ),
+  )
+}
+
+async function setupPage(page: Page, url: string, variant: Variant, size?: Size) {
+  page.setDefaultTimeout(15_000)
+  await setupStep(variant, 'navigation', () => page.goto(url))
+  await adapterReady(page, variant)
+  await setupStep(variant, 'terminal reset', () => request(page, { op: 'reset', variant, size }))
+}
+
 async function upstream(page: Page, checkout: string, variant: Variant) {
   const child = spawn(
     'python3',
@@ -79,13 +102,18 @@ async function upstream(page: Page, checkout: string, variant: Variant) {
   try {
     for await (const line of createInterface({ input: child.stdout })) {
       const message = JSON.parse(line) as Request | (Omit<Result, 'variant'> & { op: 'result' })
-      try {
-        if (message.op === 'reset' && message.suite !== suite) {
-          await page.reload()
-          await page.waitForFunction(() => 'correctness' in window)
+      if (message.op === 'reset') {
+        if (message.suite !== suite) {
+          await setupStep(variant, 'navigation', () => page.reload())
+          await adapterReady(page, variant)
           suite = message.suite
         }
-        if (message.op === 'reset') inputHex = ''
+        await setupStep(variant, 'terminal reset', () => request(page, message))
+        inputHex = ''
+        child.stdin.write('{"value":null}\n')
+        continue
+      }
+      try {
         if (message.op === 'write') inputHex += Buffer.from(message.bytes).toString('hex')
         if (message.op === 'result') {
           const { op: _, ...result } = message
@@ -123,19 +151,30 @@ async function caseResult(
   name: string,
   check: (page: Page) => Promise<void>,
   size?: Size,
+  url = parent.url(),
 ) {
-  const page = await parent.context().browser()!.newPage()
+  const page = await setupStep(variant, 'new context', () => parent.context().browser()!.newPage())
   try {
-    await page.goto(parent.url())
-    await page.waitForFunction(() => 'correctness' in window)
-    await request(page, { op: 'reset', variant, size })
+    await setupPage(page, url, variant, size)
+    await checkCase(page, variant, suite, name, check)
+  } finally {
+    await page.close().catch(() => {})
+  }
+}
+
+async function checkCase(
+  page: Page,
+  variant: Variant,
+  suite: string,
+  name: string,
+  check: (page: Page) => Promise<void>,
+) {
+  try {
     await check(page)
     results.push({ variant, suite, name, status: 'pass', detail: '' })
   } catch (error) {
     const observed = await observe(page)
     results.push({ variant, suite, name, status: 'fail', detail: String(error), observed })
-  } finally {
-    await page.close().catch(() => {})
   }
 }
 
@@ -219,13 +258,63 @@ async function custom(page: Page, variant: Variant) {
 }
 
 async function calibration(page: Page, variant: Variant) {
-  await request(page, { op: 'reset', variant })
   await write(page, 'ABC')
   const actual = await screen(page)
-  assert.equal(actual.cells[0]!.slice(0, 3).join(''), 'ABC')
+  assert.equal(actual.cells[0]!.slice(0, 3).join(''), 'ABC', `${variant}: ASCII text calibration`)
   assert.deepEqual(actual.cursor, { x: 3, y: 0 })
   assert.throws(() => assert.equal(actual.cells[0]![0], 'WRONG'))
   assert.throws(() => assert.deepEqual(actual.cursor, { x: 4, y: 0 }))
+}
+
+async function setupControls(
+  browser: Awaited<ReturnType<typeof chromium.launch>>,
+  checkout: string,
+) {
+  const parent = await browser.newPage()
+  const before = results.length
+  let checked = false
+  const controls = [
+    { step: 'navigation', url: 'http://127.0.0.1:0/' },
+    { step: 'adapter ready', url: 'data:text/html,<p>Missing adapter</p>' },
+    {
+      step: 'terminal reset',
+      url: 'data:text/html,<script>window.correctness=async()=>{throw new TypeError("Broken adapter")}</script>',
+    },
+  ]
+  try {
+    for (const control of controls) {
+      await assert.rejects(
+        () =>
+          caseResult(
+            parent,
+            'xterm.js',
+            'setup-control',
+            control.step,
+            async () => {
+              checked = true
+            },
+            undefined,
+            control.url,
+          ),
+        (error: unknown) =>
+          error instanceof TypeError && error.message.includes(`xterm.js: ${control.step}`),
+      )
+      assert.equal(results.length, before, 'Setup failures must never produce terminal results')
+      assert.equal(checked, false, 'Setup failures must abort before the case body')
+    }
+    await parent.goto(controls[2]!.url)
+    await assert.rejects(
+      () => upstream(parent, checkout, 'xterm.js'),
+      (error: unknown) =>
+        error instanceof TypeError && error.message.includes('xterm.js: terminal reset'),
+    )
+    assert.equal(results.length, before, 'Upstream setup failure must abort without case results')
+  } finally {
+    await parent.close()
+  }
+  console.log(
+    'Setup controls: navigation, missing adapter and broken reset rejected; upstream reset rejected',
+  )
 }
 
 async function main() {
@@ -284,11 +373,10 @@ async function main() {
       },
     })
     browser = await chromium.launch({ headless: true })
+    await setupControls(browser, checkout)
     for (const variant of variants) {
-      const page = await browser.newPage()
-      page.setDefaultTimeout(15_000)
-      await page.goto(`http://127.0.0.1:${server.port}`)
-      await page.waitForFunction(() => 'correctness' in window)
+      const page = await setupStep(variant, 'new context', () => browser!.newPage())
+      await setupPage(page, `http://127.0.0.1:${server.port}`, variant)
       await calibration(page, variant)
       await upstream(page, checkout, variant)
       console.log(`${variant}: esctest2 completed`)
@@ -339,6 +427,8 @@ async function main() {
       ),
       calibration:
         'ASCII text and cursor passed; deliberately wrong text and cursor rejected on every terminal',
+      setupControls:
+        'Navigation failure, missing adapter and broken reset abort without results; upstream broken reset aborts without results',
       results,
     }
     await writeFile(join(output, 'results.json'), JSON.stringify(artifact, null, 2) + '\n')

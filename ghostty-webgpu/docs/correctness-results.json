@@ -1,7 +1,7 @@
 {
-  "date": "2026-10-08T06:44:53.163Z",
+  "date": "2026-10-08T07:38:11.429Z",
   "upstreamCommit": "2798f12149a19c3295e9b4853ab2da4b2eff1b2b",
-  "commit": "523ccf51c459dee0424cfb7829fd527f033b9a5a",
+  "commit": "09d54d7184af560982603b19419b9fcc964098a3",
   "versions": {
     "ghostty-webgpu": "0.3.20",
     "xterm.js": "6.0.0",
@@ -22,6 +22,7 @@
     "correctness-esctest.py": "223963345635455bb8f6b05904d2af95557605feded9e567b4c5d9ef33be14e2"
   },
   "calibration": "ASCII text and cursor passed; deliberately wrong text and cursor rejected on every terminal",
+  "setupControls": "Navigation failure, missing adapter and broken reset abort without results; upstream broken reset aborts without results",
   "results": [
     {
       "suite": "cuu",
@@ -5628,7 +5629,7 @@
       "suite": "delivery",
       "name": "empty byte write",
       "status": "fail",
-      "detail": "Error: evaluate: RangeError: offset is out of bounds\n    at Uint8Array.set (<anonymous>)\n    at K.write (http://127.0.0.1:45075/browser.js:9853:40)\n    at IA.writeInternal (http://127.0.0.1:45075/browser.js:11600:19)\n    at IA.write (http://127.0.0.1:45075/browser.js:11596:11)\n    at http://127.0.0.1:45075/browser.js:14145:56\n    at new Promise (<anonymous>)\n    at Object.write (http://127.0.0.1:45075/browser.js:14145:22)\n    at request (http://127.0.0.1:45075/browser.js:14178:18)\n    at eval (eval at evaluate (:311:30), <anonymous>:2:23)\n    at UtilityScript.evaluate (<anonymous>:313:16)",
+      "detail": "Error: evaluate: RangeError: offset is out of bounds\n    at Uint8Array.set (<anonymous>)\n    at K.write (http://127.0.0.1:37307/browser.js:9853:40)\n    at IA.writeInternal (http://127.0.0.1:37307/browser.js:11600:19)\n    at IA.write (http://127.0.0.1:37307/browser.js:11596:11)\n    at http://127.0.0.1:37307/browser.js:14145:56\n    at new Promise (<anonymous>)\n    at Object.write (http://127.0.0.1:37307/browser.js:14145:22)\n    at request (http://127.0.0.1:37307/browser.js:14178:18)\n    at eval (eval at evaluate (:311:30), <anonymous>:2:23)\n    at UtilityScript.evaluate (<anonymous>:313:16)",
       "observed": {
         "lines": [
           "",

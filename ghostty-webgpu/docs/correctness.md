@@ -4,7 +4,7 @@ This comparison checks terminal state, response bytes and Unicode delivery in he
 
 ## Results
 
-Each cell below is **pass / fail**. The complete run contains 507 terminal/case pairs. A second complete run on the same machine, using a fresh automatic upstream clone, reproduced all 507 outcomes and the recorded asset hashes, including the ghostty-web page crash.
+Each cell below is **pass / fail**. The complete run contains 507 terminal/case pairs. A second complete run on the same machine, using a fresh automatic upstream clone, reproduced all 507 outcomes and the recorded asset hashes, including the ghostty-web page crash. A further run with fatal setup checks reproduced the same outcomes and asset hashes after passing all setup regression controls.
 
 | Selection   | ghostty-webgpu | xterm.js | ghostty-web |
 | ----------- | -------------: | -------: | ----------: |
@@ -50,6 +50,8 @@ The measured result is that ghostty-webgpu passes more cases in this fixed selec
 
 ### Findings
 
+Both ghostty-webgpu failures below are inherited from the pinned upstream core and reproduced in unpatched libghostty-vt and native Ghostty 1.3.1-arch2. [The independent probes](https://github.com/ShaulLavo/fregat/pull/964#issuecomment-6054698739) also reproduce them through the checked-in WASM with no bridge. Both remain counted as failures. This establishes agreement for these two cases; general native Ghostty parity and full VT conformance remain open.
+
 - ghostty-webgpu fails `test_CHA_RespectsOriginMode`. esctest2 expects `X` at column 5, row 6; the observed `X` is at column 5, row 11. ghostty-web shows the same row displacement. xterm.js also fails this test, with a different position. The disagreement with this upstream expectation stays in the totals.
 - ghostty-webgpu fails `test_TBC_Default`. After clearing the tab stop with `CSI g`, the next tab still reaches column 9; esctest2 expects column 17. The explicit `CSI 0 g` control passes. ghostty-web also fails the default-parameter case. xterm.js passes it.
 - xterm.js loses U+200D in both one-byte ZWJ cases. `👩‍💻` becomes `👩💻`, and `👨‍👩‍👧‍👦` becomes `👨👩👧👦`. Whole-buffer writes retain these code points. Both Ghostty wrappers retain them with either delivery pattern.
@@ -67,7 +69,7 @@ Run date: 2026-10-08. Machine: Intel Core i7-14700K, Arch Linux, kernel 7.2.8-ar
 | xterm.js       | 6.0.0   | `@xterm/xterm`, default Unicode provider, default renderer, no addons |
 | ghostty-web    | 0.4.0   | Coder's npm package, public terminal with its canvas renderer         |
 
-The native source under test is Fregat commit `523ccf51c459dee0424cfb7829fd527f033b9a5a`. Its WASM provenance names official Ghostty revision `7b11f3dca034d8d24369ad3856afe57946d7902a`. The checked-in result records WASM hashes, the bundled browser adapter hash and the Python adapter hash.
+The terminal source is unchanged from Fregat commit `523ccf51c459dee0424cfb7829fd527f033b9a5a`. Its WASM provenance names official Ghostty revision `7b11f3dca034d8d24369ad3856afe57946d7902a`. The checked-in result records WASM hashes, the bundled browser adapter hash and the Python adapter hash.
 
 The runner clones [esctest2](https://github.com/ThomasDickey/esctest2/tree/2798f12149a19c3295e9b4853ab2da4b2eff1b2b) at `2798f12149a19c3295e9b4853ab2da4b2eff1b2b` into a temporary directory. It executes the original Python test methods. Upstream source remains a runtime dependency and retains its upstream license.
 
@@ -76,6 +78,8 @@ The transport adapter sends the original escape sequences as UTF-8 bytes over a 
 Rectangle assertions read cells from each terminal's state. The native driver uses render-state snapshots, xterm.js uses buffer cells, and ghostty-web uses its WASM render-state cells and grapheme reader. These readers include grapheme tails. Empty cells compare as spaces; wide-character continuation cells contribute an empty string. The rectangle tests use ASCII, so column positions stay unambiguous.
 
 Each upstream test gets a new terminal handle. Each upstream suite gets a fresh document. Each local case gets a fresh browser context. Only the selected terminal's WASM runtime loads in that document. Every terminal first passes an ASCII text and cursor control; deliberately wrong text and cursor expectations must fail. The runner also checks that each terminal produces the same 169 unique case results.
+
+Navigation, adapter readiness and terminal creation failures abort the run with an error naming the terminal and setup step. Only failures after setup enter the terminal case results. Regression controls use a failed navigation, a page with no adapter and an adapter that rejects terminal reset. Each must reject before the case body runs and leave the result count unchanged. A separate upstream control requires a broken reset to abort the Python/browser run without case results.
 
 The esctest2 profile sets VT level 5, checksum convention 334 and a neutral terminal name. Known-bug decorators remain strict. Unsupported commands in the selected tests count as failures; they receive no capability-based exemption.
 
