@@ -174,3 +174,26 @@ public API and fresh fixtures. The provenance header identifies this distinction
 | 12   | Rejected commands and blocked dependants recover prior local history. Editor graph recovery follows in the editor lane.                      |
 | 13   | Provenance-only undo is accepted, sequenced and retained in snapshots. Durable storage follows in the persistence lane.                      |
 | 14   | File-tree shared-head undo integration belongs to Fregat's app layer.                                                                        |
+
+## Concurrent undo verification
+
+`src/visibility-model.ts` is an independently written scalar model. Every retained
+UTF-16 code unit has its insertion operation and all deletion operations, including
+deletes applied while hidden. Accepted host envelopes build the confirmed model.
+Each participant check uses that participant's confirmed host prefix and replays
+its pending, unblocked envelopes. Every simulation step checks visible text and
+visibility per identity before and after delivery. Placement order is inspected
+separately from the model's visibility decisions.
+
+`test/review-regressions.test.ts` includes the transport impersonation and remote
+capture reproductions. Its mutation control replaces visibility with a deliberately
+incorrect last-deletion-only rule and requires the simulator's scalar oracle to
+reject it. Remote effect commands resolve their original operations' identity spans
+for capture grouping; intersecting undo and redo seal the group, while disjoint
+commands keep it open.
+
+`Host.submit(envelope, sender)` requires the submitting author's authenticated
+session identity. A network adapter must get this value from its registered peer
+session. `InMemoryTransport.submit(participant, envelope, delay)` binds the sender
+to a participant registered when the transport was created, independently of the
+envelope. Missing, unregistered and mismatched senders fail before sequencing.

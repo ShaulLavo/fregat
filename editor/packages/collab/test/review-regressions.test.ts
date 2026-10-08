@@ -53,7 +53,7 @@ test('review: transport must reject impersonated effect commands', () => {
   })
   const transport = new InMemoryTransport(host, [alice, bob])
   const edit = alice.local({ offset: 0, deleteCount: 0, text: 'Alice' })
-  transport.submit(edit)
+  transport.submit(alice, edit)
   transport.quiesce()
   const id = { actor: 'alice', seq: 2 }
   const forged: Envelope = {
@@ -67,8 +67,8 @@ test('review: transport must reject impersonated effect commands', () => {
       effects: [{ op: edit.id, active: false }],
     },
   }
-  // A forged frame submitted through the transport's existing public API has no sender binding.
-  transport.submit(forged)
+  expect(() => transport.submit(bob, forged)).toThrow('sender-mismatch')
+  expect(() => host.submit(forged, bob.actor)).toThrow('sender-mismatch')
   transport.quiesce()
   expect(host.outcome(id)?.status).not.toBe('accepted')
   expect(host.text()).toBe('Alice')
@@ -109,20 +109,26 @@ test('review: concurrent simulator detects last-delete-wins visibility mutant', 
     return visible
   }
   let failure: unknown
+  let seeds = 0
   try {
-    for (let seed = 0; seed < 500; seed++)
+    for (let seed = 0; seed < 500; seed++) {
+      seeds++
       simulate({ seed, participants: 3 + (seed % 3), undoRedo: true })
+    }
   } catch (error) {
     failure = error
   } finally {
     Effects.prototype.visible = original
   }
-  console.log('EXISTING SIMULATOR MUTATION:', {
-    seeds: 500,
+  console.log('SCALAR ORACLE MUTATION:', {
+    seeds,
     changedProjections,
     detected: !!failure,
   })
-  expect(failure, 'independent concurrent visibility oracle must kill mutant').toBeDefined()
+  expect(changedProjections).toBeGreaterThan(0)
+  expect(failure, 'independent concurrent visibility oracle must kill mutant').toMatchObject({
+    code: expect.stringMatching(/^oracle-visibility-/),
+  })
 })
 
 function independentlyCheck(seed: number) {
@@ -152,8 +158,9 @@ function independentlyCheck(seed: number) {
     } else {
       const op = key(env.id)
       states.set(op, true)
-      const insert =
-        change.kind === 'insert' ? change : change.kind === 'replace' ? change.insert : null
+      let insert = null
+      if (change.kind === 'insert') insert = change
+      if (change.kind === 'replace') insert = change.insert
       if (insert)
         for (let i = 0; i < insert.text.length; i++)
           chars.set(char({ bunch: insert.start.bunch, counter: insert.start.counter + i }), {
@@ -197,7 +204,10 @@ function independentlyCheck(seed: number) {
   }
   const transport = new InMemoryTransport(host, participants, () => random(5))
   const submit = (envelope: Envelope) => {
-    transport.submit(envelope)
+    transport.submit(
+      participants.find((p) => p.actor === envelope.id.actor)!,
+      envelope,
+    )
     transport.quiesce()
   }
   try {
@@ -212,7 +222,8 @@ function independentlyCheck(seed: number) {
     for (let step = 0; step < 64; step++) {
       const p = participants[random(3)]!
       const action = random(5)
-      let env = action === 0 ? p.undoManager.undo() : action === 1 ? p.undoManager.redo() : null
+      let env = action === 0 ? p.undoManager.undo() : null
+      if (action === 1) env = p.undoManager.redo()
       if (!env) {
         const text = p.text()
         const offset = random(text.length + 1)
@@ -222,8 +233,8 @@ function independentlyCheck(seed: number) {
           { boundary: true },
         )
       }
-      transport.submit(env, random(5))
-      if (random(4) === 0) transport.submit(env, random(5))
+      transport.submit(p, env, random(5))
+      if (random(4) === 0) transport.submit(p, env, random(5))
       transport.advance(random(3))
     }
     transport.quiesce()

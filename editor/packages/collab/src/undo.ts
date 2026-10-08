@@ -45,6 +45,7 @@ export class UndoManager {
   private metadata: unknown
   private paused = false
   private region: IdSpan[] = []
+  private operations = new Map<string, readonly IdSpan[]>()
   private current: UndoTransaction | null = null
 
   constructor(
@@ -139,6 +140,7 @@ export class UndoManager {
 
   record(envelope: Envelope, capture: CaptureOptions = {}): void {
     if (envelope.id.actor !== this.actor || envelope.change.kind === 'setEffects') return
+    this.operations.set(editKey(envelope.id), affectedSpans(envelope.change))
     if (this.paused || capture.history === false) {
       this.seal()
       return
@@ -173,8 +175,22 @@ export class UndoManager {
   }
 
   remote(envelope: Envelope): void {
+    const change = envelope.change
+    if (change.kind !== 'setEffects')
+      this.operations.set(editKey(envelope.id), affectedSpans(change))
     if (!this.group || envelope.id.actor === this.actor) return
-    if (intersects(envelope.change, this.region)) this.seal()
+    if (change.kind !== 'setEffects') {
+      if (intersects(change, this.region)) this.seal()
+      return
+    }
+    if (
+      change.effects.some((effect) => {
+        const spans = this.operations.get(editKey(effect.op))
+        // Snapshot baselines may predate the observed operation scopes.
+        return !spans || spansIntersect(spans, this.region)
+      })
+    )
+      this.seal()
   }
 
   reject(ids: readonly EditId[]): void {
@@ -280,7 +296,10 @@ function intersects(change: Change, region: readonly IdSpan[]): boolean {
     )
   )
     return true
-  return affectedSpans(change).some((target) =>
+  return spansIntersect(affectedSpans(change), region)
+}
+function spansIntersect(targets: readonly IdSpan[], region: readonly IdSpan[]): boolean {
+  return targets.some((target) =>
     region.some(
       (span) =>
         target.start.bunch === span.start.bunch &&

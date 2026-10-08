@@ -46,8 +46,9 @@ export class Host<Snapshot = unknown> {
     return this.outcomes.get(editKey(id))
   }
 
-  /** Transports bind sender to their peer session before submission. */
-  submit(envelope: Envelope, sender: string = envelope.id.actor): SubmitResult {
+  /** The transport supplies sender from its authenticated session, never from the frame. */
+  submit(envelope: Envelope, sender: string): SubmitResult {
+    if (typeof sender !== 'string' || !sender) throw new CollabFailure('missing-sender')
     if (sender !== envelope.id.actor) throw new CollabFailure('sender-mismatch')
     const key = editKey(envelope.id)
     const outcome = this.outcomes.get(key)

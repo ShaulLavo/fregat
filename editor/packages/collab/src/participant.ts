@@ -22,6 +22,7 @@ export type ParticipantState = {
 }
 
 export class Participant<Snapshot = unknown> {
+  readonly actor: string
   readonly undoManager: UndoManager
   private historyRejected: EditId[] = []
   private confirmed: Snapshot
@@ -39,6 +40,7 @@ export class Participant<Snapshot = unknown> {
 
   constructor(private readonly options: ParticipantOptions<Snapshot>) {
     if (!options.actor) throw new CollabFailure('invalid-actor')
+    this.actor = options.actor
     this.confirmed = options.engine.snapshot()
     this.undoManager = new UndoManager(
       options.actor,

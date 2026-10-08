@@ -10,6 +10,7 @@ export class InMemoryTransport<Snapshot = unknown> {
   private clock = 0
   private order = 0
   private lastDelivery = new Map<Participant<Snapshot>, number>()
+  private senders = new Map<Participant<Snapshot>, string>()
   private unsubscribe: () => void
 
   constructor(
@@ -17,6 +18,7 @@ export class InMemoryTransport<Snapshot = unknown> {
     participants: readonly Participant<Snapshot>[],
     delay: () => number = () => 0,
   ) {
+    for (const participant of participants) this.senders.set(participant, participant.actor)
     this.unsubscribe = host.subscribe((message) => {
       for (const participant of participants) {
         const at = Math.max(this.clock + delay(), this.lastDelivery.get(participant) ?? 0)
@@ -26,10 +28,13 @@ export class InMemoryTransport<Snapshot = unknown> {
     })
   }
 
-  submit(envelope: Envelope, delay = 0): void {
+  submit(sender: Participant<Snapshot>, envelope: Envelope, delay = 0): void {
+    const actor = this.senders.get(sender)
+    if (!actor) throw new CollabFailure('unknown-sender')
+    if (envelope.id.actor !== actor) throw new CollabFailure('sender-mismatch')
     if (!Number.isSafeInteger(delay) || delay < 0) throw new CollabFailure('invalid-delay')
     this.schedule(this.clock + delay, () => {
-      this.host.submit(envelope)
+      this.host.submit(envelope, actor)
     })
   }
 

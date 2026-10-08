@@ -50,6 +50,11 @@ export class ReferenceEngine implements Engine<ReferenceSnapshot> {
       .join('')
   }
 
+  /** Retained IDs in placement order, including hidden characters. */
+  orderedIds(): readonly CharId[] {
+    return this.ordered().map((node) => ({ ...(node.id as CharId) }))
+  }
+
   /** Hidden IDs resolve to their retained gap; only unknown IDs return null. */
   visibleOffset(id: CharId): number | null {
     let offset = 0

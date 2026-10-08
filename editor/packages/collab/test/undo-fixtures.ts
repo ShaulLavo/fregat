@@ -1,3 +1,4 @@
+import { submitAsAuthor } from './host-fixtures'
 import { expect } from 'vitest'
 import { Host, Participant, ReferenceEngine } from '../src/index'
 import type { CaptureOptions, Envelope, HostMessage, UndoOptions } from '../src/index'
@@ -21,7 +22,7 @@ export function undoRoom(options: UndoOptions = { groupDelay: 0 }, count = 2) {
   function sync(selected: readonly number[] = users.map((_, index) => index)) {
     for (const index of selected)
       for (const envelope of users[index]!.participant.state().pending) {
-        const result = host.submit(envelope)
+        const result = submitAsAuthor(host, envelope)
         expect(result.status).not.toBe('rejected')
       }
     for (const index of selected) users[index]!.participant.receive(log)

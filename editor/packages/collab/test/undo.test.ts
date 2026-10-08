@@ -1,5 +1,6 @@
+import { submitAsAuthor } from './host-fixtures'
 import { expect, test } from 'vitest'
-import { Host, ReferenceEngine } from '../src/index'
+import { Host, InMemoryTransport, ReferenceEngine } from '../src/index'
 import type { Envelope } from '../src/index'
 import { authority, replica } from './fixtures'
 import { undoRoom } from './undo-fixtures'
@@ -36,8 +37,8 @@ test('foreign effect ownership, command identity and sender binding are checked 
   const { host } = authority()
   const first = a.insert(0, 'A'),
     foreign = b.insert(0, 'B')
-  host.submit(first)
-  host.submit(foreign)
+  submitAsAuthor(host, first)
+  submitAsAuthor(host, foreign)
   const id = { actor: 'a', seq: 2 }
   const command: Envelope = {
     ...first,
@@ -52,7 +53,10 @@ test('foreign effect ownership, command identity and sender binding are checked 
       ],
     },
   }
-  expect(host.submit(command)).toMatchObject({ status: 'rejected', reason: 'foreign-effect' })
+  expect(submitAsAuthor(host, command)).toMatchObject({
+    status: 'rejected',
+    reason: 'foreign-effect',
+  })
   expect(host.text()).toBe('AB')
   const own = {
     ...command,
@@ -69,7 +73,7 @@ test('foreign effect ownership, command identity and sender binding are checked 
   expect(host.submit(own, 'a').status).toBe('accepted')
   expect(host.text()).toBe('B')
   const mismatched = { ...own, id: { actor: 'a', seq: 4 } }
-  expect(host.submit(mismatched)).toMatchObject({
+  expect(submitAsAuthor(host, mismatched)).toMatchObject({
     status: 'rejected',
     reason: 'invalid-effect-command',
   })
@@ -94,7 +98,10 @@ test('an invalid target or state rejects the entire command before changing any 
       ],
     },
   }
-  expect(room.host.submit(command)).toMatchObject({ status: 'rejected', reason: 'unknown-effect' })
+  expect(submitAsAuthor(room.host, command)).toMatchObject({
+    status: 'rejected',
+    reason: 'unknown-effect',
+  })
   expect(room.host.text()).toBe('a')
   const invalid: Envelope = {
     ...command,
@@ -108,7 +115,7 @@ test('an invalid target or state rejects the entire command before changing any 
       ],
     },
   }
-  expect(room.host.submit(invalid)).toMatchObject({
+  expect(submitAsAuthor(room.host, invalid)).toMatchObject({
     status: 'rejected',
     reason: 'conflicting-effects',
   })
@@ -122,7 +129,7 @@ test('an invalid target or state rejects the entire command before changing any 
       effects: [{ op: first.id, active: 1 as unknown as boolean }],
     },
   }
-  expect(room.host.submit(invalidState)).toMatchObject({
+  expect(submitAsAuthor(room.host, invalidState)).toMatchObject({
     status: 'rejected',
     reason: 'invalid-effect-state',
   })
@@ -229,8 +236,8 @@ test('5: pending local edit, undo, redo and remote insertion replay capture hist
     undo.id,
     redo.id,
   ])
-  expect(room.host.submit(redo).status).toBe('deferred')
-  expect(room.host.submit(undo).status).toBe('deferred')
+  expect(submitAsAuthor(room.host, redo).status).toBe('deferred')
+  expect(submitAsAuthor(room.host, undo).status).toBe('deferred')
   room.converged()
 })
 
@@ -239,8 +246,8 @@ test('6: duplicate acknowledgements and retransmission never duplicate or invert
   room.edit(0, 0, 0, 'x')
   room.sync()
   const command = room.undo()
-  const outcome = room.host.submit(command)
-  expect(room.host.submit(command)).toBe(outcome)
+  const outcome = submitAsAuthor(room.host, command)
+  expect(submitAsAuthor(room.host, command)).toBe(outcome)
   room.users[0]!.participant.receive(room.log)
   room.users[0]!.participant.receive(room.log)
   expect(room.users[0]!.history.state()).toMatchObject({
@@ -249,7 +256,7 @@ test('6: duplicate acknowledgements and retransmission never duplicate or invert
   })
   room.redo()
   room.converged()
-  expect(room.host.submit(command)).toBe(outcome)
+  expect(submitAsAuthor(room.host, command)).toBe(outcome)
   expect(room.host.text()).toBe('x')
 })
 
@@ -290,7 +297,7 @@ test('12: rejected undo and its dependent redo recover the prior local history',
   room.sync()
   const command = room.undo(),
     redo = room.redo()
-  room.host.submit({ ...command, epoch: 'old' })
+  submitAsAuthor(room.host, { ...command, epoch: 'old' })
   room.users[0]!.participant.receive(room.log)
   expect(room.text()).toBe('x')
   expect(room.users[0]!.participant.state().blocked).toEqual([redo.id])
@@ -298,13 +305,13 @@ test('12: rejected undo and its dependent redo recover the prior local history',
     undo: [{ edits: [original.id] }],
     redo: [],
   })
-  expect(room.host.submit(redo)).toMatchObject({
+  expect(submitAsAuthor(room.host, redo)).toMatchObject({
     status: 'rejected',
     reason: 'rejected-dependency',
   })
   room.users[0]!.participant.receive(room.log)
   const retry = room.undo()
-  expect(room.host.submit(retry).status).toBe('accepted')
+  expect(submitAsAuthor(room.host, retry).status).toBe('accepted')
   room.users[0]!.participant.receive(room.log)
   expect(room.text()).toBe('')
 })
@@ -341,7 +348,7 @@ test('publication-created local work clears redo before rejection recovery repla
   expect(room.text()).toBe('y')
   expect(room.users[0]!.history.state().redo).toHaveLength(0)
   const rejected = room.edit(0, 1, 0, 'z')
-  room.host.submit({ ...rejected, epoch: 'old' })
+  submitAsAuthor(room.host, { ...rejected, epoch: 'old' })
   room.users[0]!.participant.receive(room.log)
   expect(room.text()).toBe('y')
   expect(room.users[0]!.history.state().redo).toHaveLength(0)
@@ -385,4 +392,64 @@ test('an observer failure preserves an already-applied history command', () => {
   })
   expect(room.users[0]!.history.currentTransaction).toBeNull()
   room.converged()
+})
+
+test('host requires a sender even for retransmissions and transport requires a registered session', () => {
+  const a = replica('a')
+  const impostor = replica('a')
+  const { host } = authority()
+  const envelope = a.insert(0, 'a')
+  expect(() => Reflect.apply(host.submit, host, [envelope])).toThrow('missing-sender')
+  expect(() => host.submit(envelope, '')).toThrow('missing-sender')
+  expect(host.hostSequence).toBe(0)
+  const transport = new InMemoryTransport(host, [a.participant])
+  try {
+    expect(() => transport.submit(impostor.participant, envelope)).toThrow('unknown-sender')
+    transport.submit(a.participant, envelope)
+    transport.quiesce()
+    expect(() => host.submit(envelope, 'b')).toThrow('sender-mismatch')
+    expect(() => Reflect.apply(host.submit, host, [envelope])).toThrow('missing-sender')
+    expect(host.text()).toBe('a')
+    expect(host.hostSequence).toBe(1)
+  } finally {
+    transport.close()
+  }
+})
+
+test('remote redo touching an already-hidden ID seals the local capture group', () => {
+  const room = undoRoom({ groupDelay: 500, now: () => 0 })
+  room.edit(1, 0, 0, 'abc', { history: false })
+  room.sync()
+  room.edit(1, 1, 1, '')
+  room.sync()
+  room.undo(1)
+  room.sync()
+  room.edit(0, 1, 1, '')
+  room.sync()
+  room.redo(1)
+  room.sync()
+  room.edit(0, 0, 0, 'Y')
+  expect(room.users[0]!.history.state().undo).toHaveLength(2)
+  room.undo(0)
+  room.converged()
+  expect(room.text()).toBe('ac')
+})
+
+test('disjoint remote undo and redo preserve an open local capture group', () => {
+  const room = undoRoom({ groupDelay: 500, now: () => 0 })
+  room.edit(1, 0, 0, 'abc')
+  room.sync()
+  room.edit(0, 3, 0, 'X')
+  room.sync()
+  room.undo(1)
+  room.sync()
+  room.edit(0, 1, 0, 'Y')
+  room.sync()
+  room.redo(1)
+  room.sync()
+  room.edit(0, room.text().length, 0, 'Z')
+  expect(room.users[0]!.history.state().undo).toHaveLength(1)
+  room.undo(0)
+  room.converged()
+  expect(room.text()).toBe('abc')
 })
