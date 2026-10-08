@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GhosttyResult, RenderStateDirty } from '../abi.js'
 import { GhosttyRuntime } from '../runtime.js'
-import { TextRowReader } from '../text-row-reader.js'
+import { equalTextRows, TextRowReader } from '../text-row-reader.js'
 import type { RenderRow, RenderTextRow } from '../types.js'
 
 let runtime: GhosttyRuntime | undefined
@@ -149,6 +149,89 @@ describe('text-only render rows', () => {
     expect(state.readTextRows({ dirtyOnly: true })).toEqual([])
   })
 
+  it('shares enumerable accessors across owned rows and preserves structured text transfer', async () => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 16, rows: 2 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('👩‍💻界é')
+    state.update()
+    const first = state.readTextRows()
+    const second = state.readTextRows()
+    const decode = vi.spyOn(String, 'fromCodePoint')
+    for (const name of ['text', 'cells', 'continuations']) {
+      const accessor = Object.getOwnPropertyDescriptor(first[0]!, name)!
+      expect(accessor.enumerable).toBe(true)
+      expect(accessor.get).toBe(Object.getOwnPropertyDescriptor(first[1]!, name)!.get)
+      expect(accessor.get).toBe(Object.getOwnPropertyDescriptor(second[0]!, name)!.get)
+    }
+    expect(Object.keys(first[0]!)).toEqual(['y', 'text', 'cells', 'continuations'])
+    expect(decode).not.toHaveBeenCalled()
+    expect(structuredClone(first)).toEqual(materialize(first))
+    expect(decode).toHaveBeenCalled()
+  })
+
+  it('compares matching cell layouts without per-codepoint iterator results', async () => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 32, rows: 2 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('INFO same 👩‍💻界é')
+    state.update()
+    const before = state.readTextRows()[0]!
+    const equal = state.readTextRows()[0]!
+    terminal.write('\rWARN same 👩‍💻界é')
+    state.update()
+    const changed = state.readTextRows()[0]!
+    const iterator = (function* () {
+      yield 0
+    })()
+    const next = vi.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(iterator)), 'next')
+    const decode = vi.spyOn(String, 'fromCodePoint')
+    expect(equalTextRows(before, equal)).toBe(true)
+    expect(equalTextRows(before, changed)).toBe(false)
+    expect(next).not.toHaveBeenCalled()
+    expect(decode).not.toHaveBeenCalled()
+  })
+
+  it('compares owned codepoints exactly without decoding text, including equivalent cell layouts', async () => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 16, rows: 3 })
+    const state = runtime.createRenderState(terminal)
+    const snapshots: readonly RenderTextRow[][] = [
+      '',
+      ' ',
+      'a',
+      'a ',
+      '界',
+      '界 ',
+      'é',
+      'é',
+      '👩‍💻',
+      '𐐀',
+      '\x1b[31ma',
+      '\x1b[8ma',
+      '\x1b[?2027h👩‍💻',
+      '\x1b[?2027l👩‍💻',
+    ].map((text) => {
+      terminal.write(`\x1b[0m\x1b[2J\x1b[H${text}`)
+      state.update()
+      return [...state.readTextRows()]
+    })
+    const decode = vi.spyOn(String, 'fromCodePoint')
+    const comparisons = snapshots.flatMap((left) =>
+      snapshots.flatMap((right) => left.map((row, index) => equalTextRows(row, right[index]!))),
+    )
+    expect(decode).not.toHaveBeenCalled()
+    decode.mockRestore()
+    expect(comparisons).toEqual(
+      snapshots.flatMap((left) =>
+        snapshots.flatMap((right) => left.map((row, index) => row.text === right[index]!.text)),
+      ),
+    )
+    const row = snapshots[2]![0]!
+    expect(equalTextRows(row, { ...row, text: row.text })).toBe(true)
+    expect(equalTextRows(row, { ...row, text: 'different' })).toBe(false)
+  })
+
   it('keeps lazy immutable cell arrays owned across growth, reader reuse, resize, and disposal', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 12, rows: 3 })
@@ -156,6 +239,7 @@ describe('text-only render rows', () => {
     terminal.write('\x1b[?2027h\x1b[1;38;2;10;20;30m👩‍💻界é')
     state.update()
     const expected = equivalentTextRows(state.readRows())
+    const decode = vi.spyOn(String, 'fromCodePoint')
     const from = vi.spyOn(Array, 'from')
     const rows = state.readTextRows()
     const eagerArrays = from.mock.calls.length
@@ -164,6 +248,7 @@ describe('text-only render rows', () => {
     expect(Object.isFrozen(rows)).toBe(true)
     for (const row of rows) {
       expect(Object.isFrozen(row)).toBe(true)
+      expect(typeof Object.getOwnPropertyDescriptor(row, 'text')?.get).toBe('function')
       expect(typeof Object.getOwnPropertyDescriptor(row, 'cells')?.get).toBe('function')
       expect(typeof Object.getOwnPropertyDescriptor(row, 'continuations')?.get).toBe('function')
     }
@@ -178,7 +263,12 @@ describe('text-only render rows', () => {
     state.dispose()
     terminal.dispose()
     runtime.dispose()
+    expect(decode).not.toHaveBeenCalled()
     expect(materialize(rows)).toEqual(expected)
+    expect(decode).toHaveBeenCalled()
+    decode.mockClear()
+    expect(materialize(rows)).toEqual(expected)
+    expect(decode).not.toHaveBeenCalled()
     for (const row of rows) {
       expect(Object.isFrozen(row.cells)).toBe(true)
       expect(Object.isFrozen(row.continuations)).toBe(true)

@@ -2256,18 +2256,21 @@ describe('terminal frame consumer demand in Chromium', () => {
     expect(harness.terminal.diagnostics.hasPendingLinkResolution).toBe(false)
   })
 
-  it('owns submitted text for caret and accessibility while decoding link cells on demand', async () => {
+  it('owns undecoded submitted text until visible text, accessibility or links consume it', async () => {
     const idle = await createIntegratedHarness({ accessibility: false })
     const idleFrame = measuredFrame(['https://measured.test'])
     idle.renderer.emit(idleFrame.snapshot)
     expect(idleFrame.reads.cursor).toBeGreaterThan(0)
-    expect(idleFrame.reads.text).toBeGreaterThan(0)
+    expect(idleFrame.reads.text).toBe(0)
     expect(idleFrame.reads.y).toBeGreaterThan(0)
     expect(idleFrame.reads).toMatchObject({
       cells: 0,
       continuations: 0,
       renderCells: 0,
     })
+
+    expect(idle.terminal.visibleLines()[0]).toBe('https://measured.test')
+    expect(idleFrame.reads.text).toBeGreaterThan(0)
 
     const accessible = await createIntegratedHarness()
     const accessibleFrame = measuredFrame(['https://measured.test'])

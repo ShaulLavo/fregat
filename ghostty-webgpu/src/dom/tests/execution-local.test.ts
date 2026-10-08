@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TerminalSession } from '../../term/session.js'
 import type { TerminalClipboardWrite } from '../../term/types.js'
 import { LocalTerminalExecution } from '../execution-local.js'
@@ -8,6 +8,7 @@ const cleanups: Array<() => void> = []
 const decoder = new TextDecoder()
 
 afterEach(() => {
+  vi.restoreAllMocks()
   for (const cleanup of cleanups.splice(0).reverse()) cleanup()
 })
 
@@ -124,6 +125,95 @@ describe('local terminal execution owner', () => {
     expect(resized.grid.columns).toBe(summary.grid.columns + 1)
     expect(resized.grid.rows).toBe(summary.grid.rows - 1)
     expect(resized.font).toBe(font)
+  })
+
+  it('shares submitted text accessors while retaining enumerable worker transfer', async () => {
+    const session = await TerminalSession.create<Event>({
+      appearance: { grid: { columns: 20, rows: 3 } },
+    })
+    const execution = new LocalTerminalExecution(session)
+    cleanups.push(() => execution.dispose())
+    execution.commitLayout(
+      calculateTerminalFittedFont(
+        session.appearance.font,
+        { advanceWidth: 10, fontAscent: 16, fontDescent: 4 },
+        1,
+      ),
+      { bottom: 0, left: 0, right: 0, top: 0 },
+    )
+    execution.write('accepted 👩‍💻')
+    session.renderState.update()
+    execution.submit({ cursor: session.renderState.readCursor(), rows: [] })
+    const rows = execution.submittedFrame!.rows
+    const decode = vi.spyOn(String, 'fromCodePoint')
+    const accessor = Object.getOwnPropertyDescriptor(rows[0]!, 'text')!
+    expect(accessor.enumerable).toBe(true)
+    expect(accessor.get).toBe(Object.getOwnPropertyDescriptor(rows[1]!, 'text')!.get)
+    expect(Object.keys(rows[0]!)).toEqual(['y', 'text'])
+    expect(decode).not.toHaveBeenCalled()
+    expect(structuredClone(rows)).toEqual(rows.map(({ y, text }) => ({ y, text })))
+    expect(decode).toHaveBeenCalled()
+  })
+
+  it('decodes no copied text until a submitted row has a consumer', async () => {
+    const session = await TerminalSession.create<Event>({
+      appearance: { grid: { columns: 20, rows: 3 } },
+    })
+    const execution = new LocalTerminalExecution(session)
+    cleanups.push(() => execution.dispose())
+    execution.commitLayout(
+      calculateTerminalFittedFont(
+        session.appearance.font,
+        { advanceWidth: 10, fontAscent: 16, fontDescent: 4 },
+        1,
+      ),
+      { bottom: 0, left: 0, right: 0, top: 0 },
+    )
+    const decode = vi.spyOn(String, 'fromCodePoint')
+    for (const text of ['first 👩‍💻', 'second 界', 'second 界']) {
+      execution.write(`\r${text}`)
+      session.renderState.update()
+      execution.submit({ cursor: session.renderState.readCursor(), rows: [] })
+      session.renderState.acknowledge()
+    }
+    expect(decode).not.toHaveBeenCalled()
+    const summary = execution.submittedFrame!
+    expect(summary.rows[0]?.text.trimEnd()).toBe('second 界')
+    expect(decode).toHaveBeenCalled()
+    decode.mockClear()
+    expect(summary.rows[0]?.text.trimEnd()).toBe('second 界')
+    expect(decode).not.toHaveBeenCalled()
+  })
+
+  it('keeps undecoded accepted text after an updated snapshot is left unsubmitted', async () => {
+    const session = await TerminalSession.create<Event>({
+      appearance: { grid: { columns: 20, rows: 3 } },
+    })
+    const execution = new LocalTerminalExecution(session)
+    cleanups.push(() => execution.dispose())
+    execution.commitLayout(
+      calculateTerminalFittedFont(
+        session.appearance.font,
+        { advanceWidth: 10, fontAscent: 16, fontDescent: 4 },
+        1,
+      ),
+      { bottom: 0, left: 0, right: 0, top: 0 },
+    )
+    execution.write('accepted 👩‍💻')
+    session.renderState.update()
+    execution.submit({ cursor: session.renderState.readCursor(), rows: [] })
+    session.renderState.acknowledge()
+    const accepted = execution.submittedFrame!
+    const textFrame = execution.textFrame()!
+    execution.write('\r\x1b[2Kreplacement 界')
+    session.renderState.update()
+    session.renderState.readTextRows!()
+    expect(execution.submittedFrame).toBe(accepted)
+    expect(accepted.rows[0]?.text.trimEnd()).toBe('accepted 👩‍💻')
+    expect(textFrame.rows[0]?.text.trimEnd()).toBe('accepted 👩‍💻')
+    expect(execution.textFrame()).toBe(textFrame)
+    execution.dispose()
+    expect(accepted.rows[0]?.text.trimEnd()).toBe('accepted 👩‍💻')
   })
 
   it('keeps live native measurements and atomic prompt geometry with the submitted owner', async () => {

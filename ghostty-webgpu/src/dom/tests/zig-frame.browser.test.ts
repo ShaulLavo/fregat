@@ -288,6 +288,32 @@ it.each(['webgl2', 'webgpu'] as const)(
 )
 
 it.each(['webgl2', 'webgpu'] as const)(
+  'keeps undecoded submitted text readable after a failed native update (%s)',
+  async (backend) => {
+    const clock = new TestClock()
+    const native = await hostFixture(backend, { columns: 20, rows: 3 }, clock)
+    native.terminal.write('\x1b[?25laccepted 👩‍💻')
+    clock.flushFrame()
+    const accepted = native.terminal.submittedFrame!
+    expect(typeof Object.getOwnPropertyDescriptor(accepted.rows[0]!, 'text')?.get).toBe('function')
+    const version = native.state.snapshotVersion!
+    const fault = vi
+      .spyOn(native.runtime.bridge, 'buildFrame')
+      .mockReturnValue(GhosttyResult.OutOfMemory)
+    native.terminal.write('\r\x1b[2Kreplacement 界')
+    expect(() => clock.flushFrame()).not.toThrow()
+    expect(native.state.snapshotVersion).toBeGreaterThan(version)
+    expect(native.terminal.submittedFrame).toBe(accepted)
+    expect(native.errors).toHaveLength(1)
+    native.state.readTextRows!()
+    expect(native.terminal.visibleLines()[0]?.trimEnd()).toBe('accepted 👩‍💻')
+    fault.mockRestore()
+    native.terminal.dispose()
+    expect(accepted.rows[0]?.text.trimEnd()).toBe('accepted 👩‍💻')
+  },
+)
+
+it.each(['webgl2', 'webgpu'] as const)(
   'rebuilds unsubmitted persistent records after a bridge exception (%s)',
   async (backend) => {
     const clock = new TestClock()

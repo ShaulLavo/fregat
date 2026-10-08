@@ -129,8 +129,8 @@ export class FrameObserver {
     rows: readonly RenderRow[] | undefined,
   ): readonly RendererTextFrameRow[] {
     if (this.options.onFrame) return this.fullRows.filter(defined)
-    if (rows && (this.current || rows.length === this.rowCount)) return rows.map(copiedFrameRow)
     if (state.readTextRows) return state.readTextRows(options)
+    if (rows && (this.current || rows.length === this.rowCount)) return rows.map(copiedFrameRow)
     const source = this.current && rows ? rows : state.readRows(options)
     return source.map(copiedFrameRow)
   }

@@ -1,5 +1,6 @@
 import type { SelectionCoordinates } from '../core/selection.js'
-import type { TerminalScrollbar } from '../core/types.js'
+import { equalTextRows } from '../core/text-row-reader.js'
+import type { RenderTextRow, TerminalScrollbar } from '../core/types.js'
 import type { RendererTextFrameSnapshot } from '../render/renderer.js'
 import type { TerminalFittedFont, TerminalGrid, TerminalRendererTheme } from '../term/types.js'
 import type { TerminalElementPadding } from './elements.js'
@@ -42,6 +43,32 @@ export interface TerminalSubmission {
   readonly snapshot: RendererTextFrameSnapshot
 }
 
+class SubmittedRow implements TerminalSubmittedRow {
+  readonly y: number
+  readonly #source: RenderTextRow
+
+  constructor(source: RenderTextRow) {
+    this.y = source.y
+    this.#source = source
+    Object.defineProperty(this, 'text', submittedText)
+    Object.freeze(this)
+  }
+
+  get text(): string {
+    return this.#source.text
+  }
+
+  matches(row: RenderTextRow): boolean {
+    return equalTextRows(this.#source, row)
+  }
+}
+
+// Worker transfer reads the shared getter from each row's own properties.
+const submittedText = {
+  ...Object.getOwnPropertyDescriptor(SubmittedRow.prototype, 'text'),
+  enumerable: true,
+}
+
 export function submittedFrame(
   previous: TerminalSubmittedFrame | undefined,
   input: TerminalSubmission,
@@ -51,8 +78,12 @@ export function submittedFrame(
   const previousRows = sameLayout ? previous.rows : []
   const rows = input.snapshot.rows.map((row) => {
     const old = previousRows[row.y]
-    if (old?.y === row.y && old.text === row.text) return old
-    const owned = Object.freeze({ y: row.y, text: row.text })
+    if (
+      old?.y === row.y &&
+      (old instanceof SubmittedRow ? old.matches(row) : old.text === row.text)
+    )
+      return old
+    const owned = new SubmittedRow(row)
     rowPatches.push(owned)
     return owned
   })
