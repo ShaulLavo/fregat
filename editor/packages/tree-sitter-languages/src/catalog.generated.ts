@@ -503,6 +503,40 @@ export const TREE_SITTER_LANGUAGE_CONTRIBUTIONS: readonly TreeSitterLanguageCont
       }
     },
   },
+  {
+    id: 'jsdoc',
+    extensions: [],
+    filenames: [],
+    aliases: [],
+    injectionDependencies: [],
+    async load() {
+      const assets = await Promise.all([
+        import('tree-sitter-jsdoc/tree-sitter-jsdoc.wasm?url').then((module) => module.default),
+        import('tree-sitter-jsdoc/queries/highlights.scm?raw').then((module) => module.default),
+      ])
+      return {
+        wasmUrl: assets[0]!,
+        highlightQuerySource: mapQueryCaptures([assets[1]!].join('\n'), captureMappings),
+      }
+    },
+  },
+  {
+    id: 'regex',
+    extensions: [],
+    filenames: [],
+    aliases: [],
+    injectionDependencies: [],
+    async load() {
+      const assets = await Promise.all([
+        import('tree-sitter-regex/tree-sitter-regex.wasm?url').then((module) => module.default),
+        import('tree-sitter-regex/queries/highlights.scm?raw').then((module) => module.default),
+      ])
+      return {
+        wasmUrl: assets[0]!,
+        highlightQuerySource: mapQueryCaptures([assets[1]!].join('\n'), captureMappings),
+      }
+    },
+  },
 ]
 const captureMappings: Readonly<Record<string, string>> = {
   escape: 'string.escape',
@@ -522,4 +556,5 @@ const captureMappings: Readonly<Record<string, string>> = {
   'text.strike': 'text.literal',
   'text.underline': 'text.reference',
   storageclass: 'keyword.storage',
+  'character.special': 'string.special',
 }
