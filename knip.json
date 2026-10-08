@@ -103,6 +103,8 @@
         "import-proxy-usage-key.ts",
         "pair.ts",
         "prod.ts",
+        "product-sites/test-mobile.mjs",
+        "product-sites/verify-mobile.mjs",
         "tui.ts",
         "web-layering.mjs",
         "skills/port-pstack.ts",

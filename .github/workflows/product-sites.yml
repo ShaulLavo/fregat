@@ -47,20 +47,64 @@ on:
       - '!**/tests/**'
       - '!**/*.test.*'
       - '!**/*.spec.*'
+  pull_request:
+    paths:
+      - apps/site/**
+      - packages/client-core/src/**
+      - packages/contracts/src/**
+      - packages/markdown/src/**
+      - packages/observability/src/**
+      - packages/tree/src/**
+      - packages/ui/src/**
+      - packages/utils/src/**
+      - packages/*/package.json
+      - packages/*/tsconfig*.json
+      - hotkeys/packages/*/src/**
+      - hotkeys/packages/*/package.json
+      - hotkeys/packages/*/tsconfig*.json
+      - hotkeys/tsconfig.json
+      - hotkeys/package.json
+      - editor/packages/*/src/**
+      - editor/packages/*/package.json
+      - editor/packages/*/tsconfig*.json
+      - editor/packages/*/scripts/**
+      - editor/tsconfig*.json
+      - editor/scripts/build-package.ts
+      - editor/examples/app/**
+      - editor/site/**
+      - editor/package.json
+      - ghostty-webgpu/site/**
+      - ghostty-webgpu/src/**
+      - ghostty-webgpu/package.json
+      - ghostty-webgpu/tsconfig*.json
+      - ghostty-webgpu/scripts/**
+      - ghostty-webgpu/*.wasm
+      - scripts/product-sites/**
+      - scripts/build-site.ts
+      - scripts/dev-sources.ts
+      - scripts/runtime-network.ts
+      - scripts/structured-errors.ts
+      - .github/actions/setup/**
+      - .github/workflows/product-sites.yml
+      - package.json
+      - bun.lock
+      - turbo.json
+      - '!**/tests/**'
+      - '!**/*.test.*'
+      - '!**/*.spec.*'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: production-product-sites
+  group: production-product-sites-${{ github.event.pull_request.number || 'main' }}
   cancel-in-progress: false
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Check archive publisher
@@ -68,6 +112,20 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Build production sites
         run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites"
+      - name: Install mobile check browsers
+        working-directory: scripts
+        run: bun x playwright install --with-deps chromium webkit
+      - name: Test mobile overflow detection
+        run: bun scripts/product-sites/test-mobile.mjs
+      - name: Check every built page on mobile
+        run: bun scripts/product-sites/verify-mobile.mjs --directory "$RUNNER_TEMP/product-sites" --evidence "$RUNNER_TEMP/mobile-layout"
+      - name: Upload mobile layout evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-layout
+          path: ${{ runner.temp }}/mobile-layout
+          retention-days: 7
       - name: Package production sites
         run: tar -czf "$RUNNER_TEMP/product-sites.tar.gz" -C "$RUNNER_TEMP/product-sites" index.html fregat singapore ghostty-webgpu
       - uses: actions/upload-artifact@v4

@@ -28,6 +28,26 @@ The existing Pages workflow keeps its defaults.
 library sources, build configuration or manifests, and on manual dispatch from main. Test-only
 changes do not trigger it. Markdown under site sources remains an input. The Fregat landing page
 uses its own animated replica. Web application source changes do not trigger this build.
+Site pull requests run the build and mobile checks; deployment runs only from main.
+
+The mobile check visits every built HTML page in touch-enabled Chromium and WebKit at
+320, 360 and 390 CSS pixels, with a device pixel ratio of 2. It also opens the documentation
+search dialog and the repository demo's piece-tree inspector. A page fails if its root scroll
+width exceeds the requested CSS width or its mobile layout viewport expands, with no pixel
+tolerance. Code and tables can scroll inside a box that fits the page.
+
+```sh
+cd scripts && bun x playwright install --with-deps chromium webkit && cd ..
+bun scripts/product-sites/test-mobile.mjs
+bun scripts/product-sites/verify-mobile.mjs --directory /path/to/output --evidence /path/to/evidence
+```
+
+Use `--widths 320,360,375,390,393,414,430,667,844 --screenshots` for the wider audit.
+The last two widths use a landscape viewport. Each result records offending element bounds;
+failed checks save screenshots even without `--screenshots`. For a published-site crawl, pass
+`--origin https://shaulavo.dev --sitemaps /singapore/sitemap-index.xml,/ghostty-webgpu/sitemap-index.xml`
+and `--paths /,/fregat/,/singapore/demo/`. Evidence is JSON Lines, with one row per page, engine,
+width and interaction state.
 
 The build job has no deployment secret. It uploads a gzip tar artifact with one-day retention.
 A fresh deploy job downloads that artifact and sends it directly over SSH. It runs in the
