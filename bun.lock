@@ -283,13 +283,24 @@
     "editor/packages/collaboration": {
       "name": "@singapore-editor/collaboration",
       "version": "0.0.1",
+      "dependencies": {
+        "@singapore-editor/collab": "workspace:*",
+      },
       "devDependencies": {
+        "@singapore-editor/core": "workspace:*",
         "@types/node": "26.6.3",
+        "@vitest/browser-playwright": "5.0.2",
         "oxfmt": "0.70.0",
         "oxlint": "1.85.0",
         "typescript": "7.0.2",
         "vitest": "5.0.2",
       },
+      "peerDependencies": {
+        "@singapore-editor/core": "workspace:*",
+      },
+      "optionalPeers": [
+        "@singapore-editor/core",
+      ],
     },
     "editor/packages/decode": {
       "name": "@singapore-editor/decode",
@@ -3722,6 +3733,12 @@
 
     "@mswjs/interceptors/@open-draft/deferred-promise": ["@open-draft/deferred-promise@2.2.0", "", {}, "sha512-CecwLWx3rhxVQF6V4bAgPS5t+So2sTbPgAzafKkVizyi7tlwpcFpdFqq+wqF2OwNBmqFuu6tOyouTuxgpMfzmA=="],
 
+    "@singapore-editor/markdown/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#f7263d7", { "peerDependencies": { "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#3805c8921570361c317cb766cc8e96ae700de8cb" } }, "ShaulLavo-tree-sitter-md-f7263d7", "sha512-vBP+vsFndiIFUiN5sn6ehWROlitgwl2NJy4uKMM8yO8aFU0Kh1E51CA1Rec/TDrU1/44nkNSi50VvxZeCB5izQ=="],
+
+    "@singapore-editor/tree-sitter/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#f7263d7", { "peerDependencies": { "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#3805c8921570361c317cb766cc8e96ae700de8cb" } }, "ShaulLavo-tree-sitter-md-f7263d7", "sha512-vBP+vsFndiIFUiN5sn6ehWROlitgwl2NJy4uKMM8yO8aFU0Kh1E51CA1Rec/TDrU1/44nkNSi50VvxZeCB5izQ=="],
+
+    "@singapore-editor/tree-sitter-languages/tree-sitter-md": ["tree-sitter-md@github:ShaulLavo/tree-sitter-md#f7263d7", { "peerDependencies": { "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#3805c8921570361c317cb766cc8e96ae700de8cb" } }, "ShaulLavo-tree-sitter-md-f7263d7", "sha512-vBP+vsFndiIFUiN5sn6ehWROlitgwl2NJy4uKMM8yO8aFU0Kh1E51CA1Rec/TDrU1/44nkNSi50VvxZeCB5izQ=="],
+
     "@tailwindcss/node/lightningcss": ["lightningcss@1.32.0", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.32.0", "lightningcss-darwin-arm64": "1.32.0", "lightningcss-darwin-x64": "1.32.0", "lightningcss-freebsd-x64": "1.32.0", "lightningcss-linux-arm-gnueabihf": "1.32.0", "lightningcss-linux-arm64-gnu": "1.32.0", "lightningcss-linux-arm64-musl": "1.32.0", "lightningcss-linux-x64-gnu": "1.32.0", "lightningcss-linux-x64-musl": "1.32.0", "lightningcss-win32-arm64-msvc": "1.32.0", "lightningcss-win32-x64-msvc": "1.32.0" } }, "sha512-NXYBzinNrblfraPGyrbPoD19C1h9lfI/1mzgWYvXUTe414Gz/X1FD2XBZSZM7rRTrMA8JL3OtAaGifrIKhQ5yQ=="],
 
     "@tailwindcss/node/magic-string": ["magic-string@0.30.21", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.5" } }, "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ=="],
@@ -3839,6 +3856,8 @@
     "svgo/commander": ["commander@11.1.0", "", {}, "sha512-yPVavfyCcRhmorC7rWlkHn15b4wDVgVmBA7kV4QVBsF7kv/9TKJAbAXVTxvTnwP8HHKjRCJDClKbciiYS7p0DQ=="],
 
     "tree-sitter-cpp/tree-sitter-c": ["tree-sitter-c@0.23.6", "", { "dependencies": { "node-addon-api": "^8.3.0", "node-gyp-build": "^4.8.4" }, "peerDependencies": { "tree-sitter": "^0.22.1" }, "optionalPeers": ["tree-sitter"] }, "sha512-0dxXKznVyUA0s6PjNolJNs2yF87O5aL538A/eR6njA5oqX3C3vH4vnx3QdOKwuUdpKEcFdHuiDpRKLLCA/tjvQ=="],
+
+    "tree-sitter-md/web-tree-sitter": ["web-tree-sitter@github:ShaulLavo/tree-sitter-x#3805c89", {}, "ShaulLavo-tree-sitter-x-3805c89", "sha512-JJf1yahzT8bEQhS4fH/5jEJwwLjDgz5PTtfil5YTzKBz7d9TqJywZeYHjXaY5DPgbPirfZK7TLA+blj5oYYUJg=="],
 
     "tree-sitter-typescript/tree-sitter-javascript": ["tree-sitter-javascript@0.23.1", "", { "dependencies": { "node-addon-api": "^8.2.2", "node-gyp-build": "^4.8.2" }, "peerDependencies": { "tree-sitter": "^0.21.1" }, "optionalPeers": ["tree-sitter"] }, "sha512-/bnhbrTD9frUYHQTiYnPcxyHORIw157ERBa6dqzaKxvR/x3PC4Yzd+D1pZIMS6zNg2v3a8BZ0oK7jHqsQo9fWA=="],
 

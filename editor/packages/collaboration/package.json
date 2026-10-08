@@ -11,12 +11,19 @@
     "README.md"
   ],
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "**/*.css"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./presence-plugin": {
+      "types": "./dist/presence-plugin.d.ts",
+      "import": "./dist/presence-plugin.js",
+      "default": "./dist/presence-plugin.js"
     }
   },
   "publishConfig": {
@@ -31,11 +38,24 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check ."
   },
+  "dependencies": {
+    "@singapore-editor/collab": "workspace:*"
+  },
   "devDependencies": {
+    "@singapore-editor/core": "workspace:*",
     "@types/node": "26.6.3",
+    "@vitest/browser-playwright": "5.0.2",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
     "typescript": "7.0.2",
     "vitest": "5.0.2"
+  },
+  "peerDependencies": {
+    "@singapore-editor/core": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@singapore-editor/core": {
+      "optional": true
+    }
   }
 }

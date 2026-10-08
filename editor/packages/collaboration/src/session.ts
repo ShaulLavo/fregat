@@ -1,3 +1,4 @@
+import type { PresenceMessage, PresenceObserver } from './presence'
 import {
   compareBranches,
   compareIds,
@@ -60,6 +61,7 @@ export class Session<E extends EditEnvelope> {
   readonly archives: { readonly branch: Branch; readonly history: readonly Confirmation<E>[] }[] =
     []
   readonly members = new Set<string>()
+  private readonly presenceObservers = new Set<PresenceObserver>()
   private phase: Phase<E> = { kind: 'waiting' }
   private authority: Authority
   private maxTerm = 0
@@ -121,6 +123,16 @@ export class Session<E extends EditEnvelope> {
     return { tip: this.options.engine.checkpoint(), authority: this.authority }
   }
 
+  sendPresence(payload: PresenceMessage): void {
+    if (this.phase.kind !== 'left') this.broadcast('PRESENCE', payload)
+  }
+
+  subscribePresence(observer: PresenceObserver): () => void {
+    this.presenceObservers.add(observer)
+    observer.tick(this.now)
+    return () => this.presenceObservers.delete(observer)
+  }
+
   connect(peer: string): void {
     if (
       this.phase.kind === 'left' ||
@@ -153,6 +165,8 @@ export class Session<E extends EditEnvelope> {
 
   tick(now: number): void {
     this.now = now
+    if (this.phase.kind !== 'left')
+      for (const observer of this.presenceObservers) observer.tick(now)
     if (this.phase.kind === 'left' || now - this.lastTick < this.options.pulseInterval) return
     this.lastTick = now
     if (
@@ -233,6 +247,7 @@ export class Session<E extends EditEnvelope> {
         this.handoff(message.sender, message.payload)
         break
       case 'LEAVE':
+        for (const observer of this.presenceObservers) observer.leave(message.sender)
         this.departed.add(message.sender)
         this.members.delete(message.sender)
         this.observed.delete(message.sender)
@@ -244,6 +259,8 @@ export class Session<E extends EditEnvelope> {
           this.negotiate()
         break
       case 'PRESENCE':
+        for (const observer of this.presenceObservers)
+          observer.receive(message.sender, message.payload)
         this.options.onPresence?.(message.sender, message.payload)
         break
     }
@@ -252,6 +269,7 @@ export class Session<E extends EditEnvelope> {
   leave(successor: string): void {
     if (!this.isHost || !this.members.has(successor) || successor === this.peer)
       throw new TypeError('Handoff needs a connected successor and a stable host')
+    for (const observer of this.presenceObservers) observer.leave(this.peer)
     this.departure = successor
     this.startHandoff(successor)
   }

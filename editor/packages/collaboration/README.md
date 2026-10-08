@@ -5,8 +5,8 @@ It chooses an ordering host, recovers after host failure, and preserves both bra
 edits when network partitions rejoin. A confirmation means acceptance on the current
 branch. Reconciliation can return a branch-confirmed edit to pending.
 
-This package currently contains the session protocol. WebRTC, BroadcastChannel,
-presence rendering and editor attachment follow separately.
+The package includes the session protocol and character-based presence. The optional
+`presence-plugin` entry point paints remote carets and selections in an editor view.
 
 ## Integration boundary
 
@@ -88,13 +88,62 @@ authentication, message-size bounds, backpressure and retention limits belong to
 transport/production integration. History chunks here are bounded by record count;
 the later transport must also enforce its byte limit.
 
+## Presence
+
+`new Presence(peerSessionId, documentId, session)` keeps per-peer clocks and bounded
+remote state. The session supplies authenticated senders and its caller-driven clock.
+Presence uses `PRESENCE` messages and leaves document history unchanged. Each active
+editor attachment subscribes to that clock. The final attachment sends a null local
+state, unsubscribes, and hides remote state while retaining clocks. `dispose()` releases
+all state when the room closes. Presence creates no timers.
+
+`setLocalState` accepts an epoch, a confirmed tip, a display name, a six-digit hex
+colour, a focused view ID or `null`, and selections. Each selection has an `anchor`
+and a `head` gap. A gap contains `left: CharId | 'start'`, `right: CharId | 'end'`, and
+`bias: 'left' | 'right'`. Both characters must be known before resolving the gap.
+Deleted characters keep their retained position. A left-biased gap stays after its
+left character; a right-biased gap stays before its right character.
+
+Local state renews every 15 seconds. Remote state expires after 30 seconds of silence.
+Newer clocks win. Equal-clock null state removes a peer. Expiry retains clock metadata,
+so delayed packets cannot restore expired state. The room retains at most 256 peer
+incarnations until `dispose()`. Each state has at most 32 selections,
+128 display-name code units, and 256 code units per identifier. Names exclude control
+and formatting characters. Parsing copies validated fields and discards extra fields.
+
+The view plugin takes plain options and works with `new Editor(element)`:
+
+```ts
+import { Editor } from '@singapore-editor/core/editor'
+import { Presence } from '@singapore-editor/collaboration'
+import { createPresencePlugin } from '@singapore-editor/collaboration/presence-plugin'
+
+const presence = new Presence(peerSessionId, documentId, session)
+const editor = new Editor(element, {
+  plugins: [createPresencePlugin({ presence, resolver })],
+})
+editor.setText(text)
+```
+
+`resolver` implements `resolveGap(gap): number | undefined`. The rendering contribution
+retains unresolved selections and retries them on content or layout updates. The view
+uses owner-scoped highlights and mounted range geometry, including wrapped rows and
+horizontal scroll. Folded or unmounted carets stay hidden until their text becomes
+visible. Name labels use text content, remain still, and expose the full name through
+`title`. An editor with zero remote peers creates no presence DOM or highlights.
+
+`Presence.attach()` also supports a headless consumer. Its returned function detaches
+that consumer. A transport-neutral consumer can omit `session`, deliver packets with
+`receive`, and advance a monotonic millisecond clock with `tick`.
+
 ## Checks
 
 From the repository root:
 
 ```sh
+bunx turbo run build --filter=@singapore-editor/collaboration...
+bunx playwright install chromium
 bun run --cwd editor/packages/collaboration typecheck
-bun run --cwd editor/packages/collaboration build
 bun run --cwd editor/packages/collaboration test
 COLLABORATION_LONG_RUN=1 bun run --cwd editor/packages/collaboration test
 ```
