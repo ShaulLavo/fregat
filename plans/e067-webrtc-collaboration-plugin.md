@@ -110,7 +110,13 @@ Not in scope: accounts, permissions, persistent rooms, a server peer, and rooms 
   WebRTC and BroadcastChannel transports with an encrypted signaling client and a self-hostable
   broker (#982), hardened with per-member admission tokens and per-member, per-address and IPv6
   prefix limits (#1016); presence (#991); the Start/Join example (#1026).
-- Remaining: Fregat settings registration, and two-machine and relay-only (TURN) qualification.
+- Fregat settings with credentials from the secret store (#1070); presence clears only on
+  confirmed departure (#1076); scoped connection-error recovery in the example (#1074).
+- Qualified on 2026-10-08 between Linux Chromium and Mac Chrome and WebKit, direct and
+  relay-only through a TURN server (relay/relay candidate pairs on both machines), including a
+  host crash mid-typing with takeover and rejoin. The TURN browser test now asserts relay
+  traffic (#1072).
+- All six steps are delivered. Open follow-up: Fregat has no UI that starts a session yet.
 
 ## Risks and decisions
 
