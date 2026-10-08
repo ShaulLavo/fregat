@@ -31,7 +31,14 @@ const proof = {
     editor.setSelection(text.length)
     article.hidden = true
   },
+  loadMarkdown(source: string, wrap: boolean) {
+    editor.setText(source, { languageId: 'markdown' })
+    editor.setSelection(source.length)
+    editor.setWordWrap(wrap)
+    editor.setScrollPosition({ top: 0 })
+  },
   loadPlain(source: string) {
+    editor.setWordWrap(false)
     editor.setText(source, { languageId: 'plaintext' })
   },
   scroll(top: number) {
