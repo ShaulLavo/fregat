@@ -628,9 +628,9 @@ export const SETTINGS_DOCUMENTATION = {
   'chat.keepImportedSessionsUpdated': {
     title: 'Keep imported chats updated',
     details:
-      'The server rescans local Claude and Codex history every minute and brings imported chats up to date. A chat stops updating once it has a turn sent from Platform.',
+      'The server rescans local Claude and Codex history every minute and brings imported chats up to date. A chat stops updating once it has a turn sent from Fregat.',
     description:
-      'Imported chats keep getting new messages from the Claude or Codex history on this machine until you send a message in them from Platform. New chats are imported only when you click Import.',
+      'Imported chats keep getting new messages from the Claude or Codex history on this machine until you send a message in them from Fregat. New chats are imported only when you click Import.',
     keywords: ['chat', 'import', 'sync', 'history', 'claude', 'codex', 'cli', 'app', 'local'],
   },
   'chat.diagramFontWaitMs': {
@@ -893,7 +893,7 @@ export const SETTINGS_DOCUMENTATION = {
   'files.watchDirectoryLimit': {
     title: 'Folder watch limit',
     details:
-      "Each watched folder uses one inotify watch from a per-user pool that every watcher on the machine shares (524,288 on the owner's machine). Opening /work took 484,687 watches and other apps began failing with ENOSPC. 200,000 fits four roots the size of the Platform checkout (45,036 folders) and leaves 62% of the pool free.",
+      "Each watched folder uses one inotify watch from a per-user pool that every watcher on the machine shares (524,288 on the owner's machine). Opening /work took 484,687 watches and other apps began failing with ENOSPC. 200,000 fits four roots the size of the Fregat checkout (45,036 folders) and leaves 62% of the pool free.",
     description:
       'How many folders all open workspaces may watch for live changes together. A workspace that would pass it updates its top level and open files only.',
     keywords: ['files', 'watch', 'watcher', 'inotify', 'limit', 'large', 'folders', 'live'],

@@ -76,7 +76,12 @@ export async function startIsolatedServer(
   const productionRoot = path.join(directory, 'production')
   mkdirSync(home)
   mkdirSync(productionRoot)
-  mkdirSync(path.join(directory, 'served', 'web'), { recursive: true })
+  const servedWeb = path.join(directory, 'served', 'web')
+  mkdirSync(servedWeb, { recursive: true })
+  // Keep web and server release descriptors beside each other when promotion updates them.
+  if (webRoot)
+    for (const name of readdirSync(webRoot))
+      symlinkSync(path.resolve(webRoot, name), path.join(servedWeb, name))
   const entry = isolatedReleaseEntry(directory)
   // Scenarios install their own fixture drivers; only an owner's --real-providers run keeps the
   // built-in accounts on.
@@ -109,7 +114,7 @@ export async function startIsolatedServer(
     realProviders,
     scratchRoot,
     webOrigin,
-    webRoot,
+    webRoot: servedWeb,
   })
   const spawn = () =>
     Bun.spawn({

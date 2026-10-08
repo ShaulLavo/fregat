@@ -49,7 +49,13 @@ import { GitService } from './git/service'
 import { CommitMessageGenerator } from './git/commit-message-generator'
 import { setLspDownloadPolicy } from './lsp/installers'
 import { LspSessionPool } from './lsp/proxy-session'
-import { lspMatchQuerySchema, lspRouteMatch, lspRouteSemanticTokens, lspRoutes } from './lsp/routes'
+import {
+  lspMatchQuerySchema,
+  lspRouteMatch,
+  lspRouteSemanticTokens,
+  lspRoutes,
+  type LspRouteDeps,
+} from './lsp/routes'
 import {
   applyObservability,
   flushObservability,
@@ -167,6 +173,8 @@ export type AppOptions = FileSystemServiceOptions & {
      * assert `closeApp` killed it. Production always builds its own.
      */
     pool?: LspSessionPool
+    /** Test seam: resolve real matches with an injected process startup function. */
+    resolveServer?: LspRouteDeps['resolveServer']
   }
   /**
    * Required in practice. `settingsPaths` throws `settings.FILE_PATH_UNSET`
@@ -790,7 +798,14 @@ export function createApp(options: AppOptions) {
       ({ query }) => lspRouteSemanticTokens(fs.paths, query, lspSettings(), lspPool),
       { query: lspMatchQuerySchema },
     )
-    .ws('/lsp', lspRoutes(fs, auth, { pool: lspPool, settings: lspSettings }))
+    .ws(
+      '/lsp',
+      lspRoutes(fs, auth, {
+        pool: lspPool,
+        resolveServer: options.lsp?.resolveServer,
+        settings: lspSettings,
+      }),
+    )
     .ws('/terminal', terminal.routes(auth))
     .post('/terminal/restart', ({ body }) => terminal.restart(body), {
       body: terminalRestartInputSchema,

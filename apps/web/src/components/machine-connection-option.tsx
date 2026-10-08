@@ -33,7 +33,7 @@ export function MachineConnectionOption({
         <span className='text-muted-foreground mt-1 block text-xs leading-relaxed font-normal'>
           {kind === 'ssh'
             ? 'Start a server using your SSH config and keys.'
-            : 'Connect to a running Platform server.'}
+            : 'Connect to a running Fregat server.'}
         </span>
       </span>
     </Button>

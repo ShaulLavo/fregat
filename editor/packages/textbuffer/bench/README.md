@@ -1,7 +1,8 @@
-# Singapore vs vscode-textbuffer
+# Singapore vs VS Code vs CodeMirror 6
 
-A reproducible Node comparison of the extracted textbuffer and Microsoft's standalone library.
-This does not benchmark full Monaco, current VS Code, a renderer, or browser input-to-paint latency.
+A reproducible Node comparison of Singapore's text buffer, Microsoft's standalone
+`vscode-textbuffer` and CodeMirror 6's `@codemirror/state` document model.
+This does not benchmark full Monaco, current VS Code, the CodeMirror editor, a renderer, or browser input-to-paint latency.
 No production tree algorithms, tombstones, anchors or line-ending policies are changed here.
 
 ## Run
@@ -17,17 +18,19 @@ bun run bench -- --only random-replacements,ranges-after-churn --samples 3
 ```
 
 `bench:check` builds the package, builds the pinned control and runs Vitest adapter/oracle tests.
-`bench` also rebuilds both implementations, even when invoked directly as `node bench/run.mjs`.
+`bench` also rebuilds Singapore and the vendored VS Code control, even when invoked directly as `node bench/run.mjs`.
 Timing runs use native Node child processes, not Bun's JavaScript engine. Node 24 is used in CI.
 The pinned control's source is vendored in `bench/vscode-textbuffer/`, so preparation needs no network;
 each file's Git blob hash is verified before every build. Compiled output is rebuilt, never trusted from cache.
-No upstream npm dependencies or lifecycle scripts are installed or executed.
+`@codemirror/state` is an exact-version dev dependency installed from the workspace lockfile.
+Its version and installed package/build hashes are recorded beside every result.
+The benchmark uses its published ESM build. Dependency installation stays outside timing.
 
 The package remains independently usable outside the monorepo. Benchmark code uses its package exports,
 not editor-local aliases, shims or a copied Singapore implementation. There are no new runtime dependencies.
 The vendored Microsoft source keeps its unchanged MIT license beside it; lint and formatting skip it so its
 bytes stay identical. Builds go to the ignored `bench/.cache` directory.
-See [upstream.json](upstream.json) for the exact repository commit and all source blob identities.
+See [upstream.json](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/textbuffer/bench/upstream.json) for the exact repository commit and all source blob identities.
 The source revision is deliberately pinned; this is not a moving claim about VS Code's latest internals.
 
 ## Measurement contract
@@ -36,12 +39,17 @@ The source revision is deliberately pinned; this is not a moving claim about VS 
   are valid code-point boundaries; offsets and columns count UTF-16 code units, not bytes or graphemes.
   Read queries may address any UTF-16 boundary. CRLF, lone CR, BOM and unusual terminators are covered
   by normalization/adapter tests, not silently included in one engine's edit timing.
-- The same pre-generated serialized fixture and SHA-256 are handed to both engines. The independent
+- The same pre-generated serialized fixture and SHA-256 are handed to all three engines. The independent
   plain-string model generates final text, line/position answers and historical-text hashes.
   No random generation, string oracle, sorting of results, correctness assertion, process startup,
   compilation, dependency fetching or forced GC happens inside the timer.
 - A sample is one complete workload in a fresh Node process. Standard mode uses 9 samples, each with
-  2 fresh-buffer warmups. Pair order alternates by sample and workload. Setup edits for read workloads
+  2 fresh-buffer warmups. Each workload rotates its starting engine. Order reverses only at
+  three-sample block boundaries, so every complete block puts each engine once in each position.
+  Every six shared samples
+  cover all six orders, with each engine appearing twice in every position. The default nine
+  samples also place each engine three times in every position. Custom sample counts that are
+  multiples of three preserve this balance. Setup edits for read workloads
   are outside the timer; their resulting structure and retained memory remain part of the sample.
 - Natural garbage collection during the operation loop is included. Forced collections before/after
   the region stabilize retained-memory measurements but are not editing latency. There is no per-edit
@@ -67,25 +75,33 @@ These are synthetic traces, not captured user sessions; change seeds and repeat 
 
 The adapters express the same user-observable operations, not necessarily identical primitive calls:
 
-| Operation              | Singapore                                 | vscode-textbuffer                                                            |
-| ---------------------- | ----------------------------------------- | ---------------------------------------------------------------------------- |
-| Load                   | `createPieceTableSnapshot`                | Builder + factory, LF mode                                                   |
-| Replacement            | `applyBatchToPieceTable` with one edit    | delete, then mutable insert                                                  |
-| Batch                  | `applyBatchToPieceTable`                  | Descending-offset loop of delete/insert; no equivalent native batch API here |
-| Line read              | `readPieceTableLine`                      | `getLineContent`                                                             |
-| Offset-range/full read | Native offset-based range/materialization | Two `getPositionAt` calls + `getValueInRange`                                |
-| Coordinates            | Zero-based Point API                      | One-based API translated to zero-based                                       |
+| Operation              | Singapore                                                                    | vscode-textbuffer                             | CodeMirror 6                                          |
+| ---------------------- | ---------------------------------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------- |
+| Load                   | `createPieceTableSnapshot`                                                   | Builder + factory, LF mode                    | `Text.of(text.split('\n'))`                           |
+| Single edit            | Replacement through `applyBatchToPieceTable`; native insert/delete otherwise | Delete, then mutable insert                   | `Text.replace` with inserted `Text`                   |
+| Batch                  | `applyBatchToPieceTable`                                                     | Descending-offset loop of delete/insert       | `ChangeSet.of(edits, length, '\n').apply(doc)`        |
+| Line read              | `readPieceTableLine`                                                         | `getLineContent`                              | `Text.line(row + 1).text`                             |
+| Offset-range/full read | Native offset-based range/materialization                                    | Two `getPositionAt` calls + `getValueInRange` | `Text.sliceString` / `Text.toString`                  |
+| Coordinates            | Zero-based Point API                                                         | One-based API translated to zero-based        | `Text.lineAt` / `Text.line`, translated to zero-based |
 
 Those adapter costs are included and intentional. In particular, the offset-range result cannot be
 attributed exclusively to tree traversal because the VS Code API needs position conversion. Likewise,
 Singapore's `readPieceTableLine` finds the row in one descent but keeps no cache of the last line. Do not present the comparison
 as equal primitive counts, equal caching, or equal semantics for capabilities one side does not offer.
-Original input is delivered as one string chunk to both constructors; streaming ingestion is not measured.
+Original input is delivered as one string to each adapter. CodeMirror splits that string into lines
+inside the load timer, as required by `Text.of`. Streaming ingestion is not measured.
+Single-edit timing includes converting the inserted string to `Text` and replacing the range.
+Batch timing includes constructing one `ChangeSet` from the original-document offsets and applying it
+once, as CodeMirror does for a transaction. All adapters receive the same unsorted edit list.
+No adapter precomputes inserted text, batches, or position answers outside the timed operation.
+CodeMirror keeps only its latest immutable document in shared lanes. These measurements exclude
+`EditorState`, selection mapping, undo history, parsing and rendering in every engine.
 
 ## Persistence, anchors and memory
 
 `persistent-history`, `branch-edits`, `anchor-resolution-after-churn` and `anchor-density` are
-Singapore-only lanes, never assigned a VS Code speed ratio. The branch lane applies one insert on each of 64 branches from the
+Singapore-only lanes, never assigned a control speed ratio. CodeMirror has immutable documents, but this suite does
+not adapt its persistence to Singapore's history, branch and stable-anchor contracts. The branch lane applies one insert on each of 64 branches from the
 same churned root; every branch after the first forks the shared buffer log, which is the copy the
 `fork.copiedArraySlots` counter budgets. Microsoft's read snapshots are not persistent editable versions. The history lane
 retains up to 64 roots while executing the churn trace, verifies every retained text hash, and checks
@@ -111,9 +127,9 @@ performance results are artifacts for review, not a noisy merge gate. Smoke is c
 
 ## Explain the differences
 
-The [profiling contract](PROFILING.md) describes four independent diagnostic passes: CPU sampling,
+The [profiling contract](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/textbuffer/bench/PROFILING.md) describes four independent diagnostic passes: CPU sampling,
 JS-heap allocation sampling, GC events, and structural work counters. These do not enter the clean
-speed-ratio tables. The [initial attribution report](ATTRIBUTION.md) records measured findings and
+speed-ratio tables. The [initial attribution report](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/textbuffer/bench/ATTRIBUTION.md) records measured findings and
 optimization candidates without changing buffer semantics.
 
 ```sh
@@ -124,7 +140,7 @@ bun run bench:profile -- --profile standard --only random-insertions --repeats 2
 
 ## Counter budgets
 
-[budgets.json](budgets.json) holds a ceiling per workload for every structural counter, for the
+[budgets.json](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/textbuffer/bench/budgets.json) holds a ceiling per workload for every structural counter, for the
 smoke and standard profiles at one fixed seed. `bench:check` replays each workload in the
 instrumented build and fails when a count exceeds its ceiling, when a budget names a counter that
 no longer exists, or when a structural counter has no budget. Counts are exact events, so the gate
@@ -138,12 +154,29 @@ node bench/budgets.mjs --write --margin 0.02
 
 ## Tree shape
 
-The [tree height replay](HEIGHT.md) samples height, depth and piece counts of both engines' trees across
+The [tree height replay](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/textbuffer/bench/HEIGHT.md) samples height, depth and piece counts of both engines' trees across
 edit traces and Singapore priority seeds. It is a separate structural replay with no timing.
 
 ```sh
 bun run bench:height -- --profile standard
 ```
+
+## Results and CI
+
+The existing textbuffer workflow runs the three-engine smoke pipeline on pull requests and the
+standard comparison on main pushes and manual runs. Timing has no pass/fail threshold.
+Its summary shows median and whole-workload p95 columns for all three engines, plus separate
+Singapore/control ratios. JSON schema version 2 adds `codemirror` provenance, a `codemirror`
+engine per shared workload and `codemirrorRatio`. The existing `ratio` still means Singapore/VS Code.
+The four Singapore-specific capability lanes retain separate rows with empty control cells.
+Diagnostic profiling and tree-height replays remain two-engine tools; their own reports state
+that scope. They do not contribute timing samples to the three-engine comparison.
+
+Generated Markdown includes the method, date, machine, revisions, seed and warmup/sample counts
+next to its table. Adjacent JSON retains every raw sample, correctness result and fixture identity.
+Local runs are experiments. Publishing a headline number requires a dated result, its raw data,
+the reproduction command, and checks across seeds and machines. This document makes no editor-level
+performance claim.
 
 ## Next measurements
 

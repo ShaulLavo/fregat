@@ -1,6 +1,6 @@
-# Platform TUI
+# Fregat TUI
 
-The TUI connects to the existing Platform server. The Agent view provides prompts, streamed
+The TUI connects to the existing Fregat server. The Agent view provides prompts, streamed
 conversations, session management, models, and approvals. The workbench provides files, terminals,
 Git, search, diagnostics, logs, settings, and address navigation.
 
@@ -128,7 +128,7 @@ or start a session there. The manager remains available after the last session i
 **Discard changes…** shows a separate preview and confirmation. Changed files require a new
 confirmation. Running processes, remaining sessions, and protected checkouts prevent cleanup.
 Cleanup retains branches and commits. **Retain checkout** keeps a blocked checkout; **Release…**
-keeps its files and transfers cleanup responsibility outside Platform. Missing and unclaimed
+keeps its files and transfers cleanup responsibility outside Fregat. Missing and unclaimed
 checkouts have explicit resolution and adoption actions.
 In worktree action and confirmation dialogs, **Page Up** and **Page Down** scroll the details.
 Arrow keys select actions; the selected action stays visible in small terminals.
@@ -187,9 +187,9 @@ With the terminal focused, **Ctrl+K, then N** creates another shell. **Ctrl+K, t
 switches shells, and **Ctrl+K, then W** closes one. The palette also provides copy, paste, and clear.
 Shell input, mouse events, and layout changes reach the server PTY as bytes and resize controls.
 Default Ctrl+C, Ctrl+Z, Tab, and Escape reach the inner program. **F1** opens the palette;
-**Ctrl+K, then Q** quits Platform. Explicit user keybinding overrides remain active.
+**Ctrl+K, then Q** quits Fregat. Explicit user keybinding overrides remain active.
 
-Press **Ctrl+K, then A** to attach the host terminal directly. To return to Platform, press
+Press **Ctrl+K, then A** to attach the host terminal directly. To return to Fregat, press
 **Ctrl+]**, then **d**. Press Ctrl+] twice to send one literal Ctrl+] to the shell. Ctrl+B passes
 through for tmux. Detaching leaves the server shell running. Multiple web and TUI viewers may
 share the same shell, and the most recent resize controls its dimensions.
@@ -237,7 +237,7 @@ A failed connection still writes an error frame and exits 1; a live frame exits 
 mode requires a TTY other than `TERM=dumb`. The supported minimum is 40 columns by 12 rows.
 
 Tests use real in-process Elysia routes, isolated settings/databases, and OpenTUI's native renderer.
-They never open a socket to the Platform server.
+They never open a socket to the Fregat server.
 
 Permanent PTY tests also exercise direct and repository-launcher startup, Ctrl+Z and `fg`, built-in
 editor cancellation, Ctrl+C, SIGTERM, and protection of a shared shell process group. These checks use

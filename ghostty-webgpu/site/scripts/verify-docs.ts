@@ -15,6 +15,7 @@ page.on('pageerror', (error) => errors.push(error.message))
 const paths = [
   '',
   'guides/pty/',
+  'guides/scrollback/',
   'start/quick-start/',
   'start/xterm/',
   'reference/options/',

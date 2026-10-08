@@ -1944,7 +1944,7 @@ class CodexAppServerSession extends SessionContext {
       'runtime.warning',
       {
         message:
-          "This session runs without Platform's tools: your Codex config defines its own MCP server named platform.",
+          "This session runs without Fregat's tools: your Codex config defines its own MCP server named platform.",
       },
       'config/read',
       null,
@@ -1958,7 +1958,7 @@ class CodexAppServerSession extends SessionContext {
         'runtime.warning',
         {
           detail: params,
-          message: `Platform's tools did not start in this session: ${parsed.output.error ?? 'Codex gave no reason'}.`,
+          message: `Fregat's tools did not start in this session: ${parsed.output.error ?? 'Codex gave no reason'}.`,
         },
         'mcpServer/startupStatus/updated',
         params,
@@ -3302,7 +3302,7 @@ async function initializeCodexClient(
       capabilities: { experimentalApi: true },
       clientInfo: {
         name: 'platform',
-        title: 'Platform',
+        title: 'Fregat',
         version: '0.0.0',
       },
     },

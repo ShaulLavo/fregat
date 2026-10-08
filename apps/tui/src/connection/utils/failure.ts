@@ -7,7 +7,7 @@ export function connectionFailure(error: unknown) {
   const detail = rpcErrorPayload(error)
   const code = errorStringField(detail, 'code') ?? 'TUI_CONNECTION_FAILED'
   return {
-    message: errorStringField(detail, 'message') ?? 'Could not reach the Platform server.',
+    message: errorStringField(detail, 'message') ?? 'Could not reach the Fregat server.',
     fix: errorStringField(detail, 'fix') ?? failureFix(code),
     code,
   }

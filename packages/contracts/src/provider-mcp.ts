@@ -15,7 +15,7 @@ export const providerMcpServerNameSchema = v.pipe(
   v.regex(/^[A-Za-z0-9_-]{1,64}$/, 'Use letters, digits, hyphens and underscores (at most 64).'),
   v.check(
     (name) => name.toLowerCase() !== RESERVED_MCP_SERVER_NAME,
-    'The name platform is reserved for Platform’s own tools.',
+    'The name platform is reserved for Fregat’s own tools.',
   ),
 )
 

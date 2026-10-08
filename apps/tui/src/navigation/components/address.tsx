@@ -138,7 +138,7 @@ export function AddressDialog({
         onSubmit={(value) => void open(value)}
         theme={theme}
         disabled={pending}
-        placeholder='Paste a Platform address…'
+        placeholder='Paste a Fregat address…'
       />
       {copy && !pending && !failure && (
         <text fg={theme.mutedForeground}>

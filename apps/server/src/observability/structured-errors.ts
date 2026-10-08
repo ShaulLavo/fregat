@@ -25,7 +25,7 @@ export const orchestrationErrors = defineErrorCatalog('orchestration', {
     message: ({ command, attempts }: { command: string; attempts: number }) =>
       `${command} could not be saved after ${attempts} attempts`,
     why: 'The server could not record which terminal runs this session.',
-    fix: 'Check that the disk has free space and no other Platform server holds the database, then open the terminal again.',
+    fix: 'Check that the disk has free space and no other Fregat server holds the database, then open the terminal again.',
   },
   COMMAND_PREVIOUSLY_REJECTED: {
     status: 409,

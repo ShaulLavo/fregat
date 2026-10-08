@@ -832,3 +832,29 @@ cancelled event streams during navigation. Isolated provider-discovery warnings 
 phone-surfaces records the known fixture-provider update 500s. Earlier WebKit runs crashed in
 WPEWebProcess's compositor with SIGSEGV (coredump PIDs 1075651 and 1077432), with memory available.
 The WebKit phone-surfaces run is incomplete after that host-browser crash. No real provider ran.
+
+## October 2026 issue follow-ups
+
+Status: Approved, retained by [Plan 336 closeout](issue-closeout-2026-10.md).
+These are remaining execution items. Closing their tracker records does not certify a fix
+or change acceptance of an earlier delivered milestone. Each original thread retains its
+full reproduction, comments and historical artifacts. Source links below pin the reviewed
+main revision; recheck them before implementation.
+
+### Issue 896
+
+Source: [#896: WebKit crashes capturing a recovered attachment lightbox on Linux](https://github.com/ShaulLavo/fregat/issues/896), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/896).
+Current owner: [apps/web/src/features/chat/components/chat-image-lightbox.tsx](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/web/src/features/chat/components/chat-image-lightbox.tsx).
+
+Linux Playwright WebKit build 2359 reproducibly SIGSEGVed while screenshotting the recovered attachment lightbox after reload. Picking/uploading worked. The retained WPEWebProcess compositor core had no matching OOM. The scenario now checks the recovered thumbnail without opening the lightbox, which leaves that path unverified. Native iPhone impact is unknown. Preserve the exact Linux recovery/screenshot case and qualify another WebKit environment in a separately authorized lane. This plan does not turn a browser crash into an app defect or authorize Mac crash debugging.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 919
+
+Source: [#919: Unconfirmed: browser dictation misses and misrecognizes words on later attempts](https://github.com/ShaulLavo/fregat/issues/919), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/919#issuecomment-6042551382).
+Current owner: [apps/web/src/features/chat/utils/browser-voice-input.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/web/src/features/chat/utils/browser-voice-input.ts).
+
+On iPhone Safari later dictation attempts omitted or misrecognized words. The owner confirmed missing words never appear in live preview, ruling out the final commit filter as their loss point. Browser versus spoken language was not established. SpeechRecognition/webkitSpeechRecognition uses locale, continuous and interim results; PR #920 repaired readiness status only. Capture real-device event timing, selected locale and result counts across first/later attempts, with a known-good control. Never log speech text or audio. Synthetic events do not establish recognition accuracy.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.

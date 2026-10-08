@@ -25,6 +25,9 @@ work transferred into execution plans, the original issue links, and remaining i
 pass and its verification limits. [August log-audit follow-ups](log-audit-follow-ups.md) retain
 14 historical reports for current reproduction.
 
+[October issue closeout](issue-closeout-2026-10.md) records the Plan 336 tracker migration
+and links each retained failure or experiment to its owning execution plan.
+
 [Wave readiness review](wave-readiness-2026-10-03.md) records the large-program ordering and
 corrected launch dependencies. Upcoming wave order remains in root `PLAN.md`.
 

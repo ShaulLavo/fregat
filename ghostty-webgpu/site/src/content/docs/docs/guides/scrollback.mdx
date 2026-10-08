@@ -7,6 +7,7 @@ sidebar:
 
 import { Code } from '@astrojs/starlight/components'
 import sample from '../../../../examples/history.ts?raw'
+import retention from '../../../../examples/retention.ts?raw'
 
 You will read the last 100 retained rows as text. Start with a live main-thread terminal.
 
@@ -18,7 +19,11 @@ You will read the last 100 retained rows as text. Start with a live main-thread 
 
 ## 2. Choose retention
 
-Set `appearance.scrollbackLimit` for a row budget and `appearance.scrollbackByteLimit` for a byte budget. Retention is page-granular, so the actual row count can vary around the requested limit. Zero disables history. Read `lineCount` for the current count.
+`appearance.scrollbackLimit` budgets physical history rows, excluding the active screen. Ghostty prunes whole pages and permits at least one standard page of rows. Small values, including `scrollbackLimit: 0`, can therefore retain history. Pages that overlap the active screen stay whole, and page capacity depends on terminal width, styles and graphemes.
+
+`appearance.scrollbackByteLimit` budgets logical page allocations, including the active area. A positive value is raised to Ghostty's minimum allocation for the active area plus one extra page. `scrollbackByteLimit: 0` erases retained history and disables further scrollback. Both budgets apply independently; the first reached triggers pruning. Read `lineCount` for the current history plus active rows.
+
+<Code code={retention} lang='ts' title='retention.ts' />
 
 A single `readLines` call returns at most 1,024 rows. Paginate larger reads by advancing by the number returned. Writes, eviction and reflow between calls can shift row indices. Use a paused producer when you need a stable export.
 

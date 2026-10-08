@@ -341,8 +341,8 @@ test('a stale managed server with an older checkout is refused by the launch scr
   const error = remoteFailure('launch', launched.stderr, launched.exitCode)
   expect(error).toMatchObject({
     code: 'machines.SSH_PROTOCOL',
-    message: `The remote server speaks protocol ${expected - 1}, and this Platform needs protocol ${expected}.`,
-    fix: `Update the Platform checkout at ${await realpath(remoteRoot)} to this server’s version, run bun install there, then Retry.`,
+    message: `The remote server speaks protocol ${expected - 1}, and this Fregat needs protocol ${expected}.`,
+    fix: `Update the Fregat checkout at ${await realpath(remoteRoot)} to this server’s version, run bun install there, then Retry.`,
   })
   expect(error.internal).toEqual({
     expected,
@@ -392,7 +392,7 @@ test('a stale external server is refused and left running', async ({ remoteRoot 
   const error = remoteFailure('launch', launched.stderr, launched.exitCode)
   expect(error).toMatchObject({
     code: 'machines.SSH_PROTOCOL',
-    fix: `Restart the Platform server on remote port ${external.record.port} from a checkout at this server’s version, then Retry.`,
+    fix: `Restart the Fregat server on remote port ${external.record.port} from a checkout at this server’s version, then Retry.`,
   })
   expect(error.internal).toMatchObject({ kind: 'external', running: expected - 1 })
   expect(external.child.exitCode).toBeNull()

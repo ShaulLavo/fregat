@@ -45,6 +45,53 @@ test('pending changesets target versioned workspace manifests', async () => {
   await expectPublicChangesets(checkout)
 })
 
+test('versions the current pending changesets offline in a disposable workspace', async () => {
+  const rootManifest = JSON.parse(await readFile(join(checkout, 'package.json'), 'utf8'))
+  const patterns = rootManifest.workspaces.packages
+  const pending = await readChangesets(checkout)
+  await withWorkspace(async ({ root, put, read }) => {
+    await put('', { name: rootManifest.name, private: true, workspaces: patterns })
+    await writeFile(join(root, 'bun.lock'), await readFile(join(checkout, 'bun.lock')))
+    const packages = new Map()
+    for (const pattern of patterns) {
+      for await (const file of new Glob(`${pattern}/package.json`).scan({ cwd: checkout })) {
+        const manifest = JSON.parse(await readFile(join(checkout, file), 'utf8'))
+        await put(dirname(file), manifest)
+        packages.set(manifest.name, { directory: dirname(file), manifest })
+      }
+    }
+    await symlink(join(checkout, 'node_modules'), join(root, 'node_modules'), 'junction')
+    await mkdir(join(root, '.changeset'))
+    await writeFile(
+      join(root, '.changeset/config.json'),
+      await readFile(join(checkout, '.changeset/config.json')),
+    )
+    for (const { id } of pending) {
+      const file = `.changeset/${id}.md`
+      await writeFile(join(root, file), await readFile(join(checkout, file)))
+    }
+    const result = spawnSync(
+      'node',
+      [join(checkout, 'node_modules/@changesets/cli/bin.js'), 'version'],
+      { cwd: root, encoding: 'utf8', env: { ...process.env, GITHUB_TOKEN: '' } },
+    )
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
+    expect(await readChangesets(root)).toEqual([])
+    for (const { releases, summary } of pending) {
+      for (const { name, type } of releases) {
+        expect(type).toBe('patch')
+        const { directory, manifest } = packages.get(name)
+        const after = await read(directory)
+        expect(after.version).not.toBe(manifest.version)
+        expect(after.version.split('.').slice(0, 2)).toEqual(
+          manifest.version.split('.').slice(0, 2),
+        )
+        expect(await readFile(join(root, directory, 'CHANGELOG.md'), 'utf8')).toContain(summary)
+      }
+    }
+  })
+})
+
 test('reports catalog dependencies without dependency-range warnings', async () => {
   await withWorkspace(async ({ root, put }) => {
     await put('', {
