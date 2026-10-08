@@ -44,9 +44,12 @@ The source revision is deliberately pinned; this is not a moving claim about VS 
   No random generation, string oracle, sorting of results, correctness assertion, process startup,
   compilation, dependency fetching or forced GC happens inside the timer.
 - A sample is one complete workload in a fresh Node process. Standard mode uses 9 samples, each with
-  2 fresh-buffer warmups. Engine order rotates and reverses by sample and workload. Every six shared samples
+  2 fresh-buffer warmups. Each workload rotates its starting engine. Order reverses only at
+  three-sample block boundaries, so every complete block puts each engine once in each position.
+  Every six shared samples
   cover all six orders, with each engine appearing twice in every position. The default nine
-  samples also place each engine three times in every position. Setup edits for read workloads
+  samples also place each engine three times in every position. Custom sample counts that are
+  multiples of three preserve this balance. Setup edits for read workloads
   are outside the timer; their resulting structure and retained memory remain part of the sample.
 - Natural garbage collection during the operation loop is included. Forced collections before/after
   the region stabilize retained-memory measurements but are not editing latency. There is no per-edit

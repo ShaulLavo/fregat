@@ -149,6 +149,23 @@ describe('reproducibility and reporting', () => {
         expect(orders.filter((order) => order[position] === engine)).toHaveLength(2)
   })
 
+  it.each(
+    fixtures
+      .map((fixture, workloadIndex) => ({ ...fixture, workloadIndex }))
+      .filter((fixture) => fixture.category !== 'singapore-only'),
+  )('balances every engine position for $name', ({ workloadIndex }) => {
+    for (const samples of [3, 6, 9]) {
+      const orders = Array.from({ length: samples }, (_, sample) =>
+        engineOrder(sample, workloadIndex),
+      )
+      for (const engine of comparisonEngines)
+        for (let position = 0; position < comparisonEngines.length; position += 1)
+          expect(orders.filter((order) => order[position] === engine)).toHaveLength(
+            samples / comparisonEngines.length,
+          )
+    }
+  })
+
   it('prints all controls and keeps capability lanes separate', () => {
     const timeMs = statistics([1, 2, 3])
     const retainedBytes = Object.fromEntries(

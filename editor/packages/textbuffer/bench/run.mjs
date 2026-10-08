@@ -56,10 +56,11 @@ function sourceIdentity() {
   }
 }
 
-export function engineOrder(index) {
+export function engineOrder(sample, workloadIndex = 0) {
+  const index = sample + workloadIndex
   const start = index % comparisonEngines.length
   const order = comparisonEngines.slice(start).concat(comparisonEngines.slice(0, start))
-  return Math.floor(index / comparisonEngines.length) % 2 ? order.reverse() : order
+  return Math.floor(sample / comparisonEngines.length) % 2 ? order.reverse() : order
 }
 
 export function markdown(report) {
@@ -188,7 +189,7 @@ async function main() {
       writeFileSync(filename, encoded)
       const samples = Object.fromEntries(comparisonEngines.map((engine) => [engine, []]))
       for (let sample = 0; sample < options.samples; sample += 1) {
-        let engines = engineOrder(sample + workloadIndex)
+        let engines = engineOrder(sample, workloadIndex)
         if (fixture.category === 'singapore-only') engines = ['singapore']
         for (const engine of engines) {
           const output = execFileSync(
