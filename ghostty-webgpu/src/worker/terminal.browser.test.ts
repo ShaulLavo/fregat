@@ -272,6 +272,7 @@ it.each(['normal', 'held', 'retired-held', 'replacement-held'] as const)(
       await eventually(() => observations.some((value) => value.type === 'layout-held'))
       expect(terminal.hasPendingFrame).toBe(true)
       channel.postMessage('release-layout')
+      await eventually(() => !terminal.hasPendingFrame)
       expect(terminal.hasPendingFrame).toBe(false)
       expect(errors).toEqual([])
       terminate.mockClear()
