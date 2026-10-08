@@ -299,4 +299,20 @@ export const TREE_SITTER_LANGUAGE_METADATA = [
       folds: 'none',
     },
   },
+  {
+    id: 'jsdoc',
+    extensions: [],
+    filenames: [],
+    aliases: [],
+    injectionDependencies: [],
+    capabilities: { highlighting: 'partial', injections: 'none', detection: 'none', folds: 'none' },
+  },
+  {
+    id: 'regex',
+    extensions: [],
+    filenames: [],
+    aliases: [],
+    injectionDependencies: [],
+    capabilities: { highlighting: 'partial', injections: 'none', detection: 'none', folds: 'none' },
+  },
 ] as const

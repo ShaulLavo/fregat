@@ -477,6 +477,42 @@
         "detection": "verified",
         "folds": "none"
       }
+    },
+    {
+      "id": "jsdoc",
+      "extensions": [],
+      "filenames": [],
+      "aliases": [],
+      "wasm": "tree-sitter-jsdoc/tree-sitter-jsdoc.wasm",
+      "queries": {
+        "highlights": ["tree-sitter-jsdoc/queries/highlights.scm"]
+      },
+      "injectionDependencies": [],
+      "source": "tree-sitter-jsdoc",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "none",
+        "detection": "none",
+        "folds": "none"
+      }
+    },
+    {
+      "id": "regex",
+      "extensions": [],
+      "filenames": [],
+      "aliases": [],
+      "wasm": "tree-sitter-regex/tree-sitter-regex.wasm",
+      "queries": {
+        "highlights": ["tree-sitter-regex/queries/highlights.scm"]
+      },
+      "injectionDependencies": [],
+      "source": "tree-sitter-regex",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "none",
+        "detection": "none",
+        "folds": "none"
+      }
     }
   ],
   "sources": {
@@ -713,6 +749,34 @@
       "revision": "f7263d7f7b1593270b348f007c80eddb3916c761",
       "license": "MIT",
       "compiler": "wasi-sdk 34"
+    },
+    "tree-sitter-jsdoc": {
+      "package": "tree-sitter-jsdoc",
+      "version": "0.25.0",
+      "repository": {
+        "url": "git+https://github.com/tree-sitter/tree-sitter-jsdoc.git",
+        "type": "git"
+      },
+      "license": "MIT",
+      "compiler": "upstream artifact; compiler not recorded",
+      "revision": "658d18dcdddb75c760363faa4963427a7c6b52db",
+      "queryRevision": "658d18dcdddb75c760363faa4963427a7c6b52db",
+      "integrity": "sha512-ki7u9WA/AUZyk2ISULzFALL2iMax27O0Bz2O5WtyUkGAfJ97R0dgOSs0Bdf1zUpk6q5cq7bI2hBgJt29WH54Tw==",
+      "tarball": "https://registry.npmjs.org/tree-sitter-jsdoc/-/tree-sitter-jsdoc-0.25.0.tgz"
+    },
+    "tree-sitter-regex": {
+      "package": "tree-sitter-regex",
+      "version": "0.25.0",
+      "repository": {
+        "url": "git+https://github.com/tree-sitter/tree-sitter-regex.git",
+        "type": "git"
+      },
+      "license": "MIT",
+      "compiler": "upstream artifact; compiler not recorded",
+      "revision": "b2ac15e27fce703d2f37a79ccd94a5c0cbe9720b",
+      "queryRevision": "b2ac15e27fce703d2f37a79ccd94a5c0cbe9720b",
+      "integrity": "sha512-Xf3KU+LOfCS6djfIzEHdVlq4ITinLNfVy7LkWqFr0R4ZG1SGV2u/HS4ct+TNwuLTPfU9EA/tQZnbJ/KLtgljgQ==",
+      "tarball": "https://registry.npmjs.org/tree-sitter-regex/-/tree-sitter-regex-0.25.0.tgz"
     }
   },
   "captureMappings": {
@@ -732,7 +796,8 @@
     "error": "tag.error",
     "text.strike": "text.literal",
     "text.underline": "text.reference",
-    "storageclass": "keyword.storage"
+    "storageclass": "keyword.storage",
+    "character.special": "string.special"
   },
   "transparentCaptures": {
     "none": "Retain raw Markdown fence captures without painting a parent style over injections.",
