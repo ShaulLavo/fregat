@@ -52,6 +52,7 @@
     "test:server": "bun --bun vitest run --config vitest.server.config.ts"
   },
   "dependencies": {
+    "@noble/hashes": "2.4.0",
     "@singapore-editor/collab": "workspace:*"
   },
   "devDependencies": {
