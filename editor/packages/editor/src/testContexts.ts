@@ -99,6 +99,7 @@ export function createTestViewContributionContext(
     getSnapshot: () => missing('getSnapshot'),
     getDocumentContributions: () => null,
     requestViewUpdate: () => undefined,
+    authorEdits: () => noDisposal,
     onDidTransaction: () => noDisposal,
     reconcile: () => undefined,
     onDidType: () => noDisposal,

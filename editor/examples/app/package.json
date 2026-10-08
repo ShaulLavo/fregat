@@ -24,7 +24,9 @@
     "@singapore-editor/spellcheck": "workspace:*",
     "@singapore-editor/textbuffer": "workspace:*",
     "@singapore-editor/tree-sitter-languages": "workspace:*",
-    "@singapore-editor/typescript-lsp": "workspace:*"
+    "@singapore-editor/typescript-lsp": "workspace:*",
+    "@singapore-editor/collaboration": "workspace:*",
+    "@singapore-editor/collab": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

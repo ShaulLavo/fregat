@@ -20,6 +20,12 @@ export {
   type Message,
 } from './protocol'
 
+export { CollaborationDocument, type CollaborationDocumentOptions } from './document'
+export {
+  createCollaborationPlugin,
+  type CollaborationPluginOptions,
+  type CollaborationConnection,
+} from './plugin'
 export {
   Presence,
   parsePresence,

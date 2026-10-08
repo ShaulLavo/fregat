@@ -157,6 +157,22 @@ export class Participant<Snapshot = unknown> {
     this.publish()
   }
 
+  /** Installs a verified branch while retaining authored pending work and local undo. */
+  install(base: Snapshot, messages: readonly HostMessage[]): void {
+    this.confirmed = base
+    this.sequence = 0
+    this.frontier.clear()
+    this.rejected.clear()
+    this.incoming.clear()
+    if (messages.length) {
+      this.receive(messages)
+      return
+    }
+    this.options.engine.restore(base)
+    this.replay()
+    this.publish()
+  }
+
   private confirm(message: HostMessage): void {
     const id = message.status === 'accepted' ? message.envelope.id : message.id
     this.pending = this.pending.filter((envelope) => editKey(envelope.id) !== editKey(id))

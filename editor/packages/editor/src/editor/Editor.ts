@@ -1,3 +1,4 @@
+import { projectReconciliationEdits } from '../reconciliation'
 import { acquireEditorDocumentAnalysis, type EditorDocumentAnalysis } from './documentAnalysis'
 import { normalizeGutterLeadingInset } from '../virtualization/virtualizedTextViewHelpers'
 import { captureJumpLocation, JumpHistory, type JumpLocation, type JumpCause } from './jumpHistory'
@@ -12,6 +13,7 @@ import {
   type DocumentSession,
   type DocumentSessionChange,
   type DocumentSessionReconcileOptions,
+  type DocumentEditAuthor,
   type EditorTextTransaction,
   type EditorBufferSession,
   type EditorTextBufferChange,
@@ -150,7 +152,6 @@ import { normalizeTabSize } from '../displayTransforms'
 import type { InjectedTextRow } from '../displayTransforms'
 import {
   anchorAt,
-  applyBatchToPieceTable,
   offsetToPoint,
   type PieceTableAnchor,
   type PieceTableSnapshot,
@@ -1847,6 +1848,13 @@ export class Editor {
         this.pendingTransactions.length = 0
       },
     })
+  }
+
+  authorEdits(author: DocumentEditAuthor): EditorDisposable {
+    this.ensureAnonymousSession()
+    const session = this.getBufferSession()
+    if (!session) throw new TypeError('edit author requires a document')
+    return this.claimForContribution(session.buffer.setEditAuthor(author))
   }
 
   reconcile(
@@ -3565,6 +3573,7 @@ export class Editor {
       getSnapshot: () => this.createViewSnapshot(),
       getDocumentContributions: () => this.analysis?.contributions ?? null,
       requestViewUpdate: () => this.requestViewUpdate(owner()),
+      authorEdits: (author) => this.claimedBy(claims, () => this.authorEdits(author)),
       onDidTransaction: (listener) => this.claimedBy(claims, () => this.onDidTransaction(listener)),
       reconcile: (base, batches, options) => this.reconcile(base, batches, options),
       onDidType: (listener) => this.claimedBy(claims, () => this.addTypedTextListener(listener)),
@@ -3665,7 +3674,10 @@ export class Editor {
     if (this.trackedAnchors.size === 0) return
     // Project on the old identity space first to retain deletion and edge bias,
     // then transplant surviving positions onto the independently supplied base.
-    const projected = applyBatchToPieceTable(event.textSnapshotBefore.snapshot, event.change.edits)
+    const projected = projectReconciliationEdits(
+      event.textSnapshotBefore.snapshot,
+      event.change.edits,
+    )
     for (const reference of this.trackedAnchors) {
       const tracked = reference.deref()
       if (!tracked) {

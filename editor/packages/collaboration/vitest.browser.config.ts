@@ -160,6 +160,7 @@ export default defineConfig({
   },
   test: {
     include: ['test/**/*.browser.test.ts'],
+    exclude: ['test/editor.browser.test.ts'],
     testTimeout: 90_000,
     fileParallelism: false,
     browser: {

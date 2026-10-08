@@ -30,6 +30,7 @@ import type { TextEdit } from './tokens'
 import type {
   DocumentSessionApplyEditsOptions,
   DocumentSessionReconcileOptions,
+  DocumentEditAuthor,
   EditorTextTransaction,
 } from './documentSession'
 import type { PieceTableSnapshot } from '@singapore-editor/textbuffer'
@@ -152,7 +153,7 @@ export type EditorViewScope = {
   handle(
     command: EditorAnyCommandId | EditorContributedCommandDeclaration,
     run: EditorCommandHandler,
-  ): void
+  ): EditorDisposable
   getSelections(): readonly EditorResolvedSelection[]
   /** One atomic batch; options choose history and origin, and selection may be one range per caret. */
   applyEdits(
@@ -160,6 +161,8 @@ export type EditorViewScope = {
     selection?: EditorSelectionRange | readonly EditorSelectionRange[],
     options?: DocumentSessionApplyEditsOptions,
   ): void
+  /** Owns local snapshot authoring for this document; confirmations use reconcile. */
+  authorEdits(author: DocumentEditAuthor): EditorDisposable
   /** Exact authored transactions. Reconciliation publishes content without creating an authored edit. */
   onDidTransaction(listener: (event: EditorTextTransaction) => void): EditorDisposable
   reconcile(
@@ -408,12 +411,11 @@ function createScopeContribution(
       if (input) scope.watch(input, (next) => provided.set(next))
     },
     handle: (command, run) =>
-      void owned.add(
-        context.registerCommand(typeof command === 'string' ? command : command.id, run),
-      ),
+      owned.add(context.registerCommand(typeof command === 'string' ? command : command.id, run)),
     getSelections: () => context.getSelections(),
     applyEdits: (edits, selection, options) =>
       context.applyEdits(edits, 'editor.plugin.applyEdits', selection, options),
+    authorEdits: (author) => owned.add(context.authorEdits(author)),
     onDidTransaction: (listener) => owned.add(context.onDidTransaction(listener)),
     reconcile: (base, batches, options) => context.reconcile(base, batches, options),
     textGate: (accepts) => void owned.add(context.registerTextGate(accepts)),

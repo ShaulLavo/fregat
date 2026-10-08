@@ -222,7 +222,14 @@ export type EditorHistoryGraph = {
   readonly barrier: EditorHistoryBarrier | null
 }
 
+/** Supplies authored identities before native input mutates an identity-enabled document. */
+export type DocumentEditAuthor = (
+  before: PieceTableSnapshot,
+  edits: readonly TextEdit[],
+) => PieceTableSnapshot
+
 export type EditorTextBuffer = {
+  setEditAuthor(author: DocumentEditAuthor): { dispose(): void }
   getStorageMaintenanceStats(): Readonly<TextStorageMaintenanceStats>
   applyText(
     selections: SelectionSet<PieceTableAnchor>,
@@ -655,6 +662,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     action: 'editor.buffer.lease_listener_failed',
   })
   private readonly editChain = new DocumentEditChain(0, 0)
+  private applyLocalEdits: DocumentEditAuthor = applyBatchToPieceTable
   private history: DocumentHistory
   private cleanSnapshot: PieceTableSnapshot
   private dirtyCacheSnapshot: PieceTableSnapshot
@@ -685,6 +693,17 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     this.tooLargeForHeapOperation = exceedsHeapOperationBudget(snapshot.length)
   }
 
+  public setEditAuthor(author: DocumentEditAuthor): { dispose(): void } {
+    if (this.applyLocalEdits !== applyBatchToPieceTable)
+      throw new TypeError('document already has an edit author')
+    this.applyLocalEdits = author
+    return {
+      dispose: () => {
+        if (this.applyLocalEdits === author) this.applyLocalEdits = applyBatchToPieceTable
+      },
+    }
+  }
+
   public applyText(
     selections: SelectionSet<PieceTableAnchor>,
     rawText: string,
@@ -700,7 +719,12 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
       return appendTiming(this.createChange('none', []), 'session.applyText', start)
     }
 
-    const result = applyTextToSelections(this.history.current, selections, text)
+    const result = applyTextToSelections(
+      this.history.current,
+      selections,
+      text,
+      this.applyLocalEdits,
+    )
     return appendTiming(
       this.commitEdit(result.snapshot, result.selections, result.edits, {
         history: 'record',
@@ -722,7 +746,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     if (this.mutationLease) {
       return appendTiming(this.createChange('none', []), 'session.indentSelection', start)
     }
-    const result = indentSelections(this.history.current, selections, text)
+    const result = indentSelections(this.history.current, selections, text, this.applyLocalEdits)
     return appendTiming(
       this.commitEdit(result.snapshot, result.selections, result.edits, {
         history: 'record',
@@ -744,7 +768,12 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     if (this.mutationLease) {
       return appendTiming(this.createChange('none', []), 'session.outdentSelection', start)
     }
-    const result = outdentSelections(this.history.current, selections, tabSize)
+    const result = outdentSelections(
+      this.history.current,
+      selections,
+      tabSize,
+      this.applyLocalEdits,
+    )
     return appendTiming(
       this.commitEdit(result.snapshot, result.selections, result.edits, {
         history: 'record',
@@ -767,6 +796,13 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     if (this.mutationLease) {
       return appendTiming(this.createChange('none', []), 'session.applyEdits', start)
     }
+    if (
+      options.origin &&
+      options.origin !== 'local' &&
+      options.origin !== 'view' &&
+      this.applyLocalEdits !== applyBatchToPieceTable
+    )
+      throw new TypeError('authored documents require reconcile for non-local updates')
     const normalizedEdits = normalizeTextEdits(edits)
     if (normalizedEdits.length === 0) {
       return appendTiming(this.createChange('none', []), 'session.applyEdits', start)
@@ -777,7 +813,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     // undo inversion, incremental re-render, decoration remapping, the LSP's
     // copy of the document — has to be told what actually happened.
     const appliedEdits = snapBatchEditRanges(this.history.current, normalizedEdits)
-    const nextSnapshot = applyBatchToPieceTable(this.history.current, appliedEdits)
+    const nextSnapshot = this.applyLocalEdits(this.history.current, appliedEdits)
     const effectiveEdits = appliedEdits.filter(isEffectiveTextEdit)
     if (effectiveEdits.length === 0) {
       return appendTiming(this.createChange('none', []), 'session.applyEdits', start)
@@ -860,7 +896,12 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     if (this.mutationLease) {
       return appendTiming(this.createChange('none', []), 'session.backspace', start)
     }
-    const result = backspaceSelections(this.history.current, selections, tabSize)
+    const result = backspaceSelections(
+      this.history.current,
+      selections,
+      tabSize,
+      this.applyLocalEdits,
+    )
     return appendTiming(
       this.commitEdit(result.snapshot, result.selections, result.edits, {
         history: 'record',
@@ -881,7 +922,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     if (this.mutationLease) {
       return appendTiming(this.createChange('none', []), 'session.delete', start)
     }
-    const result = deleteSelections(this.history.current, selections)
+    const result = deleteSelections(this.history.current, selections, this.applyLocalEdits)
     return appendTiming(
       this.commitEdit(result.snapshot, result.selections, result.edits, {
         history: 'record',
@@ -1721,7 +1762,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
       edits,
       options.metadata,
     )
-    if (options.history === 'record') {
+    if (options.history === 'record' && this.applyLocalEdits === applyBatchToPieceTable) {
       this.commitRecordedEdit(snapshot, selections, edits, options, transaction)
     } else {
       this.history = replaceEditorHistoryState(this.history, snapshot, selections)
