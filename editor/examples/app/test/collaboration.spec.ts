@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
 test('participants, hosts and the final peer can leave the example', async ({ page }) => {
   const errors: string[] = []
@@ -104,9 +104,7 @@ test('failed setup releases its intervals, channels and editor before retry', as
   await expect(page.locator('.peer-header span').filter({ hasText: '2 peers' })).toHaveCount(2)
 })
 
-test('connection errors are replaced and cleared after the session recovers', async ({
-  page,
-}, testInfo) => {
+async function failingBroadcastExample(page: Page) {
   await page.clock.install()
   await page.addInitScript(() => {
     const heartbeat = new Set<() => void>()
@@ -115,17 +113,24 @@ test('connection errors are replaced and cleared after the session recovers', as
       if (timeout === 500 && typeof handler === 'function') heartbeat.add(() => handler(...args))
       return interval(handler, timeout, ...args)
     }) as typeof setInterval
-    let failure: string | undefined
+    const failures = new Map<number, string>()
+    let nextChannel = 0
     const Channel = window.BroadcastChannel
     window.BroadcastChannel = class extends Channel {
+      private readonly index = nextChannel++
       override postMessage(message: unknown) {
+        const failure = failures.get(this.index)
         if (failure) throw new TypeError(failure)
         super.postMessage(message)
       }
     }
     Object.assign(window, {
-      failBroadcast(message: string | undefined) {
-        failure = message
+      failBroadcast(message: string | undefined, index?: number) {
+        for (let channel = 0; channel < nextChannel; channel++) {
+          if (index !== undefined && index !== channel) continue
+          if (message) failures.set(channel, message)
+          else failures.delete(channel)
+        }
         for (const announce of heartbeat) announce()
       },
     })
@@ -134,19 +139,44 @@ test('connection errors are replaced and cleared after the session recovers', as
   await page.locator('#start').click()
   await expect(page.locator('.peer-header span').filter({ hasText: '2 peers' })).toHaveCount(2)
   await page.clock.pauseAt(new Date(Date.now() + 1000))
+  return (message: string | undefined, index?: number) =>
+    page.evaluate(
+      ({ error, channel }) => {
+        const control = window as unknown as {
+          failBroadcast(message: string | undefined, index?: number): void
+        }
+        control.failBroadcast(error, channel)
+      },
+      { error: message, channel: index },
+    )
+}
+
+test('a connection error persists while its transport still fails', async ({ page }) => {
+  const failBroadcast = await failingBroadcastExample(page)
   const status = page.locator('#status')
-  await expect(status).toContainText('Session ready')
-  const failBroadcast = (message: string | undefined) =>
-    page.evaluate((error) => {
-      ;(window as unknown as { failBroadcast(message: string | undefined): void }).failBroadcast(
-        error,
-      )
-    }, message)
-  await failBroadcast('Peer connection stopped')
-  await expect(status).toHaveText('Peer connection stopped')
   await failBroadcast('Data channel failed')
   await expect(status).toHaveText('Data channel failed')
-  await failBroadcast(undefined)
+  await page.clock.runFor(100)
+  await expect(status).toHaveText('Data channel failed')
+  await page.clock.runFor(1000)
+  await expect(status).toHaveText('Data channel failed')
+})
+
+test('connection errors are replaced and cleared only as their transports recover', async ({
+  page,
+}, testInfo) => {
+  const failBroadcast = await failingBroadcastExample(page)
+  const status = page.locator('#status')
+  await failBroadcast('Peer connection stopped')
+  await expect(status).toHaveText('Peer connection stopped')
+  await failBroadcast('Data channel failed', 0)
+  await expect(status).toHaveText('Data channel failed')
+  await failBroadcast(undefined, 0)
+  await expect(status).toHaveText('Peer connection stopped')
+  await page.clock.runFor(100)
+  await expect(status).toHaveText('Peer connection stopped')
+  await failBroadcast(undefined, 1)
+  await expect(status).toHaveText('Session ready. Share the invitation link to add peers.')
   await page
     .locator('.peer')
     .filter({ has: page.locator('span', { hasText: 'Ordering host' }) })
