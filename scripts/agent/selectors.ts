@@ -1255,6 +1255,9 @@ export const selectors = {
       .locator('[role="treeitem"][aria-level="2"]'),
   pendingChord: (page: Page) => page.locator('[data-slot="keymap-pending"]'),
   editorSurface: (page: Page) => page.locator('.editor-virtualized-viewport'),
+  editorLineNumberSelector:
+    '.editor-virtualized-gutter-row:not([hidden]) .editor-virtualized-line-number',
+  editorLineNumbers: (page: Page) => page.locator(selectors.editorLineNumberSelector),
   editorFindInput: (page: Page) => page.getByRole('textbox', { name: 'Find', exact: true }),
   editorFindCount: (page: Page) => page.locator('.editor-find-count'),
   editorFindWidget: (page: Page) => page.locator('.editor-find-widget'),

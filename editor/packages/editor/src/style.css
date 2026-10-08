@@ -159,7 +159,8 @@
      the spacer's size depend on every mounted row's text, which disqualifies
      rows as relayout boundaries and forces document-rooted layout on every
      recycle frame. */
-  contain: layout paint style;
+  /* Remapped rows can lie beyond the capped spacer height; the viewport clips their paint. */
+  contain: layout style;
   position: relative;
 }
 

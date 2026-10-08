@@ -19,9 +19,10 @@ bash scripts/product-sites/build.sh /path/to/new-output-directory
 ```
 
 The output directory must be new. The build runs the workspace library builds, builds Fregat's
-landing page and fixture demo, builds Singapore at `/singapore/`, and builds ghostty-webgpu at
-`/ghostty-webgpu/`. Until `editor/site/package.json` exists, Singapore uses `editor/examples/app`.
-`SITE_ORIGIN` sets the production Astro origin. The existing Pages workflow keeps its defaults.
+landing page and fixture demo, builds Singapore's documentation from `editor/site` at
+`/singapore/`, and keeps the repository editor from `editor/examples/app` at `/singapore/demo/`.
+It builds ghostty-webgpu at `/ghostty-webgpu/`. `SITE_ORIGIN` sets the production Astro origin.
+The existing Pages workflow keeps its defaults.
 
 `.github/workflows/product-sites.yml` runs on main pushes affecting site sources, imported
 library sources, build configuration or manifests, and on manual dispatch from main. Test-only

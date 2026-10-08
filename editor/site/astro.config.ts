@@ -32,6 +32,7 @@ const references = packages.map((entry) => {
 })
 
 export default defineConfig({
+  site: process.env.SITE_ORIGIN,
   trailingSlash: 'always',
   vite: {
     // The native Markdown binding resolves from its installed package directory.
