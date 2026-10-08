@@ -7,11 +7,13 @@ export function ToolbarButton({
   disabled = false,
   label,
   onClick,
+  size = 'icon-xs',
 }: {
   children: ReactNode
   disabled?: boolean
   label: string
   onClick?: () => void
+  size?: 'icon-xs' | 'icon-sm'
 }) {
   return (
     <Tooltip>
@@ -23,7 +25,7 @@ export function ToolbarButton({
             disabled={disabled}
             focusableWhenDisabled
             onClick={onClick}
-            size='icon-xs'
+            size={size}
             type='button'
             variant='ghost'
           />
