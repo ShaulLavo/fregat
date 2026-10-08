@@ -2,7 +2,8 @@
  * Light or dark. The page follows `prefers-color-scheme` until the reader picks one; the inline
  * script in the layout applies a stored pick before first paint.
  */
-const KEY = 'singapore-theme'
+// Shared with Starlight's theme picker, so one choice holds on every page.
+const KEY = 'starlight-theme'
 const root = document.documentElement
 const system = matchMedia('(prefers-color-scheme: dark)')
 const listeners = new Set<() => void>()
