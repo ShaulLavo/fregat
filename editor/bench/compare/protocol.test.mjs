@@ -186,3 +186,95 @@ test('geometry rejects an unconstrained scroll viewport and unbounded row pool',
   geometry.renderedRows = 50
   assert.doesNotThrow(() => verifyGeometry({ geometry }))
 })
+
+test('resume rejects changed served editor assets with unchanged source provenance', async () => {
+  const { readServedBuilds, verifyResume } = await import('./provenance.mjs')
+  const { mkdtemp, mkdir, writeFile, readFile, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { resolve } = await import('node:path')
+  const directory = await mkdtemp(resolve(tmpdir(), 'singapore-build-provenance-'))
+  try {
+    const ids = editors.flatMap((editor) =>
+      ['core', 'typescript'].map((mode) => `${editor}-${mode}`),
+    )
+    for (const id of ids) {
+      await mkdir(resolve(directory, id, 'assets'), { recursive: true })
+      for (const file of ['index.html', 'entry.js', 'assets/worker.js', 'assets/style.css'])
+        await writeFile(resolve(directory, id, file), `${id}: ${file}`)
+    }
+    const recorded = {
+      git: 'unchanged-head',
+      benchmarkSha256: 'unchanged-harness',
+      rootLockSha256: 'unchanged-lock',
+      versions: { singapore: '0.2.6' },
+      builds: await readServedBuilds(directory),
+      bundles: [{ id: 'minimal', files: [{ sha256: 'unchanged-minimal' }] }],
+    }
+    assert.doesNotThrow(() => verifyResume(recorded, structuredClone(recorded)))
+    for (const file of [
+      'singapore-typescript/assets/worker.js',
+      'monaco-typescript/entry.js',
+      'codemirror-typescript/index.html',
+      'singapore-core/assets/style.css',
+    ]) {
+      const path = resolve(directory, file)
+      const original = await readFile(path)
+      await writeFile(path, 'changed product build from dirty source')
+      const current = { ...recorded, builds: await readServedBuilds(directory) }
+      assert.throws(() => verifyResume(recorded, current), /Resume differs in builds/)
+      await writeFile(path, original)
+    }
+    const extra = resolve(directory, 'singapore-typescript/assets/new.wasm')
+    await writeFile(extra, 'new lazy grammar')
+    const added = { ...recorded, builds: await readServedBuilds(directory) }
+    assert.throws(() => verifyResume(recorded, added), /Resume differs in builds/)
+    await rm(extra)
+    assert.throws(
+      () => verifyResume({ ...recorded, builds: undefined }, recorded),
+      /requires recorded/,
+    )
+    assert.throws(() => verifyResume({ ...recorded, builds: [] }, recorded), /requires recorded/)
+    assert.throws(() => verifyResume(recorded, { ...recorded, bundles: [] }), /differs in bundles/)
+    await rm(resolve(directory, 'singapore-typescript/entry.js'))
+    await assert.rejects(readServedBuilds(directory), /Incomplete served build/)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('positive control rejects missing, failed, unmatched and nonfinite observations', async () => {
+  const { verifyControl } = await import('./verify-control.mjs')
+  const { readFile } = await import('node:fs/promises')
+  const { gunzipSync } = await import('node:zlib')
+  const evidence = new URL('../../docs/performance/browser-compare-2026-10-08/', import.meta.url)
+  const baseline = JSON.parse(gunzipSync(await readFile(new URL('pilot.json.gz', evidence))))
+  const control = JSON.parse(gunzipSync(await readFile(new URL('control-120.json.gz', evidence))))
+  assert.equal(verifyControl(baseline, control).length, 3)
+  for (const samples of [
+    [],
+    baseline.samples.map((row) => ({ ...row, status: 'failed' })),
+    baseline.samples.map((row) => ({ ...row, mib: 50 })),
+    baseline.samples.filter((row) => row.editor !== 'singapore'),
+  ])
+    assert.throws(() => verifyControl({ ...baseline, samples }, control), /baseline observations/)
+  const missingLocation = structuredClone(baseline)
+  missingLocation.samples[0].typing.end.raw = []
+  assert.throws(() => verifyControl(missingLocation, control), /baseline observations/)
+  const extraFixture = structuredClone(control)
+  extraFixture.samples.push({ ...extraFixture.samples[0], mib: 50 })
+  assert.throws(() => verifyControl(baseline, extraFixture), /baseline observations.*50 MiB/)
+  for (const value of [NaN, Infinity, undefined]) {
+    const invalid = structuredClone(baseline)
+    invalid.samples[0].typing.end.raw[0].mutationMs = value
+    assert.throws(() => verifyControl(invalid, control), /Nonfinite baseline observations/)
+    const invalidControl = structuredClone(control)
+    invalidControl.samples[0].typing.middle.raw[0].mutationMs = value
+    assert.throws(() => verifyControl(baseline, invalidControl), /Nonfinite control observations/)
+  }
+  assert.throws(() => verifyControl(baseline, { ...control, samples: [] }), /control observations/)
+  const failedControl = {
+    ...control,
+    samples: control.samples.map((row) => ({ ...row, status: 'failed' })),
+  }
+  assert.throws(() => verifyControl(baseline, failedControl), /control observations/)
+})

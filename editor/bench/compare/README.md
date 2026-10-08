@@ -55,7 +55,11 @@ milliseconds, including open, heap collection, typing and scroll. The default
 is 60,000 ms. A timeout closes the browser and starts a new one for the next
 sample. Failures remain in the JSON. If a host stops the overall process, rerun
 with `--resume` and the same options to continue missing sample identities. The
-runner rejects changed source, browser, machine or configuration. Completed
+runner rejects changed source, browser, machine, configuration or served-build hashes.
+It hashes every file in all six served editor builds, including HTML, CSS, workers
+and lazy assets, and also compares the minimal-bundle manifest. This detects rebuilt
+product code even when Git HEAD, package versions and lockfiles stay unchanged.
+Earlier runs without recorded served-build hashes cannot resume. Completed
 failures remain recorded and are never silently replaced. The largest successful size is a bound on
 this scan, not an absolute limit for an editor.
 
@@ -90,8 +94,11 @@ files below Chromium's DevTools message-size limit.
   then visible syntax readiness to another two callbacks. The first number
   is a frame opportunity after mount. The second includes visible syntax
   startup. Readiness checks nonempty CSS Highlight ranges in Singapore,
-  colored token spans in Monaco and language spans in CodeMirror. It does
-  not require parsing the entire file in every editor.
+  colored token spans in Monaco and language spans in CodeMirror. Singapore
+  must finish its initial full-document parse before querying viewport tokens;
+  Monaco and CodeMirror can highlight the viewport first. The highlighted-open
+  row compares user-visible startup, with different prerequisite work. It is
+  not a like-for-like full-document highlighting or parser-speed comparison.
 - Typing sends trusted Playwright `q` presses at the end and `z` presses in the middle. A capture
   listener reads the key event timestamp for the clock; a MutationObserver waits for document length
   to grow; two subsequent animation-frame callbacks end it. Each sample
@@ -101,6 +108,9 @@ files below Chromium's DevTools message-size limit.
   Event Timing entries with the browser's minimum 16 ms threshold remain in
   the raw samples, including processing timestamps. Keys below that
   threshold have no Event Timing record.
+- Highlight readiness is checked at initial open. Later typing and scrolling
+  keep TypeScript enabled but do not wait for completed highlighting in newly
+  visited viewports or after each edit.
 - Scroll advances 200 px per frame for 120 frames, about 1,200 text lines.
   CDP captures main-thread script, microtask, event, layout, style and paint
   spans. The reducer clips them to each measured frame and unions overlaps

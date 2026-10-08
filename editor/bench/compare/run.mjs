@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process'
 import { parseArgs } from 'node:util'
 import { chromium } from 'playwright'
 import { root, output } from './build.mjs'
+import { readServedBuilds, verifyResume } from './provenance.mjs'
 import {
   fixtureIdentity,
   order,
@@ -47,6 +48,7 @@ if (
 )
   throw new RangeError('Use positive integer counts and fixture sizes from 1,10,50,100,200')
 await mkdir(values.output, { recursive: true })
+const builds = await readServedBuilds(output)
 const server = createServer(async (request, response) => {
   const path = resolve(output, `.${new URL(request.url, 'http://localhost').pathname}`)
   if (!path.startsWith(`${output}/`)) {
@@ -130,6 +132,7 @@ let results = {
             'monaco.js',
             'codemirror.js',
             'protocol.mjs',
+            'provenance.mjs',
             'run.mjs',
             'summarize.mjs',
             'verify-control.mjs',
@@ -154,6 +157,7 @@ let results = {
     deviceScaleFactor: 1,
   },
   fixtures: selected.map(fixtureIdentity),
+  builds,
   bundles: JSON.parse(await readFile(resolve(output, 'bundles.json'), 'utf8')),
   samples: [],
 }
@@ -355,18 +359,7 @@ async function sample(editor, mib, repetition) {
 try {
   if (values.resume) {
     const previous = JSON.parse(await readFile(resolve(values.output, 'experiment.json'), 'utf8'))
-    for (const key of [
-      'browser',
-      'tooling',
-      'versions',
-      'rootLockSha256',
-      'benchmarkSha256',
-      'config',
-      'machine',
-    ]) {
-      if (JSON.stringify(previous[key]) !== JSON.stringify(results[key]))
-        throw new RangeError(`Resume differs in ${key}`)
-    }
+    verifyResume(previous, results)
     previous.resumedAt = [...(previous.resumedAt ?? []), results.date]
     results = previous
   }
