@@ -4,6 +4,8 @@ import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
+  // This config resolves editor source; transport tests resolve its built package.
+  cacheDir: resolve(import.meta.dirname, 'node_modules/.vite-editor'),
   resolve: {
     alias: {
       '@singapore-editor/core/editor': resolve(import.meta.dirname, '../editor/src/editor.ts'),
