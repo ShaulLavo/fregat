@@ -254,6 +254,19 @@ export const createEmptySyntaxResult = (
   tokens: [],
 })
 
+export function syntaxResultCoversRange(
+  result: EditorSyntaxResult,
+  range?: EditorSyntaxRange | null,
+): boolean {
+  const analysis = result.projection.analysis
+  if (analysis?.kind === 'cancelled' || result.degraded?.kind === 'range-unavailable') return false
+  if (!range || !analysis) return true
+  return (
+    analysis.coveredRange.startIndex <= range.startIndex &&
+    analysis.coveredRange.endIndex >= range.endIndex
+  )
+}
+
 export const isEditorSyntaxLanguage = (
   languageId: string | null | undefined,
 ): languageId is EditorSyntaxLanguageId => {

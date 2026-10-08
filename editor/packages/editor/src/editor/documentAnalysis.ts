@@ -26,6 +26,7 @@ import {
 } from '../syntax/providerTheme'
 import {
   createEmptySyntaxResult,
+  syntaxResultCoversRange,
   type EditorSyntaxProvider,
   type EditorSyntaxSession,
   type EditorSyntaxRuntime,
@@ -1138,7 +1139,7 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
         queried = true
         return this.structuralSession.queryRange?.(range, signal) ?? this.current()
       }).then((result) => {
-        if (queried && this.canAdmitRange(key, pending)) {
+        if (queried && syntaxResultCoversRange(result, range) && this.canAdmitRange(key, pending)) {
           this.resultOrigins.set(result, {
             snapshot: pending.snapshot,
             point,

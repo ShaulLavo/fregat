@@ -17,12 +17,13 @@ it('keeps provisional paint after a budget cancellation and retries retained ran
     registry.registerLanguage(contribution)
   const query = backend.queryRange.bind(backend)
   let cancelled = false
+  let retryEnabled = false
   let calls = 0
   let runtime: TreeSitterSyntaxSession | undefined
   backend.queryRange = async (payload, signal) => {
     calls++
     const result = await query(payload, signal)
-    if (!result || result.analysis?.kind !== 'full' || cancelled) return result
+    if (!result || result.analysis?.kind !== 'full' || retryEnabled) return result
     cancelled = true
     return {
       ...result,
@@ -86,6 +87,7 @@ it('keeps provisional paint after a budget cancellation and retries retained ran
     expect(runtime?.canQueryRange()).toBe(true)
     expect(runtime?.getResult().projection.analysis?.kind).toBe('full')
     await page.screenshot({ element: host, path: 'viewport-cancellation-retained.png' })
+    retryEnabled = true
     const before = calls
     const recovered = await editor['syntax']['retainedSyntax']!.queryRange({
       startIndex: 0,

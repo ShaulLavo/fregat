@@ -19,7 +19,7 @@ import type {
   EditorPluginHost,
 } from '../plugins'
 import type { EditorHighlightResult, EditorHighlighterSession } from '../syntax/highlighter'
-import { createEmptySyntaxResult } from '../syntax/session'
+import { createEmptySyntaxResult, syntaxResultCoversRange } from '../syntax/session'
 import type {
   BracketInfo,
   EditorSyntaxCapture,
@@ -1523,7 +1523,8 @@ export class EditorSyntaxController {
     configurationGeneration: number,
   ): boolean {
     const session = this.options.getSession()
-    if (loadResult.skipApply) return false
+    if (loadResult.skipApply || !syntaxResultCoversRange(loadResult.result, loadResult.range))
+      return false
     if (!session || documentVersion !== this.options.getDocumentVersion()) return false
     if (configurationGeneration !== this.initialHighlightConfigurationGeneration) return false
     if (loadResult.contentVersion !== this.syntaxContentVersion) return false
