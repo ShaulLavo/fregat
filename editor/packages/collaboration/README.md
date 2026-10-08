@@ -36,6 +36,12 @@ presence.dispose()
 
 [Integration guide](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/collaboration/docs/integration.md)
 
+## Connection lifecycle
+
+`Session.disconnect(peer)` records loss of the last transport path. Membership and presence remain during `suspicionTimeout`; caller-driven `Session.tick(now)` evicts the peer when that deadline passes. `Session.connect(peer)` cancels pending eviction and refreshes local presence. `Session.retire(peer)` and received `LEAVE` messages remove presence immediately and fence the departed incarnation.
+
+Custom `PresenceObserver` implementations receive `connected()` when a new or restored link becomes available. Attached `Presence` instances use it to republish current selections or offline removals with a fresh clock. Removed peers retain their clock floors so delayed messages cannot restore old carets.
+
 ## TURN verification
 
 The browser suite skips its TURN-only case until `COLLABORATION_TEST_TURN` contains an

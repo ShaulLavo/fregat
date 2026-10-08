@@ -7,6 +7,57 @@ import { fail } from './errors.mjs'
 
 const manifestName = 'package-set.json'
 const digest = (value) => createHash('sha256').update(value).digest('hex')
+// Vite's production browser build also enables import and default during export resolution.
+const browserConditions = new Set(['browser', 'module', 'production', 'import', 'default'])
+
+function exportEntries(exports) {
+  if (typeof exports === 'string' || Array.isArray(exports)) return [['.', exports]]
+  if (!exports || typeof exports !== 'object') fail('Invalid frozen package exports')
+  const keys = Object.keys(exports)
+  if (keys.every((key) => !key.startsWith('.'))) return [['.', exports]]
+  if (keys.some((key) => !key.startsWith('.'))) fail('Mixed frozen export conditions and subpaths')
+  return Object.entries(exports)
+}
+
+function browserExport(target) {
+  if (typeof target === 'string' || target === null) return target
+  if (Array.isArray(target)) {
+    for (const candidate of target) {
+      const entry = browserExport(candidate)
+      if (typeof entry === 'string') return entry
+    }
+    return undefined
+  }
+  if (typeof target !== 'object') fail('Invalid frozen export target')
+  for (const [condition, candidate] of Object.entries(target)) {
+    if (!browserConditions.has(condition)) continue
+    const entry = browserExport(candidate)
+    if (entry !== undefined) return entry
+  }
+  return undefined
+}
+
+function frozenAlias(specifier, replacement, reason) {
+  const escaped = specifier
+    .split('*')
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('([^?#]*)')
+  const alias = {
+    // Leave Vite's asset queries on the replacement while matching the complete export name.
+    find: new RegExp(`^${escaped}(?=$|[?#])`),
+    replacement: replacement.replaceAll('*', '$1'),
+  }
+  if (reason) alias.reason = reason
+  return alias
+}
+
+function exportOrder(left, right) {
+  const leftPattern = left.specifier.indexOf('*')
+  const rightPattern = right.specifier.indexOf('*')
+  if (leftPattern < 0) return rightPattern < 0 ? 0 : -1
+  if (rightPattern < 0) return 1
+  return rightPattern - leftPattern || right.specifier.length - left.specifier.length
+}
 
 async function hashDirectory(directory) {
   const hash = createHash('sha256')
@@ -24,7 +75,10 @@ async function hashDirectory(directory) {
 
 async function inspectPackage(directory, folder) {
   const manifest = JSON.parse(await readFile(resolve(directory, 'package.json'), 'utf8'))
-  if (!manifest.name?.startsWith('@singapore-editor/') || !manifest.exports?.['.'])
+  if (
+    !manifest.name?.startsWith('@singapore-editor/') ||
+    !exportEntries(manifest.exports).some(([subpath]) => subpath === '.')
+  )
     fail(`Editor package requires its public exports: ${folder}`)
   const require = createRequire(resolve(directory, 'package.json'))
   const links = Object.fromEntries(
@@ -188,7 +242,8 @@ export async function loadPackageSet(path) {
     JSON.stringify(manifest.packages.map((entry) => entry.folder).sort())
   )
     fail('Frozen package set membership changed')
-  const aliases = []
+  const aliasEntries = []
+  const skippedExports = []
   for (const expected of manifest.packages) {
     const packageDirectory = resolve(directory, expected.folder)
     const actual = await inspectPackage(packageDirectory, expected.folder)
@@ -196,30 +251,26 @@ export async function loadPackageSet(path) {
       if (actual[key] !== expected[key]) fail(`Frozen package ${expected.name} changed ${key}`)
     if (JSON.stringify(actual.links) !== JSON.stringify(expected.links))
       fail(`Frozen package ${expected.name} resolves its dependencies elsewhere`)
-    for (const [subpath, target] of Object.entries(expected.exports)) {
-      const entry = typeof target === 'string' ? target : (target.import ?? target.default)
-      if (typeof entry !== 'string' || !entry.startsWith('./dist/'))
+    for (const [subpath, target] of exportEntries(actual.exports)) {
+      const entry = browserExport(target)
+      const specifier = expected.name + (subpath === '.' ? '' : subpath.slice(1))
+      if (entry == null) {
+        const reason = `No target for ${[...browserConditions].join(', ')} conditions`
+        skippedExports.push({ specifier, reason })
+        aliasEntries.push({ specifier, alias: frozenAlias(specifier, specifier, reason) })
+        continue
+      }
+      if (!entry.startsWith('./dist/'))
         fail(`Unsupported frozen export: ${expected.name}${subpath}`)
       const replacement = resolve(packageDirectory, entry)
       if (!replacement.startsWith(resolve(packageDirectory, 'dist') + sep))
         fail('Frozen export escapes dist')
-      const specifier = expected.name + (subpath === '.' ? '' : subpath.slice(1))
-      if (subpath.includes('*')) {
-        const escaped = specifier
-          .split('*')
-          .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-          .join('(.+)')
-        aliases.push({
-          find: new RegExp(`^${escaped}$`),
-          replacement: replacement.replace('*', '$1'),
-        })
-        continue
-      }
-      if (!(await stat(replacement)).isFile()) fail(`Missing frozen export: ${specifier}`)
-      aliases.push({ find: specifier, replacement })
+      if (!subpath.includes('*') && !(await stat(replacement)).isFile())
+        fail(`Missing frozen export: ${specifier}`)
+      aliasEntries.push({ specifier, alias: frozenAlias(specifier, replacement) })
     }
   }
-  aliases.sort((left, right) => String(right.find).length - String(left.find).length)
+  const aliases = aliasEntries.sort(exportOrder).map(({ alias }) => alias)
   const external = await externalReceipt(
     directory,
     manifest.packages.map((entry) => entry.folder),
@@ -240,6 +291,7 @@ export async function loadPackageSet(path) {
   return {
     directory,
     aliases,
+    skippedExports,
     manifest,
     externalHash: external.sha256,
     sourceHash: digest(
@@ -270,6 +322,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       sourceHash: set.sourceHash,
       buildHash: set.buildHash,
       packages: set.manifest.packages.length,
+      skippedExports: set.skippedExports,
     }),
   )
 }

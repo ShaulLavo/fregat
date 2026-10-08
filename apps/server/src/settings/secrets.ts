@@ -1,4 +1,4 @@
-import { REDACTED_SETTINGS_VALUE } from '@workspace/contracts'
+import { type CollaborationSecretRef, REDACTED_SETTINGS_VALUE } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
 import {
   discardStagedSettingsFile,
@@ -26,7 +26,7 @@ export const PROXY_USAGE_MANAGEMENT_KEY_REF = 'usage.cliproxy.management'
 /** A secret the server generates for itself and never hands to a client. */
 export type ServerSecretRef = typeof VAPID_PRIVATE_KEY_REF | typeof PROXY_USAGE_MANAGEMENT_KEY_REF
 
-export type SecretRef = ProviderSecretRef | ServerSecretRef
+export type SecretRef = ProviderSecretRef | ServerSecretRef | CollaborationSecretRef
 
 export type SecretWriteOutcome = 'committed' | 'unchanged' | 'revision-mismatch'
 

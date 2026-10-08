@@ -5,7 +5,7 @@ import { WebSocketSignaling } from '../src/signaling'
 
 const encoder = new TextEncoder()
 
-test('signaling opens one socket per distinct configured URL', () => {
+test('signaling opens one socket per distinct configured URL', async () => {
   const urls: string[] = []
   const offered: string[][] = []
   vi.stubGlobal(
@@ -21,16 +21,138 @@ test('signaling opens one socket per distinct configured URL', () => {
   const signaling = new WebSocketSignaling({
     urls: ['ws://localhost:12345', 'ws://localhost:12345'],
     room: crypto.randomUUID(),
-    credentials: { protocols: ['private-token', 'singapore-collaboration'] },
+    credentials: { protocols: () => ['private-token', 'singapore-collaboration'] },
     reconnectInterval: 100,
     onError: vi.fn(),
   })
   try {
     signaling.start(vi.fn(), vi.fn())
-    expect(urls).toEqual(['ws://localhost:12345'])
+    await vi.waitFor(() => expect(urls).toEqual(['ws://localhost:12345']))
     expect(offered).toEqual([['singapore-collaboration', 'private-token']])
   } finally {
     signaling.close()
+    vi.unstubAllGlobals()
+  }
+})
+
+test('signaling requests renewed credentials before each reconnect', async () => {
+  vi.useFakeTimers()
+  const sockets: Socket[] = []
+  class Socket {
+    onclose?: () => void
+    constructor(
+      _url: string,
+      readonly protocols: readonly string[],
+    ) {
+      sockets.push(this)
+    }
+    close() {
+      this.onclose?.()
+    }
+  }
+  vi.stubGlobal('WebSocket', Socket)
+  let token = 'initial-admission'
+  const credentials = vi.fn(() => [token])
+  const signaling = new WebSocketSignaling({
+    urls: ['ws://localhost:12345'],
+    room: crypto.randomUUID(),
+    credentials: { protocols: credentials },
+    reconnectInterval: 100,
+    onError: vi.fn(),
+  })
+  try {
+    signaling.start(vi.fn(), vi.fn())
+    await vi.advanceTimersByTimeAsync(0)
+    expect(sockets[0]?.protocols).toEqual(['singapore-collaboration', 'initial-admission'])
+    token = 'renewed-admission'
+    sockets[0]!.close()
+    await vi.advanceTimersByTimeAsync(100)
+    expect(sockets[1]?.protocols).toEqual(['singapore-collaboration', 'renewed-admission'])
+    expect(credentials).toHaveBeenCalledTimes(2)
+  } finally {
+    signaling.close()
+    expect(vi.getTimerCount()).toBe(0)
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  }
+})
+
+test('closing signaling cancels pending credentials and ignores their late result', async () => {
+  const socket = vi.fn()
+  vi.stubGlobal(
+    'WebSocket',
+    class Socket {
+      constructor() {
+        socket()
+      }
+    },
+  )
+  let complete!: (protocols: readonly string[]) => void
+  let pendingSignal!: AbortSignal
+  const signaling = new WebSocketSignaling({
+    urls: ['ws://localhost:12345'],
+    room: crypto.randomUUID(),
+    credentials: {
+      protocols: (signal) => {
+        pendingSignal = signal
+        return new Promise((resolve) => {
+          complete = resolve
+        })
+      },
+    },
+    reconnectInterval: 100,
+    onError: vi.fn(),
+  })
+  try {
+    signaling.start(vi.fn(), vi.fn())
+    signaling.close()
+    expect(pendingSignal.aborted).toBe(true)
+    complete(['late-admission'])
+    await Promise.resolve()
+    expect(socket).not.toHaveBeenCalled()
+  } finally {
+    signaling.close()
+    vi.unstubAllGlobals()
+  }
+})
+
+test('signaling retries a failed credential request before opening a socket', async () => {
+  vi.useFakeTimers()
+  const socket = vi.fn()
+  vi.stubGlobal(
+    'WebSocket',
+    class Socket {
+      constructor() {
+        socket()
+      }
+      close() {}
+    },
+  )
+  const failure = new TypeError('Credential storage unavailable')
+  const credentials = vi
+    .fn()
+    .mockRejectedValueOnce(failure)
+    .mockResolvedValue(['renewed-admission'])
+  const onError = vi.fn()
+  const signaling = new WebSocketSignaling({
+    urls: ['ws://localhost:12345'],
+    room: crypto.randomUUID(),
+    credentials: { protocols: credentials },
+    reconnectInterval: 100,
+    onError,
+  })
+  try {
+    signaling.start(vi.fn(), vi.fn())
+    await vi.advanceTimersByTimeAsync(0)
+    expect(socket).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledWith(failure)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(socket).toHaveBeenCalledTimes(1)
+    expect(credentials).toHaveBeenCalledTimes(2)
+  } finally {
+    signaling.close()
+    expect(vi.getTimerCount()).toBe(0)
+    vi.useRealTimers()
     vi.unstubAllGlobals()
   }
 })

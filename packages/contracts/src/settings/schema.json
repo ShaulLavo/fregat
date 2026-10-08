@@ -517,6 +517,68 @@
       "minLength": 1,
       "type": "string"
     },
+    "editor.collaboration.colour": {
+      "anyOf": [
+        {
+          "const": ""
+        },
+        {
+          "pattern": "^#[\\da-fA-F]{6}$",
+          "type": "string"
+        }
+      ],
+      "default": "",
+      "description": "The colour editing peers see on your cursor and selection. Enter a six-digit hex colour such as #5684ff."
+    },
+    "editor.collaboration.displayName": {
+      "default": "",
+      "description": "The name editing peers see beside your cursor and selection. Enter a printable name of up to 128 characters.",
+      "maxLength": 128,
+      "type": "string"
+    },
+    "editor.collaboration.iceServers": {
+      "default": [],
+      "description": "STUN and TURN servers used to connect editing peers. Each object supplies urls as a URI or list of URIs. TURN usernames and passwords come from the secret store. An empty list leaves collaboration unavailable.",
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "urls": {
+            "anyOf": [
+              {
+                "items": {
+                  "pattern": "^(?:stuns?:|turns?:)(?:[a-zA-Z\\d](?:[a-zA-Z\\d.-]*[a-zA-Z\\d])?|\\[[a-fA-F\\d:]+\\])(?::\\d{1,5})?(?:\\?transport=(?:udp|tcp))?$",
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "pattern": "^(?:stuns?:|turns?:)(?:[a-zA-Z\\d](?:[a-zA-Z\\d.-]*[a-zA-Z\\d])?|\\[[a-fA-F\\d:]+\\])(?::\\d{1,5})?(?:\\?transport=(?:udp|tcp))?$",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "required": ["urls"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "editor.collaboration.signalingUrls": {
+      "default": [],
+      "description": "WebSocket broker URLs used to discover editing peers. Configure ws or wss URLs with a host and path. An empty list leaves collaboration unavailable.",
+      "items": {
+        "format": "uri",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "editor.collaboration.transportPolicy": {
+      "default": "all",
+      "description": "Choose direct and relay connections, or require every WebRTC connection to use a configured TURN relay.",
+      "enum": ["all", "relay-only"],
+      "type": "string"
+    },
     "editor.decode.mode": {
       "default": "off",
       "description": "Animate a file as it opens, as if it were being written.",

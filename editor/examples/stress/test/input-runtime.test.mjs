@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import * as runtime from '../input-runtime.mjs'
 import { inputSourceIdentity } from '../input-identity.mjs'
+import { freezePackageSet } from '../package-set.mjs'
 
 const roots = []
 afterEach(async () => {
@@ -40,6 +41,98 @@ async function executionFixture() {
   }
   return { root, stress }
 }
+
+async function exportRuntimeFixture(exports) {
+  const root = await mkdtemp(join(tmpdir(), 'input-export-runtime-'))
+  roots.push(root)
+  const core = join(root, 'source/core')
+  await write(
+    join(core, 'package.json'),
+    JSON.stringify({ name: '@singapore-editor/core', version: '0.0.0', exports }),
+  )
+  await write(join(core, 'src/index.ts'), 'export const value = 1')
+  for (const file of ['index.js', 'feature.js', 'server.js', 'server/private.js'])
+    await write(join(core, 'dist', file), 'export const value = "browser-export"')
+  const set = await freezePackageSet(join(root, 'source'), join(root, 'frozen'), {
+    commit: 'fixture',
+  })
+  const buildImport = (specifier, name, worker = false) => {
+    const imported = `import { value } from '${specifier}'; globalThis.value = value`
+    const sources = [
+      {
+        path: 'examples/stress/index.html',
+        bytes: Buffer.from('<script type="module" src="/src/browser.js"></script>'),
+      },
+      {
+        path: 'examples/stress/src/browser.js',
+        bytes: Buffer.from(
+          worker
+            ? 'new Worker(new URL("./worker.js", import.meta.url), { type: "module" })'
+            : imported,
+        ),
+      },
+    ]
+    if (worker)
+      sources.push({ path: 'examples/stress/src/worker.js', bytes: Buffer.from(imported) })
+    return runtime.buildInputRuntime(
+      set,
+      join(root, name),
+      root,
+      { fixtures: [] },
+      {
+        ...inputSourceIdentity(sources, 'external'),
+        sources,
+        receipt: { packages: [] },
+      },
+    )
+  }
+  return { set, buildImport }
+}
+
+test.each([
+  { subpath: './server', imported: 'server', worker: false },
+  { subpath: './server', imported: 'server', worker: true },
+  { subpath: './server', imported: 'server?import', worker: false },
+  { subpath: './server/*', imported: 'server/private', worker: false },
+])(
+  'runtime builds reject a skipped export covered by a wildcard: %j',
+  async (example) => {
+    const { set, buildImport } = await exportRuntimeFixture({
+      '.': './dist/index.js',
+      './*': './dist/*.js',
+      [example.subpath]: { bun: './server/signaling.ts' },
+    })
+    const suffix = example.imported.includes('?') ? '?import' : ''
+    const valid = await buildImport(
+      `@singapore-editor/core/feature${suffix}`,
+      'valid',
+      example.worker,
+    )
+    expect(valid.runtimeGraph.escaped).toEqual([])
+    const specifier = `@singapore-editor/core/${example.imported}`
+    await expect(buildImport(specifier, 'skipped', example.worker)).rejects.toThrow(
+      `Skipped frozen export: ${specifier}. ${set.skippedExports[0].reason}`,
+    )
+  },
+  30_000,
+)
+
+test.each([
+  { subpath: './server/private', imported: 'server/private' },
+  { subpath: './server/public/*', imported: 'server/public/feature' },
+])(
+  'a more specific browser export wins over a skipped wildcard: %j',
+  async (example) => {
+    const { buildImport } = await exportRuntimeFixture({
+      '.': './dist/index.js',
+      './server/*': { bun: './server/signaling.ts' },
+      [example.subpath]: './dist/feature.js',
+    })
+    const valid = await buildImport(`@singapore-editor/core/${example.imported}`, 'specific')
+    expect(valid.runtimeGraph.escaped).toEqual([])
+  },
+  30_000,
+)
 
 test('actual instrument covers the browser launcher and bundler execution trees', async () => {
   const instrument = await runtime.inputInstrument()
@@ -95,7 +188,7 @@ test('both real builds use captured harness bytes after the live source changes'
   }
   const directory = join(root, 'packages')
   await write(join(directory, 'package-set.json'), JSON.stringify({ packages: [] }))
-  const packageSet = { directory, aliases: {}, manifest: { external: { packages: [] } } }
+  const packageSet = { directory, aliases: [], manifest: { external: { packages: [] } } }
   for (const side of ['baseline', 'candidate']) {
     await writeFile(live, `document.body.dataset.instrument = '${side}-changed-instrument'`)
     const output = join(root, side)

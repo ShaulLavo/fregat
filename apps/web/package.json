@@ -52,6 +52,7 @@
     "@lexical/react": "^0.51.0",
     "@lexical/text": "^0.51.0",
     "@phosphor-icons/react": "^2.1.10",
+    "@singapore-editor/collaboration": "workspace:*",
     "@singapore-editor/core": "workspace:*",
     "@singapore-editor/decode": "workspace:*",
     "@singapore-editor/diff": "workspace:*",
