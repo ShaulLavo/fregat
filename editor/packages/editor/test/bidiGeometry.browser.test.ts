@@ -629,48 +629,55 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')('BiDi geometry brow
     }
   })
 
-  it('keeps long mixed-row visual motion exact when the queried glyph is horizontally clipped', () => {
-    const prefix = 'x'.repeat(40)
-    const text = `${prefix}${BIDI_CORPUS.mixed}${'x'.repeat(40)}`
-    const reference = mountBidiEditor(text, undefined, {}, { width: 1_200 })
-    const clipped = mountBidiEditor(text, undefined, {}, { width: 80 })
-    clipped.container.style.transform = 'translateX(-75px)'
-    const cases = [
-      { offset: prefix.length + 8, affinity: 'before', direction: 'right' },
-      { offset: prefix.length + 8, affinity: 'after', direction: 'left' },
-      { offset: prefix.length + 12, affinity: 'before', direction: 'left' },
-      { offset: prefix.length + 12, affinity: 'after', direction: 'right' },
-    ] as const
-    try {
-      const row = clipped.view.getState().mountedRows[0]!
-      row.element.style.setProperty('translate', '3px 0px', 'important')
-      const scrollLeft = clipped.view.scrollElement.scrollLeft
-      const translate = row.element.style.getPropertyValue('translate')
-      const translatePriority = row.element.style.getPropertyPriority('translate')
-      for (const testCase of cases) {
-        const expected = reference.view.visualHorizontalTarget(
-          testCase.offset,
-          testCase.affinity,
-          testCase.direction,
-        )
-        expect(expected).not.toBeNull()
-        expect(
-          clipped.view.visualHorizontalTarget(
+  it.each(['editor', 'blank document'] as const)(
+    'keeps long mixed-row visual motion exact when the queried glyph is horizontally clipped over %s',
+    (background) => {
+      if (background === 'blank document') {
+        fixture?.dispose()
+        fixture = null
+      }
+      const prefix = 'x'.repeat(40)
+      const text = `${prefix}${BIDI_CORPUS.mixed}${'x'.repeat(40)}`
+      const reference = mountBidiEditor(text, undefined, {}, { width: 1_200 })
+      const clipped = mountBidiEditor(text, undefined, {}, { width: 80 })
+      clipped.container.style.transform = 'translateX(-75px)'
+      const cases = [
+        { offset: prefix.length + 8, affinity: 'before', direction: 'right' },
+        { offset: prefix.length + 8, affinity: 'after', direction: 'left' },
+        { offset: prefix.length + 12, affinity: 'before', direction: 'left' },
+        { offset: prefix.length + 12, affinity: 'after', direction: 'right' },
+      ] as const
+      try {
+        const row = clipped.view.getState().mountedRows[0]!
+        row.element.style.setProperty('translate', '3px 0px', 'important')
+        const scrollLeft = clipped.view.scrollElement.scrollLeft
+        const translate = row.element.style.getPropertyValue('translate')
+        const translatePriority = row.element.style.getPropertyPriority('translate')
+        for (const testCase of cases) {
+          const expected = reference.view.visualHorizontalTarget(
             testCase.offset,
             testCase.affinity,
             testCase.direction,
-          ),
-        ).toEqual(expected)
-      }
+          )
+          expect(expected).not.toBeNull()
+          expect(
+            clipped.view.visualHorizontalTarget(
+              testCase.offset,
+              testCase.affinity,
+              testCase.direction,
+            ),
+          ).toEqual(expected)
+        }
 
-      expect(clipped.view.scrollElement.scrollLeft).toBe(scrollLeft)
-      expect(row.element.style.getPropertyValue('translate')).toBe(translate)
-      expect(row.element.style.getPropertyPriority('translate')).toBe(translatePriority)
-    } finally {
-      reference.dispose()
-      clipped.dispose()
-    }
-  })
+        expect(clipped.view.scrollElement.scrollLeft).toBe(scrollLeft)
+        expect(row.element.style.getPropertyValue('translate')).toBe(translate)
+        expect(row.element.style.getPropertyPriority('translate')).toBe(translatePriority)
+      } finally {
+        reference.dispose()
+        clipped.dispose()
+      }
+    },
+  )
 
   it('crosses Left at the visual edge of a horizontally clipped long mixed prior row', () => {
     const firstLine = `${'x'.repeat(80)} אב`

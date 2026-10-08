@@ -2338,18 +2338,21 @@ function hitTestBidiVisualProbeAtLocalX(
   localX: number,
 ): number | null {
   const point = rowClientPointAtLocalX(row, localX)
-  const hit = hitTestRowOffset(row, point.x, point.y)
-  if (hit !== null) return hit
+  const viewport = bidiVisualProbeViewport(view, point.y)
+  if (viewport === null) return null
 
-  const viewportX = bidiVisualProbeViewportX(view, point.y)
-  if (viewportX === null) return null
-  return hitTestBidiVisualProbeWithTranslatedRow(row, point, viewportX)
+  // Native caret APIs can return a nearby row for a point outside its scrollport.
+  if (point.x >= viewport.left && point.x <= viewport.right) {
+    const hit = hitTestRowOffset(row, point.x, point.y)
+    if (hit !== null) return hit
+  }
+  return hitTestBidiVisualProbeWithTranslatedRow(row, point, (viewport.left + viewport.right) / 2)
 }
 
-function bidiVisualProbeViewportX(
+function bidiVisualProbeViewport(
   view: VirtualizedTextViewInternal,
   clientY: number,
-): number | null {
+): { readonly left: number; readonly right: number } | null {
   const element = view.scrollElement
   const rect = element.getBoundingClientRect()
   const scale = element.offsetWidth > 0 ? rect.width / element.offsetWidth : 1
@@ -2367,7 +2370,7 @@ function bidiVisualProbeViewportX(
     Math.max(viewportLeft, documentViewport.left, gutterRight) + BIDI_VISUAL_PROBE_VIEWPORT_INSET
   const right = Math.min(viewportRight, documentViewport.right) - BIDI_VISUAL_PROBE_VIEWPORT_INSET
   if (right <= left) return null
-  return (left + right) / 2
+  return { left, right }
 }
 
 function bidiVisualProbeDocumentViewport(document: Document): {
