@@ -61,7 +61,15 @@ export function withSettingsWriteCoordinatorSync<T>(
 ): T {
   const canonicalPath = canonicalSettingsPathSync(filePath)
   const coordinator = coordinatorFor(canonicalPath)
-  if (coordinator.held) throw settingsWriteContendedError(0, 0)
+  if (coordinator.held) {
+    throw settingsWriteContendedError(0, 0, {
+      reason: 'coordinator-held',
+      attemptLimit: null,
+      budgetMs: null,
+      elapsedMs: 0,
+      lastRevisionMismatch: null,
+    })
+  }
 
   coordinator.references += 1
   coordinator.held = true

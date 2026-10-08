@@ -74,7 +74,10 @@ async function prepare({ root, put }) {
     name: 'fixture',
     private: true,
     packageManager: 'bun@1.4.2',
-    workspaces: { packages: ['apps/*', 'hotkeys/packages/*'], catalog },
+    workspaces: {
+      packages: ['apps/*', 'hotkeys/packages/*', 'editor/site', 'ghostty-webgpu/site'],
+      catalog,
+    },
   })
   const format = JSON.stringify({ semi: false, singleQuote: true })
   await writeFile(`${root}/.oxfmtrc.json`, format)
@@ -93,6 +96,14 @@ test('checks workspace tools, standalone catalogs and the Astro compiler API', a
     await prepare(fixture)
     await fixture.put('apps/site', {
       name: 'site',
+      devDependencies: { typescript: catalog['typescript-api'] },
+    })
+    await fixture.put('editor/site', {
+      name: 'singapore-editor-site',
+      devDependencies: { typescript: catalog['typescript-api'] },
+    })
+    await fixture.put('ghostty-webgpu/site', {
+      name: 'ghostty-webgpu-site',
       devDependencies: { typescript: catalog['typescript-api'] },
     })
     await fixture.put('hotkeys', {

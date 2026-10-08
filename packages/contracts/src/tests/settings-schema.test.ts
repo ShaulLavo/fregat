@@ -61,14 +61,10 @@ describe('settings JSON Schema', () => {
     const target = path.join(directory, 'schema.json')
     await writeFile(target, '{}\n', 'utf8')
 
-    const result = spawnSync(
-      'bun',
-      ['scripts/generate-settings-schema.ts', '--check', '--target', target],
-      {
-        cwd: path.resolve(import.meta.dirname, '../../../..'),
-        encoding: 'utf8',
-      },
-    )
+    const result = spawnSync('bun', ['run', 'settings:schema:check', '--target', target], {
+      cwd: path.resolve(import.meta.dirname, '../../../..'),
+      encoding: 'utf8',
+    })
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('settings schema is stale')

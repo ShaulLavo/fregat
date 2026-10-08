@@ -38,5 +38,10 @@
     "file": "packages/solid/src/index.ts",
     "function": "readWholeRevision",
     "reason": "Backs Solid's explicitly called materializeFullText accessor, which caches one pair and clears it on disposal."
+  },
+  {
+    "file": "packages/collab/src/textbuffer.ts",
+    "function": "TextbufferEngine.text",
+    "reason": "Explicit whole-document string projection for Host.text, Participant.text/state and subscribed participant views. Identity-native authoring and application read the piece table directly."
   }
 ]

@@ -35,7 +35,11 @@ function expectedVersion(file, name) {
   // Astro and TypeDoc use the JavaScript compiler API; TypeScript 7 supplies the CLI.
   if (
     name === 'typescript' &&
-    ['apps/site/package.json', 'ghostty-webgpu/site/package.json'].includes(file)
+    [
+      'apps/site/package.json',
+      'editor/site/package.json',
+      'ghostty-webgpu/site/package.json',
+    ].includes(file)
   )
     return catalog['typescript-api']
   return catalog[name]

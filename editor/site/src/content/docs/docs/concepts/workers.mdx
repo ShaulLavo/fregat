@@ -1,0 +1,26 @@
+---
+title: Workers
+description: Understand which work leaves the main thread and who owns it.
+sidebar:
+  order: 4
+---
+
+The canonical document stays on the main thread. Workers maintain derived state for parsing, highlighting, minimap drawing, spellcheck and TypeScript language analysis.
+
+## Synchronization
+
+The document integration can transfer immutable source chunks and versioned edit information to a worker. The worker keeps the source it needs and updates its own derived state. A new version identifies which document a response describes.
+
+This keeps expensive parsing and analysis away from the immediate input path. Communication, source retention and result application still have costs. Measure those costs with your integration.
+
+## Owners and lifetime
+
+A worker owner starts its worker, tracks requests and state, and disposes it. Host integrations that supply an owner or shared service must retain it while its consumers need it.
+
+Worker failure handling differs by system. Tree-sitter and Shiki owners can start a fresh generation on the next request after a crash; failed requests are not automatically replayed. Minimap and TypeScript integrations require recreating their affected contribution or transport after failure. See the [worker topology](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/architecture/worker-topology.md) for each owner.
+
+## Platform dependencies
+
+Module workers need valid emitted URLs. Tree-sitter also loads WebAssembly. Minimap drawing uses OffscreenCanvas. SharedArrayBuffer cancellation is optional and used only when the page is cross-origin isolated.
+
+The Bundling and workers guide covers production asset requests and Content Security Policy checks.
