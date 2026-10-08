@@ -17,7 +17,7 @@ import {
   type CharIdSpan,
   type IdentityIndex,
 } from './identityRuns'
-import { extendTailChunk } from './buffers'
+import { bufferSpanAt, extendTailChunk } from './buffers'
 import { ensureValidRange, splitsSurrogatePair } from './reads'
 import { applyReverseIndexChanges, lookupReverseIndex } from './reverseIndex'
 import { createNormalizedSnapshot, createSnapshot, editingEpoch } from './snapshot'
@@ -194,6 +194,16 @@ const mergeRanges = (ranges: readonly PieceVisibilityRange[]): readonly PieceVis
   return merged
 }
 
+const ensureRetainedPayload = (
+  snapshot: PieceTableSnapshot,
+  buffer: PieceBufferId,
+  from: number,
+  to: number,
+): void => {
+  // Prove complete sparse coverage before editing the tree or advancing its epoch.
+  while (from < to) from = Math.min(to, bufferSpanAt(snapshot.buffers, buffer, from).end)
+}
+
 const collectStorageRanges = (
   snapshot: PieceTableSnapshot,
   buffer: PieceBufferId,
@@ -209,6 +219,7 @@ const collectStorageRanges = (
     const piece = found.piece
     const to = Math.min(end, piece.start + piece.length)
     if (piece.visible !== visible) {
+      if (visible) ensureRetainedPayload(snapshot, buffer, from, to)
       const ranges = targets.get(piece.order) ?? []
       ranges.push({ from: from - piece.start, to: to - piece.start, visible })
       targets.set(piece.order, ranges)

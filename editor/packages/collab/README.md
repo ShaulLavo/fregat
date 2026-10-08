@@ -70,8 +70,11 @@ IDs are deduplicated. Snapshots retain provenance, operation states and command 
 alongside the piece table and placement indexes, by reference.
 
 Effect changes visit the affected identity spans and change visibility of retained
-piece-table payloads. They do not allocate replacement IDs or retain a second text
-store. Operation and provenance indexes grow with history; acknowledgement-aware
+piece-table payloads. Each snapshot registers its immutable provenance spans as
+reclamation roots, retaining text reachable by future undo/redo effects. Genuinely
+expired payloads reject the entire effect batch with `expired-character-payload`,
+preserving visibility, operation states and command deduplication. Effect changes
+allocate no replacement IDs and keep text in the piece table. Operation and provenance indexes grow with history; acknowledgement-aware
 compaction remains a separate concern.
 
 ## Checks and bounded performance experiment

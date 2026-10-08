@@ -133,3 +133,21 @@ test.each([false, true])(
     expect(host.submit(undo, 'a')).toEqual(result)
   },
 )
+
+test.each([false, true])(
+  'retained prior snapshots keep immutable provenance roots with transient=%s',
+  (transient) => {
+    const { engine, participant } = setup(transient)
+    const prior = engine.snapshot()
+    participant.local({ offset: 0, deleteCount: 0, text: 'XYZ' })
+    participant.undoManager.undo()
+    expect(engine.text()).toBe('aef')
+    const current = engine.snapshot()
+    expect(collect([prior.buffer, current.buffer]).codeUnits).toBe(0)
+    participant.undoManager.redo()
+    expect(engine.text()).toBe('XYZaef')
+    engine.restore(prior)
+    expect(engine.text()).toBe('aef')
+    expect(collect([prior.buffer]).codeUnits).toBe(0)
+  },
+)

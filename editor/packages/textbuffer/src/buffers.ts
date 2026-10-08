@@ -11,6 +11,7 @@ import { DEFAULT_DOCUMENT_LINE_ENDING, type DocumentLineEnding } from './lineEnd
 import { recordTextBufferDiagnostic } from './diagnostics'
 import { containsSurrogate } from './surrogates'
 import {
+  ReclaimedTextError,
   copyTextRange,
   sparseSpanAt,
   unionTextRanges,
@@ -279,7 +280,7 @@ class PieceBufferChunkView implements PieceBufferChunks {
 
   public chunkText(chunk: number): string {
     const text = this.log.chunks[chunk]!
-    if (typeof text !== 'string') throw new RangeError('piece buffer text reclaimed')
+    if (typeof text !== 'string') throw new ReclaimedTextError()
     if (chunk !== this.size - 1 || text.length === this.tailLength) return text
     // A newer snapshot grew the tail after this one; the extent is the truth.
     return text.slice(0, this.tailLength)

@@ -8,6 +8,8 @@ import {
   locateCharId,
   materializePieceTableFullText,
   retainPieceTableSnapshot,
+  retainCharIdPayloads,
+  ReclaimedTextError,
   setCharIdVisibility,
 } from '@singapore-editor/textbuffer'
 import type { CharIdBoundary, PieceTableSnapshot } from '@singapore-editor/textbuffer'
@@ -15,7 +17,13 @@ import { CollabFailure } from './failure'
 import { ceiling, compareId, floor, get, put } from './run-index'
 import type { Index } from './run-index'
 import { insertionOf, sameChar } from './types'
-import { appliedEffect, initialEffects, recordEffects, setEffectStates } from './textbuffer-effects'
+import {
+  appliedEffect,
+  effectPayloads,
+  initialEffects,
+  recordEffects,
+  setEffectStates,
+} from './textbuffer-effects'
 import type { TextbufferEffects } from './textbuffer-effects'
 import type {
   AuthorContext,
@@ -82,6 +90,7 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
       forks: null,
       roots: run ? { L: [], R: [run.start] } : emptyChildren,
     }
+    this.retainPayloads(this.state)
   }
 
   text(): string {
@@ -112,6 +121,7 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
   }
   restore(snapshot: TextbufferSnapshot): void {
     retainPieceTableSnapshot(snapshot.buffer)
+    this.retainPayloads(snapshot)
     this.state = snapshot
   }
   visibleOffset(id: CharId): number | null {
@@ -159,8 +169,17 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
       if (change.command.actor !== envelope.id.actor || change.command.seq !== envelope.id.seq)
         throw new CollabFailure('invalid-effect-command')
       const result = setEffectStates(saved.effects, envelope.id, change.effects)
-      const buffer = setCharIdVisibility(saved.buffer, result.visibility)
-      this.state = { ...saved, buffer, effects: result.state }
+      let buffer
+      try {
+        buffer = setCharIdVisibility(saved.buffer, result.visibility)
+      } catch (cause) {
+        if (cause instanceof ReclaimedTextError)
+          throw new CollabFailure('expired-character-payload')
+        throw cause
+      }
+      const next = { ...saved, buffer, effects: result.state }
+      this.retainPayloads(next)
+      this.state = next
       return
     }
     const insert = insertionOf(change)
@@ -178,11 +197,17 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
         delete: deletions,
         ...(insert && at ? { insert: { start: insert.start, text: insert.text, at } } : {}),
       })
-      this.state = { ...this.state, buffer, effects }
+      const next = { ...this.state, buffer, effects }
+      this.retainPayloads(next)
+      this.state = next
     } catch (cause) {
       this.state = saved
       throw cause
     }
+  }
+
+  private retainPayloads(snapshot: TextbufferSnapshot): void {
+    retainCharIdPayloads(snapshot.buffer, effectPayloads(snapshot.effects))
   }
 
   private checkRange(offset: number, count: number): void {

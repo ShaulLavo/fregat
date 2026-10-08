@@ -23,6 +23,22 @@ export function initialEffects(span?: IdSpan): TextbufferEffects {
     operations: null,
   }
 }
+/** Every retained provenance span remains addressable by a future effect command. */
+export function effectPayloads(state: TextbufferEffects): Iterable<IdSpan> {
+  const { provenance } = state
+  return {
+    *[Symbol.iterator]() {
+      const stack: Index<Provenance>[] = provenance ? [provenance] : []
+      while (stack.length) {
+        const node = stack.pop()!
+        yield node.value
+        if (node.left) stack.push(node.left)
+        if (node.right) stack.push(node.right)
+      }
+    },
+  }
+}
+
 export function appliedEffect(state: TextbufferEffects, id: EditId): boolean {
   return get(state.operations, operationKey(id)) !== null
 }

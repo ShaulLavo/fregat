@@ -60,6 +60,8 @@ export {
 export type { CreatePieceTableSnapshotOptions } from './snapshot'
 export type { PieceTableBufferOptions } from './buffers'
 export { snapBatchEditRanges } from './edits'
+export { retainCharIdPayloads } from './payloadRetention'
+export { ReclaimedTextError } from './textSpans'
 
 export {
   CharIdAllocator,

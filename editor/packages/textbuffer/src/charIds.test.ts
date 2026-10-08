@@ -24,6 +24,8 @@ import { compactPieceTableTombstones } from './compaction'
 import { reclaimPieceTableText, reclaimSnapshotStorage } from './reclamation'
 import { validatePieceTreeInvariants } from './inspection'
 import { BUFFER_CHUNK_SIZE } from './buffers'
+import { retainCharIdPayloads } from './payloadRetention'
+import { ReclaimedTextError } from './textSpans'
 
 const id = (counter: number, bunch = 'seed:0'): CharId => ({ bunch, counter })
 const make = (text = 'abcd', transient = false) =>
@@ -637,5 +639,22 @@ it.each([false, true])(
     expect(hidden.buffers.lineage.epoch).toBe(epoch)
     expect(locateCharId(hidden, id(0))!.liveness).toBe('live')
     expect(locateCharId(hidden, id(2))!.liveness).toBe('deleted')
+  },
+)
+
+it.each([false, true])(
+  'payload roots retain only reachable hidden spans with transient=%s',
+  (transient) => {
+    const hidden = deleteByCharId(make('abcdef', transient), [{ start: id(1), count: 3 }])
+    retainCharIdPayloads(hidden, [{ start: id(1), count: 1 }])
+    const fork = reclaimPieceTableText(hidden)
+    expect(fork).not.toBe(hidden)
+    expect(text(setCharIdVisibility(fork, [{ start: id(1), count: 1, visible: true }]))).toBe(
+      'abef',
+    )
+    expect(() => setCharIdVisibility(fork, [{ start: id(2), count: 2, visible: true }])).toThrow(
+      ReclaimedTextError,
+    )
+    expect(text(hidden)).toBe('aef')
   },
 )
