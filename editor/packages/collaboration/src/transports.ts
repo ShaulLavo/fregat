@@ -4,7 +4,12 @@ export {
   type SessionEndpoint,
   type TransportKind,
 } from './transport-router'
-export { RoomCrypto, createRoomInvitation, type SealedPacket } from './room-crypto'
+export {
+  RoomCrypto,
+  DuplicatePeerSessionError,
+  createRoomInvitation,
+  type SealedPacket,
+} from './room-crypto'
 export {
   WebSocketSignaling,
   type WebSocketSignalingOptions,

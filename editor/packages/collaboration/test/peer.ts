@@ -67,7 +67,7 @@ function startRTC(): void {
   const signaling = new WebSocketSignaling({
     urls: [configuration.url],
     room: configuration.room,
-    credentials: { protocols: [] },
+    credentials: { protocols: ['fixture-admission'] },
     reconnectInterval: 100,
     onError,
   })

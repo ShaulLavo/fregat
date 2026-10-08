@@ -36,9 +36,17 @@ export function createRoomInvitation(): { readonly room: string; readonly secret
   return { room: crypto.randomUUID(), secret: toBase64(crypto.getRandomValues(new Uint8Array(32))) }
 }
 
+export class DuplicatePeerSessionError extends TypeError {
+  constructor() {
+    super('Duplicate peer-session ID: create a fresh session ID for this tab')
+    this.name = 'DuplicatePeerSessionError'
+  }
+}
+
 export class RoomCrypto {
   private sequence = 0
   private readonly seen = new Map<string, ReplayWindow>()
+  private readonly owned = new Map<string, number>()
   private constructor(
     readonly room: string,
     readonly peer: string,
@@ -73,6 +81,10 @@ export class RoomCrypto {
       sequence: ++this.sequence,
       sentAt: Date.now(),
     }
+    this.prune()
+    if (!this.owned.has(generation) && this.owned.size >= 1024)
+      throw new RangeError('Too many active local connection generations')
+    this.owned.set(generation, header.sentAt)
     const iv = crypto.getRandomValues(new Uint8Array(12))
     const ciphertext = await crypto.subtle.encrypt(
       { name: 'AES-GCM', iv, additionalData: associatedData(header) },
@@ -88,7 +100,7 @@ export class RoomCrypto {
     if (
       !validPacket(input) ||
       input.room !== this.room ||
-      input.sender === this.peer ||
+      (input.sender === this.peer && this.owned.has(input.generation)) ||
       Math.abs(Date.now() - input.sentAt) > PACKET_LIFETIME
     )
       return undefined
@@ -104,6 +116,7 @@ export class RoomCrypto {
         fromBase64(input.ciphertext),
       )
       const payload: unknown = JSON.parse(decoder.decode(bytes))
+      if (input.sender === this.peer) throw new DuplicatePeerSessionError()
       // Decryption can overlap across adapters; check again after the asynchronous boundary.
       if (
         Math.abs(Date.now() - input.sentAt) > PACKET_LIFETIME ||
@@ -111,7 +124,8 @@ export class RoomCrypto {
       )
         return undefined
       return { packet: input, payload }
-    } catch {
+    } catch (error) {
+      if (error instanceof DuplicatePeerSessionError) throw error
       return undefined
     }
   }
@@ -140,6 +154,8 @@ export class RoomCrypto {
   private prune(): void {
     const threshold = Date.now() - PACKET_LIFETIME
     for (const [key, window] of this.seen) if (window.sentAt < threshold) this.seen.delete(key)
+    for (const [generation, sentAt] of this.owned)
+      if (sentAt < threshold) this.owned.delete(generation)
   }
 }
 

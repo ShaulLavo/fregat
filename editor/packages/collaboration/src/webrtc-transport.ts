@@ -1,6 +1,6 @@
 import { frameMessage, FrameReceiver, MESSAGE_LIMIT, sendFrames } from './framing'
 import type { EditEnvelope, Message } from './protocol'
-import { RoomCrypto, sealedPacketSize } from './room-crypto'
+import { DuplicatePeerSessionError, RoomCrypto, sealedPacketSize } from './room-crypto'
 import type { SignalingClient } from './signaling'
 import { TransportRouter } from './transport-router'
 import { prunePeerHistory } from './peer-history'
@@ -45,6 +45,8 @@ type Link = {
 export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
   private readonly links = new Map<string, Link>()
   private readonly pending = new Map<string, AbortController>()
+  private readonly handshakes = new Map<string, { tail: Promise<void>; count: number }>()
+  private handshakeBytes = 0
   private readonly discovered = new Map<
     string,
     { time: number; advertisement?: string; sequence: number }
@@ -80,6 +82,7 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
       throw new RangeError('Connection timeout must exceed the positive announce interval')
     this.unsubscribe = options.router.onChange((peer) => {
       if (options.router.has(peer, 'broadcast')) {
+        this.pending.get(peer)?.abort()
         const link = this.links.get(peer)
         if (link) this.remove(link)
         return
@@ -98,7 +101,10 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
         this.inboundBytes += size
         this.inbound = this.inbound
           .then(() => this.receive(packet))
-          .catch(options.onError)
+          .catch(async (error) => {
+            options.onError(error)
+            if (error instanceof DuplicatePeerSessionError) await this.close()
+          })
           .finally(() => {
             this.inboundBytes -= size
           })
@@ -184,6 +190,7 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
       )
         return
       this.discovered.delete(sender)
+      this.pending.get(sender)?.abort()
       const link = this.links.get(sender)
       if (link) this.remove(link)
       return
@@ -203,6 +210,11 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
       return
     }
     if (payload.to !== this.options.router.identity.peer || this.retired.has(generation)) return
+    // Retain only the SDP dictionary fields accounted for by the per-peer queue.
+    const description: RTCSessionDescriptionInit = {
+      type: payload.description.type,
+      sdp: payload.description.sdp,
+    }
     if (payload.type === 'offer') {
       if (
         sender >= this.options.router.identity.peer ||
@@ -214,33 +226,65 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
       this.latestOffers.set(sender, opened.packet.sequence)
       const existing = this.links.get(sender)
       if (existing?.generation === generation) return
+      this.pending.get(sender)?.abort()
       if (existing) this.remove(existing)
-      const link = await this.create(sender, generation)
-      if (!link) return
-      try {
-        await link.pc.setRemoteDescription(payload.description)
-        await link.pc.setLocalDescription(await link.pc.createAnswer())
-        await gatherIce(link.pc, link.abort.signal)
-        if (this.current(link))
-          this.publish(generation, {
-            type: 'answer',
-            document: this.options.router.identity.document,
-            to: sender,
-            description: link.pc.localDescription!.toJSON(),
-          })
-      } catch (error) {
-        this.fail(link, error)
-      }
+      const sequence = opened.packet.sequence
+      this.enqueue(sender, description, async () => {
+        if (this.latestOffers.get(sender) !== sequence || !this.discovered.has(sender)) return
+        const link = await this.create(sender, generation)
+        if (!link) return
+        try {
+          await link.pc.setRemoteDescription(description)
+          if (!this.current(link)) return
+          await link.pc.setLocalDescription(await link.pc.createAnswer())
+          if (!this.current(link)) return
+          await gatherIce(link.pc, link.abort.signal)
+          if (this.current(link))
+            this.publish(generation, {
+              type: 'answer',
+              document: this.options.router.identity.document,
+              to: sender,
+              description: link.pc.localDescription!.toJSON(),
+            })
+        } catch (error) {
+          this.fail(link, error)
+        }
+      })
       return
     }
     const link = this.links.get(sender)
-    if (!link || link.generation !== generation || link.pc.signalingState !== 'have-local-offer')
-      return
-    try {
-      await link.pc.setRemoteDescription(payload.description)
-    } catch (error) {
-      this.fail(link, error)
-    }
+    if (!link || link.generation !== generation) return
+    this.enqueue(sender, description, async () => {
+      if (!this.current(link) || link.pc.signalingState !== 'have-local-offer') return
+      try {
+        await link.pc.setRemoteDescription(description)
+      } catch (error) {
+        this.fail(link, error)
+      }
+    })
+  }
+
+  private enqueue(
+    peer: string,
+    description: RTCSessionDescriptionInit,
+    work: () => Promise<void>,
+  ): void {
+    const queue = this.handshakes.get(peer) ?? { tail: Promise.resolve(), count: 0 }
+    const size = 2 * (description.sdp?.length ?? 0) + 4096
+    if (queue.count >= 8 || this.handshakeBytes + size > 4 * 1024 * 1024) return
+    this.handshakeBytes += size
+    queue.count++
+    this.handshakes.set(peer, queue)
+    queue.tail = queue.tail
+      .then(() => {
+        if (!this.closed) return work()
+      })
+      .catch(this.options.onError)
+      .finally(() => {
+        this.handshakeBytes -= size
+        queue.count--
+        if (queue.count === 0) this.handshakes.delete(peer)
+      })
   }
 
   private initiate(peer: string): void {
@@ -281,7 +325,12 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
     const credentialTimeout = setTimeout(() => abort.abort(), this.options.connectionTimeout)
     try {
       const credentials = await supplyCredentials(this.options.credentials.turn, peer, abort.signal)
-      if (this.closed || this.options.router.has(peer, 'broadcast') || !this.discovered.has(peer))
+      if (
+        abort.signal.aborted ||
+        this.closed ||
+        this.options.router.has(peer, 'broadcast') ||
+        !this.discovered.has(peer)
+      )
         return undefined
       const pc = new RTCPeerConnection({
         iceServers: [...this.options.iceServers, ...credentials],
@@ -312,9 +361,12 @@ export class WebRTCTransport<E extends EditEnvelope = EditEnvelope> {
           this.fail(link, new TypeError('Peer connection stopped'))
       }
       return link
+    } catch (error) {
+      if (!abort.signal.aborted) throw error
+      return undefined
     } finally {
       clearTimeout(credentialTimeout)
-      this.pending.delete(peer)
+      if (this.pending.get(peer) === abort) this.pending.delete(peer)
     }
   }
 

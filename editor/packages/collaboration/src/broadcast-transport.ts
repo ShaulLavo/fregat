@@ -1,6 +1,6 @@
 import type { EditEnvelope, Message } from './protocol'
 import { MESSAGE_LIMIT } from './framing'
-import { RoomCrypto, sealedPacketSize } from './room-crypto'
+import { DuplicatePeerSessionError, RoomCrypto, sealedPacketSize } from './room-crypto'
 import { TransportRouter } from './transport-router'
 
 export interface BroadcastTransportOptions<E extends EditEnvelope> {
@@ -49,7 +49,10 @@ export class BroadcastTransport<E extends EditEnvelope = EditEnvelope> {
       this.inboundBytes += size
       this.inbound = this.inbound
         .then(() => this.receive(event.data))
-        .catch(options.onError)
+        .catch(async (error) => {
+          options.onError(error)
+          if (error instanceof DuplicatePeerSessionError) await this.close()
+        })
         .finally(() => {
           this.inboundBytes -= size
         })

@@ -6,7 +6,15 @@ declare const __COLLABORATION_TURN_AVAILABLE__: boolean
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
-    collaborationScenario(kind: 'webrtc' | 'broadcast' | 'combined' | 'turn'): Promise<{
+    collaborationScenario(
+      kind:
+        | 'webrtc'
+        | 'broadcast'
+        | 'combined'
+        | 'turn'
+        | 'duplicate-webrtc'
+        | 'duplicate-broadcast',
+    ): Promise<{
       before: readonly PeerSnapshot[]
       after: readonly PeerSnapshot[]
       rejoined: readonly PeerSnapshot[]
@@ -33,6 +41,18 @@ for (const kind of ['webrtc', 'broadcast', 'combined'] as const) {
     expect(result.rejoined[0]!.credentialCalls).toBeGreaterThan(result.after[0]!.credentialCalls)
     expect(result.rejoined[0]!.offers.length).toBeGreaterThan(result.after[0]!.offers.length)
     expect(result.rejoined.every((peer) => peer.rtcLinks === 2)).toBe(true)
+  })
+}
+
+for (const kind of ['duplicate-webrtc', 'duplicate-broadcast'] as const) {
+  test(`${kind} reports a collision in both real tabs`, async () => {
+    const result = await commands.collaborationScenario(kind)
+    expect(result.after).toHaveLength(2)
+    for (const peer of result.after) {
+      expect(peer.errors.some((error) => error.includes('Duplicate peer-session'))).toBe(true)
+      expect(peer.rtcLinks).toBe(0)
+      expect(peer.members).toBe(1)
+    }
   })
 }
 

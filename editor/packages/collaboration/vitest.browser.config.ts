@@ -6,10 +6,9 @@ import { defineConfig } from 'vitest/config'
 import type { BrowserCommand } from 'vitest/node'
 import type { PeerOptions, PeerSnapshot } from './test/peer.ts'
 
-const scenario: BrowserCommand<[kind: 'webrtc' | 'broadcast' | 'combined' | 'turn']> = async (
-  { context, page },
-  kind,
-) => {
+const scenario: BrowserCommand<
+  [kind: 'webrtc' | 'broadcast' | 'combined' | 'turn' | 'duplicate-webrtc' | 'duplicate-broadcast']
+> = async ({ context, page }, kind) => {
   const origin = new URL(page.url()).origin
   const broker = spawn(
     'bun',
@@ -53,12 +52,12 @@ const scenario: BrowserCommand<[kind: 'webrtc' | 'broadcast' | 'combined' | 'tur
       await peerPage.goto(`${origin}/test/peer.html`)
       await peerPage.waitForFunction(() => !!window.collaborationPeer)
       const options: PeerOptions = {
-        peer: `peer-${index}`,
+        peer: kind.startsWith('duplicate-') ? 'shared-peer' : `peer-${index}`,
         room,
         secret,
         url,
-        broadcast: kind === 'broadcast' || kind === 'combined',
-        rtc: kind !== 'broadcast',
+        broadcast: kind === 'broadcast' || kind === 'combined' || kind === 'duplicate-broadcast',
+        rtc: kind !== 'broadcast' && kind !== 'duplicate-broadcast',
         iceServers: kind === 'turn' ? turn : [],
         transportPolicy: kind === 'turn' ? 'relay' : 'all',
       }
@@ -71,6 +70,21 @@ const scenario: BrowserCommand<[kind: 'webrtc' | 'broadcast' | 'combined' | 'tur
       Promise.all(
         pages.map((peerPage) => peerPage.evaluate(() => window.collaborationPeer.snapshot())),
       )
+    if (kind.startsWith('duplicate-')) {
+      await Promise.all(
+        pages.map((peerPage) =>
+          peerPage.waitForFunction(
+            () =>
+              window.collaborationPeer
+                .snapshot()
+                .errors.some((error) => error.includes('Duplicate peer-session')),
+            undefined,
+            { timeout: 10_000 },
+          ),
+        ),
+      )
+      return { before: [], after: await snapshots(), rejoined: [], texts: [] }
+    }
     const stable = async (depth: number) => {
       await Promise.all(
         pages.map((peerPage) =>

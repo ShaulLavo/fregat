@@ -124,8 +124,12 @@ CI runs the default checks and offers the long run through workflow dispatch.
 
 ## Browser transports
 
-Create a fresh random peer-session ID for each process. `createRoomInvitation()`
-returns an opaque room UUID and a 256-bit invitation secret. Share the invitation
+Create a fresh random peer-session ID for each tab or process. Share one `RoomCrypto`
+instance between that tab's adapters. An authenticated packet from another tab using
+its own peer ID raises `DuplicatePeerSessionError` through `onError` and closes the
+affected adapter. Reconstruct the tab's session, router and adapters with a fresh
+random peer-session ID before retrying. Reflected local packets and unauthenticated
+forgeries are ignored. `createRoomInvitation()` returns an opaque room UUID and a 256-bit invitation secret. Share the invitation
 outside the broker. Every peer must use the same room, secret and document ID.
 
 The caller supplies all signaling URLs, ICE servers, transport policy and credentials.
@@ -183,8 +187,10 @@ The TURN supplier receives `(peer, abortSignal)` and returns ICE server entries
 with current username/credential values. It runs for every new connection,
 including reconnects. Static credentials can be included in `iceServers` and the
 required `credentials` object can be `{}`. The browser supports WebSocket
-subprotocols for deployments that require them; the example broker's optional
-`authorize(request)` hook owns application admission.
+subprotocols for admission credentials. The broker requires an explicit
+`authorize(request)` policy. The example uses a separate deployment admission token;
+include that token in `config.webSocketProtocols` and share it privately with members.
+The room invitation secret stays outside the broker.
 
 ### Link and wire design
 
@@ -204,7 +210,11 @@ WebRTC uses a full mesh of at most eight peer sessions. The lower peer ID initia
 each pair. Each connection uses one reliable ordered channel, with no partial
 reliability options. Offers and answers include fully gathered ICE candidates.
 This non-trickle exchange keeps signaling small and avoids candidate-order races.
-Each replacement connection has a fresh random generation. Failed, disconnected,
+Decryption and discovery use a shared serialized queue. SDP, renewable TURN credentials
+and ICE gathering run in separate per-peer queues: a stalled peer leaves other links
+free to proceed. Each peer retains at most eight handshake operations, with a shared
+4 MiB retained-SDP budget. New offers cancel superseded credential/ICE work; stale
+completions cannot replace the newer generation. Each replacement connection has a fresh random generation. Failed, disconnected,
 closed, timed-out or malformed links report `disconnect` to the session. A live
 BroadcastChannel path keeps that peer connected while the WebRTC path retires.
 
@@ -237,14 +247,36 @@ The Bun-only `/server` entry is separate from the browser bundle. It forwards
 opaque publish frames to subscribed sockets and stores no history. Each socket
 subscribes to one room. Limits are eight subscribers per room, 1,024 active rooms
 and 1 MiB per WebSocket frame or buffered socket output. Connections must present
-an origin from the explicit allowlist. The optional admission callback can require
-an application credential. Deploy it behind TLS and application rate limits.
+an origin from the explicit allowlist and pass the required admission callback.
+The explicit `limits` option requires positive integer `connections`,
+`connectionsPerIP`, `subscribeTimeout` and `idleTimeout` values (timeouts in milliseconds),
+plus `framesPerSecond` and `bytesPerSecond` budgets per connection. Both pending
+asynchronous admissions and upgraded sockets count toward connection quotas;
+admission work has the subscribe deadline. IP accounting uses the direct socket
+address. Configure trusted proxy enforcement separately when deploying behind a proxy.
+Subscribe and application-idle deadlines terminate sockets and release room and IP
+capacity. Incoming pings, pongs and repeated subscriptions leave those deadlines
+unchanged. Publish traffic consumes the frame/byte budget and refreshes the idle deadline.
 
-Run the included example with your own bind address, port and allowed origins:
+The example reads a separate random deployment admission token from a file and
+requires it as a WebSocket subprotocol. It permits 256 connections, 16 per IP, a
+5-second subscribe/admission deadline, a 120-second application-idle deadline and
+64 frames / 2 MiB per second per connection. Keep the client's announce interval below
+the broker idle deadline. Unauthorized clients are refused before receiving room
+capacity. Authorized clients still share finite capacity: admission is a trust boundary,
+and deployments need TLS and upstream HTTP/connection rate limits for network floods.
+Use a synchronous token check or authenticate before reaching an asynchronous policy
+so strangers cannot occupy its pending-admission quota. The room's shared encryption
+secret alone provides no broker admission or service-availability guarantee.
+
+Generate a random token in a private file, then run with your bind address, port,
+file path and allowed origins. The token itself stays out of command arguments and logs:
 
 ```sh
+umask 077
+bun -e 'console.log(Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url"))' > admission-token
 bun editor/packages/collaboration/examples/signaling-server.ts \
-  127.0.0.1 8789 http://localhost:5173
+  127.0.0.1 8789 ./admission-token http://localhost:5173
 ```
 
 Wire messages are `{ type: 'subscribe', topic }`, the acknowledgement
@@ -265,6 +297,11 @@ peers exchange session submissions and confirmations, including an 80 KiB Unicod
 edit, lose the host, elect a replacement and rejoin with fresh connection
 generations and renewed credentials. Two same-origin pages exchange edits through
 BroadcastChannel. The combined test proves those pages use zero WebRTC links.
+Two-tab collision cases cover both adapters with a shared peer ID and require an
+explicit diagnostic in each tab. Native-connection fakes prove another peer answers
+while credentials or ICE gathering stall, and a new generation cancels stalled work.
+Broker tests cover admission refusal, global/IP quotas, subscribe and idle eviction,
+frame/byte budgets and bounded asynchronous authorization.
 
 The TURN-only case skips with a stated reason unless a relay is explicitly supplied.
 CI has no relay or TURN credentials. To run it against a local coturn instance,
