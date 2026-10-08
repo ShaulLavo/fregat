@@ -2,6 +2,7 @@
 import '@fontsource-variable/inter/wght.css'
 import '@fontsource-variable/jetbrains-mono/wght.css'
 import interLatin from '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url'
+import appIcon from '../../../web/public/icons/fregat.svg?url'
 import Icons from '../components/Icons.astro'
 import Plate from '../components/Plate.astro'
 import { plateFor } from '../lib/bundles'
@@ -39,7 +40,7 @@ const ogImage = new URL(`${base}og.jpg`, Astro.site)
     <header class="top">
       <div class="wrap">
         <a class="brand" href={base}
-          ><img src={`${base}favicon.svg`} alt="" width="24" height="24" />Fregat</a
+          ><img src={appIcon} alt="" width="24" height="24" />Fregat</a
         >
         <nav>
           <a href="#review">Review</a><a href="#keeps-going">Work keeps going</a><a href="#agents"
@@ -187,7 +188,7 @@ const ogImage = new URL(`${base}og.jpg`, Astro.site)
     <footer>
       <div class="wrap">
         <a class="brand" href={base}
-          ><img src={`${base}favicon.svg`} alt="" width="20" height="20" />Fregat</a
+          ><img src={appIcon} alt="" width="20" height="20" />Fregat</a
         >
         <span>{version} · MIT licensed. Made by Shaul Lavochkin.</span>
         <nav>

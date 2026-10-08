@@ -3,7 +3,6 @@ import { workspaceToken } from '@workspace/client-core/address/workspace'
 import { setupWorker } from 'msw/browser'
 import { emptyAddress, formatAddress } from '@workspace/client-core/address/grammar'
 import { writeBootMirror } from '@/lib/settings-boot-mirror'
-import wallpaperUrl from '../../../site/src/assets/eyes-wide.jpg?url'
 import { DEMO_ADDRESS, seedSession } from './seed'
 import { DemoWorkspace } from './state/workspace'
 import { DemoOrchestration } from './state/orchestration'
@@ -24,7 +23,7 @@ export async function startDemoBackend({
   const diagnostics: DemoDiagnostics = { requests: [], unhandled: [], logs: [] }
   const socketFrames: DemoSocketFrame[] = []
   const assets = {
-    wallpaper: new URL(wallpaperUrl, location.href).href,
+    wallpaper: new URL('demo-assets/eyes-wide.jpg', assetBase).href,
     font: new URL('demo-assets/fonts/JetBrainsMonoNerdFont-Regular.ttf', assetBase).href,
   }
   const worker = setupWorker(
