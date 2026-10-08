@@ -4,36 +4,33 @@ import { hasChromium, startPreview, type Preview } from './preview'
 
 const desktop: BrowserContextOptions = { viewport: { width: 1440, height: 900 } }
 
-/** Pixels that differ between two screenshots inside `clip`, compared in the page. */
-function changedPixels(
-  page: Page,
-  before: Buffer,
-  after: Buffer,
-  clip: { x: number; y: number; width: number; height: number },
-) {
-  return page.evaluate(
-    async ([a, b, box]) => {
-      const pixels = async (base64: string) => {
-        const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0))
-        const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
-        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
-        const context = canvas.getContext('2d')!
-        context.drawImage(bitmap, 0, 0)
-        return context.getImageData(box.x, box.y, box.width, box.height).data
-      }
-      const [one, two] = await Promise.all([pixels(a), pixels(b)])
-      let changed = 0
-      for (let index = 0; index < one.length; index += 4)
-        if (
-          one[index] !== two[index] ||
-          one[index + 1] !== two[index + 1] ||
-          one[index + 2] !== two[index + 2]
-        )
-          changed++
-      return changed
-    },
-    [before.toString('base64'), after.toString('base64'), clip] as const,
-  )
+/** Each visible source line's top and height, from the static rows or the editor's gutter. */
+function lineBoxes(page: Page, source: 'static' | 'editor') {
+  return page.evaluate((source) => {
+    const view = document.querySelector('.viewport')!.getBoundingClientRect()
+    const lines: { line: number; top: number }[] =
+      source === 'static'
+        ? [...document.querySelectorAll<HTMLElement>('#doc .r[data-n]')].map((row) => ({
+            line: Number(row.dataset.n),
+            top: row.getBoundingClientRect().top,
+          }))
+        : [
+            ...document.querySelectorAll<HTMLElement>(
+              '.editor-host .editor-virtualized-line-number:not([hidden])',
+            ),
+          ].map((cell) => ({
+            line: Number(cell.style.counterSet.split(' ')[1]),
+            top: cell.getBoundingClientRect().top,
+          }))
+    lines.sort((a, b) => a.line - b.line)
+    const boxes: Record<number, string> = {}
+    lines.forEach(({ line, top }, index) => {
+      const next = lines[index + 1]
+      if (!next || next.line !== line + 1 || top < view.top || next.top > view.bottom) return
+      boxes[line] = `${Math.round(top)}+${Math.round(next.top - top)}`
+    })
+    return boxes
+  }, source)
 }
 
 describe.skipIf(!hasChromium())(
@@ -66,29 +63,32 @@ describe.skipIf(!hasChromium())(
       return { context, page, problems }
     }
 
-    test.each(['light', 'dark'] as const)(
-      'the %s editor replaces the static page without moving a pixel',
-      async (colorScheme) => {
-        const { context, page, problems } = await open('/docs/start-here/quick-start/?editor=off', {
+    test.each([
+      ['light', 'quick-start', 600],
+      ['dark', 'introduction', 0],
+    ] as const)(
+      'the %s editor replaces %s at %i px without moving a line',
+      async (colorScheme, name, scroll) => {
+        const { context, page, problems } = await open(`/docs/start-here/${name}/?editor=off`, {
           ...desktop,
           colorScheme,
         })
         try {
-          await page.evaluate(() => (document.getElementById('doc')!.scrollTop = 600))
-          const clip = await page.evaluate(() => {
-            const box = document.querySelector('.viewport')!.getBoundingClientRect()
-            return { x: 0, y: Math.ceil(box.y), width: innerWidth, height: Math.floor(box.height) }
-          })
+          await page.evaluate((top) => (document.getElementById('doc')!.scrollTop = top), scroll)
           await page.waitForTimeout(200)
-          const before = await page.screenshot()
+          const before = await lineBoxes(page, 'static')
+          expect(Object.keys(before).length).toBeGreaterThan(20)
           await page.getByRole('button', { name: 'Open in editor' }).click()
           await page.locator('body[data-mode="editor"]').waitFor({ timeout: 20_000 })
-          // Glyph antialiasing differs by a few pixels per row; a moved row or wrap changes thousands.
+          // Every line keeps its top and its wrapped height across the swap.
           await expect
-            .poll(async () => changedPixels(page, before, await page.screenshot(), clip), {
-              timeout: 5_000,
+            .poll(async () => {
+              const after = await lineBoxes(page, 'editor')
+              return Object.entries(before)
+                .filter(([line, box]) => after[Number(line)] !== box)
+                .map(([line, box]) => `${line}: ${box} became ${after[Number(line)]}`)
             })
-            .toBeLessThan(clip.width * clip.height * 0.005)
+            .toEqual([])
           expect(problems).toEqual([])
         } finally {
           await context.close()
