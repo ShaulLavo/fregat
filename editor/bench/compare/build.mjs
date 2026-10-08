@@ -96,6 +96,10 @@ export async function buildAll({ fullDocument = false } = {}) {
                   return (minimal ? minimalEntry(editor, highlighted) : page)
                     .replace("'ACTOR'", JSON.stringify(resolve(root, `${editor}.js`)))
                     .replace("'FIXTURE'", JSON.stringify(resolve(root, 'fixture.mjs')))
+                    .replace(
+                      "'./output-proof.mjs'",
+                      JSON.stringify(resolve(root, 'output-proof.mjs')),
+                    )
                     .replaceAll('HIGHLIGHTED', JSON.stringify(highlighted))
               },
               transform(code, id) {

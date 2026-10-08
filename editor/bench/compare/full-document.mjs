@@ -107,6 +107,8 @@ export function verifyFullDocumentRow(row) {
       row.openProfile.requests.some((request) => request.type === 'init'))
   )
     throw new RangeError('Warm control requires the same worker and a fresh document')
+  if (full.analysis?.kind !== 'full')
+    throw new RangeError('Full-document result must declare complete analysis')
   const proof = row.outputProof
   const root = proof?.coverage?.find((layer) => layer.kind === 'root')
   if (!root || root.start !== 0 || root.end !== row.mib * 1024 * 1024)
@@ -116,6 +118,8 @@ export function verifyFullDocumentRow(row) {
   const expectedLanguages =
     {
       injected: ['typescript', 'regex', 'jsdoc'],
+      'dense-injected': ['typescript', 'regex', 'jsdoc'],
+      'dense-recovery': ['typescript', 'regex', 'jsdoc'],
       html: ['html', 'css', 'javascript', 'regex'],
       markdown: ['html', 'css', 'javascript', 'regex'],
     }[row.corpus] ?? []
@@ -125,6 +129,41 @@ export function verifyFullDocumentRow(row) {
     )
   )
     throw new RangeError('Full-document output is missing expected injection layers')
+  if (row.corpus?.startsWith('dense-')) {
+    const text = fixture(row.mib, row.corpus)
+    const comments = [...text.matchAll(/\/\*\*.*?\*\//g)]
+    const pairs = comments.length
+    const expected = new Set(
+      comments.flatMap((comment) => {
+        const regex = text.indexOf('[a-z]+', comment.index)
+        return [
+          `jsdoc:${comment.index}:${comment.index + comment[0].length}`,
+          `regex:${regex}:${regex + 6}`,
+        ]
+      }),
+    )
+    const children = proof.coverage.filter((layer) => layer.kind === 'injection')
+    for (const layer of children) {
+      const key = `${layer.languageId}:${layer.start}:${layer.end}`
+      if (
+        layer.ranges.length !== 1 ||
+        layer.ranges[0][0] !== layer.start ||
+        layer.ranges[0][1] !== layer.end ||
+        !expected.delete(key)
+      )
+        throw new RangeError('Dense full-document injection range is unexpected or duplicated')
+    }
+    if (expected.size || children.length !== pairs * 2)
+      throw new RangeError('Dense full-document output is missing injection layers')
+    if (proof.tokenCount !== pairs * 17)
+      throw new RangeError('Dense full-document fixture has an unexpected token count')
+    if (row.corpus === 'dense-recovery' && proof.errorCount !== pairs * 3)
+      throw new RangeError('Dense recovery output is missing grammar error records')
+    if (row.corpus === 'dense-injected' && proof.errorCount !== 0)
+      throw new RangeError('Grammar-valid dense fixture produced syntax errors')
+    if (proof.injectionCount !== pairs * 2)
+      throw new RangeError('Dense full-document output is missing injection records')
+  }
   if (proof.matchLimitExceeded !== false || !proof.queryCalls)
     throw new RangeError('Full-document query limit status is missing or exceeded')
   if (
@@ -136,7 +175,10 @@ export function verifyFullDocumentRow(row) {
     throw new RangeError('Full-document output proof is incomplete')
   if ((row.corpus ?? 'repeated') === 'repeated' && row.mib === 10 && proof.tokenCount !== 1_198_376)
     throw new RangeError('Repeated 10 MiB fixture has an unexpected token count')
-  if (proof.lastToken[1] > row.mib * 1024 * 1024 || proof.lastToken[1] < row.mib * 1024 * 1024 - 70)
+  if (
+    proof.lastToken[1] > row.mib * 1024 * 1024 ||
+    proof.lastToken[1] < row.mib * 1024 * 1024 - 100
+  )
     throw new RangeError('Full-document output is missing tail tokens')
   if (
     proof.coverage.length !== full.statistics.layers ||

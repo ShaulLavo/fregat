@@ -4,12 +4,40 @@ export function installOpenProbe() {
   globalThis.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = (event) => {
     probe.diagnostics.push(event)
   }
+  const workers = []
+  let nextInspection = -1
+  probe.inspectRetention = async () =>
+    Promise.all(
+      workers.map(
+        (worker) =>
+          new Promise((resolve, reject) => {
+            const id = nextInspection--
+            const timer = setTimeout(() => {
+              worker.removeEventListener('message', receive)
+              reject(new RangeError('Worker retention inspection exceeded 30 seconds'))
+            }, 30000)
+            const receive = ({ data }) => {
+              if (data?.id !== id) return
+              clearTimeout(timer)
+              worker.removeEventListener('message', receive)
+              if (!data.ok || !data.result?.retention) {
+                reject(new RangeError('Worker retention inspection returned no snapshot'))
+                return
+              }
+              resolve({ worker: worker.probeId, ...data.result.retention })
+            }
+            worker.addEventListener('message', receive)
+            worker.postMessage({ id, payload: { type: 'idleFence', includeRetention: true } })
+          }),
+      ),
+    )
   let nextWorker = 0
   const OriginalWorker = globalThis.Worker
   globalThis.Worker = class extends OriginalWorker {
     constructor(...args) {
       super(...args)
       this.probeId = ++nextWorker
+      workers.push(this)
       this.addEventListener('message', ({ data }) => {
         if (data?.result?.tokensPacked) probe.outputs.push(data.result)
         probe.messages.push({

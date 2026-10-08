@@ -25,6 +25,7 @@ export async function sourceIdentity(root) {
   }
   for (const file of [
     'full-document.mjs',
+    'output-proof.mjs',
     'page.js',
     'page.html',
     'fixture.mjs',

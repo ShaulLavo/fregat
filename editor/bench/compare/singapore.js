@@ -33,6 +33,9 @@ export function mount(host, text, highlighted) {
     viewport: () => host.querySelector('.editor-virtualized'),
     rowCount: () => host.querySelectorAll('.editor-virtualized-row:not([hidden])').length,
     dispose: () => editor.dispose(),
+    snapshot: () => editor.getTextSnapshot(),
+    edit: (from, to, text) => editor.edit({ from, to, text }),
+    reset: (text) => editor.setText(text, { languageId: language }),
     facts: () => editor.getState(),
   }
 }

@@ -47,6 +47,8 @@ export async function outputProof() {
   const encode = (value) => new TextEncoder().encode(JSON.stringify(value))
   return {
     tokenCount: starts.length,
+    injectionCount: result.injections.length,
+    errorCount: result.errors.length,
     tokenSha256: await hash(bytes),
     stylesSha256: await hash(encode(canonical)),
     structuralSha256: await hash(

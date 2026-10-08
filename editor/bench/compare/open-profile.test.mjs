@@ -206,6 +206,7 @@ test('provisional profiles require a measured bounded bootstrap query', async ()
     {
       resultMode: 'full',
       returnedResult: true,
+      analysis: { kind: 'full' },
       statistics: { rangeStart: 0, rangeEnd: 200 * 1024 * 1024, tokens: 100, layers: 1 },
       timings: [{ name: 'treeSitter.parseRoot', durationMs: 80 }],
     },
@@ -327,4 +328,39 @@ test('diagnostic comparison retains failed groups and rejects changed measuremen
   const changed = structuredClone(after)
   changed.bundles.find((bundle) => bundle.id === 'monaco-typescript').files[0].sha256 = 'changed'
   assert.throws(() => compareOpenProfiles(before, changed), /competitor bundles/)
+})
+
+test('retention inspection fences every observed worker with distinct request IDs', async () => {
+  const originalWorker = globalThis.Worker
+  const previousProbe = globalThis.__compareOpenProbe
+  const diagnostics = globalThis.__EDITOR_PERFORMANCE_DIAGNOSTICS__
+  const ids = []
+  class WorkerControl extends EventTarget {
+    postMessage(request) {
+      assert.deepEqual(request.payload, { type: 'idleFence', includeRetention: true })
+      ids.push(request.id)
+      queueMicrotask(() => {
+        const event = new Event('message')
+        event.data = { id: request.id, ok: true, result: { retention: { documentCount: 1 } } }
+        this.dispatchEvent(event)
+      })
+    }
+  }
+  try {
+    globalThis.Worker = WorkerControl
+    installOpenProbe()
+    new Worker('first')
+    new Worker('second')
+    const retention = await globalThis.__compareOpenProbe.inspectRetention()
+    assert.deepEqual(retention, [
+      { worker: 1, documentCount: 1 },
+      { worker: 2, documentCount: 1 },
+    ])
+    assert.equal(new Set(ids).size, 2)
+    assert.ok(ids.every((id) => id < 0))
+  } finally {
+    globalThis.Worker = originalWorker
+    globalThis.__compareOpenProbe = previousProbe
+    globalThis.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = diagnostics
+  }
 })

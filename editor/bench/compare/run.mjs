@@ -13,6 +13,7 @@ import { verifyFullDocumentRow } from './full-document.mjs'
 import { installOpenProbe, summarizeOpenProfile } from './open-profile.mjs'
 import { outputProof, verifyOutputEquality } from './output-proof.mjs'
 import { corpora } from './fixture.mjs'
+import { monitorProcessMemory } from './memory.mjs'
 import {
   fixtureIdentity,
   order,
@@ -41,6 +42,7 @@ const { values } = parseArgs({
     corpus: { type: 'string', default: 'repeated' },
     editors: { type: 'string', default: 'singapore,monaco,codemirror' },
     warm: { type: 'boolean', default: false },
+    lifecycle: { type: 'boolean', default: false },
   },
 })
 const selectedEditors = values.editors.split(',')
@@ -51,6 +53,7 @@ const frames = Number(values['scroll-frames'])
 const timeout = Number(values.timeout)
 if (
   !corpora.includes(values.corpus) ||
+  (values.lifecycle && (!values['full-document'] || selectedEditors.join(',') !== 'singapore')) ||
   selectedEditors.some((editor) => !['singapore', 'monaco', 'codemirror'].includes(editor)) ||
   new Set(selectedEditors).size !== selectedEditors.length ||
   ((values.corpus !== 'repeated' || values.warm) &&
@@ -146,6 +149,7 @@ let results = {
       (
         await Promise.all(
           [
+            'memory.mjs',
             'output-proof.mjs',
             'full-document.mjs',
             'native-full-parse.c',
@@ -181,6 +185,7 @@ let results = {
     .update(await readFile(resolve(root, 'full-document.mjs')))
     .digest('hex'),
   config: {
+    lifecycle: values.lifecycle,
     condition: values.condition,
     profileOpen: values['profile-open'],
     fullDocument: values['full-document'],
@@ -368,6 +373,7 @@ async function sample(editor, mib, repetition) {
     if (row.console.length < 20)
       row.console.push({ type: message.type(), text: message.text().slice(0, 500) })
   })
+  let stopMemory
   try {
     if (values['profile-open']) await page.addInitScript(installOpenProbe)
     await page.goto(
@@ -377,10 +383,14 @@ async function sample(editor, mib, repetition) {
     if (values.warm) await page.evaluate(() => window.bench.warm())
     row.heapBefore = await heap(cdp)
     row.heapBeforeBytes = row.heapBefore.usedSize
+    const processIds = (await processMemory()).map((process) => process.id)
+    stopMemory = monitorProcessMemory(processIds)
     await page.evaluate((mib) => window.bench.prepare(mib), mib)
     row.open = values['profile-open']
       ? await profileOpen(page, cdp, row)
       : await page.evaluate(() => window.bench.open())
+    row.openMemory = await stopMemory()
+    stopMemory = undefined
     if (values['full-document'] && editor === 'singapore') {
       row.outputProof = await page.evaluate(outputProof)
       verifyFullDocumentRow(row)
@@ -392,7 +402,15 @@ async function sample(editor, mib, repetition) {
       row.heapAfterBytes = row.heapAfter.usedSize
       row.heapDeltaBytes = row.heapAfterBytes - row.heapBeforeBytes
       row.processMemory = await processMemory()
+      if (editor === 'singapore' && values['full-document'])
+        row.retention = await page.evaluate(() => globalThis.__compareOpenProbe.inspectRetention())
       await page.screenshot({ path: resolve(values.output, `${editor}-${mib}-${repetition}.png`) })
+      if (values.lifecycle) {
+        stopMemory = monitorProcessMemory((await processMemory()).map((process) => process.id))
+        row.lifecycle = await page.evaluate((mib) => window.bench.lifecycle(mib), mib)
+        row.lifecycleMemory = await stopMemory()
+        stopMemory = undefined
+      }
       row.status = row.errors.length ? 'page-error' : 'ok'
       return row
     }
@@ -470,6 +488,7 @@ async function sample(editor, mib, repetition) {
     row.errors.push(error.message)
     row.failureFacts = await page.evaluate(() => window.bench?.facts()).catch(() => null)
   } finally {
+    if (stopMemory) row.failedMemory = await stopMemory()
     await context.close().catch((error) => {
       row.errors.push(`Context cleanup: ${error.message}`)
       row.status = 'failed'

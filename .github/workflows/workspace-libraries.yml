@@ -46,6 +46,16 @@ jobs:
       - name: Smoke complete syntax output
         timeout-minutes: 2
         run: bun run --cwd editor/bench/compare smoke:full --output "$RUNNER_TEMP/singapore-full-smoke"
+      - name: Smoke dense syntax lifecycle
+        timeout-minutes: 3
+        run: bun run --cwd editor/bench/compare smoke:full --corpus dense-injected --lifecycle --timeout 150000 --output "$RUNNER_TEMP/singapore-dense-smoke"
+      - name: Keep dense syntax lifecycle evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: singapore-dense-smoke
+          path: ${{ runner.temp }}/singapore-dense-smoke
+          if-no-files-found: ignore
       - name: Keep full-document smoke evidence
         if: always()
         uses: actions/upload-artifact@v4

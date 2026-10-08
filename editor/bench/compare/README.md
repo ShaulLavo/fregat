@@ -246,11 +246,17 @@ inside a comment. It measures syntax work, not TypeScript type checking.
 ### Qualification controls
 
 `--editors singapore` runs only Singapore. `--corpus` selects `repeated`,
-`realistic`, `long-line`, `unicode`, `malformed`, `injected`, `html` or `markdown`.
+`realistic`, `long-line`, `unicode`, `malformed`, `injected`, `dense-injected`,
+`dense-recovery`, `html` or `markdown`.
 Each corpus has exactly the requested number of UTF-16 code units. Unicode can
 occupy more UTF-8 bytes. Fixture identities record both lengths, line count and
 SHA-256. The injected fixtures place JSDoc, regex, JS/CSS and nested fenced HTML
-before a deterministic body, so their layer counts stay bounded as size grows.
+before a deterministic body. The two dense corpora repeat complete JSDoc/regex
+pairs and pad the final block with spaces. Their layer count grows with size.
+`dense-injected` uses a grammar-valid description; `dense-recovery` retains the
+upstream grammar recovery records for the bare comment. Both require every
+expected child layer and injection record. The grammar-valid control requires
+zero syntax errors.
 
 ```sh
 bun run build:full
@@ -258,6 +264,7 @@ bun run smoke:full --output ./results/smoke
 bun run bench:full --editors singapore --condition quiet --repetitions 5 --timeout 60000 --output ./results/cold
 bun run bench:full --editors singapore --warm --condition quiet --repetitions 5 --timeout 60000 --output ./results/warm
 bun run smoke:full --corpus injected --output ./results/injected
+bun run smoke:full --corpus dense-injected --lifecycle --timeout 180000 --output ./results/lifecycle
 ```
 
 Use the execution host's quiet scheduler for commands labelled `quiet`. The warm
@@ -284,3 +291,24 @@ lifetime RSS high-water mark. Summing high-water marks gives an upper bound,
 not the simultaneous peak. Other systems retain process IDs and CPU time with
 RSS fields marked unavailable. Browser smoke reports timings without CI latency
 budgets. Its exact-output and coverage assertions are gating.
+
+`--lifecycle` runs separate post-open controls through the simple Editor API.
+It retains four immutable text snapshots across three edits, verifies that
+round-trip edits restore the original complete output, opens two additional
+dense documents, supersedes a dispatched dense parse and checks its cancellation
+reply, then disposes the extra documents. Worker retention must return to the
+active document's baseline, including its cached edit snapshots. Full edit
+replies are checked against actual root bounds; their legacy response shape can
+omit the analysis marker. Startup replies must explicitly declare full analysis.
+Lifecycle work stays outside the open clock and has a separate memory series.
+
+Worker idle-fence inspections report live documents, snapshots and tree handles,
+shared parser resources, committed WASM capacity and unmeasured resource kinds.
+They do not estimate allocator-live bytes. Linux RSS sampling runs every 100 ms
+against the browser process IDs observed before the measurement. The recorded
+peak is the largest simultaneous sum observed, with raw samples and actual gaps.
+It can miss a shorter peak or a newly spawned process, and shared pages count in
+each process's RSS. Keep the execution host's whole-job peak-memory receipt with
+the evidence. That receipt includes browser, controller and diagnostic overhead
+for the entire batch. Heap collection, hashing and retention inspection happen
+after the measured highlighted frame.
