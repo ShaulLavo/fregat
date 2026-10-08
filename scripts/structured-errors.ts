@@ -61,7 +61,7 @@ export const scriptErrors = defineErrorCatalog('scripts', {
     message: ({ source, detail }: { source: string; detail: string }) =>
       `Bundling the heavy-job wrapper from ${source} failed: ${detail}`,
     why: 'The installed wrapper is a self-contained bundle, so every import must resolve in the source checkout.',
-    fix: 'Run `bun install --frozen-lockfile` in that checkout and run the install again.',
+    fix: 'Restore missing workspace source files, including `hotkeys/packages/hotkeys/src/index.ts` for `@fregat/hotkeys`. Run `bun install --frozen-lockfile` for missing third-party dependencies, then retry the install.',
   },
   HEAVY_SLICE_OUTSIDE_ROOT: {
     status: 500,
