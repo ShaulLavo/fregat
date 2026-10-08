@@ -7,11 +7,13 @@ const encoder = new TextEncoder()
 
 test('signaling opens one socket per distinct configured URL', () => {
   const urls: string[] = []
+  const offered: string[][] = []
   vi.stubGlobal(
     'WebSocket',
     class Socket {
-      constructor(url: string) {
+      constructor(url: string, protocols: string[]) {
         urls.push(url)
+        offered.push(protocols)
       }
       close() {}
     },
@@ -19,13 +21,14 @@ test('signaling opens one socket per distinct configured URL', () => {
   const signaling = new WebSocketSignaling({
     urls: ['ws://localhost:12345', 'ws://localhost:12345'],
     room: crypto.randomUUID(),
-    credentials: { protocols: [] },
+    credentials: { protocols: ['private-token', 'singapore-collaboration'] },
     reconnectInterval: 100,
     onError: vi.fn(),
   })
   try {
     signaling.start(vi.fn(), vi.fn())
     expect(urls).toEqual(['ws://localhost:12345'])
+    expect(offered).toEqual([['singapore-collaboration', 'private-token']])
   } finally {
     signaling.close()
     vi.unstubAllGlobals()

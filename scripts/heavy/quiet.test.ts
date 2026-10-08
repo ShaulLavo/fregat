@@ -1168,6 +1168,63 @@ describe.skipIf(!userScopes)('quiet holds', () => {
     40_000,
   )
 
+  test('a manager connection failure after a quiet hold releases admission and records the failed launch', async () => {
+    const box = quietBox(600)
+    const releaseQuiet = path.join(box.root, 'release-quiet')
+    const payload = path.join(box.root, 'ordinary-payload')
+    const preload = path.join(box.root, 'disconnected.ts')
+    const diagnostic = 'Failed to start transient scope unit: Transport endpoint is not connected'
+    writeFileSync(
+      preload,
+      `const spawn = Bun.spawn.bind(Bun)
+      Bun.spawn = (options) => spawn(options.cmd?.[0] === 'systemd-run'
+        ? { ...options, cmd: ['bash', '-c', ${JSON.stringify(`printf '%s\\n' '${diagnostic}' >&2; exit 1`)}] }
+        : options)
+      `,
+    )
+    const quiet = start(box, 'quiet', ['bash', '-c', `echo started; ${until(releaseQuiet)}`], {
+      jobClass: 'bench',
+      machine: true,
+      quiet: true,
+    })
+    let ordinary: ReturnType<typeof start> | undefined
+    try {
+      await expect.poll(quiet.stdout).toContain('started')
+      ordinary = start(box, 'ordinary', ['touch', payload], {
+        jobClass: 'suite',
+        machine: true,
+        preload,
+      })
+      await expect.poll(ordinary.stderr).toContain("quiet hold by 'quiet'")
+      expect(recordOf(box, 'ordinary')).toBeUndefined()
+      expect(existsSync(payload)).toBe(false)
+      writeFileSync(releaseQuiet, '')
+      expect((await quiet.done).code).toBe(0)
+      const result = await ordinary.done
+      expect(result.code, result.stderr).toBe(1)
+      expect(result.stderr).toContain(diagnostic)
+      const record = recordOf(box, 'ordinary')!
+      expect(record).toMatchObject({ exitCode: 1, quiet: false })
+      expect(existsSync(payload)).toBe(false)
+      expect(sliceState(box.sliceRoot, record.slice!)).not.toBe('running')
+      for (const place of ['jobs', 'queue']) {
+        expect(
+          readdirSync(path.join(box.state, place)).filter((file) => file.endsWith('.json')),
+        ).toEqual([])
+      }
+      expect(readFileSync(path.join(box.state, 'quiet.holder'), 'utf8')).toBe('')
+      for (const slot of ['admission.lock', 'slot1.lock', 'slot2.lock', 'slot3.lock']) {
+        const fd = tryLock(path.join(box.state, slot))
+        if (fd !== null) unlock(fd)
+        expect(fd).not.toBeNull()
+      }
+    } finally {
+      writeFileSync(releaseQuiet, '')
+      ordinary?.child.kill('SIGTERM')
+      await Promise.all([quiet.done, ordinary?.done])
+    }
+  })
+
   test.each([false, true])(
     'an expired launcher retains admission ownership until release for its quiet=%s successor',
     async (quietSuccessor) => {
@@ -1253,7 +1310,10 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         expect(next.child.exitCode).toBeNull()
         writeFileSync(releaseNext, '')
         expect((await next.done).code).toBe(0)
-        if (ordinary) expect((await ordinary.done).code).toBe(0)
+        if (ordinary) {
+          const result = await ordinary.done
+          expect(result.code, result.stderr).toBe(0)
+        }
       } catch (error) {
         console.error(
           '[quiet-fixture-failure]',

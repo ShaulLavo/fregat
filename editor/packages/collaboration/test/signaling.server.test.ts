@@ -24,7 +24,10 @@ async function client(url: string, protocol?: string): Promise<WebSocket> {
     options: { headers: Record<string, string> },
   ) => WebSocket
   const socket = new Socket(url, {
-    headers: { Origin: origin, ...(protocol ? { 'Sec-WebSocket-Protocol': protocol } : {}) },
+    headers: {
+      Origin: origin,
+      ...(protocol ? { 'Sec-WebSocket-Protocol': `singapore-collaboration, ${protocol}` } : {}),
+    },
   })
   await new Promise<void>((resolve, reject) => {
     socket.addEventListener('open', () => resolve(), { once: true })
@@ -181,7 +184,10 @@ test('broker refuses strangers without consuming a legitimate room slot', async 
     allowedOrigins: [origin],
     limits,
     authorize: (request: Request) =>
-      request.headers.get('sec-websocket-protocol') === 'test-admission',
+      request.headers
+        .get('sec-websocket-protocol')
+        ?.split(',')
+        .some((value) => value.trim() === 'test-admission') === true,
   }
   const server = startSignalingServer(options)
   const sockets: WebSocket[] = []
