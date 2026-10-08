@@ -23,7 +23,7 @@ export default defineConfig({
   define: { __COLLABORATION_MEASURE__: JSON.stringify(Boolean(process.env.COLLABORATION_MEASURE)) },
   server: { fs: { allow: [resolve(import.meta.dirname, '../../../..')] } },
   test: {
-    include: ['test/editor.browser.test.ts'],
+    include: ['test/editor*.browser.test.ts'],
     fileParallelism: false,
     testTimeout: 30_000,
     browser: {

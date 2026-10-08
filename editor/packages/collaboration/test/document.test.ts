@@ -95,3 +95,32 @@ test('a semantically invalid accepted record leaves confirmed ordering unchanged
   expect(b.apply(a.sequence(next))).toBe(true)
   expect(b.engine.text()).toBe('seedy')
 })
+
+test('branch recovery restores losing confirmed origins before dependent pending typing', () => {
+  const losing = new CollaborationDocument({ ...options, peer: 'losing' })
+  const origin = losing.participant.local({ offset: 4, deleteCount: 0, text: 'A' })
+  losing.sequence(origin)
+  const dependent = losing.participant.local({ offset: 5, deleteCount: 0, text: 'B' })
+  const winner = new CollaborationDocument({ ...options, peer: 'winner' })
+  winner.sequence(winner.participant.local({ offset: 0, deleteCount: 0, text: 'X' }))
+  winner.sequence(winner.participant.local({ offset: 0, deleteCount: 0, text: 'Y' }))
+  expect(() => losing.install(winner.exportHistory(winner.genesis)!, [origin])).not.toThrow()
+  expect(losing.engine.text()).toBe('YXseedAB')
+  expect(losing.participant.state().blocked).toEqual([])
+  expect(losing.participant.state().pending.map((edit) => edit.id)).toEqual([
+    origin.id,
+    dependent.id,
+  ])
+  losing.sequence(origin)
+  losing.sequence(dependent)
+  expect(losing.participant.state().pending).toEqual([])
+})
+
+test('unrecoverable branch origins surface a blocked conflict without partial replay', () => {
+  const losing = new CollaborationDocument({ ...options, peer: 'losing' })
+  losing.sequence(losing.participant.local({ offset: 4, deleteCount: 0, text: 'A' }))
+  const dependent = losing.participant.local({ offset: 5, deleteCount: 0, text: 'B' })
+  expect(() => losing.install([])).not.toThrow()
+  expect(losing.engine.text()).toBe('seed')
+  expect(losing.participant.state().blocked).toEqual([dependent.id])
+})
