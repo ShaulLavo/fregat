@@ -39,6 +39,70 @@ and pending work durably if crashes must preserve unsent work, and reconnects us
 that new identity. A surviving peer's branch retains edits authored by departed peers.
 The session has no timer, editor hook or browser dependency of its own.
 
+## Message replay window
+
+`SessionOptions.replayWindowSize` defaults to 8,192 sender message IDs. It must be a
+positive safe integer. Each sender has a highest received ID and a circular bitmap
+covering that ID and the preceding `replayWindowSize - 1` IDs. The default bitmap
+uses 1,024 bytes per sender. Reordered first deliveries inside that range reach their
+handlers once. Every duplicate, including an arbitrarily old duplicate, is rejected.
+Sender IDs are positive safe integers and increase across all recipients and across
+short reconnects. Gaps caused by messages addressed to other peers consume window
+space too.
+
+A first delivery below the window floor counts as message loss. The session recovers
+document work through fresh submissions, advertisements, history requests and phase
+retries. These retries carry new message IDs and preserve the original EditIds.
+Presence producers renew their current state. An integration with large message bursts
+or heavily reordered delivery can increase `replayWindowSize` to retain more delayed
+first deliveries. `receive` returns `true` when it admits a message to its handler,
+and `false` for unrelated traffic, duplicates, invalid IDs and deliveries below the
+floor. Admission can still leave a handler's authority or history checks unsatisfied.
+
+`disconnect` retains the sender's window throughout that sender session's lifetime,
+so queued packets from an old connection remain fenced after reconnect. When an
+authenticated peer-session ID is permanently retired, call `retire(peer)` to close
+its membership and release its window. The caller uses this after learning that a
+process restarted with a fresh peer-session ID. Retired IDs stay excluded from future
+membership. An admitted `LEAVE` releases the sender's window automatically. A local
+session releases all its windows when it completes its own departure.
+
+## History recovery
+
+`HISTORY_REQUEST` identifies one missing chunk with its required `index` field.
+Its `from` checkpoint offers a verified prefix the requester already holds. The sender
+uses that prefix when it belongs to the requested history, or replies from genesis
+for a divergent branch. Chunk indices and counts describe the remaining suffix.
+A reply contains up to `historyChunkRecords` records.
+
+The requester retains received chunks and keeps at most half its replay window's
+size in outstanding chunk indices, with a minimum of one. The first chunk establishes
+the suffix length. Receipt of a new chunk returns one request credit; repeated replies
+for cached chunks return no credit. Each outstanding index gets at most one request
+per pulse interval. Discovery and phase retries request missing indices with fresh
+message IDs.
+
+Each peer has one active download. Same-authority synchronization completes its current
+target before downloading the latest advertised tip, reusing the verified prefix for
+the next suffix. Stable downloads install each verified contiguous prefix while
+remaining chunks are in flight. A continuously growing host tip keeps existing chunk
+requests valid. Frozen offers and handoff bases retain their own recovery targets.
+
+This selective-repeat flow keeps each response to one chunk regardless of the total
+history size. Reversed delivery and a lost prefix therefore leave a smaller set of
+missing chunks on each successful retry. The engine verifies the complete hash chain
+before a history becomes available for reconciliation, synchronization or handoff.
+
+Election and reconciliation offers carry one branch descriptor per message. Commit
+and host-claim messages carry their branch list and replay edits in one message.
+Handoff carries its pending edits in one message. Submitted edits and confirmations
+use individual messages. Submission retries rotate through retained pending edits,
+with a per-pulse batch bounded by the replay window divided by the member count.
+History downloads serve current synchronization and the coordinator's frozen offers;
+participants fetch the chosen base for installation. Confirmed outcomes and retained
+pending intents recover through history transfer and fresh submissions. Transport
+framing still owns byte limits for these payloads.
+
 ## State and convergence
 
 Membership is the current set of direct authenticated links. `HELLO` and `HOST_PULSE`
@@ -57,7 +121,9 @@ Terms fence authority traffic and never rank history.
 The coordinator distributes a base and the union of losing branches' unique original
 intents. Peers archive their replaced branch and install the base. The chosen host
 waits for every round member's `HAVE` before claiming authority and sequencing pending
-work. Replay follows dependencies and preserves IDs. A membership change invalidates
+work. Its subsequent `HOST_PULSE` also activates installed followers after a lost claim.
+The installed host keeps renewing pulses while roster discovery pauses sequencing. Replay follows
+dependencies and preserves IDs. A membership change invalidates
 the round. A third partition therefore starts another frozen round rather than
 accepting a partially discovered pairwise result as globally final.
 
@@ -67,10 +133,11 @@ announcements carry pending edits authored throughout the transfer. `HAVE` ident
 the handoff stage and the retained EditIds. Departure waits for the successor to retain
 every pending edit and for every member to install the successor announcement.
 Installing a handoff base settles pending IDs already present in its confirmed history.
-The outgoing host continues pulses and retransmits its preceding authority announcement
-throughout preparation. Members relay preparation and
+The outgoing host continues pulses throughout preparation. Members relay preparation and
 commit announcements to the successor across delayed direct links. The successor
 retains the union of transferred edits and relays the committed announcement.
+Handoff acknowledgements go to the connected outgoing host. After its links close,
+retained announcements continue fencing old authority without generating acknowledgements.
 
 The requested departure survives an intervening election. A re-elected outgoing host
 retries its handoff, choosing a connected successor if the requested one disconnected.
@@ -171,7 +238,12 @@ COLLABORATION_LONG_RUN=1 bun run --cwd editor/packages/collaboration test
 bun run --cwd editor/packages/collaboration test:browser -- test/presence.browser.test.ts
 ```
 
-The default run has 100 deterministic seeds. The long run has 10,000. Each seed
+The default run has nine deterministic seeds per window, three per scenario, covering
+all room sizes from three to eight peers. The long run
+has 10,000 per window. Quiescence
+allows up to 960 simulator steps for elections and serialized download pages, then
+checks the full invariants. Settled components finish after the first 240 steps.
+Each seed
 checks components computed from the actual directed-link graph after host crash and
 restart, two-pair splits, or three-way splits with staggered healing. Partial-heal
 checks include a one-way bridge followed by a bidirectional bridge before full-mesh
@@ -183,6 +255,29 @@ short disconnect and reconnect with packets still queued. Packets carry the link
 generation at send time. Counters require both delivery from an older generation and
 its arrival after traffic from the new generation. The suite prints and asserts
 positive counts for every required scenario.
+
+Each seed runs with an eight-ID window to force below-floor loss and with the default
+8,192-ID window. An independent delivery ledger checks every message's admission and
+every duplicate rejection. The small-window run requires positive stale-loss counts
+while preserving every existing convergence invariant. The default-window run requires
+zero stale first deliveries. The default replay-window test exhausts all 720 orderings
+of six IDs; long mode exhausts all 40,320 orderings of eight IDs. Every ordering checks
+first delivery, immediate duplicates and duplicates after the full ordering. Both modes
+check ring rollover and sparse IDs. A surviving session receives one million pulses
+while retaining a 1,024-byte bitmap.
+
+Reversed-delivery regressions transfer 33 single-record chunks with the default
+window, expanded to 8,193 in long mode, and recover dropped prefix, middle and final
+chunks with the eight-ID window.
+Prefix fixtures assert that only missing suffix records cross the wire. The simulator
+also reverses reliable traffic during large divergent-branch recovery,
+bulk submissions and handoff. It checks every authored outcome and every existing
+convergence invariant. Separate 18-seed handoff runs use both window sizes and require
+positive stale `HANDOFF` losses at size eight. Non-coordinator handoffs also run 18 seeds.
+Long mode expands each handoff sweep to 100 seeds. The encrypted-room rollover test
+opens 4,097 fresh packets by default and 16,400 in long mode; both modes then check
+a 4,096-packet gap and reject the original packet. Seeded runs report stale losses by
+message type alongside their scenario counts.
 
 Full-mesh quiescence checks require identical confirmed history and text, EditId
 uniqueness, one host per component, and settlement of every authored edit as accepted
