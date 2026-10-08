@@ -42,13 +42,13 @@ jobs:
           bun-version-file: package.json
       - name: Install locked workspace dependencies
         run: bun install --frozen-lockfile
+      - name: Build package and editor dependencies
+        run: bunx turbo run build --filter=@singapore-editor/collaboration...
       - name: Check types, lint and formatting
         run: |
           bun run --cwd editor/packages/collaboration typecheck
           bun run --cwd editor/packages/collaboration lint
           bun run --cwd editor/packages/collaboration format:check
-      - name: Build publishable entry point
-        run: bun run --cwd editor/packages/collaboration build
       - name: Verify session and network invariants
         env:
           COLLABORATION_LONG_RUN: ${{ inputs.long_run && '1' || '0' }}
@@ -58,7 +58,7 @@ jobs:
       - name: Install Chromium
         uses: ./.github/actions/install-browsers
         with:
-          playwright: apps/web/node_modules/.bin/playwright
+          playwright: editor/packages/editor/node_modules/.bin/playwright
           browsers: chromium
-      - name: Verify native WebRTC and same-origin tabs
+      - name: Verify native WebRTC, same-origin tabs and presence
         run: bun run --cwd editor/packages/collaboration test:browser
