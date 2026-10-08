@@ -29,7 +29,7 @@ export const pushErrors = defineErrorCatalog('push', {
   SCOPE_TAKEN: {
     status: 409,
     message: 'Another service worker controls this page',
-    why: 'Push needs its own service worker at the app’s address, and this page already runs a different one, as the demo does.',
+    why: 'Push needs its own service worker at the app’s address, and this page already runs a different one.',
     fix: 'Open the app from its server to use push notifications.',
   },
   SUBSCRIBE_FAILED: {

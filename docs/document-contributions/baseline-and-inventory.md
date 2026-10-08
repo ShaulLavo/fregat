@@ -440,8 +440,6 @@ Resolved at first sight unclassified:
   `utils/history-compare.ts:26`, which reads the piece table through
   `materializePieceTableFullText` from `@singapore-editor/textbuffer`): whole-text diff consumers.
   They sit with the diff/headless callers in units 2 and 5.
-- **Platform demo `orchestration.ts:85`** and **`demo-entry.ts:60`**: agent sessions and iframe
-  messages, not document consumers.
 - **`apps/tui/src/viewer/state/lsp.ts:103`**: the terminal viewer's own LSP client over its own
   text. It has no Editor buffer and is outside this plan.
 
