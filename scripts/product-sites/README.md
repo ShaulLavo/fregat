@@ -23,18 +23,45 @@ landing page and fixture demo, builds Singapore at `/singapore/`, and builds gho
 `/ghostty-webgpu/`. Until `editor/site/package.json` exists, Singapore uses `editor/examples/app`.
 `SITE_ORIGIN` sets the production Astro origin. The existing Pages workflow keeps its defaults.
 
-`.github/workflows/product-sites.yml` runs on relevant main pushes and manual dispatch from main.
-It sends one gzip tar archive over SSH. The publisher validates paths, file types, indexes and
-size limits before swapping `current` to the complete new release. A failed upload leaves the
-previous release active. A file lock serializes publishers. Releases remain available for rollback.
-Hashed assets are hard-linked into an append-only `immutable` directory. Nginx falls back to those
-files after a new release, so cached HTML can still load assets from the previous build.
+`.github/workflows/product-sites.yml` runs on main pushes affecting site sources, imported
+library sources, build configuration or manifests, and on manual dispatch from main. Test-only
+changes do not trigger it. Markdown under site sources remains an input. The fixture demo imports
+web application and shared-library source, so those source changes still require a site build.
+
+The build job has no deployment secret. It uploads a gzip tar artifact with one-day retention.
+A fresh deploy job downloads that artifact and sends it directly over SSH. It runs in the
+`production` GitHub environment, whose deployment branch policy allows only the branch `main`.
+The deploy job runs no repository or dependency build code.
+
+The publisher validates paths, file types, indexes and size limits before swapping `current`
+to a complete new release. It fsyncs files and directories before activation and fsyncs the
+root directory after the atomic switch. A file lock serializes validation, activation and
+pruning. A SHA-256 manifest of sorted paths and file contents detects identical site output,
+which leaves the current release unchanged regardless of archive timestamps.
+
+Keep at most three complete releases, including current, for rollback. A hidden `.complete`
+marker distinguishes finished uploads from interrupted ones. At startup and after activation,
+prune other releases and hashed assets referenced by none of the retained releases. SIGALRM,
+SIGXCPU, SIGTERM, SIGHUP and SIGINT raise exceptions so cleanup runs. SIGKILL and OOM cannot run
+cleanup; the next publisher sweeps their unfinished release under the lock. A failed upload
+leaves the previous release active. An unfinished upload is bounded to 400 MiB.
+
+Retained hashed assets cover the current release and rollback releases only. Older cached HTML
+can receive an asset 404 after those releases are pruned. This trades indefinite fallback
+retention for bounded VPS storage. The cache header permits browsers to retain already loaded
+assets for a year; it does not promise a year of origin retention.
 
 HTML uses `Cache-Control: public, max-age=60, must-revalidate`. Hashed files in `_astro` or `assets`
 use `public, max-age=31536000, immutable`. Unhashed files revalidate on every request, including the wasm runtime and service worker. Missing pages and assets
 return 404, including unknown routes under the editor example. Base-path redirects are relative,
 so requests keep the public HTTPS origin while Nginx listens internally on port 8080. The apex accepts only the project
 index and the three project paths. The proxy continues to handle `/healthz`.
+
+The hashed-name rule accepts an eight-character build suffix containing an uppercase letter,
+digit or underscore. Plain names such as `tree-sitter-typescript.wasm` revalidate. Dotfiles are
+rejected in uploads and denied by Nginx. Responses include apex-only HSTS, a strict-origin
+referrer policy, `nosniff`, and same-origin framing via CSP and X-Frame-Options. HSTS omits
+`includeSubDomains` because this deployment does not own subdomain policy.
 
 ## VPS setup
 
@@ -76,8 +103,10 @@ docker exec product-sites nginx -t
 
 ## Credential and limits
 
-The dedicated Ed25519 key is named `fregat-product-sites-actions-20261008`. Its private half is
-stored only in the `PRODUCT_SITES_DEPLOY_KEY` repository Actions secret after setup. No private
+The dedicated Ed25519 key is named `fregat-product-sites-production-20261008`, fingerprint
+`SHA256:Umi3Zhj+VMdKVRkaPKEOir7SfQ2DLlTA6v/MJV4rCjs`. Its private half is stored only in the
+`PRODUCT_SITES_DEPLOY_KEY` secret in the repository's main-only `production` environment.
+The earlier repository-scoped key was rotated and its repository secret deleted. No private
 key is checked in. Workflow temporary key files are mode 0600 and removed on exit.
 The public host key was read through the already trusted admin SSH connection and pinned in
 `PRODUCT_SITES_KNOWN_HOSTS`. CI uses strict host-key checking and only the dedicated identity.
@@ -85,16 +114,47 @@ The public host key was read through the already trusted admin SSH connection an
 The forced command accepts the literal SSH command `publish` only. It can write site content
 under `/srv/product-sites` and activate it. It rejects shell commands, SFTP, SCP, rsync commands,
 absolute paths, traversal, symlinks, hard links, devices, duplicate files, missing site indexes,
-more than 50,000 archive members and more than 1 GiB of uncompressed content. The process has
-a 512 MiB address-space limit, 120 CPU seconds and a ten-minute deadline. `restrict` disables
+more than 50,000 archive members and more than 400 MiB of uncompressed content. The current
+payload is about 135 MiB. The process has a 512 MiB address-space limit, a 120 CPU-second soft
+limit, a 130 CPU-second hard limit and a ten-minute deadline. `restrict` disables
 port forwarding, agent forwarding, X11, PTYs and user SSH startup scripts. It cannot alter the
 root-owned publisher, Nginx configuration or proxy configuration. The key does allow replacement
 of public website content, which is the purpose of this credential.
 
 To rotate, generate a new Ed25519 key locally, replace the public key in the root-owned
-`authorized_keys`, set `gh secret set PRODUCT_SITES_DEPLOY_KEY -R ShaulLavo/fregat` from the private
-key on stdin, test a publish, and remove the temporary private key. To revoke, remove that
-`authorized_keys` entry and delete the repository secret.
+`authorized_keys`, set `gh secret set PRODUCT_SITES_DEPLOY_KEY -R ShaulLavo/fregat --env production`
+from the private key on stdin, test a publish, and remove the temporary private key.
+
+Create the environment and its branch policy once with an admin-authorized GitHub token:
+
+```sh
+printf '%s\n' '{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}' |
+  gh api -X PUT repos/ShaulLavo/fregat/environments/production --input -
+printf '%s\n' '{"name":"main","type":"branch"}' |
+  gh api -X POST repos/ShaulLavo/fregat/environments/production/deployment-branch-policies --input -
+gh secret set PRODUCT_SITES_DEPLOY_KEY -R ShaulLavo/fregat --env production < /path/to/private-key
+```
+
+When moving an existing repository secret, rotate the key and delete the old repository secret
+with `gh secret delete PRODUCT_SITES_DEPLOY_KEY -R ShaulLavo/fregat` after testing the new identity.
+Inspect deployment-branch policies and remove any policy other than the branch `main`.
+
+To revoke, remove the authorized-key entry and run
+`gh secret delete PRODUCT_SITES_DEPLOY_KEY -R ShaulLavo/fregat --env production`.
+After suspected compromise, stop the container, revoke first, audit the releases, then purge
+all published content as root under the publication lock:
+
+```sh
+docker compose -f /opt/product-sites/compose.yaml down
+flock /srv/product-sites/publish.lock sh -c '
+  rm -f /srv/product-sites/current /srv/product-sites/current.next
+  rm -rf /srv/product-sites/releases /srv/product-sites/immutable
+'
+```
+
+Rotate to a fresh key and publish a trusted build before restarting the container. Purging the
+origin cannot revoke content already cached by visitors. Audit cookies and any affected clients
+separately if malicious content was served.
 
 ## Rollback and maintenance
 
@@ -102,15 +162,40 @@ As the VPS admin, list `/srv/product-sites/releases` and point `current` at the 
 release with an atomic symlink replacement. Nginx needs no restart:
 
 ```sh
-cd /srv/product-sites
-ln -s releases/RELEASE_NAME rollback.next
-mv -Tf rollback.next current
+flock /srv/product-sites/publish.lock sh -ec '
+  cd /srv/product-sites
+  ln -s releases/RELEASE_NAME rollback.next
+  mv -Tf rollback.next current
+'
 ```
 
-Before pruning old releases, check the `current` target and keep the current release and recent
-rollback candidates. Releases are deployment artifacts. This setup does not delete earlier
-releases automatically. Check free space when changing site payloads or retention. Retained hashed assets also need an
-admin retention policy. Keep them for the advertised one-year cache lifetime.
+Publication automatically keeps current plus at most two recent complete rollback releases.
+Assets referenced by none of those releases are removed under the same lock. With the 400 MiB
+upload cap, three releases, their retained assets and one interrupted upload use at most 2.8 GiB of file payload before
+filesystem overhead. Retained assets are hard links, though matching files in different releases
+can have separate inodes. The normal 135 MiB payload needs substantially less space. This is an
+application bound, not a dedicated filesystem quota. The whole sites tree also has an enforced
+3 GiB allocated-byte ceiling and 50,000 unique-inode ceiling, including releases, retained assets,
+directories, lock and symlinks. Hard-linked files count once. Before extracting each file or creating
+directories, reserve its allocation and directory-entry headroom against the remaining budget.
+Recount the complete tree before the atomic switch. An over-budget upload is rejected and cleaned
+up while the active release stays unchanged. Check free space before changing these limits.
+
+For rollback, hold `publish.lock` across the symlink commands above so a concurrent publisher
+cannot prune the chosen release. Use only complete, retained releases.
+
+To apply publisher and header revisions reproducibly from a checkout:
+
+```sh
+scp scripts/product-sites/publish.py scripts/product-sites/nginx.conf hetzner:/opt/product-sites/
+ssh hetzner 'chown root:root /opt/product-sites/publish.py /opt/product-sites/nginx.conf &&
+  chmod 0644 /opt/product-sites/publish.py /opt/product-sites/nginx.conf &&
+  docker exec product-sites nginx -t && docker exec product-sites nginx -s reload'
+```
+
+Publish one trusted archive to exercise validation and pruning. Repeating it should report
+`Unchanged site content`. The first revision with completion markers sweeps old unmarked
+non-current releases. No existing proxy, DNS, Mesh or host-wide SSH setting changes are required.
 
 To stop serving this apex, run `docker compose -f /opt/product-sites/compose.yaml down`. This removes
 only the product-sites container and its apex route. Preserve `/srv/product-sites` for rollback.

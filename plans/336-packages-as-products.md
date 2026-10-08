@@ -223,9 +223,11 @@ Owner authorized this track now on 2026-10-08. It replaces the Cloudflare Worker
    one static directory on the owner's Hetzner VPS. Coolify's existing Traefik proxy terminates
    TLS; a read-only Nginx container serves files. Leave Mesh and every subdomain untouched.
 2. `.github/workflows/product-sites.yml` builds main with the production base paths and uploads
-   through the `PRODUCT_SITES_DEPLOY_KEY` repository secret. The dedicated SSH user can only
+   in a secret-free job, then deploys through the `PRODUCT_SITES_DEPLOY_KEY` secret in the
+   main-only `production` environment. The dedicated SSH user can only
    publish a validated archive to `/srv/product-sites`. A symlink swap activates all sites
-   together. HTML caches for 60 seconds; hashed assets cache for a year with `immutable`;
+   together. Keep three complete releases, prune assets with their releases, and skip identical
+   content. HTML caches for 60 seconds; hashed assets cache for a year with `immutable`;
    missing files return 404. See [deployment setup](../scripts/product-sites/README.md).
 3. Start with `apps/site`, `editor/examples/app` and `ghostty-webgpu/site`. The pipeline selects
    `editor/site` when it lands. The new Astro sites replace current builds through this pipeline.

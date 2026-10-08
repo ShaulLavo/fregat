@@ -27,6 +27,14 @@ for path in ('/', '/fregat/', '/singapore/', '/ghostty-webgpu/'):
         assert response.status == 200, (path, response.status)
         cache = response.headers.get('Cache-Control')
         assert cache == 'public, max-age=60, must-revalidate', (path, cache)
+        for header, expected in {
+            'Strict-Transport-Security': 'max-age=31536000',
+            'Referrer-Policy': 'strict-origin-when-cross-origin',
+            'X-Content-Type-Options': 'nosniff',
+            'Content-Security-Policy': "frame-ancestors 'self'",
+            'X-Frame-Options': 'SAMEORIGIN',
+        }.items():
+            assert response.headers.get(header) == expected, (path, header, response.headers.get(header))
         html = response.read().decode()
         print(path, response.status, cache)
     candidates = re.findall(r'(?:src|href)="([^"]+)"', html)
@@ -37,7 +45,7 @@ for path in ('/', '/fregat/', '/singapore/', '/ghostty-webgpu/'):
             assert response.status == 200, (asset, response.status)
             assert response.headers.get('Cache-Control') == 'public, max-age=31536000, immutable'
             print(asset, response.status, response.headers.get('Cache-Control'))
-    for missing in (path + 'missing-page', path + 'assets/missing-12345678.js'):
+    for missing in (path + 'missing-page', path + 'assets/missing-12345678.js', path + '.complete', path + '.git/config'):
         with fetch(missing) as response:
             assert response.status == 404, (missing, response.status)
             print(missing, response.status)
