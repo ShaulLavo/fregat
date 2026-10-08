@@ -1,0 +1,2452 @@
+{
+  "schemaVersion": 1,
+  "experiment": true,
+  "noisy": true,
+  "schedulerSnapshot": "2026-10-08T07:48:13Z\nmachine: 15040 MiB available, memory pressure 2.55%, CPU load 0.05 per core\ndrain: none requested\nquiet hold: none\nslot locks: free for heavy jobs\nrunning: 2\n  p336-noisy-production-experiments-v2 (suite, 6656 MiB) 9s using 1083 MiB\n  p336-singapore-private-preview-restarted (light, 1536 MiB, server) 1246s using 177 MiB\n",
+  "date": "2026-10-08T07:48:09.782Z",
+  "commit": "a632b0d321cd5c9cb098ed067b6c775d6f1efa46",
+  "sourceFingerprint": "f42d375500f2ffa7dc02310546c4c80a55a6824144aaf8e1fe10048d180f6c99",
+  "buildSource": {
+    "commit": "a632b0d321cd5c9cb098ed067b6c775d6f1efa46",
+    "fingerprint": "f42d375500f2ffa7dc02310546c4c80a55a6824144aaf8e1fe10048d180f6c99",
+    "builtAt": "2026-10-08T07:48:09.782Z"
+  },
+  "sourceCleanliness": "clean",
+  "machine": {
+    "name": "omarchy",
+    "os": "linux",
+    "kernel": "7.2.8-arch1-2",
+    "cpu": "Intel(R) Core(TM) i7-14700K",
+    "logicalCpus": 28,
+    "memoryBytes": 33368662016
+  },
+  "runtime": "1.4.2",
+  "browser": {
+    "browser": "153.0.8010.12",
+    "rendering": {
+      "rasterization": "disabled_software",
+      "compositing": "disabled_software",
+      "glRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+      "path": "software"
+    },
+    "errors": []
+  },
+  "workbench": {
+    "schemaVersion": 1,
+    "timestamp": "2026-10-08T07:48:19.270Z",
+    "method": "DOM content readiness plus two requestAnimationFrame callbacks; paint opportunity, not display presentation",
+    "terminalPaintGate": "Saved viewport canvas, or a live canvas after replay-complete and the native frame event remove inert",
+    "replayMarker": "REPLAY_3ac661ca90fb4d4f868cb2b47c34c524",
+    "healthPollMs": 10,
+    "workspaceReloadMs": [192.5, 145.19999998807907, 170, 140.10000002384186, 112.40000003576279],
+    "editorTabSwitchMs": [
+      87, 74.69999998807907, 85.60000002384186, 82.80000001192093, 146.5, 82.80000001192093,
+      182.69999998807907, 76.40000003576279, 83.90000003576279, 76.5
+    ],
+    "terminalReloadFirstFrameMs": [
+      192.5, 145.19999998807907, 170, 140.10000002384186, 112.40000003576279
+    ],
+    "serverBackToTerminalReplayMs": 949.9872159999995,
+    "freshReplayConnections": 2
+  },
+  "files": [
+    {
+      "sizeMiB": 1,
+      "extension": "txt",
+      "twoByte": true,
+      "analysis": "default",
+      "highlighting": "default",
+      "keys": 30,
+      "settleMs": 10000,
+      "profile": false,
+      "initialBytes": 1048546,
+      "corpus": "folded-functions-v1-unicode-body-v2",
+      "browser": "153.0.8010.12",
+      "host": {
+        "name": "omarchy",
+        "arch": "x64",
+        "cpus": 28,
+        "memoryBytes": 33368662016
+      },
+      "runtime": "1.4.2",
+      "timestamp": "2026-10-08T07:48:20.228Z",
+      "frameScheduling": "unthrottled Chromium (--disable-frame-rate-limit --disable-gpu-vsync)",
+      "rendering": {
+        "rasterization": "disabled_software",
+        "compositing": "disabled_software",
+        "glRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+        "path": "software"
+      },
+      "status": "passed",
+      "metrics": {
+        "openToTextMs": 336.7899030000008,
+        "highlighting": {
+          "state": "plain"
+        },
+        "keyLatencyMs": {
+          "count": 30,
+          "p50": 3.300000011920929,
+          "p95": 5.599999964237213,
+          "max": 12.600000023841858
+        },
+        "saveMs": 62.15469099999973,
+        "diskBytes": 1048576,
+        "expectedSha256": "fa007517115ba53caf7ea394fffbdfdb87c44064731df892cfa76954a8169152",
+        "savedSha256": "fa007517115ba53caf7ea394fffbdfdb87c44064731df892cfa76954a8169152",
+        "heapBeforeOpen": {
+          "usedBytes": 19362176,
+          "backingBytes": 7220662
+        },
+        "heapAfterOpen": {
+          "usedBytes": 27516448,
+          "backingBytes": 7967669
+        },
+        "heapAfterTyping": {
+          "usedBytes": 29691736,
+          "backingBytes": 7971060
+        },
+        "heapAfterSave": {
+          "usedBytes": 30193948,
+          "backingBytes": 7974850
+        },
+        "workersAfterOpen": [
+          {
+            "url": "http://localhost:45125/assets/minimap.worker-wolEhtnQ-BW6AZSYz.js",
+            "heap": {
+              "usedSize": 4989472,
+              "totalSize": 5423104,
+              "backingStorageSize": 329865
+            }
+          },
+          {
+            "url": "http://localhost:45125/assets/shiki.worker-DBJrwiUq-KsPxxMTd.js",
+            "heap": {
+              "usedSize": 791400,
+              "totalSize": 1314816,
+              "backingStorageSize": 1880778
+            }
+          }
+        ],
+        "workersAfterSave": [
+          {
+            "url": "http://localhost:45125/assets/minimap.worker-wolEhtnQ-BW6AZSYz.js",
+            "heap": {
+              "usedSize": 5160868,
+              "totalSize": 5771264,
+              "backingStorageSize": 329865
+            }
+          },
+          {
+            "url": "http://localhost:45125/assets/shiki.worker-DBJrwiUq-KsPxxMTd.js",
+            "heap": {
+              "usedSize": 791400,
+              "totalSize": 1314816,
+              "backingStorageSize": 1880778
+            }
+          }
+        ],
+        "openPeak": {
+          "browserBytes": 854556672,
+          "rendererBytes": 304033792,
+          "serverTreeBytes": 271253504,
+          "totalBytes": 1125810176
+        },
+        "typingPeak": {
+          "browserBytes": 918118400,
+          "rendererBytes": 318050304,
+          "serverTreeBytes": 256761856,
+          "totalBytes": 1172373504
+        },
+        "savePeak": {
+          "browserBytes": 930578432,
+          "rendererBytes": 320901120,
+          "serverTreeBytes": 264183808,
+          "totalBytes": 1187258368
+        },
+        "mainThreadKeyMs": {
+          "method": "Sum of renderer main-thread RunTask intervals from the keydown task through the second animation-frame callback task. Includes input processing, frame work and other main-thread work in that window; excludes idle time, worker time and work scheduled after the window. This is an upper bound on causal main-thread work inside the sampled window.",
+          "count": 30,
+          "p50": 4.59,
+          "p95": 7.032,
+          "max": 14.148,
+          "samples": [
+            {
+              "key": 0,
+              "mainThreadMs": 14.148,
+              "eventDispatchMs": 23.045,
+              "windowMs": 15.369
+            },
+            {
+              "key": 1,
+              "mainThreadMs": 6.97,
+              "eventDispatchMs": 9.003,
+              "windowMs": 7.344
+            },
+            {
+              "key": 2,
+              "mainThreadMs": 6.81,
+              "eventDispatchMs": 8.375,
+              "windowMs": 6.817
+            },
+            {
+              "key": 3,
+              "mainThreadMs": 5.09,
+              "eventDispatchMs": 5.903,
+              "windowMs": 5.751
+            },
+            {
+              "key": 4,
+              "mainThreadMs": 6.173,
+              "eventDispatchMs": 8.107,
+              "windowMs": 6.821
+            },
+            {
+              "key": 5,
+              "mainThreadMs": 5.067,
+              "eventDispatchMs": 6.019,
+              "windowMs": 5.69
+            },
+            {
+              "key": 6,
+              "mainThreadMs": 5.02,
+              "eventDispatchMs": 6.026,
+              "windowMs": 5.574
+            },
+            {
+              "key": 7,
+              "mainThreadMs": 4.804,
+              "eventDispatchMs": 5.828,
+              "windowMs": 5.169
+            },
+            {
+              "key": 8,
+              "mainThreadMs": 4.984,
+              "eventDispatchMs": 5.805,
+              "windowMs": 5.559
+            },
+            {
+              "key": 9,
+              "mainThreadMs": 4.766,
+              "eventDispatchMs": 5.592,
+              "windowMs": 5.211
+            },
+            {
+              "key": 10,
+              "mainThreadMs": 4.339,
+              "eventDispatchMs": 4.878,
+              "windowMs": 4.987
+            },
+            {
+              "key": 11,
+              "mainThreadMs": 4.969,
+              "eventDispatchMs": 5.877,
+              "windowMs": 5.422
+            },
+            {
+              "key": 12,
+              "mainThreadMs": 4.691,
+              "eventDispatchMs": 5.017,
+              "windowMs": 5.282
+            },
+            {
+              "key": 13,
+              "mainThreadMs": 7.032,
+              "eventDispatchMs": 9.121,
+              "windowMs": 7.629
+            },
+            {
+              "key": 14,
+              "mainThreadMs": 4.092,
+              "eventDispatchMs": 4.463,
+              "windowMs": 4.665
+            },
+            {
+              "key": 15,
+              "mainThreadMs": 4.217,
+              "eventDispatchMs": 4.429,
+              "windowMs": 4.755
+            },
+            {
+              "key": 16,
+              "mainThreadMs": 4.313,
+              "eventDispatchMs": 4.563,
+              "windowMs": 4.694
+            },
+            {
+              "key": 17,
+              "mainThreadMs": 4.59,
+              "eventDispatchMs": 4.91,
+              "windowMs": 5.154
+            },
+            {
+              "key": 18,
+              "mainThreadMs": 4.544,
+              "eventDispatchMs": 4.465,
+              "windowMs": 4.555
+            },
+            {
+              "key": 19,
+              "mainThreadMs": 4.234,
+              "eventDispatchMs": 4.352,
+              "windowMs": 4.78
+            },
+            {
+              "key": 20,
+              "mainThreadMs": 4.296,
+              "eventDispatchMs": 4.452,
+              "windowMs": 4.862
+            },
+            {
+              "key": 21,
+              "mainThreadMs": 4.269,
+              "eventDispatchMs": 4.538,
+              "windowMs": 4.846
+            },
+            {
+              "key": 22,
+              "mainThreadMs": 4.323,
+              "eventDispatchMs": 4.713,
+              "windowMs": 4.96
+            },
+            {
+              "key": 23,
+              "mainThreadMs": 4.449,
+              "eventDispatchMs": 5.078,
+              "windowMs": 4.847
+            },
+            {
+              "key": 24,
+              "mainThreadMs": 4.467,
+              "eventDispatchMs": 5.015,
+              "windowMs": 5.001
+            },
+            {
+              "key": 25,
+              "mainThreadMs": 4.158,
+              "eventDispatchMs": 4.382,
+              "windowMs": 4.721
+            },
+            {
+              "key": 26,
+              "mainThreadMs": 4.15,
+              "eventDispatchMs": 4.493,
+              "windowMs": 4.714
+            },
+            {
+              "key": 27,
+              "mainThreadMs": 4.352,
+              "eventDispatchMs": 4.315,
+              "windowMs": 4.878
+            },
+            {
+              "key": 28,
+              "mainThreadMs": 6.085,
+              "eventDispatchMs": 7.684,
+              "windowMs": 6.566
+            },
+            {
+              "key": 29,
+              "mainThreadMs": 4.185,
+              "eventDispatchMs": 4.189,
+              "windowMs": 4.693
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "sizeMiB": 200,
+      "extension": "txt",
+      "twoByte": true,
+      "analysis": "default",
+      "highlighting": "default",
+      "keys": 30,
+      "settleMs": 10000,
+      "profile": false,
+      "initialBytes": 209715170,
+      "corpus": "folded-functions-v1-unicode-body-v2",
+      "browser": "153.0.8010.12",
+      "host": {
+        "name": "omarchy",
+        "arch": "x64",
+        "cpus": 28,
+        "memoryBytes": 33368662016
+      },
+      "runtime": "1.4.2",
+      "timestamp": "2026-10-08T07:48:48.712Z",
+      "frameScheduling": "unthrottled Chromium (--disable-frame-rate-limit --disable-gpu-vsync)",
+      "rendering": {
+        "rasterization": "disabled_software",
+        "compositing": "disabled_software",
+        "glRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+        "path": "software"
+      },
+      "status": "passed",
+      "metrics": {
+        "openToTextMs": 1356.3900209999993,
+        "highlighting": {
+          "state": "plain"
+        },
+        "keyLatencyMs": {
+          "count": 30,
+          "p50": 2.600000023841858,
+          "p95": 3.300000011920929,
+          "max": 7.5
+        },
+        "saveMs": 9603.142853999998,
+        "diskBytes": 209715200,
+        "expectedSha256": "89a66d3c689e35e55048ef794cabb1eb87bfc11b5329a8b6c44ac4dc625733ec",
+        "savedSha256": "89a66d3c689e35e55048ef794cabb1eb87bfc11b5329a8b6c44ac4dc625733ec",
+        "heapBeforeOpen": {
+          "usedBytes": 19584012,
+          "backingBytes": 5758042
+        },
+        "heapAfterOpen": {
+          "usedBytes": 435671892,
+          "backingBytes": 73781796
+        },
+        "heapAfterTyping": {
+          "usedBytes": 437562960,
+          "backingBytes": 73785095
+        },
+        "heapAfterSave": {
+          "usedBytes": 438050656,
+          "backingBytes": 73790590
+        },
+        "workersAfterOpen": [
+          {
+            "url": "http://localhost:45033/assets/shiki.worker-DBJrwiUq-KsPxxMTd.js",
+            "heap": {
+              "usedSize": 790360,
+              "totalSize": 1839104,
+              "backingStorageSize": 1880778
+            }
+          }
+        ],
+        "workersAfterSave": [
+          {
+            "url": "http://localhost:45033/assets/shiki.worker-DBJrwiUq-KsPxxMTd.js",
+            "heap": {
+              "usedSize": 790360,
+              "totalSize": 1576960,
+              "backingStorageSize": 1880778
+            }
+          }
+        ],
+        "openPeak": {
+          "browserBytes": 1698443264,
+          "rendererBytes": 1158877184,
+          "serverTreeBytes": 681590784,
+          "totalBytes": 1958612992
+        },
+        "typingPeak": {
+          "browserBytes": 1311711232,
+          "rendererBytes": 737755136,
+          "serverTreeBytes": 251969536,
+          "totalBytes": 1563676672
+        },
+        "savePeak": {
+          "browserBytes": 5461393408,
+          "rendererBytes": 4221665280,
+          "serverTreeBytes": 1104379904,
+          "totalBytes": 6141689856
+        },
+        "mainThreadKeyMs": {
+          "method": "Sum of renderer main-thread RunTask intervals from the keydown task through the second animation-frame callback task. Includes input processing, frame work and other main-thread work in that window; excludes idle time, worker time and work scheduled after the window. This is an upper bound on causal main-thread work inside the sampled window.",
+          "count": 30,
+          "p50": 3.623,
+          "p95": 4.901,
+          "max": 8.861,
+          "samples": [
+            {
+              "key": 0,
+              "mainThreadMs": 8.861,
+              "eventDispatchMs": 12.856,
+              "windowMs": 9.376
+            },
+            {
+              "key": 1,
+              "mainThreadMs": 4.295,
+              "eventDispatchMs": 5.083,
+              "windowMs": 4.545
+            },
+            {
+              "key": 2,
+              "mainThreadMs": 4.206,
+              "eventDispatchMs": 4.497,
+              "windowMs": 4.578
+            },
+            {
+              "key": 3,
+              "mainThreadMs": 4.901,
+              "eventDispatchMs": 4.771,
+              "windowMs": 4.915
+            },
+            {
+              "key": 4,
+              "mainThreadMs": 3.947,
+              "eventDispatchMs": 4.41,
+              "windowMs": 4.344
+            },
+            {
+              "key": 5,
+              "mainThreadMs": 3.542,
+              "eventDispatchMs": 3.594,
+              "windowMs": 3.817
+            },
+            {
+              "key": 6,
+              "mainThreadMs": 3.777,
+              "eventDispatchMs": 4.055,
+              "windowMs": 4.103
+            },
+            {
+              "key": 7,
+              "mainThreadMs": 4.008,
+              "eventDispatchMs": 4.209,
+              "windowMs": 4.287
+            },
+            {
+              "key": 8,
+              "mainThreadMs": 4.106,
+              "eventDispatchMs": 4.569,
+              "windowMs": 4.297
+            },
+            {
+              "key": 9,
+              "mainThreadMs": 3.836,
+              "eventDispatchMs": 4.015,
+              "windowMs": 4.205
+            },
+            {
+              "key": 10,
+              "mainThreadMs": 3.204,
+              "eventDispatchMs": 3.029,
+              "windowMs": 3.496
+            },
+            {
+              "key": 11,
+              "mainThreadMs": 3.119,
+              "eventDispatchMs": 2.919,
+              "windowMs": 3.498
+            },
+            {
+              "key": 12,
+              "mainThreadMs": 3.785,
+              "eventDispatchMs": 4.01,
+              "windowMs": 4.36
+            },
+            {
+              "key": 13,
+              "mainThreadMs": 3.731,
+              "eventDispatchMs": 3.504,
+              "windowMs": 3.756
+            },
+            {
+              "key": 14,
+              "mainThreadMs": 3.221,
+              "eventDispatchMs": 3.112,
+              "windowMs": 3.474
+            },
+            {
+              "key": 15,
+              "mainThreadMs": 3.148,
+              "eventDispatchMs": 2.846,
+              "windowMs": 3.433
+            },
+            {
+              "key": 16,
+              "mainThreadMs": 3.038,
+              "eventDispatchMs": 2.767,
+              "windowMs": 3.306
+            },
+            {
+              "key": 17,
+              "mainThreadMs": 4.787,
+              "eventDispatchMs": 4.281,
+              "windowMs": 5.038
+            },
+            {
+              "key": 18,
+              "mainThreadMs": 3.264,
+              "eventDispatchMs": 2.915,
+              "windowMs": 3.492
+            },
+            {
+              "key": 19,
+              "mainThreadMs": 3.746,
+              "eventDispatchMs": 3.402,
+              "windowMs": 3.756
+            },
+            {
+              "key": 20,
+              "mainThreadMs": 3.172,
+              "eventDispatchMs": 2.78,
+              "windowMs": 3.477
+            },
+            {
+              "key": 21,
+              "mainThreadMs": 3.134,
+              "eventDispatchMs": 2.885,
+              "windowMs": 3.461
+            },
+            {
+              "key": 22,
+              "mainThreadMs": 3.047,
+              "eventDispatchMs": 2.702,
+              "windowMs": 3.4
+            },
+            {
+              "key": 23,
+              "mainThreadMs": 3.026,
+              "eventDispatchMs": 2.622,
+              "windowMs": 3.434
+            },
+            {
+              "key": 24,
+              "mainThreadMs": 3.238,
+              "eventDispatchMs": 2.949,
+              "windowMs": 3.69
+            },
+            {
+              "key": 25,
+              "mainThreadMs": 3.561,
+              "eventDispatchMs": 3.165,
+              "windowMs": 3.785
+            },
+            {
+              "key": 26,
+              "mainThreadMs": 4.421,
+              "eventDispatchMs": 4.36,
+              "windowMs": 4.692
+            },
+            {
+              "key": 27,
+              "mainThreadMs": 3.221,
+              "eventDispatchMs": 2.873,
+              "windowMs": 3.422
+            },
+            {
+              "key": 28,
+              "mainThreadMs": 3.623,
+              "eventDispatchMs": 3.285,
+              "windowMs": 3.948
+            },
+            {
+              "key": 29,
+              "mainThreadMs": 3.104,
+              "eventDispatchMs": 2.657,
+              "windowMs": 3.312
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "sizeMiB": 0.0625,
+      "extension": "ts",
+      "twoByte": false,
+      "analysis": "off",
+      "highlighting": "default",
+      "keys": 30,
+      "settleMs": 10000,
+      "profile": false,
+      "initialBytes": 65506,
+      "corpus": "scoped-functions-v2",
+      "browser": "153.0.8010.12",
+      "host": {
+        "name": "omarchy",
+        "arch": "x64",
+        "cpus": 28,
+        "memoryBytes": 33368662016
+      },
+      "runtime": "1.4.2",
+      "timestamp": "2026-10-08T07:49:38.891Z",
+      "frameScheduling": "unthrottled Chromium (--disable-frame-rate-limit --disable-gpu-vsync)",
+      "rendering": {
+        "rasterization": "disabled_software",
+        "compositing": "disabled_software",
+        "glRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+        "path": "software"
+      },
+      "status": "passed",
+      "metrics": {
+        "openToTextMs": 325.8798050000041,
+        "highlighting": {
+          "state": "paused"
+        },
+        "keyLatencyMs": {
+          "count": 30,
+          "p50": 2.599999964237213,
+          "p95": 3.800000011920929,
+          "max": 8.5
+        },
+        "saveMs": 33.073048000005656,
+        "diskBytes": 65536,
+        "expectedSha256": "4b5edaed86d62960ad6337b3323dadc71b490237be856f7602a31b71537876e8",
+        "savedSha256": "4b5edaed86d62960ad6337b3323dadc71b490237be856f7602a31b71537876e8",
+        "heapBeforeOpen": {
+          "usedBytes": 18836732,
+          "backingBytes": 5847875
+        },
+        "heapAfterOpen": {
+          "usedBytes": 23439564,
+          "backingBytes": 6776139
+        },
+        "heapAfterTyping": {
+          "usedBytes": 25718584,
+          "backingBytes": 6777375
+        },
+        "heapAfterSave": {
+          "usedBytes": 26386100,
+          "backingBytes": 6781099
+        },
+        "workersAfterOpen": [
+          {
+            "url": "http://localhost:40017/assets/minimap.worker-wolEhtnQ-BW6AZSYz.js",
+            "heap": {
+              "usedSize": 731280,
+              "totalSize": 1572864,
+              "backingStorageSize": 314505
+            }
+          }
+        ],
+        "workersAfterSave": [
+          {
+            "url": "http://localhost:40017/assets/minimap.worker-wolEhtnQ-BW6AZSYz.js",
+            "heap": {
+              "usedSize": 843956,
+              "totalSize": 1572864,
+              "backingStorageSize": 314505
+            }
+          }
+        ],
+        "openPeak": {
+          "browserBytes": 761683968,
+          "rendererBytes": 262107136,
+          "serverTreeBytes": 304820224,
+          "totalBytes": 1066504192
+        },
+        "typingPeak": {
+          "browserBytes": 822190080,
+          "rendererBytes": 275374080,
+          "serverTreeBytes": 330354688,
+          "totalBytes": 1150435328
+        },
+        "savePeak": {
+          "browserBytes": 841019392,
+          "rendererBytes": 278695936,
+          "serverTreeBytes": 389898240,
+          "totalBytes": 1229537280
+        },
+        "mainThreadKeyMs": {
+          "method": "Sum of renderer main-thread RunTask intervals from the keydown task through the second animation-frame callback task. Includes input processing, frame work and other main-thread work in that window; excludes idle time, worker time and work scheduled after the window. This is an upper bound on causal main-thread work inside the sampled window.",
+          "count": 30,
+          "p50": 3.592,
+          "p95": 5.213,
+          "max": 9.907,
+          "samples": [
+            {
+              "key": 0,
+              "mainThreadMs": 9.907,
+              "eventDispatchMs": 15.135,
+              "windowMs": 11.077
+            },
+            {
+              "key": 1,
+              "mainThreadMs": 4.686,
+              "eventDispatchMs": 5.523,
+              "windowMs": 5.275
+            },
+            {
+              "key": 2,
+              "mainThreadMs": 4.138,
+              "eventDispatchMs": 4.636,
+              "windowMs": 4.56
+            },
+            {
+              "key": 3,
+              "mainThreadMs": 3.592,
+              "eventDispatchMs": 3.946,
+              "windowMs": 3.848
+            },
+            {
+              "key": 4,
+              "mainThreadMs": 3.882,
+              "eventDispatchMs": 4.266,
+              "windowMs": 4.362
+            },
+            {
+              "key": 5,
+              "mainThreadMs": 3.881,
+              "eventDispatchMs": 4.146,
+              "windowMs": 4.349
+            },
+            {
+              "key": 6,
+              "mainThreadMs": 3.778,
+              "eventDispatchMs": 4.062,
+              "windowMs": 4.177
+            },
+            {
+              "key": 7,
+              "mainThreadMs": 3.825,
+              "eventDispatchMs": 4.122,
+              "windowMs": 4.227
+            },
+            {
+              "key": 8,
+              "mainThreadMs": 3.832,
+              "eventDispatchMs": 4.12,
+              "windowMs": 4.243
+            },
+            {
+              "key": 9,
+              "mainThreadMs": 3.754,
+              "eventDispatchMs": 3.926,
+              "windowMs": 4.299
+            },
+            {
+              "key": 10,
+              "mainThreadMs": 3.396,
+              "eventDispatchMs": 3.371,
+              "windowMs": 3.903
+            },
+            {
+              "key": 11,
+              "mainThreadMs": 4.861,
+              "eventDispatchMs": 5.477,
+              "windowMs": 5.407
+            },
+            {
+              "key": 12,
+              "mainThreadMs": 4.462,
+              "eventDispatchMs": 5.347,
+              "windowMs": 4.894
+            },
+            {
+              "key": 13,
+              "mainThreadMs": 3.885,
+              "eventDispatchMs": 4.37,
+              "windowMs": 4.229
+            },
+            {
+              "key": 14,
+              "mainThreadMs": 4.552,
+              "eventDispatchMs": 4.909,
+              "windowMs": 5.032
+            },
+            {
+              "key": 15,
+              "mainThreadMs": 3.224,
+              "eventDispatchMs": 3.093,
+              "windowMs": 3.731
+            },
+            {
+              "key": 16,
+              "mainThreadMs": 3.348,
+              "eventDispatchMs": 3.163,
+              "windowMs": 3.87
+            },
+            {
+              "key": 17,
+              "mainThreadMs": 3.098,
+              "eventDispatchMs": 2.801,
+              "windowMs": 3.623
+            },
+            {
+              "key": 18,
+              "mainThreadMs": 3.203,
+              "eventDispatchMs": 3.106,
+              "windowMs": 3.708
+            },
+            {
+              "key": 19,
+              "mainThreadMs": 3.2,
+              "eventDispatchMs": 2.855,
+              "windowMs": 3.758
+            },
+            {
+              "key": 20,
+              "mainThreadMs": 3.426,
+              "eventDispatchMs": 3.299,
+              "windowMs": 3.79
+            },
+            {
+              "key": 21,
+              "mainThreadMs": 3.078,
+              "eventDispatchMs": 2.855,
+              "windowMs": 3.354
+            },
+            {
+              "key": 22,
+              "mainThreadMs": 3.327,
+              "eventDispatchMs": 3.106,
+              "windowMs": 3.741
+            },
+            {
+              "key": 23,
+              "mainThreadMs": 3.258,
+              "eventDispatchMs": 3.015,
+              "windowMs": 3.733
+            },
+            {
+              "key": 24,
+              "mainThreadMs": 3.22,
+              "eventDispatchMs": 2.911,
+              "windowMs": 3.717
+            },
+            {
+              "key": 25,
+              "mainThreadMs": 3.35,
+              "eventDispatchMs": 2.937,
+              "windowMs": 3.722
+            },
+            {
+              "key": 26,
+              "mainThreadMs": 3.324,
+              "eventDispatchMs": 3.05,
+              "windowMs": 3.699
+            },
+            {
+              "key": 27,
+              "mainThreadMs": 3.167,
+              "eventDispatchMs": 2.895,
+              "windowMs": 3.712
+            },
+            {
+              "key": 28,
+              "mainThreadMs": 3.139,
+              "eventDispatchMs": 2.891,
+              "windowMs": 3.586
+            },
+            {
+              "key": 29,
+              "mainThreadMs": 5.213,
+              "eventDispatchMs": 4.927,
+              "windowMs": 5.679
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "sizeMiB": 0.0625,
+      "extension": "ts",
+      "twoByte": false,
+      "analysis": "on",
+      "highlighting": "tree-sitter",
+      "keys": 30,
+      "settleMs": 10000,
+      "profile": false,
+      "initialBytes": 65506,
+      "corpus": "scoped-functions-v2",
+      "browser": "153.0.8010.12",
+      "host": {
+        "name": "omarchy",
+        "arch": "x64",
+        "cpus": 28,
+        "memoryBytes": 33368662016
+      },
+      "runtime": "1.4.2",
+      "timestamp": "2026-10-08T07:50:07.901Z",
+      "frameScheduling": "unthrottled Chromium (--disable-frame-rate-limit --disable-gpu-vsync)",
+      "rendering": {
+        "rasterization": "disabled_software",
+        "compositing": "disabled_software",
+        "glRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+        "path": "software"
+      },
+      "status": "passed",
+      "metrics": {
+        "openToTextMs": 369.74098799999047,
+        "highlighting": {
+          "state": "active",
+          "openToHighlightMs": 576.3355369999917,
+          "colorCount": 9
+        },
+        "keyLatencyMs": {
+          "count": 30,
+          "p50": 3.899999976158142,
+          "p95": 9.699999988079071,
+          "max": 13.399999976158142
+        },
+        "saveMs": 67.84688999998616,
+        "diskBytes": 65536,
+        "expectedSha256": "4b5edaed86d62960ad6337b3323dadc71b490237be856f7602a31b71537876e8",
+        "savedSha256": "4b5edaed86d62960ad6337b3323dadc71b490237be856f7602a31b71537876e8",
+        "heapBeforeOpen": {
+          "usedBytes": 20085288,
+          "backingBytes": 6489150
+        },
+        "heapAfterOpen": {
+          "usedBytes": 27276792,
+          "backingBytes": 8779505
+        },
+        "heapAfterTyping": {
+          "usedBytes": 30061208,
+          "backingBytes": 8780967
+        },
+        "heapAfterSave": {
+          "usedBytes": 30677760,
+          "backingBytes": 8784644
+        },
+        "workersAfterOpen": [
+          {
+            "url": "http://localhost:40825/assets/treeSitter.worker-CiynBiBJ-CheswXIo.js",
+            "heap": {
+              "usedSize": 5266908,
+              "totalSize": 5963776,
+              "backingStorageSize": 1691307
+            }
+          },
+          {
+            "url": "http://localhost:40825/assets/minimap.worker-wolEhtnQ-BW6AZSYz.js",
+            "heap": {
+              "usedSize": 1017460,
+              "totalSize": 1572864,
+              "backingStorageSize": 367161
+            }
+          }
+        ],
+        "workersAfterSave": [
+          {
+            "url": "http://localhost:40825/assets/treeSitter.worker-CiynBiBJ-CheswXIo.js",
+            "heap": {
+              "usedSize": 5640004,
+              "totalSize": 6750208,
+              "backingStorageSize": 1691307
+            }
+          },
+          {
+            "url": "http://localhost:40825/assets/minimap.worker-wolEhtnQ-BW6AZSYz.js",
+            "heap": {
+              "usedSize": 1146960,
+              "totalSize": 1572864,
+              "backingStorageSize": 367169
+            }
+          }
+        ],
+        "openPeak": {
+          "browserBytes": 831553536,
+          "rendererBytes": 331055104,
+          "serverTreeBytes": 482545664,
+          "totalBytes": 1314099200
+        },
+        "typingPeak": {
+          "browserBytes": 1015767040,
+          "rendererBytes": 440926208,
+          "serverTreeBytes": 496250880,
+          "totalBytes": 1511690240
+        },
+        "savePeak": {
+          "browserBytes": 986943488,
+          "rendererBytes": 404983808,
+          "serverTreeBytes": 497217536,
+          "totalBytes": 1475530752
+        },
+        "mainThreadKeyMs": {
+          "method": "Sum of renderer main-thread RunTask intervals from the keydown task through the second animation-frame callback task. Includes input processing, frame work and other main-thread work in that window; excludes idle time, worker time and work scheduled after the window. This is an upper bound on causal main-thread work inside the sampled window.",
+          "count": 30,
+          "p50": 8.699,
+          "p95": 18.854,
+          "max": 22.622,
+          "samples": [
+            {
+              "key": 0,
+              "mainThreadMs": 22.622,
+              "eventDispatchMs": 24.292,
+              "windowMs": 22.642
+            },
+            {
+              "key": 1,
+              "mainThreadMs": 18.854,
+              "eventDispatchMs": 15.931,
+              "windowMs": 18.92
+            },
+            {
+              "key": 2,
+              "mainThreadMs": 7.223,
+              "eventDispatchMs": 7.382,
+              "windowMs": 8.182
+            },
+            {
+              "key": 3,
+              "mainThreadMs": 9.066,
+              "eventDispatchMs": 6.08,
+              "windowMs": 9.085
+            },
+            {
+              "key": 4,
+              "mainThreadMs": 10.12,
+              "eventDispatchMs": 7.353,
+              "windowMs": 10.136
+            },
+            {
+              "key": 5,
+              "mainThreadMs": 10.193,
+              "eventDispatchMs": 8.743,
+              "windowMs": 10.212
+            },
+            {
+              "key": 6,
+              "mainThreadMs": 8.625,
+              "eventDispatchMs": 5.871,
+              "windowMs": 8.642
+            },
+            {
+              "key": 7,
+              "mainThreadMs": 6.705,
+              "eventDispatchMs": 5.957,
+              "windowMs": 7.681
+            },
+            {
+              "key": 8,
+              "mainThreadMs": 9.748,
+              "eventDispatchMs": 9.909,
+              "windowMs": 10.737
+            },
+            {
+              "key": 9,
+              "mainThreadMs": 9.357,
+              "eventDispatchMs": 6.884,
+              "windowMs": 9.372
+            },
+            {
+              "key": 10,
+              "mainThreadMs": 7.531,
+              "eventDispatchMs": 7.126,
+              "windowMs": 8.036
+            },
+            {
+              "key": 11,
+              "mainThreadMs": 8.476,
+              "eventDispatchMs": 5.273,
+              "windowMs": 8.493
+            },
+            {
+              "key": 12,
+              "mainThreadMs": 8.209,
+              "eventDispatchMs": 5.46,
+              "windowMs": 8.227
+            },
+            {
+              "key": 13,
+              "mainThreadMs": 8.775,
+              "eventDispatchMs": 5.381,
+              "windowMs": 8.799
+            },
+            {
+              "key": 14,
+              "mainThreadMs": 8.426,
+              "eventDispatchMs": 4.987,
+              "windowMs": 8.442
+            },
+            {
+              "key": 15,
+              "mainThreadMs": 8.925,
+              "eventDispatchMs": 5.774,
+              "windowMs": 8.948
+            },
+            {
+              "key": 16,
+              "mainThreadMs": 9.547,
+              "eventDispatchMs": 6.655,
+              "windowMs": 9.565
+            },
+            {
+              "key": 17,
+              "mainThreadMs": 8.133,
+              "eventDispatchMs": 5.371,
+              "windowMs": 8.152
+            },
+            {
+              "key": 18,
+              "mainThreadMs": 6.194,
+              "eventDispatchMs": 5.081,
+              "windowMs": 7.303
+            },
+            {
+              "key": 19,
+              "mainThreadMs": 8.699,
+              "eventDispatchMs": 5.841,
+              "windowMs": 8.719
+            },
+            {
+              "key": 20,
+              "mainThreadMs": 8.503,
+              "eventDispatchMs": 5.695,
+              "windowMs": 8.521
+            },
+            {
+              "key": 21,
+              "mainThreadMs": 8.429,
+              "eventDispatchMs": 6.803,
+              "windowMs": 8.447
+            },
+            {
+              "key": 22,
+              "mainThreadMs": 7.661,
+              "eventDispatchMs": 4.742,
+              "windowMs": 7.678
+            },
+            {
+              "key": 23,
+              "mainThreadMs": 6.481,
+              "eventDispatchMs": 5.291,
+              "windowMs": 7.389
+            },
+            {
+              "key": 24,
+              "mainThreadMs": 12.279,
+              "eventDispatchMs": 7.234,
+              "windowMs": 12.308
+            },
+            {
+              "key": 25,
+              "mainThreadMs": 7.953,
+              "eventDispatchMs": 5.911,
+              "windowMs": 8.718
+            },
+            {
+              "key": 26,
+              "mainThreadMs": 9.174,
+              "eventDispatchMs": 4.999,
+              "windowMs": 9.203
+            },
+            {
+              "key": 27,
+              "mainThreadMs": 7.671,
+              "eventDispatchMs": 5.236,
+              "windowMs": 8.895
+            },
+            {
+              "key": 28,
+              "mainThreadMs": 9.958,
+              "eventDispatchMs": 5.866,
+              "windowMs": 9.982
+            },
+            {
+              "key": 29,
+              "mainThreadMs": 9.999,
+              "eventDispatchMs": 7.112,
+              "windowMs": 10.95
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "sizeMiB": 1,
+      "extension": "ts",
+      "twoByte": false,
+      "analysis": "off",
+      "highlighting": "default",
+      "keys": 30,
+      "settleMs": 10000,
+      "profile": false,
+      "initialBytes": 1048546,
+      "corpus": "scoped-functions-v2",
+      "browser": "153.0.8010.12",
+      "host": {
+        "name": "omarchy",
+        "arch": "x64",
+        "cpus": 28,
+        "memoryBytes": 33368662016
+      },
+      "runtime": "1.4.2",
+      "timestamp": "2026-10-08T07:50:36.090Z",
+      "frameScheduling": "unthrottled Chromium (--disable-frame-rate-limit --disable-gpu-vsync)",
+      "rendering": {
+        "rasterization": "disabled_software",
+        "compositing": "disabled_software",
+        "glRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+        "path": "software"
+      },
+      "status": "passed",
+      "metrics": {
+        "openToTextMs": 346.192733999982,
+        "highlighting": {
+          "state": "paused"
+        },
+        "keyLatencyMs": {
+          "count": 30,
+          "p50": 3.199999988079071,
+          "p95": 4.699999988079071,
+          "max": 10.900000035762787
+        },
+        "saveMs": 62.87678500000038,
+        "diskBytes": 1048576,
+        "expectedSha256": "46f5623a1d0505e1b556a43d9e9502c1659b9d5122348e63ac1d71a907585775",
+        "savedSha256": "46f5623a1d0505e1b556a43d9e9502c1659b9d5122348e63ac1d71a907585775",
+        "heapBeforeOpen": {
+          "usedBytes": 19549412,
+          "backingBytes": 6389248
+        },
+        "heapAfterOpen": {
+          "usedBytes": 26803684,
+          "backingBytes": 8247667
+        },
+        "heapAfterTyping": {
+          "usedBytes": 29007504,
+          "backingBytes": 8248867
+        },
+        "heapAfterSave": {
+          "usedBytes": 32645968,
+          "backingBytes": 8252543
+        },
+        "workersAfterOpen": [
+          {
+            "url": "http://localhost:40109/assets/minimap.worker-wolEhtnQ-BW6AZSYz.js",
+            "heap": {
+              "usedSize": 4711252,
+              "totalSize": 5570560,
+              "backingStorageSize": 314505
+            }
+          }
+        ],
+        "workersAfterSave": [
+          {
+            "url": "http://localhost:40109/assets/minimap.worker-wolEhtnQ-BW6AZSYz.js",
+            "heap": {
+              "usedSize": 4809708,
+              "totalSize": 5582848,
+              "backingStorageSize": 314505
+            }
+          }
+        ],
+        "openPeak": {
+          "browserBytes": 799096832,
+          "rendererBytes": 288387072,
+          "serverTreeBytes": 302796800,
+          "totalBytes": 1101893632
+        },
+        "typingPeak": {
+          "browserBytes": 844591104,
+          "rendererBytes": 296054784,
+          "serverTreeBytes": 411508736,
+          "totalBytes": 1251659776
+        },
+        "savePeak": {
+          "browserBytes": 862085120,
+          "rendererBytes": 318144512,
+          "serverTreeBytes": 461041664,
+          "totalBytes": 1316581376
+        },
+        "mainThreadKeyMs": {
+          "method": "Sum of renderer main-thread RunTask intervals from the keydown task through the second animation-frame callback task. Includes input processing, frame work and other main-thread work in that window; excludes idle time, worker time and work scheduled after the window. This is an upper bound on causal main-thread work inside the sampled window.",
+          "count": 30,
+          "p50": 4.397,
+          "p95": 6.232,
+          "max": 12.62,
+          "samples": [
+            {
+              "key": 0,
+              "mainThreadMs": 12.62,
+              "eventDispatchMs": 18.831,
+              "windowMs": 13.684
+            },
+            {
+              "key": 1,
+              "mainThreadMs": 5.579,
+              "eventDispatchMs": 7.555,
+              "windowMs": 5.93
+            },
+            {
+              "key": 2,
+              "mainThreadMs": 5.604,
+              "eventDispatchMs": 7.261,
+              "windowMs": 5.894
+            },
+            {
+              "key": 3,
+              "mainThreadMs": 5.993,
+              "eventDispatchMs": 7.586,
+              "windowMs": 6.002
+            },
+            {
+              "key": 4,
+              "mainThreadMs": 4.164,
+              "eventDispatchMs": 4.657,
+              "windowMs": 4.653
+            },
+            {
+              "key": 5,
+              "mainThreadMs": 4.269,
+              "eventDispatchMs": 4.585,
+              "windowMs": 4.691
+            },
+            {
+              "key": 6,
+              "mainThreadMs": 6.21,
+              "eventDispatchMs": 6.859,
+              "windowMs": 6.623
+            },
+            {
+              "key": 7,
+              "mainThreadMs": 6.232,
+              "eventDispatchMs": 7.348,
+              "windowMs": 6.487
+            },
+            {
+              "key": 8,
+              "mainThreadMs": 4.34,
+              "eventDispatchMs": 4.825,
+              "windowMs": 4.601
+            },
+            {
+              "key": 9,
+              "mainThreadMs": 3.914,
+              "eventDispatchMs": 3.985,
+              "windowMs": 4.296
+            },
+            {
+              "key": 10,
+              "mainThreadMs": 4.917,
+              "eventDispatchMs": 5.557,
+              "windowMs": 5.374
+            },
+            {
+              "key": 11,
+              "mainThreadMs": 5.73,
+              "eventDispatchMs": 6.106,
+              "windowMs": 6.283
+            },
+            {
+              "key": 12,
+              "mainThreadMs": 3.474,
+              "eventDispatchMs": 3.72,
+              "windowMs": 3.823
+            },
+            {
+              "key": 13,
+              "mainThreadMs": 4.488,
+              "eventDispatchMs": 5.36,
+              "windowMs": 5.092
+            },
+            {
+              "key": 14,
+              "mainThreadMs": 3.885,
+              "eventDispatchMs": 4.135,
+              "windowMs": 4.375
+            },
+            {
+              "key": 15,
+              "mainThreadMs": 4.397,
+              "eventDispatchMs": 5.125,
+              "windowMs": 4.778
+            },
+            {
+              "key": 16,
+              "mainThreadMs": 5.629,
+              "eventDispatchMs": 5.145,
+              "windowMs": 5.741
+            },
+            {
+              "key": 17,
+              "mainThreadMs": 4.543,
+              "eventDispatchMs": 4.152,
+              "windowMs": 4.875
+            },
+            {
+              "key": 18,
+              "mainThreadMs": 3.547,
+              "eventDispatchMs": 3.526,
+              "windowMs": 3.961
+            },
+            {
+              "key": 19,
+              "mainThreadMs": 3.409,
+              "eventDispatchMs": 3.398,
+              "windowMs": 3.74
+            },
+            {
+              "key": 20,
+              "mainThreadMs": 5.095,
+              "eventDispatchMs": 5.313,
+              "windowMs": 5.493
+            },
+            {
+              "key": 21,
+              "mainThreadMs": 3.848,
+              "eventDispatchMs": 3.292,
+              "windowMs": 4.08
+            },
+            {
+              "key": 22,
+              "mainThreadMs": 3.589,
+              "eventDispatchMs": 3.434,
+              "windowMs": 4.049
+            },
+            {
+              "key": 23,
+              "mainThreadMs": 4.601,
+              "eventDispatchMs": 5.032,
+              "windowMs": 5.04
+            },
+            {
+              "key": 24,
+              "mainThreadMs": 3.322,
+              "eventDispatchMs": 3.154,
+              "windowMs": 3.807
+            },
+            {
+              "key": 25,
+              "mainThreadMs": 3.674,
+              "eventDispatchMs": 3.75,
+              "windowMs": 3.964
+            },
+            {
+              "key": 26,
+              "mainThreadMs": 3.341,
+              "eventDispatchMs": 3.084,
+              "windowMs": 3.689
+            },
+            {
+              "key": 27,
+              "mainThreadMs": 5.047,
+              "eventDispatchMs": 5.039,
+              "windowMs": 5.519
+            },
+            {
+              "key": 28,
+              "mainThreadMs": 3.487,
+              "eventDispatchMs": 3.345,
+              "windowMs": 3.813
+            },
+            {
+              "key": 29,
+              "mainThreadMs": 3.837,
+              "eventDispatchMs": 4.027,
+              "windowMs": 4.071
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "sizeMiB": 1,
+      "extension": "ts",
+      "twoByte": false,
+      "analysis": "on",
+      "highlighting": "tree-sitter",
+      "keys": 30,
+      "settleMs": 10000,
+      "profile": false,
+      "initialBytes": 1048546,
+      "corpus": "scoped-functions-v2",
+      "browser": "153.0.8010.12",
+      "host": {
+        "name": "omarchy",
+        "arch": "x64",
+        "cpus": 28,
+        "memoryBytes": 33368662016
+      },
+      "runtime": "1.4.2",
+      "timestamp": "2026-10-08T07:51:03.810Z",
+      "frameScheduling": "unthrottled Chromium (--disable-frame-rate-limit --disable-gpu-vsync)",
+      "rendering": {
+        "rasterization": "disabled_software",
+        "compositing": "disabled_software",
+        "glRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+        "path": "software"
+      },
+      "status": "passed",
+      "metrics": {
+        "openToTextMs": 371.99957499999437,
+        "highlighting": {
+          "state": "active",
+          "openToHighlightMs": 843.9966359999962,
+          "colorCount": 9
+        },
+        "keyLatencyMs": {
+          "count": 30,
+          "p50": 9.5,
+          "p95": 13.899999976158142,
+          "max": 31.100000023841858
+        },
+        "saveMs": 53.82115599999088,
+        "diskBytes": 1048576,
+        "expectedSha256": "46f5623a1d0505e1b556a43d9e9502c1659b9d5122348e63ac1d71a907585775",
+        "savedSha256": "46f5623a1d0505e1b556a43d9e9502c1659b9d5122348e63ac1d71a907585775",
+        "heapBeforeOpen": {
+          "usedBytes": 18516928,
+          "backingBytes": 6478057
+        },
+        "heapAfterOpen": {
+          "usedBytes": 35754012,
+          "backingBytes": 10906600
+        },
+        "heapAfterTyping": {
+          "usedBytes": 37958244,
+          "backingBytes": 10637556
+        },
+        "heapAfterSave": {
+          "usedBytes": 41991448,
+          "backingBytes": 11620818
+        },
+        "workersAfterOpen": [
+          {
+            "url": "http://localhost:35613/assets/minimap.worker-wolEhtnQ-BW6AZSYz.js",
+            "heap": {
+              "usedSize": 5809340,
+              "totalSize": 6356992,
+              "backingStorageSize": 584849
+            }
+          },
+          {
+            "url": "http://localhost:35613/assets/treeSitter.worker-CiynBiBJ-CheswXIo.js",
+            "heap": {
+              "usedSize": 4444100,
+              "totalSize": 5390336,
+              "backingStorageSize": 3580721
+            }
+          }
+        ],
+        "workersAfterSave": [
+          {
+            "url": "http://localhost:35613/assets/minimap.worker-wolEhtnQ-BW6AZSYz.js",
+            "heap": {
+              "usedSize": 6785052,
+              "totalSize": 7393280,
+              "backingStorageSize": 802593
+            }
+          },
+          {
+            "url": "http://localhost:35613/assets/treeSitter.worker-CiynBiBJ-CheswXIo.js",
+            "heap": {
+              "usedSize": 4730568,
+              "totalSize": 5390336,
+              "backingStorageSize": 3580721
+            }
+          }
+        ],
+        "openPeak": {
+          "browserBytes": 950525952,
+          "rendererBytes": 425656320,
+          "serverTreeBytes": 603086848,
+          "totalBytes": 1552363520
+        },
+        "typingPeak": {
+          "browserBytes": 1126260736,
+          "rendererBytes": 570482688,
+          "serverTreeBytes": 836521984,
+          "totalBytes": 1903362048
+        },
+        "savePeak": {
+          "browserBytes": 1100840960,
+          "rendererBytes": 525037568,
+          "serverTreeBytes": 807895040,
+          "totalBytes": 1906429952
+        },
+        "mainThreadKeyMs": {
+          "method": "Sum of renderer main-thread RunTask intervals from the keydown task through the second animation-frame callback task. Includes input processing, frame work and other main-thread work in that window; excludes idle time, worker time and work scheduled after the window. This is an upper bound on causal main-thread work inside the sampled window.",
+          "count": 30,
+          "p50": 17.264,
+          "p95": 46.164,
+          "max": 47.314,
+          "samples": [
+            {
+              "key": 0,
+              "mainThreadMs": 35.982,
+              "eventDispatchMs": 58.337,
+              "windowMs": 36.002
+            },
+            {
+              "key": 1,
+              "mainThreadMs": 47.314,
+              "eventDispatchMs": 24.966,
+              "windowMs": 47.33
+            },
+            {
+              "key": 2,
+              "mainThreadMs": 46.164,
+              "eventDispatchMs": 20.079,
+              "windowMs": 46.198
+            },
+            {
+              "key": 3,
+              "mainThreadMs": 10.441,
+              "eventDispatchMs": 12.924,
+              "windowMs": 11.017
+            },
+            {
+              "key": 4,
+              "mainThreadMs": 40.725,
+              "eventDispatchMs": 15.931,
+              "windowMs": 40.749
+            },
+            {
+              "key": 5,
+              "mainThreadMs": 32.948,
+              "eventDispatchMs": 17.357,
+              "windowMs": 32.967
+            },
+            {
+              "key": 6,
+              "mainThreadMs": 13.309,
+              "eventDispatchMs": 18.593,
+              "windowMs": 14.161
+            },
+            {
+              "key": 7,
+              "mainThreadMs": 34.06,
+              "eventDispatchMs": 15.488,
+              "windowMs": 34.082
+            },
+            {
+              "key": 8,
+              "mainThreadMs": 10.522,
+              "eventDispatchMs": 13.386,
+              "windowMs": 11.06
+            },
+            {
+              "key": 9,
+              "mainThreadMs": 15.119,
+              "eventDispatchMs": 17.917,
+              "windowMs": 16.988
+            },
+            {
+              "key": 10,
+              "mainThreadMs": 39.063,
+              "eventDispatchMs": 15.807,
+              "windowMs": 39.097
+            },
+            {
+              "key": 11,
+              "mainThreadMs": 14.759,
+              "eventDispatchMs": 22.319,
+              "windowMs": 15.345
+            },
+            {
+              "key": 12,
+              "mainThreadMs": 13.782,
+              "eventDispatchMs": 18.364,
+              "windowMs": 14.82
+            },
+            {
+              "key": 13,
+              "mainThreadMs": 11.285,
+              "eventDispatchMs": 14.953,
+              "windowMs": 12.347
+            },
+            {
+              "key": 14,
+              "mainThreadMs": 9.772,
+              "eventDispatchMs": 11.912,
+              "windowMs": 10.299
+            },
+            {
+              "key": 15,
+              "mainThreadMs": 10.517,
+              "eventDispatchMs": 13.384,
+              "windowMs": 11.132
+            },
+            {
+              "key": 16,
+              "mainThreadMs": 9.749,
+              "eventDispatchMs": 12.108,
+              "windowMs": 10.765
+            },
+            {
+              "key": 17,
+              "mainThreadMs": 9.561,
+              "eventDispatchMs": 11.345,
+              "windowMs": 10.343
+            },
+            {
+              "key": 18,
+              "mainThreadMs": 39.68,
+              "eventDispatchMs": 20.936,
+              "windowMs": 39.72
+            },
+            {
+              "key": 19,
+              "mainThreadMs": 11.44,
+              "eventDispatchMs": 14.498,
+              "windowMs": 12.558
+            },
+            {
+              "key": 20,
+              "mainThreadMs": 17.264,
+              "eventDispatchMs": 23.008,
+              "windowMs": 17.388
+            },
+            {
+              "key": 21,
+              "mainThreadMs": 14.954,
+              "eventDispatchMs": 22.158,
+              "windowMs": 16.077
+            },
+            {
+              "key": 22,
+              "mainThreadMs": 30.885,
+              "eventDispatchMs": 11.268,
+              "windowMs": 30.908
+            },
+            {
+              "key": 23,
+              "mainThreadMs": 29.662,
+              "eventDispatchMs": 11.937,
+              "windowMs": 29.684
+            },
+            {
+              "key": 24,
+              "mainThreadMs": 10.372,
+              "eventDispatchMs": 11.775,
+              "windowMs": 11.351
+            },
+            {
+              "key": 25,
+              "mainThreadMs": 40.567,
+              "eventDispatchMs": 21.351,
+              "windowMs": 40.594
+            },
+            {
+              "key": 26,
+              "mainThreadMs": 30.922,
+              "eventDispatchMs": 11.197,
+              "windowMs": 30.939
+            },
+            {
+              "key": 27,
+              "mainThreadMs": 13.607,
+              "eventDispatchMs": 14.158,
+              "windowMs": 14.588
+            },
+            {
+              "key": 28,
+              "mainThreadMs": 37.702,
+              "eventDispatchMs": 11.673,
+              "windowMs": 37.731
+            },
+            {
+              "key": 29,
+              "mainThreadMs": 37.912,
+              "eventDispatchMs": 11.855,
+              "windowMs": 37.949
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "sizeMiB": 10,
+      "extension": "ts",
+      "twoByte": false,
+      "analysis": "off",
+      "highlighting": "default",
+      "keys": 30,
+      "settleMs": 10000,
+      "profile": false,
+      "initialBytes": 10485730,
+      "corpus": "scoped-functions-v2",
+      "browser": "153.0.8010.12",
+      "host": {
+        "name": "omarchy",
+        "arch": "x64",
+        "cpus": 28,
+        "memoryBytes": 33368662016
+      },
+      "runtime": "1.4.2",
+      "timestamp": "2026-10-08T07:51:30.299Z",
+      "frameScheduling": "unthrottled Chromium (--disable-frame-rate-limit --disable-gpu-vsync)",
+      "rendering": {
+        "rasterization": "disabled_software",
+        "compositing": "disabled_software",
+        "glRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+        "path": "software"
+      },
+      "status": "passed",
+      "metrics": {
+        "openToTextMs": 390.8891739999817,
+        "highlighting": {
+          "state": "paused"
+        },
+        "keyLatencyMs": {
+          "count": 30,
+          "p50": 4.100000023841858,
+          "p95": 7.600000023841858,
+          "max": 12.299999952316284
+        },
+        "saveMs": 288.08379999999306,
+        "diskBytes": 10485760,
+        "expectedSha256": "e01aff2d765f30237dec6f9fc624ae34393efb91b12f0698360978b1935421a1",
+        "savedSha256": "e01aff2d765f30237dec6f9fc624ae34393efb91b12f0698360978b1935421a1",
+        "heapBeforeOpen": {
+          "usedBytes": 18008396,
+          "backingBytes": 5688691
+        },
+        "heapAfterOpen": {
+          "usedBytes": 66325184,
+          "backingBytes": 10869703
+        },
+        "heapAfterTyping": {
+          "usedBytes": 68327744,
+          "backingBytes": 10870974
+        },
+        "heapAfterSave": {
+          "usedBytes": 100897388,
+          "backingBytes": 10877452
+        },
+        "workersAfterOpen": [
+          {
+            "url": "http://localhost:38985/assets/shiki.worker-DBJrwiUq-KsPxxMTd.js",
+            "heap": {
+              "usedSize": 790360,
+              "totalSize": 1576960,
+              "backingStorageSize": 1880778
+            }
+          },
+          {
+            "url": "http://localhost:38985/assets/minimap.worker-wolEhtnQ-BW6AZSYz.js",
+            "heap": {
+              "usedSize": 42898460,
+              "totalSize": 43343872,
+              "backingStorageSize": 314505
+            }
+          }
+        ],
+        "workersAfterSave": [
+          {
+            "url": "http://localhost:38985/assets/shiki.worker-DBJrwiUq-KsPxxMTd.js",
+            "heap": {
+              "usedSize": 790360,
+              "totalSize": 1576960,
+              "backingStorageSize": 1880778
+            }
+          },
+          {
+            "url": "http://localhost:38985/assets/minimap.worker-wolEhtnQ-BW6AZSYz.js",
+            "heap": {
+              "usedSize": 43530976,
+              "totalSize": 44421120,
+              "backingStorageSize": 314505
+            }
+          }
+        ],
+        "openPeak": {
+          "browserBytes": 932376576,
+          "rendererBytes": 455962624,
+          "serverTreeBytes": 596316160,
+          "totalBytes": 1506598912
+        },
+        "typingPeak": {
+          "browserBytes": 982515712,
+          "rendererBytes": 445980672,
+          "serverTreeBytes": 1305780224,
+          "totalBytes": 2275672064
+        },
+        "savePeak": {
+          "browserBytes": 1214476288,
+          "rendererBytes": 670871552,
+          "serverTreeBytes": 1575792640,
+          "totalBytes": 2743648256
+        },
+        "mainThreadKeyMs": {
+          "method": "Sum of renderer main-thread RunTask intervals from the keydown task through the second animation-frame callback task. Includes input processing, frame work and other main-thread work in that window; excludes idle time, worker time and work scheduled after the window. This is an upper bound on causal main-thread work inside the sampled window.",
+          "count": 30,
+          "p50": 5.362,
+          "p95": 9.244,
+          "max": 13.595,
+          "samples": [
+            {
+              "key": 0,
+              "mainThreadMs": 13.595,
+              "eventDispatchMs": 21.374,
+              "windowMs": 14.484
+            },
+            {
+              "key": 1,
+              "mainThreadMs": 6.4,
+              "eventDispatchMs": 8.899,
+              "windowMs": 6.688
+            },
+            {
+              "key": 2,
+              "mainThreadMs": 9.244,
+              "eventDispatchMs": 12.347,
+              "windowMs": 9.794
+            },
+            {
+              "key": 3,
+              "mainThreadMs": 5.362,
+              "eventDispatchMs": 6.995,
+              "windowMs": 5.753
+            },
+            {
+              "key": 4,
+              "mainThreadMs": 6.063,
+              "eventDispatchMs": 8.203,
+              "windowMs": 6.449
+            },
+            {
+              "key": 5,
+              "mainThreadMs": 5.725,
+              "eventDispatchMs": 7.425,
+              "windowMs": 6.152
+            },
+            {
+              "key": 6,
+              "mainThreadMs": 5.148,
+              "eventDispatchMs": 6.571,
+              "windowMs": 5.633
+            },
+            {
+              "key": 7,
+              "mainThreadMs": 5.054,
+              "eventDispatchMs": 6.47,
+              "windowMs": 5.327
+            },
+            {
+              "key": 8,
+              "mainThreadMs": 5.308,
+              "eventDispatchMs": 6.849,
+              "windowMs": 5.682
+            },
+            {
+              "key": 9,
+              "mainThreadMs": 7.398,
+              "eventDispatchMs": 9.396,
+              "windowMs": 7.66
+            },
+            {
+              "key": 10,
+              "mainThreadMs": 4.709,
+              "eventDispatchMs": 5.822,
+              "windowMs": 5.199
+            },
+            {
+              "key": 11,
+              "mainThreadMs": 4.824,
+              "eventDispatchMs": 5.89,
+              "windowMs": 5.299
+            },
+            {
+              "key": 12,
+              "mainThreadMs": 7.139,
+              "eventDispatchMs": 9.287,
+              "windowMs": 7.709
+            },
+            {
+              "key": 13,
+              "mainThreadMs": 5.193,
+              "eventDispatchMs": 6.585,
+              "windowMs": 5.704
+            },
+            {
+              "key": 14,
+              "mainThreadMs": 5.537,
+              "eventDispatchMs": 6.998,
+              "windowMs": 6.014
+            },
+            {
+              "key": 15,
+              "mainThreadMs": 5.412,
+              "eventDispatchMs": 6.096,
+              "windowMs": 5.825
+            },
+            {
+              "key": 16,
+              "mainThreadMs": 4.671,
+              "eventDispatchMs": 5.909,
+              "windowMs": 5.053
+            },
+            {
+              "key": 17,
+              "mainThreadMs": 4.852,
+              "eventDispatchMs": 6.049,
+              "windowMs": 5.257
+            },
+            {
+              "key": 18,
+              "mainThreadMs": 7.72,
+              "eventDispatchMs": 9.965,
+              "windowMs": 8.225
+            },
+            {
+              "key": 19,
+              "mainThreadMs": 4.695,
+              "eventDispatchMs": 5.608,
+              "windowMs": 4.898
+            },
+            {
+              "key": 20,
+              "mainThreadMs": 5.311,
+              "eventDispatchMs": 6.171,
+              "windowMs": 5.64
+            },
+            {
+              "key": 21,
+              "mainThreadMs": 5.944,
+              "eventDispatchMs": 6.793,
+              "windowMs": 6.316
+            },
+            {
+              "key": 22,
+              "mainThreadMs": 5.406,
+              "eventDispatchMs": 7.175,
+              "windowMs": 5.676
+            },
+            {
+              "key": 23,
+              "mainThreadMs": 4.497,
+              "eventDispatchMs": 5.51,
+              "windowMs": 4.916
+            },
+            {
+              "key": 24,
+              "mainThreadMs": 6.93,
+              "eventDispatchMs": 8.288,
+              "windowMs": 7.402
+            },
+            {
+              "key": 25,
+              "mainThreadMs": 6.892,
+              "eventDispatchMs": 8.35,
+              "windowMs": 7.357
+            },
+            {
+              "key": 26,
+              "mainThreadMs": 4.656,
+              "eventDispatchMs": 5.462,
+              "windowMs": 5.088
+            },
+            {
+              "key": 27,
+              "mainThreadMs": 4.808,
+              "eventDispatchMs": 5.91,
+              "windowMs": 5.21
+            },
+            {
+              "key": 28,
+              "mainThreadMs": 5.283,
+              "eventDispatchMs": 6.752,
+              "windowMs": 5.76
+            },
+            {
+              "key": 29,
+              "mainThreadMs": 4.353,
+              "eventDispatchMs": 5.273,
+              "windowMs": 4.756
+            }
+          ]
+        }
+      },
+      "errors": []
+    },
+    {
+      "sizeMiB": 10,
+      "extension": "ts",
+      "twoByte": false,
+      "analysis": "on",
+      "highlighting": "tree-sitter",
+      "keys": 30,
+      "settleMs": 10000,
+      "profile": false,
+      "initialBytes": 10485730,
+      "corpus": "scoped-functions-v2",
+      "browser": "153.0.8010.12",
+      "host": {
+        "name": "omarchy",
+        "arch": "x64",
+        "cpus": 28,
+        "memoryBytes": 33368662016
+      },
+      "runtime": "1.4.2",
+      "timestamp": "2026-10-08T07:52:01.775Z",
+      "frameScheduling": "unthrottled Chromium (--disable-frame-rate-limit --disable-gpu-vsync)",
+      "rendering": {
+        "rasterization": "disabled_software",
+        "compositing": "disabled_software",
+        "glRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+        "path": "software"
+      },
+      "status": "passed",
+      "metrics": {
+        "openToTextMs": 453.31651999999303,
+        "highlighting": {
+          "state": "active",
+          "openToHighlightMs": 3350.285537000018,
+          "colorCount": 9
+        },
+        "keyLatencyMs": {
+          "count": 30,
+          "p50": 44.30000001192093,
+          "p95": 63.80000001192093,
+          "max": 66.30000001192093
+        },
+        "saveMs": 556.7926110000117,
+        "diskBytes": 10485760,
+        "expectedSha256": "e01aff2d765f30237dec6f9fc624ae34393efb91b12f0698360978b1935421a1",
+        "savedSha256": "e01aff2d765f30237dec6f9fc624ae34393efb91b12f0698360978b1935421a1",
+        "heapBeforeOpen": {
+          "usedBytes": 17932416,
+          "backingBytes": 5646382
+        },
+        "heapAfterOpen": {
+          "usedBytes": 89164892,
+          "backingBytes": 13526254
+        },
+        "heapAfterTyping": {
+          "usedBytes": 97990396,
+          "backingBytes": 13527460
+        },
+        "heapAfterSave": {
+          "usedBytes": 124016724,
+          "backingBytes": 13529825
+        },
+        "workersAfterOpen": [
+          {
+            "url": "http://localhost:39425/assets/treeSitter.worker-CiynBiBJ-CheswXIo.js",
+            "heap": {
+              "usedSize": 14030104,
+              "totalSize": 14827520,
+              "backingStorageSize": 3581366
+            }
+          },
+          {
+            "url": "http://localhost:39425/assets/minimap.worker-wolEhtnQ-BW6AZSYz.js",
+            "heap": {
+              "usedSize": 43984756,
+              "totalSize": 44654592,
+              "backingStorageSize": 584849
+            }
+          }
+        ],
+        "workersAfterSave": [
+          {
+            "url": "http://localhost:39425/assets/treeSitter.worker-CiynBiBJ-CheswXIo.js",
+            "heap": {
+              "usedSize": 14186056,
+              "totalSize": 15089664,
+              "backingStorageSize": 3581366
+            }
+          },
+          {
+            "url": "http://localhost:39425/assets/minimap.worker-wolEhtnQ-BW6AZSYz.js",
+            "heap": {
+              "usedSize": 44645272,
+              "totalSize": 45346816,
+              "backingStorageSize": 584849
+            }
+          }
+        ],
+        "openPeak": {
+          "browserBytes": 1655046144,
+          "rendererBytes": 1134518272,
+          "serverTreeBytes": 2146332672,
+          "totalBytes": 3482927104
+        },
+        "typingPeak": {
+          "browserBytes": 2705887232,
+          "rendererBytes": 2141835264,
+          "serverTreeBytes": 3442618368,
+          "totalBytes": 5809795072
+        },
+        "savePeak": {
+          "browserBytes": 2798399488,
+          "rendererBytes": 2133061632,
+          "serverTreeBytes": 3499302912,
+          "totalBytes": 6066249728
+        },
+        "mainThreadKeyMs": {
+          "method": "Sum of renderer main-thread RunTask intervals from the keydown task through the second animation-frame callback task. Includes input processing, frame work and other main-thread work in that window; excludes idle time, worker time and work scheduled after the window. This is an upper bound on causal main-thread work inside the sampled window.",
+          "count": 30,
+          "p50": 67.198,
+          "p95": 239.596,
+          "max": 243.047,
+          "samples": [
+            {
+              "key": 0,
+              "mainThreadMs": 70.477,
+              "eventDispatchMs": 129.624,
+              "windowMs": 70.496
+            },
+            {
+              "key": 1,
+              "mainThreadMs": 229.8,
+              "eventDispatchMs": 89.628,
+              "windowMs": 229.817
+            },
+            {
+              "key": 2,
+              "mainThreadMs": 243.047,
+              "eventDispatchMs": 84.92,
+              "windowMs": 243.072
+            },
+            {
+              "key": 3,
+              "mainThreadMs": 47.222,
+              "eventDispatchMs": 88.646,
+              "windowMs": 47.231
+            },
+            {
+              "key": 4,
+              "mainThreadMs": 42.764,
+              "eventDispatchMs": 78.432,
+              "windowMs": 42.772
+            },
+            {
+              "key": 5,
+              "mainThreadMs": 46.522,
+              "eventDispatchMs": 86.654,
+              "windowMs": 46.529
+            },
+            {
+              "key": 6,
+              "mainThreadMs": 42.809,
+              "eventDispatchMs": 77.517,
+              "windowMs": 42.819
+            },
+            {
+              "key": 7,
+              "mainThreadMs": 48.773,
+              "eventDispatchMs": 91.569,
+              "windowMs": 48.78
+            },
+            {
+              "key": 8,
+              "mainThreadMs": 230.34,
+              "eventDispatchMs": 95.681,
+              "windowMs": 230.367
+            },
+            {
+              "key": 9,
+              "mainThreadMs": 67.198,
+              "eventDispatchMs": 125.652,
+              "windowMs": 67.207
+            },
+            {
+              "key": 10,
+              "mainThreadMs": 54.183,
+              "eventDispatchMs": 100.737,
+              "windowMs": 54.191
+            },
+            {
+              "key": 11,
+              "mainThreadMs": 217.26,
+              "eventDispatchMs": 80.94,
+              "windowMs": 217.283
+            },
+            {
+              "key": 12,
+              "mainThreadMs": 232.821,
+              "eventDispatchMs": 80.457,
+              "windowMs": 232.845
+            },
+            {
+              "key": 13,
+              "mainThreadMs": 238.503,
+              "eventDispatchMs": 99.986,
+              "windowMs": 238.519
+            },
+            {
+              "key": 14,
+              "mainThreadMs": 41.376,
+              "eventDispatchMs": 75.854,
+              "windowMs": 41.386
+            },
+            {
+              "key": 15,
+              "mainThreadMs": 221.022,
+              "eventDispatchMs": 77.798,
+              "windowMs": 221.043
+            },
+            {
+              "key": 16,
+              "mainThreadMs": 47.041,
+              "eventDispatchMs": 86.102,
+              "windowMs": 47.05
+            },
+            {
+              "key": 17,
+              "mainThreadMs": 219.399,
+              "eventDispatchMs": 76.181,
+              "windowMs": 219.419
+            },
+            {
+              "key": 18,
+              "mainThreadMs": 50.236,
+              "eventDispatchMs": 91.429,
+              "windowMs": 50.249
+            },
+            {
+              "key": 19,
+              "mainThreadMs": 57.374,
+              "eventDispatchMs": 107.2,
+              "windowMs": 57.384
+            },
+            {
+              "key": 20,
+              "mainThreadMs": 215.382,
+              "eventDispatchMs": 77.026,
+              "windowMs": 215.41
+            },
+            {
+              "key": 21,
+              "mainThreadMs": 46.623,
+              "eventDispatchMs": 87.818,
+              "windowMs": 46.631
+            },
+            {
+              "key": 22,
+              "mainThreadMs": 43.685,
+              "eventDispatchMs": 78.811,
+              "windowMs": 43.694
+            },
+            {
+              "key": 23,
+              "mainThreadMs": 239.596,
+              "eventDispatchMs": 107.856,
+              "windowMs": 239.625
+            },
+            {
+              "key": 24,
+              "mainThreadMs": 41.344,
+              "eventDispatchMs": 75.339,
+              "windowMs": 41.354
+            },
+            {
+              "key": 25,
+              "mainThreadMs": 213.338,
+              "eventDispatchMs": 79.3,
+              "windowMs": 213.372
+            },
+            {
+              "key": 26,
+              "mainThreadMs": 226.506,
+              "eventDispatchMs": 75.574,
+              "windowMs": 226.543
+            },
+            {
+              "key": 27,
+              "mainThreadMs": 39.414,
+              "eventDispatchMs": 70.498,
+              "windowMs": 39.425
+            },
+            {
+              "key": 28,
+              "mainThreadMs": 41.783,
+              "eventDispatchMs": 76.608,
+              "windowMs": 41.796
+            },
+            {
+              "key": 29,
+              "mainThreadMs": 204.83,
+              "eventDispatchMs": 70.943,
+              "windowMs": 204.852
+            }
+          ]
+        }
+      },
+      "errors": []
+    }
+  ]
+}

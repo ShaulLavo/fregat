@@ -1,4 +1,12 @@
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -58,6 +66,34 @@ it.each(['bun', 'node'])(
   },
   40_000,
 )
+
+it('serves supplied web assets with the isolated promoted release descriptor', async () => {
+  const fixture = mkdtempSync(path.join(tmpdir(), 'fregat-built-web-'))
+  const web = path.join(fixture, 'web')
+  mkdirSync(web)
+  writeFileSync(path.join(web, 'index.html'), '<!doctype html><p>Built fixture</p>')
+  let server: IsolatedServer | undefined
+  try {
+    server = await startIsolatedServer(new URL('http://localhost:5214'), { webRoot: web })
+    writeFileSync(
+      path.join(server.directory, 'served', 'build-config.json'),
+      JSON.stringify({ release: 'fixture-promoted', liveCheck: false }),
+    )
+    const release = await (await fetch(`${server.origin}/release`)).json()
+    expect(release).toMatchObject({
+      release: 'fixture-promoted',
+      server: { release: 'fixture-promoted' },
+      liveCheckRequired: false,
+    })
+    expect(await (await fetch(server.origin)).text()).toContain('Built fixture')
+    await server.stop()
+    expect(existsSync(path.join(web, 'index.html'))).toBe(true)
+    expect(existsSync(path.join(fixture, 'build-config.json'))).toBe(false)
+  } finally {
+    await server?.stop()
+    rmSync(fixture, { recursive: true, force: true })
+  }
+}, 40_000)
 
 function alive(pid: number) {
   try {
