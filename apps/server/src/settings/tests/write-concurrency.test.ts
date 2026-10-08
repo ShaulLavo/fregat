@@ -11,8 +11,14 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import { afterEach, describe, expect, it } from 'vitest'
+import { textFileVersion } from '../../fs/version'
+import { isEvlogError } from '../../observability/structured-errors'
 import { SettingsStore, type SettingsStoreOptions } from '../store'
-import { activeSettingsWriteCoordinatorCount } from '../write-coordinator'
+import {
+  activeSettingsWriteCoordinatorCount,
+  withSettingsWriteCoordinator,
+  withSettingsWriteCoordinatorSync,
+} from '../write-coordinator'
 
 const roots: string[] = []
 const stores: SettingsStore[] = []
@@ -154,7 +160,13 @@ describe('semantic write coordination', () => {
     const system = setColorTheme(store, 'theme-system', 'system')
     releaseLight.resolve()
 
-    await expect(Promise.all([dark, light, system])).resolves.toHaveLength(3)
+    const completed = Promise.all([dark, light, system]).catch((error: unknown) => {
+      if (isEvlogError(error) && error.code === 'settings.WRITE_CONTENDED') {
+        console.error('Ordered settings write contention', error.internal)
+      }
+      throw error
+    })
+    await expect(completed).resolves.toHaveLength(3)
     expect(store.snapshot().values['workbench.colorTheme']).toBe('system')
   })
 
@@ -212,9 +224,98 @@ describe('semantic write coordination', () => {
       attempts: 2,
       code: 'settings.WRITE_CONTENDED',
       coordinatorWaitMs: expect.any(Number),
+      internal: {
+        attempts: 2,
+        attemptLimit: 2,
+        budgetMs: 2_000,
+        coordinatorWaitMs: expect.any(Number),
+        elapsedMs: expect.any(Number),
+        reason: 'attempt-limit',
+        lastRevisionMismatch: {
+          source: 'settings',
+          expectedRevision: textFileVersion('{ "editor.lineHeight": 31 }\n'),
+          observedRevision: textFileVersion('{ "editor.lineHeight": 32 }\n'),
+        },
+      },
     })
 
     expect((await readdir(root)).filter((name) => name.endsWith('.tmp'))).toEqual([])
+  })
+
+  it('reports cancellation without a revision mismatch', async () => {
+    const root = await tempRoot()
+    const store = createStore(root)
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(
+      store.write(
+        {
+          mutationId: 'cancelled',
+          operations: [{ key: 'workbench.colorTheme', kind: 'set', value: 'dark' }],
+          target: 'user',
+        },
+        controller.signal,
+      ),
+    ).rejects.toMatchObject({
+      code: 'settings.WRITE_CONTENDED',
+      internal: {
+        attempts: 0,
+        attemptLimit: 8,
+        budgetMs: 2_000,
+        coordinatorWaitMs: expect.any(Number),
+        elapsedMs: expect.any(Number),
+        reason: 'aborted',
+        lastRevisionMismatch: null,
+      },
+    })
+  })
+
+  it('identifies the elapsed-time bound separately from the attempt bound', async () => {
+    const root = await tempRoot()
+    const store = createStore(root, {
+      rebaseBudgetMs: Number.MIN_VALUE,
+      writeHooks: {
+        async afterStage(context) {
+          await writeFile(context.staged.destination, '{ "editor.lineHeight": 31 }\n', 'utf8')
+        },
+      },
+    })
+
+    await expect(setColorTheme(store, 'elapsed-budget', 'dark')).rejects.toMatchObject({
+      code: 'settings.WRITE_CONTENDED',
+      internal: {
+        attempts: expect.any(Number),
+        attemptLimit: 8,
+        budgetMs: Number.MIN_VALUE,
+        coordinatorWaitMs: expect.any(Number),
+        elapsedMs: expect.any(Number),
+        reason: 'time-budget',
+      },
+    })
+    expect((await readdir(root)).filter((name) => name.endsWith('.tmp'))).toEqual([])
+  })
+
+  it('identifies a held coordinator in synchronous writes', async () => {
+    const root = await tempRoot()
+    const file = path.join(root, 'settings.json')
+
+    await withSettingsWriteCoordinator(file, async () => {
+      expect(() => withSettingsWriteCoordinatorSync(file, () => undefined)).toThrow(
+        expect.objectContaining({
+          code: 'settings.WRITE_CONTENDED',
+          internal: {
+            attempts: 0,
+            attemptLimit: null,
+            budgetMs: null,
+            coordinatorWaitMs: 0,
+            elapsedMs: 0,
+            reason: 'coordinator-held',
+            lastRevisionMismatch: null,
+          },
+        }),
+      )
+    })
   })
 
   it('coordinates two stores through canonical real and symlink paths', async () => {

@@ -112,6 +112,35 @@ export function rawRevisionStaleError(metadata: {
   return Object.assign(settingsErrors.RAW_REVISION_STALE({ target: metadata.target }), metadata)
 }
 
-export function settingsWriteContendedError(attempts: number, coordinatorWaitMs: number) {
-  return Object.assign(settingsErrors.WRITE_CONTENDED({}), { attempts, coordinatorWaitMs })
+export type SettingsRevisionMismatch = {
+  readonly source: 'settings' | 'secrets'
+  readonly expectedRevision: string | null
+  readonly observedRevision: string | null
+}
+
+export type SettingsWriteContentionContext = {
+  readonly reason:
+    | 'attempt-limit'
+    | 'time-budget'
+    | 'aborted'
+    | 'coordinator-held'
+    | 'revision-mismatch'
+    | 'prune-protected'
+  readonly attemptLimit: number | null
+  readonly budgetMs: number | null
+  readonly elapsedMs: number
+  readonly lastRevisionMismatch: SettingsRevisionMismatch | null
+}
+
+export function settingsWriteContendedError(
+  attempts: number,
+  coordinatorWaitMs: number,
+  context: SettingsWriteContentionContext,
+) {
+  return Object.assign(
+    settingsErrors.WRITE_CONTENDED({
+      internal: { ...context, attempts, coordinatorWaitMs },
+    }),
+    { attempts, coordinatorWaitMs },
+  )
 }
