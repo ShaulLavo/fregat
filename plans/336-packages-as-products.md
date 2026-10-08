@@ -466,11 +466,14 @@ node editor/bench/compare/summarize-open.mjs \
    bounded work units. Visible queries and edits take priority. Do not queue an idle full reparse
    ahead of the first visible result. Measure the existing post-acknowledgement unpin gap before
    changing that idle policy.
-3. Preserve grammar context and prove preview correctness. Compare initial tokens with the completed
-   parse for this TypeScript fixture, multiline strings/comments, syntax crossing the preview end,
-   TSX ambiguities and injected languages. Scroll or jump beyond covered ranges must request valid
-   context rather than reuse a partial root as a complete document. Edits and disposal cancel stale
-   bootstrap/background results by source identity and version.
+3. Preserve grammar entry context. Provisional colors may be corrected when complete analysis
+   arrives. Replace visible colors atomically in one frame, without an unstyled flash or an
+   intermediate palette; unchanged visible colors persist. Final colors must exactly match a
+   separate non-provisional run. Cover this TypeScript fixture, multiline strings/comments, syntax
+   crossing the preview end, TSX ambiguities, injected languages and custom highlight queries. Scroll
+   or jump beyond covered ranges must request valid context rather than reuse a partial root as a
+   complete document. Edits and disposal cancel stale bootstrap/background results by source
+   identity and version.
 4. Retain timings and a structured cancellation outcome when analysis exhausts a work budget.
    Silent missing results must not leave the visible-highlight request permanently unsettled.
 5. Re-run the original uninstrumented matrix and the diagnostic open matrix on the same machine,
@@ -491,20 +494,20 @@ by the pre-existing tail-layout failure recorded below.
 - The first demanded range chooses a canonical prefix ending 4,096 code units beyond demand,
   capped at 65,536. Parsing starts at offset zero to preserve the grammar entry state. These are
   fixed library work limits; this change adds no host execution setting.
-- A distant range waits for complete context. Any grammar recovery error in the preview
-  also waits for complete context: truncation can reinterpret tokens before the
-  error's reported range. Crossing-comment and long-template controls exposed incorrect provisional
-  tokens before this guard. Error-free parsing alone is insufficient: a distant call continuation
-  can change an identifier's color. Preview coverage stops before the first unterminated top-level
-  construct. JavaScript, TypeScript and TSX accept only explicit semicolon-terminated statement
-  kinds; HTML accepts closed elements. Comments need an observed terminator or newline. Other
-  grammars and unproven boundaries wait for complete context.
-- Provisional parsing owns only the host-language root tree. Injection discovery identifies
-  excluded content ranges; no injection tree is parsed and no injection-derived capture is
-  published before complete analysis. Host captures overlapping injected content are also
-  withheld, so those regions remain unpainted until complete context arrives. This applies to
-  ordinary and combined injections alike: terminated host statements do not isolate a combined
-  injection from future ranges.
+- A distant range waits for complete context. Grammar recovery errors in a truncated preview
+  also wait for complete context. The prefix can supply approximate colors: distant continuations,
+  combined injections and custom predicates can change them when complete analysis arrives.
+  Statement-kind whitelists and injection-content exclusions are removed. Preview parsing owns
+  only the host-language root tree and does no injection discovery or injected-language parsing;
+  injected regions initially receive ordinary host-language colors.
+- Completion advances the retained-analysis generation, preventing displayed provisional contributors
+  from repopulating cleared range caches. A measured mounted control reproduced retained provisional
+  colors after complete analysis before this fix. Completion keeps the displayed token store until its replacement is ready. Token adoption and
+  CSS Highlight range reconciliation run synchronously in one task. Unchanged row signatures keep
+  their existing registered ranges; changed rows receive their final ranges before the next paint.
+  Removing an unused palette color now invalidates only rows that used it; it previously cleared
+  every row's ranges, including unchanged tokens. A real-browser identity control reproduced this
+  before the fix, and a view unit control covers replacing and removing a color.
 - Partial trees occupy separate worker storage. Their replies carry the canonical source identity,
   sync point, snapshot version and coverage. They publish tokens and captures, with empty folds,
   diagnostics, brackets and injection structure. Structural selection reads complete trees only.
@@ -522,28 +525,50 @@ by the pre-existing tail-layout failure recorded below.
   The viewport-first complete path skips the unchanged idle reparse so it cannot block subsequent
   visible requests. Existing small-source and Markdown idle behavior is unchanged. First-edit
   behavior remains part of the original uninstrumented comparison matrix.
-- The frozen baseline at `66c8e8a68` failed all six initial preview controls. The complete real-worker
-  Chromium suite passes 95 controls, including 21 viewport-first cases, mounted replacement,
+- The frozen baseline at `66c8e8a68` failed all six initial preview controls. At `664dff34a`, the
+  complete real-worker Chromium suite passed 95 controls, including 21 viewport-first cases, mounted replacement,
   canonical edit cancellation, disposal, TSX ambiguity and HTML script/style injections. Unit
-  controls pass 107 tests; diagnostic harness controls pass nine tests. Core and Tree-sitter
-  typechecks, workspace builds, retained syntax regressions and repository gates pass.
+  controls passed 107 tests; diagnostic harness controls passed nine tests. Core and Tree-sitter
+  typechecks, workspace builds, retained syntax regressions and repository gates passed.
 
 #### Review fixes and verification
 
 Both blocking controls failed on `832edf887`: a distant call continuation changed first-screen
 capture interpretation, and a budget-cancelled range replaced the session's usable result. The
-committed controls compare resolved token styles as well as captures for the future call, arrow
-continuation and a terminated-call positive case. Another control checks that provisional coverage
-ends before a later open statement. The cancellation control checks preserved timings, retained
-session state and a successful third query without an edit or reopen.
+current controls compare complete resolved token styles and captures with a non-provisional run
+for the future call, arrow continuation and a terminated-call positive case. Function declarations
+now receive bounded provisional coverage without a statement-kind whitelist. The cancellation
+control checks preserved timings, retained session state and a successful third query without an
+edit or reopen.
 
 The second review reproduced three future-context hazards inside combined tagged-template
-injections: a TypeScript call continuation and SQL call/member continuations. All three additional
-controls fail on `7b1d7166d` and pass with root-only preview parsing. They require the injected
-content to have no initial tokens or captures, confirm the complete function/type color,
-and require every initially painted position to retain its resolved style after completion.
-The HTML script/style control now checks stable host tokens while injection colors arrive only
-with complete analysis. Injection-free review evidence is retained in `injection-fixes/`.
+injections. The root-only exclusion revision at `664dff34a` passed those controls but a further
+review found twelve provisional/final differences through interpolation holes, combined ranges
+spanning host code and later-context custom queries. This showed that statement terminators and
+injection-content exclusions do not prove stable provisional colors.
+
+The coordinator's Approved correction changes the contract: provisional colors may change,
+complete colors must equal a separate non-provisional baseline, and replacement must be atomic
+without an unstyled frame. Partial structural results remain withheld and the cancellation recovery
+fix remains. The twelve failing controls, the passing unknown-tag case and a node-local custom-query
+positive case now exercise mounted editor replacement. The exact long-space sources use word wrap inside a constrained, measured viewport
+to keep mounted demand inside the bootstrap cap. The first observation fixture accidentally let
+the editor grow to 16,000,000 pixels tall and requested the whole source; those failures described
+the fixture, not replacement behavior. Native worker replies are held after provisional
+adoption, ensuring a visible provisional frame before completion is released; parsing stays real. Historical failing-first evidence in
+`injection-fixes/` records the earlier contract, not the current acceptance criterion.
+
+The correction passes 15 mounted frame/convergence controls, including a calibrated observer that
+can detect an unstyled frame and checks unchanged range identities. All 110 real-worker Chromium
+controls and 107 Tree-sitter unit controls pass; 229 retained-analysis, display-demand and view
+controls pass, alongside nine diagnostic harness controls. Core and Tree-sitter typechecks and
+workspace builds, repository gates and root workspace typechecks pass. Four provisional/final
+screenshots were read back. Raw logs and images live
+in `atomic-replacement/` under the retained evidence directory. A fresh isolated Fregat doctor and
+tracked-source scrolling scenario pass; ready and scrolled screenshots were reviewed. The initial
+ignored scratch fixture was unavailable in quick open, so verification used `treeSitter.worker.ts`.
+No new performance matrix was run for this correction, and the historical timings below describe
+earlier implementations.
 
 A fresh one-repetition 200 MiB diagnostic smoke after the first review fixes highlights in 375.9 ms with
 27,455 bootstrap units. Its screenshot was read back and shows colored text throughout the visible

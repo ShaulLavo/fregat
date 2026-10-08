@@ -102,7 +102,6 @@ type ParsedDocument = {
 
 type BootstrapPreview = Omit<ParsedDocument, 'layers'> & {
   readonly layers: readonly [ParsedLayer]
-  readonly excludedRanges: readonly TreeSitterSyntaxRange[]
 }
 
 type DocumentCache = {
@@ -1264,27 +1263,24 @@ const parseTreeSlice = (
   )
 }
 
-const parseBootstrapPreview = async (
+const parseBootstrapPreview = (
   request: TreeSitterRangeRequest,
   completeSource: TreeSitterPieceTableInput,
   runtime: Runtime,
   end: number,
   context: CancellationContext,
-): Promise<BootstrapPreview> => {
+): BootstrapPreview => {
   const source = limitTreeSitterInput(completeSource, end)
   let root: ParsedLayer | null = null
   try {
     root = measurePhase(context, 'bootstrapRoot', () =>
       parseRootLayer(runtime, source, null, context),
     )
-    // Combined injections can acquire future ranges even after a terminated host statement.
-    const injections = await findInjections(root, runtime, source, context, null)
     return {
       snapshotVersion: request.snapshotVersion,
       languageId: request.languageId,
       source: source.retain(),
       layers: [root],
-      excludedRanges: injections.flatMap((plan) => plan.ranges),
       degraded: [],
       missingLanguages: [],
       size: source.length,
@@ -1296,62 +1292,6 @@ const parseBootstrapPreview = async (
   } finally {
     source.dispose()
   }
-}
-
-const bootstrapCoverageEnd = (preview: BootstrapPreview): number => {
-  const language = preview.languageId
-  const statements = ['javascript', 'typescript', 'tsx'].includes(language)
-  if (!statements && language !== 'html') return 0
-  for (const node of preview.layers[0].tree.rootNode.namedChildren) {
-    if (node.type === 'comment' && bootstrapCommentTerminated(node, preview.source, language))
-      continue
-    if (statements && bootstrapStatementTerminated(node)) continue
-    if (language === 'html' && bootstrapElementTerminated(node)) continue
-    return node.startIndex
-  }
-  return preview.size
-}
-
-const bootstrapStatementTerminated = (node: Node): boolean => {
-  if (
-    ![
-      'expression_statement',
-      'lexical_declaration',
-      'variable_declaration',
-      'import_statement',
-      'export_statement',
-      'type_alias_declaration',
-    ].includes(node.type)
-  )
-    return false
-  let terminal = node
-  while (terminal.lastChild) terminal = terminal.lastChild
-  return terminal.type === ';'
-}
-
-const bootstrapElementTerminated = (node: Node): boolean => {
-  const terminal = node.lastNamedChild?.type
-  return terminal === 'end_tag' || terminal === 'self_closing_tag'
-}
-
-const bootstrapCommentTerminated = (
-  node: Node,
-  source: TreeSitterPieceTableInput,
-  language: string,
-): boolean => {
-  const tail = readTreeSitterInputRange(
-    source,
-    Math.max(node.startIndex, node.endIndex - 3),
-    node.endIndex,
-  )
-  if (language === 'html') return tail.endsWith('-->')
-  if (tail.endsWith('*/')) return true
-  const next = readTreeSitterInputRange(
-    source,
-    node.endIndex,
-    Math.min(source.length, node.endIndex + 1),
-  )
-  return next === '\n' || next === '\r'
 }
 
 const queryBootstrapRange = async (
@@ -1370,12 +1310,8 @@ const queryBootstrapRange = async (
     TREE_SITTER_BOOTSTRAP_UNITS,
     request.range.endIndex + 4096,
   )
-  if (
-    !staged.preview ||
-    staged.preview.size < end ||
-    staged.preview.missingLanguages.some((id) => resolveRegisteredLanguageAlias(id))
-  ) {
-    const preview = await parseBootstrapPreview(request, staged.source, runtime, end, context)
+  if (!staged.preview || staged.preview.size < end) {
+    const preview = parseBootstrapPreview(request, staged.source, runtime, end, context)
     if (bootstrapDocuments.get(request.runtimeSessionId) !== staged) {
       disposeCachedSnapshot(preview)
       return undefined
@@ -1388,48 +1324,28 @@ const queryBootstrapRange = async (
   if (!preview) return undefined
   // Recovery in a truncated tree can reinterpret tokens before the error's range.
   if (preview.layers.some((layer) => layer.tree.rootNode.hasError)) return undefined
-  // A valid artificial EOF can still turn a future call into a plain identifier.
-  const coverageEnd = bootstrapCoverageEnd(preview)
   const range = normalizedSyntaxRange(request.range, staged.source.length)
-  if (range.endIndex > coverageEnd) return undefined
   const result = await flattenDocumentRange(preview, context, {
     range,
-    includeHighlights: false,
-    includeCaptures: true,
+    includeHighlights: request.includeHighlights,
+    includeCaptures: request.includeCaptures ?? true,
   })
-  // Leave injected content unpainted, including host captures that span that content.
-  const captures = result.captures.filter(
-    (capture) =>
-      !preview.excludedRanges.some((excluded) =>
-        indexesIntersectRange(capture.startIndex, capture.endIndex, excluded),
-      ),
-  )
-  const tokensPacked = packHighlights(captures, request.includeHighlights, context)
   assertNotCancelled(context)
-  // Truncation can turn an open comment or string into unrelated grammar tokens.
-  if (
-    result.errors.some(
-      (error) => error.startIndex < range.endIndex && error.endIndex >= preview.size,
-    )
-  )
-    return undefined
   return {
     ...result,
-    captures: (request.includeCaptures ?? true) ? captures : [],
-    tokensPacked,
     documentId: request.documentId,
     snapshotVersion: request.snapshotVersion,
     languageId: request.languageId,
     range,
     source: sourceTag(staged.source),
-    analysis: { kind: 'partial', coveredRange: { startIndex: 0, endIndex: coverageEnd } },
+    analysis: { kind: 'partial', coveredRange: { startIndex: 0, endIndex: preview.size } },
     folds: [],
     errors: [],
     brackets: [],
     injections: [],
     missingLanguages: preview.missingLanguages,
     statistics: {
-      ...resultStatistics(preview, { ...result, captures, tokensPacked }, context, range),
+      ...resultStatistics(preview, result, context, range),
       bootstrapUnits: preview.size,
     },
     timings: phaseTimings(context),

@@ -1,0 +1,122 @@
+Observation setup notes: the first fourteen failures requested an entire unwrapped 80,000-space row and therefore received complete analysis; they do not establish an atomicity failure. The final control successfully read both known token palettes, then failed the unchanged-row range identity assertion. That palette-wide reset is the rendering regression reproduced here. The raw follow-up probe measured an unconstrained 16,000,000-pixel editor viewport, so wrapping still requested the whole source. Final controls constrain and measure the viewport before opening the same exact source, then hold native replies after provisional adoption.
+
+[wave-heavy] 'viewport corrected colors and frames' is waiting: 5 job(s) ahead in the queue
+[wave-heavy] 'viewport corrected colors and frames' is waiting: 5 job(s) ahead in the queue
+[wave-heavy] 'viewport corrected colors and frames' is waiting: 5 job(s) ahead in the queue
+[wave-heavy] 'viewport corrected colors and frames' is waiting: 5 job(s) ahead in the queue
+[wave-heavy] 'viewport corrected colors and frames' is waiting: 5 job(s) ahead in the queue
+[wave-heavy] 'viewport corrected colors and frames' is waiting: 5 job(s) ahead in the queue
+[wave-heavy] started 'viewport corrected colors and frames' on local after 350s: 7959 MiB free covers 4096 MiB
+$ tsc --noEmit
+
+ RUN  v5.0.2 /work/worktrees/platform/singapore-viewport-first/editor/packages/tree-sitter
+      API started at http://localhost:63315/
+
+ ❯ |chromium| test/viewport-replacement.browser.test.ts (15 tests | 15 failed) 16598ms
+   × atomically replaces unknown tag interpolation with the non-provisional baseline 1304ms
+   × atomically replaces sql interpolation string with the non-provisional baseline 1245ms
+   × atomically replaces sql interpolation identifier with the non-provisional baseline 1200ms
+   × atomically replaces typescript interpolation string with the non-provisional baseline 1151ms
+   × atomically replaces typescript interpolation identifier with the non-provisional baseline 1150ms
+   × atomically replaces javascript interpolation comment with the non-provisional baseline 1198ms
+   × atomically replaces sql future string spanning host with the non-provisional baseline 1217ms
+   × atomically replaces typescript future string spanning host with the non-provisional baseline 1149ms
+   × atomically replaces javascript future comment spanning host with the non-provisional baseline 1168ms
+   × atomically replaces html future comment spanning host with the non-provisional baseline 1150ms
+   × atomically replaces last sibling with the non-provisional baseline 1135ms
+   × atomically replaces later sibling predicate with the non-provisional baseline 1132ms
+   × atomically replaces scope text predicate with the non-provisional baseline 1133ms
+   × atomically replaces node-local predicate positive control with the non-provisional baseline 1134ms
+   × observes a cleared paint frame and retains unchanged-row range identities 132ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 15 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > atomically replaces unknown tag interpolation with the non-provisional baseline
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > atomically replaces sql interpolation string with the non-provisional baseline
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > atomically replaces sql interpolation identifier with the non-provisional baseline
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > atomically replaces typescript interpolation string with the non-provisional baseline
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > atomically replaces typescript interpolation identifier with the non-provisional baseline
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > atomically replaces javascript interpolation comment with the non-provisional baseline
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > atomically replaces sql future string spanning host with the non-provisional baseline
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > atomically replaces typescript future string spanning host with the non-provisional baseline
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > atomically replaces javascript future comment spanning host with the non-provisional baseline
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > atomically replaces html future comment spanning host with the non-provisional baseline
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > atomically replaces last sibling with the non-provisional baseline
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > atomically replaces later sibling predicate with the non-provisional baseline
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > atomically replaces scope text predicate with the non-provisional baseline
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > atomically replaces node-local predicate positive control with the non-provisional baseline
+AssertionError: expected false to be true // Object.is equality
+
+Failure screenshots:
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/atomically-replaces-unknown-tag-interpolation-with-the-non-provisional-baseline.png
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/atomically-replaces-sql-interpolation-string-with-the-non-provisional-baseline.png
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/atomically-replaces-sql-interpolation-identifier-with-the-non-provisional-baseline.png
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/atomically-replaces-typescript-interpolation-string-with-the-non-provisional-baseline.png
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/atomically-replaces-typescript-interpolation-identifier-with-the-non-provisional-baseline.png
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/atomically-replaces-javascript-interpolation-comment-with-the-non-provisional-baseline.png
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/atomically-replaces-sql-future-string-spanning-host-with-the-non-provisional-baseline.png
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/atomically-replaces-typescript-future-string-spanning-host-with-the-non-provisional-baseline.png
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/atomically-replaces-javascript-future-comment-spanning-host-with-the-non-provisional-baseline.png
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/atomically-replaces-html-future-comment-spanning-host-with-the-non-provisional-baseline.png
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/atomically-replaces-last-sibling-with-the-non-provisional-baseline.png
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/atomically-replaces-later-sibling-predicate-with-the-non-provisional-baseline.png
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/atomically-replaces-scope-text-predicate-with-the-non-provisional-baseline.png
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/atomically-replaces-node-local-predicate-positive-control-with-the-non-provisional-baseline.png
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+ ❯ Proxy.__VITEST_POLL_CHAIN__ node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/deps/index.DGdajAO2-qC8TxPz3.js?v=2f000a4f:5777:47
+ ❯ test/viewport-replacement.browser.test.ts:140:10
+    138|           adoptions.some((entry) => entry.kind === 'partial' && entry.…
+    139|         )
+    140|         .toBe(true)
+       |          ^
+    141|       await expect
+    142|         .poll(() => mountedColors(editor, prefix.length), { timeout: 2…
+ ❯ node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/deps/plugins.Cigb0uSy-D3-MQlbH.js?v=2f000a4f:4951:20
+
+Caused by: Error: Matcher did not succeed in time.
+ ❯ throwWithCause node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/deps/index.DGdajAO2-qC8TxPz3.js?v=2f000a4f:5757:34
+ ❯ promise node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/deps/index.DGdajAO2-qC8TxPz3.js?v=2f000a4f:5842:7
+ ❯ test/viewport-replacement.browser.test.ts:136:7
+ ❯ node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/deps/plugins.Cigb0uSy-D3-MQlbH.js?v=2f000a4f:4951:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/15]⎯
+
+ FAIL  |chromium| test/viewport-replacement.browser.test.ts > observes a cleared paint frame and retains unchanged-row range identities
+AssertionError: expected Map{ '{"color":"#ff0000"}' => [ …(1) ] } to be Map{ '{"color":"#ff0000"}' => [ …(1) ] } // Object.is equality
+
+If it should pass with deep equality, replace "toBe" with "toStrictEqual"
+
+Expected: Map{ '{"color":"#ff0000"}' => [ …(1) ] }
+Received: serializes to the same string
+
+
+Failure screenshot:
+  - .vitest/attachments/failure-screenshots/viewport-replacement.browser.test.ts/observes-a-cleared-paint-frame-and-retains-unchanged-row-range-identities.png
+
+[2mCompared values have no visual difference.[22m
+
+ ❯ test/viewport-replacement.browser.test.ts:231:58
+    229|     await new Promise<void>((resolve) => requestAnimationFrame(() => r…
+    230|     expect(mountedColors(editor, 17)).toEqual(tokenColors(complete, 17…
+    231|     expect([...view['view'].rowTokenRanges.values()][0]).toBe(firstRow)
+       |                                                          ^
+    232|     const ranges = [...firstRow.values()].flat()
+    233|     expect(ranges.length).toBe(retained.length)
+ ❯ node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/deps/plugins.Cigb0uSy-D3-MQlbH.js?v=2f000a4f:4951:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/15]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  15 failed | 21 passed (36)
+   Start at  18:28:52
+   Duration  17.32s (tests 97%, import 2%, worker 1%)
+
+
+[exited with code 1]

@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from 'vitest'
 import { Editor } from '@singapore-editor/core/editor'
-import { toEditorTokenStore, type EditorToken } from '@singapore-editor/core/syntax'
+import { toEditorTokenStore } from '@singapore-editor/core/syntax'
 import { createTreeSitterLanguagePlugin } from '../src/index'
 import { TreeSitterWorkerClient } from '../src/treeSitter/workerClient'
 import { TreeSitterLanguageRegistry } from '../src/treeSitter/registry'
@@ -16,7 +16,7 @@ afterEach(async () => {
   clients.clear()
 })
 
-function document(text: string, languageId = 'typescript') {
+function document(text: string, languageId = 'typescript', syntaxMode: 'full' | 'range' = 'range') {
   const backend = new TreeSitterWorkerClient()
   clients.add(backend)
   const registry = new TreeSitterLanguageRegistry()
@@ -27,7 +27,7 @@ function document(text: string, languageId = 'typescript') {
     languageId,
     languageResolver: registry,
     backend,
-    syntaxMode: 'range',
+    syntaxMode,
     text,
   })
 }
@@ -70,9 +70,7 @@ it.each([
     const completed = await doc.runtime.queryRange(range)
     expect(completed.projection.analysis?.kind).toBe('full')
     expect(completed.projection.source).toEqual(preview.projection.source)
-    for (const capture of preview.captures) expect(completed.captures).toContainEqual(capture)
-    const completedTokens = toEditorTokenStore(completed.tokens).toTokens()
-    expectRetainedTokenStyles(toEditorTokenStore(preview.tokens).toTokens(), completedTokens)
+    await expectBaselineTokens(doc, prefix + ' '.repeat(70_000), languageId, range)
   },
   30_000,
 )
@@ -187,84 +185,76 @@ it('replaces provisional syntax in a mounted editor without another edit or scro
 }, 30_000)
 
 it.each([
-  ['terminated call', 'foo();\n', ' '.repeat(80_000), 'partial'],
-  ['distant call continuation', 'foo', ' '.repeat(80_000) + '(42);\n', 'full'],
-  ['distant arrow continuation', 'const foo = ', ' '.repeat(80_000) + '() => 42;\n', 'full'],
+  ['terminated call', 'foo();\n', ' '.repeat(80_000)],
+  ['distant call continuation', 'foo', ' '.repeat(80_000) + '(42);\n'],
+  ['distant arrow continuation', 'const foo = ', ' '.repeat(80_000) + '() => 42;\n'],
 ])(
-  'keeps initial token styles stable for a %s',
-  async (_name, prefix, suffix, kind) => {
-    const doc = document(prefix + suffix)
+  'converges to baseline token styles for a %s',
+  async (_name, prefix, suffix) => {
+    const text = prefix + suffix
+    const doc = document(text)
     await doc.run()
-    const range = { startIndex: 0, endIndex: prefix.length }
-    const initial = await doc.runtime.queryRange(range)
-    await expect.poll(() => doc.runtime.getResult().projection.analysis?.kind).toBe('full')
-    const complete = await doc.runtime.queryRange(range)
-    expect(toEditorTokenStore(initial.tokens).toTokens()).toEqual(
-      toEditorTokenStore(complete.tokens).toTokens(),
-    )
-    expect(initial.captures).toEqual(complete.captures)
-    expect(initial.projection.analysis?.kind).toBe(kind)
+    await doc.runtime.queryRange({ startIndex: 0, endIndex: prefix.length })
+    await expectBaselineTokens(doc, text, 'typescript', { startIndex: 0, endIndex: prefix.length })
   },
   30_000,
 )
 
-it('limits provisional coverage before an unterminated trailing statement', async () => {
-  const prefix = 'const stable = 1;\n'
-  const doc = document(prefix + 'foo' + ' '.repeat(80_000) + '(42);\n')
+it('paints function declarations provisionally without a statement-kind whitelist', async () => {
+  const prefix = 'function answer() { return 42; }\n'
+  const text = prefix + ' '.repeat(80_000)
+  const doc = document(text)
   await doc.run()
   const range = { startIndex: 0, endIndex: prefix.length }
   const initial = await doc.runtime.queryRange(range)
-  expect(initial.projection.analysis).toEqual({
-    kind: 'partial',
-    coveredRange: { startIndex: 0, endIndex: prefix.length },
-  })
-  await expect.poll(() => doc.runtime.getResult().projection.analysis?.kind).toBe('full')
-  const complete = await doc.runtime.queryRange(range)
-  expect(toEditorTokenStore(initial.tokens).toTokens()).toEqual(
-    toEditorTokenStore(complete.tokens).toTokens(),
-  )
+  expect(initial.projection.analysis?.kind).toBe('partial')
+  expect(initial.projection.analysis?.coveredRange.endIndex).toBe(prefix.length + 4096)
+  expect(initial.folds).toEqual([])
+  expect(initial.errors).toEqual([])
+  expect(initial.brackets).toEqual([])
+  expect(initial.injections).toEqual([])
+  await expectBaselineTokens(doc, text, 'typescript', range)
 }, 30_000)
 
 it.each([
-  ['typescript`foo`;\n', 'typescript`(42);`;', 'foo', 'function'],
-  ['sql`SELECT foo`;\n', 'sql`(42);`;', 'SELECT foo', 'function'],
-  ['sql`SELECT foo`;\n', 'sql`.bar;`;', 'SELECT foo', 'type'],
+  ['typescript`foo`;\n', 'typescript`(42);`;', 'function'],
+  ['sql`SELECT foo`;\n', 'sql`(42);`;', 'function'],
+  ['sql`SELECT foo`;\n', 'sql`.bar;`;', 'type'],
 ])(
-  'defers combined injection colors for %s',
-  async (prefix, suffix, content, finalStyle) => {
-    const doc = document(prefix + ' '.repeat(80_000) + suffix)
+  'converges combined injection colors for %s',
+  async (prefix, suffix, finalStyle) => {
+    const text = prefix + ' '.repeat(80_000) + suffix
+    const doc = document(text)
     await doc.run()
     const range = { startIndex: 0, endIndex: prefix.length }
     const initial = await doc.runtime.queryRange(range)
     expect(initial.projection.analysis?.kind).toBe('partial')
-    const start = prefix.indexOf(content)
-    const end = start + content.length
-    const initialTokens = toEditorTokenStore(initial.tokens).toTokens()
-    expect(initialTokens.some((token) => token.start < end && token.end > start)).toBe(false)
-    expect(
-      initial.captures.some((capture) => capture.startIndex < end && capture.endIndex > start),
-    ).toBe(false)
-    await expect.poll(() => doc.runtime.getResult().projection.analysis?.kind).toBe('full')
+    expect(initial.injections).toEqual([])
+    await expectBaselineTokens(doc, text, 'typescript', range)
     const complete = await doc.runtime.queryRange(range)
-    const completeTokens = toEditorTokenStore(complete.tokens).toTokens()
     const identifier = prefix.indexOf('foo')
-    const resolved = completeTokens.find(
-      (token) => token.start <= identifier && identifier < token.end,
-    )
+    const resolved = toEditorTokenStore(complete.tokens)
+      .toTokens()
+      .find((token) => token.start <= identifier && identifier < token.end)
     expect(resolved?.style.color).toBe(`var(--editor-syntax-${finalStyle})`)
-    expectRetainedTokenStyles(initialTokens, completeTokens)
   },
   30_000,
 )
 
-function expectRetainedTokenStyles(
-  initial: readonly EditorToken[],
-  complete: readonly EditorToken[],
+async function expectBaselineTokens(
+  doc: ReturnType<typeof document>,
+  text: string,
+  languageId: string,
+  range: { readonly startIndex: number; readonly endIndex: number },
 ) {
-  for (const token of initial) {
-    for (let index = token.start; index < token.end; index++) {
-      const resolved = complete.find((next) => next.start <= index && index < next.end)
-      expect(resolved?.style).toEqual(token.style)
-    }
-  }
+  await expect.poll(() => doc.runtime.getResult().projection.analysis?.kind).toBe('full')
+  const complete = await doc.runtime.queryRange(range)
+  const baseline = document(text, languageId, 'full')
+  await baseline.run()
+  const reference = await baseline.runtime.queryRange(range)
+  expect(reference.projection.analysis?.kind).toBe('full')
+  expect(toEditorTokenStore(complete.tokens).toTokens()).toEqual(
+    toEditorTokenStore(reference.tokens).toTokens(),
+  )
+  expect(complete.captures).toEqual(reference.captures)
 }

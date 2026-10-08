@@ -1189,6 +1189,7 @@ export class StructuralEntry extends AnalysisEntry<EditorSyntaxResult> {
   }
 
   protected override runtimeResultChanged(): void {
+    this.generation += 1
     this.ranges.clear()
     for (const query of this.queries.values()) query.admission = 'return-only'
   }
