@@ -159,11 +159,12 @@ class CanvasSurface implements RowRendererSurface {
       if (!this.plan) this.prepare(cursor)
       if (!this.canReuse(row.y, cursor)) {
         this.pixelTarget?.beginRow(row.y)
+        // Pixel targets publish the whole scratch row.
         this.painter.paint(
           row,
           cursor,
           this.canvas.width,
-          this.pending.size === 1 && this.plan!.offset === 0,
+          !this.pixelTarget && this.pending.size === 1 && this.plan!.offset === 0,
         )
         this.pixelTarget?.finishRow(row.y)
         this.reuseMetrics.repaintedRows += 1
@@ -195,14 +196,8 @@ class CanvasSurface implements RowRendererSurface {
     this.canvas.style.height = `${grid.rows * font.cssCellHeight}px`
   }
 
-  restoreContext(): void {
-    this.contextLost = false
+  refreshFontResources(): void {
     this.painter.resetContext(this.font)
-    this.clearPixelCache()
-    this.invalidate()
-  }
-
-  clearPixelCache(): void {
     this.pixelTarget?.invalidate?.()
   }
 
@@ -286,7 +281,7 @@ export class CanvasTerminalRenderer extends RowTerminalRenderer {
     this.canvasSurface.invalidate()
   }
   private readonly onContextRestored = (): void => {
-    this.canvasSurface.restoreContext()
+    this.canvasSurface.contextLost = false
     this.clearTextureAtlas()
   }
 
@@ -321,7 +316,7 @@ export class CanvasTerminalRenderer extends RowTerminalRenderer {
 
   override clearTextureAtlas(): void {
     this.canvasSurface.invalidate()
-    this.canvasSurface.clearPixelCache()
+    this.canvasSurface.refreshFontResources()
     super.clearTextureAtlas()
   }
 

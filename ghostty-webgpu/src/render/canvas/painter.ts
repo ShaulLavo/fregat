@@ -172,6 +172,7 @@ export class CanvasRowPainter {
     let end = text.length
     while (first < end && previous.text[first] === text[first]) first += 1
     while (end > first && previous.text[end - 1] === text[end - 1]) end -= 1
+    if (first === end) end = 0
     if (previous.cursor !== currentCursor) {
       for (const value of [previous.cursor, currentCursor]) {
         if (!value) continue
