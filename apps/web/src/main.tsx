@@ -49,7 +49,6 @@ import { launchAddress } from '@/components/utils/launch-address'
 import { applyBackdrop, resolveBackdrop } from '@/lib/platform/backdrop.ts'
 import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-trace.ts'
 import { reportReactError } from '@/lib/react-error-reporting.ts'
-import { applicationHost } from '@/lib/application-host'
 import { configureIntentPrediction } from '@/lib/intent-prefetch-options'
 import { takePairingCodeFromLocation } from '@/lib/pairing/state/link-claim'
 import { useShellStore, watchShellKind } from '@/lib/shell/state/store'
@@ -59,7 +58,7 @@ import { shellQueryOptions } from '@/features/workspace/utils/shell-query'
 installEditorPerformanceTraceFromUrl()
 configureIntentPrediction()
 initializeClientLogging()
-applyBackdrop(applicationHost()?.backdrop ?? resolveBackdrop())
+applyBackdrop(resolveBackdrop())
 // Before `createRoot`, deliberately. The mirrored appearance is initial
 // document state: descendants construct geometry and read computed styles on
 // their first render. `AppearanceProvider` corrects it from the server snapshot
@@ -96,12 +95,12 @@ const pairingCode = takePairingCodeFromLocation(
   new URL(import.meta.env.BASE_URL, location.href).href,
 )
 // Preserve explicit fields before Router normalizes defaults; boot merges them with the cache.
-const restoredHref = applicationHost()?.initialAddress ?? selectInitialAddress(window.location.href)
+const restoredHref = selectInitialAddress(window.location.href)
 const liveHref = selectInitialAddress(window.location.href, null)
 const coarsePointer = window.matchMedia(COARSE_POINTER_QUERY).matches
 const initialHref = phoneStartAddress(restoredHref, liveHref, coarsePointer)
 const initialIntent = parseAddressIntent(initialHref)
-const routerHistory = applicationHost()?.history ?? createBrowserHistory()
+const routerHistory = createBrowserHistory()
 const initialBrowserHref = browserAddressHref(initialHref)
 if (routerHistory.location.href !== initialBrowserHref) routerHistory.replace(initialBrowserHref)
 routerHistory.flush()

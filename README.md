@@ -9,7 +9,7 @@
   <a href="docs/development.md"><img src="https://img.shields.io/badge/install-source-blue" alt="Run from source" /></a>
 </p>
 <p align="center">
-  <a href="https://shaulavo.dev/fregat/">Website and demo</a> ·
+  <a href="https://shaulavo.dev/fregat/">Website</a> ·
   <a href="docs/README.md">Documentation</a> ·
   <a href="PLAN.md">Roadmap</a> ·
   <a href="https://github.com/ShaulLavo/fregat/discussions">Discussions</a>

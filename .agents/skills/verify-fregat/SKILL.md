@@ -63,17 +63,19 @@ The scenarios land on a workspace by registering a root-relative folder (`--work
 
 ## Landing page and product assets
 
-Use the same tool for `apps/site`. Its build includes the real app demo. The existing Vite server serves the built site at `/fregat/`:
+Use the same tool for `apps/site`. The build contains the Astro landing page and its
+animated replica. Verify the built files without starting the web app:
 
 ```bash
+bun run build:workspaces
 bun run --cwd apps/site site:build
-bun run agent:browser look --site --headed --url http://localhost:5173/fregat/ --width 1440 --height 1200
-bun run agent:browser look --site --headed --url http://localhost:5173/fregat/ --width 390 --height 844
+bun run agent:browser look --site --static-dir apps/site/dist --width 1440 --height 1200
+bun run agent:browser look --site --static-dir apps/site/dist --width 390 --height 844
 ```
 
-Read both screenshots. `layout.json` records viewport, document width, image and iframe dimensions and positions. Final screenshots wait for the embedded app. The `demo-startup` scenario separately checks that the iframe is visible during loading and no screenshot preview replaces it. `--static-dir` remains useful for documents without service workers; use real HTTP through the existing Vite server for this demo.
-
-Run `scenario demo-workspace` and `scenario demo-agent-git` against `/fregat/demo/index.html`, and `scenario demo-reset` against `/fregat/`. These use the actual app UI. `inspection.json` retains mock requests, unhandled operations and client log batches. The mock's logs are the relevant logs here; demo scenarios do not read the unrelated development server log window. `observed.json` includes service-worker responses, native socket connections and console source locations. Inspect failures as well as successful steps.
+Read both screenshots. `layout.json` records viewport, document width, image and iframe
+bounds. `--site` waits for document, fonts and images. The retired live-app demo and its
+browser scenarios were removed after the replica shipped in PR #1012.
 
 For a `--url` run, set `OBSERVABILITY_DIR` to the target process's log directory on the browser or logs command so the captured log window comes from the process being driven.
 

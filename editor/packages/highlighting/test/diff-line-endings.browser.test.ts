@@ -106,6 +106,19 @@ function constStarts(buffer: string) {
   return [...buffer.matchAll(/const/g)].map(({ index }) => [index, 'const'])
 }
 
+function waitForSyntax(plugin: DiffPlugin): Promise<void> {
+  if (plugin.isSyntaxReady()) return Promise.resolve()
+
+  return new Promise((resolve) => {
+    const subscription = plugin.onDidChangeTokens(() => {
+      if (!plugin.isSyntaxReady()) return
+      subscription.dispose()
+      resolve()
+    })
+    cleanups.push(() => subscription.dispose())
+  })
+}
+
 describe.each(Object.entries(DIFFS))('%s diff', (_name, texts) => {
   describe.each(Object.entries(THEMES))('under the %s', (_theme, selection) => {
     test.each(SIDES)('a prepared %s pane paints each const whole', async (side) => {
@@ -120,7 +133,7 @@ describe.each(Object.entries(DIFFS))('%s diff', (_name, texts) => {
       })
       const shown = highlighting.showDiff(plugin, file, side, source)
       cleanups.push(() => shown.dispose())
-      await expect.poll(() => plugin.isSyntaxReady() && plugin.getTokens().length > 0).toBe(true)
+      await waitForSyntax(plugin)
 
       const { buffer, tokens } = paint(plugin)
       expect(paintedConsts(buffer, tokens)).toEqual(constStarts(buffer))
@@ -135,7 +148,7 @@ describe.each(Object.entries(DIFFS))('%s diff', (_name, texts) => {
       })
       plugin.setFile(diffOf(texts))
       cleanups.push(() => plugin.setFile(null))
-      await expect.poll(() => plugin.isSyntaxReady() && plugin.getTokens().length > 0).toBe(true)
+      await waitForSyntax(plugin)
 
       const { buffer, tokens } = paint(plugin)
       expect(paintedConsts(buffer, tokens)).toEqual(constStarts(buffer))
