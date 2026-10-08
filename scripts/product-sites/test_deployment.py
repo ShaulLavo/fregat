@@ -29,7 +29,8 @@ class DeploymentTests(unittest.TestCase):
         self.assertNotIn('      - apps/web/**\n', workflow)
         self.assertNotIn('      - packages/**\n', workflow)
         self.assertNotIn('      - ghostty-webgpu/**\n', workflow)
-        self.assertIn('      - apps/web/src/**\n', workflow)
+        self.assertNotIn('      - apps/web/src/**\n', workflow)
+        self.assertNotIn('apps/web/demo', workflow)
         self.assertIn('      - ghostty-webgpu/*.wasm\n', workflow)
         self.assertIn('      - hotkeys/packages/*/src/**\n', workflow)
         self.assertIn('      - editor/scripts/build-package.ts\n', workflow)
@@ -62,6 +63,13 @@ class DeploymentTests(unittest.TestCase):
             self.assertIn('run --cwd editor/site build --base /singapore/', commands)
             self.assertEqual((output / 'singapore/index.html').read_text(), 'editor/site')
             self.assertEqual((output / 'singapore/demo/index.html').read_text(), 'editor/examples/app')
+
+    def test_fregat_build_only_builds_the_landing_page(self):
+        root = Path(__file__).resolve().parents[2]
+        build = (root / 'scripts/build-site.ts').read_text()
+        self.assertIn("['bun', 'astro', 'build']", build)
+        for retired in ('demo', 'msw', 'apps/web', 'vite'):
+            self.assertNotIn(retired, build)
 
     def test_dotfile_deny_precedes_site_location(self):
         config = Path(__file__).with_name('nginx.conf').read_text()
