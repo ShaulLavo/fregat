@@ -1,0 +1,127 @@
+:root {
+  color-scheme: light dark;
+  --background: #f6f7f9;
+  --surface: #e8ecf0;
+  --ink: #17212c;
+  --muted: #4c5866;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #17212c;
+    --surface: #23313e;
+    --ink: #edf2f6;
+    --muted: #bac6d0;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0 auto;
+  padding: 16px;
+  max-width: 960px;
+  background: var(--background);
+  color: var(--ink);
+  font:
+    15px/1.5 system-ui,
+    sans-serif;
+}
+h1 {
+  font-size: 21px;
+  margin: 0 0 8px;
+}
+h2 {
+  font-size: 17px;
+}
+p {
+  margin: 8px 0 12px;
+}
+form,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+  margin: 12px 0;
+}
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+button,
+select,
+input {
+  background: var(--surface);
+  color: var(--ink);
+  border: 0;
+  border-radius: 6px;
+  padding: 10px;
+  font: inherit;
+  min-height: 44px;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+}
+:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+#editor {
+  height: 46svh;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+#editor .editor-virtualized {
+  --editor-background: var(--surface);
+  --editor-foreground: var(--ink);
+  --editor-gutter-background: var(--surface);
+  --editor-gutter-foreground: var(--muted);
+}
+#editor[data-anchor='none'] .editor-virtualized {
+  overflow-anchor: none;
+}
+#editor[data-gutter='absolute'] .editor-virtualized-gutter {
+  position: absolute;
+  top: 0;
+}
+#editor[data-paint='native'] .editor-virtualized-viewport {
+  position: absolute;
+  height: 100% !important;
+  clip-path: none;
+}
+#editor[data-paint='native'] .editor-virtualized-content {
+  height: 100% !important;
+  transform: none !important;
+}
+pre,
+textarea {
+  font:
+    12px/1.6 ui-monospace,
+    monospace;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+textarea {
+  width: 100%;
+  border: 0;
+}
+details {
+  margin: 12px 0;
+}
+summary {
+  cursor: pointer;
+}
+#status {
+  font-size: 13px;
+}
