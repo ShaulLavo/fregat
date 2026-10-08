@@ -1,0 +1,33 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { expect, test } from 'vitest'
+
+const root = path.resolve(import.meta.dirname, '..')
+const source = (file: string) => readFileSync(path.join(root, file), 'utf8')
+
+test('the landing page describes source-built desktop and phone browser access', () => {
+  const page = source('apps/site/src/pages/index.astro')
+  expect(page).not.toMatch(/no releases|0\.0\.1|a native app/)
+  expect(page).toContain('desktop app')
+  expect(page).toContain('phone browser')
+  expect(page).toContain('https proxy')
+  expect(page).toContain('public downloads')
+})
+
+test('the README names the shipped desktop client and phone setup', () => {
+  const readme = source('README.md')
+  expect(readme).not.toContain('native mac')
+  expect(readme).toContain('https proxy')
+  expect(readme).toContain('pairing')
+})
+
+test.each([
+  ['apps/mac/Sources/MacApp/main.swift', 'window.title = "Fregat"'],
+  ['apps/desktop/native/macos/platform-webview.m', 'window.title = @"Fregat"'],
+  ['apps/desktop/native/linux/platform-webview.c', 'GTK_WINDOW(window), "Fregat"'],
+  ['apps/tui/README.md', '# Fregat TUI'],
+  ['apps/tui/src/host/utils/arguments.ts', '`Fregat TUI'],
+  ['apps/web/src/features/workbench/utils/titlebar-model.ts', "workspaceTitle: 'Fregat'"],
+])('the product name in %s is Fregat', (file, expected) => {
+  expect(source(file)).toContain(expected)
+})
