@@ -48,6 +48,7 @@ function fixture() {
     'test-tui': { result: 'success' },
     browser: { result: 'success' },
     site: { result: 'success' },
+    'mobile-layout': { result: 'success' },
     libraries: { result: 'success' },
   }
   const names = [
@@ -64,6 +65,7 @@ function fixture() {
     'Test (tui)',
     'Browser tests',
     'Site build',
+    'Mobile layout',
     'Libraries / Editor tests',
     'Libraries / Ghostty tests',
     'Libraries / Standalone packages',
@@ -133,7 +135,7 @@ test('missing required needs rejects before trusting successful API jobs', () =>
   expect(value.run()).toEqual({ passed: false, issues: ['Required need browser is missing'] })
 })
 
-test.each(['Test (web 3/4)', 'Libraries / Ghostty tests', 'Browser tests'])(
+test.each(['Test (web 3/4)', 'Libraries / Ghostty tests', 'Browser tests', 'Mobile layout'])(
   'missing required execution %s rejects a successful parent',
   (name) => {
     const value = fixture()
@@ -154,22 +156,26 @@ test('disabled reusable children may skip while selected family succeeds', () =>
   expect(value.run()).toEqual({ passed: true, issues: [] })
 })
 
-test('source-authorized docs-only selection permits skipped or absent disabled jobs', () => {
+test('docs-only selection requires mobile layout and permits skipped or absent disabled jobs', () => {
   const value = fixture()
   for (const key of Object.keys(value.changes.outputs)) {
     if (key !== 'web_shards') value.changes.outputs[key] = key === 'docs' ? 'true' : 'false'
   }
   for (const id of Object.keys(value.needs)) {
-    value.needs[id] = { result: id === 'changes' || id === 'docs' ? 'success' : 'skipped' }
+    value.needs[id] = {
+      result: ['changes', 'docs', 'mobile-layout'].includes(id) ? 'success' : 'skipped',
+    }
   }
   value.needs.changes = value.changes
   const jobs = value.jobs
-    .filter((job) => job.name === 'Changes' || job.name === 'Docs format')
+    .filter((job) => ['Changes', 'Docs format', 'Mobile layout'].includes(job.name))
     .map((job) => ({ ...job, conclusion: 'success', runner_id: 1 }))
   expect(value.evaluate(jobs)).toEqual({
     passed: true,
     issues: [],
   })
+  value.needs['mobile-layout'] = { result: 'skipped' }
+  expect(value.evaluate(jobs).passed).toBe(false)
 })
 
 test('enabled work reported skipped rejects', () => {

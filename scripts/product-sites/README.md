@@ -28,7 +28,9 @@ The existing Pages workflow keeps its defaults.
 library sources, build configuration or manifests, and on manual dispatch from main. Test-only
 changes do not trigger it. Markdown under site sources remains an input. The Fregat landing page
 uses its own animated replica. Web application source changes do not trigger this build.
-Site pull requests run the build and mobile checks; deployment runs only from main.
+The normal CI workflow builds all production sites and runs the mobile checks on every pull
+request, main push and manual CI run. Its `Mobile layout` job is required by the final `CI`
+verdict and has no deployment secrets. Production deployment remains a separate main-only workflow.
 
 The mobile check visits every built HTML page in touch-enabled Chromium and WebKit at
 320, 360 and 390 CSS pixels, with a device pixel ratio of 2. It also opens the documentation
@@ -37,7 +39,7 @@ width exceeds the requested CSS width or its mobile layout viewport expands, wit
 tolerance. Code and tables can scroll inside a box that fits the page.
 
 ```sh
-cd scripts && bun x playwright install --with-deps chromium webkit && cd ..
+scripts/node_modules/.bin/playwright install --with-deps chromium webkit
 bun scripts/product-sites/test-mobile.mjs
 bun scripts/product-sites/verify-mobile.mjs --directory /path/to/output --evidence /path/to/evidence
 ```
