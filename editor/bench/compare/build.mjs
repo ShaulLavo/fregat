@@ -5,6 +5,7 @@ import { gzipSync, brotliCompressSync } from 'node:zlib'
 import { createHash } from 'node:crypto'
 import { build } from 'vite'
 import { editors } from './protocol.mjs'
+import { fullDocumentTransform } from './full-document.mjs'
 
 export const root = dirname(fileURLToPath(import.meta.url))
 export const output = resolve(root, 'dist')
@@ -64,7 +65,7 @@ function minimalEntry(editor, highlighted) {
   return entries[editor]
 }
 
-export async function buildAll() {
+export async function buildAll({ fullDocument = false } = {}) {
   const sizes = []
   const template = await readFile(resolve(root, 'page.html'), 'utf8')
   const page = await readFile(resolve(root, 'page.js'), 'utf8')
@@ -84,6 +85,7 @@ export async function buildAll() {
           plugins: [
             {
               name: 'compare-entry',
+              enforce: 'pre',
               resolveId(id) {
                 if (id === 'virtual:compare') return '\0compare'
               },
@@ -95,6 +97,10 @@ export async function buildAll() {
                     .replaceAll('HIGHLIGHTED', JSON.stringify(highlighted))
               },
               transform(code, id) {
+                if (fullDocument) {
+                  const transformed = fullDocumentTransform(code, id)
+                  if (transformed !== undefined) return transformed
+                }
                 if (highlighted || !id.endsWith(`${editor}.js`)) return
                 return code
                   .replace(
@@ -114,7 +120,19 @@ export async function buildAll() {
             target: 'es2023',
             rollupOptions: { input: 'virtual:compare', output: { entryFileNames: 'entry.js' } },
           },
-          worker: { format: 'es' },
+          worker: {
+            format: 'es',
+            plugins: () =>
+              fullDocument
+                ? [
+                    {
+                      name: 'full-document-worker-probe',
+                      enforce: 'pre',
+                      transform: fullDocumentTransform,
+                    },
+                  ]
+                : [],
+          },
         })
       }
       const files = []
@@ -154,8 +172,10 @@ export async function buildAll() {
     }
   }
   await mkdir(output, { recursive: true })
+  await writeFile(resolve(output, 'mode.json'), JSON.stringify({ fullDocument }))
   await writeFile(resolve(output, 'bundles.json'), JSON.stringify(sizes, null, 2))
   return sizes
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await buildAll()
+if (process.argv[1] === fileURLToPath(import.meta.url))
+  await buildAll({ fullDocument: process.argv.includes('--full-document') })

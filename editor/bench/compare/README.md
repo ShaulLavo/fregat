@@ -194,3 +194,52 @@ heap columns use the median of repetitions. Failures remain separate.
 
 The committed experiment and its interpretation are in
 [the performance document](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/performance/browser-compare-2026-10-08.md).
+
+## Whole-document diagnostic
+
+The full-document mode selects Singapore's existing `resultMode: full` path at
+build time. It parses the entire source, discovers injections, runs the highlight
+and structural queries over every tree, packs every token and constructs the
+main-thread store before accepting a highlighted frame. It preserves the normal
+virtualized renderer. The build-only transform lives in `full-document.mjs`;
+shipping package source stays unchanged.
+
+```sh
+bun run build:full
+bun run bench:full --condition noisy --repetitions 3 --timeout 180000 --output ./results/full
+node summarize-open.mjs ./results/full/experiment.json
+# Optional native control. Supply a checkout of the runtime revision recorded by the package.
+node full-document.mjs --native <tree-sitter-source-checkout> ./results/full
+```
+
+The runner rejects a build/run mode mismatch, range queries, parse-only work,
+degraded phases and a result covering less than the full fixture. Source-transform
+tests fail when instrumentation targets drift. Worker and page clocks use
+`performance.timeOrigin + performance.now()` to compare absolute timestamps;
+their time origins can differ. Outbound time includes structured cloning,
+delivery and scheduling; inbound time includes reply cloning, delivery and
+scheduling. These are boundary delays, not isolated memory-copy measurements.
+`sourcePostMs` measures the synchronous `postMessage` call separately.
+`tokenStoreMs` measures `EditorTokenStore.fromPacked`; structural apply includes
+other main-thread work. Worker phases nest inside parse/query totals. Do not sum
+nested phases or combine medians into an invented end-to-end clock.
+
+CodeMirror's reference explicitly parses the same whole string with Lezer and
+walks the full tree with `highlightTree`. Monaco's reference uses
+`editor.tokenize` over the whole string with its TypeScript Monarch grammar.
+It does not use TextMate. These synchronous reference clocks exclude rendering,
+and both run before their first-frame clock in full-document mode. Singapore's
+first frame may contain plain text while its worker runs; its highlighted frame
+requires the full result. These first-frame clocks are different milestones.
+Neither competitor reference includes Singapore's folds, brackets or injection
+work, so the reference clocks establish no editor-speed ranking.
+
+The native control compiles the supplied runtime source and installed TypeScript
+0.23.2 grammar with `cc -O3`, creates a fresh parser/tree each time and verifies the
+root covers all input bytes. File I/O and compilation are outside parse time.
+The native input is contiguous UTF-8; browser input is UTF-16 through piece-table
+callbacks. Even at the same runtime commit, the ratio includes encoding and input
+adapter costs. Retain native JSON, browser JSON/traces, compiler, fixture hash,
+served-build hashes and scheduling receipts. Use quiet paired runs before making
+a performance claim. The repeated fixture has duplicate declarations and ends
+inside a comment. It measures syntax work, not TypeScript type checking.
