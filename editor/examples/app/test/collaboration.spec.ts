@@ -14,7 +14,7 @@ test('participants, hosts and the final peer can leave the example', async ({ pa
   const host = page
     .locator('.peer')
     .filter({ has: page.locator('span', { hasText: 'Ordering host' }) })
-  await expect(host.locator('span')).toContainText('1 peers')
+  await expect(host.locator('.peer-header span')).toContainText('1 peers')
   await host.getByRole('button', { name: 'Leave session' }).click()
   await expect(page.locator('.peer-header span').filter({ hasText: 'left' })).toHaveCount(2)
   expect(errors).toEqual([])
@@ -35,7 +35,7 @@ test('the host hands off to its connected successor', async ({ page }) => {
   )
 })
 
-test('failed setup releases every interval, channel and editor before retry', async ({ page }) => {
+test('failed setup releases its intervals, channels and editor before retry', async ({ page }) => {
   await page.addInitScript(() => {
     const active = new Set<number>()
     const channels = new Set<BroadcastChannel>()
@@ -68,6 +68,9 @@ test('failed setup releases every interval, channel and editor before retry', as
   await page.goto('/collaboration.html')
   await page.locator('#signaling').fill('https://invalid.example')
   await page.locator('#admission').fill('fixture-member-token')
+  const baseline = await page.evaluate(() =>
+    (window as unknown as { collaborationResources(): unknown }).collaborationResources(),
+  )
   await page.locator('#start').click()
   await expect(page.locator('#status')).toContainText('ws')
   await expect(page.locator('.peer')).toHaveCount(0)
@@ -75,7 +78,7 @@ test('failed setup releases every interval, channel and editor before retry', as
     await page.evaluate(() =>
       (window as unknown as { collaborationResources(): unknown }).collaborationResources(),
     ),
-  ).toEqual({ intervals: 0, channels: 0 })
+  ).toEqual(baseline)
   await page.locator('#signaling').fill('')
   await page.locator('#start').click()
   await expect(page.locator('.peer-header span').filter({ hasText: '2 peers' })).toHaveCount(2)

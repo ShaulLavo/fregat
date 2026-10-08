@@ -2729,6 +2729,7 @@ export class Editor {
   }
 
   private addViewContributionProvider(provider: EditorViewContributionProvider): void {
+    if (this.viewContributionsByProvider.has(provider)) return
     const contribution = this.createViewContribution(provider)
     if (!contribution) return
 
