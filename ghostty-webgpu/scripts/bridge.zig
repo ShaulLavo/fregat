@@ -196,11 +196,13 @@ const CachedCell = struct {
     styled: bool,
     tag: c.GhosttyCellContentTag,
     key: ?*glyph_index.Entry,
+    registration: u64 = 0,
 };
 const RenderedCell = struct {
     raw: c.GhosttyCell,
     key: ?*glyph_index.Entry,
     reusable: bool,
+    registration: u64,
 };
 const CachedRow = struct {
     id: c.GhosttyRenderStateRowId,
@@ -365,6 +367,7 @@ fn matchingFrameRow(frame: *Frame, iterator: c.GhosttyRenderStateRowIterator, ce
     if (result != c.GHOSTTY_SUCCESS) return result;
     for (0..raw.len) |x| {
         const input = row.cells[x];
+        if (input.key != null and input.registration != input.key.?.registration) return c.GHOSTTY_SUCCESS;
         const grapheme = input.tag == c.GHOSTTY_CELL_CONTENT_CODEPOINT_GRAPHEME and input.key != null;
         // Unstyled codepoint cells have no explicit background; raw equality proves that remains true.
         const default_colors = !input.styled and (input.tag == c.GHOSTTY_CELL_CONTENT_CODEPOINT or input.tag == c.GHOSTTY_CELL_CONTENT_CODEPOINT_GRAPHEME);
@@ -459,6 +462,7 @@ export fn bridge_destroy_glyph_index(index: *glyph_index.Index) void {
 
 export fn bridge_register_glyph(key: *glyph_index.Entry, entry: *const glyph_index.Glyph) void {
     key.glyph = entry.*;
+    key.registration +%= 1;
 }
 
 export fn bridge_clear_glyphs(index: *glyph_index.Index) void {
@@ -562,6 +566,7 @@ fn writeInstances(frame: *Frame, cells: c.GhosttyRenderStateRowCells, x: u32, y:
         .minimum_contrast = frame.glyph_minimum_contrast,
     }) orelse return c.GHOSTTY_OUT_OF_MEMORY;
     frame.row_cache.?.next[y].cells[x].key = key;
+    frame.row_cache.?.next[y].cells[x].registration = key.registration;
     const entry = key.glyph;
     if (entry.valid == 0) return missingGlyph(frame, key);
     if (entry.width == 0 or entry.height == 0) return c.GHOSTTY_SUCCESS;
@@ -638,6 +643,7 @@ fn rememberRenderedCell(cache: *FrameCache, slot: usize, input: CachedCell) void
     cache.rendered[slot] = .{
         .raw = input.raw,
         .key = input.key,
+        .registration = input.registration,
         .reusable = !input.styled and input.tag == c.GHOSTTY_CELL_CONTENT_CODEPOINT and
             (input.key == null or input.key.?.key.span == 1),
     };
@@ -653,6 +659,7 @@ fn reuseRenderedCell(frame: *Frame, raw: c.GhosttyCell, x: u32, y: u32, selected
     const slot = y * frame.columns + x;
     const input = cache.rendered[slot];
     if (!input.reusable or input.raw != raw) return false;
+    if (input.key != null and input.registration != input.key.?.registration) return false;
     const cursor = frame.cursor_visible != 0 and frame.cursor_x == x and frame.cursor_y == y;
     const old_cursor = (@as(u32, @intFromFloat(frame.cell_data[slot][12])) & 1) != 0;
     if (cursor != old_cursor or (cursor and frame.cell_data[slot][14] != @as(f32, @floatFromInt(frame.cursor_style)))) return false;
@@ -664,6 +671,7 @@ fn reuseRenderedCell(frame: *Frame, raw: c.GhosttyCell, x: u32, y: u32, selected
         .styled = false,
         .tag = c.GHOSTTY_CELL_CONTENT_CODEPOINT,
         .key = input.key,
+        .registration = input.registration,
     };
     return true;
 }
