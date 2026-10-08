@@ -16,9 +16,12 @@ export type UndoEvent = {
   readonly transaction: UndoTransaction
 }
 export type UndoOptions = {
+  /** Capture grouping for an external branching graph, without retaining linear stacks. */
+  readonly captureOnly?: boolean
   readonly groupDelay?: number
   readonly now?: () => number
   readonly onEvent?: (event: UndoEvent) => void
+  readonly onReject?: (ids: readonly EditId[]) => void
 }
 export type CaptureOptions = {
   readonly boundary?: boolean
@@ -99,6 +102,7 @@ export class UndoManager {
   private region: IdSpan[] = []
   private operations = new Map<string, readonly IdSpan[]>()
   private current: UndoTransaction | null = null
+  private captured: UndoTransaction | null = null
 
   constructor(
     private readonly actor: string,
@@ -125,6 +129,10 @@ export class UndoManager {
     }
   }
 
+  get lastRecordedTransaction(): UndoTransaction | null {
+    return this.captured
+  }
+
   get currentTransaction(): UndoTransaction | null {
     return this.current
   }
@@ -143,6 +151,7 @@ export class UndoManager {
   }
 
   seal(): void {
+    if (this.options.captureOnly && this.group) this.transactions.delete(this.group)
     this.group = null
     this.region = []
     this.explicit = false
@@ -221,17 +230,22 @@ export class UndoManager {
         edits: [],
         metadata: capture.metadata ?? this.metadata,
       })
-      this.traversal.undo.push(key)
-      this.traversal.keys.add(key)
+      if (!this.options.captureOnly) {
+        this.traversal.undo.push(key)
+        this.traversal.keys.add(key)
+      }
     }
     this.transactions.get(key)!.edits.push({ ...envelope.id })
-    this.append({ kind: 'record', id: { ...envelope.id }, transaction: key, status: 'pending' })
-    this.clearStack(this.traversal, 'redo')
+    if (!this.options.captureOnly) {
+      this.append({ kind: 'record', id: { ...envelope.id }, transaction: key, status: 'pending' })
+      this.clearStack(this.traversal, 'redo')
+    }
     this.group = key
     this.lastTime = now
     this.region.push(...affectedSpans(envelope.change))
+    this.captured = this.transaction(key)
     try {
-      this.options.onEvent?.({ kind: 'record', transaction: this.transaction(key) })
+      this.options.onEvent?.({ kind: 'record', transaction: this.captured })
     } finally {
       if (capture.boundary) this.seal()
     }
@@ -301,6 +315,7 @@ export class UndoManager {
       this.rebuild(this.actions[index]!, this.traversal)
     for (const key of previous) this.release(key)
     this.compact()
+    this.options.onReject?.(ids)
   }
 
   private move(kind: 'undo' | 'redo'): Envelope | null {

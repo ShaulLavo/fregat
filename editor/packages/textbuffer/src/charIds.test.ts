@@ -682,3 +682,15 @@ it('structural successor includes hidden identities across split pieces and reta
   expect(charIdAfter(make(''), 'start')).toBeNull()
   expect(() => charIdAfter(before, id(0, 'unknown'))).toThrow(RangeError)
 })
+
+it('restored reservations continue counters and allocate fresh author runs', () => {
+  const allocator = new CharIdAllocator('actor:with:colons')
+  allocator.reserve({ bunch: 'actor:with:colons:4', counter: 2 }, 3)
+  allocator.reserve({ bunch: 'actor:with:colons:4', counter: 0 }, 2)
+  allocator.reserve({ bunch: 'foreign:99', counter: 0 }, 1)
+  expect(allocator.generateAfter({ bunch: 'actor:with:colons:4', counter: 4 }, 2)).toEqual({
+    bunch: 'actor:with:colons:4',
+    counter: 5,
+  })
+  expect(allocator.generateAfter('start')).toEqual({ bunch: 'actor:with:colons:5', counter: 0 })
+})

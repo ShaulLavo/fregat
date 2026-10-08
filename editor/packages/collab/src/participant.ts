@@ -4,7 +4,7 @@ import { cloneEnvelope } from './host'
 import { UndoManager } from './undo'
 import type { CaptureOptions, UndoOptions } from './undo'
 import type { HostMessage } from './host'
-import { editKey } from './types'
+import { editKey, insertionOf } from './types'
 import type { EditId, Effect, EffectiveEdit, Engine, Envelope, OffsetEdit } from './types'
 
 export type ParticipantOptions<Snapshot> = {
@@ -190,6 +190,7 @@ export class Participant<Snapshot = unknown> {
     for (const edit of [...recovered, ...this.pending])
       pending.set(editKey(edit.id), cloneEnvelope(edit))
     this.pending = [...pending.values()]
+    for (const envelope of this.pending) this.reserveIdentities(envelope)
     this.confirmed = base
     this.sequence = 0
     this.frontier.clear()
@@ -207,6 +208,8 @@ export class Participant<Snapshot = unknown> {
 
   private confirm(message: HostMessage): void {
     const id = message.status === 'accepted' ? message.envelope.id : message.id
+    if (id.actor === this.actor) this.editSequence = Math.max(this.editSequence, id.seq)
+    if (message.status === 'accepted') this.reserveIdentities(message.envelope)
     this.pending = this.pending.filter((envelope) => editKey(envelope.id) !== editKey(id))
     if (message.status === 'rejected') {
       this.rejected.add(editKey(id))
@@ -218,6 +221,13 @@ export class Participant<Snapshot = unknown> {
     this.lamport = Math.max(this.lamport, message.envelope.lamport)
     for (const dependency of message.envelope.deps) this.frontier.delete(editKey(dependency))
     this.frontier.set(editKey(id), { ...id })
+  }
+
+  private reserveIdentities(envelope: Envelope): void {
+    if (envelope.id.actor !== this.actor) return
+    this.editSequence = Math.max(this.editSequence, envelope.id.seq)
+    const insert = insertionOf(envelope.change)
+    if (insert) this.allocator.reserve(insert.start, insert.text.length)
   }
 
   private replay(): void {
