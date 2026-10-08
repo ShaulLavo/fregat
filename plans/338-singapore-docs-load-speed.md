@@ -27,14 +27,14 @@ The retained prototype is `/work/reports/plan-336/designs/singapore/docs-in-edit
 
 These are experiments from 2026-10-08 on an Intel i7-14700K, Linux 7.2.8, headless Chromium 153.0.8010.12. The server used local HTTP without compression; gzip sizes came from zlib level 9. Cold-cache median of five runs:
 
-| Observation | Baseline |
-| --- | --- |
-| Static first load | 42,376 bytes gzip, about 42 KB |
-| First contentful paint | 44 ms |
-| Total files through takeover | 862,046 bytes gzip, about 862 KB |
-| Editor takeover | 249 ms, 418 ms with 4x CPU throttling |
-| Preview readiness after mount | 145 ms |
-| Largest compressed files | Editor entry 271 KB, shell grammar 185 KB, TypeScript grammar 139 KB, Tree-sitter runtime 93 KB, two Markdown grammars 85 KB, worker 39 KB |
+| Observation                   | Baseline                                                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Static first load             | 42,376 bytes gzip, about 42 KB                                                                                                             |
+| First contentful paint        | 44 ms                                                                                                                                      |
+| Total files through takeover  | 862,046 bytes gzip, about 862 KB                                                                                                           |
+| Editor takeover               | 249 ms, 418 ms with 4x CPU throttling                                                                                                      |
+| Preview readiness after mount | 145 ms                                                                                                                                     |
+| Largest compressed files      | Editor entry 271 KB, shell grammar 185 KB, TypeScript grammar 139 KB, Tree-sitter runtime 93 KB, two Markdown grammars 85 KB, worker 39 KB |
 
 Reading already precedes takeover. The remaining problem is how much code, initialization and analysis precede interaction.
 
@@ -44,14 +44,14 @@ A fresh experiment ran the same built prototype on 2026-10-08. Evidence is `/wor
 
 Method: Playwright 1.63.0, Chromium 153.0.8010.12, the same CPU and kernel, headless 1280 x 900, Quick start, `?editor=on`, fresh browser context per run, five runs at 1x and five at 4x CPU. A local server bound `127.0.0.1:5849` and stopped in `finally`. It served the unchanged build with extra timestamps added to `site.js` in memory. HTTP caching and compression were off. Trace collection ran only in the first repetition of each rate. The host was scheduled through its browser-job wrapper, without a quiet-machine qualification. Treat this as diagnostic evidence, not a public speed claim.
 
-| Stage, median milliseconds | 1x CPU | 4x CPU |
-| --- | ---: | ---: |
-| `site.js` start to idle callback beginning takeover | 27.5 | 56.9 |
-| Dynamic import, Markdown/font wait and subsequent CSS load | 27.7 | 49.4 |
-| Synchronous editor mount, document adoption and caret setup | 29.1 | 112.0 |
-| `ready()` wait for syntax, preview markers and two animation frames | 124.7 | 162.8 |
-| Scroll restoration and final frame before swap completes | 16.8 | 19.3 |
-| Navigation to completed takeover | 232.6 | 428.7 |
+| Stage, median milliseconds                                          | 1x CPU | 4x CPU |
+| ------------------------------------------------------------------- | -----: | -----: |
+| `site.js` start to idle callback beginning takeover                 |   27.5 |   56.9 |
+| Dynamic import, Markdown/font wait and subsequent CSS load          |   27.7 |   49.4 |
+| Synchronous editor mount, document adoption and caret setup         |   29.1 |  112.0 |
+| `ready()` wait for syntax, preview markers and two animation frames |  124.7 |  162.8 |
+| Scroll restoration and final frame before swap completes            |   16.8 |   19.3 |
+| Navigation to completed takeover                                    |  232.6 |  428.7 |
 
 Total navigation-to-takeover ranges were 229.5–268.5 ms at 1x and 401.8–449.0 ms at 4x. Stage medians are independent and do not add exactly to the total. The total also includes navigation to `site.js` and small gaps between marks. The prototype's original `takeoverMs` clock starts in `site.js`, so keep that clock and the navigation clock separate in future reports.
 
@@ -69,17 +69,17 @@ The measured first targets are synchronous mount and the readiness window. Entry
 
 These are acceptance targets for the implementation, not current product claims. Phase 1 freezes the fixture and exact byte accounting before comparing changes.
 
-| Metric | Target |
-| --- | --- |
-| Static guide resources, gzip | At most 45 KiB, including its font; keep the current 42,376-byte baseline visible |
-| Initial editor entry, gzip | At most 160 KiB, down from about 271 KB |
-| Cold resources through correct visible takeover | Quick start at most 550 KiB; Introduction at most 400 KiB, including static resources |
-| Complete Quick start language set after background settlement | At most 650 KiB gzip cumulative; report deferred bytes separately |
-| Cold takeover on the fixed desktop at 4x CPU, loopback | Median at most 250 ms and p95 at most 350 ms from navigation, with a correct visible preview and usable input |
-| Warm reload takeover, same 4x setup | Median at most 180 ms |
-| Static first contentful paint | At most 100 ms on the local 4x setup; no material regression from its frozen before run |
-| Cold mobile network model | At 4x CPU, 10 Mbps download, 1 Mbps upload and 80 ms RTT, static FCP at most 750 ms and forced takeover median at most 1,000 ms |
-| Swap quality | CLS at most 0.001, unchanged visible rows/scroll anchor, zero unexplained pixel differences |
+| Metric                                                        | Target                                                                                                                          |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Static guide resources, gzip                                  | At most 45 KiB, including its font; keep the current 42,376-byte baseline visible                                               |
+| Initial editor entry, gzip                                    | At most 160 KiB, down from about 271 KB                                                                                         |
+| Cold resources through correct visible takeover               | Quick start at most 550 KiB; Introduction at most 400 KiB, including static resources                                           |
+| Complete Quick start language set after background settlement | At most 650 KiB gzip cumulative; report deferred bytes separately                                                               |
+| Cold takeover on the fixed desktop at 4x CPU, loopback        | Median at most 250 ms and p95 at most 350 ms from navigation, with a correct visible preview and usable input                   |
+| Warm reload takeover, same 4x setup                           | Median at most 180 ms                                                                                                           |
+| Static first contentful paint                                 | At most 100 ms on the local 4x setup; no material regression from its frozen before run                                         |
+| Cold mobile network model                                     | At 4x CPU, 10 Mbps download, 1 Mbps upload and 80 ms RTT, static FCP at most 750 ms and forced takeover median at most 1,000 ms |
+| Swap quality                                                  | CLS at most 0.001, unchanged visible rows/scroll anchor, zero unexplained pixel differences                                     |
 
 Use at least 20 untraced navigations per accepted cell for medians and p95. Trace separate paired runs for diagnosis. A 4x-throttled desktop is a repeatable slower-CPU model, not proof of a mid-range phone's speed. Record a real mid-range phone's model, OS, browser, network and cold/warm results before claiming those targets on phones. Real-device access is a later verification receipt; it does not block profiling or low-cost implementation.
 
@@ -87,17 +87,17 @@ Use at least 20 untraced navigations per accepted cell for medians and p95. Trac
 
 Expected gains below are hypotheses. Measure each independently, keep it only when the paired result improves, and report bytes moved after takeover as well as bytes removed.
 
-| Rank | Technique | Expected gain and cost | Decision gate |
-| --- | --- | --- | --- |
-| 1 | Slim editor entry and feature code splitting | High byte/compile benefit, medium cost. Use exact exports. Defer find UI, authoring helpers and unused language-catalog loader code to command or editing intent. Keep the real editor and preview in the first editor chunk. | Bundle graph identifies retained modules; the first typed key and first find command still succeed while their chunk loads. Splitting alone can move code without saving startup work. |
-| 2 | Page- and viewport-demand fence grammars | High cold-byte benefit, medium cost. A build manifest lists languages actually present. Load Markdown first; request fence grammars only for the page's visible fences and bounded lookahead, then on scroll demand. | Prose-only pages request no shell/TypeScript. Visible code keeps correct prerendered colours until matching live colours exist. Long scrolling and editing activate delayed languages correctly. |
-| 3 | HTTP compression and immutable caching | High network benefit, low cost. Hash JS, CSS, queries and WASM; serve `Cache-Control: public, max-age=31536000, immutable`. HTML and its manifest revalidate. Use Brotli/gzip negotiation. | Verify actual headers and transfer bytes, then repeat with a warm cache. No stale grammar/query combination after a release. No assumed CPU saving on a cold run. |
-| 4 | CSS and dependency hints | Moderate startup benefit, low cost. Make the editor CSS address available in build metadata so it can load beside the import. Add targeted module preload and WASM hints only for the imminent editor and current visible languages. | Compare delayed-network traces. Static FCP stays within budget and mobile static mode does not download an editor. Avoid duplicate or unused preloads. |
-| 5 | Worker prewarm after static paint or pointer intent | Moderate overlap benefit, medium cost. Reuse one worker and one language session when takeover begins. Explicit editor actions trigger eager demand; idle prewarm remains bounded. | Worker count stays one, repeated intents are idempotent, navigation/disposal cancels abandoned work. Include idle wait in navigation totals. Prewarm must not compete with the font/static page. |
-| 6 | Streaming WASM and shared compiled modules | Potential medium readiness benefit, medium cost. Confirm the current loader first. Use `application/wasm` and streaming compilation where its API allows it; reuse compiled `WebAssembly.Module` within a live session. | Separate fetch, compile and instantiate marks prove a gain. A WASM grammar is already compiled source code; portable build-time native browser code is unavailable. Avoid a persistent engine-specific module cache. |
-| 7 | Smaller Markdown preview startup | Potential high mount/readiness benefit, medium-to-high cost. Measure syntax record scans, full-document decorations, preview installation and row layout. Delay authoring-only work and redundant scans; retain the shared Markdown renderer. | Before/after traces identify eliminated work, and preview/authoring tests plus first-edit parity pass. Keep existing package architecture unless the profile demonstrates a specific bottleneck. |
-| 8 | Reuse prerendered token/preview records | Potential high readiness benefit, high cost. Build with the same Tree-sitter queries. Carry source hash, grammar/query/theme versions and bounded visible token records into startup. | Exact source and version match, invalidation on first edit, token/preview equality controls, bounded bytes and no second document truth. Adopt only if simpler changes miss the goals. |
-| 9 | Visible-region takeover first | Potential high benefit on long guides, high correctness cost. Paint the visible rows and lookahead, then continue analysis and delayed fences while preserving static content elsewhere. | Explicit preview coverage, fast scroll, folds, wrapping, find, edits and cancellation pass. Markdown context and injection boundaries require a correctness design before implementation. |
+| Rank | Technique                                           | Expected gain and cost                                                                                                                                                                                                                        | Decision gate                                                                                                                                                                                                        |
+| ---- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Slim editor entry and feature code splitting        | High byte/compile benefit, medium cost. Use exact exports. Defer find UI, authoring helpers and unused language-catalog loader code to command or editing intent. Keep the real editor and preview in the first editor chunk.                 | Bundle graph identifies retained modules; the first typed key and first find command still succeed while their chunk loads. Splitting alone can move code without saving startup work.                               |
+| 2    | Page- and viewport-demand fence grammars            | High cold-byte benefit, medium cost. A build manifest lists languages actually present. Load Markdown first; request fence grammars only for the page's visible fences and bounded lookahead, then on scroll demand.                          | Prose-only pages request no shell/TypeScript. Visible code keeps correct prerendered colours until matching live colours exist. Long scrolling and editing activate delayed languages correctly.                     |
+| 3    | HTTP compression and immutable caching              | High network benefit, low cost. Hash JS, CSS, queries and WASM; serve `Cache-Control: public, max-age=31536000, immutable`. HTML and its manifest revalidate. Use Brotli/gzip negotiation.                                                    | Verify actual headers and transfer bytes, then repeat with a warm cache. No stale grammar/query combination after a release. No assumed CPU saving on a cold run.                                                    |
+| 4    | CSS and dependency hints                            | Moderate startup benefit, low cost. Make the editor CSS address available in build metadata so it can load beside the import. Add targeted module preload and WASM hints only for the imminent editor and current visible languages.          | Compare delayed-network traces. Static FCP stays within budget and mobile static mode does not download an editor. Avoid duplicate or unused preloads.                                                               |
+| 5    | Worker prewarm after static paint or pointer intent | Moderate overlap benefit, medium cost. Reuse one worker and one language session when takeover begins. Explicit editor actions trigger eager demand; idle prewarm remains bounded.                                                            | Worker count stays one, repeated intents are idempotent, navigation/disposal cancels abandoned work. Include idle wait in navigation totals. Prewarm must not compete with the font/static page.                     |
+| 6    | Streaming WASM and shared compiled modules          | Potential medium readiness benefit, medium cost. Confirm the current loader first. Use `application/wasm` and streaming compilation where its API allows it; reuse compiled `WebAssembly.Module` within a live session.                       | Separate fetch, compile and instantiate marks prove a gain. A WASM grammar is already compiled source code; portable build-time native browser code is unavailable. Avoid a persistent engine-specific module cache. |
+| 7    | Smaller Markdown preview startup                    | Potential high mount/readiness benefit, medium-to-high cost. Measure syntax record scans, full-document decorations, preview installation and row layout. Delay authoring-only work and redundant scans; retain the shared Markdown renderer. | Before/after traces identify eliminated work, and preview/authoring tests plus first-edit parity pass. Keep existing package architecture unless the profile demonstrates a specific bottleneck.                     |
+| 8    | Reuse prerendered token/preview records             | Potential high readiness benefit, high cost. Build with the same Tree-sitter queries. Carry source hash, grammar/query/theme versions and bounded visible token records into startup.                                                         | Exact source and version match, invalidation on first edit, token/preview equality controls, bounded bytes and no second document truth. Adopt only if simpler changes miss the goals.                               |
+| 9    | Visible-region takeover first                       | Potential high benefit on long guides, high correctness cost. Paint the visible rows and lookahead, then continue analysis and delayed fences while preserving static content elsewhere.                                                      | Explicit preview coverage, fast scroll, folds, wrapping, find, edits and cancellation pass. Markdown context and injection boundaries require a correctness design before implementation.                            |
 
 [PR #1021](https://github.com/ShaulLavo/fregat/pull/1021) supplies a relevant viewport-first experiment, not a ready-made Markdown shortcut. At this plan's writing it is open. Its provisional trees are root-only, exclude injected content, and keep Markdown/MDX on the complete-context path. Check its final merged contract before reusing anything. The small guide startup here differs from its 1–200 MiB TypeScript opens.
 
