@@ -1,0 +1,40 @@
+---
+const purposes: Record<string, string> = {
+  core: 'Editor views, documents, extensions, rendering, syntax, keymaps and testing.',
+  textbuffer: 'Persistent AVL piece table, versioned reads and anchors.',
+  collab: 'Host-ordered collaborative text core. Editor and network integration are separate work.',
+  'tree-sitter': 'Worker syntax parsing, highlighting, folds and structural selection.',
+  'tree-sitter-languages': 'Bundled grammar assets and language contributions.',
+  lsp: 'Language Server Protocol client and protocol types.',
+  'lsp-plugin': 'Editor diagnostics, completion, hover and other server-backed features.',
+  'typescript-lsp': 'TypeScript language service and virtual project files in a worker.',
+  gutters: 'Line numbers, fold arrows and gutter contributions.',
+  find: 'Find and replace widget and commands.',
+  minimap: 'Worker-drawn document overview.',
+  diff: 'Diff presentation and editor contributions.',
+  markdown: 'Markdown preview and editing features.',
+  highlighting: 'Shared highlighting support.',
+  'plugin-ui': 'Shared hovers and anchored UI for plugins.',
+  'scope-lines': 'Structure guides and sticky scope headers.',
+  spellcheck: 'Worker-backed spelling checks.',
+  paged: 'Read-only paged file viewing.',
+  panes: 'Plain DOM split-pane layouts.',
+  decode: 'Text reveal animation.',
+  react: 'React controller, host and state selectors.',
+  solid: 'Solid refs, accessors and reactive options.',
+}
+const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+---
+<table>
+  <thead><tr><th>Package</th><th>Purpose</th><th>Declaration entry points</th></tr></thead>
+  <tbody>
+    {__SINGAPORE_PACKAGES__.map((entry) => {
+      const name = entry.name.split('/')[1]!
+      return <tr>
+        <td><a href={`${base}/docs/reference/api/${name}/overview/`}>{entry.name}</a></td>
+        <td>{purposes[name]}</td>
+        <td>{entry.entryPointCount}</td>
+      </tr>
+    })}
+  </tbody>
+</table>

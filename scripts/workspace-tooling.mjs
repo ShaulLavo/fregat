@@ -32,8 +32,12 @@ const write = process.argv.includes('--write')
 const problems = []
 
 function expectedVersion(file, name) {
-  // Astro's checker uses the JavaScript compiler API; TypeScript 7 supplies the CLI.
-  if (file === 'apps/site/package.json' && name === 'typescript') return catalog['typescript-api']
+  // Astro and TypeDoc need the JavaScript compiler API; TypeScript 7 supplies the CLI.
+  if (
+    ['apps/site/package.json', 'editor/site/package.json'].includes(file) &&
+    name === 'typescript'
+  )
+    return catalog['typescript-api']
   return catalog[name]
 }
 

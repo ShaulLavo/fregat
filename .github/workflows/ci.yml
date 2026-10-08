@@ -442,6 +442,10 @@ jobs:
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/editor/
         run: bun x turbo run build --filter=@singapore-editor/example-app
+      - name: Test Singapore documentation checks
+        run: bun run --cwd editor/site test
+      - name: Build Singapore docs and check samples and internal links
+        run: bun run --cwd editor/site build
       - name: Build ghostty site
         run: bun run --cwd ghostty-webgpu/site build --base /${{ github.event.repository.name }}/ghostty-webgpu/
 

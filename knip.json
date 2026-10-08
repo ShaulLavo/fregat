@@ -126,7 +126,9 @@
     },
     ".": {
       "ignoreDependencies": ["typescript-api"],
-      "vitest": { "config": ["vitest.scripts.config.mjs"] }
+      "vitest": {
+        "config": ["vitest.scripts.config.mjs"]
+      }
     },
     "apps/tui": {
       "entry": [
@@ -320,6 +322,10 @@
     "ghostty-webgpu/site": {
       "entry": ["src/main.ts", "scripts/*.ts"],
       "project": ["src/**/*.{ts,astro}", "scripts/**/*.ts"]
+    },
+    "editor/site": {
+      "entry": ["src/examples/*.tsx"],
+      "ignoreDependencies": ["@singapore-editor/*", "satteri"]
     }
   },
   "ignore": ["editor/**/*.d.css.ts"],
