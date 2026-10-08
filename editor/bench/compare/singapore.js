@@ -25,6 +25,8 @@ export function mount(host, text, highlighted) {
       [...CSS.highlights].some(
         ([name, ranges]) => name.startsWith('editor-shared-token-') && ranges.size > 0,
       ),
+    viewport: () => host.querySelector('.editor-virtualized'),
+    rowCount: () => host.querySelectorAll('.editor-virtualized-row:not([hidden])').length,
     facts: () => editor.getState(),
   }
 }

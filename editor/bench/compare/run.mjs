@@ -130,6 +130,8 @@ let results = {
             'codemirror.js',
             'protocol.mjs',
             'run.mjs',
+            'summarize.mjs',
+            'verify-control.mjs',
             'bun.lock',
           ].map((file) => readFile(resolve(root, file))),
         )
@@ -276,6 +278,7 @@ async function sample(editor, mib, repetition) {
     for (const where of ['end', 'middle']) {
       const offset = await page.evaluate((where) => window.bench.position(where), where)
       await page.waitForTimeout(250)
+      verifyGeometry({ geometry: await page.evaluate(() => window.bench.geometry()) })
       const letter = where === 'end' ? 'q' : 'z'
       const raw = []
       for (let key = 0; key < keys; key++) {
@@ -334,6 +337,7 @@ async function sample(editor, mib, repetition) {
     if (row.scroll.top < frames * 200 - 1000)
       throw new RangeError('Scroll did not reach the requested region')
     if (row.scroll.rendering.ms.n < frames - 5) throw new RangeError('Missing trace frame samples')
+    verifyGeometry({ geometry: await page.evaluate(() => window.bench.geometry()) })
     row.status = row.errors.length ? 'page-error' : 'ok'
   } catch (error) {
     row.errors.push(error.message)

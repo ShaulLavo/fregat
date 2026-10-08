@@ -34,6 +34,8 @@ export function mount(host, text, highlighted) {
     },
     scrollTop: () => view.scrollDOM.scrollTop,
     highlighted: () => !!host.querySelector('.cm-line span[class]'),
+    viewport: () => view.scrollDOM,
+    rowCount: () => host.querySelectorAll('.cm-line').length,
     facts: () => ({
       language: highlighted ? 'Lezer TypeScript' : 'plain',
       basicSetup: highlighted,

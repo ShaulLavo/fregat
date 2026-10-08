@@ -8,7 +8,12 @@ export function verifyControl(baseline, control) {
   return editors.map((editor) => {
     const mutationTimes = (result) =>
       result.samples
-        .filter((row) => row.editor === editor && row.status === 'ok')
+        .filter(
+          (row) =>
+            row.editor === editor &&
+            row.status === 'ok' &&
+            control.samples.some((sample) => sample.mib === row.mib),
+        )
         .flatMap((row) =>
           ['end', 'middle'].flatMap((where) => row.typing[where].raw.map((key) => key.mutationMs)),
         )

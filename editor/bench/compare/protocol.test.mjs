@@ -64,6 +64,8 @@ test('verification requires trusted rendered input and scroll evidence', async (
         geometry: {
           width: 1280,
           height: 720,
+          scrollViewport: { width: 1265, height: 720 },
+          renderedRows: 50,
           visibleStyle: { fontFamily: 'monospace', fontSize: '14px', lineHeight: '20px' },
         },
       },
@@ -98,6 +100,8 @@ test('geometry check rejects the missing editor stylesheet observation', async (
   const geometry = {
     width: 1280,
     height: 720,
+    scrollViewport: { width: 1265, height: 720 },
+    renderedRows: 50,
     visibleStyle: { fontFamily: 'Times New Roman', fontSize: '16px', lineHeight: 'normal' },
   }
   assert.throws(() => verifyGeometry({ geometry }), /differs from the protocol/)
@@ -111,6 +115,7 @@ test('positive control exceeds a frame wait and detects injected handler work', 
     config: { delayMs: 120 },
     samples: editors.map((editor) => ({
       editor,
+      mib: 1,
       status: 'ok',
       typing: Object.fromEntries(
         ['end', 'middle'].map((where) => [where, { raw: [{ mutationMs }] }]),
@@ -119,6 +124,8 @@ test('positive control exceeds a frame wait and detects injected handler work', 
   })
   const baseline = sample(16)
   const control = sample(121)
+  assert.ok(verifyControl(baseline, control).every((row) => row.deltaMs === 105))
+  baseline.samples.push(...sample(1000).samples.map((row) => ({ ...row, mib: 10 })))
   assert.ok(verifyControl(baseline, control).every((row) => row.deltaMs === 105))
   control.config.delayMs = 30
   assert.throws(() => verifyControl(baseline, control), /at least 100 ms/)
@@ -148,4 +155,21 @@ test('a genuine large-file failure remains a measured outcome', async () => {
   assert.throws(() => verify(result), /no retained error/)
   result.samples[0].status = 'unreported'
   assert.throws(() => verify(result), /Unknown sample outcome/)
+})
+
+test('geometry rejects an unconstrained scroll viewport and unbounded row pool', async () => {
+  const { verifyGeometry } = await import('./protocol.mjs')
+  const geometry = {
+    width: 1280,
+    height: 720,
+    visibleStyle: { fontFamily: 'monospace', fontSize: '14px', lineHeight: '20px' },
+    scrollViewport: { width: 1280, height: 3624 },
+    renderedRows: 180,
+  }
+  assert.throws(() => verifyGeometry({ geometry }), /differs from the protocol/)
+  geometry.scrollViewport.height = 720
+  geometry.renderedRows = 10000
+  assert.throws(() => verifyGeometry({ geometry }), /differs from the protocol/)
+  geometry.renderedRows = 50
+  assert.doesNotThrow(() => verifyGeometry({ geometry }))
 })

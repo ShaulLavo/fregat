@@ -1,0 +1,53 @@
+{
+  "status": "invalid setup evidence only",
+  "observations": [
+    {
+      "file": "control-120.json.gz",
+      "accepted": false,
+      "reason": "The Singapore scroll viewport was unconstrained; aggregate comparison and crash conclusions are invalid.",
+      "retainedSamples": 3
+    },
+    {
+      "file": "control-30.json.gz",
+      "accepted": false,
+      "reason": "The Singapore scroll viewport was unconstrained; aggregate comparison and crash conclusions are invalid.",
+      "retainedSamples": 3
+    },
+    {
+      "file": "fixture-200-pilot.json.gz",
+      "accepted": false,
+      "reason": "The Singapore scroll viewport was unconstrained; aggregate comparison and crash conclusions are invalid.",
+      "retainedSamples": 3
+    },
+    {
+      "file": "fixture-baseline.json.gz",
+      "accepted": false,
+      "reason": "The Singapore scroll viewport was unconstrained; aggregate comparison and crash conclusions are invalid.",
+      "retainedSamples": 3
+    },
+    {
+      "file": "fixture-control-120.json.gz",
+      "accepted": false,
+      "reason": "The Singapore scroll viewport was unconstrained; aggregate comparison and crash conclusions are invalid.",
+      "retainedSamples": 3
+    },
+    {
+      "file": "invalid-layout-interrupted.json.gz",
+      "accepted": false,
+      "reason": "The Singapore scroll viewport was unconstrained; aggregate comparison and crash conclusions are invalid.",
+      "retainedSamples": 17
+    },
+    {
+      "file": "pilot.json.gz",
+      "accepted": false,
+      "reason": "The Singapore scroll viewport was unconstrained; aggregate comparison and crash conclusions are invalid.",
+      "retainedSamples": 3
+    },
+    {
+      "file": "transport-limit.json.gz",
+      "accepted": false,
+      "reason": "The Singapore scroll viewport was unconstrained; aggregate comparison and crash conclusions are invalid.",
+      "retainedSamples": 45
+    }
+  ]
+}

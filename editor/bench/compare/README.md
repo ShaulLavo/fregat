@@ -70,7 +70,9 @@ files below Chromium's DevTools message-size limit.
 
 - Every browser page uses the same ASCII TypeScript fixture, viewport, DPR,
   14 px monospace font, 20 px line height and wrapping off. The runner verifies
-  computed visible-text font metrics and host dimensions. Singapore imports its
+  computed visible-text font metrics, host dimensions, the actual scroll viewport
+  and a bounded rendered-row pool. The flex-column host gives Singapore's flex
+  child a definite height. Singapore imports its
   public base stylesheet. Singapore uses its default dark palette; Monaco and
   CodeMirror use their default light palettes. The fixture repeats
   short TypeScript declarations. Its exact byte count, line count and SHA-256

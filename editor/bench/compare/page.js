@@ -24,7 +24,34 @@ const painted = async () => {
   await frame()
 }
 
+const geometry = () => {
+  const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT)
+  let textNode
+  let visibleStyle
+  while ((textNode = walker.nextNode())) {
+    if (!textNode.textContent.trim() || !textNode.parentElement.getClientRects().length) continue
+    const box = textNode.parentElement.getBoundingClientRect()
+    if (box.width < 10 || box.height < 10 || box.right <= 0 || box.bottom <= 0) continue
+    const style = getComputedStyle(textNode.parentElement)
+    visibleStyle = {
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+      lineHeight: style.lineHeight,
+    }
+    break
+  }
+  const viewport = editor.viewport()
+  return {
+    width: host.clientWidth,
+    height: host.clientHeight,
+    visibleStyle,
+    scrollViewport: { width: viewport.clientWidth, height: viewport.clientHeight },
+    renderedRows: editor.rowCount(),
+  }
+}
+
 window.bench = {
+  geometry,
   prepare(mib) {
     preparedText = fixture(mib)
   },
@@ -44,25 +71,10 @@ window.bench = {
     }
     await painted()
     const highlightedFrameMs = performance.now() - start
-    const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT)
-    let textNode
-    let visibleStyle
-    while ((textNode = walker.nextNode())) {
-      if (!textNode.textContent.trim() || !textNode.parentElement.getClientRects().length) continue
-      const box = textNode.parentElement.getBoundingClientRect()
-      if (box.width < 10 || box.height < 10 || box.right <= 0 || box.bottom <= 0) continue
-      const style = getComputedStyle(textNode.parentElement)
-      visibleStyle = {
-        fontFamily: style.fontFamily,
-        fontSize: style.fontSize,
-        lineHeight: style.lineHeight,
-      }
-      break
-    }
     return {
       firstFrameMs,
       highlightedFrameMs,
-      geometry: { width: host.clientWidth, height: host.clientHeight, visibleStyle },
+      geometry: geometry(),
       facts: editor.facts(),
       length: editor.length(),
     }

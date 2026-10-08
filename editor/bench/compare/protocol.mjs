@@ -72,6 +72,15 @@ export function verifyGeometry(open) {
   if (
     geometry?.width !== 1280 ||
     geometry?.height !== 720 ||
+    geometry?.scrollViewport?.height < 690 ||
+    geometry?.scrollViewport?.height > 720 ||
+    !Number.isFinite(geometry?.scrollViewport?.height) ||
+    geometry?.scrollViewport?.width < 1200 ||
+    geometry?.scrollViewport?.width > 1280 ||
+    !Number.isFinite(geometry?.scrollViewport?.width) ||
+    !Number.isInteger(geometry?.renderedRows) ||
+    geometry.renderedRows < 1 ||
+    geometry.renderedRows > 300 ||
     font?.fontSize !== '14px' ||
     font?.lineHeight !== '20px' ||
     !/monospace/i.test(font?.fontFamily ?? '')

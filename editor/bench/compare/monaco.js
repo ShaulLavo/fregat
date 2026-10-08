@@ -46,6 +46,8 @@ export function mount(host, text, highlighted) {
       [...host.querySelectorAll('.view-line span')].some((node) =>
         /mtk[2-9]|mtk\d{2}/.test(node.className),
       ),
+    viewport: () => host.querySelector('.monaco-scrollable-element'),
+    rowCount: () => host.querySelectorAll('.view-line').length,
     facts: () => ({
       language: model.getLanguageId(),
       largeFileOptimizations: false,
