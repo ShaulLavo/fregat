@@ -79,12 +79,16 @@ test('Zed test_edit_partially_intersecting_a_deleted_fragment: retain partial hi
   )
 })
 
-const concurrentUndoSeeds = Array.from({ length: 100 }, (_, index) => 400 + index)
+const stress = process.env.COLLAB_STRESS === '1'
+const concurrentUndoSeeds = Array.from({ length: stress ? 100 : 6 }, (_, index) => 400 + index)
+const concurrentUndoEdits = stress ? 64 : 24
 
 test.each(concurrentUndoSeeds)(
   'Zed test_random_concurrent_edits: edits, undo, redo and asynchronous delivery converge, seed %s',
   (seed) => {
-    expect(simulate({ seed, participants: 3, edits: 64, undoRedo: true }).hostSequence).toBe(64)
+    expect(
+      simulate({ seed, participants: 3, edits: concurrentUndoEdits, undoRedo: true }).hostSequence,
+    ).toBe(concurrentUndoEdits)
   },
 )
 
