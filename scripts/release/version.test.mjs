@@ -45,6 +45,16 @@ test('pending changesets target versioned workspace manifests', async () => {
   await expectPublicChangesets(checkout)
 })
 
+test('reports pending releases without dependency-range warnings', () => {
+  const result = spawnSync(
+    'node',
+    [join(checkout, 'node_modules/@changesets/cli/bin.js'), 'status'],
+    { cwd: checkout, encoding: 'utf8' },
+  )
+  expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
+  expect(result.stderr).toBe('')
+})
+
 test('accepts compact empty changesets', async () => {
   await withWorkspace(async ({ root, put }) => {
     await put('', { name: 'empty-release-fixture', private: true, workspaces: ['packages/*'] })
