@@ -582,6 +582,7 @@ export class Editor {
       highlightRegistry: getHighlightRegistry(),
       gutterContributions: this.composedGutterContributions(),
       gutterLeadingInset: options.gutterLeadingInset,
+      gutterScroll: options.gutterScroll,
       cursorLineHighlight: options.cursorLineHighlight,
       hiddenCharacters: options.hiddenCharacters,
       fontSize: options.fontSize,
@@ -2213,6 +2214,17 @@ export class Editor {
       action: 'editor.layout.line_height_changed',
       level: 'info',
       layout: { lineHeight },
+    })
+  }
+
+  /** Switch all gutter lanes between the viewport edge and the horizontally scrolling text. */
+  setGutterScroll(mode: NonNullable<EditorOptions['gutterScroll']>): void {
+    if (!this.view.setGutterScroll(mode)) return
+    this.notifyViewContributions('layout', null)
+    this.log({
+      action: 'editor.layout.gutter_scroll_changed',
+      level: 'info',
+      layout: { gutterScroll: mode },
     })
   }
 

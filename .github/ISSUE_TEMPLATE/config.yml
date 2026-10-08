@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and design discussions
+    url: https://github.com/ShaulLavo/fregat/discussions
+    about: Ask how to use Fregat, Singapore, ghostty-webgpu, or hotkeys and discuss ideas.
+  - name: Private security reports
+    url: https://github.com/ShaulLavo/fregat/security/advisories/new
+    about: Report vulnerabilities privately for every product in this repository.

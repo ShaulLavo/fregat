@@ -31,7 +31,7 @@
       "file": "examples/stress/src/browser.ts",
       "id": "examples/stress/src/browser.ts:requestAnimationFrame:dffa87e548",
       "justification": "Benchmark observation of the first animation frame after an applied key; it records a timestamp only, tracks the frame handle, and cancels pending frames on disposal.",
-      "line": 269,
+      "line": 276,
       "snippet": "const frame = requestAnimationFrame(() => {"
     },
     {
@@ -39,7 +39,7 @@
       "file": "examples/stress/src/browser.ts",
       "id": "examples/stress/src/browser.ts:setTimeout:e5c148c176",
       "justification": "The bounded churn benchmark yields to the browser every ten iterations so cancellation and rendering can run. The timer only resolves the awaited promise; the next iteration checks cancellation before editing.",
-      "line": 338,
+      "line": 345,
       "snippet": "if (index % 10 === 0) await new Promise((resolve) => setTimeout(resolve, 0))"
     },
     {
@@ -151,7 +151,7 @@
       "file": "packages/collaboration/server/signaling.ts",
       "id": "packages/collaboration/server/signaling.ts:setTimeout:2017a2146d",
       "justification": "Authorization may never settle; the deadline bounds reserved quota, and finally clears it and releases the reservation when upgrade fails.",
-      "line": 117,
+      "line": 154,
       "snippet": "timeout = setTimeout(() => resolve(false), options.limits.subscribeTimeout)"
     },
     {
@@ -159,7 +159,7 @@
       "file": "packages/collaboration/server/signaling.ts",
       "id": "packages/collaboration/server/signaling.ts:setTimeout:a47f4f735b",
       "justification": "Silent clients emit no progress event; one deadline per socket bounds subscription and application idle time, is replaced by progress, and is cleared on close.",
-      "line": 74,
+      "line": 97,
       "snippet": "socket.data.deadline = setTimeout(() => {"
     },
     {
@@ -191,7 +191,7 @@
       "file": "packages/collaboration/src/signaling.ts",
       "id": "packages/collaboration/src/signaling.ts:setTimeout:2fa18ecddb",
       "justification": "Remote broker readiness has no notification; one retry per URL spaces reconnect attempts, connect checks closed, and close clears every pending retry.",
-      "line": 88,
+      "line": 90,
       "snippet": "setTimeout(() => this.connect(url), this.options.reconnectInterval),"
     },
     {
@@ -199,7 +199,7 @@
       "file": "packages/collaboration/src/webrtc-transport.ts",
       "id": "packages/collaboration/src/webrtc-transport.ts:setInterval:f477778391",
       "justification": "Signaling has no peer-roster notification; discovery announcements and retries expire silent peers on this protocol clock, which close clears.",
-      "line": 116,
+      "line": 119,
       "snippet": "this.timer = setInterval(() => {"
     },
     {
@@ -207,7 +207,7 @@
       "file": "packages/collaboration/src/webrtc-transport.ts",
       "id": "packages/collaboration/src/webrtc-transport.ts:setTimeout:4302f06a3f",
       "justification": "A TURN supplier may never settle; abort bounds the wait, finally clears the deadline, and close aborts pending requests.",
-      "line": 329,
+      "line": 336,
       "snippet": "const credentialTimeout = setTimeout(() => abort.abort(), this.options.connectionTimeout)"
     },
     {
@@ -215,7 +215,7 @@
       "file": "packages/collaboration/src/webrtc-transport.ts",
       "id": "packages/collaboration/src/webrtc-transport.ts:setTimeout:f246bd882a",
       "justification": "Native connection setup can stall without a terminal event; channel open or removal clears this deadline, and failure checks the current link generation.",
-      "line": 350,
+      "line": 357,
       "snippet": "timeout: setTimeout("
     },
     {
@@ -223,7 +223,7 @@
       "file": "packages/collaboration/vitest.browser.config.ts",
       "id": "packages/collaboration/vitest.browser.config.ts:setTimeout:aa312d20fb",
       "justification": "A child can emit neither readiness nor exit; this bounds startup failure, while stdout readiness, error, and exit notifications each clear the deadline.",
-      "line": 23,
+      "line": 25,
       "snippet": "const timeout = setTimeout("
     },
     {
@@ -327,7 +327,7 @@
       "file": "packages/editor/src/virtualization/virtualizedTextView.ts",
       "id": "packages/editor/src/virtualization/virtualizedTextView.ts:requestIdleCallback:14458bc40c",
       "justification": "Measuring every row's width is the work the horizontal scroll extent needs and nothing on screen is waiting for, so it is deliberately given whatever the frame has left rather than a place in the queue. `cancelContentWidthMeasurement` withdraws it when the content it would measure has already changed.",
-      "line": 1738,
+      "line": 1764,
       "snippet": "const handle = win.requestIdleCallback(run)"
     },
     {
@@ -335,7 +335,7 @@
       "file": "packages/editor/src/virtualization/virtualizedTextView.ts",
       "id": "packages/editor/src/virtualization/virtualizedTextView.ts:setTimeout:25021385fc",
       "justification": "The same deferral for an engine with no idle callback. Zero rather than a delay, because the point is only to leave the current frame, and the same cancel withdraws it.",
-      "line": 1747,
+      "line": 1773,
       "snippet": "const handle = win.setTimeout(run, 0)"
     },
     {

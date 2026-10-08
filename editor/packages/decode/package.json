@@ -1,6 +1,19 @@
 {
   "name": "@singapore-editor/decode",
   "version": "0.2.6",
+  "description": "Text reveal animations for documents opened in the Singapore editor.",
+  "keywords": [
+    "animation",
+    "browser",
+    "editor",
+    "singapore",
+    "text-reveal",
+    "typescript"
+  ],
+  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/decode/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

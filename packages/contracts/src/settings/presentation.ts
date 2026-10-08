@@ -109,6 +109,10 @@ export const SETTINGS_PRESENTATION = {
     widget: 'boolean',
     category: 'Machines',
   },
+  'environments.tailnetOwnerDevices': {
+    widget: 'boolean',
+    category: 'Machines',
+  },
   'server.address': {
     widget: 'string',
     category: 'Machines',

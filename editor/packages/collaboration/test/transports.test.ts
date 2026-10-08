@@ -167,7 +167,8 @@ describe('authenticated room packets', () => {
     const receiver = await RoomCrypto.create(room, 'b', secret)
     const first = await sender.seal('generation', 'first')
     expect(await receiver.open(first)).toBeDefined()
-    for (let index = 0; index < 16_400; index++) {
+    const packets = process.env.COLLABORATION_LONG_RUN === '1' ? 16_400 : 4097
+    for (let index = 0; index < packets; index++) {
       const packet = await sender.seal('generation', index)
       expect((await receiver.open(packet))?.payload).toBe(index)
     }

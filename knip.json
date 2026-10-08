@@ -25,6 +25,7 @@
         "src/system/tests/fixtures/file-lock-write-failure.ts",
         "test/factories/claude-ipc.cjs",
         "src/installation/remote-support.ts",
+        "src/devices/pair-command.ts",
         "src/terminal-host/main.ts",
         "scripts/pty-benchmark.ts",
         "scripts/pty-smoke.ts",
@@ -68,6 +69,7 @@
     "scripts": {
       "entry": [
         "check-editor-backlog.mjs",
+        "check-package-pages.mjs",
         "agent/browser.ts",
         "agent/scenarios/editor-retention-count-policy-driver.ts",
         "agent/desktop-display.ts",
@@ -101,7 +103,6 @@
         "app-icon/generate.ts",
         "install-server.ts",
         "import-proxy-usage-key.ts",
-        "pair.ts",
         "prod.ts",
         "tui.ts",
         "web-layering.mjs",
@@ -125,6 +126,7 @@
       "ignoreBinaries": ["ssh-keygen", "systemd-run", "taskset"]
     },
     ".": {
+      "entry": ["hotkeys/scripts/check-samples.mjs"],
       "ignoreDependencies": ["typescript-api"],
       "vitest": {
         "config": ["vitest.scripts.config.mjs"]

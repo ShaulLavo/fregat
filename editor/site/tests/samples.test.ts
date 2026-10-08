@@ -4,8 +4,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
+import { packages } from '../scripts/packages'
 
 const script = fileURLToPath(new URL('../scripts/check-samples.ts', import.meta.url))
+
+test('checks only editor package README samples through declaration exports with each framework JSX mode', () => {
+  const result = spawnSync('bun', [script, '--packages'], { encoding: 'utf8' })
+  expect(result.status, result.stdout + result.stderr).toBe(0)
+  expect(result.stdout).toContain(`across ${packages.length} packages.`)
+})
 
 async function check(content: string) {
   const directory = await mkdtemp(join(tmpdir(), 'singapore-doc-sample-'))

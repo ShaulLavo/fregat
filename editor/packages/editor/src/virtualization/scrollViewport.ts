@@ -1,3 +1,4 @@
+import type { VirtualizedTextViewOptions } from './virtualizedTextViewTypes'
 import { invalidateScrollElementPadding, scrollElementPadding } from './virtualizedTextViewHelpers'
 
 type ScrollLayer = ReturnType<typeof createScrollLayer>
@@ -9,9 +10,11 @@ export class ScrollViewport {
   private readonly extent: HTMLDivElement
   private readonly frame: HTMLDivElement
   private readonly layers: readonly [ScrollLayer, ScrollLayer]
+  public gutterScroll: NonNullable<VirtualizedTextViewOptions['gutterScroll']> = 'fixed'
   // CSS serializes fractional sizes with less precision than ResizeObserver reports.
   private viewportWidth = -1
   private viewportHeight = -1
+  private originY = 0
   /** Every reservation change passes through here, including the provisional paint's. */
   public onReservedOverlayWidthChange: ((side: 'left' | 'right') => void) | null = null
 
@@ -79,24 +82,41 @@ export class ScrollViewport {
     for (const layer of this.layers) layer.spacer.style.width = value
   }
 
+  public visibleGutterWidth(width: number, left: number): number {
+    return this.gutterScroll === 'content' ? Math.max(0, width - left) : width
+  }
+
   public setScrollPosition(left: number, top: number): void {
     const textTransform = `translate(${-left}px, ${-top}px)`
-    const gutterTransform = `translateY(${-top}px)`
+    const gutterLeft = this.gutterScroll === 'content' ? left : 0
+    const gutterTransform = `translate(${-gutterLeft}px, ${-top}px)`
+    this.scrollElement.style.setProperty('--editor-gutter-scroll-left', `${gutterLeft}px`)
     if (this.layers[0].content.style.transform !== textTransform)
       this.layers[0].content.style.transform = textTransform
     if (this.layers[1].content.style.transform !== gutterTransform)
       this.layers[1].content.style.transform = gutterTransform
   }
 
-  public setDocumentHeight(height: number, offsetY: number): void {
+  public get paintOffsetY(): number {
+    return -this.originY
+  }
+
+  public setDocumentHeight(height: number, offsetY: number, scrollTop = 0): boolean {
+    // Keep each painted coordinate within one native scroll extent, before browser clamping.
+    const originY = height > 0 ? Math.floor(scrollTop / height) * height : 0
+    const originChanged = this.originY !== originY
+    this.originY = originY
     const value = `${height}px`
-    const transform = offsetY === 0 ? '' : `translateY(${offsetY}px)`
+    const shiftedOffsetY = offsetY + originY
+    const transform = shiftedOffsetY === 0 ? '' : `translateY(${shiftedOffsetY}px)`
     if (this.extent.style.height !== value) {
       this.extent.style.height = value
       for (const layer of this.layers) layer.spacer.style.height = value
     }
-    if (this.textSpacer.style.transform === transform) return
-    for (const layer of this.layers) layer.spacer.style.transform = transform
+    if (this.textSpacer.style.transform !== transform) {
+      for (const layer of this.layers) layer.spacer.style.transform = transform
+    }
+    return originChanged
   }
 
   private synchronizeOrigin(): void {

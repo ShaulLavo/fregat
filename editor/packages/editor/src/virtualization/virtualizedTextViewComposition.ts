@@ -34,6 +34,11 @@ export function setCompositionPreedit(view: VirtualizedTextViewInternal, text: s
   positionCompositionPreedit(view, element)
 }
 
+export function refreshCompositionPreedit(view: VirtualizedTextViewInternal): void {
+  const element = compositionPreedits.get(view)
+  if (element) positionCompositionPreedit(view, element)
+}
+
 /** Where each character of the drawn candidate sits, for an IME placing its candidate window. */
 export function compositionCharacterRects(view: VirtualizedTextViewInternal): DOMRect[] {
   const node = compositionPreedits.get(view)?.firstChild
@@ -59,8 +64,7 @@ function positionCompositionPreedit(view: VirtualizedTextViewInternal, element: 
   const position = selection
     ? (caretPosition(view, selection.head, selection.affinity)?.[0] ?? null)
     : null
-  // Scrolled past the mounted rows there is no row to draw over. The next candidate the IME offers
-  // puts the preedit back, so nothing is lost by waiting for one.
+  // An offscreen candidate waits for its row to mount; reconciliation refreshes it on return.
   if (!position) {
     setElementHidden(element, true)
     return
@@ -68,7 +72,11 @@ function positionCompositionPreedit(view: VirtualizedTextViewInternal, element: 
 
   setElementHidden(element, false)
   setStyleValue(element, 'height', `${position.height}px`)
-  setStyleValue(element, 'transform', `translate(${position.left}px, ${position.top}px)`)
+  setStyleValue(
+    element,
+    'transform',
+    `translate(${position.left}px, ${position.top + view.viewport.paintOffsetY}px)`,
+  )
 }
 
 function createCompositionPreedit(view: VirtualizedTextViewInternal): HTMLElement {

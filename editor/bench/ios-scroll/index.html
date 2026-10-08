@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Singapore iPhone scroll probe</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Singapore iPhone scroll probe</h1>
+        <p>
+          Experiment. Start a run, drag slowly, then fling both ways inside the editor. Stop after
+          momentum ends. Repeat each setting on the same phone.
+        </p>
+      </header>
+      <details>
+        <summary>Compare settings</summary>
+        <form id="settings">
+          <label
+            >Overscan rows
+            <select name="overscan">
+              <option>12</option>
+              <option>48</option>
+              <option>120</option>
+            </select></label
+          >
+          <label
+            >Row position
+            <select name="position">
+              <option value="transform">Transform</option>
+              <option value="top">Top</option>
+            </select></label
+          >
+          <label
+            >Vertical paint
+            <select name="paint">
+              <option value="sticky">Sticky viewport baseline</option>
+              <option value="native">Native document experiment</option>
+            </select></label
+          >
+          <label
+            >Gutter
+            <select name="gutter">
+              <option value="sticky">Sticky</option>
+              <option value="absolute">Absolute</option>
+            </select></label
+          >
+          <label
+            >Geometry reads
+            <select name="geometry">
+              <option value="on">Each frame</option>
+              <option value="off">Off, timing only</option>
+            </select></label
+          >
+          <label
+            >Scroll anchoring
+            <select name="anchor">
+              <option value="browser">Browser default</option>
+              <option value="none">Off</option>
+            </select></label
+          >
+          <button type="submit">Apply settings</button>
+        </form>
+      </details>
+      <div class="actions">
+        <button id="start">Start run</button><button id="stop" disabled>Stop and save</button>
+      </div>
+      <p id="status" role="status">Loading editor…</p>
+      <div id="editor" aria-label="Long document for scroll testing"></div>
+      <div class="actions">
+        <button id="scripted">Run scripted control</button><button id="copy">Copy all runs</button
+        ><button id="download">Download JSON</button>
+      </div>
+      <section>
+        <h2>Latest run</h2>
+        <pre id="summary">Start a run to capture measurements.</pre>
+        <label
+          >How did scrolling look?
+          <input id="note" placeholder="For example: shakes during slow drag"
+        /></label>
+        <p id="collection">
+          JSON stays in this browser. The hosted collector also saves completed runs when available.
+        </p>
+      </section>
+      <details>
+        <summary>What these measurements mean</summary>
+        <p>
+          Lag compares mounted row geometry with scrollTop on the main thread. It is a DOM proxy.
+          JavaScript cannot read the compositor's actual displayed frame. Blank pixels measure
+          missing row coverage, including paint that has yet to catch up. A screen recording and
+          your observation decide whether scrolling looks steady.
+        </p>
+        <p>
+          The native document setting changes only the probe's CSS. Horizontal scrolling and editor
+          overlays need separate verification before any production use. Overscan comes from a
+          probe-only bundler override. The editor package source stays unchanged. Long tasks are
+          reported only when the browser supports that API.
+        </p>
+        <p>
+          Geometry reads can force layout. Repeat a baseline with reads off to check observer
+          overhead. Scripted controls use scrollBy and do not reproduce a finger fling.
+        </p>
+      </details>
+      <details>
+        <summary>Copyable raw JSON</summary>
+        <textarea id="json" rows="12" readonly aria-label="Captured runs as JSON"></textarea>
+      </details>
+      <script type="module" src="./page.ts"></script>
+    </main>
+  </body>
+</html>

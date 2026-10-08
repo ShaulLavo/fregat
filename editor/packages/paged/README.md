@@ -1,47 +1,54 @@
 # @singapore-editor/paged
 
-a read-only viewer model for UTF-8 files too big to load into the editor. it reads byte ranges on demand, keeps a bounded page cache and a sparse line index, and hands back windows of rows
+A read-only UTF-8 file viewer model with byte-range loading and a bounded page cache.
 
-experimental. it has its own document contract: no editing, history, saving or language features
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
 
-not on npm yet. it lives in the [singapore](../../README.md) workspace
+## Install
 
-## try it
+```sh
+npm install @singapore-editor/paged
+```
 
-give it a source that can read byte ranges. here, a `File` from an `<input type="file">`
+## Usage
+
+This experimental model reads UTF-8 files. Your app renders the returned rows.
 
 ```ts
 import { PagedDocument, type RangeSource } from '@singapore-editor/paged'
 
+const file = new File(['First line\nSecond line\n'], 'example.txt')
 const revision = String(file.lastModified)
 const source: RangeSource = {
   id: file.name,
   revision,
   byteLength: file.size,
   async readBytes(start, end) {
-    const bytes = new Uint8Array(await file.slice(start, end).arrayBuffer())
-    return { revision, bytes }
+    return { revision, bytes: new Uint8Array(await file.slice(start, end).arrayBuffer()) }
   },
 }
-
 const document = new PagedDocument(source)
+await document.initialize()
 const view = document.createView()
-const indexing = document.initialize()
-
-const first = await view.readLines(0, 24) // renders while the index is still scanning
-await indexing
-const far = await view.readLines(1_000_000, 24)
-const copied = await view.copyRange(far.rows[0].offset, far.rows[0].offset + 100)
-
+console.log(await view.readLines(0, 2))
 view.dispose()
 document.dispose()
 ```
 
-each row is `{ line, offset, text }`. offsets are UTF-16 positions in the raw decoded file, BOM and CR included. a window says `truncated: true` when a long line hit the size cap
+## API highlights
 
-a view's next read cancels its previous one. pass your own `AbortSignal` as the last argument to cancel a single request
+- `PagedDocument` indexes a byte-range source.
+- `createView()` gives each viewer its own read lifecycle.
+- `readLines()` returns a window of decoded rows.
 
-## more
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/paged/overview/)
 
-- [source contract, positions, cancellation and memory limits](docs/contract.md)
-- [the measurement behind it](../../docs/performance/e015-paged-proof.md)
+## In the Singapore family
+
+You can use this package on its own. `@singapore-editor/core` owns editor views; optional packages add syntax, search, gutters, and language features.
+
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+
+## License
+
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)

@@ -1,0 +1,28 @@
+name: ghostty-webgpu feature request
+description: Describe a problem that ghostty-webgpu could solve.
+title: '[ghostty-webgpu] '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues and the [roadmap](https://github.com/ShaulLavo/fregat/blob/main/PLAN.md) first.
+        Use [Discussions](https://github.com/ShaulLavo/fregat/discussions) for questions and early design conversations.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: Who needs this, and what are they trying to do? Give a concrete example.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe what the user could do after this change.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and related work
+      description: Include current workarounds and links to related issues, discussions, or plans.

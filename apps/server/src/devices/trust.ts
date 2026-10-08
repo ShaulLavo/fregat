@@ -1,3 +1,4 @@
+import { isIP } from 'node:net'
 import { networkInterfaces } from 'node:os'
 
 /** Reads one request header, from a `Headers` or a WebSocket's plain header record. */
@@ -20,6 +21,16 @@ export function forwardedClient(header: HeaderReader): string | null {
   const value = header('x-forwarded-for')
   if (!value) return null
   return value.split(',')[0]?.trim() || null
+}
+
+/**
+ * The one client address a forwarding proxy names, or null when the header is absent or lists a
+ * chain: an identity check only trusts the address the proxy itself saw connect.
+ */
+export function forwardedPeer(header: HeaderReader): string | null {
+  const value = header('x-forwarded-for')?.trim()
+  if (!value || isIP(value) === 0) return null
+  return value
 }
 
 /** Loopback, or an address one of this machine's own interfaces holds (its tailnet address). */

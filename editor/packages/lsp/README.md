@@ -1,16 +1,18 @@
 # @singapore-editor/lsp
 
-a small language server client. it speaks json-rpc over a websocket or a web worker, runs the `initialize` handshake, matches requests to responses, and keeps open documents in sync
+A Language Server Protocol client with WebSocket and worker transports.
 
-it runs in the browser, a worker or bun. [`@singapore-editor/lsp-plugin`](../lsp-plugin/) turns it into editor features
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
 
-## try it
+## Install
 
 ```sh
 npm install @singapore-editor/lsp
 ```
 
-connect, open a file, ask for a hover
+## Usage
+
+Run a language server that accepts LSP JSON-RPC over WebSocket at the example URL.
 
 ```ts
 import { LspClient, createWebSocketLspTransport, offsetToLspPosition } from '@singapore-editor/lsp'
@@ -32,16 +34,20 @@ const hover = await client.request('textDocument/hover', {
 await client.shutdown()
 ```
 
-`connect` resolves once the server answers `initialize`. after that `client.serverCapabilities` says what it supports
+## API highlights
 
-requests time out after 3 s. pass `{ timeoutMs, signal }` as the third argument to `request` to change that or to cancel. aborting sends `$/cancelRequest`
+- `LspClient.connect()` initializes a server connection.
+- `request()` sends a request with cancellation and timeout options.
+- `createWorkerLspTransport()` connects a worker.
 
-a server in a worker works the same way: `client.connect(createWorkerLspTransport(worker))`
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/lsp/overview/)
 
-## more
+## In the Singapore family
 
-- `@singapore-editor/lsp/positions`, offset and position conversion over strings or line-start snapshots, plus `didChange` content changes from text edits
-- `@singapore-editor/lsp/types`, the transport, document and workspace types
-- `lsp` re-exports the `vscode-languageserver-protocol` types, so `lsp.Hover` and friends come from this package
-- [`@singapore-editor/lsp-plugin`](../lsp-plugin/), diagnostics, completion, hover and navigation in the editor
-- [`@singapore-editor/typescript-lsp`](../typescript-lsp/), typescript in a worker, no server needed
+You can use this package on its own. `@singapore-editor/core` owns editor views; optional packages add syntax, search, gutters, and language features.
+
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+
+## License
+
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)

@@ -20,6 +20,7 @@ import {
   type Payloads,
   type Round,
 } from './protocol'
+import { ReplayWindow } from './replay-window'
 
 export interface SessionOptions<E extends EditEnvelope> {
   readonly peer: string
@@ -32,7 +33,19 @@ export interface SessionOptions<E extends EditEnvelope> {
   readonly suspicionTimeout: number
   readonly dependencyTimeout: number
   readonly historyChunkRecords: number
+  readonly replayWindowSize?: number
   readonly onPresence?: (peer: string, payload: Payloads<E>['PRESENCE']) => void
+}
+
+type HistoryTransfer<E extends EditEnvelope> = {
+  readonly tip: Checkpoint
+  readonly scope: string | undefined
+  from: Checkpoint
+  readonly chunks: Map<number, readonly Confirmation<E>[]>
+  next: number
+  count?: number
+  nextRequest: number
+  readonly requested: Map<number, number>
 }
 
 type Phase<E extends EditEnvelope> =
@@ -71,10 +84,11 @@ export class Session<E extends EditEnvelope> {
   private lastTick = -Infinity
   private lastHostPulse = -Infinity
   private now = 0
-  private readonly seen = new Map<string, Set<number>>()
+  private readonly replayWindowSize: number
+  private readonly seen = new Map<string, ReplayWindow>()
   private readonly histories = new Map<string, readonly Confirmation<E>[]>()
   private readonly latestRounds = new Map<string, number>()
-  private readonly chunks = new Map<string, Map<number, readonly Confirmation<E>[]>>()
+  private readonly transfers = new Map<string, HistoryTransfer<E>>()
   private commitWaiting: Commit<E> | undefined
   private lastCommit: Commit<E> | undefined
   private incomingHandoff: Payloads<E>['HANDOFF'] | undefined
@@ -101,6 +115,9 @@ export class Session<E extends EditEnvelope> {
       throw new RangeError('Dependency timeout must be positive and finite')
     if (!Number.isSafeInteger(options.historyChunkRecords) || options.historyChunkRecords < 1)
       throw new RangeError('History chunk size must be a positive record count')
+    this.replayWindowSize = options.replayWindowSize ?? 8192
+    if (!Number.isSafeInteger(this.replayWindowSize) || this.replayWindowSize < 1)
+      throw new RangeError('Replay window size must be a positive safe integer')
     this.authority = { host: options.peer, term: 0, epoch: options.genesis.hash }
     this.members.add(options.peer)
     this.rememberLocal()
@@ -165,6 +182,14 @@ export class Session<E extends EditEnvelope> {
     this.negotiate()
   }
 
+  retire(peer: string): void {
+    if (peer === this.peer) throw new TypeError('A session can retire only a remote peer')
+    this.departed.add(peer)
+    this.disconnect(peer)
+    this.seen.delete(peer)
+    this.transfers.delete(peer)
+  }
+
   submit(edit: E): void {
     if (this.phase.kind === 'left') throw new TypeError('The session has left the room')
     if (edit.document !== this.options.document)
@@ -181,27 +206,29 @@ export class Session<E extends EditEnvelope> {
     if (
       this.phase.kind === 'stable' &&
       now - this.lastHostPulse > this.options.suspicionTimeout &&
-      !this.isHost
+      this.authority.host !== this.peer
     )
       this.negotiate()
-    this.broadcast('HELLO', { ...this.advertisement(this.branch), term: this.maxTerm })
+    if (!this.isHost && this.phase.kind !== 'handoff')
+      this.broadcast('HELLO', { ...this.advertisement(this.branch), term: this.maxTerm })
     this.retryPhase()
     this.flushPending()
     this.resumeDeparture()
   }
 
-  receive(message: Message<E>): void {
+  receive(message: Message<E>): boolean {
     if (
       this.phase.kind === 'left' ||
       message.version !== 1 ||
       message.room !== this.options.room ||
-      message.document !== this.options.document
+      message.document !== this.options.document ||
+      !Number.isSafeInteger(message.messageId) ||
+      message.messageId < 1
     )
-      return
-    if (!this.members.has(message.sender) || message.sender === this.peer) return
-    const seen = this.seen.get(message.sender) ?? new Set<number>()
-    if (seen.has(message.messageId)) return
-    seen.add(message.messageId)
+      return false
+    if (!this.members.has(message.sender) || message.sender === this.peer) return false
+    const seen = this.seen.get(message.sender) ?? new ReplayWindow(this.replayWindowSize)
+    if (!seen.accept(message.messageId)) return false
     this.seen.set(message.sender, seen)
     switch (message.type) {
       case 'HELLO':
@@ -223,8 +250,11 @@ export class Session<E extends EditEnvelope> {
           message.payload.members,
           message.payload.handoff,
         )
-        if (sameAuthority(this.authority, message.payload.branch.authority))
+        if (sameAuthority(this.authority, message.payload.branch.authority)) {
           this.lastHostPulse = this.now
+          if (this.lastCommit) this.claim(message.sender, this.lastCommit)
+          this.observe(message.sender, message.payload.branch)
+        }
         break
       case 'ELECTION_OFFER':
       case 'RECONCILE_OFFER':
@@ -260,6 +290,8 @@ export class Session<E extends EditEnvelope> {
         this.departed.add(message.sender)
         this.members.delete(message.sender)
         this.observed.delete(message.sender)
+        this.seen.delete(message.sender)
+        this.transfers.delete(message.sender)
         if (
           this.authority.host === message.sender ||
           this.phase.kind === 'collecting' ||
@@ -273,6 +305,7 @@ export class Session<E extends EditEnvelope> {
         this.options.onPresence?.(message.sender, message.payload)
         break
     }
+    return true
   }
 
   leave(successor: string): void {
@@ -322,6 +355,8 @@ export class Session<E extends EditEnvelope> {
   }
   private completeDeparture(): void {
     this.phase = { kind: 'left' }
+    this.seen.clear()
+    this.transfers.clear()
     this.departure = undefined
     for (const observer of this.presenceObservers) observer.departed()
   }
@@ -401,7 +436,7 @@ export class Session<E extends EditEnvelope> {
     }
     if (this.phase.kind !== 'collecting') return
     this.phase.offers.set(peer, offer)
-    this.request(peer, offer.branch.tip)
+    if (this.coordinator() === this.peer) this.request(peer, offer.branch.tip)
     this.finishRound()
   }
 
@@ -570,9 +605,13 @@ export class Session<E extends EditEnvelope> {
     this.finishRound()
     this.activate()
     this.maxTerm = Math.max(this.maxTerm, branch.authority.term)
-    this.request(peer, branch.tip)
     if (this.phase.kind !== 'stable' || !this.compatibleMembership()) return
     if (this.lastHandoff?.branch.authority.host === peer) return
+    this.request(
+      peer,
+      branch.tip,
+      sameAuthority(this.authority, branch.authority) ? this.authority.epoch : undefined,
+    )
     if (!sameAuthority(this.authority, branch.authority)) {
       const history = this.histories.get(tipKey(branch.tip))
       if (!history) return
@@ -625,7 +664,7 @@ export class Session<E extends EditEnvelope> {
       return
     }
     if (record.depth > tip.depth + 1) {
-      this.request(peer, { depth: record.depth, hash: record.hash })
+      this.request(peer, { depth: record.depth, hash: record.hash }, this.authority.epoch)
       return
     }
     if (!this.options.engine.apply(record)) {
@@ -640,8 +679,16 @@ export class Session<E extends EditEnvelope> {
   private flushPending(): void {
     if (this.phase.kind !== 'stable' || !this.compatibleMembership()) return
     if (!this.isHost) {
-      for (const edit of this.pending.values())
+      const count = Math.min(
+        this.pending.size,
+        Math.max(1, Math.floor(this.replayWindowSize / this.members.size)),
+      )
+      for (let index = 0; index < count && this.pending.size; index++) {
+        const [key, edit] = this.pending.entries().next().value!
+        this.pending.delete(key)
+        this.pending.set(key, edit)
         this.send(this.authority.host, 'SUBMIT', { authority: this.authority, edit })
+      }
       return
     }
     const ready = [...this.pending.values()].sort(
@@ -682,7 +729,8 @@ export class Session<E extends EditEnvelope> {
     }
     if (this.phase.kind === 'collecting') {
       this.broadcast('RECONCILE_OFFER', this.phase.offers.get(this.peer)!)
-      for (const [peer, offer] of this.phase.offers) this.request(peer, offer.branch.tip)
+      if (this.coordinator() === this.peer)
+        for (const [peer, offer] of this.phase.offers) this.request(peer, offer.branch.tip)
       this.finishRound()
       return
     }
@@ -692,8 +740,6 @@ export class Session<E extends EditEnvelope> {
       return
     }
     if (this.phase.kind === 'handoff') {
-      // A follower can still be awaiting the claim that activated this outgoing host.
-      if (this.lastCommit) this.broadcast('HOST_CLAIM', this.lastCommit)
       if (this.lastHandoff) this.broadcast('HANDOFF', this.lastHandoff)
       this.broadcast('HOST_PULSE', this.advertisement(this.phase.branch))
       const handoff: Payloads<E>['HANDOFF'] = {
@@ -706,8 +752,8 @@ export class Session<E extends EditEnvelope> {
       this.broadcast('HANDOFF', handoff)
       return
     }
-    if (!this.isHost) return
-    if (this.lastCommit) this.broadcast('HOST_CLAIM', this.lastCommit)
+    // Roster discovery pauses sequencing while the installed host keeps renewing its authority.
+    if (this.authority.host !== this.peer) return
     if (this.lastHandoff) this.broadcast('HANDOFF', this.lastHandoff)
     this.broadcast('HOST_PULSE', this.advertisement(this.branch))
   }
@@ -717,48 +763,151 @@ export class Session<E extends EditEnvelope> {
     this.histories.set(tipKey(this.branch.tip), history)
   }
 
-  private request(peer: string, tip: Checkpoint): void {
+  private request(peer: string, tip: Checkpoint, scope?: string): void {
     if (this.histories.has(tipKey(tip)) || peer === this.peer) return
-    this.send(peer, 'HISTORY_REQUEST', { tip, from: this.options.genesis })
+    const own = this.branch.tip
+    const local = this.options.engine.exportHistory(this.options.genesis)!
+    const checkpoint = tip.depth === 0 ? this.options.genesis : local[tip.depth - 1]
+    if (checkpoint && sameTip(checkpoint, tip)) {
+      this.histories.set(tipKey(tip), local.slice(0, tip.depth))
+      return
+    }
+    const previous = this.transfers.get(peer)
+    if (
+      previous &&
+      scope !== undefined &&
+      previous.scope === scope &&
+      !sameTip(previous.tip, tip) &&
+      !this.histories.has(tipKey(previous.tip))
+    ) {
+      this.request(peer, previous.tip, scope)
+      return
+    }
+    let transfer = previous
+    if (!transfer || !sameTip(transfer.tip, tip) || transfer.scope !== scope) {
+      let from = own.depth <= tip.depth ? own : this.options.genesis
+      if (previous && previous.scope === scope && previous.tip.depth <= tip.depth)
+        from = this.transferPrefix(previous, from)
+      transfer = {
+        tip,
+        scope,
+        from,
+        chunks: new Map<number, readonly Confirmation<E>[]>(),
+        next: 0,
+        nextRequest: 0,
+        requested: new Map<number, number>(),
+      }
+      this.transfers.set(peer, transfer)
+    }
+    for (const [index, requestedAt] of transfer.requested) {
+      if (this.now - requestedAt < this.options.pulseInterval) continue
+      transfer.requested.set(index, this.now)
+      this.send(peer, 'HISTORY_REQUEST', { tip, from: transfer.from, index })
+    }
+    const limit = Math.max(1, Math.floor(this.replayWindowSize / 2))
+    const count = transfer.count ?? 1
+    while (transfer.requested.size < limit && transfer.nextRequest < count) {
+      const index = transfer.nextRequest++
+      if (transfer.chunks.has(index)) continue
+      transfer.requested.set(index, this.now)
+      this.send(peer, 'HISTORY_REQUEST', { tip, from: transfer.from, index })
+    }
+  }
+
+  private transferHistory(transfer: HistoryTransfer<E>): readonly Confirmation<E>[] | undefined {
+    const base = sameTip(transfer.from, this.options.genesis)
+      ? []
+      : this.histories.get(tipKey(transfer.from))
+    if (!base) return
+    return [
+      ...base,
+      ...Array.from({ length: transfer.next }, (_, index) => transfer.chunks.get(index)!).flat(),
+    ]
+  }
+
+  private transferPrefix(transfer: HistoryTransfer<E>, from: Checkpoint): Checkpoint {
+    const history = this.transferHistory(transfer)
+    const last = history?.at(-1)
+    const tip = last ? { depth: last.depth, hash: last.hash } : this.options.genesis
+    if (!history || tip.depth <= from.depth || !this.options.engine.verify(history, tip))
+      return from
+    this.histories.set(tipKey(tip), history)
+    return tip
   }
 
   private exportTo(peer: string, payload: Payloads<E>['HISTORY_REQUEST']): void {
     const history = this.histories.get(tipKey(payload.tip))
-    if (!history || !sameTip(payload.from, this.options.genesis)) return
+    if (!history) return
+    const prefix = payload.from.depth === 0 ? this.options.genesis : history[payload.from.depth - 1]
+    const from = prefix && sameTip(prefix, payload.from) ? payload.from : this.options.genesis
     const size = this.options.historyChunkRecords
-    const count = Math.max(1, Math.ceil(history.length / size))
-    for (let index = 0; index < count; index++)
-      this.send(peer, 'HISTORY_CHUNK', {
-        ...payload,
-        index,
-        count,
-        records: history.slice(index * size, (index + 1) * size),
-      })
+    const count = Math.max(1, Math.ceil((history.length - from.depth) / size))
+    const { index } = payload
+    if (!Number.isSafeInteger(index) || index < 0 || index >= count) return
+    this.send(peer, 'HISTORY_CHUNK', {
+      ...payload,
+      from,
+      count,
+      records: history.slice(from.depth + index * size, from.depth + (index + 1) * size),
+    })
   }
 
   private importFrom(peer: string, payload: Payloads<E>['HISTORY_CHUNK']): void {
     if (
-      !sameTip(payload.from, this.options.genesis) ||
+      !Number.isSafeInteger(payload.count) ||
       payload.count < 1 ||
+      !Number.isSafeInteger(payload.index) ||
       payload.index < 0 ||
-      payload.index >= payload.count
+      payload.index >= payload.count ||
+      this.histories.has(tipKey(payload.tip))
     )
       return
-    const key = JSON.stringify([peer, tipKey(payload.tip), payload.count])
-    const chunks = this.chunks.get(key) ?? new Map<number, readonly Confirmation<E>[]>()
-    chunks.set(payload.index, payload.records)
-    this.chunks.set(key, chunks)
-    if (chunks.size !== payload.count) return
-    const history = Array.from({ length: payload.count }, (_, index) => chunks.get(index)!).flat()
-    this.chunks.delete(key)
+    const transfer = this.transfers.get(peer)
+    if (!transfer || !sameTip(transfer.tip, payload.tip) || transfer.chunks.has(payload.index))
+      return
+    const base = sameTip(payload.from, this.options.genesis)
+      ? []
+      : this.histories.get(tipKey(payload.from))
+    if (!base) return
+    if (
+      transfer.count !== undefined &&
+      (transfer.count !== payload.count || !sameTip(transfer.from, payload.from))
+    )
+      return
+    transfer.from = payload.from
+    transfer.count = payload.count
+    transfer.chunks.set(payload.index, payload.records)
+    transfer.requested.delete(payload.index)
+    const previousNext = transfer.next
+    while (transfer.chunks.has(transfer.next)) transfer.next++
+    if (transfer.next !== payload.count) {
+      if (
+        transfer.next > previousNext &&
+        this.phase.kind === 'stable' &&
+        transfer.scope === this.authority.epoch
+      ) {
+        const tip = this.transferPrefix(transfer, this.branch.tip)
+        this.sync({ tip, authority: this.authority })
+      }
+      this.request(peer, payload.tip, transfer.scope)
+      return
+    }
+    const history = this.transferHistory(transfer)!
+    this.transfers.delete(peer)
     if (!this.options.engine.verify(history, payload.tip)) return
     this.histories.set(tipKey(payload.tip), history)
+    if (this.phase.kind === 'stable' && transfer.scope === this.authority.epoch)
+      this.sync({ tip: payload.tip, authority: this.authority })
     this.finishRound()
     this.tryCommit()
     this.tryHandoff()
     // A delayed transfer can belong to an archived branch; only a current advertisement drives sync.
     const advertised = this.observed.get(peer)?.branch
-    if (advertised && sameTip(advertised.tip, payload.tip)) this.observe(peer, advertised)
+    if (
+      advertised &&
+      (sameTip(advertised.tip, payload.tip) || transfer.scope === advertised.authority.epoch)
+    )
+      this.observe(peer, advertised)
   }
 
   private handoff(peer: string, payload: Payloads<E>['HANDOFF']): void {
@@ -776,7 +925,7 @@ export class Session<E extends EditEnvelope> {
       const added = edits.size !== (this.lastHandoff?.pending.length ?? 0)
       this.lastHandoff = { ...payload, pending: [...edits.values()] }
       for (const edit of payload.pending) this.submit(edit)
-      this.acknowledgeHandoff(peer, payload)
+      this.acknowledgeHandoff(payload)
       if (added && this.peer === payload.successor) this.broadcast('HANDOFF', this.lastHandoff)
       if (peer !== payload.successor && this.peer !== payload.successor)
         this.send(payload.successor, 'HANDOFF', this.lastHandoff)
@@ -808,7 +957,7 @@ export class Session<E extends EditEnvelope> {
     for (const edit of this.options.engine.uniquePending(old)) this.submit(edit)
     for (const edit of handoff.pending) this.submit(edit)
     if (handoff.stage === 'prepare') {
-      this.acknowledgeHandoff(handoff.branch.authority.host, handoff)
+      this.acknowledgeHandoff(handoff)
       return
     }
     this.authority = handoff.authority
@@ -818,7 +967,7 @@ export class Session<E extends EditEnvelope> {
     this.incomingHandoff = undefined
     this.lastCommit = undefined
     this.lastHandoff = handoff
-    this.acknowledgeHandoff(handoff.branch.authority.host, handoff)
+    this.acknowledgeHandoff(handoff)
     if (this.peer === handoff.successor) this.broadcast('HANDOFF', handoff)
     else this.send(handoff.successor, 'HANDOFF', handoff)
   }
@@ -831,7 +980,9 @@ export class Session<E extends EditEnvelope> {
     }
   }
 
-  private acknowledgeHandoff(peer: string, handoff: Payloads<E>['HANDOFF']): void {
+  private acknowledgeHandoff(handoff: Payloads<E>['HANDOFF']): void {
+    const peer = handoff.branch.authority.host
+    if (!this.members.has(peer)) return
     const acknowledgement = {
       tip: handoff.branch.tip,
       epoch: handoff.authority.epoch,
@@ -839,8 +990,6 @@ export class Session<E extends EditEnvelope> {
       pending: handoff.pending.map((edit) => edit.id),
     }
     this.send(peer, 'HAVE', acknowledgement)
-    if (peer !== handoff.branch.authority.host)
-      this.send(handoff.branch.authority.host, 'HAVE', acknowledgement)
   }
 
   private send<K extends keyof Payloads<E>>(peer: string, type: K, payload: Payloads<E>[K]): void {
