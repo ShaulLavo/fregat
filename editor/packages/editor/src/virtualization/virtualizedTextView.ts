@@ -579,7 +579,7 @@ export class VirtualizedTextView {
       return [
         {
           left: bounds.left - origin.left,
-          top: bounds.top - origin.top,
+          top: bounds.top - origin.top - this.view.viewport.paintOffsetY,
           width: bounds.width,
           height: bounds.height,
           backgroundColor: window?.getComputedStyle(element).backgroundColor ?? '',
