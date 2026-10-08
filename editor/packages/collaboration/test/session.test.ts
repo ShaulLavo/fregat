@@ -398,8 +398,12 @@ describe('transport-neutral session', () => {
     network.author(3)
     const edit = network.nodes[3]!.authored.at(-1)!
     network.crash(2)
+    const departing = network.nodes[3]!.session
+    const successor = network.nodes[2]!.session.peer
+    for (let step = 0; step < 200 && departing.members.has(successor); step++) network.advance(1)
+    expect(departing.members.has(successor)).toBe(false)
     for (const [key, link] of links) network.links.set(key, link)
-    for (let step = 0; step < 200 && !network.nodes[3]!.session.isHost; step++) network.advance(1)
+    for (let step = 0; step < 200 && !departing.isHost; step++) network.advance(1)
     expect(network.nodes[3]!.session.isHost).toBe(true)
     for (const [key, link] of network.links)
       if (key.startsWith('3:')) network.links.set(key, { ...link, drop: 1 })

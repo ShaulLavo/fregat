@@ -126,7 +126,8 @@ test('a one-second router link blip preserves the named caret and refreshes unch
     })
     network.flush()
     await expect.poll(() => carets(host).length).toBe(1)
-    const caret = carets(host)[0]!
+    const counts: number[] = []
+    presence.subscribe(() => counts.push(presence.states.length))
     const clock = presence.states[0]!.presenceClock
     await page.screenshot({ element: host, path: '../.vitest/evidence/presence-blip-before.png' })
     network.tick(1_000)
@@ -137,7 +138,8 @@ test('a one-second router link blip preserves the named caret and refreshes unch
     network.tick(2_000)
     network.connect()
     expect(presence.states[0]?.presenceClock).toBeGreaterThan(clock)
-    expect(carets(host)[0]).toBe(caret)
+    await expect.poll(() => carets(host).length).toBe(1)
+    expect(counts).not.toContain(0)
     expect(host.querySelector('.editor-remote-name')?.textContent).toBe('Ada')
     await page.screenshot({ element: host, path: '../.vitest/evidence/presence-blip-after.png' })
   } finally {

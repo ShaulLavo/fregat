@@ -276,6 +276,9 @@ test('a one-second last-path interruption preserves presence and membership', ()
     network.connect()
     expect(receiver.presence.states).toHaveLength(1)
     expect(receiver.session.host).toBe('local')
+    network.tick(6_000)
+    expect(receiver.session.members.has(sender.session.peer)).toBe(true)
+    expect(receiver.presence.states).toHaveLength(1)
   } finally {
     network.dispose()
   }
@@ -294,6 +297,53 @@ test('reconnect republishes unchanged local presence before the regular renewal'
     network.disconnect()
     network.tick(2_000)
     network.connect()
+    expect(receiver.presence.states[0]?.presenceClock).toBeGreaterThan(clock)
+  } finally {
+    network.dispose()
+  }
+})
+
+test('reconnect republishes a presence removal made while the link was down', () => {
+  const network = presenceNetwork()
+  const receiver = network.peers[0]!
+  const sender = network.peers[1]!
+  try {
+    network.connect()
+    sender.presence.setLocalState(remoteState())
+    network.flush()
+    network.tick(1_000)
+    network.disconnect()
+    sender.presence.setLocalState(null)
+    network.flush()
+    expect(receiver.presence.states).toHaveLength(1)
+    network.tick(2_000)
+    network.connect()
+    expect(receiver.presence.states).toHaveLength(0)
+  } finally {
+    network.dispose()
+  }
+})
+
+test('repeated link loss keeps the first eviction deadline and reconnect refreshes expired presence', () => {
+  const network = presenceNetwork(300)
+  const receiver = network.peers[0]!
+  const sender = network.peers[1]!
+  try {
+    network.connect()
+    sender.presence.setLocalState(remoteState())
+    network.flush()
+    const clock = receiver.presence.states[0]!.presenceClock
+    network.tick(1_000)
+    network.disconnect()
+    network.tick(1_299)
+    receiver.session.disconnect(sender.session.peer)
+    expect(receiver.presence.states).toHaveLength(1)
+    network.tick(1_300)
+    expect(receiver.session.members.has(sender.session.peer)).toBe(false)
+    expect(receiver.presence.states).toHaveLength(0)
+    network.connect()
+    network.tick(1_350)
+    expect(receiver.session.members.has(sender.session.peer)).toBe(true)
     expect(receiver.presence.states[0]?.presenceClock).toBeGreaterThan(clock)
   } finally {
     network.dispose()
@@ -402,7 +452,10 @@ test.each(['timeout', 'retire', 'LEAVE'] as const)(
           payload: { successor: null },
         })
       }
-      if (removal === 'retire') session.retire(peer)
+      if (removal === 'retire') {
+        session.disconnect(peer)
+        session.retire(peer)
+      }
       if (removal === 'timeout') {
         session.disconnect(peer)
         expect(presence.states).toHaveLength(2)
