@@ -165,6 +165,9 @@ jobs:
       - name: Check shared tooling
         run: bun run workspace:check
 
+      - name: Check package pages
+        run: bun run package-pages:check
+
       # `format:check`, never `format` — a CI job that rewrites files and then
       # passes is a job that reports on a tree nobody reviewed.
       - name: Format

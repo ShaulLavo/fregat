@@ -6,7 +6,7 @@
     "dev": "astro dev",
     "build": "bun scripts/build.ts",
     "preview": "astro preview",
-    "docs:check": "bun scripts/check-samples.ts",
+    "docs:check": "bun scripts/check-samples.ts && bun scripts/check-samples.ts --packages",
     "typecheck": "tsc --noEmit -p tsconfig.json && bun run docs:check",
     "test": "bun --bun vitest run",
     "lint": "oxlint --disable-nested-config scripts src/examples tests",
