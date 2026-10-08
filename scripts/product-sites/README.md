@@ -55,6 +55,9 @@ failed checks save screenshots even without `--screenshots`. For a published-sit
 and `--paths /,/fregat/,/singapore/demo/`. Evidence is JSON Lines, with one row per page, engine,
 width and interaction state. A navigation timeout or WebKit internal navigation error gets
 one retry before failing. Retried navigations are logged separately; layout failures always fail.
+The crawl starts fresh browser processes every 200 pages to bound long-lived browser resources.
+CI runs Chromium and WebKit in parallel jobs, each with its own evidence artifact. Both jobs
+must pass the final verdict.
 
 The build job has no deployment secret. It uploads a gzip tar artifact with one-day retention.
 A fresh deploy job downloads that artifact and sends it directly over SSH. It runs in the

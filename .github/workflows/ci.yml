@@ -463,7 +463,11 @@ jobs:
         run: bun run --cwd ghostty-webgpu/site build --base /${{ github.event.repository.name }}/ghostty-webgpu/
 
   mobile-layout:
-    name: Mobile layout
+    name: Mobile layout (${{ matrix.engine }})
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, webkit]
     needs: changes
     if: ${{ needs.changes.outputs.site == 'true' || needs.changes.outputs.docs == 'true' }}
     runs-on: ubuntu-latest
@@ -496,13 +500,13 @@ jobs:
         run: bun scripts/product-sites/test-mobile.mjs
 
       - name: Check every built page on mobile
-        run: bun scripts/product-sites/verify-mobile.mjs --directory "$RUNNER_TEMP/product-sites" --evidence "$RUNNER_TEMP/mobile-layout"
+        run: bun scripts/product-sites/verify-mobile.mjs --directory "$RUNNER_TEMP/product-sites" --evidence "$RUNNER_TEMP/mobile-layout" --engines "${{ matrix.engine }}"
 
       - name: Upload mobile layout evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mobile-layout
+          name: mobile-layout-${{ matrix.engine }}
           path: ${{ runner.temp }}/mobile-layout
           if-no-files-found: ignore
           retention-days: 7

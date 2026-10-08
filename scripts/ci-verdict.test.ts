@@ -65,7 +65,8 @@ function fixture() {
     'Test (tui)',
     'Browser tests',
     'Site build',
-    'Mobile layout',
+    'Mobile layout (chromium)',
+    'Mobile layout (webkit)',
     'Libraries / Editor tests',
     'Libraries / Ghostty tests',
     'Libraries / Standalone packages',
@@ -164,16 +165,19 @@ test('missing required needs rejects before trusting successful API jobs', () =>
   expect(value.run()).toEqual({ passed: false, issues: ['Required need browser is missing'] })
 })
 
-test.each(['Test (web 3/4)', 'Libraries / Ghostty tests', 'Browser tests', 'Mobile layout'])(
-  'missing required execution %s rejects a successful parent',
-  (name) => {
-    const value = fixture()
-    const jobs = value.jobs.filter((job) => job.name !== name)
-    const verdict = value.evaluate(jobs)
-    expect(verdict.passed).toBe(false)
-    expect(verdict.issues).toContain(`Required job ${name} lacks one successful execution`)
-  },
-)
+test.each([
+  'Test (web 3/4)',
+  'Libraries / Ghostty tests',
+  'Browser tests',
+  'Mobile layout (chromium)',
+  'Mobile layout (webkit)',
+])('missing required execution %s rejects a successful parent', (name) => {
+  const value = fixture()
+  const jobs = value.jobs.filter((job) => job.name !== name)
+  const verdict = value.evaluate(jobs)
+  expect(verdict.passed).toBe(false)
+  expect(verdict.issues).toContain(`Required job ${name} lacks one successful execution`)
+})
 
 test('disabled reusable children may skip while selected family succeeds', () => {
   const value = fixture()
@@ -197,7 +201,11 @@ test('docs-only selection requires mobile layout and permits skipped or absent d
   }
   value.needs.changes = value.changes
   const jobs = value.jobs
-    .filter((job) => ['Changes', 'Docs format', 'Mobile layout'].includes(job.name))
+    .filter((job) =>
+      ['Changes', 'Docs format', 'Mobile layout (chromium)', 'Mobile layout (webkit)'].includes(
+        job.name,
+      ),
+    )
     .map((job) => ({ ...job, conclusion: 'success', runner_id: 1 }))
   expect(value.evaluate(jobs)).toEqual({
     passed: true,
@@ -213,7 +221,10 @@ test('non-site code selection permits a skipped mobile layout job', () => {
   value.changes.outputs.docs = 'false'
   value.needs.site = { result: 'skipped' }
   value.needs['mobile-layout'] = { result: 'skipped' }
-  const jobs = value.jobs.filter((job) => !['Mobile layout', 'Site build'].includes(job.name))
+  const jobs = value.jobs.filter(
+    (job) =>
+      !['Mobile layout (chromium)', 'Mobile layout (webkit)', 'Site build'].includes(job.name),
+  )
   expect(value.evaluate(jobs)).toEqual({ passed: true, issues: [] })
 })
 

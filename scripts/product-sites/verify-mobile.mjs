@@ -251,17 +251,26 @@ async function checkWorker(browser, engine, nextUrl) {
 }
 
 async function checkBrowser(engine) {
-  const browser = await { chromium, webkit }[engine].launch()
-  let next = 0
-  const nextUrl = () => {
-    if (next % 100 === 0)
-      console.log(`${engine}: ${next}/${urls.length} pages, ${checked} checks, ${failed} failures`)
-    return urls[next++]
-  }
-  try {
-    await Promise.all(Array.from({ length: workers }, () => checkWorker(browser, engine, nextUrl)))
-  } finally {
-    await browser.close()
+  // Bound process lifetime across large reference crawls; failed pages still fail the run.
+  for (let start = 0; start < urls.length; start += 200) {
+    const browser = await { chromium, webkit }[engine].launch()
+    const end = Math.min(start + 200, urls.length)
+    let next = start
+    const nextUrl = () => {
+      if (next >= end) return undefined
+      if (next % 100 === 0)
+        console.log(
+          `${engine}: ${next}/${urls.length} pages, ${checked} checks, ${failed} failures`,
+        )
+      return urls[next++]
+    }
+    try {
+      await Promise.all(
+        Array.from({ length: workers }, () => checkWorker(browser, engine, nextUrl)),
+      )
+    } finally {
+      await browser.close()
+    }
   }
 }
 
