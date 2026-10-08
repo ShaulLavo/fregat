@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'vitest'
-import { commands } from '@vitest/browser/context'
+import { commands } from 'vitest/browser'
 import { Editor } from '@singapore-editor/core/editor'
 import {
   acquireDocumentMutationLease,
