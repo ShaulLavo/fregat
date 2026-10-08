@@ -25,6 +25,8 @@ import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { QueryClient, QueryObserver } from '@tanstack/react-query'
 import { describe, vi } from 'vitest'
 import { expect, test as it } from '../../../../test/fixtures'
+// Lazy fixture imports consume the first test's deadline on a cold worker.
+import '../../../../test/server'
 import type { WorkspaceEditResult, WorkspaceEditTransitionRequest } from '@workspace/contracts'
 
 describe('FileSyncService', () => {

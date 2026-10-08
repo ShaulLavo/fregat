@@ -33,7 +33,7 @@ bun /work/platform-production/heavy/current/run.js --class browser fixture-check
 
 Stop the server wrapper after the check, including on failure or cancellation. SIGINT or SIGTERM stops its whole slice with the configured grace.
 
-A declared server enters the same FIFO queue and keeps its class estimate, memory ceiling and accounting. Once admitted, it stays outside the quiet drain and holds no shared slot locks. This breaks the cycle where a quiet measurement waits for a server whose browser check is queued behind that measurement. New server requests keep FIFO among eligible jobs. During an active wrapper quiet hold, declared light servers use the same light-admission rule as finite light jobs. The flag applies to local jobs and cannot combine with `--quiet` or `--host pi`.
+A declared server enters the same FIFO queue and keeps its class estimate, memory ceiling and accounting. Once admitted, it stays outside the quiet drain and holds no shared slot locks. This breaks the cycle where a quiet measurement waits for a server whose browser check is queued behind that measurement. New server requests keep their FIFO positions and wait for active quiet holds to end. The flag applies to local jobs and cannot combine with `--quiet` or `--host pi`.
 
 A single finite browser job can also own server startup, readiness, browser work and teardown within its slice. Its child commands run directly in that job; the owning job must be able to finish without queuing another heavy job.
 
@@ -41,7 +41,7 @@ A single finite browser job can also own server startup, readiness, browser work
 
 `--quiet` drains finite running jobs and orphan slices before starting the measurement. Existing declared servers keep running. Their unrealized memory estimates, observed memory use and machine pressure still participate in admission. A quiet run records the server identities seen at admission in `serversAtAdmission`; status marks them `server`. Measurements requiring zero server activity need those servers stopped first.
 
-During an active wrapper quiet hold, new finite light jobs and declared light servers may start. Suite, build, browser, bench and every `--quiet` request remain held. Light jobs pass those held classes while retaining FIFO among eligible light jobs. An earlier eligible light job waiting for resources keeps later light jobs waiting. Outside an active hold, including its initial drain and after its lease expires, admission retains the full FIFO queue. Memory estimates, slice ceilings, reserve, pressure, CPU load, external drain and slot-lock gates apply unchanged.
+During an active wrapper quiet hold, new finite light jobs may start. Every new declared server, suite, build, browser, bench and `--quiet` request remains held. Light jobs pass those held classes while retaining FIFO among eligible light jobs. An earlier eligible light job waiting for resources keeps later light jobs waiting. Outside an active hold, including its initial drain and after its lease expires, admission retains the full FIFO queue. Memory estimates, slice ceilings, reserve, pressure, CPU load, external drain and slot-lock gates apply unchanged.
 
 `developer.heavyJobQuietPolicy` owns the allowed class set and the CPU-set data shape. Its portable baseline is `{ "allowedClasses": ["light"], "measurementCpus": [], "concurrentCpus": [] }`. An empty allowed class set disables concurrent light admission. This release validates light-only class sets and empty CPU sets. It leaves CPU affinity to the host scheduler. Additional classes and inherited CPU affinity require separate validation and implementation; it sets no systemd `AllowedCPUs` property.
 
@@ -61,7 +61,7 @@ An ordinary request blocked by a quiet predecessor reports a failure once both i
 
 A healthy service retains the runtime budget while renewing its heartbeat. A suspended wrapper cannot suspend the service. Arming after scope entry preserves delayed-launch ownership on fd 6. Startup signals abort execution, and a monotonic runtime check rejects a delayed readiness return even while the service remains active during grace or TERM is missed. Normal completion and abortable orphan reaping stop and collect the service.
 
-A server admitted earlier stays eligible to launch and appears in `serversAtAdmission`. Declared light servers admitted during the hold appear in `jobsDuringRun`. Other new server classes wait for the hold to end.
+A server admitted earlier stays eligible to launch and appears in `serversAtAdmission`. Every new server request waits for the hold to end. Finite light jobs admitted during the hold appear in `jobsDuringRun`.
 
 External tools can write `drain.request` in the state directory, then take `slot1.lock`, `slot2.lock` and `slot3.lock` exclusively. Finite jobs retain these locks until their processes drain; declared servers hold none. A drain request blocks every new admission, including light work, for at most one quiet hold. Waiting or held exclusive slot locks also block light work. An external lock holder owns its cleanup and duration; `status.js` reports its age. External holders have no wrapper measurement record, so this change adds no attribution or concurrency exception to their holds.
 

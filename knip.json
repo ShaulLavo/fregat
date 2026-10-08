@@ -73,6 +73,7 @@
         "agent/scenarios/editor-retention-count-policy-driver.ts",
         "agent/desktop-display.ts",
         "large-file/bench.ts",
+        "performance/fregat-measure.ts",
         "heavy/pi/launch.ts",
         "heavy/pi/run.ts",
         "heavy/pi/setup.ts",
@@ -263,8 +264,14 @@
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "bench/**/*.ts"]
     },
     "editor/packages/textbuffer": {
-      "entry": ["src/*.ts", "src/debug.ts", "src/diagnostics.ts", "src/index.ts"],
-      "project": ["src/**/*.{ts,tsx}", "bench/{adapters,run}.mjs"]
+      "entry": [
+        "src/*.ts",
+        "src/debug.ts",
+        "src/diagnostics.ts",
+        "src/index.ts",
+        "bench/{identity,profile-worker}.mjs"
+      ],
+      "project": ["src/**/*.{ts,tsx}", "bench/*.mjs"]
     },
     "editor/packages/tree-sitter": {
       "entry": ["src/index.ts", "src/**/*.worker.ts", "bench/**/*.ts"],
@@ -320,7 +327,7 @@
       "project": ["src/**/*.ts"]
     },
     "ghostty-webgpu/site": {
-      "entry": ["src/main.ts", "scripts/*.ts"],
+      "entry": ["src/main.ts", "src/pages/**/*.{astro,ts}", "src/examples/**/*.ts", "scripts/*.ts"],
       "project": ["src/**/*.{ts,astro}", "scripts/**/*.ts"]
     },
     "editor/site": {

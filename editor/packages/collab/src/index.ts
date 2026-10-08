@@ -3,6 +3,8 @@ export type {
   Change,
   CharId,
   EditId,
+  Effect,
+  SetEffects,
   Engine,
   Envelope,
   IdSpan,
@@ -21,3 +23,6 @@ export type { ParticipantOptions, ParticipantState } from './participant'
 export { InMemoryTransport } from './transport'
 export { simulate } from './simulator'
 export type { SimulationOptions, SimulationResult } from './simulator'
+
+export { UndoManager } from './undo'
+export type { UndoTransaction, UndoState, UndoOptions, UndoEvent, CaptureOptions } from './undo'

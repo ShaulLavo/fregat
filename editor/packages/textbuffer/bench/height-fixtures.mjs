@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { applyOracle, makeFixtures, randomSource, safeBoundary } from './fixtures.mjs'
 import { sha256 } from './support.mjs'
 
-export const stressNames = [
+const stressNames = [
   'prepend',
   'fixed-middle',
   'alternating-ends',
