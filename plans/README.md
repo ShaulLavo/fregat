@@ -204,6 +204,7 @@ delivered acceptance, monitoring/draft check, named follow-ons and owner-only re
 | [334](334-async-runtime-verification.md)              | Bounded async qualification, measurements and product acceptance                |
 | [335](335-stroke-icons.md)                            | Stroke icons only, Hugeicons by default, morphing icons, icon packs later       |
 | [336](336-packages-as-products.md)                    | Our packages look and read like products: READMEs, sites, docs, releases        |
+| [336 iOS scroll](336-singapore-ios-scroll.md)         | Singapore iPhone scrolling probe and measured fix                               |
 | [337](337-device-pairing.md)                          | Pairing screen that explains itself, Tailscale sign-in, approve from a phone    |
 
 ## Package and client plans
