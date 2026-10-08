@@ -72,12 +72,18 @@ test.each(['inventory', 'liveness', 'order'] as const)(
       return engine
     }
     expect(() => simulate({ seed: 0, participants: 3, edits: 0, createEngine })).toThrow(
-      'identity-seed-0',
+      /identity-seed-0|oracle-identities-|oracle-visibility-|oracle-text-/,
     )
   },
 )
 
-function run(seed: number, participants: number, edits: number, factory: () => TestEngine) {
+function run(
+  seed: number,
+  participants: number,
+  edits: number,
+  factory: () => TestEngine,
+  undoRedo = false,
+) {
   let host: TestEngine | undefined
   const result = simulate({
     createEngine: () => {
@@ -88,6 +94,7 @@ function run(seed: number, participants: number, edits: number, factory: () => T
     seed,
     participants,
     edits,
+    undoRedo,
   })
   return { result, identity: characters(host!) }
 }
@@ -99,7 +106,7 @@ test(`${rounds} seeded rounds converge with three to five participants and match
     expect(actual.result.hostSequence, `seed ${seed}`).toBe(32)
     expect(actual, `seed ${seed}`).toEqual(run(seed, participants, 32, () => new ReferenceEngine()))
   }
-}, 120_000)
+}, 300_000)
 
 test('single-author rounds match the plain string model and reference IDs', () => {
   for (let seed = 0; seed < 200; seed++) {
@@ -107,4 +114,25 @@ test('single-author rounds match the plain string model and reference IDs', () =
     expect(actual.result.hostSequence).toBe(48)
     expect(actual, `seed ${seed}`).toEqual(run(seed, 1, 48, () => new ReferenceEngine()))
   }
-}, 120_000)
+}, 300_000)
+test(`${rounds} seeded rounds converge with random undo, redo and duplicate delivery`, () => {
+  let undos = 0
+  let redos = 0
+  for (let seed = 0; seed < rounds; seed++) {
+    const actual = run(seed, 3 + (seed % 3), 32, createEngine, true)
+    expect(actual).toEqual(run(seed, 3 + (seed % 3), 32, () => new ReferenceEngine(), true))
+    const result = actual.result
+    expect(result.hostSequence, `seed ${seed}`).toBe(32)
+    undos += result.undoCommands
+    redos += result.redoCommands
+  }
+  expect(undos).toBeGreaterThan(rounds)
+  expect(redos).toBeGreaterThan(rounds / 4)
+}, 300_000)
+
+test('single-author undo and redo match an independent snapshot history model', () => {
+  for (let seed = 0; seed < 200; seed++)
+    expect(run(seed, 1, 48, createEngine, true)).toEqual(
+      run(seed, 1, 48, () => new ReferenceEngine(), true),
+    )
+})

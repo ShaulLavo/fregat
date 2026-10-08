@@ -59,6 +59,21 @@ this is not a worst-case logarithmic placement guarantee. Edits never enumerate
 all document characters or materialize the document text. `text()` deliberately
 materializes the visible projection when a consumer requests it.
 
+## Undo and retained provenance
+
+Placement runs may coalesce across authored edits. A separate persistent span index
+retains each insertion and every deleting operation, including deletes of hidden
+IDs. A character is visible when its insertion is active and all its deletions are
+inactive. Bootstrap IDs have an always-active insertion. Atomic `setEffects`
+commands validate every desired state before publication; replayed edit and command
+IDs are deduplicated. Snapshots retain provenance, operation states and command IDs
+alongside the piece table and placement indexes, by reference.
+
+Effect changes visit the affected identity spans and change visibility of retained
+piece-table payloads. They do not allocate replacement IDs or retain a second text
+store. Operation and provenance indexes grow with history; acknowledgement-aware
+compaction remains a separate concern.
+
 ## Checks and bounded performance experiment
 
 ```sh
@@ -70,7 +85,7 @@ bun run bench
 
 The shared fixture runs every unit, simulator and ported upstream suite against
 both engines. A paired simulator checks authored envelopes, text, live IDs, hidden
-IDs and visible offsets after every apply and restore, including pending replay.
+IDs and visible offsets after every apply and restore, including pending replay, undo and redo. An independent scalar visibility model checks each ID before and after deliveries under both engines. `COLLAB_STRESS=1 bun run test` expands the seeded workloads to 10,000 rounds.
 
 `Engine.characters()` returns a diagnostic inventory sorted by bunch and counter.
 Each record contains the ID, deletion state and visible offset. Hidden IDs retain

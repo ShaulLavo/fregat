@@ -69,6 +69,7 @@ export {
   deleteByCharId,
   insertByCharId,
   locateCharId,
+  setCharIdVisibility,
 } from './charIds'
 export type {
   CharId,
@@ -77,4 +78,5 @@ export type {
   CharIdBoundary,
   CharIdInsertion,
   CharIdEdit,
+  CharIdVisibility,
 } from './charIds'

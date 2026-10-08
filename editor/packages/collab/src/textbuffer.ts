@@ -8,12 +8,15 @@ import {
   locateCharId,
   materializePieceTableFullText,
   retainPieceTableSnapshot,
+  setCharIdVisibility,
 } from '@singapore-editor/textbuffer'
 import type { CharIdBoundary, PieceTableSnapshot } from '@singapore-editor/textbuffer'
 import { CollabFailure } from './failure'
 import { ceiling, compareId, floor, get, put } from './run-index'
 import type { Index } from './run-index'
 import { insertionOf, sameChar } from './types'
+import { appliedEffect, initialEffects, recordEffects, setEffectStates } from './textbuffer-effects'
+import type { TextbufferEffects } from './textbuffer-effects'
 import type {
   AuthorContext,
   CharId,
@@ -37,6 +40,7 @@ export type PlacementRun = {
 type Children = { readonly L: readonly CharId[]; readonly R: readonly CharId[] }
 export type TextbufferSnapshot = {
   readonly buffer: PieceTableSnapshot
+  readonly effects: TextbufferEffects
   readonly runs: Index<PlacementRun> | null
   readonly forks: Index<Children> | null
   readonly roots: Children
@@ -73,6 +77,7 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
       : null
     this.state = {
       buffer,
+      effects: initialEffects(span),
       runs: run ? put(null, run.start, run) : null,
       forks: null,
       roots: run ? { L: [], R: [run.start] } : emptyChildren,
@@ -146,17 +151,34 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
   }
 
   apply(envelope: Envelope): void {
-    const insert = insertionOf(envelope.change)
-    this.validate(envelope)
+    if (appliedEffect(this.state.effects, envelope.id)) return
+    const change = envelope.change
     const saved = this.state
     retainPieceTableSnapshot(saved.buffer)
+    if (change.kind === 'setEffects') {
+      if (change.command.actor !== envelope.id.actor || change.command.seq !== envelope.id.seq)
+        throw new CollabFailure('invalid-effect-command')
+      const result = setEffectStates(saved.effects, envelope.id, change.effects)
+      const buffer = setCharIdVisibility(saved.buffer, result.visibility)
+      this.state = { ...saved, buffer, effects: result.state }
+      return
+    }
+    const insert = insertionOf(change)
+    this.validate(envelope)
+    const deletions = change.kind === 'insert' ? [] : change.spans
     try {
       const at = insert ? this.integrate(insert) : null
+      const effects = recordEffects(
+        saved.effects,
+        envelope.id,
+        insert ? { start: insert.start, count: insert.text.length } : null,
+        deletions,
+      )
       const buffer = applyCharIdEdit(saved.buffer, {
-        delete: envelope.change.kind === 'insert' ? [] : envelope.change.spans,
+        delete: deletions,
         ...(insert && at ? { insert: { start: insert.start, text: insert.text, at } } : {}),
       })
-      this.state = { ...this.state, buffer }
+      this.state = { ...this.state, buffer, effects }
     } catch (cause) {
       this.state = saved
       throw cause
@@ -329,6 +351,7 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
 
   private validate(envelope: Envelope): void {
     const change = envelope.change
+    if (change.kind === 'setEffects') return
     for (const span of change.kind === 'insert' ? [] : change.spans) {
       checkId(span.start)
       if (

@@ -17,6 +17,7 @@ import {
   deleteByCharId,
   insertByCharId,
   locateCharId,
+  setCharIdVisibility,
 } from './charIds'
 import type { CharId } from './identityRuns'
 import { compactPieceTableTombstones } from './compaction'
@@ -515,3 +516,74 @@ it('normalizes exhausted split orders within one atomic replacement', () => {
   expect(locateCharId(changed, id(98))!.liveness).toBe('deleted')
   valid(changed)
 })
+
+it.each([false, true])(
+  'visibility edits revive retained payloads and IDs with transient=%s',
+  (transient) => {
+    const original = make('a😀\nbcdef', transient)
+    retainPieceTableSnapshot(original)
+    const hidden = deleteByCharId(original, [{ start: id(1), count: 7 }])
+    retainPieceTableSnapshot(hidden)
+    const revived = setCharIdVisibility(hidden, [
+      { start: id(2), count: 2, visible: true },
+      { start: id(5), count: 2, visible: true },
+      { start: id(0), count: 1, visible: false },
+    ])
+    expect(text(revived)).toBe('\ude00\ncd' + 'f')
+    expect(ids(revived)).toEqual([id(2), id(3), id(5), id(6), id(8)])
+    expect(text(original)).toBe('a😀\nbcdef')
+    expect(text(hidden)).toBe('af')
+    expect(revived.buffers).toBe(original.buffers)
+    valid(original)
+    valid(hidden)
+    valid(revived)
+  },
+)
+
+it('visibility batches validate all spans before touching transient storage', () => {
+  const original = make('abcdef', true)
+  const invalid = [
+    { start: id(0), count: 1, visible: false },
+    { start: id(99), count: 1, visible: true },
+  ]
+  expect(() => setCharIdVisibility(original, invalid)).toThrow('unknown')
+  expect(text(original)).toBe('abcdef')
+  valid(original)
+  expect(() =>
+    setCharIdVisibility(original, [
+      { start: id(1), count: 3, visible: false },
+      { start: id(2), count: 1, visible: true },
+    ]),
+  ).toThrow('overlapping')
+  expect(setCharIdVisibility(original, [{ start: id(0), count: 6, visible: true }])).toBe(original)
+})
+
+it.each([false, true])(
+  'seeded visibility flips preserve structure, payload and identities with transient=%s',
+  (transient) => {
+    const source = 'ab\nc😀def\nghij'.repeat(4)
+    let snapshot = make(source, transient)
+    const original = snapshot
+    retainPieceTableSnapshot(original)
+    const live = Array.from({ length: source.length }, () => true)
+    let random = 12345
+    for (let step = 0; step < 150; step++) {
+      random = (Math.imul(random, 1664525) + 1013904223) >>> 0
+      const from = random % source.length
+      const count = 1 + ((random >>> 8) % (source.length - from))
+      const visible = (random & 0x8000) !== 0
+      snapshot = setCharIdVisibility(snapshot, [{ start: id(from), count, visible }])
+      live.fill(visible, from, from + count)
+      expect(text(snapshot)).toBe(
+        source
+          .split('')
+          .filter((_, index) => live[index])
+          .join(''),
+      )
+      expect(ids(snapshot)).toEqual(live.flatMap((visible, index) => (visible ? [id(index)] : [])))
+      valid(snapshot)
+    }
+    expect(text(original)).toBe(source)
+    expect(snapshot.buffers).toBe(original.buffers)
+  },
+)

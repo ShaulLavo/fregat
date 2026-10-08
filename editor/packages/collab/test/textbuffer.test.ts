@@ -17,7 +17,11 @@ import type {
 import { characters, liveIds } from './engine-fixture'
 
 function envelope(change: Envelope['change']): Envelope {
-  return { document: 'test', epoch: '1', id: { actor: 'a', seq: 1 }, lamport: 1, deps: [], change }
+  const insert = change.kind === 'insert' ? change : null
+  const id = insert
+    ? { actor: insert.start.bunch, seq: insert.start.counter + 1 }
+    : { actor: 'a', seq: 1 }
+  return { document: 'test', epoch: '1', id, lamport: 1, deps: [], change }
 }
 function compare(reference: ReferenceEngine, buffer: TextbufferEngine): void {
   expect(buffer.text()).toBe(reference.text())
@@ -128,17 +132,22 @@ test('large bootstrap and interior edits use compact runs without document trave
   })
 })
 
-test('seeded arrivals and pending replay match reference text and IDs after every operation', () => {
-  for (let seed = 0; seed < 25; seed++) {
-    const result = simulate({
-      seed,
-      participants: 3 + (seed % 3),
-      edits: 48,
-      createEngine: () => new DifferentialEngine(),
-    })
-    expect(result.hostSequence).toBe(48)
-  }
-}, 120_000)
+test.each([false, true])(
+  'seeded arrivals and pending replay match after every operation with undo=%s',
+  (undoRedo) => {
+    for (let seed = 0; seed < 25; seed++) {
+      const result = simulate({
+        seed,
+        participants: 3 + (seed % 3),
+        edits: 48,
+        undoRedo,
+        createEngine: () => new DifferentialEngine(),
+      })
+      expect(result.hostSequence).toBe(48)
+    }
+  },
+  120_000,
+)
 
 class DifferentialEngine {
   private readonly reference = new ReferenceEngine()

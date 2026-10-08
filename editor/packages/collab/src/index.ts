@@ -4,6 +4,8 @@ export type {
   CharId,
   CharacterIdentity,
   EditId,
+  Effect,
+  SetEffects,
   Engine,
   Envelope,
   IdSpan,
@@ -24,3 +26,6 @@ export { simulate } from './simulator'
 export type { SimulationOptions, SimulationResult } from './simulator'
 export { TextbufferEngine } from './textbuffer'
 export type { TextbufferSnapshot } from './textbuffer'
+
+export { UndoManager } from './undo'
+export type { UndoTransaction, UndoState, UndoOptions, UndoEvent, CaptureOptions } from './undo'
