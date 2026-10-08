@@ -395,3 +395,39 @@ test('a socket from the owner’s Tailscale device is let in once its address is
   now += 61_000
   expect(authenticateWebSocketData(data, auth)?.code).toBe('DEVICE_NOT_PAIRED')
 })
+
+test('a Tailscale-admitted socket closes once Tailscale or the setting stops vouching for it', async () => {
+  const home = mkdtempSync(path.join(tmpdir(), 'platform-pairing-'))
+  homes.push(home)
+  let now = 0
+  let enabled = true
+  const nodes: Record<string, TailnetNode> = { [PHONE]: OWNER, '100.64.0.30': OWNER }
+  const devices = new DevicePairing({
+    store: new DeviceStore(path.join(home, 'devices.json')),
+    required: () => true,
+    cookieName: 'platform_device_test',
+    ownAddresses: () => new Set([THIS_MACHINE]),
+    tailnet: new TailnetOwners({
+      lookup: fakeTailnet(nodes).lookup,
+      enabled: () => enabled,
+      now: () => now,
+    }),
+  })
+  const header = (address: string) => (name: string) =>
+    name === 'x-forwarded-for' ? address : null
+  const closed: string[] = []
+  for (const address of [PHONE, '100.64.0.30']) {
+    await devices.identify(header(address))
+    devices.hold(header(address), () => closed.push(address))
+  }
+
+  await devices.recheckTailnet()
+  expect(closed).toEqual([])
+  nodes['100.64.0.30'] = { ...OWNER, tagged: true }
+  now += 61_000
+  await devices.recheckTailnet()
+  expect(closed).toEqual(['100.64.0.30'])
+  enabled = false
+  await devices.recheckTailnet()
+  expect(closed).toEqual(['100.64.0.30', PHONE])
+})

@@ -634,6 +634,9 @@ export function createApp(options: AppOptions) {
   })
   const auth = createAuthConfig(options.auth, devices)
   const stopDeviceSweep = devices.startSweeping()
+  settings.onChange(() => {
+    runDetached(() => devices.recheckTailnet(), { area: 'pairing', operation: 'recheck_tailnet' })
+  })
   const push = new PushService({ database, settings, fetcher: options.push?.fetcher })
   const presence = new ClientPresence()
   const sessionPush = new SessionNoticePush({

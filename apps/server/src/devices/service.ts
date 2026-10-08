@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import type { PairedDevice, PairingClaim, PairingTrust } from '@workspace/contracts'
 
-import { recordRequestContext } from '../observability'
+import { recordRequestContext, runDetached } from '../observability'
 import type { DeviceStore } from './device-store'
 import { PairingCodes } from './pairing-codes'
 import { pairingErrors } from './structured-errors'
@@ -23,6 +23,11 @@ const LAST_SEEN_STEP_MS = 10 * 60_000
 const COOKIE_MAX_AGE_SECONDS = 400 * 24 * 60 * 60
 /** How often idle devices are dropped, closing what they still hold open. */
 const SWEEP_MS = 60 * 60_000
+/** How often sockets admitted by Tailscale identity are checked again; matches its cache. */
+const TAILNET_RECHECK_MS = 60_000
+/** Live sockets are kept by device id, or by this prefix and the Tailscale address. */
+const TAILNET_KEY = 'tailnet:'
+const RECHECK_CONTEXT = { area: 'pairing', operation: 'recheck_tailnet' }
 
 type Admission = { readonly trust: PairingTrust; readonly deviceId: string | null }
 
@@ -38,7 +43,7 @@ export class DevicePairing {
   private readonly own: () => ReadonlySet<string>
   private readonly tailnet: TailnetOwners | null
   private readonly now: () => number
-  /** The close of every live socket, by the device it was admitted for. */
+  /** The close of every live socket, by the device or Tailscale address it was admitted for. */
   private readonly live = new Map<string, Set<() => void>>()
   readonly cookieName: string
 
@@ -94,26 +99,50 @@ export class DevicePairing {
   }
 
   /**
-   * Ties a live socket to the device it was admitted for: removing the device, or its going idle,
-   * closes the socket, so nothing already open keeps the access. Returns the release for its close.
+   * Ties a live socket to what admitted it: removing the device, its going idle, or its Tailscale
+   * identity no longer passing closes the socket, so nothing already open keeps the access.
+   * Returns the release for its close.
    */
   hold(header: HeaderReader, close: () => void) {
-    const { deviceId } = this.admit(header)
-    if (deviceId === null) return noop
-    const closes = this.live.get(deviceId) ?? new Set()
+    const key = this.holdKey(header)
+    if (key === null) return noop
+    const closes = this.live.get(key) ?? new Set()
     closes.add(close)
-    this.live.set(deviceId, closes)
+    this.live.set(key, closes)
     return () => {
       closes.delete(close)
-      if (closes.size === 0) this.live.delete(deviceId)
+      if (closes.size === 0) this.live.delete(key)
     }
   }
 
-  /** Sweeps every hour until the returned stop is called. */
+  /** Sweeps every hour, and checks Tailscale-admitted sockets every minute, until stopped. */
   startSweeping() {
-    const timer = setInterval(() => this.sweep(), SWEEP_MS)
-    timer.unref?.()
-    return () => clearInterval(timer)
+    const sweep = setInterval(() => this.sweep(), SWEEP_MS)
+    const recheck = setInterval(
+      () => runDetached(() => this.recheckTailnet(), RECHECK_CONTEXT),
+      TAILNET_RECHECK_MS,
+    )
+    sweep.unref?.()
+    recheck.unref?.()
+    return () => {
+      clearInterval(sweep)
+      clearInterval(recheck)
+    }
+  }
+
+  /**
+   * Asks Tailscale again about every address holding sockets open, and closes those it no longer
+   * vouches for. Run on a timer and whenever settings change.
+   */
+  async recheckTailnet() {
+    const addresses = [...this.live.keys()].flatMap((key) =>
+      key.startsWith(TAILNET_KEY) ? [key.slice(TAILNET_KEY.length)] : [],
+    )
+    for (const address of addresses) {
+      await this.tailnet?.resolve(address)
+      const verdict = this.tailnet?.verdict(address) ?? 'off'
+      if (verdict !== 'same-user' && this.isRequired()) this.closeSockets(TAILNET_KEY + address)
+    }
   }
 
   /** Drops the devices unseen for 30 days, and closes what they still had open. */
@@ -176,6 +205,13 @@ export class DevicePairing {
         internal: { deviceId: id, pairedCount: this.store.list().length },
       })
     this.closeSockets(id)
+  }
+
+  private holdKey(header: HeaderReader) {
+    const { trust, deviceId } = this.admit(header)
+    if (deviceId !== null) return deviceId
+    const peer = forwardedPeer(header)
+    return trust === 'tailnet' && peer !== null ? TAILNET_KEY + peer : null
   }
 
   private forget(id: string) {
