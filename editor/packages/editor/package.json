@@ -136,7 +136,7 @@
     "tree-sitter-md": "github:ShaulLavo/tree-sitter-md#f7263d7f7b1593270b348f007c80eddb3916c761",
     "typescript": "7.0.2",
     "typescript-api": "npm:typescript@6.0.3",
-    "vite": "catalog:",
+    "vite": "8.3.1",
     "vitest": "5.0.2"
   }
 }
