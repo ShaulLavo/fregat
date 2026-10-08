@@ -283,9 +283,12 @@ it.each(['normal', 'held', 'retired-held', 'replacement-held'] as const)(
           devices: [{ device: 0, waits: 1, destroys: 1 }],
         })
         expect(observations.filter((value) => value.type === 'warning')).toEqual([])
-        expect(observations.filter((value) => value.type === 'deadline-cleared')).toHaveLength(
-          observations.filter((value) => value.type === 'deadline-armed').length,
-        )
+        expect(observations.filter((value) => value.type === 'deadline-armed')).toEqual([
+          { type: 'deadline-armed', delay: 15_000 },
+        ])
+        expect(observations.filter((value) => value.type === 'deadline-cleared')).toEqual([
+          { type: 'deadline-cleared', delay: 15_000 },
+        ])
         expect(terminate).toHaveBeenCalled()
         return
       }
@@ -477,7 +480,7 @@ it.each(['release', 'deadline'] as const)(
   10_000,
 )
 
-it('rejects unfinished worker cleanup at the host operation deadline', async () => {
+it('rejects unfinished worker cleanup at the shared shutdown deadline', async () => {
   const channel = new BroadcastChannel('packaged-worker-device-lifecycle')
   const observations: DeviceLifecycleObservation[] = []
   channel.onmessage = ({ data }: MessageEvent<DeviceLifecycleObservation>) =>
@@ -507,7 +510,10 @@ it('rejects unfinished worker cleanup at the host operation deadline', async () 
       type: 'inspected',
       devices: [{ device: 0, waits: 1, destroys: 0 }],
     })
-    expect(await disposal).toMatchObject({ code: 'timeout', operation: 'dispose' })
+    expect(await disposal).toMatchObject({
+      code: 'timeout',
+      operation: expect.stringMatching(/^(dispose|cleanup)$/),
+    })
     expect(terminate).toHaveBeenCalled()
     expect(observations.some((value) => value.type === 'completed')).toBe(false)
   } finally {

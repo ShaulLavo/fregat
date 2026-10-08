@@ -117,7 +117,10 @@ scope.onmessage = (event) => {
   })
   const send = port.postMessage.bind(port)
   port.postMessage = (message: WorkerMessage) => {
-    if (message.type === 'fatal' && message.failure.operation === 'cleanup')
+    if (
+      (message.type === 'fatal' || message.type === 'reply') &&
+      message.failure?.operation === 'cleanup'
+    )
       channel.postMessage({ type: 'abandoned', devices })
     else if (
       message.type === 'fatal' ||

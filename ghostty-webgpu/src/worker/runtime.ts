@@ -23,7 +23,7 @@ import type {
   WorkerState,
   TerminalOutputMessage,
 } from './protocol.js'
-import { workerCommandNames } from './protocol.js'
+import { workerCommandNames, workerOperationTimeout } from './protocol.js'
 import { serializeWorkerFailure, workerError } from './structured-errors.js'
 
 interface WorkerScope {
@@ -35,7 +35,6 @@ interface WorkerScope {
   close(): void
 }
 const scope = globalThis as unknown as WorkerScope
-const operationTimeout = 15_000
 const workerClock: RenderSchedulerClock = {
   requestFrame: (callback) => scope.requestAnimationFrame(callback),
   cancelFrame: (handle) => scope.cancelAnimationFrame(handle),
@@ -69,6 +68,9 @@ export class TerminalWorkerRuntime {
   private prefetchedAcquisition?: Promise<GPUDevice>
   private gpuRenderer?: Promise<WebGpuTerminalRenderer>
   private cleanupPromise?: Promise<void>
+  private acquiredDevices = 0
+  private pendingAcquisitions = 0
+  private closed = false
   private layout?: WorkerLayout
   private layoutFont?: TerminalFittedFont
   private disposed = false
@@ -285,9 +287,16 @@ export class TerminalWorkerRuntime {
   }
 
   private async requestDevice(): Promise<GPUDevice> {
-    const adapter = await navigator.gpu?.requestAdapter()
-    if (!adapter) throw workerError('capability', 'renderer.webgpu', { adapter: false })
-    return adapter.requestDevice()
+    this.pendingAcquisitions += 1
+    try {
+      const adapter = await navigator.gpu?.requestAdapter()
+      if (!adapter) throw workerError('capability', 'renderer.webgpu', { adapter: false })
+      const device = await adapter.requestDevice()
+      this.acquiredDevices += 1
+      return device
+    } finally {
+      this.pendingAcquisitions -= 1
+    }
   }
 
   private deviceFactory(initialDevice: GPUDevice): () => Promise<GPUDevice> {
@@ -379,24 +388,24 @@ export class TerminalWorkerRuntime {
         result,
         state: beforeDispose ?? this.state(),
       })
-      if (request.command === 'dispose') {
-        this.initialize.port.close()
-        scope.close()
-      }
+      if (request.command === 'dispose') this.stop()
     } catch (cause) {
       const state = this.state()
-      if (request.command === 'open') await this.cleanup()
+      const failure =
+        request.command === 'open'
+          ? await this.cleanup().then(
+              () => cause,
+              (cleanupCause: unknown) => cleanupCause,
+            )
+          : cause
       this.post({
         ...this.watermarks(),
         type: 'reply',
         id: request.id,
-        failure: serializeWorkerFailure(cause, request.command),
+        failure: serializeWorkerFailure(failure, request.command),
         state,
       })
-      if (request.command === 'open') {
-        this.initialize.port.close()
-        scope.close()
-      }
+      if (request.command === 'open' || request.command === 'dispose') this.stop()
     }
   }
 
@@ -562,7 +571,7 @@ export class TerminalWorkerRuntime {
         timer = setTimeout(
           () =>
             reject(workerError('timeout', 'fence', { expected: sequence, output: this.output })),
-          operationTimeout,
+          workerOperationTimeout,
         )
       })
     } finally {
@@ -590,11 +599,38 @@ export class TerminalWorkerRuntime {
     return { ...this.identity(), control: this.control, output: this.output }
   }
   private post(message: WorkerMessage): void {
+    if (this.closed) return
     this.initialize.port.postMessage(message)
   }
 
+  private stop(): void {
+    if (this.closed) return
+    this.closed = true
+    this.initialize.port.close()
+    scope.close()
+  }
+
   private cleanup(): Promise<void> {
-    return (this.cleanupPromise ??= this.performCleanup())
+    return (this.cleanupPromise ??= this.cleanupWithinDeadline())
+  }
+
+  private async cleanupWithinDeadline(): Promise<void> {
+    const deadline = Promise.withResolvers<never>()
+    const timer = scope.setTimeout(() => {
+      const internal = {
+        deviceCount: this.acquiredDevices + this.pendingAcquisitions,
+        pendingAcquisitions: this.pendingAcquisitions,
+        reason: 'shutdown-deadline',
+        timeoutMs: workerOperationTimeout,
+      }
+      console.warn({ level: 'warn', area: 'worker.shutdown', ...internal })
+      deadline.reject(workerError('timeout', 'cleanup', internal))
+    }, workerOperationTimeout)
+    try {
+      await Promise.race([this.performCleanup(), deadline.promise])
+    } finally {
+      scope.clearTimeout(timer)
+    }
   }
 
   private async performCleanup(): Promise<void> {
@@ -622,14 +658,19 @@ export class TerminalWorkerRuntime {
   }
   private fail(cause: unknown): void {
     if (this.disposed) return
-    void this.cleanup().finally(() => {
-      this.post({
-        ...this.watermarks(),
-        type: 'fatal',
-        failure: serializeWorkerFailure(cause, 'worker'),
-      })
-      this.initialize.port.close()
-      scope.close()
+    void this.cleanup().then(
+      () => this.finishFailure(cause),
+      (cleanupCause: unknown) => this.finishFailure(cleanupCause),
+    )
+  }
+
+  private finishFailure(cause: unknown): void {
+    if (this.closed) return
+    this.post({
+      ...this.watermarks(),
+      type: 'fatal',
+      failure: serializeWorkerFailure(cause, 'worker'),
     })
+    this.stop()
   }
 }
