@@ -31,8 +31,9 @@ Hashed assets are hard-linked into an append-only `immutable` directory. Nginx f
 files after a new release, so cached HTML can still load assets from the previous build.
 
 HTML uses `Cache-Control: public, max-age=60, must-revalidate`. Hashed files in `_astro` or `assets`
-use `public, max-age=31536000, immutable`. Other files use five minutes. Missing pages and assets
-return 404, including unknown routes under the editor example. The apex accepts only the project
+use `public, max-age=31536000, immutable`. Unhashed files revalidate on every request, including the wasm runtime and service worker. Missing pages and assets
+return 404, including unknown routes under the editor example. Base-path redirects are relative,
+so requests keep the public HTTPS origin while Nginx listens internally on port 8080. The apex accepts only the project
 index and the three project paths. The proxy continues to handle `/healthz`.
 
 ## VPS setup

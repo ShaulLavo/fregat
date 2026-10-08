@@ -15,6 +15,13 @@ def fetch(path):
         return error
 
 
+for path in ('/fregat', '/singapore', '/ghostty-webgpu'):
+    with fetch(path) as response:
+        assert response.status == 200, (path, response.status)
+        assert response.url == origin.rstrip('/') + path + '/', (path, response.url)
+        print(path, 'redirects to', response.url)
+
+
 for path in ('/', '/fregat/', '/singapore/', '/ghostty-webgpu/'):
     with fetch(path) as response:
         assert response.status == 200, (path, response.status)
@@ -34,3 +41,8 @@ for path in ('/', '/fregat/', '/singapore/', '/ghostty-webgpu/'):
         with fetch(missing) as response:
             assert response.status == 404, (missing, response.status)
             print(missing, response.status)
+
+with fetch('/ghostty-webgpu/bridge.wasm') as response:
+    assert response.status == 200
+    assert response.headers.get('Cache-Control') == 'public, max-age=0, must-revalidate'
+    print('/ghostty-webgpu/bridge.wasm', response.status, response.headers.get('Cache-Control'))

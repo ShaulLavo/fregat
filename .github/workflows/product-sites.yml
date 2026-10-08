@@ -7,6 +7,7 @@ on:
       - apps/site/**
       - apps/web/**
       - packages/**
+      - hotkeys/**
       - editor/**
       - ghostty-webgpu/**
       - scripts/product-sites/**
