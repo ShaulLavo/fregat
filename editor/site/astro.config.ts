@@ -5,9 +5,10 @@ import linksValidator from 'starlight-links-validator'
 import { packages } from './scripts/packages'
 
 const references = packages.map((entry) => {
-  const [typeDoc, sidebar] = createStarlightTypeDocPlugin()
+  const [typeDoc] = createStarlightTypeDocPlugin()
   return {
-    sidebar,
+    // Symbol navigation lives in generated overviews, keeping each page's sidebar compact.
+    sidebar: { label: entry.name, slug: `docs/reference/api/${entry.name.split('/')[1]}/overview` },
     plugin: typeDoc({
       entryPoints: entry.entryPoints,
       tsconfig: './tsconfig.typedoc.json',

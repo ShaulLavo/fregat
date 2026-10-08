@@ -11,7 +11,10 @@ export function EditorPanel() {
   return (
     <>
       <button onClick={() => setWordWrap(!wordWrap())}>Toggle wrapping</button>
-      <div ref={controller.element} style={{ height: '32rem' }} />
+      <div
+        ref={controller.element}
+        style={{ height: '32rem', display: 'flex', 'flex-direction': 'column' }}
+      />
     </>
   )
 }

@@ -23,11 +23,12 @@ test('checks fenced samples as separate modules and permits non-code fences', as
       '# Example',
       '```ts\nconst answer: number = 42\n```',
       '```typescript\nconst answer: string = "forty-two"\n```',
+      '```js\nconst answer = 42\nanswer.toFixed()\n```',
       '```sh\nnpm install @singapore-editor/core\n```',
     ].join('\n\n'),
   )
   expect(result.status, result.stdout + result.stderr).toBe(0)
-  expect(result.stdout).toContain('Checked 2 inline samples and 4 example files')
+  expect(result.stdout).toContain('Checked 3 inline samples and 4 example files')
 })
 
 test('rejects a wrong type and identifies its page and fence line', async () => {
@@ -42,4 +43,10 @@ test('resolves published declaration exports for standalone snippets', async () 
     '```ts\nimport { Editor } from "@singapore-editor/core/editor"\nconst view = new Editor(document.createElement("div"))\nview.dispose()\n```\n',
   )
   expect(result.status, result.stdout + result.stderr).toBe(0)
+})
+
+test('rejects TypeScript-only syntax in JavaScript fences', async () => {
+  const result = await check('```js\nconst answer: number = 42\n```\n')
+  expect(result.status).not.toBe(0)
+  expect(result.stderr).toContain('sample.mdx:1')
 })

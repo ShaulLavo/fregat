@@ -34,10 +34,9 @@ try {
     const snippets: { name: string; value: string }[] = []
     visit(tree, 'code', (node) => {
       if (!['ts', 'tsx', 'js', 'jsx', 'typescript', 'javascript'].includes(node.lang ?? '')) return
-      const name = join(
-        temporary,
-        `snippet-${files.length + snippets.length}.${node.lang?.endsWith('x') ? 'tsx' : 'ts'}`,
-      )
+      const suffix = ['js', 'jsx', 'javascript'].includes(node.lang ?? '') ? 'js' : 'ts'
+      const extension = node.lang?.endsWith('x') ? `${suffix}x` : suffix
+      const name = join(temporary, `snippet-${files.length + snippets.length}.${extension}`)
       origins.set(name, `${relative(root, path)}:${node.position?.start.line ?? 1}`)
       snippets.push({ name, value: `${node.value}\nexport {}\n` })
     })
@@ -53,6 +52,8 @@ try {
     strict: true,
     skipLibCheck: true,
     noEmit: true,
+    allowJs: true,
+    checkJs: true,
     jsx: 'react-jsx',
     lib: ['ES2022', 'DOM', 'DOM.Iterable'],
     types: ['react'],

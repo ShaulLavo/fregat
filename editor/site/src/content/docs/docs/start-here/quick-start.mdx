@@ -44,7 +44,7 @@ yarn add @singapore-editor/core
 
 ## 2. Give the editor a container
 
-Add an HTML element with the id `editor`. Set its height to `20rem` in your stylesheet. The editor fills that element.
+Add an HTML element with the id `editor`. Set `height: 20rem`, `display: flex` and `flex-direction: column` in your stylesheet. This constrains the editor's scroll area to the element's height.
 
 ## 3. Mount it
 
@@ -52,7 +52,7 @@ Save this as `basic.ts`. The same function mounts the example below.
 
 <Code code={source} lang='ts' title='basic.ts' />
 
-Call it from your browser entry point. Retain the editor so you can release it when the view closes.
+A browser entry point can mount the view directly. Retain the editor so you can release it when the view closes.
 
 ```ts title="main.ts"
 import { Editor } from '@singapore-editor/core/editor'
@@ -87,7 +87,7 @@ editor.openDocument({
 
 ### The editor has no visible rows
 
-Check the container's height and the core stylesheet import. Mount after the container exists in the DOM.
+Check the container's height, flex layout and the core stylesheet import. Mount after the container exists in the DOM.
 
 ### Highlighting is absent
 

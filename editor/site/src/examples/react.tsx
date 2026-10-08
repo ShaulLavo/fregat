@@ -9,5 +9,10 @@ export function EditorPanel() {
       languageId: 'typescript',
     },
   })
-  return <EditorHost controller={controller} style={{ height: '32rem' }} />
+  return (
+    <EditorHost
+      controller={controller}
+      style={{ height: '32rem', display: 'flex', flexDirection: 'column' }}
+    />
+  )
 }

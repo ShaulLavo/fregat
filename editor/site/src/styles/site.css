@@ -6,6 +6,8 @@
   font-family: system-ui, sans-serif;
 }
 .live-editor {
+  display: flex;
+  flex-direction: column;
   height: 20rem;
   margin-block: 1.5rem;
 }
