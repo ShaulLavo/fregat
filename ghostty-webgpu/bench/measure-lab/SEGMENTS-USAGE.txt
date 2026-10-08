@@ -1,0 +1,71 @@
+Short-segment Mac measurement prototype
+
+Status: NOT QUALIFIED for 1% instruction or 2% estimated CPU-energy decisions.
+The scripts remain useful for diagnostics. Keep the existing long-window method
+for verdicts. This prototype's inactive renderer can consume several percent of
+all-Chrome instructions despite receiving no terminal work.
+
+Inputs
+- A preserved R07 Canvas capsule with fixture.mjs, measure.mjs, actor-document.mjs,
+  display/font/raster helpers, reader-capability-guard.mjs, rusage.py, packet/ and
+  seal.json. Copy segments.mjs beside those helpers; preserve every sealed file.
+- A prepared headed Chrome Mac recipe with a/b/outer/cpu-outer-recipe.json and
+  Playwright available through a/b/stage/package.json. Hardware Metal is required.
+- An immutable protocol.json registered before acquisition. Examples live with
+  the experiment evidence. Set a new m2-segments-* id for every acquisition.
+  Required fields include archiveSha256, arms A/B, workload, ticks, blocks, count,
+  font, geometry, warmupTicks, switchSettleMs, and injectionIterations.
+  Reduction needs at least two whole four-segment blocks; pilots used six.
+- The host's outer admission wrapper and inner lock. Never launch the controller
+  outside that wrapper on a shared measurement machine.
+
+Acquisition
+Place segment-controller.py and remote-segment-job.sh together on the controller
+machine. The driver lives inside the archive, separate from these two files.
+
+  python3 segment-controller.py protocol.json segments.tar.gz \
+    --host MAC_SSH_ALIAS --remote-root ABSOLUTE_OWNED_MAC_PARENT \
+    --prepared ABSOLUTE_PREPARED_RECIPE --lock ABSOLUTE_INNER_LOCK
+
+Run that command THROUGH the host's Mac-turn wrapper. Use a detached LOCAL
+launcher that retains the wrapper and both locks if the foreground poller dies.
+For a Linux systemd host, run the entire wrapper as a transient user service, then
+poll its log. Do not kill the acquisition service to stop polling. The service's
+lifetime must include its admission wait and the bounded acquisition.
+
+The remote manager launches with nohup under the owned prefix. It has an EXIT
+cleanup trap, cancellation, a 30-second heartbeat lease and a maximum 510-second
+runtime, shortened if staging consumes the controller budget. SSH calls are short.
+Cleanup checks PID start identities before signalling owned processes. Lost network
+access is a failure until custody can be confirmed; a clean-looking local process
+list alone proves nothing about the Mac. Hard-killing an unprotected local
+controller can release its locks before the remote lease expires.
+
+The controller refuses an existing native/ output directory. Failed acquisitions
+retain their data and get a new identity. It writes stage, launch, remote status,
+poll, run, custody and wall receipts plus the retrieved output archive.
+
+Reduction and raw validation
+  python3 reduce-segments.py native/EXPERIMENT_ID/index.json --output summary.json
+  node validate-segments.mjs native/EXPERIMENT_ID/index.json \
+    ABSOLUTE_CAPSULE_MEASURE_MODULE validation.json
+  python3 test-reduce-segments.py
+
+Boundaries and interpretation
+Two persistent pages have separate renderer processes in one Chrome session.
+Only the active page receives writes. Blocks alternate ABBA and BAAB. Native
+boundaries include reset, paced writes, two settlement RAFs and target snapshots.
+Foreground switching, reader calibration and tail probes stay outside them.
+Full content and Canvas RGBA readback occur after the cohort. Shared browser/GPU
+process work belongs to the active segment. The renderer channel includes every
+renderer; active and inactive PID deltas are also retained separately.
+
+Confidence intervals use whole-block mean log ratios. Sample-size estimates use
+alpha .05 and about 80% power and assume stationary independent blocks. They are
+planning estimates from six pilot blocks, not demonstrated precision. Inspect order
+splits, drift, two-block clustering, inactive cost and tails before using a ratio.
+Energy is the kernel's process CPU-energy estimate, not GPU/display/system power.
+CPU seconds and effective clock provide context. Lower clocks reduce memory-stall
+cycles, so a cycles win with an instructions loss needs separate stall evidence.
+Counter reads are sequential; wholly inter-endpoint short-lived processes can be
+missed. No segment may be discarded or repeated to improve its sign.
