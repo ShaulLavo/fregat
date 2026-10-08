@@ -1,0 +1,29 @@
+<div class="rep win" style="--ww:660px" data-timeline="1000,2200,3700,5200,6400,7800" role="img" aria-label="An update waits for a running agent turn, restarts the server when the turn ends, and the terminal comes back with its output.">
+  <div class="rep-title">{i:folder:sm}<span class="ws">fregat</span><span class="dot"></span><span class="mfg">omarchy</span><span class="sp"></span>
+    <span class="chipx upd press-target" data-at="1" data-until="3" data-point="1">{i:refresh:sm}Update ready</span>
+    <span class="chipx wait" data-at="3" data-until="4">Waiting for 1 turn</span>
+    <span class="chipx upd" data-at="4" data-until="5">{i:refresh:sm}Restarting</span>
+    <span class="chipx ok" data-at="5">{i:check:sm}Live check passed</span>
+  </div>
+  <div class="win-body" style="grid-template-rows:auto 230px">
+    <div style="padding:10px 12px 12px;display:flex;flex-direction:column;gap:2px">
+      <div class="sect-s" style="display:flex;align-items:center;gap:8px;height:30px;padding:0 8px;background:var(--row-sel)"><span class="sq run" data-until="4"></span><span class="sq ok" data-at="4"></span><span style="flex:1">Move settings registry into contracts</span><span class="mfg" data-until="4">Claude Code · working</span><span class="mfg" data-at="4">Turn finished · 4 files</span></div>
+      <div style="display:flex;align-items:center;gap:8px;height:30px;padding:0 8px"><span class="sq ok"></span><span style="flex:1">Why does the tree typecheck fail</span><span class="mfg">Codex · 2m</span></div>
+    </div>
+    <div class="rep-term">
+      <div class="l"><span class="b">fregat</span> <span class="m">main</span> <span class="g">❯</span> bun test --watch settings</div>
+      <div class="l"><span class="g">✓</span> settings registry <span class="d">› parses every default</span></div>
+      <div class="l"><span class="g">✓</span> settings panel <span class="d">› renders 38 rows</span></div>
+      <div class="l"> <span class="g">38 pass</span>  <span class="d">0 fail  [1.12s]</span></div>
+      <div class="banner" data-at="5">{i:refresh:sm}Server restarted. Terminal reattached and its output replayed.</div>
+      <div class="l" data-at="6"><span class="d">[watch] settings-panel.tsx changed</span></div>
+      <div class="l" data-at="6"> <span class="g">38 pass</span>  <span class="d">0 fail  [0.98s]</span> <span class="cursor"></span></div>
+    </div>
+  </div>
+  <div class="pop" data-at="2" data-until="3" style="right:12px;top:42px;width:300px">
+    <div style="font-weight:500">Fregat 0.0.23 is ready</div>
+    <div class="mfg" style="margin-top:4px">1 agent turn is running. The server restarts after it ends, then checks itself and keeps the update only if the check passes.</div>
+    <div class="btns"><span class="btn ghost">Restart now</span><span class="btn pri press-target" data-point="2" data-press>Restart when idle</span></div>
+  </div>
+  <div class="pointer"><svg viewBox="0 0 24 24" width="18" height="18"><use href="#i-pointer"/></svg></div>
+</div>
