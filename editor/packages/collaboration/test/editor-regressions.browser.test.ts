@@ -302,3 +302,17 @@ test('detached native Undo and Redo use the merged text as their fresh base', ()
   editor.dispatchCommand('redo')
   expect(text(editor)).toBe('seedownremotenative')
 })
+
+test('same-start insertions keep their native order when both ranges are empty', () => {
+  room = new EditorRoom(2, 'ab')
+  const native = mount('ab')
+  const edits = [
+    { from: 0, to: 0, text: 'X' },
+    { from: 0, to: 0, text: 'Z' },
+  ]
+  native.edit(edits)
+  room.editors[0]!.edit(edits)
+  room.flush()
+  expect(text(native)).toBe('XZab')
+  expect(room.texts()).toEqual(['XZab', 'XZab'])
+})
