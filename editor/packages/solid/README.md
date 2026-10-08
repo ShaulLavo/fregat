@@ -1,46 +1,45 @@
 # @singapore-editor/solid
 
-solid bindings for [`@singapore-editor/core`](../editor/README.md). `createEditor` gives you a ref to put on an element, accessors for the editor's state, and options that can be signals
+Solid bindings and reactive controls for the Singapore editor.
 
-## try it
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
+
+## Install
 
 ```sh
 npm install @singapore-editor/core @singapore-editor/solid solid-js
 ```
 
+## Usage
+
+Render this component in your app. Its host element gives the editor a fixed height.
+
 ```tsx
-import { createSignal } from 'solid-js'
 import { createEditor } from '@singapore-editor/solid'
 import '@singapore-editor/core/style.css'
 
 export function EditorPanel() {
-  const [wordWrap, setWordWrap] = createSignal(false)
   const controller = createEditor({
-    document: {
-      documentId: 'example.ts',
-      text: 'const value = 1;\n',
-      languageId: 'typescript',
-    },
-    wordWrap,
+    document: { documentId: 'example.ts', text: 'const value = 1\n', languageId: 'typescript' },
   })
-
-  return (
-    <>
-      <button onClick={() => setWordWrap(!wordWrap())}>wrap</button>
-      <div ref={controller.element} style={{ height: '32rem' }} />
-      <p>{controller.state()?.isDirty ? 'edited' : 'saved'}</p>
-    </>
-  )
+  return <div ref={controller.element} style={{ height: '400px' }} />
 }
 ```
 
-the editor is created after the component mounts and disposed with its owner, so call `createEditor` inside a component or a solid root
+## API highlights
 
-`document`, `theme`, `tabSize`, `wordWrap`, `selection` and the other view options take a value or an accessor. the document reopens when `documentId`, `documentMode` or `revision` changes, so bump `revision` to load new text under the same id
+- `createEditor()` creates a controller inside a Solid owner.
+- `controller.element` mounts the view.
+- `controller.state()` reads the current editor state.
 
-`controller.commands` has `focus`, `setText`, `edit`, `setSelection`, `dispatchCommand` and the find commands. `controller.editor()` gives you the `Editor` itself
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/solid/overview/)
 
-## more
+## In the Singapore family
 
-- [core](../editor/README.md), for what the editor and its options do
-- [react bindings](../react/README.md)
+`@singapore-editor/core` owns the editor view. This optional package adds Solid lifecycle and state bindings. Choose the other plugins your app needs.
+
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+
+## License
+
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)

@@ -1,6 +1,19 @@
 {
   "name": "@singapore-editor/panes",
   "version": "0.2.6",
+  "description": "Resizable split panes for browser DOM elements.",
+  "keywords": [
+    "browser",
+    "editor",
+    "resize",
+    "singapore",
+    "split-panes",
+    "typescript"
+  ],
+  "homepage": "https://shaulavo.dev/singapore/docs/reference/api/panes/overview/",
+  "bugs": {
+    "url": "https://github.com/ShaulLavo/fregat/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

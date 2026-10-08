@@ -1104,10 +1104,12 @@ export {
 export {
   PAIRING_CODE_ALPHABET,
   PAIRING_CODE_LENGTH,
+  PAIRING_LINK_PATH,
   pairedDeviceSchema,
   pairedDevicesSchema,
   pairingClaimSchema,
   pairingCodeSchema,
+  pairingLink,
   pairingLinkSchema,
   pairingStatusSchema,
   pairingTrustSchema,

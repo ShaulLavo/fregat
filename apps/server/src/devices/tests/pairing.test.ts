@@ -1,5 +1,5 @@
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { hostname, tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, onTestFinished, test } from 'vitest'
 
@@ -8,6 +8,8 @@ import { testSettingsOptions } from '../../settings/testing'
 import { authenticateWebSocketData, createAuthConfig } from '../../auth'
 import { DeviceStore } from '../device-store'
 import { DevicePairing } from '../service'
+import { TailnetOwners, type TailnetLookup, type TailnetNode } from '../tailnet-owner'
+import { pairServerAddress, pairingCodeText, requestPairingCode } from '../pair-command'
 import { createAgentTerminalFixture } from '../../../test/factories/agent-terminal'
 import { createInProcessTerminalSocket } from '../../../test/terminal-socket'
 import { machineProxyAdapter } from '../../../test/machine-proxy'
@@ -16,6 +18,8 @@ import { machineProxyHeaders } from '../../machines/proxy-http'
 const ORIGIN = 'https://omarchy.mesh.example'
 const PHONE = '100.64.0.9'
 const THIS_MACHINE = '100.64.0.1'
+const TABLET = '100.64.0.10'
+const LOOPBACK = 'http://127.0.0.1:3301'
 const homes: string[] = []
 
 afterEach(async () => {
@@ -23,18 +27,38 @@ afterEach(async () => {
   for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true })
 })
 
-function pairingApp() {
+const OWNER: TailnetNode = { login: 'owner@example.com', tagged: false, shared: false }
+
+/** A tailnet where this machine is the owner's, and `nodes` names every other address's node. */
+function fakeTailnet(nodes: Record<string, TailnetNode>) {
+  const asked: string[] = []
+  const lookup: TailnetLookup = {
+    selfAddress: () => Promise.resolve(THIS_MACHINE),
+    whois: (address) => {
+      asked.push(address)
+      const node = address === THIS_MACHINE ? OWNER : nodes[address]
+      return Promise.resolve(node ?? { failure: 'no-such-node' })
+    },
+  }
+  return { lookup, asked }
+}
+
+function pairingApp(tailnet?: TailnetLookup) {
   const home = mkdtempSync(path.join(tmpdir(), 'platform-pairing-'))
   homes.push(home)
   const filePath = path.join(home, 'devices.json')
   const app = createTestApp({
-    auth: { allowedOrigins: [ORIGIN] },
+    // The server's own loopback origin is allowed, as `index.ts` allows it.
+    auth: { allowedOrigins: [ORIGIN, LOOPBACK] },
+    webOrigin: ORIGIN,
+    system: { webBase: '/platform/' },
     settings: testSettingsOptions(home),
     workspaceRoot: home,
     devices: {
       filePath,
       cookieName: 'platform_device_test',
       ownAddresses: () => new Set([THIS_MACHINE]),
+      tailnet,
     },
   })
   return { app, filePath }
@@ -56,9 +80,9 @@ async function issueCode(app: ReturnType<typeof pairingApp>['app']) {
   return ((await response.json()) as { code: string }).code
 }
 
-async function claim(app: ReturnType<typeof pairingApp>['app'], code: string) {
+async function claim(app: ReturnType<typeof pairingApp>['app'], code: string, client = PHONE) {
   return app.handle(
-    request('/pairing/claim', PHONE, {
+    request('/pairing/claim', client, {
       method: 'POST',
       body: JSON.stringify({ code, label: 'iPhone · Safari' }),
       headers: { 'content-type': 'application/json' },
@@ -78,7 +102,8 @@ test('this machine passes, directly or through the proxy; another device is refu
     'DEVICE_NOT_PAIRED',
   )
   const status = await app.handle(request('/pairing/status', PHONE))
-  expect(await status.json()).toEqual({ trust: 'unpaired', required: true })
+  // Reachable before pairing, so it names the machine and nothing more.
+  expect(await status.json()).toEqual({ trust: 'unpaired', required: true, machine: hostname() })
 })
 
 test('a claimed link pairs the device with an HttpOnly cookie that works from then on', async () => {
@@ -100,15 +125,35 @@ test('a claimed link pairs the device with an HttpOnly cookie that works from th
   expect((await claim(app, code)).status).toBe(400)
 })
 
-test('only this machine makes links, and a device cannot remove itself', async () => {
+test('a paired device makes a code that pairs the next device; an unpaired one is refused', async () => {
   const { app } = pairingApp()
   const credential = (await claim(app, await issueCode(app))).headers
     .get('set-cookie')!
     .split(';')[0]!
   const asPhone = { headers: { cookie: credential } }
 
+  const refused = await app.handle(request('/pairing/links', TABLET, { method: 'POST' }))
+  expect(refused.status).toBe(403)
+  expect(((await refused.json()) as { error: { code: string } }).error.code).toBe(
+    'pairing.PAIRED_ONLY',
+  )
   const link = await app.handle(request('/pairing/links', PHONE, { method: 'POST', ...asPhone }))
-  expect(link.status).toBe(403)
+  expect(link.status).toBe(200)
+  const { code, url } = (await link.json()) as { code: string; url: string }
+  expect(url).toBe(`${ORIGIN}/platform/pair#token=${code}`)
+  const tablet = await claim(app, code, TABLET)
+  expect(tablet.status).toBe(200)
+  const asTablet = { headers: { cookie: tablet.headers.get('set-cookie')!.split(';')[0]! } }
+  expect((await app.handle(request('/health', TABLET, asTablet))).status).toBe(200)
+})
+
+test('a device cannot remove itself; another device or the machine can', async () => {
+  const { app } = pairingApp()
+  const credential = (await claim(app, await issueCode(app))).headers
+    .get('set-cookie')!
+    .split(';')[0]!
+  const asPhone = { headers: { cookie: credential } }
+
   const listed = await app.handle(request('/pairing/devices', PHONE, asPhone))
   const { devices } = (await listed.json()) as { devices: { id: string; current: boolean }[] }
   expect(devices).toEqual([expect.objectContaining({ current: true, label: 'iPhone · Safari' })])
@@ -292,4 +337,162 @@ test('a claim from a page on another origin is refused before the code is looked
 
   expect(foreign.status).toBe(403)
   expect((await claim(app, code)).status).toBe(200)
+})
+
+test('the owner’s own Tailscale device passes without pairing; other nodes still pair', async () => {
+  const tailnet = fakeTailnet({
+    [PHONE]: OWNER,
+    '100.64.0.20': { login: 'guest@example.com', tagged: false, shared: false },
+    '100.64.0.21': { ...OWNER, tagged: true },
+    '100.64.0.22': { ...OWNER, shared: true },
+  })
+  const { app } = pairingApp(tailnet.lookup)
+
+  expect((await app.handle(request('/health', PHONE))).status).toBe(200)
+  const status = await app.handle(request('/pairing/status', PHONE))
+  expect(await status.json()).toEqual({ trust: 'tailnet', required: true, machine: hostname() })
+  for (const other of ['100.64.0.20', '100.64.0.21', '100.64.0.22', '100.64.0.23'])
+    expect((await app.handle(request('/health', other))).status).toBe(401)
+  // Only tailnet addresses reach Tailscale; a public one never spawns a lookup.
+  expect((await app.handle(request('/health', '203.0.113.7'))).status).toBe(401)
+  expect(tailnet.asked).not.toContain('203.0.113.7')
+  // Answers are kept for a minute: a second request asks nothing.
+  const before = tailnet.asked.length
+  expect((await app.handle(request('/health', PHONE))).status).toBe(200)
+  expect(tailnet.asked.length).toBe(before)
+})
+
+test('a forwarded chain or a missing Tailscale leaves the owner’s device pairing', async () => {
+  const { app } = pairingApp(fakeTailnet({ [PHONE]: OWNER }).lookup)
+  expect((await app.handle(request('/health', `${PHONE}, 203.0.113.7`))).status).toBe(401)
+  expect((await app.handle(request('/health', `203.0.113.7, ${PHONE}`))).status).toBe(401)
+
+  const absent = pairingApp({
+    selfAddress: () => Promise.resolve({ failure: 'not-installed' }),
+    whois: () => Promise.resolve({ failure: 'not-installed' }),
+  }).app
+  expect((await absent.handle(request('/health', PHONE))).status).toBe(401)
+  const throwing = pairingApp({
+    selfAddress: () => Promise.reject(new TypeError('boom')),
+    whois: () => Promise.reject(new TypeError('boom')),
+  }).app
+  expect((await throwing.handle(request('/health', PHONE))).status).toBe(401)
+})
+
+test('the Tailscale setting turned off makes the owner’s device pair', async () => {
+  const { app } = pairingApp(fakeTailnet({ [PHONE]: OWNER }).lookup)
+  const written = await app.handle(
+    request('/settings/write', null, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        target: 'user',
+        mutationId: crypto.randomUUID(),
+        operations: [{ kind: 'set', key: 'environments.tailnetOwnerDevices', value: false }],
+      }),
+    }),
+  )
+  expect(written.status).toBe(200)
+  expect((await app.handle(request('/health', PHONE))).status).toBe(401)
+})
+
+test('a socket from the owner’s Tailscale device is let in once its address is identified', async () => {
+  const home = mkdtempSync(path.join(tmpdir(), 'platform-pairing-'))
+  homes.push(home)
+  let now = 0
+  const devices = new DevicePairing({
+    store: new DeviceStore(path.join(home, 'devices.json')),
+    required: () => true,
+    cookieName: 'platform_device_test',
+    ownAddresses: () => new Set([THIS_MACHINE]),
+    tailnet: new TailnetOwners({
+      lookup: fakeTailnet({ [PHONE]: OWNER }).lookup,
+      enabled: () => true,
+      now: () => now,
+    }),
+  })
+  const auth = createAuthConfig({ allowedOrigins: [ORIGIN] }, devices)
+  const data = { headers: { origin: ORIGIN, 'x-forwarded-for': PHONE } }
+
+  // Unknown until asked: admission never waits on Tailscale, so it refuses.
+  expect(authenticateWebSocketData(data, auth)?.code).toBe('DEVICE_NOT_PAIRED')
+  await devices.identify((name) => (name === 'x-forwarded-for' ? PHONE : null))
+  expect(authenticateWebSocketData(data, auth)).toBeNull()
+  // A stale answer is no answer.
+  now += 61_000
+  expect(authenticateWebSocketData(data, auth)?.code).toBe('DEVICE_NOT_PAIRED')
+})
+
+test('a Tailscale-admitted socket closes once Tailscale or the setting stops vouching for it', async () => {
+  const home = mkdtempSync(path.join(tmpdir(), 'platform-pairing-'))
+  homes.push(home)
+  let now = 0
+  let enabled = true
+  const nodes: Record<string, TailnetNode> = { [PHONE]: OWNER, '100.64.0.30': OWNER }
+  const devices = new DevicePairing({
+    store: new DeviceStore(path.join(home, 'devices.json')),
+    required: () => true,
+    cookieName: 'platform_device_test',
+    ownAddresses: () => new Set([THIS_MACHINE]),
+    tailnet: new TailnetOwners({
+      lookup: fakeTailnet(nodes).lookup,
+      enabled: () => enabled,
+      now: () => now,
+    }),
+  })
+  const header = (address: string) => (name: string) =>
+    name === 'x-forwarded-for' ? address : null
+  const closed: string[] = []
+  for (const address of [PHONE, '100.64.0.30']) {
+    await devices.identify(header(address))
+    devices.hold(header(address), () => closed.push(address))
+  }
+
+  await devices.recheckTailnet()
+  expect(closed).toEqual([])
+  nodes['100.64.0.30'] = { ...OWNER, tagged: true }
+  now += 61_000
+  await devices.recheckTailnet()
+  expect(closed).toEqual(['100.64.0.30'])
+  enabled = false
+  await devices.recheckTailnet()
+  expect(closed).toEqual(['100.64.0.30', PHONE])
+})
+
+test('the pair command prints a code the server made over loopback, and its link', async () => {
+  const { app } = pairingApp()
+  const link = await requestPairingCode(LOOPBACK, (url, init) => app.handle(new Request(url, init)))
+
+  expect(link.url).toBe(`${ORIGIN}/platform/pair#token=${link.code}`)
+  const text = pairingCodeText(link)
+  expect(text).toContain(`Pairing code: ${link.code.match(/.{4}/g)!.join(' ')}`)
+  expect(text).toContain(`Link: ${link.url}`)
+  expect((await claim(app, link.code)).status).toBe(200)
+})
+
+test('the pair command reports a server that refuses it', async () => {
+  const { app } = pairingApp()
+  // Through the proxy from another device: the server refuses, and the command says so.
+  const forwarded = (url: string, init: RequestInit) =>
+    app.handle(
+      new Request(url, { ...init, headers: { origin: LOOPBACK, 'x-forwarded-for': PHONE } }),
+    )
+  await expect(requestPairingCode(LOOPBACK, forwarded)).rejects.toMatchObject({
+    code: 'pairing.SERVER_REFUSED',
+  })
+})
+
+test('the pair command finds the server through --address, then the server.address setting', () => {
+  const home = mkdtempSync(path.join(tmpdir(), 'platform-pair-command-'))
+  homes.push(home)
+
+  expect(pairServerAddress([], home)).toBe(LOOPBACK)
+  writeFileSync(
+    path.join(home, 'settings.json'),
+    JSON.stringify({ 'server.address': 'http://127.0.0.1:4100' }),
+  )
+  expect(pairServerAddress([], home)).toBe('http://127.0.0.1:4100')
+  expect(pairServerAddress(['--address=http://127.0.0.1:3001/'], home)).toBe(
+    'http://127.0.0.1:3001',
+  )
 })

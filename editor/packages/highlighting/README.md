@@ -1,42 +1,44 @@
 # @singapore-editor/highlighting
 
-syntax colors for editors, diffs and standalone snippets, from one service
+Worker-based syntax highlighting for Singapore editors, diffs, and code snippets.
 
-tree-sitter gives the structure (folds, brackets, injections, selection) and the editor palette's colors. pick an imported vs code theme and shiki paints its textmate colors over the same structure. both engines run in workers
+Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the browser that keeps every version.
 
-## try it
+## Install
 
-not on npm yet. use it from this workspace
-
-```ts
-import { Editor } from '@singapore-editor/core/editor'
-import { createHighlightingPlugin } from '@singapore-editor/highlighting'
-
-const editor = new Editor(element, { plugins: [createHighlightingPlugin()] })
+```sh
+npm install @singapore-editor/highlighting
 ```
 
-the plugin makes its own service and disposes it when the editor drops the plugin
-
-highlight a snippet with no editor at all
+## Usage
 
 ```ts
 import { createHighlightingService, highlightLines } from '@singapore-editor/highlighting'
 
-const highlighting = createHighlightingService()
-const code = 'const value = 1\n'
-const result = await highlighting.highlight(code, { language: 'typescript' })
-
-for (const line of highlightLines(code, result.tokens)) {
-  for (const segment of line) console.log(segment.text, segment.style?.color ?? result.foreground)
+const service = createHighlightingService()
+const text = 'const value = 1\n'
+const result = await service.highlight(text, { language: 'typescript' })
+for (const line of highlightLines(text, result.tokens)) {
+  console.log(line.map((segment) => segment.text).join(''))
 }
-
-await highlighting.dispose()
+await service.dispose()
 ```
 
-tokens are utf-16 offsets into exactly the text you passed. a language with no grammar comes back as `language: 'text'` with no tokens
+## API highlights
 
-## more
+- `createHighlightingService()` creates a service for code snippets or shared views.
+- `highlightLines()` splits tokens into line segments.
+- `createHighlightingPlugin()` connects the service to an editor.
 
-- [sharing one service across editors, diffs and previews](docs/service.md), themes, aborts, errors, disposal
-- [`@singapore-editor/tree-sitter`](../tree-sitter/), the structure side
-- [`@singapore-editor/tree-sitter-languages`](../tree-sitter-languages/), the grammars it loads
+[Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/highlighting/overview/)
+
+## In the Singapore family
+
+You can use this package on its own. `@singapore-editor/core` owns editor views; optional packages add syntax, search, gutters, and language features.
+Use a bundler that serves the package worker and data assets. See the [hosting guide](https://shaulavo.dev/singapore/docs/guides/bundling/).
+
+[Singapore README](https://github.com/ShaulLavo/fregat/blob/main/editor/README.md) · [Documentation](https://shaulavo.dev/singapore/docs/start-here/introduction/)
+
+## License
+
+MIT. [License](https://github.com/ShaulLavo/fregat/blob/main/editor/LICENSE)

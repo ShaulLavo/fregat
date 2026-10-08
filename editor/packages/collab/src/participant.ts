@@ -1,5 +1,5 @@
 import { CharIdAllocator } from '@singapore-editor/textbuffer'
-import { CollabFailure } from './failure'
+import { CollabFailure, rethrowObserverErrors } from './failure'
 import { cloneEnvelope } from './host'
 import { UndoManager } from './undo'
 import type { CaptureOptions, UndoOptions } from './undo'
@@ -211,7 +211,7 @@ export class Participant<Snapshot = unknown> {
       this.publications = []
       this.publishing = false
     }
-    if (errors.length) throw errors[0]
+    rethrowObserverErrors('participant.publish', errors)
   }
 
   private deliver({ change, listeners }: Publication, errors: unknown[]): void {
