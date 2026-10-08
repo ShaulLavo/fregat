@@ -190,8 +190,8 @@ with current username/credential values. It runs for every new connection,
 including reconnects. Static credentials can be included in `iceServers` and the
 required `credentials` object can be `{}`. The browser supports WebSocket
 subprotocols for admission credentials. The broker requires an explicit
-`authorize(request)` policy. The example uses a separate deployment admission token;
-include that token in `config.webSocketProtocols` and share it privately with members.
+`authorize(request)` policy. The example maps a separate token to each authenticated member;
+include the member's token in `config.webSocketProtocols` and give each member their own token privately.
 The room invitation secret stays outside the broker.
 
 ### Link and wire design
@@ -258,9 +258,12 @@ asynchronous admissions and upgraded sockets count toward connection quotas;
 admission work has the subscribe deadline. `authorize` returns `false` to refuse,
 `true` for shared admission, or `{ member: stableAuthenticatedId }` for a member-specific
 quota. `limits.connectionsPerMember` defaults to the smaller of 16 and the connection
-limit. All `true` admissions share one member quota, across addresses and rooms. Use
-separate authenticated member identities to serve multiple groups. The authorization
-policy must derive each identity from verified credentials.
+limit. Member quotas apply across addresses and rooms. Shared-token policies returning
+`true` use the global and per-address limits; `connectionsPerMember` applies only when
+the callback returns a verified member identity. Shared-token holders can exhaust
+global capacity by spreading across enough addresses. Use separate authenticated
+member identities to isolate their quotas. The authorization policy must derive each
+identity from verified credentials.
 
 IP accounting uses the direct socket address. IPv6 addresses share a /64 quota by
 default; `ipv6Prefix` accepts 0 through 128. IPv4-mapped IPv6 addresses share the IPv4
@@ -273,15 +276,17 @@ Subscribe and application-idle deadlines terminate sockets and release room and 
 capacity. Incoming pings, pongs and repeated subscriptions leave those deadlines
 unchanged. Publish traffic consumes the frame/byte budget and refreshes the idle deadline.
 
-The example reads a separate random deployment admission token from a file and
-requires it as a WebSocket subprotocol credential. `WebSocketSignaling` also offers
+The example reads `member token` lines from a private admission file. Each member
+gets a unique random token, compared in constant time; a successful check returns
+that configured member identity. The example rejects shared-token files and duplicate
+members or tokens at startup. It requires the token as a WebSocket subprotocol credential. `WebSocketSignaling` also offers
 the public `singapore-collaboration` protocol, which is the only protocol the broker
 selects in its response. Custom clients offering credentials must include that public
 protocol. The broker refuses credential-only upgrades. Keep TLS enabled and scrub
 credential-bearing request headers from proxy logs.
 
-The example permits 256 connections overall, 16 per IP and 16 for its shared admission
-token across all addresses and rooms, a 5-second subscribe/admission deadline,
+The example permits 256 connections overall, 16 per IP and 16 per authenticated
+member across all addresses and rooms, a 5-second subscribe/admission deadline,
 a 120-second application-idle deadline and
 64 frames / 2 MiB per second per connection. Keep the client's announce interval below
 the broker idle deadline. Unauthorized clients are refused before receiving room
@@ -291,14 +296,15 @@ Use a synchronous token check or authenticate before reaching an asynchronous po
 so strangers cannot occupy its pending-admission quota. The room's shared encryption
 secret alone provides no broker admission or service-availability guarantee.
 
-Generate a random token in a private file, then run with your bind address, port,
-file path and allowed origins. The token itself stays out of command arguments and logs:
+Generate one token for each member in a private file, then run with your bind address,
+port, file path and allowed origins. Tokens stay out of command arguments and logs.
+Give each member only their own token; member names are local quota identities:
 
 ```sh
 umask 077
-bun -e 'console.log(Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url"))' > admission-token
+bun -e 'for (const member of ["alice", "bob"]) console.log(member, Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url"))' > admission-members
 bun editor/packages/collaboration/examples/signaling-server.ts \
-  127.0.0.1 8789 ./admission-token http://localhost:5173
+  127.0.0.1 8789 ./admission-members http://localhost:5173
 ```
 
 Wire messages are `{ type: 'subscribe', topic }`, the acknowledgement

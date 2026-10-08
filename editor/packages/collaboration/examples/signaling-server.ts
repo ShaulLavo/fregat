@@ -2,20 +2,42 @@ import { timingSafeEqual } from 'node:crypto'
 import { startSignalingServer, type Admission } from '../server/signaling'
 
 export function memberAdmission(contents: string): (request: Request) => Admission {
-  const token = contents.trim()
-  if (!/^[a-zA-Z0-9_-]{43,128}$/.test(token))
-    throw new TypeError(
-      'The admission file must contain a random base64url token of at least 32 bytes',
-    )
-  const expected = Buffer.from(token)
-  return (request) =>
-    request.headers
-      .get('sec-websocket-protocol')
-      ?.split(',')
-      .some((value) => {
-        const candidate = Buffer.from(value.trim())
-        return candidate.length === expected.length && timingSafeEqual(candidate, expected)
-      }) === true
+  const members = new Set<string>()
+  const tokens = new Set<string>()
+  const entries = contents
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => {
+      const [member, token, extra] = line.trim().split(/\s+/)
+      if (
+        !member ||
+        !/^[a-zA-Z0-9_-]{1,128}$/.test(member) ||
+        !token ||
+        !/^[a-zA-Z0-9_-]{43,128}$/.test(token) ||
+        extra ||
+        members.has(member) ||
+        tokens.has(token)
+      )
+        throw new TypeError(
+          'The admission file requires unique member token lines with random base64url tokens of at least 32 bytes',
+        )
+      members.add(member)
+      tokens.add(token)
+      return { member, expected: Buffer.from(token) }
+    })
+  return (request) => {
+    const candidates = (request.headers.get('sec-websocket-protocol') ?? '')
+      .split(',')
+      .map((value) => Buffer.from(value.trim()))
+    let admission: Admission = false
+    for (const { member, expected } of entries) {
+      const matches = candidates.some(
+        (candidate) => candidate.length === expected.length && timingSafeEqual(candidate, expected),
+      )
+      if (matches) admission = { member }
+    }
+    return admission
+  }
 }
 
 if (import.meta.main) {

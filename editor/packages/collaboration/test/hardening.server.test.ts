@@ -286,10 +286,16 @@ test('address hooks fail closed on missing and invalid addresses', async () => {
 })
 
 test('shared-token admission uses address quotas without a pooled member quota', async () => {
+  const token = 'shared-test-token'
   await withBroker(
     {
       ...options,
       clientAddress: (request) => request.headers.get('x-client-address') ?? undefined,
+      authorize: (request) =>
+        request.headers
+          .get('sec-websocket-protocol')
+          ?.split(',')
+          .some((value) => value.trim() === token) === true,
       limits: { ...options.limits, connections: 4, connectionsPerMember: 1 },
     },
     async (port, clients) => {
@@ -301,7 +307,10 @@ test('shared-token admission uses address quotas without a pooled member quota',
         ['192.0.2.2', 101],
         ['192.0.2.3', 429],
       ] as const) {
-        const client = await probe(port, '127.0.0.1', { 'X-Client-Address': address })
+        const client = await probe(port, '127.0.0.1', {
+          'X-Client-Address': address,
+          'Sec-WebSocket-Protocol': `singapore-collaboration, ${token}`,
+        })
         clients.push(client)
         expect(client.status).toBe(status)
       }
@@ -365,3 +374,16 @@ test('example admission binds verified tokens to configured member identities', 
   ).toBe(false)
   expect(authorize(new Request('http://collaboration.test'))).toBe(false)
 })
+
+for (const [name, contents] of [
+  ['empty file', ''],
+  ['short token', 'alice short'],
+  ['invalid member', `alice@example.com ${'a'.repeat(43)}`],
+  ['extra field', `alice ${'a'.repeat(43)} extra`],
+  ['duplicate member', `alice ${'a'.repeat(43)}\nalice ${'b'.repeat(43)}`],
+  ['duplicate token', `alice ${'a'.repeat(43)}\nbob ${'a'.repeat(43)}`],
+] as const) {
+  test(`example admission refuses ${name}`, () => {
+    expect(() => memberAdmission(contents)).toThrow('member token')
+  })
+}

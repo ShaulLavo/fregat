@@ -154,8 +154,8 @@ export function startSignalingServer(options: SignalingServerOptions) {
             timeout = setTimeout(() => resolve(false), options.limits.subscribeTimeout)
           }),
         ])
-        let member: string
-        if (accepted === true) member = 'shared'
+        let member: string | undefined
+        if (accepted === true) member = undefined
         else if (
           accepted &&
           typeof accepted.member === 'string' &&
@@ -164,10 +164,12 @@ export function startSignalingServer(options: SignalingServerOptions) {
         )
           member = `member:${accepted.member}`
         else return new Response('Admission refused', { status: 403 })
-        if ((admissions.get(member) ?? 0) >= connectionsPerMember)
-          return new Response('Member capacity reached', { status: 429 })
-        data.member = member
-        admissions.set(member, (admissions.get(member) ?? 0) + 1)
+        if (member) {
+          if ((admissions.get(member) ?? 0) >= connectionsPerMember)
+            return new Response('Member capacity reached', { status: 429 })
+          data.member = member
+          admissions.set(member, (admissions.get(member) ?? 0) + 1)
+        }
         upgraded = server.upgrade(request, {
           data,
           headers:
