@@ -8,6 +8,45 @@ import type {
 import { createScriptError } from '../structured-errors'
 import { detectPlatform } from '../../hotkeys/packages/hotkeys/src/platform'
 
+export const overlayAlignmentSelectors = {
+  pickerFooter: (page: Page) => selectors.pickerDialog(page).locator('[data-slot="dialog-footer"]'),
+  pickerFooterButton: (page: Page) =>
+    selectors.pickerDialog(page).locator('[data-slot="dialog-footer"] button').last(),
+  gallery: (page: Page) => page.locator('[data-overlay-gallery]'),
+  trigger: (page: Page, name: string) => page.getByRole('button', { name, exact: true }),
+  menuRow: (page: Page, name: string) =>
+    page.getByRole('menuitem', { name: new RegExp(`^${name}`) }),
+  checkedRow: (page: Page) =>
+    page.getByRole('menuitemcheckbox', { name: 'Checked action', exact: true }),
+  shortcut: (row: Locator) => row.locator('[data-slot="kbd"]'),
+  dialog: (page: Page) => page.getByRole('dialog', { name: 'Aligned dialog', exact: true }),
+  dialogTitle: (page: Page) =>
+    overlayAlignmentSelectors.dialog(page).locator('[data-slot="dialog-title"]'),
+  dialogDescription: (page: Page) =>
+    overlayAlignmentSelectors.dialog(page).locator('[data-slot="dialog-description"]'),
+  dialogBody: (page: Page) => overlayAlignmentSelectors.dialog(page).locator('p').last(),
+  dialogButton: (page: Page) =>
+    overlayAlignmentSelectors.dialog(page).getByRole('button', { name: 'Done', exact: true }),
+  rowIcon: (row: Locator) => row.locator(':scope > svg').first(),
+  rowLabel: (row: Locator) => row.locator(':scope > span:not([data-slot]):not(.absolute)').first(),
+  inputIcon: (page: Page) => page.locator('[data-slot="command-input-wrapper"] svg').first(),
+  settingLabel: (row: Locator) => row.locator('label').first(),
+  settingDescription: (row: Locator) => row.locator('p').first(),
+  modified: (row: Locator) => row.getByLabel('Modified', { exact: true }),
+  menuIcon: (row: Locator) => row.locator(':scope > svg').first(),
+  menuLabels: (page: Page) => selectors.projectMenuRows(page).locator(':scope > span:last-child'),
+  settingHeading: (row: Locator) =>
+    row.locator('xpath=ancestor::section[1]').getByRole('heading').first(),
+  phoneHeader: (page: Page) => selectors.phoneShell(page).locator('header').first(),
+  phoneTitle: (page: Page) => overlayAlignmentSelectors.phoneHeader(page).getByRole('heading'),
+  phoneAddProjectIcon: (page: Page) =>
+    selectors
+      .phoneShell(page)
+      .getByRole('button', { name: 'Add project', exact: true })
+      .locator('svg'),
+  phoneButtons: (page: Page) => overlayAlignmentSelectors.phoneHeader(page).getByRole('button'),
+}
+
 export const workbenchPaintSelectors = {
   terminal:
     '[data-slot="tool-pane"][aria-label="Terminal"] [data-terminal-presentation="saved"] canvas, [data-slot="tool-pane"][aria-label="Terminal"] :not([inert]) > .ghostty-webgpu > canvas',

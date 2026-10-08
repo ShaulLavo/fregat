@@ -273,6 +273,8 @@
   );
   /* A landscape phone keeps the sheet at reading width. */
   --sheet-max-width: 36rem;
+  /* Menu text follows the 8px start padding, one icon and the 8px row gap. */
+  --menu-inset-padding: calc(1rem + var(--icon-size));
   --density-menu-item-padding-y: 0.5rem;
   --density-textarea-min-height: 4rem;
   --density-textarea-padding-y: 0.5rem;
