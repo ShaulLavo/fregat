@@ -89,7 +89,10 @@ export default defineConfig({
               ) => {
                 const cdp = await page.context().newCDPSession(page)
                 const range = replacement
-                  ? { replacementStart: replacement[0], replacementEnd: replacement[1] }
+                  ? {
+                      replacementStart: replacement[0],
+                      replacementEnd: replacement[1],
+                    }
                   : {}
                 await cdp.send('Input.imeSetComposition', {
                   text,
@@ -142,10 +145,21 @@ export default defineConfig({
             fileParallelism: false,
             provider: playwright(),
             commands: {
-              proofMarkdownFenceScreenshot: async ({ iframe }, hostId: string, row: number) => {
-                const image = await iframe
-                  .locator(`#${hostId} [data-editor-virtual-row="${row}"]`)
-                  .screenshot({ animations: 'disabled' })
+              proofMarkdownFenceScreenshot: async (
+                { iframe },
+                hostId: string,
+                row: number,
+                text?: string,
+              ) => {
+                const target = text
+                  ? iframe
+                      .locator(`#${hostId} .editor-virtualized-row`)
+                      .filter({ hasText: text })
+                      .first()
+                  : iframe.locator(`#${hostId} [data-editor-virtual-row="${row}"]`)
+                const image = await target.screenshot({
+                  animations: 'disabled',
+                })
                 return image.toString('base64')
               },
               proofHighlightPaintScreenshot: async ({ iframe }, hostId: string) => {
