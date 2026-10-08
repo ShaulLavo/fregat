@@ -26,19 +26,71 @@ export type CaptureOptions = {
   readonly metadata?: unknown
 }
 type Transaction = { id: EditId; edits: EditId[]; metadata?: unknown }
-type Action =
-  | { readonly kind: 'record'; readonly edit: EditId; readonly transaction: string }
-  | { readonly kind: 'undo' | 'redo'; readonly command: EditId; readonly transaction: string }
-  | { readonly kind: 'clearUndo' }
-  | { readonly kind: 'clearRedo' }
+type HistoryAction = {
+  readonly kind: 'record' | 'undo' | 'redo'
+  readonly id: EditId
+  readonly transaction: string
+  status: 'pending' | 'accepted' | 'rejected'
+}
+type Action = HistoryAction | { readonly kind: 'clearUndo' } | { readonly kind: 'clearRedo' }
+type Outcome =
+  | { readonly kind: 'accepted'; readonly envelope: Envelope }
+  | { readonly kind: 'rejected'; readonly ids: readonly EditId[] }
+type Link = { previous: string | null; next: string | null }
 
-/** Local history captures user work once; host replay only reports rejected IDs. */
+class HistoryStack {
+  private entries = new Map<string, Link>()
+  private last: string | null = null
+
+  constructor(keys: Iterable<string> = []) {
+    for (const key of keys) this.push(key)
+  }
+
+  get top(): string | null {
+    return this.last
+  }
+
+  [Symbol.iterator](): MapIterator<string> {
+    return this.entries.keys()
+  }
+
+  push(key: string): void {
+    const previous = this.last
+    this.entries.set(key, { previous, next: null })
+    if (previous !== null) this.entries.get(previous)!.next = key
+    this.last = key
+  }
+
+  delete(key: string): boolean {
+    const link = this.entries.get(key)
+    if (!link) return false
+    if (link.previous !== null) this.entries.get(link.previous)!.next = link.next
+    if (link.next !== null) this.entries.get(link.next)!.previous = link.previous
+    if (this.last === key) this.last = link.previous
+    return this.entries.delete(key)
+  }
+}
+
+type Traversal = { undo: HistoryStack; redo: HistoryStack; keys: Set<string> }
+
+/** Local history captures user work once; host outcomes settle its replay journal. */
 export class UndoManager {
   private transactions = new Map<string, Transaction>()
-  private undoStack: string[] = []
-  private redoStack: string[] = []
-  private actions: Action[] = []
-  private rejected = new Set<string>()
+  private traversal: Traversal = {
+    undo: new HistoryStack(),
+    redo: new HistoryStack(),
+    keys: new Set(),
+  }
+  private checkpoint: Traversal = {
+    undo: new HistoryStack(),
+    redo: new HistoryStack(),
+    keys: new Set(),
+  }
+  private actions: (Action | null)[] = []
+  private actionHead = 0
+  private emitting: Outcome[] | null = null
+  private pending = new Map<string, HistoryAction>()
+  private journalReferences = new Map<string, number>()
   private group: string | null = null
   private lastTime = -Infinity
   private explicit = false
@@ -60,8 +112,8 @@ export class UndoManager {
 
   state(): UndoState {
     return {
-      undo: this.undoStack.map((key) => this.transaction(key)),
-      redo: this.redoStack.map((key) => this.transaction(key)),
+      undo: Array.from(this.traversal.undo, (key) => this.transaction(key)),
+      redo: Array.from(this.traversal.redo, (key) => this.transaction(key)),
     }
   }
 
@@ -101,14 +153,16 @@ export class UndoManager {
 
   clearUndo(): void {
     this.seal()
-    this.undoStack = []
+    this.clearStack(this.traversal, 'undo')
     this.actions.push({ kind: 'clearUndo' })
+    this.compact()
   }
 
   clearRedo(): void {
     this.seal()
-    this.redoStack = []
+    this.clearStack(this.traversal, 'redo')
     this.actions.push({ kind: 'clearRedo' })
+    this.compact()
   }
 
   undo(): Envelope | null {
@@ -159,11 +213,12 @@ export class UndoManager {
         edits: [],
         metadata: capture.metadata ?? this.metadata,
       })
-      this.undoStack.push(key)
+      this.traversal.undo.push(key)
+      this.traversal.keys.add(key)
     }
     this.transactions.get(key)!.edits.push({ ...envelope.id })
-    this.actions.push({ kind: 'record', edit: { ...envelope.id }, transaction: key })
-    this.redoStack = []
+    this.append({ kind: 'record', id: { ...envelope.id }, transaction: key, status: 'pending' })
+    this.clearStack(this.traversal, 'redo')
     this.group = key
     this.lastTime = now
     this.region.push(...affectedSpans(envelope.change))
@@ -178,7 +233,17 @@ export class UndoManager {
     const change = envelope.change
     if (change.kind !== 'setEffects')
       this.operations.set(editKey(envelope.id), affectedSpans(change))
-    if (!this.group || envelope.id.actor === this.actor) return
+    if (envelope.id.actor === this.actor) {
+      if (this.emitting) {
+        this.emitting.push({ kind: 'accepted', envelope })
+        return
+      }
+      const action = this.pending.get(editKey(envelope.id))
+      if (action?.status === 'pending') action.status = 'accepted'
+      this.compact()
+      return
+    }
+    if (!this.group) return
     if (change.kind !== 'setEffects') {
       if (intersects(change, this.region)) this.seal()
       return
@@ -195,31 +260,65 @@ export class UndoManager {
 
   reject(ids: readonly EditId[]): void {
     if (ids.length === 0) return
-    for (const id of ids) this.rejected.add(editKey(id))
+    if (this.emitting) {
+      this.emitting.push({ kind: 'rejected', ids })
+      return
+    }
+    const rejected = new Map<string, Set<string>>()
+    for (const id of ids) {
+      const key = editKey(id)
+      const action = this.pending.get(key)
+      if (!action || action.status !== 'pending') continue
+      action.status = 'rejected'
+      if (action.kind !== 'record') continue
+      let edits = rejected.get(action.transaction)
+      if (!edits) {
+        edits = new Set()
+        rejected.set(action.transaction, edits)
+      }
+      edits.add(key)
+    }
+    for (const [key, edits] of rejected) {
+      const transaction = this.transactions.get(key)!
+      transaction.edits = transaction.edits.filter((edit) => !edits.has(editKey(edit)))
+    }
     this.seal()
-    this.undoStack = []
-    this.redoStack = []
-    for (const action of this.actions) this.rebuild(action)
-    const retained = (key: string) => this.transaction(key).edits.length > 0
-    this.undoStack = this.undoStack.filter(retained)
-    this.redoStack = this.redoStack.filter(retained)
+    const previous = this.traversal.keys
+    this.traversal = {
+      undo: new HistoryStack(this.checkpoint.undo),
+      redo: new HistoryStack(this.checkpoint.redo),
+      keys: new Set(this.checkpoint.keys),
+    }
+    for (let index = this.actionHead; index < this.actions.length; index++)
+      this.rebuild(this.actions[index]!, this.traversal)
+    for (const key of previous) this.release(key)
+    this.compact()
   }
 
   private move(kind: 'undo' | 'redo'): Envelope | null {
-    const from = kind === 'undo' ? this.undoStack : this.redoStack
-    const to = kind === 'undo' ? this.redoStack : this.undoStack
-    const key = from.at(-1)
+    const from = kind === 'undo' ? this.traversal.undo : this.traversal.redo
+    const to = kind === 'undo' ? this.traversal.redo : this.traversal.undo
+    const key = from.top
     if (!key) return null
     this.seal()
     const transaction = this.transaction(key)
     const previous = this.current
     this.current = transaction
-    from.pop()
+    from.delete(key)
     to.push(key)
     let envelope: Envelope | null = null
+    const outcomes: Outcome[] = []
+    const previousEmission = this.emitting
     try {
-      envelope = this.emit(transaction.edits.map((op) => ({ op, active: kind === 'redo' })))
-      this.actions.push({ kind, command: { ...envelope.id }, transaction: key })
+      // The emitter chooses the command ID and can deliver its outcome before returning.
+      this.emitting = outcomes
+      try {
+        envelope = this.emit(transaction.edits.map((op) => ({ op, active: kind === 'redo' })))
+      } finally {
+        this.emitting = previousEmission
+      }
+      this.append({ kind, id: { ...envelope.id }, transaction: key, status: 'pending' })
+      this.settle(outcomes)
       try {
         this.options.onEvent?.({ kind, transaction })
       } finally {
@@ -228,12 +327,20 @@ export class UndoManager {
       return envelope
     } catch (failure) {
       if (!envelope) {
-        to.pop()
+        to.delete(key)
         from.push(key)
+        this.settle(outcomes)
       }
       throw failure
     } finally {
       this.current = previous
+    }
+  }
+
+  private settle(outcomes: readonly Outcome[]): void {
+    for (const outcome of outcomes) {
+      if (outcome.kind === 'accepted') this.remote(outcome.envelope)
+      if (outcome.kind === 'rejected') this.reject(outcome.ids)
     }
   }
 
@@ -242,33 +349,83 @@ export class UndoManager {
     return {
       id: { ...transaction.id },
       metadata: transaction.metadata,
-      edits: transaction.edits
-        .filter((id) => !this.rejected.has(editKey(id)))
-        .map((id) => ({ ...id })),
+      edits: transaction.edits.map((id) => ({ ...id })),
     }
   }
 
-  private rebuild(action: Action): void {
+  private append(action: HistoryAction): void {
+    this.actions.push(action)
+    this.pending.set(editKey(action.id), action)
+    const count = this.journalReferences.get(action.transaction) ?? 0
+    this.journalReferences.set(action.transaction, count + 1)
+  }
+
+  private compact(): void {
+    while (this.actionHead < this.actions.length) {
+      const action = this.actions[this.actionHead]!
+      // Rejecting an earlier action can change the traversal of later accepted commands.
+      if ('status' in action && action.status === 'pending') break
+      this.rebuild(action, this.checkpoint)
+      this.actions[this.actionHead++] = null
+      if (!('transaction' in action)) continue
+      this.pending.delete(editKey(action.id))
+      const references = this.journalReferences.get(action.transaction)! - 1
+      if (references === 0) this.journalReferences.delete(action.transaction)
+      else this.journalReferences.set(action.transaction, references)
+      this.release(action.transaction)
+    }
+    if (this.actionHead === this.actions.length) {
+      this.actions = []
+      this.actionHead = 0
+      return
+    }
+    // Halving bounds total suffix copies while consumed slots release their references immediately.
+    if (this.actionHead >= this.actions.length / 2) {
+      this.actions = this.actions.slice(this.actionHead)
+      this.actionHead = 0
+    }
+  }
+
+  private release(key: string): void {
+    if (
+      this.traversal.keys.has(key) ||
+      this.checkpoint.keys.has(key) ||
+      this.journalReferences.has(key)
+    )
+      return
+    this.transactions.delete(key)
+  }
+
+  private clearStack(traversal: Traversal, kind: 'undo' | 'redo'): void {
+    const discarded = traversal[kind]
+    traversal[kind] = new HistoryStack()
+    for (const key of discarded) {
+      traversal.keys.delete(key)
+      this.release(key)
+    }
+  }
+
+  private rebuild(action: Action, traversal: Traversal): void {
     if (action.kind === 'clearUndo') {
-      this.undoStack = []
+      this.clearStack(traversal, 'undo')
       return
     }
     if (action.kind === 'clearRedo') {
-      this.redoStack = []
+      this.clearStack(traversal, 'redo')
       return
     }
+    if (action.status === 'rejected') return
     if (action.kind === 'record') {
-      if (this.rejected.has(editKey(action.edit))) return
-      if (!this.undoStack.includes(action.transaction)) this.undoStack.push(action.transaction)
-      this.redoStack = []
+      this.clearStack(traversal, 'redo')
+      if (!traversal.keys.has(action.transaction)) {
+        traversal.undo.push(action.transaction)
+        traversal.keys.add(action.transaction)
+      }
       return
     }
-    if (this.rejected.has(editKey(action.command))) return
-    const from = action.kind === 'undo' ? this.undoStack : this.redoStack
-    const to = action.kind === 'undo' ? this.redoStack : this.undoStack
-    const index = from.indexOf(action.transaction)
-    if (index < 0) return
-    from.splice(index, 1)
+    const from = action.kind === 'undo' ? traversal.undo : traversal.redo
+    const to = action.kind === 'undo' ? traversal.redo : traversal.undo
+    if (!from.delete(action.transaction)) return
     to.push(action.transaction)
   }
 }

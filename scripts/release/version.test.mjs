@@ -45,7 +45,7 @@ test('pending changesets target versioned workspace manifests', async () => {
   await expectPublicChangesets(checkout)
 })
 
-test('versions the current pending changesets offline in a disposable workspace', async () => {
+test('versions pending and multi-paragraph changesets offline in a disposable workspace', async () => {
   const rootManifest = JSON.parse(await readFile(join(checkout, 'package.json'), 'utf8'))
   const patterns = rootManifest.workspaces.packages
   const pending = await readChangesets(checkout)
@@ -70,6 +70,11 @@ test('versions the current pending changesets offline in a disposable workspace'
       const file = `.changeset/${id}.md`
       await writeFile(join(root, file), await readFile(join(checkout, file)))
     }
+    await writeFile(
+      join(root, '.changeset/multiline-summary.md'),
+      await readFile(new URL('./fixtures/multiline-summary.md', import.meta.url)),
+    )
+    const changesets = await readChangesets(root)
     const result = spawnSync(
       'node',
       [join(checkout, 'node_modules/@changesets/cli/bin.js'), 'version'],
@@ -77,7 +82,7 @@ test('versions the current pending changesets offline in a disposable workspace'
     )
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
     expect(await readChangesets(root)).toEqual([])
-    for (const { releases, summary } of pending) {
+    for (const { id, releases, summary } of changesets) {
       for (const { name, type } of releases) {
         expect(type).toBe('patch')
         const { directory, manifest } = packages.get(name)
@@ -86,7 +91,11 @@ test('versions the current pending changesets offline in a disposable workspace'
         expect(after.version.split('.').slice(0, 2)).toEqual(
           manifest.version.split('.').slice(0, 2),
         )
-        expect(await readFile(join(root, directory, 'CHANGELOG.md'), 'utf8')).toContain(summary)
+        const changelog = await readFile(join(root, directory, 'CHANGELOG.md'), 'utf8')
+        expect(changelog.replace(/\s+/g, ' ')).toContain(summary.replace(/\s+/g, ' ').trim())
+        if (id === 'multiline-summary') {
+          expect(changelog).toContain(`- ${summary.replace(/\n(?=\S)/g, '\n  ')}`)
+        }
       }
     }
   })
