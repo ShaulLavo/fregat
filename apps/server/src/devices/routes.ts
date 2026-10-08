@@ -5,6 +5,7 @@ import {
   pairingStatusSchema,
 } from '@workspace/contracts'
 import { Elysia } from 'elysia'
+import { hostname } from 'node:os'
 import * as v from 'valibot'
 
 import { originGuard, type AuthConfig } from '../auth'
@@ -33,7 +34,7 @@ export function pairingRoutes(pairing: DevicePairing, auth: AuthConfig) {
       ({ request }) => {
         recordRequestContext({ area: 'pairing', operation: 'status' })
         const { trust } = pairing.admit(headersReader(request.headers))
-        return { trust, required: pairing.isRequired() }
+        return { trust, required: pairing.isRequired(), machine: hostname() }
       },
       { response: pairingStatusSchema },
     )

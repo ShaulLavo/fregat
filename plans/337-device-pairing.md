@@ -41,18 +41,23 @@ Constraints:
   talks to the local server over loopback. It prints the code and the link, and nothing else
   records them.
 
+Landed 2026-10-08: the machine-side command is `server/pair.js` in every release (run
+`bun current/server/pair.js` from the release folder); `bun run pair` runs the same file from a
+checkout. It finds the server through `server.address` or `--address=`, and prints the link when
+the server serves an origin other devices reach. The unpaired screen shows that command.
+
 Checklist:
 
-- [ ] Add the machine display name to `/pairing/status` and its schema. Test that an unpaired,
+- [x] Add the machine display name to `/pairing/status` and its schema. Test that an unpaired,
       forwarded request gets the name and nothing more.
-- [ ] Let a paired device's cookie issue codes. Test: a paired device issues a code that a second
+- [x] Let a paired device's cookie issue codes. Test: a paired device issues a code that a second
       device claims; an unpaired forwarded request is still refused.
-- [ ] Show Pair a device in Settings › Machines on paired devices, not only on the host.
-- [ ] Add the machine-side command that prints a code and link. Retire `bun run pair` or make it
+- [x] Show Pair a device in Settings › Machines on paired devices, not only on the host.
+- [x] Add the machine-side command that prints a code and link. Retire `bun run pair` or make it
       call the same command.
-- [ ] Rewrite the unpaired screen: machine name, one-line reason, the two places to get a code,
+- [x] Rewrite the unpaired screen: machine name, one-line reason, the two places to get a code,
       the code field. Phone and desktop widths.
-- [ ] Extend the `device-pairing` scenario: the unpaired screen names the machine; a paired phone
+- [x] Extend the `device-pairing` scenario: the unpaired screen names the machine; a paired phone
       issues a code that pairs a second device. Read the screenshots back.
 
 ## Tailscale sign-in (now)
