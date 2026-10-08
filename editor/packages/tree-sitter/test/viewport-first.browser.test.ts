@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from 'vitest'
 import { Editor } from '@singapore-editor/core/editor'
-import { toEditorTokenStore } from '@singapore-editor/core/syntax'
+import { toEditorTokenStore, type EditorToken } from '@singapore-editor/core/syntax'
 import { createTreeSitterLanguagePlugin } from '../src/index'
 import { TreeSitterWorkerClient } from '../src/treeSitter/workerClient'
 import { TreeSitterLanguageRegistry } from '../src/treeSitter/registry'
@@ -70,7 +70,9 @@ it.each([
     const completed = await doc.runtime.queryRange(range)
     expect(completed.projection.analysis?.kind).toBe('full')
     expect(completed.projection.source).toEqual(preview.projection.source)
-    expect(preview.captures).toEqual(completed.captures)
+    for (const capture of preview.captures) expect(completed.captures).toContainEqual(capture)
+    const completedTokens = toEditorTokenStore(completed.tokens).toTokens()
+    expectRetainedTokenStyles(toEditorTokenStore(preview.tokens).toTokens(), completedTokens)
   },
   30_000,
 )
@@ -222,3 +224,47 @@ it('limits provisional coverage before an unterminated trailing statement', asyn
     toEditorTokenStore(complete.tokens).toTokens(),
   )
 }, 30_000)
+
+it.each([
+  ['typescript`foo`;\n', 'typescript`(42);`;', 'foo', 'function'],
+  ['sql`SELECT foo`;\n', 'sql`(42);`;', 'SELECT foo', 'function'],
+  ['sql`SELECT foo`;\n', 'sql`.bar;`;', 'SELECT foo', 'type'],
+])(
+  'defers combined injection colors for %s',
+  async (prefix, suffix, content, finalStyle) => {
+    const doc = document(prefix + ' '.repeat(80_000) + suffix)
+    await doc.run()
+    const range = { startIndex: 0, endIndex: prefix.length }
+    const initial = await doc.runtime.queryRange(range)
+    expect(initial.projection.analysis?.kind).toBe('partial')
+    const start = prefix.indexOf(content)
+    const end = start + content.length
+    const initialTokens = toEditorTokenStore(initial.tokens).toTokens()
+    expect(initialTokens.some((token) => token.start < end && token.end > start)).toBe(false)
+    expect(
+      initial.captures.some((capture) => capture.startIndex < end && capture.endIndex > start),
+    ).toBe(false)
+    await expect.poll(() => doc.runtime.getResult().projection.analysis?.kind).toBe('full')
+    const complete = await doc.runtime.queryRange(range)
+    const completeTokens = toEditorTokenStore(complete.tokens).toTokens()
+    const identifier = prefix.indexOf('foo')
+    const resolved = completeTokens.find(
+      (token) => token.start <= identifier && identifier < token.end,
+    )
+    expect(resolved?.style.color).toBe(`var(--editor-syntax-${finalStyle})`)
+    expectRetainedTokenStyles(initialTokens, completeTokens)
+  },
+  30_000,
+)
+
+function expectRetainedTokenStyles(
+  initial: readonly EditorToken[],
+  complete: readonly EditorToken[],
+) {
+  for (const token of initial) {
+    for (let index = token.start; index < token.end; index++) {
+      const resolved = complete.find((next) => next.start <= index && index < next.end)
+      expect(resolved?.style).toEqual(token.style)
+    }
+  }
+}

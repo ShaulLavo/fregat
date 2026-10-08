@@ -491,14 +491,20 @@ by the pre-existing tail-layout failure recorded below.
 - The first demanded range chooses a canonical prefix ending 4,096 code units beyond demand,
   capped at 65,536. Parsing starts at offset zero to preserve the grammar entry state. These are
   fixed library work limits; this change adds no host execution setting.
-- A distant range waits for complete context. Any grammar recovery error in the preview or an
-  injected layer also waits for complete context: truncation can reinterpret tokens before the
+- A distant range waits for complete context. Any grammar recovery error in the preview
+  also waits for complete context: truncation can reinterpret tokens before the
   error's reported range. Crossing-comment and long-template controls exposed incorrect provisional
   tokens before this guard. Error-free parsing alone is insufficient: a distant call continuation
   can change an identifier's color. Preview coverage stops before the first unterminated top-level
   construct. JavaScript, TypeScript and TSX accept only explicit semicolon-terminated statement
   kinds; HTML accepts closed elements. Comments need an observed terminator or newline. Other
   grammars and unproven boundaries wait for complete context.
+- Provisional parsing owns only the host-language root tree. Injection discovery identifies
+  excluded content ranges; no injection tree is parsed and no injection-derived capture is
+  published before complete analysis. Host captures overlapping injected content are also
+  withheld, so those regions remain unpainted until complete context arrives. This applies to
+  ordinary and combined injections alike: terminated host statements do not isolate a combined
+  injection from future ranges.
 - Partial trees occupy separate worker storage. Their replies carry the canonical source identity,
   sync point, snapshot version and coverage. They publish tokens and captures, with empty folds,
   diagnostics, brackets and injection structure. Structural selection reads complete trees only.
@@ -517,7 +523,7 @@ by the pre-existing tail-layout failure recorded below.
   visible requests. Existing small-source and Markdown idle behavior is unchanged. First-edit
   behavior remains part of the original uninstrumented comparison matrix.
 - The frozen baseline at `66c8e8a68` failed all six initial preview controls. The complete real-worker
-  Chromium suite passes 92 controls, including 18 viewport-first cases, mounted replacement,
+  Chromium suite passes 95 controls, including 21 viewport-first cases, mounted replacement,
   canonical edit cancellation, disposal, TSX ambiguity and HTML script/style injections. Unit
   controls pass 107 tests; diagnostic harness controls pass nine tests. Core and Tree-sitter
   typechecks, workspace builds, retained syntax regressions and repository gates pass.
@@ -531,7 +537,15 @@ continuation and a terminated-call positive case. Another control checks that pr
 ends before a later open statement. The cancellation control checks preserved timings, retained
 session state and a successful third query without an edit or reopen.
 
-A fresh one-repetition 200 MiB diagnostic smoke after these fixes highlights in 375.9 ms with
+The second review reproduced three future-context hazards inside combined tagged-template
+injections: a TypeScript call continuation and SQL call/member continuations. All three additional
+controls fail on `7b1d7166d` and pass with root-only preview parsing. They require the injected
+content to have no initial tokens or captures, confirm the complete function/type color,
+and require every initially painted position to retain its resolved style after completion.
+The HTML script/style control now checks stable host tokens while injection colors arrive only
+with complete analysis. Injection-free review evidence is retained in `injection-fixes/`.
+
+A fresh one-repetition 200 MiB diagnostic smoke after the first review fixes highlights in 375.9 ms with
 27,455 bootstrap units. Its screenshot was read back and shows colored text throughout the visible
 viewport. This is a noisy smoke check, not a replacement for the earlier balanced matrix or a
 full typing/scroll endorsement. The earlier matrices describe the pre-review implementation.

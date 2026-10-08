@@ -100,6 +100,11 @@ type ParsedDocument = {
   lastUsed: number
 }
 
+type BootstrapPreview = Omit<ParsedDocument, 'layers'> & {
+  readonly layers: readonly [ParsedLayer]
+  readonly excludedRanges: readonly TreeSitterSyntaxRange[]
+}
+
 type DocumentCache = {
   readonly documentId: string
   readonly snapshots: ParsedDocument[]
@@ -177,7 +182,7 @@ const bootstrapDocuments = new Map<
   {
     readonly request: TreeSitterParseRequest
     readonly source: TreeSitterPieceTableInput
-    preview: ParsedDocument | null
+    preview: BootstrapPreview | null
   }
 >()
 const latestSnapshotVersions = new Map<string, number>()
@@ -1265,37 +1270,39 @@ const parseBootstrapPreview = async (
   runtime: Runtime,
   end: number,
   context: CancellationContext,
-): Promise<ParsedDocument> => {
+): Promise<BootstrapPreview> => {
   const source = limitTreeSitterInput(completeSource, end)
-  const root = measurePhase(context, 'bootstrapRoot', () =>
-    parseRootLayer(runtime, source, null, context),
-  )
+  let root: ParsedLayer | null = null
   try {
-    return await parseParsedDocument({
-      documentId: request.documentId,
+    root = measurePhase(context, 'bootstrapRoot', () =>
+      parseRootLayer(runtime, source, null, context),
+    )
+    // Combined injections can acquire future ranges even after a terminated host statement.
+    const injections = await findInjections(root, runtime, source, context, null)
+    return {
       snapshotVersion: request.snapshotVersion,
       languageId: request.languageId,
-      source,
-      rootLayer: root,
-      context,
-      oldDocument: null,
-      inputEdits: [],
-      injectionRanges: null,
+      source: source.retain(),
+      layers: [root],
+      excludedRanges: injections.flatMap((plan) => plan.ranges),
       degraded: [],
-    })
+      missingLanguages: [],
+      size: source.length,
+      lastUsed: nextUse++,
+    }
   } catch (error) {
-    root.tree.delete()
+    root?.tree.delete()
     throw error
   } finally {
     source.dispose()
   }
 }
 
-const bootstrapCoverageEnd = (preview: ParsedDocument): number => {
+const bootstrapCoverageEnd = (preview: BootstrapPreview): number => {
   const language = preview.languageId
   const statements = ['javascript', 'typescript', 'tsx'].includes(language)
   if (!statements && language !== 'html') return 0
-  for (const node of preview.layers[0]!.tree.rootNode.namedChildren) {
+  for (const node of preview.layers[0].tree.rootNode.namedChildren) {
     if (node.type === 'comment' && bootstrapCommentTerminated(node, preview.source, language))
       continue
     if (statements && bootstrapStatementTerminated(node)) continue
@@ -1387,9 +1394,17 @@ const queryBootstrapRange = async (
   if (range.endIndex > coverageEnd) return undefined
   const result = await flattenDocumentRange(preview, context, {
     range,
-    includeHighlights: request.includeHighlights,
-    includeCaptures: request.includeCaptures ?? true,
+    includeHighlights: false,
+    includeCaptures: true,
   })
+  // Leave injected content unpainted, including host captures that span that content.
+  const captures = result.captures.filter(
+    (capture) =>
+      !preview.excludedRanges.some((excluded) =>
+        indexesIntersectRange(capture.startIndex, capture.endIndex, excluded),
+      ),
+  )
+  const tokensPacked = packHighlights(captures, request.includeHighlights, context)
   assertNotCancelled(context)
   // Truncation can turn an open comment or string into unrelated grammar tokens.
   if (
@@ -1400,6 +1415,8 @@ const queryBootstrapRange = async (
     return undefined
   return {
     ...result,
+    captures: (request.includeCaptures ?? true) ? captures : [],
+    tokensPacked,
     documentId: request.documentId,
     snapshotVersion: request.snapshotVersion,
     languageId: request.languageId,
@@ -1412,7 +1429,7 @@ const queryBootstrapRange = async (
     injections: [],
     missingLanguages: preview.missingLanguages,
     statistics: {
-      ...resultStatistics(preview, result, context, range),
+      ...resultStatistics(preview, { ...result, captures, tokensPacked }, context, range),
       bootstrapUnits: preview.size,
     },
     timings: phaseTimings(context),
