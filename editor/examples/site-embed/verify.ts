@@ -163,9 +163,15 @@ for (const direction of ['a', 'b', 'c']) {
         (await host.textContent())?.includes('// edited'),
         'The million-line document is editable',
       )
+      await host.locator('[data-editor-virtual-row="999999"]').scrollIntoViewIfNeeded()
       const painted = await host.locator('[data-editor-virtual-row="999999"]').evaluate((row) => {
         const box = row.getBoundingClientRect()
-        const hit = document.elementFromPoint(box.left + 8, box.top + box.height / 2)
+        const editor = row.closest<HTMLElement>('.editor')!
+        const viewport = editor.getBoundingClientRect()
+        const gutter =
+          parseFloat(getComputedStyle(editor).getPropertyValue('--editor-gutter-width')) || 0
+        const x = Math.max(box.left + 8, viewport.left + gutter + 8)
+        const hit = document.elementFromPoint(x, box.top + box.height / 2)
         return hit === row || row.contains(hit)
       })
       assert(painted, 'The millionth line paints and receives pointer hits')
