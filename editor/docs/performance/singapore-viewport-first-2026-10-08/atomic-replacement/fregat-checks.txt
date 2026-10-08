@@ -1,0 +1,36 @@
+[wave-heavy] 'viewport tracked-source UI verification' is waiting: 13 job(s) ahead in the queue
+[wave-heavy] 'viewport tracked-source UI verification' is waiting: 7 job(s) ahead in the queue
+[wave-heavy] 'viewport tracked-source UI verification' is waiting: 4 job(s) ahead in the queue
+[wave-heavy] 'viewport tracked-source UI verification' is waiting: 3 job(s) ahead in the queue
+[wave-heavy] 'viewport tracked-source UI verification' is waiting: 1 job(s) ahead in the queue
+[wave-heavy] 'viewport tracked-source UI verification' is waiting: 1 job(s) ahead in the queue
+[wave-heavy] 'viewport tracked-source UI verification' is waiting: memory: 3781 MiB free after 4 running job(s) and the reserve, 4096 MiB needed
+[wave-heavy] started 'viewport tracked-source UI verification' on local after 372s: 7863 MiB free covers 4096 MiB
+$ bun scripts/agent/browser.ts look --doctor
+# look http://localhost:57051/
+
+screenshot: /work/worktrees/platform/singapore-viewport-first/editor/docs/performance/singapore-viewport-first-2026-10-08/atomic-replacement/fregat/20261008T161914Z-look-1440x1000-uyzgaA/page.png
+ready: yes
+health: ok
+problems: none
+
+logs (warn+, 2026-10-08T16:19:14.961Z..now): none
+api server: http://localhost:43025, throwaway state /tmp/fregat-agent-nkp3aH (removed after the run)
+full log: /work/worktrees/platform/singapore-viewport-first/editor/docs/performance/singapore-viewport-first-2026-10-08/atomic-replacement/fregat/20261008T161914Z-look-1440x1000-uyzgaA/2026-10-08.jsonl
+
+$ bun scripts/agent/browser.ts scenario editor-fast-scroll --file treeSitter.worker.ts
+# scenario editor-fast-scroll
+
+After startup settles, wheel-scroll in 1,200px sweeps and alternating 6,000px jumps.
+duration: 10749ms
+result: completed
+steps: /work/worktrees/platform/singapore-viewport-first/editor/docs/performance/singapore-viewport-first-2026-10-08/atomic-replacement/fregat/20261008T161926Z-scenario-editor-fast-scroll-bUldhP/01-opened.png, /work/worktrees/platform/singapore-viewport-first/editor/docs/performance/singapore-viewport-first-2026-10-08/atomic-replacement/fregat/20261008T161926Z-scenario-editor-fast-scroll-bUldhP/02-ready.png, /work/worktrees/platform/singapore-viewport-first/editor/docs/performance/singapore-viewport-first-2026-10-08/atomic-replacement/fregat/20261008T161926Z-scenario-editor-fast-scroll-bUldhP/03-scrolled-down.png, /work/worktrees/platform/singapore-viewport-first/editor/docs/performance/singapore-viewport-first-2026-10-08/atomic-replacement/fregat/20261008T161926Z-scenario-editor-fast-scroll-bUldhP/04-scrolled-up.png
+problems:
+- console warnings: ["No available adapters.","[.WebGL-0xa2400d3e200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels","WebSocket connection to 'ws://localhost:42013/lsp?path=work%2Fworktrees%2Fplatform%2Fsingapore-viewport-first%2Feditor%2Fpackages%2Ftree-sitter%2Fsrc%2FtreeSitter%2FtreeSitter.worker.ts&root=work%2Fworktrees%2Fplatform%2Fsingapore-viewport-first&server=typescript' failed: WebSocket is closed before the connection is established."]
+
+logs (warn+, 2026-10-08T16:19:26.352Z..now): none
+api server: http://localhost:42013, throwaway state /tmp/fregat-agent-5MnwSa (removed after the run)
+full log: /work/worktrees/platform/singapore-viewport-first/editor/docs/performance/singapore-viewport-first-2026-10-08/atomic-replacement/fregat/20261008T161926Z-scenario-editor-fast-scroll-bUldhP/2026-10-08.jsonl
+
+
+[exited with code 0]

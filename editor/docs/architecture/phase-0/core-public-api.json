@@ -970,6 +970,12 @@
         },
         {
           "kind": "type",
+          "name": "EditorSyntaxAnalysis",
+          "source": "packages/editor/src/public/syntax.ts",
+          "via": "packages/editor/src/index.ts"
+        },
+        {
+          "kind": "type",
           "name": "EditorSyntaxCapture",
           "source": "packages/editor/src/public/syntax.ts",
           "via": "packages/editor/src/index.ts"
@@ -6995,6 +7001,12 @@
           "kind": "type",
           "name": "EditorScopeStyles",
           "source": "packages/editor/src/theme.ts",
+          "via": "packages/editor/src/public/syntax.ts"
+        },
+        {
+          "kind": "type",
+          "name": "EditorSyntaxAnalysis",
+          "source": "packages/editor/src/syntax/index.ts",
           "via": "packages/editor/src/public/syntax.ts"
         },
         {

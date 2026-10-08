@@ -2118,6 +2118,26 @@ describe('VirtualizedTextView', () => {
     expect(ranges[1]!.endOffset).toBe(4)
   })
 
+  it('keeps unchanged row ranges when replacement removes a palette color', () => {
+    view.setText('first\nsecond')
+    view.setScrollMetrics(0, 40)
+    const stable = { start: 0, end: 5, style: { color: '#ff0000' } }
+    view.setTokens([stable, { start: 6, end: 12, style: { color: '#0000ff' } }])
+    const rows = view.getState().mountedRows
+    const first = tokenHighlightRangeForNode(rows[0]!.textNode)!
+    const second = tokenHighlightRangeForNode(rows[1]!.textNode)!
+
+    view.setTokens([stable, { start: 6, end: 12, style: { color: '#00ff00' } }])
+    expect(tokenHighlightRangeForNode(rows[0]!.textNode)?.range).toBe(first.range)
+    expect(first.highlight.has(first.range)).toBe(true)
+    expect(second.highlight.has(second.range)).toBe(false)
+    expect(tokenHighlightRangeForNode(rows[1]!.textNode)?.range).not.toBe(second.range)
+
+    view.setTokens([stable])
+    expect(tokenHighlightRangeForNode(rows[0]!.textNode)?.range).toBe(first.range)
+    expect(tokenHighlightRangeForNode(rows[1]!.textNode)).toBeUndefined()
+  })
+
   it('renders token highlights from unsorted token input', () => {
     view.setText('first\nsecond')
     view.setScrollMetrics(0, 40)

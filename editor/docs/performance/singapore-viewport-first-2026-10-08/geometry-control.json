@@ -1,0 +1,54 @@
+[
+  {
+    "label": "baseline",
+    "openGeometry": {
+      "width": 1280,
+      "height": 720,
+      "visibleStyle": {
+        "fontFamily": "monospace",
+        "fontSize": "14px",
+        "lineHeight": "20px"
+      },
+      "scrollViewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "renderedRows": 48
+    },
+    "endGeometry": {
+      "width": 1280,
+      "height": 720,
+      "scrollViewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "renderedRows": 13
+    }
+  },
+  {
+    "label": "after",
+    "openGeometry": {
+      "width": 1280,
+      "height": 720,
+      "visibleStyle": {
+        "fontFamily": "monospace",
+        "fontSize": "14px",
+        "lineHeight": "20px"
+      },
+      "scrollViewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "renderedRows": 48
+    },
+    "endGeometry": {
+      "width": 1280,
+      "height": 720,
+      "scrollViewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "renderedRows": 13
+    }
+  }
+]
