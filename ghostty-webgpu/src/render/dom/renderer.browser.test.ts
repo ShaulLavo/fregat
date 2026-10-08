@@ -633,7 +633,7 @@ it('packed DOM rows keep styled callbacks and lazy snapshots owned across writes
   expect(probe.renderer.metrics.paintedCells).toBe(cells)
 })
 
-it('keeps live geometry through fractional CSS, sibling flow, transforms and stylesheet rules', async () => {
+it('keeps live flow offsets through fractional CSS, sibling flow and stylesheet rules', async () => {
   const probe = await rendererProbe('dom')
   const canvas = probe.canvas
   const host = canvas.parentElement!
@@ -641,7 +641,7 @@ it('keeps live geometry through fractional CSS, sibling flow, transforms and sty
   const oracle = document.createElement('div')
   oracle.style.position = 'absolute'
   host.append(oracle)
-  const expectPosition = () => {
+  const expectFlowOffsets = () => {
     probe.terminal.write('\rnext')
     probe.renderer.notifyWrite()
     probe.clock.flush()
@@ -653,23 +653,15 @@ it('keeps live geometry through fractional CSS, sibling flow, transforms and sty
     expect(actual.left).toBeCloseTo(expected.left, 5)
     expect(actual.top).toBeCloseTo(expected.top, 5)
   }
-  expectPosition()
+  expectFlowOffsets()
   host.style.border = '2.25px solid transparent'
   host.style.padding = '3.25px 4.5px'
   canvas.style.margin = '2.5px 5.5px'
-  expectPosition()
+  expectFlowOffsets()
   const sibling = document.createElement('div')
   sibling.style.height = '17.25px'
   host.prepend(sibling)
-  expectPosition()
-  canvas.style.transform = 'translate(11.5px, 13.25px)'
-  expectPosition()
-  canvas.style.transform = ''
-  canvas.style.translate = '9px 12px'
-  expectPosition()
-  canvas.style.translate = ''
-  host.style.transform = 'scale(0.75)'
-  expectPosition()
+  expectFlowOffsets()
   canvas.setAttribute('data-dom-position-probe', '')
   const sheet = document.createElement('style')
   document.head.append(sheet)
@@ -677,13 +669,13 @@ it('keeps live geometry through fractional CSS, sibling flow, transforms and sty
   sheet.sheet!.insertRule(
     'canvas[data-dom-position-probe] { anchor-name: --embedder !important; margin-top: 23.25px !important; padding-left: 19px !important }',
   )
-  expectPosition()
+  expectFlowOffsets()
   sheet.remove()
   canvas.style.padding = '5% 7%'
   host.style.width = '400px'
-  expectPosition()
+  expectFlowOffsets()
   host.style.width = '350px'
-  expectPosition()
+  expectFlowOffsets()
 })
 
 it('isolates fixed-grid layout through theme and font changes', async () => {

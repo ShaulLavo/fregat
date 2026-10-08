@@ -962,7 +962,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
           internal: { actor: 'worker', capability: 'canvas2d' },
         })
       this.execution.setFrameListener((snapshot) => this.handleFrame(snapshot))
-      await this.execution.open(
+      this.fittedFont = await this.execution.open(
         elements,
         workerLayout(elements, 1, this.scrollbarWidthValue, this.autoFit),
       )
@@ -1634,15 +1634,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     if (this.preeditActive) {
       const summary = this.execution.submittedFrame
       const appearance = this.execution.appearance
-      const canvas = this.elementsValue!.canvas
-      const font =
-        summary?.font ??
-        this.fittedFont ??
-        fitTerminalFont(
-          canvas.ownerDocument,
-          appearance.font,
-          effectivePixelRatio(canvas, this.fitEnvironment),
-        )
+      const font = summary?.font ?? this.fittedFont
       this.updatePreeditAppearance(font, summary?.theme ?? appearance.rendererTheme)
     }
     compositionView.textContent = value

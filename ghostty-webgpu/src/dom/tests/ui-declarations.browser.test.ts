@@ -152,55 +152,61 @@ describe('terminal UI declarations', () => {
     expect(composition.style.fontSize).toBe('31px')
   })
 
-  it('styles the first worker preedit when input becomes ready', async () => {
-    const family = 'PreeditWorker'
-    const source = new URL(
-      '../../../site/public/fonts/jetbrains-mono-latin-400-normal.woff2',
-      import.meta.url,
-    ).href
-    const face = await new FontFace(family, `url(${JSON.stringify(source)})`).load()
-    document.fonts.add(face)
-    cleanups.push(() => {
-      document.fonts.delete(face)
-    })
-    let observed = false
-    const terminal = await WorkerTerminal.create({
-      accessibility: {},
-      autoFit: false,
-      appearance: { font: { family, size: 15 }, cursor: { blink: false } },
-      backend: 'webgl',
-      fonts: [{ family, source: { url: source } }],
-      workerUrl: new URL('../../../dist/worker/entry.js', import.meta.url),
-      inputHooks: {
-        inputReady: () => {
-          const textarea = terminal.textarea!
-          textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
-          textarea.value = '漢'
-          textarea.dispatchEvent(
-            new InputEvent('input', {
-              bubbles: true,
-              data: '漢',
-              inputType: 'insertCompositionText',
-              isComposing: true,
-            }),
-          )
-          const composition = terminal.element!.querySelector<HTMLElement>(
-            '.ghostty-webgpu-composition',
-          )!
-          expect(composition.hidden).toBe(false)
-          expect(composition.style.fontSize).toBe('15px')
-          expect(composition.style.minHeight).not.toBe('')
-          console.info('First worker preedit', {
-            submittedFrameAvailable: terminal.submittedFrame !== undefined,
-          })
-          observed = true
+  it.each([false, true])(
+    'styles the first worker preedit with actor metrics (host font loaded: %s)',
+    async (hostLoaded) => {
+      const family = hostLoaded ? 'PreeditWorkerHost' : 'PreeditWorkerOnly'
+      const source = new URL(
+        '../../../site/public/fonts/jetbrains-mono-latin-400-normal.woff2',
+        import.meta.url,
+      ).href
+      expect(Array.from(document.fonts).some((face) => face.family === family)).toBe(false)
+      if (hostLoaded) {
+        const face = await new FontFace(family, `url(${JSON.stringify(source)})`).load()
+        document.fonts.add(face)
+        cleanups.push(() => {
+          document.fonts.delete(face)
+        })
+      }
+      let first: { width: string; height: string } | undefined
+      const terminal = await WorkerTerminal.create({
+        accessibility: {},
+        autoFit: false,
+        appearance: { font: { family, size: 15 }, cursor: { blink: false } },
+        backend: 'webgl',
+        fonts: [{ family, source: { url: source } }],
+        workerUrl: new URL('../../../dist/worker/entry.js', import.meta.url),
+        inputHooks: {
+          inputReady: () => {
+            const textarea = terminal.textarea!
+            textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+            textarea.value = '漢'
+            textarea.dispatchEvent(
+              new InputEvent('input', {
+                bubbles: true,
+                data: '漢',
+                inputType: 'insertCompositionText',
+                isComposing: true,
+              }),
+            )
+            const composition = terminal.element!.querySelector<HTMLElement>(
+              '.ghostty-webgpu-composition',
+            )!
+            expect(composition.hidden).toBe(false)
+            expect(composition.style.fontSize).toBe('15px')
+            expect(terminal.submittedFrame).toBeUndefined()
+            first = { width: composition.style.minWidth, height: composition.style.minHeight }
+          },
         },
-      },
-    })
-    cleanups.push(() => terminal.dispose())
-    await terminal.open(mountedHost())
-    expect(observed).toBe(true)
-  })
+      })
+      cleanups.push(() => terminal.dispose())
+      await terminal.open(mountedHost())
+      await vi.waitFor(() => expect(terminal.submittedFrame).toBeDefined())
+      const font = terminal.submittedFrame!.font
+      expect(first).toEqual({ width: `${font.cssCellWidth}px`, height: `${font.cssCellHeight}px` })
+      expect(Array.from(document.fonts).some((face) => face.family === family)).toBe(hostLoaded)
+    },
+  )
 
   it('restores active preedit after a renderer peer in the same callback', async () => {
     const probe = await compositionProbe()

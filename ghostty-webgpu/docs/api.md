@@ -15,6 +15,8 @@ return promises in the main entry.
 The `ghostty-webgpu/worker` entry creates the same DOM host around a dedicated worker.
 The worker owns its native session, WASM, fitted font, Zig frame builder and WebGPU or WebGL
 renderer. Supply each font as an explicit URL or byte array with optional `FontFaceDescriptors`.
+The opening acknowledgment supplies the worker-fitted cell metrics before `inputReady` runs.
+First composed text uses these metrics even before a submitted frame reaches the host.
 
 ```ts
 import { Terminal } from 'ghostty-webgpu/worker'

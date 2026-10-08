@@ -9,7 +9,11 @@ import {
   type LinkProjection,
 } from '../term/link-snapshot.js'
 import type { LinkProvider, LinkResolverOptions } from '../term/links.js'
-import type { TerminalSessionEventType, TerminalSessionListener } from '../term/types.js'
+import type {
+  TerminalFittedFont,
+  TerminalSessionEventType,
+  TerminalSessionListener,
+} from '../term/types.js'
 import type {
   WorkerInitialize,
   WorkerCommands,
@@ -311,7 +315,7 @@ export class WorkerTerminalExecution {
     this.frameListener = listener
   }
 
-  open(elements: TerminalElements, layout: WorkerLayout): Promise<void> {
+  open(elements: TerminalElements, layout: WorkerLayout): Promise<TerminalFittedFont> {
     const canvas = elements.canvas.transferControlToOffscreen()
     return this.request('open', [canvas, layout], [canvas])
   }
