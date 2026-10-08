@@ -151,7 +151,17 @@ Long-task entries are unsupported in this Safari and are null. These initial con
 Singapore's shadowed logical scrollTop getter, so their lag numbers compare against the
 virtualizer snapshot. They are probe checks, not native-scroll latency measurements. The
 finished probe bypasses that getter through Element.prototype and records logicalScrollTop
-separately. Repeat the simulator protocol with that corrected native observation.
+separately.
+
+A repeat with the corrected native getter on the same simulator recorded 481 scroll events
+and 19 ms p95 frame intervals in sticky mode. Its native-reference DOM lag was 30 px at p95
+and 43 px maximum. The native CSS control recorded 480 events, 20 ms p95 frame intervals and
+zero DOM lag. Neither run had missing coverage. Both had 1 ms p95 measurement cost and
+unsupported long tasks. The largest native-versus-logical position difference was 43 px in
+sticky mode and 42 px in native mode. This confirms that the observation method matters and
+that native document movement removes this DOM paint dependency in the scripted control.
+There were no trusted touch events. It does not establish visually steady compositor frames
+or the behavior of a physical-iPhone fling.
 
 These controls do not reproduce the owner's shaky fling. In particular, the native CSS
 experiment's bounds can disagree with sampled scrollTop during script-driven movement.
