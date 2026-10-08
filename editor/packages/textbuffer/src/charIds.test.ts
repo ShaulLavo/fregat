@@ -587,3 +587,55 @@ it.each([false, true])(
     expect(snapshot.buffers).toBe(original.buffers)
   },
 )
+
+function collectPayloads(snapshots: readonly ReturnType<typeof make>[]) {
+  const job = reclaimSnapshotStorage(snapshots)
+  let step = job.next()
+  while (!step.done) step = job.next()
+  return step.value
+}
+
+it.each([false, true])(
+  'expired revival rejects wholly reclaimed payloads atomically with transient=%s',
+  (transient) => {
+    const original = make('abcdef', transient)
+    retainPieceTableSnapshot(original)
+    const hidden = deleteByCharId(original, [{ start: id(0), count: 6 }])
+    expect(collectPayloads([original, hidden]).codeUnits).toBe(0)
+    expect(text(setCharIdVisibility(hidden, [{ start: id(0), count: 6, visible: true }]))).toBe(
+      'abcdef',
+    )
+    expect(collectPayloads([hidden]).codeUnits).toBe(6)
+    const epoch = hidden.buffers.lineage.epoch
+    expect(() => setCharIdVisibility(hidden, [{ start: id(0), count: 6, visible: true }])).toThrow(
+      'expired',
+    )
+    expect(hidden.buffers.lineage.epoch).toBe(epoch)
+    expect(text(hidden)).toBe('')
+    expect(locateCharId(hidden, id(3))!.liveness).toBe('deleted')
+  },
+)
+
+it.each([false, true])(
+  'expired revival checks sparse holes and rejects a complete batch with transient=%s',
+  (transient) => {
+    const original = make('abcdef', transient)
+    retainPieceTableSnapshot(original)
+    const hidden = deleteByCharId(original, [{ start: id(1), count: 3 }])
+    expect(collectPayloads([hidden]).codeUnits).toBe(3)
+    const epoch = hidden.buffers.lineage.epoch
+    expect(() => setCharIdVisibility(hidden, [{ start: id(0), count: 6, visible: true }])).toThrow(
+      'expired',
+    )
+    expect(() =>
+      setCharIdVisibility(hidden, [
+        { start: id(0), count: 1, visible: false },
+        { start: id(1), count: 3, visible: true },
+      ]),
+    ).toThrow('expired')
+    expect(text(hidden)).toBe('aef')
+    expect(hidden.buffers.lineage.epoch).toBe(epoch)
+    expect(locateCharId(hidden, id(0))!.liveness).toBe('live')
+    expect(locateCharId(hidden, id(2))!.liveness).toBe('deleted')
+  },
+)
