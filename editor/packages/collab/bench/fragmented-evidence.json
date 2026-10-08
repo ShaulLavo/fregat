@@ -1,0 +1,4208 @@
+{
+  "issue": 980,
+  "date": "2026-10-08",
+  "classification": "experiment, shared machine",
+  "primaryEvidence": "Counted run lookups and persistent tree edge visits; deterministic across A1/A2 and B1/B2. Timing is secondary and includes instrumented operations, excluding consumer rendering.",
+  "baselineCommit": "e39fb2ff7be76068a4af41fc0907379d630ea619",
+  "sourceSha256": {
+    "baseline": {
+      "collab/src/textbuffer.ts": "88f9dfb3c1dff9ffe1c6b05a9a19ae342aed365821535a624c78e86b85439084",
+      "collab/src/participant.ts": "54beb7bfae6e7f0a0e74925c6effde276e821abc3ca1ce0132c4d37f1839acc9",
+      "collab/src/reference.ts": "63722397184b033f733351ddeade617eeba6a2372b0e1c2e058307c88506f7a7",
+      "collab/src/types.ts": "9ee6de1aa24edfd78ece66bc5fbcb9f777cac6846fb547794185caec9631a716",
+      "textbuffer/src/charIds.ts": "aee680815a9812e884aa563dc4113417ee20df56c009262d52e27fb02c935486",
+      "textbuffer/src/diff.ts": "7e9dc3778b2fc1986983df3d01f3dc424140a2fd4eb476ededb447a8f5545c9a"
+    },
+    "after": {
+      "collab/src/textbuffer.ts": "de548ee969893afb8aab2ee4ed3b4a4b7e088cd7cefddaab2ddb082f21201738",
+      "collab/src/participant.ts": "dd9dd5cba4b450b37441b61a1f3ea61cf67f59b96a4586e381f11d884bf14fad",
+      "collab/src/reference.ts": "59bd60b1f9e12028065bd553c35f1dcf984add401c704f52b10982a895f00f48",
+      "collab/src/types.ts": "ba51557d61953bbf6eb90a31e4b4b52d6f9c5ad10fe71df708dbac69fe02ab7a",
+      "textbuffer/src/charIds.ts": "50276c54426972f0b3b8770d799e794136fc9c2d4a97b8fb92270854a94febe7",
+      "textbuffer/src/diff.ts": "55ef67140db77d5fe9174f7d48253b44776d923ca26f2ba73708aee153b591c2"
+    }
+  },
+  "qualification": "B1/B2 measure the ancestry, structural successor, persistent diff and effective-edit publication changes. The final reentrant notification delivery queue was added afterward; those wall-clock results do not measure that queue. Full suite verification belongs to CI.",
+  "runs": [
+    {
+      "label": "baseline A1: experiment, shared machine",
+      "environment": {
+        "node": "v26.7.0",
+        "v8": "14.6.202.34-node.28",
+        "cpu": "Intel(R) Core(TM) i7-14700K",
+        "platform": "linux",
+        "release": "7.2.8-arch1-2"
+      },
+      "method": "100,000 lines / 8.1M initial UTF-16 units; 5,000 / 50,000 interleaved single-character inserts in batches of five concurrent authors, then 3,000 / 30,000 (one fewer for deep-tail) exact-ID tombstones. 31 independent restore-based samples after five warmups; 100 author/apply typing edits per sample. Timers include author/apply/allocation and observation counters, exclude history setup, pending authoring and validation; subscribed reconcile includes publication and a notification sink, excluding consumer text application and rendering. Reconcile verifies one by-reference restore and pending+1 applies. No retries/skips.",
+      "workloads": [
+        {
+          "kind": "scattered",
+          "metadata": {
+            "insertionEdits": 5000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 3000,
+            "placementRuns": 7001,
+            "forkRecords": 2000,
+            "textUnits": 8102000
+          },
+          "offset": 4051000,
+          "runLookupsForOneAuthorApply": 8,
+          "typing": {
+            "count": 3100,
+            "medianMs": 0.0595,
+            "p99Ms": 0.112138,
+            "maxMs": 0.139597,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 0.98433,
+            "p99Ms": 2.370062,
+            "maxMs": 2.370062,
+            "over8_3Ms": 0,
+            "visitedEdges": 90635
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.1792,
+                  "selfMs": 0.059069
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.010668,
+                  "selfMs": 0.009807
+                },
+                "run": {
+                  "calls": 13,
+                  "inclusiveMs": 0.018117,
+                  "selfMs": 0.018117
+                },
+                "ancestor": {
+                  "calls": 2,
+                  "inclusiveMs": 0.007965,
+                  "selfMs": 0.007267
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.008896,
+                  "selfMs": 0.008896
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 2,
+                  "inclusiveMs": 0.00993,
+                  "selfMs": 0.00993
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.093415,
+                  "selfMs": 0.073498
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.003284,
+                  "selfMs": 0.003284
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 1.601437,
+                  "selfMs": 0.0881
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002358,
+                  "selfMs": 0.001838
+                },
+                "run": {
+                  "calls": 9040,
+                  "inclusiveMs": 0.90055,
+                  "selfMs": 0.90055
+                },
+                "ancestor": {
+                  "calls": 11,
+                  "inclusiveMs": 1.475703,
+                  "selfMs": 0.580517
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000593,
+                  "selfMs": 0.000593
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 11,
+                  "inclusiveMs": 0.006522,
+                  "selfMs": 0.006522
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 1.497982,
+                  "selfMs": 0.019442
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.006233,
+                  "selfMs": 0.006233
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 12.073094,
+                  "selfMs": 0.403828
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.018437,
+                  "selfMs": 0.017903
+                },
+                "run": {
+                  "calls": 99310,
+                  "inclusiveMs": 7.776263,
+                  "selfMs": 7.776263
+                },
+                "ancestor": {
+                  "calls": 101,
+                  "inclusiveMs": 11.468082,
+                  "selfMs": 3.727251
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000856,
+                  "selfMs": 0.000856
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 101,
+                  "inclusiveMs": 0.04885,
+                  "selfMs": 0.04885
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 11.555628,
+                  "selfMs": 0.075455
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.041125,
+                  "selfMs": 0.041125
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.035404,
+              "p99Ms": 0.059283,
+              "maxMs": 0.059283,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 1.431662,
+                "p99Ms": 2.493603,
+                "maxMs": 2.493603,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 0.585837,
+              "p99Ms": 0.634608,
+              "maxMs": 0.634608,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 2.91353,
+                "p99Ms": 3.123572,
+                "maxMs": 3.123572,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 5.927505,
+              "p99Ms": 6.128052,
+              "maxMs": 6.128052,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 7.316157,
+                "p99Ms": 8.977904,
+                "maxMs": 8.977904,
+                "over8_3Ms": 12
+              }
+            }
+          ]
+        },
+        {
+          "kind": "scattered",
+          "metadata": {
+            "insertionEdits": 50000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 30000,
+            "placementRuns": 70001,
+            "forkRecords": 20000,
+            "textUnits": 8120000
+          },
+          "offset": 4060000,
+          "runLookupsForOneAuthorApply": 7,
+          "typing": {
+            "count": 3100,
+            "medianMs": 0.747951,
+            "p99Ms": 1.193372,
+            "maxMs": 1.749634,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 8.146882,
+            "p99Ms": 9.3226,
+            "maxMs": 9.3226,
+            "over8_3Ms": 7,
+            "visitedEdges": 452444
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.280086,
+                  "selfMs": 0.260702
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.004063,
+                  "selfMs": 0.003584
+                },
+                "run": {
+                  "calls": 12,
+                  "inclusiveMs": 0.002667,
+                  "selfMs": 0.002667
+                },
+                "ancestor": {
+                  "calls": 2,
+                  "inclusiveMs": 0.001032,
+                  "selfMs": 0.000784
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.001938,
+                  "selfMs": 0.001938
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 2,
+                  "inclusiveMs": 0.002045,
+                  "selfMs": 0.002045
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.012272,
+                  "selfMs": 0.008693
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.003736,
+                  "selfMs": 0.003736
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 15.246785,
+                  "selfMs": 0.365566
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002906,
+                  "selfMs": 0.002487
+                },
+                "run": {
+                  "calls": 90057,
+                  "inclusiveMs": 9.470841,
+                  "selfMs": 9.470841
+                },
+                "ancestor": {
+                  "calls": 11,
+                  "inclusiveMs": 14.810315,
+                  "selfMs": 5.352923
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.001031,
+                  "selfMs": 0.001031
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 11,
+                  "inclusiveMs": 0.009028,
+                  "selfMs": 0.009028
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 14.847795,
+                  "selfMs": 0.030639
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.017176,
+                  "selfMs": 0.017176
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 136.669518,
+                  "selfMs": 0.869646
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000793,
+                  "selfMs": 0.000423
+                },
+                "run": {
+                  "calls": 990507,
+                  "inclusiveMs": 96.489284,
+                  "selfMs": 96.489284
+                },
+                "ancestor": {
+                  "calls": 101,
+                  "inclusiveMs": 135.401936,
+                  "selfMs": 39.001048
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000779,
+                  "selfMs": 0.000779
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 101,
+                  "inclusiveMs": 0.064374,
+                  "selfMs": 0.064374
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 135.575579,
+                  "selfMs": 0.139325
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.105432,
+                  "selfMs": 0.105432
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.19456,
+              "p99Ms": 0.229439,
+              "maxMs": 0.229439,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 6.627798,
+                "p99Ms": 7.325105,
+                "maxMs": 7.325105,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 7.0413,
+              "p99Ms": 8.783385,
+              "maxMs": 8.783385,
+              "over8_3Ms": 1,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 13.278596,
+                "p99Ms": 17.74251,
+                "maxMs": 17.74251,
+                "over8_3Ms": 31
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 75.185425,
+              "p99Ms": 79.644854,
+              "maxMs": 79.644854,
+              "over8_3Ms": 31,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 82.077503,
+                "p99Ms": 96.965322,
+                "maxMs": 96.965322,
+                "over8_3Ms": 31
+              }
+            }
+          ]
+        },
+        {
+          "kind": "deep-tail",
+          "metadata": {
+            "insertionEdits": 5000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 2999,
+            "placementRuns": 5002,
+            "forkRecords": 1001,
+            "textUnits": 8102001
+          },
+          "offset": 8102001,
+          "runLookupsForOneAuthorApply": 1006,
+          "typing": {
+            "count": 3100,
+            "medianMs": 0.144459,
+            "p99Ms": 0.328624,
+            "maxMs": 0.578275,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 0.388727,
+            "p99Ms": 0.653865,
+            "maxMs": 0.653865,
+            "over8_3Ms": 0,
+            "visitedEdges": 31016
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.032298,
+                  "selfMs": 0.020676
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.003112,
+                  "selfMs": 0.002494
+                },
+                "run": {
+                  "calls": 9,
+                  "inclusiveMs": 0.001374,
+                  "selfMs": 0.001374
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000488,
+                  "selfMs": 0.000488
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 3,
+                  "inclusiveMs": 0.000291,
+                  "selfMs": 0.000291
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.009989,
+                  "selfMs": 0.008436
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.001651,
+                  "selfMs": 0.001651
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 0.130016,
+                  "selfMs": 0.090577
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002747,
+                  "selfMs": 0.00214
+                },
+                "run": {
+                  "calls": 27,
+                  "inclusiveMs": 0.007654,
+                  "selfMs": 0.007654
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000559,
+                  "selfMs": 0.000559
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 12,
+                  "inclusiveMs": 0.001674,
+                  "selfMs": 0.001674
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 0.024392,
+                  "selfMs": 0.019406
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.010753,
+                  "selfMs": 0.010753
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 0.524164,
+                  "selfMs": 0.382199
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.00359,
+                  "selfMs": 0.003148
+                },
+                "run": {
+                  "calls": 207,
+                  "inclusiveMs": 0.027739,
+                  "selfMs": 0.027739
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.00049,
+                  "selfMs": 0.00049
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 102,
+                  "inclusiveMs": 0.006217,
+                  "selfMs": 0.006217
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 0.077764,
+                  "selfMs": 0.063618
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.044343,
+                  "selfMs": 0.044343
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.034944,
+              "p99Ms": 0.039828,
+              "maxMs": 0.039828,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 1.404263,
+                "p99Ms": 3.642924,
+                "maxMs": 3.642924,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 0.073461,
+              "p99Ms": 0.105143,
+              "maxMs": 0.105143,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 1.272019,
+                "p99Ms": 2.554865,
+                "maxMs": 2.554865,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 0.451622,
+              "p99Ms": 0.50696,
+              "maxMs": 0.50696,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 2.021514,
+                "p99Ms": 3.992209,
+                "maxMs": 3.992209,
+                "over8_3Ms": 0
+              }
+            }
+          ]
+        },
+        {
+          "kind": "deep-tail",
+          "metadata": {
+            "insertionEdits": 50000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 29999,
+            "placementRuns": 50002,
+            "forkRecords": 10001,
+            "textUnits": 8120001
+          },
+          "offset": 8120001,
+          "runLookupsForOneAuthorApply": 10006,
+          "typing": {
+            "count": 3100,
+            "medianMs": 1.665814,
+            "p99Ms": 2.690091,
+            "maxMs": 4.950618,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 3.792108,
+            "p99Ms": 3.982661,
+            "maxMs": 3.982661,
+            "over8_3Ms": 0,
+            "visitedEdges": 310014
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.254366,
+                  "selfMs": 0.243435
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.00377,
+                  "selfMs": 0.003221
+                },
+                "run": {
+                  "calls": 9,
+                  "inclusiveMs": 0.001735,
+                  "selfMs": 0.001735
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000756,
+                  "selfMs": 0.000756
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 3,
+                  "inclusiveMs": 0.000298,
+                  "selfMs": 0.000298
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.008065,
+                  "selfMs": 0.006235
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.002456,
+                  "selfMs": 0.002456
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 0.309828,
+                  "selfMs": 0.286747
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002386,
+                  "selfMs": 0.001955
+                },
+                "run": {
+                  "calls": 27,
+                  "inclusiveMs": 0.004707,
+                  "selfMs": 0.004707
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000765,
+                  "selfMs": 0.000765
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 12,
+                  "inclusiveMs": 0.000856,
+                  "selfMs": 0.000856
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 0.014103,
+                  "selfMs": 0.010953
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.006231,
+                  "selfMs": 0.006231
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 0.634279,
+                  "selfMs": 0.487311
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.004383,
+                  "selfMs": 0.003924
+                },
+                "run": {
+                  "calls": 207,
+                  "inclusiveMs": 0.034215,
+                  "selfMs": 0.034215
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000768,
+                  "selfMs": 0.000768
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 102,
+                  "inclusiveMs": 0.006172,
+                  "selfMs": 0.006172
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 0.082835,
+                  "selfMs": 0.063926
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.042346,
+                  "selfMs": 0.042346
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.191394,
+              "p99Ms": 0.286968,
+              "maxMs": 0.286968,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 4.533339,
+                "p99Ms": 5.837174,
+                "maxMs": 5.837174,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 0.248384,
+              "p99Ms": 0.550045,
+              "maxMs": 0.550045,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 4.574361,
+                "p99Ms": 5.8601,
+                "maxMs": 5.8601,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 0.582242,
+              "p99Ms": 1.182032,
+              "maxMs": 1.182032,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 6.285541,
+                "p99Ms": 7.332116,
+                "maxMs": 7.332116,
+                "over8_3Ms": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "after B1: experiment, shared machine",
+      "environment": {
+        "node": "v26.7.0",
+        "v8": "14.6.202.34-node.28",
+        "cpu": "Intel(R) Core(TM) i7-14700K",
+        "platform": "linux",
+        "release": "7.2.8-arch1-2"
+      },
+      "method": "100,000 lines / 8.1M initial UTF-16 units; 5,000 / 50,000 interleaved single-character inserts in batches of five concurrent authors, then 3,000 / 30,000 (one fewer for deep-tail) exact-ID tombstones. 31 independent restore-based samples after five warmups; 100 author/apply typing edits per sample. Timers include author/apply/allocation and observation counters, exclude history setup, pending authoring and validation; subscribed reconcile includes publication and a notification sink, excluding consumer text application and rendering. Reconcile verifies one by-reference restore and pending+1 applies. No retries/skips.",
+      "workloads": [
+        {
+          "kind": "scattered",
+          "metadata": {
+            "insertionEdits": 5000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 3000,
+            "placementRuns": 7001,
+            "forkRecords": 2000,
+            "textUnits": 8102000
+          },
+          "offset": 4051000,
+          "runLookupsForOneAuthorApply": 11,
+          "typing": {
+            "count": 3100,
+            "medianMs": 0.004969,
+            "p99Ms": 0.034263,
+            "maxMs": 0.084471,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 0.010012,
+            "p99Ms": 0.025596,
+            "maxMs": 0.025596,
+            "over8_3Ms": 0,
+            "visitedEdges": 111
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.259575,
+                  "selfMs": 0.06198
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.017211,
+                  "selfMs": 0.015848
+                },
+                "run": {
+                  "calls": 21,
+                  "inclusiveMs": 0.028413,
+                  "selfMs": 0.028413
+                },
+                "ancestor": {
+                  "calls": 2,
+                  "inclusiveMs": 0.02714,
+                  "selfMs": 0.024365
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.010628,
+                  "selfMs": 0.010628
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 2,
+                  "inclusiveMs": 0.014431,
+                  "selfMs": 0.014431
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.160233,
+                  "selfMs": 0.116881
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.00424,
+                  "selfMs": 0.00424
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 0.145992,
+                  "selfMs": 0.092141
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002305,
+                  "selfMs": 0.001669
+                },
+                "run": {
+                  "calls": 66,
+                  "inclusiveMs": 0.012685,
+                  "selfMs": 0.012685
+                },
+                "ancestor": {
+                  "calls": 11,
+                  "inclusiveMs": 0.011032,
+                  "selfMs": 0.006581
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000743,
+                  "selfMs": 0.000743
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 11,
+                  "inclusiveMs": 0.006883,
+                  "selfMs": 0.006883
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 0.037074,
+                  "selfMs": 0.021667
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.005928,
+                  "selfMs": 0.005928
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 0.747317,
+                  "selfMs": 0.460416
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002172,
+                  "selfMs": 0.001782
+                },
+                "run": {
+                  "calls": 516,
+                  "inclusiveMs": 0.064949,
+                  "selfMs": 0.064949
+                },
+                "ancestor": {
+                  "calls": 101,
+                  "inclusiveMs": 0.064603,
+                  "selfMs": 0.039804
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000458,
+                  "selfMs": 0.000458
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 101,
+                  "inclusiveMs": 0.054836,
+                  "selfMs": 0.054836
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 0.166659,
+                  "selfMs": 0.087239
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.040005,
+                  "selfMs": 0.040005
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.039585,
+              "p99Ms": 0.056971,
+              "maxMs": 0.056971,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.053091,
+                "p99Ms": 0.111649,
+                "maxMs": 0.111649,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 0.083883,
+              "p99Ms": 0.148514,
+              "maxMs": 0.148514,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.093572,
+                "p99Ms": 0.211444,
+                "maxMs": 0.211444,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 0.520185,
+              "p99Ms": 1.098266,
+              "maxMs": 1.098266,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.565132,
+                "p99Ms": 1.001226,
+                "maxMs": 1.001226,
+                "over8_3Ms": 0
+              }
+            }
+          ]
+        },
+        {
+          "kind": "scattered",
+          "metadata": {
+            "insertionEdits": 50000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 30000,
+            "placementRuns": 70001,
+            "forkRecords": 20000,
+            "textUnits": 8120000
+          },
+          "offset": 4060000,
+          "runLookupsForOneAuthorApply": 10,
+          "typing": {
+            "count": 3100,
+            "medianMs": 0.005799,
+            "p99Ms": 0.106693,
+            "maxMs": 0.392916,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 0.006351,
+            "p99Ms": 0.012936,
+            "maxMs": 0.012936,
+            "over8_3Ms": 0,
+            "visitedEdges": 143
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.262383,
+                  "selfMs": 0.242445
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002709,
+                  "selfMs": 0.002214
+                },
+                "run": {
+                  "calls": 20,
+                  "inclusiveMs": 0.003623,
+                  "selfMs": 0.003623
+                },
+                "ancestor": {
+                  "calls": 2,
+                  "inclusiveMs": 0.001967,
+                  "selfMs": 0.001245
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002538,
+                  "selfMs": 0.002538
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 2,
+                  "inclusiveMs": 0.001731,
+                  "selfMs": 0.001731
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.014945,
+                  "selfMs": 0.009162
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.002134,
+                  "selfMs": 0.002134
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 0.319069,
+                  "selfMs": 0.2766
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.00115,
+                  "selfMs": 0.000788
+                },
+                "run": {
+                  "calls": 65,
+                  "inclusiveMs": 0.010192,
+                  "selfMs": 0.010192
+                },
+                "ancestor": {
+                  "calls": 11,
+                  "inclusiveMs": 0.008158,
+                  "selfMs": 0.004855
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.001228,
+                  "selfMs": 0.001228
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 11,
+                  "inclusiveMs": 0.007239,
+                  "selfMs": 0.007239
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 0.02607,
+                  "selfMs": 0.014119
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.005198,
+                  "selfMs": 0.005198
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 0.956209,
+                  "selfMs": 0.660698
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.00122,
+                  "selfMs": 0.000848
+                },
+                "run": {
+                  "calls": 515,
+                  "inclusiveMs": 0.072728,
+                  "selfMs": 0.072728
+                },
+                "ancestor": {
+                  "calls": 101,
+                  "inclusiveMs": 0.066561,
+                  "selfMs": 0.039114
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000874,
+                  "selfMs": 0.000874
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 101,
+                  "inclusiveMs": 0.063259,
+                  "selfMs": 0.063259
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 0.161738,
+                  "selfMs": 0.07847
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.041438,
+                  "selfMs": 0.041438
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.203608,
+              "p99Ms": 0.389456,
+              "maxMs": 0.389456,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.224878,
+                "p99Ms": 0.568592,
+                "maxMs": 0.568592,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 0.254273,
+              "p99Ms": 0.425739,
+              "maxMs": 0.425739,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.283173,
+                "p99Ms": 0.797258,
+                "maxMs": 0.797258,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 0.765349,
+              "p99Ms": 1.463662,
+              "maxMs": 1.463662,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.802885,
+                "p99Ms": 1.487406,
+                "maxMs": 1.487406,
+                "over8_3Ms": 0
+              }
+            }
+          ]
+        },
+        {
+          "kind": "deep-tail",
+          "metadata": {
+            "insertionEdits": 5000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 2999,
+            "placementRuns": 5002,
+            "forkRecords": 1001,
+            "textUnits": 8102001
+          },
+          "offset": 8102001,
+          "runLookupsForOneAuthorApply": 15,
+          "typing": {
+            "count": 3100,
+            "medianMs": 0.004359,
+            "p99Ms": 0.034106,
+            "maxMs": 0.05925,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 0.002732,
+            "p99Ms": 0.00322,
+            "maxMs": 0.00322,
+            "over8_3Ms": 0,
+            "visitedEdges": 77
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.057457,
+                  "selfMs": 0.01681
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002337,
+                  "selfMs": 0.001945
+                },
+                "run": {
+                  "calls": 31,
+                  "inclusiveMs": 0.003838,
+                  "selfMs": 0.003838
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000484,
+                  "selfMs": 0.000484
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 3,
+                  "inclusiveMs": 0.000339,
+                  "selfMs": 0.000339
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.039195,
+                  "selfMs": 0.035087
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.001291,
+                  "selfMs": 0.001291
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 0.07354,
+                  "selfMs": 0.048623
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000655,
+                  "selfMs": 0.00036
+                },
+                "run": {
+                  "calls": 49,
+                  "inclusiveMs": 0.006196,
+                  "selfMs": 0.006196
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000197,
+                  "selfMs": 0.000197
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 12,
+                  "inclusiveMs": 0.000858,
+                  "selfMs": 0.000858
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 0.017473,
+                  "selfMs": 0.012712
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.005249,
+                  "selfMs": 0.005249
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 0.500158,
+                  "selfMs": 0.368045
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.001027,
+                  "selfMs": 0.000719
+                },
+                "run": {
+                  "calls": 229,
+                  "inclusiveMs": 0.029927,
+                  "selfMs": 0.029927
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.0003,
+                  "selfMs": 0.0003
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 102,
+                  "inclusiveMs": 0.006857,
+                  "selfMs": 0.006857
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 0.076547,
+                  "selfMs": 0.060207
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.03513,
+                  "selfMs": 0.03513
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.027418,
+              "p99Ms": 0.04109,
+              "maxMs": 0.04109,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.038913,
+                "p99Ms": 0.133889,
+                "maxMs": 0.133889,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 0.066126,
+              "p99Ms": 0.091665,
+              "maxMs": 0.091665,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.080142,
+                "p99Ms": 0.117071,
+                "maxMs": 0.117071,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 0.442984,
+              "p99Ms": 0.478323,
+              "maxMs": 0.478323,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.471898,
+                "p99Ms": 0.520528,
+                "maxMs": 0.520528,
+                "over8_3Ms": 0
+              }
+            }
+          ]
+        },
+        {
+          "kind": "deep-tail",
+          "metadata": {
+            "insertionEdits": 50000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 29999,
+            "placementRuns": 50002,
+            "forkRecords": 10001,
+            "textUnits": 8120001
+          },
+          "offset": 8120001,
+          "runLookupsForOneAuthorApply": 19,
+          "typing": {
+            "count": 3100,
+            "medianMs": 0.005147,
+            "p99Ms": 0.107792,
+            "maxMs": 0.240119,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 0.003031,
+            "p99Ms": 0.017782,
+            "maxMs": 0.017782,
+            "over8_3Ms": 0,
+            "visitedEdges": 95
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.273629,
+                  "selfMs": 0.242995
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002815,
+                  "selfMs": 0.002373
+                },
+                "run": {
+                  "calls": 39,
+                  "inclusiveMs": 0.014973,
+                  "selfMs": 0.014973
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.00058,
+                  "selfMs": 0.00058
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 3,
+                  "inclusiveMs": 0.000422,
+                  "selfMs": 0.000422
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.026332,
+                  "selfMs": 0.012581
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.00252,
+                  "selfMs": 0.00252
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 0.316162,
+                  "selfMs": 0.279401
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.001133,
+                  "selfMs": 0.000781
+                },
+                "run": {
+                  "calls": 57,
+                  "inclusiveMs": 0.013913,
+                  "selfMs": 0.013913
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000365,
+                  "selfMs": 0.000365
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 12,
+                  "inclusiveMs": 0.000857,
+                  "selfMs": 0.000857
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 0.027611,
+                  "selfMs": 0.016189
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.005789,
+                  "selfMs": 0.005789
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 0.828714,
+                  "selfMs": 0.670587
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.001098,
+                  "selfMs": 0.000779
+                },
+                "run": {
+                  "calls": 237,
+                  "inclusiveMs": 0.039777,
+                  "selfMs": 0.039777
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000349,
+                  "selfMs": 0.000349
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 102,
+                  "inclusiveMs": 0.006145,
+                  "selfMs": 0.006145
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 0.097521,
+                  "selfMs": 0.074032
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.038143,
+                  "selfMs": 0.038143
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.273109,
+              "p99Ms": 0.457037,
+              "maxMs": 0.457037,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.233656,
+                "p99Ms": 0.262781,
+                "maxMs": 0.262781,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 0.157756,
+              "p99Ms": 0.178485,
+              "maxMs": 0.178485,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.293155,
+                "p99Ms": 29.574516,
+                "maxMs": 29.574516,
+                "over8_3Ms": 1
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 0.772422,
+              "p99Ms": 2.225328,
+              "maxMs": 2.225328,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.866866,
+                "p99Ms": 5.255009,
+                "maxMs": 5.255009,
+                "over8_3Ms": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "after B2: experiment, shared machine",
+      "environment": {
+        "node": "v26.7.0",
+        "v8": "14.6.202.34-node.28",
+        "cpu": "Intel(R) Core(TM) i7-14700K",
+        "platform": "linux",
+        "release": "7.2.8-arch1-2"
+      },
+      "method": "100,000 lines / 8.1M initial UTF-16 units; 5,000 / 50,000 interleaved single-character inserts in batches of five concurrent authors, then 3,000 / 30,000 (one fewer for deep-tail) exact-ID tombstones. 31 independent restore-based samples after five warmups; 100 author/apply typing edits per sample. Timers include author/apply/allocation and observation counters, exclude history setup, pending authoring and validation; subscribed reconcile includes publication and a notification sink, excluding consumer text application and rendering. Reconcile verifies one by-reference restore and pending+1 applies. No retries/skips.",
+      "workloads": [
+        {
+          "kind": "scattered",
+          "metadata": {
+            "insertionEdits": 5000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 3000,
+            "placementRuns": 7001,
+            "forkRecords": 2000,
+            "textUnits": 8102000
+          },
+          "offset": 4051000,
+          "runLookupsForOneAuthorApply": 11,
+          "typing": {
+            "count": 3100,
+            "medianMs": 0.005338,
+            "p99Ms": 0.032911,
+            "maxMs": 0.138477,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 0.013024,
+            "p99Ms": 0.037054,
+            "maxMs": 0.037054,
+            "over8_3Ms": 0,
+            "visitedEdges": 111
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.230485,
+                  "selfMs": 0.068539
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.012623,
+                  "selfMs": 0.011535
+                },
+                "run": {
+                  "calls": 21,
+                  "inclusiveMs": 0.022361,
+                  "selfMs": 0.022361
+                },
+                "ancestor": {
+                  "calls": 2,
+                  "inclusiveMs": 0.012892,
+                  "selfMs": 0.011085
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.008968,
+                  "selfMs": 0.008968
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 2,
+                  "inclusiveMs": 0.010515,
+                  "selfMs": 0.010515
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.132781,
+                  "selfMs": 0.10633
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.003775,
+                  "selfMs": 0.003775
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 0.146358,
+                  "selfMs": 0.09351
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002087,
+                  "selfMs": 0.00156
+                },
+                "run": {
+                  "calls": 66,
+                  "inclusiveMs": 0.012545,
+                  "selfMs": 0.012545
+                },
+                "ancestor": {
+                  "calls": 11,
+                  "inclusiveMs": 0.010672,
+                  "selfMs": 0.006399
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000497,
+                  "selfMs": 0.000497
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 11,
+                  "inclusiveMs": 0.006822,
+                  "selfMs": 0.006822
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 0.035639,
+                  "selfMs": 0.020838
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.006274,
+                  "selfMs": 0.006274
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 0.82781,
+                  "selfMs": 0.517825
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.005081,
+                  "selfMs": 0.004552
+                },
+                "run": {
+                  "calls": 516,
+                  "inclusiveMs": 0.07188,
+                  "selfMs": 0.07188
+                },
+                "ancestor": {
+                  "calls": 101,
+                  "inclusiveMs": 0.067815,
+                  "selfMs": 0.041837
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.001023,
+                  "selfMs": 0.001023
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 101,
+                  "inclusiveMs": 0.054454,
+                  "selfMs": 0.054454
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 0.182639,
+                  "selfMs": 0.09879
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.04253,
+                  "selfMs": 0.04253
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.044159,
+              "p99Ms": 0.10945,
+              "maxMs": 0.10945,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.050058,
+                "p99Ms": 0.105687,
+                "maxMs": 0.105687,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 0.093743,
+              "p99Ms": 0.229657,
+              "maxMs": 0.229657,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.095465,
+                "p99Ms": 0.242439,
+                "maxMs": 0.242439,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 0.519639,
+              "p99Ms": 0.701772,
+              "maxMs": 0.701772,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.569311,
+                "p99Ms": 1.140918,
+                "maxMs": 1.140918,
+                "over8_3Ms": 0
+              }
+            }
+          ]
+        },
+        {
+          "kind": "scattered",
+          "metadata": {
+            "insertionEdits": 50000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 30000,
+            "placementRuns": 70001,
+            "forkRecords": 20000,
+            "textUnits": 8120000
+          },
+          "offset": 4060000,
+          "runLookupsForOneAuthorApply": 10,
+          "typing": {
+            "count": 3100,
+            "medianMs": 0.00598,
+            "p99Ms": 0.102739,
+            "maxMs": 0.265485,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 0.006086,
+            "p99Ms": 0.013107,
+            "maxMs": 0.013107,
+            "over8_3Ms": 0,
+            "visitedEdges": 143
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.249377,
+                  "selfMs": 0.231662
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002992,
+                  "selfMs": 0.002476
+                },
+                "run": {
+                  "calls": 20,
+                  "inclusiveMs": 0.003087,
+                  "selfMs": 0.003087
+                },
+                "ancestor": {
+                  "calls": 2,
+                  "inclusiveMs": 0.001995,
+                  "selfMs": 0.001272
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002695,
+                  "selfMs": 0.002695
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 2,
+                  "inclusiveMs": 0.001922,
+                  "selfMs": 0.001922
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.013087,
+                  "selfMs": 0.007151
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.002104,
+                  "selfMs": 0.002104
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 0.314391,
+                  "selfMs": 0.2736
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.001208,
+                  "selfMs": 0.000792
+                },
+                "run": {
+                  "calls": 65,
+                  "inclusiveMs": 0.010142,
+                  "selfMs": 0.010142
+                },
+                "ancestor": {
+                  "calls": 11,
+                  "inclusiveMs": 0.008098,
+                  "selfMs": 0.004802
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000587,
+                  "selfMs": 0.000587
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 11,
+                  "inclusiveMs": 0.007106,
+                  "selfMs": 0.007106
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 0.024404,
+                  "selfMs": 0.012966
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.005604,
+                  "selfMs": 0.005604
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 0.978509,
+                  "selfMs": 0.672354
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.001483,
+                  "selfMs": 0.001107
+                },
+                "run": {
+                  "calls": 515,
+                  "inclusiveMs": 0.077856,
+                  "selfMs": 0.077856
+                },
+                "ancestor": {
+                  "calls": 101,
+                  "inclusiveMs": 0.070306,
+                  "selfMs": 0.041617
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000725,
+                  "selfMs": 0.000725
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 101,
+                  "inclusiveMs": 0.063002,
+                  "selfMs": 0.063002
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 0.171872,
+                  "selfMs": 0.082923
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.040408,
+                  "selfMs": 0.040408
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.203013,
+              "p99Ms": 0.352768,
+              "maxMs": 0.352768,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.21782,
+                "p99Ms": 0.346761,
+                "maxMs": 0.346761,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 0.262127,
+              "p99Ms": 0.444796,
+              "maxMs": 0.444796,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.265818,
+                "p99Ms": 0.466215,
+                "maxMs": 0.466215,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 0.787058,
+              "p99Ms": 1.463007,
+              "maxMs": 1.463007,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.803534,
+                "p99Ms": 1.444965,
+                "maxMs": 1.444965,
+                "over8_3Ms": 0
+              }
+            }
+          ]
+        },
+        {
+          "kind": "deep-tail",
+          "metadata": {
+            "insertionEdits": 5000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 2999,
+            "placementRuns": 5002,
+            "forkRecords": 1001,
+            "textUnits": 8102001
+          },
+          "offset": 8102001,
+          "runLookupsForOneAuthorApply": 15,
+          "typing": {
+            "count": 3100,
+            "medianMs": 0.004386,
+            "p99Ms": 0.030513,
+            "maxMs": 0.050712,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 0.004089,
+            "p99Ms": 0.005509,
+            "maxMs": 0.005509,
+            "over8_3Ms": 0,
+            "visitedEdges": 77
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.068313,
+                  "selfMs": 0.018807
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.003701,
+                  "selfMs": 0.00324
+                },
+                "run": {
+                  "calls": 31,
+                  "inclusiveMs": 0.003873,
+                  "selfMs": 0.003873
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000586,
+                  "selfMs": 0.000586
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 3,
+                  "inclusiveMs": 0.0003,
+                  "selfMs": 0.0003
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.047949,
+                  "selfMs": 0.043778
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.00143,
+                  "selfMs": 0.00143
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 0.078217,
+                  "selfMs": 0.050978
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000819,
+                  "selfMs": 0.000503
+                },
+                "run": {
+                  "calls": 49,
+                  "inclusiveMs": 0.006215,
+                  "selfMs": 0.006215
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000257,
+                  "selfMs": 0.000257
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 12,
+                  "inclusiveMs": 0.000822,
+                  "selfMs": 0.000822
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 0.020158,
+                  "selfMs": 0.015304
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.004957,
+                  "selfMs": 0.004957
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 0.511348,
+                  "selfMs": 0.374935
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000978,
+                  "selfMs": 0.0007
+                },
+                "run": {
+                  "calls": 229,
+                  "inclusiveMs": 0.03004,
+                  "selfMs": 0.03004
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000385,
+                  "selfMs": 0.000385
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 102,
+                  "inclusiveMs": 0.006544,
+                  "selfMs": 0.006544
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 0.077839,
+                  "selfMs": 0.061444
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.038278,
+                  "selfMs": 0.038278
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.029896,
+              "p99Ms": 0.03521,
+              "maxMs": 0.03521,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.036625,
+                "p99Ms": 0.066942,
+                "maxMs": 0.066942,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 0.063462,
+              "p99Ms": 0.089072,
+              "maxMs": 0.089072,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.079327,
+                "p99Ms": 0.16325,
+                "maxMs": 0.16325,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 0.438709,
+              "p99Ms": 0.95722,
+              "maxMs": 0.95722,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.458388,
+                "p99Ms": 1.021704,
+                "maxMs": 1.021704,
+                "over8_3Ms": 0
+              }
+            }
+          ]
+        },
+        {
+          "kind": "deep-tail",
+          "metadata": {
+            "insertionEdits": 50000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 29999,
+            "placementRuns": 50002,
+            "forkRecords": 10001,
+            "textUnits": 8120001
+          },
+          "offset": 8120001,
+          "runLookupsForOneAuthorApply": 19,
+          "typing": {
+            "count": 3100,
+            "medianMs": 0.005121,
+            "p99Ms": 0.10359,
+            "maxMs": 0.298798,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 0.002986,
+            "p99Ms": 0.018077,
+            "maxMs": 0.018077,
+            "over8_3Ms": 0,
+            "visitedEdges": 95
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.269553,
+                  "selfMs": 0.245057
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.003332,
+                  "selfMs": 0.002853
+                },
+                "run": {
+                  "calls": 39,
+                  "inclusiveMs": 0.009791,
+                  "selfMs": 0.009791
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.00041,
+                  "selfMs": 0.00041
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 3,
+                  "inclusiveMs": 0.000398,
+                  "selfMs": 0.000398
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.02141,
+                  "selfMs": 0.012241
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.002135,
+                  "selfMs": 0.002135
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 0.314804,
+                  "selfMs": 0.281343
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.001058,
+                  "selfMs": 0.00072
+                },
+                "run": {
+                  "calls": 57,
+                  "inclusiveMs": 0.010815,
+                  "selfMs": 0.010815
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000282,
+                  "selfMs": 0.000282
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 12,
+                  "inclusiveMs": 0.000776,
+                  "selfMs": 0.000776
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 0.02522,
+                  "selfMs": 0.016311
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.005615,
+                  "selfMs": 0.005615
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 0.800433,
+                  "selfMs": 0.647781
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.001211,
+                  "selfMs": 0.000839
+                },
+                "run": {
+                  "calls": 237,
+                  "inclusiveMs": 0.039102,
+                  "selfMs": 0.039102
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.00037,
+                  "selfMs": 0.00037
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 102,
+                  "inclusiveMs": 0.005802,
+                  "selfMs": 0.005802
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 0.090918,
+                  "selfMs": 0.068507
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.039243,
+                  "selfMs": 0.039243
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.218205,
+              "p99Ms": 0.435468,
+              "maxMs": 0.435468,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.21173,
+                "p99Ms": 0.383467,
+                "maxMs": 0.383467,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 0.152503,
+              "p99Ms": 0.350539,
+              "maxMs": 0.350539,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.267506,
+                "p99Ms": 0.291867,
+                "maxMs": 0.291867,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 0.58664,
+              "p99Ms": 1.151734,
+              "maxMs": 1.151734,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 0.719495,
+                "p99Ms": 1.365238,
+                "maxMs": 1.365238,
+                "over8_3Ms": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "baseline A2: experiment, shared machine",
+      "environment": {
+        "node": "v26.7.0",
+        "v8": "14.6.202.34-node.28",
+        "cpu": "Intel(R) Core(TM) i7-14700K",
+        "platform": "linux",
+        "release": "7.2.8-arch1-2"
+      },
+      "method": "100,000 lines / 8.1M initial UTF-16 units; 5,000 / 50,000 interleaved single-character inserts in batches of five concurrent authors, then 3,000 / 30,000 (one fewer for deep-tail) exact-ID tombstones. 31 independent restore-based samples after five warmups; 100 author/apply typing edits per sample. Timers include author/apply/allocation and observation counters, exclude history setup, pending authoring and validation; subscribed reconcile includes publication and a notification sink, excluding consumer text application and rendering. Reconcile verifies one by-reference restore and pending+1 applies. No retries/skips.",
+      "workloads": [
+        {
+          "kind": "scattered",
+          "metadata": {
+            "insertionEdits": 5000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 3000,
+            "placementRuns": 7001,
+            "forkRecords": 2000,
+            "textUnits": 8102000
+          },
+          "offset": 4051000,
+          "runLookupsForOneAuthorApply": 8,
+          "typing": {
+            "count": 3100,
+            "medianMs": 0.060308,
+            "p99Ms": 0.115321,
+            "maxMs": 0.18853,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 1.028118,
+            "p99Ms": 3.50261,
+            "maxMs": 3.50261,
+            "over8_3Ms": 0,
+            "visitedEdges": 90635
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.164072,
+                  "selfMs": 0.04683
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.010768,
+                  "selfMs": 0.009945
+                },
+                "run": {
+                  "calls": 13,
+                  "inclusiveMs": 0.019876,
+                  "selfMs": 0.019876
+                },
+                "ancestor": {
+                  "calls": 2,
+                  "inclusiveMs": 0.007862,
+                  "selfMs": 0.007209
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.00841,
+                  "selfMs": 0.00841
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 2,
+                  "inclusiveMs": 0.009584,
+                  "selfMs": 0.009584
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.089257,
+                  "selfMs": 0.069852
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.003134,
+                  "selfMs": 0.003134
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 1.682409,
+                  "selfMs": 0.106563
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002129,
+                  "selfMs": 0.001653
+                },
+                "run": {
+                  "calls": 9040,
+                  "inclusiveMs": 0.900577,
+                  "selfMs": 0.900577
+                },
+                "ancestor": {
+                  "calls": 11,
+                  "inclusiveMs": 1.536829,
+                  "selfMs": 0.642181
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000536,
+                  "selfMs": 0.000536
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 11,
+                  "inclusiveMs": 0.006567,
+                  "selfMs": 0.006567
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 1.559642,
+                  "selfMs": 0.019888
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.006573,
+                  "selfMs": 0.006573
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 12.476095,
+                  "selfMs": 0.425164
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.01806,
+                  "selfMs": 0.017542
+                },
+                "run": {
+                  "calls": 99310,
+                  "inclusiveMs": 8.110833,
+                  "selfMs": 8.110833
+                },
+                "ancestor": {
+                  "calls": 101,
+                  "inclusiveMs": 11.844714,
+                  "selfMs": 3.770732
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000534,
+                  "selfMs": 0.000534
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 101,
+                  "inclusiveMs": 0.050239,
+                  "selfMs": 0.050239
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 11.935852,
+                  "selfMs": 0.078675
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.040436,
+                  "selfMs": 0.040436
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.039569,
+              "p99Ms": 0.100154,
+              "maxMs": 0.100154,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 1.39405,
+                "p99Ms": 3.897243,
+                "maxMs": 3.897243,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 0.59482,
+              "p99Ms": 1.031882,
+              "maxMs": 1.031882,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 2.499275,
+                "p99Ms": 8.290994,
+                "maxMs": 8.290994,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 6.087011,
+              "p99Ms": 8.158137,
+              "maxMs": 8.158137,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 8.456463,
+                "p99Ms": 12.484697,
+                "maxMs": 12.484697,
+                "over8_3Ms": 16
+              }
+            }
+          ]
+        },
+        {
+          "kind": "scattered",
+          "metadata": {
+            "insertionEdits": 50000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 30000,
+            "placementRuns": 70001,
+            "forkRecords": 20000,
+            "textUnits": 8120000
+          },
+          "offset": 4060000,
+          "runLookupsForOneAuthorApply": 7,
+          "typing": {
+            "count": 3100,
+            "medianMs": 0.819718,
+            "p99Ms": 1.464643,
+            "maxMs": 2.794051,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 8.749855,
+            "p99Ms": 9.729397,
+            "maxMs": 9.729397,
+            "over8_3Ms": 29,
+            "visitedEdges": 452444
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.278014,
+                  "selfMs": 0.261026
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.003494,
+                  "selfMs": 0.002839
+                },
+                "run": {
+                  "calls": 12,
+                  "inclusiveMs": 0.002355,
+                  "selfMs": 0.002355
+                },
+                "ancestor": {
+                  "calls": 2,
+                  "inclusiveMs": 0.000834,
+                  "selfMs": 0.000603
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002561,
+                  "selfMs": 0.002561
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 2,
+                  "inclusiveMs": 0.002027,
+                  "selfMs": 0.002027
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.011366,
+                  "selfMs": 0.007339
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.002758,
+                  "selfMs": 0.002758
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 18.373272,
+                  "selfMs": 0.378448
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002334,
+                  "selfMs": 0.001868
+                },
+                "run": {
+                  "calls": 90057,
+                  "inclusiveMs": 10.681267,
+                  "selfMs": 10.681267
+                },
+                "ancestor": {
+                  "calls": 11,
+                  "inclusiveMs": 17.91555,
+                  "selfMs": 7.248638
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000979,
+                  "selfMs": 0.000979
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 11,
+                  "inclusiveMs": 0.011111,
+                  "selfMs": 0.011111
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 17.955499,
+                  "selfMs": 0.032523
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.020772,
+                  "selfMs": 0.020772
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 145.848525,
+                  "selfMs": 1.100331
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000881,
+                  "selfMs": 0.000447
+                },
+                "run": {
+                  "calls": 990507,
+                  "inclusiveMs": 96.837912,
+                  "selfMs": 96.837912
+                },
+                "ancestor": {
+                  "calls": 101,
+                  "inclusiveMs": 144.315072,
+                  "selfMs": 47.572119
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000709,
+                  "selfMs": 0.000709
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 101,
+                  "inclusiveMs": 0.065748,
+                  "selfMs": 0.065748
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 144.490328,
+                  "selfMs": 0.1404
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.13174,
+                  "selfMs": 0.13174
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.194489,
+              "p99Ms": 0.254131,
+              "maxMs": 0.254131,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 6.302089,
+                "p99Ms": 7.137351,
+                "maxMs": 7.137351,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 7.638511,
+              "p99Ms": 9.935679,
+              "maxMs": 9.935679,
+              "over8_3Ms": 1,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 14.544871,
+                "p99Ms": 21.615597,
+                "maxMs": 21.615597,
+                "over8_3Ms": 31
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 80.503828,
+              "p99Ms": 83.041934,
+              "maxMs": 83.041934,
+              "over8_3Ms": 31,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 88.122275,
+                "p99Ms": 90.133294,
+                "maxMs": 90.133294,
+                "over8_3Ms": 31
+              }
+            }
+          ]
+        },
+        {
+          "kind": "deep-tail",
+          "metadata": {
+            "insertionEdits": 5000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 2999,
+            "placementRuns": 5002,
+            "forkRecords": 1001,
+            "textUnits": 8102001
+          },
+          "offset": 8102001,
+          "runLookupsForOneAuthorApply": 1006,
+          "typing": {
+            "count": 3100,
+            "medianMs": 0.148665,
+            "p99Ms": 0.229308,
+            "maxMs": 0.431255,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 0.380383,
+            "p99Ms": 0.834305,
+            "maxMs": 0.834305,
+            "over8_3Ms": 0,
+            "visitedEdges": 31016
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.047015,
+                  "selfMs": 0.017165
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002669,
+                  "selfMs": 0.002232
+                },
+                "run": {
+                  "calls": 9,
+                  "inclusiveMs": 0.001303,
+                  "selfMs": 0.001303
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000469,
+                  "selfMs": 0.000469
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 3,
+                  "inclusiveMs": 0.000292,
+                  "selfMs": 0.000292
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.028416,
+                  "selfMs": 0.026853
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.00137,
+                  "selfMs": 0.00137
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 0.069714,
+                  "selfMs": 0.049184
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.00116,
+                  "selfMs": 0.000786
+                },
+                "run": {
+                  "calls": 27,
+                  "inclusiveMs": 0.003678,
+                  "selfMs": 0.003678
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000271,
+                  "selfMs": 0.000271
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 12,
+                  "inclusiveMs": 0.000761,
+                  "selfMs": 0.000761
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 0.013542,
+                  "selfMs": 0.011204
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.00499,
+                  "selfMs": 0.00499
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 0.501667,
+                  "selfMs": 0.367192
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.001352,
+                  "selfMs": 0.001015
+                },
+                "run": {
+                  "calls": 207,
+                  "inclusiveMs": 0.027501,
+                  "selfMs": 0.027501
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000252,
+                  "selfMs": 0.000252
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 102,
+                  "inclusiveMs": 0.005867,
+                  "selfMs": 0.005867
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 0.076873,
+                  "selfMs": 0.063027
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.038165,
+                  "selfMs": 0.038165
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.029283,
+              "p99Ms": 0.035928,
+              "maxMs": 0.035928,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 1.27546,
+                "p99Ms": 2.422604,
+                "maxMs": 2.422604,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 0.069885,
+              "p99Ms": 0.090246,
+              "maxMs": 0.090246,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 1.288216,
+                "p99Ms": 2.407575,
+                "maxMs": 2.407575,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 0.441178,
+              "p99Ms": 0.466467,
+              "maxMs": 0.466467,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 1.947082,
+                "p99Ms": 2.990528,
+                "maxMs": 2.990528,
+                "over8_3Ms": 0
+              }
+            }
+          ]
+        },
+        {
+          "kind": "deep-tail",
+          "metadata": {
+            "insertionEdits": 50000,
+            "authors": 5,
+            "concurrentBatchSize": 5,
+            "tombstones": 29999,
+            "placementRuns": 50002,
+            "forkRecords": 10001,
+            "textUnits": 8120001
+          },
+          "offset": 8120001,
+          "runLookupsForOneAuthorApply": 10006,
+          "typing": {
+            "count": 3100,
+            "medianMs": 1.826129,
+            "p99Ms": 2.895617,
+            "maxMs": 4.678924,
+            "over8_3Ms": 0
+          },
+          "diff": {
+            "count": 31,
+            "medianMs": 3.741673,
+            "p99Ms": 4.077352,
+            "maxMs": 4.077352,
+            "over8_3Ms": 0,
+            "visitedEdges": 310014
+          },
+          "profiles": [
+            {
+              "pending": 1,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 2,
+                  "inclusiveMs": 0.258807,
+                  "selfMs": 0.245567
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.007945,
+                  "selfMs": 0.007361
+                },
+                "run": {
+                  "calls": 9,
+                  "inclusiveMs": 0.002627,
+                  "selfMs": 0.002627
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000862,
+                  "selfMs": 0.000862
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 3,
+                  "inclusiveMs": 0.000351,
+                  "selfMs": 0.000351
+                },
+                "integrate": {
+                  "calls": 2,
+                  "inclusiveMs": 0.009388,
+                  "selfMs": 0.007346
+                },
+                "retainPayloads": {
+                  "calls": 3,
+                  "inclusiveMs": 0.002638,
+                  "selfMs": 0.002638
+                }
+              }
+            },
+            {
+              "pending": 10,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 11,
+                  "inclusiveMs": 0.303818,
+                  "selfMs": 0.279963
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.002357,
+                  "selfMs": 0.001996
+                },
+                "run": {
+                  "calls": 27,
+                  "inclusiveMs": 0.004939,
+                  "selfMs": 0.004939
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000645,
+                  "selfMs": 0.000645
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 12,
+                  "inclusiveMs": 0.00085,
+                  "selfMs": 0.00085
+                },
+                "integrate": {
+                  "calls": 11,
+                  "inclusiveMs": 0.015146,
+                  "selfMs": 0.011875
+                },
+                "retainPayloads": {
+                  "calls": 12,
+                  "inclusiveMs": 0.005907,
+                  "selfMs": 0.005907
+                }
+              }
+            },
+            {
+              "pending": 100,
+              "methods": {
+                "author": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "apply": {
+                  "calls": 101,
+                  "inclusiveMs": 0.671069,
+                  "selfMs": 0.511309
+                },
+                "restore": {
+                  "calls": 1,
+                  "inclusiveMs": 0.004585,
+                  "selfMs": 0.004051
+                },
+                "run": {
+                  "calls": 207,
+                  "inclusiveMs": 0.031688,
+                  "selfMs": 0.031688
+                },
+                "ancestor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "first": {
+                  "calls": 1,
+                  "inclusiveMs": 0.000638,
+                  "selfMs": 0.000638
+                },
+                "last": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "successor": {
+                  "calls": 0,
+                  "inclusiveMs": 0,
+                  "selfMs": 0
+                },
+                "comparePosition": {
+                  "calls": 102,
+                  "inclusiveMs": 0.006153,
+                  "selfMs": 0.006153
+                },
+                "integrate": {
+                  "calls": 101,
+                  "inclusiveMs": 0.093973,
+                  "selfMs": 0.078055
+                },
+                "retainPayloads": {
+                  "calls": 102,
+                  "inclusiveMs": 0.04376,
+                  "selfMs": 0.04376
+                }
+              }
+            }
+          ],
+          "reconciliation": [
+            {
+              "pending": 1,
+              "count": 31,
+              "medianMs": 0.190848,
+              "p99Ms": 0.296173,
+              "maxMs": 0.296173,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 4.277753,
+                "p99Ms": 5.393322,
+                "maxMs": 5.393322,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 10,
+              "count": 31,
+              "medianMs": 0.236054,
+              "p99Ms": 0.364122,
+              "maxMs": 0.364122,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 4.340263,
+                "p99Ms": 5.92123,
+                "maxMs": 5.92123,
+                "over8_3Ms": 0
+              }
+            },
+            {
+              "pending": 100,
+              "count": 31,
+              "medianMs": 0.59299,
+              "p99Ms": 0.937643,
+              "maxMs": 0.937643,
+              "over8_3Ms": 0,
+              "subscribed": {
+                "count": 31,
+                "medianMs": 6.275535,
+                "p99Ms": 6.606384,
+                "maxMs": 6.606384,
+                "over8_3Ms": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

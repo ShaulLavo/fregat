@@ -38,6 +38,8 @@ export type OffsetEdit = {
   readonly deleteCount: number
   readonly text: string
 }
+/** Effective edits use offsets in the previous projection, matching the editor's TextEdit. */
+export type EffectiveEdit = { readonly from: number; readonly to: number; readonly text: string }
 export type AuthorContext = Omit<Envelope, 'change'> & {
   readonly allocate: (left: LeftOrigin, count: number) => CharId
 }
@@ -45,6 +47,7 @@ export type AuthorContext = Omit<Envelope, 'change'> & {
 /** Snapshots are immutable and reusable; the engine owns their representation. */
 export interface Engine<Snapshot = unknown> {
   text(): string
+  changesBetween(snapshot: Snapshot): readonly EffectiveEdit[]
   /** Diagnostic inventory sorted by bunch/counter; hidden IDs retain their visible gap. */
   characters(): readonly CharacterIdentity[]
   /** Applies text edits and atomic effect states, retaining provenance in snapshots. */
