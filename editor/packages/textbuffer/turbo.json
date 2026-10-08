@@ -1,0 +1,4 @@
+{
+  "extends": ["//"],
+  "tasks": { "test": { "env": ["COLLAB_STRESS"] } }
+}

@@ -345,3 +345,29 @@ Remaining limits:
 - Previews and interactive edits share each worker's queue (measured above); scheduling is left out until a user-visible delay is shown.
 - Tree-sitter's runtime does not load in Bun workers, so built-in palette preview tests run in the browser project.
 - No physical iPhone run.
+
+## October 2026 issue follow-ups
+
+Status: Approved, retained by [Plan 336 closeout](issue-closeout-2026-10.md).
+These are remaining execution items. Closing their tracker records does not certify a fix
+or change acceptance of an earlier delivered milestone. Each original thread retains its
+full reproduction, comments and historical artifacts. Source links below pin the reviewed
+main revision; recheck them before implementation.
+
+### Issue 855
+
+Source: [#855: Investigate streaming code-fence highlighting: retained documents, per-fence cancellation, and bounded pending work](https://github.com/ShaulLavo/fregat/issues/855), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/855).
+Current owner: [packages/markdown/src/hooks/use-highlighted-code.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/packages/markdown/src/hooks/use-highlighted-code.ts).
+
+Streaming fence cleanup currently marks active=false but does not cancel underlying computation. The theme adapter owns a shared AbortController and the highlighting service owns transient snippets. Measure submitted/completed/painted versions and worker time first. Evaluate one active plus newest pending job per fence, retained document analysis and per-owner cancellation if obsolete work is material. Preserve exact provider text, token offsets, theme/language/session identity and foreground priority. Do not treat a stale-result paint guard as computational cancellation.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 860
+
+Source: [#860: Explore lossless string-representation optimization in V8 and JavaScriptCore on the actual highlighting pipeline](https://github.com/ShaulLavo/fregat/issues/860), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/860).
+Current owner: [editor/packages/editor/src/shiki/shiki.worker.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/editor/packages/editor/src/shiki/shiki.worker.ts).
+
+String representation is an owner-requested experiment, not an established bottleneck. Map V8 one/two-byte strings and slices/ropes, JSC eight/sixteen-bit strings, Oniguruma WASM and current worker/native boundaries before adding copies. Preserve all UTF-16 code units, offsets, Unicode and lone surrogates. Count conversion, allocation and transfer costs, compare Chromium and WebKit independently, and sequence the work with owned-parser migration. Keep a zero-conversion control; no universal performance claim follows from representation alone.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.

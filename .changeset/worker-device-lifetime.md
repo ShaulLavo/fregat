@@ -2,4 +2,4 @@
 'ghostty-webgpu': patch
 ---
 
-Release each worker WebGPU device once and wait for pending acquisition and recovery cleanup before confirming disposal. Bound shutdown waits with a timeout, including failures while the worker is idle.
+Fixed worker terminal shutdown confirming disposal before GPU cleanup finished. Shutdown now waits for pending device acquisition and recovery, and reports a timeout if cleanup cannot finish, including while the worker is idle.

@@ -1,3 +1,4 @@
+import type { IdentityIndex } from './identityRuns'
 import type { StandInTable } from './standIns'
 import type { DocumentLineEnding } from './lineEndings'
 
@@ -161,6 +162,7 @@ export type PieceTableReverseIndex = {
 }
 
 export type PieceTableTreeSnapshot = {
+  readonly charIds: IdentityIndex | null
   // Storage maintenance may republish this with equal text; never key a cache on its identity.
   readonly buffers: PieceTableBuffers
   readonly root: PieceTreeNode | null

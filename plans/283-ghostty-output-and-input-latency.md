@@ -416,3 +416,92 @@ product performance work remains separate.
 - [x] Balance four pairs, guard presentation-after-submission, add a recorded Linux fixture, slow measured-window GPU sampling and retry idle timeouts.
 - [x] Rerun counts 1 and 17 in separate idle-GPU quiet windows: 2700/1800 output frames respectively, four pairs and 96 latency samples per operation.
 - [x] Refresh compact evidence, attribution and PR numbers; commit by path, push and reply without merging.
+
+## October 2026 issue follow-ups
+
+Status: Approved, retained by [Plan 336 closeout](issue-closeout-2026-10.md).
+These are remaining execution items. Closing their tracker records does not certify a fix
+or change acceptance of an earlier delivered milestone. Each original thread retains its
+full reproduction, comments and historical artifacts. Source links below pin the reviewed
+main revision; recheck them before implementation.
+
+### Issue 363
+
+Source: [#363: benchmark: legacy Unicode diagnostic can crash ghostty-web WASM](https://github.com/ShaulLavo/fregat/issues/363), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/363#issuecomment-6048588512).
+Current owner: [ghostty-webgpu/bench/comparison-entry.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/ghostty-webgpu/bench/comparison-entry.ts).
+
+Pinned external ghostty-web 0.4.0 crashed in the legacy Unicode diagnostic at call 23 with 35 writes of 4,118 bytes. PR #432 isolated that browser, retained the failure and continued diagnostics with an overall failing exit. The external crash remains unresolved. Newer Pi text canaries also omitted combining and ZWJ components; distinguish serialization from visible rendering with exact source and frozen visuals. Preserve rejected or skipped comparator status. A bounded ASCII-only exception does not prove Unicode parity. This lane does no further crash debugging.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 391
+
+Source: [#391: ghostty-webgpu: NVIDIA sampler returns empty GPU list during paired xterm DOM ASCII traces (unconfirmed cause)](https://github.com/ShaulLavo/fregat/issues/391), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/391#issuecomment-5976379275).
+Current owner: [ghostty-webgpu/scripts/comparison-gpu.mjs](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/ghostty-webgpu/scripts/comparison-gpu.mjs).
+
+The original paired xterm DOM ASCII trace received an empty NVIDIA GPU list. Receipts, integer deadlines and the explicit 10-second trace budget shipped in PRs #397, #421 and #401; ordinary acquisition remains 2 seconds. Four actual monitor controls distinguish healthy, empty exit-zero, a 2,400 ms child timeout and a blocked parent whose child exited around 265 ms. Those controls prove possible signatures, not the historical cause. Capture independent child completion and parent deadline-delivery times in the same failing window. Keep original failures rejected and raw stdout, stderr, exit and signal intact.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 463
+
+Source: [#463: ghostty-webgpu: verify queue ownership during replacement and realm cancellation (unconfirmed)](https://github.com/ShaulLavo/fregat/issues/463), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/463#issuecomment-5968358760).
+Current owner: [ghostty-webgpu/src/render/renderer.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/ghostty-webgpu/src/render/renderer.ts).
+
+PR #488 retained hardware and SwiftShader browser callback, restore and readback ordering, with 180 plus 18 records. A pending JavaScript callback does not establish pending GPU work or final native Queue/Device release. Replacement and realm-cancellation ownership remain unconfirmed. Keep the browser probe as a control; investigate the native lifetime boundary with explicit queue/device identities and release evidence under a separately owned bounded lane. Do not label this a renderer defect or use a browser callback as physical completion.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 498
+
+Source: [#498: ghostty benchmark: Mac presentation-feedback qualification failed for native WebGL and xterm WebGL](https://github.com/ShaulLavo/fregat/issues/498), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/498#issuecomment-5968589914).
+Current owner: [ghostty-webgpu/scripts/comparison-runner.mjs](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/ghostty-webgpu/scripts/comparison-runner.mjs).
+
+Mac native WebGL green-glyph capture timed out and xterm WebGL submitted/committed feedback also failed. Chrome 154 screencast timestamps came from callback wall time before PNG encoding, not reference_time or a monotonic presentation clock. The failed capture lacks its exact upper bound. Retain operation/frame identity, cross-clock anchors and uncertainty before correlating these records. Do not use adjacent frames or callback time as presentation. Mac capture waits for the terminal wave to release that host; no passing timing rerun rehabilitates the failed window.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 509
+
+Source: [#509: ghostty-webgpu: unconfirmed split ZWJ glyphs in retained Mac correctness captures](https://github.com/ShaulLavo/fregat/issues/509), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/509#issuecomment-6052643281).
+Current owner: [ghostty-webgpu/bench/comparison-fixtures.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/ghostty-webgpu/bench/comparison-fixtures.ts).
+
+Retained Mac, Linux and Pi native captures split ZWJ glyphs despite matching logical source. Some xterm GPU controls also split while Linux DOM/Canvas controls join. DEC 2027 native-cell evidence in #620 shows mode-specific spans; a split glyph alone is not a renderer defect. The latest Pi R07 had native splits, joined xterm, 600 ticks and equal logical hashes, with native mode attribution unknown. Preserve frozen images, exact sequences, terminal modes and cell/row receipts. Separate Canvas cross-cell joining from native segmentation; visual acceptance needs its own qualified comparison.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 557
+
+Source: [#557: ghostty-webgpu: unconfirmed headed cursor screenshot RGB mismatch](https://github.com/ShaulLavo/fregat/issues/557), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/557#issuecomment-5971605602).
+Current owner: [ghostty-webgpu/src/render/tests](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/ghostty-webgpu/src/render/tests).
+
+The headed hardware cursor comparison observed DOM RGB 237 versus Canvas 238 at pixel 21,1. SwiftShader passed; both historical native control and candidate showed the hardware mismatch. The color conversion, edge and shaping cause remains unknown. Reproduce the exact cursor fixture with renderer/device/font identity and raw pixels, then isolate the conversion or coverage boundary. Keep the strict guard and frozen control. Do not widen tolerance merely because both arms share the discrepancy.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 581
+
+Source: [#581: ghostty benchmark: Linux headed DOM count1 fails screenshot stability and presentation qualification](https://github.com/ShaulLavo/fregat/issues/581), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/581#issuecomment-5972814690).
+Current owner: [ghostty-webgpu/scripts/comparison-render.mjs](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/ghostty-webgpu/scripts/comparison-render.mjs).
+
+Linux headed DOM count=1 failed screenshot stability or positive presentation feedback for both native and xterm. Count=17 qualified on the same frozen sources. The original 16 selected frame IDs and 12 presented IDs were disjoint under strict identity matching. Retain this diagnostic split and exact selected/presented receipts. Find the missing capture or presentation boundary without a timing fallback, adjacent-frame matching or threshold relaxation. The count=17 control does not qualify the count=1 window.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 696
+
+Source: [#696: Unconfirmed main CI: worker new press fails during stale selection release](https://github.com/ShaulLavo/fregat/issues/696), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/696#issuecomment-5988134037).
+Current owner: [ghostty-webgpu/src/dom/tests/selection-worker-ownership.browser.test.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/ghostty-webgpu/src/dom/tests/selection-worker-ownership.browser.test.ts).
+
+A new selection press failed while releasing a stale worker selection, reporting TerminalWorkerError at selectionPress/execution 500. PR #751 repaired an independently reproduced duplicate-layout selection identity and improved receipts. The historical callback cause was absent, so that repair cannot explain every original failure. Preserve the exact pending release, terminal/layout/press identities and underlying callback failure on the next natural occurrence. Keep cancellation, disposal and new-press controls distinct.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 905
+
+Source: [#905: Unconfirmed: passing navigation scenario logs a terminal WASM fetch error](https://github.com/ShaulLavo/fregat/issues/905), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/905#issuecomment-6036363223).
+Current owner: [ghostty-webgpu/src/core/runtime.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/ghostty-webgpu/src/core/runtime.ts).
+
+A passing composer-insert navigation logged GhosttyError unable to fetch WASM with nested TypeError Failed to fetch. The later terminal and failed fetch belonged to different browser instances; a later HTTP 200 lacked an independently retained receipt. Synthetic departure handling already exists. Compare a healthy cold mount with a delayed actual WASM request during native navigation. Retain CDP request/failure, browser instance, query and mount identities. Do not wrap unrelated instances into a recovery claim or suppress fetch failures without proving abandonment.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.

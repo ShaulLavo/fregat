@@ -2,4 +2,4 @@
 '@singapore-editor/core': patch
 ---
 
-Expose the default row overscan so benchmark tooling can bound retained rows against the editor's viewport policy.
+Added the `DEFAULT_OVERSCAN` export, the default number of rows the editor renders beyond the visible area.

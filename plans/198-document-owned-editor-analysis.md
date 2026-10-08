@@ -375,3 +375,47 @@ The accepted cost is more retained analysis in exchange for warm attachment. Uni
 that cost and provider configuration behavior before choosing eviction thresholds. It must also
 identify syntax callbacks that require a mounted view and leave those callbacks with the view.
 These are implementation measurements, not reasons to introduce another document owner.
+
+## October 2026 issue follow-ups
+
+Status: Approved, retained by [Plan 336 closeout](issue-closeout-2026-10.md).
+These are remaining execution items. Closing their tracker records does not certify a fix
+or change acceptance of an earlier delivered milestone. Each original thread retains its
+full reproduction, comments and historical artifacts. Source links below pin the reviewed
+main revision; recheck them before implementation.
+
+### Issue 622
+
+Source: [#622: Unconfirmed: prepared-open browser case emits ResizeObserver loop error in CI](https://github.com/ShaulLavo/fregat/issues/622), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/622#issuecomment-5989570079).
+Current owner: [apps/web/test/env/settle-layout.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/web/test/env/settle-layout.ts).
+
+Prepared-open and other passing browser contexts emitted ResizeObserver loop completed with undelivered notifications. settle-layout and editor resize callbacks are current leads, not established causes. A nearby syntax-readiness failure does not show resize caused it. Capture the observer target, callback/reflow sequence and actual browser error in a bounded prepared-open case, including a healthy layout control. Fix feedback at its owner if reproduced; preserve delivery and syntax assertions and do not suppress the event globally.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 650
+
+Source: [#650: Unconfirmed: completed editor syntax scenario reports CancelledError prefetch as error](https://github.com/ShaulLavo/fregat/issues/650), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/650#issuecomment-5978083532).
+Current owner: [apps/web/src/features/editor/utils/language-server-plugin.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/web/src/features/editor/utils/language-server-plugin.ts).
+
+A healthy editor-syntax-native scenario logged a prefetch CancelledError as error. A separate healthy editor-type-burst logged LspRequestCancelledError near the language-server callback. Shared cause and normal cancellation ownership are unconfirmed. Reproduce each scenario with query/mutation owner, request identity, cancellation initiator and final active result. Only classify cancellation as routine after proving it belongs to abandoned work; preserve actionable failures. A name-based error suppression is not a verified small fix.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 794
+
+Source: [#794: Unconfirmed: retained revisit browser control sees zero painted token runs](https://github.com/ShaulLavo/fregat/issues/794), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/794#issuecomment-5994215215).
+Current owner: [apps/web/src/features/editor/tests/prepared-open.browser.tsx](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/web/src/features/editor/tests/prepared-open.browser.tsx).
+
+One four-file browser run expected more than two painted token runs on retained revisit and saw zero. The original composition later passed 21/21 controls and exposed seven final token runs. Shared-server syntax-setting toggles are only a race hypothesis. Capture server/settings revision, analysis document identity and accepted/painted tokens in that original composition. Preserve readiness and paint assertions; do not infer a fixed race from a passing isolated case.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Issue 798
+
+Source: [#798: Reload sampler aborts on unhandled route.fetch ECONNRESET during bootstrap](https://github.com/ShaulLavo/fregat/issues/798), [latest reviewed evidence](https://github.com/ShaulLavo/fregat/issues/798#issuecomment-6049948364).
+Current owner: [apps/web/retention-acceptance.vitest.config.ts](https://github.com/ShaulLavo/fregat/blob/a713deece883494bc3ec022f2b3ebb2bf192fcd9/apps/web/retention-acceptance.vitest.config.ts).
+
+Original PR #795 bootstrap route.fetch ECONNRESET remains unexplained. PR #800 retained error/artifact/cleanup facts; later stale-idle-connection reuse evidence applies to its own packet. PRs #897/#906 were diagnostics. PR #928 framing experimentation closed unmerged. PR #939 replaced relay with native route continuation and repaired the current first-reload deadline, with natural CI 37709556303 passing five reload and three layout cases at unchanged 30 seconds, first case 23,006 ms. Preserve original and later failures separately. Capture native network failure and pending phase on the same navigation clock; do not sum before/after navigation clocks or claim the original reset was solved.
+
+- [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
