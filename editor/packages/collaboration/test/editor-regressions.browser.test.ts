@@ -1,10 +1,6 @@
 import { afterEach, expect, test } from 'vitest'
 import { Editor } from '@singapore-editor/core/editor'
-import {
-  applyBatchToPieceTable,
-  createPieceTableSnapshot,
-  materializePieceTableFullText,
-} from '@singapore-editor/textbuffer'
+import { applyBatchToPieceTable, materializePieceTableFullText } from '@singapore-editor/textbuffer'
 import {
   createEditorBufferSession,
   acquireDocumentMutationLease,
@@ -129,7 +125,7 @@ test('review: native undo after detachment publishes matching inverse and preser
   expect(text(editor)).toBe('seedownremote')
   editor.removePlugin(plugin)
   const before = editor.getBufferSession()!.getSnapshot()
-  let edits: readonly import('@singapore-editor/core/extensions').TextEdit[] | undefined
+  let edits: readonly import('@singapore-editor/textbuffer').PieceTableEdit[] | undefined
   editor.getBufferSession()!.buffer.subscribe((event) => {
     if (event.change.kind === 'undo') edits = event.change.edits
   })
@@ -259,4 +255,50 @@ test('a repaired surrogate seam within a batch remains a valid whole-pair edit',
   ])
   room.flush()
   expect(room.texts()).toEqual(['😁abX', '😁abX'])
+})
+
+test('split rejoin recovers confirmed losing origins before mid-election typing', () => {
+  room = new EditorRoom(2, 'seed')
+  const a = room.connections[0]!.session
+  const b = room.connections[1]!.session
+  a.disconnect(b.peer)
+  b.disconnect(a.peer)
+  room.flush()
+  room.editors[0]!.edit({ from: 4, to: 4, text: 'A' })
+  room.flush()
+  room.editors[1]!.edit({ from: 0, to: 0, text: 'X' })
+  room.flush()
+  room.editors[1]!.edit({ from: 0, to: 0, text: 'Y' })
+  room.flush()
+  a.connect(b.peer)
+  b.connect(a.peer)
+  room.editors[0]!.edit({ from: 5, to: 5, text: 'B' })
+  room.flush()
+  expect(room.texts()).toEqual(['YXseedAB', 'YXseedAB'])
+  expect(room.connections[0]!.document.participant.state().pending).toEqual([])
+  expect(room.connections[0]!.document.participant.state().blocked).toEqual([])
+})
+
+test('participant departure drains pending typing before closing its session', () => {
+  room = new EditorRoom(2, 'seed')
+  room.editors[1]!.edit({ from: 4, to: 4, text: 'departure' })
+  room.connections[1]!.session.leave()
+  room.flush()
+  expect(room.connections[1]!.session.status).toBe('left')
+  expect(room.texts()).toEqual(['seeddeparture', 'seeddeparture'])
+})
+
+test('detached native Undo and Redo use the merged text as their fresh base', () => {
+  room = new EditorRoom(2, 'seed')
+  room.editors[0]!.edit({ from: 4, to: 4, text: 'own' })
+  room.flush()
+  room.editors[1]!.edit({ from: 7, to: 7, text: 'remote' })
+  room.flush()
+  const editor = room.editors[0]!
+  editor.setPlugins([])
+  editor.edit({ from: 13, to: 13, text: 'native' })
+  editor.dispatchCommand('undo')
+  expect(text(editor)).toBe('seedownremote')
+  editor.dispatchCommand('redo')
+  expect(text(editor)).toBe('seedownremotenative')
 })
