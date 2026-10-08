@@ -347,6 +347,17 @@ Freeze the candidate in a separate directory after building it. Keep both sets a
 dependencies available. Each set includes all public packages' `src`, `dist`, and manifests. The
 runner verifies their receipts and the built runtime graph.
 
+These snapshots target Vite's production browser imports. Export resolution follows manifest
+condition order with `browser`, `module`, `production`, `import`, and `default` active, including
+nested conditions, fallback arrays, and root-export shorthand. Every selected target must stay
+inside the package's frozen `dist`. The CLI and `loadPackageSet` report unavailable exports in
+`skippedExports`, with their specifier and reason. For example, collaboration stays in the set
+while its Bun-only `./server` export is skipped. Importing a skipped export fails the runtime
+build with its skip reason. Exact exports take priority over wildcard exports; wildcard exports
+use the longest prefix, then the longest complete pattern. These rules apply to browser targets
+and skipped exports alike. Server files outside `src` and `dist` remain outside this browser
+snapshot; its package manifest preserves the original export map.
+
 Baseline and candidate alternate within randomized repetition pairs in one Chromium session.
 Each measure reports the median of paired p95 differences, a fixed declared historical noise budget,
 and a 95% bootstrap interval over repetitions. Native, disabled, Tree-sitter, Shiki, and minimap

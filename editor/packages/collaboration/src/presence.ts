@@ -21,6 +21,7 @@ export type PresenceMessage = { readonly clock: number; readonly state: Presence
 export type LocalPresence = Omit<PresenceState, 'peerSessionId' | 'presenceClock' | 'documentId'>
 export type GapResolver = { resolveGap(gap: CharacterGap): number | undefined }
 export type PresenceObserver = {
+  connected(): void
   receive(peer: string, payload: unknown): void
   leave(peer: string): void
   departed(): void
@@ -92,6 +93,11 @@ export class Presence {
       this.readTime()
       this.prune()
       this.unsubscribe = this.channel.subscribePresence({
+        connected: () => {
+          if (this.clock === 0 || this.departed) return
+          this.readTime()
+          this.publish(this.local)
+        },
         receive: (peer, payload) => this.receive(peer, payload),
         leave: (peer) => this.remove(peer),
         departed: () => {
@@ -262,11 +268,11 @@ export class Presence {
     if (changed) this.changed()
   }
 
-  private publish(state: PresenceState): void {
+  private publish(state: PresenceState | null): void {
     this.clock = this.nextClock()
-    this.local = { ...state, presenceClock: this.clock }
+    this.local = state && { ...state, presenceClock: this.clock }
     this.queued = true
-    if (this.now - this.sent >= UPDATE_MS) this.sendCurrent()
+    if (!state || this.now - this.sent >= UPDATE_MS) this.sendCurrent()
   }
 
   private sendCurrent(): void {

@@ -170,6 +170,19 @@ export class CharIdAllocator {
     if (actor.length === 0) throw new RangeError('character identity actor must be nonempty')
   }
 
+  /** Reserve identities from a restored author log before allocating more characters. */
+  reserve(start: CharId, count: number): void {
+    validateCharIdSpan(start, count)
+    const prefix = `${this.actor}:`
+    if (!start.bunch.startsWith(prefix)) return
+    const suffix = start.bunch.slice(prefix.length)
+    const sequence = Number(suffix)
+    if (!Number.isSafeInteger(sequence) || sequence < 0 || String(sequence) !== suffix) return
+    this.runSeq = Math.max(this.runSeq, sequence + 1)
+    const next = Math.max(this.nextCounters.get(start.bunch) ?? 0, start.counter + count)
+    this.nextCounters.set(start.bunch, next)
+  }
+
   generateAfter(before: CharId | 'start', count = 1): CharId {
     if (!Number.isSafeInteger(count) || count <= 0) throw new RangeError('invalid identity count')
     if (before !== 'start') validateCharId(before)

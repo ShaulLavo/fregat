@@ -1,0 +1,64 @@
+# Write a plugin
+
+Use a plugin when a feature needs an editor-owned lifecycle. Start with a plain `EditorPlugin`, then use the extension entry point for commands and view contributions.
+
+## 1. Define a plugin
+
+```ts
+import { Editor } from '@singapore-editor/core/editor'
+import type { EditorPlugin } from '@singapore-editor/core/extensions'
+
+const lifecyclePlugin: EditorPlugin = {
+  name: 'example.lifecycle',
+  activate() {
+    console.log('Editor feature active')
+    return { dispose: () => console.log('Editor feature released') }
+  },
+}
+const editor = new Editor(document.querySelector<HTMLElement>('#editor')!, {
+  plugins: [lifecyclePlugin],
+})
+```
+
+## 2. Own the cleanup
+
+The disposable returned by activation releases the feature's work when that activation ends. A plugin that starts a worker, subscribes to host state or mounts DOM must release those resources through its lifecycle. Disposing the editor releases its owned plugin activations.
+
+## 3. Add only the contributions you need
+
+The `/extensions` entry point exposes view contributions, capability tokens and decoration APIs. The experimental `createPlugin` authoring API uses named inputs and view scopes to describe the data a feature reads. Its public API can still change. Consult the generated reference before adopting it.
+
+Plugins can work on an editor given plain text. Add a document id or external session when a feature needs shared identity, and support plain options when it only needs a URI or language.
+
+## Scroll gutters in a reading view
+
+Line numbers and fold markers stay at the left edge by default. For a documentation code block,
+set `gutterScroll: 'content'` on the editor. All gutter lanes then move horizontally with the text,
+including any leading inset.
+
+```ts
+import { Editor } from '@singapore-editor/core/editor'
+import { createFoldGutterPlugin, createLineGutterPlugin } from '@singapore-editor/gutters'
+
+const editor = new Editor(document.querySelector<HTMLElement>('#editor')!, {
+  gutterScroll: 'content',
+  plugins: [createLineGutterPlugin(), createFoldGutterPlugin()],
+})
+editor.setText('A line of text to read')
+```
+
+Gutters stay aligned with virtualized rows during vertical scrolling. Word wrap keeps its usual
+text width and continuation-row labels. Set `gutterScroll: 'fixed'`, or call
+`editor.setGutterScroll('fixed')`, to keep gutters at the viewport edge.
+
+## If it doesn't work
+
+### A feature still runs after closing the editor
+
+Put each listener and worker under an owned disposable. Check externally supplied services separately from the editor's resources.
+
+### The plugin works only for named documents
+
+Check whether the feature actually needs shared identity. A URI or language can be a plain integration option for an unnamed editor.
+
+Continue with the [packages reference](/docs/reference/packages/) and [workers](../concepts/workers.md).

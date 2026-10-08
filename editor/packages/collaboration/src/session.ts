@@ -76,6 +76,7 @@ export class Session<E extends EditEnvelope> {
   readonly members = new Set<string>()
   private readonly presenceObservers = new Set<PresenceObserver>()
   private readonly presenceClocks = new Set<(now: number) => void>()
+  private readonly unreachable = new Map<string, number>()
   private phase: Phase<E> = { kind: 'waiting' }
   private authority: Authority
   private maxTerm = 0
@@ -161,23 +162,29 @@ export class Session<E extends EditEnvelope> {
   }
 
   connect(peer: string): void {
-    if (
-      this.phase.kind === 'left' ||
-      peer === this.peer ||
-      this.members.has(peer) ||
-      this.departed.has(peer)
-    )
-      return
-    if (this.members.size >= 8) throw new RangeError('A session supports up to eight peers')
-    this.members.add(peer)
-    this.observed.delete(peer)
-    this.negotiate()
+    if (this.phase.kind === 'left' || peer === this.peer || this.departed.has(peer)) return
+    const known = this.members.has(peer)
+    if (known && !this.unreachable.delete(peer)) return
+    if (!known) {
+      if (this.members.size >= 8) throw new RangeError('A session supports up to eight peers')
+      this.members.add(peer)
+      this.observed.delete(peer)
+      this.negotiate()
+    }
     this.send(peer, 'HELLO', { ...this.advertisement(this.branch), term: this.maxTerm })
+    for (const observer of this.presenceObservers) observer.connected()
   }
 
   disconnect(peer: string): void {
+    if (this.phase.kind === 'left' || !this.members.has(peer) || this.unreachable.has(peer)) return
+    this.unreachable.set(peer, this.now)
+  }
+
+  private removeMember(peer: string): void {
+    this.unreachable.delete(peer)
     if (!this.members.delete(peer) || this.phase.kind === 'left') return
     this.observed.delete(peer)
+    for (const observer of this.presenceObservers) observer.leave(peer)
     if (this.phase.kind === 'stable' && peer !== this.authority.host) return
     this.negotiate()
   }
@@ -185,7 +192,7 @@ export class Session<E extends EditEnvelope> {
   retire(peer: string): void {
     if (peer === this.peer) throw new TypeError('A session can retire only a remote peer')
     this.departed.add(peer)
-    this.disconnect(peer)
+    this.removeMember(peer)
     this.seen.delete(peer)
     this.transfers.delete(peer)
   }
@@ -200,13 +207,16 @@ export class Session<E extends EditEnvelope> {
 
   tick(now: number): void {
     this.now = now
+    for (const [peer, since] of this.unreachable)
+      if (now - since >= this.options.suspicionTimeout) this.removeMember(peer)
     for (const listener of this.presenceClocks) listener(now)
     if (this.phase.kind === 'left' || now - this.lastTick < this.options.pulseInterval) return
     this.lastTick = now
     if (
       this.phase.kind === 'stable' &&
       now - this.lastHostPulse > this.options.suspicionTimeout &&
-      this.authority.host !== this.peer
+      this.authority.host !== this.peer &&
+      !this.unreachable.has(this.authority.host)
     )
       this.negotiate()
     if (!this.isHost && this.phase.kind !== 'handoff')
@@ -288,6 +298,7 @@ export class Session<E extends EditEnvelope> {
       case 'LEAVE':
         for (const observer of this.presenceObservers) observer.leave(message.sender)
         this.departed.add(message.sender)
+        this.unreachable.delete(message.sender)
         this.members.delete(message.sender)
         this.observed.delete(message.sender)
         this.seen.delete(message.sender)
@@ -365,6 +376,7 @@ export class Session<E extends EditEnvelope> {
   }
   private completeDeparture(): void {
     this.phase = { kind: 'left' }
+    this.unreachable.clear()
     this.seen.clear()
     this.transfers.clear()
     this.departure = undefined

@@ -109,6 +109,8 @@
         "install-server.ts",
         "import-proxy-usage-key.ts",
         "prod.ts",
+        "product-sites/test-mobile.mjs",
+        "product-sites/verify-mobile.mjs",
         "tui.ts",
         "web-layering.mjs",
         "skills/port-pstack.ts",
@@ -351,8 +353,7 @@
       "project": ["src/**/*.ts", "server/**/*.ts", "examples/**/*.ts", "test/**/*.ts"]
     },
     "editor/site": {
-      "entry": ["src/examples/*.tsx"],
-      "ignoreDependencies": ["@singapore-editor/*", "satteri"]
+      "ignoreDependencies": ["@singapore-editor/*", "satteri", "react", "@types/react", "solid-js"]
     }
   },
   "ignore": ["editor/**/*.d.css.ts"],

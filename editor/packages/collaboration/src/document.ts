@@ -6,6 +6,7 @@ import {
   TextbufferEngine,
   type Envelope,
   type HostMessage,
+  type UndoOptions,
 } from '@singapore-editor/collab'
 import { createPieceTableSnapshot } from '@singapore-editor/textbuffer'
 import {
@@ -61,7 +62,10 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
   private history: Confirmation<Envelope>[] = []
   private readonly records = new Map<string, Confirmation<Envelope>>()
 
-  constructor(private readonly options: CollaborationDocumentOptions) {
+  constructor(
+    private readonly options: CollaborationDocumentOptions,
+    undo?: UndoOptions,
+  ) {
     const buffer = createPieceTableSnapshot(options.text, {
       charIds: { bunch: `${options.epoch}:bootstrap`, counter: 0 },
     })
@@ -72,6 +76,7 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
       document: options.document,
       epoch: options.epoch,
       engine: this.engine,
+      undo,
     })
     this.hostEngine = new TextbufferEngine(buffer)
     this.host = this.createHost()
@@ -85,6 +90,47 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
       engine: this.hostEngine,
       unknownDeps: 'reject',
     })
+  }
+
+  /** Bind local effect state and retain every already-known foreign identity. */
+  historyIdentity(): string {
+    const snapshot = this.engine.snapshot()
+    const bootstrap = indexEntries(this.base.runs).map(([key, value]) => [key, value.count])
+    const operations = indexEntries(snapshot.effects.operations).filter(
+      ([, value]) => value.kind === 'edit',
+    )
+    const own = operations.filter(([key]) => key.bunch === this.options.peer)
+    const universe = operations
+      .filter(([key]) => key.bunch !== this.options.peer)
+      .map(([key, value]) => [key, value.kind === 'edit' ? value.spans : []])
+    const identity = digest([
+      this.options.document,
+      this.options.epoch,
+      this.options.peer,
+      bootstrap,
+      own,
+    ])
+    return JSON.stringify([identity, universe])
+  }
+
+  authoredEffects(): readonly { readonly op: EditId; readonly active: boolean }[] {
+    return indexEntries(this.engine.snapshot().effects.operations).flatMap(([key, value]) =>
+      value.kind === 'edit'
+        ? [{ op: { actor: key.bunch, seq: key.counter }, active: value.active }]
+        : [],
+    )
+  }
+
+  matchesHistoryIdentity(saved: string): boolean {
+    try {
+      const [identity, universe] = JSON.parse(saved)
+      const [current, operations] = JSON.parse(this.historyIdentity())
+      if (identity !== current || !Array.isArray(universe)) return false
+      const available = new Set(operations.map(canonical))
+      return universe.every((operation: unknown) => available.has(canonical(operation)))
+    } catch {
+      return false
+    }
   }
 
   checkpoint(): Checkpoint {
@@ -110,7 +156,7 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
     const body = { depth: tip.depth + 1, predecessor: tip.hash, id: edit.id, edit, outcome }
     const record = { ...body, hash: digest(body) }
     this.append(record)
-    this.participant.receive([message])
+    this.participant.receive([message], message.status === 'rejected' ? [edit] : [])
     return record
   }
 
@@ -126,7 +172,10 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
       return false
     }
     this.append(record)
-    this.participant.receive([hostMessage(record)])
+    this.participant.receive(
+      [hostMessage(record)],
+      record.outcome.kind === 'rejected' ? [record.edit] : [],
+    )
     return true
   }
 
@@ -191,7 +240,12 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
     this.records.clear()
     for (const record of history) this.append(record)
     this.restoreHost()
-    this.participant.install(this.base, history.map(hostMessage), recovered)
+    this.participant.install(
+      this.base,
+      history.map(hostMessage),
+      recovered,
+      history.filter((record) => record.outcome.kind === 'rejected').map((record) => record.edit),
+    )
   }
 
   private restoreHost(): void {
@@ -215,4 +269,17 @@ function freezeRecord<T>(value: T): T {
   if (value === null || typeof value !== 'object' || Object.isFrozen(value)) return value
   for (const child of Object.values(value)) freezeRecord(child)
   return Object.freeze(value)
+}
+
+type IdentityTree<T> = {
+  readonly key: { readonly bunch: string; readonly counter: number }
+  readonly value: T
+  readonly left: IdentityTree<T> | null
+  readonly right: IdentityTree<T> | null
+}
+function indexEntries<T>(
+  root: IdentityTree<T> | null,
+): readonly (readonly [{ readonly bunch: string; readonly counter: number }, T])[] {
+  if (!root) return []
+  return [...indexEntries(root.left), [root.key, root.value] as const, ...indexEntries(root.right)]
 }

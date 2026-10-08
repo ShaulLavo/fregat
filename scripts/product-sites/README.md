@@ -28,6 +28,37 @@ The existing Pages workflow keeps its defaults.
 library sources, build configuration or manifests, and on manual dispatch from main. Test-only
 changes do not trigger it. Markdown under site sources remains an input. The Fregat landing page
 uses its own animated replica. Web application source changes do not trigger this build.
+The normal CI workflow builds all production sites and runs the mobile checks when a pull
+request changes site, documentation, theme, imported library or site-build inputs. Other pull
+requests skip the job. Main pushes and manual CI runs check all sites. The final `CI` verdict
+requires the `Mobile layout` job when selected, and the job has no deployment secrets.
+Production deployment remains a separate main-only workflow.
+
+The mobile check visits every built HTML page in touch-enabled Chromium and WebKit at
+320, 360 and 390 CSS pixels, with a device pixel ratio of 2. It also opens the documentation
+search dialog and the repository demo's piece-tree inspector. A page fails if its root scroll
+width exceeds the requested CSS width or its mobile layout viewport expands, with no pixel
+tolerance. Elements extending beyond the viewport also fail, including root-clipped content
+and off-screen fixed or sticky controls. Code, tables and sticky editor content can scroll
+inside an inner scroll box that fits the page.
+
+```sh
+scripts/node_modules/.bin/playwright install --with-deps chromium webkit
+bun scripts/product-sites/test-mobile.mjs
+bun scripts/product-sites/verify-mobile.mjs --directory /path/to/output --evidence /path/to/evidence
+```
+
+Use `--widths 320,360,375,390,393,414,430,667,844 --screenshots` for the wider audit.
+The last two widths use a landscape viewport. Each result records offending element bounds;
+failed checks save screenshots even without `--screenshots`. For a published-site crawl, pass
+`--origin https://shaulavo.dev --sitemaps /singapore/sitemap-index.xml,/ghostty-webgpu/sitemap-index.xml`
+and `--paths /,/fregat/,/singapore/demo/`. Evidence is JSON Lines, with one row per page, engine,
+width and interaction state. A navigation timeout or WebKit internal navigation error gets
+one retry before failing. Retried navigations are logged separately; layout failures always fail.
+The crawl gives each page a fresh browser context and starts fresh browser processes every
+200 pages to bound long-lived browser resources. CI runs two disjoint page shards per browser
+in four parallel jobs, each with its own evidence artifact. All four jobs must pass the final
+verdict. `--shards 2 --shard 0` selects alternating sorted URLs; shard `1` selects the rest.
 
 The build job has no deployment secret. It uploads a gzip tar artifact with one-day retention.
 A fresh deploy job downloads that artifact and sends it directly over SSH. It runs in the

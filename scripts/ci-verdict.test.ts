@@ -48,6 +48,7 @@ function fixture() {
     'test-tui': { result: 'success' },
     browser: { result: 'success' },
     site: { result: 'success' },
+    'mobile-layout': { result: 'success' },
     libraries: { result: 'success' },
   }
   const names = [
@@ -64,6 +65,10 @@ function fixture() {
     'Test (tui)',
     'Browser tests',
     'Site build',
+    'Mobile layout (chromium-0)',
+    'Mobile layout (chromium-1)',
+    'Mobile layout (webkit-0)',
+    'Mobile layout (webkit-1)',
     'Libraries / Editor tests',
     'Libraries / Ghostty tests',
     'Libraries / Standalone packages',
@@ -91,6 +96,35 @@ function fixture() {
   const run = () => evaluate()
   return { changes, needs, jobs, run, evaluate, identity, metadata }
 }
+
+test.each([
+  'bunfig.toml',
+  '.npmrc',
+  '.env.production',
+  'tsconfig.json',
+  'package.json',
+  'bun.lock',
+  'turbo.json',
+  'apps/site/astro.config.ts',
+  'editor/site/astro.config.ts',
+  'editor/examples/app/vite.config.ts',
+  'ghostty-webgpu/site/src/docs-theme.js',
+  'packages/ui/src/styles/theme.css',
+  'hotkeys/packages/core/src/index.ts',
+  'scripts/product-sites/build.sh',
+  'scripts/build-site.ts',
+  'scripts/dev-sources.ts',
+  'scripts/runtime-network.ts',
+  'scripts/structured-errors.ts',
+  '.github/actions/setup/action.yml',
+  '.github/actions/install-browsers/action.yml',
+])('site path selection covers build input %s', (file) => {
+  const config = read('.github/workflows/ci.yml') as {
+    jobs: { changes: { steps: { with: { filters: string } }[] } }
+  }
+  const filters = Bun.YAML.parse(config.jobs.changes.steps[0].with.filters) as { site: string[] }
+  expect(filters.site.some((pattern) => new Bun.Glob(pattern).match(file))).toBe(true)
+})
 
 test('actual required graph accepts completed successful jobs and its docs skip', () => {
   expect(fixture().run()).toEqual({ passed: true, issues: [] })
@@ -133,16 +167,21 @@ test('missing required needs rejects before trusting successful API jobs', () =>
   expect(value.run()).toEqual({ passed: false, issues: ['Required need browser is missing'] })
 })
 
-test.each(['Test (web 3/4)', 'Libraries / Ghostty tests', 'Browser tests'])(
-  'missing required execution %s rejects a successful parent',
-  (name) => {
-    const value = fixture()
-    const jobs = value.jobs.filter((job) => job.name !== name)
-    const verdict = value.evaluate(jobs)
-    expect(verdict.passed).toBe(false)
-    expect(verdict.issues).toContain(`Required job ${name} lacks one successful execution`)
-  },
-)
+test.each([
+  'Test (web 3/4)',
+  'Libraries / Ghostty tests',
+  'Browser tests',
+  'Mobile layout (chromium-0)',
+  'Mobile layout (chromium-1)',
+  'Mobile layout (webkit-0)',
+  'Mobile layout (webkit-1)',
+])('missing required execution %s rejects a successful parent', (name) => {
+  const value = fixture()
+  const jobs = value.jobs.filter((job) => job.name !== name)
+  const verdict = value.evaluate(jobs)
+  expect(verdict.passed).toBe(false)
+  expect(verdict.issues).toContain(`Required job ${name} lacks one successful execution`)
+})
 
 test('disabled reusable children may skip while selected family succeeds', () => {
   const value = fixture()
@@ -154,22 +193,54 @@ test('disabled reusable children may skip while selected family succeeds', () =>
   expect(value.run()).toEqual({ passed: true, issues: [] })
 })
 
-test('source-authorized docs-only selection permits skipped or absent disabled jobs', () => {
+test('docs-only selection requires mobile layout and permits skipped or absent disabled jobs', () => {
   const value = fixture()
   for (const key of Object.keys(value.changes.outputs)) {
     if (key !== 'web_shards') value.changes.outputs[key] = key === 'docs' ? 'true' : 'false'
   }
   for (const id of Object.keys(value.needs)) {
-    value.needs[id] = { result: id === 'changes' || id === 'docs' ? 'success' : 'skipped' }
+    value.needs[id] = {
+      result: ['changes', 'docs', 'mobile-layout'].includes(id) ? 'success' : 'skipped',
+    }
   }
   value.needs.changes = value.changes
   const jobs = value.jobs
-    .filter((job) => job.name === 'Changes' || job.name === 'Docs format')
+    .filter((job) =>
+      [
+        'Changes',
+        'Docs format',
+        'Mobile layout (chromium-0)',
+        'Mobile layout (chromium-1)',
+        'Mobile layout (webkit-0)',
+        'Mobile layout (webkit-1)',
+      ].includes(job.name),
+    )
     .map((job) => ({ ...job, conclusion: 'success', runner_id: 1 }))
   expect(value.evaluate(jobs)).toEqual({
     passed: true,
     issues: [],
   })
+  value.needs['mobile-layout'] = { result: 'skipped' }
+  expect(value.evaluate(jobs).passed).toBe(false)
+})
+
+test('non-site code selection permits a skipped mobile layout job', () => {
+  const value = fixture()
+  value.changes.outputs.site = 'false'
+  value.changes.outputs.docs = 'false'
+  value.needs.site = { result: 'skipped' }
+  value.needs['mobile-layout'] = { result: 'skipped' }
+  const jobs = value.jobs.filter(
+    (job) =>
+      ![
+        'Mobile layout (chromium-0)',
+        'Mobile layout (chromium-1)',
+        'Mobile layout (webkit-0)',
+        'Mobile layout (webkit-1)',
+        'Site build',
+      ].includes(job.name),
+  )
+  expect(value.evaluate(jobs)).toEqual({ passed: true, issues: [] })
 })
 
 test('enabled work reported skipped rejects', () => {

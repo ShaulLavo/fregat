@@ -1,6 +1,14 @@
 import {
+  authoredPathChanges,
+  resolveIdentitySelections,
+  type CharacterGap,
+  type AuthoredHistoryEdge,
+  type DocumentAuthoredHistory,
+} from './authoredHistory'
+import {
   applyBatchToPieceTable,
   diffPieceTableSnapshots,
+  locateCharId,
   type PieceTableAnchor,
   type PieceTableSnapshot,
   readPieceTableTextRange,
@@ -36,6 +44,7 @@ export type SerializedEditorHistorySelection = {
 // Text is never stored, only the edits between neighbouring states: the current
 // state's text is whatever the restoring buffer already holds.
 export type SerializedEditorHistoryNode = {
+  readonly authored?: AuthoredHistoryEdge
   readonly id: HistoryNodeId
   readonly parentId: HistoryNodeId | null
   readonly preferredChildId: HistoryNodeId | null
@@ -52,6 +61,8 @@ export type SerializedEditorHistoryNode = {
 }
 
 export type SerializedEditorHistory = {
+  /** Identity checkpoint supplied by an ID-space author; offset histories omit it. */
+  readonly authoredIdentity?: string
   readonly version: typeof SERIALIZED_EDITOR_HISTORY_VERSION
   readonly rootId: HistoryNodeId
   readonly currentId: HistoryNodeId
@@ -66,23 +77,31 @@ type Selections = SelectionSet<PieceTableAnchor>
 type DocumentHistory = EditorHistory<PieceTableSnapshot, Selections, DocumentTransaction>
 type DocumentHistoryNode = EditorHistoryNode<PieceTableSnapshot, Selections, DocumentTransaction>
 
-export const serializeDocumentHistory = (history: DocumentHistory): SerializedEditorHistory => ({
+export const serializeDocumentHistory = (
+  history: DocumentHistory,
+  authoredIdentity?: string,
+): SerializedEditorHistory => ({
+  ...(authoredIdentity ? { authoredIdentity } : {}),
   version: SERIALIZED_EDITOR_HISTORY_VERSION,
   rootId: history.rootId,
   currentId: history.currentId,
   nextId: history.nextId,
   clock: history.clock,
   currentLength: history.current.length,
-  nodes: editorHistoryNodes(history).map((node) => serializeNode(history, node)),
+  nodes: editorHistoryNodes(history).map((node) =>
+    serializeNode(history, node, Boolean(authoredIdentity)),
+  ),
 })
 
 const serializeNode = (
   history: DocumentHistory,
   node: DocumentHistoryNode,
+  authored: boolean,
 ): SerializedEditorHistoryNode => {
   const parent = node.parentId === null ? undefined : history.nodes.get(node.parentId)
-  const step = parent ? serializeStep(parent.snapshot, node) : EMPTY_STEP
+  const step = parent && !authored ? serializeStep(parent.snapshot, node) : EMPTY_STEP
   return {
+    ...(node.transaction?.authored ? { authored: node.transaction.authored } : {}),
     id: node.id,
     parentId: node.parentId,
     preferredChildId: node.preferredChildId,
@@ -121,7 +140,14 @@ const serializeStep = (
     return { edits: transaction.edits, inverseEdits: transaction.inverseEdits }
   }
 
-  const edit = diffPieceTableSnapshots(parentSnapshot, node.snapshot)
+  return diffStep(parentSnapshot, node.snapshot)
+}
+
+const diffStep = (
+  parentSnapshot: PieceTableSnapshot,
+  snapshot: PieceTableSnapshot,
+): SerializedStep => {
+  const edit = diffPieceTableSnapshots(parentSnapshot, snapshot)
   if (!edit) return EMPTY_STEP
   const inverse: TextEdit = {
     from: edit.from,
@@ -145,6 +171,7 @@ const serializeSelections = (
   })
 
 export type RestoreDocumentHistoryOptions = {
+  readonly authored?: DocumentAuthoredHistory
   readonly retainedStates?: number
 }
 
@@ -155,11 +182,16 @@ export const restoreDocumentHistory = (
   current: PieceTableSnapshot,
   options: RestoreDocumentHistoryOptions = {},
 ): DocumentHistory | null => {
+  if (data.authoredIdentity) {
+    if (!options.authored?.matchesIdentity(data.authoredIdentity)) return null
+  } else if (options.authored) return null
   if (data.version !== SERIALIZED_EDITOR_HISTORY_VERSION) return null
-  if (data.currentLength !== current.length) return null
+  if (!data.authoredIdentity && data.currentLength !== current.length) return null
 
   const byId = new Map(data.nodes.map((node) => [node.id, node]))
-  const snapshots = restoreSnapshots(data, byId, current)
+  const snapshots = data.authoredIdentity
+    ? restoreAuthoredSnapshots(data, byId, current, options.authored!)
+    : restoreSnapshots(data, byId, current)
   if (!snapshots) return null
 
   const restored: RestoredEditorHistoryNode<PieceTableSnapshot, Selections, DocumentTransaction>[] =
@@ -177,6 +209,59 @@ export const restoreDocumentHistory = (
     clock: data.clock,
     retainedStates: options.retainedStates,
   })
+}
+
+const restoreAuthoredSnapshots = (
+  data: SerializedEditorHistory,
+  byId: ReadonlyMap<HistoryNodeId, SerializedEditorHistoryNode>,
+  current: PieceTableSnapshot,
+  author: DocumentAuthoredHistory,
+): Map<HistoryNodeId, PieceTableSnapshot> | null => {
+  if (!current.charIds || !validGraph(data, byId)) return null
+  if (data.nodes.some((node) => node.parentId !== null && !node.authored)) return null
+  try {
+    const operations = new Set<string>()
+    for (const node of data.nodes) {
+      if (!node.authored) continue
+      if (!validAuthoredEdge(node.authored, current, operations)) return null
+    }
+    return new Map(
+      data.nodes.map((node) => [
+        node.id,
+        author.preview(authoredPathChanges(byId, data.currentId, node.id)),
+      ]),
+    )
+  } catch {
+    return null
+  }
+}
+
+const validCharacterGap = (snapshot: PieceTableSnapshot, gap: CharacterGap): boolean =>
+  (gap.bias === 'left' || gap.bias === 'right') &&
+  (gap.left === 'start' || locateCharId(snapshot, gap.left) !== null) &&
+  (gap.right === 'end' || locateCharId(snapshot, gap.right) !== null)
+
+const validAuthoredEdge = (
+  edge: AuthoredHistoryEdge,
+  snapshot: PieceTableSnapshot,
+  operations: Set<string>,
+): boolean => {
+  if (edge.edits.length === 0) return false
+  if (edge.id.actor !== edge.edits[0]!.actor || edge.id.seq !== edge.edits[0]!.seq) return false
+  for (const operation of edge.edits) {
+    const key = JSON.stringify([operation.actor, operation.seq])
+    if (operation.actor !== edge.id.actor || operations.has(key)) return false
+    operations.add(key)
+  }
+  return [edge.before, edge.after].every(
+    (set) =>
+      set.selections.length > 0 &&
+      set.selections.every(
+        (selection) =>
+          validCharacterGap(snapshot, selection.anchor) &&
+          validCharacterGap(snapshot, selection.head),
+      ),
+  )
 }
 
 // Inverse edits climb from the current state to the root; forward edits then fill in
@@ -241,11 +326,17 @@ const restoreNode = (
   parentSnapshot: PieceTableSnapshot | null,
   byId: ReadonlyMap<HistoryNodeId, SerializedEditorHistoryNode>,
 ): RestoredEditorHistoryNode<PieceTableSnapshot, Selections, DocumentTransaction> => {
-  const selections = restoreSelections(snapshot, node.selections)
-  const selectionsBefore = parentSnapshot
-    ? restoreSelections(parentSnapshot, node.selectionsBefore)
-    : selections
+  const selections = node.authored
+    ? resolveIdentitySelections(snapshot, node.authored.after)
+    : restoreSelections(snapshot, node.selections)
+  const selectionsBefore = node.authored
+    ? resolveIdentitySelections(snapshot, node.authored.before)
+    : parentSnapshot
+      ? restoreSelections(parentSnapshot, node.selectionsBefore)
+      : selections
   const preferred = node.preferredChildId
+  // Authored execution uses effects; inspection edits come from today's parent/child previews.
+  const step = node.authored && parentSnapshot ? diffStep(parentSnapshot, snapshot) : node
   return {
     id: node.id,
     parentId: node.parentId,
@@ -261,8 +352,9 @@ const restoreNode = (
     selectionsBefore,
     transaction: parentSnapshot
       ? {
-          edits: node.edits,
-          inverseEdits: node.inverseEdits,
+          ...(node.authored ? { authored: node.authored } : {}),
+          edits: step.edits,
+          inverseEdits: step.inverseEdits,
           snapshotBefore: parentSnapshot,
           snapshotAfter: snapshot,
           selectionBefore: selectionsBefore,

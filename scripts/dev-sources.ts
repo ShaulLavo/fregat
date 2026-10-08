@@ -90,6 +90,7 @@ function readEditorPackage(webRoot: string, name: string): DevPackage {
   const entries = new Map<string, string>()
   for (const [subpath, value] of Object.entries(exports)) {
     const target = exportTarget(value, name)
+    if (target === undefined) continue
     const id = subpath === '.' ? name : `${name}${subpath.slice(1)}`
     if (subpath.endsWith('/*')) {
       entries.set(id, editorSourcePattern(root, target, id))
@@ -169,15 +170,14 @@ function requiredFile(root: string, relative: string): string {
   return fs.realpathSync(file)
 }
 
-function exportTarget(value: unknown, name: string): string {
+function exportTarget(value: unknown, name: string): string | undefined {
   if (typeof value === 'string') return value
 
   const conditions = objectField(value, `${name} export conditions`)
   const target = conditions.import ?? conditions.default
-  if (typeof target !== 'string')
-    throw createScriptError(`Missing browser export target in ${name}.`)
-
-  return target
+  if (typeof target === 'string') return target
+  if (typeof conditions.bun === 'string') return undefined
+  throw createScriptError(`Missing browser export target in ${name}.`)
 }
 
 function readManifest(file: string): Record<string, unknown> {

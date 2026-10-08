@@ -10,7 +10,8 @@ import { visit } from 'unist-util-visit'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(new URL('../../package.json', import.meta.url))
 const compiler = join(dirname(require.resolve('typescript/package.json')), 'bin/tsc')
-const parser = unified().use(remarkParse).use(remarkMdx)
+const markdown = unified().use(remarkParse)
+const mdx = unified().use(remarkParse).use(remarkMdx)
 const packageMode = process.argv[2] === '--packages'
 const sourceDirectory = packageMode
   ? undefined
@@ -20,6 +21,9 @@ const modulePaths: Record<string, string[]> = {}
 const temporary = await mkdtemp(join(root, '.samples-'))
 const origins = new Map<string, string>()
 const files: string[] = []
+// Solid samples compile with Solid's JSX settings.
+const solidSamples = new Set<string>()
+const SOLID_IMPORT = /from ['"](?:solid-js|@singapore-editor\/solid)['"]/
 
 async function pages(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true })
@@ -61,6 +65,7 @@ function addExports(
 try {
   const sources = packageMode ? await packagePages() : await pages(sourceDirectory!)
   for (const path of sources) {
+    const parser = path.endsWith('.mdx') ? mdx : markdown
     const tree = parser.parse(await readFile(path, 'utf8'))
     const snippets: { name: string; value: string }[] = []
     visit(tree, 'code', (node) => {
@@ -69,6 +74,7 @@ try {
       const extension = node.lang?.endsWith('x') ? `${suffix}x` : suffix
       const name = join(temporary, `snippet-${files.length + snippets.length}.${extension}`)
       origins.set(name, `${relative(root, path)}:${node.position?.start.line ?? 1}`)
+      if (SOLID_IMPORT.test(node.value)) solidSamples.add(name)
       snippets.push({ name, value: `${node.value}\nexport {}\n` })
     })
     for (const snippet of snippets) {
@@ -126,13 +132,14 @@ try {
     console.log(`Checked ${sampleCount} package README samples across ${sources.length} packages.`)
   }
   if (!packageMode) {
-    files.push(join(root, 'src/env.d.ts'))
+    const environment = join(root, 'src/env.d.ts')
     await check('docs', [
-      ...files,
-      ...['basic.ts', 'playground.ts', 'react.tsx'].map((file) => join(root, 'src/examples', file)),
+      environment,
+      ...files.filter((file) => !solidSamples.has(file)),
+      ...['hero.ts', 'playground.ts'].map((file) => join(root, 'src/examples', file)),
     ])
-    await check('solid', [join(root, 'src/env.d.ts'), join(root, 'src/examples/solid.tsx')], true)
-    console.log(`Checked ${sampleCount} inline samples and 4 example files with TypeScript 7.`)
+    if (solidSamples.size) await check('solid', [environment, ...solidSamples], true)
+    console.log(`Checked ${sampleCount} inline samples and 2 example files with TypeScript 7.`)
   }
 } finally {
   await rm(temporary, { recursive: true, force: true })

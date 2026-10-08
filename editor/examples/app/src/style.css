@@ -10,7 +10,7 @@
 
 body {
   font-family: system-ui, sans-serif;
-  height: 100vh;
+  height: 100dvh;
   background: #1e1e1e;
   color: #ccc;
 }
@@ -18,11 +18,12 @@ body {
 #app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh;
 }
 
 #toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
@@ -31,6 +32,7 @@ body {
 }
 
 #toolbar button {
+  flex-shrink: 0;
   padding: 4px 12px;
   border: 1px solid #555;
   background: #3c3c3c;
@@ -59,6 +61,8 @@ body {
 }
 
 #dir-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: #aaa;
   font-size: 14px;
   margin-right: auto;
@@ -67,6 +71,7 @@ body {
 #main {
   display: flex;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -105,6 +110,8 @@ body {
 #editor-container {
   flex: 1;
   display: flex;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -334,4 +341,43 @@ circle.history-node.is-selected {
   border-top: 1px solid #444;
   overflow: auto;
   font-size: 11px;
+}
+
+dialog[aria-label='Piece tree inspector'] {
+  position: fixed;
+  z-index: 1000;
+  inset: 12px 0 auto;
+  width: 900px;
+  max-width: calc(100% - 24px);
+  max-height: calc(100dvh - 24px);
+  margin: 0 auto;
+  padding: 12px;
+  overflow: auto;
+}
+
+dialog[aria-label='Piece tree inspector'] > select,
+dialog[aria-label='Piece tree inspector'] > textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 600px) {
+  #dir-name {
+    flex-basis: 100%;
+  }
+
+  #main {
+    flex-direction: column;
+  }
+
+  #tree,
+  #history,
+  #outline {
+    width: 100%;
+    min-width: 0;
+    max-height: 25dvh;
+    flex: 0 1 auto;
+  }
 }

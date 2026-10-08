@@ -1209,3 +1209,9 @@ export {
   type ProviderUsageHistoryCoverage,
   type ProviderUsageHistorySource,
 } from './provider-usage-history'
+
+export {
+  COLLABORATION_ADMISSION_TOKEN_REF,
+  COLLABORATION_TURN_CREDENTIALS_REF,
+  type CollaborationSecretRef,
+} from './settings/collaboration'
