@@ -1,9 +1,10 @@
 import {
   createRecordSanitizer,
+  readDiagnosticStringField,
+  readDiagnosticNumberField,
   limitDiagnosticString as limitString,
 } from '@workspace/observability/sanitize'
 import { createHash } from 'node:crypto'
-import { errorNumberField, errorStringField } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
 import { log, type LogLevel } from 'evlog'
 
@@ -27,10 +28,11 @@ const maxStringLength = 2_000
 const sanitizeClientPayload = createRecordSanitizer({
   formatString: limitString,
   errorFields: (error) => ({
-    code: errorStringField(error, 'code', { maxLength: maxStringLength }),
-    fix: errorStringField(error, 'fix', { maxLength: maxStringLength }),
-    status: errorNumberField(error, 'statusCode') ?? errorNumberField(error, 'status'),
-    why: errorStringField(error, 'why', { maxLength: maxStringLength }),
+    code: readDiagnosticStringField(error, 'code')?.slice(0, maxStringLength),
+    fix: readDiagnosticStringField(error, 'fix')?.slice(0, maxStringLength),
+    status:
+      readDiagnosticNumberField(error, 'statusCode') ?? readDiagnosticNumberField(error, 'status'),
+    why: readDiagnosticStringField(error, 'why')?.slice(0, maxStringLength),
   }),
   extraSensitiveFields: ['stack'],
   limits: { maxArrayItems: 25, maxDepth: 5, maxObjectKeys: 50 },
