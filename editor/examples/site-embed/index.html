@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Singapore embed prototype</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --sg-bg: #f4f2ec;
+      --sg-fg: #2b2a27;
+      --sg-gutter: #a9a397;
+      --sg-selection: #e8d5cf;
+      --sg-caret: #a8321f;
+      --sg-kw: #a8321f;
+      --sg-str: #2f6b3a;
+      --sg-com: #8e897d;
+      --sg-num: #1f5f8b;
+      --sg-type: #8a5a00;
+      --sg-fn: #23508e;
+      --sg-prop: #3d3a35;
+      --sg-punct: #6b675f;
+    }
+    body {
+      margin: 40px auto;
+      max-width: 800px;
+      padding: 0 20px;
+      font-family: system-ui, sans-serif;
+      background: #fbfaf7;
+      color: #1f1e1b;
+    }
+    .sg-editor {
+      position: relative;
+      overflow: hidden;
+      height: 360px;
+      background: var(--sg-bg);
+      font:
+        13.5px/20px ui-monospace,
+        monospace;
+    }
+    .sg-editor > pre {
+      font: inherit;
+      white-space: pre;
+      margin: 0;
+      padding: 10px 52px;
+      overflow: auto;
+    }
+  </style>
+  <h1>Singapore embed prototype</h1>
+  <p>
+    The editor loads when this example enters view. Edit it or hover a function to start TypeScript.
+  </p>
+  <div id="hero" class="sg-editor">
+    <pre>
+import { createPieceTableSnapshot, insertIntoPieceTable } from '@singapore-editor/textbuffer'
+
+const original = createPieceTableSnapshot('hello')
+const edited = insertIntoPieceTable(original, 5, ' world')
+</pre>
+  </div>
+  <p>
+    <button id="million" type="button">Open a 1,000,000-line file</button>
+    <button id="back" type="button">Back to the sample</button>
+  </p>
+  <p>
+    Build with <code>bun editor/examples/site-embed/build.ts</code>. Serve the generated folder with
+    any static HTTP host.
+  </p>
+  <script src="loader.js"></script>
+  <script>
+    const demo = SGEmbed.mount(document.querySelector('#hero'), {
+      label: 'Singapore editor, TypeScript',
+    })
+    document.querySelector('#million').addEventListener('click', () => demo.openMillion())
+    document.querySelector('#back').addEventListener('click', () => demo.closeMillion())
+  </script>
+</html>

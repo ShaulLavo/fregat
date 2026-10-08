@@ -304,6 +304,10 @@
       "entry": ["index.html", "src/jumpHistoryDemo.ts"],
       "project": ["src/**/*.{ts,tsx}"]
     },
+    "editor/examples/site-embed": {
+      "entry": ["build.ts", "serve.ts", "verify.ts", "src/editor.ts", "src/loader.js"],
+      "project": ["*.ts", "src/**/*.{ts,js}"]
+    },
     "ghostty-webgpu": {
       "ignoreBinaries": ["zig"],
       "entry": ["src/index.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"],

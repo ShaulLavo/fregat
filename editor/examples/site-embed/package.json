@@ -1,0 +1,21 @@
+{
+  "name": "@singapore-editor/site-embed-prototype",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build.ts",
+    "verify": "bun verify.ts"
+  },
+  "dependencies": {
+    "@singapore-editor/core": "workspace:*",
+    "@singapore-editor/gutters": "workspace:*",
+    "@singapore-editor/minimap": "workspace:*",
+    "@singapore-editor/tree-sitter": "workspace:*",
+    "@singapore-editor/typescript-lsp": "workspace:*",
+    "tree-sitter-typescript": "0.23.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "vite": "8.3.1"
+  }
+}
