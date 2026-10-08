@@ -54,6 +54,7 @@
     "bench:profile:check": "bun run build && bun run bench:prepare && node --expose-gc --test bench/profile.spec.mjs"
   },
   "devDependencies": {
+    "@codemirror/state": "6.7.6",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
     "typescript": "7.0.2",

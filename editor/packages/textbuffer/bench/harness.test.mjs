@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { applyOperation, loadAdapter, retentions } from './adapters.mjs'
+import { applyOperation, comparisonEngines, loadAdapter, retentions } from './adapters.mjs'
 import {
   applyOracle,
   indexLines,
@@ -9,7 +9,7 @@ import {
   oracleQuery,
   safeBoundary,
 } from './fixtures.mjs'
-import { optionsFrom } from './run.mjs'
+import { engineOrder, markdown, optionsFrom } from './run.mjs'
 import { consume, gitBlobHash, sha256, statistics } from './support.mjs'
 import { prepareState, runOperations, validate } from './worker.mjs'
 
@@ -32,7 +32,7 @@ function assertBuffer(buffer, expected) {
   }
 }
 
-for (const name of ['singapore', 'vscode'])
+for (const name of comparisonEngines)
   describe(name + ' adapter contract', () => {
     let factory
     beforeAll(async () => {
@@ -141,6 +141,65 @@ describe('persistent-only semantics', () => {
 })
 
 describe('reproducibility and reporting', () => {
+  it('balances all three engine positions over the six order permutations', () => {
+    const orders = Array.from({ length: 6 }, (_, index) => engineOrder(index))
+    expect(new Set(orders.map((order) => order.join(','))).size).toBe(6)
+    for (const engine of comparisonEngines)
+      for (let position = 0; position < comparisonEngines.length; position += 1)
+        expect(orders.filter((order) => order[position] === engine)).toHaveLength(2)
+  })
+
+  it.each(
+    fixtures
+      .map((fixture, workloadIndex) => ({ ...fixture, workloadIndex }))
+      .filter((fixture) => fixture.category !== 'singapore-only'),
+  )('balances every engine position for $name', ({ workloadIndex }) => {
+    for (const samples of [3, 6, 9]) {
+      const orders = Array.from({ length: samples }, (_, sample) =>
+        engineOrder(sample, workloadIndex),
+      )
+      for (const engine of comparisonEngines)
+        for (let position = 0; position < comparisonEngines.length; position += 1)
+          expect(orders.filter((order) => order[position] === engine)).toHaveLength(
+            samples / comparisonEngines.length,
+          )
+    }
+  })
+
+  it('prints all controls and keeps capability lanes separate', () => {
+    const timeMs = statistics([1, 2, 3])
+    const retainedBytes = Object.fromEntries(
+      ['heapUsed', 'external', 'arrayBuffers'].map((key) => [key, timeMs]),
+    )
+    const engines = Object.fromEntries(
+      comparisonEngines.map((engine) => [engine, { timeMs, retainedBytes }]),
+    )
+    const report = markdown({
+      options: optionsFrom(['--profile', 'smoke']),
+      environment: {},
+      source: {},
+      upstream: {},
+      codemirror: { version: 'test' },
+      workloads: [
+        { name: 'shared', operations: 1, engines, ratio: 1, codemirrorRatio: 1 },
+        {
+          name: 'history',
+          operations: 1,
+          engines: { singapore: engines.singapore },
+          ratio: null,
+          codemirrorRatio: null,
+        },
+      ],
+    })
+    expect(report).toContain('CodeMirror median / p95 ms')
+    expect(report).toContain(
+      '| shared | 1 | 2.000 / 3.000 | 2.000 / 3.000 | 2.000 / 3.000 | 1.00x | 1.00x |',
+    )
+    expect(report).toContain(
+      '| history | 1 | 2.000 / 3.000 | not equivalent | not equivalent | separate lane | separate lane |',
+    )
+  })
+
   it('replays the same fixture identities for a seed and changes edit traces for another', () => {
     expect(sha256(JSON.stringify(makeFixtures('smoke', 42)))).toBe(sha256(JSON.stringify(fixtures)))
     expect(sha256(JSON.stringify(makeFixtures('smoke', 43)))).not.toBe(
