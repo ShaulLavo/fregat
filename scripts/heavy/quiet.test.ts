@@ -1239,15 +1239,28 @@ describe.skipIf(!userScopes)('quiet holds', () => {
     }
   })
 
-  test.each([false, true])(
-    'an expired launcher retains admission ownership until release for its quiet=%s successor',
-    async (quietSuccessor) => {
+  test.each([
+    [false, false],
+    [true, false],
+    [false, true],
+    [true, true],
+  ])(
+    'an expired launcher retains admission ownership until release for its quiet=%s successor with disconnected manager=%s',
+    async (quietSuccessor, disconnectedManager) => {
       const box = quietBox(2)
       const launcherFile = path.join(box.root, 'launcher.pid')
       const delayedPayload = path.join(box.root, 'delayed-payload')
       const releaseNext = path.join(box.root, 'release-next')
       const launcher = path.join(box.root, 'launcher.sh')
       const launcherDone = path.join(box.root, 'launcher.done')
+      const managerCalled = path.join(box.root, 'manager-called')
+      const bin = path.join(box.root, 'bin')
+      mkdirSync(bin)
+      writeFileSync(
+        path.join(bin, 'systemd-run'),
+        `#!/bin/bash\ntouch ${managerCalled}\nprintf '%s\\n' 'Failed to start transient scope unit: Transport endpoint is not connected' >&2\nexit 1\n`,
+        { mode: 0o755 },
+      )
       const preload = path.join(box.root, 'delay.ts')
       writeFileSync(
         launcher,
@@ -1256,7 +1269,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
       writeFileSync(
         preload,
         `const spawn = Bun.spawn.bind(Bun)
-        Bun.spawn = (options) => spawn(options.cmd?.[0] === 'systemd-run'
+        Bun.spawn = (options) => spawn(options.cmd?.includes('systemd-run')
           ? { ...options, env: { ...options.env, SYSTEMD_LOG_LEVEL: 'debug' }, cmd: ['bash', '-p', ${JSON.stringify(launcher)}, ...options.cmd] }
           : options)
         `,
@@ -1266,6 +1279,9 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         machine: true,
         quiet: true,
         preload,
+        ...(disconnectedManager
+          ? { env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } }
+          : {}),
       })
       let launcherPid: number | undefined
       const launcherCheckpoints: ReturnType<typeof quietLauncherReceipt>[] = []
@@ -1311,6 +1327,7 @@ describe.skipIf(!userScopes)('quiet holds', () => {
         )
         expect(existsSync(delayedPayload)).toBe(false)
         expect(readFileSync(launcherDone, 'utf8')).toBe('75')
+        expect(existsSync(managerCalled)).toBe(false)
         expect(next.stdout()).toBe('')
         expect(live(box.state, 'jobs').some((entry) => entry.id === owner.id)).toBe(true)
         delayed.child.kill('SIGCONT')

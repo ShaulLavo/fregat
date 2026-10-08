@@ -15,6 +15,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@singapore-editor/collab": "workspace:*",
+    "@singapore-editor/collaboration": "workspace:*",
     "@singapore-editor/core": "workspace:*",
     "@singapore-editor/diff": "workspace:*",
     "@singapore-editor/find": "workspace:*",

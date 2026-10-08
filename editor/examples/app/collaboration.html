@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Singapore collaboration</title>
+  </head>
+  <body>
+    <main class="collaboration-page">
+      <header>
+        <p class="eyebrow">Singapore editor</p>
+        <h1>Edit together</h1>
+        <p>
+          Each pane is a peer. Type in either pane, then open the invitation in another tab to join.
+        </p>
+      </header>
+      <form id="configuration">
+        <label
+          >Signaling URLs <input id="signaling" type="text" placeholder="wss://your-signaling-host"
+        /></label>
+        <label>Your broker token <input id="admission" type="password" autocomplete="off" /></label>
+        <label>ICE servers <textarea id="ice" rows="2" spellcheck="false">[]</textarea></label>
+        <label
+          >Transport policy
+          <select id="policy">
+            <option value="all">All connections</option>
+            <option value="relay">TURN relay</option>
+          </select></label
+        >
+        <button type="submit" id="start">Start session</button>
+      </form>
+      <p class="guidance">
+        Same-browser tabs connect over BroadcastChannel. Configure your signaling host and ICE
+        servers for WebRTC between browsers. Signaling protocols carry your broker’s admission
+        credentials. TURN credentials belong in the ICE server objects.
+      </p>
+      <label class="invitation"
+        >Invitation link <input id="invitation" type="text" readonly
+      /></label>
+      <p id="status" role="status" aria-live="polite">Ready to start a session.</p>
+      <section id="peers" aria-label="Collaborating editors"></section>
+    </main>
+    <script type="module" src="./src/collaboration.ts"></script>
+  </body>
+</html>

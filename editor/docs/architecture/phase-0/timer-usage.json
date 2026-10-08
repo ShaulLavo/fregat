@@ -3,6 +3,14 @@
   "schemaVersion": 1,
   "timers": [
     {
+      "api": "setInterval",
+      "file": "examples/app/src/collaboration.ts",
+      "id": "examples/app/src/collaboration.ts:setInterval:f2c35bb1c2",
+      "justification": "Session roles change outside editor events; this small status clock is cleared on departure and page teardown.",
+      "line": 131,
+      "snippet": "const timer = setInterval(() => {"
+    },
+    {
       "api": "setTimeout",
       "file": "examples/app/src/components/historyPanel.ts",
       "id": "examples/app/src/components/historyPanel.ts:setTimeout:04fd258f21",
@@ -171,19 +179,27 @@
       "snippet": "this.timer = setInterval(() => {"
     },
     {
+      "api": "setInterval",
+      "file": "packages/collaboration/src/plugin.ts",
+      "id": "packages/collaboration/src/plugin.ts:setInterval:7071949d81",
+      "justification": "The protocol needs elapsed time for failure detection; this opt-in clock is configurable, manual in simulations, and cleared when its view detaches.",
+      "line": 218,
+      "snippet": "timer = setInterval("
+    },
+    {
       "api": "requestAnimationFrame",
-      "file": "packages/collaboration/src/presence-plugin.ts",
-      "id": "packages/collaboration/src/presence-plugin.ts:requestAnimationFrame:9b743b037a",
+      "file": "packages/collaboration/src/presence-view.ts",
+      "id": "packages/collaboration/src/presence-view.ts:requestAnimationFrame:a4cb086651",
       "justification": "Remote presence changes between editor updates; one frame coalesces its notifications into a paint, and disposal cancels the pending frame.",
-      "line": 83,
+      "line": 65,
       "snippet": "this.frame = window.requestAnimationFrame(() => {"
     },
     {
       "api": "setTimeout",
-      "file": "packages/collaboration/src/presence-plugin.ts",
-      "id": "packages/collaboration/src/presence-plugin.ts:setTimeout:e13f563da7",
+      "file": "packages/collaboration/src/presence-view.ts",
+      "id": "packages/collaboration/src/presence-view.ts:setTimeout:40e456fbf6",
       "justification": "Peer events cannot signal elapsed idle time; each view keeps one deadline for the next visible name's idle transition, and clear or disposal cancels it.",
-      "line": 117,
+      "line": 99,
       "snippet": "this.labelDeadline = window.setTimeout("
     },
     {
@@ -343,7 +359,7 @@
       "file": "packages/editor/src/virtualization/virtualizedTextViewRows.ts",
       "id": "packages/editor/src/virtualization/virtualizedTextViewRows.ts:setTimeout:3bd76fd727",
       "justification": "Leaving the current frame is the entire content of this delay: it is what keeps the repaint out of the resize delivery and out of the row paint that ask for it. The one outstanding handle per view makes a second request in the same frame a no-op, and `cancelInlineWidgetRepaint` withdraws it when the view goes away.",
-      "line": 1675,
+      "line": 1697,
       "snippet": "const handle = win.setTimeout(() => {"
     },
     {

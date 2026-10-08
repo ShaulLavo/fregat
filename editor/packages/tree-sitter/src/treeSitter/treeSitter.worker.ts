@@ -166,7 +166,6 @@ const CLOSE_BRACKETS = new Set(Object.values(BRACKET_PAIRS))
 const MAX_RETAINED_SNAPSHOTS = 6
 const MAX_RETAINED_SOURCE_UNITS = 8_000_000
 const MAX_INJECTION_DEPTH = 8
-const MAX_INJECTION_LAYERS = 256
 const PARSE_BUDGET_MS = 20_000
 const QUERY_BUDGET_MS = 20_000
 
@@ -1411,8 +1410,6 @@ type ParseInjectionContext = ParseParsedDocumentOptions & {
   readonly reusableLayers: ReusableLayer[]
   readonly missingLanguages: Set<string>
   readonly reservedLayerIds: Set<string>
-  /** Layers already present, when a pass may find them again. */
-  readonly knownLayers?: ReadonlySet<string>
 }
 
 const parseRootLayer = (
@@ -1454,9 +1451,8 @@ const parseParsedDocument = async (
     await appendInjectionLayers(parsedLayers, options.rootLayer, context)
     if (options.injectionRanges) {
       await appendCarriedLayers(parsedLayers, context)
-      await refillCappedLayers(parsedLayers, context)
     }
-    const layers = cappedLayers(orderParsedLayers(options.rootLayer, parsedLayers))
+    const layers = orderParsedLayers(options.rootLayer, parsedLayers)
 
     return {
       markdown: options.markdown,
@@ -1531,9 +1527,15 @@ const appendInjectionLayers = async (
   )
 
   for (const plan of plans) {
-    if (layers.length >= MAX_INJECTION_LAYERS) break
-    if (options.knownLayers?.has(layerIdentity(plan))) continue
     if (isNonProgressingInjection(plan, parent, layers, options.rootLayer)) continue
+    if (parent.depth >= MAX_INJECTION_DEPTH) {
+      options.degraded.push({
+        kind: 'injection-failed',
+        phase: 'parse injection',
+        message: 'Injection nesting exceeds the supported depth.',
+      })
+      break
+    }
     if (!languageDescriptors.has(plan.languageId)) {
       options.missingLanguages.add(plan.languageId)
       continue
@@ -1554,29 +1556,6 @@ const appendInjectionLayers = async (
   }
 }
 
-// A capped document never parsed the layers past the cap. Once an edit leaves room, the next ones
-// are found after the last kept layer, as a full parse would find them.
-const refillCappedLayers = async (
-  layers: ParsedLayer[],
-  options: ParseInjectionContext,
-): Promise<void> => {
-  const oldLayers = options.oldDocument?.layers.length ?? 0
-  if (oldLayers <= MAX_INJECTION_LAYERS || layers.length >= MAX_INJECTION_LAYERS) return
-
-  let tailStart = 0
-  for (const layer of layers) tailStart = Math.max(tailStart, rangeSpan(layer.ranges).endIndex)
-  await appendInjectionLayers(layers, options.rootLayer, {
-    ...options,
-    injectionRanges: [{ startIndex: tailStart, endIndex: options.source.length }],
-    knownLayers: new Set(layers.map(layerIdentity)),
-  })
-}
-
-const layerIdentity = (layer: Pick<ParsedLayer, 'languageId' | 'parentId' | 'ranges'>): string => {
-  const span = rangeSpan(layer.ranges)
-  return `${layer.languageId}\u0000${layer.parentId}\u0000${span.startIndex}\u0000${span.endIndex}`
-}
-
 const isNonProgressingInjection = (
   plan: InjectionPlan,
   parent: ParsedLayer,
@@ -1588,6 +1567,7 @@ const isNonProgressingInjection = (
     if (ancestor.languageId === plan.languageId && rangesEqual(ancestor.ranges, plan.ranges))
       return true
     const parentId: string | null = ancestor.parentId
+    if (parentId === null) return false
     ancestor = parentId === root.id ? root : layers.find((layer) => layer.id === parentId)
   }
   return false
@@ -1933,16 +1913,6 @@ const orderParsedLayers = (
   return ordered
 }
 
-// Carried layers join the ones found near an edit, so the cap a full parse applies in discovery
-// order is applied here in the same order; the layers past it are the ones a full parse never makes.
-const cappedLayers = (layers: ParsedLayer[]): ParsedLayer[] => {
-  const limit = MAX_INJECTION_LAYERS + 1
-  if (layers.length <= limit) return layers
-
-  for (const layer of layers.slice(limit)) layer.tree.delete()
-  return layers.slice(0, limit)
-}
-
 const appendOrderedChildren = (
   ordered: ParsedLayer[],
   parentId: string,
@@ -1981,8 +1951,6 @@ const findInjections = async (
   context: CancellationContext,
   changedRanges: TreeSitterSyntaxRange[] | null,
 ): Promise<InjectionPlan[]> => {
-  if (parent.depth >= MAX_INJECTION_DEPTH) return []
-
   const query = ensureQuery(runtime, 'injection')
   if (!query) return []
 
@@ -2516,8 +2484,11 @@ const flattenLayer = async (
   if (withCaptures) {
     appendItems(
       result.captures,
-      runOptionalWorkerPhase('collect highlights', [] as TreeSitterCapture[], result.degraded, () =>
-        collectCaptures(layer.tree, runtime, context),
+      runOptionalWorkerPhase(
+        'collect highlights',
+        [] as readonly TreeSitterCapture[],
+        result.degraded,
+        () => withInjectionDepth(collectCaptures(layer.tree, runtime, context), layer.depth),
       ),
     )
   }
@@ -2551,9 +2522,13 @@ const flattenLayerRange = async (
       result.captures,
       runOptionalWorkerPhase(
         'collect range highlights',
-        [] as TreeSitterCapture[],
+        [] as readonly TreeSitterCapture[],
         result.degraded,
-        () => collectCaptures(layer.tree, runtime, context, options.range),
+        () =>
+          withInjectionDepth(
+            collectCaptures(layer.tree, runtime, context, options.range),
+            layer.depth,
+          ),
       ),
     )
   }
@@ -2566,6 +2541,14 @@ const flattenLayerRange = async (
   appendItems(result.brackets, treeData.brackets)
   appendItems(result.errors, treeData.errors)
   if (layer.kind !== 'root') result.injections.push(injectionInfoForLayer(layer))
+}
+
+const withInjectionDepth = (
+  captures: readonly TreeSitterCapture[],
+  depth: number,
+): readonly TreeSitterCapture[] => {
+  if (depth === 0) return captures
+  return captures.map((capture) => ({ ...capture, injectionDepth: depth }))
 }
 
 type Writable<T> = {

@@ -50,12 +50,18 @@ export class Host<Snapshot = unknown> {
   }
 
   /** The transport supplies sender from its authenticated session, never from the frame. */
-  submit(envelope: Envelope, sender: string): SubmitResult {
+  submit(envelope: Envelope, sender: string, rejection?: string): SubmitResult {
     if (typeof sender !== 'string' || !sender) throw new CollabFailure('missing-sender')
     if (sender !== envelope.id.actor) throw new CollabFailure('sender-mismatch')
     const key = editKey(envelope.id)
     const outcome = this.outcomes.get(key)
     if (outcome) return outcome
+    if (rejection !== undefined) {
+      this.deferred.delete(key)
+      this.settle(envelope, rejection)
+      this.drain()
+      return this.outcomes.get(key)!
+    }
     if (!this.deferred.has(key)) this.deferred.set(key, cloneEnvelope(envelope))
     this.drain()
     return this.outcomes.get(key) ?? { status: 'deferred', id: { ...envelope.id } }

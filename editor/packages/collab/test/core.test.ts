@@ -485,3 +485,27 @@ test.each([false, true])(
     expect(projection).toBe(a.participant.text())
   },
 )
+
+test('a batch failure after staged authoring restores pending, history and publication state', () => {
+  const a = replica('a')
+  const seed = a.insert(0, '😀ab')
+  accept(a.participant, [seed])
+  const before = a.participant.state()
+  const history = a.participant.undoManager.state()
+  let publications = 0
+  const stop = a.participant.subscribe(() => publications++)
+  expect(() =>
+    a.participant.localBatch([
+      { offset: 4, deleteCount: 0, text: 'X' },
+      { offset: 1, deleteCount: 1, text: '' },
+    ]),
+  ).toThrow('split-surrogate')
+  expect(a.participant.state()).toEqual(before)
+  expect(a.participant.undoManager.state()).toEqual(history)
+  expect(publications).toBe(0)
+  const next = a.participant.local({ offset: 4, deleteCount: 0, text: 'ok' })
+  expect(next.id.seq).toBe(seed.id.seq + 1)
+  expect(next.lamport).toBe(seed.lamport + 1)
+  expect(a.participant.text()).toBe('😀abok')
+  stop()
+})

@@ -1,3 +1,4 @@
+import { projectReconciliationEdits } from '../reconciliation'
 import { acquireEditorDocumentAnalysis, type EditorDocumentAnalysis } from './documentAnalysis'
 import { normalizeGutterLeadingInset } from '../virtualization/virtualizedTextViewHelpers'
 import { captureJumpLocation, JumpHistory, type JumpLocation, type JumpCause } from './jumpHistory'
@@ -12,6 +13,7 @@ import {
   type DocumentSession,
   type DocumentSessionChange,
   type DocumentSessionReconcileOptions,
+  type DocumentEditAuthor,
   type EditorTextTransaction,
   type EditorBufferSession,
   type EditorTextBufferChange,
@@ -150,7 +152,6 @@ import { normalizeTabSize } from '../displayTransforms'
 import type { InjectedTextRow } from '../displayTransforms'
 import {
   anchorAt,
-  applyBatchToPieceTable,
   offsetToPoint,
   type PieceTableAnchor,
   type PieceTableSnapshot,
@@ -803,7 +804,7 @@ export class Editor {
     })
     this.view.onReservedOverlayWidthChange((side) => this.notifyReservedWidth(side))
     this.viewContributions = new EditorViewContributionController(
-      this.createInitialViewContributions(this.pluginHost.getViewContributionProviders()),
+      [],
       () => this.createViewSnapshot(),
       (_contribution, phase, error) => this.logContributionFailure('view', phase, error),
       () => {
@@ -874,8 +875,11 @@ export class Editor {
         this.logPluginFailure('editor.plugin.install_failed', ambient.demand.id, error, 0),
     )
     this.inputSelection.install()
-    this.setSnapshot(options.snapshot ?? null, options.documentKey ?? null)
+    // Authors bind initialized text; saved paint must see every installed layer's identity.
     this.initializeDefaultText()
+    for (const provider of this.pluginHost.getViewContributionProviders())
+      this.addViewContributionProvider(provider)
+    this.setSnapshot(options.snapshot ?? null, options.documentKey ?? null)
     this.setRangeDecorations(options.rangeDecorations ?? [])
     const mountDurationMs = nowMs() - mountStart
     recordEditorMountTiming(mountDurationMs)
@@ -1850,6 +1854,13 @@ export class Editor {
     })
   }
 
+  authorEdits(author: DocumentEditAuthor): EditorDisposable {
+    this.ensureAnonymousSession()
+    const session = this.getBufferSession()
+    if (!session) throw new TypeError('edit author requires a document')
+    return this.claimForContribution(session.buffer.setEditAuthor(author))
+  }
+
   reconcile(
     base: PieceTableSnapshot,
     batches: readonly (readonly TextEdit[])[],
@@ -2730,22 +2741,8 @@ export class Editor {
     return this.document.currentSessionDocumentId()
   }
 
-  private createInitialViewContributions(
-    providers: readonly EditorViewContributionProvider[],
-  ): EditorViewContribution[] {
-    const contributions: EditorViewContribution[] = []
-    for (const provider of providers) {
-      const contribution = this.createViewContribution(provider)
-      if (!contribution) continue
-
-      contributions.push(contribution)
-      this.viewContributionsByProvider.set(provider, contribution)
-    }
-
-    return contributions
-  }
-
   private addViewContributionProvider(provider: EditorViewContributionProvider): void {
+    if (this.viewContributionsByProvider.has(provider)) return
     const contribution = this.createViewContribution(provider)
     if (!contribution) return
 
@@ -3577,6 +3574,7 @@ export class Editor {
       getSnapshot: () => this.createViewSnapshot(),
       getDocumentContributions: () => this.analysis?.contributions ?? null,
       requestViewUpdate: () => this.requestViewUpdate(owner()),
+      authorEdits: (author) => this.claimedBy(claims, () => this.authorEdits(author)),
       onDidTransaction: (listener) => this.claimedBy(claims, () => this.onDidTransaction(listener)),
       reconcile: (base, batches, options) => this.reconcile(base, batches, options),
       onDidType: (listener) => this.claimedBy(claims, () => this.addTypedTextListener(listener)),
@@ -3677,7 +3675,10 @@ export class Editor {
     if (this.trackedAnchors.size === 0) return
     // Project on the old identity space first to retain deletion and edge bias,
     // then transplant surviving positions onto the independently supplied base.
-    const projected = applyBatchToPieceTable(event.textSnapshotBefore.snapshot, event.change.edits)
+    const projected = projectReconciliationEdits(
+      event.textSnapshotBefore.snapshot,
+      event.change.edits,
+    )
     for (const reference of this.trackedAnchors) {
       const tracked = reference.deref()
       if (!tracked) {

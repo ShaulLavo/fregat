@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'editor/packages/collaboration/**'
+      - 'editor/packages/collab/**'
+      - 'editor/packages/editor/**'
+      - 'editor/examples/app/**'
       - 'editor/scripts/build-package.ts'
       - 'editor/tsconfig.json'
       - 'bun.lock'
@@ -12,6 +15,9 @@ on:
     branches: ['main']
     paths:
       - 'editor/packages/collaboration/**'
+      - 'editor/packages/collab/**'
+      - 'editor/packages/editor/**'
+      - 'editor/examples/app/**'
       - 'bun.lock'
       - '.github/workflows/editor-collaboration.yml'
   workflow_dispatch:
@@ -62,3 +68,5 @@ jobs:
           browsers: chromium
       - name: Verify native WebRTC, same-origin tabs and presence
         run: bun run --cwd editor/packages/collaboration test:browser
+      - name: Verify concurrent editor input and author undo
+        run: bun run --cwd editor/packages/collaboration test:editor

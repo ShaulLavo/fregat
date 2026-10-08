@@ -177,3 +177,18 @@ Qualification work in progress, 2026-10-08:
 The plan completes at M3 when all qualified repetitions return complete, equal syntax and structural output, memory stays within the agreed budget, complete-result settlement finishes within 2,000 ms of open, and the first highlighted frame using that complete result also passes within 2,000 ms. Delivery, token-store construction and structural apply are included. The stretch applies the same gates within 1,000 ms. The stretch goal is a later optimization target, not a prerequisite for layering incremental work.
 
 Stop an experiment when it needs a second text owner, SAB/transferable-text redesign, unsafe tree sharing, silent capture/layer truncation, a reduced-language shortcut, a public API expansion without a consumer need, or substantially more complexity than the measured gain warrants. A failed technique changes the ranking, not the owner's approval to make the complete file faster. Record the evidence and try the next bounded candidate.
+
+### JSDoc grammar recovery control, 2026-10-08
+
+The bundled `tree-sitter-jsdoc` 0.25.0 grammar reports an error for the valid single-line comment `/** @param {string} value */`. A standalone parse returns `(ERROR (tag_name) (type) (identifier) (ERROR (UNEXPECTED '*')))`. Adding ` description` after `value`, or putting ` */` on the next line, returns a `document` with `hasError: false`. This reproduces without the editor, included ranges or the worker, so the grammar is the source of this observation.
+
+The real-worker dense 10 MiB control repeats that first comment and `/[a-z]+/` 190,650 times. It now returns all 381,300 injections and colors the final comment and regex, with no degraded status. It also preserves 571,950 syntax error records from the grammar. These records are complete output, but they cannot establish correct JSDoc diagnostics. Keep this control separate from the grammar-valid dense control when attributing structural work, output size and delivery cost.
+
+Reproduce from a fresh checkout after installing root dependencies:
+
+```sh
+cd editor/packages/tree-sitter-languages
+bun -e 'import { Language, Parser } from "web-tree-sitter"; await Parser.init(); const parser = new Parser().setLanguage(await Language.load(new Uint8Array(await Bun.file("node_modules/tree-sitter-jsdoc/tree-sitter-jsdoc.wasm").arrayBuffer()))); for (const text of ["/** @param {string} value */", "/** @param {string} value description */", "/** @param {string} value\n */"]) { const tree = parser.parse(text); console.log(JSON.stringify({ text, hasError: tree.rootNode.hasError, tree: tree.rootNode.toString() })); tree.delete(); } parser.delete();'
+```
+
+The bounded standalone and worker evidence is under `/work/reports/plan-339/qualification/injection-cost/`. Dependency source was unchanged. An upstream grammar fix needs the owner's request under the local upstream policy; dropping error records would invalidate the full-output comparison. Consumer impact beyond the syntax-result error records is unconfirmed.

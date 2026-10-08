@@ -14,6 +14,7 @@ import {
   type EditorTextTransaction,
 } from '../src/public/document'
 import { resolveSelection } from '../src/selections'
+import { applyBatchToPieceTable, applyCharIdEdit, charIdAt } from '@singapore-editor/textbuffer'
 import { setHighlightRegistry } from '../src/public/testing'
 
 const editors: Editor[] = []
@@ -51,6 +52,59 @@ function mount(text = 'abc', onChange?: () => void) {
 }
 
 describe('exact plugin transactions on the simple API', () => {
+  it('authors identity-enabled native and programmatic inserts before publishing transactions', () => {
+    const { editor, scope, transactions } = mount()
+    scope.reconcile(
+      createPieceTableSnapshot('abc', { charIds: { bunch: 'base', counter: 0 } }),
+      [],
+      { edits: [] },
+    )
+    let counter = 0
+    const author = scope.authorEdits((snapshot, edits) => {
+      for (const edit of edits.toSorted((a, b) => b.from - a.from)) {
+        snapshot = applyCharIdEdit(snapshot, {
+          insert: {
+            text: edit.text,
+            start: { bunch: 'author', counter: counter++ },
+            at: { after: edit.from ? charIdAt(snapshot, edit.from - 1)! : 'start' },
+          },
+        })
+      }
+      return snapshot
+    })
+    expect(() =>
+      scope.applyEdits([{ from: 0, to: 0, text: 'remote' }], undefined, { origin: 'remote' }),
+    ).toThrow('authored documents require reconcile')
+    expect(counter).toBe(0)
+    editor.edit({ from: 0, to: 0, text: 'X' })
+    editor.setSelection(1)
+    editor.getBufferSession()!.applyText('Y')
+    expect(editor.materializeFullText()).toBe('XYabc')
+    expect(charIdAt(editor.getBufferSession()!.getSnapshot(), 0)).toEqual({
+      bunch: 'author',
+      counter: 0,
+    })
+    expect(transactions.map((event) => event.edits)).toEqual([
+      [{ from: 0, to: 0, text: 'X' }],
+      [{ from: 1, to: 1, text: 'Y' }],
+    ])
+    author.dispose()
+    scope.reconcile(createPieceTableSnapshot('XYabc'), [], { edits: [] })
+    editor.edit({ from: 0, to: 0, text: 'Z' })
+    expect(counter).toBe(2)
+    expect(editor.materializeFullText()).toBe('ZXYabc')
+  })
+
+  it('releases a scoped history command so native history handles the next command', () => {
+    const { editor, scope } = mount()
+    scope.applyEdits([{ from: 3, to: 3, text: 'x' }])
+    const registration = scope.handle('undo', () => true)
+    editor.dispatchCommand('undo')
+    expect(editor.getTextSnapshot().materializeFullText()).toBe('abcx')
+    registration.dispose()
+    editor.dispatchCommand('undo')
+    expect(editor.getTextSnapshot().materializeFullText()).toBe('abc')
+  })
   it('keeps logical batches separate inside a coalesced operation and carries origins and author', () => {
     const { editor, scope, transactions } = mount()
     const author = { participant: 'peer' }
@@ -460,6 +514,87 @@ describe('atomic reconcile', () => {
     expect(events).toHaveLength(1)
     expect(buffer.changesSinceDocumentSyncPoint(current, null)?.edits).toEqual([])
     expect(buffer.changesSinceDocumentSyncPoint(expired, null)).toBeNull()
+  })
+
+  it('validates supplied insertions against a persistent identity-free scratch fork', () => {
+    const session = createDocumentSession('abc')
+    const before = createPieceTableSnapshot('abc', { charIds: { bunch: 'base', counter: 0 } })
+    session.reconcile(before, [], { edits: [] })
+    const after = applyCharIdEdit(before, {
+      insert: {
+        start: { bunch: 'remote', counter: 0 },
+        text: 'R',
+        at: { after: 'start' },
+      },
+    })
+    expect(() =>
+      session.reconcile(after, [], { edits: [{ from: 0, to: 0, text: 'wrong' }] }),
+    ).toThrow()
+    expect(session.materializeFullText()).toBe('abc')
+    session.reconcile(after, [], { edits: [{ from: 0, to: 0, text: 'R' }] })
+    expect(session.materializeFullText()).toBe('Rabc')
+    expect(materializePieceTableFullText(before)).toBe('abc')
+    expect(charIdAt(session.getSnapshot(), 0)).toEqual({ bunch: 'remote', counter: 0 })
+    expect(charIdAt(before, 0)).toEqual({ bunch: 'base', counter: 0 })
+  })
+
+  it('routes shared-view history through its author and waits for mutation leases', () => {
+    const buffer = createEditorTextBuffer('seedown')
+    const first = createEditorBufferSession(buffer)
+    const second = createEditorBufferSession(buffer)
+    const actions: string[] = []
+    const registration = buffer.setEditAuthor(
+      Object.assign(
+        (
+          before: Parameters<typeof applyBatchToPieceTable>[0],
+          edits: Parameters<typeof applyBatchToPieceTable>[1],
+        ) => applyBatchToPieceTable(before, edits),
+        {
+          canUndo: () => buffer.getSnapshot().length === 7,
+          canRedo: () => buffer.getSnapshot().length === 4,
+          undo: () => {
+            actions.push('undo')
+            buffer.reconcile(createPieceTableSnapshot('seed'), [], {
+              edits: [{ from: 4, to: 7, text: '' }],
+            })
+          },
+          redo: () => {
+            actions.push('redo')
+            buffer.reconcile(createPieceTableSnapshot('seedown'), [], {
+              edits: [{ from: 4, to: 4, text: 'own' }],
+            })
+          },
+        },
+      ),
+    )
+    expect(second.canUndo()).toBe(true)
+    const lease = acquireDocumentMutationLease(
+      buffer,
+      buffer.getRevision(),
+      buffer.getSnapshot(),
+      'history',
+    )
+    expect(lease.status).toBe('acquired')
+    if (lease.status === 'acquired') {
+      second.undo()
+      expect(actions).toEqual([])
+      releaseDocumentMutationLease(buffer, lease.lease)
+    }
+    second.undo()
+    expect(actions).toEqual(['undo'])
+    expect(first.materializeFullText()).toBe('seed')
+    expect(second.canUndo()).toBe(false)
+    expect(first.canRedo()).toBe(true)
+    first.redo()
+    expect(actions).toEqual(['undo', 'redo'])
+    expect(second.materializeFullText()).toBe('seedown')
+    registration.dispose()
+    expect(first.canUndo()).toBe(false)
+    expect(second.canRedo()).toBe(false)
+    second.applyEdits([{ from: 7, to: 7, text: 'native' }])
+    first.undo()
+    expect(second.materializeFullText()).toBe('seedown')
+    expect(actions).toEqual(['undo', 'redo'])
   })
 
   it('keeps existing undo graph entries and rejects reentrant mutation leases', () => {

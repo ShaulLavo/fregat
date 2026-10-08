@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "manifestHash": "d5f7f6f7afbcbcaf9019a289dec9ecefb01070eea3b0381df4dffb84a3046349",
+  "manifestHash": "988c378278dd2ca5356c2e5405fc04f6800c64d8308f8d5858219b98cc4db3f3",
   "languages": [
     {
       "id": "javascript",
@@ -81,7 +81,7 @@
         },
         {
           "file": "./queries/javascript-injections.scm",
-          "sha256": "ebb7b92910ab116b98be93f299da04623a2c8824a86cd0669ef71bc403d9bb5e"
+          "sha256": "fc878d7c934ae77c70b5835aee4434c91f1ef87d0ed365a59d05b304ec6c7c09"
         }
       ],
       "queries": [
@@ -95,7 +95,7 @@
         },
         {
           "kind": "injections",
-          "sha256": "ebb7b92910ab116b98be93f299da04623a2c8824a86cd0669ef71bc403d9bb5e"
+          "sha256": "fc878d7c934ae77c70b5835aee4434c91f1ef87d0ed365a59d05b304ec6c7c09"
         }
       ]
     },
@@ -226,7 +226,7 @@
         },
         {
           "file": "./queries/javascript-injections.scm",
-          "sha256": "ebb7b92910ab116b98be93f299da04623a2c8824a86cd0669ef71bc403d9bb5e"
+          "sha256": "fc878d7c934ae77c70b5835aee4434c91f1ef87d0ed365a59d05b304ec6c7c09"
         }
       ],
       "queries": [
@@ -240,7 +240,7 @@
         },
         {
           "kind": "injections",
-          "sha256": "ebb7b92910ab116b98be93f299da04623a2c8824a86cd0669ef71bc403d9bb5e"
+          "sha256": "fc878d7c934ae77c70b5835aee4434c91f1ef87d0ed365a59d05b304ec6c7c09"
         }
       ]
     },
@@ -379,7 +379,7 @@
         },
         {
           "file": "./queries/javascript-injections.scm",
-          "sha256": "ebb7b92910ab116b98be93f299da04623a2c8824a86cd0669ef71bc403d9bb5e"
+          "sha256": "fc878d7c934ae77c70b5835aee4434c91f1ef87d0ed365a59d05b304ec6c7c09"
         }
       ],
       "queries": [
@@ -393,7 +393,7 @@
         },
         {
           "kind": "injections",
-          "sha256": "ebb7b92910ab116b98be93f299da04623a2c8824a86cd0669ef71bc403d9bb5e"
+          "sha256": "fc878d7c934ae77c70b5835aee4434c91f1ef87d0ed365a59d05b304ec6c7c09"
         }
       ]
     },
@@ -1975,6 +1975,158 @@
         {
           "kind": "injections",
           "sha256": "78cc79db0c2f07522328fef0f426e8bf7f0ff587467eeccbc21aa4827807e733"
+        }
+      ]
+    },
+    {
+      "id": "jsdoc",
+      "parserABI": 15,
+      "source": {
+        "package": "tree-sitter-jsdoc",
+        "version": "0.25.0",
+        "repository": {
+          "url": "git+https://github.com/tree-sitter/tree-sitter-jsdoc.git",
+          "type": "git"
+        },
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "658d18dcdddb75c760363faa4963427a7c6b52db",
+        "queryRevision": "658d18dcdddb75c760363faa4963427a7c6b52db",
+        "integrity": "sha512-ki7u9WA/AUZyk2ISULzFALL2iMax27O0Bz2O5WtyUkGAfJ97R0dgOSs0Bdf1zUpk6q5cq7bI2hBgJt29WH54Tw==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-jsdoc/-/tree-sitter-jsdoc-0.25.0.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "2ea9429679af2a1cbe8a7aef274035ccb7d33e3fd78652ade385fb8601f8e99e"
+        },
+        {
+          "file": "package.json",
+          "sha256": "e51733e53e3a9ded66eac15d2aa93c115b0f0df9c1cbba6be63b9556700a8d0a"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "9470c08833c165764d4f60b34ff702bfc7622f908c20ec755507a6edbaa183c2"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "ac93a7f30e9a684fbe160fc945af265ca0c4a42b4cc430dd9031613fa32f4e51"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "97429822f412e07fbaf66fd489e22e7a25954fcee553f7611eda37e337a12353"
+        },
+        {
+          "file": "src/scanner.c",
+          "sha256": "4e8e9fdbfbdc306998afee3848227499a4c668534d5e5d5e7a858bff9e99071e"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "c3579d510ac52b97c819a8ab5e65ee98b4cfefbbc66b75b555626816755e66f1"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-jsdoc/tree-sitter-jsdoc.wasm",
+          "sha256": "5530e630fd42424b1c026ec4b2b260ff1b73b78b7040239ac33d4be22a9b2271"
+        },
+        {
+          "file": "tree-sitter-jsdoc/queries/highlights.scm",
+          "sha256": "d455d6b541bc03d624b9e57b2957dfe2134e9a75ee0773e62c594c1c9ba29db6"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "d455d6b541bc03d624b9e57b2957dfe2134e9a75ee0773e62c594c1c9ba29db6"
+        }
+      ]
+    },
+    {
+      "id": "regex",
+      "parserABI": 15,
+      "source": {
+        "package": "tree-sitter-regex",
+        "version": "0.25.0",
+        "repository": {
+          "url": "git+https://github.com/tree-sitter/tree-sitter-regex.git",
+          "type": "git"
+        },
+        "license": "MIT",
+        "compiler": "upstream artifact; compiler not recorded",
+        "revision": "b2ac15e27fce703d2f37a79ccd94a5c0cbe9720b",
+        "queryRevision": "b2ac15e27fce703d2f37a79ccd94a5c0cbe9720b",
+        "integrity": "sha512-Xf3KU+LOfCS6djfIzEHdVlq4ITinLNfVy7LkWqFr0R4ZG1SGV2u/HS4ct+TNwuLTPfU9EA/tQZnbJ/KLtgljgQ==",
+        "tarball": "https://registry.npmjs.org/tree-sitter-regex/-/tree-sitter-regex-0.25.0.tgz"
+      },
+      "sourceFiles": [
+        {
+          "file": "grammar.js",
+          "sha256": "bf34d8926030ba197851690942de418f6c21d6f0bea714df3f8374e336f1fbde"
+        },
+        {
+          "file": "package.json",
+          "sha256": "728494ac6c891fb610efc66aed5fbe0585c5a6802b6d73a554c4330187f4c5ad"
+        },
+        {
+          "file": "src/grammar.json",
+          "sha256": "a2e6cef007b68b11ea646d866e58747686b167c24789c1092958e9c77b27c6f6"
+        },
+        {
+          "file": "src/node-types.json",
+          "sha256": "7177464227dba2b89ba4f6e86a7a01f5d91dda3b554c6f014a1f6e9e0d0257f1"
+        },
+        {
+          "file": "src/parser.c",
+          "sha256": "ddf28eb5ad0dd0898b9ed0f2593852edac639a339a410d9e93350e472859700f"
+        },
+        {
+          "file": "src/tree_sitter/alloc.h",
+          "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+        },
+        {
+          "file": "src/tree_sitter/array.h",
+          "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94"
+        },
+        {
+          "file": "src/tree_sitter/parser.h",
+          "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2"
+        },
+        {
+          "file": "src/tree_sitter/runtime.h",
+          "sha256": "51c20c6066329f0871ee68158df001e6154251bd7fa7b7e263ea93b47dca553d"
+        },
+        {
+          "file": "tree-sitter.json",
+          "sha256": "4f1e10d9a64cdf28cc689263484388e2de83b0be006bf793884a8e364eaa7d6c"
+        }
+      ],
+      "files": [
+        {
+          "file": "tree-sitter-regex/tree-sitter-regex.wasm",
+          "sha256": "e63c28e3a023614e14f2086b0d818e190239ebe5b2fcce7e64a9940091d83a79"
+        },
+        {
+          "file": "tree-sitter-regex/queries/highlights.scm",
+          "sha256": "ade28f54c53cfe89a856d22a3d8438d3c2e46cafaaaa08b2c9eabeea9f0b73de"
+        }
+      ],
+      "queries": [
+        {
+          "kind": "highlights",
+          "sha256": "06ba316985eb29acc4f429654dc76479ac2089ac88fc691fa59dc2b5384de445"
         }
       ]
     }
