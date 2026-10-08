@@ -31,7 +31,12 @@
         "@singapore-editor/scope-lines#build",
         "@singapore-editor/tree-sitter-languages#build"
       ],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/examples/stress/src/fixtures.ts"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/examples/stress/src/fixtures.ts",
+        "$TURBO_ROOT$/bench/compare/fixture.mjs",
+        "$TURBO_ROOT$/bench/compare/protocol.mjs"
+      ]
     },
     "@singapore-editor/react#typecheck": {
       "dependsOn": ["^build", "build", "@singapore-editor/tree-sitter-languages#build"]

@@ -112,7 +112,7 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
       >
         <DropdownMenuRadioGroup value={rootPath ?? ''}>
           {/* Inside the group: base-ui resolves the label against its group context. */}
-          <DropdownMenuLabel>Recent</DropdownMenuLabel>
+          <DropdownMenuLabel inset>Recent</DropdownMenuLabel>
           {isPending ? (
             <LoadingState label='Loading projects' className='px-2 py-1'>
               <div aria-hidden='true' className='flex items-baseline gap-1.5'>
@@ -123,13 +123,14 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
           ) : null}
           {entries.map((entry) => (
             <DropdownMenuRadioItem
+              inset={!entry.worktree}
               key={entry.rootPath}
               title={entry.worktree ? `Worktree · ${entry.rootPath}` : entry.rootPath}
               value={entry.rootPath}
               onClick={() => handleSelect(entry.rootPath)}
             >
               {entry.worktree ? (
-                <GitBranchIcon className='text-muted-foreground ml-3 size-(--icon-size-sm) shrink-0' />
+                <GitBranchIcon className='text-muted-foreground size-(--icon-size) shrink-0' />
               ) : null}
               <span className='flex min-w-0 flex-1 items-baseline gap-1.5'>
                 <span className='truncate'>{entry.title}</span>
