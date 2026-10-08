@@ -355,6 +355,63 @@ describe.skipIf(!hasChromium())(
       }
     })
 
+    test('Back and Forward through a same-page fragment restore the reading place', async () => {
+      const source = await (await fetch(`${base}/docs/start-here/quick-start.md`)).text()
+      const heading = source.split('\n').indexOf("## If it doesn't work") + 1
+      const { context, page, problems } = await open('/docs/start-here/quick-start/')
+      const scrollTop = () =>
+        page.locator('.editor-host .editor-virtualized').evaluate((element) => element.scrollTop)
+      try {
+        await takenOver(page).waitFor({ timeout: 20_000 })
+        await page.locator('.editor-host').hover()
+        await page.mouse.wheel(0, 300)
+        await expect.poll(scrollTop).toBeGreaterThan(200)
+        await page.waitForTimeout(200)
+        const reading = await scrollTop()
+        await page
+          .locator('.editor-host a.editor-markdown-link', { hasText: "If it doesn't work" })
+          .click()
+        await page.waitForURL(/#if-it-doesnt-work$/)
+        await expect.poll(() => editorLineTop(page, heading)).toBe(0)
+        await page.goBack()
+        await page.waitForURL(/\/quick-start\/$/)
+        await expect.poll(async () => Math.abs((await scrollTop()) - reading)).toBeLessThan(2)
+        await page.goForward()
+        await page.waitForURL(/#if-it-doesnt-work$/)
+        await expect.poll(() => editorLineTop(page, heading)).toBe(0)
+        expect(problems).toEqual([])
+      } finally {
+        await context.close()
+      }
+    })
+
+    test.each([320, 360, 390])('the open Pages menu fits a %i px phone', async (width) => {
+      for (const mode of ['off', 'on']) {
+        const { context, page } = await open(`/docs/start-here/quick-start/?editor=${mode}`, {
+          viewport: { width, height: 800 },
+          isMobile: true,
+          hasTouch: true,
+        })
+        try {
+          if (mode === 'on') await takenOver(page).waitFor({ timeout: 20_000 })
+          await page.getByText('Pages', { exact: true }).click()
+          const menu = page.getByRole('navigation', { name: 'All pages' })
+          await menu.waitFor()
+          const box = (await menu.boundingBox())!
+          expect(box.x, `editor ${mode}`).toBeGreaterThanOrEqual(0)
+          expect(box.x + box.width, `editor ${mode}`).toBeLessThanOrEqual(width)
+          expect(
+            await page.evaluate(
+              () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+            ),
+            `editor ${mode}`,
+          ).toBe(0)
+        } finally {
+          await context.close()
+        }
+      }
+    })
+
     test('the editor keeps heading roles in reading order', async () => {
       const { context, page } = await open('/docs/start-here/quick-start/')
       try {
