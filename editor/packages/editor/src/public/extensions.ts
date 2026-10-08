@@ -1,3 +1,9 @@
+export type {
+  DocumentSessionApplyEditsOptions,
+  DocumentSessionReconcileOptions,
+  EditorTextOrigin,
+  EditorTextTransaction,
+} from '../documentSession'
 export { createEditorWidgetKeymap } from '../editor/hotkeys'
 export type { EditorRowPresentation } from '../rowPresentation'
 export type { EditorPointHit, EditorMarkerHit } from '../pointQueries'

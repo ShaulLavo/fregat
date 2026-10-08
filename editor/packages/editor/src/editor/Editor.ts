@@ -10,6 +10,8 @@ import {
   subscribeDocumentMutationLeaseState,
   type DocumentSession,
   type DocumentSessionChange,
+  type DocumentSessionReconcileOptions,
+  type EditorTextTransaction,
   type EditorBufferSession,
   type EditorTextBufferChange,
 } from '../documentSession'
@@ -147,11 +149,13 @@ import { normalizeTabSize } from '../displayTransforms'
 import type { InjectedTextRow } from '../displayTransforms'
 import {
   anchorAt,
+  applyBatchToPieceTable,
   offsetToPoint,
   type PieceTableAnchor,
   type PieceTableSnapshot,
   pointToOffset,
   resolveAnchor,
+  pieceTableSnapshotsHaveSameText,
 } from '@singapore-editor/textbuffer'
 
 import type { TextOffsetRange } from '../textRanges'
@@ -199,6 +203,7 @@ import {
   type EditorViewportSnapshot,
 } from '../plugins'
 import { type EditorDisposable } from './disposables'
+import { EditorEventSource } from './emitter'
 import { lastAddedSelectionIndex, markSelectionSetDirty, resolveSelection } from '../selections'
 import { type EditorSyntaxLanguageId } from '../syntax/session'
 import type { EditorSyntaxRange } from '../syntax/session'
@@ -275,9 +280,14 @@ type EditorContributionFailurePhase =
   | 'reserved-width'
   | 'non-caret-row'
 
+type TrackedAnchor = {
+  anchor: PieceTableAnchor
+  deleted: boolean
+}
+
 type TrackedAnchorRange = {
-  readonly start: PieceTableAnchor
-  readonly end: PieceTableAnchor
+  readonly start: TrackedAnchor
+  readonly end: TrackedAnchor
 }
 
 type EditorLifecycleSummary = {
@@ -1602,6 +1612,9 @@ export class Editor {
 
   setText(text: string, options: EditorSetTextOptions = {}): void {
     this.runInOperation(() => {
+      const previous = this.transactionListeners.size > 0 ? this.getBufferSession() : null
+      const textSnapshotBefore = previous?.getTextSnapshot()
+      const revisionBefore = previous?.buffer.getRevision()
       const currentScrollPosition = this.getScrollPosition()
       const documentVersion = this.resetOwnedDocument(
         {
@@ -1619,6 +1632,23 @@ export class Editor {
       this.notifyChange(null)
       this.refreshSyntax(documentVersion, null)
       this.lifecycleSummary.document.setTextCount += 1
+      const next = textSnapshotBefore && this.getBufferSession()
+      if (
+        next &&
+        !pieceTableSnapshotsHaveSameText(textSnapshotBefore.snapshot, next.getSnapshot())
+      ) {
+        const snapshotAfter = next.getSnapshot()
+        this.emitTransaction({
+          snapshotBefore: textSnapshotBefore.snapshot,
+          snapshotAfter,
+          textSnapshotBefore,
+          edits: [{ from: 0, to: textSnapshotBefore.length, text: next.materializeFullText() }],
+          origin: 'local',
+          sourceViewId: previous!.view.viewId,
+          revisionBefore: revisionBefore!,
+          revisionAfter: next.buffer.getRevision(),
+        })
+      }
     })
   }
 
@@ -1675,6 +1705,46 @@ export class Editor {
     } finally {
       endEditorPerformanceInput(scope)
     }
+  }
+
+  private readonly transactionListeners = new EditorEventSource<EditorTextTransaction>({
+    action: 'editor.transaction_listener_failed',
+  })
+
+  private readonly trackedAnchors = new Set<WeakRef<TrackedAnchor>>()
+  private readonly pendingTransactions: EditorTextTransaction[] = []
+  private publishingTransactions = false
+
+  private emitTransaction(event: EditorTextTransaction): void {
+    this.pendingTransactions.push(event)
+    if (this.publishingTransactions) return
+    this.publishingTransactions = true
+    try {
+      while (this.pendingTransactions.length > 0) {
+        this.transactionListeners.fire(this.pendingTransactions.shift()!)
+      }
+    } finally {
+      this.publishingTransactions = false
+    }
+  }
+
+  /** Each logical edit, before view updates can coalesce it. The registration survives document swaps. */
+  onDidTransaction(listener: (event: EditorTextTransaction) => void): EditorDisposable {
+    return this.claimForContribution(this.transactionListeners.subscribe(listener))
+  }
+
+  reconcile(
+    base: PieceTableSnapshot,
+    batches: readonly (readonly TextEdit[])[],
+    options: DocumentSessionReconcileOptions = {},
+  ): void {
+    this.runInOperation(() => {
+      if (this.disposed) return
+      this.ensureAnonymousSession()
+      if (!this.session) return
+      const change = this.session.reconcile(base, batches, options)
+      if (change.kind !== 'none') this.applySessionChange(change, 'editor.reconcile', nowMs())
+    })
   }
 
   edit(editOrEdits: EditorEditInput, options: EditorEditOptions = {}): void {
@@ -3350,8 +3420,8 @@ export class Editor {
     return {
       unstableEditor: this,
       getSelections: () => this.inputSelection.resolveViewSelections(),
-      applyEdits: (edits, timingName, selection) =>
-        this.inputSelection.applyFindEdits(edits, timingName, selection),
+      applyEdits: (edits, timingName, selection, options) =>
+        this.inputSelection.applyFindEdits(edits, timingName, selection, options),
       registerCommand: (command, handler) =>
         this.claimedBy(claims, () => this.registerCommandHandler(command, handler)),
       refreshInputs: () => this.viewContributions?.refreshInputs(),
@@ -3365,6 +3435,8 @@ export class Editor {
       getSnapshot: () => this.createViewSnapshot(),
       getDocumentContributions: () => this.analysis?.contributions ?? null,
       requestViewUpdate: () => this.requestViewUpdate(owner()),
+      onDidTransaction: (listener) => this.claimedBy(claims, () => this.onDidTransaction(listener)),
+      reconcile: (base, batches, options) => this.reconcile(base, batches, options),
       onDidType: (listener) => this.claimedBy(claims, () => this.addTypedTextListener(listener)),
       registerPressParticipant: (participant) =>
         this.claimedBy(claims, () => this.registerPressParticipant(participant)),
@@ -3424,8 +3496,8 @@ export class Editor {
     const snapshot = this.session?.getSnapshot()
     const tracked = snapshot
       ? ranges.map((range) => ({
-          start: anchorAt(snapshot, range.start, bias.startBias),
-          end: anchorAt(snapshot, range.end, bias.endBias),
+          start: this.trackAnchor(anchorAt(snapshot, range.start, bias.startBias)),
+          end: this.trackAnchor(anchorAt(snapshot, range.end, bias.endBias)),
         }))
       : []
 
@@ -3436,18 +3508,44 @@ export class Editor {
     descriptor: Extract<EditorTextAnchor, { readonly kind: 'point' }>,
   ): EditorTrackedPoint {
     const snapshot = this.session?.getSnapshot()
-    const anchor = snapshot ? anchorAt(snapshot, descriptor.offset, descriptor.bias) : null
+    const tracked = snapshot
+      ? this.trackAnchor(anchorAt(snapshot, descriptor.offset, descriptor.bias))
+      : null
 
     return {
       resolve: () => {
         const current = this.session?.getSnapshot()
-        if (!current || !anchor) return null
+        if (!current || !tracked) return null
 
-        const resolved = resolveAnchor(current, anchor)
-        if (resolved.liveness === 'deleted') return { kind: 'deleted' }
+        const resolved = resolveAnchor(current, tracked.anchor)
+        if (tracked.deleted || resolved.liveness === 'deleted') return { kind: 'deleted' }
 
         return { kind: 'live', offset: resolved.offset }
       },
+    }
+  }
+
+  private trackAnchor(anchor: PieceTableAnchor): TrackedAnchor {
+    const tracked = { anchor, deleted: false }
+    this.trackedAnchors.add(new WeakRef(tracked))
+    return tracked
+  }
+
+  private reconcileTrackedAnchors(event: EditorTextBufferChange): void {
+    if (this.trackedAnchors.size === 0) return
+    // Project on the old identity space first to retain deletion and edge bias,
+    // then transplant surviving positions onto the independently supplied base.
+    const projected = applyBatchToPieceTable(event.textSnapshotBefore.snapshot, event.change.edits)
+    for (const reference of this.trackedAnchors) {
+      const tracked = reference.deref()
+      if (!tracked) {
+        this.trackedAnchors.delete(reference)
+        continue
+      }
+      const resolved = resolveAnchor(projected, tracked.anchor)
+      tracked.deleted ||= resolved.liveness === 'deleted'
+      const bias = tracked.anchor.kind === 'anchor' ? tracked.anchor.bias : 'left'
+      tracked.anchor = anchorAt(event.change.snapshot, resolved.offset, bias)
     }
   }
 
@@ -3457,8 +3555,8 @@ export class Editor {
 
     const resolved: TextOffsetRange[] = []
     for (const range of tracked) {
-      const start = resolveAnchor(snapshot, range.start).offset
-      const end = resolveAnchor(snapshot, range.end).offset
+      const start = resolveAnchor(snapshot, range.start.anchor).offset
+      const end = resolveAnchor(snapshot, range.end.anchor).offset
       // A span whose text is gone has nothing left to hold, and the point it collapsed onto is a
       // range the caller never asked about.
       if (end > start) resolved.push({ start, end })
@@ -3506,8 +3604,8 @@ export class Editor {
           this.registerLanguageFeatureProvider(token, selector, provider),
         ),
       focusEditor: () => this.focus(),
-      applyEdits: (edits, timingName, selection) =>
-        this.inputSelection.applyFindEdits(edits, timingName, selection),
+      applyEdits: (edits, timingName, selection, options) =>
+        this.inputSelection.applyFindEdits(edits, timingName, selection, options),
       startSnippetSession: (stops) => this.inputSelection.startSnippetSession(stops),
     }
   }
@@ -3554,8 +3652,8 @@ export class Editor {
         this.applyRequestedSelection(anchor, head, timingName, options),
       setSelections: (selections, timingName, revealOffset) =>
         this.applyRequestedSelections(selections, timingName, revealOffset),
-      applyEdits: (edits, timingName, selection) =>
-        this.inputSelection.applyFindEdits(edits, timingName, selection),
+      applyEdits: (edits, timingName, selection, options) =>
+        this.inputSelection.applyFindEdits(edits, timingName, selection, options),
       startSnippetSession: (stops) => this.inputSelection.startSnippetSession(stops),
       setRangeHighlight: (name, ranges, style) => this.view.setRangeHighlight(name, ranges, style),
       clearRangeHighlight: (name) => this.view.clearRangeHighlight(name),
@@ -3667,6 +3765,10 @@ export class Editor {
 
   private handleBufferChange(session: EditorBufferSession, event: EditorTextBufferChange): void {
     if (this.session !== session) return
+    if (event.change.kind === 'reconcile') {
+      this.reconcileTrackedAnchors(event)
+      this.inputSelection.acceptReconcile()
+    }
     this.bufferPublication = event
     try {
       const pending = this.pendingBufferChangeOptions.get(event.change.textSnapshot)
@@ -3688,6 +3790,23 @@ export class Editor {
       )
     } finally {
       if (this.bufferPublication === event) this.bufferPublication = null
+    }
+    if (
+      this.transactionListeners.size > 0 &&
+      event.revisionAfter !== event.revisionBefore &&
+      event.change.kind !== 'reconcile'
+    ) {
+      this.emitTransaction({
+        snapshotBefore: event.textSnapshotBefore.snapshot,
+        snapshotAfter: event.change.snapshot,
+        textSnapshotBefore: event.textSnapshotBefore,
+        edits: event.change.edits,
+        origin: event.origin,
+        sourceViewId: event.sourceViewId,
+        author: event.author,
+        revisionBefore: event.revisionBefore,
+        revisionAfter: event.revisionAfter,
+      })
     }
   }
 
@@ -5461,7 +5580,8 @@ function isTextSessionChange(change: DocumentSessionChange): boolean {
     change.kind === 'edit' ||
     change.kind === 'undo' ||
     change.kind === 'redo' ||
-    change.kind === 'checkout'
+    change.kind === 'checkout' ||
+    change.kind === 'reconcile'
   )
 }
 
