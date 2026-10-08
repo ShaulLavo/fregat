@@ -146,12 +146,28 @@ export function lspRoutes(fs: LspRouteFileSystem, auth: AuthConfig, deps: LspRou
         return
       }
 
-      const match = await resolveExplicitLspRouteMatch(
-        target,
-        socket.serverId,
-        deps.settings(),
-        resolveServer,
-      )
+      let match: LspServerMatch | null
+      try {
+        match = await resolveExplicitLspRouteMatch(
+          target,
+          socket.serverId,
+          deps.settings(),
+          resolveServer,
+        )
+      } catch (error) {
+        const wasClosed = pending.closed
+        rejectPendingLspSession(sessions, socket, pending)
+        recordProcessWarning('lsp.session.rejected', {
+          area: 'lsp',
+          error: operatorErrorSummary(error),
+          operation: 'open',
+          outcome: 'resolve_failed',
+          rootPath: socket.root,
+          serverId: socket.serverId,
+        })
+        if (!wasClosed) closeWithReason(socket, 'resolve_failed', socket.serverId ?? 'unknown')
+        return
+      }
       if (!match) {
         rejectPendingLspSession(sessions, socket, pending)
         recordProcessWarning('lsp.session.rejected', {
@@ -360,16 +376,12 @@ async function resolveExplicitLspRouteMatch(
 ): Promise<LspServerMatch | null> {
   if (!target || !serverId) return null
 
-  try {
-    return resolve({
-      filePath: target.filePath,
-      serverId,
-      settings,
-      workspaceRoot: target.workspaceRoot,
-    })
-  } catch {
-    return null
-  }
+  return resolve({
+    filePath: target.filePath,
+    serverId,
+    settings,
+    workspaceRoot: target.workspaceRoot,
+  })
 }
 
 function resolveRouteTarget(paths: WorkspacePaths, input: LspRouteMatchInput) {
