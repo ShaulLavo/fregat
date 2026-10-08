@@ -16,6 +16,6 @@ export async function runPaletteCommand(
   })
   await act(async () => {
     frame.mockInput.pressEnter()
-    await settle?.()
   })
+  if (settle) await act(settle)
 }
