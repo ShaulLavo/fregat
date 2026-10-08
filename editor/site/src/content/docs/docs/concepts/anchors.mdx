@@ -21,6 +21,17 @@ Anchor bias is a storage rule. Caret affinity is a display rule for choosing a p
 
 ## Coordinate rules
 
-Offsets count UTF-16 code units. Anchor creation requires a valid code-point boundary and rejects an offset in the middle of a surrogate pair. Check conversions when your application uses byte offsets or user-perceived character counts.
+Offsets count UTF-16 code units. Anchor creation snaps an offset inside a surrogate pair to the start of that code point. Offsets below zero or beyond the document length throw a `RangeError`. Validate external offsets and check conversions when your application uses byte offsets or user-perceived character counts.
+
+In `a😀b`, offset 2 falls inside the emoji. Resolving an anchor created there returns offset 1:
+
+```ts
+import { anchorAfter, createPieceTableSnapshot, resolveAnchor } from '@singapore-editor/textbuffer'
+
+const snapshot = createPieceTableSnapshot('a😀b')
+const anchor = anchorAfter(snapshot, 2)
+const resolved = resolveAnchor(snapshot, anchor)
+console.log(resolved) // { offset: 1, liveness: 'live' }
+```
 
 The [anchor design](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/positions/anchors.md) explains resolution and liveness. The generated `textbuffer` reference documents creation and resolution functions.

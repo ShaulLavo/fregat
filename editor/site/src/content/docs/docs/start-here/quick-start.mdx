@@ -61,7 +61,9 @@ import '@singapore-editor/core/style.css'
 const element = document.querySelector<HTMLElement>('#editor')!
 const editor = new Editor(element)
 editor.setText('const greeting = "Hello, Singapore"\n')
-window.addEventListener('pagehide', () => editor.dispose(), { once: true })
+window.addEventListener('pagehide', (event) => {
+  if (!event.persisted) editor.dispose()
+})
 ```
 
 <LiveEditor />

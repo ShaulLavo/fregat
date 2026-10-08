@@ -6,6 +6,8 @@
   for (const element of document.querySelectorAll<HTMLElement>('[data-singapore-example]')) {
     element.replaceChildren()
     const editor = mountEditor(element)
-    window.addEventListener('pagehide', () => editor.dispose(), { once: true })
+    window.addEventListener('pagehide', (event) => {
+      if (!event.persisted) editor.dispose()
+    })
   }
 </script>

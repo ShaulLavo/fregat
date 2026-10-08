@@ -11,7 +11,8 @@
     "test": "bun --bun vitest run",
     "lint": "oxlint --disable-nested-config scripts src/examples tests",
     "format": "oxfmt --write . --ignore-path .gitignore",
-    "format:check": "oxfmt --check . --ignore-path .gitignore"
+    "format:check": "oxfmt --check . --ignore-path .gitignore",
+    "test:browser": "vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
     "@singapore-editor/collab": "workspace:*",
@@ -46,6 +47,7 @@
     "hast-util-from-html": "2.0.3",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
+    "playwright": "1.63.0",
     "react": "19.2.7",
     "remark-mdx": "3.1.1",
     "remark-parse": "11.0.0",

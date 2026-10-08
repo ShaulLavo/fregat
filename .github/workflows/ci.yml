@@ -446,6 +446,13 @@ jobs:
         run: bun run --cwd editor/site test
       - name: Build Singapore docs and check samples and internal links
         run: bun run --cwd editor/site build
+      - name: Install Singapore browser test dependencies
+        uses: ./.github/actions/install-browsers
+        with:
+          playwright: editor/site/node_modules/.bin/playwright
+          browsers: chromium
+      - name: Test Singapore editor history restoration
+        run: bun run --cwd editor/site test:browser
       - name: Build ghostty site
         run: bun run --cwd ghostty-webgpu/site build --base /${{ github.event.repository.name }}/ghostty-webgpu/
 

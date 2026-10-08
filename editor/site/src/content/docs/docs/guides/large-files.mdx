@@ -9,7 +9,9 @@ Choose a loading path based on whether the user needs editing and language analy
 
 ## 1. Decide which work the file needs
 
-The core stores a fully loaded editable document. A file that fits memory may still cost too much to parse, tokenize or analyze on each edit. Syntax and language-server analysis have size limits; their default analysis cap is 10 Mi UTF-16 code units.
+The core stores a fully loaded editable document. A file that fits memory may still cost too much to parse, tokenize or analyze on each edit. A plain core editor has no language analysis until you attach providers or plugins. Singapore's tree-sitter and TypeScript plugins have no automatic document-size cutoff.
+
+Choose and enforce an analysis policy in your host application. You can keep large documents editable while leaving expensive analysis plugins detached. Fregat's host defaults to a 10 Mi UTF-16 code-unit cutoff for syntax and language-server analysis. That cutoff belongs to Fregat's settings and host policy.
 
 The `paged` package provides a read-only path for files you want to inspect without loading the whole file into the editable buffer. Editable paging remains planned work.
 
@@ -33,7 +35,7 @@ There is no supported universal 1 GB editable-file claim. Public editor-level co
 
 ### Typing stalls after adding language features
 
-Inspect each plugin's analysis limit and measure its work separately. For log inspection, the read-only paged view may fit better.
+Check the cutoff your host enforces, and measure each plugin's work separately. Detach expensive analysis above the file size your measurements support. For log inspection, the read-only paged view may fit better.
 
 ### The file opens but memory keeps growing
 

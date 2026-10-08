@@ -8,6 +8,8 @@ twice('two')</pre>
   for (const element of document.querySelectorAll<HTMLElement>('[data-singapore-playground]')) {
     element.replaceChildren()
     const editor = mountPlayground(element)
-    window.addEventListener('pagehide', () => editor.dispose(), { once: true })
+    window.addEventListener('pagehide', (event) => {
+      if (!event.persisted) editor.dispose()
+    })
   }
 </script>
