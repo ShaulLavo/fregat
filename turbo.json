@@ -222,6 +222,7 @@
   },
   "agentGuidance": false,
   "globalDependencies": [
+    "package.json",
     ".oxfmtrc.json",
     ".oxlintrc.json",
     "tsconfig.json",

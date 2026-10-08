@@ -92,6 +92,12 @@
       "cache": false,
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/docs/performance/e034-*.json.gz"]
     },
+    "@singapore-editor/collaboration#test:browser": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/browser-test-responses.ts"],
+      "env": ["COLLABORATION_TEST_TURN"],
+      "outputs": []
+    },
     "@singapore-editor/core#bench:edit-commands": {
       "dependsOn": ["^build", "build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/browser-test-responses.ts"]

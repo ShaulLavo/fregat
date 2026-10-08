@@ -107,10 +107,11 @@ function hashedWorkspaces(workspace, taskName) {
 }
 
 function checkWorkspace(workspace) {
-  const found = []
+  const { files, errors: found, projectReads } = workspaceFiles(workspace)
   const manifest = path.join(workspace.directory, 'package.json')
   const reads = [
-    ...[...workspaceFiles(workspace)].flatMap(([file, tasks]) =>
+    ...projectReads,
+    ...[...files].flatMap(([file, tasks]) =>
       relativeReads(file, RELATIVE_LITERAL, 2, workspace.directory).map((target) => ({
         file,
         target,
@@ -195,39 +196,93 @@ function readTarget(file, literal, packageDirectory) {
   return existsSync(directory) ? directory : null
 }
 
-function scriptConfigs(workspace, script) {
+function scriptConfigs(workspace, script, errors = []) {
   const configs = new Set()
   const pending = [script]
   const seen = new Set()
+  const context = { workspace, script, errors }
   while (pending.length > 0) {
     const name = pending.pop()
     if (seen.has(name)) continue
     seen.add(name)
-    const tokens = (workspace.scripts[name]?.match(SCRIPT_TOKEN) ?? []).map((token) =>
-      token.replace(/(["'])(.*?)\1/g, '$2'),
-    )
-    for (let index = 0; index < tokens.length; index++) {
-      const token = tokens[index]
-      if (['bun', 'npm', 'pnpm', 'yarn'].includes(token) && tokens[index + 1] === 'run')
-        pending.push(tokens[index + 2])
+    for (const tokens of scriptCommands(workspace.scripts[name] ?? '')) {
+      const called = scriptCall(tokens, workspace.scripts)
+      if (called) {
+        pending.push(called)
+        continue
+      }
+      const discovered = toolConfigs(context, tokens, toolIndex(tokens))
+      for (const file of discovered) configs.add(file)
     }
-    const discovered = tokens.flatMap((_, index) => toolConfigs(workspace.directory, tokens, index))
-    for (const file of discovered) configs.add(file)
   }
-  return [...configs].filter(existsSync)
+  return [...configs]
 }
 
-function toolConfigs(directory, tokens, index) {
-  const tool = path.basename(tokens[index])
+function scriptCommands(command) {
+  const commands = [[]]
+  const tokens = (command.match(SCRIPT_TOKEN) ?? []).map((token) =>
+    token.replace(/(["'])(.*?)\1/g, '$2'),
+  )
+  for (const token of tokens) {
+    if (/^[;&|]+$/.test(token)) commands.push([])
+    else commands.at(-1).push(token)
+  }
+  return commands
+}
+
+function commandIndex(tokens) {
+  let index = 0
+  while (tokens[index] === 'env' || /^[\w]+=.*/.test(tokens[index] ?? '')) index++
+  return index
+}
+
+function toolIndex(tokens) {
+  let index = commandIndex(tokens)
+  if (!['bun', 'bunx', 'npm', 'npx', 'pnpm', 'yarn'].includes(path.basename(tokens[index] ?? '')))
+    return index
+  index++
+  while (tokens[index]?.startsWith('-')) index++
+  if (['run', 'exec', 'x', 'dlx'].includes(tokens[index])) index++
+  while (tokens[index]?.startsWith('-')) index++
+  return index
+}
+
+function scriptCall(tokens, scripts) {
+  const start = commandIndex(tokens)
+  const manager = path.basename(tokens[start] ?? '')
+  if (!['bun', 'npm', 'pnpm', 'yarn'].includes(manager)) return null
+  const args = tokens.slice(start + 1).filter((token) => !token.startsWith('-'))
+  if (args[0] === 'run') return Object.hasOwn(scripts, args[1]) ? args[1] : null
+  if (
+    manager !== 'bun' ||
+    ['test', 'build', 'install', 'add', 'remove', 'x', 'exec', 'pm'].includes(args[0])
+  )
+    return null
+  return Object.hasOwn(scripts, args[0]) ? args[0] : null
+}
+
+function unresolvedConfig(context, file, detail) {
+  const { workspace, script, errors } = context
+  errors.push(
+    `${workspace.name}#${script}: ${path.relative(repoRoot, file)}: ${detail}. Resolve config usage with existing config paths and literal project arrays or local constants.`,
+  )
+}
+
+function toolConfigs(context, tokens, index) {
+  const tool = path.basename(tokens[index] ?? '')
   if (tool !== 'vitest' && tool !== 'vite') return []
-  const end = tokens.findIndex((next, at) => at > index && /^[;&|]+$/.test(next))
-  const args = tokens.slice(index + 1, end === -1 ? undefined : end)
+  const { directory } = context.workspace
+  const args = tokens.slice(index + 1)
   const flag = args.findIndex(
     (arg) => arg === '--config' || arg === '-c' || arg.startsWith('--config='),
   )
   if (flag === -1) return defaultConfigs(directory, tool)
   const config = args[flag].startsWith('--config=') ? args[flag].slice(9) : args[flag + 1]
-  return config ? [path.resolve(directory, config)] : []
+  const file = path.resolve(directory, config ?? args[flag])
+  if (config && SOURCE_FILE.test(file) && statSync(file, { throwIfNoEntry: false })?.isFile())
+    return [file]
+  unresolvedConfig(context, file, 'Selected config file could not be resolved')
+  return []
 }
 
 function defaultConfigs(directory, tool) {
@@ -238,17 +293,65 @@ function defaultConfigs(directory, tool) {
   return files
 }
 
-function projectConfigs(file, directory) {
+function localBindings(source) {
+  const bindings = new Map()
+  for (const statement of source.statements) {
+    if (
+      !ts.isVariableStatement(statement) ||
+      !(statement.declarationList.flags & ts.NodeFlags.Const)
+    )
+      continue
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.initializer)
+        bindings.set(declaration.name.text, declaration.initializer)
+    }
+  }
+  return bindings
+}
+
+function staticExpression(node, bindings, seen = new Set()) {
+  if (!node) return null
+  if (
+    ts.isParenthesizedExpression(node) ||
+    ts.isAsExpression(node) ||
+    ts.isSatisfiesExpression(node) ||
+    ts.isTypeAssertionExpression(node)
+  )
+    return staticExpression(node.expression, bindings, seen)
+  if (!ts.isIdentifier(node)) return node
+  if (seen.has(node.text)) return null
+  seen.add(node.text)
+  return staticExpression(bindings.get(node.text), bindings, seen)
+}
+
+function projectEntries(expression, bindings, context, file, seen = new Set()) {
+  const node = staticExpression(expression, bindings)
+  if (!node || !ts.isArrayLiteralExpression(node) || seen.has(node)) {
+    unresolvedConfig(context, file, 'Vitest project array could not be resolved')
+    return []
+  }
+  seen.add(node)
+  const entries = node.elements.flatMap((element) =>
+    ts.isSpreadElement(element)
+      ? projectEntries(element.expression, bindings, context, file, seen)
+      : [element],
+  )
+  seen.delete(node)
+  return entries
+}
+
+function projectConfigs(context, file) {
   const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest)
+  const bindings = localBindings(source)
   const configs = []
   const visit = (node) => {
-    const elements = projectElements(node, source)
-    for (const element of elements) {
-      const pattern = projectPattern(element, source)
-      if (!pattern) continue
-      configs.push(
-        ...new Bun.Glob(pattern).scanSync({ cwd: directory, absolute: true, onlyFiles: true }),
-      )
+    const property = ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)
+    if (property && node.name.getText(source).replace(/["']/g, '') === 'projects') {
+      const expression = ts.isShorthandPropertyAssignment(node) ? node.name : node.initializer
+      for (const element of projectEntries(expression, bindings, context, file)) {
+        const pattern = projectPattern(element, source, bindings, context, file)
+        if (pattern) configs.push(...resolveProject(pattern, context, file))
+      }
     }
     ts.forEachChild(node, visit)
   }
@@ -256,26 +359,45 @@ function projectConfigs(file, directory) {
   return configs
 }
 
-function projectPattern(element, source) {
-  if (ts.isStringLiteralLike(element)) return element.text
-  if (!ts.isObjectLiteralExpression(element)) return null
-  const extension = element.properties.find(
+function projectPattern(element, source, bindings, context, file) {
+  const node = staticExpression(element, bindings)
+  if (node && ts.isStringLiteralLike(node)) return node.text
+  if (!node || !ts.isObjectLiteralExpression(node)) {
+    unresolvedConfig(context, file, 'Vitest project entry could not be resolved')
+    return null
+  }
+  if (node.properties.some(ts.isSpreadAssignment))
+    unresolvedConfig(context, file, 'Vitest inline project spread could not be resolved')
+  const extension = node.properties.find(
     (property) =>
-      ts.isPropertyAssignment(property) &&
+      (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property)) &&
       property.name.getText(source).replace(/["']/g, '') === 'extends',
   )
-  return extension && ts.isStringLiteralLike(extension.initializer)
-    ? extension.initializer.text
-    : null
+  if (!extension) return null
+  const expression = ts.isShorthandPropertyAssignment(extension)
+    ? extension.name
+    : extension.initializer
+  const value = staticExpression(expression, bindings)
+  if (value && ts.isStringLiteralLike(value)) return value.text
+  if (value?.kind === ts.SyntaxKind.TrueKeyword || value?.kind === ts.SyntaxKind.FalseKeyword)
+    return null
+  unresolvedConfig(context, file, 'Vitest project extends path could not be resolved')
+  return null
 }
 
-function projectElements(node, source) {
-  if (
-    !ts.isPropertyAssignment(node) ||
-    node.name.getText(source).replace(/["']/g, '') !== 'projects'
+function resolveProject(pattern, context, file) {
+  const matches = [
+    ...new Bun.Glob(pattern).scanSync({
+      cwd: context.workspace.directory,
+      absolute: true,
+      onlyFiles: false,
+    }),
+  ]
+  if (matches.length === 0)
+    unresolvedConfig(context, file, 'Vitest project path matched no files or directories')
+  return matches.flatMap((match) =>
+    statSync(match).isDirectory() ? defaultConfigs(match, 'vitest') : [match],
   )
-    return []
-  return ts.isArrayLiteralExpression(node.initializer) ? node.initializer.elements : []
 }
 
 function addFileTasks(files, pending, file, tasks) {
@@ -294,19 +416,25 @@ function workspaceFiles(workspace) {
     .map((entry) => path.join(directory, entry))
   const trees = SCANNED_DIRECTORIES.map((entry) => path.join(directory, entry)).filter(existsSync)
   const files = new Map()
+  const errors = []
+  const projectReads = []
   const pending = []
   for (const script of Object.keys(workspace.scripts)) {
-    for (const config of scriptConfigs(workspace, script))
+    for (const config of scriptConfigs(workspace, script, errors))
       addFileTasks(files, pending, config, [script])
   }
   while (pending.length > 0) {
     const file = pending.pop()
-    for (const project of projectConfigs(file, directory)) {
-      if (isInside(directory, project)) addFileTasks(files, pending, project, files.get(file))
-    }
+    const tasks = files.get(file)
+    const context = { workspace, script: [...tasks].join(', '), errors }
+    const imports = relativeReads(file, RELATIVE_LITERAL, 2, directory)
+      .map(importedFile)
+      .filter(Boolean)
+    const projects = projectConfigs(context, file)
+    projectReads.push(...projects.map((target) => ({ file, target, tasks: [...tasks] })))
+    for (const imported of [...imports, ...projects]) addFileTasks(files, pending, imported, tasks)
   }
   const configFiles = new Set(files.keys())
-  pending.push(...configFiles)
   for (const file of [...configs, ...trees.flatMap(sourceFiles)]) {
     if (!configFiles.has(file)) addFileTasks(files, pending, file, readingTasks(workspace, file))
   }
@@ -316,12 +444,11 @@ function workspaceFiles(workspace) {
     const imports = relativeReads(file, RELATIVE_LITERAL, 2, directory)
       .map(importedFile)
       .filter(Boolean)
-    const projects = SOURCE_FILE.test(file) ? projectConfigs(file, directory) : []
-    for (const imported of [...imports, ...projects]) {
+    for (const imported of imports) {
       if (isInside(directory, imported)) addFileTasks(files, pending, imported, tasks)
     }
   }
-  return files
+  return { files, errors: [...new Set(errors)], projectReads }
 }
 
 function importedFile(target) {
