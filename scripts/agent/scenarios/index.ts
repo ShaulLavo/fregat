@@ -43,6 +43,7 @@ import { responseDelivery } from './response-delivery'
 import { draftRecovery } from './draft-recovery'
 import { composerDefaults } from './composer-defaults'
 import { sessionNotifications } from './session-notifications'
+import { workbenchMeasurements } from './workbench-measurements'
 import { terminalHistory, terminalIdleShells } from './terminal-history'
 import { chatStream } from './chat-stream'
 import { chatHistoryPages } from './chat-history-pages'
@@ -482,6 +483,7 @@ export const scenarios: readonly Scenario[] = [
   editorFeatureTiers,
   editorSavedSnapshot,
   historyComparisonNoFlicker,
+  workbenchMeasurements,
   terminalHistory,
   terminalIdleShells,
   responseDelivery,
