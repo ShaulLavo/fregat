@@ -90,6 +90,7 @@ jobs:
               - 'editor/**'
               - 'ghostty-webgpu/**'
               - 'scripts/build-site.ts'
+              - 'scripts/site-player.test.ts'
               - 'scripts/dev-sources.ts'
               - 'scripts/runtime-network.ts'
               - 'scripts/structured-errors.ts'
@@ -459,6 +460,8 @@ jobs:
         with:
           playwright: editor/site/node_modules/.bin/playwright
           browsers: chromium
+      - name: Test landing page playback
+        run: bun run test:scripts scripts/site-player.test.ts
       - name: Test Singapore editor history restoration
         run: bun run --cwd editor/site test:browser
       - name: Check landing page focus, contrast and motion controls
