@@ -346,3 +346,15 @@ A bounded isolated control used `bun --bun vitest run --config vitest.scripts.co
 The build-graph fixture separately exceeded its 10000 ms hook while copying every tracked file in `scripts/build-graph.test.ts:20`. A same-volume temporary directory and an explicit 60000 ms hook bound allowed all eight graph controls to pass in 26.36 seconds. A later combined run hit the original 5000 ms deadline in `workspace catalog consumers build after local hotkeys declarations`, while the other seven graph cases and all 144 selection/workflow controls passed. No committed timeout was changed.
 
 - [ ] Measure the build-graph fixture's copy and dry-run phases separately with a known-good task hash. Check cross-volume file copying and repeated Turbo subprocess cost before changing its fixture structure. Preserve the cache invalidation assertions. Use the narrow `scripts/build-graph.test.ts` command, OS temporary directories and explicit one-off bounds while investigating; committed tests must remain portable.
+
+## Approved CI cuts, 2026-10-10
+
+Status: Approved. The owner requested these cuts and a direct push to main.
+
+- Fixed the metadata-documentation omission exposed by PR #1207. Its four Markdown files previously selected all 48 packages because `.agents/skills/react-development/SKILL.md` was treated as unknown code. The exact-file regression now selects zero application packages and documentation formatting.
+- Main pushes compare with the last successful main validation so replaced queued runs remain covered. Scheduled and manual runs retain full validation.
+- Normal site checks use six representative pages in both Chromium and WebKit. Full page crawls retain four disjoint browser shards during scheduled and manual validation.
+- Collaboration stress and textbuffer benchmark workflows are scheduled or manual. Full-document benchmark/lifecycle probes follow full-validation mode. Broker, presence, transport, and one concurrent editor input/undo regression remain in ordinary Editor CI.
+- Ghostty verification owns its formatting, lint and type checks; the generic package runner omits the duplicate executions.
+
+The failing-before executable check reported `Selected 48 packages for 4 Markdown files` and failed its expected-zero assertion. The updated selector reports zero. The initial adjacent run passed 149 controls; live CI and subsequent main validation supply the remaining delivery evidence.

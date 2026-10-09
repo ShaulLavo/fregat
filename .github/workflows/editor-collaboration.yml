@@ -1,27 +1,8 @@
 name: Collaboration session
 
 on:
-  pull_request:
-    paths:
-      - 'editor/packages/collaboration/**'
-      - 'editor/packages/collab/**'
-      - 'editor/packages/editor/**'
-      - 'editor/packages/diff/**'
-      - 'editor/examples/app/**'
-      - 'editor/scripts/build-package.ts'
-      - 'editor/tsconfig.json'
-      - 'bun.lock'
-      - '.github/workflows/editor-collaboration.yml'
-  push:
-    branches: ['main']
-    paths:
-      - 'editor/packages/collaboration/**'
-      - 'editor/packages/collab/**'
-      - 'editor/packages/editor/**'
-      - 'editor/packages/diff/**'
-      - 'editor/examples/app/**'
-      - 'bun.lock'
-      - '.github/workflows/editor-collaboration.yml'
+  schedule:
+    - cron: '37 2 * * *'
   workflow_dispatch:
     inputs:
       long_run:
@@ -59,7 +40,7 @@ jobs:
           bun run --cwd editor/packages/collaboration format:check
       - name: Verify session and network invariants
         env:
-          COLLABORATION_LONG_RUN: ${{ inputs.long_run && '1' || '0' }}
+          COLLABORATION_LONG_RUN: ${{ (github.event_name == 'schedule' || inputs.long_run) && '1' || '0' }}
         run: bun run --cwd editor/packages/collaboration test
       - name: Verify self-hosted signaling broker
         run: bun run --cwd editor/packages/collaboration test:server
