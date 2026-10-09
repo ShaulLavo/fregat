@@ -1468,10 +1468,12 @@ describe('terminal frame consumer demand in Chromium', () => {
       expect(harness.snapshots.length).toBe(textFrames + 1)
       expect(harness.snapshots.at(-1)?.rows[0]?.text.trimEnd()).toBe('B')
       expect(harness.readTextRowsCalls()).toBeGreaterThan(textReads)
-      expect(harness.readRowsCalls()).toBe(1)
+      expect(harness.readRowsCalls()).toBe(0)
+      expect(harness.readRetainedRowsCalls()).toBe(1)
       expect(harness.terminal.visibleLines()[0]?.trimEnd()).toBe('B')
       expect(harness.host.querySelector('[role="listitem"]')?.textContent).toBe('B')
       expect(harness.terminal.frameSnapshot()?.rows[0]?.text.trimEnd()).toBe('B')
+      expect(harness.readRetainedRowsCalls()).toBe(2)
       expect(retained.rows[0]?.text.trimEnd()).toBe('A')
       expect(retainedText.rows[0]?.text.trimEnd()).toBe('A')
       expect(changedRows.at(-1)).toEqual([0])
@@ -1888,7 +1890,7 @@ describe('terminal frame consumer demand in Chromium', () => {
     expect(retained.rows[0]?.text.trimEnd()).toBe('old')
   })
 
-  it('declines lazy hydration when unpainted native state has replaced the last captured state', async () => {
+  it('hydrates the retained displayed frame while newer native state is unpainted', async () => {
     const harness = await createObservedRendererHarness()
     harness.terminal.write('old')
     await settleTerminal(harness.terminal)
@@ -1898,7 +1900,10 @@ describe('terminal frame consumer demand in Chromium', () => {
     harness.terminal.write(`${escape}[2J${escape}[Hnew output`)
     harness.renderState.update()
 
-    expect(harness.terminal.frameSnapshot()).toBeUndefined()
+    const retained = harness.terminal.frameSnapshot()!
+    expect(retained.rows[0]?.text.trimEnd()).toBe('old')
+    expect(retained.cursor.viewport).toMatchObject({ x: 3, y: 0 })
+    expect(harness.readRetainedRowsCalls()).toBe(1)
     expect(harness.terminal.visibleLines()[0]?.trimEnd()).toBe('old')
     expect(harness.terminal.captureViewport()).toBeUndefined()
     expect(harness.readRowsCalls()).toBe(0)
@@ -1907,6 +1912,7 @@ describe('terminal frame consumer demand in Chromium', () => {
 
     expect(harness.terminal.visibleLines()[0]?.trimEnd()).toBe('new output')
     expect(harness.terminal.frameSnapshot()?.cursor.viewport).toMatchObject({ x: 10, y: 0 })
+    expect(retained.rows[0]?.text.trimEnd()).toBe('old')
   })
 
   it('hydrates accessibility from owned submitted rows and keeps later summary patches when disabled', async () => {
@@ -2647,6 +2653,7 @@ describe('integrated terminal UI host', () => {
     })
     let renderer: FrameRenderer | undefined
     const terminal = await Terminal.create({
+      accessibility: {},
       appearance: {
         cursor: { blink: false },
         grid: { columns: 20, rows: 3 },
