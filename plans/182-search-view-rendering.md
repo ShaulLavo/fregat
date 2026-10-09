@@ -530,36 +530,45 @@ imports the editor feature.
   Its `live` read names the environment and workspace (`scope`), the path (`key`), the buffer
   incarnation (`buffer`) and the revision (`revision`, `syncPoint`). The read follows every
   committed edit.
-- **Capture.** `captureSourceRange(read, { start, end })` returns
-  `{ kind: 'valid', ref: SourceRangeRef }` or `{ kind: 'invalid', reason }`.
+- **Capture.** `captureSourceRange(read, { start, end }, matchedText)` returns
+  `{ kind: 'valid', ref: SourceRangeRef }` or `{ kind: 'invalid', reason }`. It captures only when
+  the read's text at those offsets equals `matchedText`. Search offsets come from disk, and an open
+  file may hold unsaved edits, so a result whose live text moved reports `stale`. Search then finds
+  the match again in that line of `read.snapshot` and captures those offsets, or drops the result.
 - **Resolve.** `resolveSourceRange(ref, lease.read())` maps the range through the buffer's edit
-  chain to the read's revision. Keep the `ref` it returns: the chain holds 128 edits, so a ref that
-  is never rebased ends as `history-unavailable`.
+  chain to the read's revision. Keep the `ref` it returns. The chain holds 128 publications, so a
+  ref that is never rebased ends as `history-unavailable`. Rebase every match on each publication;
+  resolving each match from its first capture recomposes the same history every time.
 
 ```ts
 const lease = previewSource.acquireLivePreview({ scope, key, maxBytes, signal })
-if (!lease) return openThenCheckLine() // the search's text came from disk
-let match = captureSourceRange(lease.read(), { start, end })
+if (!lease) return openFileThenCapture() // opening creates the live document; capture as below
+const read = lease.read()
+let match = captureSourceRange(read, diskRange, matchedText)
+if (match.kind === 'invalid' && match.reason === 'stale')
+  match = captureSourceRange(read, findInLiveLine(read.snapshot, line, matchedText), matchedText)
 // On each publication, and before forwarding an edit:
 if (match.kind === 'valid') match = resolveSourceRange(match.ref, lease.read())
 if (match.kind === 'invalid') dropOrRequery(match.reason)
 ```
 
-| Reason                | When                                                                                                     |
-| --------------------- | -------------------------------------------------------------------------------------------------------- |
-| `edited`              | An edit touched the range's text. An insertion at its start moves it; one at its end stays outside it.   |
-| `replaced`            | The read's buffer is another incarnation: the file reloaded with different text, or closed and reopened. |
-| `ended`               | The lease was released, the file closed or replaced under this lease, or the owner was disposed.         |
-| `partial`             | The range lies past a bounded live prefix, or the read is a truncated disk capture.                      |
-| `not-live`            | A complete disk or attachment capture. It is immutable and has no edits to follow.                       |
-| `history-unavailable` | The edit chain no longer reaches the ref: over 128 edits, a rotated segment, or edits it cannot compose. |
+| Reason                | When                                                                                                                 |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `stale`               | At capture, the read's text at the offsets differs from the text they were computed from.                            |
+| `edited`              | An edit touched or abutted the range since capture, including an insertion at either end.                            |
+| `replaced`            | The read's buffer is another incarnation: the file reloaded with different text, or closed and reopened.             |
+| `ended`               | The lease was released, the file closed or replaced under this lease, or the owner was disposed.                     |
+| `partial`             | The range lies past the read's covered prefix, at capture or after mapping, or the read is a truncated disk capture. |
+| `not-live`            | A complete disk or attachment capture. It is immutable and has no edits to follow.                                   |
+| `history-unavailable` | The edit chain no longer reaches the ref: over 128 publications, a rotated segment, or edits it cannot compose.      |
 
-A read for another document throws. A ref holds its buffer; drop it with its lease.
+The chain composes publications into net edits, so the rules judge only where each net edit
+lands. One resolve across many publications gives the same verdict as a resolve after each. A live read for another document throws. A ref holds its buffer; drop it with its lease.
 
-Still this plan's work: the recycled editor pool and its renderer, per-file sideways scroll, the
-multibuffer (M1), the edit filter and forwarding, opening a file on first edit and checking its line
-against the search's text, and undo and save across touched files. `result-file-editor.tsx` keeps
-its generated static excerpt documents until this plan binds them to the source.
+Still this plan's work: binding results to these references, per-file edit forwarding on the
+recycled editors (the pool and per-file sideways scroll are delivered, P1), opening a file on its
+first edit, and undo and save across touched files. M1 stays unscheduled. `result-file-editor.tsx`
+keeps its generated static excerpt documents until this plan binds them to the source.
 
 ## Verification
 

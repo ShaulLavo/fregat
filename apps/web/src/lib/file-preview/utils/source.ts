@@ -6,6 +6,7 @@ import type {
   DocumentTextSnapshot,
   EditorTextBuffer,
   TextEdit,
+  TextOffsetRange,
   TextSnapshot,
   TextReadSnapshot,
 } from '@singapore-editor/core/document'
@@ -98,7 +99,6 @@ export type PreviewViewRequest = {
   readonly signal: AbortSignal
 }
 
-export type SourceRange = { readonly start: number; readonly end: number }
 // Holds its buffer: drop it with the lease it was captured from.
 export type SourceRangeRef = {
   readonly scope: SnapshotComparisonScope
@@ -106,11 +106,12 @@ export type SourceRangeRef = {
   readonly buffer: EditorTextBuffer
   readonly revision: number
   readonly syncPoint: DocumentSyncPoint
-  readonly range: SourceRange
+  readonly range: TextOffsetRange
 }
 type SourceRangeInvalidReason =
   | 'not-live'
   | 'partial'
+  | 'stale'
   | 'ended'
   | 'replaced'
   | 'edited'
@@ -203,15 +204,21 @@ export function samePreviewScope(
   )
 }
 
+// `expectedText` is the text the caller's offsets were computed from; offsets from another
+// revision or from disk capture only when the live text at them still matches.
 export function captureSourceRange(
   read: PreviewSourceRead,
-  range: SourceRange,
+  range: TextOffsetRange,
+  expectedText: string,
 ): SourceRangeResolution {
   if (read.kind !== 'live') return { kind: 'invalid', reason: nonLiveSourceReason(read) }
-  assertSourceRange(range, read.snapshot.length)
-  if (range.end > read.range.end) return { kind: 'invalid', reason: 'partial' }
+  const { start, end } = range
+  assertSourceRange(start, end, read.snapshot.length)
+  if (end > read.range.end) return { kind: 'invalid', reason: 'partial' }
+  if (read.snapshot.readRange(start, end) !== expectedText)
+    return { kind: 'invalid', reason: 'stale' }
   const { scope, key, buffer, revision, syncPoint } = read
-  return { kind: 'valid', ref: { scope, key, buffer, revision, syncPoint, range } }
+  return { kind: 'valid', ref: { scope, key, buffer, revision, syncPoint, range: { start, end } } }
 }
 
 export function resolveSourceRange(
@@ -229,6 +236,7 @@ export function resolveSourceRange(
   if (!changes?.edits) return { kind: 'invalid', reason: 'history-unavailable' }
   const range = mapSourceRange(ref.range, changes.edits)
   if (!range) return { kind: 'invalid', reason: 'edited' }
+  if (range.end > read.range.end) return { kind: 'invalid', reason: 'partial' }
   return {
     kind: 'valid',
     ref: { ...ref, revision: read.revision, syncPoint: read.syncPoint, range },
@@ -243,33 +251,36 @@ function nonLiveSourceReason(
   return 'not-live'
 }
 
-function assertSourceRange(range: SourceRange, length: number): void {
+function assertSourceRange(start: number, end: number, length: number): void {
   if (
-    Number.isSafeInteger(range.start) &&
-    Number.isSafeInteger(range.end) &&
-    range.start >= 0 &&
-    range.start <= range.end &&
-    range.end <= length
+    Number.isSafeInteger(start) &&
+    Number.isSafeInteger(end) &&
+    start >= 0 &&
+    start <= end &&
+    end <= length
   )
     return
   throw createClientInvariantError('Source range must lie inside its snapshot', {
-    start: range.start,
-    end: range.end,
+    start,
+    end,
     length,
   })
 }
 
-// Edits share the capture's coordinates. An insertion at the start moves the range;
-// one at the end stays outside it. Anything touching the range's text invalidates it.
-function mapSourceRange(range: SourceRange, edits: readonly TextEdit[]): SourceRange | null {
+// The chain composes publications into net edits, which lose where each edit sat relative
+// to the range. Any composed edit that touches or abuts the range invalidates it, empty ones
+// included, so one resolve across many publications agrees with a resolve after each.
+function mapSourceRange(
+  range: TextOffsetRange,
+  edits: readonly TextEdit[],
+): TextOffsetRange | null {
   let delta = 0
   for (const edit of edits) {
-    if (edit.from === edit.to && edit.text.length === 0) continue
-    if (edit.to <= range.start) {
+    if (edit.to < range.start) {
       delta += edit.text.length - (edit.to - edit.from)
       continue
     }
-    if (edit.from >= range.end) continue
+    if (edit.from > range.end) continue
     return null
   }
   return { start: range.start + delta, end: range.end + delta }

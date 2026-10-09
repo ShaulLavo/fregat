@@ -279,8 +279,8 @@ Future work for this plan, after the composer runs on our editor. Plan 200 did n
 - **One Markdown buffer.** Source, source-revealing and visual presentations and any draft preview
   read the same buffer, as the Markdown file preview does. A preview borrows it through a live
   lease (`acquireLivePreview` accepts file documents today and would accept drafts too), and
-  `captureSourceRange` and `resolveSourceRange` give mention and command ranges the same
-  invalidation rules as search results ([Plan 182](182-search-view-rendering.md#source-handoff-from-plan-200)).
+  `captureSourceRange(read, range, text)` and `resolveSourceRange` give mention and command ranges
+  the same verification and invalidation rules as search results ([Plan 182](182-search-view-rendering.md#source-handoff-from-plan-200)).
 
 ## October 2026 issue follow-ups
 
