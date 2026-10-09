@@ -41,6 +41,7 @@ async function takeOver() {
   await docs.highlighted()
   host.dataset.state = 'ready'
   box.dataset.mode = 'editor'
+  docs.editor.setPresentationReady(true)
   mode.textContent = ''
 }
 
