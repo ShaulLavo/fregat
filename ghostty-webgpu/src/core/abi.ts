@@ -739,7 +739,6 @@ export interface GhosttyWasmExports extends WebAssembly.Exports {
 
 export interface BridgeWasmExports extends WebAssembly.Exports {
   __stack_pointer: WebAssembly.Global
-  bridge_acknowledge(state: number, iterator: number, out: number): number
   bridge_read_rows(
     state: number,
     iterator: number,

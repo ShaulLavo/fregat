@@ -206,7 +206,9 @@ export class WebGpuTextPass {
   }
 
   submit(view: GPUTextureView, copy?: TextPassCopy): void {
-    this.device.queue.submit([this.encode(view, copy)])
+    const encoder = this.device.createCommandEncoder()
+    this.encode(encoder, view, copy)
+    this.device.queue.submit([encoder.finish()])
     this.acceptFrame()
   }
 
@@ -215,9 +217,8 @@ export class WebGpuTextPass {
     this.metrics.submittedFrames += 1
   }
 
-  encode(view: GPUTextureView, copy?: TextPassCopy): GPUCommandBuffer {
+  encode(encoder: GPUCommandEncoder, view: GPUTextureView, copy?: TextPassCopy): void {
     if (!this.glyphBindGroup) throw new Error('Atlas textures must be synchronized before drawing')
-    const encoder = this.device.createCommandEncoder()
     const pass = encoder.beginRenderPass({
       colorAttachments: [
         {
@@ -247,7 +248,6 @@ export class WebGpuTextPass {
         copy.size,
       )
     }
-    return encoder.finish()
   }
 
   destroy(): void {

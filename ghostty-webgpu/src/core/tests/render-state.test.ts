@@ -1,5 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { GhosttyResult, RenderStateDirty } from '../abi.js'
+import { afterEach, describe, expect, it } from 'vitest'
 import { GhosttyRuntime } from '../runtime.js'
 
 let runtime: GhosttyRuntime | undefined
@@ -7,48 +6,9 @@ let runtime: GhosttyRuntime | undefined
 afterEach(() => {
   runtime?.dispose()
   runtime = undefined
-  vi.restoreAllMocks()
 })
 
 describe('render row reads', () => {
-  it('acknowledges live dirty rows through one bridge call after memory growth', async () => {
-    runtime = await GhosttyRuntime.create()
-    const terminal = runtime.createTerminal({ columns: 12, rows: 4 })
-    const state = runtime.createRenderState(terminal)
-    const acknowledge = vi.spyOn(runtime.bridge, 'acknowledge')
-    terminal.write('Aé界\r\nsecond')
-    state.update()
-    const before = state.readRows()
-    const dirtyRows = state.readRows({ dirtyOnly: true }).length
-    expect(state.acknowledge()).toBe(dirtyRows)
-    expect(acknowledge).toHaveBeenCalledTimes(1)
-    expect(state.dirty).toBe(RenderStateDirty.False)
-    expect(state.readRows({ dirtyOnly: true })).toEqual([])
-    expect(state.readRows()).toEqual(before.map((row) => ({ ...row, dirty: false })))
-    expect(state.acknowledge()).toBe(0)
-    expect(acknowledge).toHaveBeenCalledTimes(2)
-
-    terminal.write('\x1b[2;1H👩‍💻')
-    state.update()
-    const changed = state.readRows()
-    const changedRows = state.readRows({ dirtyOnly: true }).length
-    runtime.exports.memory.grow(1)
-    expect(state.acknowledge()).toBe(changedRows)
-    expect(acknowledge).toHaveBeenCalledTimes(3)
-    expect(state.dirty).toBe(RenderStateDirty.False)
-    expect(state.readRows({ dirtyOnly: true })).toEqual([])
-    expect(state.readRows()).toEqual(changed.map((row) => ({ ...row, dirty: false })))
-  })
-
-  it('returns native acknowledgement errors without writing the result', async () => {
-    runtime = await GhosttyRuntime.create()
-    const pointer = runtime.memory.allocate(4)
-    runtime.memory.view.setUint32(pointer, 123, true)
-    expect(runtime.bridge.acknowledge(0, 0, pointer)).toBe(GhosttyResult.InvalidValue)
-    expect(runtime.memory.view.getUint32(pointer, true)).toBe(123)
-    runtime.memory.free(pointer, 4)
-  })
-
   it('reuses memory views and refreshes them after growth between cell reads', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 12, rows: 3 })

@@ -636,13 +636,17 @@ export class WebGpuTerminalRenderer {
       frame?.notify()
       return
     }
-    let command: GPUCommandBuffer
+    let encoder: GPUCommandEncoder | undefined
     try {
-      command = this.textPass.encode(this.context.getCurrentTexture().createView())
+      const view = this.context.getCurrentTexture().createView()
+      encoder = this.coordinator.createEncoder(this.device)
+      this.textPass.encode(encoder, view)
     } catch (cause) {
+      if (encoder) this.coordinator.abandonEncoder(this.device, encoder, cause)
       this.reportFrameFailure(cause)
       if (this.disposed) return
-      command = this.textPass.encode(this.context.getCurrentTexture().createView())
+      encoder = this.coordinator.createEncoder(this.device)
+      this.textPass.encode(encoder, this.context.getCurrentTexture().createView())
     }
     let rows: readonly RenderRow[] | undefined
     if (this.frames.requiresFullRows) {
@@ -653,7 +657,7 @@ export class WebGpuTerminalRenderer {
     this.coordinator.submit({
       owner: this,
       device: this.device,
-      command,
+      encoder,
       commit: () => {
         if (this.disposed) return
         frame = this.captureFrame(
