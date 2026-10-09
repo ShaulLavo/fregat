@@ -362,3 +362,7 @@ The failing-before executable check reported `Selected 48 packages for 4 Markdow
 ### Terminal-only CI, 2026-10-10
 
 Status: Approved. The owner requested terminal verification for PR #1208 without unrelated app suites. Its original run used the earlier broad workflow. The exact ten changed files now select Ghostty verification, its standalone packaging check and patch-note formatting. Shared repository checks and consumer app/site suites are omitted for terminal-only changes; mixed app changes and scheduled/manual full validation retain them. Markdown changesets are documentation metadata. The separate Ghostty documentation workflow triggers for site changes, shared build inputs, scheduled runs and manual runs rather than every terminal implementation edit.
+
+### Strict package ownership, 2026-10-10
+
+Status: Approved. The owner requested that each changed app or package run its own tests. Normal runs now use direct file ownership. Automatic consumer and cross-source-reader test expansion is removed; dependency builds remain preparation only. Root configuration and scripts select root tooling. Generic script tests, browser tooling checks and shared censuses run only for their owning tooling changes. Editor-specific browser checks are conditioned on the owning package. Standalone family exports remain full-validation checks. Sites build and smoke-test only their selected owners. Scheduled/manual full validation retains cross-package coverage.

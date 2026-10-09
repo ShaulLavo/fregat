@@ -190,7 +190,7 @@ there small and list them in the PR body.
 ### L4 — server operations and boot · port 5214
 
 Owns `apps/server/src/observability/**`, `scripts/deploy/**`, `apps/server/src/{index,app}.ts`,
-`terminal/service.ts`, `terminal-host/`, `apps/web/scripts/bundle-*`, `vite.config.ts`.
+`terminal/service.ts`, `terminal-host/`, `apps/web/scripts/license-notices-plugin.ts`, `vite.config.ts`.
 
 1. **147** log hygiene: P1 server ‖ P2 client, then P3 gate (with 125's deferred items).
 2. **148** in its redesigned form (see the decisions above): stage instead of swap, server
@@ -199,7 +199,7 @@ Owns `apps/server/src/observability/**`, `scripts/deploy/**`, `apps/server/src/{
 3. **149** terminal host (D2: quitting the desktop app kills its terminals, as recommended).
 4. **132 P2 and P3** dev plumbing; fold **076** B (a full-process restart in dev) into it, and
    file the Bun `--watch` issue upstream.
-5. **109 P4** first-load gate, plus the hashed-asset carry-forward; **109 P1** doc.
+5. **109 P4** hashed-asset carry-forward; **109 P1** doc. The first-load size gate was removed by owner decision on 2026-10-09.
 6. **129 Q2–Q4** (shiki in entry, evlog, minimatch); drop Q5.
 7. **075 U1**: log the terminal renderer tier and show it.
 

@@ -32,10 +32,6 @@ test('the four documentation files in PR 1207 do not consume application or libr
   expect(plan.docs_files).toContain('.agents/skills/react-development/SKILL.md')
 })
 
-test('metadata code still receives full validation', () => {
-  expect(select(['.agents/skills/helper.ts']).packages).toHaveLength(graph.packages.size)
-})
-
 const terminalPrFiles = [
   '.changeset/desktop-linux-webgl-auto.md',
   'ghostty-webgpu/docs/api.md',
@@ -94,101 +90,25 @@ test('full validation still covers terminal consumers and repository checks', ()
   })
 })
 
-test('published terminal measurements still select the website that imports them', () => {
-  expect(select(['ghostty-webgpu/docs/correctness-results.json'])).toMatchObject({
-    shared: true,
-    site: true,
-  })
+test.each([
+  ['apps/web/src/features/chat/components/message.tsx', 'web'],
+  ['apps/server/src/provider/service.ts', 'server'],
+  ['apps/tui/src/main.tsx', 'tui'],
+  ['editor/packages/highlighting/src/index.ts', '@singapore-editor/highlighting'],
+  ['hotkeys/packages/hotkeys/src/index.ts', '@fregat/hotkeys'],
+  ['packages/contracts/src/index.ts', '@workspace/contracts'],
+  ['ghostty-webgpu/site/src/main.ts', 'ghostty-webgpu-site'],
+  ['ghostty-webgpu/docs/correctness-results.json', 'ghostty-webgpu'],
+])('%s selects only its owning package', (file, name) => {
+  expect(select([file]).packages).toEqual([name])
+  expect(select([file]).tooling).toBe(false)
 })
 
-test('a web source reader runs contracts checks without treating contracts as changed code', () => {
-  const plan = select(['apps/web/src/features/chat/components/message.tsx'])
-  expect(plan.packages).toEqual(['@workspace/contracts', 'web'])
-  expect(plan).toMatchObject({
-    web: true,
-    server: false,
-    tui: false,
-    desktop: false,
-    site: false,
-    editor: false,
-    ghostty: false,
-    hotkeys: false,
-  })
-})
-
-test('server changes select every real in-process test consumer', () => {
-  const plan = select(['apps/server/src/provider/service.ts'])
-  expect(plan.packages).toEqual([
-    '@workspace/client-core',
-    '@workspace/contracts',
-    'server',
-    'tui',
-    'web',
-  ])
-  expect(plan).toMatchObject({
-    web: true,
-    server: true,
-    tui: true,
-    site: false,
-    editor: false,
-    ghostty: false,
-  })
-})
-
-test('an Editor highlighting change skips unrelated server, TUI and Ghostty suites', () => {
-  expect(select(['editor/packages/highlighting/src/index.ts'])).toMatchObject({
-    web: true,
-    site: true,
-    editor: true,
-    server: false,
-    tui: false,
-    ghostty: false,
-    hotkeys: false,
-  })
-})
-
-test('catalog-backed Hotkeys consumers are selected with their dependents', () => {
-  const plan = select(['hotkeys/packages/hotkeys/src/index.ts'])
-  expect(plan.packages).toEqual(
-    expect.arrayContaining([
-      '@fregat/react-hotkeys',
-      '@workspace/contracts',
-      '@workspace/client-core',
-      '@singapore-editor/core',
-      'ghostty-webgpu',
-      'web',
-      'tui',
-    ]),
-  )
-  expect(plan).toMatchObject({
-    web: true,
-    server: true,
-    tui: true,
-    editor: true,
-    ghostty: true,
-    hotkeys: true,
-  })
-})
-
-test('nested website ownership does not run its parent library tests', () => {
-  const plan = select(['ghostty-webgpu/site/src/main.ts'])
-  expect(plan.packages).toEqual(['ghostty-webgpu-site'])
-  expect(plan).toMatchObject({ site: true, ghostty: false, editor: false, web: false })
-})
-
-test('the separate line editor selects its verification contract', () => {
-  expect(select(['ghostty-webgpu-line-editor/src/index.ts'])).toMatchObject({ ghostty: true })
-})
-
-test('the native Mac app keeps shared checks and uses its own workflow', () => {
-  expect(select(['apps/mac/MacApp/WorkspaceView.swift'])).toMatchObject({
-    code: true,
-    packages: [],
-    web: false,
-    server: false,
-    tui: false,
-    site: false,
-  })
+test('dependencies are built without selecting their tests', () => {
+  const plan = select(['apps/web/src/main.tsx'])
+  expect(plan.packages).toEqual(['web'])
+  expect(requiredLibraries(graph, plan.packages)).toContain('ghostty-webgpu')
+  expect(plan.ghostty).toBe(false)
 })
 
 test.each([
@@ -196,21 +116,29 @@ test.each([
   'bun.lock',
   'turbo.json',
   '.github/workflows/ci.yml',
-  'scripts/dev-sources.ts',
+  '.agents/skills/helper.ts',
   'apps/deleted-package/src/index.ts',
-  'packages/deleted-package/package.json',
-])('%s retains full validation', (file) => {
-  expect(select([file]).packages).toEqual(Array.from(graph.packages.keys()).sort())
+])('%s selects root tooling without every application suite', (file) => {
+  expect(select([file])).toMatchObject({
+    packages: [],
+    tooling: true,
+    web: false,
+    server: false,
+    tui: false,
+    ghostty: false,
+    editor: false,
+  })
 })
 
-test('every Turbo global dependency retains full validation', () => {
-  for (const input of graph.globalInputs) {
-    const file = input
-      .replaceAll('**', 'fixture')
-      .replaceAll('*', 'fixture')
-      .replace('{ts,mjs}', 'ts')
-    expect(select([file]).packages, file).toEqual(Array.from(graph.packages.keys()).sort())
-  }
+test('script changes select the script package and its tooling suite', () => {
+  expect(select(['scripts/dev-sources.ts'])).toMatchObject({
+    packages: ['scripts'],
+    tooling: true,
+    web: false,
+    server: false,
+    tui: false,
+    ghostty: false,
+  })
 })
 
 test.each([
@@ -223,41 +151,21 @@ test.each([
 })
 
 test.each(['docs/settings-reference.md', 'docs/native-syntax-coverage.md'])(
-  'generated documentation %s still selects code checks',
+  'generated documentation %s selects its root tooling owner',
   (file) => {
-    expect(select([file]).packages).toHaveLength(graph.packages.size)
+    expect(select([file])).toMatchObject({ packages: [], tooling: true })
   },
 )
 
-test('root-document task inputs still select the check that reads them', () => {
-  const pkg = graph.packages.get('@workspace/contracts')
-  const custom = { ...graph, packages: new Map(graph.packages) }
-  custom.packages.set(pkg.name, {
-    ...pkg,
-    tasks: pkg.tasks.concat([{ name: 'test', inputs: ['docs/example.md'], dependencies: [] }]),
-  })
-  expect(selectAffected(custom, ['docs/example.md'])).toMatchObject({
-    packages: ['@workspace/contracts'],
-    web: false,
-    server: false,
-  })
-})
-
-test('external check inputs add checks without invalidating production consumers', () => {
-  const plan = select(['editor/bench/compare/protocol.mjs'])
-  expect(plan.packages).toContain('@singapore-editor/core')
-  expect(plan.server).toBe(false)
-})
-
-test('main and manual runs retain the full graph even with no changed files', () => {
+test('scheduled and manual validation retain every package', () => {
   expect(select([], true).packages).toHaveLength(graph.packages.size)
   expect(select([], true)).toMatchObject({
+    tooling: true,
     web: true,
     server: true,
     tui: true,
     editor: true,
     ghostty: true,
-    hotkeys: true,
     site: true,
   })
 })

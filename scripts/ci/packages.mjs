@@ -36,12 +36,26 @@ if (operation === 'build') {
     const pkg = graph.packages.get(name)
     if (operation === 'checks' && ['ghostty-webgpu', 'ghostty-webgpu-line-editor'].includes(name))
       continue
-    const sharedTest =
-      name.startsWith('@workspace/') || name.startsWith('@fregat/') || name === 'desktop'
-    const editorTest =
-      pkg.directory.startsWith('editor/packages/') || pkg.directory.startsWith('editor/examples/')
-    if (operation === 'tests' && !sharedTest) continue
-    if (operation === 'editor-tests' && !editorTest) continue
+    const dedicatedTest =
+      [
+        'web',
+        'server',
+        'tui',
+        'ghostty-webgpu',
+        'ghostty-webgpu-line-editor',
+        'singapore-editor-site',
+        'scripts',
+      ].includes(name) ||
+      pkg.directory.startsWith('editor/packages/') ||
+      pkg.directory.startsWith('editor/examples/')
+    if (operation === 'tests' && dedicatedTest) continue
+    if (
+      operation === 'editor-tests' &&
+      !(
+        pkg.directory.startsWith('editor/packages/') || pkg.directory.startsWith('editor/examples/')
+      )
+    )
+      continue
     const tasks = operation === 'checks' ? ['format:check', 'lint', 'typecheck'] : ['test']
     for (const task of tasks) {
       if (!pkg.scripts[task]) continue
