@@ -83,3 +83,23 @@ for (const [name, source] of fixtures) {
     },
   )
 }
+
+test('replaces overestimated joined-emoji extent with measured paint', async () => {
+  const container = document.createElement('div')
+  container.style.cssText = 'display:flex;width:60px;height:600px'
+  document.body.append(container)
+  const editor = new Editor(container, {
+    wordWrap: true,
+    wordWrapBreak: 'word',
+    fontFamily: 'monospace',
+    fontSize: 16,
+  })
+  mounted.push({ editor, container })
+  editor.setText('👨‍👩‍👧‍👦\nlast')
+  const scroller = container.querySelector<HTMLElement>('.editor-virtualized')!
+  await expect.poll(() => scroller.scrollWidth).toBe(scroller.clientWidth)
+  editor.setSelection('👨‍👩‍👧‍👦'.length)
+  await expect.poll(() => scroller.scrollWidth).toBe(scroller.clientWidth)
+  expect(scroller.scrollLeft).toBe(0)
+  await page.elementLocator(container).screenshot()
+})
