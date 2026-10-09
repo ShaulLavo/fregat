@@ -31,7 +31,11 @@ async function expectActiveTab(page: Page, name: string, message: string) {
 async function pressForTab(page: Page, key: string, name: string, message: string) {
   await page.keyboard.press(key)
   await expectActiveTab(page, name, message)
-  await page.waitForFunction(
+  await editorFocused(page)
+}
+
+function editorFocused(page: Page) {
+  return page.waitForFunction(
     () => document.activeElement?.getAttribute('aria-label') === 'Editor input',
   )
 }
@@ -119,6 +123,7 @@ async function workbench(page: Page, step: Step, keys: ItemKeys) {
   await selectors.workspaceMode(page, 'Workbench').click()
   for (const name of FILES) await openFileByName(page, name)
   await expectActiveTab(page, 'README.md', 'The last opened file is active')
+  await editorFocused(page)
 
   await pressForTab(page, keys.select(1), 'AGENTS.md', 'Item 1 selects the first tab')
   await pressForTab(page, keys.select(3), 'README.md', 'Item 3 selects the third tab')
