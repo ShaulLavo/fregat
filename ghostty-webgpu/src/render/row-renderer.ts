@@ -293,11 +293,14 @@ export class RowTerminalRenderer {
 
   private rowsToPaint(damage: RenderStateDirty): readonly RenderRow[] {
     if (this.needsFullRebuild) return this.readRows()
+    if (this.overlayRows.size === 0) {
+      if (damage === RenderStateDirty.False) return []
+      return this.readRows({ dirtyOnly: true })
+    }
     const rows = new Map<number, RenderRow>()
     if (damage !== RenderStateDirty.False) {
       for (const row of this.readRows({ dirtyOnly: true })) rows.set(row.y, row)
     }
-    if (this.overlayRows.size === 0) return [...rows.values()]
     const missing = new Set([...this.overlayRows].filter((row) => !rows.has(row)))
     if (missing.size === 0) return [...rows.values()]
     for (const row of this.readRows({ rows: missing })) {
