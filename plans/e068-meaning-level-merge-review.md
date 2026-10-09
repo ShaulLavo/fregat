@@ -124,8 +124,9 @@ them).
 3. **Detector** in the tree-sitter worker: `overlap`, `parse`, `signature`, `orphan`, with author
    versions rebuilt through `setEffects`.
 4. **Marks, hover and resolutions** in the collaboration plugin, wired into the example page.
-5. **Fregat:** host-side detection for agent edits racing human typing, review annotations on the
-   host, and the "Fix with AI" action. Lands with Delta DB phase 4.
+5. **Fregat:** marks for agent edits racing human typing, review annotations on the host, and the
+   "Fix with AI" action. Detection runs in the browser, where the parser lives; the server host
+   does not parse. Lands with Delta DB phase 4.
 
 ## Verification
 

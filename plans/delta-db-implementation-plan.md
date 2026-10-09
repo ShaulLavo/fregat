@@ -22,9 +22,11 @@ One protocol, three places to host it. The editor core does not know which one i
    ([E067](e067-webrtc-collaboration-plugin.md), delivered). No server sees the text. This stays
    the standalone editor's path.
 2. **Fregat: the person's own Fregat server hosts.** Each machine server hosts its open
-   documents, as this plan describes. Its browsers, desktop windows and agents are participants.
-   Teammates join that server directly or over WebRTC, where the server takes part as a peer and,
-   being always on, is the preferred host. Nothing goes through company servers.
+   documents, as this plan describes. Its browsers and desktop windows are participants over the
+   connection they already have to the server; agents run on the server. The host only orders
+   edits and places characters, so it needs no parser: syntax trees, highlighting and merge
+   review ([E068](e068-meaning-level-merge-review.md)) stay in the browser. How teammates on
+   other machines reach the server is D4. Nothing goes through company servers.
 3. **Hosted Delta DB: a paid service run by the Fregat company.** A company server hosts shared
    documents and keeps durable history and provenance for teams whose machines are not always on.
    It is a participant that reads the text, so it is opt-in per workspace.
@@ -235,6 +237,13 @@ cost and agent-branch spawn latency against `git/worktrees.ts` on a realistic re
 
 **D3 — what compilers and shells read.** Before phase 2 ships: whether the host materializes
 accepted edits to disk continuously, on save only, or per agent turn.
+
+**D4 — how a teammate reaches someone's Fregat server.** Before phase 4. Options: the existing
+browser connection when the server is reachable (same tailnet, a tunnel); WebRTC with the server
+as a peer, which needs a native data-channel library in Bun; or server-to-server QUIC with NAT
+traversal and relays (iroh-style) when both sides run Fregat. Criterion: works across home NATs
+without setup, and no company server can read the text. WebRTC stays the only option between two
+browsers with no server (Singapore on its own).
 
 ---
 
