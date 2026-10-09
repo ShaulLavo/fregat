@@ -183,7 +183,7 @@ read `/platform/release` before citing its current state.
 
 - [282](../plans/282-fast-paired-input-latency-check.md): paired input-latency instrument;
   099 unit 0 stays partial and units 2–7 retain their replacement proof and explicit owner gate.
-- [198](../plans/198-document-owned-editor-analysis.md): full browser, pixel-level and
+- [198](https://github.com/ShaulLavo/fregat/blob/c01c490faa37ab9a100613389c9c2a6175c7b5a3/plans/198-document-owned-editor-analysis.md): full browser, pixel-level and
   memory/WASM acceptance. Its landed publication subscriber is not a second analysis owner.
 - [126](../plans/126-t3code-alignment.md), [114](../plans/114-installed-app.md) and
   [156](../plans/156-documents-in-the-editor.md): their existing row ledgers, desktop/Mac,

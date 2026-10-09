@@ -1,54 +1,51 @@
-import { Editor } from '@singapore-editor/core/editor'
-import { createDiffPresentationBinding } from '@/features/editor/state/diff-presentation'
+import { waitFor } from '@testing-library/react'
+import { createTextDiff } from '@singapore-editor/diff'
 import { TabPresentations } from '@/features/editor/state/tab-presentation'
 import { tabId } from '@/lib/documents/utils/identity'
 import { expect, test } from '../../../../test/fixtures'
 import { stubEditorViewport } from '../../../../test/env/editor-viewport'
 import { stubHighlightApi } from '../../../../test/env/highlight-api'
+import {
+  mountDiffProjectionControl,
+  projectionControl,
+} from '../../../../test/factories/diff-attachment'
 
-test('restores a moved diff view before its old editor finishes disposal', () => {
-  stubEditorViewport()
+test('restores a moved diff view before its old editor finishes disposal, and a copied tab keeps its own place', async () => {
+  stubEditorViewport({ height: 120, width: 300 })
   stubHighlightApi()
+  const text = Array.from({ length: 80 }, (_, index) => `const line${index} = ${index}`).join('\n')
+  const attachment = projectionControl(
+    createTextDiff({
+      oldFile: { path: 'moving.ts', text: 'base' },
+      newFile: { path: 'moving.ts', text },
+    }),
+  )
   const tabs = new TabPresentations()
   const id = tabId('moving-diff')
-  const presentation = tabs.get(id).diffPanes.new
-  const before = createDiffPresentationBinding(presentation)
-  const firstHost = document.createElement('div')
-  const secondHost = document.createElement('div')
-  document.body.append(firstHost, secondHost)
-  const first = new Editor(firstHost, { plugins: [before.plugin] })
-  first.setText('alpha\nbeta\ngamma\n')
-  before.restore(first)
-  first.setSelection(6, 9)
-  first.setScrollPosition({ left: 2, top: 11 })
-  const position = first.getScrollPosition()
-  before.detach()
+  const first = mountDiffProjectionControl(attachment, 'new', tabs.get(id).diffPanes.new)
+  await waitFor(() => expect(first.snapshot().viewport.clientHeight).toBe(120))
+  first.editor.setSelection(first.offset(40) + 6, first.offset(40) + 9, { reveal: false })
+  first.editor.setScrollPosition({ top: 240, left: 2 })
+  const position = first.editor.getScrollPosition()
+  const selections = first.editor.getSelections()
+  first.binding.detach()
 
-  const after = createDiffPresentationBinding(tabs.get(id).diffPanes.new)
-  const second = new Editor(secondHost, { plugins: [after.plugin] })
-  try {
-    second.setText('alpha\nbeta\ngamma\n')
-    after.restore(second)
-    first.dispose()
+  const second = mountDiffProjectionControl(attachment, 'new', tabs.get(id).diffPanes.new)
+  first.editor.dispose()
+  await waitFor(() => expect(second.snapshot().viewport.clientHeight).toBe(120))
+  expect(second.editor.getScrollPosition()).toEqual(position)
+  expect(second.editor.getSelections()).toEqual(selections)
 
-    expect(second.getState().cursor).toEqual({ row: 1, column: 3 })
-    expect(second.getScrollPosition()).toEqual(position)
-    second.setSelection(1, 3)
-    after.detach()
-    expect(presentation.selections[0]).toMatchObject({ anchorOffset: 1, headOffset: 3 })
-    const movedPosition = presentation.scroll
-
-    const copiedId = tabId('copied-diff')
-    tabs.copy(id, copiedId)
-    const copy = tabs.get(copiedId)
-    copy.diffPanes.new.scroll = { left: 0, top: 40 }
-    copy.regions.toggleRegion('context-row')
-    expect(presentation.scroll).toEqual(movedPosition)
-    expect(tabs.get(id).regions.isExpanded('context-row')).toBe(false)
-  } finally {
-    first.dispose()
-    second.dispose()
-    firstHost.remove()
-    secondHost.remove()
-  }
+  const copiedId = tabId('copied-diff')
+  tabs.copy(id, copiedId)
+  const original = tabs.get(id).diffPanes.new.views
+  const saved = [...original.values()][0]!.anchors
+  const copy = mountDiffProjectionControl(attachment, 'new', tabs.get(copiedId).diffPanes.new)
+  await waitFor(() => expect(copy.snapshot().viewport.clientHeight).toBe(120))
+  expect(copy.editor.getScrollPosition()).toEqual(position)
+  copy.editor.setScrollPosition({ top: 40, left: 0 })
+  copy.binding.detach()
+  tabs.get(copiedId).regions.toggleRegion('context-row')
+  expect([...original.values()][0]!.anchors).toBe(saved)
+  expect(tabs.get(id).regions.isExpanded('context-row')).toBe(false)
 })

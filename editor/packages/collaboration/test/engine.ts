@@ -67,6 +67,14 @@ export class ToyEngine implements DocumentEngine<ToyEdit> {
     this.outcomes.set(editKey(record.id), record.outcome)
     return true
   }
+  sequenceBatch(
+    edits: readonly { readonly edit: ToyEdit; readonly rejection?: string }[],
+  ): readonly Confirmation<ToyEdit>[] {
+    return edits.map(({ edit, rejection }) => this.sequence(edit, rejection))
+  }
+  applyBatch(records: readonly Confirmation<ToyEdit>[]): boolean {
+    return records.every((record) => this.apply(record))
+  }
   exportHistory(from: Checkpoint): readonly Confirmation<ToyEdit>[] | undefined {
     const checkpoint = from.depth === 0 ? genesis : this.history[from.depth - 1]
     if (!checkpoint || !sameTip(checkpoint, from)) return undefined

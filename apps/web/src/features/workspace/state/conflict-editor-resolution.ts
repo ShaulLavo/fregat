@@ -227,7 +227,6 @@ export class ConflictEditorResolutionCoordinator {
           ...capture.conflict,
           eventType: retryEventType(capture.conflict),
           remoteFile: file,
-          remoteText: file.content,
         },
         {
           comparisonScope: capture.conflict.latest.input.scope,

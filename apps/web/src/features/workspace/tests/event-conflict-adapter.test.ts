@@ -79,7 +79,6 @@ test('deletion updates an existing conflict so resolving it can recreate the fil
   expect(conflictStore.getState().conflicts[original.id]).toMatchObject({
     id: original.id,
     eventType: 'deleted',
-    remoteText: null,
     remoteFile: null,
   })
 })

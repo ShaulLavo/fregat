@@ -54,10 +54,11 @@ empty framework scaffold, second application store or web-to-terminal component 
   required under their explicit profiles. They are not all initial Crush-profile prerequisites.
 - Plans [108](108-markdown-modes.md), [111](111-editor-decorations.md),
   [171](171-composer-on-our-editor.md), [179](179-isolating-foreign-content.md),
-  [197](197-editor-highlighting-service.md), [198](198-document-owned-editor-analysis.md),
-  [099](099-document-contributions.md) and [200](200-document-backed-content-views.md) keep their
-  existing authoring, isolation, highlighting and document responsibilities. Consume only the
-  exact contracts required; do not gate the whole TUI on unrelated units or invent another owner.
+  [197](197-editor-highlighting-service.md) and [099](099-document-contributions.md) keep their
+  existing authoring, isolation, highlighting and document responsibilities. Document and
+  analysis ownership follows [document-backed content views](../docs/document-backed-content-views.md).
+  Consume only the exact contracts required; do not gate the whole TUI on unrelated units or
+  invent another owner.
 - Plans [203](203-fregat-hotkeys.md) and [206](206-platform-one-keymap.md) own keymap infrastructure.
   Local UI controls integrate with that route and supply focus, commands and hints. Until its TUI
   adoption lands, preserve the current command owner. Do not add a competing global dispatcher or
