@@ -1,28 +1,33 @@
 import type { PlatformBridge, PlatformPickOptions } from '../shared/bridge'
 import { isRecord } from '@workspace/utils/objects'
 
-export function parsePickRequest(
-  body: unknown,
-  origin: string,
-): { id: number; documentId: string; options: PlatformPickOptions } | undefined {
+export type PickRequest =
+  | { id: number; documentId: string; options: PlatformPickOptions }
+  | { id: number; documentId: string; refused: 'options' }
+
+/**
+ * A pick request this page can be answered on. Requests without a usable id or
+ * document id have no caller to answer and return undefined; any other invalid
+ * shape is refused so the page's promise settles with an error.
+ */
+export function parsePickRequest(body: unknown, origin: string): PickRequest | undefined {
   if (
     !isRecord(body) ||
     body.origin !== origin ||
     body.method !== 'pickEntry' ||
     !Number.isSafeInteger(body.id) ||
     typeof body.documentId !== 'string' ||
-    !/^[a-f0-9-]{36}$/.test(body.documentId) ||
-    !isRecord(body.options)
+    !/^[a-f0-9-]{36}$/.test(body.documentId)
   )
     return
+  const caller = { id: body.id as number, documentId: body.documentId }
   const options = body.options
-  if (Object.keys(options).some((key) => key !== 'startingPath')) return
-  if (options.startingPath !== undefined && typeof options.startingPath !== 'string') return
-  return {
-    id: body.id as number,
-    documentId: body.documentId,
-    options: { startingPath: options.startingPath },
-  }
+  if (!isRecord(options)) return { ...caller, refused: 'options' }
+  if (Object.keys(options).some((key) => key !== 'startingPath'))
+    return { ...caller, refused: 'options' }
+  if (options.startingPath !== undefined && typeof options.startingPath !== 'string')
+    return { ...caller, refused: 'options' }
+  return { ...caller, options: { startingPath: options.startingPath } }
 }
 export function shellBridge(
   url: string,

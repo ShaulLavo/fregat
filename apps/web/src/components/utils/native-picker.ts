@@ -23,7 +23,7 @@ import {
   type ClientError,
 } from '@/lib/client-error-taxonomy'
 import { toastError } from '@/lib/toast-error'
-import { createClientInvariantError, createRpcError } from '@/lib/structured-errors'
+import { clientErrors, createClientInvariantError, createRpcError } from '@/lib/structured-errors'
 
 export function nativePickerCapabilitiesOptions(client: Client) {
   return queryOptions({
@@ -86,9 +86,12 @@ export function nativeSelectionOptions(queryClient: QueryClient) {
     retry: false,
     mutationFn: ({
       request,
+      replyMs,
       signal,
     }: {
       readonly request: NativePickerRequest
+      /** How long the desktop bridge may stay silent: its own dialog limit plus its stop grace. */
+      readonly replyMs: number
       readonly signal: AbortSignal
     }) =>
       observeClientOperation(
@@ -105,7 +108,7 @@ export function nativeSelectionOptions(queryClient: QueryClient) {
             throw createClientInvariantError(
               'The server filesystem picker is available for this connection.',
             )
-          const result = await nativeSelection(client, request, signal)
+          const result = await nativeSelection(client, request, replyMs, signal)
           signal.throwIfAborted()
           const path = result.paths[0]
           if (!path) return null
@@ -134,11 +137,12 @@ export function nativeSelectionOptions(queryClient: QueryClient) {
 async function nativeSelection(
   client: Client,
   request: NativePickerRequest,
+  replyMs: number,
   signal: AbortSignal,
 ): Promise<NativePickerResult> {
   const pickEntry = getPlatformBridge()?.pickEntry
   if (pickEntry) {
-    const paths = await pickEntry(request)
+    const paths = await bridgeReply(pickEntry(request), replyMs)
     if (paths.length === 0) return { outcome: 'cancelled', paths: [] }
     return { outcome: 'selected', paths }
   }
@@ -150,6 +154,22 @@ async function nativeSelection(
   if (!parsed.success)
     throw createClientInvariantError('The server returned an invalid picker selection.')
   return parsed.output
+}
+
+// The launcher closes its own dialog at the time limit and answers; silence past it means no answer is coming.
+async function bridgeReply(pending: Promise<string[]>, replyMs: number) {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const silence = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(clientErrors.NATIVE_CHOOSER_NO_REPLY({ internal: { replyMs } })),
+      replyMs,
+    )
+  })
+  try {
+    return await Promise.race([pending, silence])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 async function hydrateSelection(

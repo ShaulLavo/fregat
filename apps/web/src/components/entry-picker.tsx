@@ -12,6 +12,7 @@ import {
 import { runMutation } from '@/lib/mutations/run'
 import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
 import { toastError } from '@/lib/toast-error'
+import { useSettingValue } from '@/hooks/use-setting-value'
 
 export function EntryPicker({ open, value, onOpenChange, onPick }: UsePickEntryOptions) {
   const queryClient = useQueryClient()
@@ -20,6 +21,10 @@ export function EntryPicker({ open, value, onOpenChange, onPick }: UsePickEntryO
   const [fallback, setFallback] = useState(false)
   const native = capabilities.isSuccess && capabilities.data?.nativePicker === true && !fallback
   const startingPath = value?.path
+  const dialogSeconds = useSettingValue('window.nativeDialogTimeoutSeconds')
+  const graceSeconds = useSettingValue('window.nativeHostStopGraceSeconds')
+  // Read at chooser start; a settings refresh must not reopen an open chooser.
+  const replyMs = useEffectEvent(() => (dialogSeconds + graceSeconds) * 1000)
   const picked = useEffectEvent((entry: PickedFsEntry | null) => {
     if (entry) onPick(entry)
     onOpenChange(false)
@@ -51,6 +56,7 @@ export function EntryPicker({ open, value, onOpenChange, onPick }: UsePickEntryO
       if (controller.signal.aborted) return
       void runMutation(queryClient, nativeSelectionOptions(queryClient), {
         request: { startingPath },
+        replyMs: replyMs(),
         signal: controller.signal,
       }).then(
         (entry) => {

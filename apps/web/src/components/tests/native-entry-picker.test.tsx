@@ -1,13 +1,15 @@
 import { mkdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { useState } from 'react'
-import { onTestFinished } from 'vitest'
+import { afterEach, onTestFinished } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import { toast } from 'sonner'
 import { entryPickerMutationKeys } from '@/components/utils/mutation-keys'
 import { entryPickerQueryKeys } from '@/components/utils/query-keys'
 import { clientPathFromOsPath } from '@/components/utils/picked-path'
 import { usePickEntry } from '@/components/use-pick-entry'
+import { nativeSelectionOptions } from '@/components/utils/native-picker'
+import { runMutation } from '@/lib/mutations/run'
 import { toClientError } from '@/lib/client-error-taxonomy'
 import type { PickedFsEntry } from '@/lib/file-system-types'
 import { filePickerKeys, fileSystemKeys } from '@/lib/query-keys'
@@ -16,6 +18,15 @@ import { installTestClient } from '../../../test/factories/client-binding'
 import { installNativePickerHelper } from '../../../test/factories/native-picker'
 import { expect, test } from '../../../test/fixtures'
 import { createTestQueryClient, renderWithProviders } from '../../../test/render'
+
+afterEach(() => {
+  delete window.platformBridge
+})
+
+// The shape the desktop shell bridge rejects with when the launcher answers with an error.
+function bridgeFailure(reply: { message: string; code: string; why: string; fix: string }) {
+  return Object.assign(Object.create(Error.prototype) as Error, reply)
+}
 
 function NativePickerFixture({
   onPick,
@@ -125,5 +136,66 @@ test
     expect(queryClient.getQueryState(filePickerKeys.recents())?.isInvalidated).toBe(true)
     expect(posts).toBe(1)
     expect(await calls()).toEqual(outcome === 'not-local' ? [] : [{}])
+  },
+)
+
+test.skipIf(process.platform === 'win32')(
+  'a refused desktop bridge request shows the launcher error and opens the web picker',
+  async ({ server, client }) => {
+    void client
+    await installNativePickerHelper(server, [])
+    const refusal = {
+      message: 'The folder chooser request is not valid.',
+      code: 'desktop.webview.PICKER_REFUSED',
+      why: 'This window and the desktop app are from different versions, so the app cannot read the request.',
+      fix: 'Restart Fregat so the window and the desktop app match, then open the folder again.',
+    }
+    window.platformBridge = {
+      backdrop: 'compositor',
+      platform: 'linux',
+      colorScheme: null,
+      titlebar: 'native',
+      pickEntry: () => Promise.reject(bridgeFailure(refusal)),
+    }
+    const queryClient = createTestQueryClient()
+    const before = toast.getHistory().length
+    renderWithProviders(<NativePickerFixture onPick={() => {}} onClose={() => {}} />, {
+      queryClient,
+    })
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+    await waitFor(() => expect(toast.getHistory()).toHaveLength(before + 1))
+    expect(toast.getHistory().at(-1)).toMatchObject({
+      title: 'Could not open folder chooser',
+      description: expect.stringContaining(refusal.fix),
+    })
+    expect(toast.getHistory().at(-1)).toMatchObject({
+      description: expect.stringContaining(refusal.why),
+    })
+  },
+)
+
+test.skipIf(process.platform === 'win32')(
+  'a silent desktop bridge fails after the reply limit',
+  async ({ server, client }) => {
+    void client
+    await installNativePickerHelper(server, [])
+    window.platformBridge = {
+      backdrop: 'compositor',
+      platform: 'linux',
+      colorScheme: null,
+      titlebar: 'native',
+      pickEntry: () => new Promise<string[]>(() => {}),
+    }
+    const queryClient = createTestQueryClient()
+    const failure = await runMutation(queryClient, nativeSelectionOptions(queryClient), {
+      request: {},
+      replyMs: 50,
+      signal: new AbortController().signal,
+    }).catch((error: unknown) => toClientError(error))
+    expect(failure).toMatchObject({
+      code: 'client.NATIVE_CHOOSER_NO_REPLY',
+      why: expect.stringContaining('different versions'),
+      fix: expect.stringContaining('Restart Fregat'),
+    })
   },
 )
