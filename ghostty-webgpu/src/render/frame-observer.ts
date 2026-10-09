@@ -66,12 +66,13 @@ export class FrameObserver {
     const { onFrame, onTextFrame, onRowsChanged, onRowsPainted } = this.options
     const changedRows = Object.freeze([...changed])
     if (!onFrame && !onTextFrame) return this.rowDelivery(generation, changedRows, rows)
+    // Extraction can fail; finish it before rotating the accepted native reader.
+    if (this.rowsNeeded) this.updateRows(state, changed, rows)
+    else this.clearRows()
     const nativeFrame = this.options.retainDisplayedText
       ? state.retainDisplayedFrame?.({ full: !this.retained })
       : undefined
     if (nativeFrame) this.retained = true
-    if (this.rowsNeeded) this.updateRows(state, changed, rows)
-    else this.clearRows()
     const viewport = cursor.viewport ? Object.freeze({ ...cursor.viewport }) : undefined
     const snapshot = {
       cursor: Object.freeze({ ...cursor, viewport }),
