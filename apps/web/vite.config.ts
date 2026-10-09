@@ -16,6 +16,7 @@ import { phosphorWeightPlugin } from './scripts/phosphor-weight-plugin.ts'
 import {
   SHELL_ENTRIES,
   PHONE_BOOT_SCREENS,
+  PHONE_OVERLAYS,
   shellChunksPlugin,
 } from './scripts/shell-chunks-plugin.ts'
 import { shellChunkGroups } from './scripts/shell-chunk-groups.ts'
@@ -67,6 +68,9 @@ export default defineConfig(({ command, isPreview }) => {
               phone: path.resolve(import.meta.dirname, SHELL_ENTRIES.phone),
               workbench: path.resolve(import.meta.dirname, SHELL_ENTRIES.workbench),
               phoneScreens: PHONE_BOOT_SCREENS.map((entry) =>
+                path.resolve(import.meta.dirname, entry),
+              ),
+              phoneOverlays: PHONE_OVERLAYS.map((entry) =>
                 path.resolve(import.meta.dirname, entry),
               ),
             }),

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 
-import { ProviderSignInDialog } from '@/features/chat/components/provider-sign-in-dialog'
+import { DeferredOverlay } from '@/components/deferred-overlay'
+import { providerSignInDialogModuleQueryOptions } from '@/features/chat/utils/sign-in-dialog-module'
 import type { ProviderSignInTarget } from '@workspace/client-core/chat/providers/auth'
 import {
   ProviderSignInDialogContext,
@@ -25,15 +26,24 @@ export function ChatProviderSignInProvider({ children }: { readonly children: Re
     <ProviderSignInDialogContext value={value}>
       {children}
       {target ? (
-        <ProviderSignInDialog
+        <DeferredOverlay
+          label='sign-in'
+          module={providerSignInDialogModuleQueryOptions}
           open
-          providerInstanceId={target.providerInstanceId}
-          providerLabel={target.providerLabel}
-          onOpenChange={(open) => {
-            if (open) return
-            setTarget(null)
-          }}
-        />
+          onClose={() => setTarget(null)}
+        >
+          {({ ProviderSignInDialog }) => (
+            <ProviderSignInDialog
+              open
+              providerInstanceId={target.providerInstanceId}
+              providerLabel={target.providerLabel}
+              onOpenChange={(open) => {
+                if (open) return
+                setTarget(null)
+              }}
+            />
+          )}
+        </DeferredOverlay>
       ) : null}
     </ProviderSignInDialogContext>
   )

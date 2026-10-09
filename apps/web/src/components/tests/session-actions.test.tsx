@@ -70,8 +70,8 @@ test('delete from the sidebar header confirms through the shared dialog and canc
 
   await openActions('Sidebar header')
   await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
-  const dialog = await screen.findByRole('dialog')
-  await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+  // The dialog's code may still be downloading; its loading shell has no Cancel.
+  await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
 
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect((await h.refresh()).sessions).toHaveLength(2)

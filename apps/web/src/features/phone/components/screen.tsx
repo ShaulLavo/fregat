@@ -5,6 +5,7 @@ import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundar
 
 import { ModuleLoadError } from '@/components/module-load-error'
 import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
+import { useWarmOverlays } from '@/features/phone/hooks/use-warm-overlays'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import type { PhoneLevel } from '@/features/phone/utils/level'
 import { screenQueryOptions, type ScreenProps } from '@/features/phone/utils/screen-query'
@@ -15,6 +16,7 @@ export function Screen({ level, ...props }: ScreenProps & { readonly level: Phon
   const shown = useHeldUntilReady(level, wanted.isSuccess)
   const query = useQuery(screenQueryOptions(shown), resourceQueryClient)
   const frameRef = useRef<HTMLDivElement>(null)
+  useWarmOverlays(shown, query.isSuccess)
   const previousShown = useRef(shown)
   // A pushed or popped screen takes focus, so a screen reader starts on it, not on the body.
   useEffect(() => {

@@ -13,6 +13,14 @@ export const PHONE_BOOT_SCREENS = [
   'src/features/phone/components/session-screen.tsx',
 ] as const
 
+/** Overlays loaded on demand (`src/components/deferred-overlay.tsx`), grouped apart from the workbench. */
+export const PHONE_OVERLAYS = [
+  'src/components/session-dialogs.tsx',
+  'src/components/theme-studio-slot.tsx',
+  'src/features/environments/components/picker-dialog.tsx',
+  'src/features/chat/components/provider-sign-in-dialog.tsx',
+] as const
+
 const PLACEHOLDER = '<!-- shell-chunks -->'
 
 /**
