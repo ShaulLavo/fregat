@@ -1662,6 +1662,11 @@
       "minimum": 6,
       "type": "integer"
     },
+    "terminal.integrated.screenReader": {
+      "default": true,
+      "description": "Expose terminal text and announce new output to screen readers.",
+      "type": "boolean"
+    },
     "terminal.integrated.scrollback": {
       "default": 10000,
       "description": "How many lines of output the terminal keeps.",
