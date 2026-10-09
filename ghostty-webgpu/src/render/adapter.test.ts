@@ -9,7 +9,6 @@ describe('automatic WebGPU adapter eligibility', () => {
     { info: { architecture: 'llvmpipe' } },
     { info: { device: 'softpipe' } },
     { info: { description: 'lavapipe' } },
-    { info: { description: 'Software Vulkan implementation' } },
     { info: { description: 'Microsoft Basic Render Driver' } },
     { info: { architecture: 'WARP' } },
   ])('identifies software adapters (%j)', (adapter) => {
@@ -18,6 +17,8 @@ describe('automatic WebGPU adapter eligibility', () => {
 
   it.each([
     { info: {} },
+    { info: { description: 'Software Vulkan implementation' } },
+    { info: { vendor: 'Example Software', description: 'Hardware GPU' } },
     { isFallbackAdapter: false, info: { isFallbackAdapter: false } },
     { info: { vendor: 'apple', architecture: 'metal', description: 'Apple M1' } },
     { info: { vendor: 'nvidia', description: 'NVIDIA GeForce RTX 3070, Vulkan' } },

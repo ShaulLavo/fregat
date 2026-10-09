@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
-import { Terminal as MainTerminal, attachTerminalHotkeys } from '../../dist/index.js'
+import {
+  Terminal as MainTerminal,
+  attachTerminalHotkeys,
+  type GhosttyWebGpuRendererFactory,
+} from '../../dist/index.js'
 import { Terminal as WorkerTerminal, TerminalWorkerError } from '../../dist/worker/index.js'
 import type { TerminalApi } from '../../dist/dom/terminal-api.js'
 import { WebGlTerminalRenderer } from '../../dist/render/webgl/renderer.js'
@@ -130,6 +134,121 @@ it.each(['auto', 'webgpu'] as const)(
       () => terminal.visibleLines()[0]?.includes('software adapter selection') === true,
     )
     expect(terminal.diagnostics.rendererBackend).toBe(backend === 'auto' ? 'webgl2' : 'webgpu')
+  },
+)
+
+it.each(['auto', 'webgpu'] as const)(
+  'reports or restores main hardware-to-software device loss (%s)',
+  async (backend) => {
+    const requestAdapter = navigator.gpu.requestAdapter.bind(navigator.gpu)
+    const devices: GPUDevice[] = []
+    let adapterRequests = 0
+    const acquisition = vi
+      .spyOn(navigator.gpu, 'requestAdapter')
+      .mockImplementation(async (options) => {
+        const request = ++adapterRequests
+        const adapter = await requestAdapter(options)
+        if (!adapter) return null
+        return {
+          isFallbackAdapter: request > 1,
+          info: { description: request > 1 ? 'SwiftShader' : 'Apple M1' },
+          requestDevice: async () => {
+            const device = await adapter.requestDevice()
+            devices.push(device)
+            return device
+          },
+        } as unknown as GPUAdapter
+      })
+    try {
+      const explicitFactory: GhosttyWebGpuRendererFactory = WebGpuTerminalRenderer.create
+      const terminal = await MainTerminal.create({
+        appearance: { cursor: { blink: false } },
+        runtime: { kind: 'owned', options: assets },
+        rendererFactory: backend === 'webgpu' ? explicitFactory : undefined,
+      })
+      active.push(terminal)
+      const errors: unknown[] = []
+      terminal.on('error', (event) => errors.push(event))
+      await terminal.open(container())
+      expect(terminal.diagnostics.rendererBackend).toBe('webgpu')
+      await terminal.write('BEFORE-LOSS')
+      await eventually(() => terminal.visibleLines()[0]?.includes('BEFORE-LOSS') === true)
+      expect(errors).toHaveLength(0)
+      expect(devices).toHaveLength(1)
+      devices[0]!.destroy()
+      await devices[0]!.lost
+      await eventually(() => adapterRequests >= 2)
+      if (backend === 'auto') {
+        await expect.poll(() => errors.length).toBe(1)
+        expect(errors[0]).toMatchObject({
+          operation: 'renderer.restore',
+          cause: { name: 'WebGpuUnavailableError', reason: 'adapter' },
+        })
+        expect(devices).toHaveLength(1)
+        await terminal.dispose()
+        return
+      }
+      await eventually(() => devices.length === 2)
+      await terminal.write('\r\nAFTER-LOSS')
+      await eventually(() => terminal.visibleLines().join('\n').includes('AFTER-LOSS'))
+      expect(errors).toHaveLength(0)
+      expect(terminal.diagnostics.rendererBackend).toBe('webgpu')
+      await terminal.dispose()
+    } finally {
+      acquisition.mockRestore()
+    }
+  },
+)
+
+it.each(['auto', 'webgpu'] as const)(
+  'reports or restores worker hardware-to-software device loss (%s)',
+  async (backend) => {
+    const channelName = `packaged-hardware-to-software-${backend}`
+    const channel = new BroadcastChannel(channelName)
+    const observations: Array<{ type: string; request: number }> = []
+    channel.onmessage = ({ data }) => observations.push(data)
+    try {
+      const url = new URL('./tests/hardware-to-software.worker.ts', import.meta.url)
+      url.searchParams.set('channel', channelName)
+      const terminal = await WorkerTerminal.create({
+        assets,
+        appearance: { font: { family, size: 16 }, cursor: { blink: false } },
+        backend,
+        workerUrl: url,
+        fonts: [{ family, source: { url: fontUrl } }],
+      })
+      active.push(terminal)
+      const errors: unknown[] = []
+      terminal.on('error', (event) => errors.push(event))
+      await terminal.open(container())
+      expect(terminal.diagnostics.rendererBackend).toBe('webgpu')
+      await terminal.write('BEFORE-LOSS')
+      await eventually(() => terminal.visibleLines()[0]?.includes('BEFORE-LOSS') === true)
+      expect(errors).toHaveLength(0)
+      channel.postMessage('destroy')
+      await eventually(() =>
+        observations.some((value) => value.type === 'adapter' && value.request === 2),
+      )
+      if (backend === 'auto') {
+        await expect.poll(() => errors.length).toBe(1)
+        expect(errors[0]).toMatchObject({
+          cause: { name: 'TerminalWorkerError', code: 'capability', operation: 'renderer.webgpu' },
+        })
+        expect(observations.filter((value) => value.type === 'device')).toHaveLength(1)
+        await expect.poll(() => terminal.lifecycle).toBe('disposed')
+        return
+      }
+      await eventually(() =>
+        observations.some((value) => value.type === 'device' && value.request === 2),
+      )
+      await terminal.write('\r\nAFTER-LOSS')
+      await eventually(() => terminal.visibleLines().join('\n').includes('AFTER-LOSS'))
+      expect(errors).toHaveLength(0)
+      expect(terminal.diagnostics.rendererBackend).toBe('webgpu')
+      await terminal.dispose()
+    } finally {
+      channel.close()
+    }
   },
 )
 

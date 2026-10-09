@@ -12,7 +12,7 @@ interface AdapterIdentity {
 export function isSoftwareWebGpuAdapter(adapter: AdapterIdentity): boolean {
   if (adapter.isFallbackAdapter || adapter.info.isFallbackAdapter) return true
   const { vendor, architecture, device, description } = adapter.info
-  return /swiftshader|llvmpipe|softpipe|lavapipe|software|microsoft basic render driver|\bwarp\b/i.test(
+  return /swiftshader|llvmpipe|softpipe|lavapipe|microsoft basic render driver|\bwarp\b/i.test(
     [vendor, architecture, device, description].join(' '),
   )
 }

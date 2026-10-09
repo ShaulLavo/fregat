@@ -40,7 +40,7 @@ async function createRenderer(
   for (const backend of automaticGpuBackends(platform)) {
     signal?.throwIfAborted()
     try {
-      if (backend === 'webgpu') return await WebGpuTerminalRenderer.create(options, 'hardware')
+      if (backend === 'webgpu') return await WebGpuTerminalRenderer.create({ ...options, adapterPolicy: 'hardware' })
       if (options.replaceCanvas)
         return await FallbackTerminalRenderer.create(options, options.replaceCanvas, signal)
       return await WebGlTerminalRenderer.create(options)
