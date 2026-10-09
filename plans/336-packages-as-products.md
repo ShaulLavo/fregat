@@ -627,8 +627,11 @@ The original 200 MiB geometry failure remains a blocker for publishing a full co
 
 ## Approved follow-up: explicit FreeSans geometry
 
-- [x] Reproduce the explicit FreeSans failures, fix shaped-run measurement, and keep the unchanged
+- [x] Reproduce and fix the original eight explicit FreeSans failures, and keep the unchanged
       native geometry assertions in CI with a licensed package-local font fixture.
+- [ ] Finish the native-run geometry redesign identified by independent review of draft
+      [PR #1186](https://github.com/ShaulLavo/fregat/pull/1186). Mounted native insertion positions
+      must survive ligatures and storage chunks, without document-wide native measurement.
 
 An exploratory DPR-1 run on 2026-10-09 exposed additional proportional-font failures with
 Ubuntu `fonts-freefont-ttf_20211204+svn4273-2`, explicitly loaded as the test face. This is
@@ -671,7 +674,33 @@ than the current next-stop formula in `proportionalRows.ts` and `wordWrap.ts`. T
 `iii\tAV\tffi` control agrees in all engines. Reproduce by extending
 `test/freeSansShaping.browser.test.ts` with the four-`i` case; its unchanged 0.05px bound fails
 only in Firefox. `/work/reports/freesans-geometry/shaping-regressions.log` retains the failure.
-The CSS minimum space before a tab stop is a candidate cause, not a confirmed attribution.
+Native attribution is confirmed. Firefox gives the zero glyph a `7.2333`-pixel advance; the
+four-`i` prefix is `11.2333` pixels wide, leaving `1.7667` pixels before the `13`-pixel stop.
+[CSS Text](https://www.w3.org/TR/css-text-3/) requires using the following stop when the gap is
+less than `0.5ch`, which is `3.6167` pixels here. Firefox advances the first tab to `26` pixels;
+the editor stops at `13`. This is an editor error, not a Firefox bug. WebKit reaches `13` in the
+same explicit `tab-size:4` native probe, so the eventual geometry must respect actual connected
+native layout. The separate tab-minimum fix waits behind native-run review.
+
+Independent review found two additional correctness failures in the first shaped implementation:
+`'ffi'.repeat(10_000)` loses shaping across 512-unit blocks, and lookup inside `AV office ffi`
+uses detached-prefix widths instead of insertion positions in the intact run. Review fixtures,
+raw native measurements and a real 30-pixel scrolled-caret failure are retained under
+`/work/reports/virtualizer-cross-engine-review-2026-10-09/shaped-runs/`; reproduction inputs are
+in its `harness/`. The draft PR contains the pre-implementation design note. Native measurements
+must belong to mounted rows only, preserve connected shaping context, and invalidate one row
+on typing. The existing `displayProjectionWrap.ts` scans 256-line blocks before mounting, so
+putting DOM measurement in `GlyphAdvances.measure` would violate that contract. The unresolved
+bounded contracts are accurate horizontal window origins inside long unbroken runs and the
+indexing of native-wrapped mounted rows without walking unmounted content.
+
+The review's quadratic hanging-tab rescan is fixed in `9caa0e36860e619189492f14dfbacb14108d98bc`:
+settled tab-separated runs are reused, empty runs need no measurement, and tabs join hanging
+space batching. Tests cover 1,000, 2,000 and 4,000 tabs across 1-, 257- and 4,096-unit chunks,
+with linear bounds on measurement calls and measured code units. The full package check passes
+4,208 tests. Paired three-engine experiments and actual insertion controls are in
+`/work/reports/freesans-geometry/`; the draft PR records all methods, costs and cold-run variance.
+Caching and settled tabs do not resolve the remaining native-caret correctness failures.
 
 ## Kickoff prompt for an executing coordinator
 
