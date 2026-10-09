@@ -38,11 +38,7 @@ export function buildNative(
       throw buildErrors.BUILD_FAILED({
         internal: { stage: 'webkit2gtk-4.1', exitCode: pkg.exitCode },
       })
-    flags = new TextDecoder()
-      .decode(pkg.stdout)
-      .trim()
-      .split(/\s+/)
-      .map((flag) => (flag === '-pthread' ? '-D_REENTRANT' : flag))
+    flags = new TextDecoder().decode(pkg.stdout).trim().split(/\s+/).map(zigFlag)
   }
   const args = linux
     ? []
@@ -103,6 +99,13 @@ export function copyNativeHost(binary: string, destination: string) {
   const source = path.join(path.dirname(path.dirname(binary)), 'Frameworks')
   const target = path.join(path.dirname(path.dirname(destination)), 'Frameworks')
   cpSync(source, target, { recursive: true })
+}
+
+/** pkg-config speaks the C compiler driver's dialect; Zig spells these two its own way. */
+export function zigFlag(flag: string) {
+  if (flag === '-pthread') return '-D_REENTRANT'
+  if (flag === '-Wl,--export-dynamic') return '-rdynamic'
+  return flag
 }
 
 function linuxCommand({

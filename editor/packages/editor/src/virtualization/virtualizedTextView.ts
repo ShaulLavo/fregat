@@ -1,3 +1,4 @@
+import { isElementNode, isTextareaElement } from '../dom'
 import {
   acquireRowPresentation,
   invalidateRowPresentations,
@@ -388,8 +389,7 @@ export class VirtualizedTextView {
     this.scrollElement = scrollElement
     this.contentElement = contentElement
     this.inputElement = inputElement
-    this.editContext =
-      inputElement instanceof HTMLTextAreaElement ? null : createEditContext(inputElement)
+    this.editContext = isTextareaElement(inputElement) ? null : createEditContext(inputElement)
     this.view = {
       disposed: false,
       provisional: false,
@@ -1096,7 +1096,7 @@ export class VirtualizedTextView {
   /** An EditContext only receives text while attached, so a read-only view detaches it. */
   private setInputEditable(editable: boolean): void {
     const input = this.inputElement
-    if (input instanceof HTMLTextAreaElement) {
+    if (isTextareaElement(input)) {
       input.readOnly = !editable
       return
     }
@@ -2634,7 +2634,7 @@ function rowOffsetFromCaretHit(
 }
 
 function auxiliaryCaretHitElement(node: Node): HTMLElement | null {
-  const element = node instanceof Element ? node : node.parentElement
+  const element = isElementNode(node) ? node : node.parentElement
   return element?.closest<HTMLElement>(AUXILIARY_CARET_HIT_SELECTOR) ?? null
 }
 
