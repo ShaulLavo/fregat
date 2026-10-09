@@ -95,10 +95,7 @@ export class WebGpuTextPass {
   readonly drawCount: number
   private frameUploadedBytesValue = 0
   private glyphBindGroupCreationCountValue = 0
-  private drawBundles?: readonly GPURenderBundle[]
-  private readonly format: GPUTextureFormat
-  private colorAttachment?: GPURenderPassColorAttachment
-  private renderPassDescriptor?: GPURenderPassDescriptor
+  private glyphBindGroup?: GPUBindGroup
   private readonly instanceCount: number
   readonly metrics: TextPassMetrics = {
     draws: 0,
@@ -121,7 +118,6 @@ export class WebGpuTextPass {
 
   constructor(options: WebGpuTextPassOptions) {
     this.device = options.device
-    this.format = options.format
     this.instanceCount = options.instanceCount
     const capacity = textPassGlyphCapacity(this.device, this.instanceCount)
     try {
@@ -168,16 +164,7 @@ export class WebGpuTextPass {
       })
       this.glyphBindGroupCreationCountValue += 1
     }
-    const bundle = this.device.createRenderBundleEncoder({ colorFormats: [this.format] })
-    bundle.setPipeline(this.resources.cellPipeline)
-    bundle.setBindGroup(0, this.resources.cellBindGroup)
-    bundle.draw(6, this.instanceCount)
-    bundle.setPipeline(this.resources.glyphPipeline)
-    for (const batch of this.glyphBatches) {
-      bundle.setBindGroup(0, batch.bindGroup!)
-      bundle.draw(6, batch.instanceCount)
-    }
-    this.drawBundles = [bundle.finish()]
+    this.glyphBindGroup = this.glyphBatches[0]!.bindGroup
   }
 
   get glyphBindGroupCreationCount(): number {
@@ -202,18 +189,12 @@ export class WebGpuTextPass {
       this.uploadRows(data)
       this.rowsInitialized = true
     }
-    const cellData = data.cellData
-    const glyphData = data.glyphData
-    if (updates.length === 1 && this.glyphBatches.length === 1) {
-      const update = updates[0]!
-      this.writeRange(this.cellBuffer, cellData, update.cell)
-      this.writeRange(this.glyphBuffer, glyphData, update.glyph)
-      return Number(update.cell.byteLength > 0) + Number(update.glyph.byteLength > 0)
-    }
     const plan =
       (changes & 1) === 0
         ? this.editPlanner(updates, this.wrapRow)
         : planSparseUploadRanges(updates)
+    const cellData = data.cellData
+    const glyphData = data.glyphData
     for (const range of plan.cell) this.writeRange(this.cellBuffer, cellData, range)
     if (this.glyphBatches.length === 1) {
       for (const range of plan.glyph) this.writeRange(this.glyphBuffer, glyphData, range)
@@ -235,18 +216,29 @@ export class WebGpuTextPass {
   }
 
   encode(view: GPUTextureView, copy?: TextPassCopy): GPUCommandBuffer {
-    if (!this.drawBundles) throw new Error('Atlas textures must be synchronized before drawing')
+    if (!this.glyphBindGroup) throw new Error('Atlas textures must be synchronized before drawing')
     const encoder = this.device.createCommandEncoder()
-    const attachment = (this.colorAttachment ??= {
-      clearValue: { a: 0, b: 0, g: 0, r: 0 },
-      loadOp: 'clear',
-      storeOp: 'store',
-      view,
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [
+        {
+          clearValue: { a: 0, b: 0, g: 0, r: 0 },
+          loadOp: 'clear',
+          storeOp: 'store',
+          view,
+        },
+      ],
     })
-    attachment.view = view
-    const descriptor = (this.renderPassDescriptor ??= { colorAttachments: [attachment] })
-    const pass = encoder.beginRenderPass(descriptor)
-    pass.executeBundles(this.drawBundles)
+    pass.setPipeline(this.resources.cellPipeline)
+    pass.setBindGroup(0, this.resources.cellBindGroup)
+    pass.draw(6, this.instanceCount)
+    pass.setPipeline(this.resources.glyphPipeline)
+    pass.setBindGroup(0, this.glyphBindGroup)
+    pass.draw(6, this.glyphBatches[0]!.instanceCount)
+    for (let index = 1; index < this.glyphBatches.length; index += 1) {
+      const batch = this.glyphBatches[index]!
+      pass.setBindGroup(0, batch.bindGroup!)
+      pass.draw(6, batch.instanceCount)
+    }
     pass.end()
     if (copy) {
       encoder.copyTextureToBuffer(

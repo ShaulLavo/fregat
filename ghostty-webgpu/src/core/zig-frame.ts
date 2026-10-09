@@ -10,8 +10,6 @@ import type {
 } from '../render/instances/types.js'
 
 const frameBytes = 144
-const cursorStyles = ['block', 'bar', 'underline', 'outline'] as const
-const emptyGlyphs: readonly number[] = Object.freeze([])
 
 function packedColor(color: RgbColor): number {
   return color.r | (color.g << 8) | (color.b << 16)
@@ -91,23 +89,22 @@ export class ZigFrameBuilder {
     }
   }
 
-  private cellView?: Float32Array
-  private glyphView?: Float32Array
-
   get cellData(): Float32Array {
     this.ensureActive()
-    const buffer = this.runtime.memory.bytes.buffer
-    if (!this.cellView || this.cellView.buffer !== buffer)
-      this.cellView = new Float32Array(buffer, this.cellPointer, this.columns * this.rows * 16)
-    return this.cellView
+    return new Float32Array(
+      this.runtime.memory.bytes.buffer,
+      this.cellPointer,
+      this.columns * this.rows * 16,
+    )
   }
 
   get glyphData(): Float32Array {
     this.ensureActive()
-    const buffer = this.runtime.memory.bytes.buffer
-    if (!this.glyphView || this.glyphView.buffer !== buffer)
-      this.glyphView = new Float32Array(buffer, this.glyphPointer, this.columns * this.rows * 24)
-    return this.glyphView
+    return new Float32Array(
+      this.runtime.memory.bytes.buffer,
+      this.glyphPointer,
+      this.columns * this.rows * 24,
+    )
   }
 
   private physicalToLogicalRows?: number[]
@@ -155,7 +152,6 @@ export class ZigFrameBuilder {
   get missingGlyphs(): readonly number[] {
     this.ensureActive()
     const count = this.runtime.memory.view.getUint32(this.frame + 40, true)
-    if (count === 0) return emptyGlyphs
     return Array.from(new Uint32Array(this.runtime.memory.bytes.buffer, this.missing, count))
   }
 
@@ -174,17 +170,21 @@ export class ZigFrameBuilder {
     view.setFloat32(this.frame + 52, options.cellHeight, true)
     view.setFloat32(this.frame + 56, options.theme.minimumContrast, true)
     view.setFloat64(this.frame + 104, options.theme.minimumContrast, true)
-    view.setUint32(this.frame + 60, packedColor(options.theme.foreground), true)
-    view.setUint32(this.frame + 64, packedColor(options.theme.background), true)
-    view.setUint32(this.frame + 68, packedColor(options.theme.cursor), true)
-    view.setUint32(this.frame + 72, packedColor(options.theme.cursorText), true)
+    const colors = [
+      options.theme.foreground,
+      options.theme.background,
+      options.theme.cursor,
+      options.theme.cursorText,
+    ]
+    for (const [index, color] of colors.entries()) this.setUint(60 + index * 4, packedColor(color))
     const cursor = options.cursor
-    view.setUint32(this.frame + 76, cursor?.x ?? 0, true)
-    view.setUint32(this.frame + 80, cursor?.y ?? 0, true)
-    view.setUint32(this.frame + 84, cursor?.visible ? 1 : 0, true)
-    view.setUint32(this.frame + 88, cursor ? cursorStyles.indexOf(cursor.style) : 0, true)
-    view.setUint32(this.frame + 92, packedColor(options.theme.selectionForeground), true)
-    view.setUint32(this.frame + 96, packedColor(options.theme.selectionBackground), true)
+    this.setUint(76, cursor?.x ?? 0)
+    this.setUint(80, cursor?.y ?? 0)
+    this.setUint(84, cursor?.visible ? 1 : 0)
+    const styles = ['block', 'bar', 'underline', 'outline']
+    this.setUint(88, cursor ? styles.indexOf(cursor.style) : 0)
+    this.setUint(92, packedColor(options.theme.selectionForeground))
+    this.setUint(96, packedColor(options.theme.selectionBackground))
     assertGhosttyResult(
       'bridge_build_frame',
       this.runtime.bridge.buildFrame(

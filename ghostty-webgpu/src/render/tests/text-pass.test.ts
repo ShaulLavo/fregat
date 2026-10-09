@@ -32,29 +32,13 @@ function gpuFixture(
     draw(_vertices: number, instances: number) {
       draws.push(instances)
     },
-    executeBundles(bundles: readonly { draws: readonly number[] }[]) {
-      for (const bundle of bundles) draws.push(...bundle.draws)
-    },
     end() {},
   }
-  const bundles: GPURenderBundleEncoderDescriptor[] = []
   const pipeline = { getBindGroupLayout: () => ({}) }
   const device = {
     limits: { ...limits, maxTextureArrayLayers: 256 },
     createTexture: () => ({ createView: () => ({}), destroy() {} }),
     createCommandEncoder: () => ({ beginRenderPass: () => renderPass, finish: () => ({}) }),
-    createRenderBundleEncoder(descriptor: GPURenderBundleEncoderDescriptor) {
-      bundles.push(descriptor)
-      const recordedDraws: number[] = []
-      return {
-        setPipeline() {},
-        setBindGroup() {},
-        draw(_vertices: number, instances: number) {
-          recordedDraws.push(instances)
-        },
-        finish: () => ({ draws: recordedDraws }),
-      }
-    },
     createBuffer({ size }: { size: number }) {
       const buffer = { bytes: new Uint8Array(size), destroy() {} }
       buffers.push(buffer)
@@ -97,7 +81,7 @@ function gpuFixture(
     instanceCount,
   })
   writes.length = 0
-  return { device, pass, buffers, writes, bindGroups, draws, bundles }
+  return { device, pass, buffers, writes, bindGroups, draws }
 }
 
 function frame() {
@@ -584,23 +568,4 @@ it('refreshes the direct native upload view after real memory growth', () => {
   const uploaded = new Uint32Array(fixture.writes[1]!.bytes.buffer)
   expect(uploaded[0]).toBe(0x7fc54321)
   expect(uploaded[22]).toBe(0x80000000)
-})
-
-it('rebuilds the draw bundle only when atlas bind groups change', () => {
-  const fixture = gpuFixture()
-  const textures = new AtlasGpuTextures(fixture.device, {
-    layerCount: 1,
-    pageHeight: 8,
-    pageWidth: 8,
-  })
-  fixture.pass.syncAtlas(textures)
-  fixture.pass.encode({} as GPUTextureView)
-  fixture.pass.encode({} as GPUTextureView)
-  expect(fixture.bundles).toEqual([{ colorFormats: ['rgba8unorm'] }])
-  expect(fixture.draws).toEqual([480, 480, 480, 480])
-  fixture.pass.syncAtlas(textures)
-  fixture.pass.encode({} as GPUTextureView)
-  expect(fixture.bundles).toHaveLength(2)
-  expect(fixture.pass.glyphBindGroupCreationCount).toBe(2)
-  expect(fixture.draws).toEqual([480, 480, 480, 480, 480, 480])
 })
