@@ -206,8 +206,16 @@ it('visits link and marker ranges a bounded number of times as the document grow
         href: 'url',
       })
     }
+    specs.reverse()
+    links.reverse()
     renderMarkdownLinks(specs, createStringTextSnapshot(unit.repeat(count)), links, {})
     expect(visits).toBeLessThan(count * 40)
+    expect(specs.slice(0, count).map((spec) => spec.id)).toEqual(
+      Array.from({ length: count }, (_, index) => `marker:${count - index - 1}`),
+    )
+    expect(specs.slice(count).map((spec) => spec.startIndex)).toEqual(
+      links.map((link) => link.label.start),
+    )
     expect(specs.length).toBe(count * 2)
     expect(
       specs.filter((spec) => spec.kind === 'link').every((spec) => spec.text === 'label'),
@@ -331,4 +339,9 @@ it('keeps marker order and link fragment boundaries with formatted multiline lab
       },
     ]
   `)
+})
+
+it('orders nested formatting markers beyond the first 16 bits of source offsets', () => {
+  const prefix = `${'a'.repeat(70_000)} `
+  expect(preview(`${prefix}[***both*** and **bold**](url)`)).toBe(`${prefix}both and bold`)
 })
