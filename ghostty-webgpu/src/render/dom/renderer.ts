@@ -35,23 +35,6 @@ function themesEqual(first: CanonicalRendererTheme, second: CanonicalRendererThe
   })
 }
 
-function replaceChangedText(text: Text, previous: string, next: string): void {
-  let start = 0
-  const commonLength = Math.min(previous.length, next.length)
-  while (start < commonLength && previous.charCodeAt(start) === next.charCodeAt(start)) start += 1
-  let previousEnd = previous.length
-  let nextEnd = next.length
-  while (
-    previousEnd > start &&
-    nextEnd > start &&
-    previous.charCodeAt(previousEnd - 1) === next.charCodeAt(nextEnd - 1)
-  ) {
-    previousEnd -= 1
-    nextEnd -= 1
-  }
-  text.replaceData(start, previousEnd - start, next.slice(start, nextEnd))
-}
-
 interface MountedRun {
   readonly element: HTMLSpanElement
   readonly text: Text
@@ -124,7 +107,7 @@ class DomSurface implements RowRendererSurface {
         changed = true
       }
       if (previous.value.text !== run.text) {
-        replaceChangedText(previous.text, previous.value.text, run.text)
+        previous.text.data = run.text
         changed = true
       }
       if (previous.value.cursor !== run.cursor) {
