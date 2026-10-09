@@ -249,13 +249,20 @@ nothing installed beyond Fregat.
   the URL fragment, which browsers never send to a server. The guest opens it and connects over
   E067's WebRTC transport, loaded only when a session starts. Signaling is end-to-end encrypted
   (`room-crypto.ts`), so the broker that introduces the two sides cannot read it. Closing the
-  share ends the room. To decide: who runs the broker and the TURN relay for networks where a
-  direct link fails (the company, as the free relay-only tier, or a self-hosted one), and whether
-  the server joins as a WebRTC peer (a native data-channel library in Bun) or the owner's open
-  browser bridges the guest to the server over the connection it already has.
+  share ends the room. A guest who could reach
+  the server directly would need no WebRTC, so the broker has to sit where both sides reach it:
+  the company runs a free one (it relays only sealed packets), or a team self-hosts
+  `editor/packages/collaboration/server/signaling.ts`. The same broker serves standalone
+  Singapore, which today leaves the broker and STUN/TURN URLs to the embedding app.
+- **The server joins as a WebRTC peer.** Neither Bun nor Node has WebRTC built in. Two libraries
+  ran a data channel between two in-process peers under Bun 1.4.2 on Linux (2026-10-09):
+  `node-datachannel` 0.33.4 (native libdatachannel, prebuilt binaries) and `werift` 0.25.0 (pure
+  TypeScript, no native code). Still unproven: a browser peer on another machine and a TURN relay.
 - **Shortcut: both sides on Tailscale.** The same link opens the server directly over the tailnet
   (Fregat already reads Tailscale for machines and same-user sign-in), with no broker or relay.
   The guest still pairs unless they are the same Tailscale user.
+  When either side lacks Tailscale, the share dialog says Tailscale gives a direct connection and
+  links to its setup.
 
 Not planned now: Tailscale Funnel and embedded networking such as Iroh. Criterion for any path:
 works across home routers without setup, and no company server can read the text.
