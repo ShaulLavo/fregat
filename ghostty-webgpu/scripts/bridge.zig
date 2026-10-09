@@ -432,6 +432,12 @@ fn physicalRow(frame: *Frame, y: u32) u32 {
     return (y + frame.row_offset) % frame.rows;
 }
 
+fn previousLogicalRow(frame: *Frame, y: u32) u32 {
+    const cache = frame.row_cache.?;
+    if (frame.stable_rows == 0 or frame.row_offset == cache.previous_offset) return y;
+    return (y + frame.row_offset + frame.rows - cache.previous_offset) % frame.rows;
+}
+
 fn reuseFrameRow(frame: *Frame, y: u32) c.GhosttyResult {
     const cache = frame.row_cache.?;
     const source = cache.sources[y];
@@ -460,10 +466,11 @@ fn reuseFrameRow(frame: *Frame, y: u32) c.GhosttyResult {
     var glyph_first = frame.columns;
     var glyph_end: u32 = 0;
     const top = if (frame.stable_rows != 0) 0 else @as(f32, @floatFromInt(y)) * frame.cell_height;
+    const previous = &cache.previous[previousLogicalRow(frame, y)];
     for (0..frame.columns) |x| {
         const row = cache.next[y];
         const selected = row.selected and x >= row.selection_start and x <= row.selection_end;
-        if (reuseRenderedCell(frame, row.cells[x].raw, @intCast(x), y, selected)) continue;
+        if (reuseRenderedCell(frame, previous, start + @as(u32, @intCast(x)), row.cells[x].raw, @intCast(x), y, selected)) continue;
         rememberRenderedCell(cache, start + x, cache.next[y].cells[x]);
         var next_cell = source_cells[source_start + x];
         var next_glyph = source_glyphs[source_start + x];
@@ -547,8 +554,7 @@ const CellContent = struct {
     tag: c.GhosttyCellContentTag,
 };
 
-fn writeInstances(frame: *Frame, cells: c.GhosttyRenderStateRowCells, x: u32, y: u32, content: CellContent, style: c.GhosttyStyle, fg: u32, bg: u32, selected: bool) c.GhosttyResult {
-    const slot = physicalRow(frame, y) * frame.columns + x;
+fn writeInstances(frame: *Frame, cells: c.GhosttyRenderStateRowCells, slot: u32, x: u32, y: u32, content: CellContent, style: c.GhosttyStyle, fg: u32, bg: u32, selected: bool) c.GhosttyResult {
     const cell = &frame.cell_data[slot];
     const glyph = &frame.glyph_data[slot];
     cell.* = @splat(0);
@@ -624,7 +630,7 @@ fn writeInstances(frame: *Frame, cells: c.GhosttyRenderStateRowCells, x: u32, y:
     return c.GHOSTTY_SUCCESS;
 }
 
-fn buildCell(frame: *Frame, raws: []const c.GhosttyCell, cells: c.GhosttyRenderStateRowCells, x: u32, y: u32, selected: bool) c.GhosttyResult {
+fn buildCell(frame: *Frame, raws: []const c.GhosttyCell, cells: c.GhosttyRenderStateRowCells, slot: u32, x: u32, y: u32, selected: bool) c.GhosttyResult {
     const raw = raws[x];
     var codepoint: u32 = 0;
     var wide: c.GhosttyCellWide = 0;
@@ -673,7 +679,7 @@ fn buildCell(frame: *Frame, raws: []const c.GhosttyCell, cells: c.GhosttyRenderS
         .tag = tag,
         .key = null,
     };
-    return writeInstances(frame, cells, x, y, .{
+    return writeInstances(frame, cells, slot, x, y, .{
         .codepoint = codepoint,
         .continuation = wide == c.GHOSTTY_CELL_WIDE_SPACER_TAIL,
         .span = span,
@@ -691,16 +697,12 @@ fn rememberRenderedCell(cache: *FrameCache, slot: usize, input: CachedCell) void
     };
 }
 
-fn reuseRenderedCell(frame: *Frame, raw: c.GhosttyCell, x: u32, y: u32, selected: bool) bool {
+fn reuseRenderedCell(frame: *Frame, previous: *const CachedRow, slot: u32, raw: c.GhosttyCell, x: u32, y: u32, selected: bool) bool {
     const cache = frame.row_cache.?;
-    // Rendered cells are physical; selection and appearance belong to their previous logical row.
-    const previous_y = if (frame.stable_rows != 0 and frame.row_offset != cache.previous_offset) (y + frame.row_offset + frame.rows - cache.previous_offset) % frame.rows else y;
-    const previous = cache.previous[previous_y];
     if (!std.mem.eql(u32, &previous.appearance, &cache.appearance)) return false;
     if (sameRowId(previous.id, std.mem.zeroes(c.GhosttyRenderStateRowId))) return false;
     const old_selected = previous.selected and x >= previous.selection_start and x <= previous.selection_end;
     if (selected != old_selected) return false;
-    const slot = physicalRow(frame, y) * frame.columns + x;
     const input = cache.rendered[slot];
     if (!input.reusable or input.raw != raw) return false;
     if (input.key != null and input.registration != input.key.?.registration) return false;
@@ -742,13 +744,16 @@ fn buildRow(frame: *Frame, iterator: c.GhosttyRenderStateRowIterator, cells: *c.
     var cell_end: u32 = 0;
     var glyph_first = frame.columns;
     var glyph_end: u32 = 0;
+    const start = physicalRow(frame, y) * frame.columns;
+    // Instance slots are physical; selection and appearance belong to the previous logical owner.
+    const previous = &frame.row_cache.?.previous[previousLogicalRow(frame, y)];
     for (0..raw.len) |x| {
         const selected = has_selection and x >= selection.start_x and x <= selection.end_x;
-        if (!force and reuseRenderedCell(frame, raw.ptr[x], @intCast(x), y, selected)) continue;
-        const slot = physicalRow(frame, y) * frame.columns + x;
+        const slot = start + @as(u32, @intCast(x));
+        if (!force and reuseRenderedCell(frame, previous, slot, raw.ptr[x], @intCast(x), y, selected)) continue;
         const previous_cell = frame.cell_data[slot];
         const previous_glyph = frame.glyph_data[slot];
-        result = buildCell(frame, raw.ptr[0..raw.len], cells.*, @intCast(x), y, selected);
+        result = buildCell(frame, raw.ptr[0..raw.len], cells.*, slot, @intCast(x), y, selected);
         if (result != c.GHOSTTY_SUCCESS) return result;
         rememberRenderedCell(frame.row_cache.?, slot, cached.cells[x]);
         if (force or !std.mem.eql(u8, std.mem.asBytes(&previous_cell), std.mem.asBytes(&frame.cell_data[slot]))) {
@@ -763,9 +768,9 @@ fn buildRow(frame: *Frame, iterator: c.GhosttyRenderStateRowIterator, cells: *c.
     // Logical row changes can leave GPU bytes identical, such as concealed text.
     if (frame.ranges_len == frame.ranges_cap) return c.GHOSTTY_OUT_OF_SPACE;
     frame.ranges[frame.ranges_len] = .{
-        .cell_offset = (physicalRow(frame, y) * frame.columns + if (cell_end == 0) @as(u32, 0) else cell_first) * 64,
+        .cell_offset = (start + if (cell_end == 0) @as(u32, 0) else cell_first) * 64,
         .cell_length = if (cell_end == 0) 0 else (cell_end - cell_first) * 64,
-        .glyph_offset = (physicalRow(frame, y) * frame.columns + if (glyph_end == 0) @as(u32, 0) else glyph_first) * 96,
+        .glyph_offset = (start + if (glyph_end == 0) @as(u32, 0) else glyph_first) * 96,
         .glyph_length = if (glyph_end == 0) 0 else (glyph_end - glyph_first) * 96,
     };
     frame.ranges_len += 1;
