@@ -14,6 +14,26 @@ as in Matthew Weidner's
 owns identity, placement, reconciliation and undo (E066); this plan owns the server host, disk
 and agent edits, provenance, and history.
 
+## Where the host runs (owner direction, 2026-10-09)
+
+One protocol, three places to host it. The editor core does not know which one it runs under.
+
+1. **Singapore on its own: browsers only.** Peers connect over WebRTC and one browser hosts
+   ([E067](e067-webrtc-collaboration-plugin.md), delivered). No server sees the text. This stays
+   the standalone editor's path.
+2. **Fregat: the person's own Fregat server hosts.** Each machine server hosts its open
+   documents, as this plan describes. Its browsers, desktop windows and agents are participants.
+   Teammates join that server directly or over WebRTC, where the server takes part as a peer and,
+   being always on, is the preferred host. Nothing goes through company servers.
+3. **Hosted Delta DB: a paid service run by the Fregat company.** A company server hosts shared
+   documents and keeps durable history and provenance for teams whose machines are not always on.
+   It is a participant that reads the text, so it is opt-in per workspace.
+
+A middle option for tier 2: the company runs only signaling and TURN relays. Peers still connect
+end to end (DTLS), so relays cannot read the text. Host choice follows the dynamic-host idea in
+E067: always-on servers win over laptops and phones. The product name is open (owner floated
+"Sigma"); this plan keeps "Delta DB" until it is decided.
+
 ---
 
 ## 1. Ground truth — what already exists
@@ -197,8 +217,8 @@ disconnected participants are accounted for.
 
 ## 6. Explicit non-goals
 
-- No peer-to-peer topology inside Fregat; the server is the host. The standalone editor's
-  peer-to-peer plugin is [E067](e067-webrtc-collaboration-plugin.md).
+- No browser-hosted documents inside Fregat; the machine server is the host. It may join an
+  [E067](e067-webrtc-collaboration-plugin.md) room as a peer to reach teammates.
 - No custom B-tree or KV store; SQLite and drizzle carry the log.
 - No third-party CRDT engine owning the buffer.
 
