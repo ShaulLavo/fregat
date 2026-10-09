@@ -42,7 +42,7 @@ test('file type dropdown filters every view, clears hidden selection, and retain
     )
     expect(screen.queryByRole('option', { name: /picker-ignored.txt/ })).toBeNull()
     await page.getByRole('option', { name: /editor-tab-a.ts/ }).click()
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose file' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open' })).toBeEnabled())
     await page.getByRole('combobox', { name: 'File type' }).click()
     await page.getByRole('option', { name: '.md', exact: true }).click()
     await waitFor(() =>
@@ -50,7 +50,7 @@ test('file type dropdown filters every view, clears hidden selection, and retain
     )
     expect(screen.getByRole('option', { name: /picker-notes.md/ })).toBeVisible()
     expect(screen.getByRole('option', { name: /picker-nested/ })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Choose file' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Open' })).toBeDisabled()
   }
   await page.getByRole('option', { name: /picker-nested/ }).click()
   await waitFor(() => expect(screen.getByRole('option', { name: 'note.md' })).toBeVisible())

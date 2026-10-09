@@ -28,19 +28,62 @@ export type FileListRow =
       entry: FsEntry
       position: number
       showPath: boolean
+      /** A recent folder leading the list, which a tap goes to wherever it lives. */
+      recent: boolean
     }
 
-export function fileListRows(entries: FsEntry[], isSearching: boolean): FileListRow[] {
-  if (!isSearching || !entries.some(hasSearchScope)) {
-    return entries.map((entry, index) => ({
+/** Recent folders shown above the folder they lead, which `folder` names. */
+export type LeadingRecents = {
+  readonly entries: readonly FsEntry[]
+  readonly folder: string
+}
+
+/** Enough recent folders to reach the usual ones without pushing the folder's own rows away. */
+export const LEADING_RECENT_LIMIT = 5
+
+/** The recent folders that lead a folder's rows, newest first. */
+export function leadingRecentEntries(recents: readonly FsEntry[]) {
+  return recents.slice(0, LEADING_RECENT_LIMIT)
+}
+
+export function fileListRows(
+  entries: readonly FsEntry[],
+  isSearching: boolean,
+  recents: LeadingRecents | null = null,
+): FileListRow[] {
+  if (isSearching && entries.some(hasSearchScope)) return searchRows(entries)
+
+  const leading = isSearching ? [] : (recents?.entries ?? [])
+  const folderRows = entries.map((entry, index): FileListRow => ({
+    kind: 'entry',
+    key: entry.path,
+    entry,
+    position: leading.length + index + 1,
+    showPath: false,
+    recent: false,
+  }))
+  if (!recents || leading.length === 0) return folderRows
+
+  return [
+    { kind: 'section', key: 'section:recent', label: 'Recent' },
+    ...leading.map((entry, index): FileListRow => ({
       kind: 'entry',
-      key: entry.path,
+      key: `recent:${entry.path}`,
       entry,
       position: index + 1,
-      showPath: false,
-    }))
-  }
+      showPath: true,
+      recent: true,
+    })),
+    {
+      kind: 'section',
+      key: 'section:folder',
+      label: entries.length > 0 ? `In ${recents.folder}` : `Nothing in ${recents.folder}`,
+    },
+    ...folderRows,
+  ]
+}
 
+function searchRows(entries: readonly FsEntry[]): FileListRow[] {
   let position = 0
   return searchResultSections(entries).flatMap((section) => {
     if (section.entries.length === 0) return []
@@ -59,6 +102,7 @@ export function fileListRows(entries: FsEntry[], isSearching: boolean): FileList
           entry,
           position,
           showPath: true,
+          recent: false,
         }
       }),
     ]
@@ -87,7 +131,7 @@ function hasSearchScope(entry: FsEntry) {
   return entry.searchScope === 'current' || entry.searchScope === 'system'
 }
 
-function searchResultSections(entries: FsEntry[]) {
+function searchResultSections(entries: readonly FsEntry[]) {
   return [
     {
       scope: 'current' as const,

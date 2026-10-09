@@ -524,6 +524,11 @@ export const selectors = {
   pickerSearch: (page: Page) =>
     page.getByRole('textbox', { name: 'Search files and folders', exact: true }),
   pickerEmpty: (page: Page) => page.getByText('Nothing here', { exact: true }),
+  /** The folder the picker shows, from its screen-reader description; a folder picker lists no files. */
+  pickerBrowsing: (page: Page, path: string) =>
+    selectors
+      .pickerDialog(page)
+      .getByText(new RegExp(`^Browsing ${RegExp.escape(path)}( on .+)?\\.$`)),
   pickerRow: (page: Page, name: string) =>
     page
       .getByRole('dialog', { name: 'Choose folder', exact: true })
@@ -591,7 +596,7 @@ export const selectors = {
   pickerChoose: (page: Page) =>
     page
       .getByRole('dialog', { name: 'Choose folder', exact: true })
-      .getByRole('button', { name: 'Choose folder', exact: true }),
+      .getByRole('button', { name: 'Open', exact: true }),
   liveUpdatesLimited: (page: Page) =>
     page.getByRole('button', { name: 'Live updates limited', exact: true }),
   navigationTarget: (page: Page) => page.locator('[data-navigation-target]'),

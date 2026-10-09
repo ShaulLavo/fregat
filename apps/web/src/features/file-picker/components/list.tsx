@@ -1,4 +1,4 @@
-import { useId, useRef, type KeyboardEvent, type RefObject } from 'react'
+import { useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import { ArrowClockwiseIcon, FolderOpenIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
@@ -10,7 +10,7 @@ import { ListLoading } from '@/features/file-picker/components/list-loading'
 import { FileRow } from '@/features/file-picker/components/file-row'
 import { TouchRow } from '@/features/file-picker/components/touch-row'
 import { useFilePickerSessionActions } from '@/features/file-picker/hooks/use-file-picker-session-actions'
-import { fileListRows } from '@/features/file-picker/utils/rows'
+import { fileListRows, type LeadingRecents } from '@/features/file-picker/utils/rows'
 import { SCROLL_INTENT_SETTLE_MS } from '@/features/file-picker/utils/intent'
 import {
   listLabel,
@@ -32,6 +32,7 @@ export function FileList({
   onCommitEntry,
   onGoParent,
   onRetry,
+  recents = null,
   selectedPath,
   touch,
 }: {
@@ -47,6 +48,8 @@ export function FileList({
   onCommitEntry: (entry: FsEntry) => void
   onGoParent: () => void
   onRetry: () => void
+  /** Recent folders to lead the list with; a tap goes to one wherever it lives. */
+  recents?: LeadingRecents | null
   selectedPath: string | null
   /** Finger-sized rows where one tap opens a folder. */
   touch: boolean
@@ -56,8 +59,17 @@ export function FileList({
   const virtualRef = useRef<VirtualListHandle>(null)
   const lastScrollAt = useRef(Number.NEGATIVE_INFINITY)
   const statusId = useId()
-  const rows = fileListRows(entries, isSearching)
-  const { selectEntry } = useFilePickerSessionActions()
+  const showLoading = loadState.status === 'loading' && entries.length === 0
+  // The loading and error overlays are see-through, so no row may sit under them.
+  const rows =
+    showLoading || loadState.status === 'error' ? [] : fileListRows(entries, isSearching, recents)
+  const setSize = rows.filter((row) => row.kind === 'entry').length
+  const { revealEntry, selectEntry } = useFilePickerSessionActions()
+  // A recent folder can also be listed below it; the row last moved to keeps the highlight.
+  const [lastActiveKey, setLastActiveKey] = useState<string | null>(null)
+  const selectedRows = rows.filter((row) => row.kind === 'entry' && row.entry.path === selectedPath)
+  const activeKey =
+    selectedRows.find((row) => row.key === lastActiveKey)?.key ?? selectedRows[0]?.key ?? null
   const list = useListbox({
     role: 'listbox',
     containerRef,
@@ -66,15 +78,18 @@ export function FileList({
       label: row.kind === 'entry' ? row.entry.name : '',
       disabled: isBusy || row.kind === 'section',
     })),
-    activeId:
-      rows.find((row) => row.kind === 'entry' && row.entry.path === selectedPath)?.key ?? null,
+    activeId: activeKey,
     onActiveChange(id) {
       const row = rows.find((row) => row.key === id)
-      if (row?.kind === 'entry') selectEntry(row.entry)
+      if (row?.kind !== 'entry') return
+      setLastActiveKey(row.key)
+      selectEntry(row.entry)
     },
     onCommit(id) {
       const row = rows.find((row) => row.key === id)
-      if (row?.kind === 'entry') onCommitEntry(row.entry)
+      if (row?.kind !== 'entry') return
+      if (row.recent) return revealEntry(row.entry)
+      onCommitEntry(row.entry)
     },
     onSelect() {},
     typeahead: true,
@@ -88,9 +103,9 @@ export function FileList({
       onEntryDoubleClick(row.entry)
     },
   })
-  const showLoading = loadState.status === 'loading' && entries.length === 0
   const showError = !showLoading && loadState.status === 'error'
-  const showEmpty = !showLoading && !showError && entries.length === 0
+  // With recent folders above it, an empty folder says so in its section label.
+  const showEmpty = !showLoading && !showError && rows.length === 0
   const showStatus = showLoading || showError || showEmpty
 
   function signalDirectoryIntent(path: string) {
@@ -144,11 +159,12 @@ export function FileList({
                 entry={row.entry}
                 isBusy={isBusy}
                 mode={mode}
-                onOpen={onEntryDoubleClick}
+                onOpen={row.recent ? revealEntry : onEntryDoubleClick}
+                opensOnTap={row.recent}
                 position={row.position}
                 rowProps={list.rowProps(row.key)}
-                selected={row.entry.path === selectedPath}
-                setSize={entries.length}
+                selected={row.key === activeKey}
+                setSize={setSize}
                 showPath={row.showPath}
               />
             )
@@ -160,10 +176,10 @@ export function FileList({
               isBusy={isBusy}
               mode={mode}
               onDirectoryIntent={signalDirectoryIntent}
-              onDoubleClick={onEntryDoubleClick}
+              onDoubleClick={row.recent ? revealEntry : onEntryDoubleClick}
               position={row.position}
-              selected={row.entry.path === selectedPath}
-              setSize={entries.length}
+              selected={row.key === activeKey}
+              setSize={setSize}
               showPath={row.showPath}
             />
           )
