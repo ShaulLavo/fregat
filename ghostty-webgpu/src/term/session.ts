@@ -955,10 +955,11 @@ function applyInitialAppearance(terminal: GhosttyTerminal, appearance: TerminalA
 }
 
 function readScrollSnapshot(terminal: GhosttyTerminal): TerminalScrollEvent {
+  const snapshot = terminal.scrollSnapshot
   return Object.freeze({
-    scrollbackLength: terminal.scrollbackLength,
-    scrollbar: Object.freeze({ ...terminal.scrollbar }),
-    viewportActive: terminal.viewportActive,
+    scrollbackLength: snapshot.scrollbackLength,
+    scrollbar: Object.freeze(snapshot.scrollbar),
+    viewportActive: snapshot.viewportActive,
   })
 }
 
@@ -1090,6 +1091,7 @@ export class TerminalSession<TEvent = unknown> {
   private readonly keyEncoder: GhosttyKeyEncoder
   private readonly links: LinkResolver<TEvent>
   private readonly mouseEncoder: GhosttyMouseEncoder
+  private mouseOptionsDirty = false
   private readonly nativeRenderState: GhosttyRenderState
   private osc8RangeCache?: Osc8RangeCache
   private readonly ownsRuntime: boolean
@@ -1273,7 +1275,7 @@ export class TerminalSession<TEvent = unknown> {
     return this.runOperation(() => {
       const selectionBefore = this.readObservedOutputSelection()
       this.runVtWrite(() => this.terminal.write(data))
-      this.mouseEncoder.syncFromTerminal()
+      this.mouseOptionsDirty = true
       this.invalidateLinks()
       this.revisionValue += 1
       // Effects can reenter the owner; capture this write before publishing any of them.
@@ -1352,6 +1354,10 @@ export class TerminalSession<TEvent = unknown> {
   mouse(input: TerminalMouseInput): TerminalInputResult {
     return this.runOperation(() => {
       const normalized = normalizeTerminalMouseInput(input)
+      if (this.mouseOptionsDirty) {
+        this.mouseEncoder.syncFromTerminal()
+        this.mouseOptionsDirty = false
+      }
       return this.publishInput(this.mouseEncoder.encode(normalized.event, normalized.state), false)
     })
   }
@@ -1648,7 +1654,7 @@ export class TerminalSession<TEvent = unknown> {
   private writeNow(data: TerminalInputData): TerminalMutationResult {
     const selectionBefore = this.readObservedOutputSelection()
     this.runVtWrite(() => this.terminal.write(data))
-    this.mouseEncoder.syncFromTerminal()
+    this.mouseOptionsDirty = true
     this.invalidateLinks()
     // Observers can read geometry or reenter; publish the committed native revision first.
     this.revisionValue += 1
@@ -1721,6 +1727,7 @@ export class TerminalSession<TEvent = unknown> {
     this.selection.clear()
     this.mouseEncoder.reset()
     this.mouseEncoder.syncFromTerminal()
+    this.mouseOptionsDirty = false
     this.invalidateLinks()
     this.revisionValue += 1
     const scroll = this.commitScrollChange()
