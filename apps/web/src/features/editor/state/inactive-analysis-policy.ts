@@ -1,6 +1,6 @@
 import type { EditorDocumentAnalysis } from '@singapore-editor/core/editor'
 
-type RetentionEntry = ReturnType<EditorDocumentAnalysis['inspectRetention']>['entries'][number]
+type RetentionEntry = ReturnType<EditorDocumentAnalysis['inspectLeases']>[number]
 type Reclamation = ReturnType<EditorDocumentAnalysis['reclaimInactive']>
 
 export type InactiveAnalysisDisposition = 'warm' | 'obsolete' | 'abandoned'
@@ -72,7 +72,7 @@ function inspectOwners(enumerate: () => Iterable<EditorDocumentAnalysis>): Enume
   let protectedEntryCount = 0
   for (const analysis of owners) {
     const entries = new Map(
-      analysis.inspectRetention().entries.map((entry) => [entry.runtimeSessionId, entry]),
+      analysis.inspectLeases().map((entry) => [entry.runtimeSessionId, entry]),
     )
     entryCount += entries.size
     for (const entry of entries.values()) {

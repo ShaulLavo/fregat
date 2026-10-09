@@ -10,43 +10,49 @@ afterEach(() => {
   host?.remove()
 })
 
-it('keeps a 200 MiB document windowed and reveals its capped tail', async () => {
-  host = document.createElement('div')
-  host.style.cssText = 'width:720px;height:400px;display:flex;flex-direction:column'
-  document.body.append(host)
-  editor = new Editor(host, {
-    lineHeight: 20,
-    wordWrap: false,
-    scrollPastEnd: false,
-    fontFamily: 'monospace',
-  })
-  const lines = (200 * 1024 * 1024) / 128
-  const text = `${'x'.repeat(127)}\n`.repeat(lines) + 'tail'
-  editor.setText(text)
-  await frames()
-  expect(host.querySelectorAll('[data-editor-virtual-row]').length).toBeLessThan(100)
-  const scroller = host.querySelector<HTMLElement>('.editor-virtualized')!
-  const extent = host.querySelector<HTMLElement>('.editor-virtualized-extent')!
-  const nativeHeight = extent.getBoundingClientRect().height
-  expect(nativeHeight).toBeGreaterThan(0)
-  expect(nativeHeight).toBeLessThanOrEqual(16_000_000)
-  expect(Reflect.get(Element.prototype, 'scrollHeight', scroller)).toBe(nativeHeight)
-  assertNativeStickyHeight(nativeHeight)
-  editor.setSelection(text.length, text.length, { reveal: true })
-  await frames()
-  const tail = host.querySelector<HTMLElement>(`[data-editor-virtual-row="${lines}"]`)!
-  expect(tail.textContent).toBe('tail')
-  const viewport = scroller.getBoundingClientRect()
-  const bounds = tail.getBoundingClientRect()
-  expect(bounds.top).toBeGreaterThanOrEqual(viewport.top - 1)
-  expect(bounds.bottom).toBeLessThanOrEqual(viewport.bottom + 1)
-  const hit = document.elementFromPoint(bounds.left + 8, bounds.top + 10)
-  expect(hit === tail || tail.contains(hit)).toBe(true)
-  editor.setSelection(0, 0, { reveal: true })
-  await frames()
-  expect(host.querySelector('[data-editor-virtual-row="0"]')).not.toBeNull()
-  expect(host.querySelectorAll('[data-editor-virtual-row]').length).toBeLessThan(100)
-}, 60_000)
+it.each(['virtualized', 'static'] as const)(
+  'keeps a 200 MiB document windowed after starting in %s mode',
+  async (initialMode) => {
+    host = document.createElement('div')
+    host.style.cssText = 'width:720px;height:400px;display:flex;flex-direction:column'
+    document.body.append(host)
+    editor = new Editor(host, {
+      lineHeight: 20,
+      wordWrap: false,
+      scrollPastEnd: false,
+      fontFamily: 'monospace',
+      scrollMode: initialMode,
+    })
+    editor.setScrollMode('virtualized')
+    const lines = (200 * 1024 * 1024) / 128
+    const text = `${'x'.repeat(127)}\n`.repeat(lines) + 'tail'
+    editor.setText(text)
+    await frames()
+    expect(host.querySelectorAll('[data-editor-virtual-row]').length).toBeLessThan(100)
+    const scroller = host.querySelector<HTMLElement>('.editor-virtualized')!
+    const extent = host.querySelector<HTMLElement>('.editor-virtualized-extent')!
+    const nativeHeight = extent.getBoundingClientRect().height
+    expect(nativeHeight).toBeGreaterThan(0)
+    expect(nativeHeight).toBeLessThanOrEqual(16_000_000)
+    expect(Reflect.get(Element.prototype, 'scrollHeight', scroller)).toBe(nativeHeight)
+    assertNativeStickyHeight(nativeHeight)
+    editor.setSelection(text.length, text.length, { reveal: true })
+    await frames()
+    const tail = host.querySelector<HTMLElement>(`[data-editor-virtual-row="${lines}"]`)!
+    expect(tail.textContent).toBe('tail')
+    const viewport = scroller.getBoundingClientRect()
+    const bounds = tail.getBoundingClientRect()
+    expect(bounds.top).toBeGreaterThanOrEqual(viewport.top - 1)
+    expect(bounds.bottom).toBeLessThanOrEqual(viewport.bottom + 1)
+    const hit = document.elementFromPoint(bounds.left + 8, bounds.top + 10)
+    expect(hit === tail || tail.contains(hit)).toBe(true)
+    editor.setSelection(0, 0, { reveal: true })
+    await frames()
+    expect(host.querySelector('[data-editor-virtual-row="0"]')).not.toBeNull()
+    expect(host.querySelectorAll('[data-editor-virtual-row]').length).toBeLessThan(100)
+  },
+  60_000,
+)
 
 async function frames() {
   for (let index = 0; index < 3; index++)

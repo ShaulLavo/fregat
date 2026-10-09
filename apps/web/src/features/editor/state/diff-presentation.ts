@@ -157,8 +157,8 @@ export function createDiffPresentationBinding(
     rows: readonly DiffRenderRow[],
     tokens: readonly EditorToken[],
     configuration: SyntaxConfiguration,
-  ) {
-    if (!view) return
+  ): boolean {
+    if (!view) return false
     const previous = installed
     const restoring = pendingDiffRestore(presentation, attachment)
     if (
@@ -169,7 +169,7 @@ export function createDiffPresentationBinding(
       previous.tokens === tokens &&
       sameConfiguration(previous.configuration, configuration)
     )
-      return
+      return false
     presentation.pendingRestore = null
     const subject = diffAttachmentSubject(attachment)
     const sameSubject =
@@ -233,6 +233,7 @@ export function createDiffPresentationBinding(
     }
     restored = true
     capture()
+    return true
   }
 
   function publishTokens(

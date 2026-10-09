@@ -130,7 +130,7 @@ are outside this Markdown effort.
   blocks, caret geometry and scroll anchoring.
 - [Plan 176](../plans/176-markdown-parser.md): parser integration and the future
   convergence of chat and split rendering onto that parser.
-- [Plan 198](../plans/198-document-owned-editor-analysis.md): retained analysis
+- [Document-backed content views](document-backed-content-views.md): retained analysis
   ownership, revisions and disposal.
 
 Start with reusable authoring operations and prove them in the file editor.
