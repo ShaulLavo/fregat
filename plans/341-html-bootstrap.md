@@ -120,11 +120,11 @@ Add a Vite adapter that produces the same elements and payload through the share
 
 ## Steps
 
-1. [ ] Reproduce on a fresh browser profile and the historical appearance-cache case. Record baseline HTML timing, wallpaper request initiators, transfer count, decode/first-painted-frame timing, and frame samples. Resolve document admission, native backdrop context, and library-image preload adoption.
-2. [ ] Add the shared schema/IDs, `createAppearanceBootstrap()`, and `renderHtmlBootstrap()`. Declare template elements. Align release stamping and both Vite insertion hooks according to the HTML inventory. Test mode resolution, admission, escaping, element invariants, base paths, conditional preloads, direct-document routing, release-stamp idempotence/completion, and build-script ordering against real transformed responses.
-3. [ ] Add `readHtmlBootstrap()` and migrate all appearance startup consumers together. Remove superseded appearance storage/preload logic while preserving live queries, decoded-image transitions, and non-appearance storage consumers.
-4. [ ] Wire the Vite and isolated-server adapters. Replace storage-seeded wallpaper bootstrap scenarios with real document production. Add stable selectors to the verification selector module.
-5. [ ] Qualify built production HTML in Chromium and WebKit at phone and desktop sizes. Compare matched cold-load traces and image transfers. Add a concise architecture explanation and correct obsolete palette comments.
+1. [x] Reproduce on a fresh browser profile and the historical appearance-cache case. Record baseline HTML timing, wallpaper request initiators, transfer count, decode/first-painted-frame timing, and frame samples. Resolve document admission, native backdrop context, and library-image preload adoption.
+2. [x] Add the shared schema/IDs, `createAppearanceBootstrap()`, and `renderHtmlBootstrap()`. Declare template elements. Align release stamping and both Vite insertion hooks according to the HTML inventory. Test mode resolution, admission, escaping, element invariants, base paths, conditional preloads, direct-document routing, release-stamp idempotence/completion, and build-script ordering against real transformed responses.
+3. [x] Add `readHtmlBootstrap()` and migrate all appearance startup consumers together. Remove superseded appearance storage/preload logic while preserving live queries, decoded-image transitions, and non-appearance storage consumers.
+4. [x] Wire the Vite and isolated-server adapters. Replace storage-seeded wallpaper bootstrap scenarios with real document production. Add stable selectors to the verification selector module.
+5. [x] Qualify built production HTML in Chromium and WebKit at phone and desktop sizes. Compare matched cold-load traces and image transfers. Add a concise architecture explanation and correct obsolete palette comments.
 6. [ ] Deliver the implementation through normal review, CI, and authorized installation. Server and web changes ship together. Confirm the served release and perform the read-only live check.
 
 ## Verification and acceptance
@@ -151,4 +151,15 @@ Do not claim saved milliseconds from source inspection. Compare time to initial 
 
 ## Delivery boundaries
 
-This documentation change does not enable or deploy the mechanism. The rejected wallpaper-delay PR stays draft and unmerged. The later implementation must update the server and web release together because the web client depends on a new document contract. Public contract-package behavior changes require the usual patch changeset; this plan-only change does not.
+The initial plan-only PR did not enable the mechanism. Runtime delivery is recorded below. The rejected wallpaper-delay PR stays draft and unmerged. The later implementation must update the server and web release together because the web client depends on a new document contract. Public contract-package behavior changes require the usual patch changeset; this plan-only change does not.
+
+## Implementation qualification, 2026-10-09
+
+The source now implements the shared appearance schema, Bun document producer/renderer, client handoff, decoded-image adoption, release stamping, and Vite/fixture adapters. The native hints were ported into the current Zig and Swift hosts after the native rewrite landed. Product delivery is still pending review/CI and installation.
+
+- Focused qualification: 26 server transformation/admission checks, 28 client appearance/wallpaper checks, 69 release/adapter checks, repository gates and full repository typechecks passed. The Zig host builds. The complete Swift host compiles with the repository's Swift 6/warnings-as-errors flags; an offscreen Swift WebKit proof sent four real requests and verified app/transparent hints on initial loads and reloads. This does not claim full native-window material or Linux GUI qualification.
+- Chromium and WebKit startup scenarios confirm off creates no wallpaper requests, and the enabled library image is visible with the later settings response held. The HTML link, decoder and rendered image consume one transfer. Known-good images and screenshots were inspected. WebKit retained its existing unsupported viewport-hint diagnostic and cancelled requests during reload.
+- Three matched quiet Chromium phone-emulation runs per source used 150 ms latency, 1.125 MB/s throughput and 4x CPU. Median first-screen time was 7,371.9 ms before and 6,954.0 ms after. Median HTML response was 178.4 ms before and 205.4 ms after; served HTML grew from 25,657 to 59,639 bytes. The unwanted 486,426-byte wallpaper transfer disappeared, with two wallpaper requests before and zero afterward. Completed total bytes including HTML fell by 449,076 bytes. All six first-screen screenshots were identical.
+- Measurement limits: built web assets over source-matched isolated APIs, appearance-cache-cleared cold reload after fixture setup, simulated Chromium phone conditions rather than a physical iPhone. The after runs had one additional declared background server; admission records retain the exact overlaps. This is bounded qualification, not a universal startup speed claim.
+
+Local evidence is retained in the task's reported evidence directories. The execution checklist and PR name the source and delivery receipts; no owner settings or sessions were used for these writing scenarios.
