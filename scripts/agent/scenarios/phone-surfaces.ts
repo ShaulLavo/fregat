@@ -125,6 +125,16 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>, 
   await page
     .getByRole('button', { name: 'Go to folder, now /', exact: true })
     .waitFor({ timeout: 10_000 })
+
+  // The system Back gesture steps through the picker's folders; it is the browser's history Back.
+  await list.getByRole('option', { name: /^tmp/ }).tap()
+  await page
+    .getByRole('button', { name: 'Go to folder, now /tmp', exact: true })
+    .waitFor({ timeout: 10_000 })
+  await page.goBack({ waitUntil: 'commit' })
+  await page
+    .getByRole('button', { name: 'Go to folder, now /', exact: true })
+    .waitFor({ timeout: 10_000 })
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
   await dialog.waitFor({ state: 'hidden' })
 }
