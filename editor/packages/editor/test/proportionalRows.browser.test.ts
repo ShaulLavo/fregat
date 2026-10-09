@@ -36,10 +36,14 @@ async function mount(text = `${LONG}\nshort`) {
   return { container, editor, scroller }
 }
 
-function textWidth(text: string, fontFamily = `"${FACE}"`): number {
+function textWidth(text: string, fontFamily = `"${FACE}"`, chunkSize = text.length): number {
   const probe = document.createElement('span')
   probe.style.cssText = `font:13px ${fontFamily};white-space:pre;position:absolute`
-  probe.textContent = text
+  for (let start = 0; start < text.length; start += chunkSize) {
+    const chunk = document.createElement('span')
+    chunk.textContent = text.slice(start, start + chunkSize)
+    probe.append(chunk)
+  }
   document.body.append(probe)
   const width = probe.getBoundingClientRect().width
   probe.remove()
@@ -161,7 +165,11 @@ test.each([
   container.style.cssText = 'width:500px;height:200px'
   document.body.append(container)
   containers.push(container)
-  const editor = new VirtualizedTextView(container, { fontFamily: initialFace, wrap: false })
+  const editor = new VirtualizedTextView(container, {
+    fontFamily: initialFace,
+    wrap: false,
+    longLineChunkSize: 512,
+  })
   editors.push(editor)
   editor.setText(text)
   editor.setScrollMetrics(0, 200, 500)
@@ -176,5 +184,16 @@ test.each([
   const nextWidth = textWidth(widest, nextFace)
   expect(Math.abs(nextWidth - initialWidth)).toBeGreaterThan(1_000)
   await expect.poll(() => Math.abs(extent() - nextWidth)).toBeLessThan(nextWidth * 0.01)
-  expect(extent()).toBeGreaterThanOrEqual(nextWidth)
+  // A single large text node accumulates advances differently from the mounted chunks.
+  expect(extent()).toBeGreaterThanOrEqual(textWidth(widest, nextFace, 512))
+  await expect
+    .poll(() => {
+      scroller.scrollLeft = scroller.scrollWidth
+      const tail = editor.createRange(widest.length, widest.length, { scrollIntoView: false })
+      if (!tail) return false
+      const bounds = scroller.getBoundingClientRect()
+      const caret = tail.getBoundingClientRect()
+      return caret.left >= bounds.left && caret.right <= bounds.right
+    })
+    .toBe(true)
 })
