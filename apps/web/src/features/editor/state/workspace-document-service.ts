@@ -81,6 +81,7 @@ import {
   type EditorTextBufferChange,
   type EditorViewSession,
   type PieceTableSnapshot,
+  type DocumentSyncPoint,
   type DocumentTextSnapshot,
 } from '@singapore-editor/core/document'
 import {
@@ -293,6 +294,12 @@ type SavedComparisonInterest = {
   stop: () => void
 }
 
+type CommittedLiveRevision = {
+  readonly revision: number
+  readonly syncPoint: DocumentSyncPoint
+  readonly snapshot: DocumentTextSnapshot
+}
+
 type PreviewInterest = {
   current: PreviewSourceRead
   readonly key: DocumentKey | null
@@ -409,6 +416,7 @@ export class WorkspaceDocumentService {
       key,
       buffer: document.buffer,
       revision: document.buffer.getRevision(),
+      syncPoint: document.buffer.getDocumentSyncPoint(),
       snapshot: document.buffer.getTextSnapshot(),
       ...boundedPreviewPrefix(document.buffer.getTextSnapshot(), maxBytes),
       maxBytes,
@@ -510,10 +518,7 @@ export class WorkspaceDocumentService {
     if (!this.sourceOwnerDisposed) this.onStateChange()
   }
 
-  private refreshPreviewSources(
-    key: DocumentKey,
-    committed?: { readonly revision: number; readonly snapshot: DocumentTextSnapshot },
-  ): void {
+  private refreshPreviewSources(key: DocumentKey, committed?: CommittedLiveRevision): void {
     for (const [lease, entry] of Array.from(this.previewInterests)) {
       if (
         this.previewInterests.get(lease) !== entry ||
@@ -531,6 +536,7 @@ export class WorkspaceDocumentService {
       entry.current = {
         ...entry.current,
         revision: committed?.revision ?? document.buffer.getRevision(),
+        syncPoint: committed?.syncPoint ?? document.buffer.getDocumentSyncPoint(),
         snapshot,
         ...boundedPreviewPrefix(snapshot, entry.maxBytes),
         dirty: document.buffer.isDirty(),
@@ -2067,6 +2073,7 @@ export class WorkspaceDocumentService {
       this.liveDocumentsByKey.set(documentKey, { ...document, localRevision })
       this.refreshLiveComparison(documentKey, {
         revision: event.revisionAfter,
+        syncPoint: event.syncPointAfter,
         snapshot: event.change.textSnapshot,
       })
       this.onStateChange()
@@ -2076,6 +2083,7 @@ export class WorkspaceDocumentService {
     this.acceptTextRevision(document, localRevision, event.change.isDirty)
     this.refreshLiveComparison(documentKey, {
       revision: event.revisionAfter,
+      syncPoint: event.syncPointAfter,
       snapshot: event.change.textSnapshot,
     })
     this.onStateChange()
@@ -2279,10 +2287,7 @@ export class WorkspaceDocumentService {
     if (input && input !== previous) this.publishSnapshotInput(group, input)
   }
 
-  private refreshLiveComparison(
-    key: DocumentKey,
-    committed?: { readonly revision: number; readonly snapshot: DocumentTextSnapshot },
-  ): void {
+  private refreshLiveComparison(key: DocumentKey, committed?: CommittedLiveRevision): void {
     this.refreshPreviewSources(key, committed)
     this.refreshSettingsComparisons(key, committed)
     for (const [lease, entry] of this.comparisonInterests) {

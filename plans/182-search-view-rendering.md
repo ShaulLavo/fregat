@@ -519,6 +519,48 @@ block) → { update?, dispose }`), shaped as building blocks of Plan 122's `crea
 Outside this plan, recorded in the first pass: grammar wasm ships as base64 inside JS chunks (bundle
 shape, Plan 129's lane), and a workspace opened at a nested ignored repository searches empty.
 
+## Source handoff from Plan 200
+
+Landed 2026-10-09 in `apps/web/src/lib/file-preview/utils/source.ts`, tested in
+`lib/file-preview/tests/source-range.test.ts`. Search reaches it through `lib/`, so it never
+imports the editor feature.
+
+- **Lease.** `PreviewSourceCapability.acquireLivePreview({ scope, key, maxBytes, signal })` returns
+  a `PreviewSourceLease` on the file's live buffer, or `null` when the file has no live document.
+  Its `live` read names the environment and workspace (`scope`), the path (`key`), the buffer
+  incarnation (`buffer`) and the revision (`revision`, `syncPoint`). The read follows every
+  committed edit.
+- **Capture.** `captureSourceRange(read, { start, end })` returns
+  `{ kind: 'valid', ref: SourceRangeRef }` or `{ kind: 'invalid', reason }`.
+- **Resolve.** `resolveSourceRange(ref, lease.read())` maps the range through the buffer's edit
+  chain to the read's revision. Keep the `ref` it returns: the chain holds 128 edits, so a ref that
+  is never rebased ends as `history-unavailable`.
+
+```ts
+const lease = previewSource.acquireLivePreview({ scope, key, maxBytes, signal })
+if (!lease) return openThenCheckLine() // the search's text came from disk
+let match = captureSourceRange(lease.read(), { start, end })
+// On each publication, and before forwarding an edit:
+if (match.kind === 'valid') match = resolveSourceRange(match.ref, lease.read())
+if (match.kind === 'invalid') dropOrRequery(match.reason)
+```
+
+| Reason                | When                                                                                                     |
+| --------------------- | -------------------------------------------------------------------------------------------------------- |
+| `edited`              | An edit touched the range's text. An insertion at its start moves it; one at its end stays outside it.   |
+| `replaced`            | The read's buffer is another incarnation: the file reloaded with different text, or closed and reopened. |
+| `ended`               | The lease was released, the file closed or replaced under this lease, or the owner was disposed.         |
+| `partial`             | The range lies past a bounded live prefix, or the read is a truncated disk capture.                      |
+| `not-live`            | A complete disk or attachment capture. It is immutable and has no edits to follow.                       |
+| `history-unavailable` | The edit chain no longer reaches the ref: over 128 edits, a rotated segment, or edits it cannot compose. |
+
+A read for another document throws. A ref holds its buffer; drop it with its lease.
+
+Still this plan's work: the recycled editor pool and its renderer, per-file sideways scroll, the
+multibuffer (M1), the edit filter and forwarding, opening a file on first edit and checking its line
+against the search's text, and undo and save across touched files. `result-file-editor.tsx` keeps
+its generated static excerpt documents until this plan binds them to the source.
+
 ## Verification
 
 - Before and after each phase: `trace` of the probe tiers on a production build (recipe in the

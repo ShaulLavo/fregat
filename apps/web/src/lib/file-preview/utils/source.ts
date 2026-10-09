@@ -2,8 +2,10 @@ import { createClientInvariantError } from '@/lib/structured-errors'
 import { mutationOptions, type QueryClient } from '@tanstack/react-query'
 import type { StoreApi } from 'zustand/vanilla'
 import type {
+  DocumentSyncPoint,
   DocumentTextSnapshot,
   EditorTextBuffer,
+  TextEdit,
   TextSnapshot,
   TextReadSnapshot,
 } from '@singapore-editor/core/document'
@@ -44,6 +46,7 @@ export type PreviewSourceRead =
       readonly key: DocumentKey
       readonly buffer: EditorTextBuffer
       readonly revision: number
+      readonly syncPoint: DocumentSyncPoint
       readonly snapshot: DocumentTextSnapshot
       readonly range: { readonly start: 0; readonly end: number }
       readonly text: string
@@ -94,6 +97,27 @@ export type PreviewViewRequest = {
   readonly scope: SnapshotComparisonScope | null
   readonly signal: AbortSignal
 }
+
+export type SourceRange = { readonly start: number; readonly end: number }
+// Holds its buffer: drop it with the lease it was captured from.
+export type SourceRangeRef = {
+  readonly scope: SnapshotComparisonScope
+  readonly key: DocumentKey
+  readonly buffer: EditorTextBuffer
+  readonly revision: number
+  readonly syncPoint: DocumentSyncPoint
+  readonly range: SourceRange
+}
+type SourceRangeInvalidReason =
+  | 'not-live'
+  | 'partial'
+  | 'ended'
+  | 'replaced'
+  | 'edited'
+  | 'history-unavailable'
+export type SourceRangeResolution =
+  | { readonly kind: 'valid'; readonly ref: SourceRangeRef }
+  | { readonly kind: 'invalid'; readonly reason: SourceRangeInvalidReason }
 
 export function attachmentPreviewMutationOptions(
   capability: PreviewSourceCapability | null,
@@ -177,6 +201,78 @@ export function samePreviewScope(
       left.rootPath === right.rootPath,
     )
   )
+}
+
+export function captureSourceRange(
+  read: PreviewSourceRead,
+  range: SourceRange,
+): SourceRangeResolution {
+  if (read.kind !== 'live') return { kind: 'invalid', reason: nonLiveSourceReason(read) }
+  assertSourceRange(range, read.snapshot.length)
+  if (range.end > read.range.end) return { kind: 'invalid', reason: 'partial' }
+  const { scope, key, buffer, revision, syncPoint } = read
+  return { kind: 'valid', ref: { scope, key, buffer, revision, syncPoint, range } }
+}
+
+export function resolveSourceRange(
+  ref: SourceRangeRef,
+  read: PreviewSourceRead,
+): SourceRangeResolution {
+  if (read.kind !== 'live') return { kind: 'invalid', reason: nonLiveSourceReason(read) }
+  if (read.key !== ref.key || !samePreviewScope(read.scope, ref.scope))
+    throw createClientInvariantError('Source range belongs to a different document', {
+      keyMatches: read.key === ref.key,
+      scopeMatches: samePreviewScope(read.scope, ref.scope),
+    })
+  if (read.buffer !== ref.buffer) return { kind: 'invalid', reason: 'replaced' }
+  const changes = read.buffer.changesBetweenDocumentSyncPoints(ref.syncPoint, read.syncPoint, null)
+  if (!changes?.edits) return { kind: 'invalid', reason: 'history-unavailable' }
+  const range = mapSourceRange(ref.range, changes.edits)
+  if (!range) return { kind: 'invalid', reason: 'edited' }
+  return {
+    kind: 'valid',
+    ref: { ...ref, revision: read.revision, syncPoint: read.syncPoint, range },
+  }
+}
+
+function nonLiveSourceReason(
+  read: Exclude<PreviewSourceRead, { kind: 'live' }>,
+): SourceRangeInvalidReason {
+  if (read.kind === 'released' || read.kind === 'unavailable') return 'ended'
+  if (read.kind === 'disk' && read.input.head.truncated) return 'partial'
+  return 'not-live'
+}
+
+function assertSourceRange(range: SourceRange, length: number): void {
+  if (
+    Number.isSafeInteger(range.start) &&
+    Number.isSafeInteger(range.end) &&
+    range.start >= 0 &&
+    range.start <= range.end &&
+    range.end <= length
+  )
+    return
+  throw createClientInvariantError('Source range must lie inside its snapshot', {
+    start: range.start,
+    end: range.end,
+    length,
+  })
+}
+
+// Edits share the capture's coordinates. An insertion at the start moves the range;
+// one at the end stays outside it. Anything touching the range's text invalidates it.
+function mapSourceRange(range: SourceRange, edits: readonly TextEdit[]): SourceRange | null {
+  let delta = 0
+  for (const edit of edits) {
+    if (edit.from === edit.to && edit.text.length === 0) continue
+    if (edit.to <= range.start) {
+      delta += edit.text.length - (edit.to - edit.from)
+      continue
+    }
+    if (edit.from >= range.end) continue
+    return null
+  }
+  return { start: range.start + delta, end: range.end + delta }
 }
 
 export function previewViewMutationOptions(
