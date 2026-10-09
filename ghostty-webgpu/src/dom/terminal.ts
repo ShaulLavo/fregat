@@ -257,6 +257,7 @@ function fittedFontSettingsEqual(
 const createFromSessionInternal = Symbol('createFromSessionInternal')
 
 export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements TerminalApi<Mode> {
+  private textSubscribers = 0
   private accessibility?: TerminalAccessibilityController
   private readonly accessibilityOptions?: false | GhosttyWebGpuTerminalAccessibilityOptions
   private readonly autoFit: boolean
@@ -598,9 +599,54 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     return this.on('frame', listener)
   }
 
+  readDisplayedText(): RendererTextFrameSnapshot | undefined {
+    this.ensureActive()
+    const frame = this.readFrame()
+    if (!frame) return undefined
+    return Object.freeze({
+      cursor: frame.cursor,
+      paintedCursor: frame.paintedCursor,
+      rows: frame.rows,
+    })
+  }
+
+  subscribeDisplayedText(
+    listener: (frame: RendererTextFrameSnapshot) => void,
+  ): GhosttyWebGpuTerminalSubscription {
+    this.ensureActive()
+    this.textSubscribers += 1
+    const subscription = this.onFrame(() => {
+      const frame = this.readDisplayedText()
+      if (frame) listener(frame)
+    })
+    let active = true
+    try {
+      const current = this.readDisplayedText()
+      if (current) listener(current)
+    } catch (cause) {
+      active = false
+      this.textSubscribers -= 1
+      subscription.dispose()
+      throw cause
+    }
+    return {
+      dispose: () => {
+        if (!active) return
+        active = false
+        this.textSubscribers -= 1
+        subscription.dispose()
+      },
+    }
+  }
+
   get submittedFrame(): TerminalSubmittedFrame | undefined {
     this.ensureActive()
-    return this.execution.submittedFrame
+    const frame = this.execution.submittedFrame
+    if (frame) {
+      void frame.rows
+      void frame.rowPatches
+    }
+    return frame
   }
 
   geometry(): TerminalResult<Mode, TerminalGeometry> {
@@ -988,7 +1034,9 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
         onError: (cause) => this.reportError(cause, 'renderer.restore'),
         onCleanUpdate: () => this.handleCleanUpdate(),
         onTextFrame: (snapshot) => this.handleFrame(snapshot),
-        needsFrameRows: () => true,
+        retainDisplayedText: true,
+        needsFrameRows: () =>
+          Boolean(this.accessibility || this.links?.needsFrame || this.textSubscribers > 0),
         onRowsChanged: (rows) => {
           if (!this.emitters.frame.hasListeners && !this.extensionDispatch.events.frame) return
           this.emitHostEvent('frame', Object.freeze({ rows }))
@@ -1466,7 +1514,7 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     if (summary) this.updatePreeditAppearance(summary.font, summary.theme)
     this.runUiOperation('frame.caret', () => this.positionTextarea(snapshot))
     this.runUiOperation('frame.links', () => {
-      if (snapshot.rows.length > 0 && this.links?.needsFrame) this.updateLinkFrame(snapshot)
+      if (this.links?.needsFrame && snapshot.rows.length > 0) this.updateLinkFrame(snapshot)
       else this.invalidateLinks()
     })
     this.runUiOperation('frame.accessibility', () =>

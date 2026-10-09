@@ -9,6 +9,7 @@ import {
 import { assertGhosttyResult, createGhosttyError } from './error.js'
 import { requireLayout } from './memory.js'
 import { ZigFrameBuilder } from './zig-frame.js'
+import { DisplayedFrameStore } from './displayed-frame.js'
 import { RowReader } from './row-reader.js'
 import { TextRowReader } from './text-row-reader.js'
 import type { GhosttyRuntime } from './runtime.js'
@@ -145,6 +146,7 @@ function createOwnedHandle(
 }
 
 export class GhosttyRenderState {
+  private displayedFrames?: DisplayedFrameStore
   private readonly cells: OwnedHandle
   private readonly rowReader: RowReader
   private readonly textRowReader: TextRowReader
@@ -263,6 +265,17 @@ export class GhosttyRenderState {
     )
   }
 
+  retainDisplayedFrame() {
+    this.ensureActive()
+    this.displayedFrames ??= new DisplayedFrameStore(this.runtime)
+    return this.displayedFrames.capture(
+      this.state.handle,
+      this.iterator.handle,
+      this.cells.handle,
+      this.readGrid(),
+    )
+  }
+
   readCursor(): RenderCursorSnapshot {
     this.ensureActive()
     if (!this.cursorSnapshot) this.update()
@@ -298,6 +311,7 @@ export class GhosttyRenderState {
 
   dispose(): void {
     if (this.disposed) return
+    this.displayedFrames?.dispose()
     this.cursorReader.dispose()
     this.rowReader.dispose()
     this.textRowReader.dispose()
