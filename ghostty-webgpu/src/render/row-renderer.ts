@@ -28,6 +28,7 @@ export interface RowRendererMetrics {
 export type RowThemeInvalidation = 'all' | 'cursor'
 
 export interface RowRendererSurface {
+  readonly retainsDisplayedText?: boolean
   beginFrame?(): void
   dispose(): void
   paint(row: RenderRow, cursor: CursorState | undefined): void
@@ -81,7 +82,7 @@ export class RowTerminalRenderer {
       rows: options.rows,
     })
     this.frames = new FrameObserver(
-      options.retainDisplayedText
+      options.retainDisplayedText && !surface.retainsDisplayedText
         ? { ...options, retainDisplayedText: false, needsFrameRows: () => true }
         : options,
     )
@@ -228,32 +229,28 @@ export class RowTerminalRenderer {
     }
     const style = this.focused ? undefined : this.inactiveCursorStyle
     const cursorState = renderCursorState(this.cursor, this.cursorPhaseVisible, style)
-    this.surface.beginFrame?.()
-    for (const row of rows) this.paintRow(row, cursorState)
-    if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
+    // Native retention needs the logical dirty rows before acknowledge clears them.
+    const frame = this.frames.capture(
+      this.renderState,
+      cursor,
+      cursorState,
+      rows.map((row) => row.y),
+      rows,
+    )
+    try {
+      this.surface.beginFrame?.()
+      for (const row of rows) this.paintRow(row, cursorState)
+      if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
+      frame.accept()
+    } catch (cause) {
+      frame.discard()
+      throw cause
+    }
     this.metrics.paintedRows += rows.length
     this.metrics.submittedFrames += 1
     this.needsFullRebuild = false
     this.overlayRows.clear()
-    this.emitFrame(rows)
-  }
-
-  private emitFrame(
-    rows: readonly RenderRow[] | undefined,
-    changed = rows?.map((row) => row.y) ?? [],
-  ): void {
-    if (!this.cursor) return
-    this.frames.emit(
-      this.renderState,
-      this.cursor,
-      renderCursorState(
-        this.cursor,
-        this.cursorPhaseVisible,
-        this.focused ? undefined : this.inactiveCursorStyle,
-      ),
-      changed,
-      rows,
-    )
+    frame.notify()
   }
 
   private gridEquals(grid: RendererGridSize): boolean {
