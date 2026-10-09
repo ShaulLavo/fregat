@@ -2,7 +2,7 @@ import type { ZigFrameBuilder } from '../../core/zig-frame.js'
 import type { AtlasKind, AtlasPageUpload, AtlasTextureLayout } from '../atlas/types.js'
 import { CELL_INSTANCE_BYTES, GLYPH_INSTANCE_BYTES } from '../instances/layout.js'
 import type { InstanceByteRange } from '../instances/types.js'
-import { planUploadRanges } from '../instances/upload-ranges.js'
+import { planSparseUploadRanges, planUploadRanges } from '../instances/upload-ranges.js'
 
 import {
   cellFragmentShader,
@@ -19,10 +19,17 @@ export interface WebGlTextPassOptions {
   readonly width: number
 }
 
+type FrameRows =
+  | { readonly stableRows?: false }
+  | Pick<ZigFrameBuilder, 'stableRows' | 'columns' | 'rowHeight' | 'rowOffset'>
+
 interface Pipeline {
   readonly buffer: WebGLBuffer
   readonly program: WebGLProgram
   readonly vertexArray: WebGLVertexArrayObject
+  readonly rowLayout: WebGLUniformLocation
+  readonly instanceBaseUniform: WebGLUniformLocation
+  instanceBase: number
   drawable: Uint8Array
   drawInstanceCount: number
 }
@@ -68,6 +75,13 @@ export class WebGlTextPass {
   private readonly atlasLayout: AtlasTextureLayout
   private readonly cells: Pipeline
   private readonly glyphs: Pipeline
+  private readonly wrappedGlyphs: WebGLVertexArrayObject
+  private wrappedGlyphFirst = 0
+  private rowColumns = 0
+  private rowCount = 0
+  private rowOffset = 0
+  private rowHeight = 0
+  private rowMappingChangedValue = false
   private readonly textures: Readonly<Record<AtlasKind, WebGLTexture>>
   private atlasUploadedBytesValue = 0
   private atlasUploadOperationsValue = 0
@@ -88,6 +102,7 @@ export class WebGlTextPass {
         glyphFragmentShader,
         GLYPH_INSTANCE_BYTES,
       )
+      this.wrappedGlyphs = this.createVertexArray(this.glyphs.buffer, GLYPH_INSTANCE_BYTES)
       this.textures = {
         grayscale: this.createAtlasTexture('grayscale'),
         color: this.createAtlasTexture('color'),
@@ -112,6 +127,10 @@ export class WebGlTextPass {
     return this.frameUploadedBytesValue
   }
 
+  get rowMappingChanged(): boolean {
+    return this.rowMappingChangedValue
+  }
+
   syncAtlas(uploads: readonly AtlasPageUpload[]): void {
     this.ensureActive()
     if (uploads.length === 0) return
@@ -129,12 +148,17 @@ export class WebGlTextPass {
   }
 
   uploadFrame(
-    frame: Pick<ZigFrameBuilder, 'cellData' | 'glyphData'>,
+    frame: FrameRows &
+      Pick<ZigFrameBuilder, 'cellData' | 'glyphData'> & { readonly rowChanges?: number },
     updates: readonly { readonly cell: InstanceByteRange; readonly glyph: InstanceByteRange }[],
   ): number {
     this.ensureActive()
     this.frameUploadedBytesValue = 0
-    const plan = planUploadRanges(updates)
+    this.rowMappingChangedValue = this.updateRows(frame)
+    const plan =
+      frame.stableRows && ((frame.rowChanges ?? 0) & 1) !== 0
+        ? planSparseUploadRanges(updates)
+        : planUploadRanges(updates)
     this.writeRanges(this.cells, frame.cellData, plan.cell, CELL_INSTANCE_BYTES)
     this.writeRanges(this.glyphs, frame.glyphData, plan.glyph, GLYPH_INSTANCE_BYTES)
     return plan.cell.length + plan.glyph.length
@@ -150,6 +174,8 @@ export class WebGlTextPass {
     this.instanceCount = options.instanceCount
     this.resizePipeline(this.cells, CELL_INSTANCE_BYTES)
     this.resizePipeline(this.glyphs, GLYPH_INSTANCE_BYTES)
+    this.updateRows({ stableRows: false })
+    this.wrappedGlyphFirst = -1
   }
 
   submit(): number {
@@ -169,7 +195,7 @@ export class WebGlTextPass {
     gl.clearColor(0, 0, 0, 0)
     gl.clear(gl.COLOR_BUFFER_BIT)
     this.bindAtlas()
-    const draws = this.draw(this.cells) + this.draw(this.glyphs)
+    const draws = this.draw(this.cells) + this.drawGlyphs()
     gl.bindVertexArray(null)
     return draws
   }
@@ -235,27 +261,61 @@ export class WebGlTextPass {
     const gl = this.context
     const program = this.createProgram(vertex, fragment)
     const buffer = this.own(gl.createBuffer(), (resource) => gl.deleteBuffer(resource))
-    const vertexArray = this.own(gl.createVertexArray(), (resource) =>
-      gl.deleteVertexArray(resource),
-    )
-    gl.bindVertexArray(vertexArray)
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
     gl.bufferData(gl.ARRAY_BUFFER, this.instanceCount * stride, gl.DYNAMIC_DRAW)
-    for (let attribute = 0; attribute < stride / 16; attribute += 1) {
-      gl.enableVertexAttribArray(attribute)
-      gl.vertexAttribPointer(attribute, 4, gl.FLOAT, false, stride, attribute * 16)
-      gl.vertexAttribDivisor(attribute, 1)
-    }
-    gl.bindVertexArray(null)
+    const vertexArray = this.createVertexArray(buffer, stride)
     gl.useProgram(program)
     gl.uniform2f(this.uniform(program, 'viewport'), this.width, this.height)
     return {
       buffer,
       program,
       vertexArray,
+      rowLayout: this.uniform(program, 'rowLayout'),
+      instanceBaseUniform: this.uniform(program, 'instanceBase'),
+      instanceBase: 0,
       drawable: new Uint8Array(this.instanceCount),
       drawInstanceCount: 0,
     }
+  }
+
+  private createVertexArray(buffer: WebGLBuffer, stride: number): WebGLVertexArrayObject {
+    const gl = this.context
+    const vertexArray = this.own(gl.createVertexArray(), (resource) =>
+      gl.deleteVertexArray(resource),
+    )
+    gl.bindVertexArray(vertexArray)
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+    for (let attribute = 0; attribute < stride / 16; attribute += 1) {
+      gl.enableVertexAttribArray(attribute)
+      gl.vertexAttribPointer(attribute, 4, gl.FLOAT, false, stride, attribute * 16)
+      gl.vertexAttribDivisor(attribute, 1)
+    }
+    gl.bindVertexArray(null)
+    return vertexArray
+  }
+
+  private updateRows(frame: FrameRows): boolean {
+    const columns = frame.stableRows ? frame.columns : 0
+    const rows = columns === 0 ? 0 : this.instanceCount / columns
+    const offset = frame.stableRows ? frame.rowOffset : 0
+    const height = frame.stableRows ? frame.rowHeight : 0
+    if (
+      columns === this.rowColumns &&
+      rows === this.rowCount &&
+      offset === this.rowOffset &&
+      height === this.rowHeight
+    )
+      return false
+    this.rowColumns = columns
+    this.rowCount = rows
+    this.rowOffset = offset
+    this.rowHeight = height
+    const gl = this.context
+    for (const pipeline of [this.cells, this.glyphs]) {
+      gl.useProgram(pipeline.program)
+      gl.uniform4f(pipeline.rowLayout, columns, rows, offset, height)
+    }
+    return true
   }
 
   private uniform(program: WebGLProgram, name: string): WebGLUniformLocation {
@@ -389,8 +449,58 @@ export class WebGlTextPass {
     const gl = this.context
     gl.useProgram(pipeline.program)
     gl.bindVertexArray(pipeline.vertexArray)
+    this.setInstanceBase(pipeline, 0)
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, pipeline.drawInstanceCount)
     return 1
+  }
+
+  private setInstanceBase(pipeline: Pipeline, first: number): void {
+    if (pipeline.instanceBase === first) return
+    this.context.uniform1i(pipeline.instanceBaseUniform, first)
+    pipeline.instanceBase = first
+  }
+
+  private drawGlyphs(): number {
+    const first = this.rowOffset * this.rowColumns
+    if (first === 0) return this.draw(this.glyphs)
+    const highCount = Math.max(0, this.glyphs.drawInstanceCount - first)
+    const lowCount = Math.min(first, this.glyphs.drawInstanceCount)
+    if (highCount + lowCount === 0) return 0
+    const gl = this.context
+    gl.useProgram(this.glyphs.program)
+    let draws = 0
+    // Overhanging glyphs must blend in logical row order across the physical ring split.
+    if (highCount > 0) {
+      gl.bindVertexArray(this.wrappedGlyphs)
+      this.moveWrappedGlyphs(first)
+      this.setInstanceBase(this.glyphs, first)
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, highCount)
+      draws += 1
+    }
+    if (lowCount > 0) {
+      gl.bindVertexArray(this.glyphs.vertexArray)
+      this.setInstanceBase(this.glyphs, 0)
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, lowCount)
+      draws += 1
+    }
+    return draws
+  }
+
+  private moveWrappedGlyphs(first: number): void {
+    if (this.wrappedGlyphFirst === first) return
+    const gl = this.context
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.glyphs.buffer)
+    for (let attribute = 0; attribute < GLYPH_INSTANCE_BYTES / 16; attribute += 1) {
+      gl.vertexAttribPointer(
+        attribute,
+        4,
+        gl.FLOAT,
+        false,
+        GLYPH_INSTANCE_BYTES,
+        first * GLYPH_INSTANCE_BYTES + attribute * 16,
+      )
+    }
+    this.wrappedGlyphFirst = first
   }
 
   private assertNoError(operation: string): void {

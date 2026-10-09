@@ -87,6 +87,8 @@ async function createGrid(options: {
   renderRows: readonly RenderRow[]
   rows: number
   theme?: RendererTheme
+  stableRows?: boolean
+  rasterizer?: GlyphRasterizer
 }) {
   const width = options.columns * cellSize
   const height = options.rows * cellSize
@@ -104,9 +106,10 @@ async function createGrid(options: {
     theme,
     cursor: options.cursor,
     full: true,
+    stableRows: options.stableRows ?? false,
     overlayRows: new Set<number>(),
   }
-  expect(buildZigFrame(builder, atlas, rasterizer, frameOptions)).toBe(0)
+  expect(buildZigFrame(builder, atlas, options.rasterizer ?? rasterizer, frameOptions)).toBe(0)
   const updates = builder.changedRanges()
   const pass = new WebGlTextPass({
     atlasLayout: atlas.textureLayout,
@@ -584,3 +587,71 @@ it('bounding uploads preserve bit patterns, erasures and authoritative gaps afte
   expect(grid.pass.uploadFrame(frame, [])).toBe(0)
   expect(grid.pass.frameUploadedBytes).toBe(0)
 })
+
+const overhangRasterizer: GlyphRasterizer = {
+  rasterize() {
+    return {
+      height: cellSize * 2,
+      width: cellSize,
+      kind: 'grayscale',
+      offsetX: 0,
+      offsetY: -cellSize / 2,
+      pixels: new Uint8Array(cellSize * cellSize * 2).fill(128),
+    }
+  },
+}
+
+it.each([rasterizer, overhangRasterizer])(
+  'preserves logical pixels through native row-ring wraps and partial scrolls',
+  async (glyphRasterizer) => {
+    const renderRows = Array.from({ length: 4 }, (_, y) =>
+      row(y, [
+        cell(0, {
+          text: String.fromCharCode(65 + y),
+          foreground: { r: y % 2 ? 0 : 255, g: 80, b: y % 2 ? 255 : 0 },
+          style: style({ faint: true, underline: 1 }),
+        }),
+      ]),
+    )
+    const grids = await Promise.all(
+      [false, true].map((stableRows) =>
+        createGrid({
+          columns: 4,
+          rows: 4,
+          renderRows,
+          stableRows,
+          rasterizer: glyphRasterizer,
+        }),
+      ),
+    )
+    const writes = [
+      ...Array.from(
+        { length: 12 },
+        (_, index) => `\x1b[4;1H\r\n\x1b[${index % 2 ? 31 : 34}m${String.fromCharCode(69 + index)}`,
+      ),
+      '\x1b[2;3r\x1b[3;1H\r\nX',
+      '\x1b[r\x1b[2;1H\x1b[L',
+      '\x1b[3;1H\x1b[M',
+      '\x1b[1;1H\x1b[2K',
+    ]
+    for (const write of writes) {
+      const pixels = grids.map((grid) => {
+        grid.native.state.acknowledge()
+        grid.native.terminal.write(write)
+        grid.native.state.update()
+        expect(
+          buildZigFrame(grid.builder, grid.atlas, glyphRasterizer, {
+            ...grid.frameOptions,
+            full: false,
+          }),
+        ).toBe(0)
+        grid.pass.syncAtlas(grid.atlas.consumeUploads())
+        grid.pass.uploadFrame(grid.builder, grid.builder.changedRanges())
+        return grid.pass.capturePixels()
+      })
+      expect(pixels[1], write).toEqual(pixels[0])
+    }
+    expect(grids[1]!.builder.stableRows).toBe(true)
+    expect(grids[1]!.gl.getError()).toBe(grids[1]!.gl.NO_ERROR)
+  },
+)

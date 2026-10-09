@@ -402,6 +402,7 @@ export class WebGlTerminalRenderer {
         this.focused ? undefined : this.inactiveCursorStyle,
       ),
       full: this.needsFullRebuild,
+      stableRows: true,
       overlayRows: this.overlayRows,
     }
     const status = buildZigFrame(builder, this.atlas, this.rasterizer, options)
@@ -414,8 +415,9 @@ export class WebGlTerminalRenderer {
     const updates = builder.changedRanges()
     pass.syncAtlas(this.atlas.consumeUploads())
     const operations = pass.uploadFrame(builder, updates)
-    // Persistent records can report terminal damage without changing either GPU buffer.
-    const draws = operations > 0 ? pass.submit() : 0
+    // Scrolling can remap resident records without uploading buffer bytes.
+    const submitted = operations > 0 || pass.rowMappingChanged
+    const draws = submitted ? pass.submit() : 0
     if (this.context.isContextLost()) {
       this.suspendContext()
       return
@@ -430,7 +432,7 @@ export class WebGlTerminalRenderer {
     )
     try {
       if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
-      if (operations > 0) {
+      if (submitted) {
         this.recordFrame(pass, builder.rowRebuilds, operations, draws)
         this.metrics.zigFrames += 1
       }

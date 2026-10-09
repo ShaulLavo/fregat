@@ -162,12 +162,13 @@ describe('WebGL WASM frame pixels', () => {
       if (delta === -1) expect(pixels).not.toEqual(bottom)
       if (delta === 1) expect(pixels).toEqual(bottom)
       const uploadedBytes = native.renderer.metrics.uploadedBytes - uploaded
-      expect(uploadedBytes).toBeGreaterThan(0)
+      expect(uploadedBytes).toBeGreaterThanOrEqual(0)
       expect({ full: build.mock.calls.map(([options]) => options.full), uploadedBytes }).toEqual({
         full: [false],
         uploadedBytes: expect.any(Number),
       })
-      expect(uploadedBytes).toBeLessThan(fullBufferBytes)
+      if (delta === -1) expect(uploadedBytes).toBe(fullBufferBytes)
+      if (delta === 1) expect(uploadedBytes).toBeLessThan(fullBufferBytes)
       expect(readRows).not.toHaveBeenCalled()
     }
   })
@@ -723,3 +724,78 @@ function atlasInsertion(
     if (result.value.glyph.key === key) return result.value
   }
 }
+
+it('submits mapping-only native scrolls and publishes every moved logical row', async () => {
+  const source = await runtimeFixture(4, 3)
+  source.terminal.write('\x1b[?25lA\r\nB\r\nC')
+  const textByRow = new Map<number, string>()
+  const onRowsPainted = (rows: readonly RenderRow[]) => {
+    for (const row of rows)
+      textByRow.set(
+        row.y,
+        row.cells
+          .map((cell) => cell.text)
+          .join('')
+          .trimEnd(),
+      )
+  }
+  const { clock, renderer } = await rendererFixture(source, { onRowsPainted })
+  clock.flushFrame()
+  source.terminal.write('\x1b[3;1H\r\nA')
+  renderer.notifyWrite()
+  clock.flushFrame()
+  const before = await renderer.capturePixels()
+  const uploaded = renderer.metrics.uploadedBytes
+  const submitted = renderer.metrics.submittedFrames
+  source.terminal.write('\x1b[3;1H\r\nB')
+  renderer.notifyWrite()
+  clock.flushFrame()
+  expect(renderer.metrics.uploadedBytes).toBe(uploaded)
+  expect(renderer.metrics.submittedFrames).toBe(submitted + 1)
+  expect(await renderer.capturePixels()).not.toEqual(before)
+  expect([...textByRow.entries()]).toEqual([
+    [0, 'C'],
+    [1, 'A'],
+    [2, 'B'],
+  ])
+  expect(source.state.dirty).toBe(RenderStateDirty.False)
+  expect(clock.frames.size).toBe(0)
+})
+
+it('restores wrapped physical rows after context loss and a grid resize', async () => {
+  const source = await runtimeFixture(8, 3)
+  source.terminal.write('\x1b[?25lfirst\r\nsecond\r\nthird')
+  const { canvas, clock, renderer } = await rendererFixture(source)
+  clock.flushFrame()
+  for (const text of ['fourth', 'fifth']) {
+    source.terminal.write(`\x1b[3;1H\r\n${text}`)
+    renderer.notifyWrite()
+    clock.flushFrame()
+  }
+  const before = await renderer.capturePixels()
+  const gl = canvas.getContext('webgl2')!
+  const extension = gl.getExtension('WEBGL_lose_context')!
+  const lost = new Promise((resolve) =>
+    canvas.addEventListener('webglcontextlost', resolve, { once: true }),
+  )
+  extension.loseContext()
+  await lost
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
+  const restored = new Promise((resolve) =>
+    canvas.addEventListener('webglcontextrestored', resolve, { once: true }),
+  )
+  extension.restoreContext()
+  await restored
+  flushPendingFrames(clock)
+  expect(await renderer.capturePixels()).toEqual(before)
+  source.terminal.resize({ columns: 9, rows: 3 })
+  renderer.resize({ columns: 9, rows: 3 })
+  const resized = await renderer.capturePixels()
+  const cellWidth = fittedFont().deviceCellWidth
+  for (let y = 0; y < canvas.height; y += 1) {
+    expect(resized.subarray(y * 9 * cellWidth * 4, (y * 9 + 8) * cellWidth * 4)).toEqual(
+      before.subarray(y * 8 * cellWidth * 4, (y + 1) * 8 * cellWidth * 4),
+    )
+  }
+  expect(gl.getError()).toBe(gl.NO_ERROR)
+})
