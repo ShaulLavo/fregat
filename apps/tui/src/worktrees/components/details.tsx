@@ -1,3 +1,4 @@
+import { finalize } from '@/utils/finalize'
 import { useStore } from 'zustand'
 import { useEffect, useState } from 'react'
 import { errorStringField } from '@workspace/contracts'
@@ -80,13 +81,18 @@ export function WorktreeDetails({
     if (!onOpenWorkbench || pending) return
     setOpening(true)
     setOpenError(null)
-    try {
-      await onOpenWorkbench(worktree.path)
-    } catch (error) {
-      setOpenError(errorStringField(error, 'message') ?? 'The checkout could not be opened.')
-    } finally {
-      setOpening(false)
-    }
+    return await finalize(
+      async () => {
+        try {
+          await onOpenWorkbench(worktree.path)
+        } catch (error) {
+          setOpenError(errorStringField(error, 'message') ?? 'The checkout could not be opened.')
+        }
+      },
+      () => {
+        setOpening(false)
+      },
+    )
   }
   useCommandFocus(
     {
