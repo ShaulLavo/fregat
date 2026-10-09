@@ -151,6 +151,7 @@
     "spellcheck.words",
     "terminal.integrated.cursorBlinking",
     "terminal.integrated.fontSize",
+    "terminal.integrated.screenReader",
     "terminal.integrated.scrollback",
     "terminal.shellKeys",
     "tui.theme.colors",

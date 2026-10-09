@@ -106,6 +106,7 @@ const MIRRORED_KEYS = [
   'search.quickOpenLimit',
   'search.wholeWord',
   'server.activationTimeoutSeconds',
+  'terminal.integrated.screenReader',
   'terminal.integrated.fontSize',
   'terminal.integrated.cursorBlinking',
   'terminal.integrated.scrollback',

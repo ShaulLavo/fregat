@@ -83,6 +83,7 @@ export function TerminalPanel({
   const cursorBlink = useSettingValue('terminal.integrated.cursorBlinking')
   const fontSize = useSettingValue('terminal.integrated.fontSize')
   const fontFamily = fontStack(useSettingValue('editor.fontFamily'), 'code')
+  const screenReader = useSettingValue('terminal.integrated.screenReader')
   const scrollback = useSettingValue('terminal.integrated.scrollback')
   const contextMenu = useContextMenu()
   const terminalActions = useTerminalActions({ rootPath, terminalId: sessionId })
@@ -160,6 +161,7 @@ export function TerminalPanel({
       applyTerminalAppearance(terminal, { cursorBlink, fontFamily, fontSize })
       applyTerminalCursorOptions(terminal, terminalCursorOptions(terminalFocused, cursorBlink))
       applyTerminalTheme(terminal, terminalColors)
+      terminal.setAccessibilityEnabled(screenReader)
       registerTerminalLinks(terminal)
     },
   )
@@ -242,6 +244,10 @@ export function TerminalPanel({
   useEffect(() => {
     applyTerminalAppearance(terminalRef.current, { cursorBlink, fontFamily, fontSize })
   }, [cursorBlink, fontFamily, fontSize])
+
+  useEffect(() => {
+    terminalRef.current?.setAccessibilityEnabled(screenReader)
+  }, [screenReader])
 
   // Keyed on the content hash, not the mode: a dark-to-dark palette change repaints the ANSI
   // table without a remount, and the same colors arriving as a fresh object repaint nothing.
