@@ -34,7 +34,8 @@ export function useFilePickerSession(value: PickedFsEntry | null) {
   const [selectedEntry, setSelectedEntry] = useState<FsEntry | null>(value)
   const [columnWidths, setColumnWidths] = useState(NO_COLUMN_WIDTHS)
 
-  const initializeOpenSession = (info: ServerInfo) => {
+  /** `preselect` selects the picked value in the folder it opens in. */
+  const initializeOpenSession = (info: ServerInfo, preselect = true) => {
     if (isInitialized) return
 
     setIsInitialized(true)
@@ -46,7 +47,7 @@ export function useFilePickerSession(value: PickedFsEntry | null) {
       openedPath,
     })
     setQuery('')
-    setSelectedEntry(value)
+    setSelectedEntry(preselect ? value : null)
   }
 
   const resetOpenSession = () => {

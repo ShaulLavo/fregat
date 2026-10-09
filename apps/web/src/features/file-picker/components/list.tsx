@@ -59,7 +59,10 @@ export function FileList({
   const virtualRef = useRef<VirtualListHandle>(null)
   const lastScrollAt = useRef(Number.NEGATIVE_INFINITY)
   const statusId = useId()
-  const rows = fileListRows(entries, isSearching, recents)
+  const showLoading = loadState.status === 'loading' && entries.length === 0
+  // The loading and error overlays are see-through, so no row may sit under them.
+  const rows =
+    showLoading || loadState.status === 'error' ? [] : fileListRows(entries, isSearching, recents)
   const setSize = rows.filter((row) => row.kind === 'entry').length
   const { revealEntry, selectEntry } = useFilePickerSessionActions()
   // A recent folder can also be listed below it; the row last moved to keeps the highlight.
@@ -100,7 +103,6 @@ export function FileList({
       onEntryDoubleClick(row.entry)
     },
   })
-  const showLoading = loadState.status === 'loading' && entries.length === 0
   const showError = !showLoading && loadState.status === 'error'
   // With recent folders above it, an empty folder says so in its section label.
   const showEmpty = !showLoading && !showError && rows.length === 0

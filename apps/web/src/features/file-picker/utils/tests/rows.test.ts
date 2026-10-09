@@ -2,7 +2,11 @@ import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FsEntry } from '@/lib/file-system-types'
 import { expect, test } from '../../../../../test/fixtures'
 
-import { fileListRows, LEADING_RECENT_LIMIT } from '@/features/file-picker/utils/rows'
+import {
+  fileListRows,
+  LEADING_RECENT_LIMIT,
+  leadingRecentEntries,
+} from '@/features/file-picker/utils/rows'
 
 const folder = (path: string): FsEntry => ({
   birthtimeMs: 0,
@@ -41,10 +45,8 @@ test('caps the recent folders above a folder', () => {
   const recents = Array.from({ length: LEADING_RECENT_LIMIT + 3 }, (_, index) =>
     folder(`/recent/${index}`),
   )
-  const rows = fileListRows([folder('/home/me/alpha')], false, { entries: recents, folder: 'me' })
-
-  expect(rows.filter((row) => row.kind === 'entry' && row.recent)).toHaveLength(
-    LEADING_RECENT_LIMIT,
+  expect(leadingRecentEntries(recents).map((entry) => entry.path)).toEqual(
+    recents.slice(0, LEADING_RECENT_LIMIT).map((entry) => entry.path),
   )
 })
 

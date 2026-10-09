@@ -82,7 +82,8 @@ import { CompactHeader } from '@/features/file-picker/components/compact-header'
 import { CompactMenu } from '@/features/file-picker/components/compact-menu'
 import { LocationBar } from '@/features/file-picker/components/location-bar'
 import { PlacesSheet } from '@/features/file-picker/components/places-sheet'
-import { LEADING_RECENT_LIMIT } from '@/features/file-picker/utils/rows'
+import { leadingRecentEntries } from '@/features/file-picker/utils/rows'
+import { leadingListState } from '@/features/file-picker/utils/load-state'
 import { PlacesSidebar } from '@/features/file-picker/components/places-sidebar'
 import { PinFolderButton } from '@/features/file-picker/components/pin-folder-button'
 import {
@@ -144,6 +145,8 @@ export function FilePickerDialog({
   const settingsActions = useSettingsActions()
   const session = useFilePickerSession(value)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const wide = useMediaQuery(WIDE_QUERY, true)
+  const compact = useMediaQuery(COMPACT_QUERY, false)
   const listRef = useRef<HTMLDivElement>(null)
   const commitStartedRef = useRef(false)
   const [typeFilter, setTypeFilter] = useState('')
@@ -154,7 +157,12 @@ export function FilePickerDialog({
     refresh: refreshServerInfo,
     serverInfo,
     serverInfoError,
-  } = useServerInfoForOpen(open, session.initializeOpenSession, session.resetOpenSession)
+  } = useServerInfoForOpen(
+    open,
+    // A phone picker starts with nothing selected; a tap opens a folder rather than selecting it.
+    (info) => session.initializeOpenSession(info, !compact),
+    session.resetOpenSession,
+  )
   const {
     currentEntry,
     isFetching: isDirectoryFetching,
@@ -227,23 +235,20 @@ export function FilePickerDialog({
     [effectiveSort, loadedEntries],
   )
   const entries = filterPickerEntries(sortedEntries, mode, activeAccept)
-  const wide = useMediaQuery(WIDE_QUERY, true)
-  const compact = useMediaQuery(COMPACT_QUERY, false)
   // A phone leads the folder it opened in with recent folders; the Places sheet has them anywhere.
-  const leadsWithRecents = compact && !isSearching && session.currentPath === session.openedPath
-  const leadingRecents = leadsWithRecents
-    ? filterPickerEntries(loadStateEntries(recentState), mode, activeAccept).slice(
-        0,
-        LEADING_RECENT_LIMIT,
-      )
-    : []
+  const leadsWithRecents =
+    compact && session.isInitialized && !isSearching && session.currentPath === session.openedPath
   // Recents and the folder appear together, so no row moves under a finger once shown.
-  const recentsPending = leadsWithRecents && recentState.status === 'loading'
-  // The picked folder is usually a recent one too; its recent row keeps the top of the list in view.
-  const selectedEntry = selectedVisibleEntry(
-    leadingRecents.length > 0 ? [...leadingRecents, ...entries] : entries,
-    session.selectedEntry,
-  )
+  const lead = leadingListState(loadState, recentState, leadsWithRecents)
+  const leadPending = lead.pending
+  const leadingRecents =
+    leadsWithRecents && !leadPending
+      ? leadingRecentEntries(filterPickerEntries(loadStateEntries(recentState), mode, activeAccept))
+      : []
+  const listEntries = leadPending ? [] : entries
+  // The rows in the order the list shows them; the keyboard walks these.
+  const shownEntries = leadingRecents.length > 0 ? [...leadingRecents, ...entries] : listEntries
+  const selectedEntry = selectedVisibleEntry(shownEntries, session.selectedEntry)
   const viewSetting = useSettingValue('files.picker.view')
   const chosenView = pickerView(viewSetting, mode)
   const [middleRef, middleWidth] = useElementWidth<HTMLDivElement>()
@@ -267,6 +272,8 @@ export function FilePickerDialog({
       ? deepestPickable(trail, mode, activeAccept)
       : toPickedEntry(focusedEntry, mode, activeAccept)
   const selectedPickable = focusedPickable ?? currentPickableEntry(currentEntry, mode)
+  // The phone's Open always takes the folder its header names; a file picker takes the tapped file.
+  const phoneTarget = mode === 'folder' ? currentPickableEntry(currentEntry, mode) : focusedPickable
   const homePath = serverInfo?.homePath ?? ROOT_PATH
   // Pins name folders on the machine being browsed, so they live in that machine's settings.
   const machine = useQueryClient()
@@ -371,7 +378,7 @@ export function FilePickerDialog({
 
   function selectByOffset(event: KeyboardEvent<HTMLElement>, offset: number) {
     event.preventDefault()
-    const nextEntry = entryByOffset(entries, selectedEntry, offset)
+    const nextEntry = entryByOffset(shownEntries, selectedEntry, offset)
     if (!nextEntry) return
 
     session.setSelectedEntry(nextEntry)
@@ -395,7 +402,7 @@ export function FilePickerDialog({
       return
     }
 
-    const candidate = focusedEntry ?? entries[0] ?? null
+    const candidate = focusedEntry ?? shownEntries[0] ?? null
     if (candidate && isDirectoryEntry(candidate) && mode === 'file') {
       event.preventDefault()
       navigateTo(candidate.path)
@@ -604,7 +611,8 @@ export function FilePickerDialog({
         className='h-full text-xs'
         onChange={handleSearchChange}
         onKeyDown={handleSearchKeyDown}
-        placeholder={copy.searchPlaceholder}
+        // The phone's Places button shares the row, so its field keeps a word that always fits.
+        placeholder={compact ? 'Search' : copy.searchPlaceholder}
         spellCheck={false}
         value={session.query}
       />
@@ -700,11 +708,11 @@ export function FilePickerDialog({
           )}
           <FileList
             accept={activeAccept}
-            entries={recentsPending ? [] : entries}
+            entries={listEntries}
             isBusy={listInteractionPending}
             isSearching={isSearching}
             listRef={listRef}
-            loadState={recentsPending ? { status: 'loading' } : loadState}
+            loadState={lead.state}
             mode={mode}
             onDirectoryIntent={guessDirectory}
             onEntryDoubleClick={handleEntryDoubleClick}
@@ -984,14 +992,14 @@ export function FilePickerDialog({
                 <Button
                   className='min-w-0 flex-1'
                   size='lg'
-                  disabled={!selectedPickable}
-                  onClick={chooseSelected}
-                  title={selectedPickable ? displayPath(selectedPickable.path) : undefined}
+                  disabled={!phoneTarget}
+                  onClick={() => {
+                    if (phoneTarget) commitPick(phoneTarget)
+                  }}
+                  title={phoneTarget ? displayPath(phoneTarget.path) : undefined}
                   type='button'
                 >
-                  <span className='truncate'>
-                    {selectedPickable ? `Choose ${selectedPickable.name}` : copy.noSelectionLabel}
-                  </span>
+                  {copy.chooseLabel}
                 </Button>
               </DialogFooter>
             ) : (

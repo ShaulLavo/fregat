@@ -7,7 +7,6 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@workspace/ui/components/popover'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { useState } from 'react'
 
 import type { FsEntry } from '@/lib/file-system-types'
@@ -58,20 +57,15 @@ export function PlacesSheet({
       }
     />
   ) : (
-    <Tooltip>
+    <IconTooltip label='Places'>
       <PopoverTrigger
         render={
-          <TooltipTrigger
-            render={
-              <Button aria-label='Places' size='icon-sm' type='button' variant='ghost'>
-                <MapPinIcon />
-              </Button>
-            }
-          />
+          <Button aria-label='Places' size='icon-sm' type='button' variant='ghost'>
+            <MapPinIcon />
+          </Button>
         }
       />
-      <TooltipContent>Places</TooltipContent>
-    </Tooltip>
+    </IconTooltip>
   )
 
   return (

@@ -41,6 +41,11 @@ export type LeadingRecents = {
 /** Enough recent folders to reach the usual ones without pushing the folder's own rows away. */
 export const LEADING_RECENT_LIMIT = 5
 
+/** The recent folders that lead a folder's rows, newest first. */
+export function leadingRecentEntries(recents: readonly FsEntry[]) {
+  return recents.slice(0, LEADING_RECENT_LIMIT)
+}
+
 export function fileListRows(
   entries: readonly FsEntry[],
   isSearching: boolean,
@@ -48,7 +53,7 @@ export function fileListRows(
 ): FileListRow[] {
   if (isSearching && entries.some(hasSearchScope)) return searchRows(entries)
 
-  const leading = isSearching ? [] : (recents?.entries.slice(0, LEADING_RECENT_LIMIT) ?? [])
+  const leading = isSearching ? [] : (recents?.entries ?? [])
   const folderRows = entries.map((entry, index): FileListRow => ({
     kind: 'entry',
     key: entry.path,

@@ -69,9 +69,30 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>, 
     })
     ok(response.ok(), `Recording a recent folder answered ${response.status()}`)
   }
+  // A slow folder read: the recents answer first, and must not show before the folder does.
+  let releaseFolder = () => {}
+  const folderHeld = new Promise<void>((resolve) => {
+    releaseFolder = resolve
+  })
+  await page.route('**/fs/tree?**', async (route) => {
+    await folderHeld
+    await route.fallback()
+  })
   await page.getByRole('button', { name: 'Add project', exact: true }).click()
   const dialog = selectors.pickerDialog(page)
   await dialog.waitFor()
+  await page.getByRole('status', { name: 'Loading folder' }).waitFor({ timeout: 20_000 })
+  await page.waitForTimeout(800)
+  ok(
+    (await selectors.pickerList(page).getByRole('option').count()) === 0,
+    'No row shows while the opened folder loads',
+  )
+  ok(
+    !(await selectors.pickerList(page).innerText()).toLowerCase().includes('recent'),
+    'Recent folders wait for the folder they lead',
+  )
+  releaseFolder()
+  await page.unroute('**/fs/tree?**')
   await recentsAndPlaces(page, step, fixture)
   // Opened on a small folder: this machine's root and home listings are not under test.
   // The folder name in the bar is where a path is typed, as a phone's Files app does.
@@ -97,16 +118,14 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>, 
   await page
     .getByRole('button', { name: `Go to folder, now ${fixture}/alpha`, exact: true })
     .waitFor({ timeout: 10_000 })
-  await page.getByRole('button', { name: 'Choose alpha', exact: true }).waitFor()
+  await expectOpenNames(page, `${fixture}/alpha`)
   await step('picker-tapped-folder')
   await page.getByRole('button', { name: 'More folder actions', exact: true }).click()
   await page.getByRole('menuitemradio', { name: 'Newest first' }).waitFor()
   await step('picker-menu')
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Up one folder', exact: true }).click()
-  await page
-    .getByRole('button', { name: `Choose ${path.basename(fixture)}`, exact: true })
-    .waitFor()
+  await expectOpenNames(page, fixture)
   // A folder picker lists folders only.
   ok(
     (await list.getByRole('option', { name: /^notes\.md/ }).count()) === 0,
@@ -168,6 +187,11 @@ async function recentsAndPlaces(
   const first = list.getByRole('option').first()
   await first.waitFor({ timeout: 20_000 })
   const opened = await openedFolder(page)
+  await expectOpenNames(page, opened)
+  ok(
+    (await list.locator('[aria-selected="true"]').count()) === 0,
+    'Nothing is selected until a tap',
+  )
   ok(
     (await first.textContent())?.trim().startsWith('alpha'),
     `The first row is the newest recent folder: ${await first.textContent()}`,
@@ -233,6 +257,15 @@ async function recentsAndPlaces(
     .getByRole('button', { name: `Go to folder, now ${opened}`, exact: true })
     .waitFor({ timeout: 10_000 })
   await page.emulateMedia({ colorScheme: null })
+}
+
+/** The phone's Open button opens the folder the header names, whatever is selected. */
+async function expectOpenNames(page: Page, folder: string) {
+  await selectors
+    .pickerDialog(page)
+    .getByRole('button', { name: 'Open', exact: true })
+    .and(page.locator(`[title="${folder}"]`))
+    .waitFor({ timeout: 10_000 })
 }
 
 async function openedFolder(page: Page) {
