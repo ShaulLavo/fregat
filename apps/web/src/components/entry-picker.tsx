@@ -13,14 +13,7 @@ import { runMutation } from '@/lib/mutations/run'
 import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
 import { toastError } from '@/lib/toast-error'
 
-export function EntryPicker({
-  accept,
-  mode = 'folder',
-  open,
-  value,
-  onOpenChange,
-  onPick,
-}: UsePickEntryOptions) {
+export function EntryPicker({ open, value, onOpenChange, onPick }: UsePickEntryOptions) {
   const queryClient = useQueryClient()
   const client = clientForQueryClient(queryClient)
   const capabilities = useQuery({ ...nativePickerCapabilitiesOptions(client), enabled: open })
@@ -57,7 +50,7 @@ export function EntryPicker({
     queueMicrotask(() => {
       if (controller.signal.aborted) return
       void runMutation(queryClient, nativeSelectionOptions(queryClient), {
-        request: { accept, mode, startingPath },
+        request: { mode: 'folder', startingPath },
         signal: controller.signal,
       }).then(
         (entry) => {
@@ -69,13 +62,11 @@ export function EntryPicker({
       )
     })
     return () => controller.abort()
-  }, [accept, mode, native, open, queryClient, startingPath])
+  }, [native, open, queryClient, startingPath])
 
   if (!open || native || (capabilities.isPending && !fallback)) return null
   return (
     <DeferredFilePickerDialog
-      accept={accept}
-      mode={mode}
       onOpenChange={onOpenChange}
       onPick={onPick}
       open={open}

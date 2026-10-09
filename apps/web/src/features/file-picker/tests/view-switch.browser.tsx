@@ -8,16 +8,15 @@ import { renderWithProviders } from '../../../../test/render'
 
 afterEach(cleanup)
 
-test('switching views keeps the entry selected in the deepest column', async () => {
+test('switching views keeps the folder selected in the deepest column', async () => {
   await page.viewport(1440, 1000)
   renderWithProviders(
     <FilePickerDialog
       open
-      mode='file'
       value={{
-        name: 'editor-tab-a.ts',
-        path: filesystemPath('picker/editor-tab-a.ts'),
-        type: 'file',
+        name: 'picker-nested',
+        path: filesystemPath('picker/picker-nested'),
+        type: 'directory',
         size: 0,
         mtimeMs: 0,
         birthtimeMs: 0,
@@ -29,16 +28,16 @@ test('switching views keeps the entry selected in the deepest column', async () 
   )
   await page.getByRole('tab', { name: 'Columns', exact: true }).click()
   await page.getByRole('option', { name: /picker-nested/ }).click()
-  await page.getByRole('option', { name: 'note.md' }).click()
+  await page.getByRole('option', { name: 'deeper' }).click()
 
   await page.getByRole('tab', { name: 'List', exact: true }).click()
   await waitFor(() =>
-    expect(screen.getByRole('option', { name: /note\.md/, selected: true })).toBeVisible(),
+    expect(screen.getByRole('option', { name: /deeper/, selected: true })).toBeVisible(),
   )
   expect(screen.queryByRole('option', { name: /picker-nested/, selected: true })).toBeNull()
 
   await page.getByRole('tab', { name: 'Columns', exact: true }).click()
   await waitFor(() =>
-    expect(screen.getByRole('option', { name: 'note.md', selected: true })).toBeVisible(),
+    expect(screen.getByRole('option', { name: 'deeper', selected: true })).toBeVisible(),
   )
 })

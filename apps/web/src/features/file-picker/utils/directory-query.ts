@@ -2,7 +2,6 @@ import {
   loadDirectoryData,
   type DirectoryLoadData,
 } from '@/features/file-picker/utils/data-helpers'
-import type { FilePickerMode } from '@/features/file-picker/utils/model'
 import type { FsEntry } from '@/lib/file-system-types'
 import { filePickerKeys } from '@/lib/query-keys'
 import { queryOptions, type QueryClient, type QueryKey } from '@tanstack/react-query'
@@ -11,25 +10,22 @@ import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 export const DIRECTORY_QUERY_STALE_MS = 10_000
 
 export function directoryQueryOptions({
-  mode,
   path,
   query,
   showHidden,
 }: {
-  mode: FilePickerMode
   path: string
   query: string
   showHidden: boolean
 }) {
-  const queryKey = filePickerKeys.directory(path, query, mode, showHidden)
-  const baseQueryKey = filePickerKeys.directory(path, '', mode, showHidden)
+  const queryKey = filePickerKeys.directory(path, query, showHidden)
+  const baseQueryKey = filePickerKeys.directory(path, '', showHidden)
 
   return queryOptions<DirectoryLoadData>({
     queryFn: ({ signal, client }) =>
       loadDirectoryData(
         path,
         query,
-        mode,
         signal,
         (entries) => {
           if (signal.aborted) return

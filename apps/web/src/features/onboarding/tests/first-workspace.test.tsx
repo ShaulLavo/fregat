@@ -109,7 +109,7 @@ test('cancelling the remote folder step opens nothing and keeps the machine', as
 
   await userEvent.click(await screen.findByRole('button', { name: /^Connect a remote machine/ }))
   await userEvent.click(await screen.findByRole('button', { name: /Remote fixture/ }))
-  await screen.findByRole('listbox', { name: 'Folders and files' })
+  await screen.findByRole('listbox', { name: 'Folders' })
   await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
   // Back on the machine list, the saved machine still connected.
   await screen.findByRole('button', { name: /Remote fixture/ })

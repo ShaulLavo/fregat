@@ -154,7 +154,7 @@ async function lookupEvent(logDir: string) {
 }
 
 async function recentPaths(app: ReturnType<typeof createTestApp>) {
-  const response = await request(app, '/fs/recents?mode=folder&showHidden=true')
+  const response = await request(app, '/fs/recents?showHidden=true')
   const payload = (await response.json()) as { entries: Array<{ path: string }> }
   return payload.entries.map((entry) => entry.path)
 }

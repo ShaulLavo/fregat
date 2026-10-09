@@ -1,6 +1,4 @@
 import type { FsEntry } from '@/lib/file-system-types'
-import { isDirectoryEntry } from '@/lib/file-system-types'
-import { formatSizeLabel, type FilePickerMode } from '@/features/file-picker/utils/model'
 import type {
   FileListSortKey,
   FileListSortDirection,
@@ -115,12 +113,6 @@ export function formatFileListModified(mtimeMs: number) {
   return compactModifiedFormatter.format(new Date(mtimeMs))
 }
 
-export function fileListSizeLabel(entry: FsEntry) {
-  if (isDirectoryEntry(entry)) return '--'
-
-  return formatSizeLabel(entry)
-}
-
 export function sortButtonLabel(key: FileListSortKey, direction?: FileListSortDirection) {
   if (!direction) return `Sort by ${key}`
 
@@ -146,10 +138,4 @@ function searchResultSections(entries: readonly FsEntry[]) {
   ]
 }
 
-export function fileListGridClass(mode: FilePickerMode) {
-  if (mode === 'folder') {
-    return 'grid-cols-[minmax(0,1fr)_116px_74px] max-sm:grid-cols-1'
-  }
-
-  return 'grid-cols-[minmax(0,1fr)_80px_116px_74px] max-sm:grid-cols-[minmax(0,1fr)_68px]'
-}
+export const FILE_LIST_GRID = 'grid-cols-[minmax(0,1fr)_116px] max-sm:grid-cols-1'
