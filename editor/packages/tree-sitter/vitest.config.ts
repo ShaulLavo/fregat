@@ -1,4 +1,6 @@
+import { mkdtempSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { tmpdir } from 'node:os'
 import { dirname, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { playwright } from '@vitest/browser-playwright'
@@ -7,6 +9,7 @@ import { defineConfig } from 'vitest/config'
 const require = createRequire(import.meta.url)
 const packageDir = dirname(fileURLToPath(import.meta.url))
 const workspaceRoot = resolve(packageDir, '../..')
+const screenshotDirectory = mkdtempSync(resolve(tmpdir(), 'singapore-tree-sitter-screenshots-'))
 const languagePackageDir = resolve(packageDir, '../tree-sitter-languages')
 const servedDependencyRoots = uniqueItems(
   [
@@ -22,14 +25,21 @@ const servedDependencyRoots = uniqueItems(
 )
 
 export default defineConfig({
+  optimizeDeps: {
+    include: [
+      '@singapore-editor/core > @fregat/hotkeys > @tanstack/store',
+      '@singapore-editor/core > diff',
+    ],
+  },
   server: {
     fs: {
-      allow: [workspaceRoot, ...servedDependencyRoots],
+      allow: [workspaceRoot, screenshotDirectory, ...servedDependencyRoots],
     },
   },
   test: {
     browser: {
       headless: true,
+      screenshotDirectory,
       provider: playwright(),
       instances: [{ browser: 'chromium' }],
     },

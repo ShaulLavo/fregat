@@ -86,7 +86,7 @@ it('keeps provisional paint after a budget cancellation and retries retained ran
     expect(mountedColors(editor, prefix.length)).toEqual(paint.initial)
     expect(runtime?.canQueryRange()).toBe(true)
     expect(runtime?.getResult().projection.analysis?.kind).toBe('full')
-    await page.screenshot({ element: host, path: 'viewport-cancellation-retained.png' })
+    await page.screenshot({ element: host })
     retryEnabled = true
     const before = calls
     const recovered = await editor['syntax']['retainedSyntax']!.queryRange({
@@ -103,7 +103,7 @@ it('keeps provisional paint after a budget cancellation and retries retained ran
     await expect
       .poll(() => editor['syntax']['rangeCopyOwner']?.contributor.result.projection.analysis?.kind)
       .toBe('full')
-    await page.screenshot({ element: host, path: 'viewport-cancellation-recovered.png' })
+    await page.screenshot({ element: host })
     console.log('viewport-cancellation-recovery', JSON.stringify({ before, after: calls }))
   } finally {
     editor.dispose()
