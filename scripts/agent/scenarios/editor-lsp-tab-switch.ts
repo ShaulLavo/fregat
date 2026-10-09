@@ -1,6 +1,6 @@
 import { scratchPath } from '../paths'
 import type { Page } from 'playwright'
-import { strictEqual, ok } from 'node:assert/strict'
+import { deepStrictEqual, strictEqual, ok } from 'node:assert/strict'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Scenario } from './index'
@@ -14,6 +14,7 @@ import {
 } from '../selectors'
 
 type ProtocolMessage = {
+  connection: number
   direction: string
   method?: string
   uri?: string
@@ -50,14 +51,29 @@ export const editorLspTabSwitch: Scenario = {
       await waitForLspErrorPaint(page)
       await step('diagnostics-visible')
       const uri = `file://${fixture}/lsp-retained-error.ts`
-      const opens = messages.filter(
+      // Symbol queries use separate temporary documents; retention belongs to diagnostic lanes.
+      const editorMessages = () => {
+        const connections = new Set(
+          messages
+            .filter(
+              (message) =>
+                message.direction === 'sent' &&
+                message.method === 'textDocument/diagnostic' &&
+                message.uri === uri,
+            )
+            .map((message) => message.connection),
+        )
+        return messages.filter((message) => connections.has(message.connection))
+      }
+      const initialConnections = new Set(editorMessages().map((message) => message.connection))
+      const opens = editorMessages().filter(
         (message) => message.method === 'textDocument/didOpen' && message.uri === uri,
       ).length
       ok(opens > 0, 'the instrument observed the initial didOpen')
       await openFileFromTree(page, 'lsp-retained-other.ts')
       await step('other-tab')
       strictEqual(
-        messages.filter(
+        editorMessages().filter(
           (message) => message.method === 'textDocument/didClose' && message.uri === uri,
         ).length,
         0,
@@ -66,8 +82,13 @@ export const editorLspTabSwitch: Scenario = {
       await focusEditor(page)
       const painted = await lspErrorPainted(page)
       strictEqual(painted, true, 'diagnostics are already painted on return')
+      deepStrictEqual(
+        new Set(editorMessages().map((message) => message.connection)),
+        initialConnections,
+        'returning to the tab reuses its diagnostic connections',
+      )
       strictEqual(
-        messages.filter(
+        editorMessages().filter(
           (message) => message.method === 'textDocument/didOpen' && message.uri === uri,
         ).length,
         opens,
@@ -82,7 +103,7 @@ export const editorLspTabSwitch: Scenario = {
         .waitFor({ state: 'detached' })
       await step('tab-closed')
       ok(
-        messages.some(
+        editorMessages().some(
           (message) => message.method === 'textDocument/didClose' && message.uri === uri,
         ),
         'closing the last tab releases the LSP document',
@@ -100,16 +121,26 @@ export const editorLspTabSwitch: Scenario = {
 
 function captureProtocol(page: Page): ProtocolMessage[] {
   const messages: ProtocolMessage[] = []
+  let nextConnection = 0
   captures.set(page, messages)
   page.on('websocket', (socket) => {
     if (!socket.url().includes('/lsp')) return
-    socket.on('framesent', ({ payload }) => messages.push(protocolMessage('sent', payload)))
-    socket.on('framereceived', ({ payload }) => messages.push(protocolMessage('received', payload)))
+    const connection = nextConnection++
+    socket.on('framesent', ({ payload }) =>
+      messages.push(protocolMessage('sent', payload, connection)),
+    )
+    socket.on('framereceived', ({ payload }) =>
+      messages.push(protocolMessage('received', payload, connection)),
+    )
   })
   return messages
 }
 
-function protocolMessage(direction: string, payload: string | Buffer): ProtocolMessage {
+function protocolMessage(
+  direction: string,
+  payload: string | Buffer,
+  connection: number,
+): ProtocolMessage {
   const message = protocolRecord(JSON.parse(payload.toString()))
   const params = protocolRecord(message.params)
   const textDocument = protocolRecord(params.textDocument)
@@ -117,6 +148,7 @@ function protocolMessage(direction: string, payload: string | Buffer): ProtocolM
   const uri = textDocument.uri ?? params.uri
   const diagnostics = params.diagnostics ?? result.items
   return {
+    connection,
     direction,
     method: typeof message.method === 'string' ? message.method : undefined,
     id: typeof message.id === 'number' ? message.id : undefined,

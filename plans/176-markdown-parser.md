@@ -26,6 +26,25 @@ required future work, with streaming and rendering acceptance checks.
   source before their live-preview decorations land.
 - Method, tables and pinned versions: [docs/markdown-parser/measurements.md](../docs/markdown-parser/measurements.md).
 
+## TanStack Markdown reference, 2026-10-09
+
+[TanStack Markdown](https://tanstack.com/markdown/latest) is cloned at
+`references/tanstack-markdown`, inspected at
+[`d9b5ef7133ba514f7269cd8f29b5719cd34f5836`](https://github.com/TanStack/markdown/tree/d9b5ef7133ba514f7269cd8f29b5719cd34f5836).
+Study its [architecture](https://github.com/TanStack/markdown/blob/d9b5ef7133ba514f7269cd8f29b5719cd34f5836/docs/project/architecture.md)
+for a serializable AST shared by HTML and framework renderers, safe HTML and URL
+defaults, and separately imported rendering and highlighting adapters.
+Its [AI streaming profile](https://github.com/TanStack/markdown/blob/d9b5ef7133ba514f7269cd8f29b5719cd34f5836/docs/guides/ai-streaming.md)
+reparses accumulated text and suppresses incomplete trailing blocks. Compare that
+behavior with our chat migration and shared semantic contract in
+[the Editor and TUI consumer plan](bubli-markdown-consumer.md).
+
+The upstream syntax profile covers controlled technical content and intentionally
+omits full CommonMark and GFM conformance. Use its implementation and corpus checks
+as research for the remaining rendering work; retain this plan's selected parser
+and correctness gates. Upstream bundle and performance figures need local measurement
+before they inform a change here.
+
 ## Implementation evidence — 2026-09-28
 
 - Published `tree-sitter-md@0.1.0` from `5dd917a`; npm tarball integrity matches the verified pack.

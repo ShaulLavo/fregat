@@ -650,7 +650,9 @@
 
 /* A scroller's edge fades only while content lies past it, so the list is crisp at rest.
    A scroll timeline drives both depths, so there is no script and no scroll listener; an
-   engine without scroll timelines keeps both edges crisp. */
+   engine without scroll timelines keeps both edges crisp. Chromium keeps a finished
+   scroll-driven animation's value after its scroller stops overflowing, so the full top
+   depth comes from a hold whose range ends past the scroll end and never finishes. */
 @property --scroll-fade-top {
   syntax: '<length>';
   inherits: false;
@@ -674,12 +676,14 @@
 
   @supports (animation-timeline: scroll()) {
     animation:
-      app-scroll-fade-top linear both,
+      app-scroll-fade-top linear backwards,
+      app-scroll-fade-top-hold linear,
       app-scroll-fade-bottom linear both;
     animation-range:
       0 calc(var(--scroll-fade-size) * 4),
+      calc(var(--scroll-fade-size) * 4) calc(100% + 1px),
       calc(100% - var(--scroll-fade-size) * 4) 100%;
-    animation-timeline: scroll(self y), scroll(self y);
+    animation-timeline: scroll(self y), scroll(self y), scroll(self y);
   }
 }
 
@@ -1003,6 +1007,13 @@
     --scroll-fade-top: 0px;
   }
 
+  to {
+    --scroll-fade-top: var(--scroll-fade-size);
+  }
+}
+
+@keyframes app-scroll-fade-top-hold {
+  from,
   to {
     --scroll-fade-top: var(--scroll-fade-size);
   }

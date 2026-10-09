@@ -521,6 +521,8 @@ export const selectors = {
   pickerOptions: (page: Page) =>
     page.getByRole('listbox', { name: 'Folders', exact: true }).getByRole('option'),
   pickerGoToFolder: (page: Page) => page.getByRole('button', { name: 'Go to folder', exact: true }),
+  pickerUpOneFolder: (page: Page) =>
+    page.getByRole('button', { name: 'Up one folder', exact: true }),
   pickerFolderPath: (page: Page) => page.getByRole('textbox', { name: 'Folder path', exact: true }),
   pickerSearch: (page: Page) => page.getByRole('textbox', { name: 'Search folders', exact: true }),
   pickerEmpty: (page: Page) => page.getByText('Nothing here', { exact: true }),
@@ -1411,6 +1413,7 @@ export const selectors = {
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
   phoneTerminalCanvas: (page: Page) => page.locator('[data-phone-level="terminal"] canvas').first(),
   phoneFirstScreenSelector: '[data-phone-level="sessions"] section[aria-label="Sessions"]',
+  phoneViewportPolicy: `({virtualKeyboard:'virtualKeyboard' in navigator,resizesContent:document.querySelector('meta[name="viewport"]')?.content.includes('interactive-widget=resizes-content') ?? false})`,
   phoneLevelSelector: '[data-phone-level]',
   desktopFirstScreenSelector: '[aria-label="Window toolbar"]',
   phoneShell: (page: Page) => page.locator('[data-phone-shell]'),

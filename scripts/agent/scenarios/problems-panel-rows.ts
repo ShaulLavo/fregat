@@ -6,6 +6,7 @@ import type { Page } from 'playwright'
 
 import type { Scenario } from './index'
 import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
+import { preserveAppearance, writeUserSetting } from '../preserve-settings'
 import { focusEditor, openFileFromTree, selectors } from '../selectors'
 
 /** Two files that fail type checking as written, so nothing has to be typed into them. */
@@ -31,10 +32,13 @@ async function activeRowText(page: Page) {
 export const problemsPanelRows: Scenario = {
   name: 'problems-panel-rows',
   description:
-    'Two files with type errors in a disposable workspace: Problems is one tree with one tab stop, the arrows walk from the first file into the second, clicking a problem moves the cursor to it, and Mod+. or Fix with AI in the F8 popup hands the problem to a new chat draft.',
+    'Two files with type errors in a disposable workspace: Problems is one tree with one tab stop, the arrows walk from the first file into the second, clicking a problem moves the cursor to it, and Mod+. (VS Code keys) or Fix with AI in the F8 popup hands the problem to a new chat draft.',
   async run(page, { step }) {
     const fixture = await createFixture()
+    const restore = await preserveAppearance(page, ['keybindings.preset'])
     try {
+      // Mod+. on a problem is a VS Code preset binding; the default preset copies Zed's keys.
+      await writeUserSetting(page, 'keybindings.preset', 'vscode')
       await openFixtureWorkspace(page, fixture)
       await openFileFromTree(page, 'alpha.ts')
       await openFileFromTree(page, 'beta.ts')
@@ -98,7 +102,7 @@ export const problemsPanelRows: Scenario = {
       const composer = selectors.chatMessage(page)
       await composer.waitFor({ timeout: 15_000 })
       await page.waitForFunction(
-        (element) => (element?.textContent ?? '').includes('Investigate and fix the cause'),
+        (element) => (element?.textContent ?? '').includes('Fix this error'),
         await composer.elementHandle(),
         { timeout: 10_000 },
       )
@@ -120,12 +124,13 @@ export const problemsPanelRows: Scenario = {
       await peek.getByRole('button', { name: 'Fix with AI', exact: true }).click()
       await peek.waitFor({ state: 'detached', timeout: 10_000 })
       await page.waitForFunction(
-        (element) => (element?.textContent ?? '').includes('Investigate and fix the cause'),
+        (element) => (element?.textContent ?? '').includes('Fix this error'),
         await composer.elementHandle(),
         { timeout: 10_000 },
       )
       await step('popup-fix-with-ai-draft')
     } finally {
+      await restore()
       await releaseFixture(fixture)
     }
   },

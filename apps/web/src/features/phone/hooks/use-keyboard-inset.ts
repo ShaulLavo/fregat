@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 /**
  * iOS lays the on-screen keyboard over the page instead of resizing it, so the frame pads its
  * bottom by what the keyboard covers, and sheets sit above it. Chromium resizes the page
- * (`interactive-widget` in index.html) and this measures zero there. On the root, because sheets
+ * (the boot script's `interactive-widget` hint) and this measures zero there. On the root, because sheets
  * portal out of the frame.
  */
 export function useKeyboardInset() {
