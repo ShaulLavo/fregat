@@ -1,3 +1,5 @@
+import type { PaintedTextFrame } from '../render/painted-text-frame.js'
+import { PaintedSubmission } from './painted-submission.js'
 import type { SelectionCoordinates } from '../core/selection.js'
 import type { TerminalScrollbar } from '../core/types.js'
 import type { RendererTextFrameSnapshot } from '../render/renderer.js'
@@ -48,12 +50,14 @@ export interface TerminalSubmission {
   readonly scrollbar: Readonly<TerminalScrollbar>
   readonly snapshot: RendererTextFrameSnapshot
   readonly previousTextRows?: () => readonly TerminalSubmittedRow[]
+  readonly paintedFrame?: PaintedTextFrame
 }
 
 export function submittedFrame(
   previous: TerminalSubmittedSnapshot | undefined,
   input: TerminalSubmission,
 ): TerminalSubmittedSnapshot {
+  if (input.paintedFrame) return new PaintedSubmission(previous, input, input.paintedFrame)
   if (input.previousTextRows) return retainedSubmittedFrame(previous, input)
   const rowPatches: TerminalSubmittedRow[] = []
   const sameLayout = previous?.layout === input.layout

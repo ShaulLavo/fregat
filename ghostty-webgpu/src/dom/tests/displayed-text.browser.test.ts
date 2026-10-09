@@ -372,7 +372,10 @@ describe.each(['canvas', 'dom'] as const)('%s owned displayed-text publication',
       submittedFrame: TerminalSubmittedSnapshot
     }
     const summary = execution.submittedFrame
-    expect(Boolean(Object.getOwnPropertyDescriptor(summary, 'rows')?.get)).toBe(backend === 'dom')
+    const rowDescriptor =
+      Object.getOwnPropertyDescriptor(summary, 'rows') ??
+      Object.getOwnPropertyDescriptor(Object.getPrototypeOf(summary), 'rows')
+    expect(Boolean(rowDescriptor?.get)).toBe(backend === 'dom')
     expect(summary.rows.map((row) => row.text)).toEqual(displayed)
     expect(delivered.at(-1)!.rows).toEqual(summary.rows)
     terminal.write('\rnew pending')
@@ -406,6 +409,39 @@ describe.each(['webgl', 'webgpu'] as const)('%s logical displayed text', (backen
     await expect.poll(() => delivered.at(-1)?.rows[0]?.text).toContain('hidden two')
     expect(delivered.length).toBeGreaterThan(before)
     expect(delivered.at(-1)!.rowPatches[0]!.text).toContain('hidden two')
+    expect(errors).toEqual([])
+  })
+})
+
+describe('DOM lazy metadata submission', () => {
+  it('shares row accessors and preserves lazy accepted text through clean updates', async () => {
+    const { terminal, session, clock, errors } = await fixture('dom')
+    terminal.write('accepted text')
+    clock.flush()
+    const execution = Reflect.get(terminal, 'execution') as {
+      submittedFrame: TerminalSubmittedSnapshot
+    }
+    const saved = execution.submittedFrame
+    expect(Object.getOwnPropertyDescriptor(saved, 'rows')).toBeUndefined()
+    expect(Object.getOwnPropertyDescriptor(Object.getPrototypeOf(saved), 'rows')?.get).toBeDefined()
+    const frame = saved.frame
+    const revision = saved.nativeRevision
+    terminal.write('\x1b[?2004h')
+    clock.flush()
+    const clean = execution.submittedFrame
+    expect(clean.frame).toBe(frame)
+    expect(clean.nativeRevision).toBe(session.revision)
+    expect(clean.nativeRevision).toBeGreaterThan(revision)
+    expect(Object.isFrozen(clean)).toBe(true)
+    expect(terminal.submittedFrame).not.toHaveProperty('rows')
+    expect(clean.rows).toBe(saved.rows)
+    expect(clean.rowPatches).toBe(saved.rowPatches)
+    expect(saved.nativeRevision).toBe(revision)
+    const owned = JSON.stringify({ rows: saved.rows, rowPatches: saved.rowPatches })
+    terminal.write('\rnext text')
+    clock.flush()
+    expect(execution.submittedFrame.rowPatches[0]!.text).toContain('next text')
+    expect(JSON.stringify({ rows: saved.rows, rowPatches: saved.rowPatches })).toBe(owned)
     expect(errors).toEqual([])
   })
 })

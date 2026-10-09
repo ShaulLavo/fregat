@@ -47,6 +47,7 @@ import type {
 import type { TerminalElementPadding } from './elements.js'
 import type { GhosttyWebGpuRenderer, GhosttyWebGpuRendererFactory } from './types.js'
 import { submittedFrame, type TerminalSubmittedSnapshot } from './submitted-frame.js'
+import { PaintedSubmission } from './painted-submission.js'
 import { encodeTerminalViewport } from './viewport.js'
 
 interface SubmittedLayout {
@@ -473,7 +474,6 @@ export class LocalTerminalExecution {
     if (nativeFrame)
       previousTextRows = () =>
         nativeFrame.readPreviousTextRows().map((row) => Object.freeze({ y: row.y, text: row.text }))
-    if (paintedFrame) previousTextRows = () => paintedFrame.previousRows
     this.summaryValue = submittedFrame(previous, {
       nativeRevision: this.session.revision,
       snapshotVersion: this.lastFrameVersion,
@@ -491,6 +491,7 @@ export class LocalTerminalExecution {
       scrollbar: this.session.scrollbar,
       snapshot: this.lastFrame,
       previousTextRows,
+      paintedFrame,
     })
     return this.lastFrame
   }
@@ -505,6 +506,10 @@ export class LocalTerminalExecution {
       this.rendererValue.hasPendingFrame
     )
       return
+    if (summary instanceof PaintedSubmission) {
+      this.summaryValue = summary.withRevision(this.session.revision)
+      return
+    }
     if (!this.lastFrame?.nativeFrame && !this.lastFrame?.paintedFrame) {
       this.summaryValue = Object.freeze({ ...summary, nativeRevision: this.session.revision })
       return
