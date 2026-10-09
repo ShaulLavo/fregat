@@ -215,10 +215,10 @@ stays safe to read, share and export.
 
 ## Keyboard shortcuts
 
-| Setting                 | Default  | Scope       | What it does                                                                                                                                       |
-| ----------------------- | -------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `keybindings.preset`    | `"ours"` | application | The shortcuts your contextual bindings build on. Ours starts with Zed’s keys; Zed tracks its defaults; VS Code uses its editing and app shortcuts. |
-| `keybindings.overrides` | `[]`     | application | Shortcuts and the focus contexts where they apply.                                                                                                 |
+| Setting                 | Default  | Scope       | What it does                                                                                                                                                                               |
+| ----------------------- | -------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `keybindings.preset`    | `"ours"` | application | The shortcuts your contextual bindings build on. Ours starts with Zed’s keys and adds keys for Fregat’s own commands; Zed tracks its defaults; VS Code uses its editing and app shortcuts. |
+| `keybindings.overrides` | `[]`     | application | Shortcuts and the focus contexts where they apply.                                                                                                                                         |
 
 ### Details
 

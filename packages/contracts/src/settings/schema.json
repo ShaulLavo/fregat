@@ -1044,7 +1044,7 @@
     },
     "keybindings.preset": {
       "default": "ours",
-      "description": "The shortcuts your contextual bindings build on. Ours starts with Zed’s keys; Zed tracks its defaults; VS Code uses its editing and app shortcuts.",
+      "description": "The shortcuts your contextual bindings build on. Ours starts with Zed’s keys and adds keys for Fregat’s own commands; Zed tracks its defaults; VS Code uses its editing and app shortcuts.",
       "enum": ["ours", "vscode", "zed"],
       "type": "string"
     },
