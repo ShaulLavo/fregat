@@ -32,6 +32,7 @@ interface Pipeline {
   instanceBase: number
   drawable: Uint8Array
   drawInstanceCount: number
+  overhangCount: number
 }
 
 function positiveInteger(name: string, value: number): void {
@@ -275,6 +276,7 @@ export class WebGlTextPass {
       instanceBase: 0,
       drawable: new Uint8Array(this.instanceCount),
       drawInstanceCount: 0,
+      overhangCount: 0,
     }
   }
 
@@ -327,6 +329,7 @@ export class WebGlTextPass {
   private resizePipeline(pipeline: Pipeline, stride: number): void {
     pipeline.drawable = new Uint8Array(this.instanceCount)
     pipeline.drawInstanceCount = 0
+    pipeline.overhangCount = 0
     const gl = this.context
     gl.bindBuffer(gl.ARRAY_BUFFER, pipeline.buffer)
     gl.bufferData(gl.ARRAY_BUFFER, this.instanceCount * stride, gl.DYNAMIC_DRAW)
@@ -437,7 +440,14 @@ export class WebGlTextPass {
     for (let index = start; index < end; index += 1) {
       const offset = index * floats
       const drawable = Number(data[offset + 2]! > 0 && data[offset + 3]! > 0)
-      pipeline.drawable[index] = drawable
+      const overhang = Number(
+        pipeline === this.glyphs &&
+          this.rowHeight > 0 &&
+          drawable &&
+          (data[offset + 1]! < 0 || data[offset + 1]! + data[offset + 3]! > this.rowHeight),
+      )
+      pipeline.overhangCount += overhang - (pipeline.drawable[index]! >> 1)
+      pipeline.drawable[index] = drawable | (overhang << 1)
       if (drawable) pipeline.drawInstanceCount = Math.max(pipeline.drawInstanceCount, index + 1)
     }
     while (pipeline.drawInstanceCount > 0 && !pipeline.drawable[pipeline.drawInstanceCount - 1])
@@ -462,7 +472,8 @@ export class WebGlTextPass {
 
   private drawGlyphs(): number {
     const first = this.rowOffset * this.rowColumns
-    if (first === 0) return this.draw(this.glyphs)
+    // Glyphs contained by their rows cannot overlap another row across the ring split.
+    if (first === 0 || this.glyphs.overhangCount === 0) return this.draw(this.glyphs)
     const highCount = Math.max(0, this.glyphs.drawInstanceCount - first)
     const lowCount = Math.min(first, this.glyphs.drawInstanceCount)
     if (highCount + lowCount === 0) return 0

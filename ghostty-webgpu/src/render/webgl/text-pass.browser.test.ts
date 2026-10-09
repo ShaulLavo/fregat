@@ -635,6 +635,7 @@ it.each([rasterizer, overhangRasterizer])(
       '\x1b[1;1H\x1b[2K',
     ]
     for (const write of writes) {
+      const draws: number[] = []
       const pixels = grids.map((grid) => {
         grid.native.state.acknowledge()
         grid.native.terminal.write(write)
@@ -647,11 +648,56 @@ it.each([rasterizer, overhangRasterizer])(
         ).toBe(0)
         grid.pass.syncAtlas(grid.atlas.consumeUploads())
         grid.pass.uploadFrame(grid.builder, grid.builder.changedRanges())
+        draws.push(grid.pass.submit())
         return grid.pass.capturePixels()
       })
       expect(pixels[1], write).toEqual(pixels[0])
+      if (glyphRasterizer === rasterizer) expect(draws[1], write).toBe(draws[0])
     }
     expect(grids[1]!.builder.stableRows).toBe(true)
     expect(grids[1]!.gl.getError()).toBe(grids[1]!.gl.NO_ERROR)
   },
 )
+
+it('returns to one glyph draw after the last resident row overhang scrolls away', async () => {
+  const mixedRasterizer: GlyphRasterizer = {
+    rasterize(input) {
+      return input.text === 'X' ? overhangRasterizer.rasterize(input) : rasterizer.rasterize(input)
+    },
+  }
+  const grids = await Promise.all(
+    [false, true].map((stableRows) =>
+      createGrid({
+        columns: 4,
+        rows: 4,
+        renderRows: ['A', 'X', 'C', 'D'].map((text, y) =>
+          row(y, [cell(0, { text, foreground: { r: y % 2 ? 0 : 255, g: 80, b: 100 } })]),
+        ),
+        stableRows,
+        rasterizer: mixedRasterizer,
+      }),
+    ),
+  )
+  for (const [index, text] of ['E', 'F'].entries()) {
+    const draws: number[] = []
+    const pixels = grids.map((grid) => {
+      grid.native.state.acknowledge()
+      grid.native.terminal.write(`\x1b[4;1H\r\n${text}`)
+      grid.native.state.update()
+      expect(
+        buildZigFrame(grid.builder, grid.atlas, mixedRasterizer, {
+          ...grid.frameOptions,
+          full: false,
+        }),
+      ).toBe(0)
+      grid.pass.syncAtlas(grid.atlas.consumeUploads())
+      grid.pass.uploadFrame(grid.builder, grid.builder.changedRanges())
+      draws.push(grid.pass.submit())
+      return grid.pass.capturePixels()
+    })
+    expect(grids[1]!.builder.stableRows).toBe(true)
+    expect(grids[1]!.builder.rowOffset).toBeGreaterThan(0)
+    expect(pixels[1]).toEqual(pixels[0])
+    expect(draws[1]).toBe(draws[0]! + Number(index === 0))
+  }
+})
