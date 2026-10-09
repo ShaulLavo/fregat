@@ -65,6 +65,14 @@ export class PackedCells {
     return span
   }
 
+  // Private synchronous consumers own this scratch; published rows materialize independently.
+  readInto(target: RenderCell[]): readonly RenderCell[] {
+    for (let index = 0; index < this.length; index += 1)
+      target[index] = this.read(index, target[index] ?? emptyRenderCell())
+    target.length = this.length
+    return target
+  }
+
   materialize(): readonly RenderCell[] {
     return Array.from({ length: this.length }, (_, index) => this.read(index, emptyRenderCell()))
   }

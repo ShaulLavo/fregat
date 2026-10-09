@@ -141,6 +141,7 @@ describe('review failure boundaries', () => {
   })
 
   it.each([
+    { backend: 'canvas', coordinated: false, failure: 'acknowledge' },
     { backend: 'webgl', coordinated: false, failure: 'acknowledge' },
     { backend: 'webgpu', coordinated: false, failure: 'acknowledge' },
     { backend: 'webgpu', coordinated: true, failure: 'acknowledge' },
@@ -170,9 +171,13 @@ describe('review failure boundaries', () => {
       })
       cleanups.push(() => fail.mockRestore())
       terminal.write('\rpending after failure 🧑‍💻')
-      clock.flush()
+      if (backend === 'canvas') {
+        expect(() => clock.flush()).toThrow('injected acceptance failure')
+      } else {
+        clock.flush()
+      }
       expect(capture.mock.calls.length).toBeGreaterThan(captures)
-      expect(errors).toHaveLength(1)
+      expect(errors).toHaveLength(backend === 'canvas' ? 0 : 1)
       expect(terminal.submittedFrame).toEqual(accepted)
       expect(terminal.visibleLines()).toEqual(expected)
       expect(terminal.frameSnapshot()?.rows.map((row) => row.text)).toEqual(expected)
@@ -285,36 +290,42 @@ describe('review failure boundaries', () => {
     expect(terminal.visibleLines()[0]).toContain('from listener')
   })
 
-  it('keeps public renderer onTextFrame snapshots owned after the next capture', async () => {
-    const frames: RendererTextFrameSnapshot[] = []
-    const { terminal, clock } = await fixture('webgl', false, false, frames)
-    terminal.write('held')
-    clock.flush()
-    const held = frames.at(-1)!
-    const text = held.rows.map((row) => row.text)
-    terminal.write('\rnew')
-    clock.flush()
-    expect(held.rows.map((row) => row.text)).toEqual(text)
-    terminal.dispose()
-    expect(held.rows.map((row) => row.text)).toEqual(text)
-  })
+  it.each(['canvas', 'webgl'] as const)(
+    'keeps %s public renderer onTextFrame snapshots owned after the next capture',
+    async (backend) => {
+      const frames: RendererTextFrameSnapshot[] = []
+      const { terminal, clock } = await fixture(backend, false, false, frames)
+      terminal.write('held')
+      clock.flush()
+      const held = frames.at(-1)!
+      const text = held.rows.map((row) => row.text)
+      terminal.write('\rnew')
+      clock.flush()
+      expect(held.rows.map((row) => row.text)).toEqual(text)
+      terminal.dispose()
+      expect(held.rows.map((row) => row.text)).toEqual(text)
+    },
+  )
 
-  it('keeps public renderer text snapshots cloneable without public native tokens', async () => {
-    const frames: RendererTextFrameSnapshot[] = []
-    const { terminal, session, clock } = await fixture('webgl', false, false, frames)
-    terminal.write('held')
-    clock.flush()
-    const frame = frames.at(-1)!
-    expect(() => structuredClone(frame)).not.toThrow()
-    expect(frame).not.toHaveProperty('nativeFrame')
-    expect(frame).not.toHaveProperty('previousTextRows')
-    expect(session.renderState).not.toHaveProperty('retainDisplayedFrame')
-  })
+  it.each(['canvas', 'webgl'] as const)(
+    'keeps %s public renderer text snapshots cloneable without public native tokens',
+    async (backend) => {
+      const frames: RendererTextFrameSnapshot[] = []
+      const { terminal, session, clock } = await fixture(backend, false, false, frames)
+      terminal.write('held')
+      clock.flush()
+      const frame = frames.at(-1)!
+      expect(() => structuredClone(frame)).not.toThrow()
+      expect(frame).not.toHaveProperty('nativeFrame')
+      expect(frame).not.toHaveProperty('previousTextRows')
+      expect(session.renderState).not.toHaveProperty('retainDisplayedFrame')
+    },
+  )
 })
 
 describe('review text publication reentrancy and device recovery', () => {
   it('keeps accessibility on the newest frame after a reentrant WebGPU layout update', async () => {
-    const { terminal, session, clock, host, errors } = await fixture('webgpu', true)
+    const { terminal, clock, host, errors } = await fixture('webgpu', true)
     terminal.write('row one\r\nrow two\r\nrow three\r\nrow four')
     clock.flush()
     let once = true
