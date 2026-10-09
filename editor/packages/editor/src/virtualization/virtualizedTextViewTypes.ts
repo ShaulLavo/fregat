@@ -74,8 +74,6 @@ export type VirtualizedTextViewOptions = {
   readonly rowGap?: number
   readonly overscan?: number
   readonly scrollMode?: VirtualizedTextViewScrollMode
-  /** Native scroll extent in CSS pixels. Supplied text metrics use 16,000,000 by default; other views measure the browser limit. */
-  readonly maxScrollHeight?: number
   readonly rowPositioning?: VirtualizedTextViewRowPositioning
   readonly className?: string
   readonly gutterWidth?: number | ((context: EditorGutterWidthContext) => number)

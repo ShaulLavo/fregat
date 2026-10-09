@@ -54,39 +54,59 @@ it.each(['virtualized', 'static'] as const)(
   60_000,
 )
 
-it.each(['virtualized', 'static'] as const)(
-  'uses an embedder-supplied native extent after starting in %s mode',
-  async (initialMode) => {
+it.each([
+  ['virtualized', 'load'],
+  ['static', 'load'],
+  ['virtualized', 'grow'],
+  ['virtualized', 'show'],
+] as const)(
+  'discovers the supplied-metrics scroll limit from %s mode on %s',
+  async (initialMode, operation) => {
     host = document.createElement('div')
     host.style.cssText = 'width:720px;height:400px;display:flex;flex-direction:column'
+    if (operation === 'show') host.style.display = 'none'
     document.body.append(host)
     editor = new Editor(host, {
       lineHeight: 20,
       wordWrap: false,
       scrollPastEnd: false,
+      fontFamily: 'monospace',
       scrollMode: initialMode,
       textMetrics: { rowHeight: 20, characterWidth: 8 },
-      maxScrollHeight: 1_024,
     })
     editor.setScrollMode('virtualized')
-    const text = 'x\n'.repeat(1_000) + 'tail'
-    editor.setText(text)
+    if (operation === 'grow') editor.setText('x')
     await frames()
+    const lines = 500_000
+    const text = 'x\n'.repeat(lines) + 'tail'
+    editor.setText(text)
+    if (operation === 'show') host.style.display = 'flex'
+    await frames()
+    expect(host.querySelectorAll('[data-editor-virtual-row]').length).toBeLessThan(100)
     const scroller = host.querySelector<HTMLElement>('.editor-virtualized')!
     const extent = host.querySelector<HTMLElement>('.editor-virtualized-extent')!
-    expect(extent.getBoundingClientRect().height).toBe(1_024)
-    expect(Reflect.get(Element.prototype, 'scrollHeight', scroller)).toBe(1_024)
+    const nativeHeight = extent.getBoundingClientRect().height
+    expect(nativeHeight).toBeGreaterThan(0)
+    expect(nativeHeight).toBeLessThanOrEqual(10_000_020)
+    expect(Reflect.get(Element.prototype, 'scrollHeight', scroller)).toBe(nativeHeight)
+    assertNativeStickyHeight(nativeHeight, 10_000_020)
     editor.setSelection(text.length, text.length, { reveal: true })
     await frames()
-    const tail = host.querySelector<HTMLElement>('[data-editor-virtual-row="1000"]')!
+    const tail = host.querySelector<HTMLElement>(`[data-editor-virtual-row="${lines}"]`)!
+    expect(tail).not.toBeNull()
     expect(tail.textContent).toBe('tail')
     const bounds = tail.getBoundingClientRect()
     const viewport = scroller.getBoundingClientRect()
     expect(bounds.top).toBeGreaterThanOrEqual(viewport.top - 1)
     expect(bounds.bottom).toBeLessThanOrEqual(viewport.bottom + 1)
-    const hit = document.elementFromPoint(bounds.left + 4, bounds.top + 10)
+    const hit = document.elementFromPoint(bounds.left + 8, bounds.top + 10)
     expect(hit === tail || tail.contains(hit)).toBe(true)
+    editor.setSelection(0, 0, { reveal: true })
+    await frames()
+    expect(host.querySelector('[data-editor-virtual-row="0"]')).not.toBeNull()
+    expect(host.querySelectorAll('[data-editor-virtual-row]').length).toBeLessThan(100)
   },
+  60_000,
 )
 
 async function frames() {
@@ -94,7 +114,7 @@ async function frames() {
     await new Promise((resolve) => requestAnimationFrame(resolve))
 }
 
-function assertNativeStickyHeight(height: number) {
+function assertNativeStickyHeight(height: number, logicalHeight = 16_000_000) {
   const scroller = document.createElement('div')
   scroller.style.cssText = 'width:200px;height:200px;overflow:auto;scrollbar-width:none'
   const extent = document.createElement('div')
@@ -108,7 +128,7 @@ function assertNativeStickyHeight(height: number) {
     extent.style.height = '16000000px'
     scroller.scrollTop = 16_000_000
     if (sticky.getBoundingClientRect().top === scroller.getBoundingClientRect().top)
-      expect(height).toBe(16_000_000)
+      expect(height).toBe(Math.min(16_000_000, logicalHeight))
     extent.style.height = `${height}px`
     scroller.scrollTop = height
     expect(scroller.scrollHeight).toBe(height)

@@ -596,7 +596,6 @@ export class Editor {
       rowGap: options.rowGap,
       rowPositioning: options.rowPositioning,
       scrollMode: options.scrollMode,
-      maxScrollHeight: options.maxScrollHeight,
       tabSize: this.tabSize,
       textMetrics: options.textMetrics,
       inputRoute: options.inputRoute,

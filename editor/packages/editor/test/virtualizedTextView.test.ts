@@ -24,6 +24,7 @@ import {
   measureBrowserTextMetrics,
 } from '../src/virtualization/browserMetrics'
 import { type VirtualizedTextHighlightRegistry, VirtualizedTextView } from '../src/virtualization'
+import { ScrollViewport } from '../src/virtualization/scrollViewport'
 import type { VirtualizedTextViewInternal } from '../src/virtualization/virtualizedTextViewInternals'
 
 const highlightsMap = new Map<string, Highlight>()
@@ -442,33 +443,33 @@ describe('VirtualizedTextView', () => {
   })
 
   it.each(['virtualized', 'static'] as const)(
-    'uses a supplied scroll cap without probing after starting in %s mode',
+    'defers native cap discovery until supplied-metrics content scrolls from %s mode',
     (scrollMode) => {
       view.dispose()
-      const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
-      view = new VirtualizedTextView(container, {
-        highlightRegistry: mockRegistry,
-        overscan: 0,
-        scrollMode,
-        scrollPastEnd: false,
-        textMetrics: { characterWidth: 7, rowHeight: 18 },
-        maxScrollHeight: 1_024,
-      })
-      expect(rectSpy).not.toHaveBeenCalled()
-      rectSpy.mockRestore()
-
-      view.setScrollMode('virtualized')
-      view.setText(createLines(1_000))
-      view.setScrollMetrics(0, 100)
-      expect(view.getState().totalHeight).toBe(18_000)
-      expect(container.querySelector<HTMLElement>('.editor-virtualized-extent')!.style.height).toBe(
-        '1024px',
-      )
-      view.setScrollMode('static')
-      view.setScrollMode('virtualized')
-      expect(container.querySelector<HTMLElement>('.editor-virtualized-extent')!.style.height).toBe(
-        '1024px',
-      )
+      const capSpy = vi.spyOn(ScrollViewport.prototype, 'maxScrollHeight', 'get')
+      try {
+        view = new VirtualizedTextView(container, {
+          highlightRegistry: mockRegistry,
+          overscan: 0,
+          scrollMode,
+          scrollPastEnd: false,
+          textMetrics: { characterWidth: 7, rowHeight: 18 },
+        })
+        expect(capSpy).not.toHaveBeenCalled()
+        view.setScrollMetrics(0, 100)
+        view.setScrollMode('virtualized')
+        expect(capSpy).not.toHaveBeenCalled()
+        view.setText('x')
+        expect(capSpy).not.toHaveBeenCalled()
+        view.setText(createLines(1_000))
+        expect(capSpy).toHaveBeenCalledTimes(1)
+        view.setText(createLines(2_000))
+        view.setScrollMode('static')
+        view.setScrollMode('virtualized')
+        expect(capSpy).toHaveBeenCalledTimes(1)
+      } finally {
+        capSpy.mockRestore()
+      }
     },
   )
 
