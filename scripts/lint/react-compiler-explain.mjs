@@ -11,6 +11,7 @@ import { isTestFile } from './web-design-census.mjs'
 const REPOSITORY = path.resolve(import.meta.dirname, '../..')
 const DEFAULT_ROOTS = [
   'apps/web/src',
+  'apps/tui/src',
   'packages/markdown/src',
   'packages/tree/src',
   'packages/ui/src',

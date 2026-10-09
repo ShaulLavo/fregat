@@ -24,7 +24,13 @@ export async function launchTui({
   // The TUI stops its job group only when it or this launcher leads it.
   env.PLATFORM_TUI_LAUNCHER_PID = String(process.pid)
   const child = Bun.spawn({
-    cmd: [process.execPath, ...(watch ? ['--watch'] : []), entrypoint, ...args],
+    cmd: [
+      process.execPath,
+      ...(watch ? ['--watch'] : []),
+      ...(entrypoint === 'src/main.tsx' ? ['--preload', './scripts/compiler-preload.ts'] : []),
+      entrypoint,
+      ...args,
+    ],
     cwd: path.join(root, 'apps/tui'),
     env,
     stdin: 'inherit',

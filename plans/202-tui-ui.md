@@ -301,3 +301,79 @@ Current owner: [apps/tui/src/agent-rail/tests/rail.test.tsx](https://github.com/
 A passing TUI job emitted 1,498 act-warning matching lines. PR #763 fixed one rail case but 1,165 wider warnings remained; PR #771 later settled Undo/Redo selection inside act. A separate later archive Undo palette assertion expected a non-null value and got null, with no proven shared cause. Inventory the remaining warning owners and capture that assertion with its actual state transition. Keep current assertions and deadlines. This is test-settlement work in the terminal-first redesign, not a request to port web notices or dialogs.
 
 - [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+## React Compiler enablement, 2026-10-09
+
+Status: Approved. Enable compilation first, then repair the diagnostics exposed by the gate.
+
+Release builds use `Bun.build` with `target: 'bun'`, `reactCompiler: true`, and
+`reactCompilerOutputMode: 'client'`. Bun's default SSR mode removes interactive hooks.
+Development startup and Vitest compile TUI source with OXC and the OpenTUI JSX runtime.
+The root compiler census and manual-memo audit include `apps/tui/src`; TUI lint runs the
+census too. The existing compiler lint rules remain enabled. No new exceptions were added.
+
+Verification: real headless OpenTUI rendering produced the same seven terminal frames for
+uncompiled source, development compilation, and Bun client compilation. State, props,
+context, keyboard input, conditional unmount/remount, and effect cleanup passed. Five
+unrelated parent updates executed the child five times in the control and zero in both
+compiled cases. The TUI release bundle and the compiled frame regression test pass.
+This fixture result makes no claim about application speed.
+
+### Repair the compiler refusals
+
+Run from a fresh installed checkout after `bun run build:workspaces`:
+
+```sh
+bun run compiler:census
+node scripts/lint/react-compiler-census.mjs --check --root apps/tui/src --json
+bun run compiler:explain apps/tui/src/<file>.tsx
+bun run --cwd apps/tui lint
+bun run --cwd apps/tui test
+```
+
+The first narrowed census reports 31 diagnostics across 25 files: 23 classified refusals
+and 8 unclassified diagnostics. A diagnostic can appear twice across the normal and strict
+compiler passes. The new gate intentionally fails until these are repaired. OpenTUI's
+React reconciler and the compiler runtime work; these are source/compiler syntax problems,
+not renderer incompatibility. Keep refusals visible and inspect emitted output after each
+repair. Do not remove the command provider's remaining memo: its `useEffect` uses the
+binding table identity to cancel pending chords when bindings change.
+
+| Source and line                                            | Diagnostic                                                                                         |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `apps/tui/src/agent-models/components/choices.tsx:58`      | unreorderable-expression                                                                           |
+| `apps/tui/src/agent-rail/components/rail.tsx:197`          | unreorderable-expression                                                                           |
+| `apps/tui/src/agent-rail/components/rail.tsx:245`          | unreorderable-expression                                                                           |
+| `apps/tui/src/agent-stage/components/changed-files.tsx:63` | try-finally                                                                                        |
+| `apps/tui/src/agent-stage/components/changed-files.tsx:92` | try-finally                                                                                        |
+| `apps/tui/src/agent-stage/components/composer.tsx:55`      | logical-assignment                                                                                 |
+| `apps/tui/src/agent-stage/components/path-dialog.tsx:47`   | try-finally                                                                                        |
+| `apps/tui/src/agent-stage/components/stage.tsx:155`        | try-finally                                                                                        |
+| `apps/tui/src/agent-stage/components/timeline.tsx:157`     | (BuildHIR::lowerExpression) Handle ThisExpression expressions                                      |
+| `apps/tui/src/agent-stage/hooks/use-stage.ts:47`           | refs-during-render                                                                                 |
+| `apps/tui/src/agent-stage/hooks/use-stage.ts:173`          | try-finally                                                                                        |
+| `apps/tui/src/commands/components/palette.tsx:127`         | try-finally                                                                                        |
+| `apps/tui/src/commands/hooks/use-command-focus.ts:39`      | (BuildHIR::lowerExpression) Handle get functions in ObjectExpression                               |
+| `apps/tui/src/components/orbit-loader.tsx:7`               | unreorderable-expression                                                                           |
+| `apps/tui/src/components/ring-loader.tsx:7`                | unreorderable-expression                                                                           |
+| `apps/tui/src/components/shimmer.tsx:7`                    | unreorderable-expression                                                                           |
+| `apps/tui/src/components/spinner.tsx:7`                    | unreorderable-expression                                                                           |
+| `apps/tui/src/components/workspace.tsx:201`                | hoisted-function                                                                                   |
+| `apps/tui/src/git/components/diff.tsx:68`                  | (BuildHIR::lowerExpression) Handle ThisExpression expressions                                      |
+| `apps/tui/src/logs/components/pane.tsx:49`                 | [Codegen] Internal error: MethodCall::property must be an unpromoted + unmemoized MemberExpression |
+| `apps/tui/src/navigation/components/address.tsx:121`       | try-finally                                                                                        |
+| `apps/tui/src/search/components/pane.tsx:73`               | unreorderable-expression                                                                           |
+| `apps/tui/src/settings/components/editor.tsx:99`           | try-finally                                                                                        |
+| `apps/tui/src/terminal/components/view.tsx:175`            | try-finally                                                                                        |
+| `apps/tui/src/tree/components/tree.tsx:147`                | try-finally                                                                                        |
+| `apps/tui/src/tree/components/tree.tsx:177`                | (BuildHIR::lowerExpression) Handle ThisExpression expressions                                      |
+| `apps/tui/src/viewer/components/viewer.tsx:282`            | (BuildHIR::lowerExpression) Handle ThisExpression expressions                                      |
+| `apps/tui/src/viewer/components/viewer.tsx:283`            | (BuildHIR::lowerExpression) Handle ThisExpression expressions                                      |
+| `apps/tui/src/worktrees/components/details.tsx:87`         | try-finally                                                                                        |
+| `apps/tui/src/worktrees/components/picker.tsx:48`          | unreorderable-expression                                                                           |
+
+For `try-finally`, move the operation into a module-scope helper and keep the component's
+handler simple. Trace the render-ref warning to the mutable owner's lifetime. The
+`ThisExpression`, getter expression, and logs-pane code-generation diagnostics require
+small source reductions before deciding whether to restructure the source or record an
+upstream compiler bug. No upstream bugs have been confirmed or filed for these diagnostics.
