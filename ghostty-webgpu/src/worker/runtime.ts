@@ -1,3 +1,4 @@
+import { isSoftwareWebGpuAdapter } from '../render/adapter.js'
 import { LocalTerminalExecution } from '../dom/execution-local.js'
 import {
   calculateTerminalFittedFont,
@@ -290,8 +291,10 @@ export class TerminalWorkerRuntime {
   private async requestDevice(): Promise<GPUDevice> {
     this.pendingAcquisitions += 1
     try {
-      const adapter = await navigator.gpu?.requestAdapter()
+      const adapter = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' })
       if (!adapter) throw workerError('capability', 'renderer.webgpu', { adapter: false })
+      if (this.initialize.backend === 'auto' && isSoftwareWebGpuAdapter(adapter))
+        throw workerError('capability', 'renderer.webgpu', { softwareAdapter: true })
       const device = await adapter.requestDevice()
       this.acquiredDevices += 1
       return device

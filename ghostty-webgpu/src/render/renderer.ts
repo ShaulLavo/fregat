@@ -1,3 +1,4 @@
+import { isSoftwareWebGpuAdapter } from './adapter.js'
 import { FrameCoordinator } from './frame-coordinator.js'
 import { DeviceOwner, type DeviceLease } from './device-owner.js'
 import { createGhosttyError } from '../core/error.js'
@@ -155,7 +156,7 @@ export class WebGpuUnavailableError extends Error {
   }
 }
 
-async function defaultDeviceFactory(): Promise<GPUDevice> {
+async function defaultDeviceFactory(adapterPolicy: 'hardware' | 'any'): Promise<GPUDevice> {
   if (!navigator.gpu) throw new WebGpuUnavailableError('api', 'WebGPU is unavailable')
   let adapter: GPUAdapter | null
   try {
@@ -167,6 +168,12 @@ async function defaultDeviceFactory(): Promise<GPUDevice> {
   }
   if (!adapter) {
     throw new WebGpuUnavailableError('adapter', 'WebGPU requestAdapter returned null')
+  }
+  if (adapterPolicy === 'hardware' && isSoftwareWebGpuAdapter(adapter)) {
+    throw new WebGpuUnavailableError(
+      'adapter',
+      'Automatic WebGPU selection requires a hardware adapter',
+    )
   }
   try {
     return await adapter.requestDevice()
@@ -217,7 +224,9 @@ function prepareRenderer(
   return { ...validated, context: requireContext(options.canvas), format }
 }
 
-const defaultDeviceOwner = new DeviceOwner(defaultDeviceFactory)
+const defaultDeviceOwner = new DeviceOwner(() => defaultDeviceFactory('any'))
+// Automatic selection cannot borrow an explicit software device.
+const hardwareDeviceOwner = new DeviceOwner(() => defaultDeviceFactory('hardware'))
 let defaultFrameCoordinator: FrameCoordinator | undefined
 function sharedFrameCoordinator(): FrameCoordinator {
   return (defaultFrameCoordinator ??= new FrameCoordinator(browserRenderClock()))
@@ -327,11 +336,13 @@ export class WebGpuTerminalRenderer {
     }
   }
 
-  static async create(options: WebGpuTerminalRendererOptions): Promise<WebGpuTerminalRenderer> {
+  static async create(
+    options: WebGpuTerminalRendererOptions,
+    adapterPolicy: 'hardware' | 'any' = 'any',
+  ): Promise<WebGpuTerminalRenderer> {
     const validated = validateRenderer(options)
-    const owner = options.deviceFactory
-      ? new DeviceOwner(options.deviceFactory)
-      : defaultDeviceOwner
+    let owner = adapterPolicy === 'hardware' ? hardwareDeviceOwner : defaultDeviceOwner
+    if (options.deviceFactory) owner = new DeviceOwner(options.deviceFactory)
     const lease = await owner.acquire()
     let prepared: PreparedRenderer | undefined
     try {

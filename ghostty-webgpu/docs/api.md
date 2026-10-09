@@ -39,8 +39,10 @@ terminal.focus()
 await terminal.dispose()
 ```
 
-`backend` accepts `webgpu`, `webgl` or `auto`. Automatic selection checks worker GPU support
-before choosing a context. Capability failures carry `code`, `operation`, `why`, `fix` and
+`backend` accepts `webgpu`, `webgl` or `auto`. Automatic selection chooses hardware WebGPU
+when available and falls through to WebGL for software adapters. An explicit `webgpu` backend
+uses any available WebGPU adapter, including software adapters. The main-thread terminal's
+automatic renderer follows the same hardware preference. Capability failures carry `code`, `operation`, `why`, `fix` and
 runtime facts. `assets` and `workerUrl` can point at explicitly hosted native files and the
 built standalone `dist/worker/entry.js`; the defaults resolve beside the package output.
 

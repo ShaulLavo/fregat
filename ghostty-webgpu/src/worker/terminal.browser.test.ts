@@ -4,6 +4,7 @@ import { Terminal as MainTerminal, attachTerminalHotkeys } from '../../dist/inde
 import { Terminal as WorkerTerminal, TerminalWorkerError } from '../../dist/worker/index.js'
 import type { TerminalApi } from '../../dist/dom/terminal-api.js'
 import { WebGlTerminalRenderer } from '../../dist/render/webgl/renderer.js'
+import { WebGpuTerminalRenderer } from '../../dist/render/renderer.js'
 import { createDomInputController } from '../../dist/dom/input.js'
 import type {
   TerminalOutputReady,
@@ -69,6 +70,26 @@ async function create(mode: 'main' | 'webgpu' | 'webgl', enableAccessibility = f
   return terminal
 }
 
+it.each(['auto', 'webgpu'] as const)(
+  'selects the requested worker backend with a software adapter (%s)',
+  async (backend) => {
+    const terminal = await WorkerTerminal.create({
+      assets,
+      appearance: { font: { family, size: 16 }, cursor: { blink: false } },
+      backend,
+      workerUrl: new URL('./tests/software-adapter.worker.ts', import.meta.url),
+      fonts: [{ family, source: { url: fontUrl } }],
+    })
+    active.push(terminal)
+    await terminal.open(container())
+    await terminal.write('software adapter selection')
+    await eventually(
+      () => terminal.visibleLines()[0]?.includes('software adapter selection') === true,
+    )
+    expect(terminal.diagnostics.rendererBackend).toBe(backend === 'auto' ? 'webgl2' : 'webgpu')
+  },
+)
+
 it('rejects an opening reply without font metrics before inputReady', async () => {
   const inputReady = vi.fn()
   const terminal = await WorkerTerminal.create({
@@ -110,6 +131,7 @@ it('waits and destroys each public Window device once', async () => {
     const terminal = await MainTerminal.create({
       appearance: { font: { family, size: 16 }, cursor: { blink: false } },
       runtime: { kind: 'owned', options: assets },
+      rendererFactory: (options) => WebGpuTerminalRenderer.create(options),
     })
     active.push(terminal)
     await terminal.open(container())
