@@ -156,7 +156,7 @@ export function summarizeDocumentWrap(
   )
 }
 
-function summarizeMeasuredWrap(
+export function summarizeMeasuredWrap(
   measured: TextMeasurements,
   width: number,
   tabSize: number,
@@ -166,11 +166,12 @@ function summarizeMeasuredWrap(
   const ends: number[] = []
   let start = 0
   const normalizedWidth = Math.max(1, Math.floor(width))
-  while (start < measured.length) {
-    const row = measured.slice(start, Math.min(measured.length, start + normalizedWidth))
-    start += Math.max(1, row.offsetAt(normalizedWidth, 'before', tabSize, 'utf16'))
-    ends.push(start)
-  }
+  const state = { visual: 0, segmentVisual: 0, hasTabs: false }
+  measured.forEachTextChunk((text) => {
+    appendWrapEnds(text, start, normalizedWidth, tabSize, ends, state)
+    start += text.length
+  })
+  ends.push(measured.length)
   return {
     kind: 'indexed',
     length: measured.length,

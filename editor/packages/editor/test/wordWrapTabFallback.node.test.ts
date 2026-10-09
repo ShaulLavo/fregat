@@ -36,3 +36,24 @@ test.each([5, 6, 7])(
     }
   },
 )
+
+test('visits fragmented measured source ranges once when wrapping tabs', async () => {
+  const { TextMeasurements, TextSourceIndex } = await import('../src/textMeasurements')
+  const { summarizeMeasuredWrap } = await import('../src/virtualization/displayProjectionText')
+  const source = new TextSourceIndex('a'.repeat(63) + '\t')
+  let reads = 0
+  const pieces = 1024
+  const ranges = Array.from({ length: pieces }, () => ({
+    source,
+    start: 0,
+    get end() {
+      reads += 1
+      return 64
+    },
+  }))
+  const measured = new TextMeasurements(ranges)
+  reads = 0
+  const wrap = summarizeMeasuredWrap(measured, 80, 4)
+  expect(wrap.rows).toBe(820)
+  expect(reads).toBeLessThanOrEqual(pieces * 4)
+})
