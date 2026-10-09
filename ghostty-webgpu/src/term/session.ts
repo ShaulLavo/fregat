@@ -955,10 +955,11 @@ function applyInitialAppearance(terminal: GhosttyTerminal, appearance: TerminalA
 }
 
 function readScrollSnapshot(terminal: GhosttyTerminal): TerminalScrollEvent {
+  const snapshot = terminal.scrollSnapshot
   return Object.freeze({
-    scrollbackLength: terminal.scrollbackLength,
-    scrollbar: Object.freeze({ ...terminal.scrollbar }),
-    viewportActive: terminal.viewportActive,
+    scrollbackLength: snapshot.scrollbackLength,
+    scrollbar: Object.freeze(snapshot.scrollbar),
+    viewportActive: snapshot.viewportActive,
   })
 }
 

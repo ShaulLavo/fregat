@@ -158,6 +158,12 @@ export interface TerminalScrollbar {
   total: number
 }
 
+export interface TerminalScrollSnapshot {
+  readonly scrollbackLength: number
+  readonly scrollbar: Readonly<TerminalScrollbar>
+  readonly viewportActive: boolean
+}
+
 export interface TerminalColors {
   background?: RgbColor
   cursor?: RgbColor

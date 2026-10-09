@@ -716,7 +716,6 @@ export interface GhosttyWasmExports extends WebAssembly.Exports {
   ghostty_render_state_new(allocator: number, outState: number): number
   ghostty_render_state_free(state: number): void
   ghostty_render_state_update(state: number, terminal: number): number
-  ghostty_render_state_clean(state: number): number
   ghostty_render_state_get(state: number, data: number, out: number): number
   ghostty_render_state_get_multi(
     state: number,
@@ -729,7 +728,6 @@ export interface GhosttyWasmExports extends WebAssembly.Exports {
   ghostty_render_state_row_iterator_new(allocator: number, outIterator: number): number
   ghostty_render_state_row_iterator_free(iterator: number): void
   ghostty_render_state_row_iterator_next(iterator: number): number
-  ghostty_render_state_row_iterator_next_dirty(iterator: number, outY: number): number
   ghostty_render_state_row_get(iterator: number, data: number, out: number): number
   ghostty_render_state_row_set(iterator: number, option: number, value: number): number
   ghostty_render_state_row_cells_new(allocator: number, outCells: number): number

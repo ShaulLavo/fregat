@@ -49,6 +49,7 @@ export type {
   TerminalPoint,
   TerminalPointTag,
   TerminalScrollbar,
+  TerminalScrollSnapshot,
   TerminalSelectionFormatOptions,
   TerminalSize,
   WasmSource,
