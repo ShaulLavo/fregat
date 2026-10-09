@@ -164,6 +164,18 @@ A separate editor implementation agent owns this section. First add a failing te
 
 Additional required regression inputs are tabs at wrap boundaries, trailing spaces, nonbreaking spaces, CJK, combining sequences, emoji/surrogate pairs at a chunk boundary, long identifiers, link replacements, emphasis and a caret revealing Markdown marks. These are test targets, not confirmed bugs from this investigation. If one fails, record its exact text, width and row ends here and fix it under this plan. Do not open issues or leave a new wrap failure unowned.
 
+### Wrap implementation evidence
+
+- [x] Keep streamed graphemes intact across storage chunks. [PR #1098](https://github.com/ShaulLavo/fregat/pull/1098) fixes `aaa😀bb` at width 4, whose old row ends were `[4, 7]`, and `aaa ébc` at width 2, whose old ends were `[2, 4, 6, 8]`. Tests cover every chunk split, ZWJ emoji, flags and real 4,096/16,384-unit projection boundaries.
+- [x] Admit wrapped text within the measured content width. [PR #1099](https://github.com/ShaulLavo/fregat/pull/1099) measures fallback glyphs, budgets the gutter and caret, floors the column fallback and separates hanging-space scroll width from caret geometry. Before the fix, the home sample had 9/17 px extra extent at 320/390 px in iPhone-descriptor WebKit. The portable phone project passes 120 tests across Chromium and WebKit, with exact `scrollWidth === clientWidth` before and after caret reveal.
+- [x] Restart tabs on each displayed row. [PR #1104](https://github.com/ShaulLavo/fregat/pull/1104) fixes `\t a\ta aa` at width 4, whose old soft ends were `[2, 6]` and whose middle row painted five columns. [PR #1106](https://github.com/ShaulLavo/fregat/pull/1106) completes the column-only paths: `aaaaa\tb\tcdefgh\tij` at widths 5/6 had row ends `[5, 7, 10, 14, 17]`/`[5, 7, 11, 16, 17]`, painting `\tcd`/`\tcde` as six/seven columns. The projection tests include inline-map and block paths, measured and column wrapping, and deterministic edits/fold toggles.
+- [x] Wrap long Markdown link labels through row-local rendered fragments. [PR #1114](https://github.com/ShaulLavo/fregat/pull/1114) fixes the real-parser input `read [the long label with words and averylongidentifier](https://example.com) now`, whose old display ends were `[5, 55, 58]` at width 10, leaving a 49-column label. The corrected node fixture fits every row and preserves all preview text. Browser fixtures cover link destinations, keyboard-node disposal, resize, source reveal, emphasis, long inline code and padded table labels, including 320/390 px in Chromium and iPhone-descriptor WebKit. Twelve phone-engine cases pass; the existing Markdown replacement/preview suites pass 55 tests.
+- [x] Include patch changesets for core and Markdown behavior changes, with no package version edits.
+
+The width fixtures also cover fractional glyph boundaries, prose, long identifiers, CJK, URLs, package names, nonbreaking spaces, combining sequences, emoji and trailing spaces. Screenshots were read back. These checks prove live editor containment and source preservation, not static/live pixel parity.
+
+The home height numbers alone do not prove duplicate wrapped rows. Their excesses exactly match the existing `scrollPastEnd` padding: `1254 - 638 = 638 - 22`, and `946 - 484 = 484 - 22`. Content-height ownership and hidden-to-visible highlights remain with their separate implementation lane. Deleting the site's independent break policy and proving static/live parity remain Phase 3 work.
+
 ## Snapshot speed budget
 
 Treat restore speed as a landing-page requirement, separate from worker/parser startup. These are acceptance budgets, not achieved product claims:
