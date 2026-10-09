@@ -322,6 +322,8 @@ export type TreeSitterWorkerResult =
 export type TreeSitterWorkerRetentionSnapshot = {
   readonly documentCount: number
   readonly snapshotCount: number
+  /** Projection dependencies visited while disposing cached highlighting snapshots. */
+  readonly projectionCleanupVisits: number
   /** Unique generic layer Tree objects. Markdown internal trees are unavailable. */
   readonly treeCount: number
   readonly markdownDocumentEntries: number

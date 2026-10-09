@@ -275,6 +275,29 @@ them).
    and eight-million-source-unit limits; eviction of a base also releases its projections.
    The distinct request leaves highlighting and the existing `mergeUnit` contract unchanged.
 
+   Projection ownership follow-up: a new projected tree stays request-owned until every unit
+   query and the final cancellation/stale check succeeds. All other exits dispose its trees,
+   source reference and native Markdown document; a completed cached projection remains owned
+   by retention when a later request is cancelled. Replacement projections commit only after
+   success. Each base snapshot holds its own dependency set, allocated only after a successful
+   projected read. Highlighting disposal traverses that set only; ordinary documents perform
+   no projection-cache lookup or traversal. The retention diagnostic `projectionCleanupVisits`
+   counts dependencies visited during base disposal. A failing-first real-worker regression
+   with eight review sessions and six unrelated highlighting evictions changes from 48 visits
+   to zero, while disposing a review base visits exactly its one owned projection. Mid-query
+   cancellation regressions cover new and reused TypeScript/Markdown projections, resource
+   counts and source pins; an invalid-query regression proves exception cleanup.
+
+   The review-fix **experiment, shared machine** repeats complete A/B/B/A under bench-class
+   admission without quiet mode. The comparison file's `reviewFixVerification` retains all raw
+   samples and source hashes. Ordinary 8,192-record before/after medians are
+   2.191/1.715, 2.219/1.854 and 2.223/1.873 ms for 2/4/8 authors; after p95 is
+   3.579/4.115/3.721 ms. Marked before/after median/p95 is
+   801.082/903.444 versus 4.607/9.545 ms, with three bounded parses in every after sample.
+   All ordinary medians and the additional marked 8 ms median gate pass; the ordinary 2 ms
+   p95 gate remains open. This detector fixture bypasses worker transport and retention;
+   real-worker cancellation/resource and dependency-visit tests prove the ownership fixes.
+
    Differential corpus, regression and seeded detector cases compare projected results with
    cold full reparses across JavaScript, TypeScript, TSX, CSS, JSON, Markdown, Python, Rust and
    Go. They assert retained-tree serialization stays unchanged, including incremental fallback.

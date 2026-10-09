@@ -499,3 +499,201 @@ it.each(['markdown', 'mdx'])(
     }
   },
 )
+
+it.each([
+  ['typescript', false, false],
+  ['markdown', false, false],
+  ['typescript', true, false],
+  ['markdown', true, false],
+  ['typescript', true, true],
+] as const)(
+  'cleans cancelled %s projection requests while preserving completed reads (reuse: %s, expand: %s)',
+  async (languageId, reuse, expand) => {
+    const identity = { ...document, runtimeSessionId: `cancel-${languageId}`, languageId }
+    const code =
+      'const first = 1;\ninterface Body { field: string; }\nconst end = 2;\n' +
+      'const padding = 3;\n'.repeat(12)
+    const text = languageId === 'markdown' ? `# Head\n\n\`\`\`typescript\n${code}\`\`\`\n` : code
+    await parseTreeDocument(client, {
+      ...identity,
+      snapshotVersion: 1,
+      text,
+      resultMode: 'parseOnly',
+    })
+    const target = text.indexOf('field')
+    await client.mergeUnit({
+      ...identity,
+      snapshotVersion: 1,
+      range: { startIndex: 0, endIndex: 1 },
+    })
+    const prepared = await prepareTreeEdit(client, {
+      ...identity,
+      previousSnapshotVersion: 1,
+      snapshotVersion: 2,
+      edits: [{ from: target, to: target + 5, text: 'other' }],
+      resultMode: 'parseOnly',
+    })
+    const projection = {
+      ...identity,
+      baseSnapshotVersion: 1,
+      snapshotVersion: 2,
+      source: prepared!.payload.source,
+      inputEdits: prepared!.payload.inputEdits,
+      ranges: [{ startIndex: target, endIndex: target + 5 }],
+      analysis: true,
+      contentKey: true,
+    } as const
+    if (reuse) expect(await client.projectMergeUnits(projection)).toMatchObject({ status: 'ok' })
+    const flag = new SharedArrayBuffer(4)
+    const before = await client.inspectRetention()
+    const selected = expand ? text.lastIndexOf('padding') : target
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      const pending = client.projectMergeUnits({
+        ...projection,
+        ranges: Array.from({ length: 50_000 }, () => ({
+          startIndex: selected,
+          endIndex: selected + 5,
+        })),
+        analysis: true,
+        contentKey: true,
+        cancellationBuffer: flag,
+      })
+      timer = setTimeout(() => Atomics.store(new Int32Array(flag), 0, 1), 100)
+      expect(await pending).toMatchObject({ status: 'cancelled', units: [] })
+      const after = await client.inspectRetention()
+      expect(
+        after!.documents
+          .find((entry) => entry.runtimeSessionId === identity.runtimeSessionId)!
+          .snapshots.map((snapshot) => snapshot.snapshotVersion),
+      ).toEqual(reuse ? [1, 2] : [1])
+      expect(after!.treeCount).toBe(before!.treeCount)
+      expect(after!.markdownDocumentCount).toBe(before!.markdownDocumentCount)
+      expect(after!.source).toEqual(before!.source)
+    } finally {
+      clearTimeout(timer)
+      await prepared!.prepared.dispose()
+    }
+  },
+  30_000,
+)
+
+it('highlighting eviction visits only projections owned by the evicted base', async () => {
+  const text = 'interface Body { field: string; }'
+  const target = text.indexOf('field')
+  for (let session = 0; session < 8; session++) {
+    const identity = { ...document, runtimeSessionId: `review-${session}` }
+    await parseTreeDocument(client, {
+      ...identity,
+      snapshotVersion: 1,
+      text,
+      resultMode: 'parseOnly',
+    })
+    const prepared = await prepareTreeEdit(client, {
+      ...identity,
+      previousSnapshotVersion: 1,
+      snapshotVersion: 2,
+      edits: [{ from: target, to: target + 5, text: 'other' }],
+      resultMode: 'parseOnly',
+    })
+    try {
+      expect(
+        await client.projectMergeUnits({
+          ...identity,
+          baseSnapshotVersion: 1,
+          snapshotVersion: 2,
+          source: prepared!.payload.source,
+          inputEdits: prepared!.payload.inputEdits,
+          ranges: [{ startIndex: target, endIndex: target + 5 }],
+        }),
+      ).toMatchObject({ status: 'ok' })
+    } finally {
+      await prepared!.prepared.dispose()
+    }
+  }
+  const before = await client.inspectRetention()
+  const idle = { ...document, runtimeSessionId: 'highlight-only' }
+  for (let version = 1; version <= 12; version++) {
+    await parseTreeDocument(client, {
+      ...idle,
+      snapshotVersion: version,
+      text,
+      resultMode: 'parseOnly',
+    })
+  }
+  const after = await client.inspectRetention()
+  expect(after!.projectionCleanupVisits - before!.projectionCleanupVisits).toBe(0)
+  expect(after!.documents.filter((entry) => entry.runtimeSessionId.startsWith('review-'))).toEqual(
+    before!.documents,
+  )
+  for (let version = 3; version <= 9; version++) {
+    await parseTreeDocument(client, {
+      ...document,
+      runtimeSessionId: 'review-0',
+      snapshotVersion: version,
+      text,
+      resultMode: 'parseOnly',
+    })
+  }
+  const evicted = await client.inspectRetention()
+  expect(evicted!.projectionCleanupVisits - after!.projectionCleanupVisits).toBe(1)
+  expect(
+    evicted!.documents
+      .find((entry) => entry.runtimeSessionId === 'review-0')!
+      .snapshots.map((snapshot) => snapshot.snapshotVersion),
+  ).toEqual([9, 8, 7, 6, 5, 4])
+  expect(
+    evicted!.documents.filter(
+      (entry) =>
+        entry.runtimeSessionId.startsWith('review-') && entry.runtimeSessionId !== 'review-0',
+    ),
+  ).toEqual(before!.documents.slice(1))
+  client.disposeDocument('review-0')
+  await client.awaitRuntimeSessionIdle('review-0')
+  expect((await client.inspectRetention())!.projectionCleanupVisits).toBe(
+    evicted!.projectionCleanupVisits,
+  )
+})
+
+it('releases request-owned projections when a merge query throws', async () => {
+  const descriptor = await resolveTreeSitterLanguageContribution(
+    TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((entry) => entry.id === 'typescript')!,
+  )
+  await client.registerLanguages([
+    { ...descriptor, mergeUnitQuerySource: '(missing_node_type) @unit' },
+  ])
+  const text = 'interface Body { field: string; }'
+  await parseTreeDocument(client, {
+    ...document,
+    snapshotVersion: 1,
+    text,
+    resultMode: 'parseOnly',
+  })
+  const target = text.indexOf('field')
+  const prepared = await prepareTreeEdit(client, {
+    ...document,
+    previousSnapshotVersion: 1,
+    snapshotVersion: 2,
+    edits: [{ from: target, to: target + 5, text: 'other' }],
+    resultMode: 'parseOnly',
+  })
+  const before = await client.inspectRetention()
+  try {
+    await expect(
+      client.projectMergeUnits({
+        ...document,
+        baseSnapshotVersion: 1,
+        snapshotVersion: 2,
+        source: prepared!.payload.source,
+        inputEdits: prepared!.payload.inputEdits,
+        ranges: [{ startIndex: target, endIndex: target + 5 }],
+      }),
+    ).rejects.toThrow()
+    const after = await client.inspectRetention()
+    expect(after!.documents).toEqual(before!.documents)
+    expect(after!.treeCount).toBe(before!.treeCount)
+    expect(after!.source).toEqual(before!.source)
+  } finally {
+    await prepared!.prepared.dispose()
+  }
+})

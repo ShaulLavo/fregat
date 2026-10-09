@@ -106,6 +106,7 @@ type ParsedDocument = {
   markdownDefinitions?: Uint32Array
   mergeUnitTree?: Tree
   mergeUnitParents?: WeakMap<Query, Map<number, boolean>>
+  projections?: Set<ProjectedDocument>
   readonly snapshotVersion: number
   readonly languageId: TreeSitterLanguageId
   readonly source: TreeSitterPieceTableInput
@@ -117,11 +118,14 @@ type ParsedDocument = {
 }
 
 type ProjectedDocument = {
+  readonly entries: Map<number, ProjectedDocument>
+  readonly runtimeSessionId: string
   readonly base: ParsedDocument
   readonly document: ParsedDocument
   readonly parentRange?: TreeSitterSyntaxRange
 }
 const projectedDocuments = new Map<string, Map<number, ProjectedDocument>>()
+let projectionCleanupVisits = 0
 
 type BootstrapPreview = Omit<ParsedDocument, 'layers'> & {
   readonly layers: readonly [ParsedLayer]
@@ -2918,19 +2922,26 @@ const queryProjectedMergeUnits = async (
         request.baseSnapshotVersion,
       ) !== base,
   }
+  let prepared: { readonly entry: ProjectedDocument; readonly retained: boolean } | undefined
+  let committed = false
   try {
     assertNotCancelled(context)
     const runtime = await ensureRuntime(request.languageId)
     assertNotCancelled(context)
-    const projected = await projectedDocument(request, source, base, runtime, context)
+    prepared = await projectedDocument(request, source, base, runtime, context)
     assertNotCancelled(context)
-    const units = await projectedUnits(request, projected, context)
+    const units = await projectedUnits(request, prepared.entry, context)
     assertNotCancelled(context)
+    if (!prepared.retained) retainProjectedDocument(prepared.entry)
+    committed = true
     return { ...identity, status: 'ok', units }
   } catch (error) {
     if (error instanceof SyntaxRequestCancelled)
       return { ...identity, status: 'cancelled', units: [] }
     throw error
+  } finally {
+    if (prepared && !prepared.retained && !committed)
+      disposeProjectedSnapshot(prepared.entry.document)
   }
 }
 
@@ -2940,7 +2951,7 @@ const projectedDocument = async (
   base: ParsedDocument,
   runtime: Runtime,
   context: CancellationContext,
-): Promise<ProjectedDocument> => {
+): Promise<{ readonly entry: ProjectedDocument; readonly retained: boolean }> => {
   const entries =
     projectedDocuments.get(request.runtimeSessionId) ?? new Map<number, ProjectedDocument>()
   const existing = entries.get(request.snapshotVersion)
@@ -2951,11 +2962,7 @@ const projectedDocument = async (
       return range.startIndex < root.startIndex || range.endIndex > root.endIndex
     })
   if (existing && existing.base === base && existing.document.size === source.length && !expanded) {
-    return existing
-  }
-  if (existing) {
-    entries.delete(request.snapshotVersion)
-    disposeProjectedSnapshot(existing.document)
+    return { entry: existing, retained: true }
   }
   let baseTree = base.layers.find((layer) => layer.kind === 'root')?.tree ?? base.mergeUnitTree
   if (!baseTree) {
@@ -3009,11 +3016,16 @@ const projectedDocument = async (
     disposeProjectedSnapshot(document)
     throw new SyntaxRequestCancelled()
   }
-  const entry: ProjectedDocument = { base, document, parentRange: projected.parentRange }
-  entries.set(request.snapshotVersion, entry)
-  projectedDocuments.set(request.runtimeSessionId, entries)
-  evictProjectedDocuments(entries)
-  return entry
+  return {
+    entry: {
+      base,
+      document,
+      entries,
+      runtimeSessionId: request.runtimeSessionId,
+      parentRange: projected.parentRange,
+    },
+    retained: false,
+  }
 }
 
 const parseProjectedDocument = async (
@@ -3118,6 +3130,24 @@ const selectProjectedUnits = (
   return unit ? [unit] : []
 }
 
+const retainProjectedDocument = (entry: ProjectedDocument): void => {
+  const existing = entry.entries.get(entry.document.snapshotVersion)
+  if (existing) releaseProjectedDocument(existing)
+  entry.entries.set(entry.document.snapshotVersion, entry)
+  const dependencies = (entry.base.projections ??= new Set())
+  dependencies.add(entry)
+  projectedDocuments.set(entry.runtimeSessionId, entry.entries)
+  evictProjectedDocuments(entry.entries)
+}
+
+const releaseProjectedDocument = (entry: ProjectedDocument): void => {
+  entry.entries.delete(entry.document.snapshotVersion)
+  entry.base.projections!.delete(entry)
+  if (entry.base.projections!.size === 0) entry.base.projections = undefined
+  if (entry.entries.size === 0) projectedDocuments.delete(entry.runtimeSessionId)
+  disposeProjectedSnapshot(entry.document)
+}
+
 const evictProjectedDocuments = (entries: Map<number, ProjectedDocument>): void => {
   const units = () =>
     Array.from(entries.values()).reduce((sum, entry) => sum + entry.document.size, 0)
@@ -3127,18 +3157,14 @@ const evictProjectedDocuments = (entries: Map<number, ProjectedDocument>): void 
   ) {
     const oldest = entries.entries().next().value
     if (!oldest) return
-    entries.delete(oldest[0])
-    disposeProjectedSnapshot(oldest[1].document)
+    releaseProjectedDocument(oldest[1])
   }
 }
 
-const dropProjectedDocuments = (base: ParsedDocument): void => {
-  for (const entries of projectedDocuments.values()) {
-    for (const [version, entry] of entries) {
-      if (entry.base !== base) continue
-      entries.delete(version)
-      disposeProjectedSnapshot(entry.document)
-    }
+const dropProjectedDocuments = (entries: Set<ProjectedDocument>): void => {
+  for (const entry of entries) {
+    projectionCleanupVisits++
+    releaseProjectedDocument(entry)
   }
 }
 
@@ -3490,7 +3516,7 @@ const disposeLayer = (layer: ParsedLayer): void => {
 }
 
 const disposeCachedSnapshot = (snapshot: ParsedDocument): void => {
-  dropProjectedDocuments(snapshot)
+  if (snapshot.projections) dropProjectedDocuments(snapshot.projections)
   snapshot.mergeUnitTree?.delete()
   for (const layer of snapshot.layers) disposeLayer(layer)
   snapshot.source.dispose()
@@ -3922,6 +3948,7 @@ const inspectRetention = async (): Promise<{
     retention: {
       documentCount: new Set([...documentCaches.keys(), ...bootstrapDocuments.keys()]).size,
       snapshotCount: resources.snapshots.size,
+      projectionCleanupVisits,
       treeCount: resources.trees.size,
       markdownDocumentEntries: markdownDocuments.size,
       markdownDocumentCount: resources.markdown.size,
