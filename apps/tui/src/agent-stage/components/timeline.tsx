@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useKeyboard, useTerminalDimensions } from '@opentui/react'
 import type { ScrollBoxRenderable } from '@opentui/core'
 import type { ChatSession } from '@workspace/client-core/chat/types'
@@ -7,7 +7,8 @@ import { useCommandHandlers } from '@/commands/hooks/use-command-handlers'
 import { useCommands } from '@/commands/hooks/use-commands'
 import { timelineRows, groupTimelineRows } from '@/agent-stage/utils/timeline'
 import { createTimelineLayout } from '@/agent-stage/state/timeline-layout'
-import { markdownSyntax } from '@/agent-stage/utils/syntax'
+import { markdownStyles, refreshMarkdownStyles } from '@/agent-stage/utils/syntax'
+import { useSyntaxStyle } from '@/agent-stage/hooks/use-syntax-style'
 import { TimelineRow } from '@/agent-stage/components/timeline-row'
 import { OrbitLoader } from '@/components/orbit-loader'
 import type { Theme } from '@/theme/utils/theme'
@@ -33,7 +34,7 @@ export function Timeline({
   const [endId, setEndId] = useState<string | null>(null)
   const [activityMode, setActivityMode] = useState<0 | 1 | 2>(0)
   const [layout] = useState(createTimelineLayout)
-  const [syntax] = useState(() => markdownSyntax(theme))
+  const { syntax, key: syntaxKey } = useSyntaxStyle(markdownStyles(theme))
   const scroll = useRef<ScrollBoxRenderable>(null)
   const dimensions = useTerminalDimensions()
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null)
@@ -46,7 +47,9 @@ export function Timeline({
   const width = viewport?.width ?? dimensions.width
   const height = viewport?.height ?? dimensions.height - 15
   const window = layout.window(visible, width, height, endId)
-  useEffect(() => () => syntax.destroy(), [syntax])
+  useLayoutEffect(() => {
+    if (scroll.current) refreshMarkdownStyles(scroll.current)
+  }, [syntaxKey])
   function latest() {
     setEndId(null)
     scroll.current?.scrollTo(scroll.current.scrollHeight)

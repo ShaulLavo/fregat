@@ -1,6 +1,6 @@
 import type { TextareaRenderable } from '@opentui/core'
 import { useKeyboard, usePaste, useTerminalDimensions } from '@opentui/react'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import { usePaneFocus } from '@/commands/hooks/use-pane-focus'
 import { useCommandHandlers } from '@/commands/hooks/use-command-handlers'
 import { useCommands } from '@/commands/hooks/use-commands'
@@ -10,7 +10,8 @@ import type { Theme } from '@/theme/utils/theme'
 import { createPromptEditor } from '@/agent-stage/state/prompt-editor'
 import { imagePastePath, largePaste, type PromptElement } from '@/agent-stage/utils/prompt'
 import { formatTerminalContextLabel } from '@workspace/client-core/chat/terminal-context'
-import { promptSyntax } from '@/agent-stage/utils/syntax'
+import { promptStyles } from '@/agent-stage/utils/syntax'
+import { useSyntaxStyle } from '@/agent-stage/hooks/use-syntax-style'
 
 export function Composer({
   draft,
@@ -41,8 +42,7 @@ export function Composer({
   const compact = height < 20
   const input = useRef<TextareaRenderable>(null)
   const editor = useRef<ReturnType<typeof createPromptEditor> | null>(null)
-  const [syntax] = useState(() => promptSyntax(theme))
-  useEffect(() => () => syntax.destroy(), [syntax])
+  const { syntax } = useSyntaxStyle(promptStyles(theme))
   const focused = usePaneFocus({
     id: 'agent-composer',
     area: 'chat',
