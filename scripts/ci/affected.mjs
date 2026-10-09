@@ -119,6 +119,7 @@ function rootDocument(file) {
     file.startsWith('plans/') ||
     file.startsWith('docs/') ||
     (file.startsWith('.agents/') && file.endsWith('.md')) ||
+    (file.startsWith('.changeset/') && file.endsWith('.md')) ||
     (!file.includes('/') && file.endsWith('.md'))
   )
 }
@@ -191,6 +192,7 @@ function inputReaders(graph, files, changed) {
 
 export function selectAffected(graph, files, full = false) {
   const { seeds, global } = changedOwners(graph, files)
+
   for (const pkg of graph.packages.values()) {
     if (
       pkg.tasks.some(
@@ -199,10 +201,23 @@ export function selectAffected(graph, files, full = false) {
     )
       seeds.add(pkg.name)
   }
-  const affected = full || global ? new Set(graph.packages.keys()) : expandConsumers(graph, seeds)
+  const terminalOnly =
+    !full &&
+    !global &&
+    seeds.size > 0 &&
+    Array.from(seeds).every((name) =>
+      ['ghostty-webgpu', 'ghostty-webgpu-line-editor'].includes(name),
+    )
+  let affected = new Set(seeds)
+  if (full || global) affected = new Set(graph.packages.keys())
+  if (!full && !global && !terminalOnly) affected = expandConsumers(graph, seeds)
   // Check-only source readers do not change the package's produced code.
   const packages = Array.from(
-    new Set(Array.from(affected).concat(Array.from(inputReaders(graph, files, affected)))),
+    new Set(
+      Array.from(affected).concat(
+        terminalOnly ? [] : Array.from(inputReaders(graph, files, affected)),
+      ),
+    ),
   ).sort()
   const familyChanged = (family) =>
     Array.from(affected).some((name) => {
@@ -216,9 +231,11 @@ export function selectAffected(graph, files, full = false) {
     'ghostty-webgpu-site',
     '@singapore-editor/example-app',
   ].some((name) => affected.has(name))
+  const code = packages.length > 0 || files.some((file) => file.startsWith('apps/mac/'))
   return {
     exhaustive: full,
-    code: packages.length > 0 || files.some((file) => file.startsWith('apps/mac/')),
+    code,
+    shared: !terminalOnly && code,
     packages,
     web: affected.has('web'),
     server: affected.has('server'),

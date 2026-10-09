@@ -3,7 +3,9 @@ name: ghostty docs
 on:
   pull_request:
     paths:
-      - ghostty-webgpu/**
+      - ghostty-webgpu/site/**
+      - ghostty-webgpu/docs/correctness-results.json
+      - ghostty-webgpu/docs/benchmarks/**
       - hotkeys/packages/hotkeys/**
       - package.json
       - scripts/workspace-tooling.mjs
@@ -13,13 +15,17 @@ on:
   push:
     branches: [main]
     paths:
-      - ghostty-webgpu/**
+      - ghostty-webgpu/site/**
+      - ghostty-webgpu/docs/correctness-results.json
+      - ghostty-webgpu/docs/benchmarks/**
       - hotkeys/packages/hotkeys/**
       - package.json
       - scripts/workspace-tooling.mjs
       - bun.lock
       - .github/actions/setup/**
       - .github/workflows/ghostty-docs.yml
+  schedule:
+    - cron: '17 3 * * *'
   workflow_dispatch:
 
 permissions:

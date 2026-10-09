@@ -358,3 +358,7 @@ Status: Approved. The owner requested these cuts and a direct push to main.
 - Ghostty verification owns its formatting, lint and type checks; the generic package runner omits the duplicate executions.
 
 The failing-before executable check reported `Selected 48 packages for 4 Markdown files` and failed its expected-zero assertion. The updated selector reports zero. The initial adjacent run passed 149 controls; live CI and subsequent main validation supply the remaining delivery evidence.
+
+### Terminal-only CI, 2026-10-10
+
+Status: Approved. The owner requested terminal verification for PR #1208 without unrelated app suites. Its original run used the earlier broad workflow. The exact ten changed files now select Ghostty verification, its standalone packaging check and patch-note formatting. Shared repository checks and consumer app/site suites are omitted for terminal-only changes; mixed app changes and scheduled/manual full validation retain them. Markdown changesets are documentation metadata. The separate Ghostty documentation workflow triggers for site changes, shared build inputs, scheduled runs and manual runs rather than every terminal implementation edit.
