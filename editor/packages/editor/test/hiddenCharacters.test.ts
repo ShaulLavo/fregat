@@ -279,11 +279,34 @@ describe('hidden character markers', () => {
     expect(markerOffsets()).toEqual([8, 9, 11, 12, 13])
   })
 
-  it('leaves a wrapped segment that carries on below unmarked in trailing mode', () => {
+  it('marks source trailing spaces across character-wrapped segments', () => {
     const view = mountView(
       {
         hiddenCharacters: 'trailing',
         wrap: true,
+        gutterContributions: [createLineGutterContribution()],
+      },
+      'ab   cd  ',
+    )
+    mockViewport(view.scrollElement, 72, 200)
+    view.setScrollMetrics(0, 200, 72)
+
+    // Character wrap counts spaces; the caret reserve reduces this viewport to four columns.
+    expect(view.getState().mountedRows.map((row) => row.text)).toEqual(['ab  ', ' cd ', ' '])
+    expect(view.getState().mountedRows.map((row) => [row.startOffset, row.endOffset])).toEqual([
+      [0, 4],
+      [4, 8],
+      [8, 9],
+    ])
+    expect(markerOffsets()).toEqual([7, 8])
+  })
+
+  it('hangs spaces on word-wrapped rows and marks only the source line trailing spaces', () => {
+    const view = mountView(
+      {
+        hiddenCharacters: 'trailing',
+        wrap: true,
+        wrapBreak: 'word',
         gutterContributions: [createLineGutterContribution()],
       },
       'ab   cd  ',

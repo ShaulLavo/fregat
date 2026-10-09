@@ -74,6 +74,7 @@ test.each(['character', 'word'] as const)(
     const { container, editor } = await mount(wordWrapBreak)
     const scroller = container.querySelector<HTMLElement>('.editor-virtualized')!
     const edge = scroller.getBoundingClientRect().left + scroller.clientWidth
+    const textEdge = edge - glyphWidth(container, 'm')
     const painted = rows(container)
     let checked = 0
 
@@ -82,7 +83,7 @@ test.each(['character', 'word'] as const)(
       if (text.trimEnd().length === 0) continue
       const extent = textExtent(row)
       const trailing = glyphWidth(container, text.slice(text.trimEnd().length))
-      expect(extent.right - trailing).toBeLessThanOrEqual(edge + 0.5)
+      expect(extent.right - trailing).toBeLessThanOrEqual(textEdge + 0.5)
 
       const next = painted[index + 1]
       const nextText = next?.textContent ?? ''
@@ -90,8 +91,10 @@ test.each(['character', 'word'] as const)(
       if (bufferRow(editor, index + 1) !== bufferRow(editor, index)) continue
       checked += 1
       const nextUnit = wordWrapBreak === 'word' ? (nextText.match(/^\S+/)?.[0] ?? '') : nextText[0]!
-      // Early by more than the next unit means the row could have held it.
-      expect(extent.right - trailing + glyphWidth(container, nextUnit)).toBeGreaterThan(edge - 2)
+      // The character-width allowance keeps the caret inside the scrolling viewport.
+      expect(extent.right - trailing + glyphWidth(container, nextUnit)).toBeGreaterThan(
+        textEdge - 2,
+      )
     }
     expect(checked).toBeGreaterThan(3)
   },

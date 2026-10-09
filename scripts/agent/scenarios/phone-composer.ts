@@ -15,13 +15,13 @@ const usageRoute = /\/providers\/usage(\?|$)/
 
 /**
  * The phone composer with every control it can show (model, access, effort, attach, plan usage,
- * send): one line of equal squares, Send inset evenly in the corner, the empty field one line
- * tall, and each control still opens what it names.
+ * dictation, send): one line of equal squares, dictation and Send inset evenly in the corner,
+ * the empty field one line tall, and each control still opens what it names.
  */
 export const phoneComposer: Scenario = {
   name: 'phone-composer',
   description:
-    'At a touch phone viewport (320, 390, 430): the composer controls and plan gauge are one even run of equal squares after the model name, Send sits alone and evenly in the corner, the empty field is one line, every control opens, and a long draft stays clear of welcome text with the keyboard open.',
+    'At a touch phone viewport (320, 390, 430): the composer controls and plan gauge are one even run of equal squares after the model name, dictation and Send sit evenly in the corner with the same spacing, the empty field is one line, every control opens, and a long draft stays clear of welcome text with the keyboard open.',
   capture: { width: 390, height: 844, scale: 2, touch: true },
   requiresIsolatedServer: true,
   async run(page, { step }) {
@@ -209,32 +209,35 @@ async function opens(
 }
 
 /**
- * Every icon control is the same square, spaced alike in one run with the plan gauge after
- * Attach; Send alone in the corner, as far from the right edge as from the bottom.
+ * Every icon control is the same square. The model and its controls and readouts form one run
+ * from the left; dictation and Send form the corner group, spaced like the run, as far from the
+ * right edge as from the bottom and set apart from the run by the row gap.
  */
 async function expectComposerRhythm(page: Page, width: number) {
-  const layout = await selectors.composerActions(page).evaluate((row) => {
-    const surface = row.parentElement?.getBoundingClientRect()
-    const buttons = [...row.querySelectorAll('button')].filter(
-      (button) => button.getBoundingClientRect().width > 0,
-    )
-    const boxes = buttons.map((button) => {
-      const box = button.getBoundingClientRect()
-      return {
-        name: button.getAttribute('aria-label') ?? '',
-        usage: button.hasAttribute('data-usage-meter'),
-        left: box.left,
-        right: box.right,
-        top: box.top,
-        bottom: box.bottom,
-        width: box.width,
-        height: box.height,
-      }
-    })
-    const model = row.querySelector('[aria-label="Provider and model"] span.truncate')
+  const layout = await selectors.composerActions(page).evaluate((actions) => {
+    const surface = actions.parentElement?.getBoundingClientRect()
+    const groups = [...(actions.firstElementChild?.children ?? [])]
+    const measure = (group: Element | undefined) =>
+      [...(group?.querySelectorAll('button') ?? [])]
+        .filter((button) => button.getBoundingClientRect().width > 0)
+        .map((button) => {
+          const box = button.getBoundingClientRect()
+          return {
+            name: button.getAttribute('aria-label') ?? '',
+            usage: button.hasAttribute('data-usage-meter'),
+            left: box.left,
+            right: box.right,
+            top: box.top,
+            bottom: box.bottom,
+            width: box.width,
+            height: box.height,
+          }
+        })
+    const model = actions.querySelector('[aria-label="Provider and model"] span.truncate')
     const field = document.querySelector('[aria-label="Message"]')?.getBoundingClientRect()
     return {
-      boxes,
+      run: measure(groups[0]),
+      corner: measure(groups[1]),
       field: field ? { height: field.height } : null,
       modelClipped: model ? model.scrollWidth > model.clientWidth + 1 : true,
       surface: surface ? { right: surface.right, bottom: surface.bottom } : null,
@@ -242,38 +245,46 @@ async function expectComposerRhythm(page: Page, width: number) {
   })
   const label = `${width}px`
   ok(layout.surface, `${label}: the composer surface is laid out`)
-  const icons = layout.boxes.filter((box) => box.name !== 'Provider and model')
-  const send = icons.at(-1)
-  // Under a 300px row the read-only gauge gives way; the actions all stay.
-  const expected = width >= 390 ? 5 : 4
+  const boxes = [...layout.run, ...layout.corner]
+  const icons = boxes.filter((box) => box.name !== 'Provider and model')
+  const send = layout.corner.at(-1)
+  ok(send?.name === 'Send message', `${label}: Send ends the row: ${JSON.stringify(layout.corner)}`)
   ok(
-    send && icons.length >= expected,
-    `${label}: every control shows: ${JSON.stringify(layout.boxes)}`,
+    layout.corner.some((box) => box.name === 'Start dictation'),
+    `${label}: dictation sits beside Send: ${JSON.stringify(layout.corner)}`,
+  )
+  // Under a 300px row the read-only gauge gives way; the actions all stay.
+  const expected = width >= 390 ? 4 : 3
+  ok(
+    layout.run.length - 1 >= expected,
+    `${label}: every control shows: ${JSON.stringify(layout.run)}`,
   )
   for (const icon of icons)
     ok(
       Math.abs(icon.width - send.width) <= 0.5 && Math.abs(icon.height - send.height) <= 0.5,
       `${label}: "${icon.name}" is ${icon.width}×${icon.height}, Send is ${send.width}×${send.height}`,
     )
-  const middle = (box: (typeof layout.boxes)[number]) => (box.top + box.bottom) / 2
-  for (const box of layout.boxes)
+  const middle = (box: (typeof boxes)[number]) => (box.top + box.bottom) / 2
+  for (const box of boxes)
     ok(Math.abs(middle(box) - middle(send)) <= 1, `${label}: "${box.name}" leaves the line`)
-  const gaps = layout.boxes.slice(1).map((box, index) => box.left - layout.boxes[index]!.right)
-  // One run from the model through the readouts, evenly spaced; only Send stands apart.
-  const run = gaps.slice(0, -1)
+  const gapsOf = (group: typeof boxes) =>
+    group.slice(1).map((box, index) => box.left - group[index]!.right)
+  // One spacing inside the run and inside the corner group alike.
+  const inner = [...gapsOf(layout.run), ...gapsOf(layout.corner)]
   ok(
-    run.every((gap) => Math.abs(gap - run[0]!) <= 1),
-    `${label}: uneven gaps between the controls: ${run.join(', ')}`,
+    inner.every((gap) => Math.abs(gap - inner[0]!) <= 1),
+    `${label}: uneven gaps between the controls: ${gapsOf(layout.run).join(', ')} | ${gapsOf(layout.corner).join(', ')}`,
   )
+  const slack = layout.corner[0]!.left - layout.run.at(-1)!.right
+  ok(slack >= inner[0]! + 7, `${label}: the corner group sits ${slack}px from the run`)
   if (width >= 390) {
-    const attach = layout.boxes.findIndex((box) => box.name.startsWith('Attach'))
-    ok(layout.boxes[attach + 1]?.usage, `${label}: the plan gauge follows Attach`)
+    const attach = layout.run.findIndex((box) => box.name.startsWith('Attach'))
+    ok(layout.run[attach + 1]?.usage, `${label}: the plan gauge follows Attach`)
   }
   const right = layout.surface.right - send.right
   const bottom = layout.surface.bottom - send.bottom
   ok(Math.abs(right - bottom) <= 1, `${label}: Send inset ${right} beside, ${bottom} below`)
   // The model name is the one thing that gives way, and only once the row has no room left.
-  const slack = gaps.at(-1) ?? 0
   ok(!layout.modelClipped || slack <= 9, `${label}: the model name is cut off beside ${slack}px`)
   return layout.field
 }

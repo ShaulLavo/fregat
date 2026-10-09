@@ -9,7 +9,6 @@ import {
   appendSearchMatch,
   fallbackEntries,
   PICKER_HIDDEN_SEARCH_EXCLUDE_GLOBS,
-  searchEntryType,
   streamPickerSearchEntries,
   type WorkspaceSearchStream,
 } from '@/features/file-picker/state/search'
@@ -61,13 +60,6 @@ describe('fallbackEntries', () => {
   })
 })
 
-describe('searchEntryType', () => {
-  it('restricts folder mode to directories and leaves file mode unfiltered', () => {
-    expect(searchEntryType('folder')).toBe('directory')
-    expect(searchEntryType('file')).toBeUndefined()
-  })
-})
-
 describe('hidden search exclusions', () => {
   it('rejects a dot-prefixed segment at the root or below another folder', () => {
     const matcher = createWorkspaceSearchMatcher({
@@ -94,7 +86,6 @@ describe('streamPickerSearchEntries', () => {
     const result = await streamPickerSearchEntries(
       'src',
       'a',
-      'file',
       new AbortController().signal,
       (entries) => snapshots.push(entries.length),
       { search },
@@ -115,7 +106,6 @@ describe('streamPickerSearchEntries', () => {
     const result = await streamPickerSearchEntries(
       '',
       'a',
-      'file',
       new AbortController().signal,
       () => undefined,
       {
@@ -141,14 +131,10 @@ describe('streamPickerSearchEntries', () => {
       return toStream([doneEvent()])
     }
 
-    await streamPickerSearchEntries(
-      '',
-      'env',
-      'file',
-      new AbortController().signal,
-      () => undefined,
-      { search, showHidden: true },
-    )
+    await streamPickerSearchEntries('', 'env', new AbortController().signal, () => undefined, {
+      search,
+      showHidden: true,
+    })
 
     expect(observedQueries[0]?.excludeGlobs).toBeUndefined()
   })
@@ -160,7 +146,6 @@ describe('streamPickerSearchEntries', () => {
     const promise = streamPickerSearchEntries(
       'src',
       'a',
-      'file',
       controller.signal,
       () => controller.abort(),
       {
@@ -182,7 +167,7 @@ describe('streamPickerSearchEntries', () => {
     }
 
     await expect(
-      streamPickerSearchEntries('src', 'a', 'file', controller.signal, () => undefined, { search }),
+      streamPickerSearchEntries('src', 'a', controller.signal, () => undefined, { search }),
     ).rejects.toThrow('Aborted')
   })
 })

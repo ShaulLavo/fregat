@@ -744,7 +744,15 @@ export function createApp(options: AppOptions) {
     // origin is known. Mounted before every parent hook: an Elysia plugin
     // mounted after one parent `onBeforeHandle` inherits the parent's later
     // hooks too, which would put the auth guard in front of index.html.
-    .use(webRoutes(options.web ?? {}, update, terminal))
+    .use(
+      webRoutes(options.web ?? {}, update, terminal, {
+        auth,
+        settings,
+        palettes,
+        environmentId: identity.id,
+        webBase: options.system?.webBase ?? '/',
+      }),
+    )
     .use(providerUsageFeedRoutes(providerUsage))
     // Before the browser guard, which refuses the Origin-less requests agents send.
     .use(
@@ -846,6 +854,7 @@ export function createApp(options: AppOptions) {
     .use(
       attachmentRoutes({
         attachmentsDir: options.orchestration?.attachmentsDir,
+        files: fs,
         ownership: createAttachmentOwnership(database),
       }),
     )

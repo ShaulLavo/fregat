@@ -43,16 +43,6 @@ export function wallpaperStillUrl(origin: string): string | null {
   return source ? `${desktopWallpaperUrl(source)}/still` : null
 }
 
-/** `unknown` when the boot script preloaded nothing, or a different wallpaper. */
-export function wallpaperPreloadState(source: string): 'pending' | 'ready' | 'error' | 'unknown' {
-  if (typeof window === 'undefined') return 'unknown'
-
-  const preload = window.platformBootWallpaper
-  if (preload?.href !== new URL(source, document.baseURI).href) return 'unknown'
-
-  return preload.status
-}
-
 async function fetchWallpaperKind(origin: string): Promise<WallpaperMediaKind> {
   const source = wallpaperSource(origin)
   if (!source) return 'image'

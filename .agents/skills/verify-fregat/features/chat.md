@@ -90,6 +90,7 @@ Commands dispatch over the orchestration socket when it is live and over HTTP ot
 - `session-titles`: isolated native provider JSON title generation, regeneration, delayed-result/manual rename race, reload, visible invalid-output failure and retry. Restores only its project title-model override and removes its provider/session/processes.
 
 - `file-attachments`: user upload, reload draft recovery, native provider file bytes, transcript text preview and exact download; isolated fixture and settings cleanup.
+- `machine-file-attach` and `phone-machine-file-attach`: the attach menu's "From <machine>…" opens the in-app picker in the project; two files from two folders attach ready to send, at desktop and touch phone viewports. The desktop run also reports a verified local desktop through `/system/capabilities` and checks that the offer is gone.
 
 - `chat-stash-context`: image-only stash, complete image/file draft swap, reload recovery with a decoded staged thumbnail, isolated native file delivery and retention of the separate draft. Terminal-context pairing has a focused store/composer check; this scenario does not simulate terminal selection.
 - `chat-claude-catalog`: the Claude list read from the running CLI — current models with Fable 5.1 first, retired ones under the collapsible Legacy row, Opus 5.5 options with the Fast mode switch, its bolt on the trigger, a level description tooltip and 1M, Fable 5.1 without Fast. Restores the project default model.

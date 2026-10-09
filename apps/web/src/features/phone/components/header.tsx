@@ -23,10 +23,11 @@ export function Header({
       <BackButton />
       <div className='flex min-w-0 flex-1 flex-col justify-center' title={fullTitle}>
         <h1 className='truncate text-xs font-medium'>{title}</h1>
-        {/* A flex row, so a chip keeps its own width and text still truncates. */}
+        {/* A flex row, so a chip keeps its own width and text still truncates. Bare text gets a
+            span: a text node is no element for the row's truncation to reach. */}
         {detail ? (
           <div className='text-muted-foreground text-2xs flex min-w-0 [&>*]:min-w-0 [&>*]:truncate'>
-            {detail}
+            {typeof detail === 'string' ? <span>{detail}</span> : detail}
           </div>
         ) : null}
       </div>

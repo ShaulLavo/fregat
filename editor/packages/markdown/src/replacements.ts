@@ -58,18 +58,20 @@ function preserveTableWidths(
       ...spec,
       text: spec.text + padding,
       className: 'editor-markdown-text',
-      render: paddedRender(render, spec.text, padding),
+      render: paddedRender(render, spec.text.length),
     }
   })
 }
 
 function paddedRender(
   render: InlineReplacementSpec['render'],
-  text: string,
-  padding: string,
+  textLength: number,
 ): InlineReplacementSpec['render'] {
-  return (container) => {
-    const disposable = render?.(container)
+  return (container, displayText, displayStart) => {
+    const labelLength = Math.max(0, Math.min(displayText.length, textLength - displayStart))
+    const text = displayText.slice(0, labelLength)
+    const padding = displayText.slice(labelLength)
+    const disposable = labelLength > 0 ? render?.(container, text, displayStart) : undefined
     if (!render) container.append(text)
     const spacer = container.ownerDocument.createElement('span')
     spacer.className = 'editor-markdown-padding'

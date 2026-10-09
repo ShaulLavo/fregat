@@ -10,6 +10,7 @@ import { settingsPageQueryOptions } from '@/features/settings/utils/page-query'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { BUNDLED_THEMES, resolveThemeSettings } from '@workspace/contracts'
 import { wallpaperPng } from '../../../test/factories/wallpaper'
+import { installHtmlBootstrap } from '../../../test/factories/html-bootstrap'
 import { getClient } from '@/lib/client'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { selectSettingsSearch } from '@/features/settings/state/search-store'
@@ -173,6 +174,10 @@ test('consecutive toggles project landed settings intents before React renders',
 test('consecutive toggles replay intents before the confirmed settings query lands', async ({
   controlledClient,
 }) => {
+  installHtmlBootstrap({
+    'workbench.theme': null,
+    'workbench.wallpaper': { enabled: true, source: { kind: 'desktop' } },
+  })
   const queryClient = createTestQueryClient()
   const view = renderCommandProvider(queryClient)
   await waitFor(() => expect(capturedBus).not.toBeNull())
