@@ -45,8 +45,6 @@ export function buildNative(
     : [
         '-framework',
         'WebKit',
-        '-framework',
-        'UniformTypeIdentifiers',
         '-swift-version',
         '6',
         '-parse-as-library',

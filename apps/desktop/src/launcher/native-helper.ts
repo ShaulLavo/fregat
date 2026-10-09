@@ -6,9 +6,15 @@ import { defineErrorCatalog } from 'evlog'
 export const nativeErrors = defineErrorCatalog('desktop.webview', {
   PICKER_TIMEOUT: {
     status: 408,
-    message: 'The file chooser closed after its time limit.',
-    why: 'The file chooser did not receive a selection before the allowed interval ended.',
-    fix: 'Open the file chooser again and select an entry before it closes.',
+    message: 'The folder chooser closed after its time limit.',
+    why: 'The folder chooser did not receive a selection before the allowed interval ended.',
+    fix: 'Open the folder chooser again and select a folder before it closes.',
+  },
+  PICKER_REFUSED: {
+    status: 400,
+    message: 'The folder chooser request is not valid.',
+    why: 'The desktop app could not read the folder chooser request this window sent.',
+    fix: 'Reload the window, then open the folder again.',
   },
   HOST_FAILED: {
     status: 500,
