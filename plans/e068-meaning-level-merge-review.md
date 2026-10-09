@@ -32,8 +32,9 @@ Fregat ask a model for a combined fix. Code that merged without overlap stays un
   are concurrent when neither is in the other's dependencies; this is a property of the log, so
   every participant computes the same answer.
 - Character IDs and deletion provenance tell which author inserted or deleted each character
-  (`packages/collab`, `packages/textbuffer` identity runs). `setEffects` turns edits on and off
-  for author-selective undo, which can rebuild the text as one author saw it (`packages/collab/src/effects.ts`).
+  (`packages/collab`, `packages/textbuffer` identity runs). `setEffects` sends author-owned undo
+  commands. `Engine.projectEffects` returns a local snapshot with selected authors' effects on
+  or off, preserving the live engine and log. A review reader restores that snapshot on a fork.
 - The tree-sitter worker keeps an incremental parse per document, with changed ranges and error
   and missing nodes (`packages/tree-sitter/src/treeSitter/`). Query kinds are `highlights`,
   `folds` and `injections`; E063 adds more kinds as files per language.
@@ -89,7 +90,7 @@ them).
 - **Signals**, each with a stable kind:
   - `overlap`: concurrent edits from two or more authors in one unit, outside a commutative parent.
   - `parse`: the unit has error or missing nodes now, and each author's version of it parsed
-    clean. Author versions are rebuilt with `setEffects` limited to that unit's edits.
+    clean. Author versions are rebuilt with `projectEffects` limited to that unit's edits.
   - `signature`: two children of one commutative parent share a signature and came from
     concurrent edits.
   - `orphan`: one author deleted a unit while a concurrent edit by another author inserted text
@@ -117,12 +118,21 @@ them).
 
 1. **Concurrency query** in `@singapore-editor/collab`: given a confirmed window, return groups
    of concurrent edits by different authors with their character IDs. Property tests against the
-   reference engine.
+   reference engine. **Delivered 2026-10-09.** `ConfirmedWindow` keeps a canonical suffix of at
+   most 8,192 accepted envelopes, supports incremental batches, and returns exact concurrent
+   pairs with inserted/deleted ID spans. Effect commands carry causal dependencies; candidates
+   are the original text operations. `Engine.projectEffects` supports local author/base review
+   snapshots in both engines. Tests cover 50 seeded reference histories, different host arrival
+   orders, 30 incremental/eviction histories, transitive dependencies through undo, same-author
+   exclusions, the replay cap, UTF-16 spans, and projection snapshot consistency.
+   Run `bun run --cwd editor/packages/collab bench:concurrency` after its package build.
+   Cost evidence lives in `editor/packages/collab/bench/concurrency-evidence.json`.
+   These are shared-machine experiments; the detector's full 2 ms budget remains a step 3 gate.
 2. **Merge-unit queries** in `packages/tree-sitter-languages`, first for TypeScript, TSX,
    JavaScript, JSON, CSS, Markdown, Python, Rust and Go; the other languages in `languages.json`
    use the line fallback until they get a file.
 3. **Detector** in the tree-sitter worker: `overlap`, `parse`, `signature`, `orphan`, with author
-   versions rebuilt through `setEffects`.
+   versions rebuilt through local `projectEffects` snapshots.
 4. **Marks, hover and resolutions** in the collaboration plugin, wired into the example page.
 5. **Fregat:** marks for agent edits racing human typing, review annotations on the host, and the
    "Fix with AI" action. Detection runs in the browser, where the parser lives; the server host
