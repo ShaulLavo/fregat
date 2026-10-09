@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import os from 'node:os'
 import { performance } from 'node:perf_hooks'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { createPieceTableSnapshot, CharIdAllocator } from '@singapore-editor/textbuffer'
 import { ConfirmedWindow, TextbufferEngine } from '../dist/index.js'
 
@@ -103,11 +105,67 @@ function measure(input) {
   }))
 }
 
+function measureComparison(input, BaselineWindow) {
+  const prefix = input.history.slice(0, -100)
+  const batch = input.history.slice(-100)
+  const modes = {
+    baseline: BaselineWindow,
+    current: ConfirmedWindow,
+  }
+  const samples = { baseline: [], current: [] }
+  const querySamples = { baseline: [], current: [] }
+  const expected = new BaselineWindow(input.history)
+  const expectedPairs = expected.pairs(input.batch)
+  for (let sample = -20; sample < 51; sample++) {
+    for (const label of ['baseline', 'current', 'current', 'baseline']) {
+      const window = new modes[label](prefix)
+      const before = performance.now()
+      window.append(batch)
+      const appended = performance.now()
+      const pairs = window.pairs(input.batch)
+      const queried = performance.now()
+      assert.equal(pairs.length, input.expectedPairs)
+      if (sample === 50) {
+        assert.deepEqual(window.edits, expected.edits)
+        assert.deepEqual(pairs, expectedPairs)
+      }
+      if (sample < 0) continue
+      samples[label].push(appended - before)
+      querySamples[label].push(queried - appended)
+    }
+  }
+  return Object.entries(samples).map(([label, values]) => ({
+    label,
+    pairCount: input.expectedPairs,
+    medianMs: percentile(values, 0.5),
+    p95Ms: percentile(values, 0.95),
+    queryMedianMs: percentile(querySamples[label], 0.5),
+    combinedMedianMs: percentile(
+      values.map((value, i) => value + querySamples[label][i]),
+      0.5,
+    ),
+    combinedP95Ms: percentile(
+      values.map((value, i) => value + querySamples[label][i]),
+      0.95,
+    ),
+    samplesMs: values,
+    querySamplesMs: querySamples[label],
+  }))
+}
+
+const compareArgument = process.argv.indexOf('--compare')
+const baseline =
+  compareArgument === -1
+    ? null
+    : await import(pathToFileURL(resolve(process.argv[compareArgument + 1])).href)
 const results = []
 for (const authors of [2, 4, 8]) {
   for (const retained of [100, 8192]) {
     const input = workload(authors, retained)
-    results.push(...measure(input).map((result) => ({ authors, retained, ...result })))
+    const measurements = baseline
+      ? measureComparison(input, baseline.ConfirmedWindow)
+      : measure(input)
+    results.push(...measurements.map((result) => ({ authors, retained, ...result })))
   }
 }
 console.log(
@@ -115,8 +173,9 @@ console.log(
     {
       qualification: 'experiment, shared machine',
       environment: { node: process.version, cpu: os.cpus()[0]?.model, platform: process.platform },
-      method:
-        '100k-line TypeScript document. 100 independent confirmed replacements per batch, spread across 2/4/8 authors. Retained history is 100 or 8192 edits. 102 samples per mode after 40 warmups, in A/B/B/A order (A builds the full index, B appends the confirmed batch to a prefix index prepared outside the timer). Real TextbufferEngine author/apply and validation outside timers. Build-and-query includes canonical ordering, copying, causal indexing, footprint extraction and exact pair output. Append-and-query includes adding the new edits, evicting the canonical suffix, updating causal intervals and emitting pairs. Excludes parsing, merge-unit mapping and version reconstruction. No detector budget claim.',
+      method: baseline
+        ? '100k-line TypeScript document. 100 independent confirmed replacements per batch, spread across 2/4/8 authors. Retained history is 100 or 8192 edits. 102 samples per mode after 40 warmups, in A/B/B/A order (A uses the baseline ConfirmedWindow module supplied through --compare, B uses the current build). Each prefix index is prepared outside timing. Append and exact pair output are timed separately. Real TextbufferEngine author/apply and validation outside timers. Final samples compare all retained edits and exact pairs against a fresh baseline window. Excludes parsing, merge-unit mapping and version reconstruction. No detector budget claim.'
+        : '100k-line TypeScript document. 100 independent confirmed replacements per batch, spread across 2/4/8 authors. Retained history is 100 or 8192 edits. 102 samples per mode after 40 warmups, in A/B/B/A order (A builds the full index, B appends the confirmed batch to a prefix index prepared outside the timer). Real TextbufferEngine author/apply and validation outside timers. Build-and-query includes canonical ordering, copying, causal indexing, footprint extraction and exact pair output. Append-and-query includes adding the new edits, evicting the canonical suffix, updating causal intervals and emitting pairs. Excludes parsing, merge-unit mapping and version reconstruction. No detector budget claim.',
       lines,
       characters: text.length,
       results,

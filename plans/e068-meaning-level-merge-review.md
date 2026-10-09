@@ -127,6 +127,7 @@ them).
    exclusions, the replay cap, UTF-16 spans, and projection snapshot consistency.
    Run `bun run --cwd editor/packages/collab bench:concurrency` after its package build.
    Cost evidence lives in `editor/packages/collab/bench/concurrency-evidence.json`.
+   The [append cost follow-up](#concurrency-append-cost) reduces retained-window bookkeeping.
    These are shared-machine experiments; the detector's full 2 ms budget remains a step 3 gate.
 2. **Merge-unit queries** in `packages/tree-sitter-languages`, first for TypeScript, TSX,
    JavaScript, JSON, CSS, Markdown, Python, Rust and Go; the other languages in `languages.json`
@@ -165,6 +166,54 @@ them).
 5. **Fregat:** marks for agent edits racing human typing, review annotations on the host, and the
    "Fix with AI" action. Detection runs in the browser, where the parser lives; the server host
    does not parse. Lands with Delta DB phase 4.
+
+### Concurrency append cost
+
+Delivered 2026-10-09. The detector profile in [PR #1164](https://github.com/ShaulLavo/fregat/pull/1164)
+attributes 47% of sampled batch CPU to retained-window append. A fresh run of the original
+concurrency bench reproduced 1.66–2.39 ms append-and-query medians with an 8,192-edit prefix.
+The document has 100k lines and the new batch contains 100 concurrent replacements.
+
+The bottleneck was rebuilding the retained index on each append. An instrumented baseline
+spent about 80% of append time sorting, rebuilding membership/live ranges, mapping retained
+entries, evicting by full-map traversal, and recreating candidate arrays. This includes
+instrumentation overhead. The remaining entry-creation phase also scanned old entries to
+skip them. These costs grow with retained edits, not document characters.
+
+`ConfirmedWindow` now keeps a bounded canonical array alongside its ID index. A batch after
+the canonical tail sorts only incoming envelopes, retains the previous suffix by reference,
+creates only new causal entries, and deletes only evicted map entries. Contiguous causal
+positions supply one live interval. Candidate and position arrays keep their suffixes.
+Empty batches and exact retries return after validation. Interleaved arrivals retain the
+canonical sorting path and exact live-position intervals. The extra array holds references
+to existing entries; suffix copies remain proportional to the window size. There is no new
+public API, timer, parser work, or whole-document text read.
+
+Evidence is `editor/packages/collab/bench/concurrency-append-evidence.json`. Both runs are
+**experiment, shared machine**, under bench-class admission without quiet mode. Each run
+alternates baseline/current/current/baseline with 102 timed samples per mode after 40 warmups.
+The baseline is `c1b3da7076daf38dd0a6a3bb1a43c2c6a2ccc39b`. Prefix setup, real textbuffer
+operations, and equality checks are outside timing. The table pools all 204 samples per mode
+for the 8,192-edit prefix; both complete runs and their tails remain in the evidence.
+
+| Authors | Append median before | Append median after | Median reduction | Append p95 after | Append + pairs median after |
+| ------- | -------------------- | ------------------- | ---------------- | ---------------- | --------------------------- |
+| 2       | 1.252 ms             | 0.272 ms            | 78.3%            | 0.342 ms         | 0.674 ms                    |
+| 4       | 1.302 ms             | 0.289 ms            | 77.8%            | 0.355 ms         | 0.637 ms                    |
+| 8       | 1.309 ms             | 0.294 ms            | 77.5%            | 0.501 ms         | 0.649 ms                    |
+
+Median append now uses about 14–15% of the 2 ms detector budget. The first eight-author pilot
+had a 1.926 ms append p95, so these shared-machine results do not establish a worst-case
+bound. Parsing, unit mapping, and version reconstruction remain excluded. The full detector
+budget is unchanged and still belongs to step 3.
+
+After building the baseline and current collab packages, rerun the paired measurement with
+`node editor/packages/collab/bench/concurrency.mjs --compare <baseline-collab-dist/index.js>`.
+The original `bench:concurrency` command still measures full construction against incremental
+append-and-query. Final comparison samples assert identical retained edits and exact pairs.
+Property tests add 30 seeded causally ready arrival histories with mixed canonical insertion
+and tail append, limits including zero, empty/retry batches, effect-command eviction, and
+atomic rejection of malformed batches.
 
 ## Verification
 
