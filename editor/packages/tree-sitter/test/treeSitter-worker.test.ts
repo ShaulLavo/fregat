@@ -273,26 +273,66 @@ describe('tree-sitter worker internals', () => {
     ])
   })
 
-  it('normalizes full range captures in flattened match order with first-capture deduplication', () => {
+  it('groups full captures by span and preserves first-capture precedence within equal spans', () => {
     const ranges = [
       { name: 'variable', startIndex: 75, endIndex: 82, patternIndex: 0 },
       { name: 'function', startIndex: 5, endIndex: 10, patternIndex: 1 },
       { name: 'variable', startIndex: 75, endIndex: 82, patternIndex: 2 },
       { name: 'function', startIndex: 75, endIndex: 82, patternIndex: 3 },
       { name: 'empty', startIndex: 3, endIndex: 3, patternIndex: 4 },
+      { name: 'variable', startIndex: 5, endIndex: 10, patternIndex: 5 },
+      { name: 'variable', startIndex: 75, endIndex: 83, patternIndex: 6 },
+      { name: 'variable', startIndex: 75, endIndex: 82, patternIndex: 7 },
+      { name: 'inverted', startIndex: 6, endIndex: 4, patternIndex: 8 },
     ]
-    const query = { captureRanges: () => ranges } as unknown as Query
+    const query = { captureRanges: () => ranges.slice() } as unknown as Query
     const context = { ...cancellationContext(), counts: new Map<string, number>() }
     expect(
       collectCaptures(fakeTree(node('program', 0, 100)), highlightedRuntime(query), context),
     ).toEqual([
-      { startIndex: 75, endIndex: 82, captureName: 'variable', languageId: 'typescript' },
       { startIndex: 5, endIndex: 10, captureName: 'function', languageId: 'typescript' },
+      { startIndex: 5, endIndex: 10, captureName: 'variable', languageId: 'typescript' },
+      { startIndex: 75, endIndex: 82, captureName: 'variable', languageId: 'typescript' },
       { startIndex: 75, endIndex: 82, captureName: 'function', languageId: 'typescript' },
+      { startIndex: 75, endIndex: 83, captureName: 'variable', languageId: 'typescript' },
     ])
-    expect(context.counts.get('rawCaptures')).toBe(5)
-    expect(context.counts.get('uniqueCaptures')).toBe(3)
-    expect(ranges.map((capture) => capture.patternIndex)).toEqual([0, 1, 2, 3, 4])
+    expect(context.counts.get('rawCaptures')).toBe(9)
+    expect(context.counts.get('uniqueCaptures')).toBe(5)
+    expect(ranges.map((capture) => capture.patternIndex)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8])
+  })
+
+  it('deduplicates full captures independently for each language and query invocation', () => {
+    const query = {
+      captureRanges: () => [
+        { name: 'string', startIndex: 5, endIndex: 10, patternIndex: 0 },
+        { name: 'string', startIndex: 5, endIndex: 10, patternIndex: 1 },
+      ],
+    } as unknown as Query
+    const tree = fakeTree(node('program', 0, 100))
+    for (const languageId of ['typescript', 'javascript'] as const) {
+      const base = highlightedRuntime(query)
+      const runtime = { ...base, descriptor: { ...base.descriptor, id: languageId } }
+      for (let repetition = 0; repetition < 2; repetition++) {
+        expect(collectCaptures(tree, runtime, cancellationContext())).toEqual([
+          { startIndex: 5, endIndex: 10, captureName: 'string', languageId },
+        ])
+      }
+    }
+  })
+
+  it('returns no full captures when every span is empty or inverted', () => {
+    const query = {
+      captureRanges: () => [
+        { name: 'string', startIndex: 5, endIndex: 5, patternIndex: 0 },
+        { name: 'string', startIndex: 10, endIndex: 5, patternIndex: 1 },
+      ],
+    } as unknown as Query
+    const context = { ...cancellationContext(), counts: new Map<string, number>() }
+    expect(
+      collectCaptures(fakeTree(node('program', 0, 100)), highlightedRuntime(query), context),
+    ).toEqual([])
+    expect(context.counts.get('rawCaptures')).toBe(2)
+    expect(context.counts.get('uniqueCaptures')).toBe(0)
   })
 
   it('skips highlights when tree-sitter provides null trees or capture nodes', () => {

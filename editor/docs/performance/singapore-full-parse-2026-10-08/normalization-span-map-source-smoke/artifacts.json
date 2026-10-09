@@ -1,0 +1,29 @@
+{
+  "artifacts": [
+    {
+      "path": "classification.json.gz",
+      "bytes": 511,
+      "sha256": "c6590d40b173febc531aaedb59d97596e5690bb4442587b53fb9986a3d46cdbd"
+    },
+    {
+      "path": "experiment.json.gz",
+      "bytes": 14736,
+      "sha256": "3e841840c3618b5eb99057f0d5ccda014a15883c76c91160a051a3f2d9ab3c4c"
+    },
+    {
+      "path": "singapore-10-0-open.trace.json.gz",
+      "bytes": 433895,
+      "sha256": "45e9ff40143510628bf235a4c36bf2ea4c6da59219d8a719248c772f1d775478"
+    },
+    {
+      "path": "singapore-10-0.png",
+      "bytes": 230628,
+      "sha256": "375701662a9a9882f648c52cfc3ba4d533818dcff4d6b85d5e2b2e8296255cfc"
+    },
+    {
+      "path": "treeSitter.worker.ts.gz",
+      "bytes": 24703,
+      "sha256": "9fe1d62012518a8da00c8fd51a6d199b40361fa27d72d991a0aff845d583c043"
+    }
+  ]
+}

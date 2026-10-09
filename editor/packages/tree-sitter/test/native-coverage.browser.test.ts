@@ -42,6 +42,44 @@ function registry(loads: string[]) {
   return registry
 }
 
+browserTest.each([
+  [
+    'typescript',
+    '/** @param {string} value */\r\nconst pattern = /[a-z]+/;\nconst value = "שלום 🪐";\n',
+  ],
+  ['html', '<script>const value = "🪐";</script>\r\n<style>p { color: red }</style>\n<p>שלום</p>'],
+  ['astro', astro],
+  ['markdown', '# שלום 🪐\r\n\n```typescript\nconst value: string = "🪐";\n```\n'],
+] as const)(
+  'keeps full and whole-range syntax equal for %s injections',
+  async (languageId, text) => {
+    const backend = new TreeSitterWorkerClient()
+    const session = createTreeDocument({
+      documentId: `normalization.${languageId}`,
+      languageId,
+      languageResolver: registry([]),
+      backend,
+      syntaxMode: 'full',
+      text,
+    })
+    try {
+      const full = await session.run()
+      const ranged = await session.runtime.queryRange({ startIndex: 0, endIndex: text.length })
+      expect(full.degraded).toBeNull()
+      expect(ranged.degraded).toBeNull()
+      expect(full.injections.length).toBeGreaterThan(0)
+      expect(full.captures).toEqual(ranged.captures)
+      expect(tokenValues(full)).toEqual(tokenValues(ranged))
+      expect(full.injections).toEqual(ranged.injections)
+      expect(full.folds).toEqual(ranged.folds)
+      expect(full.errors).toEqual(ranged.errors)
+    } finally {
+      session.dispose()
+      await backend.dispose()
+    }
+  },
+)
+
 browserTest(
   'loads only TypeScript on a cold open and preserves angle-bracket assertions',
   async () => {
