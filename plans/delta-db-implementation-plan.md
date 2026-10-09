@@ -242,20 +242,23 @@ accepted edits to disk continuously, on save only, or per agent turn.
 server everyone opens, as in Google Docs: one machine holds the project and the others edit it
 through its server. Fregat does not sync two copies of a project between machines.
 
-Owner direction (2026-10-09): Tailscale first.
+Owner direction (2026-10-09): WebRTC by default, Tailscale as a shortcut. Sharing must work with
+nothing installed beyond Fregat.
 
-- A teammate with Tailscale: share the machine with their tailnet; they open the server like
-  any of the owner's devices. Revoking the share ends access.
-- A guest without Tailscale: Tailscale Funnel publishes the server at a public HTTPS address, and
-  Fregat hands out an invite link that expires or is revoked when the session ends. Funnel makes
-  the server reachable from the internet, so Fregat's own sign-in and invite checks must hold on
-  their own.
+- **Default: a share link over WebRTC.** "Share" makes a link carrying the room and its secret in
+  the URL fragment, which browsers never send to a server. The guest opens it and connects over
+  E067's WebRTC transport, loaded only when a session starts. Signaling is end-to-end encrypted
+  (`room-crypto.ts`), so the broker that introduces the two sides cannot read it. Closing the
+  share ends the room. To decide: who runs the broker and the TURN relay for networks where a
+  direct link fails (the company, as the free relay-only tier, or a self-hosted one), and whether
+  the server joins as a WebRTC peer (a native data-channel library in Bun) or the owner's open
+  browser bridges the guest to the server over the connection it already has.
+- **Shortcut: both sides on Tailscale.** The same link opens the server directly over the tailnet
+  (Fregat already reads Tailscale for machines and same-user sign-in), with no broker or relay.
+  The guest still pairs unless they are the same Tailscale user.
 
-Later options, if people without Tailscale need direct connections: WebRTC with the server as a
-peer (needs a native data-channel library in Bun), or an embedded peer-to-peer library such as
-Iroh, which connects app instances by key with relays and needs no install or account. Criterion:
-works across home routers without setup, and no company server can read the text. WebRTC stays
-the only option between two browsers with no server (Singapore on its own).
+Not planned now: Tailscale Funnel and embedded networking such as Iroh. Criterion for any path:
+works across home routers without setup, and no company server can read the text.
 
 Presence already carries up to 32 selections per window, so each person can have several
 cursors. One person with two windows or devices shows up twice; group presence by person before
