@@ -48,7 +48,11 @@ export const reactiveOwnerSnapshots: Scenario = {
       await refuseDriftedHover(page, diskPath.slice(1), step)
       strictEqual(await readFile(diskPath, 'utf8'), text)
     } finally {
-      await releaseFixture(fixture)
+      try {
+        await page.goto('about:blank')
+      } finally {
+        await releaseFixture(fixture)
+      }
     }
   },
 }

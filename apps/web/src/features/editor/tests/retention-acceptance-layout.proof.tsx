@@ -108,29 +108,16 @@ test.for(['original', 'copy'] as const)(
       const app = await mountRetentionLayoutApp()
       const path = filesystemPath('repo/src/retention-layout.ts')
       const primaryEnvironment = activeEnvironmentId()
-      const knownPeer = app.application.connections.store
-        .getState()
-        .machines.find(
-          (machine) =>
-            machine.config.kind === 'origin' && machine.config.url === inject('layoutPeerOrigin'),
-        )
-      if (knownPeer) {
-        expect(await app.application.connections.connectMachine(knownPeer.name)).toBe('connected')
-      } else {
-        await page.getByRole('button', { name: 'Switch project', exact: true }).click()
-        await page.getByRole('menuitem', { name: 'Connect machine…', exact: true }).click()
-        if (
-          [...document.querySelectorAll('button')].some(
-            (button) => button.textContent?.trim() === 'Add machine',
-          )
-        )
-          await page.getByRole('button', { name: 'Add machine', exact: true }).click()
-        await page.getByRole('button', { name: /^Remote URL/ }).click()
-        await page
-          .getByRole('textbox', { name: 'Server URL', exact: true })
-          .fill(inject('layoutPeerOrigin'))
-        await page.getByRole('button', { name: 'Connect', exact: true }).click()
-      }
+      const peerName = 'retention-layout-peer'
+      const existing = app.application.connections.store.getState().machines
+      const configuration = Object.fromEntries(
+        existing.map((machine): [string, typeof machine.config] => [machine.name, machine.config]),
+      )
+      app.application.connections.configureMachines({
+        ...configuration,
+        [peerName]: { kind: 'origin', url: inject('layoutPeerOrigin') },
+      })
+      expect(await app.application.connections.connectMachine(peerName)).toBe('connected')
       await expect
         .poll(() =>
           app.application.connections.store
@@ -147,8 +134,11 @@ test.for(['original', 'copy'] as const)(
         status: 'applied',
       })
       expect(
-        await app.application.openEnvironmentWorkspaceRoot(peerEnvironment, filesystemPath('repo')),
-      ).toMatch(/opened|already-open/)
+        await app.navigation.openWorkspace({
+          environmentId: peerEnvironment,
+          path: filesystemPath('repo'),
+        }),
+      ).toMatchObject({ status: 'applied' })
       expect(await app.read().commands.openFileSurface(path)).toMatchObject({ status: 'applied' })
       await awaitRetentionLayoutCurrent(app, path)
       const peerTab = activeEditorTab(app.read().workspace.getState().workbenchPanels.editorGroups)
