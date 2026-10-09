@@ -291,8 +291,8 @@ function replacementPreviewLine(match: WorkspaceSearchMatch) {
   }
 }
 
-function mergeAdjacentEdits(edits: readonly TextEdit[]) {
-  const sorted = edits.toSorted(compareEditsAscending)
+function mergeAdjacentEdits(edits: TextEdit[]) {
+  const sorted = edits.sort(compareEditsAscending)
   const merged: TextEdit[] = []
 
   for (const edit of sorted) {

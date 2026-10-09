@@ -88,11 +88,10 @@ test('availability is fresh at continuation and an unavailable completion runs f
 })
 test('a bound prefix waits for its chord and runs its candidates in order on timeout', () => {
   vi.useFakeTimers()
-  const table: readonly KeymapBinding<string>[] = [
+  const table: readonly KeymapBinding<string>[] = Array.of<KeymapBinding<string>>(
     { chord: ['Control+K'], payload: 'tab' },
     { chord: ['Control+K'], payload: 'single' },
-    ...bindings,
-  ]
+  ).concat(bindings)
   const h = setup(table)
   expect(h.claim(key('k', { ctrlKey: true }))).toBe(true)
   expect(h.calls).toEqual([])
@@ -104,7 +103,9 @@ test('a bound prefix waits for its chord and runs its candidates in order on tim
 })
 test('a bound prefix followed by its continuation runs only the chord', () => {
   vi.useFakeTimers()
-  const h = setup([{ chord: ['Control+K'], payload: 'single' }, ...bindings])
+  const h = setup(
+    Array.of<KeymapBinding<string>>({ chord: ['Control+K'], payload: 'single' }).concat(bindings),
+  )
   h.claim(key('k', { ctrlKey: true }))
   h.claim(key('c', { ctrlKey: true }))
   vi.advanceTimersByTime(5000)
@@ -114,7 +115,9 @@ test('ineligible singles preserve deeper prefixes; deeper sequences execute', ()
   const calls: string[] = []
   runtime = createKeymapRuntime({
     root: document,
-    bindings: [{ chord: ['Control+K'], payload: 'single' }, ...bindings],
+    bindings: Array.of<KeymapBinding<string>>({ chord: ['Control+K'], payload: 'single' }).concat(
+      bindings,
+    ),
     captureContext: () => null,
     isAvailable: (binding) => binding.payload !== 'single',
     dispatch: (binding) => {
@@ -137,7 +140,9 @@ test('an unbound prefix waits for the next key without a timeout', () => {
 })
 test('a scheduled timeout does not depend on another event and repeats do not extend it', () => {
   vi.useFakeTimers()
-  const h = setup([{ chord: ['Control+K'], payload: 'single' }, ...bindings])
+  const h = setup(
+    Array.of<KeymapBinding<string>>({ chord: ['Control+K'], payload: 'single' }).concat(bindings),
+  )
   h.claim(key('k', { ctrlKey: true }))
   vi.advanceTimersByTime(900)
   h.claim(key('k', { ctrlKey: true, repeat: true }))
@@ -215,7 +220,9 @@ test('a declined prefix binding hands the prefix to replay on timeout', () => {
   runtime = createKeymapRuntime({
     root: document,
     platform: 'linux',
-    bindings: [{ chord: ['Control+K'], payload: 'tab' }, ...bindings],
+    bindings: Array.of<KeymapBinding<string>>({ chord: ['Control+K'], payload: 'tab' }).concat(
+      bindings,
+    ),
     captureContext: () => null,
     isAvailable: () => true,
     dispatch: ({ payload }) => payload !== 'tab',
@@ -347,7 +354,7 @@ test('a mismatch replays the buffered keys in order before the new key runs', ()
   runtime = createKeymapRuntime({
     root: document,
     platform: 'linux',
-    bindings: [...bindings, { chord: ['Control+X'], payload: 'cut' }],
+    bindings: bindings.concat([{ chord: ['Control+X'], payload: 'cut' }]),
     captureContext: () => null,
     isAvailable: () => true,
     dispatch: ({ payload }) => {
@@ -367,7 +374,10 @@ test('a mismatch runs the longest bound prefix and replays the rest', () => {
   runtime = createKeymapRuntime({
     root: document,
     platform: 'linux',
-    bindings: [{ chord: ['Control+K', 'Control+D'], payload: 'kd' }, ...bindings],
+    bindings: Array.of<KeymapBinding<string>>({
+      chord: ['Control+K', 'Control+D'],
+      payload: 'kd',
+    }).concat(bindings),
     captureContext: () => null,
     isAvailable: () => true,
     dispatch: ({ payload }) => {

@@ -173,7 +173,9 @@ function mergeTextDecorations(values: readonly (string | undefined)[]): string {
     const others = words.filter((word) => word !== 'none' && !TEXT_DECORATION_LINES.has(word))
     if (!rest && others.length) rest = others
   }
-  return [...lines, ...(rest ?? [])].join(' ')
+  return Array.from(lines)
+    .concat(rest ?? [])
+    .join(' ')
 }
 
 // Splits on whitespace outside parentheses, so `rgb(0 0 0)` stays one word.

@@ -205,7 +205,7 @@ describe('what a document votes for', () => {
   it('samples the head of a file rather than all of it', () => {
     // One two-space step inside the sampled head, against a hundred eight-space steps past it: the
     // tail would win outright if the sample were not bounded.
-    const head = ['x', '  y', ...Array.from({ length: 9_998 }, () => 'z')]
+    const head = ['x', '  y'].concat(Array.from({ length: 9_998 }, () => 'z'))
     const tail = Array.from({ length: 50 }, () => 'p\n        q')
 
     expect(guessedTabSize(createStringTextSnapshot(head.concat(tail).join('\n')), 4)).toBe(2)
@@ -255,11 +255,9 @@ describe('what a document votes for', () => {
   })
 
   it('reads a fragmented document no further than its sampled head, in bounded blocks', () => {
-    const head = [
-      'x',
-      '  y',
-      ...Array.from({ length: 9_998 }, (_, index) => `${'z'.repeat(index % 40)}`),
-    ]
+    const head = ['x', '  y'].concat(
+      Array.from({ length: 9_998 }, (_, index) => `${'z'.repeat(index % 40)}`),
+    )
     const tail = Array.from({ length: 2_000 }, () => 'p\n        q')
     const text = head.concat(tail).join('\n')
     const session = createDocumentSession(text.slice(0, 5_000))

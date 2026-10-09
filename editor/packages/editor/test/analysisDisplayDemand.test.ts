@@ -127,10 +127,9 @@ describe('analysis display demand', () => {
       try {
         editor.setContent(nextText)
         expect(view.isRenderingAtomically).toBe(false)
-        expect(view.getState().mountedRows.map((row) => row.element.textContent)).toEqual([
-          ...Array.from({ length: 8 }, (_, index) => `new${index}`),
-          '',
-        ])
+        expect(view.getState().mountedRows.map((row) => row.element.textContent)).toEqual(
+          Array.from({ length: 8 }, (_, index) => `new${index}`).concat(['']),
+        )
         expect(inspect()).toMatchObject({
           frames: 1,
           unknownLeases: 0,
@@ -145,7 +144,7 @@ describe('analysis display demand', () => {
             height: reentry === 'nested-layout' ? 96 : 72,
             width: reentry === 'nested-layout' ? 320 : 400,
             text: nextText,
-            rows: [...Array.from({ length: 8 }, (_, index) => `new${index}`), ''],
+            rows: Array.from({ length: 8 }, (_, index) => `new${index}`).concat(['']),
           },
         ])
       } finally {

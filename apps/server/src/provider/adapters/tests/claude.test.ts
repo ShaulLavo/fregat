@@ -857,7 +857,7 @@ describe('ClaudeProviderAdapter', () => {
     const reader: AgentDiagnosticsSource = { enabled: () => true, errors: async () => null }
     const harness = claudeHarness(true, undefined, reader)
     await harness.adapter.startRuntime(sessionStartInput({}))
-    expect(Object.keys(latestOptions(harness).hooks ?? {}).toSorted()).toEqual([
+    expect(Object.keys(latestOptions(harness).hooks ?? {}).sort()).toEqual([
       'PostToolUse',
       'PreToolUse',
       'Stop',
@@ -1360,7 +1360,7 @@ describe('ClaudeProviderAdapter', () => {
     })
 
     const query = latestQuery(harness)
-    query.mcpStatus = [...query.mcpStatus, { name: 'github', status: 'needs-auth' }]
+    query.mcpStatus = query.mcpStatus.concat([{ name: 'github', status: 'needs-auth' }])
     await runOwnTurn(harness, providerTurnInput({ turnId: 'turn-2' }), 'Second.')
     await waitFor(() => mcpAlerts(harness).length === 2, 'the signed-out server was not reported')
     expect(mcpAlerts(harness).map((event) => event.payload.status)).toEqual([

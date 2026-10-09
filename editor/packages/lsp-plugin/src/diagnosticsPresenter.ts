@@ -461,9 +461,7 @@ function diagnosticMarkerTarget(
     return targets.find((target) => target.range.start > offset) ?? targets[0] ?? null
   }
 
-  return (
-    targets.toReversed().find((target) => target.range.start < offset) ?? targets.at(-1) ?? null
-  )
+  return targets.findLast((target) => target.range.start < offset) ?? targets.at(-1) ?? null
 }
 
 function diagnosticTarget(

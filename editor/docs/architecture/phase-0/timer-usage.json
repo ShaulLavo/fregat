@@ -495,7 +495,7 @@
       "file": "packages/plugin-ui/src/tooltip.ts",
       "id": "packages/plugin-ui/src/tooltip.ts:setTimeout:89686cb98f",
       "justification": "A pointer grace period before the hover goes away, cancelled by re-entry; it schedules no editor work.",
-      "line": 190,
+      "line": 198,
       "snippet": "hideTimer = setTimeout(() => {"
     },
     {
@@ -503,7 +503,7 @@
       "file": "packages/plugin-ui/src/tooltip.ts",
       "id": "packages/plugin-ui/src/tooltip.ts:setTimeout:8ff275af18",
       "justification": "Resets the copy button's label after the user has had time to read it; DOM only.",
-      "line": 629,
+      "line": 665,
       "snippet": "setTimeout(() => {"
     },
     {

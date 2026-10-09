@@ -262,7 +262,8 @@ function installEmitHook(target: EventEmitter): EmitHook {
     dispatchEmitObservers(observers, this, event, args, 'before')
     let returned = false
     try {
-      const result = Reflect.apply(original, this, [event, ...args])
+      const arguments_: unknown[] = [event]
+      const result = Reflect.apply(original, this, arguments_.concat(args))
       returned = true
       return result
     } finally {
@@ -983,7 +984,7 @@ export function createRetentionSocketProvenance(options: {
     },
     close() {
       stopped = true
-      for (const restore of restores.toReversed()) restore()
+      for (const restore of restores.reverse()) restore()
       restores.length = 0
       journal.close()
     },

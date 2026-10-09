@@ -117,7 +117,7 @@ export function createDiffGutterContribution(options: DiffGutterOptions): Editor
 }
 
 function gutterLaneKinds(side: DiffGutterSide): readonly DiffGutterLaneKind[] {
-  if (side === 'stacked') return [...NUMBER_LANES, 'indicator']
+  if (side === 'stacked') return NUMBER_LANES.concat(['indicator'])
   return [side, 'indicator']
 }
 

@@ -77,12 +77,11 @@ test.for(cases)('proxy key CLI: $name', async (scenario) => {
     if (scenario.existingKey) await writeFile(secretsFile, secrets, { mode: 0o600 })
     const url = scenario.url === undefined ? URL : scenario.url
     const instances = scenario.instances ?? ['codex-work', 'codex-personal']
-    const args = [
-      keyFile,
-      ...(url === null ? [] : ['--url', url]),
-      ...instances.flatMap((id) => ['--instance', id]),
-    ]
-    const child = Bun.spawn([process.execPath, script, ...args], {
+    const args = [keyFile].concat(
+      url === null ? [] : ['--url', url],
+      instances.flatMap((id) => ['--instance', id]),
+    )
+    const child = Bun.spawn([process.execPath, script].concat(args), {
       cwd: checkout,
       env: { ...process.env, PLATFORM_HOME: root },
       stdout: 'pipe',

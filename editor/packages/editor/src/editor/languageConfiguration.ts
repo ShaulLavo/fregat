@@ -157,10 +157,9 @@ const QUOTED_PAIRS: readonly EditorAutoClosingPair[] = [
 ]
 
 /** A backtick delimits a literal only where the language has one; elsewhere it is a stray character. */
-const CODE_PAIRS: readonly EditorAutoClosingPair[] = [
-  ...QUOTED_PAIRS,
+const CODE_PAIRS: readonly EditorAutoClosingPair[] = QUOTED_PAIRS.concat([
   { close: '`', open: '`', quote: true },
-]
+])
 
 /**
  * What a language with no entry in the catalog closes: everything. Narrowing it to brackets bought

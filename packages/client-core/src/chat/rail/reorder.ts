@@ -116,7 +116,7 @@ export function planRailReorder(input: {
   const { orderedIds, keysById, movedId } = input
   const visibleIds = new Set(orderedIds)
   const reservedKeys = new Set(
-    [...keysById].flatMap(([id, key]) => (!visibleIds.has(id) && key != null ? [key] : [])),
+    Array.from(keysById).flatMap(([id, key]) => (!visibleIds.has(id) && key != null ? [key] : [])),
   )
   const movedIndex = orderedIds.indexOf(movedId)
   if (movedIndex === -1) return []

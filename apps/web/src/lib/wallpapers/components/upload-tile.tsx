@@ -45,7 +45,7 @@ export function WallpaperUploadTile({
         className='hidden'
         tabIndex={-1}
         onChange={(event) => {
-          onFiles([...(event.currentTarget.files ?? [])])
+          onFiles(Array.from(event.currentTarget.files ?? []))
           event.currentTarget.value = ''
         }}
       />

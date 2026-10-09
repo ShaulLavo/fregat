@@ -45,13 +45,14 @@ describe('orchestration read-model cache coherence', () => {
   ] as const)(
     'keeps a turn $state when its file checkpoint finishes later',
     ({ status, state }) => {
-      const projected = project([
-        ...sessionBootstrapEvents(),
-        turnStartEvent('turn-1', requestedAt),
-        runtimeSetEvent({ activeTurnId: 'turn-1', status: 'running', updatedAt: startedAt }),
-        runtimeSetEvent({ status, updatedAt: settledAt }),
-        turnDiffCompletedEvent({ turnId: 'turn-1', checkpointTurnCount: 1, status: 'ready' }),
-      ])
+      const projected = project(
+        sessionBootstrapEvents().concat([
+          turnStartEvent('turn-1', requestedAt),
+          runtimeSetEvent({ activeTurnId: 'turn-1', status: 'running', updatedAt: startedAt }),
+          runtimeSetEvent({ status, updatedAt: settledAt }),
+          turnDiffCompletedEvent({ turnId: 'turn-1', checkpointTurnCount: 1, status: 'ready' }),
+        ]),
+      )
       for (const session of [projected.shell, projected.memory, projected.sqlSession])
         expect(session?.latestTurn).toMatchObject({ state, completedAt: settledAt })
     },
@@ -71,7 +72,10 @@ describe('orchestration read-model cache coherence', () => {
               message: 'The server restarted',
               createdAt: startedAt,
             })
-      const events = [...sessionBootstrapEvents(), turnStartEvent('turn-1', requestedAt), failure]
+      const events = sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        failure,
+      ])
       expect(project(events).shell?.hasError).toBe(true)
 
       events.push(turnStartEvent('turn-2', revisedAt))
@@ -94,12 +98,13 @@ describe('orchestration read-model cache coherence', () => {
     { settledState: 'interrupted', status: 'interrupted' },
     { settledState: 'interrupted', status: 'stopped' },
   ])('settles a running turn when the session goes $status', ({ settledState, status }) => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      runtimeSetEvent({ activeTurnId: 'turn-1', status: 'running', updatedAt: startedAt }),
-      runtimeSetEvent({ status, updatedAt: settledAt }),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        runtimeSetEvent({ activeTurnId: 'turn-1', status: 'running', updatedAt: startedAt }),
+        runtimeSetEvent({ status, updatedAt: settledAt }),
+      ]),
+    )
 
     expect(projected.memory.latestTurn).toMatchObject({
       completedAt: settledAt,
@@ -112,11 +117,12 @@ describe('orchestration read-model cache coherence', () => {
   it.each(['starting', 'running', 'waiting'])(
     'leaves the turn running while the session is %s',
     (status) => {
-      const projected = project([
-        ...sessionBootstrapEvents(),
-        turnStartEvent('turn-1', requestedAt),
-        runtimeSetEvent({ activeTurnId: 'turn-1', status, updatedAt: startedAt }),
-      ])
+      const projected = project(
+        sessionBootstrapEvents().concat([
+          turnStartEvent('turn-1', requestedAt),
+          runtimeSetEvent({ activeTurnId: 'turn-1', status, updatedAt: startedAt }),
+        ]),
+      )
 
       expect(projected.memory.latestTurn).toMatchObject({ completedAt: null, state: 'running' })
       expect(projected.sqlSession.latestTurn).toEqual(projected.memory.latestTurn)
@@ -124,28 +130,30 @@ describe('orchestration read-model cache coherence', () => {
   )
 
   it('settles a turn that produced no assistant message at all', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      runtimeSetEvent({ activeTurnId: 'turn-1', status: 'running', updatedAt: startedAt }),
-      runtimeSetEvent({ lastError: 'provider died', status: 'error', updatedAt: settledAt }),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        runtimeSetEvent({ activeTurnId: 'turn-1', status: 'running', updatedAt: startedAt }),
+        runtimeSetEvent({ lastError: 'provider died', status: 'error', updatedAt: settledAt }),
+      ]),
+    )
 
     expect(projected.memory.latestTurn?.state).toBe('error')
     expect(projected.sqlSession.latestTurn?.state).toBe('error')
   })
 
   it('agrees on the session and the turn after a stop request', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      runtimeSetEvent({ activeTurnId: 'turn-1', status: 'running', updatedAt: startedAt }),
-      pendingEvent(
-        'session.runtime-stop-requested',
-        { createdAt: settledAt, sessionId: SESSION_ID },
-        settledAt,
-      ),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        runtimeSetEvent({ activeTurnId: 'turn-1', status: 'running', updatedAt: startedAt }),
+        pendingEvent(
+          'session.runtime-stop-requested',
+          { createdAt: settledAt, sessionId: SESSION_ID },
+          settledAt,
+        ),
+      ]),
+    )
 
     expect(projected.memory.runtime).toMatchObject({ status: 'stopped', updatedAt: settledAt })
     expect(projected.sqlSession.runtime).toEqual(projected.memory.runtime)
@@ -157,19 +165,20 @@ describe('orchestration read-model cache coherence', () => {
   })
 
   it('replaces the streamed draft when a completion carries text, and backfills its turn', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      messageSentEvent({ messageId: 'message-1', streaming: true, text: 'Hel' }),
-      messageSentEvent({ messageId: 'message-1', streaming: true, text: 'lo' }),
-      messageSentEvent({
-        messageId: 'message-1',
-        streaming: false,
-        text: 'Hello, world',
-        turnId: 'turn-1',
-        updatedAt: settledAt,
-      }),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        messageSentEvent({ messageId: 'message-1', streaming: true, text: 'Hel' }),
+        messageSentEvent({ messageId: 'message-1', streaming: true, text: 'lo' }),
+        messageSentEvent({
+          messageId: 'message-1',
+          streaming: false,
+          text: 'Hello, world',
+          turnId: 'turn-1',
+          updatedAt: settledAt,
+        }),
+      ]),
+    )
 
     expect(projected.memory.messages).toHaveLength(1)
     expect(projected.memory.messages[0]).toMatchObject({
@@ -181,16 +190,17 @@ describe('orchestration read-model cache coherence', () => {
   })
 
   it('keeps the streamed draft when a completion carries no text', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      messageSentEvent({ messageId: 'message-1', streaming: true, text: 'Hello' }),
-      messageSentEvent({
-        messageId: 'message-1',
-        streaming: false,
-        text: '',
-        updatedAt: settledAt,
-      }),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        messageSentEvent({ messageId: 'message-1', streaming: true, text: 'Hello' }),
+        messageSentEvent({
+          messageId: 'message-1',
+          streaming: false,
+          text: '',
+          updatedAt: settledAt,
+        }),
+      ]),
+    )
 
     expect(projected.memory.messages[0]).toMatchObject({ streaming: false, text: 'Hello' })
     expect(projected.sqlSession.messages).toEqual(projected.memory.messages)
@@ -204,24 +214,25 @@ describe('orchestration read-model cache coherence', () => {
       sizeBytes: 12,
       type: 'image',
     }
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      messageSentEvent({
-        attachments: [attachment],
-        messageId: 'message-1',
-        role: 'user',
-        streaming: false,
-        text: 'Look at this',
-      }),
-      messageSentEvent({
-        messageId: 'message-1',
-        role: 'user',
-        streaming: false,
-        text: 'Look at this',
-        turnId: 'turn-1',
-        updatedAt: settledAt,
-      }),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        messageSentEvent({
+          attachments: [attachment],
+          messageId: 'message-1',
+          role: 'user',
+          streaming: false,
+          text: 'Look at this',
+        }),
+        messageSentEvent({
+          messageId: 'message-1',
+          role: 'user',
+          streaming: false,
+          text: 'Look at this',
+          turnId: 'turn-1',
+          updatedAt: settledAt,
+        }),
+      ]),
+    )
 
     expect(projected.memory.messages[0]).toMatchObject({
       attachments: [attachment],
@@ -232,35 +243,37 @@ describe('orchestration read-model cache coherence', () => {
   })
 
   it('does not append a replayed activity twice', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      activityAppendedEvent({ id: 'event-activity-1' }),
-      activityAppendedEvent({ id: 'event-activity-1' }),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        activityAppendedEvent({ id: 'event-activity-1' }),
+        activityAppendedEvent({ id: 'event-activity-1' }),
+      ]),
+    )
 
     expect(projected.memory.activities).toHaveLength(1)
     expect(projected.sqlSession.activities).toHaveLength(1)
   })
 
   it('corrects the persisted activity when a revised frame re-emits the same id', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      activityAppendedEvent({
-        id: 'event-activity-1',
-        kind: 'tool.started',
-        payload: { itemType: 'file-read', status: 'running' },
-        summary: 'Read started',
-        tone: 'tool',
-      }),
-      activityAppendedEvent({
-        createdAt: revisedAt,
-        id: 'event-activity-1',
-        kind: 'tool.completed',
-        payload: { itemType: 'file-read', status: 'completed' },
-        summary: 'Read 40 lines',
-        tone: 'info',
-      }),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        activityAppendedEvent({
+          id: 'event-activity-1',
+          kind: 'tool.started',
+          payload: { itemType: 'file-read', status: 'running' },
+          summary: 'Read started',
+          tone: 'tool',
+        }),
+        activityAppendedEvent({
+          createdAt: revisedAt,
+          id: 'event-activity-1',
+          kind: 'tool.completed',
+          payload: { itemType: 'file-read', status: 'completed' },
+          summary: 'Read 40 lines',
+          tone: 'info',
+        }),
+      ]),
+    )
 
     // The incremental cache and a cold rebuild read the same rows, so a
     // revision only one of them lands is a divergence that surfaces as the
@@ -277,20 +290,21 @@ describe('orchestration read-model cache coherence', () => {
   })
 
   it('leaves a revised activity where the first frame put it, in the cache and the rebuild', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      activityAppendedEvent({ id: 'event-activity-1', summary: 'Read started' }),
-      activityAppendedEvent({
-        createdAt: '2026-05-24T00:01:40.000Z',
-        id: 'event-activity-2',
-        summary: 'Grep started',
-      }),
-      activityAppendedEvent({
-        createdAt: revisedAt,
-        id: 'event-activity-1',
-        summary: 'Read 40 lines',
-      }),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        activityAppendedEvent({ id: 'event-activity-1', summary: 'Read started' }),
+        activityAppendedEvent({
+          createdAt: '2026-05-24T00:01:40.000Z',
+          id: 'event-activity-2',
+          summary: 'Grep started',
+        }),
+        activityAppendedEvent({
+          createdAt: revisedAt,
+          id: 'event-activity-1',
+          summary: 'Read 40 lines',
+        }),
+      ]),
+    )
 
     for (const activities of [projected.sqlSession.activities, projected.memory.activities]) {
       expect(activities.map((activity) => activity.id)).toEqual([
@@ -305,14 +319,15 @@ describe('orchestration read-model cache coherence', () => {
   })
 
   it('backfills a revised activity onto its turn and never erases the turn again', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      activityAppendedEvent({ id: 'event-activity-1', turnId: 'turn-1' }),
-      activityAppendedEvent({ id: 'event-activity-2', turnId: null }),
-      activityAppendedEvent({ createdAt: revisedAt, id: 'event-activity-1', turnId: null }),
-      activityAppendedEvent({ createdAt: revisedAt, id: 'event-activity-2', turnId: 'turn-1' }),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        activityAppendedEvent({ id: 'event-activity-1', turnId: 'turn-1' }),
+        activityAppendedEvent({ id: 'event-activity-2', turnId: null }),
+        activityAppendedEvent({ createdAt: revisedAt, id: 'event-activity-1', turnId: null }),
+        activityAppendedEvent({ createdAt: revisedAt, id: 'event-activity-2', turnId: 'turn-1' }),
+      ]),
+    )
 
     for (const activities of [projected.sqlSession.activities, projected.memory.activities]) {
       expect(activities.map((activity) => activity.turnId)).toEqual(['turn-1', 'turn-1'])
@@ -320,15 +335,16 @@ describe('orchestration read-model cache coherence', () => {
   })
 
   it('projects the plan step the session is on, and the cache agrees with the rebuild', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      planActivity('activity-plan-1', [
-        { status: 'completed', step: 'Read the code' },
-        { status: 'inProgress', step: 'Run the tests' },
-        { status: 'pending', step: 'Write the report' },
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        planActivity('activity-plan-1', [
+          { status: 'completed', step: 'Read the code' },
+          { status: 'inProgress', step: 'Run the tests' },
+          { status: 'pending', step: 'Write the report' },
+        ]),
       ]),
-    ])
+    )
 
     expect(projected.shell?.planProgress).toEqual({
       completedSteps: 1,
@@ -340,14 +356,15 @@ describe('orchestration read-model cache coherence', () => {
   })
 
   it('narrates the first pending step of a plan nothing has started yet', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      planActivity('activity-plan-1', [
-        { status: 'pending', step: 'Read the code' },
-        { status: 'pending', step: 'Run the tests' },
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        planActivity('activity-plan-1', [
+          { status: 'pending', step: 'Read the code' },
+          { status: 'pending', step: 'Run the tests' },
+        ]),
       ]),
-    ])
+    )
 
     expect(projected.shell?.planProgress).toMatchObject({
       completedSteps: 0,
@@ -362,25 +379,26 @@ describe('orchestration read-model cache coherence', () => {
    * the high-water mark forever.
    */
   it('refolds a revised plan snapshot instead of advancing past it', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      planActivity('activity-plan-1', [
-        { status: 'completed', step: 'Read the code' },
-        { status: 'completed', step: 'Run the tests' },
-        { status: 'inProgress', step: 'Write the report' },
-      ]),
-      planActivity(
-        'activity-plan-1',
-        [
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        planActivity('activity-plan-1', [
           { status: 'completed', step: 'Read the code' },
-          { status: 'inProgress', step: 'Run the tests' },
-          { status: 'pending', step: 'Write the report' },
-        ],
-        'turn-1',
-        revisedAt,
-      ),
-    ])
+          { status: 'completed', step: 'Run the tests' },
+          { status: 'inProgress', step: 'Write the report' },
+        ]),
+        planActivity(
+          'activity-plan-1',
+          [
+            { status: 'completed', step: 'Read the code' },
+            { status: 'inProgress', step: 'Run the tests' },
+            { status: 'pending', step: 'Write the report' },
+          ],
+          'turn-1',
+          revisedAt,
+        ),
+      ]),
+    )
 
     expect(projected.shell?.planProgress).toMatchObject({
       completedSteps: 1,
@@ -393,40 +411,42 @@ describe('orchestration read-model cache coherence', () => {
     { plan: [], reason: 'withdrawn' },
     { plan: [{ status: 'completed', step: 'Read the code' }], reason: 'finished' },
   ])('narrates nothing once the plan is $reason', ({ plan }) => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      planActivity('activity-plan-1', [{ status: 'inProgress', step: 'Read the code' }]),
-      planActivity('activity-plan-2', plan, 'turn-1', revisedAt),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        planActivity('activity-plan-1', [{ status: 'inProgress', step: 'Read the code' }]),
+        planActivity('activity-plan-2', plan, 'turn-1', revisedAt),
+      ]),
+    )
 
     expect(projected.shell?.planProgress).toBeNull()
     expectPlanProgressConverges(projected)
   })
 
   it('falls back to the retained turn when a revert prunes the planning turn', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      planActivity('activity-plan-1', [
-        { status: 'completed', step: 'Read the code' },
-        { status: 'inProgress', step: 'Sketch the fix' },
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        planActivity('activity-plan-1', [
+          { status: 'completed', step: 'Read the code' },
+          { status: 'inProgress', step: 'Sketch the fix' },
+        ]),
+        turnDiffCompletedEvent({ checkpointTurnCount: 1, turnId: 'turn-1' }),
+        turnStartEvent('turn-2', startedAt),
+        planActivity(
+          'activity-plan-2',
+          [{ status: 'inProgress', step: 'Run the tests' }],
+          'turn-2',
+          startedAt,
+        ),
+        turnDiffCompletedEvent({ checkpointTurnCount: 2, turnId: 'turn-2' }),
+        pendingEvent(
+          'session.reverted',
+          { revertedAt: settledAt, sessionId: SESSION_ID, turnCount: 1 },
+          settledAt,
+        ),
       ]),
-      turnDiffCompletedEvent({ checkpointTurnCount: 1, turnId: 'turn-1' }),
-      turnStartEvent('turn-2', startedAt),
-      planActivity(
-        'activity-plan-2',
-        [{ status: 'inProgress', step: 'Run the tests' }],
-        'turn-2',
-        startedAt,
-      ),
-      turnDiffCompletedEvent({ checkpointTurnCount: 2, turnId: 'turn-2' }),
-      pendingEvent(
-        'session.reverted',
-        { revertedAt: settledAt, sessionId: SESSION_ID, turnCount: 1 },
-        settledAt,
-      ),
-    ])
+    )
 
     expect(projected.shell?.planProgress).toEqual({
       completedSteps: 1,
@@ -501,16 +521,18 @@ describe('orchestration read-model cache coherence', () => {
     fixtures.push(fixture)
     const implementerId = '00000000-0000-4000-8000-000000000002'
 
-    const model = applyIncrementally(fixture, [
-      ...sessionBootstrapEvents(),
-      proposedPlanUpsertedEvent({ planId: 'plan-1', planMarkdown: '# Plan' }),
-      sessionCreatedEvent(implementerId),
-      turnStartEventOnSession(implementerId, 'turn-1', requestedAt, {
-        planId: 'plan-1',
-        sessionId: SESSION_ID,
-      }),
-      proposedPlanImplementedEvent(implementerId, requestedAt),
-    ])
+    const model = applyIncrementally(
+      fixture,
+      sessionBootstrapEvents().concat([
+        proposedPlanUpsertedEvent({ planId: 'plan-1', planMarkdown: '# Plan' }),
+        sessionCreatedEvent(implementerId),
+        turnStartEventOnSession(implementerId, 'turn-1', requestedAt, {
+          planId: 'plan-1',
+          sessionId: SESSION_ID,
+        }),
+        proposedPlanImplementedEvent(implementerId, requestedAt),
+      ]),
+    )
 
     expect(model.sessions.get(SESSION_ID)?.hasActionableProposedPlan).toBe(false)
     expect(model.sessions.get(SESSION_ID)).toEqual(
@@ -521,16 +543,17 @@ describe('orchestration read-model cache coherence', () => {
 
 /** One or more `project.meta-updated` events over a bootstrapped project. */
 function projectMeta(...updates: ReadonlyArray<Record<string, unknown>>) {
-  return projectProject([
-    ...sessionBootstrapEvents(),
-    ...updates.map((update, index) =>
-      pendingEvent(
-        'project.meta-updated',
-        { projectId: PROJECT_ID, ...update, updatedAt: `2026-05-24T00:0${index + 1}:00.000Z` },
-        `2026-05-24T00:0${index + 1}:00.000Z`,
+  return projectProject(
+    sessionBootstrapEvents().concat(
+      updates.map((update, index) =>
+        pendingEvent(
+          'project.meta-updated',
+          { projectId: PROJECT_ID, ...update, updatedAt: `2026-05-24T00:0${index + 1}:00.000Z` },
+          `2026-05-24T00:0${index + 1}:00.000Z`,
+        ),
       ),
     ),
-  ])
+  )
 }
 
 function projectScripts(projected: ReturnType<typeof projectProject>) {

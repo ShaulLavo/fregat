@@ -31,24 +31,27 @@ export function createShellWorkspace(sessionCount: number) {
     (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
   )
 
-  const seeded = eventStore.append([
-    projectCreatedEvent(),
-    workspaceEvent(WORKTREE_ID, 'worktree', 'worktree.registered', {
-      worktreeId: WORKTREE_ID,
-      projectId: WORKSPACE_PROJECT_ID,
-      registrationGeneration: 0,
-      canonicalPath: '/workspace',
-      path: '/workspace',
-      branch: null,
-      kind: 'current',
-      ownership: 'protected',
-      createdAt: CREATED_AT,
-      updatedAt: CREATED_AT,
-      retiredAt: null,
-    }),
-    ...sessionIds.map((sessionId) => sessionCreatedEvent(sessionId)),
-    ...sessionIds.map((sessionId) => runtimeSetEvent(sessionId)),
-  ])
+  const seeded = eventStore.append(
+    [
+      projectCreatedEvent(),
+      workspaceEvent(WORKTREE_ID, 'worktree', 'worktree.registered', {
+        worktreeId: WORKTREE_ID,
+        projectId: WORKSPACE_PROJECT_ID,
+        registrationGeneration: 0,
+        canonicalPath: '/workspace',
+        path: '/workspace',
+        branch: null,
+        kind: 'current',
+        ownership: 'protected',
+        createdAt: CREATED_AT,
+        updatedAt: CREATED_AT,
+        retiredAt: null,
+      }),
+    ].concat(
+      sessionIds.map((sessionId) => sessionCreatedEvent(sessionId)),
+      sessionIds.map((sessionId) => runtimeSetEvent(sessionId)),
+    ),
+  )
   pipeline.applyEvents(seeded)
 
   return {

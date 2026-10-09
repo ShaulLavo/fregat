@@ -166,7 +166,7 @@ async function closeMaster(controlPath: string, target: string | undefined) {
 
 async function controlCommand(controlPath: string, target: string, operation: readonly string[]) {
   const child = Bun.spawn({
-    cmd: ['ssh', '-S', controlPath, ...operation, '--', target],
+    cmd: ['ssh', '-S', controlPath].concat(operation, ['--', target]),
     stdin: 'ignore',
     stdout: 'ignore',
     stderr: 'ignore',

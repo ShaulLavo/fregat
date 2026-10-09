@@ -143,7 +143,7 @@ function claudeSettingsOptions(
 ): Pick<Options, 'effort' | 'settings'> {
   const reasoning = claudeReasoningQueryOptions(input.reasoning ?? {})
   const off = input.sessionOffMcpServers ?? { other: [], project: [] }
-  const gated = [...new Set([...(input.unapprovedProjectMcpServers ?? []), ...off.project])]
+  const gated = [...new Set((input.unapprovedProjectMcpServers ?? []).concat(off.project))]
   if (gated.length === 0 && off.other.length === 0) return reasoning
 
   const settings = typeof reasoning.settings === 'object' ? reasoning.settings : {}

@@ -358,7 +358,7 @@ export class TranscriptJsonProjector {
       return { selected: kind === 'object', path: [] }
     }
     if (frame.stage !== 'value') this.state.invalid = true
-    const path = frame.kind === 'array' ? frame.path : [...frame.path, frame.key]
+    const path = frame.kind === 'array' ? frame.path : frame.path.concat([frame.key])
     const selected = frame.selected && selectedPath(path, kind)
     if (selected) {
       if (frame.entries) this.emit(',')

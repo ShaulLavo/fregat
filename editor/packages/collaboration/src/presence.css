@@ -1,3 +1,14 @@
+.editor-merge-review-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--editor-merge-review-color, var(--editor-syntax-keyword, currentColor));
+}
+
 .editor-remote-presence {
   position: absolute;
   inset: 0;

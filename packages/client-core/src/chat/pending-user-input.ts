@@ -50,7 +50,7 @@ function* parsedUserInputActivities(
   retained: readonly OrchestrationSessionActivity[],
   activities: readonly OrchestrationSessionActivity[],
 ) {
-  for (const activity of orderedSessionActivities([...retained, ...activities])) {
+  for (const activity of orderedSessionActivities(retained.concat(activities))) {
     if (!isUserInputActivity(activity.kind)) continue
 
     const parsed = v.safeParse(userInputPayloadSchema, activity.payload)
@@ -75,7 +75,7 @@ export function derivePendingUserInputs(
     openPendingUserInput(open, activity, payload.requestId, payload.questions, payload.responseMode)
   }
 
-  return [...open.values()]
+  return Array.from(open.values())
 }
 
 /**
@@ -98,7 +98,7 @@ export function resolveUserInputAnswer(
   if (question.answerKind === 'single-select')
     return customAnswer ?? selected[0] ?? attachmentAnswer
 
-  const values = customAnswer ? [...selected, customAnswer] : selected
+  const values = customAnswer ? selected.concat([customAnswer]) : selected
 
   return values.length > 0 ? values : attachmentAnswer
 }
@@ -119,7 +119,7 @@ export function toggleUserInputOption(
   const selected = normalizeSelectedValues(draft?.selectedValues)
   const next = selected.includes(optionValue)
     ? selected.filter((value) => value !== optionValue)
-    : [...selected, optionValue]
+    : selected.concat([optionValue])
 
   return { customAnswer: draft?.customAnswer ?? '', selectedValues: next }
 }
@@ -228,7 +228,7 @@ function normalizeSelectedValues(value: readonly string[] | undefined): string[]
     values.add(trimmed)
   }
 
-  return [...values]
+  return Array.from(values)
 }
 
 export function retainPendingMessageQuestions(
@@ -243,5 +243,5 @@ export function retainPendingMessageQuestions(
     }
     if (payload.responseMode === 'message') pending.set(payload.requestId, activity)
   }
-  return [...pending.values()]
+  return Array.from(pending.values())
 }

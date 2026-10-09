@@ -7,19 +7,19 @@ import { focusEditor, hoverCodePaint, hoverWord, openFileByName } from '../selec
 import type { Scenario } from './index'
 
 const EXAMPLE = ['const first = 1', 'const second = 2', 'const third = 3']
-const SOURCE = [
-  '/**',
-  ' * Doubles a number.',
-  ' * @example',
-  ' * ```ts',
-  ...EXAMPLE.map((line) => ` * ${line}`),
-  ' * ```',
-  ' */',
-  'export function twice(value: number): number {',
-  '  return value * 2',
-  '}',
-  '',
-].join('\r\n')
+const SOURCE = ['/**', ' * Doubles a number.', ' * @example', ' * ```ts']
+  .concat(
+    EXAMPLE.map((line) => ` * ${line}`),
+    [
+      ' * ```',
+      ' */',
+      'export function twice(value: number): number {',
+      '  return value * 2',
+      '}',
+      '',
+    ],
+  )
+  .join('\r\n')
 // The server reads `twice.ts` from disk, CRLF and all, because the editor never opens it.
 const CALLER = "import { twice } from './twice'\n\nexport const doubled = twice(4)\n"
 

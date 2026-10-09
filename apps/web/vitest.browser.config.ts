@@ -19,19 +19,20 @@ const alias = {
 // A linked package resolves outside the workspace, so Vite's fs allowlist blocks the non-JS
 // files it fetches at runtime: ghostty's wasm artifact, the Editor's worker scripts.
 const workspacePackages = path.resolve(import.meta.dirname, '../../packages')
-const linkedPackageRoots = [
-  ...['ghostty-webgpu'].flatMap((name) =>
+const linkedPackageRoots = ['ghostty-webgpu']
+  .flatMap((name) =>
     [import.meta.dirname, path.resolve(import.meta.dirname, '../..')].flatMap((base) => {
       const candidate = path.join(base, 'node_modules', name)
       return fs.existsSync(candidate) ? [fs.realpathSync(candidate)] : []
     }),
-  ),
-  ...fs
-    .readdirSync(workspacePackages)
-    .map((name) => path.join(workspacePackages, name))
-    .filter((candidate) => fs.lstatSync(candidate).isSymbolicLink())
-    .map((candidate) => fs.realpathSync(candidate)),
-]
+  )
+  .concat(
+    fs
+      .readdirSync(workspacePackages)
+      .map((name) => path.join(workspacePackages, name))
+      .filter((candidate) => fs.lstatSync(candidate).isSymbolicLink())
+      .map((candidate) => fs.realpathSync(candidate)),
+  )
 const browserTestPort = process.env.VITEST_BROWSER_PORT ?? '5179'
 const browserFileServerPort = process.env.VITEST_BROWSER_FILE_SERVER_PORT ?? '33201'
 const browserFileServerUrl = `http://127.0.0.1:${browserFileServerPort}`
@@ -44,7 +45,9 @@ process.env.VITEST_BROWSER_FILE_SERVER_URL = browserFileServerUrl
 export default defineConfig({
   plugins: [browserTestResponses(), react({ compiler: true }), tailwindcss()],
   resolve: { alias, dedupe: ['react', 'react-dom'] },
-  server: { fs: { allow: [path.resolve(import.meta.dirname, '../..'), ...linkedPackageRoots] } },
+  server: {
+    fs: { allow: [path.resolve(import.meta.dirname, '../..')].concat(linkedPackageRoots) },
+  },
   define: {
     // Browser tests talk to the spawned file server directly: the
     // Vitest browser runner serves tests from its own API server, so

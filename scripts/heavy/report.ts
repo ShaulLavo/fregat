@@ -103,7 +103,7 @@ function summarize(records: readonly HeavyJobRecord[], groupOf: (record: HeavyJo
     if (group) group.jobs.push(record)
     else groups.set(id, { display, jobs: [record] })
   }
-  return [...groups.values()].map(({ display, jobs }): Row => {
+  return Array.from(groups.values(), ({ display, jobs }): Row => {
     const peaks = measured(jobs, (job) => job.memoryPeakBytes)
     const cpu = measured(jobs, (job) => job.cpuUsageUsec)
     const ooms = measured(jobs, (job) => job.oomKills)
@@ -157,7 +157,8 @@ function formatTable(rows: readonly Row[], by: string) {
   const widths = header.map((title, column) =>
     Math.max(title.length, ...lines.map((line) => line[column]!.length)),
   )
-  return [header, ...lines]
+  return [header]
+    .concat(lines)
     .map((line) =>
       line
         .map((cell, column) => (column === line.length - 1 ? cell : cell.padStart(widths[column]!)))
@@ -193,7 +194,7 @@ function add(left: number, right: number) {
   return left + right
 }
 
-function median(values: readonly number[]) {
-  const sorted = values.toSorted((left, right) => left - right)
+function median(values: number[]) {
+  const sorted = values.sort((left, right) => left - right)
   return sorted[Math.floor(sorted.length / 2)]!
 }

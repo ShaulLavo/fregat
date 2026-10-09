@@ -323,7 +323,7 @@ function ReadyTreePane({
           activeFile: selectedFilePathRef.current,
           git: observedGit.current,
           expanded,
-          selected: [...tree.getSelectedPaths()],
+          selected: tree.getSelectedPaths(),
           scrollTop: scrollTopRef.current,
         },
         live ? Date.now() : saved?.record.observedAt,

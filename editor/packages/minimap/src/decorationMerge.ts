@@ -63,10 +63,10 @@ function groupByAppearance(
 
 function appendMergedBands(
   target: EditorMinimapDecoration[],
-  group: readonly EditorMinimapDecoration[],
+  group: EditorMinimapDecoration[],
   distance: number,
 ): void {
-  const ordered = group.toSorted(byStartLineNumber)
+  const ordered = group.sort(byStartLineNumber)
   let band = ordered[0]
   if (!band) return
 

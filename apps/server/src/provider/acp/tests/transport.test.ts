@@ -15,7 +15,7 @@ const disposables: { dispose: () => Promise<void> }[] = []
 const nodeExecutable = resolveFixtureNode()
 const input = (args: readonly string[] = []) => ({
   executable: nodeExecutable,
-  args: [executable, ...args],
+  args: [executable].concat(args),
   cwd: import.meta.dirname,
   env: process.env,
 })

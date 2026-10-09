@@ -52,9 +52,9 @@ function selectorStatistics(events: readonly TraceEvent[]) {
   return {
     events: count,
     selectors: all.length,
-    byTime: [...all].sort((a, b) => b.elapsedUs - a.elapsedUs).slice(0, 30),
-    byAttempts: [...all].sort((a, b) => b.attempts - a.attempts).slice(0, 30),
-    all: [...all].sort((a, b) => a.selector.localeCompare(b.selector)),
+    byTime: all.toSorted((a, b) => b.elapsedUs - a.elapsedUs).slice(0, 30),
+    byAttempts: all.toSorted((a, b) => b.attempts - a.attempts).slice(0, 30),
+    all: all.sort((a, b) => a.selector.localeCompare(b.selector)),
   }
 }
 

@@ -14,11 +14,11 @@ export async function searchHistoryTips(
     '--regexp-ignore-case',
   ]
   const [messages, authors, revision] = await Promise.all([
-    runner.run([...args, `--grep=${search}`, '--stdin'], options),
-    runner.run([...args, `--author=${search}`, '--stdin'], options),
+    runner.run(args.concat([`--grep=${search}`, '--stdin']), options),
+    runner.run(args.concat([`--author=${search}`, '--stdin']), options),
     resolveSearchRevision(runner, tips, search),
   ])
-  return [...new Set([...messages.stdout.split('\n'), ...authors.stdout.split('\n'), ...revision])]
+  return [...new Set(messages.stdout.split('\n').concat(authors.stdout.split('\n'), revision))]
     .filter(Boolean)
     .sort()
 }

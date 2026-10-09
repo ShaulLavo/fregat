@@ -246,7 +246,8 @@ function buffer(lines: readonly TerminalBufferLine[]): TerminalBufferLineReader 
 }
 
 function row(content: string, { columns = COLUMNS, wrapped = false } = {}): TerminalBufferLine {
-  const codepoints = [...content.padEnd(columns, UNWRITTEN)].map(
+  const codepoints = Array.from(
+    content.padEnd(columns, UNWRITTEN),
     (character) => character.codePointAt(0) ?? 0,
   )
 

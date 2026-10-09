@@ -49,9 +49,10 @@ export const itemNavigation: Scenario = {
       const order = await page.evaluate(
         (titlePrefix) => [
           ...new Set(
-            [...document.querySelectorAll<HTMLElement>('[title]')]
-              .map((element) => element.getAttribute('title') ?? '')
-              .filter((title) => title.startsWith(titlePrefix)),
+            Array.from(
+              document.querySelectorAll<HTMLElement>('[title]'),
+              (element) => element.getAttribute('title') ?? '',
+            ).filter((title) => title.startsWith(titlePrefix)),
           ),
         ],
         prefix,

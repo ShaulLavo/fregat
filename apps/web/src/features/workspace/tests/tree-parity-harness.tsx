@@ -58,7 +58,7 @@ export const ROW_HEIGHT = 24
  * The parity paths: a flattened chain, nested folders, a long folder for scrolling and sticky rows.
  * Folders end in `/`, as the app passes them.
  */
-const PARITY_PATHS = [
+const PARITY_PATHS: readonly string[] = [
   'README.md',
   'chain/',
   'chain/of/',
@@ -74,9 +74,10 @@ const PARITY_PATHS = [
   'src/lib/',
   'src/lib/x.ts',
   'src/lib/y.ts',
-  ...Array.from({ length: 40 }, (_, index) => `src/lib/z-${String(index).padStart(2, '0')}.ts`),
-  'zeta.ts',
-] as const
+].concat(
+  Array.from({ length: 40 }, (_, index) => `src/lib/z-${String(index).padStart(2, '0')}.ts`),
+  ['zeta.ts'],
+)
 
 type ParityEvents = {
   readonly drops: FileTreeDropResult[]

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { resolveTreeSitterLanguageContribution } from '../src'
 import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '../../tree-sitter-languages/src/catalog.generated'
 import { TreeSitterWorkerClient } from '../src/treeSitter/workerClient'
@@ -315,6 +315,78 @@ it('fingerprints an unmatched TypeScript line fallback', async () => {
   })
   expect(result).toMatchObject({ status: 'ok', unit: { source: 'line', hasErrors: false } })
   if (result?.status === 'ok') expect(result.unit.contentKey).toContain('comment')
+})
+
+it('touching selection returns every intersected unit', async () => {
+  const text = 'interface Palette { amber: string; violet: number; }'
+  await parseTreeDocument(client, {
+    ...document,
+    snapshotVersion: 1,
+    text,
+    resultMode: 'parseOnly',
+  })
+  const result = await client.mergeUnit({
+    ...document,
+    snapshotVersion: 1,
+    range: { startIndex: text.indexOf('amber'), endIndex: text.indexOf('number') + 6 },
+    selection: 'touching',
+    analysis: true,
+  })
+  expect(result?.status).toBe('ok')
+  if (result?.status !== 'ok') return
+  expect(result.units?.map((unit) => unit.signature)).toEqual(['amber', 'Palette', 'violet'])
+})
+
+it('the live review reader admits snapshots and retires worker sources', async () => {
+  const { createTreeSitterReviewSyntax } = await import('../src/mergeReview')
+  const { createPieceTableSnapshot, applyBatchToPieceTable } =
+    await import('@singapore-editor/core/document')
+  const descriptor = await resolveTreeSitterLanguageContribution(
+    TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === 'typescript')!,
+  )
+  const syntax = createTreeSitterReviewSyntax({
+    languageId: 'typescript',
+    languages: [descriptor],
+    backend: client,
+  })
+  const parse = vi.spyOn(client, 'parse')
+  const project = vi.spyOn(client, 'projectMergeUnits')
+  const base = createPieceTableSnapshot('const value = 0;\n')
+  const projected = applyBatchToPieceTable(base, [{ from: 14, to: 15, text: '1' }])
+  const ranges = [{ startIndex: 14, endIndex: 15 }]
+  expect((await syntax(base, ranges))?.[0]?.[0]?.type).toBe('lexical_declaration')
+  expect((await syntax(projected, ranges, false, 'enclosing', base))?.[0]?.[0]?.type).toBe(
+    'lexical_declaration',
+  )
+  expect(parse).toHaveBeenCalledTimes(1)
+  expect(project).toHaveBeenCalledTimes(1)
+  expect(project.mock.calls[0]![0]).toMatchObject({
+    baseSnapshotVersion: parse.mock.calls[0]![0].snapshotVersion,
+    inputEdits: [
+      {
+        startIndex: 14,
+        oldEndIndex: 15,
+        newEndIndex: 15,
+        startPosition: { row: 0, column: 14 },
+        oldEndPosition: { row: 0, column: 15 },
+        newEndPosition: { row: 0, column: 15 },
+      },
+    ],
+  })
+  expect((await client.inspectRetention())?.documentCount).toBe(1)
+  for (let index = 0; index < 8; index++) {
+    const next = applyBatchToPieceTable(base, [{ from: 14, to: 15, text: String(index + 2) }])
+    expect((await syntax(next, ranges, false, 'enclosing', base))?.[0]?.[0]?.type).toBe(
+      'lexical_declaration',
+    )
+  }
+  expect(parse).toHaveBeenCalledTimes(1)
+  expect(project).toHaveBeenCalledTimes(9)
+  await syntax.release()
+  const retired = await client.inspectRetention()
+  expect(retired?.documentCount).toBe(0)
+  expect(retired?.source.readCount).toBe(0)
+  await syntax.dispose()
 })
 
 it('projects merge units without changing highlighting trees and bounds retained projections', async () => {
@@ -697,3 +769,88 @@ it('releases request-owned projections when a merge query throws', async () => {
     await prepared!.prepared.dispose()
   }
 })
+
+it('the live review reader preserves nested fence languages in projected units', async () => {
+  const { createTreeSitterReviewSyntax } = await import('../src/mergeReview')
+  const { createPieceTableSnapshot, applyBatchToPieceTable } =
+    await import('@singapore-editor/core/document')
+  const languages = await Promise.all(
+    ['markdown', 'javascript', 'json'].map((id) =>
+      resolveTreeSitterLanguageContribution(
+        TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === id)!,
+      ),
+    ),
+  )
+  const syntax = createTreeSitterReviewSyntax({
+    languageId: 'markdown',
+    languages,
+    backend: client,
+  })
+  const text = '```javascript\nconst palette = json`{"amber": 1, "violet": 2}`;\n```\n'
+  const base = createPieceTableSnapshot(text)
+  const startIndex = text.indexOf('1')
+  const ranges = [{ startIndex, endIndex: startIndex + 1 }]
+  const projected = applyBatchToPieceTable(base, [
+    { from: startIndex, to: startIndex + 1, text: '9' },
+  ])
+  const parse = vi.spyOn(client, 'parse')
+  const project = vi.spyOn(client, 'projectMergeUnits')
+  expect((await syntax(base, ranges, true))?.[0]?.[0]).toMatchObject({
+    type: 'pair',
+    languageId: 'json',
+  })
+  expect((await syntax(projected, ranges, true, 'enclosing', base))?.[0]?.[0]).toMatchObject({
+    type: 'pair',
+    languageId: 'json',
+    hasErrors: false,
+  })
+  expect(parse).toHaveBeenCalledTimes(1)
+  expect(project).toHaveBeenCalledTimes(1)
+  const result = await project.mock.results[0]!.value
+  expect(result).toMatchObject({ languageId: 'markdown', units: [[{ languageId: 'json' }]] })
+  await syntax.dispose()
+  expect((await client.inspectRetention())?.source.readCount).toBe(0)
+})
+
+it.each(['stale', 'cancelled'] as const)(
+  'the live review reader returns unavailable for a %s projection and releases its source',
+  async (status) => {
+    const { createTreeSitterReviewSyntax } = await import('../src/mergeReview')
+    const { createPieceTableSnapshot, applyBatchToPieceTable } =
+      await import('@singapore-editor/core/document')
+    const descriptor = await resolveTreeSitterLanguageContribution(
+      TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === 'typescript')!,
+    )
+    const syntax = createTreeSitterReviewSyntax({
+      languageId: 'typescript',
+      languages: [descriptor],
+      backend: client,
+    })
+    const base = createPieceTableSnapshot('const value = 0;\n')
+    const projected = applyBatchToPieceTable(base, [{ from: 14, to: 15, text: '1' }])
+    const ranges = [{ startIndex: 14, endIndex: 15 }]
+    await syntax(base, ranges)
+    const baseline = await client.inspectRetention()
+    const query = client.projectMergeUnits.bind(client)
+    const cancellationBuffer = new SharedArrayBuffer(4)
+    Atomics.store(new Int32Array(cancellationBuffer), 0, 1)
+    const project = vi
+      .spyOn(client, 'projectMergeUnits')
+      .mockImplementation((request) =>
+        query(
+          status === 'stale'
+            ? { ...request, baseSnapshotVersion: -1 }
+            : { ...request, cancellationBuffer },
+        ),
+      )
+    expect(await syntax(projected, ranges, false, 'enclosing', base)).toBeNull()
+    expect(await project.mock.results[0]!.value).toMatchObject({ status, units: [] })
+    expect((await client.inspectRetention())?.source).toEqual(baseline?.source)
+    project.mockRestore()
+    expect((await syntax(projected, ranges, false, 'enclosing', base))?.[0]?.[0]?.type).toBe(
+      'lexical_declaration',
+    )
+    await syntax.dispose()
+    expect((await client.inspectRetention())?.source.readCount).toBe(0)
+  },
+)

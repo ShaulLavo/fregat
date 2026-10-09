@@ -166,15 +166,16 @@ function postSearch(body: unknown) {
  * the detail window to find it.
  */
 function seedEvents() {
-  return [
-    ...sessionBootstrapEvents(),
-    searchMessageEvent({
-      createdAt: BURIED_AT,
-      messageId: 'message-buried',
-      text: BURIED_TEXT,
-      sessionId: SESSION_ID,
-    }),
-    ...Array.from({ length: NOISE_MESSAGE_COUNT }, (_, index) =>
+  return sessionBootstrapEvents().concat(
+    [
+      searchMessageEvent({
+        createdAt: BURIED_AT,
+        messageId: 'message-buried',
+        text: BURIED_TEXT,
+        sessionId: SESSION_ID,
+      }),
+    ],
+    Array.from({ length: NOISE_MESSAGE_COUNT }, (_, index) =>
       searchMessageEvent({
         createdAt: noiseCreatedAt(index),
         messageId: `message-noise-${index}`,
@@ -182,44 +183,46 @@ function seedEvents() {
         sessionId: SESSION_ID,
       }),
     ),
-    searchSessionCreatedEvent({
-      createdAt: '2026-05-25T00:00:00.000Z',
-      sessionId: '19e557ea-fa7c-515a-9051-e990f8aa54c6',
-    }),
-    searchMessageEvent({
-      createdAt: '2026-05-25T00:30:00.000Z',
-      messageId: 'message-2a',
-      role: 'user',
-      text: 'the first pelican mention in this session',
-      sessionId: '19e557ea-fa7c-515a-9051-e990f8aa54c6',
-    }),
-    searchMessageEvent({
-      createdAt: RECENT_SESSION_MATCH_AT,
-      messageId: 'message-2b',
-      text: 'the second pelican mention, which is the newer one',
-      sessionId: '19e557ea-fa7c-515a-9051-e990f8aa54c6',
-    }),
-    searchSessionCreatedEvent({
-      createdAt: '2026-05-26T00:00:00.000Z',
-      sessionId: '287d7571-b9f0-5489-8ea1-7dc0decb92ee',
-    }),
-    searchMessageEvent({
-      createdAt: NEWEST_SESSION_MATCH_AT,
-      messageId: 'message-3a',
-      text: 'a pelican in the newest session',
-      sessionId: '287d7571-b9f0-5489-8ea1-7dc0decb92ee',
-    }),
-    searchSessionCreatedEvent({
-      createdAt: '2026-05-20T00:00:00.000Z',
-      sessionId: '20ec4a31-6791-57a0-85a7-9ffb0330fa7a',
-    }),
-    searchMessageEvent({
-      createdAt: '2026-05-20T00:30:00.000Z',
-      messageId: 'message-4a',
-      text: `${'filler '.repeat(300)}${LONG_MESSAGE_MATCH}${' trailing'.repeat(300)}`,
-      sessionId: '20ec4a31-6791-57a0-85a7-9ffb0330fa7a',
-    }),
-  ]
+    [
+      searchSessionCreatedEvent({
+        createdAt: '2026-05-25T00:00:00.000Z',
+        sessionId: '19e557ea-fa7c-515a-9051-e990f8aa54c6',
+      }),
+      searchMessageEvent({
+        createdAt: '2026-05-25T00:30:00.000Z',
+        messageId: 'message-2a',
+        role: 'user',
+        text: 'the first pelican mention in this session',
+        sessionId: '19e557ea-fa7c-515a-9051-e990f8aa54c6',
+      }),
+      searchMessageEvent({
+        createdAt: RECENT_SESSION_MATCH_AT,
+        messageId: 'message-2b',
+        text: 'the second pelican mention, which is the newer one',
+        sessionId: '19e557ea-fa7c-515a-9051-e990f8aa54c6',
+      }),
+      searchSessionCreatedEvent({
+        createdAt: '2026-05-26T00:00:00.000Z',
+        sessionId: '287d7571-b9f0-5489-8ea1-7dc0decb92ee',
+      }),
+      searchMessageEvent({
+        createdAt: NEWEST_SESSION_MATCH_AT,
+        messageId: 'message-3a',
+        text: 'a pelican in the newest session',
+        sessionId: '287d7571-b9f0-5489-8ea1-7dc0decb92ee',
+      }),
+      searchSessionCreatedEvent({
+        createdAt: '2026-05-20T00:00:00.000Z',
+        sessionId: '20ec4a31-6791-57a0-85a7-9ffb0330fa7a',
+      }),
+      searchMessageEvent({
+        createdAt: '2026-05-20T00:30:00.000Z',
+        messageId: 'message-4a',
+        text: `${'filler '.repeat(300)}${LONG_MESSAGE_MATCH}${' trailing'.repeat(300)}`,
+        sessionId: '20ec4a31-6791-57a0-85a7-9ffb0330fa7a',
+      }),
+    ],
+  )
 }
 
 function noiseCreatedAt(index: number) {

@@ -281,8 +281,8 @@ function logSummary(
   }
 }
 
-function sortNewest(events: readonly NormalizedLogEvent[]) {
-  return events.toSorted((left, right) => right.timestampMs - left.timestampMs)
+function sortNewest(events: NormalizedLogEvent[]) {
+  return events.sort((left, right) => right.timestampMs - left.timestampMs)
 }
 
 function breakdown(
@@ -297,7 +297,7 @@ function breakdown(
   }
 
   return Array.from(counts, ([value, count]) => ({ count, value }))
-    .toSorted(compareBreakdownItems)
+    .sort(compareBreakdownItems)
     .slice(0, maxBreakdownItems)
 }
 
@@ -411,7 +411,7 @@ function numericDurations(events: readonly LogEventFields[]) {
   return events
     .map((event) => event.durationMs)
     .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
-    .toSorted((left, right) => left - right)
+    .sort((left, right) => left - right)
 }
 
 function percentile(values: readonly number[], percentileValue: number) {
@@ -531,6 +531,6 @@ function stableStringify(value: unknown): string {
 
 function stableEntries(value: Record<string, unknown>) {
   return Object.keys(value)
-    .toSorted()
+    .sort()
     .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
 }

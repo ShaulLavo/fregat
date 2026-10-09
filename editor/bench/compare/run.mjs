@@ -126,19 +126,22 @@ let results = {
           '@singapore-editor/tree-sitter-languages',
           '../../packages/tree-sitter-languages/package.json',
         ],
-        ...[
-          'monaco-editor',
-          'codemirror',
-          '@codemirror/state',
-          '@codemirror/view',
-          '@codemirror/lang-javascript',
-          'playwright',
-          'vite',
-        ].map((name) => [name, `node_modules/${name}/package.json`]),
-      ].map(async ([name, file]) => [
-        name,
-        JSON.parse(await readFile(resolve(root, file), 'utf8')).version,
-      ]),
+      ]
+        .concat(
+          [
+            'monaco-editor',
+            'codemirror',
+            '@codemirror/state',
+            '@codemirror/view',
+            '@codemirror/lang-javascript',
+            'playwright',
+            'vite',
+          ].map((name) => [name, `node_modules/${name}/package.json`]),
+        )
+        .map(async ([name, file]) => [
+          name,
+          JSON.parse(await readFile(resolve(root, file), 'utf8')).version,
+        ]),
     ),
   ),
   rootLockSha256: createHash('sha256')
@@ -504,7 +507,7 @@ try {
   if (values.resume) {
     const previous = JSON.parse(await readFile(resolve(values.output, 'experiment.json'), 'utf8'))
     verifyResume(previous, results)
-    previous.resumedAt = [...(previous.resumedAt ?? []), results.date]
+    previous.resumedAt = (previous.resumedAt ?? []).concat([results.date])
     results = previous
   }
   for (const mib of selected) {

@@ -234,14 +234,9 @@ function invalidateFileHistory(runtime: FileOperationRuntime) {
 function moveEditorPaths(owners: DocumentOwners, move: DocumentMove) {
   const workspace = owners.workspaceStore.getState()
   const renames = editorPathRenames(
-    [
-      ...filePathsForTabs([
-        ...workspace.openTabContents,
-        ...workspace.editorHistory,
-        ...workspace.recentlyClosedTabs,
-      ]),
-      ...liveDocumentPaths(owners.documentStore),
-    ],
+    filePathsForTabs(
+      workspace.openTabContents.concat(workspace.editorHistory, workspace.recentlyClosedTabs),
+    ).concat(liveDocumentPaths(owners.documentStore)),
     move.from,
     move.to,
   )

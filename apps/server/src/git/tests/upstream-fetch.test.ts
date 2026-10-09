@@ -209,7 +209,7 @@ describe('UpstreamFetchScheduler', () => {
         gitCommonDirectory({
           rootAbsolutePath,
           run: async (args) => ({
-            stdout: (await runGit(root, ['--git-dir', gitDir, ...args])).stdout.trimEnd(),
+            stdout: (await runGit(root, ['--git-dir', gitDir].concat(args))).stdout.trimEnd(),
           }),
         }),
       )

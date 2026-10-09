@@ -318,7 +318,7 @@ export class Network {
         assert.equal(
           node.session.pending.size,
           0,
-          `Every reachable edit settled: ${context} pending=${JSON.stringify([...node.session.pending.values()].map((edit) => ({ id: edit.id, missing: edit.deps.filter((id) => !node.engine.outcome(id)) })))}\n${this.trace.join('\n')}`,
+          `Every reachable edit settled: ${context} pending=${JSON.stringify(Array.from(node.session.pending.values(), (edit) => ({ id: edit.id, missing: edit.deps.filter((id) => !node.engine.outcome(id)) })))}\n${this.trace.join('\n')}`,
         )
       }
       assert.equal(
@@ -456,7 +456,7 @@ export function runSeed(
     network.type(15)
     network.advance(30)
     // Two branches meet while the third keeps typing, then the third joins mid-replay.
-    network.partition([[...groups[0]!, ...groups[1]!], groups[2]!])
+    network.partition([groups[0]!.concat(groups[1]!), groups[2]!])
     network.advance(10 + network.integer(25))
     network.type(8)
     network.heal()

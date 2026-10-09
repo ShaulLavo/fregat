@@ -190,8 +190,8 @@ function createBatchEvent(
   visibleCountDelta: number | null,
 ): PathStoreBatchEvent {
   return {
-    affectedAncestorIds: [...frame.affectedAncestorIds],
-    affectedNodeIds: [...frame.affectedNodeIds],
+    affectedAncestorIds: Array.from(frame.affectedAncestorIds),
+    affectedNodeIds: Array.from(frame.affectedNodeIds),
     canonicalChanged: frame.events.some((event) => event.canonicalChanged),
     events: [...frame.events],
     operation: 'batch',

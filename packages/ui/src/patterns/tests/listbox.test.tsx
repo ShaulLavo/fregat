@@ -62,7 +62,7 @@ describe('useListbox', () => {
     const { list } = renderListbox()
     expect(list.tabIndex).toBe(0)
     expect(
-      [...list.querySelectorAll<HTMLElement>('[role="option"]')].every(
+      Array.from(list.querySelectorAll<HTMLElement>('[role="option"]')).every(
         (row) => row.tabIndex === -1,
       ),
     ).toBe(true)
@@ -130,7 +130,10 @@ describe('useListbox', () => {
     ['PageDown', 'Home', 'Delta'],
   ])('moves %s to the enabled boundary when a section occupies the edge', (key, start, label) => {
     const { list } = renderListbox({
-      items: [{ id: 'heading', disabled: true }, ...items, { id: 'footer', disabled: true }],
+      items: Array.of<UseListboxOptions<string>['items'][number]>({
+        id: 'heading',
+        disabled: true,
+      }).concat(items, [{ id: 'footer', disabled: true }]),
       pageSize: 20,
     })
     press(list, start)
@@ -228,7 +231,7 @@ describe('useListbox', () => {
       <Listbox
         scrollToIndex={reveal}
         activeId={null}
-        items={[{ id: 'new', label: 'New' }, ...items]}
+        items={[{ id: 'new', label: 'New' }].concat(items)}
       />,
     )
     expect(reveal).not.toHaveBeenCalled()

@@ -79,7 +79,7 @@ export function parseSettingsDocument(text: string): ParsedSettingsDocument {
   if (!isRecord(parsed)) {
     const notAnObject = { message: 'settings must be a JSON object', offset: 0, length: 0 }
 
-    return { values: {}, parseErrors: [...parseErrors, notAnObject], keyRanges: {} }
+    return { values: {}, parseErrors: parseErrors.concat([notAnObject]), keyRanges: {} }
   }
 
   return { values: parsed, parseErrors, keyRanges: topLevelKeyRanges(root) }

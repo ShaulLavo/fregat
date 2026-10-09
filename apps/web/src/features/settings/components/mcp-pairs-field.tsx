@@ -69,7 +69,7 @@ export function McpPairsField({
       ))}
       <Button
         className='self-start'
-        onClick={() => onChange([...pairs, { key: '', value: '' }])}
+        onClick={() => onChange(pairs.concat([{ key: '', value: '' }]))}
         size='sm'
         type='button'
         variant='ghost'

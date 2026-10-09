@@ -1,0 +1,65 @@
+[
+  {
+    "file": "apps/web/src/features/command-palette/components/content.tsx",
+    "component": "CommandPaletteContent",
+    "name": "actions",
+    "signature": "6a5880a3826ed36d6f082a466f699b129b39b9a39c155ddf8a213622d9f7a8ea",
+    "reason": "Reviewed both nested helpers: they capture inputs already in the manual keys. Compiler scope names those closures separately; retaining the context identity is intentional."
+  },
+  {
+    "file": "apps/web/src/features/editor/hooks/use-dirty-tab-close.tsx",
+    "component": "useDirtyTabCloseRequest",
+    "name": "handleOpenChange",
+    "signature": "571da4a57591b809fe9f521f65e2f5617b223143864b640a668e672eee5d1a18",
+    "reason": "clearPendingClose reads stable refs and state setters. Keep the callback identity for the dialog open-change consumer."
+  },
+  {
+    "file": "apps/web/src/features/editor/hooks/use-dirty-tab-close.tsx",
+    "component": "useDirtyTabCloseRequest",
+    "name": "handleCancel",
+    "signature": "9d29e68acae2fd626a0b55b4ea32cecb8e7d93b369974c1d6044bcd552fe680d",
+    "reason": "clearPendingClose reads stable refs and state setters. Retain the cancellation callback identity."
+  },
+  {
+    "file": "apps/web/src/features/editor/hooks/use-dirty-tab-close.tsx",
+    "component": "useDirtyTabCloseRequest",
+    "name": "handleDiscard",
+    "signature": "16a7ec1945066fd5d085cf44cae61f0eceb8dcf172f02a68dbf8f5b61ca32148",
+    "reason": "advancePendingClose reads stable refs and setters. Remaining reactive inputs match; retaining the consumer callback identity is intentional."
+  },
+  {
+    "file": "apps/web/src/features/editor/hooks/use-dirty-tab-close.tsx",
+    "component": "useDirtyTabCloseRequest",
+    "name": "handleSave",
+    "signature": "b5a853aa19e1bca940da358558db99a520e0601a5f8a563bfb88402bcb5d3bdf",
+    "reason": "advancePendingClose has no changing render input. Remaining reactive inputs match; retaining the save callback identity is intentional."
+  },
+  {
+    "file": "apps/web/src/features/search/components/result-file-header-row.tsx",
+    "component": "SearchResultFileHeaderRow",
+    "name": "handleMouseDown",
+    "signature": "af41ca850a7a620f432bec7b7dffd5adf5a2f5c45e4cbd3def890faf894a9853",
+    "reason": "The callback reads id and selectResult. The compiler merges it with row and virtual-scroll work; the narrower handler keys preserve identity across scroll updates."
+  },
+  {
+    "file": "apps/web/src/features/workspace/hooks/use-selected-file.ts",
+    "component": "useSelectedFile",
+    "name": "fileState",
+    "signature": "8fd44456fd0186b59f12a66a84ea4971aaa910d1cd4e69b990c1a8102f42da3d",
+    "reason": "fileState reads exactly the manual keys. Metadata changes update the separate fileVersion derivation; the narrower state identity is intentional."
+  },
+  {
+    "file": "apps/web/src/hooks/use-element-width.ts",
+    "component": "useElementWidth",
+    "name": "ref",
+    "signature": "4dbd5336a6cf081359abc5819559fc98212b713f0e219f8753e56180fb6d4da2",
+    "reason": "Returned DOM ref owns ResizeObserver cleanup. Stable callback identity avoids detaching and re-observing when its caller renders."
+  },
+  {
+    "file": "apps/web/src/lib/appearance/hooks/use-shown.ts",
+    "component": "useShown",
+    "name": "ref",
+    "signature": "0f2ba3d02dc6b42015845ae89cf6796fa9a325aea51a6d5763f196b20821355c",
+    "reason": "Returned DOM ref owns IntersectionObserver cleanup. Stable callback identity avoids detaching and re-observing when its caller renders."
+  }
+]

@@ -346,7 +346,7 @@ viewport.addEventListener(
 onThemeChange(() => docs?.refreshTheme())
 setUpSearch(
   new Map(
-    [...pages.values()].map((page) => [new URL(page.url, location.href).pathname, page.file]),
+    Array.from(pages.values(), (page) => [new URL(page.url, location.href).pathname, page.file]),
   ),
 )
 

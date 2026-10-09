@@ -389,7 +389,7 @@ describe('decoration store ownership', () => {
     expect(offsetsOf(store)).toEqual([])
     expect(store.decorationsInRange('row', 0, 100)).toEqual([])
     expect(store.decorationsInRange('minimap', 0, 100)).toEqual([])
-    expect(store.replaceOwner('find', [...specs])).toBe(true)
+    expect(store.replaceOwner('find', specs)).toBe(true)
   })
 })
 

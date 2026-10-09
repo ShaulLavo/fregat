@@ -150,7 +150,7 @@ export class ProjectHost implements ProjectService {
     return {
       getCompilationSettings: () => this.options,
       getProjectVersion: () => String(this.#projectVersion),
-      getScriptFileNames: () => [...this.#roots, ...this.#openOutsideRoots()],
+      getScriptFileNames: () => this.#roots.concat(this.#openOutsideRoots()),
       getScriptVersion: (fileName) => String(this.#versions.get(this.canonical(fileName)) ?? 0),
       getScriptSnapshot: (fileName) => {
         const text = this.#text(fileName)

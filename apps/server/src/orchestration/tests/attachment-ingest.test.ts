@@ -226,9 +226,10 @@ function persistedJson(database: Awaited<ReturnType<typeof createFixture>>['data
   const events = database.select().from(schema.orchestrationEvents).all()
   const receipts = database.select().from(schema.orchestrationCommandReceipts).all()
 
-  return [...events.map((row) => row.payloadJson), ...receipts.map((row) => row.commandJson)].join(
-    '\n',
-  )
+  return events
+    .map((row) => row.payloadJson)
+    .concat(receipts.map((row) => row.commandJson))
+    .join('\n')
 }
 
 function pngAttachment() {

@@ -182,8 +182,8 @@ test('Update app lists busy sessions, closing keeps them, and Update now interru
     await screen.findByRole('button', { name: /Restarting…|Reconnecting…|Waiting for readiness…/ }),
   ).toBeInTheDocument()
   expect(exits).toHaveLength(1)
-  expect(exits[0]?.interrupted.map((session) => session.sessionId).toSorted()).toEqual(
-    [SESSION_ID, LATE_SESSION_ID].toSorted(),
+  expect(exits[0]?.interrupted.map((session) => session.sessionId).sort()).toEqual(
+    [SESSION_ID, LATE_SESSION_ID].sort(),
   )
   expect(screen.queryByRole('dialog')).toBeNull()
 })

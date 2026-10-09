@@ -104,12 +104,12 @@ for (const result of [
     assert.deepEqual(result.environment[field], before.environment[field])
 assert.throws(() => validate({ ...before, samples: before.samples.slice(1) }))
 assert.throws(() =>
-  validate({ ...before, samples: [before.samples[0], ...before.samples.slice(0, -1)] }),
+  validate({ ...before, samples: [before.samples[0]].concat(before.samples.slice(0, -1)) }),
 )
 assert.throws(() =>
   validate({
     ...before,
-    samples: [{ ...before.samples[0], state: 'missing-group' }, ...before.samples.slice(1)],
+    samples: [{ ...before.samples[0], state: 'missing-group' }].concat(before.samples.slice(1)),
   }),
 )
 assert.throws(() =>
@@ -131,10 +131,10 @@ function metricValue(sample, metric) {
 }
 const metricValues = (result, key, metric) =>
   result.samples.filter((s) => identity(s) === key).map((s) => metricValue(s, metric))
-const metrics = (sample) => [
-  ...Object.keys(sample.latencyMs),
-  ...(sample.plugin === 'tree-sitter' ? ['firstHighlightedCaptureUpperBound'] : []),
-]
+const metrics = (sample) =>
+  Object.keys(sample.latencyMs).concat(
+    sample.plugin === 'tree-sitter' ? ['firstHighlightedCaptureUpperBound'] : [],
+  )
 const groups = keys.map((key) => ({
   key,
   metrics: Object.fromEntries(

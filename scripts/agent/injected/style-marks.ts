@@ -9,7 +9,11 @@ function observeStyles(root: Node, kind: string) {
         mark(kind)
         continue
       }
-      if ([...record.addedNodes, ...record.removedNodes].some((node) => node.nodeName === 'STYLE'))
+      if (
+        Array.from(record.addedNodes)
+          .concat(Array.from(record.removedNodes))
+          .some((node) => node.nodeName === 'STYLE')
+      )
         mark(kind)
     }
   })

@@ -25,7 +25,7 @@ test.each([false, true])(
     appendWordWrapText(line, text, 0, text.length, rules)
     finishWordWrapLine(line, rules)
     let start = 0
-    for (const end of [...line.ends, text.length]) {
+    for (const end of line.ends.concat([text.length])) {
       const row = text.slice(start, end)
       expect(columns(row), JSON.stringify({ text, start, end, row })).toBeLessThanOrEqual(4)
       start = end

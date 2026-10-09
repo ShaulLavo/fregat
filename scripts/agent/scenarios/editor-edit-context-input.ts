@@ -47,7 +47,7 @@ async function rowTexts(page: Page): Promise<string[]> {
   return page.evaluate((layers) => {
     const rows = Array.from(
       document.querySelectorAll<HTMLElement>('.editor-virtualized-row:not([hidden])'),
-    ).toSorted(
+    ).sort(
       (left, right) =>
         Number(left.dataset.editorVirtualRow) - Number(right.dataset.editorVirtualRow),
     )

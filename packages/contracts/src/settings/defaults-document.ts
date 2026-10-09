@@ -51,16 +51,15 @@ export function defaultSettingsDocument(): string {
 }
 
 function entryLines(id: SettingId, descriptor: SettingDescriptor, last: boolean): string[] {
-  const comment = [...wrap(descriptor.description), ...provenance(descriptor)]
+  const comment = wrap(descriptor.description).concat(provenance(descriptor))
   const value = JSON.stringify(descriptor.default, null, INDENT.length)
     .split('\n')
     .map((line, index) => (index === 0 ? line : `${INDENT}${line}`))
     .join('\n')
 
-  return [
-    ...comment.map((line) => `${INDENT}// ${line}`),
-    `${INDENT}${JSON.stringify(id)}: ${value}${last ? '' : ','}`,
-  ]
+  return comment
+    .map((line) => `${INDENT}// ${line}`)
+    .concat([`${INDENT}${JSON.stringify(id)}: ${value}${last ? '' : ','}`])
 }
 
 function provenance(descriptor: SettingDescriptor): string[] {

@@ -63,14 +63,14 @@ async function routeExists() {
 }
 
 async function mesh(args: readonly string[]) {
-  const child = Bun.spawn({ cmd: ['mesh', ...args], stderr: 'inherit', stdout: 'inherit' })
+  const child = Bun.spawn({ cmd: ['mesh'].concat(args), stderr: 'inherit', stdout: 'inherit' })
   const exitCode = await child.exited
   if (exitCode === 0) return
   throw scriptErrors.MESH_FAILED({ command: args.join(' '), exitCode })
 }
 
 async function meshOutput(args: readonly string[]) {
-  const child = Bun.spawn({ cmd: ['mesh', ...args], stderr: 'inherit', stdout: 'pipe' })
+  const child = Bun.spawn({ cmd: ['mesh'].concat(args), stderr: 'inherit', stdout: 'pipe' })
   const output = await new Response(child.stdout).text()
   const exitCode = await child.exited
   if (exitCode === 0) return output

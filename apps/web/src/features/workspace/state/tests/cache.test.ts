@@ -129,7 +129,7 @@ describe('workspace cache', () => {
         testTabContent('/other/a.ts'),
         documentTab({ kind: 'search', root: workspaceRoot('/other') }),
       ]
-      const contents = [...admitted, ...rejected]
+      const contents = admitted.concat(rejected)
       writeRootFolderCache(testScopedStorage, pickedDirectory(rootPath))
       writeWorkspaceSliceCache(testScopedStorage, rootPath, {
         viewScrollPositions: [],
@@ -153,19 +153,19 @@ describe('workspace cache', () => {
     },
   )
 
-  it.each([
-    ...INVALID_DOCUMENT_IDS,
-    ...INVALID_SETTINGS_SURFACE_IDS,
-    ...INTERNAL_SETTINGS_DOCUMENT_IDS,
-  ])('rejects untyped reserved content %s from stored history', (path) => {
-    writeRootFolderCache(testScopedStorage, pickedDirectory(''))
-    testScopedStorage.setItem(
-      workspaceSliceStorageKey(''),
-      JSON.stringify({ ...emptyWorkspaceSlice(), editorHistory: [path] }),
-    )
-    expect(readWorkspaceCache(testScopedStorage).workspaces['']?.editorHistory).toEqual([])
-    expect(testScopedStorage.getItem(workspaceSliceStorageKey(''))).toBeNull()
-  })
+  const invalidDocumentIds: readonly string[] = INVALID_DOCUMENT_IDS
+  it.each(invalidDocumentIds.concat(INVALID_SETTINGS_SURFACE_IDS, INTERNAL_SETTINGS_DOCUMENT_IDS))(
+    'rejects untyped reserved content %s from stored history',
+    (path) => {
+      writeRootFolderCache(testScopedStorage, pickedDirectory(''))
+      testScopedStorage.setItem(
+        workspaceSliceStorageKey(''),
+        JSON.stringify({ ...emptyWorkspaceSlice(), editorHistory: [path] }),
+      )
+      expect(readWorkspaceCache(testScopedStorage).workspaces['']?.editorHistory).toEqual([])
+      expect(testScopedStorage.getItem(workspaceSliceStorageKey(''))).toBeNull()
+    },
+  )
 
   it.each([documentTargets.checkpointSession, documentTargets.checkpointTurn])(
     'persists multi-file checkpoint %s under its workspace owner',

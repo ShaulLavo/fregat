@@ -46,7 +46,7 @@ function statusIdentity(status: GitStatusResult, paths: readonly string[]) {
     repository: status.repository,
     files: status.files
       .filter((file) => selected.has(file.path))
-      .toSorted((a, b) => a.path.localeCompare(b.path)),
+      .sort((a, b) => a.path.localeCompare(b.path)),
   })
 }
 

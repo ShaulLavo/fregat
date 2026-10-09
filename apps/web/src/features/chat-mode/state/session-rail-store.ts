@@ -50,7 +50,7 @@ export function hydrateSessionRailCollapse(storage: ScopedStorage) {
   collapseStorage.set(storage.environmentId, storage)
   const restored = readPersistedRailCollapse(storage)
   useSessionRailStore.setState((state) => ({
-    collapsedProjectIds: [...new Set([...state.collapsedProjectIds, ...restored])],
+    collapsedProjectIds: Array.from(new Set(state.collapsedProjectIds.concat(restored))),
   }))
 }
 
@@ -99,5 +99,5 @@ export const useSessionRailStore = create<SessionRailStore>()((set) => ({
 function toggledProjectIds(projectIds: readonly string[], projectKeys: readonly string[]) {
   if (projectKeys.every((key) => projectIds.includes(key)))
     return projectIds.filter((candidate) => !projectKeys.includes(candidate))
-  return [...new Set([...projectIds, ...projectKeys])]
+  return Array.from(new Set(projectIds.concat(projectKeys)))
 }
