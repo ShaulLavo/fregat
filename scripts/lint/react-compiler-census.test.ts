@@ -130,6 +130,7 @@ test('every whole-tree gate runs in the commit hook, in verify and in CI', () =>
     'bun run dupes',
     'bun run design:census',
     'bun run compiler:census',
+    'bun run compiler:memos:check',
     'bun run errors:census',
     'bun run query:check',
     'bun run arrays:check',

@@ -248,10 +248,14 @@ cd apps/tui
 bun --bun vitest run
 bun run typecheck
 bun run build
+bun run lint
 ```
 
-The build checks the generated terminal palette before emitting Bun modules. After shared UI
-token changes, run `bun run theme:generate`. Standalone binaries belong to the distribution slice.
+The build uses Bun's React Compiler with client output for the interactive renderer.
+Development and tests use OXC's React Compiler with the OpenTUI JSX runtime.
+`bun run compiler:census` includes the TUI, and `bun run compiler:memos apps/tui/src`
+compares manual memoization with compiler output. After shared UI token changes, run
+`bun run theme:generate`. Standalone binaries belong to the distribution slice.
 
 Use `Select` from `@/components/select` for lists. It owns wrapping and arrow routing from search
 inputs; lint rejects raw `<select>` elements elsewhere. Prompts own Enter submission and supply

@@ -52,7 +52,7 @@ export function Composer({
   const commands = useCommands()
   useLayoutEffect(() => {
     if (!input.current) return
-    editor.current ??= createPromptEditor(input.current, syntax)
+    if (!editor.current) editor.current = createPromptEditor(input.current, syntax)
     editor.current.sync(draft)
   }, [draft, syntax])
   usePaste((event) => {
