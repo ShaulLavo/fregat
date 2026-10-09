@@ -118,3 +118,21 @@ function operationKeys(operation: SettingOperation): readonly string[] {
     return ['keybindings.overrides']
   return [`environments.machines.${operation.name}`]
 }
+
+/**
+ * Binds sidebar panels 1–5 to Mod+Alt+1–5 for the user, as the Shortcuts settings would; no
+ * layout binds them by default. Returns the restore of the user's own bindings.
+ */
+export async function bindSidebarPanelKeys(page: Page) {
+  const restore = await preserveAppearance(page, ['keybindings.overrides'])
+  await writeUserOperations(
+    page,
+    [1, 2, 3, 4, 5].map((position) => ({
+      kind: 'keybinding.set' as const,
+      command: `workspace.sidebarPanel${position}`,
+      keys: [`Mod+Alt+${position}`],
+      context: 'Workspace',
+    })),
+  )
+  return restore
+}

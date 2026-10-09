@@ -10,32 +10,32 @@
       "platform": "linux",
       "preset": "ours",
       "shellKeys": false,
-      "count": 353,
-      "bindings": "75c56bb9d5b6f41999f7931afac367772b97e019423870dc77c2702c14c9914e",
+      "count": 356,
+      "bindings": "3a6375791392a2f8a2816378fa95c7d65b11c0415f172baac19b6bc7c3320db2",
       "unmapped": "3ace8efb24dce48184e1b1f60ad4413a653cbfa33c0af795f6734f090e9799c1"
     },
     {
       "platform": "linux",
       "preset": "ours",
       "shellKeys": true,
-      "count": 400,
-      "bindings": "f697e03f71348f45eaea74bd7a5fb3e85e549fab5573f11c716323fd883ac7c8",
+      "count": 403,
+      "bindings": "4c2e7a5e1903f4119dd5c51cc634054f093d3f71a80e59e7dea85a46fce730e8",
       "unmapped": "3ace8efb24dce48184e1b1f60ad4413a653cbfa33c0af795f6734f090e9799c1"
     },
     {
       "platform": "linux",
       "preset": "zed",
       "shellKeys": false,
-      "count": 353,
-      "bindings": "be9e9cda6d5cdd796af20c6a1348b45254a651f397a723d47cc6c31b8fb6132d",
+      "count": 356,
+      "bindings": "506bc1627fb0b3c212eb441e69f0bbf9d54f33818f55b5e867d34e7d7a6b901d",
       "unmapped": "3ace8efb24dce48184e1b1f60ad4413a653cbfa33c0af795f6734f090e9799c1"
     },
     {
       "platform": "linux",
       "preset": "zed",
       "shellKeys": true,
-      "count": 400,
-      "bindings": "487fadd8f702f5f33355b5e54538a1627f0874a98e82bbbac8b110b00766cda8",
+      "count": 403,
+      "bindings": "ad6675fcc877d8fe7fdff50a58f44d5f0bfbe9bce8e03b9f3bbf9a7fe8027a06",
       "unmapped": "3ace8efb24dce48184e1b1f60ad4413a653cbfa33c0af795f6734f090e9799c1"
     },
     {
@@ -43,7 +43,7 @@
       "preset": "vscode",
       "shellKeys": false,
       "count": 302,
-      "bindings": "a3aec3bec044fb44acf56d2814906b195b8907c28321536bde0cb36119bde144",
+      "bindings": "4f79b13ee5d1488194056fa0d75159c0be496b14c2db9b64bd6cf18b7f4008eb",
       "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     {
@@ -51,39 +51,39 @@
       "preset": "vscode",
       "shellKeys": true,
       "count": 349,
-      "bindings": "671354657d8a967315dc3978e10f21d198a6105f4982ef66b4aec62b9dc913d2",
+      "bindings": "d8dd06b09888f63f15e78d6fef81f30a1ea55ac06a1e0d79ca0bf8e055f2c0f5",
       "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     {
       "platform": "mac",
       "preset": "ours",
       "shellKeys": false,
-      "count": 371,
-      "bindings": "56007eab96c01c79d56bd2706abdd35f08ebd9777e61d45acc3593afcc01186c",
+      "count": 374,
+      "bindings": "33b50edbea06b6e7e3666066fc3f6dd67f8588c8334e8ccb3d5541dfaf4e4f35",
       "unmapped": "f23aaa6c56dc61704549e89b13407ba00583bf7a797d95e2d9c177e5d7649bd1"
     },
     {
       "platform": "mac",
       "preset": "ours",
       "shellKeys": true,
-      "count": 418,
-      "bindings": "0996b10e8202829905fdee6a027450905c733bf67cd2ae3e1f8c31943c0c8f3e",
+      "count": 421,
+      "bindings": "8350405c9278b49c890b8350d3a0af42d32c244899722676ee6011c7ad445072",
       "unmapped": "f23aaa6c56dc61704549e89b13407ba00583bf7a797d95e2d9c177e5d7649bd1"
     },
     {
       "platform": "mac",
       "preset": "zed",
       "shellKeys": false,
-      "count": 371,
-      "bindings": "79718d30b6c401eb459ccd0865a2fbca2426eff193968395bcde0bf3a9458215",
+      "count": 374,
+      "bindings": "655d4766a46bc3fd7eed7740ea03175723e77a17de994ff57ac93b6d1e4d6912",
       "unmapped": "f23aaa6c56dc61704549e89b13407ba00583bf7a797d95e2d9c177e5d7649bd1"
     },
     {
       "platform": "mac",
       "preset": "zed",
       "shellKeys": true,
-      "count": 418,
-      "bindings": "1b207dbfa7d047ca24b55271499cc813b2f9fcf4bc37ea04354fdbd2e81c4b91",
+      "count": 421,
+      "bindings": "c8c878ccb391f8c06a8cdc0215a09f376af774cb1129267294a383136eef27a2",
       "unmapped": "f23aaa6c56dc61704549e89b13407ba00583bf7a797d95e2d9c177e5d7649bd1"
     },
     {
@@ -91,7 +91,7 @@
       "preset": "vscode",
       "shellKeys": false,
       "count": 308,
-      "bindings": "b1b8f977ed47df79038f3b530166fbe4313c911fd0a79e39c965fa1e9899cdcd",
+      "bindings": "795eeca014ecb7800fbdf9467d3c1832492d2b5a85c85b89a31ece3e4e93f1f9",
       "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     {
@@ -99,39 +99,39 @@
       "preset": "vscode",
       "shellKeys": true,
       "count": 355,
-      "bindings": "c0651794f8a9ed06c6b8939331ab32b37eae08e3b37f8cb02115dae4e85d98f3",
+      "bindings": "291f4f9c8f7a9ac3987c267dc3c957d756ad7945ad4222596b0c10e93acaf859",
       "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     {
       "platform": "windows",
       "preset": "ours",
       "shellKeys": false,
-      "count": 353,
-      "bindings": "4af6d2affaece3911c8dd2e787094ae9c6d124989fd6564d99b46925fe278ea7",
+      "count": 356,
+      "bindings": "34b3bdf7d16e614f766f7ab10d09e0ad614a7eaf65349ffd78292dca0c98d3e5",
       "unmapped": "99b4756cac4baf5ffad051ea0ba73397fddd7205c2cd11bd7a0d5659dd928d14"
     },
     {
       "platform": "windows",
       "preset": "ours",
       "shellKeys": true,
-      "count": 400,
-      "bindings": "6982ac6dd1769ed3c91b499f1072b89a7a7f186fa24931ef6eb1a51b05189467",
+      "count": 403,
+      "bindings": "5187756efca6dca1cf15669ad43888544b876fec6cdbf599a4438ff8bfe08b2b",
       "unmapped": "99b4756cac4baf5ffad051ea0ba73397fddd7205c2cd11bd7a0d5659dd928d14"
     },
     {
       "platform": "windows",
       "preset": "zed",
       "shellKeys": false,
-      "count": 353,
-      "bindings": "d303ede19e26c13f901efd77ab0ba91544600d588c95d76395cf59c227ef579d",
+      "count": 356,
+      "bindings": "8e6cced63119af4e7f240625e2ff0017d927d2986893d377b5e17860cf2c92f4",
       "unmapped": "99b4756cac4baf5ffad051ea0ba73397fddd7205c2cd11bd7a0d5659dd928d14"
     },
     {
       "platform": "windows",
       "preset": "zed",
       "shellKeys": true,
-      "count": 400,
-      "bindings": "7582ec9ee0147eb05ddd10f8f95565b847104a54634f91bfa29a6477fdc2a4ce",
+      "count": 403,
+      "bindings": "9881153245ae1c2d497c626a94cb7c909868472a4c15e5fb62f0727da0f8fffa",
       "unmapped": "99b4756cac4baf5ffad051ea0ba73397fddd7205c2cd11bd7a0d5659dd928d14"
     },
     {
@@ -139,7 +139,7 @@
       "preset": "vscode",
       "shellKeys": false,
       "count": 300,
-      "bindings": "60ad364873ae10a92121fb7638a10778425f5574bc2ca1ecae0e0b367f101883",
+      "bindings": "c0ff2b63cd1e3e9172351f1e92d17544c5173691856c49750e554173d1262033",
       "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     {
@@ -147,7 +147,7 @@
       "preset": "vscode",
       "shellKeys": true,
       "count": 347,
-      "bindings": "88434255ad405bf6235f6d85260625851194db106a61fbddd9de915813d686a8",
+      "bindings": "80d436948ad20a706a5191d9476d66713efd9cffdcd37081d3e9ba64a4e8297c",
       "unmapped": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     }
   ]

@@ -85,6 +85,37 @@ test('generic Editor preset rows exclude widget fields while explicit Find rows 
   }
 })
 
+test('Escape in the text closes the completion list, then the signature hint, then find', () => {
+  const escape = (preset: 'ours' | 'zed' | 'vscode', editor: string) =>
+    bindingsForInput(
+      compileKeymap(
+        defaultPlatformKeyBindings('linux', preset).map(({ entry }) => entry),
+        'linux',
+      ),
+      [createKeyInput({ key: 'Escape' })],
+      ['Workspace', editor].map(parseKeyContext),
+    ).bindings[0]?.command
+  for (const preset of ['ours', 'zed', 'vscode'] as const) {
+    expect(
+      escape(preset, 'Editor writable suggestWidgetVisible parameterHintsVisible findVisible'),
+    ).toBe('hideSuggestWidget')
+    expect(escape(preset, 'Editor writable parameterHintsVisible findVisible')).toBe(
+      'closeParameterHints',
+    )
+    expect(escape(preset, 'Editor writable findVisible')).toBe('closeFind')
+  }
+})
+
+test('item keys fire from the terminal and the chat composer in every layout', () => {
+  for (const preset of ['ours', 'zed', 'vscode'] as const) {
+    const items = defaultPlatformKeyBindings('linux', preset).filter(({ command }) =>
+      /^workspace\.(selectItem\d|nextItem|previousItem)$/.test(command ?? ''),
+    )
+    expect(items.map(({ keys }) => keys)).toContain('Alt+1')
+    expect(items.every(({ firesWhileTyping }) => firesWhileTyping === true)).toBe(true)
+  }
+})
+
 test('a deeper default remains ahead of a user binding on the Workspace', () => {
   const defaults = [
     binding('Ctrl+B', { command: 'workspace.toggleSidebarVisibility', context: 'Workspace' }),

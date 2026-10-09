@@ -1,6 +1,7 @@
 import { deepStrictEqual, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
-import { chords, openFileByName, selectors } from '../selectors'
+import { bindSidebarPanelKeys } from '../preserve-settings'
+import { chords, itemKeys, openFileByName, selectors } from '../selectors'
 import { createIdleSessions, dispatch, openChatWorkspace } from './chat-verification'
 import type { Scenario } from './index'
 
@@ -30,60 +31,74 @@ async function release(page: Page, ...keys: string[]) {
 export const shortcutHints: Scenario = {
   name: 'shortcut-hints',
   description:
-    'Holding Mod badges editor tabs (workbench) and session rows (chat); Mod+Alt badges sidebar panels, or a strip where the hidden sidebar was. Releasing clears them and nothing moves.',
+    "Holding the default layout's item modifier (Alt, or Ctrl on macOS) badges editor tabs (workbench) and session rows (chat); holding user-bound Mod+Alt badges sidebar panels, or a strip where the hidden sidebar was. Releasing clears them and nothing moves.",
   async run(page, { step }) {
     const workspace = await openChatWorkspace(page)
-    const prefix = `Shortcut hints ${crypto.randomUUID().slice(0, 8)}`
-    const ids = await createIdleSessions(page, workspace, prefix, 3)
+    const { modifier } = await itemKeys(page)
+    const unbindPanels = await bindSidebarPanelKeys(page)
     try {
-      await selectors.sessionSearch(page).fill(prefix)
-      await selectors.sessionByTitle(page, `${prefix} 3`).waitFor()
-      await page.keyboard.down('Control')
-      deepStrictEqual(await hints(page, '[data-screen-sidebar]'), ['1', '2', '3'])
-      await step('chat-rows-held')
-      await release(page, 'Control')
-      deepStrictEqual(await hints(page, 'body'), [])
+      await chatRows(page, step, modifier, workspace)
+      await workbench(page, step, modifier)
     } finally {
-      for (const sessionId of ids)
-        await dispatch(page, workspace.base, { type: 'session.delete', sessionId })
+      await unbindPanels()
     }
-
-    await selectors.workspaceMode(page, 'Workbench').click()
-    for (const name of ['AGENTS.md', 'PLAN.md', 'README.md']) await openFileByName(page, name)
-    const before = await tabBoxes(page)
-    await page.keyboard.down('Control')
-    deepStrictEqual(await hints(page, '[role="tablist"][aria-label="Editor tabs"]'), [
-      '1',
-      '2',
-      '3',
-    ])
-    deepStrictEqual(await hints(page, '[aria-label="Sidebar tabs"]'), [])
-    deepStrictEqual(await tabBoxes(page), before, 'Badges must not move the tabs')
-    await step('tabs-held')
-
-    await page.keyboard.down('Alt')
-    deepStrictEqual(await hints(page, '[aria-label="Sidebar tabs"]'), ['1', '2', '3', '4', '5'])
-    deepStrictEqual(await hints(page, '[role="tablist"][aria-label="Editor tabs"]'), [])
-    await step('panels-held')
-
-    await page.keyboard.down('Shift')
-    deepStrictEqual(await hints(page, 'body'), [], 'An extra modifier hides every hint')
-    await release(page, 'Control', 'Alt', 'Shift')
-    deepStrictEqual(await hints(page, 'body'), [])
-
-    await page.keyboard.press(chords.toggleSidebar)
-    await selectors.resizablePanel(page, 'sidebar').waitFor({ state: 'detached' })
-    await page.keyboard.down('Control')
-    await page.keyboard.down('Alt')
-    deepStrictEqual(await hints(page, '[data-closed-sidebar-hints]'), ['1', '2', '3', '4', '5'])
-    strictEqual(
-      await selectors.resizablePanel(page, 'sidebar').count(),
-      0,
-      'Holding reopens nothing',
-    )
-    await step('closed-strip-held')
-    await release(page, 'Control', 'Alt')
-    strictEqual(await page.locator('[data-closed-sidebar-hints]').count(), 0)
-    await step('released')
   },
+}
+
+type Step = Parameters<Scenario['run']>[1]['step']
+
+async function chatRows(
+  page: Page,
+  step: Step,
+  modifier: string,
+  workspace: Awaited<ReturnType<typeof openChatWorkspace>>,
+) {
+  const prefix = `Shortcut hints ${crypto.randomUUID().slice(0, 8)}`
+  const ids = await createIdleSessions(page, workspace, prefix, 3)
+  try {
+    await selectors.sessionSearch(page).fill(prefix)
+    await selectors.sessionByTitle(page, `${prefix} 3`).waitFor()
+    await page.keyboard.down(modifier)
+    deepStrictEqual(await hints(page, '[data-screen-sidebar]'), ['1', '2', '3'])
+    await step('chat-rows-held')
+    await release(page, modifier)
+    deepStrictEqual(await hints(page, 'body'), [])
+  } finally {
+    for (const sessionId of ids)
+      await dispatch(page, workspace.base, { type: 'session.delete', sessionId })
+  }
+}
+
+async function workbench(page: Page, step: Step, modifier: string) {
+  await selectors.workspaceMode(page, 'Workbench').click()
+  for (const name of ['AGENTS.md', 'PLAN.md', 'README.md']) await openFileByName(page, name)
+  const before = await tabBoxes(page)
+  await page.keyboard.down(modifier)
+  deepStrictEqual(await hints(page, '[role="tablist"][aria-label="Editor tabs"]'), ['1', '2', '3'])
+  deepStrictEqual(await hints(page, '[aria-label="Sidebar tabs"]'), [])
+  deepStrictEqual(await tabBoxes(page), before, 'Badges must not move the tabs')
+  await step('tabs-held')
+  await release(page, modifier)
+
+  await page.keyboard.down('ControlOrMeta')
+  await page.keyboard.down('Alt')
+  deepStrictEqual(await hints(page, '[aria-label="Sidebar tabs"]'), ['1', '2', '3', '4', '5'])
+  deepStrictEqual(await hints(page, '[role="tablist"][aria-label="Editor tabs"]'), [])
+  await step('panels-held')
+
+  await page.keyboard.down('Shift')
+  deepStrictEqual(await hints(page, 'body'), [], 'An extra modifier hides every hint')
+  await release(page, 'ControlOrMeta', 'Alt', 'Shift')
+  deepStrictEqual(await hints(page, 'body'), [])
+
+  await page.keyboard.press(chords.toggleSidebar)
+  await selectors.resizablePanel(page, 'sidebar').waitFor({ state: 'detached' })
+  await page.keyboard.down('ControlOrMeta')
+  await page.keyboard.down('Alt')
+  deepStrictEqual(await hints(page, '[data-closed-sidebar-hints]'), ['1', '2', '3', '4', '5'])
+  strictEqual(await selectors.resizablePanel(page, 'sidebar').count(), 0, 'Holding reopens nothing')
+  await step('closed-strip-held')
+  await release(page, 'ControlOrMeta', 'Alt')
+  strictEqual(await page.locator('[data-closed-sidebar-hints]').count(), 0)
+  await step('released')
 }

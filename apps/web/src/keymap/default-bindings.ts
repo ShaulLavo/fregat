@@ -24,7 +24,7 @@ import { presetRuntimeRows, oursRuntimePatches } from '@/keymap/presets/runtime'
 import vscodeApp from '@/keymap/presets/vscode-app.json'
 import { editorCommandIdFromPlatform, editorPlatformCommandId } from '@/keymap/editor-keymap'
 import { isPlatformCommandId, platformCommand } from '@/keymap/table'
-import type { PlatformKeyBinding } from '@/keymap/types'
+import { ITEM_POSITIONS, selectItemCommandId, type PlatformKeyBinding } from '@/keymap/types'
 
 const vscodePacks: readonly EditorKeymapPack[] = [
   vscodeNavigationPack,
@@ -79,7 +79,9 @@ export function defaultPlatformKeyBindings(
       pack[platform].map((entry) => presetBinding(entry, platform)),
     )
     const terminal = terminalDefaultPack[platform].map((entry) => presetBinding(entry, platform))
-    return [...app, ...appWidgets, ...widgets, ...editor, ...terminal, ...readOnly, ...shell]
+    return [...app, ...appWidgets, ...widgets, ...editor, ...terminal, ...readOnly, ...shell].map(
+      itemKeyTyping,
+    )
   }
   const current = presetRuntimeRows.filter(
     (row) => row[1] === (platform === 'mac' ? 'mac' : 'linux'),
@@ -100,7 +102,42 @@ export function defaultPlatformKeyBindings(
       upstreamCommand,
     )
   })
-  return [...appWidgets, ...widgets, ...bindings, ...readOnly, ...shell]
+  const cancel = editorCancelRows(platform).map((entry) => presetBinding(entry, platform))
+  return [...appWidgets, ...widgets, ...bindings, ...cancel, ...readOnly, ...shell].map(
+    itemKeyTyping,
+  )
+}
+
+const ITEM_COMMANDS: ReadonlySet<string> = new Set([
+  ...ITEM_POSITIONS.map(selectItemCommandId),
+  'workspace.nextItem',
+  'workspace.previousItem',
+])
+
+/**
+ * Tab and chat keys work from the terminal and the chat composer, as Zed's and VS Code's do.
+ * Their Alt+digit form types no character outside macOS; AltGr text still wins.
+ */
+function itemKeyTyping(binding: PlatformKeyBinding): PlatformKeyBinding {
+  if (!binding.command || !ITEM_COMMANDS.has(binding.command)) return binding
+  return { ...binding, firesWhileTyping: true }
+}
+
+const EDITOR_CANCEL_COMMANDS: ReadonlySet<string> = new Set([
+  'closeFind',
+  'closeParameterHints',
+  'hideSuggestWidget',
+])
+
+/**
+ * Zed's Escape (`editor::Cancel`) closes the editor's open widgets: the completion list first,
+ * then the signature hint, then find. Fregat has a narrower command for each, so the Zed-based
+ * layouts take their Escape rows from the VS Code packs; later rows win ties.
+ */
+function editorCancelRows(platform: PlatformName) {
+  return [...vscodeFindPack[platform], ...suggestPack[platform]].filter((entry) =>
+    EDITOR_CANCEL_COMMANDS.has(entry.command),
+  )
 }
 
 export function presetBinding(

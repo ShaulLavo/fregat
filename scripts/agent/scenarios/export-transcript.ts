@@ -4,7 +4,7 @@ import type { Download, Page } from 'playwright'
 
 import type { Scenario } from './index'
 import { runPaletteCommand, selectors } from '../selectors'
-import { dispatch, openChat, readShell } from './chat-verification'
+import { dispatch, openChatWorkspace, readShell } from './chat-verification'
 
 const PROMPT = 'Export verification prompt'
 
@@ -31,11 +31,7 @@ export const exportTranscript: Scenario = {
     'One disposable session whose provider instance does not exist, so its turn fails without spending tokens. Exports it as Markdown and JSON from the rail menu, as Markdown from the message menu and from the palette, and reads each downloaded file.',
   async run(page, { step }) {
     // A fresh throwaway home has no default model, and this session needs none.
-    const base = await openChat(page)
-    const worktree = (await readShell(page, base)).worktrees.find((item) =>
-      item.path.endsWith('/projects/platform'),
-    )
-    ok(worktree, 'Platform worktree must be registered')
+    const { base, worktree } = await openChatWorkspace(page)
     const sessionId = crypto.randomUUID()
     const title = `Export verification ${sessionId.slice(0, 8)}`
     await dispatch(page, base, {
