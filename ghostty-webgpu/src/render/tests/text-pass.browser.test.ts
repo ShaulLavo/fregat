@@ -508,12 +508,10 @@ it('remaps physical storage rows with exact pixels after ring wrap and regional 
   expect(ring.pixels).toEqual(control.pixels)
 })
 
-it('reuses the atlas draw bundle while encoding fresh target views', async () => {
+it('reuses the render-pass descriptor while each encoded frame captures its target view', async () => {
   const device = await createDevice()
   device.pushErrorScope('validation')
-  const bundles = vi.spyOn(device, 'createRenderBundleEncoder')
-  const draws = vi.spyOn(GPURenderPassEncoder.prototype, 'draw')
-  const executes = vi.spyOn(GPURenderPassEncoder.prototype, 'executeBundles')
+  const encodes = vi.spyOn(GPUCommandEncoder.prototype, 'beginRenderPass')
   onTestFinished(() => {
     vi.restoreAllMocks()
   })
@@ -523,16 +521,30 @@ it('reuses the atlas draw bundle while encoding fresh target views', async () =>
     x: 0,
     y: 0,
   })
-  const texture = device.createTexture({
-    format: 'rgba8unorm',
-    size: [width, height],
-    usage: GPUTextureUsage.RENDER_ATTACHMENT,
+  const targets = Array.from({ length: 2 }, () => {
+    const texture = device.createTexture({
+      format: 'rgba8unorm',
+      size: [width, height],
+      usage: GPUTextureUsage.COPY_SRC | GPUTextureUsage.RENDER_ATTACHMENT,
+    })
+    const buffer = device.createBuffer({
+      size: bytesPerRow * height,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    })
+    onTestFinished(() => {
+      buffer.destroy()
+      texture.destroy()
+    })
+    return { buffer, bytesPerRow, size: [width, height], texture }
   })
-  onTestFinished(() => texture.destroy())
-  grid.pass.encode(texture.createView())
-  grid.pass.encode(texture.createView())
-  expect(bundles).toHaveBeenCalledTimes(1)
-  expect(draws).not.toHaveBeenCalled()
-  expect(executes).toHaveBeenCalledTimes(3)
+  const commands = targets.map((target) => grid.pass.encode(target.texture.createView(), target))
+  expect(encodes.mock.calls[0]?.[0]).toBe(encodes.mock.calls[1]?.[0])
+  expect(encodes.mock.calls[1]?.[0]).toBe(encodes.mock.calls[2]?.[0])
+  device.queue.submit(commands)
+  for (const target of targets) {
+    await target.buffer.mapAsync(GPUMapMode.READ)
+    expect(new Uint8Array(target.buffer.getMappedRange())).toEqual(grid.pixels)
+    target.buffer.unmap()
+  }
   expect(await device.popErrorScope()).toBeNull()
 })
