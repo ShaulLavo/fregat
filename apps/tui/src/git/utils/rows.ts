@@ -10,10 +10,9 @@ export type GitRow = {
 }
 export function gitRows(files: readonly GitFileStatus[]): GitRow[] {
   const { staged, worktree } = gitStatusRows(files)
-  return [
-    ...staged.map((file) => gitRow(file, true)),
-    ...worktree.map((file) => gitRow(file, false)),
-  ]
+  return staged
+    .map((file) => gitRow(file, true))
+    .concat(worktree.map((file) => gitRow(file, false)))
 }
 function gitRow(file: GitFileStatus, staged: boolean): GitRow {
   const group = staged ? 'Staged' : 'Changes'

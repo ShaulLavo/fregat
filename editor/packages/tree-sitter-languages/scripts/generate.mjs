@@ -22,11 +22,11 @@ const digest = (bytes) => createHash('sha256').update(bytes).digest('hex')
 for (const language of manifest.languages) {
   assert(!ids.has(language.id), `Duplicate language: ${language.id}`)
   ids.add(language.id)
-  for (const alias of [language.id, ...language.aliases]) {
+  for (const alias of [language.id].concat(language.aliases)) {
     assert(!aliases.has(alias), `Ambiguous alias: ${alias}`)
     aliases.add(alias)
   }
-  const files = [language.wasm, ...Object.values(language.queries).flat()]
+  const files = [language.wasm].concat(Object.values(language.queries).flat())
   const hashes = await Promise.all(
     files.map(async (file) => ({ file, sha256: digest(await readFile(assetPath(file))) })),
   )
@@ -68,7 +68,7 @@ for (const [name, source] of Object.entries(manifest.sources)) {
 
 const loaders = manifest.languages
   .map((language) => {
-    const imports = [language.wasm, ...Object.values(language.queries).flat()]
+    const imports = [language.wasm].concat(Object.values(language.queries).flat())
     const parts = [`wasmUrl: assets[0]!`]
     let index = 1
     for (const [kind, sources] of Object.entries(language.queries)) {

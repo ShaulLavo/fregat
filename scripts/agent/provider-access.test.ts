@@ -187,7 +187,7 @@ describe('a scenario run without --real-providers', () => {
       })
     const webOrigin = 'http://localhost:5215'
     // Should the guard regress, the SDK's bundled Claude CLI would still start; give it no account.
-    const inherited = ['HOME', ...ACCOUNT_ENV].map((name) => [name, process.env[name]] as const)
+    const inherited = ['HOME'].concat(ACCOUNT_ENV).map((name) => [name, process.env[name]] as const)
     process.env.HOME = mkdtempSync(path.join(outside, 'home-'))
     for (const name of ACCOUNT_ENV) delete process.env[name]
     const server = await startIsolatedServer(new URL(webOrigin), {

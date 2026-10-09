@@ -28,7 +28,7 @@ function exportEntries(dir: string): string[] {
   const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
   const targets = new Set<string>()
   collectTargets(manifest.exports, targets)
-  return [...targets].map((target) => {
+  return Array.from(targets, (target) => {
     const base = target.replace(/^\.\/dist\//, 'src/').replace(/\.js$/, '')
     return existsSync(join(dir, `${base}.tsx`)) ? `${base}.tsx` : `${base}.ts`
   })
@@ -55,7 +55,7 @@ function packageWorkspace(name: string): WorkspaceConfig {
   const project = ['src/**/*.{ts,tsx}']
   if (hasTypeScript(join(dir, 'test'))) project.push('test/**/*.{ts,tsx}')
   if (hasTypeScript(join(dir, 'bench'))) project.push('bench/**/*.ts')
-  return { entry: [...exportEntries(dir), ...(extraEntries[name] ?? [])], project }
+  return { entry: exportEntries(dir).concat(extraEntries[name] ?? []), project }
 }
 
 const packages = readdirSync('packages', { withFileTypes: true })

@@ -37,8 +37,8 @@ export class Selection {
     return this.#paths.has(path)
   }
 
-  public paths(): readonly string[] {
-    return [...this.#paths]
+  public paths(): string[] {
+    return Array.from(this.#paths)
   }
 
   // Resolves each path against the store; returns the resolved ones.
@@ -59,7 +59,7 @@ export class Selection {
     nextAnchorPath: string | null = this.#anchorPath,
     emit: boolean = true,
   ): void {
-    const uniqueSelectedPaths = [...new Set(nextSelectedPaths)]
+    const uniqueSelectedPaths = Array.from(new Set(nextSelectedPaths))
     const selectionChanged = !arePathSetsEqual(this.#paths, uniqueSelectedPaths)
     const anchorChanged = this.#anchorPath !== nextAnchorPath
     if (!selectionChanged && !anchorChanged) {
@@ -78,7 +78,7 @@ export class Selection {
 
   public selectAllVisible(): void {
     this.#host.ensureFull()
-    const nextSelectedPaths = [...this.#host.projection.paths()]
+    const nextSelectedPaths = this.#host.projection.paths()
     this.apply(nextSelectedPaths, this.#host.focus.path ?? this.#anchorPath)
   }
 
@@ -97,7 +97,7 @@ export class Selection {
       return
     }
 
-    this.apply([...this.#paths, resolvedPath])
+    this.apply(Array.from(this.#paths).concat(resolvedPath))
   }
 
   public deselect(path: string): void {
@@ -106,7 +106,7 @@ export class Selection {
       return
     }
 
-    this.apply([...this.#paths].filter((selectedPath) => selectedPath !== resolvedPath))
+    this.apply(Array.from(this.#paths).filter((selectedPath) => selectedPath !== resolvedPath))
   }
 
   public toggle(path: string): void {
@@ -131,13 +131,13 @@ export class Selection {
 
     if (this.#paths.has(resolvedPath)) {
       this.apply(
-        [...this.#paths].filter((selectedPath) => selectedPath !== resolvedPath),
+        Array.from(this.#paths).filter((selectedPath) => selectedPath !== resolvedPath),
         resolvedPath,
       )
       return
     }
 
-    this.apply([...this.#paths, resolvedPath], resolvedPath)
+    this.apply(Array.from(this.#paths).concat(resolvedPath), resolvedPath)
   }
 
   public selectRange(path: string, unionSelection: boolean): void {
@@ -152,7 +152,9 @@ export class Selection {
     const anchorIndex = anchorPath == null ? -1 : projection.indexOf(anchorPath)
     const targetIndex = projection.indexOf(resolvedPath)
     if (anchorIndex === -1 || targetIndex === -1) {
-      const nextSelectedPaths = unionSelection ? [...this.#paths, resolvedPath] : [resolvedPath]
+      const nextSelectedPaths = unionSelection
+        ? Array.from(this.#paths).concat(resolvedPath)
+        : [resolvedPath]
       this.apply(nextSelectedPaths, resolvedPath)
       return
     }
@@ -160,7 +162,9 @@ export class Selection {
     const [startIndex, endIndex] =
       anchorIndex <= targetIndex ? [anchorIndex, targetIndex] : [targetIndex, anchorIndex]
     const rangePaths = projection.paths().slice(startIndex, endIndex + 1)
-    const nextSelectedPaths = unionSelection ? [...this.#paths, ...rangePaths] : rangePaths
+    const nextSelectedPaths = unionSelection
+      ? Array.from(this.#paths).concat(rangePaths)
+      : rangePaths
     this.apply(nextSelectedPaths, anchorPath)
   }
 
@@ -198,7 +202,7 @@ export class Selection {
       nextSelectedPaths.add(nextPath)
     }
 
-    this.apply([...nextSelectedPaths], this.#anchorPath ?? currentPath, false)
+    this.apply(Array.from(nextSelectedPaths), this.#anchorPath ?? currentPath, false)
     focus.set(nextIndex)
   }
 
@@ -219,15 +223,16 @@ export class Selection {
 
   public remapThroughMutation(event: StorePathMutationEvent): void {
     const store = this.#host.store()
-    const nextSelectedPaths = [...this.#paths]
-      .map((selectedPath) => remapPathThroughMutation(selectedPath, event))
+    const nextSelectedPaths = Array.from(this.#paths, (selectedPath) =>
+      remapPathThroughMutation(selectedPath, event),
+    )
       .filter((resolvedPath): resolvedPath is string => resolvedPath != null)
       .map((resolvedPath) => store.getPathInfo(resolvedPath)?.path ?? null)
       .filter((resolvedPath): resolvedPath is string => resolvedPath != null)
     const nextAnchorPath = remapPathThroughMutation(this.#anchorPath, event)
     const canonicalAnchorPath =
       nextAnchorPath == null ? null : (store.getPathInfo(nextAnchorPath)?.path ?? null)
-    const uniqueNextSelectedPaths = [...new Set(nextSelectedPaths)]
+    const uniqueNextSelectedPaths = Array.from(new Set(nextSelectedPaths))
     const selectionChanged = !arePathSetsEqual(this.#paths, uniqueNextSelectedPaths)
     if (selectionChanged) {
       this.#paths = new Set(uniqueNextSelectedPaths)

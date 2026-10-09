@@ -27,7 +27,7 @@ export async function openCodeProcessFixture(
   if (options.wrapper)
     await writeFile(
       wrapperPath,
-      `#!${process.execPath}\nimport { spawn } from 'node:child_process'\nimport { appendFileSync } from 'node:fs'\nconst child = spawn(${JSON.stringify(process.execPath)}, [${JSON.stringify(binaryPath)}, ...process.argv.slice(2)], { env: process.env, stdio: ['ignore', 'inherit', 'inherit'] })\nappendFileSync(${JSON.stringify(marker)}, JSON.stringify({ wrapperPid: process.pid, childPid: child.pid }) + '\\n')\n${options.wrapper === 'exit' ? 'child.unref(); process.exit(0)' : "process.on('SIGTERM', () => process.exit(0)); setInterval(() => {}, 1000)"}\n`,
+      `#!${process.execPath}\nimport { spawn } from 'node:child_process'\nimport { appendFileSync } from 'node:fs'\nconst child = spawn(${JSON.stringify(process.execPath)}, [${JSON.stringify(binaryPath)}].concat(process.argv.slice(2)), { env: process.env, stdio: ['ignore', 'inherit', 'inherit'] })\nappendFileSync(${JSON.stringify(marker)}, JSON.stringify({ wrapperPid: process.pid, childPid: child.pid }) + '\\n')\n${options.wrapper === 'exit' ? 'child.unref(); process.exit(0)' : "process.on('SIGTERM', () => process.exit(0)); setInterval(() => {}, 1000)"}\n`,
       { mode: 0o755 },
     )
   return {

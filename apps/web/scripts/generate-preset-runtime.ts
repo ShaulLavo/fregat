@@ -68,7 +68,7 @@ export async function presetRuntimeSource(): Promise<string> {
       row.context,
       row.upstreamCommand,
     ]
-    return ['args' in row ? [...fields, row.args] : fields]
+    return ['args' in row ? fields.concat([row.args]) : fields]
   })
   const runtimePatches = patches.map(({ index, fields }) => [index, fields.command, fields.context])
   const source =

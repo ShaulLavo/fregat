@@ -85,7 +85,8 @@ export function holdRetentionAcceptanceWorkerReply() {
       requestedType = type
       requestedFamily = family
     },
-    requests: () => [...requests.values()].flatMap((pending) => [...pending.values()]),
+    requests: () =>
+      Array.from(requests.values()).flatMap((pending) => Array.from(pending.values())),
     held: () => replies.map(({ event, request }) => ({ request, response: event.data })),
     release,
     restore,

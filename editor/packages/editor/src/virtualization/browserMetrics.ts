@@ -109,8 +109,8 @@ function measureTextMetrics(element: HTMLElement): MeasuredTextMetrics {
   const style = readComputedStyle(probe)
   const spaceWidth = measuredAdvance(spaceProbe)
   const dotWidths = dotProbes.map(measuredAdvance)
-  const monospaceWidths = [spaceWidth, ...monospaceProbes.map(measuredAdvance)]
-  for (const attached of [probe, spaceProbe, ...dotProbes, ...monospaceProbes]) attached.remove()
+  const monospaceWidths = [spaceWidth].concat(monospaceProbes.map(measuredAdvance))
+  for (const attached of [probe, spaceProbe].concat(dotProbes, monospaceProbes)) attached.remove()
 
   const metrics = {
     rowHeight: measuredRowHeight(rect, style),

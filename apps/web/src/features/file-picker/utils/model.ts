@@ -11,7 +11,7 @@ import type { LoadState } from '@/lib/load-state'
 export { basename, displayPath } from '@/lib/path-formatters'
 import { compareFuzzyRankedTargets } from '@workspace/contracts'
 
-export type EntriesLoadState = LoadState<FsEntry[]>
+export type EntriesLoadState = LoadState<readonly FsEntry[]>
 
 export type DirectoryFsEntry = FsEntry &
   (
@@ -79,7 +79,7 @@ export function toggleChosen(
     return chosen.filter((item) => item.path !== entry.path)
   if (chosen.length >= limit) return chosen
 
-  return [...chosen, entry]
+  return chosen.concat([entry])
 }
 
 /** The folder picker lists folders only; a search or listing may still return files. */
@@ -87,7 +87,11 @@ export function folderEntries(entries: readonly FsEntry[]) {
   return entries.filter(isDirectoryEntry)
 }
 
-export function entryByOffset(entries: FsEntry[], selectedEntry: FsEntry | null, offset: number) {
+export function entryByOffset(
+  entries: readonly FsEntry[],
+  selectedEntry: FsEntry | null,
+  offset: number,
+) {
   if (entries.length === 0) return null
 
   const currentIndex = entries.findIndex((entry) => entry.path === selectedEntry?.path)

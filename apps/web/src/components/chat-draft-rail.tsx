@@ -85,7 +85,7 @@ export function ChatDraftRail({
       if (!project || (scope && scope !== project.groupKey)) return false
       return !query.trim() || row.label.toLowerCase().includes(query.trim().toLowerCase())
     })
-    .toSorted(
+    .sort(
       (a, b) =>
         b.identity.createdAt.localeCompare(a.identity.createdAt) || a.key.localeCompare(b.key),
     )

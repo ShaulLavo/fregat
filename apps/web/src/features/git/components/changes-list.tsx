@@ -54,7 +54,7 @@ export function ChangesList({
     { expanded: open.staged, label: 'Staged', rows: staged, section: 'staged' },
     { expanded: open.worktree, label: 'Changes', rows: worktree, section: 'worktree' },
   ])
-  const rows = [...(open.staged ? staged : []), ...(open.worktree ? worktree : [])]
+  const rows = (open.staged ? staged : []).concat(open.worktree ? worktree : [])
 
   function setGroupExpanded(id: string, expanded: boolean) {
     if (id !== 'staged' && id !== 'worktree') return

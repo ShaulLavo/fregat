@@ -19,7 +19,7 @@ export const editorSplitOrder: Scenario = {
     const right = await tabs(page, 1)
     deepStrictEqual(
       right.map((tab) => tab.path),
-      left.map((tab) => tab.path).toReversed(),
+      left.map((tab) => tab.path).reverse(),
     )
     await step('independent-tab-orders')
 

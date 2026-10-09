@@ -46,7 +46,7 @@ test.each(['old', 'new', 'stacked'] as const)(
     expect(restored.editor.getPresentationState()).toBe('provisional')
     expect(restored.editor.materializeFullText()).toBe('')
     const cells = (host: HTMLElement) =>
-      Array.from(host.querySelectorAll('.editor-diff-gutter')).map((cell) => cell.textContent)
+      Array.from(host.querySelectorAll('.editor-diff-gutter'), (cell) => cell.textContent)
     expect(cells(restored.host)).toEqual(cells(original.host))
     expect(restored.host.querySelectorAll('[data-editor-provisional-row]').length).toBeGreaterThan(
       0,

@@ -191,13 +191,13 @@ it('the reader overrides conflicting static context and setContext in every capt
   node.focus()
   expect(node.context().identifiers).toEqual(new Set(['Editor', 'live']))
   expect(node.context().values).toEqual(new Map([['mode', 'live']]))
-  expect(dispatcher.contextStack().map((context) => [...context.identifiers])).toEqual([
+  expect(dispatcher.contextStack().map((context) => Array.from(context.identifiers))).toEqual([
     ['Editor', 'live'],
   ])
   expect(dispatcher.handleKey(press('b'), null)).toBe(true)
   node.setContext('Editor static mode=static')
   expect(node.context().identifiers).toEqual(new Set(['Editor', 'live']))
-  expect(dispatcher.contextStack().map((context) => [...context.values])).toEqual([
+  expect(dispatcher.contextStack().map((context) => Array.from(context.values))).toEqual([
     [['mode', 'live']],
   ])
   expect(dispatcher.handleKey(press('b'), null)).toBe(true)

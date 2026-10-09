@@ -308,7 +308,7 @@ export class DisplayProjection {
     }
     const context = buildContext(transition.after, config, this.counters)
     const ranges = editRanges(transition)
-    for (const range of ranges.toReversed()) {
+    for (const range of ranges.reverse()) {
       this.root = splice(
         this.root,
         range.oldStart,
@@ -515,7 +515,7 @@ function changedSparseRanges(
       row,
     ]),
   )
-  const candidates = new Set([...oldRows.keys(), ...after.sparseRows])
+  const candidates = new Set(Array.from(oldRows.keys()).concat(after.sparseRows))
   for (const row of candidates) {
     const previous = oldRows.get(row)
     if (previous !== undefined && sameLineTransforms(before, previous, after, row)) continue

@@ -1226,7 +1226,7 @@ function resolveHoverDefinitionOptions(
   }
 }
 
-const LANGUAGE_SERVER_COMMANDS: readonly LanguageServerCommandSpec[] = [
+const LANGUAGE_SERVER_BASE_COMMANDS: readonly LanguageServerCommandSpec[] = [
   {
     id: 'editor.action.goToDefinition',
     run: (state) => state.goToDefinitionFromSelection(),
@@ -1284,13 +1284,14 @@ const LANGUAGE_SERVER_COMMANDS: readonly LanguageServerCommandSpec[] = [
     id: 'editor.action.marker.prev',
     run: (state) => state.moveDiagnosticMarker('previous'),
   },
-  ...keyCommandSpecs(COMPLETION_KEY_COMMANDS, (target, command) =>
-    target.completionCommand(command),
-  ),
-  ...keyCommandSpecs(SIGNATURE_HELP_KEY_COMMANDS, (target, command) =>
+]
+
+const LANGUAGE_SERVER_COMMANDS = LANGUAGE_SERVER_BASE_COMMANDS.concat(
+  keyCommandSpecs(COMPLETION_KEY_COMMANDS, (target, command) => target.completionCommand(command)),
+  keyCommandSpecs(SIGNATURE_HELP_KEY_COMMANDS, (target, command) =>
     target.signatureHelpCommand(command),
   ),
-]
+)
 
 /** The completion list and signature hint, driven by the keymap rather than by raw keys. */
 function keyCommandSpecs<Command extends string>(

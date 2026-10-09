@@ -422,8 +422,8 @@ const KIND_ORDER: Record<ProviderUsageWindowKind, number> = {
   other: 3,
 }
 
-export function sortUsageWindows(windows: readonly ProviderUsageWindow[]) {
-  return windows.toSorted(
+export function sortUsageWindows(windows: ProviderUsageWindow[]) {
+  return windows.sort(
     (left, right) =>
       KIND_ORDER[left.kind] - KIND_ORDER[right.kind] || left.id.localeCompare(right.id),
   )

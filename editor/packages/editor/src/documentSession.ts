@@ -1189,19 +1189,19 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     const to = editorHistoryPath(previous, next.currentId)
     let common = 0
     while (common < from.length && from[common] === to[common]) common++
-    const changes = [
-      ...from
-        .slice(common)
-        .reverse()
-        .map((id) => ({
-          transaction: previous.nodes.get(id)!.transaction!.authored!,
-          active: false,
-        })),
-      ...to.slice(common).map((id) => ({
+    const changes = from
+      .slice(common)
+      .reverse()
+      .map((id) => ({
         transaction: previous.nodes.get(id)!.transaction!.authored!,
-        active: true,
-      })),
-    ]
+        active: false,
+      }))
+      .concat(
+        to.slice(common).map((id) => ({
+          transaction: previous.nodes.get(id)!.transaction!.authored!,
+          active: true,
+        })),
+      )
     const snapshot = this.applyLocalEdits.history!.apply(changes)
     const selectionEdge =
       kind === 'undo'
@@ -1287,12 +1287,12 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     const target = pathMatches(current)
       ? current
       : [...nodes.values()]
-          .toSorted((a, b) => b.visitedAt - a.visitedAt)
+          .sort((a, b) => b.visitedAt - a.visitedAt)
           .find((node) => pathMatches(node.id))?.id
     if (target === undefined)
       throw new TypeError('author effects do not match a retained history path')
     const restored = restoreEditorHistory(
-      [...nodes.values()].map((node) => ({
+      Array.from(nodes.values(), (node) => ({
         ...node,
         preferredChildId:
           node.preferredChildId !== null && nodes.has(node.preferredChildId)
@@ -2262,7 +2262,7 @@ class PieceTableEditorViewSession implements EditorViewSession {
     const nextSelection = this.createSelection(anchorOffset, headOffset, options)
     this.selections = normalizeSelectionSet(
       this.buffer.getSnapshot(),
-      createSelectionSet([...this.selections.selections, nextSelection]),
+      createSelectionSet(this.selections.selections.concat([nextSelection])),
     )
     return appendTiming(this.createChange('selection', []), 'session.addSelection', start)
   }
@@ -3182,7 +3182,7 @@ function invertTextEdits(
 ): readonly TextEdit[] {
   let delta = 0
   const inverse: TextEdit[] = []
-  const sorted = edits.toSorted((left, right) => left.from - right.from || left.to - right.to) // TODO check if we can sort in place
+  const sorted = edits.toSorted((left, right) => left.from - right.from || left.to - right.to)
   for (const edit of sorted) {
     const from = edit.from + delta
     const to = from + edit.text.length
@@ -3197,9 +3197,7 @@ function invertTextEdits(
   }
 
   // Equal-offset insertions apply in reverse text order, including adjacent deletions' inverses.
-  return inverse
-    .toReversed()
-    .toSorted((left, right) => left.from - right.from || left.to - right.to)
+  return inverse.reverse().sort((left, right) => left.from - right.from || left.to - right.to)
 }
 
 function createInitialSelectionSet(
@@ -3251,10 +3249,10 @@ function appendTiming(
   name: string,
   startMs: number,
 ): DocumentSessionChange {
-  return withDocumentSessionChangeTimings(change, [
-    ...change.timings,
-    { name, durationMs: nowMs() - startMs },
-  ])
+  return withDocumentSessionChangeTimings(
+    change,
+    change.timings.concat([{ name, durationMs: nowMs() - startMs }]),
+  )
 }
 
 function sameOperationGroup(left: AuthoredHistoryEdge, right: AuthoredHistoryEdge): boolean {

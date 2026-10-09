@@ -31,16 +31,17 @@ afterEach(() => {
 
 describe('orchestration checkpoint projection', () => {
   it('answers from the projection after the event log is gone', async () => {
-    const fixture = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      turnDiffCompletedEvent({
-        checkpointRef: readyRef,
-        checkpointTurnCount: 1,
-        files: [{ additions: 2, deletions: 1, kind: 'modified', path: 'app.txt' }],
-        turnId: 'turn-1',
-      }),
-    ])
+    const fixture = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        turnDiffCompletedEvent({
+          checkpointRef: readyRef,
+          checkpointTurnCount: 1,
+          files: [{ additions: 2, deletions: 1, kind: 'modified', path: 'app.txt' }],
+          turnId: 'turn-1',
+        }),
+      ]),
+    )
     // Nothing may re-fold the stream to answer a checkpoint question: with the
     // events deleted, a reader that still scans them comes back empty.
     fixture.database.run(sql`DELETE FROM orchestration_events`)
@@ -62,14 +63,15 @@ describe('orchestration checkpoint projection', () => {
   })
 
   it('drops the checkpoints a revert undid', () => {
-    const fixture = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      turnDiffCompletedEvent({ checkpointTurnCount: 1, turnId: 'turn-1' }),
-      turnStartEvent('turn-2', requestedAt),
-      turnDiffCompletedEvent({ checkpointTurnCount: 2, turnId: 'turn-2' }),
-      revertedEvent(1),
-    ])
+    const fixture = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        turnDiffCompletedEvent({ checkpointTurnCount: 1, turnId: 'turn-1' }),
+        turnStartEvent('turn-2', requestedAt),
+        turnDiffCompletedEvent({ checkpointTurnCount: 2, turnId: 'turn-2' }),
+        revertedEvent(1),
+      ]),
+    )
 
     expect(
       fixture.snapshots.sessionDetailSnapshot(SESSION_ID).checkpoints.map((entry) => entry.turnId),
@@ -77,17 +79,22 @@ describe('orchestration checkpoint projection', () => {
   })
 
   it('never lets a placeholder overwrite a captured checkpoint', () => {
-    const fixture = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      turnDiffCompletedEvent({ checkpointRef: readyRef, checkpointTurnCount: 1, turnId: 'turn-1' }),
-      turnDiffCompletedEvent({
-        checkpointRef: placeholderRef,
-        checkpointTurnCount: 1,
-        status: 'missing',
-        turnId: 'turn-1',
-      }),
-    ])
+    const fixture = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        turnDiffCompletedEvent({
+          checkpointRef: readyRef,
+          checkpointTurnCount: 1,
+          turnId: 'turn-1',
+        }),
+        turnDiffCompletedEvent({
+          checkpointRef: placeholderRef,
+          checkpointTurnCount: 1,
+          status: 'missing',
+          turnId: 'turn-1',
+        }),
+      ]),
+    )
 
     expect(fixture.snapshots.sessionDetailSnapshot(SESSION_ID).checkpoints).toMatchObject([
       { checkpointRef: readyRef, status: 'ready' },
@@ -99,16 +106,17 @@ describe('orchestration checkpoint projection', () => {
   })
 
   it('does not settle a turn its session is still running', () => {
-    const fixture = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      runtimeSetEvent({ activeTurnId: 'turn-1', status: 'running' }),
-      turnDiffCompletedEvent({
-        checkpointTurnCount: 1,
-        status: 'missing',
-        turnId: 'turn-1',
-      }),
-    ])
+    const fixture = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        runtimeSetEvent({ activeTurnId: 'turn-1', status: 'running' }),
+        turnDiffCompletedEvent({
+          checkpointTurnCount: 1,
+          status: 'missing',
+          turnId: 'turn-1',
+        }),
+      ]),
+    )
 
     expect(fixture.snapshots.sessionDetailSnapshot(SESSION_ID).session.latestTurn).toMatchObject({
       completedAt: null,
@@ -132,11 +140,12 @@ describe('orchestration checkpoint projection', () => {
   })
 
   it('rejects a range past the last checkpoint with a typed code', async () => {
-    const fixture = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      turnDiffCompletedEvent({ checkpointTurnCount: 1, turnId: 'turn-1' }),
-    ])
+    const fixture = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        turnDiffCompletedEvent({ checkpointTurnCount: 1, turnId: 'turn-1' }),
+      ]),
+    )
 
     const error = await captureRejection(
       diffQuery(fixture).turnDiff({ fromTurnCount: 0, sessionId, toTurnCount: 4 }),
@@ -150,11 +159,12 @@ describe('orchestration checkpoint projection', () => {
   })
 
   it('rejects an uncaptured checkpoint with a typed code', async () => {
-    const fixture = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      turnDiffCompletedEvent({ checkpointTurnCount: 1, status: 'missing', turnId: 'turn-1' }),
-    ])
+    const fixture = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        turnDiffCompletedEvent({ checkpointTurnCount: 1, status: 'missing', turnId: 'turn-1' }),
+      ]),
+    )
 
     const error = await captureRejection(
       diffQuery(fixture).turnDiff({ fromTurnCount: 0, sessionId, toTurnCount: 1 }),

@@ -58,7 +58,7 @@ function groupModules(entry: string, shells: ShellRoots, context: ChunkingContex
   for (const id of screens[0] ?? [])
     if (workbench.has(id) && screens.every((screen) => screen.has(id))) initial.add(id)
   const overlays = new Set(
-    shells.phoneOverlays.flatMap((root) => [...overlayModules(root, context)]),
+    shells.phoneOverlays.flatMap((root) => Array.from(overlayModules(root, context))),
   )
   // Shared by an overlay and a boot screen: the overlay must not pull the screen's whole chunk.
   for (const id of overlays)

@@ -159,47 +159,46 @@ function allowanceFixture(): ProviderUsageResult {
   const now = Date.now()
   const at = (minutes: number) => new Date(now + minutes * 60_000).toISOString()
   return {
-    accounts: [
-      {
-        accountKey: 'owner-native',
-        label: 'fixture.native',
-        driverKind: v.parse(providerDriverKindSchema, 'claude'),
-        providerInstanceIds: [],
-        planType: 'max',
-        checkedAt: at(-2),
-        source: 'claude-local-cache',
-        routing: { mode: 'unknown', active: null, lastServedAt: null },
-        windows: [
-          {
-            id: 'five_hour',
-            kind: 'session',
-            label: 'Five-hour',
-            usedPercent: 42,
-            resetsAt: at(120),
-            windowMinutes: 300,
-            status: 'allowed',
-            observedAt: at(-2),
-            source: 'claude-local-cache',
-            freshness: 'fresh',
-          },
-          {
-            id: 'seven_day',
-            kind: 'weekly',
-            label: 'Weekly',
-            usedPercent: 83,
-            resetsAt: at(3000),
-            windowMinutes: 10080,
-            status: 'warning',
-            observedAt: at(-120),
-            source: 'claude-local-cache',
-            freshness: 'stale',
-          },
-        ],
-      },
-      ...accountUsageFixture(now).accounts.map((account, index) =>
+    accounts: Array.of<ProviderUsageResult['accounts'][number]>({
+      accountKey: 'owner-native',
+      label: 'fixture.native',
+      driverKind: v.parse(providerDriverKindSchema, 'claude'),
+      providerInstanceIds: [],
+      planType: 'max',
+      checkedAt: at(-2),
+      source: 'claude-local-cache',
+      routing: { mode: 'unknown', active: null, lastServedAt: null },
+      windows: [
+        {
+          id: 'five_hour',
+          kind: 'session',
+          label: 'Five-hour',
+          usedPercent: 42,
+          resetsAt: at(120),
+          windowMinutes: 300,
+          status: 'allowed',
+          observedAt: at(-2),
+          source: 'claude-local-cache',
+          freshness: 'fresh',
+        },
+        {
+          id: 'seven_day',
+          kind: 'weekly',
+          label: 'Weekly',
+          usedPercent: 83,
+          resetsAt: at(3000),
+          windowMinutes: 10080,
+          status: 'warning',
+          observedAt: at(-120),
+          source: 'claude-local-cache',
+          freshness: 'stale',
+        },
+      ],
+    }).concat(
+      accountUsageFixture(now).accounts.map((account, index) =>
         index === 0 ? { ...account, label: 'fixture.person' } : account,
       ),
-    ],
+    ),
   }
 }
 

@@ -24,7 +24,7 @@ const TOOLTIP_POINTER_INTENT_TOLERANCE_PX = 4
 const TOOLTIP_RESIZE_HANDLE_PX = 5
 const TOOLTIP_SCROLL_STEP_PX = 30
 const SVG_NS = 'http://www.w3.org/2000/svg'
-const TOOLTIP_THEME_VARIABLES = [
+const TOOLTIP_THEME_VARIABLES: readonly string[] = [
   '--editor-background',
   '--editor-popup-background',
   '--editor-foreground',
@@ -32,14 +32,14 @@ const TOOLTIP_THEME_VARIABLES = [
   '--editor-font-family',
   '--editor-font-size',
   '--editor-row-height',
-  ...HOVER_THEME_VARIABLES,
+].concat(HOVER_THEME_VARIABLES, [
   '--editor-syntax-bracket',
   '--editor-syntax-comment',
   '--editor-syntax-keyword',
   '--editor-syntax-number',
   '--editor-syntax-string',
   '--editor-syntax-type',
-] as const
+])
 
 type TooltipDimensions = {
   readonly width: number
@@ -319,12 +319,9 @@ export function createTooltipController(options: TooltipOptions): TooltipControl
   const hotkeys = register({
     element: tooltip,
     context: () => ({
-      identifiers: [
-        'EditorWidget',
-        'Tooltip',
-        'TooltipBody',
-        ...(isInteractiveKeyboardTarget(document.activeElement) ? ['TooltipControl'] : []),
-      ],
+      identifiers: ['EditorWidget', 'Tooltip', 'TooltipBody'].concat(
+        isInteractiveKeyboardTarget(document.activeElement) ? ['TooltipControl'] : [],
+      ),
     }),
     commands: {
       'tooltip.hide': hide,
@@ -420,9 +417,8 @@ function renderTooltip(element: HTMLDivElement, content: TooltipContent): void {
   element.replaceChildren()
   element.setAttribute('aria-busy', String(content.loading))
   const body = createTooltipBody(element.ownerDocument, content.classNamespace)
-  const parts = content.hoverText
-    ? [{ markdown: content.hoverText }, ...content.parts]
-    : content.parts
+  const prefix: readonly TooltipPart[] = content.hoverText ? [{ markdown: content.hoverText }] : []
+  const parts = content.hoverText ? prefix.concat(content.parts) : content.parts
   const footer = element.ownerDocument.createElement('div')
   footer.className = tooltipClassName(content.classNamespace, 'controls')
   Object.assign(footer.style, {
@@ -712,7 +708,7 @@ function noteCopyText(note: TooltipNote): string {
   const details = noteDetailsText(note)
   const head = `${note.text}${details ? ` ${details}` : ''}`
   const related = (note.related ?? []).map((link) => `${link.label}${link.text}`)
-  return [head, ...related].join('\n').trim()
+  return [head].concat(related).join('\n').trim()
 }
 
 function noteDetailsText(note: TooltipNote): string {

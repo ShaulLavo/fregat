@@ -23,7 +23,7 @@ export function repairCmdline(text: string) {
     throw createScriptError(`cmdline.txt sets ${conflicts.join(' ')}; resolve that by hand.`)
   }
   const added = FLAGS.filter((flag) => !tokens.includes(flag))
-  return { text: [body, ...added].join(' ') + ending, added }
+  return { text: [body].concat(added).join(' ') + ending, added }
 }
 
 /**

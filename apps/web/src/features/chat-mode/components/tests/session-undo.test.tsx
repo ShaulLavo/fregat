@@ -326,7 +326,7 @@ test('VSCode bulk archive Undo restores only the rows that were archived', async
   await waitFor(async () =>
     expect((await h.refresh()).sessions.every((session) => session.archivedAt === null)).toBe(true),
   )
-  expect(unarchived.toSorted()).toEqual([refs[0]!.sessionId, refs[2]!.sessionId].toSorted())
+  expect(unarchived.toSorted()).toEqual([refs[0]!.sessionId, refs[2]!.sessionId].sort())
   neutral.remove()
 })
 

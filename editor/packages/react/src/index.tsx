@@ -813,7 +813,7 @@ function editorPluginsForOptions(
 ): readonly EditorPlugin[] {
   if (reactEditorStoreSyncMode(options) === 'none') return options.plugins ?? []
 
-  return [reactSyncPlugin, ...(options.plugins ?? [])]
+  return [reactSyncPlugin].concat(options.plugins ?? [])
 }
 
 function reactEditorStoreSyncMode(options: ReactEditorOptions): ReactEditorStoreSyncMode {

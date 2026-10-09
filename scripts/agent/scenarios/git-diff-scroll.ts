@@ -264,7 +264,7 @@ async function verifyCopyAndRefresh(
   const lines = fixtureLines(file, 'after')
   await writeFile(
     path.join(fixture, file),
-    [...lines.slice(0, at), ...inserted, ...lines.slice(at)].join('\n'),
+    lines.slice(0, at).concat(inserted, lines.slice(at)).join('\n'),
   )
   for (let waited = 0; reads.length === readsBefore; waited += 100) {
     ok(waited < 10_000, 'The diff rereads after its file changes on disk')

@@ -309,7 +309,7 @@ export function createApplicationRuntime({
       )
     },
     hasUnsavedDocuments: () =>
-      [...environments.values()].some(({ editor }) => editor.hasUnsavedDocuments()),
+      Array.from(environments.values()).some(({ editor }) => editor.hasUnsavedDocuments()),
     dispose() {
       if (disposed) return
       disposed = true
@@ -320,7 +320,7 @@ export function createApplicationRuntime({
       stopLatency()
       stopMachines()
       connections.stop()
-      const retained = [...environments.values()]
+      const retained = Array.from(environments.values())
       for (const environment of retained) environment.stopAnalysisMembership()
       environments.clear()
       notifyRetainedEditorAnalyses()

@@ -165,7 +165,7 @@ describe('git checkpoint diff', () => {
       toRef: LATER_REF,
     })
 
-    expect(diffs.map((diff) => diff.path).toSorted()).toEqual(['added.txt', 'tracked.txt'])
+    expect(diffs.map((diff) => diff.path).sort()).toEqual(['added.txt', 'tracked.txt'])
   })
 
   it('hides whitespace-only changes when asked to', async () => {

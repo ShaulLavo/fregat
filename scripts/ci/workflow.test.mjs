@@ -66,12 +66,13 @@ test.each([
       return
     }
     const args = (await readFile(output, 'utf8')).split('\0').filter(Boolean)
-    expect(args).toEqual([
-      `oxfmt@${JSON.parse(manifest).workspaces.catalog.oxfmt}`,
-      '--check',
-      '--no-error-on-unmatched-pattern',
-      ...Object.keys(fixtures).map((file) => `./${file}`),
-    ])
+    expect(args).toEqual(
+      [
+        `oxfmt@${JSON.parse(manifest).workspaces.catalog.oxfmt}`,
+        '--check',
+        '--no-error-on-unmatched-pattern',
+      ].concat(Object.keys(fixtures).map((file) => `./${file}`)),
+    )
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

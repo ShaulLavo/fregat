@@ -190,10 +190,9 @@ export const createTreeSitterLanguagePlugin = (
   name: options.name ?? 'tree-sitter-languages',
   activate(context) {
     const registration = defaultProviderRegistration()
-    return [
-      retainSyntaxProvider(context, registration),
-      ...contributions.map((contribution) => retainLanguage(registration, contribution)),
-    ]
+    return [retainSyntaxProvider(context, registration)].concat(
+      contributions.map((contribution) => retainLanguage(registration, contribution)),
+    )
   },
 })
 

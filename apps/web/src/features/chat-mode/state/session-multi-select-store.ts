@@ -18,7 +18,7 @@ export const useSessionMultiSelectStore = create<SessionMultiSelectStore>()((set
       anchor: ref,
       refs: state.refs.some((entry) => scopedSessionKey(entry) === scopedSessionKey(ref))
         ? state.refs.filter((entry) => scopedSessionKey(entry) !== scopedSessionKey(ref))
-        : [...state.refs, ref],
+        : state.refs.concat([ref]),
     })),
   extendTo: (ref, ordered) =>
     set((state) => {

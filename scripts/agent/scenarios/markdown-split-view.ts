@@ -22,14 +22,13 @@ function guide() {
     'See [the other file](other.md) and the pixel ![pixel](img/pixel.png).',
     '',
     '```ts',
-    ...fence,
-    '```',
-    '',
-    '## After the fence',
-    '',
-    // Enough tail that both panes can scroll the heading to their top.
-    ...Array.from({ length: 40 }, (_, index) => `Closing paragraph ${index + 1}.\n`),
-  ].join('\n')
+  ]
+    .concat(
+      fence,
+      ['```', '', '## After the fence', ''], // Enough tail that both panes can scroll the heading to their top.
+      Array.from({ length: 40 }, (_, index) => `Closing paragraph ${index + 1}.\n`),
+    )
+    .join('\n')
 }
 
 function preview(page: Page) {

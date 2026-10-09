@@ -21,7 +21,7 @@ try {
     if (manifest.private) continue
     const readme = join(directory, 'README.md')
     const text = await readFile(readme, 'utf8')
-    const snippets = [...text.matchAll(/^```(ts|tsx)\n([\s\S]*?)\n```/gm)]
+    const snippets = Array.from(text.matchAll(/^```(ts|tsx)\n([\s\S]*?)\n```/gm))
     assert(snippets.length > 0, `${manifest.name}: missing typed README sample`)
     // Keep samples beside their package so self imports use its published exports.
     const scratch = await mkdtemp(join(directory, '.readme-samples-'))

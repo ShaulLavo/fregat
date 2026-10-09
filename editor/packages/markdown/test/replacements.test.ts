@@ -25,6 +25,21 @@ const preview = (text: string): string => {
 }
 
 describe('markdown inline replacements', () => {
+  it('returns arrays the caller can reorder independently', () => {
+    const text = '**bold** and _em_'
+    const snapshot = createStringTextSnapshot(text)
+    const records = parseMarkdown(text)
+    const first = markdownInlineReplacements(snapshot, records)
+    const second = markdownInlineReplacements(snapshot, records)
+    const original = second.map((spec) => spec.id)
+
+    expect(first).not.toBe(second)
+    first.reverse()
+
+    expect(first.map((spec) => spec.id)).toEqual(original.toReversed())
+    expect(second.map((spec) => spec.id)).toEqual(original)
+  })
+
   it('hides emphasis and strong fences', () => {
     expect(preview('a **bold** b')).toBe('a bold b')
     expect(preview('an _em_ word')).toBe('an em word')

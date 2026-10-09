@@ -158,7 +158,7 @@ export class MergeReviewDetector {
       const right = touches.get(pair[1]) ?? []
       collectCandidates(confirmed.buffer, pair, left, right, candidates, signatures)
       if (!sharedDeletion(pair)) continue
-      const combined = [...left, ...right].map((touch) => touch.unit)
+      const combined = left.concat(right).map((touch) => touch.unit)
       if (!combined.length || combined.every((unit) => sameUnit(unit, combined[0]!))) continue
       const range = combined.reduce(
         (range, unit) => ({
@@ -204,9 +204,9 @@ export class MergeReviewDetector {
     }
     return {
       status: 'complete',
-      marks: [...marks.values()]
-        .map(finalizeMark)
-        .sort((a, b) => compare(a.unitId, b.unitId) || compare(a.kind, b.kind)),
+      marks: Array.from(marks.values(), finalizeMark).sort(
+        (a, b) => compare(a.unitId, b.unitId) || compare(a.kind, b.kind),
+      ),
     }
   }
 
@@ -257,8 +257,8 @@ export class MergeReviewDetector {
   }
 
   private async cleanVersions(state: ReviewState, candidate: Candidate) {
-    const edits = new Set(candidate.pairs.flatMap((pair) => [...pair]))
-    const authors = new Set([...edits].map((edit) => edit.envelope.id.actor))
+    const edits = new Set(candidate.pairs.flatMap((pair) => pair))
+    const authors = new Set(Array.from(edits, (edit) => edit.envelope.id.actor))
     for (const actor of authors) {
       const projected = without(
         state,
@@ -353,10 +353,9 @@ function without(state: ReviewState, edits: readonly ConcurrentEdit[]): PieceTab
 }
 
 function touchedRanges(snapshot: PieceTableSnapshot, edit: ConcurrentEdit): MergeReviewRange[] {
-  return coalesceRanges([
-    ...spanRanges(snapshot, edit.inserted, false),
-    ...spanRanges(snapshot, edit.deleted, true),
-  ])
+  return coalesceRanges(
+    spanRanges(snapshot, edit.inserted, false).concat(spanRanges(snapshot, edit.deleted, true)),
+  )
 }
 
 function spanRanges(
@@ -383,9 +382,9 @@ function spanRanges(
   return coalesceRanges(ranges)
 }
 
-function coalesceRanges(ranges: readonly MergeReviewRange[]): MergeReviewRange[] {
+function coalesceRanges(ranges: MergeReviewRange[]): MergeReviewRange[] {
   const result: MergeReviewRange[] = []
-  for (const range of ranges.toSorted(
+  for (const range of ranges.sort(
     (a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex,
   )) {
     const previous = result.at(-1)
@@ -526,7 +525,7 @@ function addMark(
   for (const pair of pairs) {
     const edge = pair
       .map((edit) => edit.envelope.id)
-      .toSorted((a, b) => compare(keyOf(a), keyOf(b))) as [EditId, EditId]
+      .sort((a, b) => compare(keyOf(a), keyOf(b))) as [EditId, EditId]
     mark.edges.set(JSON.stringify(edge), edge)
   }
   marks.set(key, mark)
@@ -539,7 +538,7 @@ function finalizeMark(mark: MarkAccumulator): MergeReviewMark {
     kind: mark.kind,
     unitId: mark.unitId,
     unit: mark.unit,
-    authors: [...new Set([...edits.values()].map((edit) => edit.actor))].sort(compare),
+    authors: [...new Set(Array.from(edits.values(), (edit) => edit.actor))].sort(compare),
     edits: [...edits.values()].sort((a, b) => compare(keyOf(a), keyOf(b))),
     pairs: [...mark.edges.values()].sort((a, b) => compare(JSON.stringify(a), JSON.stringify(b))),
   }
@@ -582,7 +581,7 @@ function spanCovered(span: IdSpan, spans: readonly IdSpan[]): boolean {
   const end = cursor + span.count
   for (const covering of spans
     .filter((entry) => entry.start.bunch === span.start.bunch)
-    .toSorted((a, b) => a.start.counter - b.start.counter)) {
+    .sort((a, b) => a.start.counter - b.start.counter)) {
     if (covering.start.counter > cursor) break
     cursor = Math.max(cursor, covering.start.counter + covering.count)
     if (cursor >= end) return true

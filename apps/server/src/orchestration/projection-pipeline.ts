@@ -1712,15 +1712,19 @@ function jsonOrUndefined(value: unknown) {
   return JSON.stringify(value)
 }
 
-function latestProjectionTurn(turns: Array<typeof projectionTurns.$inferSelect>) {
-  return turns
-    .toSorted((left, right) => {
-      const requestedOrder = left.requestedAt.localeCompare(right.requestedAt)
-      if (requestedOrder !== 0) return requestedOrder
-
-      return left.turnId.localeCompare(right.turnId)
-    })
-    .at(-1)
+function latestProjectionTurn(turns: readonly (typeof projectionTurns.$inferSelect)[]) {
+  let latest: (typeof turns)[number] | undefined
+  for (const turn of turns) {
+    if (!latest) {
+      latest = turn
+      continue
+    }
+    const requestedOrder = turn.requestedAt.localeCompare(latest.requestedAt)
+    if (requestedOrder < 0) continue
+    if (requestedOrder === 0 && turn.turnId.localeCompare(latest.turnId) < 0) continue
+    latest = turn
+  }
+  return latest
 }
 
 /** The first cause recorded wins: a user stop stays a user stop when the harness reports its abort. */
@@ -1758,7 +1762,7 @@ function latestUserMessageAt(messages: Array<typeof projectionSessionMessages.$i
   return (
     messages
       .filter((message) => message.role === 'user')
-      .toSorted((left, right) => left.createdAt.localeCompare(right.createdAt))
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
       .at(-1)?.createdAt ?? null
   )
 }

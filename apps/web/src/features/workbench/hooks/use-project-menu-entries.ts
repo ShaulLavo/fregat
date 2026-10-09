@@ -19,7 +19,7 @@ export function useProjectMenuEntries({
     (entry) => entry.rootPath !== input.activeRootPath,
   )
   // Sorted so a reorder of the same candidates reuses the cached answer.
-  const candidatePaths = candidates.map((entry) => entry.rootPath).toSorted()
+  const candidatePaths = candidates.map((entry) => entry.rootPath).sort()
   const resolved = useQuery({
     // Waits for the sources, so one request covers every candidate.
     enabled: enabled && !sourcesPending && candidatePaths.length > 0,

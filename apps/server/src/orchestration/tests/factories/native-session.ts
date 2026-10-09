@@ -24,20 +24,22 @@ export function createNativeSessionProjection(
     runtimeEpoch: input.runtimeEpoch,
     createdAt,
   }
-  let model = applyIncrementally(projection, [
-    ...sessionBootstrapEvents(createdAt),
-    messageSentEvent({
-      messageId: `message-user-${input.turnId}`,
-      turnId: input.turnId,
-      role: 'user',
-      streaming: false,
-      text: input.messageText,
-      createdAt,
-    }),
-    turnStartEvent(input.turnId, createdAt),
-    pendingEvent('session.provider-start-claimed', providerStart, createdAt),
-    pendingEvent('session.provider-start-adopted', providerStart, createdAt),
-  ])
+  let model = applyIncrementally(
+    projection,
+    sessionBootstrapEvents(createdAt).concat([
+      messageSentEvent({
+        messageId: `message-user-${input.turnId}`,
+        turnId: input.turnId,
+        role: 'user',
+        streaming: false,
+        text: input.messageText,
+        createdAt,
+      }),
+      turnStartEvent(input.turnId, createdAt),
+      pendingEvent('session.provider-start-claimed', providerStart, createdAt),
+      pendingEvent('session.provider-start-adopted', providerStart, createdAt),
+    ]),
+  )
   const ingestion = new ProviderRuntimeIngestion(
     async (command) => {
       const events = projection.append(decideOrchestrationCommand(command, model))

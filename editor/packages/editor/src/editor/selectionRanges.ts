@@ -73,7 +73,7 @@ function selectionRangeLadder(
     .flatMap((provider) => provider(context))
     .map((range) => clampRange(textSnapshot, range))
     .filter((range) => containsRange(range, selection))
-    .toSorted(innermostFirst)
+    .sort(innermostFirst)
 
   const chain: TextOffsetRange[] = [selection]
   for (const range of candidates) {
@@ -138,7 +138,7 @@ export class SelectionRangeStore {
     const textSnapshot = session.getTextSnapshot()
     const languageId = this.options.getLanguageId()
     const folds = this.options.getSyntaxFolds()
-    const providers = [wordSelectionRanges, ...this.options.getProviders()]
+    const providers = [wordSelectionRanges].concat(this.options.getProviders())
 
     return resolved.map((selection) => ({
       ranges: selectionRangeLadder(

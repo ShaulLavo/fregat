@@ -427,9 +427,9 @@ class SnippetParser {
 
   /** 1, 2, 3 … then 0, because `$0` is where the caret exits. */
   private orderedStops(): readonly SnippetStop[] {
-    return [...this.byStop.entries()]
-      .map(([index, ranges]) => ({ index, ranges }))
-      .sort((left, right) => stopOrder(left.index) - stopOrder(right.index))
+    return Array.from(this.byStop.entries(), ([index, ranges]) => ({ index, ranges })).sort(
+      (left, right) => stopOrder(left.index) - stopOrder(right.index),
+    )
   }
 
   private variableValue(name: string): string {

@@ -90,13 +90,14 @@ describe('codexRolloutUsage', () => {
       timestamp: '2026-09-24T10:00:00.000Z',
       payload: { type: 'token_count', info: { total_token_usage: total, last_token_usage: last } },
     })
-    const rows = [
+    const metadata: Record<string, unknown>[] = [
       { type: 'session_meta', payload: { forked_from_id: 'parent' } },
-      ...(baseline ? [tokenCount(counts(100, 20), counts(100, 20))] : []),
+    ]
+    const rows = metadata.concat(baseline ? [tokenCount(counts(100, 20), counts(100, 20))] : [], [
       { type: 'turn_context', payload: { turn_id: 'child-turn', model: 'gpt-5.5' } },
       tokenCount(counts(150, 30), counts(50, 10)),
       tokenCount(counts(170, 35), counts(20, 5)),
-    ]
+    ])
     expect(codexRolloutUsage(rows)).toEqual([
       expect.objectContaining({ turnKey: 'child-turn', inputTokens: 70, outputTokens: 15 }),
     ])

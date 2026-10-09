@@ -49,7 +49,7 @@ export async function isolateProductTerminals(page: Page, evidence: Evidence) {
     if (!page.isClosed())
       throw createScriptError('Close the capture page before disposing its terminals.')
     const results = await Promise.all(
-      [...sessions.values()].map((session) => killCaptureTerminal(request, session)),
+      Array.from(sessions.values(), (session) => killCaptureTerminal(request, session)),
     )
     const path = await evidence.json('product-terminals.json', {
       prefix,

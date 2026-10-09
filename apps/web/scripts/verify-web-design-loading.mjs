@@ -333,7 +333,7 @@ export async function verifyDesignLoading(options) {
       if (terminal) result.cleanup = await terminal.dispose()
       if (result.cleanup?.some((item) => item.status !== 'passed')) result.status = 'failed'
       for (const handle of pendingHandles) await handle?.dispose()
-      result.responses = [...(gate?.responses ?? []), ...(socket?.responses ?? [])]
+      result.responses = (gate?.responses ?? []).concat(socket?.responses ?? [])
       result.routeErrors = gate?.errors ?? []
       if (result.routeErrors.length) result.status = 'failed'
       writeFileSync(join(directory, 'results.json'), JSON.stringify(results, null, 2) + '\n')

@@ -9,16 +9,17 @@ import { verifyWorktreeAdministration } from './worktree-paths'
 export async function removalPreview(runner: GitRepositoryRunner, checkout: string) {
   await verifyWorktreeAdministration(runner, checkout)
   const args = ['-C', checkout]
-  const head = await runner.run([...args, 'rev-parse', '--verify', 'HEAD'])
-  const status = await runner.run([
-    ...args,
-    'status',
-    '--porcelain=v1',
-    '-z',
-    '--untracked-files=all',
-    '--ignored=traditional',
-  ])
-  const index = await runner.run([...args, 'ls-files', '--stage', '-z'])
+  const head = await runner.run(args.concat(['rev-parse', '--verify', 'HEAD']))
+  const status = await runner.run(
+    args.concat([
+      'status',
+      '--porcelain=v1',
+      '-z',
+      '--untracked-files=all',
+      '--ignored=traditional',
+    ]),
+  )
+  const index = await runner.run(args.concat(['ls-files', '--stage', '-z']))
   const hash = createHash('sha256')
   addField(hash, 'platform-worktree-removal-v1')
   addField(hash, head.stdout.trim())

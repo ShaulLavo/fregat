@@ -9,12 +9,13 @@ export function commitMessageTemplate(statusOutput: string) {
     '# Please enter the commit message for your changes. Lines starting',
     "# with '#' will be ignored, and an empty message aborts the commit.",
     '#',
-    ...commitBranchLines(branch),
-    '#',
-    ...commitSectionLines('Changes to be committed:', sections.staged),
-    ...commitSectionLines('Changes not staged for commit:', sections.unstaged),
-    ...commitSectionLines('Untracked files:', sections.untracked),
-  ]
+  ].concat(
+    commitBranchLines(branch),
+    ['#'],
+    commitSectionLines('Changes to be committed:', sections.staged),
+    commitSectionLines('Changes not staged for commit:', sections.unstaged),
+    commitSectionLines('Untracked files:', sections.untracked),
+  )
 
   return ensureTrailingNewline(lines.join('\n'))
 }

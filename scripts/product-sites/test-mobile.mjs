@@ -130,7 +130,7 @@ try {
     ['--engines', 'firefox'],
     ['--offset', '999'],
   ]) {
-    const rejected = spawnSync(process.execPath, [script, '--directory', root, ...invalid], {
+    const rejected = spawnSync(process.execPath, [script, '--directory', root].concat(invalid), {
       encoding: 'utf8',
     })
     assert.equal(rejected.status, 1, rejected.stdout + rejected.stderr)

@@ -58,7 +58,7 @@ function readWorkspaces() {
       absolute: true,
       onlyFiles: true,
     })
-    return [...manifests].map((file) => {
+    return Array.from(manifests, (file) => {
       const directory = path.dirname(file)
       const packageJson = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'))
       const declared = {
@@ -95,7 +95,7 @@ function hashedWorkspaces(workspace, taskName) {
   const explicit = (task(workspace, taskName).dependsOn ?? [])
     .map((entry) => entry.split('#')[0])
     .filter((name) => byName.has(name))
-  const pending = [...workspace.declared.filter((name) => byName.has(name)), ...explicit]
+  const pending = workspace.declared.filter((name) => byName.has(name)).concat(explicit)
   const seen = new Set([workspace.name])
   while (pending.length > 0) {
     const name = pending.pop()
@@ -109,27 +109,26 @@ function hashedWorkspaces(workspace, taskName) {
 function checkWorkspace(workspace) {
   const { files, errors: found, projectReads } = workspaceFiles(workspace)
   const manifest = path.join(workspace.directory, 'package.json')
-  const reads = [
-    ...projectReads,
-    ...[...files].flatMap(([file, tasks]) =>
+  const reads = projectReads.concat(
+    [...files].flatMap(([file, tasks]) =>
       relativeReads(file, RELATIVE_LITERAL, 2, workspace.directory).map((target) => ({
         file,
         target,
         tasks: [...tasks],
       })),
     ),
-    ...Object.entries(workspace.scripts).flatMap(([name, command]) => {
-      const argumentsRead = [...command.matchAll(RELATIVE_ARGUMENT)]
-        .map((match) => readTarget(manifest, match[0], workspace.directory))
-        .filter(Boolean)
+    Object.entries(workspace.scripts).flatMap(([name, command]) => {
+      const argumentsRead = Array.from(command.matchAll(RELATIVE_ARGUMENT), (match) =>
+        readTarget(manifest, match[0], workspace.directory),
+      ).filter(Boolean)
       const configsRead = scriptConfigs(workspace, name)
-      return [...new Set([...argumentsRead, ...configsRead])].map((target) => ({
+      return Array.from(new Set(argumentsRead.concat(configsRead)), (target) => ({
         file: manifest,
         target,
         tasks: [name],
       }))
     }),
-  ]
+  )
   for (const { file, target, tasks: reading } of reads) {
     if (isInside(workspace.directory, target)) continue
     const where = `${path.relative(repoRoot, file)} reads ${path.relative(repoRoot, target) || '.'}`
@@ -432,10 +431,10 @@ function workspaceFiles(workspace) {
       .filter(Boolean)
     const projects = projectConfigs(context, file)
     projectReads.push(...projects.map((target) => ({ file, target, tasks: [...tasks] })))
-    for (const imported of [...imports, ...projects]) addFileTasks(files, pending, imported, tasks)
+    for (const imported of imports.concat(projects)) addFileTasks(files, pending, imported, tasks)
   }
   const configFiles = new Set(files.keys())
-  for (const file of [...configs, ...trees.flatMap(sourceFiles)]) {
+  for (const file of configs.concat(trees.flatMap(sourceFiles))) {
     if (!configFiles.has(file)) addFileTasks(files, pending, file, readingTasks(workspace, file))
   }
   while (pending.length > 0) {

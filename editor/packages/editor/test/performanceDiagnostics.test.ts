@@ -67,7 +67,7 @@ test.each([
     expect(commits).toHaveLength(commands.length)
     expect(updates).toHaveLength(1)
     expect(
-      [...commits, ...updates].every((event) => event.operation?.id === input?.operation?.id),
+      commits.concat(updates).every((event) => event.operation?.id === input?.operation?.id),
     ).toBe(true)
     expect(input?.timestampMs).toBeGreaterThanOrEqual(updates[0]?.timestampMs ?? Infinity)
     const deferred = records.filter((event) => event.name === 'editor.secondary.folds')
@@ -148,7 +148,7 @@ test.each([false, true])(
     expect(commits).toHaveLength(reentrantPeer ? 4 : 2)
     expect(updates).toHaveLength(reentrantPeer ? 3 : 2)
     expect(new Set(updates.map((event) => event.view?.id)).size).toBe(2)
-    expect([...commits, ...updates].every((event) => event.operation === operation)).toBe(true)
+    expect(commits.concat(updates).every((event) => event.operation === operation)).toBe(true)
     expect(inputs[0]?.timestampMs).toBeGreaterThanOrEqual(
       Math.max(...updates.map((event) => event.timestampMs)),
     )

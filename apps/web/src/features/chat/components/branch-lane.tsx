@@ -22,7 +22,7 @@ export function BranchLane({
       className='absolute inset-y-0 left-2 size-auto h-full'
       style={{ width }}
     >
-      {[...new Set([...row.above, ...row.below])].map((lane) => (
+      {Array.from(new Set(row.above.concat(row.below)), (lane) => (
         <path
           key={lane}
           d={`M ${lane * 12 + 6} ${row.above.includes(lane) ? 0 : 12} V ${row.below.includes(lane) ? 24 : 12}`}

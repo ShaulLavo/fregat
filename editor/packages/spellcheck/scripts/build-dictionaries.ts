@@ -74,7 +74,9 @@ async function buildDictionaries(): Promise<void> {
   // One trie: a suggestion walk costs about the same over a small trie as over a large one, so three
   // tries would triple it. en_US's stored forms go in verbatim; the additions are parsed the way
   // cspell-tools parses a word list, which adds their case-insensitive forms.
-  const merged = buildTrie([...us.words(), ...parseDictionaryLines([...british, ...termLines])])
+  const merged = buildTrie(
+    Array.from(us.words()).concat(Array.from(parseDictionaryLines(british.concat(termLines)))),
+  )
   const text = [...serializeTrie(merged.root, { base: 32, version: 3 })].join('')
   const compressed = gzipSync(text, { level: 9 })
   await writeFile(path.join(outputDir, 'english.trie.gz'), compressed)
@@ -95,7 +97,7 @@ async function britishOnlyWords(us: ITrie): Promise<readonly string[]> {
     if (/\d/.test(word) || us.hasWord(word, true)) continue
     words.add(word)
   }
-  return [...words].toSorted()
+  return Array.from(words).sort()
 }
 
 async function writeNotices(): Promise<void> {

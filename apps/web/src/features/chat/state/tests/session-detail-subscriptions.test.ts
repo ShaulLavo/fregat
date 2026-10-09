@@ -489,9 +489,9 @@ function createManualTimers() {
       timers.delete(handle as unknown as number)
     },
     /** Delays of the timers still pending. */
-    delays: () => [...timers.values()].map((timer) => timer.delay),
+    delays: () => Array.from(timers.values(), (timer) => timer.delay),
     runAll: () => {
-      const pending = [...timers.values()]
+      const pending = Array.from(timers.values())
       timers.clear()
 
       for (const timer of pending) {

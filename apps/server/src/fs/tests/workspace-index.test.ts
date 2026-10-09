@@ -1247,7 +1247,7 @@ function heldRoots(service: FileSystemService, root: string) {
   return service
     .info()
     .workspaceIndexes.map((status) => path.relative(root, status.scanRoot ?? ''))
-    .toSorted()
+    .sort()
 }
 
 function requireEntry<T>(entry: T | undefined): T {

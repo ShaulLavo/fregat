@@ -99,7 +99,7 @@ function flattenSymbols(
     }
     if (containerName) information.containerName = containerName
     if (symbol.tags) information.tags = symbol.tags
-    return [information, ...flattenSymbols(uri, symbol.children ?? [], symbol.name)]
+    return [information].concat(flattenSymbols(uri, symbol.children ?? [], symbol.name))
   })
 }
 

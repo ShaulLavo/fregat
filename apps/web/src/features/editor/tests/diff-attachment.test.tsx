@@ -579,7 +579,7 @@ test('split in-place refresh keeps both panes on one paired row and scrolls on c
   const before = base.map((line, index) => (replaced(index) ? `${line} old` : line))
   const after = base.map((line, index) => (replaced(index) ? `${line} new` : line))
   const inserted = Array.from({ length: 5 }, (_, index) => `inserted${index}`)
-  const revised = [...after.slice(0, 59), ...inserted, ...after.slice(59)]
+  const revised = after.slice(0, 59).concat(inserted, after.slice(59))
   const revision = (lines: readonly string[], name: string) =>
     projectionControl(
       createTextDiff({

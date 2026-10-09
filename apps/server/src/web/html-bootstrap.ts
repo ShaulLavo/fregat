@@ -60,11 +60,9 @@ export async function renderHtmlBootstrap(
     })
   }
   const body = await rewriter.transform(document).text()
-  for (const id of [
-    HTML_BOOTSTRAP_ID,
-    HTML_BOOTSTRAP_PALETTE_ID,
-    ...Object.values(HTML_BOOTSTRAP_WALLPAPER_IDS),
-  ]) {
+  for (const id of [HTML_BOOTSTRAP_ID, HTML_BOOTSTRAP_PALETTE_ID].concat(
+    Object.values(HTML_BOOTSTRAP_WALLPAPER_IDS),
+  )) {
     const found = counts.get(id) ?? 0
     if (found !== 1)
       throw webErrors.BOOTSTRAP_TEMPLATE_INVALID({ internal: { element: id, found, expected: 1 } })

@@ -30,7 +30,7 @@ async function mountWrapped(text: string) {
 function renderedRows(container: HTMLElement): readonly HTMLElement[] {
   return [...container.querySelectorAll<HTMLElement>('.editor-virtualized-row')]
     .filter((row) => row.dataset.editorVirtualRow !== undefined && row.style.display !== 'none')
-    .toSorted(
+    .sort(
       (left, right) =>
         Number(left.dataset.editorVirtualRow) - Number(right.dataset.editorVirtualRow),
     )

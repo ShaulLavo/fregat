@@ -112,10 +112,10 @@ function ensureChildDirectory(parent: MutableDirectory, name: string): MutableDi
 
 function directoryChildren(directory: MutableDirectory): readonly SourceTreeEntry[] {
   const directories = Array.from(directory.directories.values())
-    .toSorted((left, right) => left.name.localeCompare(right.name))
+    .sort((left, right) => left.name.localeCompare(right.name))
     .map(directoryEntry)
   const files = Array.from(directory.files.entries())
-    .toSorted(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => left.localeCompare(right))
     .map(([name, file]) => fileEntry(name, file))
 
   return directories.concat(files)

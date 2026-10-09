@@ -42,7 +42,7 @@ function setup(options: { runningTurn?: string } = {}) {
   const running = options.runningTurn
     ? [turnStartEvent(options.runningTurn, '2026-05-24T00:03:00.000Z')]
     : []
-  const model = applyIncrementally(fixture, [...sessionBootstrapEvents(), ...messages, ...running])
+  const model = applyIncrementally(fixture, sessionBootstrapEvents().concat(messages, running))
   return { fixture, model }
 }
 
@@ -131,12 +131,11 @@ test.each([
 
 test('a session keeps the agent it started as, and its fork runs as the same agent', () => {
   const { fixture, model } = setup()
+  const sessions = new Map(model.sessions)
+  sessions.set(SESSION_ID, { ...model.sessions.get(SESSION_ID)!, agent: 'reviewer' })
   const created = decideOrchestrationCommand(fork('turn-1'), {
     ...model,
-    sessions: new Map([
-      ...model.sessions,
-      [SESSION_ID, { ...model.sessions.get(SESSION_ID)!, agent: 'reviewer' }],
-    ]),
+    sessions,
   })
   expect(created[0]?.payload).toMatchObject({ agent: 'reviewer' })
 

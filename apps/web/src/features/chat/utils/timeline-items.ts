@@ -59,7 +59,7 @@ export type ChatTimelineItem =
       type: 'turn-status'
     }
   | {
-      activities: ChatWorkLogEntry[]
+      activities: readonly ChatWorkLogEntry[]
       id: string
       timestamp: string
       type: 'activity-group'
@@ -219,7 +219,7 @@ export function chatTimelineItems({
   const visibleOptimisticMessages = optimisticMessages.filter(
     (message) => !resolvedMessageIds.has(message.id),
   )
-  const timelineMessages = [...messages, ...visibleOptimisticMessages]
+  const timelineMessages = messages.concat(visibleOptimisticMessages)
   const workLogEntries = chatWorkLogEntries({ activities })
   const agentGroups = chatAgentGroups(activities)
   const activeResponseTurnIds = chatActiveResponseTurnIds({
@@ -297,7 +297,7 @@ export function chatTimelineItems({
     sourceOrder += 1
   }
 
-  const chronological = items.toSorted(compareTimelineEntries)
+  const chronological = items.sort(compareTimelineEntries)
   const timelineItems = arrangeTimelineItems(
     chronological,
     deriveTurnFolds(chronological, latestTurn, activeResponseTurnIds, turns),
@@ -638,7 +638,7 @@ function arrangeTimelineItems(
   folds: ReadonlyMap<string, TurnFold>,
 ) {
   const hiddenEntryIds = foldedEntryIds(folds)
-  const foldedTurnIds = new Set([...folds.values()].map((fold) => fold.turnId))
+  const foldedTurnIds = new Set(Array.from(folds.values(), (fold) => fold.turnId))
   const arranged: ChatTimelineItem[] = []
   let pendingActivities: ChatWorkLogEntry[] = []
   const flushActivities = () => {
@@ -958,7 +958,7 @@ function appendActivityGroup(items: ChatTimelineItem[], activities: readonly Cha
   if (!firstActivity) return
 
   items.push({
-    activities: [...activities],
+    activities,
     id: `activity-group:${firstActivity.id}`,
     timestamp: firstActivity.createdAt,
     type: 'activity-group',
@@ -1130,7 +1130,7 @@ function foldsHolding(item: ChatTimelineItem, rowId: string): string[] | null {
   if (item.type !== 'turn-fold') return null
   for (const nested of item.items) {
     const folds = foldsHolding(nested, rowId)
-    if (folds) return [item.id, ...folds]
+    if (folds) return [item.id].concat(folds)
   }
   return null
 }

@@ -47,7 +47,7 @@ function runBox() {
 }
 
 const git = (cwd: string, ...args: string[]) =>
-  spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
+  spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t'].concat(args), {
     cwd,
     encoding: 'utf8',
   }).stdout.trim()
@@ -83,7 +83,7 @@ describe.skipIf(!userScopes)('a job run through the wrapper', () => {
     expect(record?.cpuUsageUsec).toBeGreaterThan(0)
     expect(record).toMatchObject({
       area: 'heavy-jobs',
-      command: [...allocate(220)],
+      command: allocate(220),
       cwd: box.root,
       exitCode: 0,
       host: 'local',
@@ -132,7 +132,7 @@ describe.skipIf(!userScopes)('a job run through the wrapper', () => {
     const checkout = path.join(box.root, 'platform')
     const started = repository(checkout)
     const committing = ['git', '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q']
-    await heavy(box, 'commits', [...committing, '--allow-empty', '-m', 'during'], {
+    await heavy(box, 'commits', committing.concat(['--allow-empty', '-m', 'during']), {
       cwd: checkout,
       machine: true,
     })
@@ -428,7 +428,7 @@ test('a Pi job waits only for the Pi lane, never for this machine', async () => 
 test('refuses --max-wall without --host pi, and a ceiling that is not whole seconds', () => {
   const label = 'ceiling-check'
   const wrapper = (flags: readonly string[]) =>
-    spawnSync(process.execPath, [RUN, ...flags, label, '--', 'true'], { encoding: 'utf8' })
+    spawnSync(process.execPath, [RUN].concat(flags, [label, '--', 'true']), { encoding: 'utf8' })
   const local = wrapper(['--max-wall', '60'])
   expect(local.status).toBe(2)
   expect(local.stderr).toContain('--max-wall applies to --host pi')

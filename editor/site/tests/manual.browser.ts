@@ -10,18 +10,19 @@ function lineBoxes(page: Page, source: 'static' | 'editor') {
     const view = document.querySelector('.viewport')!.getBoundingClientRect()
     const lines: { line: number; top: number }[] =
       source === 'static'
-        ? [...document.querySelectorAll<HTMLElement>('#doc .r[data-n]')].map((row) => ({
+        ? Array.from(document.querySelectorAll<HTMLElement>('#doc .r[data-n]'), (row) => ({
             line: Number(row.dataset.n),
             top: row.getBoundingClientRect().top,
           }))
-        : [
-            ...document.querySelectorAll<HTMLElement>(
+        : Array.from(
+            document.querySelectorAll<HTMLElement>(
               '.editor-host .editor-virtualized-line-number:not([hidden])',
             ),
-          ].map((cell) => ({
-            line: Number(cell.style.counterSet.split(' ')[1]),
-            top: cell.getBoundingClientRect().top,
-          }))
+            (cell) => ({
+              line: Number(cell.style.counterSet.split(' ')[1]),
+              top: cell.getBoundingClientRect().top,
+            }),
+          )
     lines.sort((a, b) => a.line - b.line)
     const boxes: Record<number, string> = {}
     lines.forEach(({ line, top }, index) => {
@@ -174,7 +175,7 @@ describe.skipIf(!hasChromium())(
           ).map((page) => page.url),
         )
         await listing.context.close()
-        for (const path of ['/', ...pages.map((url) => url.slice(prefix.length))]) {
+        for (const path of ['/'].concat(pages.map((url) => url.slice(prefix.length)))) {
           const { context, page, problems } = await open(path, {
             viewport: { width, height: 800 },
             isMobile: true,
@@ -308,7 +309,8 @@ describe.skipIf(!hasChromium())(
             if (mode === 'on') await takenOver(page).waitFor({ timeout: 20_000 })
             const right = await page.evaluate(() =>
               Math.max(
-                ...[...document.querySelectorAll('header.top *')].map(
+                ...Array.from(
+                  document.querySelectorAll('header.top *'),
                   (element) => element.getBoundingClientRect().right,
                 ),
               ),

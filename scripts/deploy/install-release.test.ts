@@ -39,7 +39,7 @@ test.each([false, true])(
           },
         }),
       )
-      const args = ['--from', source, '--skip-live-check', ...(server ? ['--server'] : [])]
+      const args = ['--from', source, '--skip-live-check'].concat(server ? ['--server'] : [])
       const script = `import { main } from ${JSON.stringify(installer)};
 await main(${JSON.stringify(args)}, {
   preflight: async () => {}, installUnit: async () => {},

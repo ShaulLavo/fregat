@@ -162,10 +162,9 @@ it('bounds token visits across disjoint fragments with overlapping syntax tokens
     text: 'x',
     separator: '\n',
   }))
-  const tokens = [
-    token(0, 2000, 'red'),
-    ...fragments.map((fragment) => token(fragment.startOffset, fragment.startOffset + 1, 'blue')),
-  ]
+  const tokens = [token(0, 2000, 'red')].concat(
+    fragments.map((fragment) => token(fragment.startOffset, fragment.startOffset + 1, 'blue')),
+  )
   expect(copy('', tokens, { fragments })).toBeNull()
 })
 
@@ -175,10 +174,9 @@ it('keeps many fragments styled just below the cumulative token-visit limit', ()
     text: 'x',
     separator: '\n',
   }))
-  const tokens = [
-    token(0, 722, 'red'),
-    ...fragments.map((fragment) => token(fragment.startOffset, fragment.startOffset + 1, 'blue')),
-  ]
+  const tokens = [token(0, 722, 'red')].concat(
+    fragments.map((fragment) => token(fragment.startOffset, fragment.startOffset + 1, 'blue')),
+  )
   const html = copy('', tokens, { fragments: fragments.slice(0, 360) })
   expect(html).toContain('<span style="color: blue;">x</span>\n')
   expect(html?.match(/<span style="color: red;">x<\/span>\n/g)).toHaveLength(359)
