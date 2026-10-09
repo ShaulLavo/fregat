@@ -1,3 +1,4 @@
+import type { QueryClient } from '@tanstack/react-query'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { pushDeviceId } from '@workspace/contracts'
@@ -8,7 +9,10 @@ import { Toaster } from '@workspace/ui/components/sonner'
 import { PushSection } from '@/features/settings/components/push-section'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { SettingsPage } from '@/features/settings/components/page'
-import { subscribeThisDevice } from '@/features/settings/utils/push-browser'
+import {
+  pushThisDeviceQueryOptions,
+  subscribeThisDevice,
+} from '@/features/settings/utils/push-browser'
 import { pushDevicesQueryOptions } from '@/features/settings/utils/push-api'
 import { pushErrors } from '@/features/settings/utils/push-errors'
 import { settingsQueryKeys } from '@/features/settings/utils/query-keys'
@@ -23,10 +27,7 @@ test('says why a browser without push cannot turn it on', async ({ client }) => 
   const rendered = renderWithProviders(<Section />)
 
   try {
-    // The unsupported state needs the devices query, including first-use server key generation.
-    await act(async () => {
-      await rendered.queryClient.query(pushDevicesQueryOptions())
-    })
+    await waitForPushReady(rendered.queryClient)
     expect(await screen.findByText('This browser cannot receive push notifications')).toBeVisible()
     expect(await screen.findByText('No devices registered')).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Turn on for this device' })).toBeNull()
@@ -48,6 +49,7 @@ test('asks permission from the button, subscribes, and marks this device', async
   const rendered = renderWithProviders(<Section />)
 
   try {
+    await waitForPushReady(rendered.queryClient)
     const turnOn = await screen.findByRole('button', { name: 'Turn on for this device' })
     expect(platform.Notification.requestPermission).not.toHaveBeenCalled()
     await userEvent.click(turnOn)
@@ -95,6 +97,7 @@ test('drops an expired device from the list and says so', async ({ client }) => 
   )
 
   try {
+    await waitForPushReady(rendered.queryClient)
     await userEvent.click(await screen.findByRole('button', { name: 'Turn on for this device' }))
     const id = await pushDeviceId(platform.endpoint)
     const row = await findDeviceRow(id)
@@ -142,6 +145,7 @@ test('names the site setting when notifications are blocked', async ({ client })
   const rendered = renderWithProviders(<Section />)
 
   try {
+    await waitForPushReady(rendered.queryClient)
     expect(await screen.findByText('Notifications are blocked for this site')).toBeVisible()
     expect(screen.getByText(/Allow notifications for this site/)).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Turn on for this device' })).toBeNull()
@@ -178,6 +182,7 @@ test('says how to answer a prompt closed without an answer', async ({ client }) 
   const rendered = renderWithProviders(<Section />)
 
   try {
+    await waitForPushReady(rendered.queryClient)
     await userEvent.click(await screen.findByRole('button', { name: 'Turn on for this device' }))
 
     const alert = await screen.findByRole('alert')
@@ -196,6 +201,7 @@ test('switches to the blocked state when the prompt is denied', async ({ client 
   const rendered = renderWithProviders(<Section />)
 
   try {
+    await waitForPushReady(rendered.queryClient)
     await userEvent.click(await screen.findByRole('button', { name: 'Turn on for this device' }))
 
     expect(await screen.findByText(pushErrors.PERMISSION_DENIED.message)).toBeVisible()
@@ -213,6 +219,7 @@ test('shows why the browser could not subscribe', async ({ client }) => {
   const rendered = renderWithProviders(<Section />)
 
   try {
+    await waitForPushReady(rendered.queryClient)
     await userEvent.click(await screen.findByRole('button', { name: 'Turn on for this device' }))
 
     const alert = await screen.findByRole('alert')
@@ -255,6 +262,7 @@ test('replaces a subscription the server does not list', async ({ client }) => {
   const rendered = renderWithProviders(<Section />)
 
   try {
+    await waitForPushReady(rendered.queryClient)
     await userEvent.click(await screen.findByRole('button', { name: 'Turn on for this device' }))
 
     const row = await findDeviceRow(await pushDeviceId(platform.endpoint))
@@ -279,6 +287,7 @@ test('replaces a subscription made with an older server key', async ({ client })
   const rendered = renderWithProviders(<Section />)
 
   try {
+    await waitForPushReady(rendered.queryClient)
     await userEvent.click(await screen.findByRole('button', { name: 'Turn on for this device' }))
 
     const row = await findDeviceRow(await pushDeviceId(fresh))
@@ -307,6 +316,7 @@ test('offers registration again when a listed endpoint belongs to an older VAPID
   expect(registered.error).toBeNull()
   const rendered = renderWithProviders(<Section />)
   try {
+    await waitForPushReady(rendered.queryClient)
     expect(await screen.findByRole('button', { name: 'Turn on for this device' })).toBeVisible()
     expect(screen.queryByText('This device receives push notifications.')).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Turn on for this device' }))
@@ -350,6 +360,13 @@ test('the page shows the push switch once, inside the push section', async ({ cl
     rendered.unmount()
   }
 })
+
+async function waitForPushReady(queryClient: QueryClient) {
+  await act(async () => {
+    await queryClient.query(pushThisDeviceQueryOptions())
+    await queryClient.query(pushDevicesQueryOptions())
+  })
+}
 
 async function findDeviceRow(id: string) {
   await waitFor(() => expect(document.querySelector(`[data-push-device="${id}"]`)).not.toBeNull())
