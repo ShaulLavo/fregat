@@ -1,5 +1,6 @@
-import { afterEach, assert, expect, it } from 'vitest'
+import { afterEach, assert, expect, it, vi } from 'vitest'
 import { commands } from 'vitest/browser'
+import { Editor } from '../src/editor/Editor'
 import { VirtualizedTextView } from '../src/virtualization'
 import '../src/style.css'
 
@@ -152,4 +153,48 @@ it('keeps an equal-priority range color above twins after a token refresh', asyn
   expect(ink(painted, (red, green, blue) => red < 20 && green > 70 && blue < 20)).toBeGreaterThan(
     20,
   )
+})
+
+it('refreshes only the revealed editor ranges and preserves shared syntax groups', () => {
+  const peer = mount()
+  const host = document.createElement('div')
+  host.style.cssText = 'width:480px;height:80px;visibility:hidden'
+  document.body.append(host)
+  const editor = new Editor(host, { presentationReady: false })
+  try {
+    editor.setText('MMMMMMMMMMMM')
+    editor.setTokens([{ start: 0, end: 12, style: { color: '#ff0000' } }])
+    const entry = [...CSS.highlights].find(([, group]) =>
+      [...group].some((range) => host.contains(range.startContainer)),
+    )!
+    expect(entry).toBeDefined()
+    const [name, group] = entry
+    const ranges = [...group]
+    const owned = ranges.filter((range) => host.contains(range.startContainer))
+    const peerRanges = ranges.filter((range) => peer.host.contains(range.startContainer))
+    expect(owned.length).toBeGreaterThan(0)
+    expect(peerRanges.length).toBeGreaterThan(0)
+    const removed = vi.spyOn(group, 'delete')
+    host.style.visibility = 'visible'
+    editor.setPresentationReady(true)
+    expect(removed.mock.calls.map(([range]) => range)).toEqual(owned)
+    expect(CSS.highlights.get(name)).toBe(group)
+    expect(new Set(group)).toEqual(new Set(ranges))
+    removed.mockClear()
+    editor.setPresentationReady(true)
+    expect(removed).not.toHaveBeenCalled()
+    editor.setPresentationReady(false)
+    editor.setPresentationReady(true)
+    expect(removed.mock.calls.map(([range]) => range)).toEqual(owned)
+    editor.dispose()
+    expect([...group]).toEqual(peerRanges)
+    removed.mockClear()
+    editor.setPresentationReady(false)
+    editor.setPresentationReady(true)
+    expect(removed).not.toHaveBeenCalled()
+    removed.mockRestore()
+  } finally {
+    editor.dispose()
+    host.remove()
+  }
 })

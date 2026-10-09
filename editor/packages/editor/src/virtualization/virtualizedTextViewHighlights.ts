@@ -646,6 +646,27 @@ export function clearTokenHighlightsFromRow(
   scheduleHighlightRepaintNudge(view.highlightRegistry)
 }
 
+export function restoreHighlightsAfterPresentation(view: VirtualizedTextViewInternal): void {
+  const registry = view.highlightRegistry
+  if (!registry || !view.scrollElement.isConnected) return
+  restoreTokenHighlightGroups(view, registry)
+  restoreRangeHighlightGroups(view, registry)
+  restoreStyleRuleElements(view)
+
+  // WebKit retains unpainted StaticRanges registered under a hidden host. Refresh only this
+  // view's memberships: token groups can also contain ranges owned by other editors.
+  for (const rangesByStyle of view.rowTokenRanges.values()) {
+    for (const [styleKey, ranges] of rangesByStyle) {
+      const group = view.tokenGroups.get(styleKey)
+      if (!group) continue
+      for (const range of ranges) {
+        group.highlight.delete(range)
+        group.highlight.add(range)
+      }
+    }
+  }
+}
+
 export function restoreHighlightsAfterBrowserResume(view: VirtualizedTextViewInternal): void {
   const registry = view.highlightRegistry
   if (!registry) return

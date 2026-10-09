@@ -79,6 +79,7 @@ import {
   renderSelectionHighlight,
   renderTokenHighlights,
   restoreHighlightsAfterBrowserResume,
+  restoreHighlightsAfterPresentation,
   setRangeHighlight,
   setSelection,
   setSelections,
@@ -1069,6 +1070,10 @@ export class VirtualizedTextView {
 
   public adoptTokens(tokens: EditorTokenStore): void {
     adoptViewTokens(this.view, tokens)
+  }
+
+  public restorePresentationHighlights(): void {
+    restoreHighlightsAfterPresentation(this.view)
   }
 
   public setTheme(theme: EditorTheme | null | undefined): void {
