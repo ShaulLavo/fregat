@@ -165,7 +165,7 @@ function appendCompleteWrapText(
       breakVisual = visual
     }
 
-    const cells = clusterCells(text, index, end, visual, tabStop, advance)
+    let cells = clusterCells(text, index, end, segmentVisual, tabStop, advance)
     const overflows = cells > 0 && segmentVisual > 0 && segmentVisual + cells > width
     if (overflows && !(words && space)) {
       if (breakAt > segmentStart) {
@@ -177,6 +177,7 @@ function appendCompleteWrapText(
         segmentStart = length
         segmentVisual = 0
       }
+      cells = clusterCells(text, index, end, segmentVisual, tabStop, advance)
     }
     visual += cells
     segmentVisual += cells
