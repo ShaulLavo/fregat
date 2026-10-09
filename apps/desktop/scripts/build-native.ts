@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { copyFileSync, cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { defineErrorCatalog } from 'evlog'
 import { developmentNativeHost } from '../src/shared/native-path'
@@ -7,8 +7,8 @@ const buildErrors = defineErrorCatalog('desktop.native', {
   BUILD_FAILED: {
     message: 'The native desktop helper could not be built.',
     status: 500,
-    why: 'The native helper needs a C compiler and the platform development libraries.',
-    fix: 'Install cc, pkg-config and webkit2gtk-4.1 on Linux, or the Xcode command-line tools on macOS, then run build:native again.',
+    why: 'The native helper needs its platform compiler and development libraries.',
+    fix: 'Install Zig 0.17, pkg-config and webkit2gtk-4.1 on Linux, or Swift 6 and the Xcode command-line tools on macOS, then run build:native again.',
   },
 })
 
@@ -21,12 +21,12 @@ export function buildNative(
   const source = path.join(
     desktopDir,
     'native',
-    linux ? 'linux/platform-webview.c' : 'macos/platform-webview.m',
+    linux ? 'linux/platform-webview.zig' : 'macos/PlatformWebview.swift',
   )
   const output = developmentNativeHost(desktopDir)
   if (!existsSync(source))
     throw buildErrors.BUILD_FAILED({ internal: { stage: 'source', platform: process.platform } })
-  const compiler = linux ? 'cc' : 'clang'
+  const compiler = linux ? 'zig' : 'swiftc'
   if (!Bun.which(compiler))
     throw buildErrors.BUILD_FAILED({ internal: { stage: 'compiler', compiler } })
   let flags: string[] = []
@@ -38,29 +38,121 @@ export function buildNative(
       throw buildErrors.BUILD_FAILED({
         internal: { stage: 'webkit2gtk-4.1', exitCode: pkg.exitCode },
       })
-    flags = new TextDecoder().decode(pkg.stdout).trim().split(/\s+/)
+    flags = new TextDecoder().decode(pkg.stdout).trim().split(/\s+/).map(zigFlag)
   }
   const args = linux
     ? []
     : [
         '-framework',
         'WebKit',
-        '-framework',
-        'UniformTypeIdentifiers',
-        ...(arch ? ['-arch', arch === 'x64' ? 'x86_64' : arch] : []),
-        '-fobjc-arc',
-        '-mmacosx-version-min=11.0',
+        '-swift-version',
+        '6',
+        '-parse-as-library',
+        '-target',
+        `${(arch ?? process.arch) === 'x64' ? 'x86_64' : 'arm64'}-apple-macosx11.0`,
         '-framework',
         'Cocoa',
+        '-Xlinker',
+        '-rpath',
+        '-Xlinker',
+        '@executable_path/../Frameworks',
       ]
   mkdirSync(path.dirname(output), { recursive: true })
-  const result = Bun.spawnSync([compiler, ...args, '-O2', '-o', output, source, ...flags])
+  const command = linux
+    ? linuxCommand({ desktopDir, source, output, flags })
+    : [compiler, ...args, '-O', '-warnings-as-errors', '-o', output, source]
+  const result = Bun.spawnSync(command)
   if (result.exitCode !== 0) {
     process.stderr.write(result.stderr)
     throw buildErrors.BUILD_FAILED({ internal: { stage: 'compile', exitCode: result.exitCode } })
   }
-  if (!linux) writeDevelopmentBundle(desktopDir, output)
+  if (!linux) {
+    const frameworks = path.join(path.dirname(path.dirname(output)), 'Frameworks')
+    mkdirSync(frameworks, { recursive: true })
+    const runtime = Bun.spawnSync([
+      'xcrun',
+      'swift-stdlib-tool',
+      '--copy',
+      '--platform',
+      'macosx',
+      '--scan-executable',
+      output,
+      '--destination',
+      frameworks,
+    ])
+    if (runtime.exitCode !== 0) {
+      process.stderr.write(runtime.stderr)
+      throw buildErrors.BUILD_FAILED({
+        internal: { stage: 'swift-runtime', exitCode: runtime.exitCode },
+      })
+    }
+    writeDevelopmentBundle(desktopDir, output)
+  }
   return output
+}
+
+export function copyNativeHost(binary: string, destination: string) {
+  copyFileSync(binary, destination)
+  if (process.platform !== 'darwin') return
+  const source = path.join(path.dirname(path.dirname(binary)), 'Frameworks')
+  const target = path.join(path.dirname(path.dirname(destination)), 'Frameworks')
+  cpSync(source, target, { recursive: true })
+}
+
+/** pkg-config speaks the C compiler driver's dialect; Zig spells these two its own way. */
+export function zigFlag(flag: string) {
+  if (flag === '-pthread') return '-D_REENTRANT'
+  if (flag === '-Wl,--export-dynamic') return '-rdynamic'
+  return flag
+}
+
+function linuxCommand({
+  desktopDir,
+  source,
+  output,
+  flags,
+}: {
+  desktopDir: string
+  source: string
+  output: string
+  flags: readonly string[]
+}) {
+  const version = Bun.spawnSync(['zig', 'version'])
+  if (version.exitCode !== 0 || !version.stdout.toString().trim().startsWith('0.17.'))
+    throw buildErrors.BUILD_FAILED({
+      internal: { stage: 'zig-version', exitCode: version.exitCode },
+    })
+  const cache = ['--cache-dir', path.join(path.dirname(output), '.zig-cache')]
+  const bindings = path.join(path.dirname(output), 'native.zig')
+  const translated = Bun.spawnSync([
+    'zig',
+    'translate-c',
+    path.join(desktopDir, 'native/linux/native.h'),
+    '-lc',
+    ...flags,
+    ...cache,
+  ])
+  if (translated.exitCode !== 0) {
+    process.stderr.write(translated.stderr)
+    throw buildErrors.BUILD_FAILED({
+      internal: { stage: 'translate-c', exitCode: translated.exitCode },
+    })
+  }
+  writeFileSync(bindings, translated.stdout)
+  return [
+    'zig',
+    'build-exe',
+    '-O',
+    'ReleaseSafe',
+    '-lc',
+    ...flags,
+    '--dep',
+    'native',
+    `-Mroot=${source}`,
+    `-Mnative=${bindings}`,
+    ...cache,
+    `-femit-bin=${output}`,
+  ]
 }
 
 function writeDevelopmentBundle(desktopDir: string, binary: string) {

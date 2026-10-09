@@ -14,6 +14,7 @@ import { CommandBusProvider } from '@/keymap/providers/bus-provider'
 import { ApplicationRuntimeProvider } from '@/providers/application-runtime-provider'
 import { EnvironmentTransportsProvider } from '@/providers/environment-transports-provider'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
+import { readHtmlBootstrap } from '@/lib/html-bootstrap'
 
 export function ApplicationBootstrap({
   bootstrap,
@@ -38,7 +39,18 @@ export function ApplicationBootstrap({
         ...report,
       })
   }, [application, error])
-  if (unpaired) return <DeferredPairDevice onPaired={bootstrap.retry} />
+  if (unpaired)
+    return (
+      <DeferredPairDevice
+        onPaired={() => {
+          if (readHtmlBootstrap()?.kind === 'pairing') {
+            window.location.reload()
+            return
+          }
+          bootstrap.retry()
+        }}
+      />
+    )
   if (error)
     return (
       <StatusFrame

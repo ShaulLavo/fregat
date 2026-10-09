@@ -32,8 +32,9 @@ Fregat ask a model for a combined fix. Code that merged without overlap stays un
   are concurrent when neither is in the other's dependencies; this is a property of the log, so
   every participant computes the same answer.
 - Character IDs and deletion provenance tell which author inserted or deleted each character
-  (`packages/collab`, `packages/textbuffer` identity runs). `setEffects` turns edits on and off
-  for author-selective undo, which can rebuild the text as one author saw it (`packages/collab/src/effects.ts`).
+  (`packages/collab`, `packages/textbuffer` identity runs). `setEffects` sends author-owned undo
+  commands. `Engine.projectEffects` returns a local snapshot with selected authors' effects on
+  or off, preserving the live engine and log. A review reader restores that snapshot on a fork.
 - The tree-sitter worker keeps an incremental parse per document, with changed ranges and error
   and missing nodes (`packages/tree-sitter/src/treeSitter/`). Query kinds are `highlights`,
   `folds` and `injections`; E063 adds more kinds as files per language.
@@ -89,7 +90,7 @@ them).
 - **Signals**, each with a stable kind:
   - `overlap`: concurrent edits from two or more authors in one unit, outside a commutative parent.
   - `parse`: the unit has error or missing nodes now, and each author's version of it parsed
-    clean. Author versions are rebuilt with `setEffects` limited to that unit's edits.
+    clean. Author versions are rebuilt with `projectEffects` limited to that unit's edits.
   - `signature`: two children of one commutative parent share a signature and came from
     concurrent edits.
   - `orphan`: one author deleted a unit while a concurrent edit by another author inserted text
@@ -117,16 +118,177 @@ them).
 
 1. **Concurrency query** in `@singapore-editor/collab`: given a confirmed window, return groups
    of concurrent edits by different authors with their character IDs. Property tests against the
-   reference engine.
+   reference engine. **Delivered 2026-10-09.** `ConfirmedWindow` keeps a canonical suffix of at
+   most 8,192 accepted envelopes, supports incremental batches, and returns exact concurrent
+   pairs with inserted/deleted ID spans. Effect commands carry causal dependencies; candidates
+   are the original text operations. `Engine.projectEffects` supports local author/base review
+   snapshots in both engines. Tests cover 50 seeded reference histories, different host arrival
+   orders, 30 incremental/eviction histories, transitive dependencies through undo, same-author
+   exclusions, the replay cap, UTF-16 spans, and projection snapshot consistency.
+   Run `bun run --cwd editor/packages/collab bench:concurrency` after its package build.
+   Cost evidence lives in `editor/packages/collab/bench/concurrency-evidence.json`.
+   The [append cost follow-up](#concurrency-append-cost) reduces retained-window bookkeeping.
+   These are shared-machine experiments; the detector's full 2 ms budget remains a step 3 gate.
 2. **Merge-unit queries** in `packages/tree-sitter-languages`, first for TypeScript, TSX,
    JavaScript, JSON, CSS, Markdown, Python, Rust and Go; the other languages in `languages.json`
    use the line fallback until they get a file.
-3. **Detector** in the tree-sitter worker: `overlap`, `parse`, `signature`, `orphan`, with author
-   versions rebuilt through `setEffects`.
+   Delivered in [PR #1153](https://github.com/ShaulLavo/fregat/pull/1153). All nine grammars ship and now load `merge-units`
+   through the language manifest and catalog generator. The worker's `mergeUnit` request
+   returns the smallest enclosing unit, its source-spelling signature, and its parent range
+   with a commutativity flag. Missing queries, unmatched ranges and damaged units use complete
+   lines. Missing snapshots report `stale`.
+   Query compilation is demand-only. Generic languages reuse the retained tree; Markdown
+   creates a structural block tree on the first request because its native renderer hides
+   that tree. The extra tree retires with its snapshot and appears in retention inspection.
+   Ordered arguments, arrays, CSS declarations, Python definitions, JavaScript class bodies
+   and objects, and Go and Rust field lists stay ordered. This preserves overload and decorator
+   evaluation, property enumeration, positional construction, layout and destruction order.
+   TypeScript interfaces commute only when every semantic member is a property signature;
+   methods and call signatures keep the parent ordered. Comments leave eligibility unchanged.
+   Import aliases identify local bindings. Each Go field name is a separate unit with the
+   declaration as its owning parent, so grouped names remain identifiable. Signatures retain
+   source spelling; the detector can normalize escaped or differently quoted names. Duplicate
+   signature comparisons apply only to commutative parents; ordered parents expose name hints.
+   Verification covers original fixtures for every grammar, separator-enclosing LF/CRLF fallback,
+   lazy compilation, incremental edits, stale requests, deepest nested injections, MDX fences,
+   injected-language fallback, UTF-16 offsets and all ten independent-review blockers.
+3. **Detector:** functional implementation verified 2026-10-09; **step incomplete** until
+   worker integration and the unchanged **under-2-ms batch gate** pass. The demand-only
+   `@singapore-editor/collaboration/merge-review` export combines confirmed concurrency and an
+   injectable syntax reader without adding a dependency between collab and tree-sitter.
+   It emits `overlap`, `parse`, `signature` and `orphan`, retains exact concurrent edges,
+   builds unit IDs from unit kind/first-character identity, filters inactive effects and
+   reconstructs author/base versions through local `projectEffects` snapshots. Equivalent
+   JSON and JavaScript/TypeScript quoted/escaped signatures normalize before comparison;
+   unquoted numeric property names canonicalize separately from quoted strings.
+   Token/shape fingerprints are requested only for formatting projections. The syntax reader
+   returns one group per requested range: touching selection covers all units intersecting a
+   coalesced identity-piece interval, while enclosing selection supports version comparisons.
+   Replacement footprints include inserted and deleted identities. Nested units suppress only
+   fully covered ancestor touches, preserving edited headers.
+
+   Worker merge-unit analysis retains damaged syntax units and reports errors. Lazy Markdown
+   structural parsing now uses `parseTreeSlices` / `resumeTreeSlices`; query progress checks
+   use the existing cancellation/deadline context, and parent eligibility is reused per
+   retained snapshot/query. Cancellation/disposal of a 100k-block Markdown request releases
+   the retained snapshot, and subsequent requests report stale.
+
+   The detector coordinator, effect visibility, identity mapping, signatures, orphan checks
+   and projections run on the **invoking thread**. The supplied syntax reader determines the
+   query/parse thread; worker `mergeUnit` support runs in the parser worker, while the real
+   grammar test adapter runs on the Node test thread. There are no typing hooks, subscriptions
+   or automatic calls. Null session windows and logs without cross-author pairs return before
+   syntax work. A production bridge must still register confirmed/projected snapshots in the
+   parser worker and schedule review after accepted batches. Batch-scoped results describe
+   pairs involving the supplied IDs; request the full window to replace marks after undo or
+   retention changes. This step ships no marks UI or session scheduling.
+
+   Verification: original 18-case conflict corpus plus wide damaged-tree and quoted-escape
+   regressions; 10,000 seeded independent-function cases with zero marks; 10,000 shared-unit
+   cases all marked; five real E067 peer-session runs with reordered/duplicate delivery and
+   identical converged mark sets. The revised suites pass 194 collaboration tests, 682 collab
+   tests (four existing skips), and 137 Node plus 136 browser tree-sitter tests. The corpus
+   covers causal copy/move and edited descendants that survive wrapper removal; arbitrary
+   copy/delete moves do not preserve character identities.
+
+   Independent-review revision in [PR #1164](https://github.com/ShaulLavo/fregat/pull/1164):
+   all 13 initial detector reproductions failed before implementation; the isolated worker
+   reproduction exposed three failures with TypeScript cancellation as the known-good control.
+   Fifteen detector regressions and four browser cases now cover all ten numbered findings:
+   replacement deletion footprints; ancestor/header retention; tombstoned insertions and causal
+   deletions; deleted whitespace interrupted by concurrent text; operation-local formatting;
+   formatting-filtered signatures and pre-existing duplicates; numeric versus quoted names;
+   every surviving orphan portion; fallback analysis/fingerprints/cancellation; and bounded
+   paste intervals/queries. Per-operation projections disable only the inspected operation,
+   preserving causal surrounding effects. Signature marks require a newly introduced duplicate.
+   Projection snapshots are reused per detect call, and mark edges are accumulated once.
+   No changes were made to `packages/collab/src/concurrency.ts`; its append tuning is separate.
+
+   **Cost gate remains incomplete.** Run
+   `bun run --cwd editor/packages/collaboration bench:merge-review` after workspace builds.
+   Evidence: `editor/packages/collaboration/bench/detector-evidence.json`, with a separately
+   instrumented profile in `detector-profile-evidence.json`. Both are **experiment, shared
+   machine**, A/B/B/A. Current retained parsing is prepared outside timing, as detection runs
+   after parsing; IPC and UI are excluded. The complete detector includes concurrency append,
+   pair selection, identity mapping and real queries. For 100 retained records, median
+   2/4/8-author batches are 1.140/1.160/1.266 ms (p95 2.491/2.255/2.708 ms). At 8,192 records
+   they are **3.218/3.058/3.100 ms**, p95 **5.478/4.823/5.060 ms**. These do not satisfy 2 ms.
+   `detector-baseline-evidence.json` records the intermediate cached-state implementation
+   before demand-only fingerprints, not the initial implementation.
+
+   The separately profiled representative batch has 100k lines, 100 edits, four authors and
+   8,192 retained records. Mean append is 1.728 ms; exact pair selection alone is 0.486 ms;
+   detector work after append is 2.298 ms. Current-unit lookup totals 0.878 ms, including
+   0.258 ms inside real query matching: one unit range and four query matches per edit.
+   V8 samples estimate 0.159 ms append, 0.456 ms pair selection, 0.757 ms unit selection/query,
+   0.121 ms signature/candidate checks, 0.057 ms orphan checks, 0.145 ms identity/effect work
+   and 0.487 ms bookkeeping per complete batch. These sampled estimates exclude harness/GC
+   and are not additive wall timings. Parsing, token fingerprints and `projectEffects` rebuilds
+   are zero in this independent-unit timed workload; reconstruction cost remains unbounded by
+   this experiment. Append is the largest separately timed component; unit/query selection
+   is the largest sampled category. Keep the existing budget and include marked projection
+   workloads and worker transport in the remaining proof.
+
+   A separate **experiment, shared machine** in `paste-evidence.json` compares reviewed head
+   `d8ff8d97b4249cf3842e6c72b250c82f9137c6ea` with the revision, using two concurrent insertions
+   of 16,000 and one UTF-16 units and a trivial injected reader. After ten warmups per version,
+   A/B/B/A supplies 60 samples per version: median/p95 148.301/253.077 ms before versus
+   0.086/0.176 ms after. Syntax ranges fall from 16,001 to two. A real 100,000-character
+   multi-unit paste uses two ranges and 20 real query matches, retaining both signature marks.
+   This bounds the paste range-collection regression, independently of the ordinary batch gate.
+
 4. **Marks, hover and resolutions** in the collaboration plugin, wired into the example page.
 5. **Fregat:** marks for agent edits racing human typing, review annotations on the host, and the
    "Fix with AI" action. Detection runs in the browser, where the parser lives; the server host
    does not parse. Lands with Delta DB phase 4.
+
+### Concurrency append cost
+
+Delivered 2026-10-09. The detector profile in [PR #1164](https://github.com/ShaulLavo/fregat/pull/1164)
+attributes 47% of sampled batch CPU to retained-window append. A fresh run of the original
+concurrency bench reproduced 1.66–2.39 ms append-and-query medians with an 8,192-edit prefix.
+The document has 100k lines and the new batch contains 100 concurrent replacements.
+
+The bottleneck was rebuilding the retained index on each append. An instrumented baseline
+spent about 80% of append time sorting, rebuilding membership/live ranges, mapping retained
+entries, evicting by full-map traversal, and recreating candidate arrays. This includes
+instrumentation overhead. The remaining entry-creation phase also scanned old entries to
+skip them. These costs grow with retained edits, not document characters.
+
+`ConfirmedWindow` now keeps a bounded canonical array alongside its ID index. A batch after
+the canonical tail sorts only incoming envelopes, retains the previous suffix by reference,
+creates only new causal entries, and deletes only evicted map entries. Contiguous causal
+positions supply one live interval. Candidate and position arrays keep their suffixes.
+Empty batches and exact retries return after validation. Interleaved arrivals retain the
+canonical sorting path and exact live-position intervals. The extra array holds references
+to existing entries; suffix copies remain proportional to the window size. There is no new
+public API, timer, parser work, or whole-document text read.
+
+Evidence is `editor/packages/collab/bench/concurrency-append-evidence.json`. Both runs are
+**experiment, shared machine**, under bench-class admission without quiet mode. Each run
+alternates baseline/current/current/baseline with 102 timed samples per mode after 40 warmups.
+The baseline is `c1b3da7076daf38dd0a6a3bb1a43c2c6a2ccc39b`. Prefix setup, real textbuffer
+operations, and equality checks are outside timing. The table pools all 204 samples per mode
+for the 8,192-edit prefix; both complete runs and their tails remain in the evidence.
+
+| Authors | Append median before | Append median after | Median reduction | Append p95 after | Append + pairs median after |
+| ------- | -------------------- | ------------------- | ---------------- | ---------------- | --------------------------- |
+| 2       | 1.252 ms             | 0.272 ms            | 78.3%            | 0.342 ms         | 0.674 ms                    |
+| 4       | 1.302 ms             | 0.289 ms            | 77.8%            | 0.355 ms         | 0.637 ms                    |
+| 8       | 1.309 ms             | 0.294 ms            | 77.5%            | 0.501 ms         | 0.649 ms                    |
+
+Median append now uses about 14–15% of the 2 ms detector budget. The first eight-author pilot
+had a 1.926 ms append p95, so these shared-machine results do not establish a worst-case
+bound. Parsing, unit mapping, and version reconstruction remain excluded. The full detector
+budget is unchanged and still belongs to step 3.
+
+After building the baseline and current collab packages, rerun the paired measurement with
+`node editor/packages/collab/bench/concurrency.mjs --compare <baseline-collab-dist/index.js>`.
+The original `bench:concurrency` command still measures full construction against incremental
+append-and-query. Final comparison samples assert identical retained edits and exact pairs.
+Property tests add 30 seeded causally ready arrival histories with mixed canonical insertion
+and tail append, limits including zero, empty/retry batches, effect-command eviction, and
+atomic rejection of malformed batches.
 
 ## Verification
 

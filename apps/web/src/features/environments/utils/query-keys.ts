@@ -7,3 +7,7 @@ export const machineKeys = {
 export const environmentQueryKeys = {
   descriptor: ['environment-descriptor'],
 } as const
+
+export const pickerDialogQueryKeys = {
+  module: ['machine-picker-dialog', 'module'] as const,
+}

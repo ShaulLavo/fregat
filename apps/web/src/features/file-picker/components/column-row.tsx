@@ -10,23 +10,18 @@ import { INTENT_PREFETCH_HIT_SLOP_PX } from '@/lib/intent-prefetch-options'
 import { EntryIcon } from '@/features/file-picker/components/entry-icon'
 import { ENTRY_NAME_TEXT } from '@/features/file-picker/utils/rows'
 import { DIRECTORY_QUERY_STALE_MS } from '@/features/file-picker/utils/directory-query'
-import { isPickableEntry, type FilePickerMode } from '@/features/file-picker/utils/model'
 
 /** A name and its icon; a folder carries the caret that says a column opens to its right. */
 export function ColumnRow({
-  accept,
   entry,
   isBusy,
-  mode,
   onDirectoryIntent,
   onDoubleClick,
   rowProps,
   selected,
 }: {
-  accept?: readonly string[]
   entry: FsEntry
   isBusy: boolean
-  mode: FilePickerMode
   onDirectoryIntent: (path: string) => void
   onDoubleClick: (entry: FsEntry) => void
   rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
@@ -47,10 +42,7 @@ export function ColumnRow({
   return (
     <ListRow
       {...rowProps}
-      className={cn(
-        'flex w-full cursor-default items-center text-left',
-        !isPickableEntry(entry, mode, accept) && !directory && 'text-muted-foreground',
-      )}
+      className='flex w-full cursor-default items-center text-left'
       disabled={isBusy}
       ref={directory ? elementRef : undefined}
       role='option'

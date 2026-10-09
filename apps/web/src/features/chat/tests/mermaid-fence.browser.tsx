@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { settingsSnapshot } from '../../../../test/factories/settings'
-import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/render'
 import { AssistantMarkdown } from '../components/assistant-markdown'
 import { ChatWorkspaceRootContext } from '../providers/workspace-root-context'
 import { loadedMermaid, setMermaidLoader } from '../state/mermaid'
@@ -32,7 +32,7 @@ beforeEach(() => {
   // A settings document fetched mid-test makes AppearanceProvider rewrite the `--font-ui` these
   // tests set, so the diagram reverts to the default face.
   queryClient.setQueryData(settingsKeys.document(), settingsSnapshot())
-  seedBootMirrorTheme('dark')
+  seedHtmlTheme('dark')
   const container = document.createElement('main')
   container.style.width = '720px'
   document.body.append(container)

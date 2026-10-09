@@ -26,27 +26,106 @@ interface PackedDescriptor {
   readonly bits: Record<string, { readonly lsb: number; readonly width: number }>
 }
 
+interface DisplayedFrames {
+  current?: NativeSlot
+  previous?: NativeSlot
+  spare?: NativeSlot
+  pending?: NativeSlot
+  disposed: boolean
+  currentToken: number
+  pendingToken: number
+  readonly rowReader: RowReader
+  readonly textReader: TextRowReader
+  readonly previousReader: TextRowReader
+}
+
+const noOptions = Object.freeze({})
+const emptyTextRows: readonly RenderTextRow[] = Object.freeze([])
+
+class DisplayedFrame implements NativeDisplayedFrame {
+  #rows: readonly RenderTextRow[] | undefined
+  #previousRows: readonly RenderTextRow[] | undefined
+
+  constructor(
+    private readonly frames: DisplayedFrames,
+    private readonly current: NativeSlot,
+    private readonly previous: NativeSlot | undefined,
+    readonly token: number,
+  ) {}
+
+  accept(): void {
+    if (!this.pending()) return
+    const frames = this.frames
+    frames.pending = undefined
+    frames.spare = frames.previous
+    frames.previous = frames.current
+    frames.current = this.current
+    frames.currentToken = this.token
+  }
+
+  discard(): void {
+    if (this.pending()) this.frames.pending = undefined
+  }
+
+  readRows(options: DisplayedRowsOptions = noOptions): readonly RenderRow[] {
+    this.active()
+    return this.frames.rowReader.read(this.current.handle, 0, 0, this.current, options)
+  }
+
+  readTextRows(options: DisplayedTextOptions = noOptions): readonly RenderTextRow[] {
+    this.active()
+    if (options.rows)
+      return this.frames.textReader.read(this.current.handle, 0, 0, this.current, options)
+    return (this.#rows ??= this.frames.textReader.read(
+      this.current.handle,
+      0,
+      0,
+      this.current,
+      options,
+    ))
+  }
+
+  readPreviousTextRows(): readonly RenderTextRow[] {
+    this.active()
+    if (!this.previous) return emptyTextRows
+    return (this.#previousRows ??= this.frames.previousReader.read(
+      this.previous.handle,
+      0,
+      0,
+      this.previous,
+      noOptions,
+    ))
+  }
+
+  private pending(): boolean {
+    return this.frames.pending === this.current && this.frames.pendingToken === this.token
+  }
+
+  private active(): void {
+    const frames = this.frames
+    if (
+      frames.disposed ||
+      (!this.pending() && (frames.current !== this.current || frames.currentToken !== this.token))
+    )
+      throw createGhosttyError('read_displayed_frame', 'Displayed-frame token has retired')
+  }
+}
+
 export class DisplayedFrameStore {
-  private current?: NativeSlot
-  private previous?: NativeSlot
-  private spare?: NativeSlot
-  private disposed = false
   private token = 0
-  private currentToken = 0
-  private pending?: NativeSlot
-  private pendingToken = 0
-  private readonly rowReader: RowReader
-  private readonly textReader: TextRowReader
-  private readonly previousReader: TextRowReader
+  private readonly frames: DisplayedFrames
 
   constructor(private readonly runtime: GhosttyRuntime) {
-    this.rowReader = new RowReader(runtime, (...args) => runtime.bridge.readRetainedRows(...args))
-    this.textReader = new TextRowReader(runtime, (...args) =>
-      runtime.bridge.readRetainedText(...args),
-    )
-    this.previousReader = new TextRowReader(runtime, (...args) =>
-      runtime.bridge.readRetainedText(...args),
-    )
+    this.frames = {
+      disposed: false,
+      currentToken: 0,
+      pendingToken: 0,
+      rowReader: new RowReader(runtime, (...args) => runtime.bridge.readRetainedRows(...args)),
+      textReader: new TextRowReader(runtime, (...args) => runtime.bridge.readRetainedText(...args)),
+      previousReader: new TextRowReader(runtime, (...args) =>
+        runtime.bridge.readRetainedText(...args),
+      ),
+    }
   }
 
   capture(
@@ -56,15 +135,17 @@ export class DisplayedFrameStore {
     grid: { columns: number; rows: number },
     full = false,
   ): NativeDisplayedFrame {
-    if (this.disposed) throw createGhosttyError('retain_frame', 'Displayed-frame store is disposed')
-    if (this.pending)
+    const frames = this.frames
+    if (frames.disposed)
+      throw createGhosttyError('retain_frame', 'Displayed-frame store is disposed')
+    if (frames.pending)
       throw createGhosttyError('retain_frame', 'A displayed-frame capture is awaiting acceptance')
     const descriptor = this.runtime.layouts.GhosttyCell as unknown as PackedDescriptor
     const tag = descriptor.bits.content_tag
     const style = descriptor.bits.style_id
     if (!tag || tag.width !== 2 || !style || style.width < 1 || style.width > 32)
       throw createGhosttyError('retain_frame', 'Native cell layout cannot be retained')
-    let next = this.spare
+    let next = frames.spare
     if (!next || next.columns !== grid.columns || next.rows !== grid.rows) {
       const handle = this.runtime.bridge.createRetainedFrame(grid.columns, grid.rows)
       if (!handle)
@@ -76,7 +157,7 @@ export class DisplayedFrameStore {
         'retain_frame',
         this.runtime.bridge.captureRetainedFrame(
           next.handle,
-          this.current?.handle ?? 0,
+          frames.current?.handle ?? 0,
           Number(full),
           state,
           iterator,
@@ -87,70 +168,32 @@ export class DisplayedFrameStore {
         ),
       )
     } catch (cause) {
-      if (next !== this.spare) this.runtime.bridge.destroyRetainedFrame(next.handle)
+      if (next !== frames.spare) this.runtime.bridge.destroyRetainedFrame(next.handle)
       throw cause
     }
-    if (this.spare && next !== this.spare)
-      this.runtime.bridge.destroyRetainedFrame(this.spare.handle)
-    this.spare = next
-    this.pending = next
+    if (frames.spare && next !== frames.spare)
+      this.runtime.bridge.destroyRetainedFrame(frames.spare.handle)
+    frames.spare = next
+    frames.pending = next
     const token = ++this.token
-    this.pendingToken = token
-    const current = next
-    const previous = this.current
-    let rows: readonly RenderTextRow[] | undefined
-    let previousRows: readonly RenderTextRow[] | undefined
-    const pending = () => this.pending === current && this.pendingToken === token
-    const active = () => {
-      if (
-        this.disposed ||
-        (!pending() && (this.current !== current || this.currentToken !== token))
-      )
-        throw createGhosttyError('read_displayed_frame', 'Displayed-frame token has retired')
-    }
-    return Object.freeze({
-      token,
-      accept: () => {
-        if (!pending()) return
-        this.pending = undefined
-        this.spare = this.previous
-        this.previous = this.current
-        this.current = current
-        this.currentToken = token
-      },
-      discard: () => {
-        if (pending()) this.pending = undefined
-      },
-      readRows: (options: DisplayedRowsOptions = {}) => {
-        active()
-        return this.rowReader.read(current.handle, 0, 0, current, options)
-      },
-      readTextRows: (options: DisplayedTextOptions = {}) => {
-        active()
-        if (options.rows) return this.textReader.read(current.handle, 0, 0, current, options)
-        return (rows ??= this.textReader.read(current.handle, 0, 0, current, options))
-      },
-      readPreviousTextRows: () => {
-        active()
-        if (!previous) return Object.freeze([])
-        return (previousRows ??= this.previousReader.read(previous.handle, 0, 0, previous, {}))
-      },
-    })
+    frames.pendingToken = token
+    return Object.freeze(new DisplayedFrame(frames, next, frames.current, token))
   }
 
   dispose(): void {
-    if (this.disposed) return
-    this.disposed = true
+    const frames = this.frames
+    if (frames.disposed) return
+    frames.disposed = true
     this.token += 1
-    if (this.current) this.runtime.bridge.destroyRetainedFrame(this.current.handle)
-    if (this.previous) this.runtime.bridge.destroyRetainedFrame(this.previous.handle)
-    if (this.spare) this.runtime.bridge.destroyRetainedFrame(this.spare.handle)
-    this.pending = undefined
-    this.spare = undefined
-    this.current = undefined
-    this.previous = undefined
-    this.rowReader.dispose()
-    this.textReader.dispose()
-    this.previousReader.dispose()
+    if (frames.current) this.runtime.bridge.destroyRetainedFrame(frames.current.handle)
+    if (frames.previous) this.runtime.bridge.destroyRetainedFrame(frames.previous.handle)
+    if (frames.spare) this.runtime.bridge.destroyRetainedFrame(frames.spare.handle)
+    frames.pending = undefined
+    frames.spare = undefined
+    frames.current = undefined
+    frames.previous = undefined
+    frames.rowReader.dispose()
+    frames.textReader.dispose()
+    frames.previousReader.dispose()
   }
 }

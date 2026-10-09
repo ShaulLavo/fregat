@@ -25,9 +25,9 @@ test('registers canonical directory identity across symlink aliases without acti
   expect(canonical.id).toHaveLength(16)
   expect(canonical.id).toMatch(/^[A-Za-z0-9_-]{16}$/)
   expect(await (await request(app, '/health')).json()).toMatchObject({ workspaceIndexes: [] })
-  expect(
-    await (await request(app, '/fs/recents?mode=folder&showHidden=true')).json(),
-  ).toMatchObject({ entries: [] })
+  expect(await (await request(app, '/fs/recents?showHidden=true')).json()).toMatchObject({
+    entries: [],
+  })
 
   const opened = await request(app, '/fs/workspace-root', { path: 'alias' })
   expect(opened.status).toBe(200)
@@ -79,9 +79,9 @@ test('resolves and reuses the address after all apps and database handles restar
   expect(
     await (await request(restarted, '/fs/workspace-address', { path: 'project' })).json(),
   ).toEqual(registered)
-  expect(
-    await (await request(restarted, '/fs/recents?mode=folder&showHidden=true')).json(),
-  ).toMatchObject({ entries: [] })
+  expect(await (await request(restarted, '/fs/recents?showHidden=true')).json()).toMatchObject({
+    entries: [],
+  })
 })
 
 test('rejects unknown IDs, files, absent paths, and paths escaping the filesystem namespace', async ({
@@ -179,9 +179,9 @@ test('register and GET resolution leave recents alone', async ({ workspace }) =>
       registered,
     )
   }
-  expect(
-    await (await request(app, '/fs/recents?mode=folder&showHidden=true')).json(),
-  ).toMatchObject({ entries: [] })
+  expect(await (await request(app, '/fs/recents?showHidden=true')).json()).toMatchObject({
+    entries: [],
+  })
   const opened = await request(app, '/fs/workspace-root', { path: 'linked' })
   expect(await opened.json()).toMatchObject({ entry: { workspaceAddress: registered } })
 })

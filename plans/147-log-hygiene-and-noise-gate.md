@@ -291,3 +291,9 @@ Phase 3:
 - Retention and rollover of the log files.
 - The Mac's `ENVIRONMENT_PROTOCOL_MISMATCH` errors; that fix belongs to the remote-machine version
   check.
+
+## Provider-usage authorization noise observed during Plan 341 delivery
+
+The 2026-10-09 production live check retained `warn auth GET /providers/usage -` as a preexisting diagnostic: 288 records over 23h56m, exceeding the 50-line budget. Seven inspected recent records returned 403 at five-minute intervals, spanning before and after the HTML-bootstrap deployment. For example, the 17:13:55.021Z record has request id `8ce67113-9012-4ee8-aa70-b6914002be2b`. The fresh read-only browser check generated no warning or error, and the HTML-bootstrap correction passed its live check. This evidence does not identify the polling caller.
+
+Reproduce with `bun scripts/lint/log-noise-census.ts --dir=<production-log-directory> --since=24h --json` and inspect the matching structured records. Start at the authorization event in `apps/server/src/auth.ts:74` and the endpoint in `apps/server/src/provider/routes.ts:66`. Identify the caller and its admission context before changing warning levels or suppressing records. Keep authorization refusals visible while fixing or bounding the unauthorized poller. The local evidence is `/work/tmp/html-bootstrap-341/live-check-corrected/live-check.json`; no settings, credentials or private file contents were copied into this plan.

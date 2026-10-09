@@ -109,9 +109,15 @@ export type InlineCursorStops = 'both' | 'left' | 'right' | 'none'
 
 /**
  * Fills the node a replacement is painted as. Returning a disposable lets the run take down whatever
- * it attached — a listener, an observer — when the replacement leaves the map.
+ * it attached — a listener, an observer — when the replacement leaves the map. The display text is
+ * the complete replacement, or its current display-row fragment when `wrap` is `text`.
+ * `displayStart` is the fragment's offset within the complete replacement text.
  */
-export type InlineReplacementRender = (container: HTMLElement) => void | { dispose(): void }
+export type InlineReplacementRender = (
+  container: HTMLElement,
+  displayText: string,
+  displayStart: number,
+) => void | { dispose(): void }
 
 /**
  * A single-line source span painted as `text` instead of its own characters. An empty `text` hides
@@ -131,6 +137,8 @@ export type InlineReplacement = {
   /** Styles the run alone, where `kind` restyles the whole row the run sits on. */
   readonly className?: string
   readonly cursorStops?: InlineCursorStops
+  /** Wraps textual paint into independently rendered display-row fragments. */
+  readonly wrap?: 'text'
   readonly render?: InlineReplacementRender
   /** Which mount a rendered node belongs to; the id when unset. */
   readonly key?: string
@@ -149,6 +157,8 @@ export type InlineRowSegment = {
   readonly replacementKind?: string
   readonly className?: string
   readonly cursorStops?: InlineCursorStops
+  /** Wraps textual paint into independently rendered display-row fragments. */
+  readonly wrap?: 'text'
   readonly render?: InlineReplacementRender
   readonly key?: string
   readonly metadata?: unknown
@@ -445,6 +455,7 @@ export const inlineReplacementSegment = (
   ...(replacement.kind === undefined ? {} : { replacementKind: replacement.kind }),
   ...(replacement.className === undefined ? {} : { className: replacement.className }),
   ...(replacement.cursorStops === undefined ? {} : { cursorStops: replacement.cursorStops }),
+  ...(replacement.wrap === undefined ? {} : { wrap: replacement.wrap }),
   ...(replacement.render === undefined ? {} : { render: replacement.render }),
   ...(replacement.key === undefined ? {} : { key: replacement.key }),
   ...(replacement.metadata === undefined ? {} : { metadata: replacement.metadata }),

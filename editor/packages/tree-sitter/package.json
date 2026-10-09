@@ -41,7 +41,7 @@
     "build": "bun ../../scripts/build-package.ts",
     "bench:syntax": "bun bench/treeSitter-syntax.ts",
     "test": "vitest run --exclude '**/*.browser.test.ts' && bun run test:browser",
-    "test:browser": "vitest run --browser.enabled --browser.headless test/viewport-first.browser.test.ts test/viewport-replacement.browser.test.ts test/viewport-cancellation.browser.test.ts test/treeSitter-workerClient.browser.test.ts test/native-coverage.browser.test.ts test/markdown.browser.test.ts test/capture-address.browser.test.ts",
+    "test:browser": "vitest run --browser.enabled --browser.headless test/viewport-first.browser.test.ts test/viewport-replacement.browser.test.ts test/viewport-cancellation.browser.test.ts test/treeSitter-workerClient.browser.test.ts test/native-coverage.browser.test.ts test/markdown.browser.test.ts test/capture-address.browser.test.ts test/mergeUnits.browser.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
     "format": "oxfmt --write .",

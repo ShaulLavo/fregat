@@ -1,3 +1,5 @@
+import { createScriptError } from '../../../scripts/structured-errors.ts'
+
 type ChunkingContext = {
   getModuleInfo(id: string): {
     readonly importedIds: readonly string[]
@@ -9,12 +11,15 @@ type ShellRoots = {
   readonly phone: string
   readonly workbench: string
   readonly phoneScreens: readonly string[]
+  /** Closed dialogs and drawers a phone loads after its first screen. */
+  readonly phoneOverlays: readonly string[]
 }
 
 const GROUPS = [
   'initial',
   'phone-sessions',
   'phone-session',
+  'phone-overlays',
   'workbench-shared',
   'workbench',
 ] as const
@@ -24,6 +29,8 @@ type GroupName = (typeof GROUPS)[number]
  * Code-splitting groups for each shell's first load:
  * - `initial`: the entry's static graph, plus the phone shell and boot screens' static modules the workbench
  *   also needs, since both shells load this chunk;
+ * - `phone-overlays`: the workbench modules the phone's deferred overlays need, so opening one on
+ *   a phone downloads them alone, never `workbench-shared` or a boot screen's chunk;
  * - `workbench-shared`: the rest of the lazy workbench's static graph that a phone can reach;
  * - `workbench`: the rest, which only a desktop ever loads.
  * Whole chunks, because automatic splitting cuts them into dozens of files that gzip worse than
@@ -50,6 +57,12 @@ function groupModules(entry: string, shells: ShellRoots, context: ChunkingContex
     if (workbench.has(id)) initial.add(id)
   for (const id of screens[0] ?? [])
     if (workbench.has(id) && screens.every((screen) => screen.has(id))) initial.add(id)
+  const overlays = new Set(
+    shells.phoneOverlays.flatMap((root) => [...overlayModules(root, context)]),
+  )
+  // Shared by an overlay and a boot screen: the overlay must not pull the screen's whole chunk.
+  for (const id of overlays)
+    if (workbench.has(id) && screens.some((screen) => screen.has(id))) initial.add(id)
   // Everything a phone could ever load: every import from the entry except the workbench's.
   const phone = reachable(entry, context, { dynamic: true, skip: shells.workbench })
   const groups = new Map<string, GroupName>()
@@ -61,9 +74,18 @@ function groupModules(entry: string, shells: ShellRoots, context: ChunkingContex
       groups.set(id, screen === 0 ? 'phone-sessions' : 'phone-session')
       continue
     }
+    if (overlays.has(id)) {
+      groups.set(id, 'phone-overlays')
+      continue
+    }
     groups.set(id, phone.has(id) ? 'workbench-shared' : 'workbench')
   }
   return groups
+}
+
+function overlayModules(root: string, context: ChunkingContext) {
+  if (!context.getModuleInfo(root)) throw createScriptError(`shell-chunks: no module for ${root}`)
+  return reachable(root, context, { dynamic: false })
 }
 
 function reachable(

@@ -13,6 +13,7 @@ import { compareTraceSummaries, formatTraceSummary, summarizeTrace } from './tra
 import { summarizeSelectors } from './selector-stats'
 import { captureTraceSources } from './trace-source-maps'
 import { captureSize, type CaptureSize } from './capture-options'
+import { routeHtmlBootstrap } from './html-bootstrap'
 import {
   openStaticPreview,
   routeStaticPreview,
@@ -661,8 +662,16 @@ async function withPage(
     viewport: { width: options.width, height: options.height },
     deviceScaleFactor: options.scale,
     ...(options.touch ? { hasTouch: true, isMobile: true } : {}),
+    ...(options.touch
+      ? {
+          userAgent:
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1',
+        }
+      : {}),
     ...(options.productWallpaper ? { userAgent: PRODUCT_USER_AGENT } : {}),
   })
+  if (options.server && new URL(options.url).origin !== options.server.origin)
+    await routeHtmlBootstrap(context, options.url, options.server.origin)
   if (options.server)
     await context.addInitScript(
       `window.platformDevServerUrl = ${JSON.stringify(options.server.origin)}`,
