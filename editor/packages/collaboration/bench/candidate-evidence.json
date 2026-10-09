@@ -1,0 +1,121 @@
+{
+  "qualification": "experiment, shared machine",
+  "environment": {
+    "runtime": "v26.7.0",
+    "cpu": "Intel(R) Core(TM) i7-14700K",
+    "platform": "linux"
+  },
+  "versionParsing": "bounded parent context",
+  "targetMedianMs": 8,
+  "method": "100k TypeScript lines, 100 concurrent edits, 4 authors, 8192 retained records. 96 independent replacements, a whitespace/content pair and two conflicting string replacements. Current parse, authoring and causal prefix prepared outside timing. Complete append/detection includes projected snapshots, bounded parent-context version parses (copied-tree incremental fallback) and content fingerprints. Two warmups and eight samples. Retained trees are released between batches. Parse/query instrumentation calls the real implementation. Before/after order is supplied by the four A/B/B/A invocations, not by this test. IPC and UI excluded.",
+  "lines": 100000,
+  "characters": 3300000,
+  "medianMs": 3.615393999999924,
+  "p95Ms": 4.279039000000012,
+  "samples": [
+    {
+      "elapsedMs": 4.279039000000012,
+      "projections": 3,
+      "fingerprints": 2,
+      "marks": 3,
+      "ranges": 106,
+      "parses": 3,
+      "parseMs": 0.3729670000000169,
+      "queries": 408,
+      "queryMs": 0.5734170000000631,
+      "unitsMs": 1.7501929999996264,
+      "boundedParses": 3
+    },
+    {
+      "elapsedMs": 3.9405349999999544,
+      "projections": 3,
+      "fingerprints": 2,
+      "marks": 3,
+      "ranges": 106,
+      "parses": 3,
+      "parseMs": 0.29923699999994824,
+      "queries": 408,
+      "queryMs": 0.2770359999985885,
+      "unitsMs": 1.203094000000192,
+      "boundedParses": 3
+    },
+    {
+      "elapsedMs": 3.615393999999924,
+      "projections": 3,
+      "fingerprints": 2,
+      "marks": 3,
+      "ranges": 106,
+      "parses": 3,
+      "parseMs": 0.26905200000010154,
+      "queries": 408,
+      "queryMs": 0.26373799999919356,
+      "unitsMs": 1.1788949999993292,
+      "boundedParses": 3
+    },
+    {
+      "elapsedMs": 3.1157720000001063,
+      "projections": 3,
+      "fingerprints": 2,
+      "marks": 3,
+      "ranges": 106,
+      "parses": 3,
+      "parseMs": 0.22724300000004405,
+      "queries": 408,
+      "queryMs": 0.2722519999990709,
+      "unitsMs": 1.171757999999727,
+      "boundedParses": 3
+    },
+    {
+      "elapsedMs": 2.6423640000002706,
+      "projections": 3,
+      "fingerprints": 2,
+      "marks": 3,
+      "ranges": 106,
+      "parses": 3,
+      "parseMs": 0.23461699999961638,
+      "queries": 408,
+      "queryMs": 0.24966000000040367,
+      "unitsMs": 1.1227240000030179,
+      "boundedParses": 3
+    },
+    {
+      "elapsedMs": 2.4630150000002686,
+      "projections": 3,
+      "fingerprints": 2,
+      "marks": 3,
+      "ranges": 106,
+      "parses": 3,
+      "parseMs": 0.23249100000020917,
+      "queries": 408,
+      "queryMs": 0.24213999999801672,
+      "unitsMs": 1.034227000001465,
+      "boundedParses": 3
+    },
+    {
+      "elapsedMs": 3.76241600000003,
+      "projections": 3,
+      "fingerprints": 2,
+      "marks": 3,
+      "ranges": 106,
+      "parses": 3,
+      "parseMs": 0.23123900000018693,
+      "queries": 408,
+      "queryMs": 0.2415160000036849,
+      "unitsMs": 1.1046639999990475,
+      "boundedParses": 3
+    },
+    {
+      "elapsedMs": 2.5632110000001376,
+      "projections": 3,
+      "fingerprints": 2,
+      "marks": 3,
+      "ranges": 106,
+      "parses": 3,
+      "parseMs": 0.23367400000006455,
+      "queries": 408,
+      "queryMs": 0.2523889999979474,
+      "unitsMs": 1.066657000001669,
+      "boundedParses": 3
+    }
+  ]
+}

@@ -316,3 +316,186 @@ it('fingerprints an unmatched TypeScript line fallback', async () => {
   expect(result).toMatchObject({ status: 'ok', unit: { source: 'line', hasErrors: false } })
   if (result?.status === 'ok') expect(result.unit.contentKey).toContain('comment')
 })
+
+it('projects merge units without changing highlighting trees and bounds retained projections', async () => {
+  const text =
+    'const before = 1;\ninterface Palette { amber: string; violet: number; }\nconst after = 2;\n' +
+    'const padding = 3;\n'.repeat(1000)
+  await parseTreeDocument(client, {
+    ...document,
+    snapshotVersion: 1,
+    text,
+    resultMode: 'parseOnly',
+  })
+  const startIndex = text.indexOf('amber')
+  const range = { startIndex, endIndex: startIndex + 5 }
+  const initial = await client.mergeUnit({
+    ...document,
+    snapshotVersion: 1,
+    range,
+    analysis: true,
+    contentKey: true,
+  })
+  const prepared = await prepareTreeEdit(client, {
+    ...document,
+    previousSnapshotVersion: 1,
+    snapshotVersion: 2,
+    edits: [{ from: startIndex, to: startIndex + 5, text: 'indigo' }],
+    resultMode: 'parseOnly',
+  })
+  expect(prepared).not.toBeNull()
+  const projection = {
+    ...document,
+    baseSnapshotVersion: 1,
+    snapshotVersion: 2,
+    source: prepared!.payload.source,
+    inputEdits: prepared!.payload.inputEdits,
+    ranges: [{ startIndex, endIndex: startIndex + 6 }],
+    analysis: true as const,
+    contentKey: true as const,
+  }
+  try {
+    const projectedText = text.slice(0, startIndex) + 'indigo' + text.slice(startIndex + 5)
+    await parseTreeDocument(client, {
+      ...document,
+      runtimeSessionId: 'projection-control',
+      snapshotVersion: 2,
+      text: projectedText,
+      resultMode: 'parseOnly',
+    })
+    const control = await client.mergeUnit({
+      ...document,
+      runtimeSessionId: 'projection-control',
+      snapshotVersion: 2,
+      range: projection.ranges[0]!,
+      analysis: true,
+      contentKey: true,
+    })
+    const projected = await client.projectMergeUnits(projection)
+    expect(projected).toMatchObject({ status: 'ok', units: [[control!.unit]] })
+    expect(
+      await client.mergeUnit({
+        ...document,
+        snapshotVersion: 1,
+        range,
+        analysis: true,
+        contentKey: true,
+      }),
+    ).toEqual(initial)
+    const repeated = await Promise.all([
+      client.projectMergeUnits(projection),
+      client.projectMergeUnits(projection),
+    ])
+    expect(repeated).toEqual([projected, projected])
+    const distant = { startIndex: text.length - 10, endIndex: text.length - 9 }
+    const expanded = await client.projectMergeUnits({ ...projection, ranges: [distant] })
+    const expandedControl = await client.mergeUnit({
+      ...document,
+      runtimeSessionId: 'projection-control',
+      snapshotVersion: 2,
+      range: distant,
+      analysis: true,
+      contentKey: true,
+    })
+    expect(expanded).toMatchObject({ status: 'ok', units: [[expandedControl!.unit]] })
+    for (let version = 3; version <= 12; version++)
+      expect(
+        (await client.projectMergeUnits({ ...projection, snapshotVersion: version }))?.status,
+      ).toBe('ok')
+    const retained = await client.inspectRetention()
+    const snapshots = retained!.documents.find(
+      (entry) => entry.runtimeSessionId === document.runtimeSessionId,
+    )!.snapshots
+    expect(snapshots.filter((snapshot) => snapshot.snapshotVersion !== 1)).toHaveLength(6)
+    expect(snapshots.some((snapshot) => snapshot.snapshotVersion === 1)).toBe(true)
+    expect(
+      await client.projectMergeUnits({ ...projection, baseSnapshotVersion: 99 }),
+    ).toMatchObject({ status: 'stale', units: [] })
+    const cancellationBuffer = new SharedArrayBuffer(4)
+    Atomics.store(new Int32Array(cancellationBuffer), 0, 1)
+    expect(
+      await client.projectMergeUnits({ ...projection, snapshotVersion: 13, cancellationBuffer }),
+    ).toMatchObject({ status: 'cancelled', units: [] })
+    client.disposeDocument(document.runtimeSessionId)
+    await client.awaitRuntimeSessionIdle(document.runtimeSessionId)
+    expect(
+      (await client.inspectRetention())!.documents.some(
+        (entry) => entry.runtimeSessionId === document.runtimeSessionId,
+      ),
+    ).toBe(false)
+  } finally {
+    await prepared!.prepared.dispose()
+  }
+})
+
+it.each(['markdown', 'mdx'])(
+  'projects nested injections in %s without changing the base',
+  async (languageId) => {
+    const identity = { ...document, languageId }
+    const text = '```javascript\nconst palette = json`{"amber": 1, "violet": 2}`;\n```\n'
+    await parseTreeDocument(client, { ...identity, snapshotVersion: 1, text })
+    const startIndex = text.indexOf('1')
+    const range = { startIndex, endIndex: startIndex + 1 }
+    const original = await client.mergeUnit({
+      ...identity,
+      snapshotVersion: 1,
+      range,
+      analysis: true,
+      contentKey: true,
+    })
+    const prepared = await prepareTreeEdit(client, {
+      ...identity,
+      previousSnapshotVersion: 1,
+      snapshotVersion: 2,
+      edits: [{ from: startIndex, to: startIndex + 1, text: '9' }],
+    })
+    expect(prepared).not.toBeNull()
+    try {
+      await parseTreeDocument(client, {
+        ...identity,
+        runtimeSessionId: 'injection-control',
+        snapshotVersion: 2,
+        text: text.slice(0, startIndex) + '9' + text.slice(startIndex + 1),
+      })
+      const control = await client.mergeUnit({
+        ...identity,
+        runtimeSessionId: 'injection-control',
+        snapshotVersion: 2,
+        range,
+        analysis: true,
+        contentKey: true,
+      })
+      expect(control).toMatchObject({ status: 'ok', unit: { source: 'syntax', type: 'pair' } })
+      expect(
+        await client.projectMergeUnits({
+          ...identity,
+          baseSnapshotVersion: 1,
+          snapshotVersion: 2,
+          source: prepared!.payload.source,
+          inputEdits: prepared!.payload.inputEdits,
+          ranges: [range],
+          analysis: true,
+          contentKey: true,
+        }),
+      ).toMatchObject({ status: 'ok', units: [[{ ...control!.unit, languageId: 'json' }]] })
+      expect(
+        await client.mergeUnit({
+          ...identity,
+          snapshotVersion: 1,
+          range,
+          analysis: true,
+          contentKey: true,
+        }),
+      ).toEqual(original)
+      client.disposeDocument(identity.runtimeSessionId)
+      client.disposeDocument('injection-control')
+      await client.awaitRuntimeSessionIdle(identity.runtimeSessionId)
+      await client.awaitRuntimeSessionIdle('injection-control')
+      const retained = await client.inspectRetention()
+      expect(retained!.treeCount).toBe(0)
+      expect(retained!.markdownDocumentCount).toBe(0)
+    } finally {
+      await prepared!.prepared.dispose()
+    }
+  },
+)

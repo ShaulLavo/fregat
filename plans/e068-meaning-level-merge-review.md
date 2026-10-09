@@ -204,30 +204,92 @@ them).
    Projection snapshots are reused per detect call, and mark edges are accumulated once.
    No changes were made to `packages/collab/src/concurrency.ts`; its append tuning is separate.
 
-   **Cost gate remains incomplete.** Run
-   `bun run --cwd editor/packages/collaboration bench:merge-review` after workspace builds.
-   Evidence: `editor/packages/collaboration/bench/detector-evidence.json`, with a separately
-   instrumented profile in `detector-profile-evidence.json`. Both are **experiment, shared
-   machine**, A/B/B/A. Current retained parsing is prepared outside timing, as detection runs
-   after parsing; IPC and UI are excluded. The complete detector includes concurrency append,
-   pair selection, identity mapping and real queries. For 100 retained records, median
-   2/4/8-author batches are 1.140/1.160/1.266 ms (p95 2.491/2.255/2.708 ms). At 8,192 records
-   they are **3.218/3.058/3.100 ms**, p95 **5.478/4.823/5.060 ms**. These do not satisfy 2 ms.
-   `detector-baseline-evidence.json` records the intermediate cached-state implementation
-   before demand-only fingerprints, not the initial implementation.
+   **The independent-unit median and marked 8 ms median pass; the 2 ms tail gate remains open.**
+   Run `bun run --cwd editor/packages/collaboration bench:merge-review` after workspace builds.
+   The 2026-10-09 detector-cost follow-up includes append, exact pairs, identity mapping and
+   real syntax queries. Current parsing, authoring, window construction, application, IPC and
+   UI remain outside timing. `bench/detector-cost-comparison.json` records four complete
+   before/after A/B/B/A invocations against `2266ab2c0`, raw samples, source hashes and separate
+   profiles. Every run uses bench-class admission without quiet mode. These are
+   **experiment, shared machine**, with 120 complete detector samples per version and setting.
+   Each optimized invocation passes the unchanged independent-unit median budget.
 
-   The separately profiled representative batch has 100k lines, 100 edits, four authors and
-   8,192 retained records. Mean append is 1.728 ms; exact pair selection alone is 0.486 ms;
-   detector work after append is 2.298 ms. Current-unit lookup totals 0.878 ms, including
-   0.258 ms inside real query matching: one unit range and four query matches per edit.
-   V8 samples estimate 0.159 ms append, 0.456 ms pair selection, 0.757 ms unit selection/query,
-   0.121 ms signature/candidate checks, 0.057 ms orphan checks, 0.145 ms identity/effect work
-   and 0.487 ms bookkeeping per complete batch. These sampled estimates exclude harness/GC
-   and are not additive wall timings. Parsing, token fingerprints and `projectEffects` rebuilds
-   are zero in this independent-unit timed workload; reconstruction cost remains unbounded by
-   this experiment. Append is the largest separately timed component; unit/query selection
-   is the largest sampled category. Keep the existing budget and include marked projection
-   workloads and worker transport in the remaining proof.
+   | Retained records | Authors | Median before | Median after | p95 before | p95 after |
+   | ---------------- | ------- | ------------- | ------------ | ---------- | --------- |
+   | 100              | 2       | 1.243 ms      | 1.158 ms     | 2.526 ms   | 2.189 ms  |
+   | 100              | 4       | 1.249 ms      | 1.107 ms     | 2.464 ms   | 2.020 ms  |
+   | 100              | 8       | 1.325 ms      | 1.136 ms     | 2.096 ms   | 1.804 ms  |
+   | 8,192            | 2       | 2.030 ms      | 1.573 ms     | 3.919 ms   | 3.293 ms  |
+   | 8,192            | 4       | 2.029 ms      | 1.656 ms     | 3.841 ms   | 3.246 ms  |
+   | 8,192            | 8       | 2.097 ms      | 1.682 ms     | 3.609 ms   | 3.300 ms  |
+
+   Repeated retained-history traversal and per-pair effect bookkeeping were the ordinary
+   bottlenecks. `ConfirmedWindow` maintains retained-author counts; ordered batch selection
+   looks up supplied IDs and binary-searches causal positions. Nonmonotone arrivals still scan
+   canonical candidates. The detector reuses its involved-edit set on the all-active path and
+   checks identity origins directly for orphan eligibility. Failed appends, eviction,
+   missing/repeated batch IDs and non-tail selection preserve pair order and results.
+
+   Separately instrumented four-author profiles put exact-pair means at
+   0.524/0.515 ms before and
+   0.100/0.089 ms after. Detector work after append falls from
+   2.536/2.462 ms to
+   1.860/1.761 ms. Unit lookup remains
+   0.958/0.906 ms after, with 100 ranges and 400 real query matches.
+   These profiles include instrumentation overhead; they are separate from the median gate.
+   No unmeasured explanation is assigned to shared-machine tails. `detector-evidence.json` and
+   `detector-profile-evidence.json` contain the last optimized run. Historical intermediate
+   `detector-baseline-evidence.json` predates demand-only fingerprints.
+
+   `bench/candidates.test.ts` measures a marked 100k-line, 100-edit, four-author, 8,192-record
+   batch: 96 independent replacements, one formatting/content pair and two conflicting string
+   replacements. Each timed batch creates three projected snapshots, parses three versions
+   and fingerprints two ranges. Current parsing stays outside timing; projected trees are
+   released between batches. Sixteen samples per version give median/p95
+   **811.451/871.644 ms cold before** and
+   **3.615/7.096 ms bounded after**. Projected parsing alone changes from
+   807.759 ms to 0.235 ms at the median; every optimized sample uses three bounded parses.
+   Every run asserts overlap and parse marks, the exact conflicting edit IDs and formatting
+   exclusion. `candidate-evidence.json` contains the last optimized run; the comparison file
+   retains both versions, raw samples and excluded exploratory failures.
+
+   Whole-document version parsing dominated the marked path. Copy/edit alone was cheap, but
+   incremental parsing of a 100k-child flat root still missed one frame in exploratory pilots.
+   The language-neutral projected reader parses affected top-level units with neighboring
+   parent context at absolute source coordinates. It expands through damaged recovery nodes,
+   checks unchanged clean boundaries and uses copied-tree incremental parsing when the context
+   remains damaged, is not self-contained, has injection layers or a later range lies outside
+   the cached bounded tree. Full-document parent geometry is restored for bounded query results.
+   Damaged-line error lookup now descends at the exact point and visits overlapping siblings.
+   Both benchmark versions use this final query helper; the cold A path still reparses each
+   projected document in full. No retained highlighting tree is edited directly.
+
+   Minimal bridge contract: the optional fifth `MergeReviewSyntax` argument is the retained
+   current/base snapshot for a projected read. `createTreeSitterInputEdits(baseRead, edits)`
+   creates base-relative UTF-16 parser edits. `TreeSitterWorkerOwner.projectMergeUnits()` takes
+   the retained `baseSnapshotVersion`, a distinct projected `snapshotVersion`, projected `source`,
+   `inputEdits`, `ranges` and optional analysis, fingerprint, selection and cancellation flags.
+   It returns one unit group per range with `ok`, or an empty result with `stale`/`cancelled`.
+   Each projected unit carries its own `languageId` for nested injections.
+   Projected versions have an isolated per-runtime cache, bounded by the existing six-snapshot
+   and eight-million-source-unit limits; eviction of a base also releases its projections.
+   The distinct request leaves highlighting and the existing `mergeUnit` contract unchanged.
+
+   Differential corpus, regression and seeded detector cases compare projected results with
+   cold full reparses across JavaScript, TypeScript, TSX, CSS, JSON, Markdown, Python, Rust and
+   Go. They assert retained-tree serialization stays unchanged, including incremental fallback.
+   A real-worker browser test also checks identical groups, later-range expansion, concurrency,
+   missing bases, cancellation, projection-cache eviction and runtime disposal. Markdown/MDX
+   nested-fence cases compare against full worker parses and release every owned tree/document.
+   Native Markdown needs a separate full-text native document to discover projected fences;
+   it never reuses the highlighting document. This fallback is outside the TypeScript cost proof.
+
+   The ordinary p95 and marked batch still exceed the unchanged 2 ms budget. The representative
+   marked median passes the additional 8 ms frame target; this is not a dense-conflict worst-case
+   bound. Remaining proof: run the production bridge including worker transport after UI wiring,
+   and bound wide/damaged or injected contexts that take incremental fallback. Reproduce with
+   the benchmark command above and `bench/workload.ts`; retain the ordinary budget and the exact
+   full-reparse differential control while investigating these tails.
 
    A separate **experiment, shared machine** in `paste-evidence.json` compares reviewed head
    `d8ff8d97b4249cf3842e6c72b250c82f9137c6ea` with the revision, using two concurrent insertions
