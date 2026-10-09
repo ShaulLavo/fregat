@@ -222,8 +222,12 @@ export const settingsRawConflict: Scenario = {
         (facts) => facts.sync.confirmedText === newerText && facts.sync.revision !== null,
       )
       await selectors.settingsCompare(page).click()
+      await selectors.diffPanes(page).first().hover()
+      await page.mouse.wheel(0, 250)
       const reopened = await waitForSettings(identity, (facts) =>
-        Boolean(facts.display?.exactCurrentRead),
+        Boolean(
+          facts.display?.exactCurrentRead && facts.display.native.visibleText.includes(NEWER_KEY),
+        ),
       )
       secondBinding = await identity.evaluateHandle(captureSettingsBinding)
       strictEqual(
@@ -242,9 +246,15 @@ export const settingsRawConflict: Scenario = {
       await step('reopened-comparison')
 
       await selectors.settingsKeepChanges(page).click()
-      const saved = await waitForSettings(identity, (facts) => facts.sync.state === 'idle')
+      await waitForSettings(identity, (facts) => facts.sync.state === 'idle')
       strictEqual(await readFile(settingsFile, 'utf8'), undone.localText)
       await selectors.settingsComparison(page).waitFor({ state: 'hidden' })
+      await selectors.writableEditorInput(page).focus()
+      await page.keyboard.press('Control+End')
+      await page.keyboard.press('Home')
+      const saved = await waitForSettings(identity, (facts) =>
+        facts.native.visibleText.includes('"workbench.wallpaper"'),
+      )
       strictEqual(saved.sameNative, true)
       strictEqual(saved.sameBuffer, true)
       strictEqual(saved.sourceInterests, 0)
@@ -285,7 +295,6 @@ export const settingsRawConflict: Scenario = {
       strictEqual(await firstBinding.evaluate((binding) => binding?.lease.read().kind), 'released')
       strictEqual(await secondBinding.evaluate((binding) => binding?.lease.read().kind), 'released')
       await evidence.json('native-closed-and-terminal.json', closed)
-      await step('closed-and-terminal')
     } catch (error) {
       if (identity)
         await evidence.json(
