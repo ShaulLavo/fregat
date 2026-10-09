@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import {
   appendWordWrapText,
   createWordWrapLine,
@@ -94,3 +94,14 @@ test.each([4095, 16383])(
     }
   },
 )
+
+test('segments each mixed-Unicode storage chunk once', () => {
+  const spy = vi.spyOn(Intl.Segmenter.prototype, 'segment')
+  try {
+    const text = 'word 中文 é 👩‍💻 אבג '.repeat(50)
+    expect(ends(text, []).at(-1)).toBe(text.length)
+    expect(spy.mock.calls.length).toBeLessThanOrEqual(2)
+  } finally {
+    spy.mockRestore()
+  }
+})
