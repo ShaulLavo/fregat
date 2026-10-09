@@ -254,6 +254,11 @@
     "@singapore-editor/collaboration#typecheck": {
       "dependsOn": ["^typecheck", "@singapore-editor/diff#build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/examples/app/src/**"]
+    },
+    "@workspace/ui#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["src/lib/generated/cn-tables.ts"],
+      "inputs": ["$TURBO_DEFAULT$", "!src/lib/generated/cn-tables.ts"]
     }
   },
   "agentGuidance": false,

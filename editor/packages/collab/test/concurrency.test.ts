@@ -176,6 +176,25 @@ test('concurrency is represented by exact pairs, not transitive connected groups
   )
 })
 
+test('batch selection preserves exact order for missing, evicted and non-tail edits', () => {
+  for (let seed = 0; seed < 20; seed++) {
+    const history = confirmedHistory(seed)
+    const window = new ConfirmedWindow([], 16)
+    for (const envelope of shuffled(history, randomFor(seed + 400))) window.append([envelope])
+    const all = window.pairs()
+    for (const envelope of history) {
+      const batch = [envelope.id, envelope.id, { actor: 'missing', seq: 1 }]
+      const selected = new Set(batch.map(editKey))
+      expect(window.pairs(batch)).toEqual(
+        all.filter(
+          ([a, b]) => selected.has(editKey(a.envelope.id)) || selected.has(editKey(b.envelope.id)),
+        ),
+      )
+    }
+    expect(window.pairs([])).toEqual([])
+  }
+})
+
 test('the replay cap retains the same canonical suffix regardless of arrival order', () => {
   const history: Envelope[] = Array.from({ length: 8193 }, (_, i) => ({
     document: 'review',
