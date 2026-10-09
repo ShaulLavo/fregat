@@ -1,10 +1,10 @@
 import { expect, test } from 'vitest'
 
-import { settingsMetadataInStartup } from './bundle-report'
+import { eagerModulesInStartup } from './bundle-report'
 import { checkFirstLoad, pinsFrom, type GateReport, type Pins } from './bundle-gate'
 
 const baseline: GateReport = {
-  eagerSettingsMetadata: [],
+  eagerStartupModules: [],
   firstLoad: { scriptGzip: 1_000_000 },
   phoneFirstLoad: { scriptGzip: 600_000 },
   phoneSessionFirstLoad: { scriptGzip: 600_000 },
@@ -22,7 +22,7 @@ test('the pinned build passes', () => {
 
 test('an owner that grew past its margin fails and is named', () => {
   const grown: GateReport = {
-    eagerSettingsMetadata: [],
+    eagerStartupModules: [],
     firstLoad: { scriptGzip: 1_020_000 },
     phoneFirstLoad: { scriptGzip: 600_000 },
     phoneSessionFirstLoad: { scriptGzip: 600_000 },
@@ -38,7 +38,7 @@ test('an owner that grew past its margin fails and is named', () => {
 
 test('a new owner in first load is named when it passes the floor', () => {
   const added: GateReport = {
-    eagerSettingsMetadata: [],
+    eagerStartupModules: [],
     firstLoad: { scriptGzip: 1_030_000 },
     phoneFirstLoad: { scriptGzip: 600_000 },
     phoneSessionFirstLoad: { scriptGzip: 600_000 },
@@ -51,7 +51,7 @@ test('a new owner in first load is named when it passes the floor', () => {
 
 test('small drift inside the margins passes, and a tiny owner has a floor', () => {
   const drift: GateReport = {
-    eagerSettingsMetadata: [],
+    eagerStartupModules: [],
     firstLoad: { scriptGzip: 1_005_000 },
     phoneFirstLoad: { scriptGzip: 600_000 },
     phoneSessionFirstLoad: { scriptGzip: 600_000 },
@@ -66,7 +66,7 @@ test('small drift inside the margins passes, and a tiny owner has a floor', () =
 
 test('total growth spread thin over owners still fails on the total', () => {
   const spread: GateReport = {
-    eagerSettingsMetadata: [],
+    eagerStartupModules: [],
     firstLoad: { scriptGzip: 1_020_000 },
     phoneFirstLoad: { scriptGzip: 600_000 },
     phoneSessionFirstLoad: { scriptGzip: 600_000 },
@@ -123,7 +123,7 @@ test('a direct conversation boot is gated even when the sessions list is smaller
 
 test('settings documentation cannot return to first load within the byte budget', () => {
   const owner = '/checkout/packages/contracts/src/settings/documentation.ts'
-  const result = checkFirstLoad({ ...baseline, eagerSettingsMetadata: [owner] }, pins)
+  const result = checkFirstLoad({ ...baseline, eagerStartupModules: [owner] }, pins)
   expect(result.passed).toBe(false)
   expect(result.failures).toEqual([{ owner, pinned: 0, now: 1 }])
 })
@@ -137,13 +137,27 @@ test('the ownership oracle inspects emitted startup files and ignores lazy or re
     { fileName: 'lazy.js', modules: [{ id: documentation, renderedLength: 20 }] },
     { fileName: 'initial.js', modules: [{ id: documentation, renderedLength: 0 }] },
   ]
-  expect(settingsMetadataInStartup(chunks, [{ fileName: 'desktop.js' }])).toEqual([defaults])
-  expect(settingsMetadataInStartup(chunks, [{ fileName: 'phone.js' }])).toEqual([documentation])
-  expect(settingsMetadataInStartup(chunks, [{ fileName: 'initial.js' }])).toEqual([])
+  expect(eagerModulesInStartup(chunks, [{ fileName: 'desktop.js' }])).toEqual([defaults])
+  expect(eagerModulesInStartup(chunks, [{ fileName: 'phone.js' }])).toEqual([documentation])
+  expect(eagerModulesInStartup(chunks, [{ fileName: 'initial.js' }])).toEqual([])
 })
 
 test('the ownership oracle rejects emitted presentation metadata in startup', () => {
   const id = '/checkout/packages/contracts/src/settings/presentation.ts'
   const chunks = [{ fileName: 'phone.js', modules: [{ id, renderedLength: 20 }] }]
-  expect(settingsMetadataInStartup(chunks, [{ fileName: 'phone.js' }])).toEqual([id])
+  expect(eagerModulesInStartup(chunks, [{ fileName: 'phone.js' }])).toEqual([id])
+})
+
+test('editor recording cannot return to first load within the byte budget', () => {
+  const owner = '/checkout/apps/web/src/features/editor/state/performance-recording.ts'
+  const chunks = [
+    { fileName: 'initial.js', modules: [{ id: owner, renderedLength: 5000 }] },
+    { fileName: 'lazy.js', modules: [{ id: owner, renderedLength: 5000 }] },
+  ]
+  const eagerStartupModules = eagerModulesInStartup(chunks, [{ fileName: 'initial.js' }])
+  expect(checkFirstLoad({ ...baseline, eagerStartupModules }, pins).failures).toEqual([
+    { owner, pinned: 0, now: 1 },
+  ])
+  expect(eagerModulesInStartup(chunks, [{ fileName: 'lazy.js' }])).toEqual([owner])
+  expect(eagerModulesInStartup(chunks, [{ fileName: 'phone.js' }])).toEqual([])
 })
