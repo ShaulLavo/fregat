@@ -122,8 +122,13 @@ export class CanvasRowPainter {
   }
 
   invalidate(): void {
+    this.finishFrame()
     this.backgroundColor = undefined
     this.plainRows.clear()
+  }
+
+  finishFrame(): void {
+    this.cells.length = 0
   }
 
   setTheme(theme: CanonicalRendererTheme): void {

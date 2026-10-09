@@ -402,6 +402,7 @@ describe('CanvasTerminalRenderer', () => {
       const packed = new PackedCells(words, new Uint32Array())
       const decode = vi.spyOn(packed, 'read')
       const materialize = vi.spyOn(packed, 'materialize')
+      const readInto = vi.spyOn(packed, 'readInto')
       let cells: readonly RenderCell[] | undefined
       source.rows[0] = {
         y: 0,
@@ -418,6 +419,8 @@ describe('CanvasTerminalRenderer', () => {
       expect(materialize).toHaveBeenCalledTimes(expectedMaterializations)
       // Eligibility, key capture, and painting each read the packed row once.
       expect(decode).toHaveBeenCalledTimes(120)
+      expect(readInto).toHaveBeenCalledTimes(batch ? 2 : 1)
+      for (const [scratch] of readInto.mock.calls) expect(scratch).toHaveLength(0)
       expectFullRepaint(canvas, source)
       expect(materialize).toHaveBeenCalledTimes(1)
     },

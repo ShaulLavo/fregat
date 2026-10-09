@@ -140,6 +140,7 @@ class CanvasSurface implements RowRendererSurface {
   }
 
   beginFrame(): void {
+    this.captureCells.length = 0
     this.capturing = false
     this.plan = undefined
     this.nextImage = undefined
@@ -153,6 +154,7 @@ class CanvasSurface implements RowRendererSurface {
   }
 
   invalidate(): void {
+    this.captureCells.length = 0
     this.painter.invalidate()
     this.image = undefined
     this.nextImage = undefined
@@ -181,6 +183,7 @@ class CanvasSurface implements RowRendererSurface {
       }
       this.remaining -= 1
       if (this.remaining === 0) {
+        this.painter.finishFrame()
         this.pixelTarget?.present()
         this.image = this.nextImage
       }
