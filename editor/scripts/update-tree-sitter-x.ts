@@ -30,7 +30,9 @@ assert.notEqual(manifest.peerDependenciesMeta?.['web-tree-sitter']?.optional, tr
 assert.equal(manifest.dependencies?.['web-tree-sitter'], undefined)
 assert.equal(typeof manifest.version, 'string')
 
-const paths: string[] = []
+const paths: string[] = [resolve(root, 'package.json')]
+const siteManifest = resolve(root, 'site/package.json')
+if (existsSync(siteManifest)) paths.push(siteManifest)
 for await (const file of new Glob('packages/*/package.json').scan(root)) {
   paths.push(resolve(root, file))
 }

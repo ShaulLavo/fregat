@@ -45,6 +45,9 @@
     "typescript-api": "npm:typescript@6.0.3",
     "vite": "8.3.1"
   },
+  "overrides": {
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#a052adf5c2c34ef78f97d1631c41ca83db9816d3"
+  },
   "packageManager": "bun@1.4.2",
   "patchedDependencies": {
     "vitest@5.0.2": "patches/vitest@5.0.2.patch",

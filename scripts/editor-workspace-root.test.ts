@@ -98,7 +98,10 @@ async function withUpdater(
     }
     await writeFile(
       path.join(editor, 'package.json'),
-      JSON.stringify({ workspaces: ['packages/*'] }),
+      JSON.stringify({
+        workspaces: ['packages/*'],
+        overrides: { 'web-tree-sitter': runtimeSpec(runtime) },
+      }),
     )
     const manifests: Record<string, unknown> = {
       'package.json': {
@@ -187,6 +190,11 @@ test('a matching Markdown source advances full host, peer, catalog, and fixture 
       }
       const host = JSON.parse(contents[0]!)
       expect(host.overrides['web-tree-sitter']).toBe(runtimeSpec(nextRuntime))
+      expect(
+        JSON.parse(await readFile(path.join(root, 'editor/package.json'), 'utf8')).overrides[
+          'web-tree-sitter'
+        ],
+      ).toBe(runtimeSpec(nextRuntime))
       const fixture = JSON.parse(contents[1]!)
       expect(fixture.packages[0].dependencies['web-tree-sitter']).toBe(runtimeSpec(nextRuntime))
       expect(fixture.packages[1].dependencies['tree-sitter-md']).toBe(markdownSpec(nextMarkdown))
@@ -282,6 +290,8 @@ test('authored host, Markdown, catalog, and release fixture pins agree with the 
   expect(runtimePin).toMatch(/^github:ShaulLavo\/tree-sitter-x#[0-9a-f]{40}$/)
   expect(markdownPin).toMatch(/^github:ShaulLavo\/tree-sitter-md#[0-9a-f]{40}$/)
   expect(read('package.json').overrides['web-tree-sitter']).toBe(runtimePin)
+  expect(read('editor/package.json').overrides['web-tree-sitter']).toBe(runtimePin)
+  expect(read('editor/site/package.json').devDependencies['web-tree-sitter']).toBe(runtimePin)
   const require = createRequire(path.join(repository, 'editor/packages/tree-sitter/package.json'))
   const markdownName = Object.keys(host).find((name) => host[name] === markdownPin)
   const peer = JSON.parse(readFileSync(require.resolve(`${markdownName}/package.json`), 'utf8'))

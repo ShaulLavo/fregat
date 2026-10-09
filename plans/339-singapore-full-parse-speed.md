@@ -475,3 +475,24 @@ qualified artifact: SHA-256
 `65aa79c497fe2172b9d635af91f7004129ba2728eeb41eb226c17de208ed5eed`.
 The temporary diagnostic transform was removed and the ordinary benchmark
 build restored.
+
+### Standalone runtime identity repair, 2026-10-09
+
+Status: Approved. The hoisted standalone Editor check in Fregat #1086 found a
+second runtime below Markdown. The root Fregat override had hidden the mismatch:
+Markdown still required artifact `3805c892`, while the host used `a052adf5`.
+The original failed qualification observations above remain unchanged.
+
+Reviewed [tree-sitter-md #11](https://github.com/ShaulLavo/tree-sitter-md/pull/11)
+aligns its required peer and development dependency with `a052adf5`. The normal
+runtime updater now pins merged Markdown source
+`00b65ee848d7ea6a3f6123b0507b7a791d6a6769` throughout the consumer manifests,
+language catalog and release fixture. Grammar and resolver binaries are
+unchanged. The standalone Editor root also overrides the runtime, and the
+updater includes that root and the documentation site's development pin.
+This keeps nested and standalone installations on the same artifact.
+
+Verification runs the standalone action's install, build, typecheck, lint and
+format checks, then both runtime identity and host-loaded Markdown tests in
+isolated and hoisted installations. The updater and authored-pin tests cover
+the mirror override, documentation site and exact required Markdown peer.
