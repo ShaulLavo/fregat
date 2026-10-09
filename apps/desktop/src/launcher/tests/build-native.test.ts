@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { tmpdir } from 'node:os'
 import { expect, test } from 'vitest'
-import { buildNative, copyNativeHost } from '../../../scripts/build-native'
+import { buildNative, copyNativeHost, zigFlag } from '../../../scripts/build-native'
 import { observeNativeBuild } from './native-build-observation'
 
 const supported = process.platform === 'linux'
@@ -118,3 +118,9 @@ test.skipIf(!macSdk)(
   },
   30_000,
 )
+
+test("pkg-config's driver flags reach Zig in its own spelling", () => {
+  expect(
+    ['-pthread', '-Wl,--export-dynamic', '-I/usr/include/gtk-3.0', '-lgtk-3'].map(zigFlag),
+  ).toEqual(['-D_REENTRANT', '-rdynamic', '-I/usr/include/gtk-3.0', '-lgtk-3'])
+})
