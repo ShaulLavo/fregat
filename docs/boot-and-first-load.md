@@ -58,8 +58,9 @@ palette load and closing/reopening the pending picker.
 ## Bundle size
 
 Bundle size is not gated; deal with it when it's a real problem (owner, 2026-10-09).
-CI, commit hooks and `verify` impose no first-load byte limits or per-owner budgets.
-The former gate, pins and build-based report were removed. Vite's production build
+PR #1202 removed the first-load size check from CI and `verify`. The remaining
+on-demand gate, pins and build-based report were then removed. Commit hooks also
+impose no first-load byte limits or per-owner budgets. Vite's production build
 log still reports output sizes. Investigate download size alongside measured startup
 behavior when users encounter a problem.
 
