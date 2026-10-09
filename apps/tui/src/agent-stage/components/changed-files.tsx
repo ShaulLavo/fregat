@@ -1,3 +1,4 @@
+import { finalize } from '@/utils/finalize'
 import { useState } from 'react'
 import { createCheckpointRevertCommand } from '@workspace/client-core/chat/commands'
 import type { ChatSession } from '@workspace/client-core/chat/types'
@@ -60,20 +61,23 @@ export function ChangedFiles({
   async function confirm(value: string) {
     if ((value !== 'revert' && value !== 'restore files') || selectedTurn === null || busy) return
     setBusy(true)
-    try {
-      if (
-        await run(
-          createCheckpointRevertCommand({
-            sessionId: conversation.id,
-            turnCount: selectedTurn,
-            restoreFiles: value === 'restore files',
-          }),
+    return await finalize(
+      async () => {
+        if (
+          await run(
+            createCheckpointRevertCommand({
+              sessionId: conversation.id,
+              turnCount: selectedTurn,
+              restoreFiles: value === 'restore files',
+            }),
+          )
         )
-      )
-        onClose()
-    } finally {
-      setBusy(false)
-    }
+          onClose()
+      },
+      () => {
+        setBusy(false)
+      },
+    )
   }
   async function openFile(index: number) {
     if (busy) return
@@ -81,17 +85,22 @@ export function ChangedFiles({
     if (!entry) return
     setBusy(true)
     setError('')
-    try {
-      await navigation.openFile({
-        rootPath: conversation.worktree.path,
-        relativePath: entry.file.path,
-      })
-      onClose()
-    } catch (failure) {
-      setError(connectionFailure(failure).message)
-    } finally {
-      setBusy(false)
-    }
+    return await finalize(
+      async () => {
+        try {
+          await navigation.openFile({
+            rootPath: conversation.worktree.path,
+            relativePath: entry.file.path,
+          })
+          onClose()
+        } catch (failure) {
+          setError(connectionFailure(failure).message)
+        }
+      },
+      () => {
+        setBusy(false)
+      },
+    )
   }
   return (
     <Dialog
