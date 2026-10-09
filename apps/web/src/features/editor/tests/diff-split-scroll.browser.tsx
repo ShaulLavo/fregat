@@ -8,7 +8,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, expect, test } from 'vitest'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'
-import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/render'
 
 // Registered in `vitest.config.ts` under `browser.commands`, which is a runtime registry with no
 // types of its own — a caller has to say what it accepts.
@@ -136,7 +136,7 @@ async function animationFrames(count: number) {
 }
 
 function mountSplitDiff() {
-  seedBootMirrorTheme('dark')
+  seedHtmlTheme('dark')
   // Changed in one long block on purpose. Two scattered edits over 400 lines project to about
   // SIXTEEN rows — everything between them collapses into `Show N unmodified lines` — and with
   // overscan 12 no row is ever recycled and the mounted window never shifts, so the regime this

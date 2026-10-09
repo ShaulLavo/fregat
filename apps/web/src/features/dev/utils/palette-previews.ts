@@ -1,4 +1,4 @@
-import { resolvePalette } from '@workspace/client-core/themes/palette'
+import { resolvePalette } from '@workspace/contracts/themes/palette-rendering'
 import {
   BUNDLED_PALETTES,
   paletteSupportsMode,

@@ -1,3 +1,5 @@
+import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
+import { resetBootAppearance, writeBootMirror } from '@/lib/settings-boot-mirror'
 import * as themeRegistration from '@workspace/client-core/themes/registration'
 import { loadCodeThemePreview } from '@/lib/code-theme/state/preview'
 import { afterEach, beforeEach, vi } from 'vitest'
@@ -25,7 +27,7 @@ import {
 
 const BOOT_MIRROR_KEY = 'platform.settings-boot-mirror.v1'
 
-// The node project reads the settings boot mirror through the Storage boundary.
+// Non-appearance preferences keep their storage boundary in the node project.
 const STORE = new Map<string, string>()
 
 function memoryLocalStorage(): Storage {
@@ -42,6 +44,7 @@ function memoryLocalStorage(): Storage {
 }
 
 beforeEach(() => {
+  resetBootAppearance()
   STORE.clear()
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
@@ -51,6 +54,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  resetBootAppearance()
   STORE.clear()
   resetEditorColorThemeStore()
   delete (globalThis as { localStorage?: Storage }).localStorage
@@ -75,28 +79,24 @@ test('ignores theme ids that are in neither catalog', () => {
   expect(getSelectedEditorThemeId('dark')).toBe('dark-plus')
 })
 
-test('reads native and imported selections from the confirmed settings mirror', () => {
-  localStorage.setItem(
-    BOOT_MIRROR_KEY,
-    JSON.stringify({
-      'editor.codeTheme.dark': 'tree-sitter-dark',
-      'editor.codeTheme.light': 'github-light',
-    }),
-  )
+test('reads native and imported selections from confirmed appearance memory', () => {
+  writeBootMirror({
+    ...DEFAULT_SETTING_VALUES,
+    'editor.codeTheme.dark': 'tree-sitter-dark',
+    'editor.codeTheme.light': 'github-light',
+  })
   resetEditorColorThemeStore()
 
   expect(getSelectedEditorThemeId('dark')).toBe('tree-sitter-dark')
   expect(getSelectedEditorThemeId('light')).toBe('github-light')
 })
 
-test('falls back for unavailable or wrong-mode saved code themes', () => {
-  localStorage.setItem(
-    BOOT_MIRROR_KEY,
-    JSON.stringify({
-      'editor.codeTheme.dark': 'garbage',
-      'editor.codeTheme.light': 'monokai',
-    }),
-  )
+test('falls back for unavailable or wrong-mode confirmed code themes', () => {
+  writeBootMirror({
+    ...DEFAULT_SETTING_VALUES,
+    'editor.codeTheme.dark': 'garbage',
+    'editor.codeTheme.light': 'monokai',
+  })
   resetEditorColorThemeStore()
 
   expect(getSelectedEditorThemeId('dark')).toBe('dark-plus')

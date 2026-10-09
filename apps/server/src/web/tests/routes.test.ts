@@ -4,6 +4,13 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { closeTestApps, createTestApp } from '../../../test/server'
 import { testSettingsOptions } from '../../settings/testing'
+import { DEFAULT_ALLOWED_ORIGINS } from '../../auth'
+import {
+  HTML_BOOTSTRAP_ID,
+  HTML_BOOTSTRAP_PALETTE_ID,
+  HTML_BOOTSTRAP_WALLPAPER_IDS,
+  type HtmlBootstrap,
+} from '@workspace/contracts'
 
 const roots: string[] = []
 
@@ -19,7 +26,7 @@ describe('web routes', () => {
       const response = await app.handle(navigation(pathname))
       expect(response.status, pathname).toBe(200)
       expect(response.headers.get('content-type')).toContain('text/html')
-      expect(response.headers.get('cache-control')).toBe('no-cache')
+      expect(response.headers.get('cache-control')).toBe('private, no-store')
       expect(await response.text()).toContain('<div id="root">')
     }
   })
@@ -30,6 +37,176 @@ describe('web routes', () => {
 
     expect(response.status).toBe(200)
     expect(await response.text()).toContain('<div id="root">')
+  })
+
+  it('personalizes direct app filenames and navigation fallbacks through the same policy', async () => {
+    const app = await webApp()
+    for (const pathname of ['/index.html', '/dev.html', '/~repo/workbench']) {
+      const response = await app.handle(navigation(pathname))
+      const html = await response.text()
+      expect(response.status).toBe(200)
+      expect(response.headers.get('cache-control')).toBe('private, no-store')
+      expect(embedded(html)).toMatchObject({ version: 1, kind: 'app', apiBase: 'http://local/' })
+    }
+  })
+
+  it('rejects a direct foreign document host before returning private bootstrap data', async () => {
+    const app = await webApp()
+    const response = await app.handle(
+      new Request('http://foreign.test/index.html', {
+        headers: { accept: 'text/html', 'sec-fetch-dest': 'document', 'sec-fetch-site': 'none' },
+      }),
+    )
+    expect(response.status).toBe(403)
+    const body = await response.text()
+    expect(body).toContain('web.BOOTSTRAP_DOCUMENT_ORIGIN_INVALID')
+    expect(body).not.toContain(HTML_BOOTSTRAP_ID)
+    expect(body).not.toContain('graphite')
+    expect(body).not.toContain('/wallpaper/still')
+  })
+
+  it('uses a trusted forwarded HTTPS origin in the payload and preloads with the configured base', async () => {
+    const app = await webApp({ allowedOrigins: ['https://example.test'], webBase: '/prefix/' })
+    const request = navigation('/~repo/workbench')
+    request.headers.set('x-forwarded-proto', 'https')
+    request.headers.set('x-forwarded-host', 'example.test')
+    const response = await app.handle(request)
+    const html = await response.text()
+    expect(response.status).toBe(200)
+    expect(embedded(html)).toMatchObject({ kind: 'app', apiBase: 'https://example.test/prefix/' })
+    expect(html).toContain('href="https://example.test/prefix/wallpaper/still"')
+    expect(html).not.toContain('http://local')
+  })
+
+  it('uses the same forwarded address for the development adapter default', async () => {
+    const app = await webApp({
+      development: true,
+      allowedOrigins: ['https://example.test'],
+      webBase: '/prefix/',
+    })
+    const response = await app.handle(
+      new Request('http://local/web/bootstrap', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          origin: 'https://example.test',
+          'x-forwarded-proto': 'https',
+          'x-forwarded-host': 'example.test',
+        },
+        body: JSON.stringify({ html: appTemplate('root') }),
+      }),
+    )
+    expect(response.status).toBe(200)
+    expect(embedded(await response.text())).toMatchObject({
+      kind: 'app',
+      apiBase: 'https://example.test/prefix/',
+    })
+  })
+
+  it('rejects malformed and untrusted forwarded addresses before private appearance is returned', async () => {
+    const app = await webApp({ allowedOrigins: ['https://example.test'] })
+    for (const headers of [
+      { 'x-forwarded-proto': 'https' },
+      { 'x-forwarded-host': 'example.test' },
+      { 'x-forwarded-proto': 'https,http', 'x-forwarded-host': 'example.test' },
+      { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'unknown.test' },
+      { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'example.test/other' },
+      { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'example.test:invalid' },
+      { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'user@example.test' },
+    ]) {
+      const request = navigation('/index.html')
+      for (const [name, value] of Object.entries(headers)) request.headers.set(name, value)
+      const response = await app.handle(request)
+      expect(response.status).toBe(400)
+      const body = await response.text()
+      expect(body).toContain('web.BOOTSTRAP_PROXY_INVALID')
+      expect(body).not.toContain('graphite')
+    }
+  })
+
+  it('keeps private appearance out of unadmitted documents, including direct filenames', async () => {
+    const app = await webApp()
+    for (const pathname of ['/', '/index.html', '/dev.html']) {
+      const request = navigation(pathname)
+      request.headers.set('x-forwarded-for', '203.0.113.92')
+      const response = await app.handle(request)
+      const html = await response.text()
+      expect(response.status).toBe(200)
+      expect(embedded(html)).toEqual({ version: 1, kind: 'pairing' })
+      expect(html).not.toContain('graphite')
+      expect(html).not.toContain('/wallpaper/still')
+      expect(html).not.toContain(HTML_BOOTSTRAP_PALETTE_ID)
+    }
+  })
+
+  it('checks the development adapter origin before returning private data', async () => {
+    const app = await webApp({ development: true })
+    const response = await app.handle(
+      new Request('http://local/web/bootstrap', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'https://unknown.test' },
+        body: JSON.stringify({ html: appTemplate('root') }),
+      }),
+    )
+    expect(response.status).toBe(403)
+    expect(await response.text()).not.toContain('graphite')
+    const admitted = await app.handle(
+      new Request('http://local/web/bootstrap', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost:5173' },
+        body: JSON.stringify({
+          html: appTemplate('root'),
+          apiBase: 'http://localhost:5173/prefix/',
+        }),
+      }),
+    )
+    expect(admitted.status).toBe(200)
+    expect(embedded(await admitted.text())).toMatchObject({
+      kind: 'app',
+      apiBase: 'http://localhost:5173/prefix/',
+    })
+  })
+
+  it('keeps development documents generic before admission and rejects a foreign API base', async () => {
+    const app = await webApp({ development: true })
+    const post = (apiBase: string, forwarded = false) =>
+      app.handle(
+        new Request('http://local/web/bootstrap', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            origin: 'http://localhost:5173',
+            ...(forwarded ? { 'x-forwarded-for': '203.0.113.92' } : {}),
+          },
+          body: JSON.stringify({ html: appTemplate('root'), apiBase }),
+        }),
+      )
+    const foreign = await post('https://unknown.test/')
+    expect(foreign.status).toBe(403)
+    expect(await foreign.text()).not.toContain('graphite')
+    const generic = await post('http://localhost:5173/', true)
+    expect(generic.status).toBe(200)
+    const html = await generic.text()
+    expect(embedded(html)).toEqual({ version: 1, kind: 'pairing' })
+    expect(html).not.toContain('/wallpaper/still')
+  })
+
+  it('accepts the development API own origin independently of the allowed frontend origin', async () => {
+    const app = await webApp({ development: true, allowedOrigins: ['https://frontend.test'] })
+    for (const apiBase of [undefined, 'http://localhost:42917/prefix/']) {
+      const response = await app.handle(
+        new Request('http://localhost:42917/web/bootstrap', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', origin: 'https://frontend.test' },
+          body: JSON.stringify({ html: appTemplate('root'), ...(apiBase ? { apiBase } : {}) }),
+        }),
+      )
+      expect(response.status).toBe(200)
+      expect(embedded(await response.text())).toMatchObject({
+        kind: 'app',
+        apiBase: apiBase ?? 'http://localhost:42917/',
+      })
+    }
   })
 
   it('serves the dev gallery under /dev only when the release carries it', async () => {
@@ -197,7 +374,17 @@ describe('web routes', () => {
   })
 })
 
-async function webApp({ devPage = true } = {}) {
+async function webApp({
+  devPage = true,
+  development = false,
+  allowedOrigins = [...DEFAULT_ALLOWED_ORIGINS, 'http://local'],
+  webBase = '/',
+}: {
+  devPage?: boolean
+  development?: boolean
+  allowedOrigins?: readonly string[]
+  webBase?: string
+} = {}) {
   const root = await fixtureRoot()
   const release = path.join(root, 'stamp-abc-slug')
   const web = path.join(release, 'web')
@@ -208,9 +395,8 @@ async function webApp({ devPage = true } = {}) {
   await writeFile(path.join(web, 'licenses/index.html'), '<main>Third-party notices</main>')
   await writeFile(path.join(web, 'licenses/THIRD_PARTY_NOTICES.txt'), 'Copyright fixture web')
   await writeFile(path.join(release, 'server/THIRD_PARTY_NOTICES.txt'), 'Copyright fixture server')
-  await writeFile(path.join(web, 'index.html'), '<html><body><div id="root"></div></body></html>')
-  if (devPage)
-    await writeFile(path.join(web, 'dev.html'), '<html><body><div id="dev"></div></body></html>')
+  await writeFile(path.join(web, 'index.html'), appTemplate('root'))
+  if (devPage) await writeFile(path.join(web, 'dev.html'), appTemplate('dev'))
   await writeFile(path.join(web, 'assets', 'index-abc.js'), 'console.log(1)')
   await writeFile(path.join(web, 'assets', 'ghostty-vt.wasm'), new Uint8Array([0, 97, 115, 109]))
   await writeFile(path.join(web, 'vscode-icons', 'code.svg'), '<svg/>')
@@ -219,10 +405,24 @@ async function webApp({ devPage = true } = {}) {
     JSON.stringify({ release, commit: 'abc', dirtyFiles: ['x.ts'] }),
   )
   return createTestApp({
+    auth: { allowedOrigins },
+    system: { webBase },
     settings: testSettingsOptions(root),
-    web: { root: web },
+    web: { root: web, bootstrapDevelopment: development },
     workspaceRoot: root,
   })
+}
+
+function appTemplate(root: string) {
+  return `<html><head><script id="${HTML_BOOTSTRAP_ID}" type="application/json"></script><style id="${HTML_BOOTSTRAP_PALETTE_ID}"></style><link id="${HTML_BOOTSTRAP_WALLPAPER_IDS.light}"><link id="${HTML_BOOTSTRAP_WALLPAPER_IDS.dark}"></head><body><div id="${root}"></div></body></html>`
+}
+
+function embedded(html: string): HtmlBootstrap {
+  const json = new RegExp(`<script id="${HTML_BOOTSTRAP_ID}"[^>]*>(.*?)</script>`, 'su').exec(
+    html,
+  )?.[1]
+  expect(json).toBeDefined()
+  return JSON.parse(json!)
 }
 
 function navigation(pathname: string) {

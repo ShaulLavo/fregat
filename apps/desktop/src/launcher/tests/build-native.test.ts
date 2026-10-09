@@ -119,6 +119,24 @@ test.skipIf(!macSdk)(
   30_000,
 )
 
+test('native document requests identify each window backdrop before HTML discovery', async () => {
+  const desktop = path.resolve(import.meta.dirname, '../../..')
+  const mac = await Bun.file(path.join(desktop, 'native/macos/PlatformWebview.swift')).text()
+  const linux = await Bun.file(path.join(desktop, 'native/linux/platform-webview.zig')).text()
+  expect(mac).toContain(
+    'configuration.applicationNameForUserAgent = options.vibrant ? "FregatBackdrop/transparent" : "FregatBackdrop/app"',
+  )
+  expect(mac.indexOf('configuration.applicationNameForUserAgent')).toBeLessThan(
+    mac.indexOf('view.load('),
+  )
+  expect(linux).toContain(
+    'webkit_settings_set_user_agent_with_application_details(settings, "FregatBackdrop", "compositor")',
+  )
+  expect(linux.indexOf('webkit_settings_set_user_agent_with_application_details')).toBeLessThan(
+    linux.indexOf('webkit_web_view_load_uri'),
+  )
+})
+
 test("pkg-config's driver flags reach Zig in its own spelling", () => {
   expect(
     ['-pthread', '-Wl,--export-dynamic', '-I/usr/include/gtk-3.0', '-lgtk-3'].map(zigFlag),

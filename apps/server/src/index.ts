@@ -108,7 +108,11 @@ export const app = createApp({
     // Behind the relay every request arrives on the private socket; the relay admits loopback only.
     peer: activated ? () => '127.0.0.1' : undefined,
   },
-  web: { root: webRoot, serverReleaseFile },
+  web: {
+    root: webRoot,
+    serverReleaseFile,
+    bootstrapDevelopment: Bun.env.NODE_ENV !== 'production',
+  },
   webOrigin: configuredOrigins?.[0] ?? loopbackOrigins(hostname, port)[0],
   workspaceRoot: configuredWorkspaceRoot,
 })

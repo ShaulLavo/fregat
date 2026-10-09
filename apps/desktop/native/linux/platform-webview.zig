@@ -241,6 +241,7 @@ fn openWindow(host: *Host, uri: [*c]const u8, text: [*c]const u8, directory: [*c
     const view: *c.WebKitWebView = @ptrCast(@alignCast(c.g_object_new(c.webkit_web_view_get_type(), @as([*c]const u8, "web-context"), context, @as([*c]const u8, "user-content-manager"), manager, @as([*c]const u8, null))));
     host.view = view;
     const settings = c.webkit_web_view_get_settings(view);
+    c.webkit_settings_set_user_agent_with_application_details(settings, "FregatBackdrop", "compositor");
     c.webkit_settings_set_enable_developer_extras(settings, 1);
     c.webkit_settings_set_hardware_acceleration_policy(settings, c.WEBKIT_HARDWARE_ACCELERATION_POLICY_ALWAYS);
     connect(view, "web-process-terminated", &onWebProcessTerminated, host);
