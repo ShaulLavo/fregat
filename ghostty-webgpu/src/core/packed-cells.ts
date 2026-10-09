@@ -33,6 +33,8 @@ export function emptyRenderCell(): RenderCell {
 
 export class PackedCells {
   readonly length: number
+  private defaultText: string | null | undefined
+  private defaultTail = 0
 
   constructor(
     private readonly words: Uint32Array,
@@ -56,6 +58,14 @@ export class PackedCells {
   }
 
   defaultRunText(padToColumns = false): string | undefined {
+    // Owned packed records preserve this projection for the row snapshot's lifetime.
+    if (this.defaultText === undefined) this.defaultText = this.projectDefaultRun()
+    const text = this.defaultText
+    if (text === null) return undefined
+    return padToColumns ? text + ' '.repeat(this.defaultTail) : text
+  }
+
+  private projectDefaultRun(): string | null {
     const words = this.words
     let end = 0
     for (let offset = 0; offset < words.length; offset += PACKED_CELL_WORDS) {
@@ -64,13 +74,14 @@ export class PackedCells {
         words[offset + 1] !== 0xffffffff ||
         words[offset + 2] !== 0xffffffff
       )
-        return undefined
+        return null
       if (words[offset] !== 0 || words[offset + 5] !== 0) end = offset + PACKED_CELL_WORDS
     }
     let text = ''
     for (let offset = 0; offset < end; offset += PACKED_CELL_WORDS)
       text += this.textAt(offset) || ' '
-    return padToColumns ? text + ' '.repeat((words.length - end) / PACKED_CELL_WORDS) : text
+    this.defaultTail = (words.length - end) / PACKED_CELL_WORDS
+    return text
   }
 
   span(index: number): number {

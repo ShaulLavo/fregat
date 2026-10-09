@@ -156,6 +156,42 @@ it.each(['', ' '.repeat(40), 'a'.repeat(40), '\x1b[1;40Hx', '  é edit 0000   '
   },
 )
 
+it.each(['edit 0000', '  é edit 0000   ', '\x1b[1;40Hx'])(
+  'reuses owned default glyph projection for padded frame text (%#)',
+  async (input) => {
+    const runtime = await GhosttyRuntime.create()
+    try {
+      const terminal = runtime.createTerminal({ columns: 40, rows: 3 })
+      const state = runtime.createRenderState(terminal)
+      terminal.write(input)
+      state.update()
+      const row = state.readRows({ packed: true })[0]!
+      const expected = copiedFrameRow(state.readRows()[0]!)
+      const decode = vi.spyOn(String, 'fromCodePoint')
+      try {
+        const prefix = row.packed!.defaultRunText()
+        const firstReads = decode.mock.calls.length
+        expect(firstReads).toBeGreaterThan(0)
+        const snapshot = copiedFrameRow(row)
+        expect(snapshot.text).toBe(expected.text)
+        expect(decode.mock.calls.length).toBe(firstReads)
+        terminal.write('\x1b[2J\x1b[Hlater')
+        state.update()
+        runtime.exports.memory.grow(1)
+        expect(row.packed!.defaultRunText()).toBe(prefix)
+        expect(row.packed!.defaultRunText(true)).toBe(expected.text)
+        expect(snapshot.cells).toEqual(expected.cells)
+        expect(snapshot.renderCells).toEqual(expected.renderCells)
+        expect(snapshot.continuations).toEqual(expected.continuations)
+      } finally {
+        decode.mockRestore()
+      }
+    } finally {
+      runtime.dispose()
+    }
+  },
+)
+
 it('reuses full-width default run CSS without serializing the width again', async () => {
   const runtime = await GhosttyRuntime.create()
   try {
