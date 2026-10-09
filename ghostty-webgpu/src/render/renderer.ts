@@ -41,7 +41,7 @@ import type { NativeDisplayedFrame } from '../core/displayed-frame.js'
 
 export interface RenderStateSource {
   readonly snapshotVersion?: number
-  retainDisplayedFrame?(): NativeDisplayedFrame
+  retainDisplayedFrame?(options?: { full?: boolean }): NativeDisplayedFrame
   createFrameBuilder?(columns: number, rows: number): ZigFrameBuilder
   acknowledge(): number
   readCursor(): RenderCursorSnapshot
@@ -620,16 +620,17 @@ export class WebGpuTerminalRenderer {
           ? this.renderState.readRows({ packed: true })
           : this.rowsToRebuild(damage)
       }
+      const notifyFrame = this.captureFrame(
+        rows,
+        updates.map((update) => update.row),
+      )
       if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
       this.recordFrame(rebuiltRows, operations)
       this.metrics.zigFrames += 1
       this.needsFullRebuild = false
       this.frameFailed = false
       this.overlayRows.clear()
-      this.emitFrame(
-        rows,
-        updates.map((update) => update.row),
-      )
+      notifyFrame?.()
       return
     }
     let command: GPUCommandBuffer
@@ -653,24 +654,16 @@ export class WebGpuTerminalRenderer {
       commit: () => {
         if (this.disposed) return
         textPass.acceptFrame()
+        notifyFrame = this.captureFrame(
+          rows,
+          updates.map((update) => update.row),
+        )
         if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
         this.recordFrame(rebuiltRows, operations)
         this.metrics.zigFrames += 1
         this.needsFullRebuild = false
         this.frameFailed = false
         this.overlayRows.clear()
-        if (this.cursor)
-          notifyFrame = this.frames.capture(
-            this.renderState,
-            this.cursor,
-            renderCursorState(
-              this.cursor,
-              this.cursorPhaseVisible,
-              this.focused ? undefined : this.inactiveCursorStyle,
-            ),
-            updates.map((update) => update.row),
-            rows,
-          )
       },
       notify: () => {
         if (!this.disposed) notifyFrame?.()
@@ -698,12 +691,12 @@ export class WebGpuTerminalRenderer {
     this.overlayRows.add(row)
   }
 
-  private emitFrame(
+  private captureFrame(
     rows: readonly RenderRow[] | undefined,
     changed = rows?.map((row) => row.y) ?? [],
-  ): void {
+  ): (() => void) | undefined {
     if (!this.cursor) return
-    this.frames.emit(
+    return this.frames.capture(
       this.renderState,
       this.cursor,
       renderCursorState(

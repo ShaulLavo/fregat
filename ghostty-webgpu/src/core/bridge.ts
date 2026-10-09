@@ -207,6 +207,8 @@ export class CallbackBridge {
 
   captureRetainedFrame(
     handle: number,
+    baseline: number,
+    full: number,
     state: number,
     iterator: number,
     cells: number,
@@ -216,6 +218,8 @@ export class CallbackBridge {
   ): number {
     return this.bridgeExports!.bridge_capture_retained_frame(
       handle,
+      baseline,
+      full,
       state,
       iterator,
       cells,

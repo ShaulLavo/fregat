@@ -761,6 +761,8 @@ export interface BridgeWasmExports extends WebAssembly.Exports {
   bridge_destroy_retained_frame(handle: number): void
   bridge_capture_retained_frame(
     handle: number,
+    baseline: number,
+    full: number,
     state: number,
     iterator: number,
     cells: number,

@@ -424,6 +424,10 @@ export class WebGlTerminalRenderer {
     if (this.frames.requiresFullRows) {
       rows = options.full ? this.renderState.readRows({ packed: true }) : this.rowsToRebuild(damage)
     }
+    const notifyFrame = this.captureFrame(
+      rows,
+      updates.map((update) => update.row),
+    )
     if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
     if (operations > 0) {
       this.recordFrame(pass, builder.rowRebuilds, operations)
@@ -432,10 +436,7 @@ export class WebGlTerminalRenderer {
     this.needsFullRebuild = false
     this.frameFailed = false
     this.overlayRows.clear()
-    this.emitFrame(
-      rows,
-      updates.map((update) => update.row),
-    )
+    notifyFrame?.()
   }
 
   private rowsToRebuild(damage: RenderStateDirty): readonly RenderRow[] {
@@ -516,12 +517,12 @@ export class WebGlTerminalRenderer {
     this.metrics.uploadedBytes += pass.frameUploadedBytes
   }
 
-  private emitFrame(
+  private captureFrame(
     rows: readonly RenderRow[] | undefined,
     changed = rows?.map((row) => row.y) ?? [],
-  ): void {
+  ): (() => void) | undefined {
     if (!this.cursor) return
-    this.frames.emit(
+    return this.frames.capture(
       this.renderState,
       this.cursor,
       renderCursorState(

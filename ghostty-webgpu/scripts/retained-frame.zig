@@ -9,7 +9,7 @@ extern "env" fn ghostty_wasm_free(ptr: ?[*]u8, len: usize) void;
 
 const Decoration = struct { foreground: u32 = 0xffffffff, background: u32 = 0xffffffff, flags: u32 = 0 };
 const Grapheme = struct { pointer: ?[*]u32 = null, length: u32 = 0 };
-const RawRow = struct { selection: c.GhosttyRenderStateRowSelection, selected: bool = false };
+const RawRow = struct { selection: c.GhosttyRenderStateRowSelection, selected: bool = false, revision: u64 = 0 };
 pub const Frame = struct {
     columns: u32,
     rows: u32,
@@ -17,6 +17,7 @@ pub const Frame = struct {
     decorations: [*]Decoration,
     graphemes: [*]Grapheme,
     metadata: [*]RawRow,
+    revision: u64 = 0,
 };
 
 fn allocate(comptime T: type, count: usize) ?[*]T {
@@ -51,6 +52,7 @@ pub fn create(columns: u32, rows: u32) callconv(.c) ?*Frame {
         return null;
     };
     @memset(graphemes[0 .. columns * rows], .{});
+    @memset(metadata[0..rows], .{ .selection = undefined });
     memory[0] = .{ .columns = columns, .rows = rows, .raw = raw, .decorations = decorations, .graphemes = graphemes, .metadata = metadata };
     return &memory[0];
 }
@@ -162,17 +164,61 @@ fn captureRow(frame: *Frame, iterator: c.GhosttyRenderStateRowIterator, cells: c
     return c.GHOSTTY_SUCCESS;
 }
 
-pub fn capture(frame: *Frame, state: c.GhosttyRenderState, iterator: c.GhosttyRenderStateRowIterator, cells: c.GhosttyRenderStateRowCells, tag_shift: u32, style_shift: u32, style_width: u32) callconv(.c) c.GhosttyResult {
+fn copyRow(frame: *Frame, baseline: *const Frame, y: usize) c.GhosttyResult {
+    const start = y * frame.columns;
+    const end = start + frame.columns;
+    // A failed copy must never leave a stale slot marked as matching its accepted baseline.
+    frame.metadata[y].revision = 0;
+    @memcpy(frame.raw[start..end], baseline.raw[start..end]);
+    @memcpy(frame.decorations[start..end], baseline.decorations[start..end]);
+    for (start..end) |slot| {
+        const source = baseline.graphemes[slot];
+        const target = &frame.graphemes[slot];
+        if (source.length != target.length) {
+            const pointer = if (source.length == 0) null else allocate(u32, source.length) orelse return c.GHOSTTY_OUT_OF_MEMORY;
+            if (target.pointer) |old| free(u32, old, target.length);
+            target.* = .{ .pointer = pointer, .length = source.length };
+        }
+        if (source.length > 0) @memcpy(target.pointer.?[0..source.length], source.pointer.?[0..source.length]);
+    }
+    frame.metadata[y] = baseline.metadata[y];
+    return c.GHOSTTY_SUCCESS;
+}
+
+pub fn capture(frame: *Frame, baseline: ?*const Frame, full: bool, state: c.GhosttyRenderState, iterator: c.GhosttyRenderStateRowIterator, cells: c.GhosttyRenderStateRowCells, tag_shift: u32, style_shift: u32, style_width: u32) callconv(.c) c.GhosttyResult {
+    const previous = if (baseline) |b| (if (b.columns == frame.columns and b.rows == frame.rows) b else null) else null;
+    var damage: c.GhosttyRenderStateDirty = undefined;
+    var result = c.ghostty_render_state_get(state, c.GHOSTTY_RENDER_STATE_DATA_DIRTY, &damage);
+    if (result != c.GHOSTTY_SUCCESS) return result;
+    const capture_all = full or previous == null or damage == c.GHOSTTY_RENDER_STATE_DIRTY_FULL;
+    // Revisions stay unique across grid changes and later reuse of an older-sized spare.
+    const revision = if (baseline) |b| b.revision + 1 else 1;
     var it = iterator;
-    var result = c.ghostty_render_state_get(state, c.GHOSTTY_RENDER_STATE_DATA_ROW_ITERATOR, @ptrCast(&it));
+    result = c.ghostty_render_state_get(state, c.GHOSTTY_RENDER_STATE_DATA_ROW_ITERATOR, @ptrCast(&it));
     if (result != c.GHOSTTY_SUCCESS) return result;
     var y: usize = 0;
     while (c.ghostty_render_state_row_iterator_next(it)) : (y += 1) {
         if (y >= frame.rows) return c.GHOSTTY_INVALID_VALUE;
+        var dirty = capture_all;
+        if (!dirty) {
+            result = c.ghostty_render_state_row_get(it, c.GHOSTTY_RENDER_STATE_ROW_DATA_DIRTY, &dirty);
+            if (result != c.GHOSTTY_SUCCESS) return result;
+        }
+        if (!dirty) {
+            const b = previous.?;
+            if (frame.metadata[y].revision == b.metadata[y].revision) continue;
+            result = copyRow(frame, b, y);
+            if (result != c.GHOSTTY_SUCCESS) return result;
+            continue;
+        }
+        frame.metadata[y].revision = 0;
         result = captureRow(frame, it, cells, y, @intCast(tag_shift), @intCast(style_shift), (@as(u64, 1) << @as(u6, @intCast(style_width))) - 1);
         if (result != c.GHOSTTY_SUCCESS) return result;
+        frame.metadata[y].revision = revision;
     }
-    return if (y == frame.rows) c.GHOSTTY_SUCCESS else c.GHOSTTY_INVALID_VALUE;
+    if (y != frame.rows) return c.GHOSTTY_INVALID_VALUE;
+    frame.revision = revision;
+    return c.GHOSTTY_SUCCESS;
 }
 
 const Row = extern struct { y: u32, dirty: u32, start: u32, len: u32 };

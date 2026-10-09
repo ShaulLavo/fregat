@@ -11,6 +11,7 @@ import type {
 export class FrameObserver {
   private generation = 0
   private current = false
+  private retained = false
   private fullRows: (RendererFrameRow | undefined)[] = []
   private textRows: (RendererTextFrameRow | undefined)[] = []
 
@@ -30,6 +31,11 @@ export class FrameObserver {
 
   resize(rows = this.rowCount): void {
     this.rowCount = rows
+    this.retained = false
+    this.clearRows()
+  }
+
+  private clearRows(): void {
     this.current = false
     this.fullRows = []
     this.textRows = []
@@ -61,10 +67,11 @@ export class FrameObserver {
     const changedRows = Object.freeze([...changed])
     if (!onFrame && !onTextFrame) return this.rowDelivery(generation, changedRows, rows)
     const nativeFrame = this.options.retainDisplayedText
-      ? state.retainDisplayedFrame?.()
+      ? state.retainDisplayedFrame?.({ full: !this.retained })
       : undefined
+    if (nativeFrame) this.retained = true
     if (this.rowsNeeded) this.updateRows(state, changed, rows)
-    else this.resize()
+    else this.clearRows()
     const viewport = cursor.viewport ? Object.freeze({ ...cursor.viewport }) : undefined
     const snapshot = {
       cursor: Object.freeze({ ...cursor, viewport }),

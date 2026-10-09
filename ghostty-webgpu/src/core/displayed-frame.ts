@@ -49,6 +49,7 @@ export class DisplayedFrameStore {
     iterator: number,
     cells: number,
     grid: { columns: number; rows: number },
+    full = false,
   ): NativeDisplayedFrame {
     if (this.disposed) throw createGhosttyError('retain_frame', 'Displayed-frame store is disposed')
     const descriptor = this.runtime.layouts.GhosttyCell as unknown as PackedDescriptor
@@ -68,6 +69,8 @@ export class DisplayedFrameStore {
         'retain_frame',
         this.runtime.bridge.captureRetainedFrame(
           next.handle,
+          this.current?.handle ?? 0,
+          Number(full),
           state,
           iterator,
           cells,

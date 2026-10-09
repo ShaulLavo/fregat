@@ -4,6 +4,7 @@ import { GhosttyRuntime } from '../../core/runtime.js'
 import type { GhosttyTerminal } from '../../core/terminal.js'
 import { DomTerminalRenderer } from '../../render/dom/renderer.js'
 import { WebGlTerminalRenderer } from '../../render/webgl/renderer.js'
+import { WebGlTextPass } from '../../render/webgl/text-pass.js'
 import { CanvasTerminalRenderer } from '../../render/canvas/renderer.js'
 import { WebGpuTerminalRenderer } from '../../render/renderer.js'
 import type { TerminalSubmittedSnapshot, TerminalSubmittedText } from '../submitted-frame.js'
@@ -109,6 +110,57 @@ function extractionCount() {
 }
 
 describe('main-thread displayed-text demand', () => {
+  it('uses dirty retention until font or row-height changes invalidate the layout', async () => {
+    const retain = vi.spyOn(runtime.bridge, 'captureRetainedFrame')
+    cleanups.push(() => retain.mockRestore())
+    const { terminal, clock, errors } = await fixture()
+    expect(retain.mock.calls.at(-1)?.[2]).toBe(1)
+    terminal.write('first 界 é 🧑‍💻')
+    clock.flush()
+    terminal.write('\rnext')
+    clock.flush()
+    expect(retain.mock.calls.at(-1)?.[2]).toBe(0)
+    const held = terminal.visibleLines()
+    terminal.setFont({ size: 18 })
+    clock.flush()
+    await expect.poll(() => retain.mock.calls.at(-1)?.[2]).toBe(1)
+    terminal.setFont({ lineHeight: 1.5 })
+    clock.flush()
+    await expect.poll(() => retain.mock.calls.at(-1)?.[2]).toBe(1)
+    expect(terminal.visibleLines()).toEqual(held)
+    expect(errors).toEqual([])
+  })
+
+  it('keeps accepted dirty-row text after a failed WebGL submit and recovers every row', async () => {
+    const { terminal, session, clock, errors } = await fixture()
+    const delivered: TerminalSubmittedText[] = []
+    terminal.onText((text) => delivered.push(text))
+    terminal.write('first\r\n界 é 🧑‍💻\r\nthird\r\nfourth')
+    clock.flush()
+    terminal.write('\x1b[1;1Hnext')
+    clock.flush()
+    const accepted = terminal.visibleLines()
+    const held = JSON.stringify(delivered)
+    const submit = vi.spyOn(WebGlTextPass.prototype, 'submit').mockImplementation(() => {
+      throw new TypeError('injected WebGL submission failure')
+    })
+    cleanups.push(() => submit.mockRestore())
+    terminal.write('\x1b[1;1Hpending\x1b[2;1Hnew é 🧑‍💻')
+    clock.flush()
+    expect(errors).toHaveLength(1)
+    expect(terminal.visibleLines()).toEqual(accepted)
+    expect(JSON.stringify(delivered)).toBe(held)
+    submit.mockRestore()
+    terminal.refresh(0, 3)
+    clock.flushTimers()
+    clock.flush()
+    expect(terminal.visibleLines()).toEqual(
+      session.renderState.readTextRows!().map((row) => row.text),
+    )
+    expect(terminal.visibleLines()[0]).toContain('pending')
+    expect(JSON.stringify(delivered.slice(0, -1))).toBe(held)
+  })
+
   it('keeps metadata idle and pulls displayed bytes through pending output, resize and disposal', async () => {
     const count = extractionCount()
     const { terminal, session, clock, errors, host } = await fixture()

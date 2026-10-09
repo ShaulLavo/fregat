@@ -265,7 +265,7 @@ export class GhosttyRenderState {
     )
   }
 
-  retainDisplayedFrame() {
+  retainDisplayedFrame(options: { full?: boolean } = {}) {
     this.ensureActive()
     this.displayedFrames ??= new DisplayedFrameStore(this.runtime)
     return this.displayedFrames.capture(
@@ -273,6 +273,7 @@ export class GhosttyRenderState {
       this.iterator.handle,
       this.cells.handle,
       this.readGrid(),
+      options.full,
     )
   }
 
