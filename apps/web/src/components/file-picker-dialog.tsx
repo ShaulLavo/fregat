@@ -112,6 +112,7 @@ import {
   type FileListSortKey,
 } from '@/features/file-picker/utils/sort-entries'
 import { useSettingValue } from '@/hooks/use-setting-value'
+import { usePickerBackGesture } from '@/features/file-picker/hooks/use-back-gesture'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 
@@ -329,6 +330,12 @@ export function FilePickerDialog({
       if (loaded) session.goForward()
     })
   }
+  const backGesture = usePickerBackGesture({
+    active: open && compact,
+    depth: session.backDepth,
+    onBack: goBack,
+    onClose: () => onOpenChange(false),
+  })
 
   // Declaration order is a constraint, not a preference: React Compiler cannot rewrite a
   // hoisted reference, so every handler below is declared after the handlers it calls.
@@ -336,8 +343,14 @@ export function FilePickerDialog({
     if (commitStartedRef.current) return
 
     commitStartedRef.current = true
-    onPick(entry)
-    onOpenChange(false)
+    backGesture.leave(() => {
+      onPick(entry)
+      onOpenChange(false)
+    })
+  }
+
+  function close() {
+    backGesture.leave(() => onOpenChange(false))
   }
 
   function selectByOffset(event: KeyboardEvent<HTMLElement>, offset: number) {
@@ -693,7 +706,7 @@ export function FilePickerDialog({
   )
 
   return (
-    <Dialog onOpenChange={onOpenChange} open={open}>
+    <Dialog onOpenChange={(next) => (next ? onOpenChange(true) : close())} open={open}>
       <DialogContent
         className='bg-popover-solid flex h-[min(760px,calc(100svh-2rem))] w-[min(1080px,calc(100vw-1.5rem))] max-w-none flex-col gap-0 overflow-hidden p-0 text-sm max-sm:h-dvh max-sm:w-full max-sm:pt-[env(safe-area-inset-top)] max-sm:pb-[max(env(safe-area-inset-bottom),var(--keyboard-inset,0px))] sm:max-w-none'
         ref={pickerRef}
@@ -752,7 +765,7 @@ export function FilePickerDialog({
                     ) : null
                   }
                   onBack={goBack}
-                  onClose={() => onOpenChange(false)}
+                  onClose={close}
                   onEditPath={pathInput.open}
                   onUp={() => navigateTo(pickerParentPath(session.currentPath))}
                 />
@@ -930,7 +943,7 @@ export function FilePickerDialog({
               <DialogFooter className='flex shrink-0 flex-row gap-(--density-control-gap) px-(--bar-padding-x) py-(--density-gap-tight)'>
                 <Button
                   className='shrink-0'
-                  onClick={() => onOpenChange(false)}
+                  onClick={close}
                   size='lg'
                   type='button'
                   variant='secondary'
@@ -962,12 +975,7 @@ export function FilePickerDialog({
                     : listCountLabel(entries.length, isSearching)}
                 </span>
                 <div className='flex shrink-0 gap-1.5'>
-                  <Button
-                    onClick={() => onOpenChange(false)}
-                    size='sm'
-                    type='button'
-                    variant='ghost'
-                  >
+                  <Button onClick={close} size='sm' type='button' variant='ghost'>
                     Cancel
                   </Button>
                   <Button
