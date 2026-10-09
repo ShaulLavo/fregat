@@ -96,6 +96,8 @@ export class WebGpuTextPass {
   private frameUploadedBytesValue = 0
   private glyphBindGroupCreationCountValue = 0
   private glyphBindGroup?: GPUBindGroup
+  private colorAttachment?: GPURenderPassColorAttachment
+  private renderPassDescriptor?: GPURenderPassDescriptor
   private readonly instanceCount: number
   readonly metrics: TextPassMetrics = {
     draws: 0,
@@ -206,7 +208,9 @@ export class WebGpuTextPass {
   }
 
   submit(view: GPUTextureView, copy?: TextPassCopy): void {
-    this.device.queue.submit([this.encode(view, copy)])
+    const encoder = this.device.createCommandEncoder()
+    this.encode(encoder, view, copy)
+    this.device.queue.submit([encoder.finish()])
     this.acceptFrame()
   }
 
@@ -215,19 +219,17 @@ export class WebGpuTextPass {
     this.metrics.submittedFrames += 1
   }
 
-  encode(view: GPUTextureView, copy?: TextPassCopy): GPUCommandBuffer {
+  encode(encoder: GPUCommandEncoder, view: GPUTextureView, copy?: TextPassCopy): void {
     if (!this.glyphBindGroup) throw new Error('Atlas textures must be synchronized before drawing')
-    const encoder = this.device.createCommandEncoder()
-    const pass = encoder.beginRenderPass({
-      colorAttachments: [
-        {
-          clearValue: { a: 0, b: 0, g: 0, r: 0 },
-          loadOp: 'clear',
-          storeOp: 'store',
-          view,
-        },
-      ],
+    const attachment = (this.colorAttachment ??= {
+      clearValue: { a: 0, b: 0, g: 0, r: 0 },
+      loadOp: 'clear',
+      storeOp: 'store',
+      view,
     })
+    attachment.view = view
+    const descriptor = (this.renderPassDescriptor ??= { colorAttachments: [attachment] })
+    const pass = encoder.beginRenderPass(descriptor)
     pass.setPipeline(this.resources.cellPipeline)
     pass.setBindGroup(0, this.resources.cellBindGroup)
     pass.draw(6, this.instanceCount)
@@ -247,7 +249,6 @@ export class WebGpuTextPass {
         copy.size,
       )
     }
-    return encoder.finish()
   }
 
   destroy(): void {
