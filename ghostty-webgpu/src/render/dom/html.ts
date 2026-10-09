@@ -98,7 +98,7 @@ function cellStyle(
     .filter(Boolean)
     .join(' ')
   const underlineStyles = ['solid', 'solid', 'double', 'wavy', 'dotted', 'dashed']
-  let css = `display:inline-block;flex:none;direction:ltr;unicode-bidi:bidi-override;height:var(--ghostty-cell-height, ${font.cssCellHeight}px);vertical-align:top;`
+  let css = `display:inline-block;flex:none;contain:size layout;direction:ltr;unicode-bidi:bidi-override;height:var(--ghostty-cell-height, ${font.cssCellHeight}px);vertical-align:top;`
   if (width > 1) css += 'text-align:center;'
   css += `color:${style?.invisible ? 'transparent' : foreground};`
   if (style?.faint && !style.invisible)
@@ -296,7 +296,7 @@ function renderRowToHtml(
     const cursorAttribute = run.cursor ? ` data-cursor="${escapeHtml(run.cursor, true)}"` : ''
     return `<span${cursorAttribute} style="${escapeHtml(run.style, true)}">${escapeHtml(run.text)}</span>`
   })
-  return `<div data-row="${row.y}" style="display:block;contain:size layout;direction:ltr;unicode-bidi:bidi-override;height:var(--ghostty-cell-height, ${font.cssCellHeight}px);">${runs.join('')}</div>`
+  return `<div data-row="${row.y}" style="display:flex;contain:size layout;direction:ltr;unicode-bidi:bidi-override;height:var(--ghostty-cell-height, ${font.cssCellHeight}px);">${runs.join('')}</div>`
 }
 
 export function renderFrameToHtml(

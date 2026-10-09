@@ -814,7 +814,7 @@ it('contains fixed row layout while preserving visible glyph overflow and frame 
   for (const row of frame.querySelectorAll<HTMLElement>('[data-row]')) {
     const style = getComputedStyle(row)
     expect(style.contain).toBe('size layout')
-    expect(style.display).toBe('block')
+    expect(style.display).toBe('flex')
     expect(style.overflowX).toBe('visible')
     expect(style.overflowY).toBe('visible')
     expect(row.getBoundingClientRect().height).toBe(probeFont.cssCellHeight)
@@ -823,6 +823,24 @@ it('contains fixed row layout while preserving visible glyph overflow and frame 
   frame.style.height = 'auto'
   expect(frame.getBoundingClientRect().height).toBe(3 * probeFont.cssCellHeight)
   expect(frame.textContent).toBe(text)
+})
+
+it('contains fixed runs while preserving their cell widths and visible glyph overflow', async () => {
+  const probe = await rendererProbe('dom')
+  const frame = probe.canvas.parentElement!.querySelector<HTMLElement>('.ghostty-webgpu-frame')!
+  for (const run of frame.querySelectorAll<HTMLElement>('[data-row] > span')) {
+    const style = getComputedStyle(run)
+    expect(style.contain).toBe('size layout')
+    expect(style.overflowX).toBe('visible')
+    expect(style.overflowY).toBe('visible')
+    expect(run.getBoundingClientRect().height).toBe(probeFont.cssCellHeight)
+    expect(run.getBoundingClientRect().width / probeFont.cssCellWidth).toBeGreaterThan(0)
+  }
+  const wide = Array.from(frame.querySelectorAll<HTMLElement>('span')).find(
+    (run) => run.textContent === '界',
+  )!
+  expect(wide.getBoundingClientRect().width).toBe(2 * probeFont.cssCellWidth)
+  expect(frame.textContent).toContain('界é<&"')
 })
 
 it('preserves row-derived frame height when the host overrides height to auto', async () => {
