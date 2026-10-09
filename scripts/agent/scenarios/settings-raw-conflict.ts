@@ -248,6 +248,10 @@ export const settingsRawConflict: Scenario = {
       strictEqual(saved.sameNative, true)
       strictEqual(saved.sameBuffer, true)
       strictEqual(saved.sourceInterests, 0)
+      ok(
+        saved.native.visibleText.includes('"workbench.wallpaper"'),
+        'saved screenshot paints the retained local settings',
+      )
       strictEqual(await secondBinding.evaluate((binding) => binding?.lease.read().kind), 'released')
       await evidence.json('saved-disk-and-release.json', saved)
       await evidence.json('query-and-mutation-counts.json', await page.evaluate(readCaches))
