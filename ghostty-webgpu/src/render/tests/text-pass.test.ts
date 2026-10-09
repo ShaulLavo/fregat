@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { WebGpuTextPass } from '../text-pass.js'
 import { AtlasGpuTextures } from '../atlas/gpu-textures.js'
 import type { RowInstanceUpdate } from '../instances/types.js'
+import { planUploadRanges, planWrappedUploadRanges } from '../instances/upload-ranges.js'
 
 interface BufferState {
   bytes: Uint8Array
@@ -203,6 +204,30 @@ it('coalesces twelve full rows to two uploads with native glyph bytes and preser
   expect(fixture.buffers[1]!.bytes).toEqual(
     new Uint8Array(data.glyphData.buffer, data.glyphData.byteOffset, data.glyphData.byteLength),
   )
+})
+
+it('installs the stock edit planner until a nonzero ring offset needs wrap planning', () => {
+  const fixture = gpuFixture()
+  expect(Reflect.get(fixture.pass, 'editPlanner')).toBe(planUploadRanges)
+  for (const layout of [
+    { stableRows: false, rowOffset: 0 },
+    { stableRows: true, rowOffset: 1 },
+    { stableRows: true, rowOffset: 0 },
+    { stableRows: false, rowOffset: 0 },
+  ]) {
+    const data = { ...frame(), ...layout, columns: 40, rowHeight: 16, rowChanges: 2 }
+    fixture.pass.uploadFrame(data, [])
+    const planner = layout.rowOffset === 0 ? planUploadRanges : planWrappedUploadRanges
+    expect(Reflect.get(fixture.pass, 'editPlanner')).toBe(planner)
+    fixture.writes.length = 0
+    data.rowChanges = 0
+    expect(fixture.pass.uploadFrame(data, [update(0, 0, 64, 0, 96)])).toBe(2)
+    expect(Reflect.get(fixture.pass, 'editPlanner')).toBe(planner)
+    expect(fixture.writes.map((write) => [write.offset, write.bytes.byteLength])).toEqual([
+      [0, 64],
+      [0, 96],
+    ])
+  }
 })
 
 it.each([0, 1, 11])('does zero mapping work on edit frames at offset %s', (rowOffset) => {
