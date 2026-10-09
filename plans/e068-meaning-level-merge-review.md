@@ -131,8 +131,36 @@ them).
 2. **Merge-unit queries** in `packages/tree-sitter-languages`, first for TypeScript, TSX,
    JavaScript, JSON, CSS, Markdown, Python, Rust and Go; the other languages in `languages.json`
    use the line fallback until they get a file.
+   Delivered in [PR #1153](https://github.com/ShaulLavo/fregat/pull/1153). All nine grammars ship and now load `merge-units`
+   through the language manifest and catalog generator. The worker's `mergeUnit` request
+   returns the smallest enclosing unit, its source-spelling signature, and its parent range
+   with a commutativity flag. Missing queries, unmatched ranges and damaged units use complete
+   lines. Missing snapshots report `stale`.
+   Query compilation is demand-only. Generic languages reuse the retained tree; Markdown
+   creates a structural block tree on the first request because its native renderer hides
+   that tree. The extra tree retires with its snapshot and appears in retention inspection.
+   Ordered arguments, arrays, CSS declarations, Python definitions, JavaScript class bodies
+   and objects, and Go and Rust field lists stay ordered. This preserves overload and decorator
+   evaluation, property enumeration, positional construction, layout and destruction order.
+   TypeScript interfaces commute only when every semantic member is a property signature;
+   methods and call signatures keep the parent ordered. Comments leave eligibility unchanged.
+   Import aliases identify local bindings. Each Go field name is a separate unit with the
+   declaration as its owning parent, so grouped names remain identifiable. Signatures retain
+   source spelling; the detector can normalize escaped or differently quoted names. Duplicate
+   signature comparisons apply only to commutative parents; ordered parents expose name hints.
+   Verification covers original fixtures for every grammar, separator-enclosing LF/CRLF fallback,
+   lazy compilation, incremental edits, stale requests, deepest nested injections, MDX fences,
+   injected-language fallback, UTF-16 offsets and all ten independent-review blockers.
 3. **Detector** in the tree-sitter worker: `overlap`, `parse`, `signature`, `orphan`, with author
    versions rebuilt through local `projectEffects` snapshots.
+   Before frequent batch requests, route the lazy Markdown parse in
+   `packages/tree-sitter/src/treeSitter/treeSitter.worker.ts` (`queryMergeUnit`) through the
+   existing `parseTreeSlices` / `resumeTreeSlices` cancellation and progress path. Apply query
+   progress/deadline checks in `packages/tree-sitter/src/treeSitter/mergeUnits.ts` (`unitAt`),
+   and reuse parent eligibility per snapshot within a batch. Current single-range requests
+   synchronously parse Markdown and rebuild parent coverage; no batch latency claim is made.
+   Reproduce with 100k-line Markdown and TypeScript fixtures and 100 concurrent edit ranges,
+   then measure the plan's 2 ms budget and confirm stale or cancelled snapshots release work.
 4. **Marks, hover and resolutions** in the collaboration plugin, wired into the example page.
 5. **Fregat:** marks for agent edits racing human typing, review annotations on the host, and the
    "Fix with AI" action. Detection runs in the browser, where the parser lives; the server host
