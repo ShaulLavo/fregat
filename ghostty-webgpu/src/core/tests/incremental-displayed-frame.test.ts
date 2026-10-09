@@ -1,3 +1,4 @@
+import { retainDisplayedFrame } from '../../render/displayed-frame.js'
 import { readFile } from 'node:fs/promises'
 import { afterEach, describe, expect, it } from 'vitest'
 import { CallbackBridge } from '../bridge.js'
@@ -47,7 +48,7 @@ async function measuredState() {
   const state = runtime.createRenderState(terminal)
   const capture = (full = false) => {
     rawReads = 0
-    const frame = state.retainDisplayedFrame({ full })
+    const frame = state[retainDisplayedFrame]({ full })
     const reads = rawReads
     const expected = state.readRows().map(({ dirty: _dirty, ...row }) => row)
     expect(frame.readRows().map(({ dirty: _dirty, ...row }) => row)).toEqual(expected)

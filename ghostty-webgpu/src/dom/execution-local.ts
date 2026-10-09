@@ -1,7 +1,5 @@
 import { createGhosttyError } from '../core/error.js'
-import type { NativeDisplayedFrame } from '../core/displayed-frame.js'
-
-type RetainedTextFrame = RendererTextFrameSnapshot & { readonly nativeFrame?: NativeDisplayedFrame }
+import type { DisplayedTextFrame, DisplayedFrameOptions } from '../render/displayed-frame.js'
 import { copiedFrameRow } from '../render/frame-row.js'
 import type { SelectionPoint } from '../core/selection.js'
 import type { ReadLinesOptions, TerminalSelectionFormatOptions } from '../core/types.js'
@@ -74,7 +72,7 @@ export class LocalTerminalExecution {
   readonly kind = 'sync' as const
   private disposed = false
   private layout?: SubmittedLayout
-  private lastFrame?: RetainedTextFrame
+  private lastFrame?: DisplayedTextFrame
   private lastFullFrame?: RendererFrameSnapshot
   private lastFrameVersion?: number
   private rendererValue?: GhosttyWebGpuRenderer
@@ -424,10 +422,10 @@ export class LocalTerminalExecution {
     })
   }
 
-  submit(snapshot: RendererTextFrameSnapshot): RendererTextFrameSnapshot {
+  submit(snapshot: DisplayedTextFrame): RendererTextFrameSnapshot {
     this.lastFrameVersion = this.session.renderState.snapshotVersion
     this.lastFullFrame = undefined
-    const nativeFrame = (snapshot as RetainedTextFrame).nativeFrame
+    const nativeFrame = snapshot.nativeFrame
     if (nativeFrame) {
       this.lastFrame = Object.freeze({
         cursor: snapshot.cursor,
@@ -476,9 +474,9 @@ export class LocalTerminalExecution {
       snapshot: this.lastFrame,
       previousTextRows: nativeFrame
         ? () =>
-            nativeFrame
-              .readPreviousTextRows()
-              .map((row) => Object.freeze({ y: row.y, text: row.text }))
+            (snapshot.previousTextRows ?? nativeFrame.readPreviousTextRows()).map((row) =>
+              Object.freeze({ y: row.y, text: row.text }),
+            )
         : undefined,
     })
     return this.lastFrame
@@ -511,7 +509,7 @@ export class LocalTerminalExecution {
 
   async createRenderer(
     factory: GhosttyWebGpuRendererFactory,
-    options: Omit<WebGpuTerminalRendererOptions, 'renderState'>,
+    options: Omit<WebGpuTerminalRendererOptions, 'renderState'> & DisplayedFrameOptions,
     signal: AbortSignal,
   ): Promise<GhosttyWebGpuRenderer> {
     const renderer = await factory({ ...options, renderState: this.session.renderState }, signal)

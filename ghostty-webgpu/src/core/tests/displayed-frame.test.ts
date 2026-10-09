@@ -1,3 +1,4 @@
+import { retainDisplayedFrame } from '../../render/displayed-frame.js'
 import { afterEach, describe, expect, it } from 'vitest'
 import { TerminalSession } from '../../term/session.js'
 import { DisplayedFrameStore } from '../displayed-frame.js'
@@ -35,7 +36,7 @@ describe('retained native displayed frame', () => {
     state.update()
     const pushed = serialized(state.readTextRows())
     const styles = serialized(state.readRows().map(({ dirty: _dirty, ...row }) => row))
-    const displayed = state.retainDisplayedFrame()
+    const displayed = state[retainDisplayedFrame]()
     expect(serialized(displayed.readTextRows())).toBe(pushed)
     expect(serialized(displayed.readRows().map(({ dirty: _dirty, ...row }) => row))).toBe(styles)
     expect(displayed.readTextRows({ rows: new Set([1]) })).toEqual(
@@ -56,7 +57,7 @@ describe('retained native displayed frame', () => {
       const rows = session.renderState.readRows()
       expect(rows[0]?.cells.some((cell) => cell.selected)).toBe(true)
       const expected = serialized(rows.map(({ dirty: _dirty, ...row }) => row))
-      const displayed = session.renderState.retainDisplayedFrame!()
+      const displayed = (session.renderState as GhosttyRenderState)[retainDisplayedFrame]!()
       session.clearSelection()
       session.renderState.update()
       expect(serialized(displayed.readRows().map(({ dirty: _dirty, ...row }) => row))).toBe(
@@ -74,7 +75,7 @@ describe('retained native displayed frame', () => {
     terminal.write('displayed 界')
     state.update()
     const pushed = serialized(state.readTextRows())
-    const displayed = state.retainDisplayedFrame()
+    const displayed = state[retainDisplayedFrame]()
     terminal.write('\rnew native state')
     state.update()
     expect(serialized(state.readTextRows())).not.toBe(pushed)
@@ -84,7 +85,7 @@ describe('retained native displayed frame', () => {
     state.update()
     expect(serialized(displayed.readTextRows())).toBe(pushed)
     const owned = displayed.readTextRows()
-    const resized = state.retainDisplayedFrame()
+    const resized = state[retainDisplayedFrame]()
     expect(resized.readTextRows()).toHaveLength(4)
     expect(resized.readTextRows()[0]?.cells).toHaveLength(20)
     expect(serialized(resized.readPreviousTextRows())).toBe(pushed)

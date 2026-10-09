@@ -503,6 +503,11 @@ export const SETTINGS_DOCUMENTATION = {
     description: 'Send Ctrl+letter and readline Alt shortcuts to the focused terminal shell.',
     keywords: ['terminal', 'shell', 'readline', 'shortcut', 'keybinding'],
   },
+  'terminal.integrated.screenReader': {
+    title: 'Screen reader',
+    description: 'Expose terminal text and announce new output to screen readers.',
+    keywords: ['terminal', 'accessibility', 'screen reader', 'speech', 'output'],
+  },
   'terminal.integrated.fontSize': {
     description: 'Terminal font size in pixels.',
     keywords: ['terminal', 'font', 'size'],

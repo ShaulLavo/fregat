@@ -1,6 +1,9 @@
+import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
+import { BOOT_MIRROR_KEY } from '@/lib/boot-keys'
+import { writeBootMirror } from '@/lib/settings-boot-mirror'
 import { vi } from 'vitest'
 import { isCancelledError } from '@tanstack/query-core'
-import { GhosttyRuntime } from 'ghostty-webgpu'
+import { GhosttyRuntime, type Terminal } from 'ghostty-webgpu'
 import { initializeGhostty } from '@/features/terminal/state/runtime'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { expect, test } from '../../../../test/fixtures'
@@ -176,6 +179,66 @@ test.each([false, true])(
       host.remove()
       client.removeQueries({ queryKey })
       window.dispatchEvent(new Event('pageshow'))
+    }
+  },
+)
+
+test.each([undefined, false, true])(
+  'the mounted terminal applies screen-reader setting %s and releases its subscription',
+  { timeout: 20_000 },
+  async (enabled) => {
+    const savedMirror = localStorage.getItem(BOOT_MIRROR_KEY)
+    const initiallyEnabled = enabled ?? DEFAULT_SETTING_VALUES['terminal.integrated.screenReader']
+    if (enabled === undefined) localStorage.removeItem(BOOT_MIRROR_KEY)
+    else writeBootMirror({ ...DEFAULT_SETTING_VALUES, 'terminal.integrated.screenReader': enabled })
+    await primaryQueryClient().query(terminalCheckoutQueryOptions('.'))
+    const host = document.createElement('div')
+    host.className = 'h-96 w-96'
+    document.body.append(host)
+    const onReady = vi.fn()
+    const onFailed = vi.fn()
+    const controller = new AbortController()
+    const unmount = mountTerminal({
+      origin: primaryServerOrigin(),
+      client: getClient(),
+      signal: controller.signal,
+      host,
+      rootPath: '.',
+      scrollback: 100,
+      sessionId: 'screen-reader-mount',
+      onConnectedChange: vi.fn(),
+      getSavedScroll: () => null,
+      onCapture: vi.fn(),
+      onExit: vi.fn(),
+      onFailed,
+      onProcessChange: vi.fn(),
+      onReady,
+      onScrollbackLengthChange: vi.fn(),
+      onTitleChange: vi.fn(),
+    })
+    try {
+      await expect
+        .poll(() => onReady.mock.calls.length + onFailed.mock.calls.length, { timeout: 10_000 })
+        .toBe(1)
+      expect(onFailed).not.toHaveBeenCalled()
+      const terminal = onReady.mock.calls[0]![0] as Terminal
+      const textSubscribers = Reflect.get(terminal, 'textSubscribers') as { hasListeners: boolean }
+      expect(Boolean(host.querySelector('[aria-label="Terminal screen"]'))).toBe(initiallyEnabled)
+      expect(textSubscribers.hasListeners).toBe(initiallyEnabled)
+      expect(terminal.setAccessibilityEnabled(false)).toBe(initiallyEnabled)
+      expect(host.querySelector('[aria-label="Terminal screen"]')).toBeNull()
+      expect(textSubscribers.hasListeners).toBe(false)
+      expect(terminal.setAccessibilityEnabled(true)).toBe(true)
+      expect(textSubscribers.hasListeners).toBe(true)
+      unmount()
+      expect(textSubscribers.hasListeners).toBe(false)
+      expect(host.children).toHaveLength(0)
+    } finally {
+      controller.abort()
+      unmount()
+      host.remove()
+      if (savedMirror === null) localStorage.removeItem(BOOT_MIRROR_KEY)
+      else localStorage.setItem(BOOT_MIRROR_KEY, savedMirror)
     }
   },
 )
