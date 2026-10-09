@@ -1,3 +1,4 @@
+import { isTextareaElement } from '../dom'
 import { scheduleFrame, type ScheduledFrame } from './scheduleFrame'
 import type {
   DocumentSession,
@@ -1785,7 +1786,7 @@ export class InputSelectionController {
       writeAccessibleWindow(input, content)
       return
     }
-    if (!(input instanceof HTMLTextAreaElement)) return
+    if (!isTextareaElement(input)) return
 
     if (input.value !== content.value) input.value = content.value
     input.setSelectionRange(content.selectionStart, content.selectionEnd, content.direction)
@@ -1930,7 +1931,7 @@ export class InputSelectionController {
     if (this.inputState.compositionActive) return
 
     const input = this.options.view.inputElement
-    if (!(input instanceof HTMLTextAreaElement)) return
+    if (!isTextareaElement(input)) return
     const current = readHiddenInputState(input)
     const deduced = deduceHiddenInputEdit(this.hiddenInputContent, current)
     // Nothing is written back for either of these, so the element keeps whatever the browser put
@@ -1949,10 +1950,9 @@ export class InputSelectionController {
       // A textarea selects what the composition is about to replace, which is how a correction
       // reaching back over a word says so: the event itself carries only the new text.
       const input = this.options.view.inputElement
-      this.compositionRange =
-        input instanceof HTMLTextAreaElement
-          ? { start: input.selectionStart, end: input.selectionEnd }
-          : null
+      this.compositionRange = isTextareaElement(input)
+        ? { start: input.selectionStart, end: input.selectionEnd }
+        : null
     },
   )
 
@@ -2880,7 +2880,11 @@ export class InputSelectionController {
     if (!this.session) return
     // Crossing between the rows inside the editor leaves each of them in turn, and the drag has not
     // gone anywhere.
-    if (event.relatedTarget instanceof Node && this.options.el.contains(event.relatedTarget)) return
+    if (
+      event.relatedTarget instanceof this.options.el.ownerDocument.defaultView!.Node &&
+      this.options.el.contains(event.relatedTarget)
+    )
+      return
 
     this.syncSessionSelectionHighlight()
   }
@@ -3132,7 +3136,7 @@ export class InputSelectionController {
     if (!this.canTypeText()) return
     if (event.target === this.options.view.inputElement) return
     if (
-      event.target instanceof Element &&
+      event.target instanceof this.options.el.ownerDocument.defaultView!.Element &&
       event.target.closest('input, textarea, button, a, [contenteditable]')
     )
       return

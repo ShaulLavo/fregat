@@ -3304,7 +3304,7 @@ function offsetFromElementBoundary(
   node: Node,
   offset: number,
 ): number | null {
-  if (!(node instanceof HTMLElement)) return null
+  if (!(node instanceof row.element.ownerDocument.defaultView!.HTMLElement)) return null
   if (!row.element.contains(node) && node !== row.element) return null
   if (node === row.element && offset <= 0) return row.startOffset
   if (node === row.element && offset >= node.childNodes.length) return row.endOffset

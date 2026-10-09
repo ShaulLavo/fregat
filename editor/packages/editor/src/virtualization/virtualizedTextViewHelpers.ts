@@ -253,8 +253,12 @@ export function computeLineStarts(text: string): number[] {
 }
 
 export function rowElementFromNode(node: Node, boundary: HTMLElement): HTMLDivElement | null {
-  if (node instanceof HTMLDivElement && node.dataset.editorVirtualRow !== undefined) return node
-  if (!(node.parentElement instanceof HTMLElement)) return null
+  if (
+    node instanceof boundary.ownerDocument.defaultView!.HTMLDivElement &&
+    node.dataset.editorVirtualRow !== undefined
+  )
+    return node
+  if (!node.parentElement) return null
 
   const element = node.parentElement.closest<HTMLDivElement>('[data-editor-virtual-row]')
   if (!element || !boundary.contains(element)) return null
