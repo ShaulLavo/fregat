@@ -103,7 +103,7 @@ Read the applicable skills before writing or reviewing code, or running their wo
 
 ## Desktop app
 
-- `apps/desktop/src/launcher/index.ts` is the desktop entry point. On machines with registered Mesh dev routes, `bun run desktop:dev` opens those routes; `bun run app:mac` builds the self-contained macOS bundle. Automatic selection uses the native WebKit host on macOS and prefers the installed Chrome app on Linux. Transparent-window mode selects the native system-webview host; an explicit browser executable overrides automatic selection. Native hosts are C on Linux and Objective-C on macOS.
+- `apps/desktop/src/launcher/index.ts` is the desktop entry point. On machines with registered Mesh dev routes, `bun run desktop:dev` opens those routes; `bun run app:mac` builds the self-contained macOS bundle. Automatic selection uses the native WebKit host on macOS and prefers the installed Chrome app on Linux. Transparent-window mode selects the native system-webview host; an explicit browser executable overrides automatic selection. Native hosts are Zig 0.17 on Linux and Swift with AppKit and WKWebView on macOS.
 - Installed-browser features work from OS shortcuts without a running launcher or injected globals. Native window transport belongs to the retained host. Production clients share one server per machine/state home; installation reuses its service or registers OS activation. Closing a client leaves shared services and terminals running. [Plan 114](plans/114-installed-app.md) owns these contracts.
 
 ## Dev, Gates, Verification
