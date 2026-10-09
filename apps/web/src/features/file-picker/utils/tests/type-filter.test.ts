@@ -37,7 +37,11 @@ test('filters accepted types while retaining navigable folders', () => {
       (item) => item.name,
     ),
   ).toEqual(['src', 'notes.md'])
-  expect(filterPickerEntries(entries, 'folder', ['.md'])).toEqual(entries)
+})
+
+test('a folder picker lists only folders', () => {
+  const entries = [entry('src', 'directory'), entry('code.ts'), entry('notes.md')]
+  expect(filterPickerEntries(entries, 'folder').map((item) => item.name)).toEqual(['src'])
 })
 
 test('a stale choice cannot broaden the caller constraint', () => {
