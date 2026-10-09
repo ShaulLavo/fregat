@@ -11,7 +11,7 @@ import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import type { ChatInputDraftTarget } from '@/features/chat/state/chat-input-draft-store'
 import type { useVoiceInput } from '../hooks/use-voice-input'
 import { ChatInputDictation } from './chat-input-dictation'
-import { ChatInputAttachButton } from './chat-input-attach-button'
+import { ChatInputAttachButton, type MachineFilesAttach } from './chat-input-attach-button'
 import { ChatInputSubmitButton } from './chat-input-submit-button'
 import { ComposerControlsMenu } from './composer-controls-menu'
 import { ContextUsageRing } from './context-usage-ring'
@@ -43,6 +43,7 @@ export function ChatInputActions({
   disabledReason = null,
   draftTarget,
   interactionMode,
+  machineFiles,
   onSelectImageFiles,
   onStop,
   onSubmit,
@@ -59,6 +60,7 @@ export function ChatInputActions({
   pendingAction?: ComposerPendingAction
   draftTarget: ChatInputDraftTarget
   interactionMode: InteractionMode
+  machineFiles: MachineFilesAttach
   onSelectImageFiles: (files: readonly File[]) => void
   onStop: () => void
   onSubmit: () => Promise<boolean>
@@ -117,6 +119,7 @@ export function ChatInputActions({
           <ChatInputAttachButton
             captureScope={`${draftTarget.environmentId}:${draftTarget.draftKey}`}
             disabled={disabled}
+            machineFiles={machineFiles}
             onSelectFiles={onSelectImageFiles}
           />
           {contextMeterEnabled && contextUsage && !tiny ? (

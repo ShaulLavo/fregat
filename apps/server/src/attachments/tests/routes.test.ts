@@ -1,4 +1,5 @@
 import { createAttachmentTestOwnership } from '../../../test/factories/attachment-ownership'
+import { createTestMachineFiles } from '../../../test/factories/machine-files'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -10,7 +11,7 @@ import { attachmentRoutes } from '../routes'
 import { writeAttachmentFromDataUrl } from '../store'
 
 const roots: string[] = []
-const handles: Array<() => void> = []
+const handles: Array<() => unknown> = []
 
 // A real 1x1 PNG header + payload; the route must hand these bytes back verbatim.
 const pngBytes = new Uint8Array([
@@ -40,7 +41,9 @@ async function createAttachmentsDir(): Promise<string> {
 function testApp(attachmentsDir: string) {
   const { ownership, close } = createAttachmentTestOwnership()
   handles.push(close)
-  return new Elysia().use(attachmentRoutes({ attachmentsDir, ownership }))
+  const machine = createTestMachineFiles(path.dirname(attachmentsDir))
+  handles.push(machine.close)
+  return new Elysia().use(attachmentRoutes({ attachmentsDir, files: machine.files, ownership }))
 }
 
 function attachmentRequest(attachment: ChatAttachmentUpload) {
@@ -48,7 +51,7 @@ function attachmentRequest(attachment: ChatAttachmentUpload) {
 }
 
 afterEach(async () => {
-  handles.splice(0).forEach((close) => close())
+  await Promise.all(handles.splice(0).map((close) => close()))
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 

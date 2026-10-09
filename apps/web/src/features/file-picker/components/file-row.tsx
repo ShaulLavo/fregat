@@ -1,3 +1,4 @@
+import type { MouseEvent } from 'react'
 import { useForesight } from '@/hooks/use-foresight'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
@@ -10,27 +11,34 @@ import {
   FILE_LIST_GRID,
   formatFileListModified,
 } from '@/features/file-picker/utils/rows'
+import { ChoiceMark } from '@/features/file-picker/components/choice-mark'
 import { EntryIcon } from '@/features/file-picker/components/entry-icon'
 import { DIRECTORY_QUERY_STALE_MS } from '@/features/file-picker/utils/directory-query'
 import { INTENT_PREFETCH_HIT_SLOP_PX } from '@/lib/intent-prefetch-options'
 import { FILE_PICKER_INTENT_PREFIX } from '@/features/file-picker/utils/intent'
 
 export function FileRow({
+  chosen = null,
   entry,
   rowProps,
   isBusy,
   onDirectoryIntent,
   onDoubleClick,
+  onToggle,
   position,
   selected,
   setSize,
   showPath,
 }: {
+  /** Null when the row is not a choice: a folder, or a picker that chooses folders. */
+  chosen?: boolean | null
   entry: FsEntry
   rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   isBusy: boolean
   onDirectoryIntent: (path: string) => void
   onDoubleClick: (entry: FsEntry) => void
+  /** A click on a choosable file adds it to the chosen files or takes it out. */
+  onToggle?: (entry: FsEntry) => void
   position: number
   selected: boolean
   setSize: number
@@ -52,6 +60,11 @@ export function FileRow({
     return onDirectoryIntent(entry.path)
   }
 
+  function handleClick(event: MouseEvent<HTMLElement>) {
+    rowProps.onClick(event)
+    if (chosen !== null && !isBusy) onToggle?.(entry)
+  }
+
   function handleDoubleClick() {
     if (isBusy) return
 
@@ -63,10 +76,12 @@ export function FileRow({
       {...rowProps}
       ref={directory ? elementRef : undefined}
       disabled={isBusy}
+      aria-checked={chosen ?? undefined}
       aria-posinset={position}
       selected={selected}
       aria-setsize={setSize}
       className={cn('grid w-full cursor-default text-left', FILE_LIST_GRID)}
+      onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       role='option'
       title={entry.path}
@@ -79,6 +94,7 @@ export function FileRow({
             <span className='text-muted-foreground text-2xs ml-2'>{displayPath(entry.path)}</span>
           ) : null}
         </div>
+        {chosen === null ? null : <ChoiceMark chosen={chosen} />}
       </div>
       <div className='text-muted-foreground truncate tabular-nums max-sm:hidden'>
         {formatFileListModified(entry.mtimeMs)}

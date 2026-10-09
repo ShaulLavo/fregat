@@ -534,6 +534,18 @@ export const selectors = {
       .getByRole('option')
       // Folder glyphs carry whitespace between their paths, so the name follows it.
       .filter({ hasText: new RegExp(`^\\s*${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }),
+  filesPickerDialog: (page: Page) =>
+    page.getByRole('dialog', { name: 'Choose files', exact: true }),
+  /** A row in the file-choosing picker; choosable files carry `aria-checked`. */
+  filesPickerRow: (page: Page, name: string) =>
+    page
+      .getByRole('dialog', { name: 'Choose files', exact: true })
+      .getByRole('option')
+      .filter({ hasText: new RegExp(`^\\s*${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }),
+  filesPickerAttach: (page: Page) =>
+    page
+      .getByRole('dialog', { name: 'Choose files', exact: true })
+      .getByRole('button', { name: /^Attach( \d+ files?)?$/ }),
   pickerHiddenToggle: (page: Page, shown: boolean) =>
     page.getByRole('button', {
       name: shown ? 'Hide hidden files' : 'Show hidden files',
@@ -1133,6 +1145,12 @@ export const selectors = {
       .locator('input[type=file]'),
   chatAttachMenuItem: (page: Page, name: 'Attach files…' | 'Screenshot…') =>
     page.getByRole('menuitem', { name, exact: true }),
+  /** Files from the device in hand; named for the device once another machine's files are offered. */
+  chatAttachDeviceFiles: (page: Page) =>
+    page.getByRole('menuitem', { name: /^(Attach files|From this device)…$/ }),
+  /** Files from the machine the draft runs on, offered where this device is not verifiably it. */
+  chatAttachMachineFiles: (page: Page) =>
+    page.getByRole('menuitem', { name: /^From (?!this device).+…$/ }),
   chatStagedFile: (page: Page, name: string) =>
     page.getByLabel('Attachments', { exact: true }).getByText(name, { exact: true }),
   chatStagedImage: (page: Page, name: string) =>
