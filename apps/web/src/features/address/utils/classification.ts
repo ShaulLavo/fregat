@@ -1,5 +1,5 @@
 import { WORKSPACE_CACHE_STORAGE_KEYS } from '@/lib/workspace-cache-keys'
-import { BOOT_MIRROR_KEY, PALETTE_BOOT_KEY } from '@/lib/boot-keys'
+import { BOOT_MIRROR_KEY } from '@/lib/boot-keys'
 
 /**
  * Which state is a place, which is a preference, and which must never be replayed.
@@ -66,11 +66,6 @@ export const STATE_CLASSIFICATIONS: Readonly<Record<string, ClassifiedState>> = 
     classification: 'ephemeral',
     storageKey: 'platform.navigation.pending',
     why: 'a take-once inbox for the navigation a reload interrupted; replaying it from a link would loop',
-  },
-  paletteBoot: {
-    classification: 'preference',
-    storageKey: PALETTE_BOOT_KEY,
-    why: 'the palette CSS cached for first paint, derived from the palette preference',
   },
   environmentBinding: {
     classification: 'preference',

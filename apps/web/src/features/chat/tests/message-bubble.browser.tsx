@@ -9,7 +9,7 @@ import { page } from 'vitest/browser'
 
 import { CodeHighlighterReady } from '../../../../test/factories/code-highlighter-ready'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
-import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/render'
 import {
   ChatTimelineActionsContext,
   type ChatTimelineActions,
@@ -41,7 +41,7 @@ beforeEach(() => {
   transport = createChatTransport(activeServerOrigin())
   // Dark is what every colour assertion below is written against, and it is a
   // setting now rather than a prop — the mirror is where the app reads it.
-  seedBootMirrorTheme('dark')
+  seedHtmlTheme('dark')
 })
 
 afterEach(() => {

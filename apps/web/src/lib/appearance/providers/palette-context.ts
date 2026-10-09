@@ -1,5 +1,5 @@
 import type { Palette, PaletteId } from '@workspace/contracts'
-import type { ResolvedPalette } from '@workspace/client-core/themes/palette'
+import type { ResolvedPalette } from '@workspace/contracts/themes/palette-rendering'
 import type { SettingsSubmission } from '@workspace/client-core/settings/intent-store'
 import { createContext } from 'react'
 

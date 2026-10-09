@@ -1,4 +1,6 @@
 import { paletteContentQueryOptions } from '@/features/command-palette/utils/content-query'
+import { installHtmlBootstrap } from './factories/html-bootstrap'
+import { readHtmlBootstrap } from '@/lib/html-bootstrap'
 import { filePickerDialogQueryOptions } from '@/features/file-picker/utils/dialog-query'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { ComposerAttachProvider } from '@/providers/composer-attach-provider'
@@ -153,18 +155,17 @@ export function AppProviders({
   )
 }
 
-// Theme is a setting now, so there is no prop to pass. Seeding the boot mirror
-// is the honest equivalent: it is exactly what the app reads before the first
-// snapshot lands. Call it before mounting.
-export function seedBootMirrorTheme(theme: 'dark' | 'light') {
-  localStorage.setItem(
-    'platform.settings-boot-mirror.v1',
-    JSON.stringify({ 'workbench.colorTheme': theme }),
-  )
+/** Simulate the appearance supplied in a document before its settings query resolves. */
+export function seedHtmlTheme(theme: 'dark' | 'light') {
+  if (!readHtmlBootstrap())
+    installHtmlBootstrap({
+      'workbench.colorTheme': theme,
+      'workbench.wallpaper': { enabled: false, source: { kind: 'desktop' } },
+    })
   seedPrefersColorScheme(theme)
 }
 
-// The boot mirror only rules until the real settings snapshot lands, and the
+// The initial document only rules until the real settings snapshot lands, and the
 // shipped default for `workbench.colorTheme` is `system` - so the media query
 // decides from then on. happy-dom reports light unless the device is told
 // otherwise, which would flip the theme mid-test and re-run everything keyed on
@@ -239,7 +240,7 @@ function providerRenderOptions<Options extends RenderWithProvidersOptions>({
   theme = 'dark',
   ...options
 }: Options) {
-  seedBootMirrorTheme(theme)
+  seedHtmlTheme(theme)
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <AppProviders
@@ -263,7 +264,7 @@ export function renderApplication(
   application: ApplicationRuntime,
   { navigation = createTestNavigation({ application }) }: { readonly navigation?: Navigation } = {},
 ) {
-  seedBootMirrorTheme('dark')
+  seedHtmlTheme('dark')
   const detach = navigation.attach(application)
   const unbind = bindNavigation(navigation)
   application.start()

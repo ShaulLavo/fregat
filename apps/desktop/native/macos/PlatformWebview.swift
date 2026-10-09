@@ -328,6 +328,7 @@ private final class PlatformHost: NSObject, NSApplicationDelegate, NSWindowDeleg
         window.isReleasedWhenClosed = false
         if options.vibrant { mountEffects(window) }
         let configuration = WKWebViewConfiguration()
+        configuration.applicationNameForUserAgent = options.vibrant ? "FregatBackdrop/transparent" : "FregatBackdrop/app"
         configuration.websiteDataStore = persistentStore(options.directory)
         let source = script + "\n;if (globalThis.platformBridge) globalThis.platformBridge.capabilities.windowGlass = \(glassEffect != nil);"
         startupScript = WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true)

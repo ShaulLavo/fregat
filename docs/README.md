@@ -25,7 +25,7 @@ the revision it inspected; it is not a second implementation queue or proof of t
 | Keyboard                | [Architecture](keymap/architecture.md), [matching and dispatch](vscode-keymap-development.md)                                                                                                        |
 | Terminals               | [Terminal integration](terminal.md), [terminal host](terminal-host.md), [Ghostty package boundary](ghostty-webgpu-brief.md)                                                                          |
 | Settings and appearance | [Settings reference](settings-reference.md), [theme bundles](theme-bundles.md)                                                                                                                       |
-| Runtime and delivery    | [Boot](boot-and-first-load.md), [deployment](../plans/deployment-design.md), [observability](observability-overhead.md), [web push](web-push.md)                                                     |
+| Runtime and delivery    | [Boot](boot-and-first-load.md), [HTML bootstrap](html-bootstrap.md), [deployment](../plans/deployment-design.md), [observability](observability-overhead.md), [web push](web-push.md)                |
 
 ## Clients
 
