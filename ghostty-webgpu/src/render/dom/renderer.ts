@@ -13,7 +13,13 @@ import {
   type RowRendererSurface,
   type RowThemeInvalidation,
 } from '../row-renderer.js'
-import { frameStyle, renderFrameToHtml, renderRowRuns, type RowRun } from './html.js'
+import {
+  defaultCellStyle,
+  frameStyle,
+  renderFrameToHtml,
+  renderRowRuns,
+  type RowRun,
+} from './html.js'
 
 export { renderFrameToHtml } from './html.js'
 export type { RenderFrameHtmlOptions } from './html.js'
@@ -54,6 +60,7 @@ class DomSurface implements RowRendererSurface {
   private grid: RendererGridSize
   private theme: CanonicalRendererTheme
   private rows: MountedRow[] = []
+  private defaultStyle = ''
 
   constructor(options: WebGpuTerminalRendererOptions) {
     if (!('ownerDocument' in options.canvas) || !options.canvas.parentElement) {
@@ -87,7 +94,7 @@ class DomSurface implements RowRendererSurface {
     const mounted = this.rows[row.y]
     if (!mounted) return false
     let changed = false
-    const runs = renderRowRuns(row, cursor, this.font, this.theme)
+    const runs = renderRowRuns(row, cursor, this.font, this.theme, this.defaultStyle)
     for (let index = 0; index < runs.length; index += 1) {
       const run = runs[index]!
       const previous = mounted.runs[index]
@@ -135,6 +142,7 @@ class DomSurface implements RowRendererSurface {
     const html = renderFrameToHtml({ cursor, rows: [] }, { ...grid, font, theme: this.theme })
     this.font = font
     this.grid = grid
+    this.defaultStyle = defaultCellStyle(font, this.theme)
     this.canvas.width = grid.columns * font.deviceCellWidth
     this.canvas.height = grid.rows * font.deviceCellHeight
     this.canvas.style.width = `${grid.columns * font.cssCellWidth}px`
@@ -150,6 +158,7 @@ class DomSurface implements RowRendererSurface {
   setTheme(theme: CanonicalRendererTheme): RowThemeInvalidation {
     if (themesEqual(this.theme, theme)) return 'cursor'
     this.theme = theme
+    this.defaultStyle = defaultCellStyle(this.font, theme)
     this.container.firstElementChild?.setAttribute('style', frameStyle(this.font, this.grid, theme))
     return 'all'
   }

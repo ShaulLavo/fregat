@@ -1,4 +1,5 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
+import { CanvasColorCache } from '../canvas/colors.js'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import type { GhosttyRenderState } from '../../core/render-state.js'
 import type { GhosttyTerminal } from '../../core/terminal.js'
@@ -6,7 +7,7 @@ import type { CanonicalRendererTheme } from '../instances/types.js'
 import type { RenderRow } from '../../core/types.js'
 import { canonicalRendererTheme, mergeRendererTheme } from '../config.js'
 import { copiedFrameRow } from '../frame-row.js'
-import { renderRowRuns } from './html.js'
+import { defaultCellStyle, renderRowRuns } from './html.js'
 import { probeFont, probeInput } from './tests/probe.js'
 
 function expectPackedScreen({
@@ -42,9 +43,11 @@ function expectPackedRow(row: RenderRow, expected: RenderRow, theme: CanonicalRe
   }
   for (const style of ['block', 'bar', 'underline', 'outline'] as const) {
     const cursor = { style, visible: true, x: 2, y: row.y }
-    expect(renderRowRuns(protectedRow, cursor, probeFont, theme)).toEqual(
-      renderRowRuns(expected, cursor, probeFont, theme),
-    )
+    const expectedRuns = renderRowRuns(expected, cursor, probeFont, theme)
+    expect(renderRowRuns(protectedRow, cursor, probeFont, theme)).toEqual(expectedRuns)
+    expect(
+      renderRowRuns(protectedRow, cursor, probeFont, theme, defaultCellStyle(probeFont, theme)),
+    ).toEqual(expectedRuns)
   }
   const snapshot = copiedFrameRow(protectedRow)
   const expectedSnapshot = copiedFrameRow(expected)
@@ -52,6 +55,29 @@ function expectPackedRow(row: RenderRow, expected: RenderRow, theme: CanonicalRe
   expect(snapshot.renderCells).toEqual(expectedSnapshot.renderCells)
   expect(Object.isFrozen(snapshot.renderCells)).toBe(true)
 }
+
+it('reuses default CSS without resolving cell colors during packed row projection', async () => {
+  const runtime = await GhosttyRuntime.create()
+  try {
+    const terminal = runtime.createTerminal({ columns: 40, rows: 3 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('edit 0000')
+    state.update()
+    const row = state.readRows({ packed: true })[0]!
+    const theme = canonicalRendererTheme(mergeRendererTheme({}))
+    const expected = renderRowRuns(row, undefined, probeFont, theme)
+    const css = expected[0]!.style.slice(0, expected[0]!.style.lastIndexOf('width:calc('))
+    const foreground = vi.spyOn(CanvasColorCache.prototype, 'foreground')
+    try {
+      expect(renderRowRuns(row, undefined, probeFont, theme, css)).toEqual(expected)
+      expect(foreground).not.toHaveBeenCalled()
+    } finally {
+      foreground.mockRestore()
+    }
+  } finally {
+    runtime.dispose()
+  }
+})
 
 it('projects owned packed rows identically without materializing cells across styles, wide text and cursor states', async () => {
   const runtime = await GhosttyRuntime.create()

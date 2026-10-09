@@ -135,25 +135,30 @@ async function expectWideGlyphCursorPaint(font = probeFont) {
 }
 
 describe('DOM terminal renderer', () => {
-  it('lays out fixed-grid runs in block rows with contiguous span geometry', async () => {
-    const probe = await rendererProbe('dom')
-    const frame = probe.canvas.parentElement!.querySelector('.ghostty-webgpu-frame')!
-    const bounds = frame.getBoundingClientRect()
-    for (const [index, row] of Array.from(frame.children).entries()) {
-      expect(getComputedStyle(row).display).toBe('block')
-      const rowBounds = row.getBoundingClientRect()
-      expect(rowBounds.top).toBe(bounds.top + index * probeFont.cssCellHeight)
-      expect(rowBounds.height).toBe(probeFont.cssCellHeight)
-      expect(rowBounds.width).toBe(bounds.width)
-      let left = bounds.left
-      for (const span of row.children) {
-        const spanBounds = span.getBoundingClientRect()
-        expect(spanBounds.top).toBe(rowBounds.top)
-        expect(spanBounds.left).toBe(left)
-        expect(spanBounds.height).toBe(probeFont.cssCellHeight)
-        left += spanBounds.width
+  it('refreshes default cell styles when contrast, theme, and font change', async () => {
+    const probe = await rendererProbe('dom', '\x1b[?25ledit 0000')
+    for (const minimumContrast of [1, 7, 1]) {
+      const theme = {
+        background: { r: 80, g: 80, b: 80 },
+        foreground: { r: 90, g: 90, b: 90 },
+        minimumContrast,
       }
-      if (row.children.length > 0) expect(left).toBe(bounds.right)
+      const font = {
+        ...probeFont,
+        settings: { ...probeFont.settings, weight: minimumContrast === 7 ? 600 : 400 },
+      }
+      probe.renderer.setTheme(theme)
+      probe.renderer.setFont(font)
+      probe.clock.flush()
+      const frame = probe.canvas.parentElement!.querySelector('.ghostty-webgpu-frame')!
+      expect(frame.parentElement!.innerHTML).toBe(
+        renderFrameToHtml(snapshotRenderState(probe.state), {
+          columns: 12,
+          rows: 3,
+          font,
+          theme,
+        }),
+      )
     }
   })
 
