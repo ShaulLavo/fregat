@@ -12,7 +12,7 @@ import {
   openFixtureWorkspace,
   releaseFixture,
 } from '../fixture-workspace'
-import { openGitPanel, selectors } from '../selectors'
+import { diffPaneSelector, openGitPanel, selectors } from '../selectors'
 
 type Mode = 'stacked' | 'split'
 type Position = { top: number; left: number; width: number; contentWidth: number }
@@ -31,7 +31,7 @@ export const gitDiffScroll: Scenario = {
   name: 'git-diff-scroll',
   requiresIsolatedServer: true,
   description:
-    'Split and stacked diffs restore both scroll axes; an uncached late reply preserves the selected comparison.',
+    'Split and stacked diffs restore both scroll axes, copy the selected source line, keep the reading position through an in-place revision refresh, and an uncached late reply preserves the selected comparison.',
   inspect: async (page) => inspection.get(page) ?? null,
   async run(page, { step, evidence }) {
     const fixture = await createGitFixture('diff-scroll')
@@ -47,8 +47,10 @@ export const gitDiffScroll: Scenario = {
       await openFixtureWorkspace(page, fixture)
       await openGitPanel(page)
       await disablePrefetch(page)
-      for (const mode of ['stacked', 'split'] satisfies Mode[])
+      for (const mode of ['stacked', 'split'] satisfies Mode[]) {
         await verifyMode(page, mode, observations, step)
+        if (mode === 'stacked') await verifyCopyAndRefresh(page, fixture, reads, observations, step)
+      }
       await verifyLateRead(page, evidence, reads, observations, step)
     } catch (error) {
       await capture(page, observations, 'failed-control')
@@ -116,6 +118,68 @@ async function verifyMode(
     'A visited diff must restore its offset',
   )
   await step(`${mode}-restored-first-diff`)
+}
+
+async function verifyCopyAndRefresh(
+  page: Page,
+  fixture: string,
+  reads: string[],
+  observations: unknown[],
+  step: (label: string) => Promise<void>,
+) {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await scrollers(page).first().hover()
+  await page.mouse.wheel(0, 8000)
+  await page.waitForTimeout(400)
+  const row = await page.evaluate(`(() => {
+    const scroller = document.querySelector(${JSON.stringify(`${diffPaneSelector} ${selectors.diffScrollerSelector}`)})
+    const bounds = scroller.getBoundingClientRect()
+    const rows = [...document.querySelectorAll(${JSON.stringify(selectors.comparisonRowsSelector)})]
+      .map(element => element.getBoundingClientRect())
+      .filter(rect => rect.height > 0 && rect.top >= bounds.top && rect.bottom <= bounds.bottom)
+      .sort((left, right) => left.top - right.top)
+    const target = rows[2]
+    return { x: bounds.left + bounds.width / 2, y: target.top + target.height / 2, height: target.height }
+  })()`)
+  const { x, y, height } = row as { x: number; y: number; height: number }
+  await page.mouse.click(x, y)
+  await page.keyboard.press('Home')
+  await page.keyboard.press('Shift+End')
+  const copied = await copySelection(page)
+  const match = /^b\.txt after line (\d+) /.exec(copied)
+  ok(match, `Copy must yield one whole new-side line: ${JSON.stringify(copied.slice(0, 80))}`)
+  const line = Number(match[1])
+  strictEqual(
+    copied,
+    fixtureText('b.txt', 'after').split('\n')[line],
+    'The copied text is the selected source line, exactly',
+  )
+  ok(line > 20, `The selection sits at the scrolled reading position: line ${line}`)
+  const before = await capture(page, observations, 'stacked-selection-copied')
+  await step('stacked-selection-copied')
+
+  const readsBefore = reads.length
+  const inserted = Array.from({ length: 5 }, (_, i) => `b.txt inserted line ${i}`).join('\n')
+  await writeFile(path.join(fixture, 'b.txt'), `${inserted}\n${fixtureText('b.txt', 'after')}`)
+  for (let waited = 0; reads.length === readsBefore; waited += 100) {
+    ok(waited < 10_000, 'The diff rereads after its file changes on disk')
+    await page.waitForTimeout(100)
+  }
+  await page.waitForTimeout(600)
+  const after = await capture(page, observations, 'stacked-revision-refreshed')
+  strictEqual(await copySelection(page), copied, 'The refreshed diff keeps the selected source line')
+  ok(
+    Math.abs(after[0]!.top - (before[0]!.top + 5 * height)) <= 1,
+    `Five lines inserted above move the reading position by five rows: ${JSON.stringify({ before, after, height })}`,
+  )
+  strictEqual(after[0]!.left, before[0]!.left, 'The refresh keeps the horizontal offset')
+  await step('stacked-revision-refreshed')
+}
+
+async function copySelection(page: Page) {
+  await page.evaluate('navigator.clipboard.writeText("")')
+  await page.keyboard.press('ControlOrMeta+c')
+  return page.evaluate<string>('navigator.clipboard.readText()')
 }
 
 async function prepareFixture(fixture: string) {
