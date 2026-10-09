@@ -41,7 +41,7 @@ const sshOptions = [
 ]
 
 export function sshCommand(target: string, script: string) {
-  return [...sshOptions, '--', target, 'sh', '-c', shellQuote(script)]
+  return sshOptions.concat(['--', target, 'sh', '-c', shellQuote(script)])
 }
 
 type SshRun = {
@@ -132,21 +132,22 @@ function finishPortProbe(
 }
 
 export function forwardCommand(options: ForwardOptions, session: readonly string[] = []) {
-  return [
-    ...sshOptions,
-    session.length === 0 ? '-N' : '-T',
-    '-o',
-    'ExitOnForwardFailure=yes',
-    '-o',
-    'ServerAliveInterval=15',
-    '-o',
-    'ServerAliveCountMax=2',
-    '-L',
-    `127.0.0.1:${options.localPort}:127.0.0.1:${options.remotePort}`,
-    '--',
-    options.target,
-    ...session,
-  ]
+  return sshOptions.concat(
+    [
+      session.length === 0 ? '-N' : '-T',
+      '-o',
+      'ExitOnForwardFailure=yes',
+      '-o',
+      'ServerAliveInterval=15',
+      '-o',
+      'ServerAliveCountMax=2',
+      '-L',
+      `127.0.0.1:${options.localPort}:127.0.0.1:${options.remotePort}`,
+      '--',
+      options.target,
+    ],
+    session,
+  )
 }
 
 export async function openForward(options: ForwardOptions): Promise<SshForward> {

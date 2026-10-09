@@ -14,7 +14,8 @@ afterEach(() => {
 function repository() {
   const root = mkdtempSync(path.join(tmpdir(), 'lane-transfer-'))
   roots.push(root)
-  const git = (...args: string[]) => execFileSync('git', ['-C', root, ...args], { stdio: 'pipe' })
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-C', root].concat(args), { stdio: 'pipe' })
   git('init', '-q')
   git('config', 'user.email', 'lane@example.test')
   git('config', 'user.name', 'lane')
@@ -35,7 +36,7 @@ test('ships tracked changes and keeps unnamed untracked files here', () => {
   const plan = shipPlan(root, [], 2 ** 20, root)
   expect(Buffer.from(plan.diff).toString()).toContain('+export const a = 2')
   expect(plan.includes).toEqual([])
-  expect([...plan.omitted].sort()).toEqual(['new.ts', 'notes.md'])
+  expect(plan.omitted.toSorted()).toEqual(['new.ts', 'notes.md'])
 })
 
 test('ships a named untracked file', () => {

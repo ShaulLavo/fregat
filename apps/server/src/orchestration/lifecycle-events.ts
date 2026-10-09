@@ -24,12 +24,11 @@ export function userEngagementEvents(
 ) {
   const events = settlementActivityEvents(command, session, at)
   if (session?.snoozedUntil == null) return events
-  return [
-    ...events,
+  return events.concat([
     event(command, at, 'session.unsnoozed', {
       reason: 'activity',
       sessionId: command.sessionId,
       updatedAt: at,
     }),
-  ]
+  ])
 }

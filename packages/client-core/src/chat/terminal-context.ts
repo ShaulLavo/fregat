@@ -101,7 +101,7 @@ export function buildTerminalContextBlock(contexts: readonly TerminalContextSele
   }
   if (lines.length === 0) return ''
 
-  return [BLOCK_OPEN, ...lines, BLOCK_CLOSE].join('\n')
+  return [BLOCK_OPEN].concat(lines, [BLOCK_CLOSE]).join('\n')
 }
 
 export function parseTerminalContextBlock(block: string): TerminalContextSelection[] {

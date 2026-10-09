@@ -27,5 +27,5 @@ export function dispatchMachineProxySocket(
 ) {
   const dispatch = websocket[event]
   if (!dispatch) return expect.unreachable(`Missing Elysia ${event} WebSocket dispatch`)
-  return Reflect.apply(dispatch, websocket, [socket, ...args])
+  return Reflect.apply(dispatch, websocket, [socket].concat(args))
 }

@@ -208,10 +208,10 @@ export class ProviderAdapterRegistry {
     const live = await Promise.all(
       this.listInstances().map((providerInstanceId) => this.snapshot(providerInstanceId)),
     )
-    const providers = [...live, ...this.unavailable.values()]
+    const providers = live.concat(Array.from(this.unavailable.values()))
 
     return v.parse(providerListResultSchema, {
-      providers: providers.toSorted(compareProviderSnapshots),
+      providers: providers.sort(compareProviderSnapshots),
     })
   }
 

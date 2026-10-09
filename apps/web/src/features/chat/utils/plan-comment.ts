@@ -50,7 +50,7 @@ export function markdownQuote(
     .map((line) => `> ${line}`)
   const where =
     lines.start === lines.end ? `line ${lines.start}` : `lines ${lines.start}–${lines.end}`
-  return [`About ${subject}, ${where}:`, '', ...quoted].join('\n')
+  return [`About ${subject}, ${where}:`, ''].concat(quoted).join('\n')
 }
 
 export function planSourceLineOffset(planMarkdown: string, displayedMarkdown: string) {

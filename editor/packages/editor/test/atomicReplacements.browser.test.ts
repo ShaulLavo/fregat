@@ -25,7 +25,7 @@ afterEach(() => {
 
 function mentionSpecs(context: EditorInlineReplacementContext): readonly InlineReplacementSpec[] {
   const text = context.textSnapshot.readRange(0, context.textSnapshot.length)
-  return [...text.matchAll(MENTION)].map((match) => ({
+  return Array.from(text.matchAll(MENTION), (match) => ({
     id: `mention-${match.index}`,
     key: `mention:${match[0]}`,
     startIndex: match.index,

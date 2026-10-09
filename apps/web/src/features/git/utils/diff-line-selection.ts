@@ -120,9 +120,9 @@ export function diffLineSelectionText(
     '',
     `${fence}diff`,
     hunkHeader(address, rows),
-    ...body,
-    fence,
-  ].join('\n')
+  ]
+    .concat(body, [fence])
+    .join('\n')
 }
 
 function isCodeRow(row: DiffRenderRow): boolean {

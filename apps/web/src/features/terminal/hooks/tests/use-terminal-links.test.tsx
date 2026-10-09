@@ -328,7 +328,7 @@ function fakeTerminal(rows: readonly string[]): FakeTerminal {
 
 function linkLine(content: string): LinkLineSnapshot {
   const text = content.padEnd(COLUMNS, ' ')
-  const cells = [...text].map((value) => ({ text: value }))
+  const cells = Array.from(text, (value) => ({ text: value }))
   const textStartByCell = cells.map((_cell, index) => index)
   const textEndByCell = cells.map((_cell, index) => index + 1)
   const startCellByTextBoundary = Array.from({ length: text.length + 1 }, (_value, index) =>

@@ -213,15 +213,17 @@ describe('suspicious character markers', () => {
   }
 
   function markerKinds(): string[] {
-    return [
-      ...container.querySelectorAll<HTMLElement>('.editor-virtualized-hidden-character-marker'),
-    ].map((marker) => marker.dataset.editorHiddenCharacter ?? '')
+    return Array.from(
+      container.querySelectorAll<HTMLElement>('.editor-virtualized-hidden-character-marker'),
+      (marker) => marker.dataset.editorHiddenCharacter ?? '',
+    )
   }
 
   function markerOffsets(): number[] {
-    return [
-      ...container.querySelectorAll<HTMLElement>('.editor-virtualized-hidden-character-marker'),
-    ].map((marker) => Number(marker.dataset.editorHiddenCharacterOffset))
+    return Array.from(
+      container.querySelectorAll<HTMLElement>('.editor-virtualized-hidden-character-marker'),
+      (marker) => Number(marker.dataset.editorHiddenCharacterOffset),
+    )
   }
 
   // Whitespace rendering is a preference about how to read the text; this is a claim about what the
@@ -298,9 +300,10 @@ describe('suspicious characters as an editor option', () => {
   })
 
   function markerKinds(): string[] {
-    return [
-      ...container.querySelectorAll<HTMLElement>('.editor-virtualized-hidden-character-marker'),
-    ].map((marker) => marker.dataset.editorHiddenCharacter ?? '')
+    return Array.from(
+      container.querySelectorAll<HTMLElement>('.editor-virtualized-hidden-character-marker'),
+      (marker) => marker.dataset.editorHiddenCharacter ?? '',
+    )
   }
 
   // Whitespace rendering is on throughout so that every expectation below names markers the rows

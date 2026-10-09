@@ -103,7 +103,9 @@ describe('useHotkeySequences', () => {
 
     const manager = getHotkeyRegistry()
     expect(manager.registrations.state.size).toBe(2)
-    const disabledView = [...manager.registrations.state.values()].find((r) => r.hotkey === 'D D')
+    const disabledView = Array.from(manager.registrations.state.values()).find(
+      (r) => r.hotkey === 'D D',
+    )
     expect(disabledView?.options.enabled).toBe(false)
   })
 
@@ -245,15 +247,15 @@ describe('useHotkeySequences', () => {
         { initialProps: { enabled: true } },
       )
 
-      const idBefore = [...manager.registrations.state.keys()][0]
+      const idBefore = Array.from(manager.registrations.state.keys())[0]
       expect(manager.registrations.state.size).toBe(1)
 
       rerender({ enabled: false })
       expect(manager.registrations.state.size).toBe(1)
-      expect([...manager.registrations.state.keys()][0]).toBe(idBefore)
+      expect(Array.from(manager.registrations.state.keys())[0]).toBe(idBefore)
 
       rerender({ enabled: true })
-      expect([...manager.registrations.state.keys()][0]).toBe(idBefore)
+      expect(Array.from(manager.registrations.state.keys())[0]).toBe(idBefore)
     })
   })
 })

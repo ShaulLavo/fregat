@@ -81,7 +81,7 @@ describe('the budget fuzzy matching works inside', () => {
  */
 function rank(pattern: string, ...candidates: string[]): readonly string[] {
   return candidates
-    .toReversed()
+    .reverse()
     .sort((left, right) => scoreOf(pattern, right) - scoreOf(pattern, left))
 }
 

@@ -392,7 +392,7 @@ export class LspSessionPool implements LspSessionSource {
       return null
     }
 
-    this.sessions.set(key, [...(this.sessions.get(key) ?? []), session])
+    this.sessions.set(key, (this.sessions.get(key) ?? []).concat([session]))
     return session
   }
 }
@@ -2288,7 +2288,7 @@ function applySemanticTokenEdits(baseline: readonly number[], edits: readonly un
     parsed.push({ data: data as number[], deleteCount, start })
   }
 
-  const ordered = parsed.toSorted((left, right) => right.start - left.start)
+  const ordered = parsed.sort((left, right) => right.start - left.start)
   for (let index = 1; index < ordered.length; index += 1) {
     const later = ordered[index - 1]
     const earlier = ordered[index]
@@ -2393,7 +2393,7 @@ function protocolRecordDifference(
   right: Readonly<Record<string, unknown>>,
   path: string,
 ): string | null {
-  for (const key of new Set([...Object.keys(left), ...Object.keys(right)])) {
+  for (const key of new Set(Object.keys(left).concat(Object.keys(right)))) {
     if (!Object.hasOwn(left, key) || !Object.hasOwn(right, key)) return `${path}.${key}`
     const difference = protocolValueDifference(left[key], right[key], `${path}.${key}`)
     if (difference !== null) return difference

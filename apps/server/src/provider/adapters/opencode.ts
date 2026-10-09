@@ -312,10 +312,12 @@ export class OpenCodeProviderAdapter implements ProviderAdapter {
     this.stopped = true
     this.catalog?.controller.abort()
     for (const pending of this.starting.values()) pending.controller.abort()
-    await Promise.allSettled([
-      ...Array.from(this.starting.values(), (pending) => pending.promise),
-      this.catalog?.server.close(),
-    ])
+    await Promise.allSettled(
+      Array.from(
+        this.starting.values(),
+        (pending): Promise<unknown> | undefined => pending.promise,
+      ).concat([this.catalog?.server.close()]),
+    )
     await Promise.allSettled(
       [...this.sessions.keys()].map((sessionId) => this.stopRuntime({ sessionId })),
     )

@@ -51,23 +51,22 @@ export async function readUserPlaces(
     readOptionalText(path.join(sources.configDirectory, 'gtk-3.0', 'bookmarks')),
   ])
   const configured = parseUserDirs(userDirs, home)
-  const candidates: Candidate[] = [
-    ...XDG_PLACES.map(({ kind, xdgKey, label }) => ({
-      kind,
-      label,
-      absolute: configured.get(xdgKey) ?? path.join(home, label),
-    })),
-    ...parseGtkBookmarks(bookmarks).map(({ absolute, label }) => ({
+  const candidates: Candidate[] = XDG_PLACES.map(({ kind, xdgKey, label }) => ({
+    kind,
+    label,
+    absolute: configured.get(xdgKey) ?? path.join(home, label),
+  })).concat(
+    parseGtkBookmarks(bookmarks).map(({ absolute, label }) => ({
       kind: 'bookmark' as const,
       label,
       absolute,
     })),
-    ...DEV_FOLDER_NAMES.map((name) => ({
+    DEV_FOLDER_NAMES.map((name) => ({
       kind: 'folder' as const,
       label: name,
       absolute: path.join(home, name),
     })),
-  ]
+  )
   if (sources.platform === 'darwin')
     candidates.push({
       kind: 'cloud',

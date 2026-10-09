@@ -104,10 +104,9 @@ test('contains throwing readiness diagnostic sinks', () => {
 
 function controlRuntime(runtime: string) {
   const name = process.platform === 'win32' ? runtime + '.exe' : runtime
-  const candidates = [
-    process.execPath,
-    ...(process.env.PATH ?? '').split(delimiter).map((directory) => join(directory, name)),
-  ]
+  const candidates = [process.execPath].concat(
+    (process.env.PATH ?? '').split(delimiter).map((directory) => join(directory, name)),
+  )
   for (const candidate of candidates) {
     if (!existsSync(candidate)) continue
     const result = spawnSync(
@@ -2010,10 +2009,9 @@ setTimeout(()=>{process.stderr.write(JSON.stringify({state:writer.inspect(),peak
     if (mode === 'overflow') {
       expect(facts.state.dropped).toBe(16)
       expect(facts.state.droppedByKind.request).toBe(16)
-      expect(delivered.map((item) => item.event.requestId)).toEqual([
-        ...Array.from({ length: 64 }, (_, index) => index + 1),
-        81,
-      ])
+      expect(delivered.map((item) => item.event.requestId)).toEqual(
+        Array.from({ length: 64 }, (_, index) => index + 1).concat([81]),
+      )
       expect(capture.inspect().observations).toMatchObject({
         lastReceived: 81,
         gaps: 16,

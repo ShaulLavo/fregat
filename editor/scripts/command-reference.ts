@@ -20,9 +20,9 @@ const text = [
   '',
   '| Id | Title | Category | Changes the document | VS Code |',
   '| --- | --- | --- | --- | --- |',
-  ...rows,
-  '',
-].join('\n')
+]
+  .concat(rows, [''])
+  .join('\n')
 const formatted = await format(target, text, { printWidth: 100 })
 if (formatted.errors.length > 0) {
   console.error(formatted.errors)

@@ -136,7 +136,7 @@ function parseTreeEntries(tree: { readonly tree: readonly unknown[] }): GitHubTr
     entries.push(entry)
   }
 
-  return entries.toSorted((left, right) => left.path.localeCompare(right.path))
+  return entries.sort((left, right) => left.path.localeCompare(right.path))
 }
 
 function parseTreeFileEntry(item: unknown): GitHubTreeFileEntry | null {

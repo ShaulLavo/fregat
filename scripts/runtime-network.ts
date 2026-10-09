@@ -90,11 +90,12 @@ export function allowedOriginsForWebPort(
 
 // The origin guard is exact, so register both loopback spellings and the TUI origin.
 function webOrigins(configuredOrigins: string | undefined, webHost: string, webPort: number) {
-  return unique([
-    ...browserOriginsForWebPort(webHost, webPort),
-    TUI_CLIENT_ORIGIN,
-    ...originsFromEnv(configuredOrigins),
-  ])
+  return unique(
+    browserOriginsForWebPort(webHost, webPort).concat(
+      [TUI_CLIENT_ORIGIN],
+      originsFromEnv(configuredOrigins),
+    ),
+  )
 }
 
 function closePortProbe(server: net.Server, resolve: (available: boolean) => void) {
@@ -105,7 +106,7 @@ function browserOriginsForWebPort(webHost: string, webPort: number) {
   const configured = runtimeUrl(webHost, webPort)
   if (!isLoopbackHost(webHost)) return [configured]
 
-  return [configured, ...LOOPBACK_HOSTS.map((host) => runtimeUrl(host, webPort))]
+  return [configured].concat(LOOPBACK_HOSTS.map((host) => runtimeUrl(host, webPort)))
 }
 
 function isLoopbackHost(host: string) {

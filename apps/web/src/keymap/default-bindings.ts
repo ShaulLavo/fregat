@@ -49,10 +49,12 @@ export function defaultPlatformKeyBindings(
   const shell = shellKeys
     ? terminalShellKeysPack.map((entry) => presetBinding(entry, platform))
     : []
-  const appWidgets = applicationBindings.map(({ firesWhileTyping, ...entry }) => ({
-    ...presetBinding(entry, platform),
-    firesWhileTyping,
-  }))
+  const appWidgets = applicationBindings.map<PlatformKeyBinding>(
+    ({ firesWhileTyping, ...entry }) => ({
+      ...presetBinding(entry, platform),
+      firesWhileTyping,
+    }),
+  )
   const widgets = baseEditorKeymap[platform].map((entry) => presetBinding(entry, platform))
   const readOnly = readonlyDiffPack[platform].map((entry) => presetBinding(entry, platform))
   if (preset === 'vscode') {
@@ -61,7 +63,7 @@ export function defaultPlatformKeyBindings(
       pack[platform].map((entry) => presetBinding(entry, platform)),
     )
     const terminal = terminalDefaultPack[platform].map((entry) => presetBinding(entry, platform))
-    return [...app, ...appWidgets, ...widgets, ...editor, ...terminal, ...readOnly, ...shell]
+    return app.concat(appWidgets, widgets, editor, terminal, readOnly, shell)
   }
   const current = presetRuntimeRows.filter(
     (row) => row[1] === (platform === 'mac' ? 'mac' : 'linux'),
@@ -83,7 +85,7 @@ export function defaultPlatformKeyBindings(
     )
   })
   const fregat = preset === 'ours' ? fregatBindings(platform, bindings) : []
-  return [...appWidgets, ...widgets, ...bindings, ...fregat, ...readOnly, ...shell]
+  return appWidgets.concat(widgets, bindings, fregat, readOnly, shell)
 }
 
 type ApplicationRow = (typeof vscodeApp)[number]

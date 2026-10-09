@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import { gitFixtureEnv } from './src/testing/git-identity.ts'
 
 // Bun-native server: must run under the Bun runtime (`bun --bun vitest`) so
@@ -7,6 +7,7 @@ import { gitFixtureEnv } from './src/testing/git-identity.ts'
 export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
+    exclude: configDefaults.exclude.concat(['**/*.t3code.test.ts']),
     env: gitFixtureEnv,
     // The suite spawns real processes (git, PTYs, LSP servers); cold spawns
     // under parallel load blow Vitest's 5s default. Server project only —

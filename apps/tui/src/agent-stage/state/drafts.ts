@@ -129,7 +129,7 @@ export function createDrafts(storage: FileStorage) {
       const contexts = readInbox(storage, worktreeId)
       if (contexts.length === 0) return
       const draft = read(key)
-      write(key, { ...draft, terminalContexts: [...(draft.terminalContexts ?? []), ...contexts] })
+      write(key, { ...draft, terminalContexts: (draft.terminalContexts ?? []).concat(contexts) })
       storage.removeItem(`agent.inbox.worktree:${worktreeId}`)
     },
     update(key: string, change: Partial<ComposerDraft>) {

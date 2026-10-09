@@ -35,7 +35,7 @@ export function Status({
     !terminal && (!compact || offline) && refresh !== 'unassigned' && `${refresh} refresh`,
     terminal && quit && `${quit} quit`,
     terminal && back !== 'unassigned' && `${back} back`,
-  ].filter(Boolean)
+  ].filter((hint): hint is string => typeof hint === 'string')
   const connection = [
     state.connection.kind === 'live' ? 'Live' : 'Disconnected',
     state.descriptor.label,
@@ -49,7 +49,7 @@ export function Status({
       backgroundColor={theme.background}
     >
       <text fg={theme.mutedForeground}>
-        {compact ? `${connection}\n${hints.join(' · ')}` : [connection, ...hints].join(' · ')}
+        {compact ? `${connection}\n${hints.join(' · ')}` : [connection].concat(hints).join(' · ')}
       </text>
     </box>
   )

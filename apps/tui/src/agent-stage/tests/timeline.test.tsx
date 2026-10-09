@@ -1,13 +1,84 @@
 import assert from 'node:assert/strict'
 import type { MessageId } from '@workspace/contracts'
 import { act } from 'react'
-import { ScrollBoxRenderable } from '@opentui/core'
+import { ScrollBoxRenderable, parseColor, type SyntaxStyle } from '@opentui/core'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import { test, expect } from '../../../test/fixtures'
 import { appendAgentMessage, renderAgentStage } from '../../../test/factories/agent-stage'
 import { runPaletteCommand } from '../../../test/actions'
 import { createTimelineLayout } from '@/agent-stage/state/timeline-layout'
 import { timelineRows } from '@/agent-stage/utils/timeline'
+import { findMarkdown, setAgentTheme } from '../../../test/factories/agent-theme'
+
+test('mounted transcript repaints Markdown while retaining its scroll and focus', async ({
+  server,
+}) => {
+  const app = await renderAgentStage(server, {
+    conversation: true,
+    noColor: false,
+    colorMode: 'truecolor',
+  })
+  const { frame, submission } = app
+  assert(submission)
+  let finalSyntax: SyntaxStyle | null = null
+  try {
+    const text = Array.from({ length: 90 }, (_, index) => `Transcript line ${index}\n\n`).join('')
+    await act(async () => {
+      await appendAgentMessage(server, {
+        sessionId: submission.command.sessionId,
+        turnId: submission.command.turnId,
+        text: `# Transcript heading\n\n${text}`,
+      })
+    })
+    await runPaletteCommand(frame, 'Focus transcript')
+    await act(async () => {
+      frame.mockInput.pressKey('\x1b[5~')
+      await frame.renderOnce()
+    })
+    const scroll = frame.renderer.root.findDescendantById('agent-timeline')
+    assert(scroll instanceof ScrollBoxRenderable)
+    const markdown = findMarkdown(scroll, 'Transcript heading')
+    assert(markdown)
+    const originalSyntax = markdown.syntaxStyle
+    const originalStyleCount = originalSyntax.getStyleCount()
+    const position = scroll.scrollTop
+    expect(position + scroll.viewport.height).toBeLessThan(scroll.scrollHeight)
+    for (const [appearance, palette] of [
+      ['light', 'graphite'],
+      ['light', 'sage'],
+    ] as const) {
+      const previousSyntax = markdown.syntaxStyle
+      const theme = await setAgentTheme(app, appearance, palette)
+      expect(frame.renderer.root.findDescendantById('agent-timeline')).toBe(scroll)
+      expect(markdown.isDestroyed).toBe(false)
+      expect(frame.renderer.currentFocusedRenderable).toBe(scroll)
+      expect(scroll.scrollTop).toBe(position)
+      finalSyntax = markdown.syntaxStyle
+      expect(markdown.syntaxStyle).toBe(previousSyntax)
+      expect(markdown.syntaxStyle.getStyleCount()).toBe(originalStyleCount)
+      expect(markdown.syntaxStyle.getStyle('default')?.fg?.toInts()).toEqual(
+        parseColor(theme.foreground).toInts(),
+      )
+      expect(markdown.syntaxStyle.getStyle('markup.heading')?.fg?.toInts()).toEqual(
+        parseColor(theme.primary).toInts(),
+      )
+      await expect
+        .poll(async () => {
+          await frame.renderOnce()
+          return frame
+            .captureSpans()
+            .lines.flatMap((line) => line.spans)
+            .find((span) => span.text.includes('Transcript line'))
+            ?.fg.toInts()
+        })
+        .toEqual(parseColor(theme.foreground).toInts())
+      expect(scroll.scrollTop).toBe(position)
+    }
+  } finally {
+    await app.cleanup()
+  }
+  expect(() => finalSyntax?.getStyleCount()).toThrow('destroyed')
+})
 
 test('timeline windows traverse mixed-height messages in both directions', async ({ server }) => {
   const app = await renderAgentStage(server, { conversation: true, height: 30 })

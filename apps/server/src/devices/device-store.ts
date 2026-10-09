@@ -36,7 +36,7 @@ export class DeviceStore {
   }
 
   add(device: DeviceRecord) {
-    this.write([...this.list(), device])
+    this.write(this.list().concat([device]))
   }
 
   remove(id: string) {

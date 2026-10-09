@@ -8,7 +8,7 @@ const cleanups: Array<() => void> = []
 afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()))
 
 function popup(label: string) {
-  return [...document.querySelectorAll<HTMLElement>('[data-slot="tooltip-content"]')].find(
+  return Array.from(document.querySelectorAll<HTMLElement>('[data-slot="tooltip-content"]')).find(
     (element) => element.textContent?.startsWith(label),
   )
 }

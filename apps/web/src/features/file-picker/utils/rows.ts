@@ -62,9 +62,9 @@ export function fileListRows(
   }))
   if (!recents || leading.length === 0) return folderRows
 
-  return [
-    { kind: 'section', key: 'section:recent', label: 'Recent' },
-    ...leading.map((entry, index): FileListRow => ({
+  const rows: FileListRow[] = [{ kind: 'section', key: 'section:recent', label: 'Recent' }]
+  return rows.concat(
+    leading.map((entry, index): FileListRow => ({
       kind: 'entry',
       key: `recent:${entry.path}`,
       entry,
@@ -72,13 +72,15 @@ export function fileListRows(
       showPath: true,
       recent: true,
     })),
-    {
-      kind: 'section',
-      key: 'section:folder',
-      label: entries.length > 0 ? `In ${recents.folder}` : `Nothing in ${recents.folder}`,
-    },
-    ...folderRows,
-  ]
+    [
+      {
+        kind: 'section',
+        key: 'section:folder',
+        label: entries.length > 0 ? `In ${recents.folder}` : `Nothing in ${recents.folder}`,
+      },
+    ],
+    folderRows,
+  )
 }
 
 function searchRows(entries: readonly FsEntry[]): FileListRow[] {
@@ -86,16 +88,18 @@ function searchRows(entries: readonly FsEntry[]): FileListRow[] {
   return searchResultSections(entries).flatMap((section) => {
     if (section.entries.length === 0) return []
 
-    return [
+    const rows: FileListRow[] = [
       {
-        kind: 'section' as const,
+        kind: 'section',
         key: `section:${section.scope}`,
         label: section.label,
       },
-      ...section.entries.map((entry) => {
+    ]
+    return rows.concat(
+      section.entries.map((entry): FileListRow => {
         position += 1
         return {
-          kind: 'entry' as const,
+          kind: 'entry',
           key: `${section.scope}:${entry.path}`,
           entry,
           position,
@@ -103,7 +107,7 @@ function searchRows(entries: readonly FsEntry[]): FileListRow[] {
           recent: false,
         }
       }),
-    ]
+    )
   })
 }
 

@@ -302,7 +302,7 @@ const normalizeInlineRanges = (
     .filter((range) => range !== null)
     .filter((range) => range.startPoint.row === range.endPoint.row)
     .filter((range) => !range.text.includes('\n'))
-    .toSorted((left, right) => {
+    .sort((left, right) => {
       return (
         left.startOffset - right.startOffset ||
         insertionOrder(left) - insertionOrder(right) ||
@@ -435,7 +435,7 @@ const invalidateInlineMapEdit = (
     .filter((range) => editTouchesInlineRange(edit, range))
     .map((range) => touchedRangeInvalidation(range, nextMap))
 
-  return mergeInlineInvalidations([...touched, externalEditInvalidation(map, edit)])
+  return mergeInlineInvalidations(touched.concat([externalEditInvalidation(map, edit)]))
 }
 
 /**
@@ -544,9 +544,9 @@ const spanRevealedBy = (
 }
 
 const mergeInlineInvalidations = (
-  invalidations: readonly InlineMapInvalidatedRange[],
+  invalidations: InlineMapInvalidatedRange[],
 ): readonly InlineMapInvalidatedRange[] => {
-  const sorted = invalidations.toSorted((left, right) => left.start.row - right.start.row)
+  const sorted = invalidations.sort((left, right) => left.start.row - right.start.row)
   const merged: InlineMapInvalidatedRange[] = []
 
   for (const invalidation of sorted) {

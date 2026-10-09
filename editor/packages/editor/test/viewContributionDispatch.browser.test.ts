@@ -41,7 +41,7 @@ async function mount(plugins: readonly EditorPlugin[], counters: Counters) {
   const host = document.createElement('div')
   host.style.cssText = 'width:1000px;height:700px;display:flex'
   document.body.append(host)
-  const editor = new Editor(host, { defaultText: fixture(20_000), plugins: [...plugins] })
+  const editor = new Editor(host, { defaultText: fixture(20_000), plugins })
   restores.push(() => {
     editor.dispose()
     host.remove()
@@ -101,7 +101,7 @@ it('re-runs only the contribution that asks for a view update', async () => {
       }),
   }
   const others = Array.from({ length: 100 }, () => piece(counters, ['layout', 'content']))
-  await mount([asking, ...others], counters)
+  await mount([asking].concat(others), counters)
   asked = 0
 
   if (!requester) throw new Error('the asking contribution was not created')

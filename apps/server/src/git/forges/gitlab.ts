@@ -121,21 +121,22 @@ export const gitlab: ForgeProvider = {
     return perBranch(branches, (branch) => newestMergeRequest(context, branch, state))
   },
   async createPullRequest(context, input) {
-    const result = await glab(context, [
-      'mr',
-      'create',
-      '--repo',
-      context.remoteUrl,
-      '--source-branch',
-      input.branch,
-      '--title',
-      input.title,
-      '--description',
-      input.body,
-      '--yes',
-      ...(input.base ? ['--target-branch', input.base] : []),
-      ...(input.draft ? ['--draft'] : []),
-    ])
+    const result = await glab(
+      context,
+      [
+        'mr',
+        'create',
+        '--repo',
+        context.remoteUrl,
+        '--source-branch',
+        input.branch,
+        '--title',
+        input.title,
+        '--description',
+        input.body,
+        '--yes',
+      ].concat(input.base ? ['--target-branch', input.base] : [], input.draft ? ['--draft'] : []),
+    )
     requireCreated(context, input.branch, result)
   },
   async getPullRequest(context, number) {
@@ -179,19 +180,21 @@ export const gitlab: ForgeProvider = {
     const namespaceId = namespace ? await namespaceIdOf(context, namespace) : null
     const result = requireRepositoryCreated(
       context,
-      await glab(context, [
-        'api',
-        '--method',
-        'POST',
-        'projects',
-        '--raw-field',
-        `path=${name}`,
-        '--raw-field',
-        `name=${name}`,
-        '--raw-field',
-        `visibility=${visibility}`,
-        ...(namespaceId === null ? [] : ['--raw-field', `namespace_id=${namespaceId}`]),
-      ]),
+      await glab(
+        context,
+        [
+          'api',
+          '--method',
+          'POST',
+          'projects',
+          '--raw-field',
+          `path=${name}`,
+          '--raw-field',
+          `name=${name}`,
+          '--raw-field',
+          `visibility=${visibility}`,
+        ].concat(namespaceId === null ? [] : ['--raw-field', `namespace_id=${namespaceId}`]),
+      ),
     )
     const project = parseForgeJson(context, projectSchema, result.stdout, 'create-project')
     return {
@@ -205,19 +208,13 @@ export const gitlab: ForgeProvider = {
 async function newestMergeRequest(context: ForgeContext, branch: string, state: 'open' | 'all') {
   const result = requireSuccess(
     context,
-    await glab(context, [
-      'mr',
-      'list',
-      '--repo',
-      context.remoteUrl,
-      '--source-branch',
-      branch,
-      ...(state === 'all' ? ['--all'] : []),
-      '--per-page',
-      '1',
-      '--output',
-      'json',
-    ]),
+    await glab(
+      context,
+      ['mr', 'list', '--repo', context.remoteUrl, '--source-branch', branch].concat(
+        state === 'all' ? ['--all'] : [],
+        ['--per-page', '1', '--output', 'json'],
+      ),
+    ),
     'mr-list',
   )
   const [request] = parseForgeJson(context, v.array(mergeRequestSchema), result.stdout, 'mr-list')
@@ -235,7 +232,7 @@ async function namespaceIdOf(context: ForgeContext, namespace: string) {
 function glab(context: ForgeContext, args: readonly string[], input?: string) {
   return forgeCommand(
     context,
-    ['glab', ...args, ...(args[0] === 'api' ? ['--hostname', context.forge.host] : [])],
+    ['glab'].concat(args, args[0] === 'api' ? ['--hostname', context.forge.host] : []),
     input === undefined ? {} : { input },
   )
 }

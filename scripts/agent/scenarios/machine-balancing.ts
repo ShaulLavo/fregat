@@ -43,7 +43,7 @@ export const machineBalancing: Scenario = {
         drafts: Object.entries(localStorage).filter(([key]) =>
           key.endsWith('platform.chat-input-drafts.v1'),
         ),
-        capacity: [...(registry.__fregatQueryClients ?? [])].map(([origin, client]) => ({
+        capacity: Array.from(registry.__fregatQueryClients ?? [], ([origin, client]) => ({
           origin,
           queries: client
             .getQueryCache()

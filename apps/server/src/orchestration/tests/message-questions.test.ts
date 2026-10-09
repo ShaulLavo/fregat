@@ -17,27 +17,29 @@ afterEach(() => fixtures.splice(0).forEach((fixture) => fixture.close()))
 function setup(responseMode = 'message') {
   const fixture = createProjectionFixture()
   fixtures.push(fixture)
-  const model = applyIncrementally(fixture, [
-    ...sessionBootstrapEvents(),
-    activityAppendedEvent({
-      id: 'question-event',
-      kind: 'user-input.requested',
-      payload: {
-        requestId: 'codex-async:session:question',
-        responseMode,
-        questions: [
-          {
-            id: '0',
-            prompt: 'Choose a language?',
-            answerKind: 'text',
-            options: [],
-            allowOther: true,
-            secret: false,
-          },
-        ],
-      },
-    }),
-  ])
+  const model = applyIncrementally(
+    fixture,
+    sessionBootstrapEvents().concat([
+      activityAppendedEvent({
+        id: 'question-event',
+        kind: 'user-input.requested',
+        payload: {
+          requestId: 'codex-async:session:question',
+          responseMode,
+          questions: [
+            {
+              id: '0',
+              prompt: 'Choose a language?',
+              answerKind: 'text',
+              options: [],
+              allowOther: true,
+              secret: false,
+            },
+          ],
+        },
+      }),
+    ]),
+  )
   return { fixture, model }
 }
 function command(type: string, answers?: unknown) {

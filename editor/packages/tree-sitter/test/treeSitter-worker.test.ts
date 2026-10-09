@@ -176,7 +176,7 @@ describe('tree-sitter worker internals', () => {
       const children = [node('(', 1), node('identifier', 2, 3), node(')', 4)]
       const root = Object.assign(node('program', 0, 100), { children })
       let missingReads = 0
-      for (const current of [root, ...children]) {
+      for (const current of [root].concat(children)) {
         Object.defineProperty(current, 'isMissing', {
           get: () => {
             missingReads++

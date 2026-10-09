@@ -87,7 +87,11 @@ describe('editor-open benchmark control', () => {
     workspaceStore.getState().setWorkbenchPanels({
       ...panels,
       editorGroups: groupTree(
-        groupLeaf('benchmark', [...allEditorTabs(panels.editorGroups), unrelated], unrelated.id),
+        groupLeaf(
+          'benchmark',
+          allEditorTabs(panels.editorGroups).concat([unrelated]),
+          unrelated.id,
+        ),
         'benchmark',
       ),
     })

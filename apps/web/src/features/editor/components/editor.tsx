@@ -289,17 +289,14 @@ export function Editor({
   const textMenuRequest = useEditorUiState((state) =>
     state.textMenuRequest?.tabId === tabId ? state.textMenuRequest.count : null,
   )
-  const plugins = [
-    undoBarrierPlugin,
-    ...criticalEditorCorePlugins,
-    unicodeHighlights.plugin,
-    ...(analysisAllowed && spellcheckPlugin ? [spellcheckPlugin] : []),
-    diagnosticPeek.plugin,
-    languageServer,
-    decodePlugin,
-    scrollPersistencePlugin,
-    ...additionalPlugins,
-  ]
+  const pluginPrefix: readonly EditorPlugin[] = [undoBarrierPlugin]
+  const plugins = pluginPrefix.concat(
+    criticalEditorCorePlugins,
+    [unicodeHighlights.plugin],
+    analysisAllowed && spellcheckPlugin ? [spellcheckPlugin] : [],
+    [diagnosticPeek.plugin, languageServer, decodePlugin, scrollPersistencePlugin],
+    additionalPlugins,
+  )
   const document = liveDocument
     ? {
         documentId: liveDocument.key,

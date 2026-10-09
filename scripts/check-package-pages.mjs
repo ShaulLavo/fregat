@@ -65,7 +65,7 @@ for (const directory of packageDirectories) {
     1,
     `${manifest.name}: one standalone typed example`,
   )
-  const destinations = [...readme.matchAll(/\]\(([^)]+)\)/g)].map((match) => match[1])
+  const destinations = Array.from(readme.matchAll(/\]\(([^)]+)\)/g), (match) => match[1])
   for (const destination of destinations) {
     assert(destination.startsWith('https://'), `${manifest.name}: use absolute HTTPS links`)
     links.add(destination)

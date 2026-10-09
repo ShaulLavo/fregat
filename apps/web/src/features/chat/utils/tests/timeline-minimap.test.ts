@@ -62,10 +62,11 @@ test('one mark per turn, at the user message that started it', () => {
 test('a row the virtualizer has not placed yet gets no mark', () => {
   // Measurements arrive per row; a turn with no geometry has nowhere to sit, and
   // guessing zero would stack it on the transcript's first mark.
+  const measuredRows: readonly (TimelineRowMetrics | undefined)[] = rows(3)
   const marks = timelineMinimapMarks({
     contentHeight: 900,
     items: transcript(3),
-    rows: [...rows(3), undefined, undefined, undefined, ...rows(3)],
+    rows: measuredRows.concat([undefined, undefined, undefined], rows(3)),
   })
 
   expect(marks.map((mark) => mark.id)).toEqual(['u0', 'u6'])

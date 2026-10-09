@@ -163,16 +163,22 @@ export function recordRetentionLayoutFrames(
       at: performance.now(),
       origin: app.application.getSnapshot().origin,
       views: tabIds.map((id) => captureRetentionLayoutView(app, path, id)),
-      dom: [...document.querySelectorAll<HTMLElement>('[data-editor-group-id]')].map((group) => ({
-        groupId: group.dataset.editorGroupId,
-        headerPath:
-          group.querySelector<HTMLElement>('[data-editor-tab-id][aria-selected="true"]')?.dataset
-            .editorTabPath ?? null,
-        rows: [...group.querySelectorAll<HTMLElement>('.editor-virtualized-row')].map((row) => ({
-          text: row.textContent,
-          html: row.outerHTML,
-        })),
-      })),
+      dom: Array.from(
+        document.querySelectorAll<HTMLElement>('[data-editor-group-id]'),
+        (group) => ({
+          groupId: group.dataset.editorGroupId,
+          headerPath:
+            group.querySelector<HTMLElement>('[data-editor-tab-id][aria-selected="true"]')?.dataset
+              .editorTabPath ?? null,
+          rows: Array.from(
+            group.querySelectorAll<HTMLElement>('.editor-virtualized-row'),
+            (row) => ({
+              text: row.textContent,
+              html: row.outerHTML,
+            }),
+          ),
+        }),
+      ),
     })
     requestAnimationFrame(tick)
   }

@@ -63,14 +63,15 @@ export function attributeOwners(
       row.firstLoadModules += 1
     }
   }
-  return [...rows.values()]
-    .map((row) => ({ ...row, firstLoadGzip: Math.round(row.firstLoadGzip) }))
-    .sort(
-      (a, b) =>
-        b.firstLoadRendered - a.firstLoadRendered ||
-        b.lazyRendered - a.lazyRendered ||
-        a.owner.localeCompare(b.owner),
-    )
+  return Array.from(rows.values(), (row) => ({
+    ...row,
+    firstLoadGzip: Math.round(row.firstLoadGzip),
+  })).sort(
+    (a, b) =>
+      b.firstLoadRendered - a.firstLoadRendered ||
+      b.lazyRendered - a.lazyRendered ||
+      a.owner.localeCompare(b.owner),
+  )
 }
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] }

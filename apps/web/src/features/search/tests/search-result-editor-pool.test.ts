@@ -23,7 +23,7 @@ describe('search result editor slots', () => {
   it('skips files whose line window is empty', () => {
     const far = file(100)
 
-    expect(sync([], [...files(0, 2), far]).map((slot) => slot.item.row.file.id)).toEqual([
+    expect(sync([], files(0, 2).concat([far])).map((slot) => slot.item.row.file.id)).toEqual([
       'file:0',
       'file:1',
     ])

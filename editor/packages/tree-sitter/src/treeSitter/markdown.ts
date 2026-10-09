@@ -17,7 +17,7 @@ export const initializeMarkdown = (): Promise<void> => {
 }
 
 export function editMarkdown(document: MarkdownDocument, edits: readonly TextEdit[]): void {
-  for (const edit of [...edits].sort((a, b) => b.from - a.from)) {
+  for (const edit of edits.toSorted((a, b) => b.from - a.from)) {
     document.edit(edit.from, edit.to, edit.text)
   }
 }

@@ -19,7 +19,7 @@ function install(present: readonly string[]) {
   const log = path.join(bin, 'sudo.log')
   for (const tool of present) writeFileSync(path.join(bin, tool), '#!/bin/sh\n')
   writeFileSync(path.join(bin, 'sudo'), `#!/bin/sh\necho "$@" >> ${log}\n`)
-  for (const tool of [...present, 'sudo']) chmodSync(path.join(bin, tool), 0o755)
+  for (const tool of present.concat(['sudo'])) chmodSync(path.join(bin, tool), 0o755)
   const result = spawnSync('/bin/bash', ['-c', prerequisitesScript()], { env: { PATH: bin } })
   expect(result.status).toBe(0)
   return existsSync(log) ? readFileSync(log, 'utf8') : ''

@@ -444,7 +444,8 @@ async function expectNoSidewaysScroll(page: Page, root: string, strips = '') {
       const scope = document.querySelector(selector!)
       if (!scope) return ['missing root']
       const rootBox = scope.getBoundingClientRect()
-      return [document.documentElement, document.body, scope, ...scope.querySelectorAll('*')]
+      return [document.documentElement, document.body, scope]
+        .concat(Array.from(scope.querySelectorAll('*')))
         .filter((element) => {
           if (
             element === scope ||

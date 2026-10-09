@@ -223,7 +223,7 @@ export async function removeMachineService(
     else
       await required(
         host,
-        ['systemctl', '--user', 'disable', '--now', ...owned.present.map(({ unit }) => unit)],
+        ['systemctl', '--user', 'disable', '--now'].concat(owned.present.map(({ unit }) => unit)),
         'disable',
       )
     for (const { file } of owned.present) host.removeFile(file)

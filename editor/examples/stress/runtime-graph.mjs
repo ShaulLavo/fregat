@@ -80,7 +80,7 @@ export async function verifyRuntimeGraph({
     const { sourceRoot = '', sources: mapped = [] } = JSON.parse(await readFile(map, 'utf8'))
     for (const source of mapped)
       sources.add(
-        await existingSource(resolve(dirname(map), sourceRoot, source), [frozen, ...roots]),
+        await existingSource(resolve(dirname(map), sourceRoot, source), [frozen].concat(roots)),
       )
   }
   for (const id of sources) {
@@ -106,7 +106,7 @@ export async function verifyRuntimeGraph({
   if (emitted.length) {
     const sizes = new Map()
     for (const path of emitted) sizes.set((await stat(path)).size, [])
-    for (const root of [frozen, ...roots]) {
+    for (const root of [frozen].concat(roots)) {
       for (const path of await files(root)) {
         const real = await realpath(path)
         if (!allowed(real)) continue
@@ -125,7 +125,8 @@ export async function verifyRuntimeGraph({
     }
   }
   const receiptPackagesUsed = await Promise.all(
-    [...usedRoots].map(
+    Array.from(
+      usedRoots,
       async (root) => JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')).name,
     ),
   )

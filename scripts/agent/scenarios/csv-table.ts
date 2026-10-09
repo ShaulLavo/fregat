@@ -313,7 +313,8 @@ export const csvKeyboardNavigation: Scenario = {
       await csvSelectors.mode(page, 'Table').click()
       await csvSelectors.cell(page, 1, 1).waitFor()
       const scrollOwners = await csvSelectors.table(page).evaluate((table) =>
-        [table, ...Array.from(table.querySelectorAll<HTMLElement>('*'))]
+        [table]
+          .concat(Array.from(table.querySelectorAll<HTMLElement>('*')))
           .filter((element) => {
             const style = getComputedStyle(element)
             return (

@@ -253,7 +253,7 @@ describe.skipIf(typeof Worker === 'undefined')('Shiki worker highlighter', () =>
       { type: 'edit', edits: [] },
     ])
     for (const payload of payloads) {
-      expect(Object.keys(payload).toSorted()).toEqual(
+      expect(Object.keys(payload).sort()).toEqual(
         [
           'documentId',
           'edits',
@@ -263,7 +263,7 @@ describe.skipIf(typeof Worker === 'undefined')('Shiki worker highlighter', () =>
           'type',
           'source',
           'previousPoint',
-        ].toSorted(),
+        ].sort(),
       )
     }
     expect(caughtUp.tokens.toTokens()).toEqual(await fullTokens(changedText))

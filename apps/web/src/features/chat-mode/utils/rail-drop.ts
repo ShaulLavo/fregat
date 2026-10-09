@@ -91,7 +91,7 @@ export function sessionDropPatch(
     movedKey: active.key,
     source: active.placement,
     destination,
-    entries: [...entries.values()],
+    entries: Array.from(entries.values()),
     commands,
   }
 }

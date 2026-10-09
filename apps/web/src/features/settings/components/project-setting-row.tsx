@@ -29,8 +29,7 @@ export function ProjectSettingRow({
   const current = row.current(values, projectId)
   const choices = [
     { value: DEFAULT_CHOICE, label: `Default · ${row.defaultLabel(values)}` },
-    ...row.choices(values),
-  ]
+  ].concat(row.choices(values))
   const shown = choices.find((choice) => choice.value === current)?.label ?? current
 
   return (

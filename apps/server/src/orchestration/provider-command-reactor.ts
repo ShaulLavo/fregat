@@ -930,7 +930,7 @@ export class ProviderCommandReactor {
 
     const { worktree } = resolveSessionOwner(model, session.id)
 
-    const checkpoints = Object.values(session.checkpointByTurnId).toSorted(
+    const checkpoints = Object.values(session.checkpointByTurnId).sort(
       (left, right) => left.checkpointTurnCount - right.checkpointTurnCount,
     )
     const currentTurnCount = maxCheckpointTurnCount(checkpoints)

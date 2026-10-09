@@ -58,8 +58,7 @@ const collectGarbage: () => void = (() => {
 })()
 
 function generatedColorRules(): string {
-  return [...document.head.querySelectorAll('style')]
-    .map((element) => element.textContent ?? '')
+  return Array.from(document.head.querySelectorAll('style'), (element) => element.textContent ?? '')
     .filter((text) => text.includes('--editor-'))
     .join('\n')
 }

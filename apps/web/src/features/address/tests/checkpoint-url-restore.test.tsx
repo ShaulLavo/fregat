@@ -19,11 +19,9 @@ for (const cached of [false, true]) {
         tabPaths: cached ? ['repo/a.ts', `history:${encodeURIComponent('repo/b.ts')}`] : [],
       })
       const original = allEditorTabs(prior.editorGroups)
-      const tokens = [
-        'f/a.ts',
-        'h/b.ts',
-        ...(legacy ? ['k/f0000000-0000-4000-8000-000000000001/0..1/a.ts'] : []),
-      ]
+      const tokens = ['f/a.ts', 'h/b.ts'].concat(
+        legacy ? ['k/f0000000-0000-4000-8000-000000000001/0..1/a.ts'] : [],
+      )
       const { harness, navigation } = await renderAddressHarness({
         initialEntries: [`${workspace.base}/f/a.ts?tabs=${tokens.join('~')}`],
       })

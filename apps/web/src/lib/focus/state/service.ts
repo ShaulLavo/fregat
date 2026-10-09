@@ -328,7 +328,7 @@ export class FocusService {
 
   resolveTarget(options: ResolveFocusTargetOptions): ResolvedFocusTarget | null {
     const registration = resolveFocusTarget({
-      targets: [...this.registrations.values()],
+      targets: Array.from(this.registrations.values()),
       compatible: (target) => options.compatible(snapshotFor(target)),
       event: options.path
         ? this.resolvePath(pathFromSource(options.path), options.compatible)
@@ -352,7 +352,7 @@ export class FocusService {
     const element = sourceElement(source)
     if (!element) return null
 
-    const stage = deepestContaining([...this.registrations.values()], element)
+    const stage = deepestContaining(Array.from(this.registrations.values()), element)
     return stage.status === 'resolved' ? stage.registration.token : null
   }
 
@@ -393,7 +393,7 @@ export class FocusService {
     const activeElement = registration.element.ownerDocument.activeElement
     if (!activeElement) return
 
-    const stage = deepestContaining([...this.registrations.values()], activeElement)
+    const stage = deepestContaining(Array.from(this.registrations.values()), activeElement)
     if (stage.status !== 'resolved') return
     if (stage.registration.token !== registration.token) return
 
@@ -438,7 +438,7 @@ export class FocusService {
     const activeElement = ownerDocument.activeElement
     if (!activeElement) return
 
-    const stage = deepestContaining([...this.registrations.values()], activeElement)
+    const stage = deepestContaining(Array.from(this.registrations.values()), activeElement)
     if (stage.status === 'resolved') {
       this.currentOwner = snapshotFor(stage.registration)
       if (!stage.registration.capabilities.overlay) {
@@ -454,7 +454,7 @@ export class FocusService {
     compatible: (target: FocusTargetSnapshot) => boolean,
     exact: (target: FocusTargetSnapshot) => boolean = () => true,
   ): ResolutionStage {
-    const matches = [...this.registrations.values()].filter((registration) => {
+    const matches = Array.from(this.registrations.values()).filter((registration) => {
       const target = snapshotFor(registration)
       return compatible(target) && exact(target)
     })
@@ -469,7 +469,7 @@ export class FocusService {
     compatible: (target: FocusTargetSnapshot) => boolean,
   ): ResolutionStage {
     for (const entry of path) {
-      const matches = [...this.registrations.values()].filter((registration) => {
+      const matches = Array.from(this.registrations.values()).filter((registration) => {
         if (registration.element !== entry) return false
 
         return compatible(snapshotFor(registration))
@@ -483,7 +483,7 @@ export class FocusService {
     )
     if (!firstElement) return { status: 'none' }
 
-    const registrations = [...this.registrations.values()].filter((registration) =>
+    const registrations = Array.from(this.registrations.values()).filter((registration) =>
       compatible(snapshotFor(registration)),
     )
     return deepestContaining(registrations, firstElement)

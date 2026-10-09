@@ -78,8 +78,10 @@ function identityParts(document: DocumentRef): readonly unknown[] {
       return [document.kind, document.target]
     case 'git-ref':
       return [document.kind, document.source.path, document.source.ref]
-    case 'git-diff':
-      return [document.kind, ...comparisonIdentity(document.source)]
+    case 'git-diff': {
+      const identity: unknown[] = [document.kind]
+      return identity.concat(comparisonIdentity(document.source))
+    }
     case 'compare-saved':
     case 'history':
       return [document.kind, document.file.path]
@@ -97,19 +99,18 @@ function identityParts(document: DocumentRef): readonly unknown[] {
 function comparisonIdentity(source: GitComparison): readonly unknown[] {
   if (source.kind === 'snapshot') {
     const target = source.target
-    const subject = [source.kind, target.rootPath, target.path, target.kind]
-    if (target.kind === 'moving') return [...subject, target.changeSource]
-    if (target.kind === 'historical') return [...subject, target.origin.id]
+    const subject: readonly unknown[] = [source.kind, target.rootPath, target.path, target.kind]
+    if (target.kind === 'moving') return subject.concat([target.changeSource])
+    if (target.kind === 'historical') return subject.concat([target.origin.id])
     const revision = target.revision
-    return [
-      ...subject,
+    return subject.concat([
       revision.old.kind,
       revision.old.kind === 'blob' ? revision.old.objectId : null,
       revision.new.kind,
       revision.new.kind === 'blob' ? revision.new.objectId : null,
       revision.oldPath,
       revision.status,
-    ]
+    ])
   }
   const revisions = [
     source.oldObjectId ?? null,
@@ -117,20 +118,24 @@ function comparisonIdentity(source: GitComparison): readonly unknown[] {
     source.oldPath ?? null,
     source.status ?? null,
   ]
-  const range = [
+  const range: unknown[] = [
     source.owner,
     source.ignoreWhitespace,
     source.sessionId,
     source.fromTurnCount,
     source.toTurnCount,
-    ...revisions,
   ]
+  range.push(...revisions)
   switch (source.kind) {
-    case 'checkpoint-file':
-      return [source.kind, source.file.path, ...range]
+    case 'checkpoint-file': {
+      const identity: unknown[] = [source.kind, source.file.path]
+      return identity.concat(range)
+    }
     case 'checkpoint-session':
-    case 'checkpoint-turn':
-      return [source.kind, ...range]
+    case 'checkpoint-turn': {
+      const identity: unknown[] = [source.kind]
+      return identity.concat(range)
+    }
     default: {
       const exhaustive: never = source
       return exhaustive
