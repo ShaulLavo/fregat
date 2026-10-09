@@ -406,6 +406,7 @@ export type Scenario = {
 }
 
 import { editorDiagnosticsLifecycle } from './editor-diagnostics-lifecycle'
+import { editorRecordingStartup } from './editor-recording-startup'
 import { editorFastScroll } from './editor-fast-scroll'
 import { editorLargePaste } from './editor-large-paste'
 import { editorFind } from './editor-find'
@@ -818,6 +819,7 @@ export const scenarios: readonly Scenario[] = [
   editorLargePaste,
   editorFastScroll,
   editorDiagnosticsLifecycle,
+  editorRecordingStartup,
   editorFind,
   problemsPanelRows,
   problemsPanelWorkspace,

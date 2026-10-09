@@ -1,3 +1,4 @@
+import { isTextareaElement } from '../dom'
 import { scheduleFrame, type ScheduledFrame } from './scheduleFrame'
 import type {
   DocumentSession,
@@ -285,6 +286,8 @@ const COLUMN_SELECTION_COMMANDS = new Set<EditorCommandId>([
 ])
 
 export class InputSelectionController {
+  private readonly nodeConstructor: typeof Node | undefined
+  private readonly elementConstructor: typeof Element | undefined
   private readonly autoClose = new AutoCloseStore()
   private readonly snippet = new SnippetSession()
   private readonly ghostText = new GhostTextSession()
@@ -311,7 +314,10 @@ export class InputSelectionController {
     readonly spanEnd: number
   } | null = null
 
-  constructor(private readonly options: InputSelectionControllerOptions) {}
+  constructor(private readonly options: InputSelectionControllerOptions) {
+    this.nodeConstructor = options.el.ownerDocument.defaultView?.Node
+    this.elementConstructor = options.el.ownerDocument.defaultView?.Element
+  }
 
   private traceInput<TEvent, TResult>(
     name: string,
@@ -1614,7 +1620,7 @@ export class InputSelectionController {
     }
 
     const range = this.options.view.createRange(start, end, { scrollIntoView: false })
-    const domSelection = window.getSelection()
+    const domSelection = this.options.el.ownerDocument.getSelection()
     domSelection?.removeAllRanges()
     if (range) domSelection?.addRange(range)
     this.syncSessionSelectionHighlight()
@@ -1785,7 +1791,7 @@ export class InputSelectionController {
       writeAccessibleWindow(input, content)
       return
     }
-    if (!(input instanceof HTMLTextAreaElement)) return
+    if (!isTextareaElement(input)) return
 
     if (input.value !== content.value) input.value = content.value
     input.setSelectionRange(content.selectionStart, content.selectionEnd, content.direction)
@@ -1930,7 +1936,7 @@ export class InputSelectionController {
     if (this.inputState.compositionActive) return
 
     const input = this.options.view.inputElement
-    if (!(input instanceof HTMLTextAreaElement)) return
+    if (!isTextareaElement(input)) return
     const current = readHiddenInputState(input)
     const deduced = deduceHiddenInputEdit(this.hiddenInputContent, current)
     // Nothing is written back for either of these, so the element keeps whatever the browser put
@@ -1949,10 +1955,9 @@ export class InputSelectionController {
       // A textarea selects what the composition is about to replace, which is how a correction
       // reaching back over a word says so: the event itself carries only the new text.
       const input = this.options.view.inputElement
-      this.compositionRange =
-        input instanceof HTMLTextAreaElement
-          ? { start: input.selectionStart, end: input.selectionEnd }
-          : null
+      this.compositionRange = isTextareaElement(input)
+        ? { start: input.selectionStart, end: input.selectionEnd }
+        : null
     },
   )
 
@@ -2880,7 +2885,12 @@ export class InputSelectionController {
     if (!this.session) return
     // Crossing between the rows inside the editor leaves each of them in turn, and the drag has not
     // gone anywhere.
-    if (event.relatedTarget instanceof Node && this.options.el.contains(event.relatedTarget)) return
+    if (
+      this.nodeConstructor &&
+      event.relatedTarget instanceof this.nodeConstructor &&
+      this.options.el.contains(event.relatedTarget)
+    )
+      return
 
     this.syncSessionSelectionHighlight()
   }
@@ -3132,7 +3142,8 @@ export class InputSelectionController {
     if (!this.canTypeText()) return
     if (event.target === this.options.view.inputElement) return
     if (
-      event.target instanceof Element &&
+      this.elementConstructor &&
+      event.target instanceof this.elementConstructor &&
       event.target.closest('input, textarea, button, a, [contenteditable]')
     )
       return
@@ -3556,7 +3567,7 @@ export class InputSelectionController {
   }
 
   private readDomSelectionOffsets(): { anchorOffset: number; headOffset: number } | null {
-    const selection = window.getSelection()
+    const selection = this.options.el.ownerDocument.getSelection()
     if (!selection?.anchorNode || !selection.focusNode) return null
 
     const anchorOffset = this.domBoundaryToTextOffset(selection.anchorNode, selection.anchorOffset)
