@@ -34,6 +34,9 @@ jobs:
     outputs:
       code: ${{ steps.plan.outputs.code }}
       shared: ${{ steps.plan.outputs.shared }}
+      tooling: ${{ steps.plan.outputs.tooling }}
+      tree: ${{ steps.plan.outputs.tree }}
+      sites: ${{ steps.plan.outputs.sites }}
       exhaustive: ${{ steps.plan.outputs.exhaustive }}
       packages: ${{ steps.plan.outputs.packages }}
       web: ${{ steps.plan.outputs.web }}
@@ -107,7 +110,7 @@ jobs:
   lint:
     name: Format, lint, census
     needs: changes
-    if: ${{ needs.changes.outputs.shared == 'true' }}
+    if: ${{ needs.changes.outputs.tooling == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -163,7 +166,7 @@ jobs:
   typecheck:
     name: Typecheck, generated, packages
     needs: changes
-    if: ${{ needs.changes.outputs.shared == 'true' }}
+    if: ${{ needs.changes.outputs.shared == 'true' || needs.changes.outputs.tooling == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -174,7 +177,7 @@ jobs:
         uses: ./.github/actions/setup
         with:
           # Script tests import runtime code across the repository.
-          build-packages: all
+          build-packages: ${{ needs.changes.outputs.tooling == 'true' && 'all' || needs.changes.outputs.packages }}
 
       - name: Validate dev task graph
         if: ${{ needs.changes.outputs.web == 'true' }}
@@ -196,6 +199,7 @@ jobs:
         run: bun scripts/ci/packages.mjs checks "$CI_PACKAGES"
 
       - name: Check script types
+        if: ${{ needs.changes.outputs.tooling == 'true' }}
         run: bun run --cwd scripts typecheck
 
       - name: Check Hotkeys documentation
@@ -203,6 +207,7 @@ jobs:
         run: bun run --cwd hotkeys docs:check
 
       - name: Check generated artifacts
+        if: ${{ needs.changes.outputs.tooling == 'true' }}
         run: bun run generated:check
 
       # The one benchmark that survives a shared runner. Its thresholds are
@@ -219,7 +224,7 @@ jobs:
 
       # Script tests inspect the whole repository; package source readers are declared in Turbo.
       - name: Script tests
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.tooling == 'true' }}
         run: bun run test:scripts
 
       - name: Package tests
@@ -306,7 +311,7 @@ jobs:
   browser:
     name: Browser tests
     needs: changes
-    if: ${{ needs.changes.outputs.web == 'true' }}
+    if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.tree == 'true' || needs.changes.outputs.tooling == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -333,47 +338,49 @@ jobs:
         uses: ./.github/actions/install-browsers
         with:
           playwright: apps/web/node_modules/.bin/playwright
-          browsers: chromium
+          browsers: ${{ needs.changes.outputs.tooling == 'true' && 'chromium webkit' || 'chromium' }}
 
       - name: Agent browser doctor
+        if: ${{ !cancelled() && needs.changes.outputs.tooling == 'true' }}
         run: bun --bun vitest run scripts/agent/browser-doctor.test.ts --environment node
 
       - name: Agent browser shared memory
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.tooling == 'true' }}
         run: bun --bun vitest run scripts/agent/browser-launch.test.ts --environment node
 
       - name: Scroll highlight range controls
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.tooling == 'true' }}
         run: bun --bun vitest run --config vitest.scripts.config.mjs scripts/editor-scroll-benchmark-ranges.test.mjs
 
       - name: Browser resource teardown
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.tooling == 'true' }}
         timeout-minutes: 2
         run: bun --bun vitest run scripts/browser-gc.test.ts scripts/heavy/browser-gc.test.ts --environment node --no-file-parallelism
 
       - name: Cold dev startup
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.tooling == 'true' }}
         run: bun --bun vitest run scripts/agent/vite-cold-start.test.ts --environment node
 
       # Plain Node, not `--bun`: Vitest browser orchestration breaks under Bun.
       # Each run takes about a minute; a stuck one fails its step here, and the tree step
       # still runs, where the job timeout would cancel both.
       - name: Browser test (web)
+        if: ${{ !cancelled() && needs.changes.outputs.web == 'true' }}
         timeout-minutes: 5
         run: bun run --cwd apps/web test:browser
 
       - name: Browser test (syntax settings)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.web == 'true' }}
         timeout-minutes: 5
         run: bun run --cwd apps/web test:syntax-settings-browser
 
       - name: Browser test (tree)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.tree == 'true' }}
         timeout-minutes: 5
         run: bun run --cwd apps/web test:tree-browser
 
       - name: Browser test (retention reload)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.web == 'true' }}
         timeout-minutes: 5
         env:
           TMPDIR: ${{ runner.temp }}
@@ -388,7 +395,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Browser test (retention layout)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.changes.outputs.web == 'true' }}
         timeout-minutes: 5
         env:
           TMPDIR: ${{ runner.temp }}
@@ -421,19 +428,26 @@ jobs:
           build-packages: '[]'
 
       - name: Build production sites
-        run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites"
+        env:
+          CI_SITES: ${{ needs.changes.outputs.sites }}
+        run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites" "$CI_SITES"
       - name: Test Singapore documentation checks
+        if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
         run: bun run --cwd editor/site test
       - name: Install Singapore browser test dependencies
+        if: ${{ contains(needs.changes.outputs.sites, 'singapore') || contains(needs.changes.outputs.sites, 'fregat') || needs.changes.outputs.tooling == 'true' }}
         uses: ./.github/actions/install-browsers
         with:
           playwright: editor/site/node_modules/.bin/playwright
           browsers: chromium webkit
       - name: Test mobile overflow detection
+        if: ${{ needs.changes.outputs.tooling == 'true' }}
         run: bun scripts/product-sites/test-mobile.mjs
       - name: Test Singapore editor history restoration
+        if: ${{ contains(needs.changes.outputs.sites, 'singapore') }}
         run: bun run --cwd editor/site test:browser
       - name: Check landing page focus, contrast and motion controls
+        if: ${{ contains(needs.changes.outputs.sites, 'fregat') }}
         run: bun run --cwd apps/site verify:a11y
       - name: Share production sites with mobile checks
         uses: actions/upload-artifact@v4
@@ -485,8 +499,14 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}
           EXHAUSTIVE: ${{ needs.changes.outputs.exhaustive }}
+          CI_SITES: ${{ needs.changes.outputs.sites }}
         run: |
-          selection=(--paths '/fregat/,/singapore/,/singapore/docs/start-here/introduction/,/singapore/docs/start-here/playground/,/singapore/demo/,/ghostty-webgpu/')
+          paths=()
+          if [[ ",$CI_SITES," == *",fregat,"* ]]; then paths+=('/fregat/'); fi
+          if [[ ",$CI_SITES," == *",singapore,"* ]]; then paths+=('/singapore/' '/singapore/docs/start-here/introduction/' '/singapore/docs/start-here/playground/'); fi
+          if [[ ",$CI_SITES," == *",demo,"* ]]; then paths+=('/singapore/demo/'); fi
+          if [[ ",$CI_SITES," == *",ghostty-webgpu,"* ]]; then paths+=('/ghostty-webgpu/'); fi
+          selection=(--paths "$(IFS=,; echo "${paths[*]}")")
           if [[ "$EXHAUSTIVE" == 'true' ]]; then
             selection=(--shards 2 --shard "${SHARD##*-}")
           fi
@@ -513,9 +533,9 @@ jobs:
       exhaustive: ${{ needs.changes.outputs.exhaustive == 'true' }}
       editor: ${{ needs.changes.outputs.editor == 'true' }}
       ghostty: ${{ needs.changes.outputs.ghostty == 'true' }}
-      standalone_editor: ${{ needs.changes.outputs.editor == 'true' }}
-      standalone_ghostty: ${{ needs.changes.outputs.ghostty == 'true' }}
-      standalone_hotkeys: ${{ needs.changes.outputs.hotkeys == 'true' }}
+      standalone_editor: ${{ needs.changes.outputs.exhaustive == 'true' }}
+      standalone_ghostty: ${{ needs.changes.outputs.exhaustive == 'true' }}
+      standalone_hotkeys: ${{ needs.changes.outputs.exhaustive == 'true' }}
 
   # The one status to read: red when any job failed or was cancelled; a job skipped because the
   # change cannot affect it counts as passed.

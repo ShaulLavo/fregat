@@ -1,4 +1,8 @@
-# Browser Quirks
+# Browser quirks
+
+[Known limits](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/limitations.md)
+records measurement ceilings, analysis budgets and bounded package behavior.
+This page records browser bugs and their workarounds.
 
 Browser-specific workarounds in the editor. Every workaround in the code gets an
 entry here: the user-visible symptom, the root cause, the chosen fix and why, a

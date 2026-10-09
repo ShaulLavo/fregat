@@ -74,6 +74,12 @@ editor.setText('const value = 1;\n')
 Give `#editor` a height in your page. Call `editor.dispose()` when you remove the editor.
 The [core README](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/editor/README.md) covers documents, plugins, and lifecycle.
 
+## Documentation
+
+- [Start here](https://shaulavo.dev/singapore/docs/start-here/introduction/) for setup and the package guides.
+- [Known limits](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/limitations.md) for measurement ceilings, analysis budgets and bounded package behavior.
+- [Browser quirks](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/display/browser-quirks.md) for engine bugs and their workarounds.
+
 ## Planned work
 
 | Work                                                    | Status      | Plan                                                                                                                                                             |
