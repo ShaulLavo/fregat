@@ -294,7 +294,7 @@ function channel(rows, metadata) {
     pCoreSeconds,
     pInstructions,
     pCycles,
-    ...clusterMetrics({ instructions, cycles, pInstructions, pCycles }),
+    ...(mac ? clusterMetrics({ instructions, cycles, pInstructions, pCycles }) : {}),
     pCoreShare: pCoreSeconds !== null && cpuSeconds > 0 ? pCoreSeconds / cpuSeconds : null,
     effectiveClockGHz:
       clockAvailable && cycles !== null && cpuSeconds > 0 ? cycles / cpuSeconds / 1e9 : null,

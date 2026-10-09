@@ -281,6 +281,41 @@ test('hybrid perf counters sum P and E PMUs without scaling or pretending to mea
   assert.equal(sample.cpuTickNs, 10000000)
 })
 
+test('Linux perf counters omit Mac-only ratios for full and asymmetric event coverage', () => {
+  const fields = [
+    'eInstructions',
+    'eCycles',
+    'ipc',
+    'pIPC',
+    'eIPC',
+    'pInstructionShare',
+    'pCycleShare',
+  ]
+  for (const [instructionShare, cycleShare] of [
+    [1, 1],
+    [1, 0.5],
+    [0.5, 1],
+  ]) {
+    const last = linuxSnapshot(1e9, 1e9)
+    const events = last.processes[1].values.pmus.cpu_core
+    events.instructions[0].value = String(1e9 * instructionShare)
+    events.instructions[0].runningNs = String(1e9 * instructionShare)
+    events.cycles[0].value = String(2e9 * cycleShare)
+    events.cycles[0].runningNs = String(1e9 * cycleShare)
+    const sample = delta(linuxSnapshot(0, 0), last, { source: 'perf_event_open' })
+    assert.equal(sample.status, 'measured')
+    assert.equal(sample.channels.allChrome.instructions, 1e9 * instructionShare)
+    assert.equal(sample.channels.allChrome.cycles, 2e9 * cycleShare)
+    assert.equal(sample.processes[0].clockAvailable, cycleShare === 1)
+    for (const row of [...sample.processes, ...Object.values(sample.channels)]) {
+      assert.deepEqual(
+        Object.keys(row).filter((field) => fields.includes(field)),
+        [],
+      )
+    }
+  }
+})
+
 test('CPU seconds and their acquisition brackets keep the existing arithmetic with optional counters', async () => {
   let time = 0
   const session = {
