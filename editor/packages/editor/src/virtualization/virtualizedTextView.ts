@@ -1653,7 +1653,11 @@ export class VirtualizedTextView {
       snapshot.scrollHeight > snapshot.viewportHeight
     ) {
       this.measuredMaxScrollHeight = view.viewport.maxScrollHeight
-      if (view.virtualizer.updateOptions({ maxScrollHeight: this.measuredMaxScrollHeight })) return
+      if (
+        this.measuredMaxScrollHeight !== undefined &&
+        view.virtualizer.updateOptions({ maxScrollHeight: this.measuredMaxScrollHeight })
+      )
+        return
     }
     this.synchronizeScrollPaint(snapshot)
     this.view.viewport.setViewportSize(snapshot.viewportWidth, snapshot.viewportHeight)
