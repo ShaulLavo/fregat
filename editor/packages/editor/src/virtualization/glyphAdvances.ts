@@ -122,7 +122,8 @@ function nativeMinimumTabAdvance(element: HTMLElement, font: string): number {
     'position:absolute;visibility:hidden;white-space:pre;letter-spacing:0;tab-size:1.25ch'
   probe.style.font = font
   probe.textContent = '0'
-  element.append(probe)
+  // A hidden editor ancestor must not turn the cached font policy into a zero-width reading.
+  element.ownerDocument.documentElement.append(probe)
   try {
     const ch = probe.getBoundingClientRect().width
     probe.textContent = '0\t'

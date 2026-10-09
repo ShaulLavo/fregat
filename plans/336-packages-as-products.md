@@ -849,5 +849,22 @@ unchanged. These two findings are fixed in this lane; their logs are retained un
 `native-budget/final/`. Selected-budget costs before the extent fix are preserved in
 `native-budget/final-before-extent/`; the final table above comes from the completed rerun
 against the complete extent owner. All 126 cases completed with empty browser problem lists.
-Final source checks pass: 312 test files and 4,255 tests, with one skipped file/test; package
+Final source checks pass: 312 test files and 4,261 tests, with one skipped file/test; package
 typecheck, lint, format and root gates pass. The repaired focused run passes 7 files and 81 tests.
+
+The independent re-review of `04a462f0e` found a hidden-initialization tab-policy defect:
+Firefox cached zero when the probe lived under an editor ancestor with `display:none`.
+Revealing the editor and calling `refreshMetrics()` reused that cached value. The font-policy
+probe now mounts at the document root, outside the editor's hidden ancestors, while retaining
+its explicit font and layout styles. No refresh retry or additional cache invalidation is needed.
+Two committed regressions cover hidden-first measurement and hidden editor → reveal → refresh.
+Both failed first in Firefox; the visible control, Chromium and WebKit passed. The repaired
+three-engine focused run passes all 18 cases. Failing-first and repaired logs are retained in
+`native-budget/final/hidden-tab-failing-first.log` and `hidden-tab-fixed.log`.
+The reviewer also confirmed the native budget, inline windows and tab-scan bound, and identified
+the long-row Firefox timing tails as predating this PR. Existing cost tables remain local
+experiments measured before this probe-placement repair; they were not rerun for this fix.
+
+The complete editor suite after the hidden-probe repair passes 312 files and 4,261 tests,
+with one skipped file/test. Package typecheck, lint and formatting pass; its log is
+`native-budget/final/hidden-tab-final-suite.log`.
