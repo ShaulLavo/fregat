@@ -653,12 +653,12 @@ export function restoreHighlightsAfterPresentation(view: VirtualizedTextViewInte
   restoreRangeHighlightGroups(view, registry)
   restoreStyleRuleElements(view)
 
-  // This native text-layout capability selects WebKit without consulting the user agent.
+  // WebKit bug: async syntax ranges registered while hidden can stay unpainted on reveal.
+  // NBSP support selects WebKit, not the bug; remove this when native paint passes without refresh.
   if (!view.scrollElement.ownerDocument.defaultView?.CSS.supports('-webkit-nbsp-mode', 'space'))
     return
 
-  // WebKit retains unpainted StaticRanges registered under a hidden host. Refresh only this
-  // view's memberships: token groups can also contain ranges owned by other editors.
+  // Token groups can contain other editors' ranges. Refresh only this view's memberships.
   for (const rangesByStyle of view.rowTokenRanges.values()) {
     for (const [styleKey, ranges] of rangesByStyle) {
       const group = view.tokenGroups.get(styleKey)
