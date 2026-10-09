@@ -95,7 +95,8 @@ export class WebGpuTextPass {
   readonly drawCount: number
   private frameUploadedBytesValue = 0
   private glyphBindGroupCreationCountValue = 0
-  private glyphBindGroup?: GPUBindGroup
+  private drawBundles?: readonly GPURenderBundle[]
+  private readonly format: GPUTextureFormat
   private readonly instanceCount: number
   readonly metrics: TextPassMetrics = {
     draws: 0,
@@ -118,6 +119,7 @@ export class WebGpuTextPass {
 
   constructor(options: WebGpuTextPassOptions) {
     this.device = options.device
+    this.format = options.format
     this.instanceCount = options.instanceCount
     const capacity = textPassGlyphCapacity(this.device, this.instanceCount)
     try {
@@ -164,7 +166,16 @@ export class WebGpuTextPass {
       })
       this.glyphBindGroupCreationCountValue += 1
     }
-    this.glyphBindGroup = this.glyphBatches[0]!.bindGroup
+    const bundle = this.device.createRenderBundleEncoder({ colorFormats: [this.format] })
+    bundle.setPipeline(this.resources.cellPipeline)
+    bundle.setBindGroup(0, this.resources.cellBindGroup)
+    bundle.draw(6, this.instanceCount)
+    bundle.setPipeline(this.resources.glyphPipeline)
+    for (const batch of this.glyphBatches) {
+      bundle.setBindGroup(0, batch.bindGroup!)
+      bundle.draw(6, batch.instanceCount)
+    }
+    this.drawBundles = [bundle.finish()]
   }
 
   get glyphBindGroupCreationCount(): number {
@@ -216,7 +227,7 @@ export class WebGpuTextPass {
   }
 
   encode(view: GPUTextureView, copy?: TextPassCopy): GPUCommandBuffer {
-    if (!this.glyphBindGroup) throw new Error('Atlas textures must be synchronized before drawing')
+    if (!this.drawBundles) throw new Error('Atlas textures must be synchronized before drawing')
     const encoder = this.device.createCommandEncoder()
     const pass = encoder.beginRenderPass({
       colorAttachments: [
@@ -228,17 +239,7 @@ export class WebGpuTextPass {
         },
       ],
     })
-    pass.setPipeline(this.resources.cellPipeline)
-    pass.setBindGroup(0, this.resources.cellBindGroup)
-    pass.draw(6, this.instanceCount)
-    pass.setPipeline(this.resources.glyphPipeline)
-    pass.setBindGroup(0, this.glyphBindGroup)
-    pass.draw(6, this.glyphBatches[0]!.instanceCount)
-    for (let index = 1; index < this.glyphBatches.length; index += 1) {
-      const batch = this.glyphBatches[index]!
-      pass.setBindGroup(0, batch.bindGroup!)
-      pass.draw(6, batch.instanceCount)
-    }
+    pass.executeBundles(this.drawBundles)
     pass.end()
     if (copy) {
       encoder.copyTextureToBuffer(

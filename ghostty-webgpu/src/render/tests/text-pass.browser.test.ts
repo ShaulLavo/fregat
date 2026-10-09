@@ -1,4 +1,4 @@
-import { expect, it, onTestFinished } from 'vitest'
+import { expect, it, onTestFinished, vi } from 'vitest'
 import type { CellStyle, RenderCell, RenderRow, RgbColor } from '../../core/types.js'
 import type { TerminalFittedFont } from '../../term/types.js'
 import { GlyphAtlas } from '../atlas/atlas.js'
@@ -506,4 +506,33 @@ it('remaps physical storage rows with exact pixels after ring wrap and regional 
   const ring = await renderGrid(device, defaultRendererTheme, cursor, { inputs, stableRows: true })
   expect(ring.rowOffset).toBeGreaterThan(0)
   expect(ring.pixels).toEqual(control.pixels)
+})
+
+it('reuses the atlas draw bundle while encoding fresh target views', async () => {
+  const device = await createDevice()
+  device.pushErrorScope('validation')
+  const bundles = vi.spyOn(device, 'createRenderBundleEncoder')
+  const draws = vi.spyOn(GPURenderPassEncoder.prototype, 'draw')
+  const executes = vi.spyOn(GPURenderPassEncoder.prototype, 'executeBundles')
+  onTestFinished(() => {
+    vi.restoreAllMocks()
+  })
+  const grid = await renderGrid(device, defaultRendererTheme, {
+    style: 'block',
+    visible: false,
+    x: 0,
+    y: 0,
+  })
+  const texture = device.createTexture({
+    format: 'rgba8unorm',
+    size: [width, height],
+    usage: GPUTextureUsage.RENDER_ATTACHMENT,
+  })
+  onTestFinished(() => texture.destroy())
+  grid.pass.encode(texture.createView())
+  grid.pass.encode(texture.createView())
+  expect(bundles).toHaveBeenCalledTimes(1)
+  expect(draws).not.toHaveBeenCalled()
+  expect(executes).toHaveBeenCalledTimes(3)
+  expect(await device.popErrorScope()).toBeNull()
 })
