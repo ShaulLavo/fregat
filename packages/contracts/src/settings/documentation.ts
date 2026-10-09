@@ -890,14 +890,14 @@ export const SETTINGS_DOCUMENTATION = {
     optionTitles: { auto: 'Auto', columns: 'Columns', list: 'List', icons: 'Icons' },
     title: 'File picker view',
     description:
-      'How the file picker shows a folder: columns, a list, or icons. Auto uses columns when choosing a folder and a list when choosing a file.',
+      'How the folder picker shows a folder: columns, a list, or icons. Auto uses columns.',
     keywords: ['files', 'folders', 'picker', 'columns', 'list', 'icons', 'finder'],
   },
   'files.previewKilobytes': {
     title: 'Text preview size',
     description:
-      'Kilobytes of a text file the file picker and quick open read for their preview. A longer file shows its first part and says how much of it that is.',
-    keywords: ['files', 'preview', 'picker', 'quick open', 'size', 'kilobytes'],
+      'Kilobytes of a text file quick open reads for its preview. A longer file shows its first part and says how much of it that is.',
+    keywords: ['files', 'preview', 'quick open', 'size', 'kilobytes'],
   },
   'files.showHidden': {
     title: 'Show hidden files in pickers',

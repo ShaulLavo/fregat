@@ -5,15 +5,12 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 
 import { fetchRecentEntries } from '@/features/file-picker/utils/data-helpers'
 import { entriesLoadState } from '@/features/file-picker/utils/load-state'
-import type { FilePickerMode } from '@/features/file-picker/utils/model'
 
 export function useRecentEntries({
-  mode,
   open,
   serverInfo,
   showHidden,
 }: {
-  mode: FilePickerMode
   open: boolean
   serverInfo: ServerInfo | null
   showHidden: boolean
@@ -24,8 +21,8 @@ export function useRecentEntries({
     // Recent folders lead the phone list, so a hidden-files toggle must not blank and refill them.
     placeholderData: keepPreviousData,
     queryFn: ({ signal, client }) =>
-      fetchRecentEntries(mode, showHidden, signal, clientForQueryClient(client)),
-    queryKey: filePickerKeys.recentList(mode, showHidden),
+      fetchRecentEntries(showHidden, signal, clientForQueryClient(client)),
+    queryKey: filePickerKeys.recentList(showHidden),
   })
 
   return {

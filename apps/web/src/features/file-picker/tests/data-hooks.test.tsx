@@ -40,7 +40,6 @@ test('keeps placeholders within one directory and never carries them across navi
       useDirectoryLoad({
         currentPath,
         effectiveQuery,
-        mode: 'file',
         open: true,
         serverInfo: SERVER_INFO,
         showHidden: false,
@@ -71,37 +70,32 @@ test('keeps placeholders within one directory and never carries them across navi
   queryClient.clear()
 })
 
-test('keeps the current listing during hidden and mode changes', async ({ client }) => {
+test('keeps the current listing during a hidden-files change', async ({ client }) => {
   await client.fs['create-folder'].post({ path: 'held/visible', recursive: true })
   await client.fs['create-folder'].post({ path: 'held/.hidden', recursive: true })
   const queryClient = createTestQueryClient()
   const { result, rerender } = renderHook(
-    ({ mode, showHidden }: { mode: 'file' | 'folder'; showHidden: boolean }) =>
+    ({ showHidden }: { showHidden: boolean }) =>
       useDirectoryLoad({
         currentPath: 'held',
         effectiveQuery: '',
-        mode,
         open: true,
         serverInfo: SERVER_INFO,
         showHidden,
       }),
     {
-      initialProps: { mode: 'folder' as 'file' | 'folder', showHidden: false },
+      initialProps: { showHidden: false },
       wrapper: queryClientWrapper(queryClient),
     },
   )
   await waitFor(() => expect(entryPaths(result.current.loadState)).toEqual(['held/visible']))
-  rerender({ mode: 'folder', showHidden: true })
+  rerender({ showHidden: true })
   expect(result.current.loadState).toEqual({
     status: 'loading',
     data: [expect.objectContaining({ path: 'held/visible' })],
   })
   expect(result.current.currentEntry?.path).toBe('held')
   await waitFor(() => expect(entryPaths(result.current.loadState)).toHaveLength(2))
-  rerender({ mode: 'file', showHidden: true })
-  expect(result.current.loadState.status).toBe('loading')
-  expect('data' in result.current.loadState && result.current.loadState.data).toHaveLength(2)
-  await waitFor(() => expect(result.current.loadState.status).toBe('ready'))
   queryClient.clear()
 })
 
@@ -115,7 +109,6 @@ test('refreshes the current directory without growing the query cache', async ({
       useDirectoryLoad({
         currentPath: 'project',
         effectiveQuery: '',
-        mode: 'file',
         open: true,
         serverInfo: SERVER_INFO,
         showHidden: false,
@@ -146,7 +139,6 @@ test('refreshes recents without growing the query cache', async ({ client }) => 
   const { result } = renderHook(
     () =>
       useRecentEntries({
-        mode: 'folder',
         open: true,
         serverInfo: SERVER_INFO,
         showHidden: false,
@@ -168,41 +160,31 @@ test('refreshes recents without growing the query cache', async ({ client }) => 
   queryClient.clear()
 })
 
-test('keys and filters recents by picker mode and hidden visibility', async ({ client }) => {
+test('keys and filters recents by hidden visibility', async ({ client }) => {
   await client.fs['create-folder'].post({ path: 'folder', recursive: true })
   await client.fs['create-folder'].post({ path: '.hidden-folder', recursive: true })
-  await client.fs['create-file'].post({ path: 'file.ts' })
-  for (const path of ['folder', '.hidden-folder', 'file.ts']) {
+  for (const path of ['folder', '.hidden-folder']) {
     await client.fs.recents.post({ path })
   }
 
   const queryClient = createTestQueryClient()
   const { result, rerender } = renderHook(
-    ({ mode, showHidden }: { mode: 'file' | 'folder'; showHidden: boolean }) =>
-      useRecentEntries({ mode, open: true, serverInfo: SERVER_INFO, showHidden }),
+    ({ showHidden }: { showHidden: boolean }) =>
+      useRecentEntries({ open: true, serverInfo: SERVER_INFO, showHidden }),
     {
-      initialProps: { mode: 'folder' as 'file' | 'folder', showHidden: false },
+      initialProps: { showHidden: false },
       wrapper: queryClientWrapper(queryClient),
     },
   )
 
   await waitFor(() => expect(entryPaths(result.current.loadState)).toEqual(['folder']))
 
-  rerender({ mode: 'folder', showHidden: true })
+  rerender({ showHidden: true })
   await waitFor(() =>
     expect(entryPaths(result.current.loadState).sort()).toEqual(['.hidden-folder', 'folder']),
   )
-
-  rerender({ mode: 'file', showHidden: true })
-  await waitFor(() =>
-    expect(entryPaths(result.current.loadState).sort()).toEqual([
-      '.hidden-folder',
-      'file.ts',
-      'folder',
-    ]),
-  )
   expect(queryClient.getQueryCache().findAll({ queryKey: filePickerKeys.recents() })).toHaveLength(
-    3,
+    2,
   )
   queryClient.clear()
 })

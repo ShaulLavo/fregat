@@ -1,19 +1,16 @@
 import { cn } from '@workspace/ui/lib/utils'
-import { fileListGridClass } from '@/features/file-picker/utils/rows'
-import type { FilePickerMode } from '@/features/file-picker/utils/model'
+import { FILE_LIST_GRID } from '@/features/file-picker/utils/rows'
 import type { FileListSort, FileListSortKey } from '@/features/file-picker/utils/sort-entries'
 import { SortableColumnHeader } from '@/features/file-picker/components/sortable-column-header'
 
 export function ListHeader({
   isLoading,
   isSearching,
-  mode,
   onSort,
   sort,
 }: {
   isLoading: boolean
   isSearching: boolean
-  mode: FilePickerMode
   onSort: (key: FileListSortKey) => void
   sort: FileListSort | null
 }) {
@@ -22,7 +19,7 @@ export function ListHeader({
       aria-label='File list sorting'
       className={cn(
         'h-(--bar-height) text-muted-foreground grid items-center gap-(--density-control-gap) px-(--density-control-padding-x) section-label',
-        fileListGridClass(mode),
+        FILE_LIST_GRID,
       )}
       role='group'
     >
@@ -33,9 +30,6 @@ export function ListHeader({
         onSort={onSort}
         sort={sort}
       />
-      {mode === 'file' ? (
-        <SortableColumnHeader keyName='kind' label='Kind' onSort={onSort} sort={sort} />
-      ) : null}
       <SortableColumnHeader
         className='max-sm:hidden'
         keyName='modified'

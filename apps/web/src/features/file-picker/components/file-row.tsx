@@ -4,30 +4,22 @@ import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { cn } from '@workspace/ui/lib/utils'
 import type { FsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
-import {
-  displayPath,
-  isPickableEntry,
-  kindLabel,
-  type FilePickerMode,
-} from '@/features/file-picker/utils/model'
+import { displayPath } from '@/features/file-picker/utils/model'
 import {
   ENTRY_NAME_TEXT,
-  fileListGridClass,
+  FILE_LIST_GRID,
   formatFileListModified,
   fileListSizeLabel,
 } from '@/features/file-picker/utils/rows'
-import { fileListAvailabilityLabel } from '@/features/file-picker/utils/availability'
 import { EntryIcon } from '@/features/file-picker/components/entry-icon'
 import { DIRECTORY_QUERY_STALE_MS } from '@/features/file-picker/utils/directory-query'
 import { INTENT_PREFETCH_HIT_SLOP_PX } from '@/lib/intent-prefetch-options'
 import { FILE_PICKER_INTENT_PREFIX } from '@/features/file-picker/utils/intent'
 
 export function FileRow({
-  accept,
   entry,
   rowProps,
   isBusy,
-  mode,
   onDirectoryIntent,
   onDoubleClick,
   position,
@@ -35,11 +27,9 @@ export function FileRow({
   setSize,
   showPath,
 }: {
-  accept?: readonly string[]
   entry: FsEntry
   rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   isBusy: boolean
-  mode: FilePickerMode
   onDirectoryIntent: (path: string) => void
   onDoubleClick: (entry: FsEntry) => void
   position: number
@@ -48,8 +38,6 @@ export function FileRow({
   showPath: boolean
 }) {
   const directory = isDirectoryEntry(entry)
-  const pickable = isPickableEntry(entry, mode, accept)
-  const availabilityLabel = fileListAvailabilityLabel(entry, mode, pickable)
   const { elementRef } = useForesight<HTMLDivElement>({
     callback: signalDirectoryIntent,
     enabled: directory && !isBusy,
@@ -79,11 +67,7 @@ export function FileRow({
       aria-posinset={position}
       selected={selected}
       aria-setsize={setSize}
-      className={cn(
-        'grid w-full cursor-default text-left',
-        fileListGridClass(mode),
-        !pickable && 'text-muted-foreground',
-      )}
+      className={cn('grid w-full cursor-default text-left', FILE_LIST_GRID)}
       onDoubleClick={handleDoubleClick}
       role='option'
       title={entry.path}
@@ -97,16 +81,12 @@ export function FileRow({
           ) : null}
         </div>
       </div>
-      {mode === 'file' ? (
-        <div className='text-muted-foreground truncate'>{kindLabel(entry)}</div>
-      ) : null}
       <div className='text-muted-foreground truncate tabular-nums max-sm:hidden'>
         {formatFileListModified(entry.mtimeMs)}
       </div>
       <div className='text-muted-foreground text-right tabular-nums max-sm:hidden'>
         {fileListSizeLabel(entry)}
       </div>
-      {availabilityLabel ? <span className='sr-only'>{availabilityLabel}</span> : null}
     </ListRow>
   )
 }
