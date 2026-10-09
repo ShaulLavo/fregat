@@ -1075,8 +1075,12 @@ export {
 export {
   attachmentUploadInputSchema,
   attachmentUploadTicketSchema,
+  machineFileAttachInputSchema,
+  machineFileAttachmentSchema,
   type AttachmentUploadInput,
   type AttachmentUploadTicket,
+  type MachineFileAttachInput,
+  type MachineFileAttachment,
 } from './attachment-upload'
 export {
   BUNDLED_FONTS,

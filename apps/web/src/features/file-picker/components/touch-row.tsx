@@ -5,12 +5,17 @@ import { cn } from '@workspace/ui/lib/utils'
 import type { MouseEvent } from 'react'
 
 import type { FsEntry } from '@/lib/file-system-types'
+import { ChoiceMark } from '@/features/file-picker/components/choice-mark'
 import { EntryIcon } from '@/features/file-picker/components/entry-icon'
 import { displayPath } from '@/features/file-picker/utils/model'
 import { ENTRY_NAME_TEXT, formatFileListModified } from '@/features/file-picker/utils/rows'
 
-/** A finger-sized row: one tap opens the folder, and its caret says it drills in. */
+/**
+ * A finger-sized row: one tap opens the folder, and its caret says it drills in. A file that can
+ * be chosen shows its choice mark instead, and the tap chooses it.
+ */
 export function TouchRow({
+  chosen = null,
   entry,
   isBusy,
   onOpen,
@@ -20,6 +25,8 @@ export function TouchRow({
   setSize,
   showPath,
 }: {
+  /** Null when the row is not a choice: a folder, or a picker that chooses folders. */
+  chosen?: boolean | null
   entry: FsEntry
   isBusy: boolean
   onOpen: (entry: FsEntry) => void
@@ -39,6 +46,7 @@ export function TouchRow({
   return (
     <ListRow
       {...rowProps}
+      aria-checked={chosen ?? undefined}
       aria-posinset={position}
       aria-setsize={setSize}
       className='flex w-full cursor-default items-center gap-(--density-control-gap) py-(--density-row-padding-y) text-left'
@@ -55,10 +63,14 @@ export function TouchRow({
           {showPath ? displayPath(entry.path) : modified}
         </span>
       </div>
-      <CaretRightIcon
-        aria-hidden='true'
-        className='text-muted-foreground size-(--icon-size-sm) shrink-0'
-      />
+      {chosen === null ? (
+        <CaretRightIcon
+          aria-hidden='true'
+          className='text-muted-foreground size-(--icon-size-sm) shrink-0'
+        />
+      ) : (
+        <ChoiceMark chosen={chosen} />
+      )}
     </ListRow>
   )
 }

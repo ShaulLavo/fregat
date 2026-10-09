@@ -854,6 +854,7 @@ export function createApp(options: AppOptions) {
     .use(
       attachmentRoutes({
         attachmentsDir: options.orchestration?.attachmentsDir,
+        files: fs,
         ownership: createAttachmentOwnership(database),
       }),
     )

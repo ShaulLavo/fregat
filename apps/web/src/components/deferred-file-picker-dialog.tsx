@@ -34,8 +34,8 @@ export function DeferredFilePickerDialog(props: ComponentProps<typeof FilePicker
     <Dialog open onOpenChange={props.onOpenChange}>
       <DialogContent finalFocus={returnFocusUnlessLoaded} showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>Open folder</DialogTitle>
-          <DialogDescription>Browse folders.</DialogDescription>
+          <DialogTitle>{props.files ? 'Choose files' : 'Open folder'}</DialogTitle>
+          <DialogDescription>{props.files ? 'Browse files.' : 'Browse folders.'}</DialogDescription>
         </DialogHeader>
         {query.isPending ? (
           <Spinner
