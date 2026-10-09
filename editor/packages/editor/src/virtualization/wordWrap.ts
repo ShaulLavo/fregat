@@ -1,3 +1,10 @@
+import {
+  isCombiningMark,
+  isVariationSelector,
+  nextGraphemeBoundary,
+  segmentGraphemes,
+} from '../graphemes'
+
 /**
  * Soft-wrap row ends for one line, fed a chunk of code units at a time, in columns or in measured
  * pixels.
@@ -5,10 +12,11 @@
  * With `words`, a row may end before the first non-space after spaces, on either side of a CJK
  * character, and on either edge of an unbreakable run (a replacement painted as one node). Spaces
  * never start a row: they hang past the edge, as `white-space: pre-wrap` lets them. A word wider
- * than the row ends at the unit that overflows; an unbreakable run wider than the row overflows
- * instead. Without `words`, a row ends at whichever unit would overflow it.
+ * than the row ends before the grapheme that overflows; an unbreakable run wider than the row overflows
+ * instead. Without `words`, a row ends before whichever grapheme would overflow it.
  */
 export type WordWrapLine = {
+  pending: string
   length: number
   visual: number
   segmentStart: number
@@ -62,6 +70,7 @@ const NO_RUNS: UnbreakableRuns = []
 
 export function createWordWrapLine(): WordWrapLine {
   return {
+    pending: '',
     length: 0,
     visual: 0,
     segmentStart: 0,
@@ -75,6 +84,7 @@ export function createWordWrapLine(): WordWrapLine {
 }
 
 export function resetWordWrapLine(line: WordWrapLine): void {
+  line.pending = ''
   line.length = 0
   line.visual = 0
   line.segmentStart = 0
@@ -98,6 +108,40 @@ export function appendWordWrapText(
   rules: LineBreakRules,
   runs: UnbreakableRuns = NO_RUNS,
 ): void {
+  const chunk = line.pending + text.slice(from, to)
+  if (chunk.length === 0) return
+  const tail = pendingClusterStart(chunk)
+  line.pending = chunk.slice(tail)
+  appendCompleteWrapText(line, chunk, tail, rules, runs)
+}
+
+function pendingClusterStart(text: string): number {
+  if (!/[\u0300-\uffff]/.test(text)) return text.length - 1
+  const segments = segmentGraphemes(text)
+  const last = text.charCodeAt(text.length - 1)
+  // A high surrogate may become a joining modifier or regional indicator in the next chunk.
+  const pending = last >= 0xd800 && last <= 0xdbff ? -2 : -1
+  return segments.at(pending)?.index ?? 0
+}
+
+/** The last cluster may continue in the next storage chunk; a line ending settles it. */
+export function finishWordWrapLine(
+  line: WordWrapLine,
+  rules: LineBreakRules,
+  runs: UnbreakableRuns = NO_RUNS,
+): void {
+  const text = line.pending
+  line.pending = ''
+  appendCompleteWrapText(line, text, text.length, rules, runs)
+}
+
+function appendCompleteWrapText(
+  line: WordWrapLine,
+  text: string,
+  to: number,
+  rules: LineBreakRules,
+  runs: UnbreakableRuns,
+): void {
   const { width, words, advance } = rules
   const tabStop = advance ? rules.tabSize * advance(32) : rules.tabSize
   let { length, visual, segmentStart, segmentVisual, breakAt, breakVisual } = line
@@ -105,7 +149,8 @@ export function appendWordWrapText(
   let previousCjk = line.previousCjk
   let run = firstRunEndingAtOrAfter(runs, length)
   let passedRunEnd = -1
-  for (let index = from; index < to; index += 1) {
+  for (let index = 0; index < to;) {
+    const end = nextGraphemeBoundary(text, index)
     const code = text.charCodeAt(index)
     const space = code === 32 || code === 9
     const cjk = code >= 0x2e80 && isCjkCodeUnit(code)
@@ -120,7 +165,7 @@ export function appendWordWrapText(
       breakVisual = visual
     }
 
-    const cells = unitCells(text, index, code, visual, tabStop, advance)
+    const cells = clusterCells(text, index, end, visual, tabStop, advance)
     const overflows = cells > 0 && segmentVisual > 0 && segmentVisual + cells > width
     if (overflows && !(words && space)) {
       if (breakAt > segmentStart) {
@@ -135,7 +180,8 @@ export function appendWordWrapText(
     }
     visual += cells
     segmentVisual += cells
-    length += 1
+    length += end - index
+    index = end
     previousSpace = space
     previousCjk = cjk
     if (current !== undefined && length >= current[1]) {
@@ -153,27 +199,26 @@ export function appendWordWrapText(
   line.previousCjk = previousCjk
 }
 
-/** A pair's advance rides on its high surrogate; the low one adds nothing and never ends a row. */
-function unitCells(
+/** Advances belong to complete graphemes, so a row never starts inside a glyph. */
+function clusterCells(
   text: string,
-  index: number,
-  code: number,
+  start: number,
+  end: number,
   visual: number,
   tabStop: number,
   advance: ((codePoint: number) => number) | null,
 ): number {
-  if (code === 9) return tabStop - (visual % tabStop)
-  if (!advance) return 1
-  if (isLowSurrogate(code) && index > 0 && isHighSurrogate(text.charCodeAt(index - 1))) return 0
-  return advance(text.codePointAt(index) ?? code)
-}
-
-function isHighSurrogate(code: number): boolean {
-  return code >= 0xd800 && code <= 0xdbff
-}
-
-function isLowSurrogate(code: number): boolean {
-  return code >= 0xdc00 && code <= 0xdfff
+  if (text.charCodeAt(start) === 9) return tabStop - (visual % tabStop)
+  let cells = 0
+  for (let index = start; index < end;) {
+    const point = text.codePointAt(index)!
+    const units = point > 0xffff ? 2 : 1
+    if (!isCombiningMark(point) && !isVariationSelector(point) && point !== 0x200d) {
+      cells += advance ? advance(point) : units
+    }
+    index += units
+  }
+  return cells
 }
 
 function firstRunEndingAtOrAfter(runs: UnbreakableRuns, offset: number): number {

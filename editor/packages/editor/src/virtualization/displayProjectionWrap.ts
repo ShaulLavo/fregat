@@ -4,6 +4,7 @@ import type { BuildContext } from './displayProjectionBuild'
 import {
   appendWordWrapText,
   createWordWrapLine,
+  finishWordWrapLine,
   lineBreakRules,
   needsLineBreakRules,
   resetWordWrapLine,
@@ -125,7 +126,10 @@ function discoverTabs(state: WrapScan): void {
 }
 
 function finishLine(state: WrapScan): void {
-  if (state.word) adoptWordLine(state, state.word)
+  if (state.word) {
+    finishWordWrapLine(state.word, state.rules)
+    adoptWordLine(state, state.word)
+  }
   if (state.explicitEnds) appendTabbedLine(state)
   state.prefixes.push(state.prefixes[state.prefixes.length - 1]! + state.rows)
   state.tabOffsets.push(state.tabEnds.length)

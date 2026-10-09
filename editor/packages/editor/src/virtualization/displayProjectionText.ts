@@ -19,6 +19,7 @@ import type {
 import {
   appendWordWrapText,
   createWordWrapLine,
+  finishWordWrapLine,
   lineBreakRules,
   needsLineBreakRules,
   type UnbreakableRuns,
@@ -224,6 +225,7 @@ function summarizeRuleWrap(
     const text = readRange(start, Math.min(length, start + 4096))
     appendWordWrapText(line, text, 0, text.length, rules, runs)
   }
+  finishWordWrapLine(line, rules, runs)
   if (line.ends.length === 0) return uniformWrap(length, null)
   const ends = Uint32Array.from([...line.ends, length])
   return { kind: 'indexed', length, ends, rows: ends.length }
