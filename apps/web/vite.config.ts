@@ -132,7 +132,8 @@ export default defineConfig(({ command, isPreview }) => {
       react({
         // Vitest configs keep `compiler: true`: the flag would reprint every diagnostic per run.
         compiler: { logDiagnostics: true },
-        exclude: [/\/node_modules\//].concat(
+        exclude: [/\/node_modules\//, /[?&]html-proxy\b.*\.css$/].concat(
+          // Cached component modules retain WASM owners across Fast Refresh.
           packages.length > 0
             ? [/\/features\/terminal\/components\/(panel|saved-viewport)\.tsx$/]
             : [],
