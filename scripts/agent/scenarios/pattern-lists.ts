@@ -233,10 +233,19 @@ export const filePicker: Scenario = {
       await list.evaluate((element) => element === element.ownerDocument.activeElement),
       true,
     )
-    for (const option of await selectors.pickerOptions(page).all()) {
-      strictEqual(await option.getAttribute('tabindex'), '-1')
-      ok(Number(await option.getAttribute('aria-posinset')) > 0)
-      ok(Number(await option.getAttribute('aria-setsize')) > 0)
+    // One read of the rendered rows: the virtual window can swap rows between per-row reads.
+    const rows = await selectors.pickerOptions(page).evaluateAll((options) =>
+      options.map((option) => ({
+        tabIndex: option.getAttribute('tabindex'),
+        position: Number(option.getAttribute('aria-posinset')),
+        size: Number(option.getAttribute('aria-setsize')),
+      })),
+    )
+    ok(rows.length > 0, 'The picker must render folder rows')
+    for (const row of rows) {
+      strictEqual(row.tabIndex, '-1')
+      ok(row.position > 0)
+      ok(row.size > 0)
     }
     await step('picker-keyboard-selection')
     await page.keyboard.press('End')

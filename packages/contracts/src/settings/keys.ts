@@ -489,6 +489,11 @@ export const SETTINGS_REGISTRY = {
     default: false,
     scope: 'application',
   }),
+  'terminal.integrated.screenReader': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+  }),
   'terminal.integrated.fontSize': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(6), v.maxValue(72)),
     default: 12,

@@ -118,4 +118,11 @@ describe('listbox keys', () => {
       index: 7,
     })
   })
+
+  it('starts on the first row or tile when nothing is active', () => {
+    expect(listboxKeyAction({ ...base, activeIndex: -1 })).toEqual({ kind: 'move', index: 0 })
+    const grid = { ...base, count: 10, activeIndex: -1, columns: 4 }
+    for (const key of ['ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft'])
+      expect(listboxKeyAction({ ...grid, key })).toEqual({ kind: 'move', index: 0 })
+  })
 })

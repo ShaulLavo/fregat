@@ -323,7 +323,7 @@
     },
     "ghostty-webgpu": {
       "ignoreBinaries": ["zig"],
-      "entry": ["src/index.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"],
+      "entry": ["src/index.ts", "src/worker/index.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"],
       "project": ["src/**/*.ts", "scripts/**/*.{ts,mjs}", "bench/**/*.ts"]
     },
     "ghostty-webgpu-line-editor": {
