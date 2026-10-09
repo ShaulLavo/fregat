@@ -1,5 +1,5 @@
 import net from 'node:net'
-import { htmlBootstrapPlugin } from './scripts/html-bootstrap-plugin'
+import { htmlBootstrapPlugin } from './scripts/html-bootstrap-plugin.ts'
 import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'

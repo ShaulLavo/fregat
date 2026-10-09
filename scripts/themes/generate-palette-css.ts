@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { bundledPalette, DEFAULT_PALETTE_ID } from '../../packages/contracts/src/index'
-import { paletteStylesheet } from '../../packages/client-core/src/themes/palette'
+import { paletteStylesheet } from '../../packages/contracts/src/themes/palette-rendering'
 
 const output = path.join(
   import.meta.dirname,

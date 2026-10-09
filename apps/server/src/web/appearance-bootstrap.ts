@@ -13,7 +13,7 @@ import {
   type SettingsSnapshot,
   type SettingsValues,
 } from '@workspace/contracts'
-import { paletteStylesheet } from '@workspace/client-core/themes/palette'
+import { paletteStylesheet } from '@workspace/contracts/themes/palette-rendering'
 import type { PaletteLibrary } from '../themes/palette-library'
 import { webErrors } from './structured-errors'
 

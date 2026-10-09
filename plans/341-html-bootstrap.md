@@ -22,7 +22,7 @@ At the planning baseline, `apps/server/src/web/routes.ts` returns the built docu
 
 The browser cache can be absent or stale. The owner observed wallpaper appearing and disappearing on an iPhone load. A reproduction with no appearance mirror and held settings mounted wallpaper for 16 sampled frames and started `/wallpaper/still` and `/wallpaper/info` requests before an off setting arrived. Reproduce the same case from current main before implementation and retain its screenshots, request log, and frame samples. The historical fixture cleared appearance storage while retaining its test workspace; it does not prove every aspect of a completely new browser profile.
 
-Palette data already has one CSS renderer, `paletteStylesheet()` in `packages/client-core/src/themes/palette.ts`. `packages/ui/src/styles/palette.generated.css` is the generated Graphite fallback. `globals.css` supplies surfaces, density, feel, motion, and Tailwind mappings. Reuse these contracts. The obsolete comment in `globals.css` claiming Sage overrides appear below can be corrected with the mechanism documentation; restructuring the stylesheet is separate work.
+Palette data already has one CSS renderer, `paletteStylesheet()` in `packages/contracts/src/themes/palette-rendering.ts`. `packages/ui/src/styles/palette.generated.css` is the generated Graphite fallback. `globals.css` supplies surfaces, density, feel, motion, and Tailwind mappings. Reuse these contracts. The obsolete comment in `globals.css` claiming Sage overrides appear below can be corrected with the mechanism documentation; restructuring the stylesheet is separate work.
 
 ## Scope
 
@@ -163,3 +163,7 @@ The source now implements the shared appearance schema, Bun document producer/re
 - Measurement limits: built web assets over source-matched isolated APIs, appearance-cache-cleared cold reload after fixture setup, simulated Chromium phone conditions rather than a physical iPhone. The after runs had one additional declared background server; admission records retain the exact overlaps. This is bounded qualification, not a universal startup speed claim.
 
 Local evidence is retained in the task's reported evidence directories. The execution checklist and PR name the source and delivery receipts; no owner settings or sessions were used for these writing scenarios.
+
+### Shared palette dependency correction
+
+CI exercised real release copies and the workspace build graph, exposing a server/client-core SDK dependency cycle. Palette rendering now lives in the browser-free contracts theme module; all callers were moved and the old client-core export was removed. The renderer produces identical CSS. The 57 launcher/update regressions pass without symlink recursion, with 18 contracts palette/renderer checks and 9 remaining client-core palette checks passing.

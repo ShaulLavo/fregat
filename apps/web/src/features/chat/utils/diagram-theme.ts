@@ -1,5 +1,5 @@
 import { parseColor, toHex } from '@workspace/contracts'
-import type { ResolvedPalette } from '@workspace/client-core/themes/palette'
+import type { ResolvedPalette } from '@workspace/contracts/themes/palette-rendering'
 
 export type MermaidTheme = {
   readonly colorMode: 'dark' | 'light'

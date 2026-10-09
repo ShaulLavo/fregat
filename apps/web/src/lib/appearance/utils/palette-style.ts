@@ -1,5 +1,5 @@
 import { bundledPalette, DEFAULT_PALETTE_ID } from '@workspace/contracts'
-import { paletteStylesheet } from '@workspace/client-core/themes/palette'
+import { paletteStylesheet } from '@workspace/contracts/themes/palette-rendering'
 import { PALETTE_STYLE_ID } from '@/lib/boot-keys'
 import { readHtmlBootstrap } from '@/lib/html-bootstrap'
 

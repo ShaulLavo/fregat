@@ -24,7 +24,7 @@ import {
   type Palette,
   type PaletteId,
 } from '@workspace/contracts'
-import { paletteStylesheet, resolvePalette } from '@workspace/client-core/themes/palette'
+import { paletteStylesheet, resolvePalette } from '@workspace/contracts/themes/palette-rendering'
 
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { fontQueryOptions } from '@/lib/fonts/state/queries'

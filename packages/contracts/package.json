@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./html-bootstrap": "./src/html-bootstrap.ts",
+    "./themes/palette-rendering": "./src/themes/palette-rendering.ts",
     "./error-fields": "./src/error-fields.ts",
     "./text-encoding": "./src/text-encoding.ts",
     "./file-response": "./src/file-response.ts",

@@ -7,7 +7,7 @@ import {
   appearanceBootValuesSchema,
   htmlBootstrapSchema,
 } from '@workspace/contracts/html-bootstrap'
-import { paletteStylesheet } from '@workspace/client-core/themes/palette'
+import { paletteStylesheet } from '@workspace/contracts/themes/palette-rendering'
 import { primaryServerOrigin } from '@/lib/client'
 import { TEST_ENVIRONMENT_ID } from './chat'
 

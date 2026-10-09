@@ -1,7 +1,8 @@
-import { bundledPalette, parsePalette, SAGE_PALETTE_DOCUMENT } from '@workspace/contracts'
+import { bundledPalette, SAGE_PALETTE_DOCUMENT } from '../themes/bundled'
+import { parsePalette } from '../themes/palette'
 import { describe, expect, it } from 'vitest'
 
-import { paletteStylesheet, resolvePalette } from '../palette'
+import { paletteStylesheet, resolvePalette } from '../themes/palette-rendering'
 
 const graphite = bundledPalette('graphite')!
 const sage = bundledPalette('sage')!

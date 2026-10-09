@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { IncomingMessage, IncomingHttpHeaders, ServerResponse } from 'node:http'
 import type { Plugin, ViteDevServer } from 'vite'
-import { createScriptError } from '../../../scripts/structured-errors'
+import { createScriptError } from '../../../scripts/structured-errors.ts'
 
 /** Loopback verification requests bind HTML production to their isolated Bun API. */
 export const BOOTSTRAP_API_HEADER = 'x-fregat-bootstrap-api'

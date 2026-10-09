@@ -1,4 +1,13 @@
 export * from './html-bootstrap'
+export {
+  cssVariableForRole,
+  flattenedAppColors,
+  oppositeMode,
+  paletteStylesheet,
+  resolvePalette,
+  type ResolvedPalette,
+  type TerminalColors,
+} from './themes/palette-rendering'
 export * from './worktree-lifecycle'
 export * from './session-lifecycle'
 export {
