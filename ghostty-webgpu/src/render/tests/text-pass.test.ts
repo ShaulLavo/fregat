@@ -205,6 +205,35 @@ it('coalesces twelve full rows to two uploads with native glyph bytes and preser
   )
 })
 
+it.each([0, 1])('uses bounding spans only without retained rows: rowReuses=%s', (rowReuses) => {
+  const fixture = gpuFixture()
+  const data = { ...frame(), rowReuses }
+  const operations = fixture.pass.uploadFrame(data, [
+    update(0, 0, 64, 0, 96),
+    update(3, 256, 64, 384, 96),
+  ])
+  expect(operations).toBe(rowReuses === 0 ? 2 : 4)
+  expect(fixture.writes.map((write) => [write.offset, write.bytes.byteLength])).toEqual(
+    rowReuses === 0
+      ? [
+          [0, 320],
+          [0, 480],
+        ]
+      : [
+          [0, 64],
+          [256, 64],
+          [0, 96],
+          [384, 96],
+        ],
+  )
+  for (const write of fixture.writes) {
+    const source = write.buffer === fixture.buffers[0] ? data.cellData : data.glyphData
+    expect(write.bytes).toEqual(
+      new Uint8Array(source.buffer, source.byteOffset + write.offset, write.bytes.byteLength),
+    )
+  }
+})
+
 it('merges touching changes and keeps untouched resident gaps', () => {
   const fixture = gpuFixture(),
     data = frame()

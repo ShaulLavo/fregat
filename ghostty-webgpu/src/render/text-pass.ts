@@ -1,7 +1,7 @@
 import { createGhosttyError } from '../core/error.js'
 import type { AtlasGpuTextures } from './atlas/gpu-textures.js'
 import type { RowInstanceUpdate } from './instances/types.js'
-import { planSparseUploadRanges } from './instances/upload-ranges.js'
+import { planSparseUploadRanges, planUploadRanges } from './instances/upload-ranges.js'
 import { CELL_INSTANCE_BYTES, GLYPH_INSTANCE_BYTES } from './instances/layout.js'
 import { cellShader } from './shaders/cell.wgsl.js'
 import { glyphShader } from './shaders/glyph.wgsl.js'
@@ -159,13 +159,14 @@ export class WebGpuTextPass {
       readonly columns?: number
       readonly rowHeight?: number
       readonly rowOffset?: number
+      readonly rowReuses?: number
       readonly stableRows?: boolean
     },
     updates: readonly RowInstanceUpdate[],
   ): number {
     this.frameUploadedBytesValue = 0
     this.uploadRows(data)
-    const plan = planSparseUploadRanges(updates)
+    const plan = data.rowReuses === 0 ? planUploadRanges(updates) : planSparseUploadRanges(updates)
     const cellData = data.cellData
     const glyphData = data.glyphData
     for (const range of plan.cell) this.writeRange(this.cellBuffer, cellData, range)

@@ -428,7 +428,7 @@ fn matchingFrameRow(frame: *Frame, iterator: c.GhosttyRenderStateRowIterator, ce
 }
 
 fn physicalRow(frame: *Frame, y: u32) u32 {
-    if (frame.stable_rows == 0) return y;
+    if (frame.stable_rows == 0 or frame.row_offset == 0) return y;
     return (y + frame.row_offset) % frame.rows;
 }
 
@@ -694,7 +694,7 @@ fn rememberRenderedCell(cache: *FrameCache, slot: usize, input: CachedCell) void
 fn reuseRenderedCell(frame: *Frame, raw: c.GhosttyCell, x: u32, y: u32, selected: bool) bool {
     const cache = frame.row_cache.?;
     // Rendered cells are physical; selection and appearance belong to their previous logical row.
-    const previous_y = if (frame.stable_rows != 0) (y + frame.row_offset + frame.rows - cache.previous_offset) % frame.rows else y;
+    const previous_y = if (frame.stable_rows != 0 and frame.row_offset != cache.previous_offset) (y + frame.row_offset + frame.rows - cache.previous_offset) % frame.rows else y;
     const previous = cache.previous[previous_y];
     if (!std.mem.eql(u32, &previous.appearance, &cache.appearance)) return false;
     if (sameRowId(previous.id, std.mem.zeroes(c.GhosttyRenderStateRowId))) return false;
