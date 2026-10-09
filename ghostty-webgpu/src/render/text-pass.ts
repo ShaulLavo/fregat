@@ -8,8 +8,7 @@ import {
   type UploadPlan,
 } from './instances/upload-ranges.js'
 import { CELL_INSTANCE_BYTES, GLYPH_INSTANCE_BYTES } from './instances/layout.js'
-import { cellShader } from './shaders/cell.wgsl.js'
-import { glyphShader } from './shaders/glyph.wgsl.js'
+import { textShader } from './shaders/text.wgsl.js'
 
 export interface TextPassMetrics {
   draws: number
@@ -48,9 +47,7 @@ type FrameRows =
     }
 
 interface PipelineResources {
-  cellBindGroup: GPUBindGroup
-  cellPipeline: GPURenderPipeline
-  glyphPipeline: GPURenderPipeline
+  textPipeline: GPURenderPipeline
 }
 
 interface GlyphBatch {
@@ -138,11 +135,10 @@ export class WebGpuTextPass {
       })
       this.ownedBuffers.push(this.viewportBuffer)
       this.sampler = options.device.createSampler({ magFilter: 'linear', minFilter: 'linear' })
-      options.device.queue.writeBuffer(
-        this.viewportBuffer,
-        0,
-        new Float32Array([options.width, options.height, 0, 0]),
-      )
+      const viewportData = new ArrayBuffer(32)
+      new Float32Array(viewportData).set([options.width, options.height])
+      new DataView(viewportData).setUint32(20, this.instanceCount, true)
+      options.device.queue.writeBuffer(this.viewportBuffer, 0, viewportData)
       this.resources = this.createPipelines(options.format)
     } catch (cause) {
       this.destroy()
@@ -154,13 +150,14 @@ export class WebGpuTextPass {
     for (const batch of this.glyphBatches) {
       batch.bindGroup = this.device.createBindGroup({
         entries: [
-          { binding: 0, resource: { buffer: batch.buffer } },
+          { binding: 0, resource: { buffer: this.cellBuffer } },
           { binding: 1, resource: { buffer: this.viewportBuffer } },
           { binding: 2, resource: this.sampler },
           { binding: 3, resource: textures.view('grayscale') },
           { binding: 4, resource: textures.view('color') },
+          { binding: 5, resource: { buffer: batch.buffer } },
         ],
-        layout: this.resources.glyphPipeline.getBindGroupLayout(0),
+        layout: this.resources.textPipeline.getBindGroupLayout(0),
       })
       this.glyphBindGroupCreationCountValue += 1
     }
@@ -228,16 +225,14 @@ export class WebGpuTextPass {
         },
       ],
     })
-    pass.setPipeline(this.resources.cellPipeline)
-    pass.setBindGroup(0, this.resources.cellBindGroup)
-    pass.draw(6, this.instanceCount)
-    pass.setPipeline(this.resources.glyphPipeline)
+    pass.setPipeline(this.resources.textPipeline)
     pass.setBindGroup(0, this.glyphBindGroup)
-    pass.draw(6, this.glyphBatches[0]!.instanceCount)
+    pass.draw(6, this.instanceCount)
+    pass.draw(6, this.glyphBatches[0]!.instanceCount, 0, this.instanceCount)
     for (let index = 1; index < this.glyphBatches.length; index += 1) {
       const batch = this.glyphBatches[index]!
       pass.setBindGroup(0, batch.bindGroup!)
-      pass.draw(6, batch.instanceCount)
+      pass.draw(6, batch.instanceCount, 0, this.instanceCount)
     }
     pass.end()
     if (copy) {
@@ -276,40 +271,18 @@ export class WebGpuTextPass {
   }
 
   private createPipelines(format: GPUTextureFormat): PipelineResources {
-    const cellPipeline = this.device.createRenderPipeline({
+    const module = this.device.createShaderModule({ code: textShader })
+    const textPipeline = this.device.createRenderPipeline({
       fragment: {
         entryPoint: 'fragmentMain',
-        module: this.device.createShaderModule({ code: cellShader }),
+        module,
         targets: [{ blend: blendState(), format }],
       },
       layout: 'auto',
       primitive: { topology: 'triangle-list' },
-      vertex: {
-        entryPoint: 'vertexMain',
-        module: this.device.createShaderModule({ code: cellShader }),
-      },
+      vertex: { entryPoint: 'vertexMain', module },
     })
-    const glyphPipeline = this.device.createRenderPipeline({
-      fragment: {
-        entryPoint: 'fragmentMain',
-        module: this.device.createShaderModule({ code: glyphShader }),
-        targets: [{ blend: blendState(), format }],
-      },
-      layout: 'auto',
-      primitive: { topology: 'triangle-list' },
-      vertex: {
-        entryPoint: 'vertexMain',
-        module: this.device.createShaderModule({ code: glyphShader }),
-      },
-    })
-    const cellBindGroup = this.device.createBindGroup({
-      entries: [
-        { binding: 0, resource: { buffer: this.cellBuffer } },
-        { binding: 1, resource: { buffer: this.viewportBuffer } },
-      ],
-      layout: cellPipeline.getBindGroupLayout(0),
-    })
-    return { cellBindGroup, cellPipeline, glyphPipeline }
+    return { textPipeline }
   }
 
   private createStorageBuffer(size: number): GPUBuffer {

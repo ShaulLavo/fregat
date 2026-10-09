@@ -1,4 +1,4 @@
-import { expect, it, onTestFinished } from 'vitest'
+import { expect, it, onTestFinished, vi } from 'vitest'
 import type { CellStyle, RenderCell, RenderRow, RgbColor } from '../../core/types.js'
 import type { TerminalFittedFont } from '../../term/types.js'
 import { GlyphAtlas } from '../atlas/atlas.js'
@@ -116,6 +116,31 @@ it.each([
   })
   onTestFinished(() => pass.destroy())
   pass.syncAtlas(textures)
+  expect(await device.popErrorScope()).toBeNull()
+})
+
+it('encodes ordered cell and glyph draws with one pipeline and initial bind group', async () => {
+  const device = await createDevice()
+  const pipelines = vi.spyOn(GPURenderPassEncoder.prototype, 'setPipeline')
+  const bindings = vi.spyOn(GPURenderPassEncoder.prototype, 'setBindGroup')
+  const draws = vi.spyOn(GPURenderPassEncoder.prototype, 'draw')
+  onTestFinished(() => {
+    vi.restoreAllMocks()
+  })
+  device.pushErrorScope('validation')
+  const rendered = await renderGrid(device, defaultRendererTheme, {
+    x: 0,
+    y: 0,
+    visible: false,
+    style: 'block',
+  })
+  expect(pipelines).toHaveBeenCalledTimes(1)
+  expect(bindings).toHaveBeenCalledTimes(1)
+  expect(draws.mock.calls).toEqual([
+    [6, columns * rows],
+    [6, columns * rows, 0, columns * rows],
+  ])
+  expect(rendered.pixel(1 * cellSize + 8, 8)).toEqual([255, 0, 0, 255])
   expect(await device.popErrorScope()).toBeNull()
 })
 
