@@ -33,10 +33,14 @@ test('copies built workspaces to their own paths from any working directory', ()
 })
 
 function git(cwd: string, ...args: string[]) {
-  return execFileSync('git', ['-C', cwd, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
-    encoding: 'utf8',
-    stdio: 'pipe',
-  }).trim()
+  return execFileSync(
+    'git',
+    ['-C', cwd, '-c', 'user.name=t', '-c', 'user.email=t@t'].concat(args),
+    {
+      encoding: 'utf8',
+      stdio: 'pipe',
+    },
+  ).trim()
 }
 
 /** A source with commits A, B, C; a full receiver cloned at A, as the Pi's lane checkout is. */

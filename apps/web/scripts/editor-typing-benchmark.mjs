@@ -188,7 +188,7 @@ async function installCollector(page) {
         cancelAnimationFrame(raf)
       },
       data() {
-        return { frames: [...frames], keydowns: [...keydowns] }
+        return { frames: Array.from(frames), keydowns: Array.from(keydowns) }
       },
     }
     window.addEventListener(

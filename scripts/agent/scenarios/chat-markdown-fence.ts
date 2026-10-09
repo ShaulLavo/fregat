@@ -36,6 +36,6 @@ function fenceTokenColors(page: Page) {
     .last()
     .evaluate((pre) => {
       const tokens = pre.querySelectorAll('code > span > span')
-      return [...new Set([...tokens].map((token) => getComputedStyle(token).color))].sort()
+      return [...new Set(Array.from(tokens, (token) => getComputedStyle(token).color))].sort()
     })
 }

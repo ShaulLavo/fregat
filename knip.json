@@ -133,7 +133,7 @@
       "entry": ["hotkeys/scripts/check-samples.mjs"],
       "ignoreDependencies": ["typescript-api"],
       "vitest": {
-        "config": ["vitest.scripts.config.mjs"]
+        "config": ["vitest.scripts.config.mjs", "vitest.t3code.config.mjs"]
       }
     },
     "apps/tui": {

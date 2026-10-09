@@ -77,7 +77,7 @@ export class Participant<Snapshot = unknown> {
 
   private metadata(): Omit<ParticipantState, 'text'> {
     return {
-      frontier: [...this.frontier.values()].map((id) => ({ ...id })),
+      frontier: Array.from(this.frontier.values(), (id) => ({ ...id })),
       hostSequence: this.sequence,
       pending: Array.from(this.pending.values(), ({ envelope }) => cloneEnvelope(envelope)),
       blocked: this.blocked.map((id) => ({ ...id })),
@@ -205,7 +205,7 @@ export class Participant<Snapshot = unknown> {
       this.confirmed = this.options.engine.snapshot()
       this.acknowledged = []
     }
-    this.undoManager.reject([...this.historyRejected, ...this.blocked])
+    this.undoManager.reject(this.historyRejected.concat(this.blocked))
     this.publish()
   }
 
@@ -217,10 +217,9 @@ export class Participant<Snapshot = unknown> {
     allocated: readonly Envelope[] = [],
   ): void {
     const pending = new Map<string, Envelope>()
-    for (const edit of [
-      ...recovered,
-      ...Array.from(this.pending.values(), ({ envelope }) => envelope),
-    ])
+    for (const edit of recovered.concat(
+      Array.from(this.pending.values(), ({ envelope }) => envelope),
+    ))
       pending.set(editKey(edit.id), cloneEnvelope(edit))
     this.pending = new Map(
       Array.from(pending, ([key, envelope]) => [key, { envelope, applied: false }]),

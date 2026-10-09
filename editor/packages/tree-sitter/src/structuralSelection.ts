@@ -79,7 +79,7 @@ export const expandTreeSitterSelection = async (
     const stack = stackForSelection(options, index, input.ranges[index])
     const previous = stack.at(-1)
     if (previous && rangesEqual(previous, range)) return stack
-    return [...stack, range]
+    return stack.concat([range])
   })
 }
 
@@ -237,7 +237,7 @@ const stackWithTop = (
   const top = stack.at(-1)
   if (top && rangesEqual(top, range)) return stack
   if (stack.length === 0) return [range]
-  return [...stack.slice(0, -1), range]
+  return stack.slice(0, -1).concat([range])
 }
 
 const stackForSelection = (

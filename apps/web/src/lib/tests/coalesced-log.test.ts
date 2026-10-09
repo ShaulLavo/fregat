@@ -17,7 +17,7 @@ describe('createCoalescedLogQueue', () => {
       emit: (event) => emitted.push(event),
       merge: (current, next) => ({
         latestPath: next.path,
-        paths: [...pathsFromEvent(current), String(next.path)],
+        paths: pathsFromEvent(current).concat([String(next.path)]),
       }),
     })
 

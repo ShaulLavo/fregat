@@ -38,7 +38,7 @@ describe('released setting ids', () => {
   it('lists every key a migration retires', () => {
     // Retiring an id that was never released means the record has a hole in it:
     // the id shipped, or the migration is describing something that never did.
-    expect([...retired].filter((id) => !RELEASED_IDS.includes(id))).toEqual([])
+    expect(Array.from(retired).filter((id) => !RELEASED_IDS.includes(id))).toEqual([])
   })
 
   it('never drops an id from the record', () => {

@@ -125,11 +125,9 @@ function expectedLatencies(sample, config) {
 
 function validateMemory(memory, scenario) {
   if (scenario === 'churn' && !memory.postChurn) fail('Missing post-churn memory snapshot')
-  for (const snapshot of [
-    memory.before,
-    memory.after,
-    ...(memory.postChurn ? [memory.postChurn] : []),
-  ]) {
+  for (const snapshot of [memory.before, memory.after].concat(
+    memory.postChurn ? [memory.postChurn] : [],
+  )) {
     if (!snapshot) fail('Missing memory snapshot')
     percentile(
       ['usedBytes', 'totalBytes', 'documents', 'nodes', 'jsEventListeners'].map(
@@ -165,7 +163,7 @@ function groups(result) {
   for (const sample of result.samples) {
     for (const [metric, values] of Object.entries(sample.latencyMs)) {
       const key = `${sample.fixture}/${sample.scenario}/${sample.state}/${metric}`
-      grouped.set(key, [...(grouped.get(key) ?? []), ...values])
+      grouped.set(key, (grouped.get(key) ?? []).concat(values))
     }
   }
   return grouped
@@ -191,7 +189,7 @@ function addResourceSample(grouped, sample) {
   if (sample.memory.postChurn) counts.postChurnHeapBytes = sample.memory.postChurn.usedBytes
   for (const [metric, value] of Object.entries(counts)) {
     const key = `${prefix}/${metric}`
-    grouped.set(key, [...(grouped.get(key) ?? []), value])
+    grouped.set(key, (grouped.get(key) ?? []).concat([value]))
   }
 }
 
@@ -252,7 +250,7 @@ export function compare(baseline, candidate, calibration) {
   const proposed = groups(candidate)
   same([...reference.keys()].sort(), [...proposed.keys()].sort(), 'metric coverage')
   same([...reference.keys()].sort(), Object.keys(calibration.limits).sort(), 'calibration coverage')
-  const metrics = [...proposed].map(([key, values]) => {
+  const metrics = Array.from(proposed, ([key, values]) => {
     const limit = calibration.limits[key]
     if (
       !Number.isFinite(limit.p50Ms) ||
@@ -289,7 +287,7 @@ function compareResources(baseline, candidate, limits) {
     Object.keys(limits ?? {}).sort(),
     'resource calibration coverage',
   )
-  return [...proposed].map(([key, values]) => {
+  return Array.from(proposed, ([key, values]) => {
     const max = percentile(values, 1)
     const limit = limits[key]
     if (!Number.isFinite(limit.max) || limit.max < 0) fail(`Invalid resource limit ${key}`)

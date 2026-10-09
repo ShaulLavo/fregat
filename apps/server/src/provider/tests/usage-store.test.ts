@@ -2187,10 +2187,8 @@ async function nativeClaudeFixture(kind: 'claude' | 'codex' = 'claude') {
   const driver = {
     ...mockDriver,
     driverKind: v.parse(providerDriverKindSchema, kind),
-    environment: (config: Parameters<typeof mockDriver.environment>[0]) => [
-      ...mockDriver.environment(config, WORK),
-      { name: 'CLAUDE_CONFIG_DIR', value: root },
-    ],
+    environment: (config: Parameters<typeof mockDriver.environment>[0]) =>
+      mockDriver.environment(config, WORK).concat([{ name: 'CLAUDE_CONFIG_DIR', value: root }]),
   }
   const registry = new ProviderAdapterRegistry({
     services: { cwd: process.cwd() },

@@ -202,7 +202,7 @@ export const backspaceSelections = (
     .map((selection) => resolveSelection(snapshot, selection))
     .map((selection) => backspaceTargetForSelection(snapshot, selection, tabSize))
   const lastAddedTarget = targets[normalized.lastAddedIndex ?? 0]
-  const orderedTargets = targets.toSorted(compareSelectionEditTargets)
+  const orderedTargets = targets.sort(compareSelectionEditTargets)
   const edits = mergeOrderedTargetRanges(orderedTargets).map((range) => rangeToEdit(range, ''))
   const nextSnapshot = applyEdits(snapshot, edits)
 

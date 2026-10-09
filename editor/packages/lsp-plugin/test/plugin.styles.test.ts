@@ -99,14 +99,15 @@ function resolve(value: string | undefined, canvas: ThemeCanvas): string {
 // The rules keyed by declared type are read rather than the ones keyed by the viewer's preference:
 // both carry the same value, and only these two sit unwrapped on a line of their own.
 function declaredColors(canvas: ThemeCanvas): ReadonlyMap<string, string> {
-  const rules = [...document.head.querySelectorAll('style')]
-    .map((element) => element.textContent ?? '')
-    .join('\n')
+  const rules = Array.from(
+    document.head.querySelectorAll('style'),
+    (element) => element.textContent ?? '',
+  ).join('\n')
   const pattern = new RegExp(
     `^\\[data-editor-theme-type='${canvas}'\\] \\{ (--editor-[a-z0-9-]+): (.+); \\}$`,
     'gm',
   )
-  return new Map([...rules.matchAll(pattern)].map((match) => [match[1] ?? '', match[2] ?? '']))
+  return new Map(Array.from(rules.matchAll(pattern), (match) => [match[1] ?? '', match[2] ?? '']))
 }
 
 function expandReferences(value: string, declared: ReadonlyMap<string, string>): string {

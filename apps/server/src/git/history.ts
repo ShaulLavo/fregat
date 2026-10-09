@@ -97,19 +97,19 @@ export class GitHistory {
       })
 
     const parent = commit.parents[0]
-    const diff = await runner.run([
-      'diff-tree',
-      '--no-commit-id',
-      '--raw',
-      '--no-abbrev',
-      '-r',
-      '-z',
-      '--find-renames',
-      '--no-ext-diff',
-      '--no-textconv',
-      ...(parent ? [parent, commit.id] : ['--root', commit.id]),
-      '--',
-    ])
+    const diff = await runner.run(
+      [
+        'diff-tree',
+        '--no-commit-id',
+        '--raw',
+        '--no-abbrev',
+        '-r',
+        '-z',
+        '--find-renames',
+        '--no-ext-diff',
+        '--no-textconv',
+      ].concat(parent ? [parent, commit.id] : ['--root', commit.id], ['--']),
+    )
     const files = parseHistoryFiles(diff.stdout).map((file) => ({
       ...file,
       path: path.posix.join(runner.rootPath, file.path),

@@ -152,7 +152,7 @@ export function createSessionDetailSubscriptionCache(
   }
 
   function snapshot(): SessionDetailSubscriptionSnapshot[] {
-    return [...entries.values()].map((entry) => ({
+    return Array.from(entries.values(), (entry) => ({
       active: entry.active,
       attempt: entry.sync.attempt,
       error: entry.sync.error,
@@ -409,9 +409,9 @@ export function createSessionDetailSubscriptionCache(
   function evictIdleEntriesToCapacity() {
     if (entries.size <= maxCachedSubscriptions) return
 
-    const idleEntries = [...entries.values()]
+    const idleEntries = Array.from(entries.values())
       .filter(shouldEvictEntry)
-      .toSorted((left, right) => left.lastAccessedAt - right.lastAccessedAt)
+      .sort((left, right) => left.lastAccessedAt - right.lastAccessedAt)
 
     for (const entry of idleEntries) {
       if (entries.size <= maxCachedSubscriptions) return

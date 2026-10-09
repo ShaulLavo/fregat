@@ -49,35 +49,38 @@ test.each(['pwa-unknown', 'pwa-installed'])(
         .trim()
         .split('\n')
         .map((line) => JSON.parse(line))
-      expect(requests.filter((request) => request.method.startsWith('PWA.'))).toEqual([
-        {
+      expect(requests.filter((request) => request.method.startsWith('PWA.'))).toEqual(
+        Array.of<{ id: unknown; method: string; params: Record<string, string> }>({
           id: expect.any(Number),
           method: 'PWA.getOsAppState',
           params: { manifestId: 'http://localhost:123/platform/' },
-        },
-        ...(mode === 'pwa-unknown'
-          ? [
-              {
-                id: expect.any(Number),
-                method: 'PWA.install',
-                params: {
-                  manifestId: 'http://localhost:123/platform/',
-                  installUrlOrBundleUrl: 'http://localhost:123/platform/install.html',
+        }).concat(
+          mode === 'pwa-unknown'
+            ? [
+                {
+                  id: expect.any(Number),
+                  method: 'PWA.install',
+                  params: {
+                    manifestId: 'http://localhost:123/platform/',
+                    installUrlOrBundleUrl: 'http://localhost:123/platform/install.html',
+                  },
                 },
-              },
-              {
-                id: expect.any(Number),
-                method: 'PWA.getOsAppState',
-                params: { manifestId: 'http://localhost:123/platform/' },
-              },
-            ]
-          : []),
-        {
-          id: expect.any(Number),
-          method: 'PWA.changeAppUserSettings',
-          params: { manifestId: 'http://localhost:123/platform/', displayMode: 'standalone' },
-        },
-      ])
+                {
+                  id: expect.any(Number),
+                  method: 'PWA.getOsAppState',
+                  params: { manifestId: 'http://localhost:123/platform/' },
+                },
+              ]
+            : [],
+          [
+            {
+              id: expect.any(Number),
+              method: 'PWA.changeAppUserSettings',
+              params: { manifestId: 'http://localhost:123/platform/', displayMode: 'standalone' },
+            },
+          ],
+        ),
+      )
       expect(
         requests.some((request) =>
           /^(Runtime\.|Page\.|Target\.setAutoAttach)/.test(request.method),

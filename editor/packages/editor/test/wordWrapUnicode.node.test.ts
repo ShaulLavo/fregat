@@ -11,12 +11,12 @@ const rules: LineBreakRules = { width: 4, tabSize: 4, words: true, advance: null
 function ends(text: string, breaks: readonly number[], measured = rules): number[] {
   const line = createWordWrapLine()
   let start = 0
-  for (const end of [...breaks, text.length]) {
+  for (const end of breaks.concat([text.length])) {
     appendWordWrapText(line, text.slice(start, end), 0, end - start, measured)
     start = end
   }
   finishWordWrapLine(line, measured)
-  return [...line.ends, text.length]
+  return line.ends.concat([text.length])
 }
 
 test('keeps a surrogate pair whole at the wrap boundary', () => {
@@ -52,8 +52,11 @@ test.each(['aaa😀bb', 'aaaébb', 'aa👩‍💻bbb', 'a🇸🇬bbb', 'abc de
 test('never splits a grapheme even when a joined emoji is wider than the row', () => {
   const text = 'ab👩‍💻cdéf'
   const boundaries = new Set(
-    [0, ...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)].map((part) =>
-      typeof part === 'number' ? part : part.index,
+    [0].concat(
+      Array.from(
+        new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text),
+        (part) => part.index,
+      ),
     ),
   )
   boundaries.add(text.length)

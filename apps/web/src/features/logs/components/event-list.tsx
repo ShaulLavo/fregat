@@ -61,7 +61,11 @@ export function LogsEventList({
   })
 
   function dismissEvents(ids: readonly string[]) {
-    setDismissedIds((previous) => new Set([...previous, ...ids]))
+    setDismissedIds((previous) => {
+      const next = new Set(previous)
+      for (const id of ids) next.add(id)
+      return next
+    })
     if (inspectedEventId && ids.includes(inspectedEventId)) onInspectEvent(null)
   }
 

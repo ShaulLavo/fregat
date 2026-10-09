@@ -62,15 +62,14 @@ export function createCriticalEditorCorePlugins(
     indentationGuidesEnabled &&
     editorIndentationGuidesSupported(languageId) &&
     !editorPerformanceFeatureDisabled('scope-lines')
-  return [
-    ...(options.analysisAllowed && options.syntaxHighlightingEnabled
+  return (
+    options.analysisAllowed && options.syntaxHighlightingEnabled
       ? createEditorSyntaxHighlightingPlugins(languageId)
-      : []),
-    ...(options.analysisAllowed && languageId === 'markdown'
-      ? [createMarkdownAuthoringPlugin()]
-      : []),
-    createLineGutterPlugin(),
-    ...(options.analysisAllowed
+      : []
+  ).concat(
+    options.analysisAllowed && languageId === 'markdown' ? [createMarkdownAuthoringPlugin()] : [],
+    [createLineGutterPlugin()],
+    options.analysisAllowed
       ? [
           createFoldGutterPlugin({
             width: 16,
@@ -78,12 +77,10 @@ export function createCriticalEditorCorePlugins(
             iconClassName: 'size-3 [[data-editor-fold-state=collapsed]_&]:-rotate-90',
           }),
         ]
-      : []),
-    ...(minimapEnabled && !editorPerformanceFeatureDisabled('minimap')
-      ? [createMinimapPlugin()]
-      : []),
-    createEditorFindPlugin(),
-    ...(options.analysisAllowed
+      : [],
+    minimapEnabled && !editorPerformanceFeatureDisabled('minimap') ? [createMinimapPlugin()] : [],
+    [createEditorFindPlugin()],
+    options.analysisAllowed
       ? [
           createMergeConflictPlugin({ compare: options.compareMergeConflict }),
           createBracketMatchPlugin({
@@ -96,16 +93,16 @@ export function createCriticalEditorCorePlugins(
           }),
           createDocumentLinkPlugin(),
         ]
-      : []),
-    ...(includeGuides ? [createScopeLinesPlugin()] : []),
+      : [],
+    includeGuides ? [createScopeLinesPlugin()] : [],
     // Critical rather than lazy: loading it after first paint would flash raw markdown first. It
     // derives its replacements from Markdown records, so a file renders as source
     // while syntax highlighting is off.
-    ...(options.analysisAllowed && languageId === 'markdown' && options.markdownPreview !== false
+    options.analysisAllowed && languageId === 'markdown' && options.markdownPreview !== false
       ? [createMarkdownPreviewPlugin({ openLink: options.openMarkdownLink })]
-      : []),
-    createPlatformEditorLoggingPlugin(),
-  ]
+      : [],
+    [createPlatformEditorLoggingPlugin()],
+  )
 }
 
 export function createDecodePluginLoader(mode: DecodeMode | null): EditorPlugin {

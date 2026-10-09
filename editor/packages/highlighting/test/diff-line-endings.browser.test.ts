@@ -96,14 +96,14 @@ function paint(plugin: DiffPlugin) {
 
 /** For each `const` in the editor's text, the token painted over it, as the editor slices it. */
 function paintedConsts(buffer: string, tokens: readonly Readonly<EditorToken>[]) {
-  return [...buffer.matchAll(/const/g)].map(({ index }) => {
+  return Array.from(buffer.matchAll(/const/g), ({ index }) => {
     const token = tokens.find((candidate) => candidate.start <= index && candidate.end > index)
     return token ? [token.start, buffer.slice(token.start, token.end)] : null
   })
 }
 
 function constStarts(buffer: string) {
-  return [...buffer.matchAll(/const/g)].map(({ index }) => [index, 'const'])
+  return Array.from(buffer.matchAll(/const/g), ({ index }) => [index, 'const'])
 }
 
 function waitForSyntax(plugin: DiffPlugin): Promise<void> {

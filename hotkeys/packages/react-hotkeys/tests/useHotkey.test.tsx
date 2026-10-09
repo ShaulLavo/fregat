@@ -196,17 +196,17 @@ describe('useHotkey', () => {
         { initialProps: { enabled: true } },
       )
 
-      const idBefore = [...manager.registrations.state.keys()][0]
+      const idBefore = Array.from(manager.registrations.state.keys())[0]
       expect(manager.registrations.state.size).toBe(1)
       expect(idBefore).toBeDefined()
 
       rerender({ enabled: false })
       expect(manager.registrations.state.size).toBe(1)
-      expect([...manager.registrations.state.keys()][0]).toBe(idBefore)
+      expect(Array.from(manager.registrations.state.keys())[0]).toBe(idBefore)
       expect(manager.registrations.state.get(idBefore!)?.options.enabled).toBe(false)
 
       rerender({ enabled: true })
-      expect([...manager.registrations.state.keys()][0]).toBe(idBefore)
+      expect(Array.from(manager.registrations.state.keys())[0]).toBe(idBefore)
       expect(manager.registrations.state.get(idBefore!)?.options.enabled).not.toBe(false)
     })
   })

@@ -47,7 +47,9 @@ const schema = v.object({
   selected: v.pipe(v.array(v.string()), v.maxLength(MAX_ENTRIES)),
   scrollTop: v.pipe(v.number(), v.minValue(0)),
 })
-type Record = v.InferOutput<typeof schema>
+type Record = Omit<v.InferOutput<typeof schema>, 'selected'> & {
+  readonly selected: readonly string[]
+}
 type Observation = { readonly record: Record; readonly model: TreeModel }
 const owners = new WeakMap<
   QueryClient,
@@ -120,7 +122,7 @@ export function captureTree(
     ...view,
     observedAt,
     paths: model.paths,
-    entries: [...model.entriesByTreePath].map(([path, value]) => {
+    entries: Array.from(model.entriesByTreePath, ([path, value]) => {
       const { children: _children, ...metadata } = value
       return [path, metadata]
     }),

@@ -166,7 +166,7 @@ async function standInProduction() {
 }
 
 function wrapper(args: readonly string[], cwd?: string) {
-  return spawnSync(process.execPath, [RUN, ...args], { cwd, encoding: 'utf8' })
+  return spawnSync(process.execPath, [RUN].concat(args), { cwd, encoding: 'utf8' })
 }
 
 describe.skipIf(!userScopes)('slice roots', () => {
@@ -178,20 +178,21 @@ describe.skipIf(!userScopes)('slice roots', () => {
         (await heavy(box, 'own-root', ['true'], { jobClass: 'light', machine: true })).code,
       ).toBe(0)
       const unrooted = lifecycleBox(65536)
-      const result = wrapper([
-        ...production.args,
-        '--proc',
-        unrooted.proc,
-        '--settings-home',
-        unrooted.home,
-        '--state-dir',
-        unrooted.state,
-        '--log-dir',
-        unrooted.logs,
-        'no-root',
-        '--',
-        'true',
-      ])
+      const result = wrapper(
+        production.args.concat([
+          '--proc',
+          unrooted.proc,
+          '--settings-home',
+          unrooted.home,
+          '--state-dir',
+          unrooted.state,
+          '--log-dir',
+          unrooted.logs,
+          'no-root',
+          '--',
+          'true',
+        ]),
+      )
       expect(result.status).toBe(0)
       expect(recordOf(unrooted, 'no-root')?.slice).toMatch(/^heavys[0-9a-f]{10}-[0-9a-f]+\.slice$/)
       expect(alive(production.pid)).toBe(true)
@@ -208,20 +209,21 @@ describe.skipIf(!userScopes)('slice roots', () => {
     const production = await standInProduction()
     try {
       const box = lifecycleBox(65536)
-      const result = wrapper([
-        ...production.args,
-        '--proc',
-        box.proc,
-        '--settings-home',
-        box.home,
-        '--state-dir',
-        box.state,
-        '--slice-root',
-        production.root,
-        'refused',
-        '--',
-        'true',
-      ])
+      const result = wrapper(
+        production.args.concat([
+          '--proc',
+          box.proc,
+          '--settings-home',
+          box.home,
+          '--state-dir',
+          box.state,
+          '--slice-root',
+          production.root,
+          'refused',
+          '--',
+          'true',
+        ]),
+      )
       expect(result.status).toBe(2)
       expect(result.stderr).toContain(
         `--slice-root ${production.root} belongs to the state directory`,
@@ -242,9 +244,7 @@ describe.skipIf(!userScopes)('slice roots', () => {
       expect(sliceRootFor(alias)).toBe(sliceRootFor(box.state))
       const viaAlias = spawn(
         process.execPath,
-        [
-          RUN,
-          ...production.args,
+        [RUN].concat(production.args, [
           '--proc',
           box.proc,
           '--settings-home',
@@ -258,7 +258,7 @@ describe.skipIf(!userScopes)('slice roots', () => {
           'bash',
           '-c',
           'echo $$; exec sleep 60',
-        ],
+        ]),
         { stdio: ['ignore', 'pipe', 'ignore'] },
       )
       let out = ''
@@ -268,20 +268,21 @@ describe.skipIf(!userScopes)('slice roots', () => {
       const killed = new Promise((resolve) => viaAlias.on('exit', resolve))
       viaAlias.kill('SIGKILL')
       await killed
-      const physical = wrapper([
-        ...production.args,
-        '--proc',
-        box.proc,
-        '--settings-home',
-        box.home,
-        '--state-dir',
-        box.state,
-        '--log-dir',
-        box.logs,
-        'physical',
-        '--',
-        'true',
-      ])
+      const physical = wrapper(
+        production.args.concat([
+          '--proc',
+          box.proc,
+          '--settings-home',
+          box.home,
+          '--state-dir',
+          box.state,
+          '--log-dir',
+          box.logs,
+          'physical',
+          '--',
+          'true',
+        ]),
+      )
       expect(physical.status).toBe(0)
       expect(physical.stderr).toMatch(
         /stopping heavys[0-9a-f]{10}-[0-9a-f]+\.slice: its wrapper is gone/,

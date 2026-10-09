@@ -52,7 +52,7 @@ function changesFor(fiber: Fiber): string[] {
   const changes: string[] = []
   const props = (fiber.memoizedProps ?? {}) as Record<string, unknown>
   const prevProps = (previous.memoizedProps ?? {}) as Record<string, unknown>
-  for (const key of new Set([...Object.keys(props), ...Object.keys(prevProps)])) {
+  for (const key of new Set(Object.keys(props).concat(Object.keys(prevProps)))) {
     if (!Object.is(props[key], prevProps[key])) changes.push(`prop:${key}`)
   }
   if (FUNCTION_TAGS.has(fiber.tag)) {
@@ -87,7 +87,7 @@ function touchesDom(fiber: Fiber) {
 }
 
 function report() {
-  return [...tallies.entries()].map(([component, tally]) => ({
+  return Array.from(tallies.entries(), ([component, tally]) => ({
     changes: [...tally.changes.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)

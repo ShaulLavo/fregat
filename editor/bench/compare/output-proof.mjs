@@ -43,9 +43,9 @@ export async function outputProof() {
     view.setUint32(i * 12 + 8, ids[styleIds[i]], true)
   }
   const hash = async (bytes) =>
-    [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
-      .map((byte) => byte.toString(16).padStart(2, '0'))
-      .join('')
+    Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (byte) =>
+      byte.toString(16).padStart(2, '0'),
+    ).join('')
   const encode = (value) => new TextEncoder().encode(JSON.stringify(value))
   const proof = {
     tokenCount: starts.length,

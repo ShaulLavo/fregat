@@ -84,11 +84,10 @@ describe('whole-word checks at chunk edges', () => {
         query,
         all,
       })
-      for (const range of [
-        ...all,
+      for (const range of all.concat([
         { start: 0, end: 0 },
         { start: text.length, end: text.length },
-      ]) {
+      ])) {
         expectNextMatches(source, text, query, range)
       }
     }
@@ -102,7 +101,7 @@ describe('whole-word checks at chunk edges', () => {
         query,
         all,
       })
-      for (const range of [...all, { start: 0, end: 0 }]) {
+      for (const range of all.concat([{ start: 0, end: 0 }])) {
         expectNextMatches(source, text, query, range, GROWING)
       }
     }

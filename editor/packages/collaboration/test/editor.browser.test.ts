@@ -280,7 +280,7 @@ test.skipIf(!__COLLABORATION_MEASURE__)(
         counts.push({ authored, reconciles, publications })
       }
       expect(new Set(fixture.texts()).size).toBe(1)
-      const sorted = times.toSorted((a, b) => a - b)
+      const sorted = times.sort((a, b) => a - b)
       results.push({
         mode,
         keys: 100,

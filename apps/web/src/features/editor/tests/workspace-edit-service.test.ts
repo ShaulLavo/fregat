@@ -1661,7 +1661,7 @@ function request(
 ): ApplyWorkspaceEditRequest {
   const documents = options.documents ?? []
   const currentUris = new Set(
-    options.currentUris ?? [options.originUri, ...documents.map((entry) => entry.uri)],
+    options.currentUris ?? [options.originUri].concat(documents.map((entry) => entry.uri)),
   )
   const plan: ParsedWorkspaceEdit = { annotations: new Map(), operations }
   return {

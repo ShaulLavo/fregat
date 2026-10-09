@@ -580,7 +580,7 @@ export function AgentRail({
             !candidate.archivedAt &&
             snapshot.worktreeById[candidate.worktreeId]?.projectId === item.projectId,
         )
-        .toSorted((left, right) => compareSessionsByActivity(left, right, sessionSortOrder))[0]
+        .sort((left, right) => compareSessionsByActivity(left, right, sessionSortOrder))[0]
       if (survivor) onSelectSession(survivor.id)
       else onSelectWorktree(item.worktree.id)
     }

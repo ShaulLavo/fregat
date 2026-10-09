@@ -86,7 +86,7 @@ function applyEdit(edit) {
   }
   // What an agent's shell does in its checkout: `git checkout -b`, `git commit`.
   if (edit.op === 'git') {
-    execFileSync('git', ['-C', threadCwd, ...edit.args], { stdio: 'ignore' })
+    execFileSync('git', ['-C', threadCwd].concat(edit.args), { stdio: 'ignore' })
     return
   }
   if (edit.op === 'rename') {
@@ -182,7 +182,7 @@ function result(message) {
     case 'skills/list':
       return { data: [] }
     case 'thread/turns/list':
-      return { data: turns.toReversed().map((id) => ({ id })), nextCursor: null }
+      return { data: turns.map((id) => ({ id })).reverse(), nextCursor: null }
     case 'turn/interrupt':
       for (const turnId of held) {
         held.delete(turnId)

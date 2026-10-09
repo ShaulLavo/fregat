@@ -1,15 +1,20 @@
 import net from 'node:net'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { afterEach, expect, test } from 'vitest'
-import configFn, { bunInstallCacheRoot, requireLiteralAddress } from './vite.config'
+import configFn, {
+  bunDependencyRoots,
+  bunInstallCacheRoot,
+  requireLiteralAddress,
+} from './vite.config'
+
+const customCacheRoot = path.join(os.tmpdir(), 'fregat-bun-cache')
 
 test('bunInstallCacheRoot reads BUN_INSTALL_CACHE_DIR when set', () => {
-  expect(bunInstallCacheRoot({ BUN_INSTALL_CACHE_DIR: '/work/cache/bun/cache' })).toBe(
-    '/work/cache/bun/cache',
-  )
+  expect(bunInstallCacheRoot({ BUN_INSTALL_CACHE_DIR: customCacheRoot })).toBe(customCacheRoot)
 })
 
 test('bunInstallCacheRoot falls back to the default Bun cache location', () => {
@@ -20,15 +25,34 @@ test('dev server fs.allow includes the bun install cache root', () => {
   // Bun's isolated linker can symlink a dependency straight into this cache
   // instead of the workspace; Vite denies serving a real path outside `fs.allow`.
   const previous = process.env.BUN_INSTALL_CACHE_DIR
-  process.env.BUN_INSTALL_CACHE_DIR = '/work/cache/bun/cache'
+  process.env.BUN_INSTALL_CACHE_DIR = customCacheRoot
   try {
     // A build never reads dev-linked packages (that needs editor deps in package.json).
     const resolved = configFn({ command: 'build', mode: 'production' })
-    expect(resolved.server?.fs?.allow).toContain('/work/cache/bun/cache')
+    expect(resolved.server?.fs?.allow).toContain(customCacheRoot)
   } finally {
     if (previous === undefined) delete process.env.BUN_INSTALL_CACHE_DIR
     else process.env.BUN_INSTALL_CACHE_DIR = previous
   }
+})
+
+test('bunDependencyRoots resolves a linked installed dependency store', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'fregat-dependency-roots-'))
+  try {
+    const root = path.join(directory, 'checkout')
+    const store = path.join(directory, 'dependencies')
+    mkdirSync(path.join(root, 'node_modules'), { recursive: true })
+    mkdirSync(store)
+    symlinkSync(store, path.join(root, 'node_modules/.bun'), 'junction')
+    expect(bunDependencyRoots(root)).toEqual([realpathSync(store)])
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('dev server allows the real installed dependency store', () => {
+  const resolved = configFn({ command: 'build', mode: 'production' })
+  for (const store of bunDependencyRoots()) expect(resolved.server?.fs?.allow).toContain(store)
 })
 
 test('requireLiteralAddress falls back when WEB_HOST is unset', () => {

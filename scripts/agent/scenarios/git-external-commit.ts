@@ -17,7 +17,7 @@ export const gitExternalCommit: Scenario = {
       await fixtureGit(fixture, ['init', '-b', 'main'])
       await writeFile(path.join(fixture, 'base.txt'), 'base\n')
       await fixtureGit(fixture, ['add', '.'])
-      await fixtureGit(fixture, [...commit, 'base'])
+      await fixtureGit(fixture, commit.concat(['base']))
       await writeFile(path.join(fixture, 'change.txt'), 'change\n')
       await fixtureGit(fixture, ['add', 'change.txt'])
       await openFixtureWorkspace(page, fixture)
@@ -29,7 +29,7 @@ export const gitExternalCommit: Scenario = {
 
       // Only `.git` changes: the worktree file stays as it is.
       const committedAt = Date.now()
-      await fixtureGit(fixture, [...commit, 'external'])
+      await fixtureGit(fixture, commit.concat(['external']))
       await row.waitFor({ state: 'detached', timeout: 4_000 })
       console.log(JSON.stringify({ rowGoneMs: Date.now() - committedAt }))
       await step('committed')

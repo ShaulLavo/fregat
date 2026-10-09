@@ -102,7 +102,7 @@ async function installAndLaunch(
 ): Promise<ChromiumWindow> {
   const supervisor = startupSupervisor(options.startup, () => performance.now())
   const child = Bun.spawn({
-    cmd: [options.candidate.executable, ...chromiumArguments(options.candidate, profile)],
+    cmd: [options.candidate.executable].concat(chromiumArguments(options.candidate, profile)),
     stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'],
   })
   const spawnMs = Math.round(supervisor.elapsedMs())
@@ -253,13 +253,12 @@ async function launchInstalledBrowser(
 ): Promise<ChromiumWindow> {
   options.signal?.throwIfAborted()
   const child = Bun.spawn({
-    cmd: [
-      options.candidate.executable,
-      ...chromiumArguments(options.candidate, profile, {
+    cmd: [options.candidate.executable].concat(
+      chromiumArguments(options.candidate, profile, {
         appId: options.appId,
         url: options.url,
       }),
-    ],
+    ),
     stdio: ['ignore', 'ignore', 'ignore'],
   })
   const supervisor = startupSupervisor(options.startup, () => performance.now())

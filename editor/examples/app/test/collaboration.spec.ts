@@ -29,10 +29,9 @@ test('peers with the same base names have distinct visible names across tabs', a
     await other.goto(await page.locator('#invitation').inputValue())
     await other.locator('#start').click()
     await expect(page.locator('.peer-header span').filter({ hasText: '4 peers' })).toHaveCount(2)
-    const names = [
-      ...(await page.locator('.peer-header strong').allTextContents()),
-      ...(await other.locator('.peer-header strong').allTextContents()),
-    ]
+    const names = (await page.locator('.peer-header strong').allTextContents()).concat(
+      await other.locator('.peer-header strong').allTextContents(),
+    )
     expect(new Set(names).size).toBe(4)
     for (const name of names) expect(name).toMatch(/^Peer (one|two) · [\da-f]{8}$/)
   } finally {

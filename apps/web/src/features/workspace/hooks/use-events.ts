@@ -601,13 +601,13 @@ async function applyTreeRefreshOperation(
     await queryClient.invalidateQueries({ queryKey: fileSystemKeys.tree(rootPath), exact: true })
     return
   }
-  const directories = [...(model?.loadedDirectoryPaths ?? [])].map((treePath) =>
+  const directories = Array.from(model?.loadedDirectoryPaths ?? [], (treePath) =>
     treePath ? `${operation.path}/${treePath}` : operation.path,
   )
   await Promise.all(
-    [operation.path, ...directories].map((path) =>
-      refreshTreeDirectory(queryClient, rootPath, path, signal),
-    ),
+    [operation.path]
+      .concat(directories)
+      .map((path) => refreshTreeDirectory(queryClient, rootPath, path, signal)),
   )
 }
 
@@ -965,12 +965,9 @@ function captureWorkspaceConflictSources(
   }
   const client = clientForQueryClient(context.queryClient)
   const local = new Map<FilesystemPath, FilesystemLocalCapture>()
-  const capturedPaths = [
-    ...paths,
-    ...Object.values(context.conflictStore.getState().conflicts).map(
-      (conflict) => conflict.localPath,
-    ),
-  ]
+  const capturedPaths = paths.concat(
+    Object.values(context.conflictStore.getState().conflicts).map((conflict) => conflict.localPath),
+  )
   for (const rawPath of capturedPaths) {
     const path = filesystemPath(rawPath)
     if (local.has(path)) continue

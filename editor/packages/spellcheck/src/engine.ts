@@ -41,7 +41,7 @@ export function createSpellEngine(source: SpellEngineSource): SpellEngine {
     isCorrect,
     check: (words) => [...new Set(words)].filter((word) => !isCorrect(word)),
     suggest(word, limit) {
-      const sources = acceptedTrie ? [...tries, acceptedTrie] : tries
+      const sources = acceptedTrie ? tries.concat([acceptedTrie]) : tries
       return rankedSuggestions(sources, word, limit, weightMap)
     },
     setAcceptedWords(words) {
@@ -67,7 +67,7 @@ function rankedSuggestions(
   const candidates = tries.flatMap((trie) => trie.suggestWithCost(word, options))
   const best = new Map<string, Suggestion>()
 
-  for (const candidate of candidates.toSorted(byCost)) {
+  for (const candidate of candidates.sort(byCost)) {
     const shaped = matchCase(word, candidate.word)
     const key = shaped.toLowerCase()
     if (key === word.toLowerCase() || best.has(key)) continue

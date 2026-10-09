@@ -29,7 +29,7 @@ test('keeps licence and nested notices, deduplicates symlinks, and orders packag
       path.join(root, 'node_modules/alias/other.js'),
     ]
     const result = packageNotices(files)
-    expect(result).toBe(packageNotices([...files].reverse()))
+    expect(result).toBe(packageNotices(files.reverse()))
     expect(result.match(/alpha@1.0.0/g)).toHaveLength(1)
     expect(result).toContain('Copyright Alpha\nMIT terms')
     expect(result).toContain('Grammar copyright')

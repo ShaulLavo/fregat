@@ -59,7 +59,7 @@ export function createWorkbenchTree(session: SettingsSession, rootPath: string) 
     }
   }
   async function refresh() {
-    await Promise.all([...new Set(['', ...directories.keys()])].map(load))
+    await Promise.all([...new Set([''].concat(Array.from(directories.keys())))].map(load))
     const result = await session.client.git.status.get({
       query: { path: rootPath },
       fetch: { signal },

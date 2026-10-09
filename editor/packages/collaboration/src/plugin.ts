@@ -88,7 +88,7 @@ export function createCollaborationPlugin(options: CollaborationPluginOptions): 
         ) => {
           const batch = identityEdits(before, edits)
             .filter((edit) => edit.from !== edit.to || edit.text)
-            .toSorted((a, b) => b.from - a.from || b.to - a.to)
+            .sort((a, b) => b.from - a.from || b.to - a.to)
           authoring = true
           try {
             const envelopes = participant.localBatch(

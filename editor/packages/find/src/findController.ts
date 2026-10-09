@@ -934,21 +934,21 @@ function orderedMatchSelections(
   const currentIndex = currentMatch ? findMatchIndex(matches, currentMatch) : -1
   if (!currentSelection || currentIndex < 0) return selections
 
-  const current = {
+  const current: EditorFindSelectionRange = {
     anchor: currentSelection.anchorOffset,
     head: currentSelection.headOffset,
     affinity: currentSelection.affinity,
   }
-  if (currentIndex === 0) return [current, ...selections.slice(1)]
-  return [current, ...selections.slice(0, currentIndex), ...selections.slice(currentIndex + 1)]
+  if (currentIndex === 0) return [current].concat(selections.slice(1))
+  return [current].concat(selections.slice(0, currentIndex), selections.slice(currentIndex + 1))
 }
 
 function selectionForMatch(match: FindMatch): EditorFindSelectionRange {
   return { anchor: match.start, head: match.end, affinity: 'after' }
 }
 
-function mergeAdjacentReplaceEdits(edits: readonly TextEdit[]): readonly TextEdit[] {
-  const sorted = edits.toSorted((left, right) => left.from - right.from || left.to - right.to)
+function mergeAdjacentReplaceEdits(edits: TextEdit[]): readonly TextEdit[] {
+  const sorted = edits.sort((left, right) => left.from - right.from || left.to - right.to)
   const merged: TextEdit[] = []
   for (const edit of sorted) mergeReplaceEdit(merged, edit)
   return merged

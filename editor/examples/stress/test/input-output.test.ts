@@ -47,9 +47,10 @@ test.each(['live', 'static'])(
               InputOutput: Record<string, (index: number) => { chunks: number; covered: number }>
             }
           ).InputOutput[name]!
-          const texts = [
-            ...document.querySelectorAll('#view-0 [data-editor-virtual-chunk-start]'),
-          ].map((chunk) => chunk.firstChild!)
+          const texts = Array.from(
+            document.querySelectorAll('#view-0 [data-editor-virtual-chunk-start]'),
+            (chunk) => chunk.firstChild!,
+          )
           const ranges = texts.map((node) => {
             const boundary = {
               startContainer: node,

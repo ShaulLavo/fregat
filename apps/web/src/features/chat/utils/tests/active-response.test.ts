@@ -17,7 +17,7 @@ test('keeps provider turns beneath one prompt active across a restart, including
   ]
   const entries = [workLogEntry({ turnId: toolTurn, createdAt: '2026-05-28T00:00:02.000Z' })]
 
-  expect([...chatActiveResponseTurnIds({ messages, entries, latestTurn })]).toEqual([
+  expect(Array.from(chatActiveResponseTurnIds({ messages, entries, latestTurn }))).toEqual([
     latestTurn.turnId,
     priorTurn,
     toolTurn,
@@ -33,7 +33,7 @@ test('a new prompt excludes older messages even when it shares their timestamp',
     chatMessage({ turnId: latestTurn.turnId, createdAt: '2026-05-28T00:00:01.000Z' }),
   ]
 
-  expect([...chatActiveResponseTurnIds({ messages, entries: [], latestTurn })]).toEqual([
+  expect(Array.from(chatActiveResponseTurnIds({ messages, entries: [], latestTurn }))).toEqual([
     latestTurn.turnId,
   ])
 })
@@ -42,7 +42,7 @@ test('does not pull undelimited loaded history into the current response', () =>
   const latestTurn = v.parse(orchestrationLatestTurnSchema, sessionShell().latestTurn)
   const messages = [chatMessage({ turnId: v.parse(turnIdSchema, 'older-response') })]
 
-  expect([...chatActiveResponseTurnIds({ messages, entries: [], latestTurn })]).toEqual([
+  expect(Array.from(chatActiveResponseTurnIds({ messages, entries: [], latestTurn }))).toEqual([
     latestTurn.turnId,
   ])
 })
@@ -57,7 +57,7 @@ test('does not resurrect an old activity-only turn at the new prompt timestamp',
     workLogEntry({ turnId: latestTurn.turnId, createdAt: prompt.createdAt }),
   ]
 
-  expect([...chatActiveResponseTurnIds({ messages, entries, latestTurn })]).toEqual([
+  expect(Array.from(chatActiveResponseTurnIds({ messages, entries, latestTurn }))).toEqual([
     latestTurn.turnId,
   ])
 })

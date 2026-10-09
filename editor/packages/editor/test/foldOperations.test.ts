@@ -116,17 +116,17 @@ function logCollectorPlugin(events: EditorLogEvent[]): EditorPlugin {
 
 /** Mounted rows only: a retired row stays in the DOM still showing whatever it last rendered. */
 function visibleText(): string {
-  return [...document.querySelectorAll('.editor-virtualized-row:not([hidden])')]
-    .map((row) => row.textContent ?? '')
-    .join('\n')
+  return Array.from(
+    document.querySelectorAll('.editor-virtualized-row:not([hidden])'),
+    (row) => row.textContent ?? '',
+  ).join('\n')
 }
 
 function foldKeys(): readonly string[] {
-  return [
-    ...document.querySelectorAll<HTMLButtonElement>(
-      '.editor-virtualized-fold-toggle:not([hidden])',
-    ),
-  ].map((toggle) => toggle.dataset.editorFoldKey ?? '')
+  return Array.from(
+    document.querySelectorAll<HTMLButtonElement>('.editor-virtualized-fold-toggle:not([hidden])'),
+    (toggle) => toggle.dataset.editorFoldKey ?? '',
+  )
 }
 
 /** The gutter keys of the drawn regions, which are typed apart from the described ones. */

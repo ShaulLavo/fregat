@@ -12,8 +12,8 @@ import { markdownInlineReplacements } from '../../markdown/src/replacements'
 await init()
 const unit = 'read [the long label with words and averylongidentifier](https://example.com) now\n'
 const sizes = process.argv.slice(2).map(Number)
-const median = (values: readonly number[]): number =>
-  values.toSorted((a, b) => a - b)[Math.floor(values.length / 2)]!
+const median = (values: number[]): number =>
+  values.sort((a, b) => a - b)[Math.floor(values.length / 2)]!
 console.log(
   JSON.stringify({
     experiment: 'link-heavy Markdown construction',

@@ -6,7 +6,7 @@ export function findMatches(content: string, query: string): readonly ViewerPosi
 }
 
 function matchesInLine(text: string, query: string, line: number) {
-  return [...text.matchAll(new RegExp(RegExp.escape(query), 'giu'))].map((match) => ({
+  return Array.from(text.matchAll(new RegExp(RegExp.escape(query), 'giu')), (match) => ({
     line,
     character: match.index,
   }))

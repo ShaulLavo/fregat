@@ -23,11 +23,9 @@ const source = [
   '',
   '[outside](https://example.com/docs) and [reference][destination]',
   '',
-  ...table,
-  '',
-  '[destination]: target.md',
-  '',
-].join('\n')
+]
+  .concat(table, ['', '[destination]: target.md', ''])
+  .join('\n')
 
 export const markdownLinks: Scenario = {
   name: 'markdown-links',

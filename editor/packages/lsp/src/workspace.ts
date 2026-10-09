@@ -84,7 +84,7 @@ export class LspWorkspace {
   }
 
   public get documents(): readonly LspDocument[] {
-    return Array.from(this.documentsByUri.values()).map(cloneDocument)
+    return Array.from(this.documentsByUri.values(), cloneDocument)
   }
 
   public attachClient(client: LspWorkspaceSyncTarget): void {

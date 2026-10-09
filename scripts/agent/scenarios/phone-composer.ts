@@ -245,7 +245,7 @@ async function expectComposerRhythm(page: Page, width: number) {
   })
   const label = `${width}px`
   ok(layout.surface, `${label}: the composer surface is laid out`)
-  const boxes = [...layout.run, ...layout.corner]
+  const boxes = layout.run.concat(layout.corner)
   const icons = boxes.filter((box) => box.name !== 'Provider and model')
   const send = layout.corner.at(-1)
   ok(send?.name === 'Send message', `${label}: Send ends the row: ${JSON.stringify(layout.corner)}`)
@@ -270,7 +270,7 @@ async function expectComposerRhythm(page: Page, width: number) {
   const gapsOf = (group: typeof boxes) =>
     group.slice(1).map((box, index) => box.left - group[index]!.right)
   // One spacing inside the run and inside the corner group alike.
-  const inner = [...gapsOf(layout.run), ...gapsOf(layout.corner)]
+  const inner = gapsOf(layout.run).concat(gapsOf(layout.corner))
   ok(
     inner.every((gap) => Math.abs(gap - inner[0]!) <= 1),
     `${label}: uneven gaps between the controls: ${gapsOf(layout.run).join(', ')} | ${gapsOf(layout.corner).join(', ')}`,

@@ -143,7 +143,7 @@ export class LocalTranscriptUsageService {
     }
     return {
       ...aggregateTranscriptHistory(
-        [...snapshot.records, ...utilities, ...sessions],
+        snapshot.records.concat(utilities, sessions),
         query,
         this.now(),
       ),
@@ -181,11 +181,9 @@ export class LocalTranscriptUsageService {
       queryKey: ['provider', 'local-transcript-history'],
       queryFn: ({ signal }) =>
         this.scan(
-          AbortSignal.any([
-            signal,
-            this.shutdown.signal,
-            ...(options.signal ? [options.signal] : []),
-          ]),
+          AbortSignal.any(
+            [signal, this.shutdown.signal].concat(options.signal ? [options.signal] : []),
+          ),
         ),
       staleTime: 0,
       gcTime: Infinity,

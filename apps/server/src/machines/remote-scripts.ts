@@ -266,7 +266,7 @@ async function launch() {
   const log = openSync('logs/ssh-launch.log', 'a', 0o600);
   const entry = config.installation === 'release' ? [await realpath(config.entry[0])] : config.entry;
   const releaseDirectory = config.installation === 'release' ? path.dirname(path.dirname(entry[0])) : null;
-  const child = Bun.spawn({ cmd: ['nohup', process.execPath, ...entry], env: { ...process.env, ...config.env, FS_HOST: '127.0.0.1', PORT: String(port), SERVER_ALLOWED_ORIGINS: config.webOrigin }, stdin: 'ignore', stdout: log, stderr: log });
+  const child = Bun.spawn({ cmd: ['nohup', process.execPath].concat(entry), env: { ...process.env, ...config.env, FS_HOST: '127.0.0.1', PORT: String(port), SERVER_ALLOWED_ORIGINS: config.webOrigin }, stdin: 'ignore', stdout: log, stderr: log });
   closeSync(log);
   child.unref();
   const record = { leaseId: previousRecord?.leaseId ?? crypto.randomUUID(), processId: managedGroup?.processId ?? crypto.randomUUID(), kind: 'managed', releaseDirectory, pid: child.pid, startedAt: processStart(child.pid), port, environmentId: previousRecord?.environmentId ?? managedGroup?.environmentId ?? null };

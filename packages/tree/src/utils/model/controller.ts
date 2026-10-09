@@ -317,7 +317,8 @@ export class FileTreeController implements FileTreeMutationHandle, FileTreeSearc
 
   // Selection.
 
-  public getSelectedPaths(): readonly string[] {
+  /** Returns a fresh snapshot callers may reorder without changing the selection. */
+  public getSelectedPaths(): string[] {
     return this.#selection.paths()
   }
 

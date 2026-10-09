@@ -265,7 +265,7 @@ function table(rows: readonly Result[]): string {
     (row) =>
       `| ${row.strategy} | ${row.latencyMs} ms | ${ms(row.endToEndMs)} | ${row.programFiles} | ${row.hostCalls} | ${mb(row.bytesRead)} | ${mb(row.heapBytes)} | ${ms(row.burstMs)} | ${row.burstHostCalls} |`,
   )
-  return [header, rule, ...lines].join('\n')
+  return [header, rule].concat(lines).join('\n')
 }
 
 function ms(value: number): string {

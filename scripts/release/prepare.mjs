@@ -16,7 +16,7 @@ for (const pattern of patterns) {
   for await (const file of new Glob(`${pattern}/package.json`).scan('.')) files.add(file)
 }
 const packages = await Promise.all(
-  [...files].map(async (file) => ({
+  Array.from(files, async (file) => ({
     file,
     manifest: JSON.parse(await readFile(file, 'utf8')),
   })),

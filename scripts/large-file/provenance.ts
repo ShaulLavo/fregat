@@ -67,7 +67,7 @@ export function recordedBuildSource(value: unknown) {
 }
 
 async function git(root: string, args: string[]) {
-  const child = Bun.spawn(['git', ...args], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
+  const child = Bun.spawn(['git'].concat(args), { cwd: root, stdout: 'pipe', stderr: 'pipe' })
   const [bytes, stderr, exitCode] = await Promise.all([
     new Response(child.stdout).arrayBuffer(),
     new Response(child.stderr).text(),

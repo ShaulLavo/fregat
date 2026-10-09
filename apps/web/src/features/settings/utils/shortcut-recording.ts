@@ -35,7 +35,7 @@ export function recordingStep(
   const stroke = recordedStroke(event, platform)
   if (!stroke) return { kind: 'ignore' }
 
-  const next = strokes.length === 1 ? [...strokes, stroke] : [stroke]
+  const next = strokes.length === 1 ? strokes.concat([stroke]) : [stroke]
   if (isBindableChord(next.join(' '))) return { kind: 'record', strokes: next }
   if (isBindableChord(stroke)) return { kind: 'record', strokes: [stroke] }
 

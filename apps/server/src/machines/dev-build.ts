@@ -56,7 +56,7 @@ async function devReleaseName() {
 
 async function git(args: readonly string[]) {
   const child = Bun.spawn({
-    cmd: ['git', ...args],
+    cmd: ['git'].concat(args),
     cwd: checkoutRoot,
     stdin: 'ignore',
     stdout: 'pipe',

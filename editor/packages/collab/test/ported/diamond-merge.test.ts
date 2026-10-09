@@ -9,7 +9,7 @@ import { network, randomSource } from './adapter'
 import { randomChange } from './diamond-workload'
 
 const stress = process.env.COLLAB_STRESS === '1'
-const seeds = [1000139, 123, ...Array.from({ length: stress ? 100 : 8 }, (_, index) => index)]
+const seeds = [1000139, 123].concat(Array.from({ length: stress ? 100 : 8 }, (_, index) => index))
 
 test.each(seeds)(
   'Diamond Types host-adapted merge fuzz, seed %i',

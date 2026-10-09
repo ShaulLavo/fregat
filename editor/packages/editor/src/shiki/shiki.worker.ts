@@ -289,10 +289,9 @@ const ensureHighlighter = async (
   options: ShikiWorkerDocumentOptions,
 ): Promise<HighlighterGeneric<string, string>> => {
   const languages = uniqueLanguageRegistrations(options.languageRegistrations)
-  const themes = uniqueThemeRegistrations([
-    options.themeRegistration,
-    ...options.themeRegistrations,
-  ])
+  const themes = uniqueThemeRegistrations(
+    [options.themeRegistration].concat(options.themeRegistrations),
+  )
   const highlighter = await ensureHighlighterFor(languages, themes)
   await ensureLanguages(highlighter, languages)
 
@@ -356,10 +355,9 @@ const ensureHighlighterFor = (
 }
 
 const loadTheme = async (payload: ShikiWorkerThemeRequest): Promise<ShikiWorkerTransportResult> => {
-  const themes = uniqueThemeRegistrations([
-    payload.themeRegistration,
-    ...payload.themeRegistrations,
-  ])
+  const themes = uniqueThemeRegistrations(
+    [payload.themeRegistration].concat(payload.themeRegistrations),
+  )
   const highlighter = await ensureHighlighterFor([], themes)
   return {
     theme: editorThemeFromHighlighter(highlighter, payload.theme, payload.themeRegistration),
@@ -444,7 +442,7 @@ function responseTransfers(response: ShikiWorkerResponse): Transferable[] {
  * has, so keying on them too would rebuild and reload the whole grammar set for each document.
  */
 const highlighterKey = (themes: readonly ShikiWorkerThemeRegistration[]): string =>
-  JSON.stringify(themes.map(themeRegistrationKey).toSorted())
+  JSON.stringify(themes.map(themeRegistrationKey).sort())
 
 const themeRegistrationKey = (theme: ShikiWorkerThemeRegistration): string => JSON.stringify(theme)
 

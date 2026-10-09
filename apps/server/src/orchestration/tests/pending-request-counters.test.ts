@@ -23,84 +23,90 @@ afterEach(() => {
 
 describe('pending request counters', () => {
   it('counts open approval and user-input requests in both projections', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      approvalRequested('req-1'),
-      userInputRequested('req-2'),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        approvalRequested('req-1'),
+        userInputRequested('req-2'),
+      ]),
+    )
 
     expectCounts(projected.memory, 1, 1)
     expectCounts(projected.sqlSession, 1, 1)
   })
 
   it('closes the counter when the request resolves', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      approvalRequested('req-1'),
-      userInputRequested('req-2'),
-      requestActivity('approval.resolved', 'activity-resolve-1', 'req-1'),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        approvalRequested('req-1'),
+        userInputRequested('req-2'),
+        requestActivity('approval.resolved', 'activity-resolve-1', 'req-1'),
+      ]),
+    )
 
     expectCounts(projected.memory, 0, 1)
     expectCounts(projected.sqlSession, 0, 1)
   })
 
   it('keeps a request open through a transient respond failure and closes it on a dead one', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      approvalRequested('req-1'),
-      requestActivity('provider.approval.respond.failed', 'activity-fail-1', 'req-1', {
-        detail: 'provider timed out',
-      }),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        approvalRequested('req-1'),
+        requestActivity('provider.approval.respond.failed', 'activity-fail-1', 'req-1', {
+          detail: 'provider timed out',
+        }),
+      ]),
+    )
 
     expectCounts(projected.memory, 1, 0)
     expectCounts(projected.sqlSession, 1, 0)
 
-    const dead = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      approvalRequested('req-1'),
-      requestActivity('provider.approval.respond.failed', 'activity-fail-2', 'req-1', {
-        code: 'provider.REQUEST_GONE',
-        detail: 'The agent no longer holds this request. Restart the turn to continue.',
-      }),
-    ])
+    const dead = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        approvalRequested('req-1'),
+        requestActivity('provider.approval.respond.failed', 'activity-fail-2', 'req-1', {
+          code: 'provider.REQUEST_GONE',
+          detail: 'The agent no longer holds this request. Restart the turn to continue.',
+        }),
+      ]),
+    )
 
     expectCounts(dead.memory, 0, 0)
     expectCounts(dead.sqlSession, 0, 0)
   })
 
   it('does not double-count a replayed request activity', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      approvalRequested('req-1'),
-      approvalRequested('req-1', 'activity-approval-1'),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        approvalRequested('req-1'),
+        approvalRequested('req-1', 'activity-approval-1'),
+      ]),
+    )
 
     expectCounts(projected.memory, 1, 0)
     expectCounts(projected.sqlSession, 1, 0)
   })
 
   it('drops the requests a revert pruned and keeps the ones it retained', () => {
-    const projected = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      approvalRequested('req-1', 'activity-approval-1', 'turn-1'),
-      turnDiffCompletedEvent({ checkpointTurnCount: 1, turnId: 'turn-1' }),
-      turnStartEvent('turn-2', requestedAt),
-      userInputRequested('req-2', 'activity-input-2', 'turn-2'),
-      turnDiffCompletedEvent({ checkpointTurnCount: 2, turnId: 'turn-2' }),
-      pendingEvent(
-        'session.reverted',
-        { revertedAt: '2026-05-24T00:05:00.000Z', sessionId: SESSION_ID, turnCount: 1 },
-        '2026-05-24T00:05:00.000Z',
-      ),
-    ])
+    const projected = project(
+      sessionBootstrapEvents().concat([
+        turnStartEvent('turn-1', requestedAt),
+        approvalRequested('req-1', 'activity-approval-1', 'turn-1'),
+        turnDiffCompletedEvent({ checkpointTurnCount: 1, turnId: 'turn-1' }),
+        turnStartEvent('turn-2', requestedAt),
+        userInputRequested('req-2', 'activity-input-2', 'turn-2'),
+        turnDiffCompletedEvent({ checkpointTurnCount: 2, turnId: 'turn-2' }),
+        pendingEvent(
+          'session.reverted',
+          { revertedAt: '2026-05-24T00:05:00.000Z', sessionId: SESSION_ID, turnCount: 1 },
+          '2026-05-24T00:05:00.000Z',
+        ),
+      ]),
+    )
 
     expectCounts(projected.memory, 1, 0)
     expectCounts(projected.sqlSession, 1, 0)
@@ -110,23 +116,23 @@ describe('pending request counters', () => {
     const noise = Array.from({ length: 50 }, (_, index) =>
       activityAppendedEvent({ id: `activity-tool-${index}` }),
     )
-    const open = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      approvalRequested('req-1'),
-      ...noise,
-    ])
+    const open = project(
+      sessionBootstrapEvents().concat(
+        [turnStartEvent('turn-1', requestedAt), approvalRequested('req-1')],
+        noise,
+      ),
+    )
 
     expectCounts(open.memory, 1, 0)
     expectCounts(open.sqlSession, 1, 0)
 
-    const closed = project([
-      ...sessionBootstrapEvents(),
-      turnStartEvent('turn-1', requestedAt),
-      approvalRequested('req-1'),
-      ...noise,
-      requestActivity('approval.resolved', 'activity-resolve-1', 'req-1'),
-    ])
+    const closed = project(
+      sessionBootstrapEvents().concat(
+        [turnStartEvent('turn-1', requestedAt), approvalRequested('req-1')],
+        noise,
+        [requestActivity('approval.resolved', 'activity-resolve-1', 'req-1')],
+      ),
+    )
 
     expectCounts(closed.memory, 0, 0)
     expectCounts(closed.sqlSession, 0, 0)

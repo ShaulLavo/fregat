@@ -12,7 +12,7 @@ const usage = `Usage: bun run build-release [options]
 
 export async function main(args = Bun.argv.slice(2)) {
   const { values } = parseArgs({
-    args: [...args],
+    args,
     options: {
       output: { type: 'string' },
       base: { type: 'string' },
