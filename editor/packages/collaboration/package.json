@@ -50,6 +50,11 @@
     "./server": {
       "types": "./server/signaling.ts",
       "bun": "./server/signaling.ts"
+    },
+    "./merge-review": {
+      "types": "./dist/merge-review.d.ts",
+      "import": "./dist/merge-review.js",
+      "default": "./dist/merge-review.js"
     }
   },
   "publishConfig": {
@@ -65,7 +70,8 @@
     "format:check": "oxfmt --check .",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:server": "bun --bun vitest run --config vitest.server.config.ts",
-    "test:editor": "vitest run --config vitest.editor.config.ts"
+    "test:editor": "vitest run --config vitest.editor.config.ts",
+    "bench:merge-review": "vitest run --config vitest.cost.config.ts"
   },
   "dependencies": {
     "@noble/hashes": "2.4.0",
@@ -74,12 +80,15 @@
     "@singapore-editor/textbuffer": "workspace:*"
   },
   "devDependencies": {
+    "@singapore-editor/tree-sitter": "workspace:*",
+    "@singapore-editor/tree-sitter-languages": "workspace:*",
     "@types/bun": "1.4.2",
     "@types/node": "26.6.3",
     "@vitest/browser-playwright": "5.0.2",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
     "typescript": "7.0.2",
-    "vitest": "5.0.2"
+    "vitest": "5.0.2",
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#0fb6e61c7396727c49b8c6e4d757f6bf8dcfd6ed"
   }
 }
