@@ -39,7 +39,7 @@ import {
   createTestQueryClient,
   holdDeferredDialog,
   loadDeferredDialogs,
-  seedBootMirrorTheme,
+  seedHtmlTheme,
   renderHookWithProviders,
 } from '../../../test/render'
 
@@ -726,7 +726,7 @@ function useEditorTarget(key: string, writable: boolean) {
 
 function mountOverlayOrigins() {
   const focus = new FocusService()
-  seedBootMirrorTheme('dark')
+  seedHtmlTheme('dark')
   mount(
     <AppProviders command={false} focusService={focus} queryClient={createTestQueryClient()}>
       <EditorStateProvider>

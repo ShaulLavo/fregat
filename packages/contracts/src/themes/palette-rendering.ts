@@ -3,16 +3,12 @@ import {
   TERMINAL_ANSI_ROLES,
   paletteColorsFor,
   paletteSupportsMode,
-  flatten,
-  toCss,
-  toRgb,
   type AppColorRole,
   type ColorMode,
-  type Oklch,
   type Palette,
   type PaletteColors,
-  type Rgb,
-} from '@workspace/contracts'
+} from './palette'
+import { flatten, toCss, toRgb, type Oklch, type Rgb } from './color'
 
 /** A palette's colors for one mode, in every form a renderer needs. */
 export type ResolvedPalette = Readonly<{

@@ -231,7 +231,7 @@ export function isolatedServerEnv(input: {
     WEB_ROOT: input.webRoot ?? path.join(home, '..', 'served', 'web'),
     PORT: String(port),
     SERVER_ALLOWED_ORIGINS: allowedOriginsForWebPort(
-      undefined,
+      `http://localhost:${port},http://127.0.0.1:${port},http://[::1]:${port}`,
       webOrigin.hostname,
       Number(webOrigin.port),
     ),

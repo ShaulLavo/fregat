@@ -179,10 +179,7 @@
   transition-duration: var(--duration-color);
 }
 
-/* Warm near-greyscale: surfaces, ink and accents all sit on hue 70 at chroma
-   0.006, and nothing but the status colors carries a hue.
-   This is the `graphite` branch of workbench.palette — the default — and the
-   `sage` branch overrides it wholesale further down. */
+/* Palette colors come from the generated fallback and the document's selected palette. */
 :root {
   color-scheme: light;
   /* The bundled defaults; applyAppearance writes the chosen fonts over them. */

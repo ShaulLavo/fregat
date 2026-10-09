@@ -114,7 +114,7 @@ export async function buildWeb(release: Release, base = '/', execute = run, root
     path.join(release.directory, 'web-build.log'),
     execute,
   )
-  stampWebRelease(release.web, release.name)
+  await stampWebRelease(release.web, release.name)
 }
 
 /** How long a hashed asset stays loadable after the release that built it is replaced. */

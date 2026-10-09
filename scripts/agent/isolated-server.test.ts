@@ -71,7 +71,10 @@ it('serves supplied web assets with the isolated promoted release descriptor', a
   const fixture = mkdtempSync(path.join(tmpdir(), 'fregat-built-web-'))
   const web = path.join(fixture, 'web')
   mkdirSync(web)
-  writeFileSync(path.join(web, 'index.html'), '<!doctype html><p>Built fixture</p>')
+  writeFileSync(
+    path.join(web, 'index.html'),
+    '<!doctype html><html><head><style id="platform-palette"></style><script id="fregat-html-bootstrap" type="application/json"></script><link id="fregat-wallpaper-light"><link id="fregat-wallpaper-dark"></head><body><p>Built fixture</p></body></html>',
+  )
   let server: IsolatedServer | undefined
   try {
     server = await startIsolatedServer(new URL('http://localhost:5214'), { webRoot: web })
