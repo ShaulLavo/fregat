@@ -1,3 +1,4 @@
+import { reactiveOwnerSnapshots } from './reactive-owner-snapshots'
 import { overlayAlignment } from './overlay-alignment'
 import { commandFoundation } from './command-foundation'
 import { clientLogDelivery } from './client-log-delivery'
@@ -473,6 +474,7 @@ import { treeParityBehaviour } from './tree-parity-behaviour'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  reactiveOwnerSnapshots,
   overlayAlignment,
   unknownWorkspaceSettings,
   releaseInstallationSettings,
