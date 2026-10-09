@@ -160,19 +160,39 @@ export function rowRunStyle(style: string, width: number, font: TerminalFittedFo
   return `${style}width:calc(${width} * var(--ghostty-cell-width, ${font.cssCellWidth}px));`
 }
 
+export interface DefaultRowStyle {
+  readonly cell: string
+  readonly run: string
+  readonly columns: number
+}
+
+export function defaultRowStyle(
+  font: TerminalFittedFont,
+  theme: CanonicalRendererTheme,
+  columns: number,
+): DefaultRowStyle {
+  const cell = defaultCellStyle(font, theme)
+  return { cell, run: rowRunStyle(cell, columns, font), columns }
+}
+
 export function renderRowRuns(
   row: RenderRow,
   cursor: CursorState | undefined,
   font: TerminalFittedFont,
   theme: CanonicalRendererTheme,
-  defaultStyle?: string,
-  defaultRunStyle?: string,
+  styles?: DefaultRowStyle,
 ): readonly RowRun[] {
-  let colors: CanvasColorCache | undefined
   const packed = row.packed
+  const columns = packed?.length ?? row.cells.length
+  const defaultStyle = styles?.cell
+  const defaultRunStyle = styles?.columns === columns ? styles.run : undefined
+  if (packed && defaultRunStyle !== undefined && (!cursor?.visible || cursor.y !== row.y)) {
+    const text = packed.defaultRunText()
+    if (text !== undefined) return text ? [{ cursor: undefined, style: defaultRunStyle, text }] : []
+  }
+  let colors: CanvasColorCache | undefined
   const scratchA = emptyRenderCell()
   const scratchB = emptyRenderCell()
-  const columns = packed?.length ?? row.cells.length
   let length = columns
   const cursorEnd = cursor?.visible && cursor.y === row.y ? cursor.x + 1 : 0
   // The fixed-grid frame paints the default background; empty tails need no glyph layout.

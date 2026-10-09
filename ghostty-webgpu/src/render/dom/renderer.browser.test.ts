@@ -176,6 +176,20 @@ describe('DOM terminal renderer', () => {
     }
   })
 
+  it('keeps source row widths when the renderer grid is resized first', async () => {
+    const probe = await rendererProbe('dom', '\x1b[?25ledit 0000')
+    probe.renderer.resize({ columns: 20, rows: 3 })
+    probe.clock.flush()
+    const frame = probe.canvas.parentElement!.querySelector('.ghostty-webgpu-frame')!
+    expect(frame.parentElement!.innerHTML).toBe(
+      renderFrameToHtml(snapshotRenderState(probe.state), {
+        columns: 20,
+        rows: 3,
+        font: probeFont,
+      }),
+    )
+  })
+
   it('matches Node-safe serialized markup and Canvas2D SGR and cursor colors on the same real core input', async () => {
     const dom = await rendererProbe('dom')
     const canvas = await rendererProbe('canvas2d')

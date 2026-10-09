@@ -14,11 +14,11 @@ import {
   type RowThemeInvalidation,
 } from '../row-renderer.js'
 import {
-  defaultCellStyle,
+  defaultRowStyle,
   frameStyle,
   renderFrameToHtml,
   renderRowRuns,
-  rowRunStyle,
+  type DefaultRowStyle,
   type RowRun,
 } from './html.js'
 
@@ -61,8 +61,7 @@ class DomSurface implements RowRendererSurface {
   private grid: RendererGridSize
   private theme: CanonicalRendererTheme
   private rows: MountedRow[] = []
-  private defaultStyle = ''
-  private defaultRunStyle = ''
+  private defaultStyle: DefaultRowStyle
 
   constructor(options: WebGpuTerminalRendererOptions) {
     if (!('ownerDocument' in options.canvas) || !options.canvas.parentElement) {
@@ -72,6 +71,7 @@ class DomSurface implements RowRendererSurface {
     this.font = copyFittedFont(options.font)
     this.grid = normalizeRendererGrid(options)
     this.theme = canonicalRendererTheme(mergeRendererTheme(options.theme))
+    this.defaultStyle = defaultRowStyle(this.font, this.theme, this.grid.columns)
     this.container = this.canvas.ownerDocument.createElement('div')
     this.container.style.position = 'absolute'
     this.container.style.pointerEvents = 'none'
@@ -96,14 +96,7 @@ class DomSurface implements RowRendererSurface {
     const mounted = this.rows[row.y]
     if (!mounted) return false
     let changed = false
-    const runs = renderRowRuns(
-      row,
-      cursor,
-      this.font,
-      this.theme,
-      this.defaultStyle,
-      this.defaultRunStyle,
-    )
+    const runs = renderRowRuns(row, cursor, this.font, this.theme, this.defaultStyle)
     for (let index = 0; index < runs.length; index += 1) {
       const run = runs[index]!
       const previous = mounted.runs[index]
@@ -151,8 +144,7 @@ class DomSurface implements RowRendererSurface {
     const html = renderFrameToHtml({ cursor, rows: [] }, { ...grid, font, theme: this.theme })
     this.font = font
     this.grid = grid
-    this.defaultStyle = defaultCellStyle(font, this.theme)
-    this.defaultRunStyle = rowRunStyle(this.defaultStyle, grid.columns, font)
+    this.defaultStyle = defaultRowStyle(font, this.theme, grid.columns)
     this.canvas.width = grid.columns * font.deviceCellWidth
     this.canvas.height = grid.rows * font.deviceCellHeight
     this.canvas.style.width = `${grid.columns * font.cssCellWidth}px`
@@ -168,8 +160,7 @@ class DomSurface implements RowRendererSurface {
   setTheme(theme: CanonicalRendererTheme): RowThemeInvalidation {
     if (themesEqual(this.theme, theme)) return 'cursor'
     this.theme = theme
-    this.defaultStyle = defaultCellStyle(this.font, theme)
-    this.defaultRunStyle = rowRunStyle(this.defaultStyle, this.grid.columns, this.font)
+    this.defaultStyle = defaultRowStyle(this.font, theme, this.grid.columns)
     this.container.firstElementChild?.setAttribute('style', frameStyle(this.font, this.grid, theme))
     return 'all'
   }

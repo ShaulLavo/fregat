@@ -55,6 +55,24 @@ export class PackedCells {
     return target
   }
 
+  defaultRunText(): string | undefined {
+    const words = this.words
+    let end = 0
+    for (let offset = 0; offset < words.length; offset += PACKED_CELL_WORDS) {
+      if (
+        (words[offset + 3]! & ~1) !== 0 ||
+        words[offset + 1] !== 0xffffffff ||
+        words[offset + 2] !== 0xffffffff
+      )
+        return undefined
+      if (words[offset] !== 0 || words[offset + 5] !== 0) end = offset + PACKED_CELL_WORDS
+    }
+    let text = ''
+    for (let offset = 0; offset < end; offset += PACKED_CELL_WORDS)
+      text += this.textAt(offset) || ' '
+    return text
+  }
+
   span(index: number): number {
     let span = 1
     while (
