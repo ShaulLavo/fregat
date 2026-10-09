@@ -611,7 +611,10 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
 
   onText(listener: (text: TerminalSubmittedText) => void): GhosttyWebGpuTerminalSubscription {
     this.ensureActive()
-    return this.textSubscribers.subscribe(listener)
+    const after = this.execution.submittedFrame?.frame ?? 0
+    return this.textSubscribers.subscribe((text) => {
+      if (text.frame > after) listener(text)
+    })
   }
 
   get submittedFrame(): TerminalSubmittedFrame | undefined {
@@ -1510,7 +1513,15 @@ export class Terminal<Mode extends 'sync' | 'async' = 'sync'> implements Termina
     if (!this.textSubscribers.hasListeners) return
     const text = this.textPublication()
     if (!text) return
-    this.textSubscribers.emit(text)
+    this.emitText(text)
+  }
+
+  private emitText(text: TerminalSubmittedText): void {
+    if (this.stateValue === 'open') {
+      this.textSubscribers.emit(text)
+      return
+    }
+    if (this.stateValue === 'opening') this.pendingEvents.push(() => this.emitText(text))
   }
 
   private updateFrameUi(snapshot: RendererTextFrameSnapshot): void {
