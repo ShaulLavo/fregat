@@ -129,6 +129,7 @@ export const transientAlertSelector =
   '[role="alert"], [data-sonner-toast], [role="status"].text-warning'
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperImageSelector = 'img[data-workbench-wallpaper-layer]'
+export const wallpaperMediaSelector = '[data-workbench-wallpaper-layer]'
 export const diffPaneSelector = '.editor-diff-pane'
 /** A diff pane whose syntax tokens for its current rows have landed. */
 export const diffPaneSyntaxReadySelector = '.editor-diff-pane[data-syntax="ready"]'

@@ -1,3 +1,4 @@
+export * from './html-bootstrap'
 export * from './worktree-lifecycle'
 export * from './session-lifecycle'
 export {

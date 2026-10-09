@@ -7,6 +7,23 @@ import { observeNativeBuild } from './native-build-observation'
 
 const desktopDir = path.resolve(import.meta.dirname, '../../..')
 
+test('native document requests identify each window backdrop before HTML discovery', async () => {
+  const mac = await Bun.file(path.join(desktopDir, 'native/macos/platform-webview.m')).text()
+  const linux = await Bun.file(path.join(desktopDir, 'native/linux/platform-webview.c')).text()
+  expect(mac).toContain(
+    'configuration.applicationNameForUserAgent = vibrant ? @"FregatBackdrop/transparent" : @"FregatBackdrop/app"',
+  )
+  expect(mac.indexOf('configuration.applicationNameForUserAgent')).toBeLessThan(
+    mac.indexOf('[view loadRequest:'),
+  )
+  expect(linux).toContain(
+    'webkit_settings_set_user_agent_with_application_details(settings, "FregatBackdrop", "compositor")',
+  )
+  expect(linux.indexOf('webkit_settings_set_user_agent_with_application_details')).toBeLessThan(
+    linux.indexOf('webkit_web_view_load_uri'),
+  )
+})
+
 test('native hosts require explicit persistent storage and parse named window options', async () => {
   for (const source of ['macos/platform-webview.m', 'linux/platform-webview.c']) {
     const text = await Bun.file(path.join(desktopDir, 'native', source)).text()

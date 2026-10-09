@@ -206,6 +206,7 @@ import {
   workspaceSwitchClickDuringOpen,
 } from './large-folder'
 import { wallpaperBootHandoff } from './wallpaper-boot-handoff'
+import { wallpaperFirstLoad, desktopWallpaperFirstLoad } from './html-bootstrap-first-load'
 import { chatGitTabSwitch } from './chat-git-tab-switch'
 import { chatGitTurnRows } from './chat-git-turn-rows'
 import { chatModelPicker } from './chat-model-picker'
@@ -873,6 +874,8 @@ export const scenarios: readonly Scenario[] = [
   workspaceSwitchClickDuringOpen,
   filePickerPrefetchBound,
   wallpaperBootHandoff,
+  wallpaperFirstLoad,
+  desktopWallpaperFirstLoad,
   chatGitTabSwitch,
   chatGitTurnRows,
   editorUndoReopen,

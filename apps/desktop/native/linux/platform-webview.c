@@ -239,6 +239,7 @@ int main(int argc, char **argv) {
       "user-content-manager", manager, NULL));
   g_object_unref(web_context);
   WebKitSettings *settings = webkit_web_view_get_settings(view);
+  webkit_settings_set_user_agent_with_application_details(settings, "FregatBackdrop", "compositor");
   webkit_settings_set_enable_developer_extras(settings, TRUE);
   webkit_settings_set_hardware_acceleration_policy(settings, WEBKIT_HARDWARE_ACCELERATION_POLICY_ALWAYS);
   g_signal_connect(view, "web-process-terminated", G_CALLBACK(on_web_process_terminated), NULL);

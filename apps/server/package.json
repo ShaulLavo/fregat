@@ -41,6 +41,7 @@
     "@singapore-editor/lsp": "workspace:*",
     "@tanstack/query-core": "^5.104.0",
     "@valibot/to-json-schema": "1.8.0",
+    "@workspace/client-core": "workspace:*",
     "@workspace/contracts": "workspace:*",
     "@workspace/observability": "workspace:*",
     "@workspace/pty": "workspace:*",

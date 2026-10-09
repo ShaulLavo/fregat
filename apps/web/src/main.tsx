@@ -9,7 +9,7 @@ import { terminalPanelQueryOptions } from '@/features/terminal/utils/panel-query
 import { logsPanelQueryOptions } from '@/features/logs/utils/panel-query'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
-import { readSettingsMirror } from '@/lib/settings-boot-mirror'
+import { initialAppearanceValues, readHtmlBootstrap } from '@/lib/html-bootstrap'
 import { ApplicationBootstrap } from '@/components/application-bootstrap'
 import { StrictMode } from 'react'
 import { Button } from '@workspace/ui/components/button'
@@ -59,12 +59,13 @@ import { warmDeferredOverlays } from '@/components/utils/overlay-modules'
 installEditorPerformanceTraceFromUrl()
 configureIntentPrediction()
 initializeClientLogging()
-applyBackdrop(resolveBackdrop())
+const htmlBootstrap = readHtmlBootstrap()
+applyBackdrop(htmlBootstrap?.kind === 'app' ? htmlBootstrap.backdrop : resolveBackdrop())
 // Before `createRoot`, deliberately. The mirrored appearance is initial
 // document state: descendants construct geometry and read computed styles on
 // their first render. `AppearanceProvider` corrects it from the server snapshot
 // in React's insertion phase before later layout effects run.
-const boot = readSettingsMirror()
+const boot = initialAppearanceValues()
 applyAppearance(boot, document.documentElement, systemColorMode() === 'dark')
 applyPaletteStylesheet(document, bootPaletteStylesheet(boot['workbench.palette']))
 const visualViewport = window.visualViewport
@@ -156,10 +157,12 @@ void start().catch((cause: unknown) => {
 async function start() {
   // Paired before the bootstrap asks the machine anything, so its first request carries the cookie.
   // Loaded only for a pairing link; if it fails to load, the pairing screen still takes the code.
-  if (pairingCode)
-    await import('@/lib/pairing/state/claim-at-boot')
+  if (pairingCode) {
+    const reloading = await import('@/lib/pairing/state/claim-at-boot')
       .then(({ claimAtBoot }) => claimAtBoot(pairingCode))
-      .catch(() => undefined)
+      .catch(() => false)
+    if (reloading) return
+  }
   if (renderer.disposed) return
   // The boot script already preloads the chosen shell's chunks; this evaluates them before the first render.
   const kind = useShellStore.getState().kind

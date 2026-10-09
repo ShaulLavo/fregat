@@ -36,11 +36,11 @@ function intent(root: string) {
   return { stateHome: root, address: 'http://127.0.0.1:3301', webBase: '/', expected: null }
 }
 
-test('missing current installs a complete bundled release under the supplied root', () => {
+test('missing current installs a complete bundled release under the supplied root', async () => {
   const root = scratch()
   const releaseRoot = path.join(root, 'Application Support', 'releases')
   const source = payload(root, 'bundle')
-  const result = installBundledRelease(source, releaseRoot, intent(root))
+  const result = await installBundledRelease(source, releaseRoot, intent(root))
   expect(result.disposition).toBe('installed')
   expect(realpathSync(path.join(releaseRoot, 'current'))).toBe(result.release.directory)
   expect(result.release.directory.startsWith(path.join(releaseRoot, 'releases') + path.sep)).toBe(
@@ -50,24 +50,24 @@ test('missing current installs a complete bundled release under the supplied roo
   expect(existsSync(path.join(releaseRoot, 'pending'))).toBe(false)
 })
 
-test('same commit is a no-op, preserving the running release and pending timestamp', () => {
+test('same commit is a no-op, preserving the running release and pending timestamp', async () => {
   const root = scratch()
   const releaseRoot = path.join(root, 'installed')
   const source = payload(root, 'bundle')
-  const first = installBundledRelease(source, releaseRoot, intent(root))
-  const result = installBundledRelease(source, releaseRoot, intent(root))
+  const first = await installBundledRelease(source, releaseRoot, intent(root))
+  const result = await installBundledRelease(source, releaseRoot, intent(root))
   expect(result.disposition).toBe('unchanged')
   expect(result.release.directory).toBe(first.release.directory)
   expect(existsSync(path.join(releaseRoot, 'pending'))).toBe(false)
 })
 
-test('installed web documents identify the release the server reports', () => {
+test('installed web documents identify the release the server reports', async () => {
   const root = scratch()
   const source = payload(root, 'bundle')
   const document = '<html><head><meta name="platform-release" content="bundle"></head></html>'
   for (const name of ['index.html', 'dev.html'])
     writeFileSync(path.join(source, 'web', name), document)
-  const installed = installBundledRelease(source, path.join(root, 'installed'), intent(root))
+  const installed = await installBundledRelease(source, path.join(root, 'installed'), intent(root))
   const config = JSON.parse(
     readFileSync(path.join(installed.release.directory, 'build-config.json'), 'utf8'),
   )
@@ -80,15 +80,15 @@ test('installed web documents identify the release the server reports', () => {
   }
 })
 
-test('different commit stages once, preserving current until exact restart approval', () => {
+test('different commit stages once, preserving current until exact restart approval', async () => {
   const root = scratch()
   const releaseRoot = path.join(root, 'installed')
-  const first = installBundledRelease(payload(root, 'old'), releaseRoot, intent(root))
+  const first = await installBundledRelease(payload(root, 'old'), releaseRoot, intent(root))
   const source = payload(root, 'new', 'b'.repeat(40))
-  const staged = installBundledRelease(source, releaseRoot, intent(root))
+  const staged = await installBundledRelease(source, releaseRoot, intent(root))
   expect(staged.disposition).toBe('staged')
   expect(realpathSync(path.join(releaseRoot, 'current'))).toBe(first.release.directory)
-  expect(installBundledRelease(source, releaseRoot, intent(root)).release.directory).toBe(
+  expect((await installBundledRelease(source, releaseRoot, intent(root))).release.directory).toBe(
     staged.release.directory,
   )
   expect(promote(releaseRoot, () => true)).toBe('none')
@@ -100,7 +100,7 @@ test('first-install readiness failure retains current and records a failed verdi
   const releaseRoot = path.join(root, 'installed')
   const port = await freePort()
   const requested = { ...intent(root), address: `http://127.0.0.1:${port}` }
-  const installed = installBundledRelease(payload(root, 'first'), releaseRoot, requested, {
+  const installed = await installBundledRelease(payload(root, 'first'), releaseRoot, requested, {
     readinessMs: 1000,
   })
   const commands: string[][] = []
@@ -129,8 +129,8 @@ test('failed post-promotion identity readiness restores previous release without
   const root = scratch()
   const releaseRoot = path.join(root, 'installed')
   const requested = { ...intent(root), address: `http://127.0.0.1:${await freePort()}` }
-  const first = installBundledRelease(payload(root, 'old'), releaseRoot, requested)
-  const staged = installBundledRelease(
+  const first = await installBundledRelease(payload(root, 'old'), releaseRoot, requested)
+  const staged = await installBundledRelease(
     payload(root, 'new', 'b'.repeat(40)),
     releaseRoot,
     requested,
@@ -165,7 +165,7 @@ test('post-promotion readiness accepts the state-home identity proof and records
   const releaseRoot = path.join(root, 'installed')
   const port = await freePort()
   const requested = { ...intent(root), address: `http://127.0.0.1:${port}` }
-  const installed = installBundledRelease(payload(root, 'first'), releaseRoot, requested)
+  const installed = await installBundledRelease(payload(root, 'first'), releaseRoot, requested)
   fregatServer({ port, stateHome: root })
   expect(await checkReadiness(releaseRoot, installed.release.directory, null, () => true)).toBe(
     true,
@@ -177,7 +177,7 @@ test('post-promotion readiness accepts the state-home identity proof and records
   expect(verdict.release).toBe(installed.release.name)
 })
 
-test('seeding preserves runtime configuration, dotfiles, and internal relative symlinks', () => {
+test('seeding preserves runtime configuration, dotfiles, and internal relative symlinks', async () => {
   const root = scratch()
   const releaseRoot = path.join(root, 'installed')
   const source = payload(root, 'bundle')
@@ -188,7 +188,7 @@ test('seeding preserves runtime configuration, dotfiles, and internal relative s
   writeFileSync(path.join(source, 'runtime/.config'), 'retained')
   symlinkSync('../runtime/node_modules', path.join(source, 'server/node_modules'))
   symlinkSync('runtime/node_modules', path.join(source, 'node_modules'))
-  const result = installBundledRelease(source, releaseRoot, intent(root))
+  const result = await installBundledRelease(source, releaseRoot, intent(root))
   expect(readFileSync(path.join(result.release.directory, 'runtime/bunfig.toml'), 'utf8')).toBe(
     '[install]\nglobalStore=false\n',
   )
@@ -208,8 +208,8 @@ test('seeding preserves runtime configuration, dotfiles, and internal relative s
 test('a readiness failure cannot roll back a newer current chosen meanwhile', async () => {
   const root = scratch()
   const releaseRoot = path.join(root, 'installed')
-  const first = installBundledRelease(payload(root, 'old'), releaseRoot, intent(root))
-  const staged = installBundledRelease(
+  const first = await installBundledRelease(payload(root, 'old'), releaseRoot, intent(root))
+  const staged = await installBundledRelease(
     payload(root, 'new', 'b'.repeat(40)),
     releaseRoot,
     intent(root),
@@ -230,10 +230,10 @@ test('failed recovery keeps the previous release and requests only one restart',
   const root = scratch()
   const releaseRoot = path.join(root, 'installed')
   const requested = { ...intent(root), address: `http://127.0.0.1:${await freePort()}` }
-  const first = installBundledRelease(payload(root, 'old'), releaseRoot, requested, {
+  const first = await installBundledRelease(payload(root, 'old'), releaseRoot, requested, {
     readinessMs: 1,
   })
-  const staged = installBundledRelease(
+  const staged = await installBundledRelease(
     payload(root, 'new', 'b'.repeat(40)),
     releaseRoot,
     requested,
@@ -261,7 +261,7 @@ test('failed recovery keeps the previous release and requests only one restart',
 test('an activation that exited leaves no verdict or rollback from its stale helper', async () => {
   const root = scratch()
   const releaseRoot = path.join(root, 'installed')
-  const first = installBundledRelease(payload(root, 'old'), releaseRoot, intent(root), {
+  const first = await installBundledRelease(payload(root, 'old'), releaseRoot, intent(root), {
     readinessMs: 1,
   })
   const commands: string[][] = []
@@ -288,7 +288,7 @@ test('a listener with another state-home key cannot satisfy readiness', async ()
   const other = scratch()
   const port = await freePort()
   const requested = { ...intent(root), address: `http://127.0.0.1:${port}` }
-  const installed = installBundledRelease(payload(root, 'first'), releaseRoot, requested, {
+  const installed = await installBundledRelease(payload(root, 'first'), releaseRoot, requested, {
     readinessMs: 5,
   })
   fregatServer({ port, stateHome: root, keyHome: other })
@@ -433,8 +433,8 @@ test('rejected recovery restart compensates current and records an actionable te
   const root = scratch()
   const releaseRoot = path.join(root, 'installed')
   const requested = { ...intent(root), address: `http://127.0.0.1:${await freePort()}` }
-  const first = installBundledRelease(payload(root, 'old'), releaseRoot, requested)
-  const staged = installBundledRelease(
+  const first = await installBundledRelease(payload(root, 'old'), releaseRoot, requested)
+  const staged = await installBundledRelease(
     payload(root, 'new', 'b'.repeat(40)),
     releaseRoot,
     requested,
@@ -477,8 +477,8 @@ test('a rejected restart after the candidate exits leaves recovery with the next
   const root = scratch()
   const releaseRoot = path.join(root, 'installed')
   const requested = { ...intent(root), address: `http://127.0.0.1:${await freePort()}` }
-  const first = installBundledRelease(payload(root, 'old'), releaseRoot, requested)
-  const staged = installBundledRelease(
+  const first = await installBundledRelease(payload(root, 'old'), releaseRoot, requested)
+  const staged = await installBundledRelease(
     payload(root, 'new', 'b'.repeat(40)),
     releaseRoot,
     requested,
@@ -509,5 +509,23 @@ test('a rejected restart after the candidate exits leaves recovery with the next
   expect(realpathSync(path.join(releaseRoot, 'current'))).toBe(first.release.directory)
   expect(readFileSync(path.join(releaseRoot, 'readiness-recovery.json'), 'utf8')).toBe(
     ownedRecovery,
+  )
+})
+
+test('bundled installation keeps its lock until document stamping finishes', async () => {
+  const root = scratch()
+  const releaseRoot = path.join(root, 'installed')
+  const source = payload(root, 'bundle')
+  writeFileSync(path.join(source, 'web/index.html'), '<html><head></head></html>')
+  const installing = installBundledRelease(source, releaseRoot, intent(root))
+  await expect(installBundledRelease(source, releaseRoot, intent(root))).rejects.toMatchObject({
+    code: 'service.SETUP_BUSY',
+  })
+  const installed = await installing
+  expect(readFileSync(path.join(installed.release.web, 'index.html'), 'utf8')).toContain(
+    `<meta name="platform-release" content="${installed.release.name}">`,
+  )
+  expect((await installBundledRelease(source, releaseRoot, intent(root))).disposition).toBe(
+    'unchanged',
   )
 })

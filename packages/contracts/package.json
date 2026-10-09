@@ -6,6 +6,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
+    "./html-bootstrap": "./src/html-bootstrap.ts",
     "./error-fields": "./src/error-fields.ts",
     "./text-encoding": "./src/text-encoding.ts",
     "./file-response": "./src/file-response.ts",

@@ -4,6 +4,7 @@ import type { SettingId, SettingsValues } from '@workspace/contracts'
 
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { readSettingBootValue } from '@/lib/settings-boot-mirror'
+import { APPEARANCE_BOOT_KEYS } from '@workspace/contracts/html-bootstrap'
 
 /**
  * One setting, with its validated boot mirror or registry default until the snapshot lands.
@@ -15,5 +16,8 @@ export function useSettingValue<K extends SettingId>(key: K): SettingsValues[K] 
   const preview = useContext(AppearancePreviewContext)
   const projection = useSettingsProjection()
 
-  return preview?.[key] ?? projection?.values[key] ?? readSettingBootValue(key)
+  const previewValue = APPEARANCE_BOOT_KEYS.some((appearance) => appearance === key)
+    ? preview?.[key]
+    : undefined
+  return previewValue ?? projection?.values[key] ?? readSettingBootValue(key)
 }

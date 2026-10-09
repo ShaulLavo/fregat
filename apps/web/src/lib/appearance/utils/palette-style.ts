@@ -1,6 +1,7 @@
 import { bundledPalette, DEFAULT_PALETTE_ID } from '@workspace/contracts'
 import { paletteStylesheet } from '@workspace/client-core/themes/palette'
-import { PALETTE_BOOT_KEY, PALETTE_STYLE_ID } from '@/lib/boot-keys'
+import { PALETTE_STYLE_ID } from '@/lib/boot-keys'
+import { readHtmlBootstrap } from '@/lib/html-bootstrap'
 
 type StyleHost = Pick<Document, 'getElementById' | 'createElement' | 'head'>
 
@@ -26,47 +27,15 @@ export function applyPaletteStylesheet(document: StyleHost, css: string | null) 
   document.head.append(style)
 }
 
-/**
- * The stylesheet the boot path can produce synchronously for a palette id: a
- * bundled palette resolves at once, a user palette only if the last confirmed
- * boot cache was written for that same id. Otherwise the CSS default paints.
- */
+/** The document carries selected palettes; bundled fallbacks resolve synchronously. */
 export function bootPaletteStylesheet(id: string): string | null {
-  const cached = readPaletteBootCache()
-  if (cached?.ids.includes(id)) return cached.css
+  const bootstrap = readHtmlBootstrap()
+  if (bootstrap?.kind === 'app') {
+    const { light, dark } = bootstrap.variants
+    if (light.palette.id === id || dark.palette.id === id)
+      return paletteStylesheet(light.palette, dark.palette)
+  }
   const bundled = bundledPalette(id)
   if (bundled) return id === DEFAULT_PALETTE_ID ? null : paletteStylesheet(bundled)
-
   return null
-}
-
-/** Called only with the stylesheet of a confirmed selection, never a preview. */
-export function writePaletteBootCache(ids: readonly string[], css: string) {
-  try {
-    localStorage.setItem(PALETTE_BOOT_KEY, JSON.stringify({ ids, css }))
-  } catch {
-    // A full or unavailable localStorage costs a themed first paint, nothing more.
-  }
-}
-
-function readPaletteBootCache(): { readonly ids: readonly string[]; readonly css: string } | null {
-  try {
-    const raw = localStorage.getItem(PALETTE_BOOT_KEY)
-    if (!raw) return null
-
-    const parsed: unknown = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object') return null
-
-    const { ids, css } = parsed as { ids?: unknown; css?: unknown }
-    if (
-      !Array.isArray(ids) ||
-      !ids.every((id): id is string => typeof id === 'string') ||
-      typeof css !== 'string'
-    )
-      return null
-
-    return { ids, css }
-  } catch {
-    return null
-  }
 }

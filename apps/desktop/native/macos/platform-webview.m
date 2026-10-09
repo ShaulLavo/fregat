@@ -382,6 +382,7 @@ int main(int argc, char **argv) {
       if (host.glassEffect) [host mountContentView:host.glassEffect];
     }
     WKWebViewConfiguration *configuration = [WKWebViewConfiguration new];
+    configuration.applicationNameForUserAgent = vibrant ? @"FregatBackdrop/transparent" : @"FregatBackdrop/app";
     configuration.websiteDataStore = dataStore;
     NSString *startupSource = [NSString stringWithFormat:@"%@\n;if (globalThis.platformBridge) globalThis.platformBridge.capabilities.windowGlass = %@;",
         text, host.glassEffect ? @"true" : @"false"];

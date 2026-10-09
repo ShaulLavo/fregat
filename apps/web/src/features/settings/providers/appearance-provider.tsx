@@ -35,7 +35,7 @@ import {
 } from '@/lib/appearance/providers/draft-preview-context'
 import { BundleContext } from '@/lib/appearance/providers/bundle-context'
 import { PaletteContext } from '@/lib/appearance/providers/palette-context'
-import { applyPaletteStylesheet, writePaletteBootCache } from '@/lib/appearance/utils/palette-style'
+import { applyPaletteStylesheet } from '@/lib/appearance/utils/palette-style'
 
 import { useBundleLibrary } from '@/features/settings/hooks/use-bundle-library'
 import { usePaletteCatalog } from '@/features/settings/hooks/use-palette-catalog'
@@ -49,7 +49,8 @@ import {
 } from '@/features/settings/providers/font-preview-context'
 import type { SettingsSubmission } from '@workspace/client-core/settings/intent-store'
 import { applyAppearance, resolveColorTheme } from '@/features/settings/utils/apply-appearance'
-import { readSettingsMirror, writeBootMirror } from '@/lib/settings-boot-mirror'
+import { writeBootMirror } from '@/lib/settings-boot-mirror'
+import { bootstrapAppearance, initialAppearanceValues } from '@/lib/html-bootstrap'
 
 type FontPreview = { readonly key: FontSettingId; readonly ref: string }
 
@@ -69,7 +70,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const { applyBundle, selectBundle, setColorTheme, setSetting } = useSettingsActions()
   const { palettes: catalog, pending: palettePending } = usePaletteCatalog()
   const bundles = useBundleLibrary().catalog
-  const [bootValues] = useState(readSettingsMirror)
+  const [bootValues] = useState(initialAppearanceValues)
   const prefersDark = useSystemColorMode() === 'dark'
   const [bundleState, setBundlePreview] = useState<Preview<{
     theme: ThemeBundle
@@ -113,7 +114,10 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     projection?.layers,
   )
   const committedPaletteId = appearanceValues['workbench.palette']
-  const committedPalette = catalog.find((palette) => palette.id === committedPaletteId)
+  const startupPalette = bootstrapAppearance(resolvedMode)?.palette
+  const committedPalette =
+    catalog.find((palette) => palette.id === committedPaletteId) ??
+    (startupPalette?.id === committedPaletteId ? startupPalette : undefined)
   const paletteHandoffObserved = projectionObservesHandoff(projection, palettePreview?.handingOffTo)
   // Undefined while a user palette is still being looked up: the boot
   // stylesheet stays on screen rather than flashing Graphite in between.
@@ -183,35 +187,6 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
 
     writeBootMirror(confirmedValues, confirmedQuery.data?.layers)
   }, [confirmedValues, confirmedQuery.data?.layers])
-
-  const confirmedAppearance = confirmedValues
-    ? resolveThemeSettings(
-        confirmedValues,
-        prefersDark ? 'dark' : 'light',
-        confirmedQuery.data?.layers,
-      )
-    : null
-  const confirmedPaletteId = confirmedAppearance?.['workbench.palette']
-  useEffect(() => {
-    if (!confirmedPaletteId) return
-    const palette = catalog.find((candidate) => candidate.id === confirmedPaletteId)
-    if (!palette) return
-
-    if (!confirmedValues) return
-    const lightId = resolveThemeSettings(
-      { ...confirmedValues, 'workbench.colorTheme': 'light' },
-      'light',
-      confirmedQuery.data?.layers,
-    )['workbench.palette']
-    const darkId = resolveThemeSettings(
-      { ...confirmedValues, 'workbench.colorTheme': 'dark' },
-      'dark',
-      confirmedQuery.data?.layers,
-    )['workbench.palette']
-    const light = catalog.find((entry) => entry.id === lightId) ?? palette
-    const dark = catalog.find((entry) => entry.id === darkId) ?? palette
-    writePaletteBootCache([light.id, dark.id], paletteStylesheet(light, dark))
-  }, [catalog, confirmedPaletteId, confirmedValues, confirmedQuery.data?.layers])
 
   // Stable identity lets palette unmount cleanup clear hover exactly once.
   const clearThemePreview = useCallback(() => {
