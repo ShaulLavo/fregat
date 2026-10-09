@@ -30,7 +30,8 @@ export type MergeReviewSyntax = (
   snapshot: PieceTableSnapshot,
   ranges: readonly MergeReviewRange[],
   contentKey?: boolean,
-) => Promise<readonly MergeReviewUnit[] | null>
+  selection?: 'enclosing' | 'touching',
+) => Promise<readonly (readonly MergeReviewUnit[])[] | null>
 export type MergeReviewMark = {
   readonly kind: 'overlap' | 'parse' | 'signature' | 'orphan'
   readonly unitId: string
@@ -44,13 +45,18 @@ export type MergeReviewResult =
   | { readonly status: 'complete'; readonly marks: readonly MergeReviewMark[] }
   | { readonly status: 'unavailable'; readonly marks: readonly [] }
 
-type Touch = { readonly edit: ConcurrentEdit; readonly unit: MergeReviewUnit }
+type Touch = { readonly unit: MergeReviewUnit; readonly ranges: MergeReviewRange[] }
+type ReviewState = {
+  readonly engine: TextbufferEngine
+  readonly current: PieceTableSnapshot
+  readonly before: Map<string, PieceTableSnapshot>
+  readonly formatting: Map<string, boolean>
+}
 type Candidate = { readonly unit: MergeReviewUnit; readonly pairs: ConcurrentPair[] }
+type MarkAccumulator = Pick<MergeReviewMark, 'kind' | 'unitId' | 'unit'> & {
+  readonly edges: Map<string, readonly [EditId, EditId]>
+}
 const keyOf = (id: EditId) => JSON.stringify([id.actor, id.seq])
-const lastOf = (span: IdSpan): CharId => ({
-  bunch: span.start.bunch,
-  counter: span.start.counter + span.count - 1,
-})
 
 /** Demand-only review over a confirmed snapshot. Pending editor state is never an input. */
 export class MergeReviewDetector {
@@ -66,6 +72,12 @@ export class MergeReviewDetector {
     if (!pairs.length) return { status: 'complete', marks: [] }
     const engine = new TextbufferEngine()
     engine.restore(confirmed)
+    const state: ReviewState = {
+      engine,
+      current: confirmed.buffer,
+      before: new Map(),
+      formatting: new Map(),
+    }
     const active = new Map<ConcurrentEdit, boolean>()
     const activePairs = pairs.filter((pair) =>
       pair.every((edit) => {
@@ -82,40 +94,35 @@ export class MergeReviewDetector {
     const units = await this.syntax(
       confirmed.buffer,
       ranges.map((entry) => entry.range),
+      false,
+      'touching',
     )
-    if (!units || units.length !== ranges.length) return { status: 'unavailable', marks: [] }
-    const touches = new Map<ConcurrentEdit, Touch[]>()
+    if (!units || units.length !== ranges.length || units.some((group) => !group.length))
+      return { status: 'unavailable', marks: [] }
+    const grouped = new Map<ConcurrentEdit, Map<string, Touch>>()
     for (let index = 0; index < ranges.length; index++) {
-      const edit = ranges[index]!.edit
-      const entries = touches.get(edit) ?? []
-      const unit = units[index]!
-      if (!entries.some((entry) => sameUnit(entry.unit, unit))) entries.push({ edit, unit })
-      touches.set(edit, entries)
+      const { edit, range } = ranges[index]!
+      const entries = grouped.get(edit) ?? new Map<string, Touch>()
+      for (const unit of units[index]!) {
+        const key = rangeKey(unit)
+        const entry = entries.get(key)
+        const footprint = intersectRange(range, unit)
+        if (entry) entry.ranges.push(footprint)
+        else entries.set(key, { unit, ranges: [footprint] })
+      }
+      grouped.set(edit, entries)
     }
-    for (const [key, entries] of touches) {
-      touches.set(
-        key,
-        entries.filter(
-          (entry) =>
-            !entries.some(
-              (other) =>
-                !sameUnit(entry.unit, other.unit) &&
-                entry.unit.startIndex <= other.unit.startIndex &&
-                entry.unit.endIndex >= other.unit.endIndex,
-            ),
-        ),
-      )
+    const touches = new Map<ConcurrentEdit, Touch[]>()
+    for (const [edit, entries] of grouped) {
+      touches.set(edit, pruneTouches(confirmed.buffer, [...entries.values()]))
     }
     for (const [key, entries] of touches) {
       const edit = key
       if (edit.inserted.length || !edit.deleted.length) continue
-      const base = engine.projectEffects(
-        [...edits.values()]
-          .filter((entry) => entry.envelope.id.actor === edit.envelope.id.actor)
-          .map((entry) => ({ op: entry.envelope.id, active: false })),
-      ).buffer
-      const original = await this.syntax(base, touchedRanges(base, edit))
+      const base = without(state, [edit])
+      const original = await this.syntax(base, touchedRanges(base, edit), false, 'touching')
       if (!original) return { status: 'unavailable', marks: [] }
+      const originalUnits = original.flat()
       touches.set(
         key,
         entries.filter((entry) => {
@@ -123,7 +130,7 @@ export class MergeReviewDetector {
           const location = first && locateCharId(base, first)
           return (
             location &&
-            original.some(
+            originalUnits.some(
               (unit) =>
                 unit.type === entry.unit.type &&
                 unit.startIndex <= location.offset &&
@@ -134,20 +141,23 @@ export class MergeReviewDetector {
       )
     }
     const candidates = new Map<string, Candidate>()
-    const marks = new Map<string, MergeReviewMark>()
+    const marks = new Map<string, MarkAccumulator>()
+    const signatures: { pair: ConcurrentPair; left: MergeReviewUnit; right: MergeReviewUnit }[] = []
     for (const pair of activePairs) {
       const left = touches.get(pair[0]) ?? []
       const right = touches.get(pair[1]) ?? []
-      collectCandidates(confirmed.buffer, pair, left, right, candidates, marks)
-      if (!sharedDeletion(pair) || left.some((a) => right.some((b) => sameUnit(a.unit, b.unit))))
-        continue
+      collectCandidates(confirmed.buffer, pair, left, right, candidates, signatures)
+      if (!sharedDeletion(pair)) continue
       const combined = [...left, ...right].map((touch) => touch.unit)
-      if (!combined.length) continue
-      const range = {
-        startIndex: Math.min(...combined.map((unit) => unit.startIndex)),
-        endIndex: Math.max(...combined.map((unit) => unit.endIndex)),
-      }
-      const unit = (await this.syntax(confirmed.buffer, [range]))?.[0]
+      if (!combined.length || combined.every((unit) => sameUnit(unit, combined[0]!))) continue
+      const range = combined.reduce(
+        (range, unit) => ({
+          startIndex: Math.min(range.startIndex, unit.startIndex),
+          endIndex: Math.max(range.endIndex, unit.endIndex),
+        }),
+        { startIndex: confirmed.buffer.length, endIndex: 0 },
+      )
+      const unit = (await this.syntax(confirmed.buffer, [range]))?.[0]?.[0]
       if (!unit) return { status: 'unavailable', marks: [] }
       const unitId = unitIdentity(confirmed.buffer, unit)
       const candidate = candidates.get(unitId) ?? { unit, pairs: [] }
@@ -155,77 +165,119 @@ export class MergeReviewDetector {
       candidates.set(unitId, candidate)
     }
     for (const [unitId, candidate] of candidates) {
-      const versions = await this.versions(engine, candidate)
-      if (!versions) return { status: 'unavailable', marks: [] }
-      const meaningful = candidate.pairs.filter((pair) =>
-        pair.every((edit) => !versions.formatting.has(keyOf(edit.envelope.id))),
-      )
-      if (meaningful.length) addMark(marks, 'overlap', unitId, candidate.unit, meaningful)
-      if (candidate.unit.hasErrors && versions.clean)
-        addMark(marks, 'parse', unitId, candidate.unit, candidate.pairs)
+      const meaningful = await this.meaningful(state, candidate.unit, candidate.pairs)
+      if (!meaningful) return { status: 'unavailable', marks: [] }
+      if (!meaningful.length) continue
+      addMark(marks, 'overlap', unitId, candidate.unit, meaningful)
+      if (!candidate.unit.hasErrors) continue
+      const clean = await this.cleanVersions(state, { ...candidate, pairs: meaningful })
+      if (clean === null) return { status: 'unavailable', marks: [] }
+      if (clean) addMark(marks, 'parse', unitId, candidate.unit, meaningful)
+    }
+    for (const { pair, left, right } of signatures) {
+      const a = await this.formattingEdit(state, pair[0], left)
+      const b = await this.formattingEdit(state, pair[1], right)
+      if (a === null || b === null) return { status: 'unavailable', marks: [] }
+      if (a || b) continue
+      const introduced = await this.introducedSignature(state, pair, left, right)
+      if (introduced === null) return { status: 'unavailable', marks: [] }
+      if (!introduced) continue
+      addMark(marks, 'signature', unitIdentity(state.current, left), left, [pair])
+      addMark(marks, 'signature', unitIdentity(state.current, right), right, [pair])
     }
     for (const pair of activePairs) {
       if (!orphanPair(pair)) continue
-      const orphan = await this.orphan(engine, pair)
+      const orphan = await this.orphan(state, pair)
       if (orphan === null) return { status: 'unavailable', marks: [] }
       for (const unit of orphan)
         addMark(marks, 'orphan', unitIdentity(confirmed.buffer, unit), unit, [pair])
     }
     return {
       status: 'complete',
-      marks: [...marks.values()].sort(
-        (a, b) => compare(a.unitId, b.unitId) || compare(a.kind, b.kind),
-      ),
+      marks: [...marks.values()]
+        .map(finalizeMark)
+        .sort((a, b) => compare(a.unitId, b.unitId) || compare(a.kind, b.kind)),
     }
   }
 
-  private async versions(engine: TextbufferEngine, candidate: Candidate) {
-    const edits = new Map<string, ConcurrentEdit>()
-    for (const pair of candidate.pairs)
-      for (const edit of pair) edits.set(keyOf(edit.envelope.id), edit)
-    const needsVersions =
-      candidate.unit.hasErrors ||
-      [...edits.values()].some((edit) => {
-        return /^\s*$/.test(insertedText(edit))
-      })
-    if (!needsVersions) return { clean: false, formatting: new Set<string>() }
-    const current = engine.snapshot().buffer
-    const formatting = new Set<string>()
-    const authors = new Set([...edits.values()].map((edit) => edit.envelope.id.actor))
-    let clean = true
-    let base: MergeReviewUnit | undefined
-    for (const actor of authors) {
-      const selected = [...edits.values()].filter((edit) => edit.envelope.id.actor !== actor)
-      const projected = engine.projectEffects(
-        selected.map((edit) => ({ op: edit.envelope.id, active: false })),
-      ).buffer
-      const range = projectedRange(current, projected, candidate.unit)
-      const unit = (await this.syntax(projected, [range], true))?.[0]
-      if (!unit) return null
-      clean &&= !unit.hasErrors
-      for (const edit of edits.values()) {
-        if (edit.envelope.id.actor !== actor || !whitespaceEdit(edit, engine)) continue
-        if (!base) {
-          const before = engine.projectEffects(
-            [...edits.values()].map((entry) => ({ op: entry.envelope.id, active: false })),
-          ).buffer
-          base = (
-            await this.syntax(before, [projectedRange(current, before, candidate.unit)], true)
-          )?.[0]
-          if (!base) return null
-        }
-        if (base.contentKey !== undefined && base.contentKey === unit.contentKey)
-          formatting.add(keyOf(edit.envelope.id))
+  private async meaningful(
+    state: ReviewState,
+    unit: MergeReviewUnit,
+    pairs: readonly ConcurrentPair[],
+  ) {
+    const meaningful: ConcurrentPair[] = []
+    for (const pair of pairs) {
+      let keep = true
+      for (const edit of pair) {
+        const formatting = await this.formattingEdit(state, edit, unit)
+        if (formatting === null) return null
+        keep &&= !formatting
       }
+      if (keep) meaningful.push(pair)
     }
-    return { clean, formatting }
+    return meaningful
   }
 
-  private async orphan(engine: TextbufferEngine, pair: ConcurrentPair) {
-    const base = engine.projectEffects(
-      pair.map((edit) => ({ op: edit.envelope.id, active: false })),
-    ).buffer
-    const result: MergeReviewUnit[] = []
+  private async formattingEdit(
+    state: ReviewState,
+    edit: ConcurrentEdit,
+    unit: MergeReviewUnit,
+  ): Promise<boolean | null> {
+    if (!/^\s*$/.test(insertedText(edit))) return false
+    const key = JSON.stringify([keyOf(edit.envelope.id), unitIdentity(state.current, unit)])
+    const cached = state.formatting.get(key)
+    if (cached !== undefined) return cached
+    const before = without(state, [edit])
+    if (!whitespaceEdit(edit, before)) return false
+    const afterUnit = (await this.syntax(state.current, [unit], true))?.[0]?.[0]
+    const beforeUnit = (
+      await this.syntax(before, [projectedRange(state.current, before, unit)], true)
+    )?.[0]?.[0]
+    if (!afterUnit || !beforeUnit) return null
+    const formatting =
+      afterUnit.contentKey !== undefined && afterUnit.contentKey === beforeUnit.contentKey
+    state.formatting.set(key, formatting)
+    return formatting
+  }
+
+  private async cleanVersions(state: ReviewState, candidate: Candidate) {
+    const edits = new Set(candidate.pairs.flatMap((pair) => [...pair]))
+    const authors = new Set([...edits].map((edit) => edit.envelope.id.actor))
+    for (const actor of authors) {
+      const projected = without(
+        state,
+        [...edits].filter((edit) => edit.envelope.id.actor !== actor),
+      )
+      const unit = (
+        await this.syntax(projected, [projectedRange(state.current, projected, candidate.unit)])
+      )?.[0]?.[0]
+      if (!unit) return null
+      if (unit.hasErrors) return false
+    }
+    return true
+  }
+
+  private async introducedSignature(
+    state: ReviewState,
+    pair: ConcurrentPair,
+    left: MergeReviewUnit,
+    right: MergeReviewUnit,
+  ) {
+    const before = without(state, pair)
+    for (const unit of [left, right]) {
+      const range = projectedRange(state.current, before, unit)
+      if (range.startIndex === range.endIndex) return true
+      const previous = (await this.syntax(before, [range]))?.[0]?.[0]
+      if (!previous) return null
+      if (previous.type !== unit.type || normalizeSignature(previous) !== normalizeSignature(unit))
+        return true
+    }
+    return false
+  }
+
+  private async orphan(state: ReviewState, pair: ConcurrentPair) {
+    const base = without(state, pair)
+    const result = new Map<string, MergeReviewUnit>()
     for (const [deletion, insertion] of [pair, [pair[1], pair[0]]] as const) {
       if (!deletion.deleted.length || !insertion.inserted.length) continue
       const change = insertion.envelope.change
@@ -238,50 +290,157 @@ export class MergeReviewDetector {
       if (!insideSpans(insert.originRight, deletion.deleted)) continue
       const unit = (
         await this.syntax(base, [{ startIndex: left.offset, endIndex: right.offset + 1 }])
-      )?.[0]
+      )?.[0]?.[0]
       if (!unit) return null
       const covered = charIdSpansInRange(base, unit.startIndex, unit.endIndex).every((span) =>
         spanCovered(span, deletion.deleted),
       )
       if (!covered) continue
-      const current = engine.snapshot().buffer
-      for (const span of insertion.inserted) {
-        const location = locateCharId(current, span.start)
-        if (!location || location.liveness !== 'live') continue
-        const stranded = (
-          await this.syntax(current, [
-            { startIndex: location.offset, endIndex: location.offset + 1 },
-          ])
-        )?.[0]
-        if (!stranded) return null
-        result.push(stranded)
-      }
+      const current = state.current
+      const stranded = await this.syntax(
+        current,
+        spanRanges(current, insertion.inserted, false),
+        false,
+        'touching',
+      )
+      if (!stranded) return null
+      for (const unit of stranded.flat()) result.set(rangeKey(unit), unit)
     }
-    return result
+    return [...result.values()]
   }
 }
 
+function without(state: ReviewState, edits: readonly ConcurrentEdit[]): PieceTableSnapshot {
+  const key = JSON.stringify(edits.map((edit) => keyOf(edit.envelope.id)).sort(compare))
+  let before = state.before.get(key)
+  if (!before) {
+    before = state.engine.projectEffects(
+      edits.map((edit) => ({ op: edit.envelope.id, active: false })),
+    ).buffer
+    state.before.set(key, before)
+  }
+  return before
+}
+
 function touchedRanges(snapshot: PieceTableSnapshot, edit: ConcurrentEdit): MergeReviewRange[] {
+  return coalesceRanges([
+    ...spanRanges(snapshot, edit.inserted, false),
+    ...spanRanges(snapshot, edit.deleted, true),
+  ])
+}
+
+function spanRanges(
+  snapshot: PieceTableSnapshot,
+  spans: readonly IdSpan[],
+  hidden: boolean,
+): MergeReviewRange[] {
   const ranges: MergeReviewRange[] = []
-  const spans = edit.inserted.length ? edit.inserted : edit.deleted
   for (const span of spans) {
-    for (let counter = span.start.counter; counter < span.start.counter + span.count;) {
+    const end = span.start.counter + span.count
+    for (let counter = span.start.counter; counter < end;) {
       const location = locateCharId(snapshot, { bunch: span.start.bunch, counter })
       if (!location) break
-      const startIndex = location.offset
-      const endIndex = startIndex + Number(location.liveness === 'live')
-      if (!ranges.some((range) => range.startIndex === startIndex && range.endIndex === endIndex))
-        ranges.push({ startIndex, endIndex })
-      counter +=
-        location.liveness === 'live'
-          ? 1
-          : Math.min(
-              span.start.counter + span.count - counter,
-              location.piece.start + location.piece.length - location.unit,
-            )
+      const count = Math.min(
+        end - counter,
+        location.piece.start + location.piece.length - location.unit,
+      )
+      if (location.liveness === 'live')
+        ranges.push({ startIndex: location.offset, endIndex: location.offset + count })
+      else if (hidden) ranges.push({ startIndex: location.offset, endIndex: location.offset })
+      counter += count
     }
   }
-  return ranges
+  return coalesceRanges(ranges)
+}
+
+function coalesceRanges(ranges: readonly MergeReviewRange[]): MergeReviewRange[] {
+  const result: MergeReviewRange[] = []
+  for (const range of ranges.toSorted(
+    (a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex,
+  )) {
+    const previous = result.at(-1)
+    if (previous && range.startIndex <= previous.endIndex) {
+      result[result.length - 1] = {
+        startIndex: previous.startIndex,
+        endIndex: Math.max(previous.endIndex, range.endIndex),
+      }
+      continue
+    }
+    result.push(range)
+  }
+  return result
+}
+
+function intersectRange(range: MergeReviewRange, unit: MergeReviewUnit): MergeReviewRange {
+  return {
+    startIndex: Math.max(range.startIndex, unit.startIndex),
+    endIndex: Math.min(range.endIndex, unit.endIndex),
+  }
+}
+
+function pruneTouches(snapshot: PieceTableSnapshot, entries: readonly Touch[]): Touch[] {
+  const children = new Map<Touch, Touch[]>()
+  const stack: Touch[] = []
+  for (const entry of entries.toSorted(
+    (a, b) => a.unit.startIndex - b.unit.startIndex || b.unit.endIndex - a.unit.endIndex,
+  )) {
+    while (stack.length && !containsUnit(stack.at(-1)!.unit, entry.unit)) stack.pop()
+    const parent = stack.at(-1)
+    if (parent) {
+      const nested = children.get(parent) ?? []
+      nested.push(entry)
+      children.set(parent, nested)
+    }
+    stack.push(entry)
+  }
+  return entries.filter((entry) => !coveredTouch(snapshot, entry, children.get(entry) ?? []))
+}
+
+function containsUnit(parent: MergeReviewUnit, child: MergeReviewUnit): boolean {
+  return parent.startIndex <= child.startIndex && parent.endIndex >= child.endIndex
+}
+
+function rangeKey(unit: MergeReviewUnit): string {
+  return JSON.stringify([unit.languageId, unit.type, unit.startIndex, unit.endIndex])
+}
+
+function coveredTouch(
+  snapshot: PieceTableSnapshot,
+  entry: Touch,
+  nested: readonly Touch[],
+): boolean {
+  if (!nested.length) return false
+  const coverage = coalesceRanges(nested.map((other) => other.unit))
+  return entry.ranges.every((range) => {
+    let cursor = range.startIndex
+    for (const unit of coverage) {
+      if (unit.endIndex < cursor || unit.startIndex > range.endIndex) continue
+      if (unit.startIndex > cursor && !ignorableGap(snapshot, cursor, unit.startIndex, nested))
+        return false
+      cursor = Math.max(cursor, unit.endIndex)
+      if (cursor >= range.endIndex) return true
+    }
+    return ignorableGap(snapshot, cursor, range.endIndex, nested)
+  })
+}
+
+function ignorableGap(
+  snapshot: PieceTableSnapshot,
+  start: number,
+  end: number,
+  nested: readonly Touch[],
+): boolean {
+  if (end <= start) return true
+  const text = readPieceTableTextRange(snapshot, start, end)
+  return (
+    /^[\s,;]*$/.test(text) &&
+    nested.some(
+      (entry) =>
+        entry.unit.parent?.commutative &&
+        entry.unit.parent.startIndex <= start &&
+        entry.unit.parent.endIndex >= end,
+    )
+  )
 }
 
 function sharedDeletion(pair: ConcurrentPair): boolean {
@@ -301,7 +460,7 @@ function collectCandidates(
   left: readonly Touch[],
   right: readonly Touch[],
   candidates: Map<string, Candidate>,
-  marks: Map<string, MergeReviewMark>,
+  signatures: { pair: ConcurrentPair; left: MergeReviewUnit; right: MergeReviewUnit }[],
 ): void {
   for (const a of left) {
     for (const b of right) {
@@ -315,39 +474,45 @@ function collectCandidates(
       if (!sameCommutativeParent(a.unit, b.unit)) continue
       const signatureA = normalizeSignature(a.unit)
       if (signatureA === null || signatureA !== normalizeSignature(b.unit)) continue
-      addMark(marks, 'signature', unitIdentity(snapshot, a.unit), a.unit, [pair])
-      addMark(marks, 'signature', unitIdentity(snapshot, b.unit), b.unit, [pair])
+      signatures.push({ pair, left: a.unit, right: b.unit })
     }
   }
 }
 
 function addMark(
-  marks: Map<string, MergeReviewMark>,
+  marks: Map<string, MarkAccumulator>,
   kind: MergeReviewMark['kind'],
   unitId: string,
   unit: MergeReviewUnit,
   pairs: readonly ConcurrentPair[],
 ): void {
   const key = JSON.stringify([kind, unitId])
-  const previous = marks.get(key)
-  const edges = new Map<string, readonly [EditId, EditId]>()
-  for (const pair of previous?.pairs ?? []) edges.set(JSON.stringify(pair), pair)
+  const mark = marks.get(key) ?? {
+    kind,
+    unitId,
+    unit,
+    edges: new Map<string, readonly [EditId, EditId]>(),
+  }
   for (const pair of pairs) {
     const edge = pair
       .map((edit) => edit.envelope.id)
       .toSorted((a, b) => compare(keyOf(a), keyOf(b))) as [EditId, EditId]
-    edges.set(JSON.stringify(edge), edge)
+    mark.edges.set(JSON.stringify(edge), edge)
   }
+  marks.set(key, mark)
+}
+
+function finalizeMark(mark: MarkAccumulator): MergeReviewMark {
   const edits = new Map<string, EditId>()
-  for (const edge of edges.values()) for (const edit of edge) edits.set(keyOf(edit), edit)
-  marks.set(key, {
-    kind,
-    unitId,
-    unit,
+  for (const edge of mark.edges.values()) for (const edit of edge) edits.set(keyOf(edit), edit)
+  return {
+    kind: mark.kind,
+    unitId: mark.unitId,
+    unit: mark.unit,
     authors: [...new Set([...edits.values()].map((edit) => edit.actor))].sort(compare),
     edits: [...edits.values()].sort((a, b) => compare(keyOf(a), keyOf(b))),
-    pairs: [...edges.values()].sort((a, b) => compare(JSON.stringify(a), JSON.stringify(b))),
-  })
+    pairs: [...mark.edges.values()].sort((a, b) => compare(JSON.stringify(a), JSON.stringify(b))),
+  }
 }
 
 function unitIdentity(snapshot: PieceTableSnapshot, unit: MergeReviewUnit): string {
@@ -417,24 +582,10 @@ function insertedText(edit: ConcurrentEdit): string {
   if (change.kind === 'replace') return change.insert.text
   return ''
 }
-function whitespaceEdit(edit: ConcurrentEdit, engine: TextbufferEngine): boolean {
-  if (!/^\s*$/.test(insertedText(edit))) return false
-  const before = engine.projectEffects([{ op: edit.envelope.id, active: false }]).buffer
-  return edit.deleted.every((span) => {
-    const first = locateCharId(before, span.start)
-    const last = locateCharId(before, lastOf(span))
-    return (
-      first &&
-      last &&
-      /^\s*$/.test(
-        readPieceTableTextRange(
-          before,
-          first.offset,
-          last.offset + Number(last.liveness === 'live'),
-        ),
-      )
-    )
-  })
+function whitespaceEdit(edit: ConcurrentEdit, before: PieceTableSnapshot): boolean {
+  return spanRanges(before, edit.deleted, false).every((range) =>
+    /^\s*$/.test(readPieceTableTextRange(before, range.startIndex, range.endIndex)),
+  )
 }
 function normalizeSignature(unit: MergeReviewUnit): string | null {
   const signature = unit.signature
@@ -447,7 +598,16 @@ function normalizeSignature(unit: MergeReviewUnit): string | null {
     }
   }
   if (!['javascript', 'typescript', 'tsx'].includes(unit.languageId)) return signature
-  const unquoted = /^(["'])[\s\S]*\1$/.test(signature) ? signature.slice(1, -1) : signature
+  const quoted = /^(["'])[\s\S]*\1$/.test(signature)
+  const unquoted = quoted ? signature.slice(1, -1) : signature
+  const numeric = unquoted.replaceAll('_', '')
+  if (
+    !quoted &&
+    /^(?:0[xX][\da-fA-F]+|0[bB][01]+|0[oO][0-7]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)$/.test(
+      numeric,
+    )
+  )
+    return String(Number(numeric))
   // Decode once so a literal backslash cannot expose a second escape.
   return unquoted.replace(
     /\\(?:u\{([\da-fA-F]+)\}|u([\da-fA-F]{4})|x([\da-fA-F]{2})|([0-3][0-7]{0,2}|[4-7][0-7]?)|(\r\n|[\s\S]))/g,

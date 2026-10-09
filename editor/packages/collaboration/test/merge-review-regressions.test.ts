@@ -24,7 +24,7 @@ test('replacement deletion footprints expose a broken merge across declarations'
   for (const envelope of input.confirmed) {
     const author = peerSnapshot(input.snapshot, [envelope]).buffer
     const units = await fixture.syntax(author, [{ startIndex: 0, endIndex: author.length }])
-    expect(units?.[0]?.hasErrors).toBe(false)
+    expect(units?.[0]?.[0]?.hasErrors).toBe(false)
   }
   expect((await detect(input)).map((mark) => mark.kind)).toContain('parse')
 })
@@ -172,24 +172,26 @@ test('a paste spanning several stranded declarations marks each orphan', async (
 test('large insertions collect bounded piece intervals before syntax scheduling', async () => {
   const text = 'const value = 1;'
   const input = history(text, [
-    { offset: text.indexOf('1'), deleteCount: 1, text: '"' + 'x'.repeat(16_000) + '"' },
-    { offset: 6, deleteCount: 5, text: 'renamed' },
+    { offset: text.indexOf('1'), deleteCount: 0, text: 'x'.repeat(16_000) },
+    { offset: text.indexOf('1'), deleteCount: 0, text: 'y' },
   ])
   let ranges = 0
   const reader = new MergeReviewDetector(async (snapshot, selected) => {
     ranges += selected.length
-    return selected.map(() => ({
-      startIndex: 0,
-      endIndex: snapshot.length,
-      type: 'statement',
-      languageId: 'typescript',
-      signature: null,
-      hasErrors: false,
-      parent: null,
-    }))
+    return selected.map(() => [
+      {
+        startIndex: 0,
+        endIndex: snapshot.length,
+        type: 'statement',
+        languageId: 'typescript',
+        signature: null,
+        hasErrors: false,
+        parent: null,
+      },
+    ])
   })
   expect((await reader.detect(input.window, input.base.snapshot())).status).toBe('complete')
-  expect(ranges).toBeLessThanOrEqual(8)
+  expect(ranges).toBe(2)
 })
 
 test('large multi-unit pastes bound real queries and retain the second signature', async () => {
@@ -207,4 +209,30 @@ test('large multi-unit pastes bound real queries and retain the second signature
   expect((await detect(input)).filter((mark) => mark.kind === 'signature')).toHaveLength(2)
   expect(fixture.metrics.ranges).toBeLessThanOrEqual(16)
   expect(fixture.metrics.queries).toBeLessThan(100)
+})
+
+test('replacing a neighbouring function retains independent-unit separation', async () => {
+  const text = 'function east() { return 1; }\nfunction west() { return 2; }'
+  const input = history(text, [
+    { offset: 0, deleteCount: text.indexOf('\n') + 1, text: 'function north() { return 3; }\n' },
+    { offset: text.indexOf('2'), deleteCount: 1, text: '4' },
+  ])
+  expect(await detect(input)).toEqual([])
+})
+
+test('orphan collection skips a fully removed first unit and finds surviving later units', async () => {
+  const text = 'function f() { return 1; }\nconst tail = 0;'
+  const inserted = 'let flag = true; '
+  const input = history(text, [
+    { offset: 0, deleteCount: text.indexOf('\n'), text: '' },
+    { offset: text.indexOf('return'), deleteCount: 0, text: inserted + 'let next = false; ' },
+  ])
+  appendEdit(
+    input,
+    { offset: input.base.text().indexOf('let'), deleteCount: inserted.length, text: '' },
+    'later',
+  )
+  const orphans = (await detect(input)).filter((mark) => mark.kind === 'orphan')
+  expect(orphans).toHaveLength(1)
+  expect(orphans[0]!.unit.type).toBe('lexical_declaration')
 })

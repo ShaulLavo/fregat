@@ -1,5 +1,5 @@
 import { TREE_SITTER_BOOTSTRAP_UNITS } from './source'
-import { enclosingMergeUnit, lineMergeUnit, mergeRangeHasErrors } from './mergeUnits'
+import { analyzeLineMergeUnit, enclosingMergeUnit, lineMergeUnit } from './mergeUnits'
 import type { EditorSyntaxAnalysis } from '@singapore-editor/core/syntax'
 import {
   Edit,
@@ -2925,15 +2925,6 @@ const queryMergeUnit = async (
     ) !== cached
   )
     return { ...identity, status: 'stale', unit: null }
-  const source = runtime.descriptor.mergeUnitQuerySource
-  if (!source?.trim())
-    return {
-      ...identity,
-      languageId,
-      status: 'ok',
-      unit: lineMergeUnit(cached.source.read.text, range),
-    }
-  const query = (runtime.mergeUnitQuery ??= new Query(runtime.language, source))
   const context: CancellationContext = {
     ...createCancellationContext(request.cancellationBuffer, PARSE_BUDGET_MS),
     isStale: () =>
@@ -2945,6 +2936,15 @@ const queryMergeUnit = async (
   }
   try {
     assertNotCancelled(context)
+    const source = runtime.descriptor.mergeUnitQuerySource
+    if (!source?.trim() && !request.analysis && !request.contentKey)
+      return {
+        ...identity,
+        languageId,
+        status: 'ok',
+        unit: lineMergeUnit(cached.source.read.text, range),
+      }
+
     // The native Markdown renderer does not expose its block tree.
     let tree = layer?.tree ?? cached.mergeUnitTree
     if (!tree) {
@@ -2956,25 +2956,27 @@ const queryMergeUnit = async (
       tree = cached.mergeUnitTree ??= parsed
       if (tree !== parsed) parsed.delete()
     }
+    const query = source?.trim()
+      ? (runtime.mergeUnitQuery ??= new Query(runtime.language, source))
+      : null
     const parents = (cached.mergeUnitParents ??= new WeakMap())
-    const eligibility = parents.get(query) ?? new Map<number, boolean>()
-    parents.set(query, eligibility)
-    const unit = enclosingMergeUnit(tree.rootNode, query, range, {
+    const eligibility = query ? (parents.get(query) ?? new Map<number, boolean>()) : undefined
+    if (query && eligibility) parents.set(query, eligibility)
+    const queryContext = {
       analysis: request.analysis,
       contentKey: request.contentKey,
       parents: eligibility,
       progressCallback: () => isCancelled(context),
-    })
+    }
+    const unit = query ? enclosingMergeUnit(tree.rootNode, query, range, queryContext) : null
     assertNotCancelled(context)
-    const fallback = lineMergeUnit(cached.source.read.text, range)
     const selected =
       unit ??
-      (request.analysis
-        ? {
-            ...fallback,
-            hasErrors: mergeRangeHasErrors(tree.rootNode, fallback, () => isCancelled(context)),
-          }
-        : fallback)
+      analyzeLineMergeUnit(
+        tree.rootNode,
+        lineMergeUnit(cached.source.read.text, range),
+        queryContext,
+      )
     assertNotCancelled(context)
     return { ...identity, languageId, status: 'ok', unit: selected }
   } catch (error) {

@@ -158,8 +158,13 @@ them).
    It emits `overlap`, `parse`, `signature` and `orphan`, retains exact concurrent edges,
    builds unit IDs from unit kind/first-character identity, filters inactive effects and
    reconstructs author/base versions through local `projectEffects` snapshots. Equivalent
-   JSON and JavaScript/TypeScript quoted/escaped signatures normalize before comparison.
-   Token/shape fingerprints are requested only for formatting projections.
+   JSON and JavaScript/TypeScript quoted/escaped signatures normalize before comparison;
+   unquoted numeric property names canonicalize separately from quoted strings.
+   Token/shape fingerprints are requested only for formatting projections. The syntax reader
+   returns one group per requested range: touching selection covers all units intersecting a
+   coalesced identity-piece interval, while enclosing selection supports version comparisons.
+   Replacement footprints include inserted and deleted identities. Nested units suppress only
+   fully covered ancestor touches, preserving edited headers.
 
    Worker merge-unit analysis retains damaged syntax units and reports errors. Lazy Markdown
    structural parsing now uses `parseTreeSlices` / `resumeTreeSlices`; query progress checks
@@ -177,11 +182,26 @@ them).
    pairs involving the supplied IDs; request the full window to replace marks after undo or
    retention changes. This step ships no marks UI or session scheduling.
 
-   Verification: original 18-case conflict corpus plus wide damaged-tree and quoted-escape regressions; 10,000 seeded independent-function cases
-   with zero marks; 10,000 shared-unit cases all marked; five real E067 peer-session runs
-   with reordered/duplicate delivery and identical converged mark sets. Package and worker
-   regression suites pass. The corpus covers causal copy/move and edited descendants that
-   survive wrapper removal; arbitrary copy/delete moves do not preserve character identities.
+   Verification: original 18-case conflict corpus plus wide damaged-tree and quoted-escape
+   regressions; 10,000 seeded independent-function cases with zero marks; 10,000 shared-unit
+   cases all marked; five real E067 peer-session runs with reordered/duplicate delivery and
+   identical converged mark sets. The revised suites pass 194 collaboration tests, 682 collab
+   tests (four existing skips), and 137 Node plus 136 browser tree-sitter tests. The corpus
+   covers causal copy/move and edited descendants that survive wrapper removal; arbitrary
+   copy/delete moves do not preserve character identities.
+
+   Independent-review revision in [PR #1164](https://github.com/ShaulLavo/fregat/pull/1164):
+   all 13 initial detector reproductions failed before implementation; the isolated worker
+   reproduction exposed three failures with TypeScript cancellation as the known-good control.
+   Fifteen detector regressions and four browser cases now cover all ten numbered findings:
+   replacement deletion footprints; ancestor/header retention; tombstoned insertions and causal
+   deletions; deleted whitespace interrupted by concurrent text; operation-local formatting;
+   formatting-filtered signatures and pre-existing duplicates; numeric versus quoted names;
+   every surviving orphan portion; fallback analysis/fingerprints/cancellation; and bounded
+   paste intervals/queries. Per-operation projections disable only the inspected operation,
+   preserving causal surrounding effects. Signature marks require a newly introduced duplicate.
+   Projection snapshots are reused per detect call, and mark edges are accumulated once.
+   No changes were made to `packages/collab/src/concurrency.ts`; its append tuning is separate.
 
    **Cost gate remains incomplete.** Run
    `bun run --cwd editor/packages/collaboration bench:merge-review` after workspace builds.
@@ -190,23 +210,31 @@ them).
    machine**, A/B/B/A. Current retained parsing is prepared outside timing, as detection runs
    after parsing; IPC and UI are excluded. The complete detector includes concurrency append,
    pair selection, identity mapping and real queries. For 100 retained records, median
-   2/4/8-author batches are 0.945/1.005/1.050 ms (p95 2.011/1.988/1.770 ms). At 8,192 records
-   they are **2.645/2.734/2.723 ms**, p95 **4.181/4.790/4.918 ms**. These do not satisfy 2 ms.
+   2/4/8-author batches are 1.140/1.160/1.266 ms (p95 2.491/2.255/2.708 ms). At 8,192 records
+   they are **3.218/3.058/3.100 ms**, p95 **5.478/4.823/5.060 ms**. These do not satisfy 2 ms.
    `detector-baseline-evidence.json` records the intermediate cached-state implementation
    before demand-only fingerprints, not the initial implementation.
 
    The separately profiled representative batch has 100k lines, 100 edits, four authors and
-   8,192 retained records. Mean append is 1.677 ms; exact pair selection alone is 0.507 ms;
-   detector work after append is 2.031 ms. Current-unit lookup totals 0.821 ms, including
-   0.245 ms inside real query matching: one unit range and four query matches per edit.
-   V8 samples estimate 1.548 ms append, 0.447 ms pair selection, 0.762 ms unit selection/query,
-   0.082 ms signature/candidate checks, 0.044 ms orphan checks, 0.079 ms identity/effect work
-   and 0.323 ms bookkeeping per complete batch. These sampled estimates are not additive wall
-   timings. Parsing, token fingerprints and `projectEffects` rebuilds are zero in this
-   independent-unit timed workload; reconstruction cost remains unbounded by this experiment.
-   Follow-up starts with retained-window append (about 47% of measured CPU samples), then
-   unit/query selection (about 23%) and pair selection (about 14%). Keep the existing budget
-   and include marked projection workloads and worker transport in the remaining proof.
+   8,192 retained records. Mean append is 1.728 ms; exact pair selection alone is 0.486 ms;
+   detector work after append is 2.298 ms. Current-unit lookup totals 0.878 ms, including
+   0.258 ms inside real query matching: one unit range and four query matches per edit.
+   V8 samples estimate 0.159 ms append, 0.456 ms pair selection, 0.757 ms unit selection/query,
+   0.121 ms signature/candidate checks, 0.057 ms orphan checks, 0.145 ms identity/effect work
+   and 0.487 ms bookkeeping per complete batch. These sampled estimates exclude harness/GC
+   and are not additive wall timings. Parsing, token fingerprints and `projectEffects` rebuilds
+   are zero in this independent-unit timed workload; reconstruction cost remains unbounded by
+   this experiment. Append is the largest separately timed component; unit/query selection
+   is the largest sampled category. Keep the existing budget and include marked projection
+   workloads and worker transport in the remaining proof.
+
+   A separate **experiment, shared machine** in `paste-evidence.json` compares reviewed head
+   `d8ff8d97b4249cf3842e6c72b250c82f9137c6ea` with the revision, using two concurrent insertions
+   of 16,000 and one UTF-16 units and a trivial injected reader. After ten warmups per version,
+   A/B/B/A supplies 60 samples per version: median/p95 148.301/253.077 ms before versus
+   0.086/0.176 ms after. Syntax ranges fall from 16,001 to two. A real 100,000-character
+   multi-unit paste uses two ranges and 20 real query matches, retaining both signature marks.
+   This bounds the paste range-collection regression, independently of the ordinary batch gate.
 
 4. **Marks, hover and resolutions** in the collaboration plugin, wired into the example page.
 5. **Fregat:** marks for agent edits racing human typing, review annotations on the host, and the

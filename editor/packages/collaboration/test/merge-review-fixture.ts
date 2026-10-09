@@ -12,8 +12,9 @@ import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitte
 import type { TreeSitterMergeUnit } from '@singapore-editor/tree-sitter'
 import {
   enclosingMergeUnit,
+  touchingMergeUnits,
+  analyzeLineMergeUnit,
   lineMergeUnit,
-  mergeRangeHasErrors,
 } from '../../tree-sitter/src/treeSitter/mergeUnits'
 import { createDocumentTextSnapshot } from '@singapore-editor/core/document'
 import { MergeReviewDetector } from '../src/merge-review'
@@ -45,7 +46,7 @@ export async function syntaxFixture(languageId = 'typescript', profile = false) 
   const trees = new Map<PieceTableSnapshot, ReturnType<Parser['parse']>>()
   const parents = new Map<PieceTableSnapshot, Map<number, boolean>>()
   let calls = 0
-  const syntax: MergeReviewSyntax = async (snapshot, ranges, contentKey) => {
+  const syntax: MergeReviewSyntax = async (snapshot, ranges, contentKey, selection) => {
     calls++
     let tree = trees.get(snapshot)
     if (!tree) {
@@ -69,17 +70,21 @@ export async function syntaxFixture(languageId = 'typescript', profile = false) 
     return ranges.map((range) => {
       const before = profile ? performance.now() : 0
       const text = createDocumentTextSnapshot(snapshot)
-      const unit: TreeSitterMergeUnit =
-        enclosingMergeUnit(tree!.rootNode, query, range, {
-          analysis: true,
-          contentKey,
-          parents: parents.get(snapshot),
-        }) ?? lineMergeUnit(text, range)
-      const result = {
+      const context = { analysis: true, contentKey, parents: parents.get(snapshot) }
+      const selected: readonly TreeSitterMergeUnit[] =
+        selection === 'touching'
+          ? touchingMergeUnits(tree!.rootNode, query, range, context)
+          : [enclosingMergeUnit(tree!.rootNode, query, range, context)].filter(
+              (unit): unit is TreeSitterMergeUnit => unit !== null,
+            )
+      const units = selected.length
+        ? selected
+        : [analyzeLineMergeUnit(tree!.rootNode, lineMergeUnit(text, range), context)]
+      const result = units.map((unit) => ({
         ...unit,
         languageId,
-        hasErrors: unit.hasErrors ?? mergeRangeHasErrors(tree!.rootNode, unit),
-      }
+        hasErrors: unit.hasErrors ?? false,
+      }))
       if (profile) {
         metrics.ranges++
         metrics.unitsMs += performance.now() - before

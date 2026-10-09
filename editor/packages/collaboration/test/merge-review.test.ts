@@ -23,8 +23,8 @@ test('wide damaged fallback scans errors without overflowing argument limits', a
   const units = await fixture.syntax(input.base.snapshot().buffer, [
     { startIndex: 0, endIndex: text.length },
   ])
-  expect(units?.[0]?.type).toBe('line')
-  expect(units?.[0]?.hasErrors).toBe(true)
+  expect(units?.[0]?.[0]?.type).toBe('line')
+  expect(units?.[0]?.[0]?.hasErrors).toBe(true)
 })
 
 test('independent edits in separate functions stay unmarked', async () => {

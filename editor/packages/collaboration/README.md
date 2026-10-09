@@ -65,12 +65,19 @@ local pending typing stays outside that input. Each mark contains a unit ID buil
 unit kind and its first character's identity, sorted authors/edit IDs, and exact concurrent
 pairs. Concurrency edges remain distinct because concurrency is non-transitive.
 
-The syntax reader returns one enclosing unit per requested range, in request order, using
-UTF-16 offsets into the supplied snapshot. Units include language, original signature spelling,
+The syntax reader returns a group of units per requested range, in request order, using
+UTF-16 offsets into the supplied snapshot. The default `enclosing` selection returns one unit
+in each group. `touching` selection returns the smallest units for every touched portion of an
+interval, including ancestors whose headers are touched outside nested units. Large pastes
+use identity-piece intervals and query syntax nodes, so their request count follows pieces
+and units rather than character count. Units include language, original signature spelling,
 error state, and parent range/commutativity. A `contentKey` request asks for syntax shape and
-leaf spelling with inter-token whitespace excluded; it is used to recognize formatting-only
-changes. Return `null` when a snapshot is unavailable or a request is cancelled. The detector
-then returns `unavailable` with an empty mark set so a host can retry the whole batch.
+leaf spelling with inter-token whitespace excluded. Formatting classification compares
+snapshots differing by one operation with all surrounding effects retained. Signature marks
+require a duplicate introduced by the edits; formatting or content-only changes to existing
+duplicates stay unmarked. Return `null` when a snapshot is unavailable or a request is
+cancelled. The detector then returns `unavailable` with an empty mark set so a host can retry
+the whole batch.
 
 With `batch` supplied, results concern concurrent pairs involving those IDs. A host that needs
 a replacement mark set after undo, eviction or dismissal should request the whole retained
@@ -81,8 +88,9 @@ reader. A null session window or a window without cross-author pairs returns bef
 work. The coordinator, identity mapping, signature/orphan checks and `projectEffects` run on
 the invoking thread; the supplied reader determines where syntax queries and projected-snapshot
 parsing run. Worker `mergeUnit` requests support `analysis: true`, optional `contentKey: true`,
-and cancellation. A production bridge that registers confirmed/projected snapshots in that
-worker and schedules review after confirmed batches remains to be wired. The Node correctness
+and cancellation, including line-fallback languages. A production bridge that registers
+confirmed/projected snapshots in that worker and schedules review after confirmed batches
+remains to be wired. The Node correctness
 and cost fixtures use real grammars and queries on the test thread.
 
 Run `bun run bench:merge-review` from this package for the shared-machine cost experiment and
@@ -91,7 +99,14 @@ CPU profile. The current 8,192-record workload exceeds the plan's unchanged 2 ms
 records separately instrumented attribution. `bench/detector-baseline-evidence.json` is the
 intermediate cached-state baseline before token fingerprints became demand-only. The profile
 uses independent units, so projected-snapshot rebuilding and parsing are zero inside its timed
-region; their cost is still unbounded by that experiment.
+region; their cost is still unbounded by that experiment. The revised 2/4/8-author medians at
+8,192 records are 3.218/3.058/3.100 ms, with p95 5.478/4.823/5.060 ms.
+
+`bench/paste-evidence.json` separately records the paste interval experiment against the reviewed
+implementation: 16,001 syntax ranges become two for a 16,000-character insertion, with a trivial
+reader. A real 100,000-character multi-unit paste uses two ranges and 20 query matches while
+retaining both signature marks. These results measure paste range collection independently of
+the unchanged ordinary batch gate.
 
 ## Transport status
 

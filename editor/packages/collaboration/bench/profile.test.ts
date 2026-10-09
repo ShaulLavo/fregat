@@ -15,6 +15,9 @@ function category(stack: readonly string[]): string {
     stack.some((name) =>
       [
         'enclosingMergeUnit',
+        'touchingMergeUnits',
+        'analyzeLineMergeUnit',
+        'rangeContentKey',
         'unitAt',
         'parentEligibility',
         'nodeContentKey',
@@ -36,7 +39,7 @@ function category(stack: readonly string[]): string {
   )
     return 'signature/candidate checks'
   if (stack.some((name) => ['orphanPair', 'orphan'].includes(name))) return 'orphan checks'
-  if (stack.some((name) => ['touchedRanges', 'effectActive'].includes(name)))
+  if (stack.some((name) => ['touchedRanges', 'spanRanges', 'effectActive'].includes(name)))
     return 'identity mapping/effect visibility'
   if (stack.includes('detect')) return 'detector bookkeeping'
   return 'outside-timer: setup, validation, GC, harness'
