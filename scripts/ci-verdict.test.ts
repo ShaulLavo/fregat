@@ -12,6 +12,7 @@ function fixture() {
   const outputs: Record<string, string> = {
     code: 'true',
     packages: '["web"]',
+    exhaustive: 'true',
     web: 'true',
     server: 'true',
     tui: 'true',
@@ -21,6 +22,7 @@ function fixture() {
     hotkeys: 'true',
     docs: 'false',
     web_shards: '["1/4","2/4","3/4","4/4"]',
+    mobile_shards: '["chromium-0","chromium-1","webkit-0","webkit-1"]',
   }
   const identity: RunIdentity = {
     runId: 42,
@@ -100,6 +102,24 @@ function fixture() {
 
 test('actual required graph accepts completed successful jobs and its docs skip', () => {
   expect(fixture().run()).toEqual({ passed: true, issues: [] })
+})
+
+test('scheduled full validation uses the same strict verdict', () => {
+  const value = fixture()
+  expect(value.evaluate(value.jobs, 'schedule')).toEqual({ passed: true, issues: [] })
+})
+
+test('ordinary site changes require both smoke engines and no exhaustive mobile shards', () => {
+  const value = fixture()
+  value.changes.outputs.exhaustive = 'false'
+  value.changes.outputs.mobile_shards = '["chromium-0","webkit-0"]'
+  const jobs = value.jobs.filter(
+    (job) => !['Mobile layout (chromium-1)', 'Mobile layout (webkit-1)'].includes(job.name),
+  )
+  expect(value.evaluate(jobs)).toEqual({ passed: true, issues: [] })
+  expect(value.evaluate(jobs.filter((job) => job.name !== 'Mobile layout (webkit-0)')).passed).toBe(
+    false,
+  )
 })
 
 test('actual cancelled packet rejects synthetic successful parent needs', () => {
