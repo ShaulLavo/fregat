@@ -441,6 +441,37 @@ describe('VirtualizedTextView', () => {
     })
   })
 
+  it.each(['virtualized', 'static'] as const)(
+    'uses a supplied scroll cap without probing after starting in %s mode',
+    (scrollMode) => {
+      view.dispose()
+      const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      view = new VirtualizedTextView(container, {
+        highlightRegistry: mockRegistry,
+        overscan: 0,
+        scrollMode,
+        scrollPastEnd: false,
+        textMetrics: { characterWidth: 7, rowHeight: 18 },
+        maxScrollHeight: 1_024,
+      })
+      expect(rectSpy).not.toHaveBeenCalled()
+      rectSpy.mockRestore()
+
+      view.setScrollMode('virtualized')
+      view.setText(createLines(1_000))
+      view.setScrollMetrics(0, 100)
+      expect(view.getState().totalHeight).toBe(18_000)
+      expect(container.querySelector<HTMLElement>('.editor-virtualized-extent')!.style.height).toBe(
+        '1024px',
+      )
+      view.setScrollMode('static')
+      view.setScrollMode('virtualized')
+      expect(container.querySelector<HTMLElement>('.editor-virtualized-extent')!.style.height).toBe(
+        '1024px',
+      )
+    },
+  )
+
   it('adds bottom scroll padding so the final row can align with the viewport top', () => {
     view.setText(createLines(10))
     view.setScrollMetrics(0, 100)

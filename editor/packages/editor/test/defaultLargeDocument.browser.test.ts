@@ -54,6 +54,41 @@ it.each(['virtualized', 'static'] as const)(
   60_000,
 )
 
+it.each(['virtualized', 'static'] as const)(
+  'uses an embedder-supplied native extent after starting in %s mode',
+  async (initialMode) => {
+    host = document.createElement('div')
+    host.style.cssText = 'width:720px;height:400px;display:flex;flex-direction:column'
+    document.body.append(host)
+    editor = new Editor(host, {
+      lineHeight: 20,
+      wordWrap: false,
+      scrollPastEnd: false,
+      scrollMode: initialMode,
+      textMetrics: { rowHeight: 20, characterWidth: 8 },
+      maxScrollHeight: 1_024,
+    })
+    editor.setScrollMode('virtualized')
+    const text = 'x\n'.repeat(1_000) + 'tail'
+    editor.setText(text)
+    await frames()
+    const scroller = host.querySelector<HTMLElement>('.editor-virtualized')!
+    const extent = host.querySelector<HTMLElement>('.editor-virtualized-extent')!
+    expect(extent.getBoundingClientRect().height).toBe(1_024)
+    expect(Reflect.get(Element.prototype, 'scrollHeight', scroller)).toBe(1_024)
+    editor.setSelection(text.length, text.length, { reveal: true })
+    await frames()
+    const tail = host.querySelector<HTMLElement>('[data-editor-virtual-row="1000"]')!
+    expect(tail.textContent).toBe('tail')
+    const bounds = tail.getBoundingClientRect()
+    const viewport = scroller.getBoundingClientRect()
+    expect(bounds.top).toBeGreaterThanOrEqual(viewport.top - 1)
+    expect(bounds.bottom).toBeLessThanOrEqual(viewport.bottom + 1)
+    const hit = document.elementFromPoint(bounds.left + 4, bounds.top + 10)
+    expect(hit === tail || tail.contains(hit)).toBe(true)
+  },
+)
+
 async function frames() {
   for (let index = 0; index < 3; index++)
     await new Promise((resolve) => requestAnimationFrame(resolve))

@@ -31,7 +31,11 @@ import { EditorTokenStore, type EditorTokenInput } from '../syntax/tokenStore'
 import type { TextEdit } from '../tokens'
 import { applyEditorTheme } from '../theme'
 import { measureBrowserTextFace, type BrowserTextMetrics } from './browserMetrics'
-import { FixedRowVirtualizer, type FixedRowVirtualizerSnapshot } from './fixedRowVirtualizer'
+import {
+  DEFAULT_MAX_SCROLL_HEIGHT,
+  FixedRowVirtualizer,
+  type FixedRowVirtualizerSnapshot,
+} from './fixedRowVirtualizer'
 import {
   DEFAULT_OVERSCAN,
   DEFAULT_SELECTION_HIGHLIGHT,
@@ -307,6 +311,7 @@ export class VirtualizedTextView {
   /** Set when typed text arrives through EditContext rather than the textarea. */
   public readonly editContext: EditorEditContext | null
   private readonly view: VirtualizedTextViewInternal
+  private readonly suppliedMaxScrollHeight: number | undefined
   private readonly disposeForegroundHighlightRestore: () => void
   private cancelContentWidthMeasurement: (() => void) | null = null
   private provisionalPaint: { readonly paint: SavedPaint; readonly release: () => void } | null =
@@ -339,6 +344,8 @@ export class VirtualizedTextView {
     setFontVariable(scrollElement, '--editor-font-size', fontSizeValue(options.fontSize))
     setFontVariable(scrollElement, '--editor-font-family', fontFamilyValue(options.fontFamily))
     const textMetrics = options.textMetrics ?? null
+    this.suppliedMaxScrollHeight =
+      options.maxScrollHeight ?? (textMetrics ? DEFAULT_MAX_SCROLL_HEIGHT : undefined)
     const measuredFace = measuredTextFace(scrollElement, textMetrics)
     const measuredMetrics = measuredFace.metrics
     const lineHeightOverride = options.lineHeight ?? options.rowHeight ?? null
@@ -367,7 +374,10 @@ export class VirtualizedTextView {
     const tabSize = normalizeTabSize(options.tabSize)
     const virtualizer = new FixedRowVirtualizer({
       ...createVirtualizerOptions(rowHeight, overscan, rowGap, scrollMode, options.scrollPastEnd),
-      maxScrollHeight: scrollMode === 'virtualized' ? viewport.maxScrollHeight : undefined,
+      maxScrollHeight:
+        scrollMode === 'virtualized'
+          ? (this.suppliedMaxScrollHeight ?? viewport.maxScrollHeight)
+          : undefined,
     })
     const initialTextSnapshot = createStringTextSnapshot('')
     const initialInjectedTextRows = options.injectedTextRows ?? []
@@ -991,7 +1001,10 @@ export class VirtualizedTextView {
     view.lastRenderedRowsKey = ''
     view.virtualizer.updateOptions({
       scrollMode: nextScrollMode,
-      maxScrollHeight: nextScrollMode === 'virtualized' ? view.viewport.maxScrollHeight : undefined,
+      maxScrollHeight:
+        nextScrollMode === 'virtualized'
+          ? (this.suppliedMaxScrollHeight ?? view.viewport.maxScrollHeight)
+          : undefined,
     })
     return true
   }

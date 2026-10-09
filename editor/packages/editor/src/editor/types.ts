@@ -142,6 +142,8 @@ export type EditorOptions = {
    */
   readonly rtlMoveVisually?: boolean
   readonly scrollMode?: EditorScrollMode
+  /** Native scroll extent in CSS pixels. Supplied text metrics use 16,000,000 by default; other views measure the browser limit. */
+  readonly maxScrollHeight?: number
   readonly selectionSyncMode?: EditorSelectionSyncMode
   /** Confusable and invisible characters to point out; both families report unless turned off. */
   readonly suspiciousCharacters?: EditorSuspiciousCharactersOptions
