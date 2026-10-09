@@ -10,6 +10,7 @@ import { cursorModelCatalog } from './cursor-model-catalog'
 import { machineBalancing } from './machine-balancing'
 import { binaryFileOpen, binaryFileRemote } from './binary-file-open'
 import { ghosttySiteFit } from './ghostty-site-fit'
+import { siteReplicaPlayback } from './site-replica-playback'
 import { editorPagedReadonly } from './editor-paged-readonly'
 import { editorFeatureTiers } from './editor-feature-tiers'
 import { editorSavedSnapshot } from './editor-saved-snapshot'
@@ -473,6 +474,7 @@ import { treeParityBehaviour } from './tree-parity-behaviour'
 import { devPackageUpdates } from './dev-package-updates'
 
 export const scenarios: readonly Scenario[] = [
+  siteReplicaPlayback,
   overlayAlignment,
   unknownWorkspaceSettings,
   releaseInstallationSettings,
