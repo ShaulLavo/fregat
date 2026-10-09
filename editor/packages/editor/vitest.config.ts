@@ -36,7 +36,12 @@ export default defineConfig({
         server: { fs: { allow: [workspaceRoot] } },
         optimizeDeps: {
           // tree-sitter-md is plain ESM over web-tree-sitter; served as-is, it is never discovered.
-          exclude: ['web-tree-sitter', 'tree-sitter-md'],
+          exclude: [
+            'web-tree-sitter',
+            'tree-sitter-md',
+            'micromark-util-decode-string',
+            'micromark-util-normalize-identifier',
+          ],
           include: [
             '@fregat/hotkeys',
             'diff',
@@ -133,9 +138,17 @@ export default defineConfig({
       {
         plugins: [browserTestResponses()],
         server: { fs: { allow: [workspaceRoot] } },
+        optimizeDeps: {
+          exclude: [
+            'web-tree-sitter',
+            'tree-sitter-md',
+            'micromark-util-decode-string',
+            'micromark-util-normalize-identifier',
+          ],
+        },
         test: {
           name: 'wrap-layout',
-          include: ['test/wrapExtent.browser.test.ts'],
+          include: ['test/wrapExtent.browser.test.ts', 'test/wordWrapMarkdown.browser.test.ts'],
           browser: {
             enabled: true,
             headless: true,

@@ -109,11 +109,12 @@ function scanWordWrapChunk(text: string, state: WrapScan, word: WordWrapLine): v
 
 function appendCodeUnit(code: number, state: WrapScan): void {
   if (code === 9 && !state.explicitEnds) discoverTabs(state)
-  const cells = code === 9 ? state.tabSize - (state.visual % state.tabSize) : 1
+  let cells = code === 9 ? state.tabSize - (state.segmentVisual % state.tabSize) : 1
   if (state.segmentVisual > 0 && state.segmentVisual + cells > state.width) {
     if (state.explicitEnds) state.ends.push(state.length)
     state.rows += 1
     state.segmentVisual = 0
+    cells = code === 9 ? state.tabSize : 1
   }
   state.visual += cells
   state.segmentVisual += cells

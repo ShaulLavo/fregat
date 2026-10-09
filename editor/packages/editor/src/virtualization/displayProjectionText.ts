@@ -167,11 +167,8 @@ function summarizeMeasuredWrap(
   let start = 0
   const normalizedWidth = Math.max(1, Math.floor(width))
   while (start < measured.length) {
-    const column = measured.columnAt(start, tabSize, 'utf16')
-    start = Math.max(
-      start + 1,
-      measured.offsetAt(column + normalizedWidth, 'before', tabSize, 'utf16'),
-    )
+    const row = measured.slice(start, Math.min(measured.length, start + normalizedWidth))
+    start += Math.max(1, row.offsetAt(normalizedWidth, 'before', tabSize, 'utf16'))
     ends.push(start)
   }
   return {
@@ -234,9 +231,14 @@ function summarizeRuleWrap(
 /** A replacement is painted as one box, so no row break may fall inside its display span. */
 function unbreakableRuns(inline: InlineSummary | null): UnbreakableRuns {
   if (!inline) return []
-  return inline.parts
-    .filter((part) => part.replacement !== null && part.end > part.start)
-    .map((part) => [part.start, part.end] as const)
+  return inline.mapping.segments
+    .filter(
+      (segment) =>
+        segment.kind === 'replacement' &&
+        segment.wrap !== 'text' &&
+        segment.displayEndColumn > segment.displayStartColumn,
+    )
+    .map((segment) => [segment.displayStartColumn, segment.displayEndColumn] as const)
 }
 
 function appendWrapEnds(
@@ -249,11 +251,12 @@ function appendWrapEnds(
 ): void {
   for (let column = 0; column < text.length; column += 1) {
     const tab = text.charCodeAt(column) === 9
-    const cells = tab ? tabSize - (state.visual % tabSize) : 1
+    let cells = tab ? tabSize - (state.segmentVisual % tabSize) : 1
     state.hasTabs ||= tab
     if (state.segmentVisual > 0 && state.segmentVisual + cells > width) {
       ends.push(start + column)
       state.segmentVisual = 0
+      cells = tab ? tabSize : 1
     }
     state.visual += cells
     state.segmentVisual += cells

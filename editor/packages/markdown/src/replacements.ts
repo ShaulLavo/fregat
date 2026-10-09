@@ -69,7 +69,7 @@ function paddedRender(
   padding: string,
 ): InlineReplacementSpec['render'] {
   return (container) => {
-    const disposable = render?.(container)
+    const disposable = render?.(container, text)
     if (!render) container.append(text)
     const spacer = container.ownerDocument.createElement('span')
     spacer.className = 'editor-markdown-padding'

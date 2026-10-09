@@ -136,9 +136,13 @@ type InlineWidgets = {
   readonly hosts: Map<string, InlineWidgetHost>
   /** The map the live ids were last taken from; a different one is what retires a mount. */
   inlineMap: InlineMap | null
+  wrapAdvance: VirtualizedTextViewInternal['wrapAdvance']
+  wrapColumn: number | null
 }
 
 type InlineWidgetHost = {
+  readonly replacementId: string
+  readonly fragment: boolean
   measuredWidth: number | null
   readonly element: HTMLSpanElement
   readonly mountDisposable: { dispose(): void } | null
@@ -150,6 +154,9 @@ type InlineWidgetCleanup = Pick<InlineWidgetHost, 'element' | 'observer'> & {
 }
 
 type InlineWidgetRun = {
+  readonly replacementId: string
+  readonly fragment: boolean
+  readonly displayText: string
   /** The mount's key: the replacement's `key`, else its id. */
   readonly id: string
   readonly localStart: number
@@ -1213,15 +1220,31 @@ function inlineRowRuns(mapping: RowInlineMapping | null, text: TextContent): Inl
     const { className, render } = segment
     if (!render && className === undefined) continue
 
-    const localStart = segment.displayStartColumn - mapping.displayStartColumn
-    const localEnd = segment.displayEndColumn - mapping.displayStartColumn
+    const fragment = segment.wrap === 'text'
+    const start = segment.displayStartColumn - mapping.displayStartColumn
+    const end = segment.displayEndColumn - mapping.displayStartColumn
+    const localStart = fragment ? Math.max(0, start) : start
+    const localEnd = fragment ? Math.min(text.length, end) : end
     // A run with no display column of its own would put both its boundaries on one x, leaving the
     // caret no side to stop on and the measured advance nothing to span.
     if (localStart < 0 || localEnd > text.length || localEnd <= localStart) continue
 
-    const id = segment.render ? (segment.key ?? segment.id) : segment.id
+    const replacementId = segment.render ? (segment.key ?? segment.id) : segment.id
+    const id = fragment
+      ? `${replacementId}:${mapping.displayStartColumn + localStart}:${mapping.displayStartColumn + localEnd}`
+      : replacementId
     const styling = className === undefined ? {} : { className }
-    if (render) widgets.push({ id, localStart, localEnd, render, ...styling })
+    if (render)
+      widgets.push({
+        id,
+        replacementId,
+        fragment,
+        displayText: text.slice(localStart, localEnd),
+        localStart,
+        localEnd,
+        render,
+        ...styling,
+      })
     else if (className !== undefined) classes.push({ id, localStart, localEnd, className })
   }
 
@@ -1610,7 +1633,12 @@ function inlineWidgets(view: VirtualizedTextViewInternal): InlineWidgets {
   const existing = inlineWidgetsByView.get(view)
   if (existing) return existing
 
-  const widgets = { hosts: new Map<string, InlineWidgetHost>(), inlineMap: view.model.inlineMap }
+  const widgets = {
+    hosts: new Map<string, InlineWidgetHost>(),
+    inlineMap: view.model.inlineMap,
+    wrapAdvance: view.wrapAdvance,
+    wrapColumn: view.model.wrapColumn,
+  }
   inlineWidgetsByView.set(view, widgets)
   return widgets
 }
@@ -1627,7 +1655,7 @@ function mountInlineWidget(
   // descend into, and the replacement is one indivisible stop.
   element.setAttribute('contenteditable', 'false')
 
-  const mountDisposable = run.render(element) ?? null
+  const mountDisposable = run.render(element, run.displayText) ?? null
   if (view.disposed) {
     try {
       mountDisposable?.dispose()
@@ -1642,7 +1670,14 @@ function mountInlineWidget(
   const observer = createRowResizeObserver(() => measureInlineWidget(view, element))
   observer?.observe(element)
 
-  const host: InlineWidgetHost = { element, mountDisposable, observer, measuredWidth: null }
+  const host: InlineWidgetHost = {
+    replacementId: run.replacementId,
+    fragment: run.fragment,
+    element,
+    mountDisposable,
+    observer,
+    measuredWidth: null,
+  }
   widgets.hosts.set(run.id, host)
   measureInlineWidget(view, element)
   return host
@@ -1709,22 +1744,34 @@ function cancelInlineWidgetRepaint(view: VirtualizedTextViewInternal): void {
 }
 
 /**
- * A mount lives as long as its replacement does, not as long as the row showing it: scrolling away
- * keeps it, and only the replacement leaving the map — dropped by its provider, or revealed under
- * the caret — takes it down.
+ * Atomic mounts survive scrolling. Text fragments also retire when the wrap layout changes,
+ * because a different row boundary needs a different rendered node.
  */
 function retireInlineWidgets(view: VirtualizedTextViewInternal): void {
   const widgets = inlineWidgetsByView.get(view)
-  if (!widgets || widgets.inlineMap === view.model.inlineMap) return
+  if (!widgets) return
+  const changed =
+    widgets.inlineMap !== view.model.inlineMap ||
+    widgets.wrapAdvance !== view.wrapAdvance ||
+    widgets.wrapColumn !== view.model.wrapColumn
+  if (!changed) return
 
   widgets.inlineMap = view.model.inlineMap
+  widgets.wrapAdvance = view.wrapAdvance
+  widgets.wrapColumn = view.model.wrapColumn
   const live = new Set<string>()
   for (const replacements of view.model.inlineMap?.rowReplacements.values() ?? []) {
     for (const replacement of replacements) live.add(replacement.key ?? replacement.id)
   }
 
-  const pending = Array.from(widgets.hosts).filter(([id]) => !live.has(id))
+  const pending = Array.from(widgets.hosts).filter(
+    ([, host]) => host.fragment || !live.has(host.replacementId),
+  )
   for (const [id] of pending) widgets.hosts.delete(id)
+  if (pending.some(([, host]) => host.fragment)) {
+    for (const row of view.rowElements.values()) Object.assign(row, { chunkKey: '' })
+    clearRowGeometryCaches(view)
+  }
   const cleanup = pending.map(([, host]) => captureInlineWidgetCleanup(host))
   disposeResourceSnapshot(cleanup, disposeInlineWidget)
 }
