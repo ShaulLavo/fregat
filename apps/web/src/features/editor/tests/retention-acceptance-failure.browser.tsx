@@ -143,9 +143,10 @@ test.for([
     }
 
     async function assertBoundedRecovery(source: string, attemptsBeforeBurst: number) {
-      // 2 seconds covers the 75 ms debounce and the 100/400 ms backoff, with delivery slack.
+      // The retry clock is fake; failed script loads still settle on the browser's clock.
       for (let elapsed = 0; elapsed < 2_000; elapsed += 50) {
         await vi.advanceTimersByTimeAsync(50)
+        await awaitEditorSyntaxWorkerIdleFences()
         await nextFrame()
         assertPlainFallback(source)
         if (controller.getSnapshot()?.initialHighlightStatus === 'error') break
