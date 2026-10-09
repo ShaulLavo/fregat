@@ -47,13 +47,13 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>, 
   home.pathname = `${home.pathname.split('/~')[0]}/`
   home.search = ''
   home.hash = ''
-  // The capture opened a workspace; the picker's own entry point is a window with none.
+  // The capture opened a workspace; the phone opens the picker from an empty session rail.
   await page.evaluate(() => {
     localStorage.clear()
     sessionStorage.clear()
   })
   await page.goto(home.href, { waitUntil: 'domcontentloaded' })
-  await selectors.chooseFolder(page).click()
+  await page.getByRole('button', { name: 'Add project', exact: true }).click()
   const dialog = selectors.pickerDialog(page)
   await dialog.waitFor()
   // Opened on a small folder: this machine's root and home listings are not under test.
@@ -90,7 +90,7 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>, 
   await page
     .getByRole('button', { name: `Choose ${path.basename(fixture)}`, exact: true })
     .waitFor()
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click()
   await dialog.waitFor({ state: 'hidden' })
 }
 

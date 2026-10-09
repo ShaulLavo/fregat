@@ -749,6 +749,7 @@ export function FilePickerDialog({
                       />
                     ) : null
                   }
+                  onClose={() => onOpenChange(false)}
                   onEditPath={pathInput.open}
                   onUp={() => navigateTo(pickerParentPath(session.currentPath))}
                 />
@@ -923,12 +924,10 @@ export function FilePickerDialog({
               </PaneBar>
             ) : null}
             {compact ? (
-              <DialogFooter className='flex shrink-0 flex-row items-center gap-(--density-control-gap) px-(--bar-padding-x) py-(--density-gap-tight)'>
-                <Button onClick={() => onOpenChange(false)} type='button' variant='ghost'>
-                  Cancel
-                </Button>
+              <DialogFooter className='flex shrink-0 flex-row px-(--bar-padding-x) py-(--density-gap-tight)'>
                 <Button
                   className='min-w-0 flex-1'
+                  size='lg'
                   disabled={!selectedPickable}
                   onClick={chooseSelected}
                   title={selectedPickable ? displayPath(selectedPickable.path) : undefined}
