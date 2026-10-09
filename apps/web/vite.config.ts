@@ -1,4 +1,5 @@
 import net from 'node:net'
+import { htmlBootstrapPlugin } from './scripts/html-bootstrap-plugin.ts'
 import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'
@@ -16,6 +17,7 @@ import { phosphorWeightPlugin } from './scripts/phosphor-weight-plugin.ts'
 import {
   SHELL_ENTRIES,
   PHONE_BOOT_SCREENS,
+  PHONE_OVERLAYS,
   shellChunksPlugin,
 } from './scripts/shell-chunks-plugin.ts'
 import { shellChunkGroups } from './scripts/shell-chunk-groups.ts'
@@ -69,6 +71,9 @@ export default defineConfig(({ command, isPreview }) => {
               phoneScreens: PHONE_BOOT_SCREENS.map((entry) =>
                 path.resolve(import.meta.dirname, entry),
               ),
+              phoneOverlays: PHONE_OVERLAYS.map((entry) =>
+                path.resolve(import.meta.dirname, entry),
+              ),
             }),
           },
         },
@@ -109,6 +114,9 @@ export default defineConfig(({ command, isPreview }) => {
       ],
     },
     plugins: [
+      htmlBootstrapPlugin(
+        process.env.VITE_SERVER_URL ?? `http://localhost:${process.env.PORT ?? '3001'}`,
+      ),
       bootAppearancePlugin(import.meta.dirname),
       shellChunksPlugin(import.meta.dirname),
       devPagePlugin(),

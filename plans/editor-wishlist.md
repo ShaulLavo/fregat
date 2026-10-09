@@ -663,6 +663,9 @@ Added 2026-10-08. Several people or agents edit one document at once and every c
 same text. The core follows Matthew Weidner's host-ordered model (stable character IDs, one host
 orders edits, participants replay their unconfirmed edits) and stays network-agnostic. A plugin
 adds peer-to-peer sessions over WebRTC; Fregat's server becomes another host.
+Edits that merge cleanly but may not make sense together (both renamed one variable, one
+deleted a function the other edited, the merged statement no longer parses) get a review mark
+from syntax trees.
 
 ## Platform-agnostic core and React Strict DOM
 

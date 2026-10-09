@@ -11,6 +11,7 @@ export type LanguageServerMatchConfigurationSnapshot = {
 }
 
 export const editorQueryKeys = {
+  performanceRecording: ['editor', 'performance-recording', 'module'] as const,
   previewDiffModule: ['editor', 'workspace-edit-preview', 'module'] as const,
   languageCensus: (root: string) => ['editor', 'language-census', root] as const,
   themes: ['editor', 'theme'] as const,

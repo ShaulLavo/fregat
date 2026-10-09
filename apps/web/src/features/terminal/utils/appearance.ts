@@ -1,5 +1,5 @@
 import type { Terminal, TerminalCursorStyle } from 'ghostty-webgpu'
-import type { TerminalColors } from '@workspace/client-core/themes/palette'
+import type { TerminalColors } from '@workspace/contracts/themes/palette-rendering'
 import { terminalThemeFor } from '@/features/terminal/utils/theme'
 
 type TerminalCursorOptions = {

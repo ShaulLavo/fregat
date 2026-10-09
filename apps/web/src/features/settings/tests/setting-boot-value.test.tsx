@@ -61,7 +61,7 @@ test('single-key boot reads validate mirrored values and ignore unmirrored value
   )
 })
 
-test('material is available to first paint from confirmed boot values and validates storage', () => {
+test('confirmed material stays in memory and ignores obsolete appearance storage', () => {
   writeBootMirror({ ...DEFAULT_SETTING_VALUES, 'window.material': 'glass' })
   expect(readSettingsMirror()['window.material']).toBe('glass')
   expect(readSettingBootValue('window.material')).toBe('glass')
@@ -69,5 +69,5 @@ test('material is available to first paint from confirmed boot values and valida
     'platform.settings-boot-mirror.v1',
     JSON.stringify({ 'window.material': true }),
   )
-  expect(readSettingsMirror()['window.material']).toBe('none')
+  expect(readSettingsMirror()['window.material']).toBe('glass')
 })

@@ -114,6 +114,15 @@ describe('Tree-sitter language contributions', () => {
     },
   )
 
+  it('loads the same merge-unit queries on the simple and catalog paths', async () => {
+    for (const contribution of [JAVASCRIPT_TREE_SITTER_LANGUAGE, TYPESCRIPT_TREE_SITTER_LANGUAGE]) {
+      const assets = await loadAssets(contribution)
+      const catalogAssets = await loadAssets(requiredContribution(contribution.id))
+      expect(assets.mergeUnitQuerySource).toBeTruthy()
+      expect(assets.mergeUnitQuerySource).toBe(catalogAssets.mergeUnitQuerySource)
+    }
+  })
+
   it('loads JSX folds only for JSX-capable JavaScript and TypeScript assets', async () => {
     const [javascriptAssets, typescriptAssets, jsxJavascriptAssets, tsxTypescriptAssets] =
       await Promise.all([

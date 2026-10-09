@@ -1,3 +1,4 @@
+import type { EditorOpenSampleResetResult } from '@/features/editor/state/performance-trace'
 import { activeEditorTab as selectedGroupTab, allEditorGroups } from '@/lib/documents/utils/groups'
 import { filesystemPath, fileDocumentKey, tabId } from '@/lib/documents/utils/identity'
 import { testTabContent } from '../../../../test/factories/document-targets'
@@ -28,10 +29,7 @@ import {
   resetEditorColorThemeStore,
   syncEditorThemeSelection,
 } from '@/features/editor/state/color-theme-store'
-import {
-  installEditorPerformanceTraceFromUrl,
-  type EditorOpenSampleResetResult,
-} from '@/features/editor/state/performance-trace'
+import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-recording'
 import {
   awaitEditorSyntaxRuntimeSessionIdle,
   awaitEditorSyntaxWorkerIdleFences,
@@ -65,7 +63,7 @@ import {
   type TokenPaintReference,
   type TokenPaintObservation,
 } from '../../../../../../scripts/agent/scenarios/editor-tab-hover-highlights-probe'
-import { AppProviders, seedBootMirrorTheme } from '../../../../test/render'
+import { AppProviders, seedHtmlTheme } from '../../../../test/render'
 import {
   installDelayedFileReadClient,
   type DelayedFileReadClient,
@@ -107,7 +105,7 @@ test(
   'calibrates complete tokens in two known-good real app views',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
@@ -143,11 +141,17 @@ test(
   },
 )
 
-test(
-  'promotes a real Foresight tab prediction in the first browser frame without duplicate work',
+test.for([
+  { delay: 0, prepared: true, opening: 'promotes a ready real Foresight prediction' },
+  { delay: 200, prepared: true, opening: 'promotes a ready real Foresight prediction' },
+  { delay: 2_000, prepared: true, opening: 'promotes a ready real Foresight prediction' },
+  // The preparation's 30-second lifetime expires; the canonical document stays warm.
+  { delay: 35_000, prepared: false, opening: 'warmly reopens after Foresight preparation expires' },
+])(
+  '$opening after $delay ms without duplicate worker work',
   { timeout: 30_000 },
-  async () => {
-    seedBootMirrorTheme('dark')
+  async ({ delay, prepared }) => {
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
@@ -170,6 +174,14 @@ test(
       .toEqual(expect.arrayContaining(['open', 'parse', 'queryRange']))
     await awaitEditorSyntaxWorkerIdleFences()
     await Promise.resolve()
+    const preparedAnalyses = [...harness.documentStore.getState().enumerateEditorAnalyses()]
+    expect(preparedAnalyses).toHaveLength(1)
+    const preparedAnalysis = preparedAnalyses[0]!
+    const preparedSessions = preparedAnalysis
+      .inspectRetention()
+      .entries.map((entry) => entry.runtimeSessionId)
+    expect(preparedSessions).toHaveLength(2)
+    vi.setSystemTime(Date.now() + delay)
 
     diagnostics = []
     performance.clearMarks('editor.worker.request')
@@ -195,22 +207,42 @@ test(
       tokenPaintMismatch(requiredTokenPaint(firstFrame.tokens), currentTokenReference()),
     ).toBeNull()
 
-    expect(attachmentDiagnostic()?.detail).toMatchObject({
-      highlighter: 'ready',
-      prepared: true,
-      structural: 'ready',
-    })
-    expect(postActivationStructuralDiagnostics()).toEqual([])
+    expect(
+      harness.documentStore.getState().getLiveEditorDocument(fileDocumentKey(PATH))?.analysis,
+    ).toBe(preparedAnalysis)
+    expect(
+      preparedAnalysis.inspectRetention().entries.map((entry) => entry.runtimeSessionId),
+    ).toEqual(preparedSessions)
+
     expect(postActivationTransferRequestTypes()).toEqual([])
     expect(performance.getEntriesByName('editor.file_open.buffer_built')).toEqual([])
-    expect(performance.getEntriesByName('editor.file_open.file_read')).toEqual([])
+    expect(performance.getEntriesByName('editor.file_open.file_read')).toHaveLength(
+      delay < FILE_SNAPSHOT_STALE_MS ? 0 : 1,
+    )
     expect(performance.getEntriesByName('editor.authoritative_text_paint')).toHaveLength(1)
-    assertDistinctJoinedRuntimeIds(await resetBenchmarkSample(sampleId))
+    const sample = await resetBenchmarkSample(sampleId)
+    if (prepared) {
+      expect(attachmentDiagnostic()?.detail).toMatchObject({
+        highlighter: 'ready',
+        prepared: true,
+        structural: 'ready',
+      })
+      expect(postActivationStructuralDiagnostics()).toEqual([])
+      assertDistinctJoinedRuntimeIds(sample)
+      return
+    }
+    expect(attachmentDiagnostic()?.detail).toMatchObject({ prepared: false })
+    expect(postActivationStructuralDiagnostics()).toEqual([
+      'editor.syntax.session_created',
+      'editor.syntax.session_created',
+    ])
+    expect(sample.joinedHighlighterRuntimeSessionIds).toEqual([])
+    expect(sample.joinedStructuralRuntimeSessionIds).toEqual([])
   },
 )
 
 test('calibrates complete source token paint against a delayed partial install', async () => {
-  seedBootMirrorTheme('dark')
+  seedHtmlTheme('dark')
   resetEditorColorThemeStore()
   syncEditorThemeSelection('dark', 'dark-plus')
   editorDiagnosticGlobal.__editorPerfTrace = { mark: () => undefined }
@@ -242,7 +274,7 @@ test(
   'keeps complete current tokens on immediate repeated retained revisits',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
@@ -274,7 +306,7 @@ test(
   'shares complete current tokens between two app views and preserves the remaining view',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
@@ -368,9 +400,69 @@ test(
     expect(tokenPaintMismatch(currentTokenPaint(firstSelector), reference)).toBeNull()
     const copiedTab = second.tabs.find((tab) => tab.id !== originalTab.id)
     if (!copiedTab) throw new RangeError('split token paint copied tab unavailable')
+    const firstController = harness.uiStore.getState().controllersByTabId.get(originalTab.id)
+    const secondController = harness.uiStore.getState().controllersByTabId.get(copiedTab.id)
+    if (!firstController || !secondController)
+      throw new RangeError('split editing controllers unavailable')
+    firstController.commands.setSelection(3)
+    secondController.commands.setSelection(lowerFrame.rows[0]!.start + 3)
+    for (const [editing, other, selector, replacement] of [
+      [firstController, secondController, firstSelector, '"mapped"'],
+      [secondController, firstController, secondSelector, '""'],
+    ] as const) {
+      const row = currentTokenPaint(selector).rows[0]!
+      expect(row.text.indexOf('= ')).toBeGreaterThan(0)
+      const offset = row.start + row.text.indexOf('= ') + 2
+      const revision = retained.buffer.getRevision()
+      const replacementText = replacement
+      const delta = replacementText.length - (row.end - offset)
+      const otherSelection = other.getEditor()?.getSelections()
+      const scroll = [firstController, secondController].map((controller) =>
+        controller.getEditor()?.getScrollPosition(),
+      )
+      editing.commands.edit({
+        from: offset,
+        to: row.end,
+        text: replacementText,
+      })
+      expect(retained.buffer.getRevision()).toBe(revision + 1)
+      expect(retained.buffer.materializeFullText().slice(offset, row.end + delta)).toBe(
+        replacementText,
+      )
+      await nextAnimationFrame()
+      await awaitEditorSyntaxWorkerIdleFences()
+      await expect.poll(() => currentHighlighterRead().kind).toBe('ready')
+      const current = currentTokenReference()
+      await expect
+        .poll(() => tokenPaintMismatch(currentTokenPaint(firstSelector), current))
+        .toBeNull()
+      await expect
+        .poll(() => tokenPaintMismatch(currentTokenPaint(secondSelector), current))
+        .toBeNull()
+      expect(otherSelection).toBeDefined()
+      const shift = (position: number) => (position >= row.end ? position + delta : position)
+      expect(other.getEditor()?.getSelections()).toEqual(
+        otherSelection?.map((selection) => ({
+          ...selection,
+          anchorOffset: shift(selection.anchorOffset),
+          headOffset: shift(selection.headOffset),
+          startOffset: shift(selection.startOffset),
+          endOffset: shift(selection.endOffset),
+        })),
+      )
+      expect(
+        [firstController, secondController].map((controller) =>
+          controller.getEditor()?.getScrollPosition(),
+        ),
+      ).toEqual(scroll)
+      expect(firstController.getEditor()?.getSelections()).not.toEqual(
+        secondController.getEditor()?.getSelections(),
+      )
+      expect(workerRuntimeSessionIds('shiki')).toEqual(sessions)
+    }
     await harness.commands.closeTab(copiedTab.id)
     await nextAnimationFrame()
-    expect(tokenPaintMismatch(currentTokenPaint(), reference)).toBeNull()
+    expect(tokenPaintMismatch(currentTokenPaint(), currentTokenReference())).toBeNull()
   },
 )
 
@@ -378,7 +470,7 @@ test(
   'installs a query-ready file before the first browser frame',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     editorDiagnosticGlobal.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = (diagnostic) => {
@@ -412,7 +504,7 @@ test(
   'publishes a miss immediately while the real file read remains delayed',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
@@ -449,10 +541,10 @@ test(
 )
 
 test(
-  'reopens retained dirty text before a deliberately delayed file query',
+  'returns to dirty text and current Undo and Redo tokens with saved paint removed',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     editorDiagnosticGlobal.__editorPerfTrace = { mark: () => undefined }
@@ -470,15 +562,25 @@ test(
 
     const retained = harness.documentStore.getState().getLiveEditorDocument(fileDocumentKey(PATH))
     if (!retained) throw new RangeError('retained browser document unavailable')
-    createEditorBufferSession(retained.buffer).applyText(
-      "export const retainedDirty = 'retained dirty browser text'\n",
-    )
+    const originalText = retained.buffer.materializeFullText()
+    await awaitEditorSyntaxWorkerIdleFences()
+    const originalReference = currentTokenReference()
+    const activeTabId = selectedGroupTab(
+      harness.workspaceStore.getState().workbenchPanels.editorGroups,
+    )?.id
+    if (!activeTabId) throw new RangeError('active browser tab unavailable')
+    const controller = harness.uiStore.getState().controllersByTabId.get(activeTabId)
+    if (!controller) throw new RangeError('dirty browser controller unavailable')
+    const edit = "export const retainedDirty = 'retained dirty browser text'\n"
+    controller.commands.edit({ from: 0, to: originalText.length, text: edit })
+    await expect.poll(() => currentHighlighterRead().kind).toBe('ready')
     await awaitEditorSyntaxWorkerIdleFences()
     const reference = currentTokenReference()
-    const activeTabId =
-      selectedGroupTab(harness.workspaceStore.getState().workbenchPanels.editorGroups)?.id ?? null
-    if (!activeTabId) throw new RangeError('active browser tab unavailable')
-    expect(await harness.commands.closeTab(activeTabId)).toEqual({ status: 'applied' })
+    expect(await harness.commands.openSearchEditor(ROOT_PATH)).toEqual({ status: 'applied' })
+    removeEditorVisibleSnapshotCacheForPath(environmentScopedStorage(activeEnvironmentId()), {
+      path: PATH,
+      rootPath: ROOT_PATH,
+    })
     const queryKey = fileSnapshotQueryOptions(PATH).queryKey
     await queryClient.cancelQueries({ exact: true, queryKey })
     queryClient.removeQueries({ exact: true, queryKey })
@@ -508,6 +610,33 @@ test(
     expect(document.querySelector('.editor-virtualized')?.textContent).toContain(
       'retained dirty browser text',
     )
+    const returning = harness.uiStore.getState().controllersByTabId.get(activeTabId)
+    if (!returning) throw new RangeError('returning dirty controller unavailable')
+    for (const [command, expected] of [
+      ['undo', originalText],
+      ['redo', edit],
+    ] as const) {
+      expect(returning.commands.dispatchCommand(command)).toBe(true)
+      expect(retained.buffer.materializeFullText()).toBe(expected)
+      removeEditorVisibleSnapshotCacheForPath(environmentScopedStorage(activeEnvironmentId()), {
+        path: PATH,
+        rootPath: ROOT_PATH,
+      })
+      await nextAnimationFrame()
+      await awaitEditorSyntaxWorkerIdleFences()
+      await expect.poll(() => currentHighlighterRead().kind).toBe('ready')
+      const expectedTokens = command === 'undo' ? originalReference : reference
+      expect(currentTokenReference().runs).toEqual(expectedTokens.runs)
+      await expect
+        .poll(() =>
+          tokenPaintMismatch(currentTokenPaint(), {
+            ...expectedTokens,
+            identity: currentTokenReference().identity,
+          }),
+        )
+        .toBeNull()
+      expect(currentTokenPaint().rows.every((row) => row.presentation === 'live')).toBe(true)
+    }
   },
 )
 
@@ -515,7 +644,7 @@ test(
   'adopts pending Tree-sitter beside ready Shiki without duplicate worker requests',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
@@ -563,7 +692,7 @@ test(
   'joins hover work on click and on a repeated activation without a second session or request',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
@@ -606,7 +735,7 @@ test(
   'rejects an invalidated exact lease and lets normal highlighting win',
   { timeout: 30_000 },
   async () => {
-    seedBootMirrorTheme('dark')
+    seedHtmlTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     editorDiagnosticGlobal.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = (diagnostic) => {

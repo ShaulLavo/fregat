@@ -129,6 +129,7 @@ export const transientAlertSelector =
   '[role="alert"], [data-sonner-toast], [role="status"].text-warning'
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperImageSelector = 'img[data-workbench-wallpaper-layer]'
+export const wallpaperMediaSelector = '[data-workbench-wallpaper-layer]'
 export const diffPaneSelector = '.editor-diff-pane'
 /** A diff pane whose syntax tokens for its current rows have landed. */
 export const diffPaneSyntaxReadySelector = '.editor-diff-pane[data-syntax="ready"]'
@@ -486,6 +487,15 @@ export const selectors = {
   machineFormCancel: (dialog: Locator) =>
     dialog.getByRole('button', { name: 'Cancel', exact: true }),
   machineDialogError: (dialog: Locator) => dialog.getByRole('alert'),
+  firstWorkspaceChat: (page: Page) => page.locator('[data-first-workspace]'),
+  firstWorkspaceDialog: (page: Page) => page.locator('[data-first-workspace-dialog]'),
+  firstWorkspaceRemote: (page: Page) => page.locator('[data-first-workspace-remote]'),
+  firstWorkspaceChatLocal: (page: Page) =>
+    page.locator('[data-first-workspace]').getByRole('button', { name: /^Folder on / }),
+  firstWorkspaceChatRemote: (page: Page) =>
+    page
+      .locator('[data-first-workspace]')
+      .getByRole('button', { name: 'Remote machine', exact: true }),
   serverOutOfDate: (scope: Page | Locator) => scope.getByText('Protocol mismatch', { exact: true }),
   sshHostList: (page: Page) =>
     page.getByRole('listbox', { name: 'SSH hosts', exact: true }).first(),
@@ -507,20 +517,36 @@ export const selectors = {
   fontSampleReadySelector: '[aria-label="Code font"] span[style]:not(:has([data-slot="shimmer"]))',
   settingsFormView: (page: Page) => page.getByRole('tab', { name: 'Settings', exact: true }),
   pickerDialog: (page: Page) => page.getByRole('dialog', { name: 'Choose folder', exact: true }),
-  pickerList: (page: Page) => page.getByRole('listbox', { name: 'Folders and files', exact: true }),
+  pickerList: (page: Page) => page.getByRole('listbox', { name: 'Folders', exact: true }),
   pickerOptions: (page: Page) =>
-    page.getByRole('listbox', { name: 'Folders and files', exact: true }).getByRole('option'),
+    page.getByRole('listbox', { name: 'Folders', exact: true }).getByRole('option'),
   pickerGoToFolder: (page: Page) => page.getByRole('button', { name: 'Go to folder', exact: true }),
   pickerFolderPath: (page: Page) => page.getByRole('textbox', { name: 'Folder path', exact: true }),
-  pickerSearch: (page: Page) =>
-    page.getByRole('textbox', { name: 'Search files and folders', exact: true }),
+  pickerSearch: (page: Page) => page.getByRole('textbox', { name: 'Search folders', exact: true }),
   pickerEmpty: (page: Page) => page.getByText('Nothing here', { exact: true }),
+  /** The folder the picker shows, from its screen-reader description; a folder picker lists no files. */
+  pickerBrowsing: (page: Page, path: string) =>
+    selectors
+      .pickerDialog(page)
+      .getByText(new RegExp(`^Browsing ${RegExp.escape(path)}( on .+)?\\.$`)),
   pickerRow: (page: Page, name: string) =>
     page
       .getByRole('dialog', { name: 'Choose folder', exact: true })
       .getByRole('option')
       // Folder glyphs carry whitespace between their paths, so the name follows it.
       .filter({ hasText: new RegExp(`^\\s*${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }),
+  filesPickerDialog: (page: Page) =>
+    page.getByRole('dialog', { name: 'Choose files', exact: true }),
+  /** A row in the file-choosing picker; choosable files carry `aria-checked`. */
+  filesPickerRow: (page: Page, name: string) =>
+    page
+      .getByRole('dialog', { name: 'Choose files', exact: true })
+      .getByRole('option')
+      .filter({ hasText: new RegExp(`^\\s*${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }),
+  filesPickerAttach: (page: Page) =>
+    page
+      .getByRole('dialog', { name: 'Choose files', exact: true })
+      .getByRole('button', { name: /^Attach( \d+ files?)?$/ }),
   pickerHiddenToggle: (page: Page, shown: boolean) =>
     page.getByRole('button', {
       name: shown ? 'Hide hidden files' : 'Show hidden files',
@@ -534,15 +560,11 @@ export const selectors = {
       name: pinned ? 'Unpin this folder' : 'Pin this folder',
       exact: true,
     }),
-  /** A preview showing content: code, a decoded image or a folder's children. */
-  pickerPreviewContentSelector:
-    '[data-file-preview] [data-file-preview-text], [data-file-preview] img, [data-file-preview] ul',
+  /** A preview showing content: the folder's children. */
+  pickerPreviewContentSelector: '[data-file-preview] ul',
   paletteImportText: (page: Page) =>
     page.getByRole('textbox', { name: 'Palette JSON', exact: true }),
   pickerPreview: (page: Page) => page.locator('[data-file-preview]'),
-  pickerPreviewText: (page: Page) =>
-    selectors.pickerDialog(page).locator('[data-file-preview-text]'),
-  pickerPreviewFacts: (page: Page) => selectors.pickerPreview(page).locator('dl'),
   palettePreviewText: (page: Page) =>
     selectors.quickOpenPreview(page).locator('[data-file-preview-text]'),
   themeStudio: (page: Page) => page.getByRole('region', { name: 'Theme studio', exact: true }),
@@ -573,9 +595,6 @@ export const selectors = {
   /** 0 sits right of the places sidebar, 1 left of the preview. */
   pickerPaneHandle: (page: Page, index: number) =>
     selectors.pickerDialog(page).locator('[data-slot="resizable-handle"]').nth(index),
-  pickerPreviewScroll: (page: Page) => page.locator('[data-file-preview-scroll]'),
-  pickerPreviewLines: (page: Page) => page.locator('[data-file-preview-lines]'),
-  pickerPreviewNote: (page: Page) => page.locator('[data-file-preview-scroll] [role="note"]'),
   pickerView: (page: Page, view: 'Columns' | 'List' | 'Icons') =>
     page
       .getByRole('tablist', { name: 'View', exact: true })
@@ -585,7 +604,7 @@ export const selectors = {
   pickerChoose: (page: Page) =>
     page
       .getByRole('dialog', { name: 'Choose folder', exact: true })
-      .getByRole('button', { name: 'Choose folder', exact: true }),
+      .getByRole('button', { name: 'Open', exact: true }),
   liveUpdatesLimited: (page: Page) =>
     page.getByRole('button', { name: 'Live updates limited', exact: true }),
   navigationTarget: (page: Page) => page.locator('[data-navigation-target]'),
@@ -602,7 +621,7 @@ export const selectors = {
       .locator('[data-item-section="decoration"]'),
   pickerCurrentFolderHeading: (page: Page) =>
     page
-      .getByRole('listbox', { name: 'Folders and files', exact: true })
+      .getByRole('listbox', { name: 'Folders', exact: true })
       .getByText('Current folder', { exact: true }),
   searchResultTree: (page: Page) => page.getByRole('tree', { name: 'Search results', exact: true }),
   activeResultReplace: (page: Page) =>
@@ -1127,6 +1146,12 @@ export const selectors = {
       .locator('input[type=file]'),
   chatAttachMenuItem: (page: Page, name: 'Attach files…' | 'Screenshot…') =>
     page.getByRole('menuitem', { name, exact: true }),
+  /** Files from the device in hand; named for the device once another machine's files are offered. */
+  chatAttachDeviceFiles: (page: Page) =>
+    page.getByRole('menuitem', { name: /^(Attach files|From this device)…$/ }),
+  /** Files from the machine the draft runs on, offered where this device is not verifiably it. */
+  chatAttachMachineFiles: (page: Page) =>
+    page.getByRole('menuitem', { name: /^From (?!this device).+…$/ }),
   chatStagedFile: (page: Page, name: string) =>
     page.getByLabel('Attachments', { exact: true }).getByText(name, { exact: true }),
   chatStagedImage: (page: Page, name: string) =>
@@ -1342,6 +1367,8 @@ export const selectors = {
   editorFindWidget: (page: Page) => page.locator('.editor-find-widget'),
   editorLargeFileNotice: (page: Page) => page.getByTestId('large-file-mode'),
   editorMinimap: (page: Page) => page.locator('.editor-minimap-right'),
+  terminalAccessibilityMirror: (page: Page) =>
+    page.getByRole('list', { name: 'Terminal screen', exact: true, includeHidden: true }),
   terminalOpening: (page: Page) => page.getByRole('status', { name: 'Opening terminal' }),
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
@@ -1617,6 +1644,15 @@ export async function openGitPanel(page: Page) {
   await input.fill('>Focus Git')
   await selectors.focusGitCommand(page).first().click()
   await selectors.gitPanel(page).waitFor({ timeout: 15_000 })
+}
+
+/** Opens the folder picker from the project menu in its List view; wide windows open in Columns. */
+export async function openFolderPickerList(page: Page) {
+  await selectors.folderTree(page).waitFor()
+  await selectors.projectMenu(page).click()
+  await selectors.openFolderMenu(page).click()
+  await selectors.pickerDialog(page).waitFor()
+  await selectors.pickerView(page, 'List').click()
 }
 
 /** Holds a hold-to-confirm button until `done` resolves, the way a user keeps the mouse down. */
@@ -1990,7 +2026,7 @@ export const nativeHostSelectors = {
   settledPickerError: `Promise.all(Array.from(document.querySelectorAll('[data-sonner-toast]')).flatMap(toast => toast.getAnimations({subtree:true})).map(animation => animation.finished.catch(() => {}))).then(() => true)`,
   openProjectMenu: `document.querySelector('button[aria-label="Switch project"]')?.click()`,
   openFolderMenu: `Array.from(document.querySelectorAll('[role="menuitem"]')).find(row => row.textContent?.trim() === 'Open folder…')?.click()`,
-  pickerError: `document.body.innerText.includes('The file chooser closed after its time limit.')`,
+  pickerError: `document.body.innerText.includes('The folder chooser closed after its time limit.')`,
   bridgeFacts: `({picker:typeof globalThis.platformBridge?.pickEntry,capture:globalThis.platformBridge?.capabilities?.displayCapture,titlebar:globalThis.platformBridge?.titlebar})`,
   readiness: `({ready:Boolean(document.querySelector('[aria-label="Window toolbar"]') && document.querySelector('[aria-label="Folder tree"] [role="treeitem"][aria-label="a.txt"]')),picker:typeof globalThis.platformBridge?.pickEntry,capture:globalThis.platformBridge?.capabilities?.displayCapture})`,
 } as const

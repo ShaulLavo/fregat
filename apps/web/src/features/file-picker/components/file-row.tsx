@@ -1,55 +1,50 @@
+import type { MouseEvent } from 'react'
 import { useForesight } from '@/hooks/use-foresight'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { cn } from '@workspace/ui/lib/utils'
 import type { FsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
-import {
-  displayPath,
-  isPickableEntry,
-  kindLabel,
-  type FilePickerMode,
-} from '@/features/file-picker/utils/model'
+import { displayPath } from '@/features/file-picker/utils/model'
 import {
   ENTRY_NAME_TEXT,
-  fileListGridClass,
+  FILE_LIST_GRID,
   formatFileListModified,
-  fileListSizeLabel,
 } from '@/features/file-picker/utils/rows'
-import { fileListAvailabilityLabel } from '@/features/file-picker/utils/availability'
+import { ChoiceMark } from '@/features/file-picker/components/choice-mark'
 import { EntryIcon } from '@/features/file-picker/components/entry-icon'
 import { DIRECTORY_QUERY_STALE_MS } from '@/features/file-picker/utils/directory-query'
 import { INTENT_PREFETCH_HIT_SLOP_PX } from '@/lib/intent-prefetch-options'
 import { FILE_PICKER_INTENT_PREFIX } from '@/features/file-picker/utils/intent'
 
 export function FileRow({
-  accept,
+  chosen = null,
   entry,
   rowProps,
   isBusy,
-  mode,
   onDirectoryIntent,
   onDoubleClick,
+  onToggle,
   position,
   selected,
   setSize,
   showPath,
 }: {
-  accept?: readonly string[]
+  /** Null when the row is not a choice: a folder, or a picker that chooses folders. */
+  chosen?: boolean | null
   entry: FsEntry
   rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   isBusy: boolean
-  mode: FilePickerMode
   onDirectoryIntent: (path: string) => void
   onDoubleClick: (entry: FsEntry) => void
+  /** A click on a choosable file adds it to the chosen files or takes it out. */
+  onToggle?: (entry: FsEntry) => void
   position: number
   selected: boolean
   setSize: number
   showPath: boolean
 }) {
   const directory = isDirectoryEntry(entry)
-  const pickable = isPickableEntry(entry, mode, accept)
-  const availabilityLabel = fileListAvailabilityLabel(entry, mode, pickable)
   const { elementRef } = useForesight<HTMLDivElement>({
     callback: signalDirectoryIntent,
     enabled: directory && !isBusy,
@@ -65,6 +60,12 @@ export function FileRow({
     return onDirectoryIntent(entry.path)
   }
 
+  function handleClick(event: MouseEvent<HTMLElement>) {
+    rowProps.onClick(event)
+    // The second click of a double click belongs to the double click, which attaches the file.
+    if (chosen !== null && !isBusy && event.detail < 2) onToggle?.(entry)
+  }
+
   function handleDoubleClick() {
     if (isBusy) return
 
@@ -76,14 +77,12 @@ export function FileRow({
       {...rowProps}
       ref={directory ? elementRef : undefined}
       disabled={isBusy}
+      aria-checked={chosen ?? undefined}
       aria-posinset={position}
       selected={selected}
       aria-setsize={setSize}
-      className={cn(
-        'grid w-full cursor-default text-left',
-        fileListGridClass(mode),
-        !pickable && 'text-muted-foreground',
-      )}
+      className={cn('grid w-full cursor-default text-left', FILE_LIST_GRID)}
+      onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       role='option'
       title={entry.path}
@@ -96,17 +95,11 @@ export function FileRow({
             <span className='text-muted-foreground text-2xs ml-2'>{displayPath(entry.path)}</span>
           ) : null}
         </div>
+        {chosen === null ? null : <ChoiceMark chosen={chosen} />}
       </div>
-      {mode === 'file' ? (
-        <div className='text-muted-foreground truncate'>{kindLabel(entry)}</div>
-      ) : null}
       <div className='text-muted-foreground truncate tabular-nums max-sm:hidden'>
         {formatFileListModified(entry.mtimeMs)}
       </div>
-      <div className='text-muted-foreground text-right tabular-nums max-sm:hidden'>
-        {fileListSizeLabel(entry)}
-      </div>
-      {availabilityLabel ? <span className='sr-only'>{availabilityLabel}</span> : null}
     </ListRow>
   )
 }

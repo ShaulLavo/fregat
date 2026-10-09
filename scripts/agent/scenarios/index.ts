@@ -30,6 +30,7 @@ import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
 import { startupFailure } from './startup-failure'
 import { phoneFolderRetry } from './phone-folder-retry'
+import { firstWorkspaceMachines } from './first-workspace-machines'
 import { phoneDraftRestore } from './phone-draft-restore'
 import { settingsModuleFailure } from './settings-module-failure'
 import { settingsNewerServer, settingsStreamGiveUp } from './settings-newer-server'
@@ -70,6 +71,7 @@ import { chatQueueStopUpload } from './chat-queue-stop-upload'
 import { providerModelOptions } from './provider-model-options'
 import { screenshotDrop } from './screenshot-drop'
 import { binaryFileAttachment, fileAttachments } from './file-attachments'
+import { machineFileAttach, phoneMachineFileAttach } from './machine-file-attach'
 import {
   pdfDocuments,
   pdfAttachment,
@@ -205,6 +207,7 @@ import {
   workspaceSwitchClickDuringOpen,
 } from './large-folder'
 import { wallpaperBootHandoff } from './wallpaper-boot-handoff'
+import { wallpaperFirstLoad, desktopWallpaperFirstLoad } from './html-bootstrap-first-load'
 import { chatGitTabSwitch } from './chat-git-tab-switch'
 import { chatGitTurnRows } from './chat-git-turn-rows'
 import { chatModelPicker } from './chat-model-picker'
@@ -227,6 +230,7 @@ import { terminalBackground } from './terminal-background'
 import { terminalCancelledStartup } from './terminal-cancelled-startup'
 import { terminalWasmCancelledStartup } from './terminal-wasm-cancelled-startup'
 import { terminalWasmNavigationStartup } from './terminal-wasm-navigation-startup'
+import { terminalScreenReader } from './terminal-screen-reader'
 import { terminalRenderer, terminalRendererDom, terminalRendererWebgl } from './terminal-renderer'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { sidebarToggle } from './sidebar-toggle'
@@ -405,6 +409,7 @@ export type Scenario = {
 }
 
 import { editorDiagnosticsLifecycle } from './editor-diagnostics-lifecycle'
+import { editorRecordingStartup } from './editor-recording-startup'
 import { editorFastScroll } from './editor-fast-scroll'
 import { editorLargePaste } from './editor-large-paste'
 import { editorFind } from './editor-find'
@@ -538,6 +543,8 @@ export const scenarios: readonly Scenario[] = [
   claudeApprovalRules,
   codexApprovalRules,
   fileAttachments,
+  machineFileAttach,
+  phoneMachineFileAttach,
   binaryFileAttachment,
   pdfDocuments,
   pdfAttachment,
@@ -665,6 +672,7 @@ export const scenarios: readonly Scenario[] = [
   terminalWasmCancelledStartup,
   terminalWasmNavigationStartup,
   terminalOfflineHost,
+  terminalScreenReader,
   terminalRenderer,
   terminalRendererDom,
   terminalRendererWebgl,
@@ -798,6 +806,7 @@ export const scenarios: readonly Scenario[] = [
   settingsStreamGiveUp,
   startupFailure,
   phoneFolderRetry,
+  firstWorkspaceMachines,
   phoneDraftRestore,
   deferredDialogs,
   deferredChat,
@@ -816,6 +825,7 @@ export const scenarios: readonly Scenario[] = [
   editorLargePaste,
   editorFastScroll,
   editorDiagnosticsLifecycle,
+  editorRecordingStartup,
   editorFind,
   problemsPanelRows,
   problemsPanelWorkspace,
@@ -871,6 +881,8 @@ export const scenarios: readonly Scenario[] = [
   workspaceSwitchClickDuringOpen,
   filePickerPrefetchBound,
   wallpaperBootHandoff,
+  wallpaperFirstLoad,
+  desktopWallpaperFirstLoad,
   chatGitTabSwitch,
   chatGitTurnRows,
   editorUndoReopen,

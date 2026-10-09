@@ -1,10 +1,15 @@
-import { afterEach, vi } from 'vitest'
-
+import { performanceRecordingMutationOptions } from '@/features/editor/utils/performance-recording-mutation'
+import { editorQueryKeys } from '@/features/editor/utils/query-keys'
+import { createResourceQueryClient } from '@/lib/resources/state/query-client'
+import { runMutation } from '@/lib/mutations/run'
 import {
-  installEditorPerformanceTraceFromUrl,
+  editorPerformanceRecordingRequested,
   registerEditorOpenBenchmarkControl,
   type EditorOpenSampleResetResult,
 } from '@/features/editor/state/performance-trace'
+import { afterEach, vi } from 'vitest'
+
+import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-recording'
 import { expect, test } from '../../../../../test/fixtures'
 
 type TraceHandle = {
@@ -167,3 +172,32 @@ function performanceEntry(startTime: number, duration: number, name: string): Pe
     toJSON: () => ({}),
   }
 }
+
+test('ordinary startup skips recording and explicit tracing requests it', () => {
+  vi.stubEnv('OBSERVABILITY_ENABLED', 'true')
+  history.replaceState(null, '', '/')
+  expect(editorPerformanceRecordingRequested()).toBe(false)
+  history.replaceState(null, '', '/?editorPerfTrace=false')
+  expect(editorPerformanceRecordingRequested()).toBe(false)
+  history.replaceState(null, '', '/?editorPerfTrace=1')
+  expect(editorPerformanceRecordingRequested()).toBe(true)
+  vi.stubEnv('OBSERVABILITY_ENABLED', 'false')
+  expect(editorPerformanceRecordingRequested()).toBe(false)
+})
+
+test('on-demand recording installs the trace and settles its module cache', async () => {
+  vi.stubEnv('OBSERVABILITY_ENABLED', 'true')
+  history.replaceState(null, '', '/?editorPerfTrace=1')
+  const queryClient = createResourceQueryClient()
+  try {
+    const recording = await runMutation(
+      queryClient,
+      performanceRecordingMutationOptions(queryClient),
+      undefined,
+    )
+    expect(traceHandle()).toBeDefined()
+    expect(queryClient.getQueryData(editorQueryKeys.performanceRecording)).toBe(recording)
+  } finally {
+    queryClient.clear()
+  }
+})

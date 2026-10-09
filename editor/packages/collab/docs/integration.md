@@ -96,6 +96,59 @@ preserving visibility, operation states and command deduplication. Effect change
 allocate no replacement IDs and keep text in the piece table. Operation and provenance indexes grow with history; acknowledgement-aware
 compaction remains a separate concern.
 
+## Confirmed edit review
+
+`ConfirmedWindow` retains at most `MAX_REVIEW_EDITS` confirmed envelopes, currently 8,192.
+It orders the retained suffix by Lamport clock, actor, and edit sequence, so arrival order does
+not change the result. Dependencies include their transitive ancestors. Effect commands count
+against the window and carry causality; the returned candidates are insert, delete, and replace
+operations. Each candidate has `inserted` and `deleted` UTF-16 character ID spans.
+
+```ts
+import { ConfirmedWindow } from '@singapore-editor/collab'
+
+const window = new ConfirmedWindow(confirmedHistory)
+window.append(confirmedBatch)
+const pairs = window.pairs(confirmedBatch.map((edit) => edit.id))
+```
+
+The input is one document and epoch's complete accepted history, or a complete recent suffix
+of it. Deliver complete confirmed batches after that. Pending edits and rejected host records
+stay outside this input. A dependency missing from the suffix belongs to older history.
+Arbitrary holes inside retained history invalidate this contract. Duplicate deliveries are safe;
+conflicting duplicates fail with `conflicting-confirmed-edit`. A window size from 0 to 8,192
+can be passed as the second constructor argument.
+
+`pairs()` returns exact two-edit groups by different authors. Concurrency is not transitive;
+connected groups could include ordered edits. Supplying batch IDs returns only pairs touching
+that batch. Pair and candidate order is canonical. Queries read log metadata and ID spans only.
+They perform no document text reads. Retention, causal intervals, and effect-command bridges
+stay inside this query object; sessions that do not create one pay no query cost.
+
+`engine.projectEffects(effects)` returns a local review snapshot. Restore it on a separate
+engine to read an author's version or a base version. The selected effects can belong to
+several authors. Other effect states, character identities, and placement stay unchanged.
+The live engine and its command IDs also stay unchanged. An empty selection preserves every
+state; unknown targets, command targets, and conflicting states fail atomically.
+
+```ts
+const snapshot = engine.projectEffects([
+  { op: leftEdit.id, active: true },
+  { op: rightEdit.id, active: false },
+])
+const review = new TextbufferEngine()
+review.restore(snapshot)
+```
+
+This projection changes the selected operations in the current merged placement. Rebuilding a
+complete historical view requires selecting every operation that differs from that history.
+For a merge unit, select only the unit's operations and read the unit through its character IDs.
+`Participant.setEffects()` remains the author-owned command path for shared undo and redo.
+
+Run `bun run build` and `bun run bench:concurrency` in this package for the 100k-line,
+100-edit batch experiment. The benchmark reports cold construction and incremental batch
+updates separately, with full 8,192-edit retention as well as a 100-edit window.
+
 ## Checks and bounded performance experiment
 
 ```sh

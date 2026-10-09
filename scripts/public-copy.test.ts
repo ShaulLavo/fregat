@@ -21,8 +21,11 @@ test('the README names the shipped desktop client and phone setup', () => {
 
 test.each([
   ['apps/mac/Sources/MacApp/main.swift', 'window.title = "Fregat"'],
-  ['apps/desktop/native/macos/platform-webview.m', 'window.title = @"Fregat"'],
-  ['apps/desktop/native/linux/platform-webview.c', 'GTK_WINDOW(window), "Fregat"'],
+  ['apps/desktop/native/macos/PlatformWebview.swift', 'window.title = "Fregat"'],
+  [
+    'apps/desktop/native/linux/platform-webview.zig',
+    'c.gtk_window_set_title(@ptrCast(window), "Fregat")',
+  ],
   ['apps/tui/README.md', '# Fregat TUI'],
   ['apps/tui/src/host/utils/arguments.ts', '`Fregat TUI'],
   ['apps/web/src/features/workbench/utils/titlebar-model.ts', "workspaceTitle: 'Fregat'"],
