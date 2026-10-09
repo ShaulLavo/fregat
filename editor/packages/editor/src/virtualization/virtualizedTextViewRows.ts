@@ -2184,6 +2184,7 @@ export function horizontalViewportColumns(
 
   const inset = view.wrapEnabled ? gutterWidth(view) : visibleGutterWidth(view)
   const width = Math.max(0, viewportWidth - inset)
+  if (view.wrapEnabled) return Math.max(1, Math.floor(width / characterWidth(view)) - 1)
   return Math.max(1, Math.ceil(width / characterWidth(view)))
 }
 
@@ -2909,10 +2910,21 @@ function scanVisualColumns(
 function estimatedDisplayRowColumns(view: VirtualizedTextViewInternal, rowIndex: number): number {
   const displayRow = view.model.projection.getRow(rowIndex)
   if (!isDocumentTextDisplayRow(displayRow)) return 0
-  const glyphs = view.glyphs
-  if (!glyphs) return visualColumnLength(displayRow, view.tabSize)
+  const glyphs = view.wrapEnabled ? (view.wrapAdvance ?? view.glyphs) : view.glyphs
   const { text } = displayRow
-  return pixelsBeforeColumn(text, text.length, glyphs, view.tabSize) / characterWidth(view)
+  let end = text.length
+  if (view.wrapEnabled) {
+    while (end > 0) {
+      const code = text.charCodeAt(end - 1)
+      if (code !== 32 && code !== 9) break
+      end -= 1
+    }
+  }
+  if (!glyphs) {
+    if (end === text.length) return visualColumnLength(displayRow, view.tabSize)
+    return bufferColumnToVisualColumn(displayRow, end, view.tabSize)
+  }
+  return pixelsBeforeColumn(text, end, glyphs, view.tabSize) / characterWidth(view)
 }
 
 function applyContentWidth(view: VirtualizedTextViewInternal, visualColumns: number): void {

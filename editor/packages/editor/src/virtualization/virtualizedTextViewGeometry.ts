@@ -161,6 +161,7 @@ type PlanBuffer = {
  * them in different spaces.
  */
 type RowMeasurementContext = {
+  readonly trimSpaces?: boolean
   readonly row: MountedVirtualizedTextRow
   readonly scale: number
 }
@@ -289,6 +290,7 @@ let measuredRowRects: Map<HTMLElement, DOMRect> | null = null
 let measuredRowScales: Map<HTMLElement, number> | null = null
 let measurementScratch: MeasurementScratch | null = null
 const measuredRowWidths = new WeakMap<HTMLElement, RowContentWidthCache>()
+const measuredScrollWidths = new WeakMap<HTMLElement, Pick<RowContentWidthCache, 'key' | 'width'>>()
 const dualCollapsedBidiPositionSupport = new WeakMap<
   Document,
   { readonly getClientRects: Range['getClientRects'] | undefined; readonly supported: boolean }
@@ -498,6 +500,38 @@ export function knownRowContentWidth(
 
   const measured = measuredRowWidths.get(row.element)
   return measured?.key === key ? measured.width : null
+}
+
+/** Hanging wrap spaces retain caret geometry but contribute no scrolling width. */
+export function knownRowScrollWidth(
+  view: VirtualizedTextViewInternal,
+  row: MountedVirtualizedTextRow,
+): number | null {
+  if (!view.wrapEnabled || !/[ \t]$/.test(row.text.slice(-1))) {
+    return knownRowContentWidth(view, row)
+  }
+  const cached = measuredScrollWidths.get(row.element)
+  return cached?.key === rowGeometryCacheKey(view, row) ? cached.width : null
+}
+
+export function measureRowScrollWidth(
+  view: VirtualizedTextViewInternal,
+  row: MountedVirtualizedTextRow,
+): number {
+  if (!view.wrapEnabled || !/[ \t]$/.test(row.text.slice(-1))) {
+    return measureRowContentWidth(view, row)
+  }
+  const key = rowGeometryCacheKey(view, row)
+  const cached = measuredScrollWidths.get(row.element)
+  if (cached?.key === key) return cached.width
+  const measured = measuredRowContentsRect({
+    row,
+    scale: rowClientRectScale(row),
+    trimSpaces: true,
+  })
+  const width = measured ? measured.left + measured.width : 0
+  measuredScrollWidths.set(row.element, { key, width })
+  return width
 }
 
 /**
@@ -2846,12 +2880,24 @@ function measuredChunkContentsRect(
   chunk: VirtualizedTextChunk,
 ): { readonly left: number; readonly width: number } | null {
   const first = chunk.parts[0]
-  const last = chunk.parts.at(-1)
+  let lastIndex = chunk.parts.length - 1
+  if (measurement.trimSpaces) {
+    while (lastIndex >= 0) {
+      const part = chunk.parts[lastIndex]!
+      if (part.kind !== 'text' || part.node.data.replace(/[ \t]+$/, '').length > 0) break
+      lastIndex -= 1
+    }
+  }
+  const last = chunk.parts[lastIndex]
   if (!first || !last) return null
 
   const scratch = measurementScratchFor(measurement.row.element.ownerDocument)
   scratch.range.setStartBefore(renderedPartNode(first))
-  scratch.range.setEndAfter(renderedPartNode(last))
+  if (measurement.trimSpaces && last.kind === 'text') {
+    scratch.range.setEnd(last.node, last.node.data.replace(/[ \t]+$/, '').length)
+  } else {
+    scratch.range.setEndAfter(renderedPartNode(last))
+  }
   const rect = scratch.range.getBoundingClientRect()
   scratch.range.selectNodeContents(scratch.parking)
   if (rect.width <= 0) return null
