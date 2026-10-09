@@ -145,6 +145,13 @@ test('a connection failure keeps the catalog code, why and fix', () => {
     code: 'CONNECTION_FAILED',
     message: 'plain',
   })
+  // Eden hands a refused request back as a 503 wrapping the browser's TypeError.
+  const refused = new EdenFetchError(503, new TypeError('Failed to fetch'))
+  expect(toConnectionError(refused, 'Cannot connect to box.')).toEqual({
+    code: 'CONNECTION_FAILED',
+    message: 'Cannot connect to box.',
+    fix: 'Check that the machine is on and its address is right, then try again.',
+  })
 })
 
 test('a thrown message keeps the words of an Error and never stringifies an Eden rejection', () => {
