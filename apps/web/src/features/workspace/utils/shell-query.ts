@@ -1,11 +1,11 @@
 import { queryOptions } from '@tanstack/react-query'
 import type { ComponentType } from 'react'
 
-import type { FilesystemPath } from '@/lib/documents/utils/types'
+import type { ShellProps } from '@/lib/shell/utils/props'
 import type { ShellKind } from '@/lib/shell/utils/kind'
 import { workspaceQueryKeys } from '@/features/workspace/utils/query-keys'
 
-type ShellView = ComponentType<{ readonly rootPath: FilesystemPath }>
+type ShellView = ComponentType<ShellProps>
 
 /**
  * Each shell is its own chunk, so a desktop never downloads the phone shell and a phone never
