@@ -54,10 +54,8 @@ export async function createConflictResolutionFixture(
       eventType: deleted ? 'deleted' : 'changed',
       diffDocumentKey: key,
       localPath: path,
-      localText: 'local text',
       remotePath: path,
       remoteFile: deleted ? null : remote,
-      remoteText: deleted ? null : remote.content,
     },
     {
       comparisonScope: { environmentId, rootPath: filesystemPath('') },

@@ -78,7 +78,6 @@ test.for(['destination', 'conflict'] as const)(
       else
         fixture.conflictStore.getState().addConflict({
           ...fixture.conflictStore.getState().conflicts[fixture.target.conflictId]!,
-          remoteText: 'new conflict',
         })
       fixture.transport.release()
       await expect.poll(events.outcomes).toEqual(['unresolved'])
