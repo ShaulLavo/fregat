@@ -61,6 +61,9 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
   private host: Host<ReturnType<TextbufferEngine['snapshot']>>
   private history: Confirmation<Envelope>[] = []
   private readonly records = new Map<string, Confirmation<Envelope>>()
+  private confirmations: HostMessage[] = []
+  private allocated: Envelope[] = []
+  private batching = 0
 
   constructor(
     private readonly options: CollaborationDocumentOptions,
@@ -156,7 +159,7 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
     const body = { depth: tip.depth + 1, predecessor: tip.hash, id: edit.id, edit, outcome }
     const record = { ...body, hash: digest(body) }
     this.append(record)
-    this.participant.receive([message], message.status === 'rejected' ? [edit] : [])
+    this.confirmation(message, edit)
     return record
   }
 
@@ -172,11 +175,43 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
       return false
     }
     this.append(record)
-    this.participant.receive(
-      [hostMessage(record)],
-      record.outcome.kind === 'rejected' ? [record.edit] : [],
-    )
+    this.confirmation(hostMessage(record), record.edit)
     return true
+  }
+
+  sequenceBatch(
+    edits: readonly { readonly edit: Envelope; readonly rejection?: string }[],
+  ): readonly Confirmation<Envelope>[] {
+    return this.batch(() => edits.map(({ edit, rejection }) => this.sequence(edit, rejection)))
+  }
+
+  applyBatch(records: readonly Confirmation<Envelope>[]): boolean {
+    return this.batch(() => records.every((record) => this.apply(record)))
+  }
+
+  private batch<T>(operation: () => T): T {
+    this.batching++
+    try {
+      return operation()
+    } finally {
+      this.batching--
+      if (!this.batching) this.settleProjection()
+    }
+  }
+
+  private confirmation(message: HostMessage, envelope: Envelope): void {
+    this.confirmations.push(message)
+    if (message.status === 'rejected') this.allocated.push(envelope)
+    if (!this.batching) this.settleProjection()
+  }
+
+  private settleProjection(): void {
+    if (!this.confirmations.length) return
+    const messages = this.confirmations
+    const allocated = this.allocated
+    this.confirmations = []
+    this.allocated = []
+    this.participant.receive(messages, allocated)
   }
 
   private append(record: Confirmation<Envelope>): void {

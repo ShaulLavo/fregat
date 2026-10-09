@@ -312,7 +312,7 @@ export function FilePickerDialog({
 
   function goBack() {
     const path = session.backPath
-    if (!path) return
+    if (path === null) return
 
     const intentId = beginDirectoryIntent()
     void loadDirectory(path, intentId).then((loaded) => {
@@ -322,7 +322,7 @@ export function FilePickerDialog({
 
   function goForward() {
     const path = session.forwardPath
-    if (!path) return
+    if (path === null) return
 
     const intentId = beginDirectoryIntent()
     void loadDirectory(path, intentId).then((loaded) => {
@@ -471,12 +471,13 @@ export function FilePickerDialog({
     context: 'FilePicker',
     commands: {
       'filePicker.navigateBack': ({ source }) => {
-        if (!open || openingPopupTrigger(source?.target ?? null) || !session.backPath) return false
+        if (!open || openingPopupTrigger(source?.target ?? null) || session.backPath === null)
+          return false
         goBack()
         return true
       },
       'filePicker.navigateForward': ({ source }) => {
-        if (!open || openingPopupTrigger(source?.target ?? null) || !session.forwardPath)
+        if (!open || openingPopupTrigger(source?.target ?? null) || session.forwardPath === null)
           return false
         goForward()
         return true
@@ -730,6 +731,7 @@ export function FilePickerDialog({
                       />
                     </>
                   }
+                  backPath={session.backPath}
                   canGoUp={session.canGoUp}
                   currentPath={session.currentPath}
                   editor={
@@ -749,6 +751,8 @@ export function FilePickerDialog({
                       />
                     ) : null
                   }
+                  onBack={goBack}
+                  onClose={() => onOpenChange(false)}
                   onEditPath={pathInput.open}
                   onUp={() => navigateTo(pickerParentPath(session.currentPath))}
                 />
@@ -923,12 +927,19 @@ export function FilePickerDialog({
               </PaneBar>
             ) : null}
             {compact ? (
-              <DialogFooter className='flex shrink-0 flex-row items-center gap-(--density-control-gap) px-(--bar-padding-x) py-(--density-gap-tight)'>
-                <Button onClick={() => onOpenChange(false)} type='button' variant='ghost'>
+              <DialogFooter className='flex shrink-0 flex-row gap-(--density-control-gap) px-(--bar-padding-x) py-(--density-gap-tight)'>
+                <Button
+                  className='shrink-0'
+                  onClick={() => onOpenChange(false)}
+                  size='lg'
+                  type='button'
+                  variant='secondary'
+                >
                   Cancel
                 </Button>
                 <Button
                   className='min-w-0 flex-1'
+                  size='lg'
                   disabled={!selectedPickable}
                   onClick={chooseSelected}
                   title={selectedPickable ? displayPath(selectedPickable.path) : undefined}
