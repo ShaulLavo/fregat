@@ -6,7 +6,8 @@ import { arms, assertArmWork } from './proof.mjs'
 
 assert(process.argv[2], 'Lane directory required')
 const lane = resolve(process.argv[2])
-const record = { windows: [], failures: [] }
+const protocolSuffix = process.argv[3]
+const record = { protocolSuffix: protocolSuffix ?? null, windows: [], failures: [] }
 let expectedWindows = 0
 const sha = (value) => createHash('sha256').update(value).digest('hex')
 const oneValue = (values, message) => assert.equal(new Set(values).size, 1, message)
@@ -22,6 +23,7 @@ function assertGeometry(row, protocol) {
 }
 for (const name of await readdir(lane)) {
   if (!name.startsWith('mac-')) continue
+  if (protocolSuffix && !name.endsWith(`-${protocolSuffix}`)) continue
   const protocolPath = join(lane, name, 'protocol.json')
   let protocol
   try {
@@ -154,8 +156,9 @@ for (const name of await readdir(lane)) {
     )
   }
 }
+record.expectedWindows = expectedWindows
 record.complete =
   expectedWindows >= 24 && record.windows.length === expectedWindows && record.failures.length === 0
 await writeFile(join(lane, 'raw-verification.json'), JSON.stringify(record, null, 2) + '\n')
 console.log(JSON.stringify(record))
-assert(record.complete, 'Both complete balanced jobs required')
+assert(record.complete, 'Complete balanced selected protocols required')
