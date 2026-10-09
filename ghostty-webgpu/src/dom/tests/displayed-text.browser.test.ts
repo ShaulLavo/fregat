@@ -9,6 +9,7 @@ import { CanvasTerminalRenderer } from '../../render/canvas/renderer.js'
 import { WebGpuTerminalRenderer } from '../../render/renderer.js'
 import type { TerminalSubmittedSnapshot, TerminalSubmittedText } from '../submitted-frame.js'
 import type { RenderSchedulerClock } from '../../render/scheduler.js'
+import type { RowRendererSurface } from '../../render/row-renderer.js'
 import { TerminalSession } from '../../term/session.js'
 import { createTerminalElements } from '../elements.js'
 import { createGhosttyWebGpuTerminalFromSession } from '../terminal.js'
@@ -70,23 +71,31 @@ async function fixture(backend: 'webgl' | 'webgpu' | 'canvas' | 'dom' = 'webgl')
     runtime: { kind: 'borrowed', runtime },
   })
   const clock = new DeferredClock()
+  let renderer:
+    | WebGlTerminalRenderer
+    | WebGpuTerminalRenderer
+    | CanvasTerminalRenderer
+    | DomTerminalRenderer
+    | undefined
   const terminal = createGhosttyWebGpuTerminalFromSession(session, {
     autoFit: false,
     elements: createTerminalElements(host),
-    rendererFactory: (options) =>
-      ({
+    rendererFactory: async (options) => {
+      renderer = await {
         webgl: WebGlTerminalRenderer,
         webgpu: WebGpuTerminalRenderer,
         canvas: CanvasTerminalRenderer,
         dom: DomTerminalRenderer,
-      })[backend].create({ ...options, schedulerClock: clock }),
+      }[backend].create({ ...options, schedulerClock: clock })
+      return renderer
+    },
   })
   cleanups.push(() => terminal.dispose())
   const errors: unknown[] = []
   terminal.on('error', (event) => errors.push(event))
   await terminal.open(host)
   clock.flush()
-  return { terminal, session, clock, errors, host }
+  return { terminal, session, clock, errors, host, renderer: renderer! }
 }
 
 function extractionCount() {
@@ -109,11 +118,11 @@ function extractionCount() {
   return () => count
 }
 
-describe('main-thread displayed-text demand', () => {
+describe.each(['webgl', 'dom'] as const)('%s main-thread displayed-text demand', (backend) => {
   it('uses dirty retention until font or row-height changes invalidate the layout', async () => {
     const retain = vi.spyOn(runtime.bridge, 'captureRetainedFrame')
     cleanups.push(() => retain.mockRestore())
-    const { terminal, clock, errors } = await fixture()
+    const { terminal, clock, errors } = await fixture(backend)
     expect(retain.mock.calls.at(-1)?.[2]).toBe(1)
     terminal.write('first 界 é 🧑‍💻')
     clock.flush()
@@ -131,39 +140,42 @@ describe('main-thread displayed-text demand', () => {
     expect(errors).toEqual([])
   })
 
-  it('keeps accepted dirty-row text after a failed WebGL submit and recovers every row', async () => {
-    const { terminal, session, clock, errors } = await fixture()
-    const delivered: TerminalSubmittedText[] = []
-    terminal.onText((text) => delivered.push(text))
-    terminal.write('first\r\n界 é 🧑‍💻\r\nthird\r\nfourth')
-    clock.flush()
-    terminal.write('\x1b[1;1Hnext')
-    clock.flush()
-    const accepted = terminal.visibleLines()
-    const held = JSON.stringify(delivered)
-    const submit = vi.spyOn(WebGlTextPass.prototype, 'submit').mockImplementation(() => {
-      throw new TypeError('injected WebGL submission failure')
-    })
-    cleanups.push(() => submit.mockRestore())
-    terminal.write('\x1b[1;1Hpending\x1b[2;1Hnew é 🧑‍💻')
-    clock.flush()
-    expect(errors).toHaveLength(1)
-    expect(terminal.visibleLines()).toEqual(accepted)
-    expect(JSON.stringify(delivered)).toBe(held)
-    submit.mockRestore()
-    terminal.refresh(0, 3)
-    clock.flushTimers()
-    clock.flush()
-    expect(terminal.visibleLines()).toEqual(
-      session.renderState.readTextRows!().map((row) => row.text),
-    )
-    expect(terminal.visibleLines()[0]).toContain('pending')
-    expect(JSON.stringify(delivered.slice(0, -1))).toBe(held)
-  })
+  it.skipIf(backend !== 'webgl')(
+    'keeps accepted dirty-row text after a failed WebGL submit and recovers every row',
+    async () => {
+      const { terminal, session, clock, errors } = await fixture(backend)
+      const delivered: TerminalSubmittedText[] = []
+      terminal.onText((text) => delivered.push(text))
+      terminal.write('first\r\n界 é 🧑‍💻\r\nthird\r\nfourth')
+      clock.flush()
+      terminal.write('\x1b[1;1Hnext')
+      clock.flush()
+      const accepted = terminal.visibleLines()
+      const held = JSON.stringify(delivered)
+      const submit = vi.spyOn(WebGlTextPass.prototype, 'submit').mockImplementation(() => {
+        throw new TypeError('injected WebGL submission failure')
+      })
+      cleanups.push(() => submit.mockRestore())
+      terminal.write('\x1b[1;1Hpending\x1b[2;1Hnew é 🧑‍💻')
+      clock.flush()
+      expect(errors).toHaveLength(1)
+      expect(terminal.visibleLines()).toEqual(accepted)
+      expect(JSON.stringify(delivered)).toBe(held)
+      submit.mockRestore()
+      terminal.refresh(0, 3)
+      clock.flushTimers()
+      clock.flush()
+      expect(terminal.visibleLines()).toEqual(
+        session.renderState.readTextRows!().map((row) => row.text),
+      )
+      expect(terminal.visibleLines()[0]).toContain('pending')
+      expect(JSON.stringify(delivered.slice(0, -1))).toBe(held)
+    },
+  )
 
   it('keeps metadata idle and pulls displayed bytes through pending output, resize and disposal', async () => {
     const count = extractionCount()
-    const { terminal, session, clock, errors, host } = await fixture()
+    const { terminal, session, clock, errors, host } = await fixture(backend)
     terminal.write('displayed 界 é 🧑‍💻')
     clock.flush()
     expect(count()).toBe(0)
@@ -194,7 +206,7 @@ describe('main-thread displayed-text demand', () => {
 
   it('publishes owned viewport and patches per accepted frame, then retires the last listener', async () => {
     const count = extractionCount()
-    const { terminal, clock, session, errors } = await fixture()
+    const { terminal, clock, session, errors } = await fixture(backend)
     const delivered: TerminalSubmittedText[] = []
     const subscription = terminal.onText((text) => delivered.push(text))
     expect(delivered).toEqual([])
@@ -243,7 +255,7 @@ describe('main-thread displayed-text demand', () => {
 
   it('enables accessibility through a text subscription and releases demand when disabled', async () => {
     const count = extractionCount()
-    const { terminal, clock, host, errors } = await fixture()
+    const { terminal, clock, host, errors } = await fixture(backend)
     terminal.write('current displayed text')
     clock.flush()
     expect(count()).toBe(0)
@@ -262,7 +274,7 @@ describe('main-thread displayed-text demand', () => {
   })
 
   it('isolates subscriber failures and keeps independently registered listeners active', async () => {
-    const { terminal, clock, errors } = await fixture()
+    const { terminal, clock, errors } = await fixture(backend)
     const bad = terminal.onText(() => {
       throw new TypeError('test subscriber')
     })
@@ -342,7 +354,7 @@ describe('worker displayed-text correctness fallback', () => {
   })
 })
 
-describe.each(['canvas', 'dom'] as const)('%s owned displayed-text publication', (backend) => {
+describe.each(['canvas'] as const)('%s owned displayed-text publication', (backend) => {
   it('does no native retention or capture and preserves eager owned rows', async () => {
     const bridge = runtime.bridge
     const allocate = bridge.createRetainedFrame.bind(bridge)
@@ -391,7 +403,7 @@ describe.each(['canvas', 'dom'] as const)('%s owned displayed-text publication',
   })
 })
 
-describe.each(['webgl', 'webgpu'] as const)('%s logical displayed text', (backend) => {
+describe.each(['webgl', 'webgpu', 'dom'] as const)('%s logical displayed text', (backend) => {
   it('publishes concealed content and a complete owned viewport through a text listener', async () => {
     const { terminal, clock, errors } = await fixture(backend)
     await expect.poll(() => terminal.submittedFrame?.grid.rows).toBe(4)
@@ -440,5 +452,94 @@ describe('WebGPU retained displayed-text acceptance', () => {
     clock.flush()
     await expect.poll(() => terminal.visibleLines()[0]).toContain('GPU pending')
     expect(terminal.frameSnapshot()?.rows.map((row) => row.text)).toEqual(terminal.visibleLines())
+  })
+})
+
+describe('DOM retained displayed-text acceptance', () => {
+  it('captures successful DOM paint before acknowledging damage and leaves failed paint unpublished', async () => {
+    const retain = vi.spyOn(runtime.bridge, 'captureRetainedFrame')
+    cleanups.push(() => retain.mockRestore())
+    const { terminal, clock, errors, host, renderer } = await fixture('dom')
+    const delivered: TerminalSubmittedText[] = []
+    terminal.onText((text) => delivered.push(text))
+    terminal.write('first\r\n界 é 🧑‍💻\r\nthird\r\nfourth')
+    clock.flush()
+    expect(retain.mock.calls.length).toBeGreaterThan(0)
+    const owned = terminal.visibleLines()
+    const held = JSON.stringify(delivered)
+    const surface = Reflect.get(renderer, 'surface') as RowRendererSurface
+    const paint = vi.spyOn(surface, 'paint').mockImplementation(() => {
+      throw new TypeError('injected DOM paint failure')
+    })
+    cleanups.push(() => paint.mockRestore())
+    const captures = retain.mock.calls.length
+    terminal.write('\x1b[1;1Hpending\x1b[2;1Hnew é 🧑‍💻')
+    expect(() => clock.flush()).toThrow('injected DOM paint failure')
+    expect(errors).toEqual([])
+    expect(retain.mock.calls).toHaveLength(captures)
+    expect(terminal.visibleLines()).toEqual(owned)
+    expect(JSON.stringify(delivered)).toBe(held)
+    paint.mockRestore()
+    terminal.refresh(0, 3)
+    clock.flushTimers()
+    clock.flush()
+    const accepted = terminal.visibleLines()
+    expect(accepted[0]).toContain('pending')
+    expect(accepted[1]).toContain('new é 🧑‍💻')
+    expect(delivered.at(-1)!.rows.map((row) => row.text)).toEqual(accepted)
+    const domRows = [...host.querySelector('.ghostty-webgpu-frame')!.children]
+    expect(domRows.map((row) => row.textContent?.trimEnd())).toEqual(
+      accepted.map((row) => row.trimEnd()),
+    )
+    expect(JSON.stringify(delivered.slice(0, -1))).toBe(held)
+  })
+
+  it('pulls the accepted DOM viewport after long idle demand, alternate screen, selection and grid return', async () => {
+    const count = extractionCount()
+    const { terminal, session, clock, errors, host } = await fixture('dom')
+    for (let index = 0; index < 40; index++) {
+      terminal.write(`\x1b[${(index % 4) + 1};1H\x1b[2K${index} 界 é 🧑‍💻`)
+      clock.flush()
+    }
+    expect(count()).toBe(0)
+    const accepted = terminal.visibleLines()
+    const saved = terminal.frameSnapshot()!
+    const savedJson = JSON.stringify(saved)
+    const domText = () =>
+      [...host.querySelector('.ghostty-webgpu-frame')!.children].map((row) =>
+        row.textContent?.trimEnd(),
+      )
+    expect(domText()).toEqual(accepted.map((row) => row.trimEnd()))
+    const delivered: TerminalSubmittedText[] = []
+    const subscription = terminal.onText((text) => delivered.push(text))
+    terminal.write('\x1b[1;1H\x1b[2Ksubscribed 界')
+    clock.flush()
+    expect(delivered.at(-1)!.rowPatches.map((row) => row.y)).toEqual([0])
+    expect(delivered.at(-1)!.rows.map((row) => row.text)).toEqual(terminal.visibleLines())
+    terminal.write('\x1b[?1049h\x1b[2Jalternate é 🧑‍💻')
+    clock.flush()
+    expect(domText()).toEqual(terminal.visibleLines().map((row) => row.trimEnd()))
+    terminal.write('\x1b[?1049l')
+    clock.flush()
+    expect(terminal.visibleLines()[0]).toContain('subscribed 界')
+    terminal.selectRange({ x: 0, y: 0 }, { x: 6, y: 0 })
+    clock.flush()
+    expect(domText()).toEqual(terminal.visibleLines().map((row) => row.trimEnd()))
+    session.resize({ columns: 34, rows: 5 })
+    clock.flush()
+    session.resize({ columns: 30, rows: 4 })
+    clock.flush()
+    terminal.write('\x1b[4;1H\x1b[2Kreturned grid')
+    clock.flush()
+    expect(terminal.visibleLines()[3]).toContain('returned grid')
+    expect(domText()).toEqual(terminal.visibleLines().map((row) => row.trimEnd()))
+    expect(delivered.at(-1)!.rows.map((row) => row.text)).toEqual(terminal.visibleLines())
+    subscription.dispose()
+    const idle = count()
+    terminal.write('\x1b[3;1H\x1b[2Kunsubscribed again')
+    clock.flush()
+    expect(count()).toBe(idle)
+    expect(JSON.stringify(saved)).toBe(savedJson)
+    expect(errors).toEqual([])
   })
 })

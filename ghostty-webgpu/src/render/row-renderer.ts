@@ -73,6 +73,7 @@ export class RowTerminalRenderer {
   constructor(
     options: WebGpuTerminalRendererOptions,
     private readonly surface: RowRendererSurface,
+    retainDisplayedText = false,
   ) {
     this.cursorBlinkPreference = options.cursorBlink ?? false
     this.font = copyFittedFont(options.font)
@@ -81,7 +82,7 @@ export class RowTerminalRenderer {
       rows: options.rows,
     })
     this.frames = new FrameObserver(
-      options.retainDisplayedText
+      options.retainDisplayedText && !retainDisplayedText
         ? { ...options, retainDisplayedText: false, needsFrameRows: () => true }
         : options,
     )
@@ -230,30 +231,20 @@ export class RowTerminalRenderer {
     const cursorState = renderCursorState(this.cursor, this.cursorPhaseVisible, style)
     this.surface.beginFrame?.()
     for (const row of rows) this.paintRow(row, cursorState)
+    // Native retention needs dirty rows while they still describe the accepted paint.
+    const deliver = this.frames.capture(
+      this.renderState,
+      cursor,
+      cursorState,
+      rows.map((row) => row.y),
+      rows,
+    )
     if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
     this.metrics.paintedRows += rows.length
     this.metrics.submittedFrames += 1
     this.needsFullRebuild = false
     this.overlayRows.clear()
-    this.emitFrame(rows)
-  }
-
-  private emitFrame(
-    rows: readonly RenderRow[] | undefined,
-    changed = rows?.map((row) => row.y) ?? [],
-  ): void {
-    if (!this.cursor) return
-    this.frames.emit(
-      this.renderState,
-      this.cursor,
-      renderCursorState(
-        this.cursor,
-        this.cursorPhaseVisible,
-        this.focused ? undefined : this.inactiveCursorStyle,
-      ),
-      changed,
-      rows,
-    )
+    deliver()
   }
 
   private gridEquals(grid: RendererGridSize): boolean {

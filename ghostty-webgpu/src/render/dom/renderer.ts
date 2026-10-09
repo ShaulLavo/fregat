@@ -172,7 +172,7 @@ export class DomTerminalRenderer extends RowTerminalRenderer {
   readonly backend = 'dom' as const
 
   private constructor(options: WebGpuTerminalRendererOptions) {
-    super(options, new DomSurface(options))
+    super(options, new DomSurface(options), true)
   }
 
   protected override readRows(options: ReadRowsOptions = {}): readonly RenderRow[] {
