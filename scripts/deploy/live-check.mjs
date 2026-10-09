@@ -9,6 +9,7 @@ import { chromium } from 'playwright'
 import { attachObserver, observedProblems, serializable } from '../agent/observe.mjs'
 import { readRefusals, refusalFailures } from './live-refusals.mjs'
 import { liveVerdict } from './live-verdict.mjs'
+import { appearanceFailures, inspectAppearance } from './live-appearance.mjs'
 
 // A third-party image the chat renders; proves cross-origin isolation still lets favicons load.
 const publicFaviconUrl =
@@ -78,13 +79,10 @@ try {
       errorFrame: document.querySelector(errorFrame)?.textContent ?? null,
       rootChildren: document.querySelector('#root')?.childElementCount ?? 0,
       clientRelease: document.querySelector('meta[name="platform-release"]')?.content ?? null,
-      wallpaperPreloads: [...document.querySelectorAll('link[rel="preload"][as="image"]')].map(
-        (link) => link.href,
-      ),
-      wallpaperHandoff: window.platformBootWallpaper ?? null,
     }),
     errorFrame,
   )
+  rendered.appearance = await page.evaluate(inspectAppearance)
   await page.screenshot({ path: resolve(values.out, 'live.png') })
   Object.assign(report, {
     finalUrl: page.url(),
@@ -172,10 +170,7 @@ function failures({ served, rendered, publicFavicon, observed }) {
     )
   if (!rendered.crossOriginIsolated) found.push('page is not cross-origin isolated')
   if (!(publicFavicon.width > 0)) found.push('public favicon did not load')
-  if (rendered.wallpaperPreloads.length !== 1)
-    found.push(`wallpaper preloads: ${rendered.wallpaperPreloads.length}`)
-  if (rendered.wallpaperHandoff?.href !== rendered.wallpaperPreloads[0])
-    found.push('the boot wallpaper record does not name the preloaded image')
+  found.push(...appearanceFailures(rendered.appearance))
   // Plan 106: boot is entry + runtime + stylesheet; everything else loads after first paint.
   if (observed.assets.size < 3) found.push(`only ${observed.assets.size} boot assets loaded`)
   if (!observed.apiResponses.some((item) => item.url === `${base}health` && item.status === 200))
