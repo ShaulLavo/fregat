@@ -1,8 +1,4 @@
-import {
-  automaticGpuBackends,
-  type GpuBackend,
-  type RendererPlatform,
-} from '../render/backend-order.js'
+import { automaticGpuBackends, type GpuBackend } from '../render/backend-order.js'
 import { isSoftwareWebGpuAdapter } from '../render/adapter.js'
 import { LocalTerminalExecution } from '../dom/execution-local.js'
 import {
@@ -19,7 +15,8 @@ import {
   WebGpuUnavailableError,
   type WebGpuTerminalRendererOptions,
 } from '../render/renderer.js'
-import { WebGlTerminalRenderer, WebGlUnavailableError } from '../render/webgl/renderer.js'
+import { WebGlTerminalRenderer } from '../render/webgl/renderer.js'
+import { WebGlUnavailableError } from '../render/webgl/unavailable.js'
 import type {
   TerminalFittedFont,
   TerminalSessionEventType,
@@ -30,6 +27,7 @@ import type {
   WorkerLayout,
   WorkerMessage,
   WorkerRequest,
+  WorkerCanvasReplacement,
   WorkerState,
   TerminalOutputMessage,
 } from './protocol.js'
@@ -90,8 +88,23 @@ export class TerminalWorkerRuntime {
     readonly resolve: () => void
     readonly reject: (cause: unknown) => void
   }
-  private readonly onMessage = (event: MessageEvent<WorkerRequest>) => {
+  private canvasReplacement?: ReturnType<typeof Promise.withResolvers<OffscreenCanvas>>
+  private readonly onMessage = (event: MessageEvent<WorkerRequest | WorkerCanvasReplacement>) => {
     const request = event.data
+    if (request?.type === 'canvas') {
+      if (
+        request.terminal !== this.initialize.terminal ||
+        request.generation !== this.initialize.generation
+      )
+        return
+      if (!this.canvasReplacement || !(request.canvas instanceof OffscreenCanvas)) {
+        this.fail(workerError('protocol', 'renderer.canvas', { pending: !!this.canvasReplacement }))
+        return
+      }
+      this.canvasReplacement.resolve(request.canvas)
+      this.canvasReplacement = undefined
+      return
+    }
     if (!this.validRequest(request)) {
       this.fail(workerError('protocol', 'request', { control: this.control }))
       return
@@ -102,10 +115,7 @@ export class TerminalWorkerRuntime {
       .catch((cause: unknown) => this.fail(cause))
   }
 
-  constructor(
-    private readonly initialize: WorkerInitialize,
-    private readonly platform: RendererPlatform = navigator,
-  ) {}
+  constructor(private readonly initialize: WorkerInitialize) {}
 
   async start(): Promise<void> {
     const port = this.initialize.port
@@ -269,9 +279,8 @@ export class TerminalWorkerRuntime {
     options: WebGpuTerminalRendererOptions,
   ): Promise<WebGpuTerminalRenderer | WebGlTerminalRenderer> {
     const backends: readonly GpuBackend[] =
-      this.initialize.backend === 'auto'
-        ? automaticGpuBackends(this.platform)
-        : [this.initialize.backend]
+      this.initialize.backend === 'auto' ? automaticGpuBackends() : [this.initialize.backend]
+    options = { ...options }
     let unavailable: unknown
     for (const backend of backends) {
       this.native()
@@ -292,6 +301,12 @@ export class TerminalWorkerRuntime {
         )
           throw cause
         unavailable = cause
+        if (
+          cause instanceof WebGlUnavailableError &&
+          cause.canvasClaimed &&
+          backend !== backends.at(-1)
+        )
+          options.canvas = await this.replaceCanvas()
       }
     }
     if (unavailable instanceof WebGpuUnavailableError)
@@ -299,6 +314,13 @@ export class TerminalWorkerRuntime {
     if (unavailable instanceof WebGlUnavailableError)
       throw workerError('capability', 'renderer.webgl', { backend: this.initialize.backend })
     throw unavailable
+  }
+
+  private replaceCanvas(): Promise<OffscreenCanvas> {
+    this.native()
+    this.canvasReplacement = Promise.withResolvers<OffscreenCanvas>()
+    this.post({ ...this.watermarks(), type: 'replaceCanvas' })
+    return this.canvasReplacement.promise
   }
 
   private async createWebGpuRenderer(
@@ -676,6 +698,8 @@ export class TerminalWorkerRuntime {
   private async performCleanup(): Promise<void> {
     this.disposed = true
     this.abort.abort()
+    this.canvasReplacement?.reject(workerError('disposed', 'renderer.canvas', { disposed: true }))
+    this.canvasReplacement = undefined
     this.outputWaiter?.reject(workerError('disposed', 'fence', { output: this.output }))
     this.outputPort?.close()
     for (const subscription of this.subscriptions) subscription.dispose()

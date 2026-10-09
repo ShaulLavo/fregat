@@ -1,5 +1,11 @@
 import '../../../dist/worker/entry.js'
 
+Object.defineProperty(navigator, 'platform', { configurable: true, value: 'MacIntel' })
+Object.defineProperty(navigator, 'userAgentData', {
+  configurable: true,
+  value: { platform: 'macOS' },
+})
+
 const channelName = new URL(import.meta.url).searchParams.get('channel')!
 const channel = new BroadcastChannel(channelName)
 const requestAdapter = navigator.gpu.requestAdapter.bind(navigator.gpu)

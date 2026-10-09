@@ -43,7 +43,10 @@ await terminal.dispose()
 WebGPU on desktop Linux because WebGL measured lower CPU work there, while macOS, Windows,
 Android, ChromeOS, and other platforms try hardware WebGPU before WebGL. The main-thread
 terminal then falls through to Canvas and DOM when both GPU renderers are unavailable.
-The worker supports the same GPU order. Automatic selection skips software WebGPU adapters.
+The worker supports the same GPU order. WebGL resource allocation failures advance to the next
+backend on a replacement canvas. Managed main-thread WebGL context-loss recovery follows the
+remaining order, including hardware WebGPU when Linux selected WebGL first.
+Automatic selection skips software WebGPU adapters.
 An explicit `webgpu` backend uses any available WebGPU adapter, including software adapters.
 
 `WebGpuTerminalRenderer.create` can be passed directly as `rendererFactory`. Its
@@ -54,7 +57,6 @@ same policy as initial acquisition. Replacement acquisition failures reach the r
 as `renderer.restore`; worker errors close the worker and release its resources. Explicit
 WebGPU can restore through a software adapter. Hosts can recreate an automatic terminal to
 select an available fallback after hardware becomes unavailable.
-
 
 Capability failures carry `code`, `operation`, `why`, `fix` and runtime facts. `assets` and `workerUrl` can point at explicitly hosted native files and the
 built standalone `dist/worker/entry.js`; the defaults resolve beside the package output.

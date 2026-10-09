@@ -1,4 +1,8 @@
-import type { RendererPlatform } from '../backend-order.js'
+export interface RendererPlatform {
+  readonly platform: string
+  readonly userAgent: string
+  readonly userAgentData?: { readonly platform: string }
+}
 
 export const rendererPlatforms: readonly {
   readonly name: string

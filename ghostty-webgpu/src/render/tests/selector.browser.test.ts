@@ -1,7 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { RenderStateDirty } from '../../core/abi.js'
 import type { TerminalFittedFont } from '../../term/types.js'
-import type { RendererPlatform } from '../backend-order.js'
+import type { RendererPlatform } from './platforms.js'
+import { stubRendererNavigator, restoreRendererNavigator } from './navigator.js'
 import { rendererPlatforms } from './platforms.js'
 import { FallbackTerminalRenderer } from '../fallback.js'
 import { CanvasTerminalRenderer } from '../canvas/renderer.js'
@@ -35,6 +36,7 @@ afterEach(async () => {
   devices.clear()
   canvases.clear()
   vi.restoreAllMocks()
+  restoreRendererNavigator()
 })
 
 afterAll(async () => {
@@ -131,7 +133,8 @@ async function select(
   signal?: AbortSignal,
   platform: RendererPlatform = { platform: 'MacIntel', userAgent: '' },
 ) {
-  const renderer = await createCompatibleTerminalRenderer(options, signal, platform)
+  stubRendererNavigator(platform)
+  const renderer = await createCompatibleTerminalRenderer(options, signal)
   renderers.add(renderer)
   return renderer
 }
@@ -156,6 +159,195 @@ describe('compatible renderer selection', () => {
     expect(getContext.mock.calls.map(([type]) => type)).toEqual([platform.backend])
     expect(deviceFactory.mock.calls.length).toBe(platform.backend === 'webgpu' ? 1 : 0)
   })
+
+  it.each([
+    'createShader',
+    'createProgram',
+    'createBuffer',
+    'createVertexArray',
+    'createTexture',
+  ] as const)(
+    'replaces the claimed Linux canvas after %s allocation fails and selects WebGPU',
+    async (allocation) => {
+      const { canvas, options } = fixture()
+      const replacement = fixture().canvas
+      const replaceCanvas = vi.fn(() => {
+        canvas.replaceWith(replacement)
+        return replacement
+      })
+      const deviceFactory = vi.fn(requestDevice)
+      vi.spyOn(WebGL2RenderingContext.prototype, allocation).mockReturnValue(null)
+      const renderer = await select({ ...options, replaceCanvas, deviceFactory }, undefined, {
+        platform: 'Linux x86_64',
+        userAgent: '',
+      })
+      expect(renderer.backend).toBe('webgpu')
+      expect(replaceCanvas).toHaveBeenCalledOnce()
+      expect(canvas.isConnected).toBe(false)
+      expect(replacement.getContext('webgpu')).not.toBeNull()
+      expect(deviceFactory).toHaveBeenCalledOnce()
+    },
+  )
+
+  it.each(['limits', 'out-of-memory'] as const)(
+    'continues to WebGPU after a Linux WebGL %s capability failure',
+    async (failure) => {
+      const { canvas, options } = fixture()
+      const replaceCanvas = vi.fn(() => {
+        const next = fixture().canvas
+        canvas.replaceWith(next)
+        return next
+      })
+      if (failure === 'limits')
+        vi.spyOn(WebGL2RenderingContext.prototype, 'getParameter').mockReturnValue(1)
+      else vi.spyOn(WebGL2RenderingContext.prototype, 'getError').mockReturnValue(0x0505)
+      const renderer = await select({ ...options, replaceCanvas }, undefined, {
+        platform: 'Linux x86_64',
+        userAgent: '',
+      })
+      expect(renderer.backend).toBe('webgpu')
+      expect(replaceCanvas).toHaveBeenCalledOnce()
+    },
+  )
+
+  it('keeps Linux shader programming failures visible without replacing the canvas', async () => {
+    const { options } = fixture()
+    const replaceCanvas = vi.fn(() => fixture().canvas)
+    const deviceFactory = vi.fn(requestDevice)
+    vi.spyOn(WebGL2RenderingContext.prototype, 'getShaderParameter').mockReturnValue(false)
+    await expect(
+      select({ ...options, replaceCanvas, deviceFactory }, undefined, {
+        platform: 'Linux x86_64',
+        userAgent: '',
+      }),
+    ).rejects.toThrow('WebGL shader compilation failed')
+    expect(replaceCanvas).not.toHaveBeenCalled()
+    expect(deviceFactory).not.toHaveBeenCalled()
+  })
+
+  it.each(['canvas2d', 'dom'] as const)(
+    'selects %s after Linux WebGL allocation and WebGPU capability failures',
+    async (backend) => {
+      const { canvas, options } = fixture()
+      const replacement = fixture().canvas
+      if (backend === 'dom') replaceGetContext(replacement, () => null)
+      vi.spyOn(WebGL2RenderingContext.prototype, 'createShader').mockReturnValue(null)
+      const renderer = await select(
+        {
+          ...options,
+          deviceFactory: unavailableDevice,
+          replaceCanvas: () => {
+            canvas.replaceWith(replacement)
+            return replacement
+          },
+        },
+        undefined,
+        { platform: 'Linux x86_64', userAgent: '' },
+      )
+      expect(renderer.backend).toBe(backend)
+    },
+  )
+
+  it('replaces an unmanaged HTML canvas after Linux resource allocation fails', async () => {
+    const { canvas, options } = fixture()
+    vi.spyOn(WebGL2RenderingContext.prototype, 'createShader').mockReturnValue(null)
+    const replaceWith = vi.spyOn(canvas, 'replaceWith')
+    const renderer = await select(options, undefined, { platform: 'Linux x86_64', userAgent: '' })
+    expect(renderer.backend).toBe('webgpu')
+    expect(canvas.isConnected).toBe(false)
+    expect(replaceWith).toHaveBeenCalledOnce()
+    canvases.add(replaceWith.mock.calls[0]![0] as HTMLCanvasElement)
+  })
+
+  it('tries hardware WebGPU after the initial Linux WebGL context is lost', async () => {
+    const { canvas, options } = fixture()
+    const replacement = fixture().canvas
+    const replaceCanvas = vi.fn(() => {
+      canvas.replaceWith(replacement)
+      return replacement
+    })
+    const deviceFactory = vi.fn(requestDevice)
+    const renderer = await select({ ...options, replaceCanvas, deviceFactory }, undefined, {
+      platform: 'Linux x86_64',
+      userAgent: '',
+    })
+    expect(renderer.backend).toBe('webgl2')
+    expect(deviceFactory).not.toHaveBeenCalled()
+    const lost = new Promise<void>((resolve) =>
+      canvas.addEventListener('webglcontextlost', () => resolve(), { once: true }),
+    )
+    canvas.getContext('webgl2')!.getExtension('WEBGL_lose_context')!.loseContext()
+    await lost
+    await vi.waitFor(() => expect(renderer.backend).toBe('webgpu'))
+    expect(replaceCanvas).toHaveBeenCalledOnce()
+    expect(deviceFactory).toHaveBeenCalledOnce()
+  })
+
+  it('skips previously unavailable WebGPU after a WebGL-first fallback on macOS loses its context', async () => {
+    const { canvas, options } = fixture()
+    const replacement = fixture().canvas
+    const deviceFactory = vi.fn(unavailableDevice)
+    const renderer = await select({
+      ...options,
+      deviceFactory,
+      replaceCanvas: () => {
+        canvas.replaceWith(replacement)
+        return replacement
+      },
+    })
+    expect(renderer.backend).toBe('webgl2')
+    expect(deviceFactory).toHaveBeenCalledOnce()
+    const lost = new Promise<void>((resolve) =>
+      canvas.addEventListener('webglcontextlost', () => resolve(), { once: true }),
+    )
+    canvas.getContext('webgl2')!.getExtension('WEBGL_lose_context')!.loseContext()
+    await lost
+    await vi.waitFor(() => expect(renderer.backend).toBe('canvas2d'))
+    expect(deviceFactory).toHaveBeenCalledOnce()
+  })
+
+  it.each(['abort', 'dispose'] as const)(
+    'disposes WebGPU recovery that finishes after %s and preserves settings while acquiring it',
+    async (action) => {
+      const { canvas, clock, options } = fixture()
+      const controller = new AbortController()
+      const gate = Promise.withResolvers<void>()
+      const deviceFactory = vi.fn(async () => {
+        await gate.promise
+        return requestDevice()
+      })
+      const dispose = vi.spyOn(WebGpuTerminalRenderer.prototype, 'dispose')
+      const renderer = await select(
+        {
+          ...options,
+          deviceFactory,
+          replaceCanvas: () => {
+            const replacement = fixture().canvas
+            canvas.replaceWith(replacement)
+            return replacement
+          },
+        },
+        controller.signal,
+        { platform: 'Linux x86_64', userAgent: '' },
+      )
+      const lost = new Promise<void>((resolve) =>
+        canvas.addEventListener('webglcontextlost', () => resolve(), { once: true }),
+      )
+      canvas.getContext('webgl2')!.getExtension('WEBGL_lose_context')!.loseContext()
+      await lost
+      await vi.waitFor(() => expect(deviceFactory).toHaveBeenCalledOnce())
+      renderer.resize({ columns: 2, rows: 2 })
+      renderer.setFont(font)
+      renderer.setTheme({ foreground: { r: 0, g: 255, b: 0 } })
+      renderer.setFocused(true)
+      renderer.setDocumentVisible(false)
+      if (action === 'abort') controller.abort()
+      else await renderer.dispose()
+      gate.resolve()
+      await vi.waitFor(() => expect(dispose).toHaveBeenCalledOnce())
+      expect(clock.frames.size).toBe(0)
+    },
+  )
 
   it('uses the managed WebGL fallback first on desktop Linux', async () => {
     const { canvas, options } = fixture()
