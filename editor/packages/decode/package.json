@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/decode",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Text reveal animations for documents opened in the Singapore editor.",
   "keywords": [
     "animation",

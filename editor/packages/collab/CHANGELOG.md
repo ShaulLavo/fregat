@@ -1,0 +1,27 @@
+# @singapore-editor/collab
+
+## 0.0.2
+
+### Patch Changes
+
+- [#1026](https://github.com/ShaulLavo/fregat/pull/1026) [`f389080`](https://github.com/ShaulLavo/fregat/commit/f389080aa2abcd039dba5eede0040b029180724e) - Keep collaborative batches atomic, preserve native edit ordering and Unicode replacements, and defer remote reconciliation behind mutation leases. Respect skipped history and report selective Undo/Redo availability. Recover losing-branch origins before replay and retain shared immutable history records. Validate shared-buffer ownership before attachment and clean up example departures and failed setup.
+
+- [#1024](https://github.com/ShaulLavo/fregat/pull/1024) [`17364d8`](https://github.com/ShaulLavo/fregat/commit/17364d8257268e13ddc09fab3866d0c8d9db860e) - Fixed `Host.submit()` delivery when a broadcast listener throws or reconnects during delivery. Healthy receivers get committed outcomes in host-sequence order, including reentrant submissions, and new `Host.subscribe()` registrations begin with the next broadcast. Host and Participant subscriptions rethrow the first callback failure unchanged and report multiple failures once with a count.
+
+- [#950](https://github.com/ShaulLavo/fregat/pull/950) [`8ac6870`](https://github.com/ShaulLavo/fregat/commit/8ac68702af26ff596cd64549dcbb8644bb6e62b6) - Added `Host` and `Participant` APIs for collaborative text editing with immediate local edits and a shared host-defined order. `ReferenceEngine` provides the FugueMax reference implementation, and `simulate()` checks whether participants converge under delayed delivery.
+
+- [#993](https://github.com/ShaulLavo/fregat/pull/993) [`e34b710`](https://github.com/ShaulLavo/fregat/commit/e34b7107a5170720c5212f1e6e56752dbaa416f4) - Fixed `UndoManager` retaining cleared transactions and caller metadata. Confirmed history actions now leave the replay journal while pending rejection recovery and caller-owned graph transactions remain usable. Synchronous emitter outcomes settle before observers run, and acknowledged traversal, backlog draining, and grouped rejection use linear work.
+
+- [#1078](https://github.com/ShaulLavo/fregat/pull/1078) [`0a40acf`](https://github.com/ShaulLavo/fregat/commit/0a40acfcea619490f086617466b60cff2f6a2dc3) - Keep collaborative undo branches in the editor history graph. Switch branches with one author-selective effect command, restore character-ID selections and jump locations, and persist history against its document and character identities. Continue allocating fresh edit and character IDs when a document reopens, including allocations preserved in rejected history records, and recover local history after rejected commands. Reconstruct restored history viewer change sizes from the live identity-space branch previews.
+
+- [#1026](https://github.com/ShaulLavo/fregat/pull/1026) [`f389080`](https://github.com/ShaulLavo/fregat/commit/f389080aa2abcd039dba5eede0040b029180724e) - Bind collaborative sessions to native editor input, identity-aware snapshots, author-selective undo and atomic remote updates. Add an invitation-link example using encrypted same-origin and WebRTC transports.
+
+- [#967](https://github.com/ShaulLavo/fregat/pull/967) [`e39fb2f`](https://github.com/ShaulLavo/fregat/commit/e39fb2ff7be76068a4af41fc0907379d630ea619) - Add a persistent textbuffer-backed FugueMax engine with compact identity-run placement, exact remote edits and snapshot replay. Reuse the textbuffer character allocator for optimistic participants. Expose semantic character identity diagnostics for simulator convergence checks. Retain compact insertion/deletion provenance and deduplicated operation states for atomic undo and redo, including hidden overlapping deletions and same-ID revival. Protect undo-reachable payloads during reclamation and reject expired same-ID revival atomically with a clear host outcome.
+
+- [#1010](https://github.com/ShaulLavo/fregat/pull/1010) [`ac0aae9`](https://github.com/ShaulLavo/fregat/commit/ac0aae9fb4fa9c76661c7640a0dbb88ac53871cc) - Index placement ancestry and structural successors so typing and pending replay stay bounded on fragmented histories. Publish effective edits through participant subscriptions and skip shared textbuffer subtrees during snapshot diffs.
+
+  Breaking API changes: participant subscription callbacks now apply `change.edits` to their previous text projection and read metadata from the change. Callers requesting full text use `participant.text()` or `participant.state().text`. Custom engines must implement `changesBetween(snapshot)` with effective `{ from, to, text }` edits.
+
+- [#971](https://github.com/ShaulLavo/fregat/pull/971) [`c8727e2`](https://github.com/ShaulLavo/fregat/commit/c8727e2c743e54004b838f74063026c787294df0) - Add author-selective collaborative undo and redo with atomic effect commands, retained deletion provenance, transaction grouping, and pending replay.
+- Updated dependencies [[`0a40acf`](https://github.com/ShaulLavo/fregat/commit/0a40acfcea619490f086617466b60cff2f6a2dc3), [`ed8e3ab`](https://github.com/ShaulLavo/fregat/commit/ed8e3ab264586714b15a2589e7c74cb7af241154), [`e39fb2f`](https://github.com/ShaulLavo/fregat/commit/e39fb2ff7be76068a4af41fc0907379d630ea619), [`ac0aae9`](https://github.com/ShaulLavo/fregat/commit/ac0aae9fb4fa9c76661c7640a0dbb88ac53871cc), [`8604785`](https://github.com/ShaulLavo/fregat/commit/8604785002880294450acc2d86831b7d58bb51ad)]:
+  - @singapore-editor/textbuffer@0.2.7

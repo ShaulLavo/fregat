@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/paged",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "A read-only UTF-8 file viewer model with byte-range loading and a bounded page cache.",
   "keywords": [
     "browser",
