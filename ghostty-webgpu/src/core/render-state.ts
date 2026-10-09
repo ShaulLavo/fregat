@@ -2,9 +2,7 @@ import {
   RenderStateCursorVisualStyle,
   RenderStateData,
   RenderStateDirty,
-  RenderStateOption,
   RenderStateRowData,
-  RenderStateRowOption,
 } from './abi.js'
 import { assertGhosttyResult, createGhosttyError } from './error.js'
 import { requireLayout } from './memory.js'
@@ -161,8 +159,6 @@ export class GhosttyRenderState {
   private readonly scalarPointer: number
   private readonly state: OwnedHandle
   private readonly terminal: GhosttyTerminal
-  private readonly zeroBooleanPointer: number
-  private readonly zeroDirtyPointer: number
 
   constructor(runtime: GhosttyRuntime, terminal: GhosttyTerminal) {
     this.runtime = runtime
@@ -191,8 +187,6 @@ export class GhosttyRenderState {
     this.cursorReader = cursorReader
     this.scalarPointer = scalarPointer
     this.dirtyPointer = scalarPointer
-    this.zeroBooleanPointer = scalarPointer + 4
-    this.zeroDirtyPointer = scalarPointer + 8
   }
 
   /** Advances on damaged updates, independently of whether the renderer paints them. */
@@ -286,27 +280,23 @@ export class GhosttyRenderState {
 
   acknowledge(): number {
     this.ensureActive()
+    const partial = this.dirty === RenderStateDirty.Partial
     this.resetIterator()
     let acknowledgedRows = 0
-    while (this.runtime.exports.ghostty_render_state_row_iterator_next(this.iterator.handle)) {
-      if (!this.readRowDirty()) continue
-      assertGhosttyResult(
-        'ghostty_render_state_row_set(DIRTY)',
-        this.runtime.exports.ghostty_render_state_row_set(
-          this.iterator.handle,
-          RenderStateRowOption.Dirty,
-          this.zeroBooleanPointer,
-        ),
-      )
+    while (
+      partial
+        ? this.runtime.exports.ghostty_render_state_row_iterator_next_dirty(
+            this.iterator.handle,
+            this.dirtyPointer,
+          )
+        : this.runtime.exports.ghostty_render_state_row_iterator_next(this.iterator.handle)
+    ) {
+      if (!partial && !this.readRowDirty()) continue
       acknowledgedRows += 1
     }
     assertGhosttyResult(
-      'ghostty_render_state_set(DIRTY)',
-      this.runtime.exports.ghostty_render_state_set(
-        this.state.handle,
-        RenderStateOption.Dirty,
-        this.zeroDirtyPointer,
-      ),
+      'ghostty_render_state_clean',
+      this.runtime.exports.ghostty_render_state_clean(this.state.handle),
     )
     return acknowledgedRows
   }

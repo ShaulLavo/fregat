@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { RenderStateDirty, RenderStateOption } from '../abi.js'
 import { GhosttyRuntime } from '../runtime.js'
 
 let runtime: GhosttyRuntime | undefined
@@ -6,6 +7,7 @@ let runtime: GhosttyRuntime | undefined
 afterEach(() => {
   runtime?.dispose()
   runtime = undefined
+  vi.restoreAllMocks()
 })
 
 describe('render row reads', () => {
@@ -98,4 +100,45 @@ describe('render row reads', () => {
     expect(state.readRows({ rows: new Set([1]), dirtyOnly: true }).map((row) => row.y)).toEqual([1])
     expect(state.readRows({ rows: new Set([0]) }).map((row) => row.y)).toEqual([0])
   })
+})
+
+it('counts live partial damage without decoding each row flag in JavaScript', async () => {
+  runtime = await GhosttyRuntime.create()
+  const terminal = runtime.createTerminal({ columns: 12, rows: 4 })
+  const state = runtime.createRenderState(terminal)
+  terminal.write('first\r\nsecond')
+  state.update()
+  expect(state.acknowledge()).toBe(state.readRows().length)
+  terminal.write('\x1b[2;1HX')
+  expect(state.update()).toBe(RenderStateDirty.Partial)
+  const before = state.readRows()
+  const dirtyRows = state.readRows({ dirtyOnly: true }).length
+  const readDirty = vi.spyOn(state as unknown as { readRowDirty: () => boolean }, 'readRowDirty')
+  expect(state.acknowledge()).toBe(dirtyRows)
+  expect(readDirty).not.toHaveBeenCalled()
+  expect(state.dirty).toBe(RenderStateDirty.False)
+  expect(state.readRows()).toEqual(before.map((row) => ({ ...row, dirty: false })))
+  expect(state.acknowledge()).toBe(0)
+})
+
+it('counts live row flags independently of global damage', async () => {
+  runtime = await GhosttyRuntime.create()
+  const terminal = runtime.createTerminal({ columns: 12, rows: 4 })
+  const state = runtime.createRenderState(terminal)
+  terminal.write('Aé界')
+  state.update()
+  const fullDirtyRows = state.readRows({ dirtyOnly: true }).length
+  expect(state.acknowledge()).toBe(fullDirtyRows)
+  terminal.write('\x1b[2;1HX')
+  state.update()
+  const dirtyRows = state.readRows({ dirtyOnly: true }).length
+  expect(dirtyRows).toBeGreaterThan(0)
+  const pointer = runtime.memory.allocate(4)
+  runtime.memory.view.setInt32(pointer, RenderStateDirty.False, true)
+  const handle = (state as unknown as { state: { handle: number } }).state.handle
+  expect(runtime.exports.ghostty_render_state_set(handle, RenderStateOption.Dirty, pointer)).toBe(0)
+  runtime.memory.free(pointer, 4)
+  expect(state.dirty).toBe(RenderStateDirty.False)
+  expect(state.acknowledge()).toBe(dirtyRows)
+  expect(state.readRows({ dirtyOnly: true })).toEqual([])
 })
