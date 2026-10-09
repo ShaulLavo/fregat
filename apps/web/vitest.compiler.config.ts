@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config'
-import base, { compilerProject, domProject } from './vitest.config'
+import base, { compilerProject, domProject } from './vitest.config.ts'
 
 export default defineConfig({
   ...base,
