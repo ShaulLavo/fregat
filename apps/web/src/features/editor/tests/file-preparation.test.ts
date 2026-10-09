@@ -18,6 +18,8 @@ import { expect, test } from '../../../../test/fixtures'
 import { retentionProvider } from '../../../../test/factories/retention-provider'
 import { createPlatformFileOpenPreparer } from '@/features/editor/utils/prepared-document'
 import { preparationEnvironment } from '../../../../test/factories/file-preparation'
+import { preparedLeaseFor } from '../../../../test/factories/prepared-document'
+import { vi } from 'vitest'
 
 test('removes document membership before its provider disposal callback', async ({
   server,
@@ -391,7 +393,7 @@ test('actual analysis membership changes before publication and former provider 
 })
 
 test.for(['file', 'live'] as const)(
-  'a refused $0 view releases the activation claim and prepared resources',
+  'a refused $0 view releases its joined preparation hold',
   async (kind, { server, client, onTestFinished }) => {
     const path = filesystemPath('refused.ts')
     await writeFile(join(server.root, path), 'const refused = true\n')
@@ -408,15 +410,12 @@ test.for(['file', 'live'] as const)(
       { startIndex: 0, endIndex: 20 },
       document.analysis,
     )
-    const claim = {
-      buffer: document.buffer,
-      documentKey: document.key,
-      kind: 'live' as const,
-      localRevision: document.localRevision,
-      path,
-      preparedDocument: prepared.preparedDocument,
-      release: source.release,
-      snapshot: document.buffer.getSnapshot(),
+    const joined = {
+      ...preparedLeaseFor(document, path, prepared.preparedDocument),
+      release: vi.fn(() => {
+        prepared.preparedDocument.dispose()
+        source.release()
+      }),
     }
     const reserved = documents.reservePaths(
       [documents.preparePathReservation(path)],
@@ -425,9 +424,10 @@ test.for(['file', 'live'] as const)(
     expect(reserved.status).toBe('acquired')
     expect(() =>
       kind === 'file'
-        ? documents.ensureView(tabId('refused'), file, claim)
-        : documents.ensureViewForDocument(tabId('refused'), document.key, claim),
+        ? documents.ensureView(tabId('refused'), file, joined)
+        : documents.ensureViewForDocument(tabId('refused'), document.key, joined),
     ).toThrow()
+    expect(joined.release).toHaveBeenCalledOnce()
     if (reserved.status === 'acquired') documents.releasePaths(reserved.reservation)
     expect(
       documents.retain({ documentKeys: new Set(), tabIds: new Set() }).evictedDocumentKeys,
@@ -438,7 +438,7 @@ test.for(['file', 'live'] as const)(
         tabSizePolicy: 'detect-indentation',
         documentId: document.key,
         languageId: 'typescript',
-        snapshot: claim.snapshot,
+        snapshot: joined.snapshot,
         documentConfigurationTag: prepared.documentConfigurationTag,
         highlighterProvider: null,
         structuralProvider: null,

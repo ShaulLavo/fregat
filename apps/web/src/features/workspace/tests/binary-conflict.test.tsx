@@ -86,7 +86,6 @@ for (const event of ['changed', 'renamed'] as const) {
       })
       expect(Object.values(conflictStore.getState().conflicts)[0]).toMatchObject({
         remoteFile: remote,
-        remoteText: null,
       })
       fireEvent.click(await rendered.findByRole('button', { name: action }))
       if (action === 'Compare') {

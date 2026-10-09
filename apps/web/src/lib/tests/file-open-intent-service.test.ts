@@ -50,7 +50,7 @@ describe('file open intent service', () => {
       owner.prepare(intent(filesystemPath('/repo/pages.PDF')))
       expect(queryClient.getQueryCache().getAll()).toHaveLength(0)
       expect(prepare).not.toHaveBeenCalled()
-      expect(owner.claimReadyClean(filesystemPath('/repo/pages.PDF'))).toBeNull()
+      expect(owner.join(filesystemPath('/repo/pages.PDF'))).toBeNull()
     } finally {
       owner.disposeNow()
       queryClient.clear()
@@ -79,7 +79,7 @@ describe('file open intent service', () => {
       await vi.waitFor(() => expect(events.emitted).toHaveLength(1))
       expect(events.emitted[0]).toMatchObject({ outcome: 'rejected', reason: 'binary-file' })
       expect(prepare).not.toHaveBeenCalled()
-      expect(owner.claimReadyClean(file.path)).toBeNull()
+      expect(owner.join(file.path)).toBeNull()
     } finally {
       owner.disposeNow()
       queryClient.clear()
@@ -115,7 +115,7 @@ describe('file open intent service', () => {
       queryClient.clear()
     }
   })
-  it('prepares and claims one exact fetched revision once', async () => {
+  it('prepares one exact fetched revision that repeated joins share', async () => {
     const queryClient = new QueryClient()
     const file = fileResult('/repo/a.ts')
     queryClient.setQueryData(fileSnapshotQueryOptions(file.path).queryKey, file)
@@ -134,17 +134,20 @@ describe('file open intent service', () => {
     service.prepare(intent('/repo/a.ts'))
     expect(prepare).not.toHaveBeenCalled()
     await vi.waitFor(() => expect(prepare).toHaveBeenCalledTimes(1))
-    const claim = service.claimReadyClean(filesystemPath('/repo/a.ts'))
+    const joined = service.join(filesystemPath('/repo/a.ts'))?.prepared
 
-    expect(claim).toMatchObject({
-      file,
+    expect(joined).toMatchObject({
+      document: preparedDocument,
       fileVersion: file.version,
-      kind: 'clean',
       path: file.path,
-      preparedDocument,
     })
-    expect(claim?.buffer.getSnapshot()).toBe(claim?.snapshot)
-    expect(service.claimReadyClean(filesystemPath('/repo/a.ts'))).toBeNull()
+    expect(joined?.buffer.getSnapshot()).toBe(joined?.snapshot)
+    const repeated = service.join(filesystemPath('/repo/a.ts'))?.prepared
+    expect(repeated?.document).toBe(preparedDocument)
+    expect(prepare).toHaveBeenCalledOnce()
+    joined?.release()
+    repeated?.release()
+    expect(preparedDocument.dispose).not.toHaveBeenCalled()
   })
 
   it('preserves BOM and CRLF when preparing a saved snapshot', async () => {
@@ -168,13 +171,13 @@ describe('file open intent service', () => {
       owner.setRoot(filesystemPath('/repo'))
       owner.prepare(intent(file.path))
       await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce())
-      const claim = owner.claimReadyClean(file.path)!
-      expect(claim.file).toBe(file)
-      expect(claim.buffer).not.toBe(buffer)
-      expect(claim.buffer.materializeFullText()).toBe('first\nsecond\n')
-      expect(pieceTableDocumentText(claim.buffer.getSnapshot())).toBe(diskText)
-      expect(claim.buffer.isDirty()).toBe(false)
-      claim.preparedDocument.dispose()
+      const joined = owner.join(file.path)!.prepared!
+      expect(joined.fileVersion).toBe(file.version)
+      expect(joined.buffer).not.toBe(buffer)
+      expect(joined.buffer.materializeFullText()).toBe('first\nsecond\n')
+      expect(pieceTableDocumentText(joined.buffer.getSnapshot())).toBe(diskText)
+      expect(joined.buffer.isDirty()).toBe(false)
+      joined.release()
     } finally {
       owner.disposeNow()
       queryClient.clear()
@@ -206,7 +209,7 @@ describe('file open intent service', () => {
     await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce())
   })
 
-  it('disposes stale live preparation but still claims the authoritative buffer', async () => {
+  it('disposes stale live preparation but still joins the authoritative buffer', async () => {
     const queryClient = new QueryClient()
     const documents = preparationDocuments()
     const buffer = documents.ensureLiveDocument({
@@ -239,12 +242,9 @@ describe('file open intent service', () => {
     createEditorBufferSession(buffer).applyText('x')
     liveDocument = documents.getLiveDocument(testDocumentKey('/repo/a.ts'))!
 
-    expect(service.claimLive(filesystemPath('/repo/a.ts'))).toMatchObject({
-      buffer,
+    expect(service.join(filesystemPath('/repo/a.ts'))).toEqual({
       documentKey: testDocumentKey('/repo/a.ts'),
-      kind: 'live',
-      localRevision: buffer.getRevision(),
-      preparedDocument: null,
+      prepared: null,
     })
     expect(preparedDocument.dispose).toHaveBeenCalledTimes(1)
   })
@@ -272,7 +272,7 @@ describe('file open intent service', () => {
     service.connect()
     await Promise.resolve()
 
-    expect(service.claimReadyClean(file.path)?.preparedDocument).toBe(preparedDocument)
+    expect(service.join(file.path)?.prepared?.document).toBe(preparedDocument)
     expect(preparedDocument.dispose).not.toHaveBeenCalled()
   })
 
@@ -383,9 +383,9 @@ describe('file open intent service', () => {
     liveDocuments.emit()
 
     expect(preparedDocument.dispose).toHaveBeenCalledOnce()
-    expect(owner.service.claimLive(filesystemPath('/repo/a.ts'))).toMatchObject({
-      localRevision: liveDocument.localRevision,
-      preparedDocument: null,
+    expect(owner.service.join(filesystemPath('/repo/a.ts'))).toEqual({
+      documentKey: liveDocument.key,
+      prepared: null,
     })
   })
 
@@ -416,7 +416,7 @@ describe('file open intent service', () => {
 
     queryClient.setQueryData(queryKey, { ...file, version: 'v2' })
     expect(preparedDocument.dispose).toHaveBeenCalledOnce()
-    expect(owner.service.claimReadyClean(file.path)).toBeNull()
+    expect(joinedPreparation(owner.service, file.path)).toBeNull()
 
     const removedDocument = preparedDocumentLease()
     const second = createConnectedOwner({ queryClient, preparedDocument: removedDocument })
@@ -451,7 +451,7 @@ describe('file open intent service', () => {
 
     await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce())
     await vi.waitFor(() => expect(preparedDocument.dispose).toHaveBeenCalledOnce())
-    expect(service.claimReadyClean(file.path)).toBeNull()
+    expect(joinedPreparation(service, file.path)).toBeNull()
   })
 
   it('seeds the structural stage range from a far-down retained scroll position', async () => {
@@ -579,7 +579,7 @@ describe('file open intent service', () => {
     first.resolve(fileResult(a))
   })
 
-  it('claims a clean record whose snapshot is older than the freshness window', async () => {
+  it('joins a clean record whose snapshot is older than the freshness window', async () => {
     const queryClient = new QueryClient()
     const file = fileResult('/repo/a.ts')
     const { queryKey } = fileSnapshotQueryOptions(file.path)
@@ -602,7 +602,7 @@ describe('file open intent service', () => {
     await Promise.resolve()
     queryClient.setQueryData(queryKey, file, { updatedAt: Date.now() - 60_000 })
 
-    expect(service.claimReadyClean(file.path)).not.toBeNull()
+    expect(joinedPreparation(service, file.path)).not.toBeNull()
   })
 
   it('prepares nothing while the files switch is off', async () => {
@@ -633,7 +633,7 @@ describe('file open intent service', () => {
     await new Promise((resolve) => queueMicrotask(() => resolve(undefined)))
 
     expect(prepare).not.toHaveBeenCalled()
-    expect(owner.service.claimReadyClean(file.path)).toBeNull()
+    expect(owner.service.join(file.path)).toBeNull()
   })
 
   it('evicts settled stage results when their retained bytes exceed the service budget', async () => {
@@ -678,9 +678,9 @@ describe('file open intent service', () => {
       await vi.waitFor(() => expect(settledStages).toBe(index + 1))
     }
 
-    expect(service.claimReadyClean(filesystemPath(paths[0])!)).toBeNull()
-    expect(service.claimReadyClean(filesystemPath(paths[1])!)).toBeNull()
-    expect(service.claimReadyClean(filesystemPath(paths.at(-1)!))).not.toBeNull()
+    expect(joinedPreparation(service, paths[0]!)).toBeNull()
+    expect(joinedPreparation(service, paths[1]!)).toBeNull()
+    expect(joinedPreparation(service, paths.at(-1)!)).not.toBeNull()
   })
 
   it('keeps the newest four queued guesses when a held key outruns preparation', async () => {
@@ -728,20 +728,22 @@ describe('file open intent service', () => {
     }
   })
 
-  it('lets activation claim document data before queued provider stages start', async () => {
+  it('joins queued hover stages so each runs once and repeated joins share the preparation', async () => {
     const queryClient = new QueryClient()
     const file = fileResult('/repo/a.ts')
     queryClient.setQueryData(fileSnapshotQueryOptions(file.path).queryKey, file)
     const runtime = manualRuntime()
     const startHighlighter = vi.fn(async () => 'ready')
     const startStructural = vi.fn(async () => 'ready')
+    const preparedDocument = preparedDocumentLease()
+    const prepare = vi.fn((buffer: ReturnType<typeof createEditorTextBuffer>) => ({
+      buffer,
+      preparedDocument,
+      startStages: [startHighlighter, startStructural],
+    }))
     const service = createTestFileOpenIntentOwner(
       queryClient,
-      testPreparer((buffer) => ({
-        buffer,
-        preparedDocument: preparedDocumentLease(),
-        startStages: [startHighlighter, startStructural],
-      })),
+      testPreparer(prepare),
       () => null,
       () => false,
       () => false,
@@ -750,18 +752,61 @@ describe('file open intent service', () => {
     )
     service.setRoot(filesystemPath('/repo'))
 
-    service.prepare(intent(file.path))
-    expect(runtime.queued()).toBe(1)
+    const hover = service.prepare(intent(file.path))
     runtime.startNext()
     await vi.waitFor(() => expect(runtime.queued()).toBe(2))
-
-    expect(service.claimReadyClean(file.path)).not.toBeNull()
-    runtime.startNext()
-    runtime.startNext()
+    const click = service.join(file.path)?.prepared
+    const repeated = service.join(file.path)?.prepared
+    hover.release()
+    while (runtime.queued() > 0) runtime.startNext()
     await runtime.settled()
 
-    expect(startHighlighter).not.toHaveBeenCalled()
-    expect(startStructural).not.toHaveBeenCalled()
+    expect(prepare).toHaveBeenCalledOnce()
+    expect(click?.document).toBe(preparedDocument)
+    expect(repeated?.document).toBe(preparedDocument)
+    expect(startHighlighter).toHaveBeenCalledOnce()
+    expect(startStructural).toHaveBeenCalledOnce()
+    click?.release()
+    repeated?.release()
+    expect(preparedDocument.dispose).not.toHaveBeenCalled()
+    service.disposeNow()
+    expect(preparedDocument.dispose).toHaveBeenCalledOnce()
+  })
+
+  it('keeps joined work through hover release and expiry until its last holder leaves', async () => {
+    const queryClient = new QueryClient()
+    const file = fileResult('/repo/a.ts')
+    queryClient.setQueryData(fileSnapshotQueryOptions(file.path).queryKey, file)
+    const runtime = manualRuntime()
+    const preparedDocument = preparedDocumentLease()
+    const service = createTestFileOpenIntentOwner(
+      queryClient,
+      testPreparer((buffer) => ({ buffer, preparedDocument })),
+      () => null,
+      () => false,
+      () => false,
+      () => undefined,
+      runtime,
+    )
+    service.setRoot(filesystemPath('/repo'))
+
+    const firstHover = service.prepare(intent(file.path))
+    const secondHover = service.prepare(intent(file.path))
+    runtime.startNext()
+    await runtime.settled()
+    const view = service.join(file.path)?.prepared
+    firstHover.release()
+    secondHover.release()
+    runtime.advanceBy(60_000)
+
+    expect(preparedDocument.dispose).not.toHaveBeenCalled()
+    const probe = joinedPreparation(service, file.path)
+    expect(probe?.document).toBe(preparedDocument)
+    probe?.release()
+    view?.release()
+    expect(preparedDocument.dispose).not.toHaveBeenCalled()
+    runtime.advanceBy(30_000)
+    expect(preparedDocument.dispose).toHaveBeenCalledOnce()
   })
 
   it('does not start a queued provider stage after service disposal', async () => {
@@ -797,7 +842,7 @@ describe('file open intent service', () => {
     expect(startHighlighter).not.toHaveBeenCalled()
   })
 
-  it('relinquishes service cancellation after a prepared claim', async () => {
+  it('leaves joined work running when the service clears', async () => {
     const queryClient = new QueryClient()
     const file = fileResult('/repo/a.ts')
     const stage = deferred<string>()
@@ -822,13 +867,17 @@ describe('file open intent service', () => {
 
     service.prepare(intent(file.path))
     await vi.waitFor(() => expect(preparationSignal).not.toBeNull())
-    expect(service.claimReadyClean(file.path)).not.toBeNull()
+    const joined = joinedPreparation(service, file.path)
+    expect(joined).not.toBeNull()
 
     service.setRoot(null)
-    const claimedSignal = preparationSignal as AbortSignal | null
-    if (!claimedSignal) throw new RangeError('missing preparation signal')
-    expect(claimedSignal.aborted).toBe(false)
+    const joinedSignal = preparationSignal as AbortSignal | null
+    if (!joinedSignal) throw new RangeError('missing preparation signal')
+    expect(joinedSignal.aborted).toBe(false)
+    expect(joined?.document.dispose).not.toHaveBeenCalled()
     stage.resolve('ready')
+    joined?.release()
+    expect(joined?.document.dispose).toHaveBeenCalledOnce()
   })
 
   it('expires an abandoned prepared session without later service activity', async () => {
@@ -854,7 +903,7 @@ describe('file open intent service', () => {
     runtime.advanceBy(30_000)
 
     expect(preparedDocument.dispose).toHaveBeenCalledOnce()
-    expect(service.claimReadyClean(file.path)).toBeNull()
+    expect(joinedPreparation(service, file.path)).toBeNull()
   })
 
   it('expires a prepared session after thirty seconds without intent or stage activity', async () => {
@@ -980,10 +1029,10 @@ describe('file open intent service', () => {
     })
     await vi.waitFor(() => expect(prepareNext).toHaveBeenCalledOnce())
 
-    expect(service.claimReadyClean(typescript.path)?.preparedDocument).toBe(typescriptDocument)
+    expect(joinedPreparation(service, typescript.path)?.document).toBe(typescriptDocument)
     expect(typescriptDocument.dispose).not.toHaveBeenCalled()
     expect(oldMarkdownDocument.dispose).toHaveBeenCalledOnce()
-    expect(service.claimLive(markdown.path)?.preparedDocument).toBe(newMarkdownDocument)
+    expect(joinedPreparation(service, markdown.path)?.document).toBe(newMarkdownDocument)
   })
 
   it('rebuilds a record whose running family changes with the environment', async () => {
@@ -1065,7 +1114,7 @@ describe('file open intent service', () => {
 
     expect(startOldStructural).not.toHaveBeenCalled()
     expect(startNewStructural).toHaveBeenCalledOnce()
-    expect(service.claimLive(file.path)?.preparedDocument).toBe(replacementDocument)
+    expect(joinedPreparation(service, file.path)?.document).toBe(replacementDocument)
   })
 
   it('compares environment fields without delimiter collisions', async () => {
@@ -1152,7 +1201,7 @@ describe('file open intent service', () => {
     await runtime.settled()
 
     expect(events.emitted).toEqual([])
-    expect(service.claimReadyClean(file.path)).not.toBeNull()
+    expect(joinedPreparation(service, file.path)).not.toBeNull()
     expect(events.emitted).toEqual([])
     service.recordInitialPaint(file.path, {
       documentGeneration: 1,
@@ -1228,7 +1277,7 @@ describe('file open intent service', () => {
     })
   })
 
-  it('attributes promotion paint only to the claimed document and its first text paint', async () => {
+  it('attributes promotion paint only to the joined document and its first text paint', async () => {
     const queryClient = new QueryClient()
     const file = fileResult('/repo/a.ts')
     const documents = preparationDocuments()
@@ -1253,7 +1302,7 @@ describe('file open intent service', () => {
     service.prepare(intent(file.path))
     runtime.startNext()
     await runtime.settled()
-    expect(service.claimLive(file.path)?.documentKey).toBe(liveDocument.key)
+    expect(service.join(file.path)?.documentKey).toBe(liveDocument.key)
 
     const textPaint = {
       documentGeneration: 7,
@@ -1324,7 +1373,7 @@ describe('file open intent service', () => {
     )
 
     expect(prepare).not.toHaveBeenCalled()
-    expect(service.claimReadyClean(file.path)).toBeNull()
+    expect(joinedPreparation(service, file.path)).toBeNull()
   })
 
   it('treats an equivalent root replay as a no-op', async () => {
@@ -1347,7 +1396,7 @@ describe('file open intent service', () => {
 
     service.setRoot(filesystemPath('/repo/./'))
 
-    expect(service.claimReadyClean(file.path)?.preparedDocument).toBe(preparedDocument)
+    expect(joinedPreparation(service, file.path)?.document).toBe(preparedDocument)
     expect(preparedDocument.dispose).not.toHaveBeenCalled()
   })
 
@@ -1413,18 +1462,18 @@ describe('file open intent service', () => {
     })
 
     service.prepare(intent(file.path))
-    await vi.waitFor(() => expect(service.claimReadyClean(file.path)).not.toBeNull())
+    await vi.waitFor(() => expect(joinedPreparation(service, file.path)).not.toBeNull())
     sample.quarantine()
 
     await expect(sample.quiesce()).resolves.toEqual({
       evictions: 0,
       nonTargetIntents: 0,
-      preparedClaims: 1,
+      preparedJoins: 1,
       promotedBytes: 1,
       highlighterRuntimeSessionIds: [],
       structuralRuntimeSessionIds: [],
-      transferredHighlighterRuntimeSessionIds: [],
-      transferredStructuralRuntimeSessionIds: [],
+      joinedHighlighterRuntimeSessionIds: [],
+      joinedStructuralRuntimeSessionIds: [],
       targetIntents: 1,
       wastedIntents: 0,
     })
@@ -1466,8 +1515,8 @@ describe('file open intent service', () => {
 
     service.prepare(intent(target.path))
     service.prepare(intent(nonTarget.path))
-    await vi.waitFor(() => expect(service.claimReadyClean(target.path)).not.toBeNull())
-    await vi.waitFor(() => expect(service.claimReadyClean(nonTarget.path)).not.toBeNull())
+    await vi.waitFor(() => expect(joinedPreparation(service, target.path)).not.toBeNull())
+    await vi.waitFor(() => expect(joinedPreparation(service, nonTarget.path)).not.toBeNull())
     sample.quarantine()
 
     await expect(sample.quiesce()).resolves.toMatchObject({
@@ -1476,6 +1525,10 @@ describe('file open intent service', () => {
     })
   })
 })
+
+function joinedPreparation(service: Pick<FileOpenIntentService, 'join'>, path: string) {
+  return service.join(filesystemPath(path))?.prepared ?? null
+}
 
 function createTestFileOpenIntentOwner(
   queryClient: QueryClient,

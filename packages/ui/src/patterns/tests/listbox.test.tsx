@@ -99,6 +99,27 @@ describe('useListbox', () => {
     expect(list.querySelector('[aria-selected="true"]')?.textContent).toContain(label)
   })
 
+  it('activates the pressed row without first revealing or activating the top row', () => {
+    const reveal = vi.fn()
+    const onActiveChange = vi.fn()
+    const mounted = mount(
+      <Listbox
+        activeId={null}
+        onActiveChange={onActiveChange}
+        revealOnMount={false}
+        scrollToIndex={reveal}
+      />,
+    )
+    cleanups.push(mounted.unmount)
+    const row = mounted.container.querySelector<HTMLElement>('[title="Delta"]')!
+    act(() => {
+      row.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+      row.click()
+    })
+    expect(reveal).not.toHaveBeenCalled()
+    expect(onActiveChange.mock.calls).toEqual([['d']])
+  })
+
   it('preserves restored scroll until focus or a later cursor change requests a reveal', () => {
     const reveal = vi.fn()
     const mounted = mount(<Listbox revealOnMount={false} scrollToIndex={reveal} />)

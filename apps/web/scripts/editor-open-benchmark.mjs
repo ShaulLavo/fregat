@@ -956,7 +956,7 @@ function summarizeMode(samples) {
         'highlighterSessionCreations',
         'lineIndexScans',
         'nonTargetIntents',
-        'preparedClaims',
+        'preparedJoins',
         'promotedBytes',
         'structuralSessionCreations',
         'targetIntents',
@@ -991,22 +991,22 @@ function validateGate(summary, samples, runtimeSessionSamples) {
       `prepared-300 started transferable work after activation in ${structuralFailures.length} samples`,
     )
   }
-  if (prepared300.some((sample) => sample.preparedClaims !== 1)) {
-    throw createBenchmarkError('prepared-300 did not promote exactly one prepared claim per sample')
+  if (prepared300.some((sample) => sample.preparedJoins !== 1)) {
+    throw createBenchmarkError('prepared-300 did not join exactly one preparation per sample')
   }
   if (
     prepared300.some(
       (sample) =>
-        sample.transferredHighlighterRuntimeSessionIds.length !== 1 ||
-        sample.transferredStructuralRuntimeSessionIds.length !== 1,
+        sample.joinedHighlighterRuntimeSessionIds.length !== 1 ||
+        sample.joinedStructuralRuntimeSessionIds.length !== 1,
     )
   ) {
     throw createBenchmarkError(
-      'prepared-300 did not expose one transferred runtime id for each syntax family',
+      'prepared-300 did not expose one joined runtime id for each syntax family',
     )
   }
-  assertTransferredRuntimeIdsAreScoped(prepared300, 'highlighter')
-  assertTransferredRuntimeIdsAreScoped(prepared300, 'structural')
+  assertJoinedRuntimeIdsAreScoped(prepared300, 'highlighter')
+  assertJoinedRuntimeIdsAreScoped(prepared300, 'structural')
   assertUniqueRuntimeSessionIds(runtimeSessionSamples, [
     'highlighterRuntimeSessionIds',
     'postActivationHighlighterRuntimeSessionIds',
@@ -1049,14 +1049,14 @@ function validateGate(summary, samples, runtimeSessionSamples) {
   }
 }
 
-function assertTransferredRuntimeIdsAreScoped(samples, family) {
+function assertJoinedRuntimeIdsAreScoped(samples, family) {
   const scopedKey = `${family}RuntimeSessionIds`
-  const transferredKey = `transferred${family[0].toUpperCase()}${family.slice(1)}RuntimeSessionIds`
+  const joinedKey = `joined${family[0].toUpperCase()}${family.slice(1)}RuntimeSessionIds`
   for (const sample of samples) {
     const scoped = new Set(sample[scopedKey])
-    if (sample[transferredKey].every((runtimeSessionId) => scoped.has(runtimeSessionId))) continue
+    if (sample[joinedKey].every((runtimeSessionId) => scoped.has(runtimeSessionId))) continue
 
-    throw createBenchmarkError(`prepared-300 transferred ${family} runtime id was not scoped`)
+    throw createBenchmarkError(`prepared-300 joined ${family} runtime id was not scoped`)
   }
 }
 

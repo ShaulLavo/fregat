@@ -125,8 +125,8 @@ This table is a dated remaining-work snapshot. The linked plan overrides it when
 | [195](195-settings-defaults-browser.md)      | Registry Defaults UI/JSON view                                                  | Independent Settings feature; preserve focus/held-state fixes                                    | M                            |
 | [196](196-shared-control-polish.md)          | Sliders/switches/triggers and toolbar-toggle assessment                         | Independent shared UI; reconcile concurrent appearance work                                      | M                            |
 | [197](197-editor-highlighting-service.md)    | Highlight/diff service and bounded consumer migration                           | Independent198 lifetime; canonical package paths after 207                                       | L                            |
-| [198](198-document-owned-editor-analysis.md) | Acquisition/admission/cancel/retention/attachment proofs and gaps               | Landed analysis owner; coordinate 099 publication                                                | L                            |
-| [200](200-document-backed-content-views.md)  | Comparison/conflict/preview acquisition migration                               | Exact099/198 contracts; 197 diff service; baseline can start earlier                             | L                            |
+| [198][198-document-owned-editor-analysis-md] | Acquisition/admission/cancel/retention/attachment proofs and gaps               | Landed analysis owner; coordinate 099 publication                                                | L                            |
+| [200][200-document-backed-content-views-md]  | Comparison/conflict/preview acquisition migration                               | Exact099/198 contracts; 197 diff service; baseline can start earlier                             | L                            |
 | [201](201-cheap-overlay-marks.md)            | Calibrated overlay/diagnostic fast path and tier remeasurement                  | Measure before optimizing; LSP/highlighter policy decisions remain                               | L                            |
 | [202](202-tui-ui.md)                         | Upstream resolution, local controls/Markdown/workbench                          | Parser semantic/stream/package gates; 206 dispatch; no toolkit release                           | XL                           |
 | [203](203-fregat-hotkeys.md)                 | Library landed in PR197; consumers/publication elsewhere                        | 204–206 integration; 207 mirrors/releases                                                        | S closeout                   |
@@ -197,3 +197,6 @@ where current plans referenced delivery. Historical parser scores (including old
 notes) remain dated evidence until producer artifacts are checked; 676/676 normalized cases
 alone do not prove semantic rendering parity. Retiring completed plans, deleting kept data,
 force-pushing mirrors and starting explicitly gated phases were outside this run.
+
+[198-document-owned-editor-analysis-md]: https://github.com/ShaulLavo/fregat/blob/c01c490faa37ab9a100613389c9c2a6175c7b5a3/plans/198-document-owned-editor-analysis.md
+[200-document-backed-content-views-md]: https://github.com/ShaulLavo/fregat/blob/d297a23a7cfb9d7782fb74775caf22d3b9bc2f37/plans/200-document-backed-content-views.md

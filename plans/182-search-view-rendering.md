@@ -522,7 +522,8 @@ shape, Plan 129's lane), and a workspace opened at a nested ignored repository s
 ## Source handoff from Plan 200
 
 Landed 2026-10-09 in `apps/web/src/lib/file-preview/utils/source.ts`, tested in
-`lib/file-preview/tests/source-range.test.ts`. Search reaches it through `lib/`, so it never
+`lib/file-preview/tests/source-range.test.ts`. The permanent contract is in
+[document-backed content views](../docs/document-backed-content-views.md#source-ranges). Search reaches it through `lib/`, so it never
 imports the editor feature.
 
 - **Lease.** `PreviewSourceCapability.acquireLivePreview({ scope, key, maxBytes, signal })` returns

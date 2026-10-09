@@ -78,15 +78,15 @@ type EditorOpenSampleResetRequest = EditorOpenSampleTarget & {
 
 export type EditorOpenSampleResetResult = {
   readonly evictions: number
+  readonly joinedHighlighterRuntimeSessionIds: readonly string[]
+  readonly joinedStructuralRuntimeSessionIds: readonly string[]
   readonly nonTargetIntents: number
-  readonly preparedClaims: number
+  readonly preparedJoins: number
   readonly promotedBytes: number
   readonly highlighterRuntimeSessionIds: readonly string[]
   readonly quiescent: true
   readonly targetIntents: number
   readonly structuralRuntimeSessionIds: readonly string[]
-  readonly transferredHighlighterRuntimeSessionIds: readonly string[]
-  readonly transferredStructuralRuntimeSessionIds: readonly string[]
   readonly wastedIntents: number
 }
 
