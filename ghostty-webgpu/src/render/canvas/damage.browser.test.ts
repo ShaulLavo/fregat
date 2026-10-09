@@ -146,3 +146,61 @@ it.each([1, 1.25, 1.5, 2])(
     expectPixels(upload.mock.lastCall![0].data, referenceUpload.mock.lastCall![0].data)
   },
 )
+
+it('preserves pixel-scroll full-repaint RGBA with an inherited output filter', async () => {
+  const runtime = await GhosttyRuntime.create()
+  cleanups.push(() => runtime.dispose())
+  const arms = await Promise.all(
+    [0, 1].map(async () => {
+      const terminal = runtime.createTerminal({ columns: 40, rows: 6 })
+      const state = runtime.createRenderState(terminal)
+      cleanups.push(() => {
+        state.dispose()
+        terminal.dispose()
+      })
+      terminal.write(
+        '\x1b[?25l' +
+          ['zero Ag', 'one Bg', 'two Cg', 'three Dg', 'four Eg', 'five Fg'].join('\r\n'),
+      )
+      const canvas = document.createElement('canvas')
+      const clock = new TestClock()
+      const renderer = await CanvasTerminalRenderer.create({
+        canvas,
+        columns: 40,
+        rows: 6,
+        font: { ...fittedFont(1), charTop: 2, deviceCellWidth: 10, deviceCharWidth: 10 },
+        renderState: state,
+        rendererMode: 'canvas2d-pixels',
+        schedulerClock: clock,
+      })
+      cleanups.push(() => renderer.dispose())
+      clock.flushFrame()
+      return { terminal, state, canvas, clock, renderer }
+    }),
+  )
+  const candidate = arms[0]!
+  const reference = arms[1]!
+  const output = candidate.canvas.getContext('2d')!
+  output.save()
+  cleanups.push(() => output.restore())
+  output.filter = 'opacity(50%)'
+  const acknowledge = vi.spyOn(candidate.state, 'acknowledge')
+  const before = { ...candidate.renderer.metrics }
+  for (const arm of arms) {
+    arm.terminal.write('\x1b[6;1H\r\nnew row')
+    arm.renderer.notifyWrite()
+  }
+  reference.renderer.clearTextureAtlas()
+  candidate.clock.flushFrame()
+  reference.clock.flushFrame()
+  expect(acknowledge).toHaveBeenCalledOnce()
+  expect(candidate.renderer.metrics.submittedFrames - before.submittedFrames).toBe(1)
+  expect(candidate.renderer.metrics.selfCopies - before.selfCopies).toBe(1)
+  expect(output.filter).toBe('opacity(50%)')
+  expectPixels(
+    output.getImageData(0, 0, candidate.canvas.width, candidate.canvas.height).data,
+    reference.canvas
+      .getContext('2d')!
+      .getImageData(0, 0, reference.canvas.width, reference.canvas.height).data,
+  )
+})

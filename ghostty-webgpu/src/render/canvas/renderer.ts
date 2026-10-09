@@ -256,6 +256,7 @@ class CanvasSurface implements RowRendererSurface {
       // Source-over would retain destination pixels beneath transparent source pixels.
       this.context.globalCompositeOperation = 'copy'
       this.context.imageSmoothingEnabled = false
+      this.context.filter = 'none'
       this.context.drawImage(
         this.canvas,
         0,

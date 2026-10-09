@@ -2,4 +2,6 @@
 'ghostty-webgpu': patch
 ---
 
-Reduce Canvas pixel renderer uploads during scrolling and single-row edits, and share decoded cells between row identity checks and painting. Preserve exact pixels when transport fails and when a custom target uses a row-sized scratch buffer.
+Breaking: Move custom drawing and overlays off `terminal.canvas` onto a separate canvas.
+Improved `canvas2d-pixels` scrolling and small edits to upload fewer pixels while preserving exact output and failed-upload recovery.
+Changed: The renderer owns `terminal.canvas` and its drawing context, and pixel mode assumes no active clip.

@@ -76,6 +76,7 @@ export class PixelFrame {
     const output = this.requireOutput()
     if (!Number.isSafeInteger(offset))
       throw createGhosttyError('canvas.frame', 'Canvas row transport requires an integer offset')
+    if (this.dirty.size === 0) return
     const first = Math.max(0, offset)
     const last = output.height / this.rowHeight + Math.min(0, offset)
     const moved = new Set<number>()
