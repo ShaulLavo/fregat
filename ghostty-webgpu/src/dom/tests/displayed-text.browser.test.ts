@@ -492,6 +492,8 @@ describe('DOM retained displayed-text acceptance', () => {
     const snapshot = snapshots.at(-1)!
     expect(Object.isFrozen(snapshot)).toBe(true)
     expect(Object.isFrozen(snapshot.cursor)).toBe(true)
+    expect('nativeFrame' in snapshot).toBe(false)
+    expect('token' in snapshot).toBe(false)
     const execution = Reflect.get(terminal, 'execution') as {
       textFrame(): RendererTextFrameSnapshot | undefined
     }
