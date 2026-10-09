@@ -16,7 +16,7 @@ import type {
   EditorHighlighterSession,
   EditorHighlightResult,
 } from '../syntax/highlighter'
-import type { EditorTokenInput } from '../syntax/tokenStore'
+import { EditorTokenStore, type EditorTokenInput } from '../syntax/tokenStore'
 import type { EditorTheme } from '../theme'
 import {
   captureThemeCohort,
@@ -72,25 +72,28 @@ type AnalysisDisplayInspection = {
   readonly queryWaiters: number
   readonly queryRanges: readonly EditorSyntaxRange[]
 }
-type AnalysisRetentionEntry = {
-  readonly family: 'structural' | 'highlighter'
+type AnalysisLeaseInspection = {
   readonly runtimeSessionId: string
   readonly leaseCount: number
   readonly lastLeaseReleasedAt: number | null
+}
+type AnalysisRetentionEntry = AnalysisLeaseInspection & {
+  readonly family: 'structural' | 'highlighter'
   readonly revision: number
   readonly status: EditorAnalysisRead<unknown>['kind']
   readonly resultCount: number
   readonly tokenCount: number
   readonly cachedRangeCount: number
   readonly pendingRangeCount: number
+  readonly tokenStoreBackingBytes: number
   readonly syntaxRecordBackingBytes: number
   readonly displayDemand: AnalysisDisplayInspection
 }
 type AnalysisRetentionInspection = {
   readonly entries: readonly AnalysisRetentionEntry[]
+  readonly tokenStoreBackingBytes: number
   readonly syntaxRecordBackingBytes: number
   readonly unmeasuredBytes: readonly (
-    | 'token-store-backing'
     | 'javascript-objects'
     | 'provider-sessions'
     | 'worker-heaps'
@@ -209,6 +212,7 @@ export type EditorDocumentAnalysis = {
     request: EditorAnalysisHighlighterRequest,
   ): EditorRetainedHighlighterSession | null
   subscribeRetention(listener: () => void): () => void
+  inspectLeases(): readonly AnalysisLeaseInspection[]
   inspectRetention(): AnalysisRetentionInspection
   reclaimInactive(options: AnalysisReclamationOptions): AnalysisReclamation
   dispose(): void
@@ -1247,6 +1251,7 @@ export class HighlighterEntry extends AnalysisEntry<EditorHighlightResult> {
       ? { ...state, providerTheme: this.highlighter.themeOutcome() }
       : state
   }
+
   override refresh(): void {
     this.highlighter.invalidateTheme()
     super.refresh()
@@ -1418,25 +1423,33 @@ function createAnalysis(options: {
     borrowStructural: (request) => retention.mutate(() => borrowStructural(request)),
     borrowHighlighter: (request) => retention.mutate(() => borrowHighlighter(request)),
     subscribeRetention: (listener) => retention.subscribe(listener),
+    inspectLeases() {
+      const leases = []
+      for (const entry of entries) {
+        if (!(entry instanceof StructuralEntry || entry instanceof HighlighterEntry)) continue
+        leases.push({
+          runtimeSessionId: entry.runtimeSessionId,
+          leaseCount: entry.leaseCount,
+          lastLeaseReleasedAt: entry.lastLeaseReleasedAt,
+        })
+      }
+      return leases
+    },
     inspectRetention() {
       const records = new Set<ArrayBufferLike>()
+      const tokenStores = new Set<EditorTokenStore>()
       const retained = []
       for (const entry of entries) {
         if (entry instanceof StructuralEntry)
-          retained.push(inspectEntry('structural', entry, records))
+          retained.push(inspectEntry('structural', entry, records, tokenStores))
         if (entry instanceof HighlighterEntry)
-          retained.push(inspectEntry('highlighter', entry, records))
+          retained.push(inspectEntry('highlighter', entry, records, tokenStores))
       }
       return {
         entries: retained,
         syntaxRecordBackingBytes: backingBytes(records),
-        unmeasuredBytes: [
-          'token-store-backing',
-          'javascript-objects',
-          'provider-sessions',
-          'worker-heaps',
-          'wasm',
-        ],
+        tokenStoreBackingBytes: EditorTokenStore.inspectRetention(tokenStores).backingBytes,
+        unmeasuredBytes: ['javascript-objects', 'provider-sessions', 'worker-heaps', 'wasm'],
       }
     },
     reclaimInactive(options) {
@@ -1512,12 +1525,19 @@ function inspectEntry<T extends RetentionResult>(
   family: AnalysisRetentionEntry['family'],
   entry: AnalysisEntry<T>,
   sharedRecords: Set<ArrayBufferLike>,
+  sharedTokenStores: Set<EditorTokenStore>,
 ): AnalysisRetentionEntry {
   const results = new Set(entry.retainedResults())
   const tokens = new Set<EditorTokenInput>()
   const records = new Set<ArrayBufferLike>()
+  const tokenStores = new Set<EditorTokenStore>()
   for (const result of results) {
     tokens.add(result.tokens)
+    if (!Array.isArray(result.tokens)) {
+      const store = result.tokens as EditorTokenStore
+      tokenStores.add(store)
+      sharedTokenStores.add(store)
+    }
     const backing = result.records?.data.buffer
     if (!backing) continue
     records.add(backing)
@@ -1536,6 +1556,7 @@ function inspectEntry<T extends RetentionResult>(
     cachedRangeCount: entry.cachedRangeCount,
     pendingRangeCount: entry.pendingRangeCount,
     syntaxRecordBackingBytes: backingBytes(records),
+    tokenStoreBackingBytes: EditorTokenStore.inspectRetention(tokenStores).backingBytes,
     displayDemand: entry.inspectDisplayDemand(),
   }
 }

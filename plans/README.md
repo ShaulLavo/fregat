@@ -82,8 +82,6 @@ delivered acceptance, monitoring/draft check, named follow-ons and owner-only re
 | [195](195-settings-defaults-browser.md)               | Browse Settings defaults in UI and JSON                                              |
 | [196](196-shared-control-polish.md)                   | Polish sliders, menu switches, and picker triggers                                   |
 | [197](197-editor-highlighting-service.md)             | Editor-owned highlighting service                                                    |
-| [198](198-document-owned-editor-analysis.md)          | Keep editor analysis with the document                                               |
-| [200](200-document-backed-content-views.md)           | Shared documents behind content views                                                |
 | [201](201-cheap-overlay-marks.md)                     | One-frame typing in large files, starting with cheap underlines                      |
 | [202](202-tui-ui.md)                                  | App-local Charm-inspired terminal UI on upstream OpenTUI                             |
 | [203](203-fregat-hotkeys.md)                          | @fregat/hotkeys, our fork of TanStack Hotkeys                                        |
@@ -267,6 +265,9 @@ in the [Editor inventory](editor-backlog.md); its [manifest](editor-backlog.json
 
 - [Command foundation delivery](../docs/keymap/command-foundation-delivery.md) records
   Plans 204–206 and their exact standalone dependency qualification under Plan 207.
+
+- [Document-backed content views](../docs/document-backed-content-views.md) holds the contracts,
+  entry points and accepted limits of retired Plans 198 and 200.
 
 - [Monorepo migration delivery](207-migration-completion.md) supports Plan 207. npm publication
   remains separately deferred; this record is not a second Plan 207.

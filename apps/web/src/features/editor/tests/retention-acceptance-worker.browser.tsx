@@ -71,8 +71,10 @@ test.for(['shiki', 'tree-sitter'] as const)(
       JSON.stringify({ family, initial, held: gate.held() }),
       'retention-acceptance-held-real-response',
     )
+    const document = retentionAcceptanceSubject(app, path).document
     const observations: {
       readonly status: string | null
+      readonly sourceRevision: number
       readonly snapshotRevision: number | null
       readonly sample: ReturnType<typeof captureRetentionAcceptancePaint>
     }[] = []
@@ -85,6 +87,7 @@ test.for(['shiki', 'tree-sitter'] as const)(
       const snapshot = controller.getSnapshot()
       observations.push({
         status: snapshot?.syntaxStatus ?? null,
+        sourceRevision: document.buffer.getRevision(),
         snapshotRevision: snapshot?.documentSyncPoint.revision ?? null,
         sample: captureRetentionAcceptancePaint(app, path, tab.id),
       })
@@ -94,8 +97,12 @@ test.for(['shiki', 'tree-sitter'] as const)(
     try {
       controller.commands.setSelection(0)
       controller.commands.focus()
-      const document = retentionAcceptanceSubject(app, path).document
       const before = document.buffer.materializeFullText()
+      if (family === 'shiki')
+        await expect.poll(() => controller.getSnapshot()?.syntaxStatus).toBe('ready')
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      expect(observations.length).toBeGreaterThan(0)
+      expect(observations.at(-1)?.sourceRevision).toBe(document.buffer.getRevision())
       await commands.proofKeyPress({ key: 'x' })
       expect(document.buffer.materializeFullText()).toBe('x' + before)
       const revision = document.buffer.getRevision()
@@ -107,7 +114,12 @@ test.for(['shiki', 'tree-sitter'] as const)(
       const current = retentionAcceptanceReference(app, path)
       currentReference = current
       expect(current.identity.revision).toBe(revision)
-      const ready = observations.filter((observation) => observation.status === 'ready')
+      for (const observation of observations.filter((entry) => entry.status === 'ready'))
+        expect(observation.snapshotRevision).toBe(observation.sourceRevision)
+      const ready = observations.filter(
+        (observation) => observation.status === 'ready' && observation.sourceRevision === revision,
+      )
+      expect(ready.length).toBeGreaterThan(0)
       for (const observation of ready) {
         expect(observation.snapshotRevision).toBe(revision)
         assertRetentionAcceptancePaint(observation.sample, current, path)
