@@ -1,4 +1,5 @@
 import net from 'node:net'
+import { mkdtemp, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { createServer } from 'vite'
@@ -46,10 +47,15 @@ test('requireLiteralAddress rejects a hostname that needs DNS resolution', () =>
 
 let blocker: net.Server | undefined
 let stray: Awaited<ReturnType<typeof createServer>> | undefined
+let cacheDirectory: string | undefined
 
 afterEach(async () => {
   await stray?.close()
   stray = undefined
+  if (cacheDirectory) {
+    await rm(cacheDirectory, { recursive: true, force: true })
+    cacheDirectory = undefined
+  }
   if (blocker) {
     const server = blocker
     blocker = undefined
@@ -85,12 +91,15 @@ test.for([
   'workbench/f/a.tsx?tabs=@',
   'workbench/f/a.js?tabs=@',
   'workbench/f/a.jsx?tabs=@',
+  'workbench/d/worktree/live/a.ts?tabs=f/a.ts~@&side=git',
 ])('inline boot CSS loads at %s', async (route) => {
+  cacheDirectory = await mkdtemp(path.join(os.tmpdir(), 'fregat-vite-config-'))
   const resolved = configFn({ command: 'serve', isPreview: false, mode: 'development' })
   stray = await createServer({
     ...resolved,
     configFile: false,
     root: import.meta.dirname,
+    cacheDir: cacheDirectory,
     logLevel: 'silent',
     optimizeDeps: { noDiscovery: true, include: [] },
     server: { ...resolved.server, middlewareMode: true, hmr: false },

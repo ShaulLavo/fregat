@@ -125,6 +125,7 @@ export default defineConfig(({ command, isPreview }) => {
         compiler: { logDiagnostics: true },
         exclude: [
           /\/node_modules\//,
+          /[?&]html-proxy\b.*\.css$/,
           // Cached component modules retain WASM owners across Fast Refresh.
           ...(packages.length > 0
             ? [/\/features\/terminal\/components\/(panel|saved-viewport)\.tsx$/]
