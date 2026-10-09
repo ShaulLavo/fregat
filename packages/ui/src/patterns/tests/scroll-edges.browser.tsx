@@ -75,6 +75,21 @@ it('leaves a list that fits crisp', async () => {
   expect(fade(scroller)).toEqual({ top: '0px', bottom: '0px' })
 })
 
+it.each([
+  ['96px', 96],
+  ['600px', 600],
+  ['the end', Number.MAX_SAFE_INTEGER],
+])('drops both fades once a list scrolled to %s shrinks to fit', async (_, offset) => {
+  const scroller = render(100)
+  scroller.scrollTop = offset
+  await frames()
+  expect(fade(scroller).top).toBe('24px')
+
+  while (scroller.childElementCount > 3) scroller.lastElementChild!.remove()
+  await frames()
+  expect(fade(scroller)).toEqual({ top: '0px', bottom: '0px' })
+})
+
 it('shows the thin thumb only while the pointer is inside', async () => {
   const scroller = render(100)
   expect(getComputedStyle(scroller).scrollbarWidth).toBe('thin')

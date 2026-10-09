@@ -873,3 +873,7 @@ Current owner: [apps/web/src/features/chat/utils/browser-voice-input.ts](https:/
 On iPhone Safari later dictation attempts omitted or misrecognized words. The owner confirmed missing words never appear in live preview, ruling out the final commit filter as their loss point. Browser versus spoken language was not established. SpeechRecognition/webkitSpeechRecognition uses locale, continuous and interim results; PR #920 repaired readiness status only. Capture real-device event timing, selected locale and result counts across first/later attempts, with a known-good control. Never log speech text or audio. Synthetic events do not establish recognition accuracy.
 
 - [ ] Complete the bounded reproduction or measurement above, fix only a proven cause, and retain qualified acceptance evidence.
+
+### Viewport warning correction, 2026-10-09
+
+The HTML now declares the shared viewport settings. The pre-paint script adds `interactive-widget=resizes-content` when the browser exposes the virtual keyboard API. Chromium retains layout resizing; WebKit keeps its existing visual-viewport inset behavior and receives no unsupported viewport directive. The phone-shell scenario checks that the applied policy matches browser support. Built Chromium and WebKit phone checks retain keyboard-inset and sheet coverage; their evidence is under `/work/tmp/viewport-usage-warnings/proof/`. Device-panel simulators were unavailable, so this qualification uses browser phone emulation rather than a physical on-screen keyboard.

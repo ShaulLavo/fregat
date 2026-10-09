@@ -1088,7 +1088,7 @@ export const SETTINGS_DOCUMENTATION = {
     optionTitles: { ours: 'Ours', zed: 'Zed', vscode: 'VS Code' },
     title: 'Keyboard mode',
     description:
-      'The shortcuts your contextual bindings build on. Ours starts with Zed’s keys; Zed tracks its defaults; VS Code uses its editing and app shortcuts.',
+      'The shortcuts your contextual bindings build on. Ours starts with Zed’s keys and adds keys for Fregat’s own commands; Zed tracks its defaults; VS Code uses its editing and app shortcuts.',
     keywords: ['keybinding', 'shortcut', 'preset', 'zed', 'vscode', 'keymap'],
   },
   'keybindings.overrides': {

@@ -1,10 +1,10 @@
-# Plan 291: Keep temporary apps private and preserve the pill
+# Plan 291: Retire Mesh public hosting and preserve private apps
 
-- Status: Approved, in progress. Source changes are prepared in Mesh; validation and shipping remain open.
+- Status: Approved, in progress. Mesh source changes and local checks are complete; CI, merge, release, and installed-fleet verification remain open.
 - Date: 2026-10-03
 - Owner clarification: 2026-10-09.
 - Implementation owner: `ShaulLavo/mesh`.
-- Implementation: [Mesh PR #285](https://github.com/ShaulLavo/mesh/pull/285), pending merge and release.
+- Implementation: [Mesh PR #290](https://github.com/ShaulLavo/mesh/pull/290), awaiting CI and merge. Earlier app and widget removal merged in [Mesh PR #285](https://github.com/ShaulLavo/mesh/pull/285).
 - Reported in: [Mesh #81](https://github.com/ShaulLavo/mesh/issues/81).
 - Coordination: Preserve the private-app observability work from [Mesh #55](https://github.com/ShaulLavo/mesh/issues/55). Device authorization remains [Plan 290](290-mesh-device-authorization.md).
 
@@ -14,7 +14,7 @@ Temporary websites and artifacts remain accessible from the owner's trusted devi
 
 The owner's October 9 clarification replaces the earlier requirement to keep a functional Mesh pill and a Mesh adapter. Loading the preserved bundle must mount nothing. Mesh app pages, management routes, and generated assets must contain no sharing controls or automatic widget loader.
 
-Ordinary explicitly named public `serve` routes and authenticated SSH reverse tunnels have separate product contracts. Preserve them unless a call-site audit proves a path exists only for temporary apps. This work withdraws the public temporary-app portions of #2, #3, D30, and T29. It does not supersede daemon control authentication or ZeroTier adoption.
+The owner confirmed removal of all public hosting from Mesh on October 9. Remove ordinary public `serve` publishing, the public HTTP gateway, route snapshots and outboxes, named SSH reverse tunnels, public confirmation commands, and the public certificate role. Preserve private apps, private named services, DNS/ACME HTTPS, daemon control authentication, terminal workers, and owner source files. ZeroTier adoption remains a separate plan.
 
 ## Implementation and preserved data
 
@@ -29,9 +29,9 @@ Keep the generic component in `web/app-pill`, with caller-supplied actions and e
 
 Retain the central private app registry and signed lifecycle exchanges. Preserve app IDs, hostnames, owner keys, sequence numbers, pending operations, name reservations, and tombstones. The origin continues to own source, workers, verified loopback listeners, and cleanup. The registry remains independent of ordinary service snapshots.
 
-Remove the temporary-app callback from the ordinary public edge registry. A separate private dispatcher requires HTTPS, matching SNI and Host, an authenticated PROXY source in the Tailnet address ranges, and a recognized owner device. Browser pairing and view cookies cannot bypass that ingress check. Ordinary public services and named SSH tunnels retain their existing routes.
+Remove the public edge and tunnel framework. The private app registry uses a dedicated loopback HTTPS listener with matching SNI and Host, an authenticated PROXY source in the Tailnet address ranges, and a recognized owner device. Browser pairing and view cookies cannot bypass that ingress check. The registry receives the private-service wildcard certificate through the renewer's `appRegistry` recipient, alongside private named services. That recipient creates no DNS records.
 
-Migrate `app_state` to `private_app_state` in schema 12, preserving its bytes. Older readers must refuse the narrowed state: their absent visibility field otherwise grants public access after an executable-only rollback. Refuse downgrades that contain app state. Ignore legacy visibility during current admission and reject retired operations before replaying cached replies.
+Preserve private app-state bytes, name reservations, and tombstones while removing public route, snapshot, outbox, and tunnel tables. Remove public service fields from current storage and protocol contracts. Retired sharing operations cannot restore public access or replay cached public replies.
 
 Origin-scoped app routing is deferred. Moving the registry now also requires a safe transfer of pending operations, DNS, and retained data. The chosen registry preserves the existing lifecycle while removing public access. This plan adds no separate registry migration work.
 
@@ -39,12 +39,13 @@ Origin-scoped app routing is deferred. Moving the registry now also requires a s
 
 - [x] Audit app operations, visibility fields, hostname reservations, registry callers, browser controls, and generated assets against current main.
 - [x] Prepare generic, explicitly mounted pill source and remove Mesh ownership, sharing, and automatic mounting from the component.
-- [x] Prepare separate private dispatch and disconnect the ordinary public edge's app callback. Preserve the signed central registry and app lifecycle.
+- [x] Prepare removal of the public edge, publisher, tunnel framework, and certificate role. Keep the signed private app registry, its dedicated HTTPS ingress, and the existing app lifecycle.
 - [x] Prepare removal of Share, Make public, Make private, visibility state, management frame, widget routes, and runtime HTML injection.
-- [x] Prepare schema 12 with preserved app-state bytes and a fence against older readers and unsafe downgrades.
+- [x] Prepare private app-state storage with preserved bytes and name reservations.
+- [x] Prepare removal of public service metadata and public route/tunnel tables while preserving private apps, named services, sessions, and workers.
 - [ ] Validate prepared source changes, including static apps, server apps, cleanup, downloads, expiry, renew, delete, and owner-only failure inspection.
 - [ ] Inventory existing managed app data before rollout. Retire public app routes without deleting owner source directories or managed workspaces merely to simplify state. Quarantine obsolete app-sharing metadata from route restoration. Obtain a separate explicit approval for any necessary deletion of kept data.
-- [ ] Audit `internal/apps/safety*`, `internal/webauth`, HTTP policies, and security-wave findings by surviving callers. Keep private browser admission, request isolation, credential handling, process checks, and protection for ordinary edge routes where applicable. Delete public-app-only machinery and retire obsolete findings with evidence.
+- [ ] Audit `internal/apps/safety*`, `internal/webauth`, HTTP policies, and security-wave findings by surviving callers. Keep private browser admission, request isolation, credential handling, process checks, and protection for private named services. Delete public-hosting machinery and retire obsolete findings with evidence.
 - [ ] Rewrite `docs/plan/06-temporary-apps.md`, `docs/plan/01-decisions.md` D30, overview/status, T29, and the temporary-app parts of `07-quality-and-security-wave.md`. Document the new package home and the remaining private trust boundary.
 - [ ] Complete independent review, required gates, merge, patch release, and installed-fleet verification. Prepared source is not a shipped result.
 
@@ -52,12 +53,12 @@ Origin-scoped app routing is deferred. Moving the registry now also requires a s
 
 Create a disposable static app and server app from a trusted device. Open their private URLs on the owner's Mac or phone. Exercise reload, source download, renew, delete, expiry, startup failure, and daemon restart. Confirm unauthorized browsers cannot read the private app or manage it.
 
-Probe old public app URLs, direct edge paths, removed CLI/API actions, WebSocket upgrades, and stale app-edge state after restart. None can republish a temporary app. A separately declared ordinary public service and a named SSH tunnel must still work.
+Probe former public app URLs, public service publishing, hostname claims, SSH reverse tunnels, removed CLI/API actions, and public dispatch after restart. None can publish content. Verify private apps, private named services, authenticated terminal sessions, SFTP, and local SSH forwarding still work.
 
-Run the generic pill's browser fixtures for mouse and touch drag, flick, collapse, keyboard controls, placement, explicit mounting, and disposal. Prove that loading its bundle mounts nothing and that real Mesh app HTML remains unchanged. Search generated assets, protocol types, docs, and persisted state for remaining public-app controls. Explain any remaining `public` symbol by its ordinary service caller.
+Run the generic pill's browser fixtures for mouse and touch drag, flick, collapse, keyboard controls, placement, explicit mounting, and disposal. Prove that loading its bundle mounts nothing and that real Mesh app HTML remains unchanged. Search generated assets, protocol types, docs, and persisted state for remaining public-hosting controls. Remaining `public` symbols may describe cryptographic keys or local listener ports; they cannot retain public hosting.
 
-Load legacy public records, cached replies, and pending sharing operations through restart. Confirm private access and retained files survive, removed actions settle without blocking owner operations, and an actual previous binary refuses schema 12. Verify that a refused downgrade leaves app data unchanged.
+Upgrade stored state containing former public routes, cached replies, and pending operations. Confirm private access, app identities, retained files, name tombstones, and terminal workers survive; public route restoration and retired operations remain unavailable.
 
-Coordinate registry and origin upgrades: `app.registry` replaces `app.edge`, and mixed versions cannot renew app leases. Complete the fleet update within the lease window and check lifecycle recovery afterwards.
+Coordinate registry, origin, renewer, and gateway deployment. Preserve the installed wildcard certificate when moving its purpose to private-service, keep terminal workers running, and verify private HTTPS and app lifecycle recovery after daemon restarts.
 
-Run narrow app, pill, routing, and CLI tests, followed by Mesh's required integration gates through the heavy runner. Apply Subtract Before You Add by removing sharing before introducing further app features. Commit, push, release with a patch version, and verify private apps and ordinary public services on the installed fleet. Closure of #81 transfers execution to this plan.
+Run narrow app, pill, routing, and CLI tests, followed by Mesh's required integration gates through the heavy runner. Apply Subtract Before You Add by removing sharing before introducing further app features. Commit, push, release with a patch version, and verify private apps, private named services, and terminal continuity on the installed fleet. Closure of #81 transfers execution to this plan.
