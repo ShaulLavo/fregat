@@ -10,6 +10,26 @@ Part of [Singapore](https://shaulavo.dev/singapore/). A code editor for the brow
 npm install @singapore-editor/collaboration
 ```
 
+## What you set up
+
+The library uses no hosted services and has no public defaults. What you need depends on where
+peers are:
+
+- **Tabs in one browser:** nothing. They connect over an encrypted `BroadcastChannel`.
+- **Browsers on different machines:** WebRTC, which needs three things you run or choose:
+  - A **signaling broker** that introduces peers. It only relays encrypted packets and keeps no
+    history. Run the included Bun broker from `@singapore-editor/collaboration/server`
+    ([example](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/collaboration/examples/signaling-server.ts)) or any service with the same protocol, behind TLS,
+    with an origin allowlist and an admission token per member.
+  - **STUN servers** so peers can find a direct route.
+  - A **TURN relay** (for example coturn) for networks where a direct route fails, with
+    credentials your app issues.
+- **The invitation:** `createRoomInvitation()` makes a room ID and secret. Send them to the other
+  people yourself, for example in the fragment of a link; they never go through the broker.
+
+Pass the broker URLs, ICE servers and credentials to the transports when joining. The
+[integration guide](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/collaboration/docs/integration.md#browser-transports) covers each option.
+
 ## Usage
 
 This example validates a presence message. A room needs a document engine, authenticated links, and a clock supplied by your app.
