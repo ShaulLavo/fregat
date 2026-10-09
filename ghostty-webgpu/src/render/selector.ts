@@ -1,3 +1,4 @@
+import { automaticGpuBackends, type RendererPlatform } from './backend-order.js'
 import { DomTerminalRenderer } from './dom/renderer.js'
 import { CanvasUnavailableError, CanvasTerminalRenderer } from './canvas/renderer.js'
 import { FallbackTerminalRenderer } from './fallback.js'
@@ -18,9 +19,10 @@ export type CompatibleTerminalRenderer =
 export async function createCompatibleTerminalRenderer(
   options: WebGpuTerminalRendererOptions,
   signal?: AbortSignal,
+  platform: RendererPlatform = navigator,
 ): Promise<CompatibleTerminalRenderer> {
   signal?.throwIfAborted()
-  const renderer = await createRenderer(options, signal)
+  const renderer = await createRenderer(options, platform, signal)
   if (signal?.aborted) {
     renderer.dispose()
     signal.throwIfAborted()
@@ -30,23 +32,22 @@ export async function createCompatibleTerminalRenderer(
 
 async function createRenderer(
   options: WebGpuTerminalRendererOptions,
+  platform: RendererPlatform,
   signal?: AbortSignal,
 ): Promise<CompatibleTerminalRenderer> {
   if (options.rendererMode && options.rendererMode !== 'auto')
     return CanvasTerminalRenderer.create(options)
-  try {
-    return await WebGpuTerminalRenderer.create(options, 'hardware')
-  } catch (cause) {
-    if (!(cause instanceof WebGpuUnavailableError)) throw cause
-  }
-  signal?.throwIfAborted()
-  try {
-    if (options.replaceCanvas) {
-      return await FallbackTerminalRenderer.create(options, options.replaceCanvas, signal)
+  for (const backend of automaticGpuBackends(platform)) {
+    signal?.throwIfAborted()
+    try {
+      if (backend === 'webgpu') return await WebGpuTerminalRenderer.create(options, 'hardware')
+      if (options.replaceCanvas)
+        return await FallbackTerminalRenderer.create(options, options.replaceCanvas, signal)
+      return await WebGlTerminalRenderer.create(options)
+    } catch (cause) {
+      if (!(cause instanceof WebGpuUnavailableError || cause instanceof WebGlUnavailableError))
+        throw cause
     }
-    return await WebGlTerminalRenderer.create(options)
-  } catch (cause) {
-    if (!(cause instanceof WebGlUnavailableError)) throw cause
   }
   signal?.throwIfAborted()
   try {

@@ -1,3 +1,8 @@
+import {
+  automaticGpuBackends,
+  type GpuBackend,
+  type RendererPlatform,
+} from '../render/backend-order.js'
 import { isSoftwareWebGpuAdapter } from '../render/adapter.js'
 import { LocalTerminalExecution } from '../dom/execution-local.js'
 import {
@@ -9,7 +14,11 @@ import {
 import type { GhosttyWebGpuRenderer } from '../dom/types.js'
 import type { InactiveCursorStyle } from '../render/cursor.js'
 import type { RenderSchedulerClock } from '../render/scheduler.js'
-import { WebGpuTerminalRenderer, WebGpuUnavailableError } from '../render/renderer.js'
+import {
+  WebGpuTerminalRenderer,
+  WebGpuUnavailableError,
+  type WebGpuTerminalRendererOptions,
+} from '../render/renderer.js'
 import { WebGlTerminalRenderer, WebGlUnavailableError } from '../render/webgl/renderer.js'
 import type {
   TerminalFittedFont,
@@ -25,7 +34,7 @@ import type {
   TerminalOutputMessage,
 } from './protocol.js'
 import { workerCommandNames, workerOperationTimeout } from './protocol.js'
-import { serializeWorkerFailure, workerError } from './structured-errors.js'
+import { serializeWorkerFailure, TerminalWorkerError, workerError } from './structured-errors.js'
 
 interface WorkerScope {
   readonly fonts: FontFaceSet
@@ -93,7 +102,10 @@ export class TerminalWorkerRuntime {
       .catch((cause: unknown) => this.fail(cause))
   }
 
-  constructor(private readonly initialize: WorkerInitialize) {}
+  constructor(
+    private readonly initialize: WorkerInitialize,
+    private readonly platform: RendererPlatform = navigator,
+  ) {}
 
   async start(): Promise<void> {
     const port = this.initialize.port
@@ -222,24 +234,6 @@ export class TerminalWorkerRuntime {
     this.applyLayout(layout)
     const execution = this.native()
     const font = this.fit(layout)
-    let device: GPUDevice | undefined
-    if (this.initialize.backend !== 'webgl') {
-      this.prefetchedAcquisition = this.requestDevice().then((acquired) => {
-        this.prefetchedDevice = acquired
-        return acquired
-      })
-      try {
-        device = await this.prefetchedAcquisition
-      } catch (cause) {
-        if (this.initialize.backend === 'webgpu')
-          throw workerError('capability', 'renderer.webgpu', {
-            causeType: cause instanceof Error ? cause.name : typeof cause,
-          })
-      }
-      if (!device && this.initialize.backend === 'webgpu')
-        throw workerError('capability', 'renderer.webgpu', { device: false })
-    }
-    this.native()
     const options = {
       canvas,
       columns: execution.grid.columns,
@@ -261,24 +255,7 @@ export class TerminalWorkerRuntime {
       onError: (cause: unknown) => this.fail(cause),
     }
     const renderer = await execution.createRenderer(
-      async (input) => {
-        try {
-          if (device) {
-            this.gpuRenderer = WebGpuTerminalRenderer.create({
-              ...input,
-              deviceFactory: this.deviceFactory(device),
-            })
-            return await this.gpuRenderer
-          }
-          return await WebGlTerminalRenderer.create(input)
-        } catch (cause) {
-          if (cause instanceof WebGpuUnavailableError)
-            throw workerError('capability', 'renderer.webgpu', { reason: cause.reason })
-          if (cause instanceof WebGlUnavailableError)
-            throw workerError('capability', 'renderer.webgl', { backend: this.initialize.backend })
-          throw cause
-        }
-      },
+      (input) => this.createRenderer(input),
       options,
       this.abort.signal,
     )
@@ -286,6 +263,65 @@ export class TerminalWorkerRuntime {
     this.renderer.setInactiveCursorStyle?.(this.inactiveCursorStyle)
     this.renderer.schedule()
     return font
+  }
+
+  private async createRenderer(
+    options: WebGpuTerminalRendererOptions,
+  ): Promise<WebGpuTerminalRenderer | WebGlTerminalRenderer> {
+    const backends: readonly GpuBackend[] =
+      this.initialize.backend === 'auto'
+        ? automaticGpuBackends(this.platform)
+        : [this.initialize.backend]
+    let unavailable: unknown
+    for (const backend of backends) {
+      this.native()
+      try {
+        if (backend === 'webgl') return await WebGlTerminalRenderer.create(options)
+        return await this.createWebGpuRenderer(options)
+      } catch (cause) {
+        const capabilityFailure =
+          cause instanceof TerminalWorkerError &&
+          cause.code === 'capability' &&
+          cause.operation === 'renderer.webgpu'
+        if (
+          !(
+            cause instanceof WebGpuUnavailableError ||
+            cause instanceof WebGlUnavailableError ||
+            capabilityFailure
+          )
+        )
+          throw cause
+        unavailable = cause
+      }
+    }
+    if (unavailable instanceof WebGpuUnavailableError)
+      throw workerError('capability', 'renderer.webgpu', { reason: unavailable.reason })
+    if (unavailable instanceof WebGlUnavailableError)
+      throw workerError('capability', 'renderer.webgl', { backend: this.initialize.backend })
+    throw unavailable
+  }
+
+  private async createWebGpuRenderer(
+    options: WebGpuTerminalRendererOptions,
+  ): Promise<WebGpuTerminalRenderer> {
+    this.prefetchedAcquisition = this.requestDevice().then((acquired) => {
+      this.prefetchedDevice = acquired
+      return acquired
+    })
+    let device: GPUDevice
+    try {
+      device = await this.prefetchedAcquisition
+    } catch (cause) {
+      throw workerError('capability', 'renderer.webgpu', {
+        causeType: cause instanceof Error ? cause.name : typeof cause,
+      })
+    }
+    this.native()
+    this.gpuRenderer = WebGpuTerminalRenderer.create({
+      ...options,
+      deviceFactory: this.deviceFactory(device),
+    })
+    return this.gpuRenderer
   }
 
   private async requestDevice(): Promise<GPUDevice> {

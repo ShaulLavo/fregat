@@ -39,11 +39,13 @@ terminal.focus()
 await terminal.dispose()
 ```
 
-`backend` accepts `webgpu`, `webgl` or `auto`. Automatic selection chooses hardware WebGPU
-when available and falls through to WebGL for software adapters. An explicit `webgpu` backend
-uses any available WebGPU adapter, including software adapters. The main-thread terminal's
-automatic renderer follows the same hardware preference. Capability failures carry `code`, `operation`, `why`, `fix` and
-runtime facts. `assets` and `workerUrl` can point at explicitly hosted native files and the
+`backend` accepts `webgpu`, `webgl` or `auto`. Automatic selection tries WebGL before hardware
+WebGPU on desktop Linux because WebGL measured lower CPU work there, while macOS, Windows,
+Android, ChromeOS, and other platforms try hardware WebGPU before WebGL. The main-thread
+terminal then falls through to Canvas and DOM when both GPU renderers are unavailable.
+The worker supports the same GPU order. Automatic selection skips software WebGPU adapters.
+An explicit `webgpu` backend uses any available WebGPU adapter, including software adapters.
+Capability failures carry `code`, `operation`, `why`, `fix` and runtime facts. `assets` and `workerUrl` can point at explicitly hosted native files and the
 built standalone `dist/worker/entry.js`; the defaults resolve beside the package output.
 
 Writes copy caller-owned bytes and keep their buffers attached. `attachOutputPort(port)`

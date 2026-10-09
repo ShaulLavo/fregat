@@ -15,6 +15,7 @@ import type {
 import type { DeviceObservation } from './tests/device-loss.worker.js'
 import type { DeviceLifecycleObservation } from './tests/device-lifecycle.worker.js'
 import { observeDevice, type DeviceLifecycleCounts } from './tests/device-lifecycle.js'
+import { rendererPlatforms } from '../render/tests/platforms.js'
 
 const family = 'PackagedWorkerTest'
 const fontUrl = new URL(
@@ -69,6 +70,48 @@ async function create(mode: 'main' | 'webgpu' | 'webgl', enableAccessibility = f
   active.push(terminal)
   return terminal
 }
+
+it.each([
+  ...rendererPlatforms.map((platform) => ({
+    name: platform.name,
+    platform: platform.name,
+    backend: 'auto' as const,
+    expected: platform.backend,
+    unavailableWebGl: false,
+  })),
+  {
+    name: 'Linux without WebGL',
+    platform: 'Linux legacy platform',
+    backend: 'auto' as const,
+    expected: 'webgpu',
+    unavailableWebGl: true,
+  },
+  {
+    name: 'explicit WebGPU on Linux',
+    platform: 'Linux legacy platform',
+    backend: 'webgpu' as const,
+    expected: 'webgpu',
+    unavailableWebGl: false,
+  },
+])('selects the worker renderer for $name', async (test) => {
+  const url = new URL('./tests/platform-backend.worker.ts', import.meta.url)
+  url.searchParams.set('platform', test.platform)
+  if (test.unavailableWebGl) url.searchParams.set('unavailableWebGl', '1')
+  const terminal = await WorkerTerminal.create({
+    assets,
+    appearance: { font: { family, size: 16 }, cursor: { blink: false } },
+    backend: test.backend,
+    workerUrl: url,
+    fonts: [{ family, source: { url: fontUrl } }],
+  })
+  active.push(terminal)
+  await terminal.open(container())
+  await terminal.write('platform renderer selection')
+  await eventually(
+    () => terminal.visibleLines()[0]?.includes('platform renderer selection') === true,
+  )
+  expect(terminal.diagnostics.rendererBackend).toBe(test.expected)
+})
 
 it.each(['auto', 'webgpu'] as const)(
   'selects the requested worker backend with a software adapter (%s)',
