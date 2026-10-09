@@ -35,7 +35,8 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/examples/stress/src/fixtures.ts",
         "$TURBO_ROOT$/bench/compare/fixture.mjs",
-        "$TURBO_ROOT$/bench/compare/protocol.mjs"
+        "$TURBO_ROOT$/bench/compare/protocol.mjs",
+        "$TURBO_ROOT$/site/src/fonts/jetbrains-mono.woff2"
       ]
     },
     "@singapore-editor/react#typecheck": {
