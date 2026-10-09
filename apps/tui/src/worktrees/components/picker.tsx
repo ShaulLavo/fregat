@@ -45,9 +45,9 @@ export function WorktreePicker({
     },
     true,
   )
-  function select(index = selection.current, submittedQuery = query) {
-    const options = worktreeChoices({ worktrees, project, value, query: submittedQuery })
-    const worktree = options[index]?.value
+  function select(index?: number, submittedQuery?: string) {
+    const options = worktreeChoices({ worktrees, project, value, query: submittedQuery ?? query })
+    const worktree = options[index ?? selection.current]?.value
     if (!worktree) return
     if (!selectableWorktree(worktree)) {
       setMessage('This checkout is not ready. Open Worktrees to retry or recover it.')

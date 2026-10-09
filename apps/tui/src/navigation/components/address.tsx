@@ -1,3 +1,4 @@
+import { finalize } from '@/utils/finalize'
 import type { AgentLocation } from '@/agent/utils/target'
 import { useEffect, useState } from 'react'
 import { useRenderer } from '@opentui/react'
@@ -95,32 +96,37 @@ export function AddressDialog({
     }
     setPending(true)
     setFailure(null)
-    try {
-      const result = await resolveAddress(
-        value,
-        session.client,
-        state.descriptor.environmentId,
-        controller.signal,
-      )
-      controller.signal.throwIfAborted()
-      if (result.kind === 'failed') {
-        setFailure(result.message)
-        return
-      }
-      if (result.kind === 'settings') {
-        onSettings(result.query)
-        return
-      }
-      if (result.kind === 'agent') {
-        onAgent(result)
-        return
-      }
-      onWorkbench(result)
-    } catch (error) {
-      if (!controller.signal.aborted) setFailure(connectionFailure(error).message)
-    } finally {
-      if (!controller.signal.aborted) setPending(false)
-    }
+    return await finalize(
+      async () => {
+        try {
+          const result = await resolveAddress(
+            value,
+            session.client,
+            state.descriptor.environmentId,
+            controller.signal,
+          )
+          controller.signal.throwIfAborted()
+          if (result.kind === 'failed') {
+            setFailure(result.message)
+            return
+          }
+          if (result.kind === 'settings') {
+            onSettings(result.query)
+            return
+          }
+          if (result.kind === 'agent') {
+            onAgent(result)
+            return
+          }
+          onWorkbench(result)
+        } catch (error) {
+          if (!controller.signal.aborted) setFailure(connectionFailure(error).message)
+        }
+      },
+      () => {
+        if (!controller.signal.aborted) setPending(false)
+      },
+    )
   }
   return (
     <Dialog
