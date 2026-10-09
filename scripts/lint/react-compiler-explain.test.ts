@@ -6,7 +6,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // @ts-expect-error The tool is a plain ES module and the scripts workspace has no `allowJs`.
-import { auditManualMemos, explainSource } from './react-compiler-explain.mjs'
+import { applyMemoReviews, auditManualMemos, explainSource } from './react-compiler-explain.mjs'
 
 type Block = { readonly keys: readonly string[]; readonly yields: readonly string[] }
 type Explained = {
@@ -18,6 +18,7 @@ type Explained = {
   readonly diagnostics: readonly string[]
 }
 type AuditRow = {
+  readonly file: string
   readonly name: string
   readonly component: string
   readonly verdict: string
@@ -26,6 +27,12 @@ type AuditRow = {
   readonly inferred: readonly string[] | null
   readonly manualOnly: readonly string[]
   readonly compilerOnly: readonly string[]
+  readonly signature: string
+}
+
+type Reviewed = AuditRow & {
+  readonly review: string
+  readonly approved: boolean
 }
 
 function source(lines: readonly string[]): string {
@@ -257,6 +264,47 @@ test('check mode fails a redundant memo and leaves returned callbacks for review
     expect(redundant.status, redundant.stderr).toBe(1)
     expect(JSON.parse(redundant.stdout)[0]?.status).toBe('redundant')
 
+    const reviews = path.join(directory, 'reviews.json')
+    const memo: AuditRow = JSON.parse(redundant.stdout)[0]
+    writeFileSync(reviews, JSON.stringify([{ ...memo, reason: 'Reviewed local consumers.' }]))
+    const approved = spawnSync(
+      process.execPath,
+      [tool, 'memos', '--check', '--json', '--reviews', reviews, file],
+      {
+        encoding: 'utf8',
+      },
+    )
+    expect(approved.status, approved.stderr).toBe(0)
+    expect(JSON.parse(approved.stdout)).toEqual([])
+    const all = spawnSync(
+      process.execPath,
+      [tool, 'memos', '--check', '--json', '--all', '--reviews', reviews, file],
+      {
+        encoding: 'utf8',
+      },
+    )
+    expect(all.status, all.stderr).toBe(0)
+    expect(JSON.parse(all.stdout)[0]?.approved).toBe(true)
+
+    const changedSource = source([
+      "import { useMemo } from 'react'",
+      "import { expensive } from './expensive'",
+      'export function Probe({ id }: { id: string }) {',
+      '  const value = useMemo(() => expensive(id, 1), [id])',
+      '  return <div>{value}</div>',
+      '}',
+    ])
+    writeFileSync(file, changedSource)
+    const expired = spawnSync(
+      process.execPath,
+      [tool, 'memos', '--check', '--json', '--reviews', reviews, file],
+      {
+        encoding: 'utf8',
+      },
+    )
+    expect(expired.status, expired.stderr).toBe(1)
+    expect(JSON.parse(expired.stdout)[0]?.review).toBe('changed')
+
     writeFileSync(
       file,
       source([
@@ -275,6 +323,58 @@ test('check mode fails a redundant memo and leaves returned callbacks for review
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
+})
+
+test('memo review signatures survive formatting and expire on body or key changes', () => {
+  const original = source([
+    "import { useMemo } from 'react'",
+    "import { expensive } from './expensive'",
+    'export function Probe({ id, other }: { id: string; other: string }) {',
+    '  const value = useMemo(() => expensive(id), [id])',
+    '  return <div>{value}</div>',
+    '}',
+  ])
+  const [memo]: readonly AuditRow[] = auditManualMemos('probe.tsx', original)
+  const review = { ...memo, reason: 'Reviewed local reuse and retained intentionally.' }
+  const inspect = (input: string): Reviewed =>
+    applyMemoReviews(auditManualMemos('probe.tsx', input), [review]).rows[0]
+
+  expect(inspect(original).approved).toBe(true)
+  expect(inspect(original.replace('expensive(id)', 'expensive( id )')).approved).toBe(true)
+  expect(inspect(original.replace('expensive(id)', 'expensive(/* note */ id)')).approved).toBe(true)
+  expect(inspect(original.replace('expensive(id)', 'expensive(id, other)')).review).toBe('changed')
+  expect(inspect(original.replace('[id]', '[id, other]')).review).toBe('changed')
+})
+
+test('memo review signatures retain whitespace inside string literals', () => {
+  const original = source([
+    "import { useMemo } from 'react'",
+    "import { expensive } from './expensive'",
+    'export function Probe({ id }: { id: string }) {',
+    '  const value = useMemo(() => expensive(id, "hello world"), [id])',
+    '  return <div>{value}</div>',
+    '}',
+  ])
+  const [memo]: readonly AuditRow[] = auditManualMemos('probe.tsx', original)
+  const review = { ...memo, reason: 'Reviewed the original string semantics.' }
+  const changed: readonly AuditRow[] = auditManualMemos(
+    'probe.tsx',
+    original.replace('hello world', 'hello  world'),
+  )
+  expect(applyMemoReviews(changed, [review]).rows[0].approved).toBe(false)
+})
+
+test('memo reviews require reasons and reject duplicate entries', () => {
+  const entry = {
+    file: 'probe.tsx',
+    component: 'Probe',
+    name: 'value',
+    signature: 'a'.repeat(64),
+    reason: ' ',
+  }
+  expect(applyMemoReviews([], [entry]).problems).toContain('review[0] needs reason')
+  const explained = { ...entry, reason: 'Reviewed consumers.' }
+  expect(applyMemoReviews([], [explained, explained]).problems[0]).toContain('repeats')
 })
 
 test('never calls a memo redundant when a hook depends on the value', () => {

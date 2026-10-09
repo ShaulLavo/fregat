@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
+import { createHash } from 'node:crypto'
 
 import { parseSync } from 'oxc-parser'
 
@@ -9,6 +10,7 @@ import { compileLikeBuild } from './react-compiler.mjs'
 import { isTestFile } from './web-design-census.mjs'
 
 const REPOSITORY = path.resolve(import.meta.dirname, '../..')
+const DEFAULT_REVIEWS = path.join(REPOSITORY, 'scripts/lint/react-memo-reviewed.json')
 const DEFAULT_ROOTS = [
   'apps/web/src',
   'apps/tui/src',
@@ -17,13 +19,6 @@ const DEFAULT_ROOTS = [
   'packages/ui/src',
 ]
 const MANUAL_MEMO_HOOKS = new Set(['useMemo', 'useCallback'])
-const DEPENDENCY_HOOKS = new Set([
-  'useEffect',
-  'useLayoutEffect',
-  'useMemo',
-  'useCallback',
-  'useImperativeHandle',
-])
 const SUMMARY_WIDTH = 96
 
 function parse(file, code) {
@@ -212,19 +207,22 @@ function referencedNames(tree) {
 }
 
 function reactImports(tree) {
-  const named = new Map()
-  const namespaces = new Set()
+  const imports = { named: new Map(), namespaces: new Set() }
   for (const statement of tree.body) {
     if (statement.type !== 'ImportDeclaration' || statement.source.value !== 'react') continue
-    for (const specifier of statement.specifiers) {
-      if (specifier.type === 'ImportSpecifier') {
-        named.set(specifier.local.name, specifier.imported.name ?? specifier.imported.value)
-        continue
-      }
-      namespaces.add(specifier.local.name)
-    }
+    recordReactImports(statement.specifiers, imports)
   }
-  return { named, namespaces }
+  return imports
+}
+
+function recordReactImports(specifiers, imports) {
+  for (const specifier of specifiers) {
+    if (specifier.type === 'ImportSpecifier') {
+      imports.named.set(specifier.local.name, specifier.imported.name ?? specifier.imported.value)
+      continue
+    }
+    imports.namespaces.add(specifier.local.name)
+  }
 }
 
 function reactHook(callee, imports) {
@@ -301,14 +299,7 @@ function dependencyNames(tree, imports) {
     if (node.type !== 'CallExpression') return
     const hook = reactHook(node.callee, imports) ?? node.callee?.name
     if (!hook?.startsWith('use')) return
-    if (DEPENDENCY_HOOKS.has(hook)) {
-      const deps = node.arguments[1]
-      for (const element of deps?.type === 'ArrayExpression' ? (deps.elements ?? []) : []) {
-        const name = rootIdentifier(element)
-        if (name) names.add(name)
-      }
-    }
-    // Selectors and options can carry the memo through objects or callback closures.
+    // Arguments carry dependencies, selectors, and options through arrays, objects, or closures.
     for (const argument of node.arguments) {
       for (const name of referencedNames(argument)) names.add(name)
     }
@@ -413,6 +404,22 @@ function lineOf(source, offset) {
   return source.slice(0, offset).split('\n').length
 }
 
+function memoSignature(site, inferred, status) {
+  const semantic = {
+    hook: site.hook,
+    status,
+    arguments: site.call.arguments,
+    typeArguments: site.call.typeArguments ?? site.call.typeParameters,
+    inferred: inferred?.toSorted() ?? null,
+  }
+  const serialized = JSON.stringify(semantic, function (key, value) {
+    if (['start', 'end', 'loc', 'range', 'comments'].includes(key)) return undefined
+    if (key === 'raw' && this.type === 'Literal') return undefined
+    return typeof value === 'bigint' ? value.toString() : value
+  })
+  return createHash('sha256').update(serialized).digest('hex')
+}
+
 /** Compiles the file once per manual memo with that memo removed, and compares the keys. */
 export function auditManualMemos(file, source) {
   const tree = parse(file, source)
@@ -463,12 +470,64 @@ function auditMemoSite(file, source, baseline, entry, dependencies, escapes, sit
       manual,
       inferred,
       status: decision.split(':')[0],
+      signature: memoSignature(site, inferred, decision.split(':')[0]),
       comparison,
       manualOnly: manual && inferred ? manual.filter((key) => !inferred.includes(key)) : [],
       compilerOnly: manual && inferred ? inferred.filter((key) => !manual.includes(key)) : [],
       verdict: decision,
     },
   ]
+}
+
+function memoKey(entry) {
+  return JSON.stringify([entry.file, entry.component, entry.name])
+}
+
+function reviewProblems(entries) {
+  if (!Array.isArray(entries)) return ['memo reviews must be an array']
+  const problems = []
+  const seen = new Set()
+  entries.forEach((entry, index) => {
+    if (!entry || typeof entry !== 'object') {
+      problems.push(`review[${index}] must be an object`)
+      return
+    }
+    for (const field of ['file', 'component', 'name', 'reason']) {
+      if (typeof entry[field] !== 'string' || entry[field].trim() === '')
+        problems.push(`review[${index}] needs ${field}`)
+    }
+    if (typeof entry.signature !== 'string' || !/^[a-f0-9]{64}$/.test(entry.signature))
+      problems.push(`review[${index}] needs a current memo signature`)
+    const key = memoKey(entry)
+    if (seen.has(key)) problems.push(`review[${index}] repeats ${entry.file} ${entry.name}`)
+    seen.add(key)
+  })
+  return problems
+}
+
+export function applyMemoReviews(rows, entries) {
+  const problems = reviewProblems(entries)
+  const reviews = new Map(
+    (problems.length === 0 ? entries : []).map((entry) => [memoKey(entry), entry]),
+  )
+  return {
+    problems,
+    rows: rows.map((row) => {
+      const entry = reviews.get(memoKey(row))
+      const review = reviewState(entry, row.signature)
+      return {
+        ...row,
+        review,
+        approved: review === 'approved',
+        reason: entry?.reason ?? null,
+      }
+    }),
+  }
+}
+
+function reviewState(entry, signature) {
+  if (!entry) return 'unreviewed'
+  return entry.signature === signature ? 'approved' : 'changed'
 }
 
 function sourceFiles(target) {
@@ -519,6 +578,10 @@ function formatAudit(rows) {
         `    compiler: ${formatKeys(row.inferred)}`,
       ]
         .concat(
+          row.review === 'approved' ? [`    approved: ${row.reason}`] : [],
+          row.review === 'changed'
+            ? ['    previous review expired: the memo or compiler keys changed']
+            : [],
           row.comparison === 'different'
             ? [
                 `    manual-only: ${row.manualOnly.join(', ') || '(none)'}`,
@@ -540,6 +603,8 @@ function main() {
       // `memos` only: hide the rows that need no decision.
       undecided: { type: 'boolean', default: false },
       check: { type: 'boolean', default: false },
+      reviews: { type: 'string', default: DEFAULT_REVIEWS },
+      all: { type: 'boolean', default: false },
     },
   })
   const [verb, ...targets] = positionals
@@ -555,15 +620,27 @@ function main() {
     )
   }
   if (verb === 'memos') {
-    const rows = files
-      .flatMap((file) => auditManualMemos(...read(file)))
+    const entries = JSON.parse(fs.readFileSync(path.resolve(values.reviews), 'utf8'))
+    const reviewed = applyMemoReviews(
+      files.flatMap((file) => auditManualMemos(...read(file))),
+      entries,
+    )
+    if (reviewed.problems.length > 0) {
+      process.stderr.write(`${reviewed.problems.join('\n')}\n`)
+      process.exitCode = 2
+      return
+    }
+    const rows = reviewed.rows
+      .filter((row) => values.all || !row.approved)
       .filter(
         (row) => !values.undecided || row.status !== 'needed' || row.comparison === 'different',
       )
     const shown =
       values.check && !values.json ? rows.filter((row) => row.status === 'redundant') : rows
-    print(values.json, shown, [formatAudit(shown), tally(rows)].filter(Boolean).join('\n\n'))
-    if (values.check && rows.some((row) => row.status === 'redundant')) {
+    const approved = reviewed.rows.filter((row) => row.approved).length
+    const summary = [tally(rows), approved ? `approved ${approved}` : ''].filter(Boolean).join(', ')
+    print(values.json, shown, [formatAudit(shown), summary].filter(Boolean).join('\n\n'))
+    if (values.check && rows.some((row) => row.status === 'redundant' && !row.approved)) {
       process.stderr.write('Manual memo check failed: redundant memoization remains.\n')
       process.exitCode = 1
     }
