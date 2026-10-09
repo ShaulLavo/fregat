@@ -1,0 +1,52 @@
+[
+  {
+    "path": "intent.json.gz",
+    "bytes": 260,
+    "sha256": "d65edcbb2f120fe535ff47a3ec61ee2b02b41429b2ec230878b3ac7a1f145275"
+  },
+  {
+    "path": "pair-1/baseline/experiment.json.gz",
+    "bytes": 15006,
+    "sha256": "0ab41c226dca65c4a558d4a49baa91328e2e4b8e3865eb4bbc1b735413aac4c7"
+  },
+  {
+    "path": "pair-1/baseline/singapore-10-0-open.trace.json.gz",
+    "bytes": 484657,
+    "sha256": "7237668d285650359580144d8f32f76bbcf824770def57f410a0908954a93be1"
+  },
+  {
+    "path": "pair-1/candidate/experiment.json.gz",
+    "bytes": 14919,
+    "sha256": "bd0df20f66f080fcf1ccf7833f87ceb9b545e2358453fe2c06eb614b0ded772f"
+  },
+  {
+    "path": "pair-1/candidate/singapore-10-0-open.trace.json.gz",
+    "bytes": 409043,
+    "sha256": "c66fdbb5a8dddf80d4f4b90c14a4ba14d1a9cb0f4aa26a1ccc06620d883af1c9"
+  },
+  {
+    "path": "pair-2/baseline/experiment.json.gz",
+    "bytes": 14938,
+    "sha256": "44e06ce736a1b701a66e350267b58f609fd6a486c8be1834c543e14b462da417"
+  },
+  {
+    "path": "pair-2/baseline/singapore-10-0-open.trace.json.gz",
+    "bytes": 476171,
+    "sha256": "d9e880631610a40feb784f697002df7dc5be9145306f964047c830714158a3e4"
+  },
+  {
+    "path": "pair-2/candidate/experiment.json.gz",
+    "bytes": 14906,
+    "sha256": "0188e0303aa057744bfebbdd72aecdb59337f7dcbb0db773f39f57931bb1c5c9"
+  },
+  {
+    "path": "pair-2/candidate/singapore-10-0-open.trace.json.gz",
+    "bytes": 414864,
+    "sha256": "b4851a91c62b581a3e0ec70d3c95b2c1e54d10d099547d894fc5eb7d458d37ba"
+  },
+  {
+    "path": "trace-analysis.json.gz",
+    "bytes": 446,
+    "sha256": "04019be2a70d1a7a31d8566aa61cc5d0a762e43caa62f1f6b514b06744e4053a"
+  }
+]

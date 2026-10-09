@@ -1,0 +1,102 @@
+[
+  {
+    "path": "cold/baseline/experiment.json.gz",
+    "bytes": 14873,
+    "sha256": "557cc5dc9fa3472858d4ec2d25a88ad614bd3e7180db2cdfa6a27311ac8d39a8"
+  },
+  {
+    "path": "cold/baseline/singapore-10-0-open.trace.json.gz",
+    "bytes": 465009,
+    "sha256": "402a39fc8417a10cdf72cb66e6d825afc29fe6c85df01934260038f66680dbb9"
+  },
+  {
+    "path": "cold/baseline/singapore-10-0.png",
+    "bytes": 230628,
+    "sha256": "375701662a9a9882f648c52cfc3ba4d533818dcff4d6b85d5e2b2e8296255cfc"
+  },
+  {
+    "path": "cold/candidate/experiment.json.gz",
+    "bytes": 14921,
+    "sha256": "e839c1bf34f4cdc880385ac392ad838d419623fbce19f5607151fdba46324b1b"
+  },
+  {
+    "path": "cold/candidate/singapore-10-0-open.trace.json.gz",
+    "bytes": 475065,
+    "sha256": "8253f947723e9450788b7937f3481a27c4755d19bacbab8034a0bb7daf3ef782"
+  },
+  {
+    "path": "cold/candidate/singapore-10-0.png",
+    "bytes": 230628,
+    "sha256": "375701662a9a9882f648c52cfc3ba4d533818dcff4d6b85d5e2b2e8296255cfc"
+  },
+  {
+    "path": "cold-comparison.json.gz",
+    "bytes": 999,
+    "sha256": "33ca926d8c3d9a6e53626986d4246e0bfac5f173807d511cd1dc7fbbdb5871d7"
+  },
+  {
+    "path": "intent.json.gz",
+    "bytes": 465,
+    "sha256": "252b6d787299872b7c31d6a712cf5db31acd2eda436fa7a4643aa62eeac83a79"
+  },
+  {
+    "path": "lazy-point-marshal.ts.gz",
+    "bytes": 1171,
+    "sha256": "9e97c02333309a95a88b7accc9dd1a51d2165211381450b4d0c10f941a36ed2f"
+  },
+  {
+    "path": "lazy-point-node.ts.gz",
+    "bytes": 4279,
+    "sha256": "ee4010ea6a4b0f48ed33a9ce265d0c93c8772694fb6df5e9d3862bfb20610a13"
+  },
+  {
+    "path": "lazy-point-query.ts.gz",
+    "bytes": 7061,
+    "sha256": "52642310bb5cbfb8c554da03262dec6bbec28ff97a7640f3cb76f9c5a8c6ed47"
+  },
+  {
+    "path": "lazy-point-runtime.js.gz",
+    "bytes": 20665,
+    "sha256": "4efaa2ced3cfbe46931ba20ef062d85fc134017f2cda0d30108d91451351b105"
+  },
+  {
+    "path": "lazy-point-tests.ts.gz",
+    "bytes": 944,
+    "sha256": "7a2db86298231253a1cbff803996cac1bfe2139c127f78a575d18d06fecd3abd"
+  },
+  {
+    "path": "warm/baseline/experiment.json.gz",
+    "bytes": 14892,
+    "sha256": "3664d9fe31a228b7fe212664e03753d6027c39eb1ecd8154f1c805d41a30f3a2"
+  },
+  {
+    "path": "warm/baseline/singapore-10-0-open.trace.json.gz",
+    "bytes": 411728,
+    "sha256": "d4c408ad0cd2187aacfc3a72bdfa83e37ff2fe55bbd02ad9335be7a0923d327b"
+  },
+  {
+    "path": "warm/baseline/singapore-10-0.png",
+    "bytes": 230628,
+    "sha256": "375701662a9a9882f648c52cfc3ba4d533818dcff4d6b85d5e2b2e8296255cfc"
+  },
+  {
+    "path": "warm/candidate/experiment.json.gz",
+    "bytes": 14952,
+    "sha256": "dc86342d5837908642b4f56fe16481772a9524d26c320a9ce94ab431043661f7"
+  },
+  {
+    "path": "warm/candidate/singapore-10-0-open.trace.json.gz",
+    "bytes": 384416,
+    "sha256": "36d93d8aead5094d31731c165af76de2db8ee19d1d17470a9bfdd6a163f01b1a"
+  },
+  {
+    "path": "warm/candidate/singapore-10-0.png",
+    "bytes": 230628,
+    "sha256": "375701662a9a9882f648c52cfc3ba4d533818dcff4d6b85d5e2b2e8296255cfc"
+  },
+  {
+    "path": "warm-comparison.json.gz",
+    "bytes": 990,
+    "sha256": "c2c2483f07b429dbef67b556c2a5645ad7940a0ffc238e512c6c575c96a1d9d5"
+  }
+]

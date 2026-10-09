@@ -547,3 +547,22 @@ materializes predicate-bearing matches. Native execution, options, properties,
 text predicates and query-limit semantics stay shared with ordinary matches.
 Injection and fold consumers retain grouped node-bearing matches. A separately
 reviewed runtime PR must precede any consumer dependency pin.
+
+### Compact capture range experiment, 2026-10-09
+
+The native binding candidate adds `Query.captureRanges`, a flat array of capture names and UTF-16 ranges in accepted match order. Predicate-free patterns decode native records without constructing public nodes or points. Predicate-bearing patterns retain grouped node captures in a query-local scratch array. Injection discovery and folds still use ordinary grouped matches. The runtime WASM is unchanged.
+
+A prospective paired experiment used byte-identical root lockfiles after the standalone peer repair. Cold ran baseline then candidate, warm ran candidate then baseline. Both sides observed `matches`, `captures` and `captureRanges` for query calls and match limits. Strict comparison passed environment, fixture, dependency and canonical-output checks. Each sample returned 1,198,376 tokens with the same token, style and structural hashes, 42 query calls, no exceeded match limit and complete coverage through UTF-16 index 10,485,760. These are diagnostic experiments with one repetition per side and condition, not qualification.
+
+| Diagnostic experiment          | Cold baseline | Cold compact ranges | Warm baseline | Warm compact ranges |
+| ------------------------------ | ------------: | ------------------: | ------------: | ------------------: |
+| Complete highlighted frame     |    4,453.6 ms |          4,252.1 ms |    4,447.5 ms |          4,045.4 ms |
+| Worker parse plus query        |    4,264.4 ms |          4,074.9 ms |    4,320.2 ms |          3,891.6 ms |
+| Highlight query and predicates |    1,169.0 ms |            986.8 ms |    1,158.2 ms |            975.1 ms |
+| Overlap resolution             |      138.5 ms |            161.9 ms |      214.7 ms |            223.2 ms |
+
+Retain this candidate for independent runtime review. M1 remains unpassed. Cold worker work exceeds 4,000 ms and both conditions exceed the frozen 25% diagnostic-work reduction ceilings. A qualified window is premature. Capture normalization remains the next bounded allocation experiment; compact ranges still construct a separate normalized capture and string deduplication key for each accepted range.
+
+[Complete evidence](https://github.com/ShaulLavo/fregat/tree/lane/plan-339-capture-profile/editor/docs/performance/singapore-full-parse-2026-10-08/materialization-ranges-experiment) preserves the interrupted initial attempt, the completed dependency-confounded attempt rejected by strict comparison, and the prospective aligned experiment. No raw metadata was edited. Both prior rejected allocation designs, their runtime source snapshots and their traces remain beside it. The aligned runtime JavaScript hash is `011f537e049147dd89e23d8d8335b7f0c46111a42fa1b728e728a54b4c7c413b`.
+
+The real native suite passed 167 tests across 17 files, including grouped and repeated capture predicates, properties, Unicode, range/containing/depth options, disabled captures, match-limit status, callback failure recovery and five grammar fixtures. ESLint, a forced TypeScript build and the ESM bundle build passed. The local immutable dependency cache provides Vitest 3.2.4 while the source manifest declares Vitest 5.0.3; actual CI remains required. The expanded fixture's first run failed an explicit expected-capture count while both APIs agreed. A repeated capture pattern corrected the fixture, and the complete rerun passed.

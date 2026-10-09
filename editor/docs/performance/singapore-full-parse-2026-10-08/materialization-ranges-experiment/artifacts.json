@@ -1,0 +1,217 @@
+[
+  {
+    "path": "aborted.json.gz",
+    "bytes": 331,
+    "sha256": "8c795300bd5642c099f6ad653e5b1864aba27e2885d908e39fbfb8bd8a7707e7"
+  },
+  {
+    "path": "aligned-api/capture-ranges.test.ts.gz",
+    "bytes": 1792,
+    "sha256": "dd3d0dcebead57f66d49aec00194462d2222c2129d9ec382f0c62de8abc4f3ed"
+  },
+  {
+    "path": "aligned-api/cold/baseline/experiment.json.gz",
+    "bytes": 14845,
+    "sha256": "a60c32641fe1924351867fb2bfbf607195a16aeada45f64e95ac3c85fd3a5a72"
+  },
+  {
+    "path": "aligned-api/cold/baseline/singapore-10-0-open.trace.json.gz",
+    "bytes": 467586,
+    "sha256": "140feb4dfa8eb55d8f2f07522a2be89be77f9dba7b437531f68d4d13fcd3c290"
+  },
+  {
+    "path": "aligned-api/cold/baseline/singapore-10-0.png",
+    "bytes": 230628,
+    "sha256": "375701662a9a9882f648c52cfc3ba4d533818dcff4d6b85d5e2b2e8296255cfc"
+  },
+  {
+    "path": "aligned-api/cold/candidate/experiment.json.gz",
+    "bytes": 14735,
+    "sha256": "dfac8870144022a997fb99c4dc06c6be441d96420f895ef77bc232e01dde7031"
+  },
+  {
+    "path": "aligned-api/cold/candidate/singapore-10-0-open.trace.json.gz",
+    "bytes": 435654,
+    "sha256": "bfdbff9d5933fe0b3b32e641e1cb8d28ad9cbb05f421415592fff41df59bddd0"
+  },
+  {
+    "path": "aligned-api/cold/candidate/singapore-10-0.png",
+    "bytes": 230628,
+    "sha256": "375701662a9a9882f648c52cfc3ba4d533818dcff4d6b85d5e2b2e8296255cfc"
+  },
+  {
+    "path": "aligned-api/cold-comparison.json.gz",
+    "bytes": 989,
+    "sha256": "a1dd5b67f9848abf27b548d3e61f36e0235783ff7bffde341fb2fe941a743d11"
+  },
+  {
+    "path": "aligned-api/index.ts.gz",
+    "bytes": 347,
+    "sha256": "ffb0eadf8b761a1405ee440fcb4cb5f10b2ff719ab1d317a15945a285dc0d66d"
+  },
+  {
+    "path": "aligned-api/intent.json.gz",
+    "bytes": 631,
+    "sha256": "5a108544b0dbc0026eb9009d4eea4396722e31866a846791f12ac04acaff811e"
+  },
+  {
+    "path": "aligned-api/query.ts.gz",
+    "bytes": 7761,
+    "sha256": "2ea54e627a04ed4381cf444d5a0c03ab7c0079302974ff59b90b1ba5df4a34a9"
+  },
+  {
+    "path": "aligned-api/runtime.js.gz",
+    "bytes": 21116,
+    "sha256": "2490167543f15e44f56ebbfe8779e9f6149b3a395313ce642408bb6859fba217"
+  },
+  {
+    "path": "aligned-api/warm/baseline/experiment.json.gz",
+    "bytes": 14872,
+    "sha256": "d330897c7219b676b7bbd741a5895466bbd708534918ae6c54c83b4943e10707"
+  },
+  {
+    "path": "aligned-api/warm/baseline/singapore-10-0-open.trace.json.gz",
+    "bytes": 414775,
+    "sha256": "e50b30215e9a6d4cbf73b61fcfe5085c9c953e6b488c10e42e623b81260f2e50"
+  },
+  {
+    "path": "aligned-api/warm/baseline/singapore-10-0.png",
+    "bytes": 230628,
+    "sha256": "375701662a9a9882f648c52cfc3ba4d533818dcff4d6b85d5e2b2e8296255cfc"
+  },
+  {
+    "path": "aligned-api/warm/candidate/experiment.json.gz",
+    "bytes": 14825,
+    "sha256": "b5adfffcdcd75140a2e0e5a4fb28cd3812acbf4bd30365a6951978eb4f97e29f"
+  },
+  {
+    "path": "aligned-api/warm/candidate/singapore-10-0-open.trace.json.gz",
+    "bytes": 372274,
+    "sha256": "467fef531af416b9530ef455e925d24bdd8d16411147cd6e6abdeb232740df63"
+  },
+  {
+    "path": "aligned-api/warm/candidate/singapore-10-0.png",
+    "bytes": 230628,
+    "sha256": "375701662a9a9882f648c52cfc3ba4d533818dcff4d6b85d5e2b2e8296255cfc"
+  },
+  {
+    "path": "aligned-api/warm-comparison.json.gz",
+    "bytes": 989,
+    "sha256": "0af74013fc93a5cd7d111e72a4c27b7aadf24f801952643b2c7e35660a104b38"
+  },
+  {
+    "path": "cold/baseline/experiment.json.gz",
+    "bytes": 14853,
+    "sha256": "0f3a316386af7c351bfd7fa5247b2ff3f97c6caf8d59552a8070128b8ef0d554"
+  },
+  {
+    "path": "cold/baseline/singapore-10-0-open.trace.json.gz",
+    "bytes": 462109,
+    "sha256": "a27ac58b8495c42f2c0bb13b235667e06a7c3a5e7696cf85be39d4ed5a9bc779"
+  },
+  {
+    "path": "cold/baseline/singapore-10-0.png",
+    "bytes": 230628,
+    "sha256": "375701662a9a9882f648c52cfc3ba4d533818dcff4d6b85d5e2b2e8296255cfc"
+  },
+  {
+    "path": "cold/candidate/experiment.json.gz",
+    "bytes": 10550,
+    "sha256": "863f6aff8d5700bce663d19f12bed389c9b49d42be0ef412ec7661e2b440be07"
+  },
+  {
+    "path": "index.ts.gz",
+    "bytes": 347,
+    "sha256": "ffb0eadf8b761a1405ee440fcb4cb5f10b2ff719ab1d317a15945a285dc0d66d"
+  },
+  {
+    "path": "intent.json.gz",
+    "bytes": 386,
+    "sha256": "334cf4c3fe7b931a12bbb66ccb264cd13652f0102f33c881e859e107184247e9"
+  },
+  {
+    "path": "observed-api/classification.json.gz",
+    "bytes": 287,
+    "sha256": "a978b34cceea29641af23d3ca00cf97b994a99c40f566fcc7e94f713e559a518"
+  },
+  {
+    "path": "observed-api/cold/baseline/experiment.json.gz",
+    "bytes": 14860,
+    "sha256": "3b45eba046a2c13618548132aeffdbf7f1412b37af32ebbc08e68d92b3c91778"
+  },
+  {
+    "path": "observed-api/cold/baseline/singapore-10-0-open.trace.json.gz",
+    "bytes": 483765,
+    "sha256": "7a0859434b7420ff4755521ccc14f04dd1e31cf1bd38dc1c9ee026bb511abe11"
+  },
+  {
+    "path": "observed-api/cold/baseline/singapore-10-0.png",
+    "bytes": 230628,
+    "sha256": "375701662a9a9882f648c52cfc3ba4d533818dcff4d6b85d5e2b2e8296255cfc"
+  },
+  {
+    "path": "observed-api/cold/candidate/experiment.json.gz",
+    "bytes": 14812,
+    "sha256": "9b11828d492954985f15c40f80c567e3e64af22740a20ef806027bb2c8e4ce5e"
+  },
+  {
+    "path": "observed-api/cold/candidate/singapore-10-0-open.trace.json.gz",
+    "bytes": 440875,
+    "sha256": "d79f3828f7a3b2e5c740b39833f50e6c580152470d8e20d2ec44a62ffe164196"
+  },
+  {
+    "path": "observed-api/cold/candidate/singapore-10-0.png",
+    "bytes": 230628,
+    "sha256": "375701662a9a9882f648c52cfc3ba4d533818dcff4d6b85d5e2b2e8296255cfc"
+  },
+  {
+    "path": "observed-api/cold-comparison.json.gz",
+    "bytes": 20,
+    "sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  {
+    "path": "observed-api/intent.json.gz",
+    "bytes": 454,
+    "sha256": "cb9349decff1f65a2c6e6c7db0aea18d7dd65a28a767569e888b94d5f7328494"
+  },
+  {
+    "path": "observed-api/warm/baseline/experiment.json.gz",
+    "bytes": 14905,
+    "sha256": "6b7a0cf43ff72e7dacbdaac52161e03e11c36c72cbd965d7380773cafc46291d"
+  },
+  {
+    "path": "observed-api/warm/baseline/singapore-10-0-open.trace.json.gz",
+    "bytes": 423067,
+    "sha256": "62c3e5887358177bacf8c450383fa9650549726f81a45afc305c90ab245d241d"
+  },
+  {
+    "path": "observed-api/warm/baseline/singapore-10-0.png",
+    "bytes": 230628,
+    "sha256": "375701662a9a9882f648c52cfc3ba4d533818dcff4d6b85d5e2b2e8296255cfc"
+  },
+  {
+    "path": "observed-api/warm/candidate/experiment.json.gz",
+    "bytes": 14802,
+    "sha256": "9f66e983c136ef1fd4531cdc2deedc33eccd271cf4e2928282edb51968e3505d"
+  },
+  {
+    "path": "observed-api/warm/candidate/singapore-10-0-open.trace.json.gz",
+    "bytes": 371246,
+    "sha256": "048eebb6efaa70885b64bacf5c3939f69b49dae6598cfc9eb0858c092e4173e1"
+  },
+  {
+    "path": "observed-api/warm/candidate/singapore-10-0.png",
+    "bytes": 230628,
+    "sha256": "375701662a9a9882f648c52cfc3ba4d533818dcff4d6b85d5e2b2e8296255cfc"
+  },
+  {
+    "path": "query.ts.gz",
+    "bytes": 7762,
+    "sha256": "2f589277db6e28879699d2faa88fe3f73d54cbf9ab2e451b3e33aa5757d13583"
+  },
+  {
+    "path": "runtime.js.gz",
+    "bytes": 21227,
+    "sha256": "27fd6df511f1dee98b6466c681983a8d5fb58a029420157b8c873fe2ecccb4b6"
+  }
+]
