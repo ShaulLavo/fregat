@@ -140,6 +140,85 @@ describe('review failure boundaries', () => {
     expect(terminal.visibleLines()).toEqual(accepted)
   })
 
+  it.each([
+    { backend: 'webgl', coordinated: false, failure: 'acknowledge' },
+    { backend: 'webgpu', coordinated: false, failure: 'acknowledge' },
+    { backend: 'webgpu', coordinated: true, failure: 'acknowledge' },
+    { backend: 'webgpu', coordinated: true, failure: 'acceptFrame' },
+  ] as const)(
+    'stages $backend coordinated=$coordinated acceptance through $failure without prior text demand',
+    async ({ backend, coordinated, failure }) => {
+      const { terminal, session, renderer, clock, errors } = await fixture(backend, coordinated)
+      const retainedText = vi.spyOn(runtime.bridge, 'readRetainedText')
+      const capture = vi.spyOn(runtime.bridge, 'captureRetainedFrame')
+      cleanups.push(() => {
+        retainedText.mockRestore()
+        capture.mockRestore()
+      })
+      terminal.write('accepted 界 é')
+      clock.flush()
+      const accepted = terminal.submittedFrame
+      const expected = session.renderState.readTextRows!().map((row) => row.text)
+      expect(retainedText).not.toHaveBeenCalled()
+      const captures = capture.mock.calls.length
+      const fail =
+        failure === 'acknowledge'
+          ? vi.spyOn(session.renderState, 'acknowledge')
+          : vi.spyOn(Reflect.get(renderer!, 'textPass') as { acceptFrame(): void }, 'acceptFrame')
+      fail.mockImplementation(() => {
+        throw new TypeError('injected acceptance failure')
+      })
+      cleanups.push(() => fail.mockRestore())
+      terminal.write('\rpending after failure 🧑‍💻')
+      clock.flush()
+      expect(capture.mock.calls.length).toBeGreaterThan(captures)
+      expect(errors).toHaveLength(1)
+      expect(terminal.submittedFrame).toEqual(accepted)
+      expect(terminal.visibleLines()).toEqual(expected)
+      expect(terminal.frameSnapshot()?.rows.map((row) => row.text)).toEqual(expected)
+      fail.mockRestore()
+      terminal.refresh(0, 3)
+      clock.flushTimers()
+      clock.flush()
+      expect(terminal.visibleLines()[0]).toContain('pending after failure 🧑‍💻')
+      expect(terminal.submittedFrame!.frame).toBeGreaterThan(accepted!.frame)
+    },
+  )
+
+  it.each([
+    { backend: 'webgl', coordinated: false },
+    { backend: 'webgpu', coordinated: false },
+    { backend: 'webgpu', coordinated: true },
+  ] as const)(
+    'keeps $backend coordinated=$coordinated accepted text through an upload failure without prior text demand',
+    async ({ backend, coordinated }) => {
+      const { terminal, session, renderer, clock, errors } = await fixture(backend, coordinated)
+      terminal.write('accepted before upload 界')
+      clock.flush()
+      const accepted = terminal.submittedFrame
+      const expected = session.renderState.readTextRows!().map((row) => row.text)
+      const pass =
+        backend === 'webgl'
+          ? (Reflect.get(renderer!, 'state') as { pass: { uploadFrame(): number } }).pass
+          : (Reflect.get(renderer!, 'textPass') as { uploadFrame(): number })
+      const upload = vi.spyOn(pass, 'uploadFrame').mockImplementation(() => {
+        throw new TypeError('injected upload failure')
+      })
+      cleanups.push(() => upload.mockRestore())
+      terminal.write('\rpending after upload failure')
+      clock.flush()
+      expect(errors).toHaveLength(1)
+      expect(terminal.submittedFrame).toEqual(accepted)
+      expect(terminal.visibleLines()).toEqual(expected)
+      expect(terminal.frameSnapshot()?.rows.map((row) => row.text)).toEqual(expected)
+      upload.mockRestore()
+      terminal.refresh(0, 3)
+      clock.flushTimers()
+      clock.flush()
+      expect(terminal.visibleLines()[0]).toContain('pending after upload failure')
+    },
+  )
+
   it.each(['captureRetainedFrame', 'readTextRows'] as const)(
     'reports and recovers %s failure through coordinated WebGPU commits',
     async (operation) => {

@@ -163,9 +163,10 @@ rows internally. All renderers expose the same text API. Internal native frame i
 inside the library.
 
 WebGL and WebGPU update retained text from native logical row damage. Grid or fitted-font
-changes and native full damage refresh the complete viewport. Retention advances after every
-required row has been captured successfully. Pending writes and failed submissions preserve
-text from the last accepted frame; previously returned owned rows remain valid.
+changes and native full damage refresh the complete viewport. Capture stages the next retained
+frame. The renderer accepts it after submission, damage acknowledgement and frame commit finish;
+any failure discards that pending capture. The preceding accepted metadata, lazy text and styled
+snapshot stay readable until the next acceptance. Previously returned owned rows remain valid.
 
 Native retention owns at most three cell-array slots after a completed capture, plus frame and
 row metadata, separately allocated grapheme data, and reader scratch storage. A grid-size
