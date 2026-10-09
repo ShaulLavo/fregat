@@ -1,8 +1,8 @@
 import {
   isCombiningMark,
   isVariationSelector,
-  nextGraphemeBoundary,
   segmentGraphemes,
+  type TextSegment,
 } from '../graphemes'
 
 /**
@@ -67,6 +67,8 @@ export function lineBreakRules(config: WrapConfig): LineBreakRules {
 export type UnbreakableRuns = readonly (readonly [start: number, end: number])[]
 
 const NO_RUNS: UnbreakableRuns = []
+let lastSegmentedChunk: string | null = null
+let lastChunkSegments: readonly TextSegment[] | null = null
 
 export function createWordWrapLine(): WordWrapLine {
   return {
@@ -110,14 +112,20 @@ export function appendWordWrapText(
 ): void {
   const chunk = line.pending + text.slice(from, to)
   if (chunk.length === 0) return
-  const tail = pendingClusterStart(chunk)
+  const segments = chunk === lastSegmentedChunk ? lastChunkSegments : wrapSegments(chunk)
+  lastSegmentedChunk = chunk
+  lastChunkSegments = segments
+  const tail = pendingClusterStart(chunk, segments)
   line.pending = chunk.slice(tail)
-  appendCompleteWrapText(line, chunk, tail, rules, runs)
+  appendCompleteWrapText(line, chunk, tail, rules, runs, segments)
 }
 
-function pendingClusterStart(text: string): number {
-  if (!/[\u0300-\uffff]/.test(text)) return text.length - 1
-  const segments = segmentGraphemes(text)
+function wrapSegments(text: string): readonly TextSegment[] | null {
+  return /[\u0300-\uffff]/.test(text) ? segmentGraphemes(text) : null
+}
+
+function pendingClusterStart(text: string, segments: readonly TextSegment[] | null): number {
+  if (!segments) return text.length - 1
   const last = text.charCodeAt(text.length - 1)
   // A high surrogate may become a joining modifier or regional indicator in the next chunk.
   const pending = last >= 0xd800 && last <= 0xdbff ? -2 : -1
@@ -132,7 +140,7 @@ export function finishWordWrapLine(
 ): void {
   const text = line.pending
   line.pending = ''
-  appendCompleteWrapText(line, text, text.length, rules, runs)
+  appendCompleteWrapText(line, text, text.length, rules, runs, wrapSegments(text))
 }
 
 function appendCompleteWrapText(
@@ -141,6 +149,7 @@ function appendCompleteWrapText(
   to: number,
   rules: LineBreakRules,
   runs: UnbreakableRuns,
+  segments: readonly TextSegment[] | null,
 ): void {
   const { width, words, advance } = rules
   const tabStop = advance ? rules.tabSize * advance(32) : rules.tabSize
@@ -149,8 +158,9 @@ function appendCompleteWrapText(
   let previousCjk = line.previousCjk
   let run = firstRunEndingAtOrAfter(runs, length)
   let passedRunEnd = -1
+  let cluster = 0
   for (let index = 0; index < to;) {
-    const end = nextGraphemeBoundary(text, index)
+    const end = segments ? (segments[++cluster]?.index ?? text.length) : index + 1
     const code = text.charCodeAt(index)
     const space = code === 32 || code === 9
     const cjk = code >= 0x2e80 && isCjkCodeUnit(code)
