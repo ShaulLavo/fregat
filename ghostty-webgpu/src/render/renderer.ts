@@ -97,6 +97,8 @@ type TerminalRendererMode = 'auto' | 'canvas2d-fill-text' | 'canvas2d-pixels'
 export type CanvasPaintMode = 'fill-text' | 'pixels'
 
 export interface WebGpuTerminalRendererOptions {
+  /** Eligibility for built-in device acquisition; custom device factories own their policy. */
+  adapterPolicy?: 'hardware' | 'any'
   canvas: HTMLCanvasElement | OffscreenCanvas
   columns: number
   cursorBlink?: boolean
@@ -336,12 +338,9 @@ export class WebGpuTerminalRenderer {
     }
   }
 
-  static async create(
-    options: WebGpuTerminalRendererOptions,
-    adapterPolicy: 'hardware' | 'any' = 'any',
-  ): Promise<WebGpuTerminalRenderer> {
+  static async create(options: WebGpuTerminalRendererOptions): Promise<WebGpuTerminalRenderer> {
     const validated = validateRenderer(options)
-    let owner = adapterPolicy === 'hardware' ? hardwareDeviceOwner : defaultDeviceOwner
+    let owner = options.adapterPolicy === 'hardware' ? hardwareDeviceOwner : defaultDeviceOwner
     if (options.deviceFactory) owner = new DeviceOwner(options.deviceFactory)
     const lease = await owner.acquire()
     let prepared: PreparedRenderer | undefined
@@ -923,7 +922,8 @@ export class WebGpuTerminalRenderer {
     try {
       this.deviceLease.retire()
       return await this.deviceOwner.acquire()
-    } catch {
+    } catch (cause) {
+      this.reportFrameFailure(cause)
       return undefined
     }
   }
