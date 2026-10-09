@@ -78,7 +78,8 @@ export class FrameObserver {
     if (!onFrame && !onTextFrame && !onDisplayedFrame)
       return this.rowDelivery(generation, changedRows, rows)
     const retain = (state as DisplayedFrameSource)[retainDisplayedFrame]
-    const needsRows = this.rowsNeeded || !this.options.retainDisplayedText || !retain
+    const needsRows =
+      this.rowsNeeded || Boolean(onDisplayedFrame && (!this.options.retainDisplayedText || !retain))
     // Extraction can fail; finish it before rotating the accepted native reader.
     const previousTextRows = needsRows ? this.displayedFrame?.readTextRows() : undefined
     if (needsRows) this.updateRows(state, changed, rows)
