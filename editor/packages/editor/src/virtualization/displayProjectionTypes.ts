@@ -23,6 +23,7 @@ export type DisplayProjectionConfig = {
 export type WrapAdvance = {
   readonly width: number
   readonly advance: (codePoint: number) => number
+  readonly measure?: (text: string) => number
   /** The table `advance` reads, so a face change is visible by identity. */
   readonly glyphs?: object
 }

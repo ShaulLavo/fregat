@@ -627,6 +627,9 @@ The original 200 MiB geometry failure remains a blocker for publishing a full co
 
 ## Approved follow-up: explicit FreeSans geometry
 
+- [x] Reproduce the explicit FreeSans failures, fix shaped-run measurement, and keep the unchanged
+      native geometry assertions in CI with a licensed package-local font fixture.
+
 An exploratory DPR-1 run on 2026-10-09 exposed additional proportional-font failures with
 Ubuntu `fonts-freefont-ttf_20211204+svn4273-2`, explicitly loaded as the test face. This is
 separate from the five CI-runner assertions: DejaVu Serif reproduces the Firefox runner's
@@ -649,10 +652,26 @@ owner-host archive is `/work/reports/virtualizer-cross-engine-2026-10-09/ci-font
 assertions, and `provenance.json` records the font packages and successful runner-font controls.
 Keep these machine-specific inputs out of committed tests.
 
-The likely boundary is summed single-glyph canvas advances in
-`editor/packages/editor/src/virtualization/glyphAdvances.ts` versus native shaped runs; this
-attribution remains unconfirmed. Investigate native caret reachability and shaping/hinting before
-choosing a fix. Preserve the existing bounds and add a portable failing-first font fixture.
+Confirmed on 2026-10-09. All eight failures share one cause: geometry sums isolated glyph
+advances while native layout shapes runs. In Firefox, ten `i` characters measure `27.9333` pixels
+as a run and `28.8333` as isolated glyphs; WebKit gives `27.9240` versus `28.8600`. Document and
+offscreen canvases agree with native element and Range widths, so font loading is not the cause.
+FreeSans also forms `ffi` ligatures in all three engines.
+
+Proportional row prefixes and viewport lookup now measure bounded runs, and wrapping measures
+complete row candidates across storage chunks and resets shaping at row breaks and tabs. The
+monospace path keeps its existing advance rules. The retained 96-case harness passes unchanged,
+and the package-local fixture reproduces the same eight failures before the product fix.
+Evidence is in `/work/reports/freesans-geometry/`, including native measurements, failing-first
+logs, the exact harness result, full browser checks and Node/DOM checks.
+
+A separate native tab-stop observation needs its own fix. With explicitly loaded FreeSans at
+13px and `tab-size:4`, Firefox's native element for `iiii\tAV\tffi` advances 13 pixels further
+than the current next-stop formula in `proportionalRows.ts` and `wordWrap.ts`. The shorter
+`iii\tAV\tffi` control agrees in all engines. Reproduce by extending
+`test/freeSansShaping.browser.test.ts` with the four-`i` case; its unchanged 0.05px bound fails
+only in Firefox. `/work/reports/freesans-geometry/shaping-regressions.log` retains the failure.
+The CSS minimum space before a tab stop is a candidate cause, not a confirmed attribution.
 
 ## Kickoff prompt for an executing coordinator
 

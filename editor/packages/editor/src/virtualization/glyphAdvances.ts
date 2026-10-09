@@ -1,10 +1,12 @@
 /**
  * Per-face glyph advances from a 2D canvas. Wrapping measures monospace faces too, because CJK and
- * fallback glyphs can exceed one cell. Summed advances omit shaping, so callers leave a margin.
+ * fallback glyphs can exceed one cell. Proportional geometry measures complete shaped runs.
  */
 export type GlyphAdvances = {
   /** The advance of one code point, in CSS pixels. */
   advance(codePoint: number): number
+  /** Native shaping of a complete run, including kerning and ligatures. */
+  readonly measure?: (text: string) => number
 }
 
 type MeasureContext = {
@@ -65,6 +67,11 @@ function createGlyphAdvances(
   }
 
   return {
+    measure(text) {
+      context.font = font
+      if ('letterSpacing' in context) context.letterSpacing = letterSpacing
+      return context.measureText(text).width
+    },
     advance(codePoint) {
       if (codePoint < BMP_SIZE) {
         const known = bmp[codePoint]!

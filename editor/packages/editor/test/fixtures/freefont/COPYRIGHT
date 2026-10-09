@@ -97,3 +97,10 @@ License: GPL-3+ with Special Font Exception
  itself, and we recommend releasing modified versions that way. If it does,
  then users will likewise be permitted to embed the modified version in
  documents and be exempt from the GNU GPL requirements on those documents.
+
+Fixture provenance:
+ FreeSans.ttf is unmodified from Ubuntu fonts-freefont-ttf_20211204+svn4273-2_all.deb.
+ Font SHA-256: 350badd6ab6a58e7fd7a0ea2ae0c10174941a08e1cd06b3c6010e10b3d5ae319
+ Binary package: https://archive.ubuntu.com/ubuntu/pool/main/f/fonts-freefont/fonts-freefont-ttf_20211204+svn4273-2_all.deb
+ Corresponding source: https://archive.ubuntu.com/ubuntu/pool/main/f/fonts-freefont/fonts-freefont_20211204+svn4273.orig.tar.gz
+ The complete GPL version 3 is in LICENSE beside this file. The Special Font Exception is above.
