@@ -1,3 +1,4 @@
+import { finalize } from '@/utils/finalize'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useCommandFocus } from '@/commands/hooks/use-command-focus'
 import { useCommands } from '@/commands/hooks/use-commands'
@@ -46,14 +47,19 @@ export function PathDialog({
     if (busy || !path.trim()) return
     setBusy(true)
     setError('')
-    try {
-      await onSubmit(path.trim())
-      if (mounted.current) onClose()
-    } catch (failure) {
-      setError(connectionFailure(failure).message)
-    } finally {
-      setBusy(false)
-    }
+    return await finalize(
+      async () => {
+        try {
+          await onSubmit(path.trim())
+          if (mounted.current) onClose()
+        } catch (failure) {
+          setError(connectionFailure(failure).message)
+        }
+      },
+      () => {
+        setBusy(false)
+      },
+    )
   }
   return (
     <Dialog

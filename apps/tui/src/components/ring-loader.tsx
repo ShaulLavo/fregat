@@ -4,15 +4,16 @@ import type { Theme } from '@/theme/utils/theme'
 
 export function RingLoader({
   theme,
-  reducedMotion = theme.reducedMotion,
+  reducedMotion,
   label,
 }: {
   theme: Theme
   reducedMotion?: boolean
   label?: string
 }) {
+  const reduced = reducedMotion ?? theme.reducedMotion
   const frames = theme.noColor ? plainFrames : ringFrames
-  const frame = useLoaderFrame(frames.length, 250, reducedMotion)
+  const frame = useLoaderFrame(frames.length, 250, reduced)
   return (
     <text fg={theme.mutedForeground}>
       {frames[frame]}

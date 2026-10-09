@@ -11,6 +11,7 @@ const REPOSITORY = path.resolve(import.meta.dirname, '../..')
 // The design census's roots plus the tree fork, which holds React the design census does not read.
 const DEFAULT_ROOTS = [
   'apps/web/src',
+  'apps/tui/src',
   'packages/markdown/src',
   'packages/tree/src',
   'packages/ui/src',

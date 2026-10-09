@@ -1,3 +1,4 @@
+import { finalize } from '@/utils/finalize'
 import '@/terminal/state/renderable'
 import { createHostClipboard, type EmbeddedTerminalRenderable } from '@opentui/core'
 import { useRenderer } from '@opentui/react'
@@ -170,20 +171,24 @@ export function TerminalView({
         disabledReason: () =>
           host.attachTerminal ? null : 'Raw attach requires an interactive host terminal.',
         run: async () => {
-          if (!host.attachTerminal || attached.current) return
+          const attach = host.attachTerminal
+          if (!attach || attached.current) return
           attached.current = true
-          try {
-            await host.attachTerminal({
-              signal: session.signal,
-              open: () =>
-                openTerminalConnection(session, { worktreeId, terminalId, agentSessionId }),
-            })
-          } finally {
-            attached.current = false
-            if (terminal.current)
-              connection.current?.resize(terminal.current.width, terminal.current.height)
-            terminal.current?.invalidate()
-          }
+          return await finalize(
+            async () => {
+              await attach.call(host, {
+                signal: session.signal,
+                open: () =>
+                  openTerminalConnection(session, { worktreeId, terminalId, agentSessionId }),
+              })
+            },
+            () => {
+              attached.current = false
+              if (terminal.current)
+                connection.current?.resize(terminal.current.width, terminal.current.height)
+              terminal.current?.invalidate()
+            },
+          )
         },
       },
     },

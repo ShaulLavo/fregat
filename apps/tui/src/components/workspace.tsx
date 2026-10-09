@@ -142,11 +142,12 @@ export function Workspace({
     setOverlay(null)
     restore.current = active.origin
   }
-  function openSettings(query = search.current) {
+  function openSettings(query?: string) {
+    const nextQuery = query ?? search.current
     navigationRequest.current += 1
-    search.current = query
-    setSettingsQuery(query)
-    history.visit({ kind: 'settings', query })
+    search.current = nextQuery
+    setSettingsQuery(nextQuery)
+    history.visit({ kind: 'settings', query: nextQuery })
     if (currentOverlay.current) {
       setOverlay(null)
       restore.current = null
@@ -189,6 +190,13 @@ export function Workspace({
       session.record({ action: 'tui.files.open.failed', ...reason })
     })
   }
+  function visitWorkbench(location: WorkbenchLocation, replace = false) {
+    navigationRequest.current += 1
+    if (replace) history.replace(location)
+    else history.visit(location)
+    setOverlay(null)
+    restore.current = undefined
+  }
   function openBrowserFile(path: string) {
     const current = history.getSnapshot().current
     if (current.kind !== 'files') return
@@ -199,13 +207,6 @@ export function Workspace({
     )
       rootPath = current.workbenchRoot
     visitWorkbench({ kind: 'workbench', rootPath, pane: 'files', path, tree: false })
-  }
-  function visitWorkbench(location: WorkbenchLocation, replace = false) {
-    navigationRequest.current += 1
-    if (replace) history.replace(location)
-    else history.visit(location)
-    setOverlay(null)
-    restore.current = undefined
   }
   function openAgentFile({
     rootPath,
