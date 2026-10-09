@@ -56,6 +56,8 @@ export class ZigFrameBuilder {
       this.setUint(112, 0)
       this.setUint(124, 0)
       this.setUint(128, 0)
+      this.setUint(132, 0)
+      this.setUint(136, 0)
       this.cellPointer = this.allocate(columns * rows * 64)
       this.glyphPointer = this.allocate(columns * rows * 96)
       this.index = this.runtime.bridge.createGlyphIndex()
@@ -105,6 +107,13 @@ export class ZigFrameBuilder {
     )
   }
 
+  private physicalRows?: number[]
+
+  get rowChanges(): number {
+    this.ensureActive()
+    return this.runtime.memory.view.getUint32(this.frame + 136, true)
+  }
+
   get rowOffset(): number {
     this.ensureActive()
     return this.runtime.memory.view.getUint32(this.frame + 124, true)
@@ -148,10 +157,8 @@ export class ZigFrameBuilder {
 
   build(options: ZigFrameOptions): number {
     this.ensureActive()
-    const layoutChanged = this.stableRows !== Boolean(options.stableRows)
-    const full = options.full || layoutChanged
-    if (layoutChanged) this.setUint(124, 0)
-    this.setUint(128, options.stableRows ? 1 : 0)
+    const full = options.full
+    this.setUint(132, options.stableRows ? 1 : 0)
     const { memory } = this.runtime
     memory.bytes.fill(0, this.mask, this.mask + this.rows)
     for (const row of options.overlayRows) {
@@ -190,6 +197,15 @@ export class ZigFrameBuilder {
         this.frame,
       ),
     )
+    if (this.rowChanges !== 0) {
+      const offset = this.rowOffset
+      if (offset === 0) this.physicalRows = undefined
+      if (offset !== 0) {
+        this.physicalRows ??= new Array<number>(this.rows)
+        for (let row = 0; row < this.rows; row += 1)
+          this.physicalRows[row] = (row + this.rows - offset) % this.rows
+      }
+    }
     return this.runtime.memory.view.getUint32(this.frame + 44, true)
   }
 
@@ -207,8 +223,9 @@ export class ZigFrameBuilder {
           byteOffset: view.getUint32(pointer + 8, true),
           byteLength: view.getUint32(pointer + 12, true),
         },
-        row:
-          (Math.floor(byteOffset / (this.columns * 64)) + this.rows - this.rowOffset) % this.rows,
+        row: this.physicalRows
+          ? this.physicalRows[Math.floor(byteOffset / (this.columns * 64))]!
+          : Math.floor(byteOffset / (this.columns * 64)),
       })
     }
     return result

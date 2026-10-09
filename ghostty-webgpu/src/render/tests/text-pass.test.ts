@@ -205,16 +205,54 @@ it('coalesces twelve full rows to two uploads with native glyph bytes and preser
   )
 })
 
-it.each([0, 1])('uses bounding spans only without retained rows: rowReuses=%s', (rowReuses) => {
+it.each([0, 1, 11])('does zero mapping work on edit frames at offset %s', (rowOffset) => {
   const fixture = gpuFixture()
-  const data = { ...frame(), rowReuses }
+  const data = {
+    ...frame(),
+    columns: 40,
+    rowHeight: 16,
+    rowOffset,
+    stableRows: rowOffset !== 0,
+    rowChanges: 1,
+  }
+  fixture.pass.uploadFrame(data, [])
+  fixture.writes.length = 0
+  let addedWork = 0
+  for (const key of ['columns', 'rowHeight', 'rowOffset', 'stableRows'] as const) {
+    const value = data[key]
+    Object.defineProperty(data, key, {
+      get() {
+        addedWork += 1
+        return value
+      },
+    })
+  }
+  data.rowChanges = 0
+  const updates = [update(0, 0, 64, 0, 96), update(3, 256, 64, 384, 96)]
+  expect(fixture.pass.uploadFrame(data, updates)).toBe(2)
+  expect(addedWork).toBe(0)
+  expect(fixture.writes.map((write) => [write.offset, write.bytes.byteLength])).toEqual([
+    [0, 320],
+    [0, 480],
+  ])
+  for (const write of fixture.writes) {
+    const source = write.buffer === fixture.buffers[0] ? data.cellData : data.glyphData
+    expect(write.bytes).toEqual(
+      new Uint8Array(source.buffer, source.byteOffset + write.offset, write.bytes.byteLength),
+    )
+  }
+})
+
+it.each([0, 1])('uses sparse spans only on moved rows: rowChanges=%s', (rowChanges) => {
+  const fixture = gpuFixture()
+  const data = { ...frame(), rowChanges }
   const operations = fixture.pass.uploadFrame(data, [
     update(0, 0, 64, 0, 96),
     update(3, 256, 64, 384, 96),
   ])
-  expect(operations).toBe(rowReuses === 0 ? 2 : 4)
+  expect(operations).toBe(rowChanges === 0 ? 2 : 4)
   expect(fixture.writes.map((write) => [write.offset, write.bytes.byteLength])).toEqual(
-    rowReuses === 0
+    rowChanges === 0
       ? [
           [0, 320],
           [0, 480],
@@ -236,7 +274,7 @@ it.each([0, 1])('uses bounding spans only without retained rows: rowReuses=%s', 
 
 it('merges touching changes and keeps untouched resident gaps', () => {
   const fixture = gpuFixture(),
-    data = frame()
+    data = { ...frame(), rowChanges: 1 }
   expect(
     fixture.pass.uploadFrame(data, [
       update(2, 128, 64, 192, 96),
@@ -255,7 +293,7 @@ it('merges touching changes and keeps untouched resident gaps', () => {
 
 it('counts only changed sparse spans', () => {
   const fixture = gpuFixture(),
-    data = frame()
+    data = { ...frame(), rowChanges: 1 }
   expect(
     fixture.pass.uploadFrame(data, [update(0, 64, 64, 96, 96), update(3, 256, 64, 384, 96)]),
   ).toBe(4)
@@ -271,7 +309,14 @@ it('counts only changed sparse spans', () => {
 
 it('counts row-remap uniform writes separately from instance uploads', () => {
   const fixture = gpuFixture()
-  const data = { ...frame(), columns: 40, rowHeight: 16, rowOffset: 1, stableRows: true }
+  const data = {
+    ...frame(),
+    columns: 40,
+    rowHeight: 16,
+    rowOffset: 1,
+    stableRows: true,
+    rowChanges: 1,
+  }
   expect(fixture.pass.uploadFrame(data, [])).toBe(0)
   expect(fixture.writes).toHaveLength(1)
   expect(fixture.writes[0]!.offset).toBe(8)

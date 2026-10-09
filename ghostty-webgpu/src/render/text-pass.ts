@@ -92,6 +92,7 @@ export class WebGpuTextPass {
   private rowOffset = 0
   private rowHeight = 0
   private rowColumns = 0
+  private rowsInitialized = false
 
   constructor(options: WebGpuTextPassOptions) {
     this.device = options.device
@@ -159,14 +160,18 @@ export class WebGpuTextPass {
       readonly columns?: number
       readonly rowHeight?: number
       readonly rowOffset?: number
-      readonly rowReuses?: number
+      readonly rowChanges?: number
       readonly stableRows?: boolean
     },
     updates: readonly RowInstanceUpdate[],
   ): number {
     this.frameUploadedBytesValue = 0
-    this.uploadRows(data)
-    const plan = data.rowReuses === 0 ? planUploadRanges(updates) : planSparseUploadRanges(updates)
+    const changes = data.rowChanges ?? 0
+    if (!this.rowsInitialized || changes !== 0) {
+      this.uploadRows(data)
+      this.rowsInitialized = true
+    }
+    const plan = (changes & 1) === 0 ? planUploadRanges(updates) : planSparseUploadRanges(updates)
     const cellData = data.cellData
     const glyphData = data.glyphData
     for (const range of plan.cell) this.writeRange(this.cellBuffer, cellData, range)

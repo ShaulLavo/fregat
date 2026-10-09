@@ -129,6 +129,58 @@ describe('WASM frame records', () => {
     },
   )
 
+  it('keeps the stock layout until actual row movement and preserves it across edits', async () => {
+    runtime = await GhosttyRuntime.create()
+    const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('a0\r\na1\r\na2\r\na3')
+    state.update()
+    builder = state.createFrameBuilder(24, 4)
+    readyFrame({ ...options, stableRows: true })
+    expect(builder.stableRows).toBe(false)
+    for (const scroll of [false, true]) {
+      if (scroll) {
+        state.acknowledge()
+        terminal.write('\x1b[4;1H\r\na0')
+        state.update()
+        readyFrame({ ...options, stableRows: true, full: false })
+        expect(builder.rowOffset).toBe(1)
+      }
+      state.acknowledge()
+      terminal.write('\x1b[2;5Hb')
+      state.update()
+      readyFrame({ ...options, stableRows: true, full: false })
+      expect(builder.rowChanges).toBe(0)
+      expect(builder.rowOffset).toBe(scroll ? 1 : 0)
+      expect(builder.stableRows).toBe(scroll)
+      const cell = new Uint8Array(
+        builder.cellData.buffer,
+        builder.cellData.byteOffset,
+        builder.cellData.byteLength,
+      ).slice()
+      const glyph = new Uint8Array(
+        builder.glyphData.buffer,
+        builder.glyphData.byteOffset,
+        builder.glyphData.byteLength,
+      ).slice()
+      readyFrame({ ...options, stableRows: true })
+      expect(
+        new Uint8Array(
+          builder.cellData.buffer,
+          builder.cellData.byteOffset,
+          builder.cellData.byteLength,
+        ),
+      ).toEqual(cell)
+      expect(
+        new Uint8Array(
+          builder.glyphData.buffer,
+          builder.glyphData.byteOffset,
+          builder.glyphData.byteLength,
+        ),
+      ).toEqual(glyph)
+    }
+  })
+
   it('reports every logical row moved by a physical instance ring', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
@@ -142,6 +194,11 @@ describe('WASM frame records', () => {
     state.update()
     readyFrame({ ...options, stableRows: true, full: false })
     expect(builder.rowOffset).toBe(1)
+    state.acknowledge()
+    terminal.write('\r\na0')
+    state.update()
+    readyFrame({ ...options, stableRows: true, full: false })
+    expect(builder.rowOffset).toBe(2)
     expect(builder.changedRanges().map((range) => range.row)).toEqual([0, 1, 2, 3])
     expect(
       builder
@@ -149,7 +206,7 @@ describe('WASM frame records', () => {
         .slice(0, 3)
         .every((range) => range.cell.byteLength === 0 && range.glyph.byteLength === 0),
     ).toBe(true)
-    expect(builder.changedRanges().at(-1)?.glyph.byteOffset).toBe(0)
+    expect(builder.changedRanges().at(-1)?.glyph.byteOffset).toBe(24 * 96)
   })
 
   it('rebuilds all records when a replacement device changes the physical row layout', async () => {
