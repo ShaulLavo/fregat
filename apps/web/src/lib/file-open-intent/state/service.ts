@@ -3,7 +3,7 @@ import { isRecord } from '@workspace/utils/objects'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { DocumentKey, FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import type { QueryClient } from '@tanstack/react-query'
-import { type EditorTextBuffer } from '@singapore-editor/core/document'
+import { type EditorTextBuffer, type PieceTableSnapshot } from '@singapore-editor/core/document'
 import { type EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
 import {
   type EditorPreparedDocument,
@@ -25,11 +25,6 @@ import {
   prefetchSurfaceEnabled,
   SPECULATIVE_PREFETCH_LIMIT,
 } from '@/lib/intent-prefetch/state/scheduler'
-import type {
-  PreparedCleanFileOpenClaim,
-  PreparedFileOpenClaim,
-  PreparedLiveFileOpenClaim,
-} from '@/lib/file-open-intent/types'
 import { createWideEventScope } from '@/lib/wide-event-scope'
 import type { WideEventScope } from '@workspace/observability/scope'
 import { createClientInvariantError } from '@/lib/structured-errors'
@@ -58,6 +53,24 @@ export type FileOpenIntentPreparationSource = {
 }
 
 export type FileOpenIntentInterest = { release(): void }
+
+/** One holder's share of a preparation; the preparation is disposed when its last holder releases. */
+export type FileOpenIntentPreparedLease = {
+  readonly buffer: EditorTextBuffer
+  readonly document: EditorPreparedDocument
+  readonly documentKey: DocumentKey
+  readonly fileVersion: string | null
+  readonly localRevision: number
+  readonly path: FilesystemPath
+  readonly snapshot: PieceTableSnapshot
+  release(): void
+}
+
+type FileOpenIntentJoin = {
+  readonly documentKey: DocumentKey
+  /** The preparation this request joined, or null when the document has none to join. */
+  readonly prepared: FileOpenIntentPreparedLease | null
+}
 
 const inertInterest: FileOpenIntentInterest = { release: () => undefined }
 
@@ -150,26 +163,29 @@ export type FileOpenIntentRuntime = {
 type FileOpenIntentBenchmarkResult = {
   readonly evictions: number
   readonly nonTargetIntents: number
-  readonly preparedClaims: number
+  readonly joinedHighlighterRuntimeSessionIds: readonly string[]
+  readonly joinedStructuralRuntimeSessionIds: readonly string[]
+  readonly preparedJoins: number
   readonly promotedBytes: number
   readonly highlighterRuntimeSessionIds: readonly string[]
   readonly structuralRuntimeSessionIds: readonly string[]
-  readonly transferredHighlighterRuntimeSessionIds: readonly string[]
-  readonly transferredStructuralRuntimeSessionIds: readonly string[]
   readonly targetIntents: number
   readonly wastedIntents: number
 }
 
 export type FileOpenIntentService = {
-  claimLive(path: FilesystemPath): PreparedLiveFileOpenClaim | null
-  claimReadyClean(path: FilesystemPath): PreparedCleanFileOpenClaim | null
   getPreparationIdentity(): object
+  /**
+   * Joins a live document and any preparation already working on it, raising that work's
+   * priority. Null when the path has no live document yet.
+   */
+  join(path: FilesystemPath): FileOpenIntentJoin | null
   subscribePreparationIdentity(listener: () => void): () => void
   prepare(intent: FileOpenIntent): FileOpenIntentInterest
   recordInitialPaint(path: FilesystemPath, paint: EditorInitialPaintEvent): void
 }
 
-export type FileOpenIntentActivation = Pick<FileOpenIntentService, 'claimLive' | 'claimReadyClean'>
+export type FileOpenIntentActivation = Pick<FileOpenIntentService, 'join'>
 
 export type FileOpenIntentBenchmarkSample = {
   readonly id: string
@@ -226,15 +242,15 @@ export type FileOpenIntentServiceOwnerDependencies = {
 type FileOpenIntentBenchmarkScope = {
   evictions: number
   nonTargetIntents: number
+  readonly joinedHighlighterRuntimeSessionIds: Set<string>
+  readonly joinedStructuralRuntimeSessionIds: Set<string>
   readonly path: FilesystemPath
-  preparedClaims: number
+  preparedJoins: number
   promotedBytes: number
   readonly highlighterRuntimeSessionIds: Set<string>
   readonly sampleId: string
   targetIntents: number
   readonly structuralRuntimeSessionIds: Set<string>
-  readonly transferredHighlighterRuntimeSessionIds: Set<string>
-  readonly transferredStructuralRuntimeSessionIds: Set<string>
   wastedIntents: number
   quarantined: boolean
 }
@@ -244,16 +260,51 @@ type PreparedStageRecord = {
   progress: 'queued' | 'started' | 'settled'
 }
 
+type PreparedSource = {
+  readonly buffer: EditorTextBuffer
+  readonly documentKey: DocumentKey
+  readonly localRevision: number
+  readonly path: FilesystemPath
+  readonly snapshot: PieceTableSnapshot
+  release(): void
+} & ({ readonly fileVersion: string; readonly kind: 'clean' } | { readonly kind: 'live' })
+
 type PreparedOpenRecord = {
   readonly abortController: AbortController
-  readonly claim: PreparedFileOpenClaim
   readonly documentKey: DocumentKey
   documentConfigurationTag: readonly EditorPreparedTagValue[]
   readonly estimatedBytes: number
+  readonly holders: PreparedDocumentHolders
   lastActivityAt: number
   readonly preparedDocument: EditorPreparedDocument
+  readonly releaseHold: () => void
+  readonly source: PreparedSource
   stages: Map<FileOpenIntentPreparationFamily, PreparedStageRecord>
   structuralRange: FileOpenIntentStructuralRange
+}
+
+/** Counts the record and the views sharing one prepared document; the last release disposes it. */
+class PreparedDocumentHolders {
+  private count = 0
+
+  constructor(readonly document: EditorPreparedDocument) {}
+
+  /** True while a view holds the document beside the record that prepares it. */
+  get joined(): boolean {
+    return this.count > 1
+  }
+
+  acquire(onRelease?: () => void): () => void {
+    this.count += 1
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      this.count -= 1
+      if (this.count === 0) this.document.dispose()
+      onRelease?.()
+    }
+  }
 }
 
 type FileOpenIntentPromotion =
@@ -274,8 +325,8 @@ type FileOpenIntentPromotion =
     }
 
 type FileOpenIntentOperation = {
-  /** Whether every stage had settled when a press claimed the record. */
-  claimOutcome: 'hit' | 'partial'
+  /** Whether every stage had settled when a press joined the record. */
+  joinOutcome: 'hit' | 'partial'
   readonly detectedAt: number
   readonly event: WideEventScope
   hasTab: boolean
@@ -346,8 +397,7 @@ class FileOpenIntentOwner implements FileOpenIntentServiceOwner {
         this.identityListeners.add(listener)
         return () => this.identityListeners.delete(listener)
       },
-      claimLive: (path) => (this.canConsume() ? this.state.claimLive(path) : null),
-      claimReadyClean: (path) => (this.canConsume() ? this.state.claimReadyClean(path) : null),
+      join: (path) => this.state.join(path, this.canConsume()),
       prepare: (intent) => {
         if (!this.canConsume()) return inertInterest
         return this.state.prepare(intent)
@@ -357,10 +407,7 @@ class FileOpenIntentOwner implements FileOpenIntentServiceOwner {
         this.state.recordInitialPaint(path, paint)
       },
     }
-    this.activation = {
-      claimLive: this.service.claimLive,
-      claimReadyClean: this.service.claimReadyClean,
-    }
+    this.activation = { join: this.service.join }
   }
 
   connect(): void {
@@ -522,7 +569,7 @@ class FileOpenIntentServiceState {
   private readonly queuedPathSet = new Set<FilesystemPath>()
   private activeAbortController: AbortController | null = null
   private activeOperation: Promise<void> | null = null
-  private activePath: string | null = null
+  private activePath: FilesystemPath | null = null
   private running = false
   private rootPath: FilesystemPath | null = null
   private environment: FileOpenIntentEnvironmentIdentity
@@ -629,17 +676,17 @@ class FileOpenIntentServiceState {
 
     this.benchmarkScope = {
       evictions: 0,
+      joinedHighlighterRuntimeSessionIds: new Set(),
+      joinedStructuralRuntimeSessionIds: new Set(),
       nonTargetIntents: 0,
       path: canonicalPath(input.path),
-      preparedClaims: 0,
+      preparedJoins: 0,
       promotedBytes: 0,
       highlighterRuntimeSessionIds: new Set(),
       quarantined: false,
       sampleId,
       targetIntents: 0,
       structuralRuntimeSessionIds: new Set(),
-      transferredHighlighterRuntimeSessionIds: new Set(),
-      transferredStructuralRuntimeSessionIds: new Set(),
       wastedIntents: 0,
     }
   }
@@ -649,7 +696,8 @@ class FileOpenIntentServiceState {
     if (scope.quarantined) return
 
     scope.quarantined = true
-    scope.wastedIntents = this.records.size + this.queuedPaths.length + (this.running ? 1 : 0)
+    const unjoined = Array.from(this.records.values()).filter((record) => !record.holders.joined)
+    scope.wastedIntents = unjoined.length + this.queuedPaths.length + (this.running ? 1 : 0)
     this.clear()
   }
 
@@ -674,13 +722,13 @@ class FileOpenIntentServiceState {
 
     return {
       evictions: scope.evictions,
+      joinedHighlighterRuntimeSessionIds: [...scope.joinedHighlighterRuntimeSessionIds],
+      joinedStructuralRuntimeSessionIds: [...scope.joinedStructuralRuntimeSessionIds],
       nonTargetIntents: scope.nonTargetIntents,
-      preparedClaims: scope.preparedClaims,
+      preparedJoins: scope.preparedJoins,
       promotedBytes: scope.promotedBytes,
       highlighterRuntimeSessionIds: [...scope.highlighterRuntimeSessionIds],
       structuralRuntimeSessionIds: [...scope.structuralRuntimeSessionIds],
-      transferredHighlighterRuntimeSessionIds: [...scope.transferredHighlighterRuntimeSessionIds],
-      transferredStructuralRuntimeSessionIds: [...scope.transferredStructuralRuntimeSessionIds],
       targetIntents: scope.targetIntents,
       wastedIntents: scope.wastedIntents,
     }
@@ -773,14 +821,18 @@ class FileOpenIntentServiceState {
     if (!interests?.delete(token)) return
     if (interests.size > 0) return
     this.callerInterests.delete(path)
-    if (!this.promotedIntentOperations.has(path)) this.invalidatePath(path)
+    if (!this.promotedIntentOperations.has(path) && !this.records.get(path)?.holders.joined)
+      this.invalidatePath(path)
     this.scheduleExpiry()
   }
 
   // A held arrow key raises a guess per row; only the newest keep their place in the queue.
   private dropOverflowingQueue(): void {
     while (this.queuedPaths.length > SPECULATIVE_PREFETCH_LIMIT) {
-      const dropped = this.queuedPaths.shift()!
+      const index = this.queuedPaths.findIndex((path) => !this.records.get(path)?.holders.joined)
+      if (index < 0) return
+      const [dropped] = this.queuedPaths.splice(index, 1)
+      if (!dropped) return
       this.queuedPathSet.delete(dropped)
       this.callerInterests.delete(dropped)
       this.finishIntent(dropped, 'skipped-budget')
@@ -803,43 +855,68 @@ class FileOpenIntentServiceState {
       .finally(() => this.warmingPaths.delete(path))
   }
 
-  claimLive(path: FilesystemPath): PreparedLiveFileOpenClaim | null {
-    if (this.benchmarkScope?.quarantined) return null
-
+  join(path: FilesystemPath, joinPreparation: boolean): FileOpenIntentJoin | null {
     const canonical = canonicalPath(path)
-    if (!this.pathBelongsToRoot(canonical)) return null
-
     const liveDocument = this.getLiveDocument(canonical)
     if (!liveDocument) return null
 
-    const prepared = this.claimKind(canonical, 'live') ?? this.claimKind(canonical, 'clean')
-    if (prepared) return { ...prepared, kind: 'live' }
+    const record = joinPreparation ? this.joinableRecord(canonical) : null
+    if (!record) return { documentKey: liveDocument.key, prepared: null }
 
-    this.removeStaleRecord(canonical)
-    const source = this.acquireFilePreparation({
-      kind: 'live-document',
-      documentKey: liveDocument.key,
-    })
-    if (!source) return null
-    const { document } = source
-    const snapshot = document.buffer.getSnapshot()
+    const lease = this.preparedLease(canonical, record)
+    this.promoteRecord(canonical, record)
+    return { documentKey: record.documentKey, prepared: lease }
+  }
+
+  private joinableRecord(path: FilesystemPath): PreparedOpenRecord | null {
+    if (this.benchmarkScope?.quarantined) return null
+    if (!this.pathBelongsToRoot(path)) return null
+
+    this.pruneExpired()
+    const record = this.records.get(path)
+    if (!record) return null
+    if (this.sourceIsCurrent(record.source)) return record
+
+    this.disposeRecord(path, record)
+    this.finishIntent(path, 'stale', { reason: 'join-validation' })
+    this.scheduleExpiry()
+    return null
+  }
+
+  private preparedLease(
+    path: FilesystemPath,
+    record: PreparedOpenRecord,
+  ): FileOpenIntentPreparedLease {
+    const { source } = record
     return {
-      buffer: document.buffer,
-      documentKey: document.key,
-      kind: 'live',
-      localRevision: document.localRevision,
-      path: canonical,
-      preparedDocument: null,
-      release: source.release,
-      snapshot,
+      buffer: source.buffer,
+      document: record.preparedDocument,
+      documentKey: source.documentKey,
+      fileVersion: source.kind === 'clean' ? source.fileVersion : null,
+      localRevision: source.localRevision,
+      path: source.path,
+      snapshot: source.snapshot,
+      release: record.holders.acquire(() => this.touchRecord(path, record)),
     }
   }
 
-  claimReadyClean(path: FilesystemPath): PreparedCleanFileOpenClaim | null {
-    if (this.benchmarkScope?.quarantined) return null
+  /** A joining request outranks speculation: its queued stages run next. */
+  private promoteRecord(path: FilesystemPath, record: PreparedOpenRecord): void {
+    this.touchRecord(path, record)
+    if (queuedStages(record).length > 0 && this.activePath !== path) {
+      this.enqueuePath(path)
+      this.runNext()
+    }
+    if (!this.intentOperations.has(path)) return
 
-    const claim = this.claimKind(path, 'clean')
-    return claim?.kind === 'clean' ? claim : null
+    this.noteBenchmarkJoin(path, record.estimatedBytes, record.preparedDocument)
+    const stages = preparationStageProgress(record)
+    const settled = Object.values(stages).every(
+      (progress) => progress !== 'queued' && progress !== 'started',
+    )
+    this.promoteIntent(path, record.documentKey, settled ? 'hit' : 'partial', {
+      promotion: { kind: record.source.kind, stages },
+    })
   }
 
   recordInitialPaint(path: FilesystemPath, paint: EditorInitialPaintEvent): void {
@@ -883,41 +960,10 @@ class FileOpenIntentServiceState {
     this.finishPromotion(canonical, paint.status)
   }
 
-  private claimKind(
-    path: FilesystemPath,
-    kind: PreparedFileOpenClaim['kind'],
-  ): PreparedFileOpenClaim | null {
-    const canonical = canonicalPath(path)
-    this.pruneExpired()
-    const record = this.records.get(canonical)
-    if (!record) return null
-    if (record.claim.kind !== kind) return null
-
-    this.records.delete(canonical)
-    this.scheduleExpiry()
-    if (this.claimIsCurrent(record.claim)) {
-      if (this.activePath === canonical) this.activeAbortController = null
-      this.noteBenchmarkClaim(canonical, record.estimatedBytes, record.preparedDocument)
-      const stages = preparationStageProgress(record)
-      const settled = Object.values(stages).every(
-        (progress) => progress !== 'queued' && progress !== 'started',
-      )
-      this.promoteIntent(canonical, record.documentKey, settled ? 'hit' : 'partial', {
-        promotion: { kind: record.claim.kind, stages },
-      })
-      return record.claim
-    }
-
-    this.disposeRecord(canonical, record)
-    this.finishIntent(canonical, 'stale', { reason: 'claim-validation' })
-    this.scheduleExpiry()
-    return null
-  }
-
   invalidatePath(path: FilesystemPath): void {
     const canonical = canonicalPath(path)
     const queued = this.removeQueuedPath(canonical)
-    if (this.activePath === canonical) this.activeAbortController?.abort()
+    if (this.activePath === canonical) this.abortActivePreparation()
     const record = this.records.get(canonical)
     if (!record) {
       if (queued || this.activePath === canonical)
@@ -932,7 +978,7 @@ class FileOpenIntentServiceState {
 
   reconcileLiveAuthority(): void {
     for (const [path, record] of this.records) {
-      if (this.liveAuthorityMatches(record.claim)) continue
+      if (this.liveAuthorityMatches(record.source)) continue
 
       this.disposeRecord(path, record)
       this.finishIntent(path, 'invalidated', { reason: 'document-changed' })
@@ -947,8 +993,8 @@ class FileOpenIntentServiceState {
   ): void {
     const canonical = canonicalPath(path)
     const record = this.records.get(canonical)
-    if (!record || record.claim.kind !== 'clean') return
-    if (!removed && file && cleanFileIdentityMatches(record.claim, file)) return
+    if (!record || record.source.kind !== 'clean') return
+    if (!removed && file && cleanFileIdentityMatches(record.source, file)) return
 
     this.disposeRecord(canonical, record)
     this.finishIntent(canonical, 'invalidated', {
@@ -960,7 +1006,7 @@ class FileOpenIntentServiceState {
   clear(reason = 'service-cleared'): void {
     this.lifecycleGeneration += 1
     this.callerInterests.clear()
-    this.activeAbortController?.abort()
+    this.abortActivePreparation()
     this.activeAbortController = null
     this.queuedPaths.length = 0
     this.queuedPathSet.clear()
@@ -974,6 +1020,13 @@ class FileOpenIntentServiceState {
     for (const path of this.promotedIntentOperations.keys()) {
       this.finishPromotion(path, 'abandoned', { reason })
     }
+  }
+
+  // Work a view joined belongs to that view now; only its own release ends it.
+  private abortActivePreparation(): void {
+    const record = this.activePath ? this.records.get(this.activePath) : undefined
+    if (record?.holders.joined) return
+    this.activeAbortController?.abort()
   }
 
   private runNext(): void {
@@ -1218,23 +1271,22 @@ class FileOpenIntentServiceState {
       documentKey: document.key,
       localRevision: document.localRevision,
       path,
-      preparedDocument: prepared.preparedDocument,
       release: source.release,
       snapshot,
     }
-    const claim: PreparedFileOpenClaim =
+    const preparedSource: PreparedSource =
       file && !document.buffer.isDirty()
-        ? { ...base, file, fileVersion: file.version, kind: 'clean' }
+        ? { ...base, fileVersion: file.version, kind: 'clean' }
         : { ...base, kind: 'live' }
     if (
       abortSignal.aborted ||
       !this.generationIsCurrent(lifecycleGeneration) ||
-      !this.claimIsCurrent(claim)
+      !this.sourceIsCurrent(preparedSource)
     ) {
       prepared.preparedDocument.dispose()
       return null
     }
-    return this.store(path, document.key, claim, prepared, structuralRange, abortController)
+    return this.store(path, preparedSource, prepared, structuralRange, abortController)
   }
 
   // Highlighter and structural stages run on different workers, so they run side by side.
@@ -1317,8 +1369,7 @@ class FileOpenIntentServiceState {
 
   private store(
     path: FilesystemPath,
-    documentKey: DocumentKey,
-    claim: PreparedFileOpenClaim,
+    source: PreparedSource,
     preparation: FileOpenIntentPreparation,
     structuralRange: FileOpenIntentStructuralRange,
     abortController: AbortController,
@@ -1326,16 +1377,19 @@ class FileOpenIntentServiceState {
     const previous = this.records.get(path)
     if (previous) this.disposeRecord(path, previous)
     const preparedDocument = preparation.preparedDocument
+    const holders = new PreparedDocumentHolders(preparedDocument)
     const record: PreparedOpenRecord = {
       abortController,
-      claim,
       documentConfigurationTag: preparation.documentConfigurationTag,
-      documentKey,
+      documentKey: source.documentKey,
       get estimatedBytes() {
         return preparedDocument.estimatedBytes
       },
+      holders,
       lastActivityAt: this.runtime.now(),
       preparedDocument,
+      releaseHold: holders.acquire(),
+      source,
       stages: stageRecords(preparation.stages),
       structuralRange,
     }
@@ -1359,7 +1413,7 @@ class FileOpenIntentServiceState {
   private recordIsCurrent(path: FilesystemPath): boolean {
     const record = this.records.get(path)
     if (!record) return false
-    if (this.claimIsCurrent(record.claim)) {
+    if (this.sourceIsCurrent(record.source)) {
       this.touchRecord(path, record)
       return true
     }
@@ -1378,7 +1432,7 @@ class FileOpenIntentServiceState {
   ): void {
     const configuration = preparer.reconfigure(
       record.preparedDocument,
-      record.claim.buffer,
+      record.source.buffer,
       record.documentKey,
       path,
       record.abortController.signal,
@@ -1429,13 +1483,13 @@ class FileOpenIntentServiceState {
     return defaultStructuralRange(buffer.getSnapshot().length, this.getRetainedScrollPosition(path))
   }
 
-  private liveAuthorityMatches(claim: PreparedFileOpenClaim): boolean {
-    const liveDocument = this.getLiveDocument(claim.path)
+  private liveAuthorityMatches(source: PreparedSource): boolean {
+    const liveDocument = this.getLiveDocument(source.path)
     if (!liveDocument) return false
-    if (liveDocument.buffer !== claim.buffer) return false
-    if (liveDocument.key !== claim.documentKey) return false
-    if (liveDocument.localRevision !== claim.localRevision) return false
-    return liveDocument.buffer.getSnapshot() === claim.snapshot
+    if (liveDocument.buffer !== source.buffer) return false
+    if (liveDocument.key !== source.documentKey) return false
+    if (liveDocument.localRevision !== source.localRevision) return false
+    return liveDocument.buffer.getSnapshot() === source.snapshot
   }
 
   private rebuildRecord(path: FilesystemPath, record: PreparedOpenRecord): void {
@@ -1469,21 +1523,18 @@ class FileOpenIntentServiceState {
   private disposeRecord(path: FilesystemPath, record: PreparedOpenRecord): void {
     if (this.records.get(path) === record) this.records.delete(path)
     this.noteBenchmarkRuntimeSessionIds(record.preparedDocument)
-    record.abortController.abort()
-    record.preparedDocument.dispose()
-    record.claim.release()
+    if (!record.holders.joined) record.abortController.abort()
+    record.releaseHold()
+    record.source.release()
   }
 
-  private claimIsCurrent(claim: PreparedFileOpenClaim): boolean {
-    if (!this.pathBelongsToRoot(claim.path)) return false
-    if (claim.buffer.getSnapshot() !== claim.snapshot) return false
-    const liveDocument = this.getLiveDocument(claim.path)
-    if (!liveDocument || !this.liveAuthorityMatches(claim)) return false
-    if (claim.kind === 'clean') {
-      if (claim.buffer.isDirty()) return false
-      return this.cleanClaimMatchesCachedQuery(claim)
-    }
-    return true
+  private sourceIsCurrent(source: PreparedSource): boolean {
+    if (!this.pathBelongsToRoot(source.path)) return false
+    if (source.buffer.getSnapshot() !== source.snapshot) return false
+    if (!this.liveAuthorityMatches(source)) return false
+    if (source.kind === 'live') return true
+    if (source.buffer.isDirty()) return false
+    return this.cleanFileMatchesCachedQuery({ path: source.path, version: source.fileVersion })
   }
 
   private pathBelongsToRoot(path: FilesystemPath): boolean {
@@ -1502,6 +1553,7 @@ class FileOpenIntentServiceState {
     const oldestAllowed = this.runtime.now() - PREPARED_OPEN_TTL_MS
     for (const [path, record] of this.records) {
       if (record.lastActivityAt > oldestAllowed) continue
+      if (record.holders.joined) continue
 
       this.disposeRecord(path, record)
       this.finishIntent(path, 'evicted', { reason: 'idle-ttl' })
@@ -1525,6 +1577,7 @@ class FileOpenIntentServiceState {
     this.cancelExpiryTimer = null
     let expiresAt: number | null = null
     for (const record of this.records.values()) {
+      if (record.holders.joined) continue
       const candidate = record.lastActivityAt + PREPARED_OPEN_TTL_MS
       if (expiresAt === null || candidate < expiresAt) expiresAt = candidate
     }
@@ -1542,11 +1595,12 @@ class FileOpenIntentServiceState {
     }, delayMs)
   }
 
+  // Joined records count toward the budget but are never its victims: a view is waiting on them.
   private pruneBounds(): void {
     let totalBytes = 0
     for (const record of this.records.values()) totalBytes += record.estimatedBytes
     while (this.records.size > MAX_PREPARED_OPENS || totalBytes > MAX_PREPARED_BYTES) {
-      const oldest = this.records.entries().next().value
+      const oldest = Array.from(this.records).find(([, record]) => !record.holders.joined)
       if (!oldest) return
 
       const evictedBytes = oldest[1].estimatedBytes
@@ -1584,10 +1638,6 @@ class FileOpenIntentServiceState {
     return state.data.path === file.path && state.data.version === file.version
   }
 
-  private cleanClaimMatchesCachedQuery(claim: PreparedCleanFileOpenClaim): boolean {
-    return this.cleanFileMatchesCachedQuery({ path: claim.path, version: claim.fileVersion })
-  }
-
   private generationIsCurrent(generation: number): boolean {
     return generation === this.lifecycleGeneration
   }
@@ -1604,15 +1654,6 @@ class FileOpenIntentServiceState {
     const index = this.queuedPaths.indexOf(path)
     if (index >= 0) this.queuedPaths.splice(index, 1)
     return true
-  }
-
-  private removeStaleRecord(path: FilesystemPath): void {
-    const record = this.records.get(path)
-    if (!record) return
-
-    this.disposeRecord(path, record)
-    this.finishIntent(path, 'invalidated', { reason: 'query-changed' })
-    this.scheduleExpiry()
   }
 
   private async awaitIdle(): Promise<void> {
@@ -1644,7 +1685,7 @@ class FileOpenIntentServiceState {
     const detectedAt = this.runtime.now()
     const hasTab = intent.tabId !== undefined
     return {
-      claimOutcome: 'hit',
+      joinOutcome: 'hit',
       detectedAt,
       event: this.createEvent({
         action: 'prefetch.intent',
@@ -1709,14 +1750,14 @@ class FileOpenIntentServiceState {
   private promoteIntent(
     path: FilesystemPath,
     documentKey: DocumentKey,
-    claimOutcome: 'hit' | 'partial',
+    joinOutcome: 'hit' | 'partial',
     context: Record<string, unknown>,
   ): void {
     const operation = this.intentOperations.get(path)
     if (!operation) return
 
     this.intentOperations.delete(path)
-    operation.claimOutcome = claimOutcome
+    operation.joinOutcome = joinOutcome
     const previous = this.promotedIntentOperations.get(path)
     if (previous) this.finishPromotion(path, 'superseded')
     operation.postActivationBaseline = postActivationWorkSnapshot(path)
@@ -1724,7 +1765,7 @@ class FileOpenIntentServiceState {
     operation.event.set({
       ...context,
       leadMs: promotionAt - operation.detectedAt,
-      outcome: claimOutcome,
+      outcome: joinOutcome,
     })
     const cancelPaintTimeout = this.runtime.scheduleTimer(
       () => this.finishPromotion(path, 'timeout', { reason: 'initial-paint-timeout' }),
@@ -1753,7 +1794,7 @@ class FileOpenIntentServiceState {
     this.promotedIntentOperations.delete(path)
     promotion.cancelPaintTimeout()
     const counters = postActivationWorkSince(operation.postActivationBaseline, path)
-    const outcome = paintOutcome === 'abandoned' ? 'aborted' : operation.claimOutcome
+    const outcome = paintOutcome === 'abandoned' ? 'aborted' : operation.joinOutcome
     operation.event.set({
       postActivation: counters,
       promotion: { paintOutcome },
@@ -1853,10 +1894,10 @@ class FileOpenIntentServiceState {
     scope.nonTargetIntents += 1
   }
 
-  private noteBenchmarkClaim(
+  private noteBenchmarkJoin(
     path: FilesystemPath,
     estimatedBytes: number,
-    preparedDocument: EditorPreparedDocument | null,
+    preparedDocument: EditorPreparedDocument,
   ): void {
     const scope = this.benchmarkScope
     if (!scope) return
@@ -1864,15 +1905,11 @@ class FileOpenIntentServiceState {
     this.noteBenchmarkRuntimeSessionIds(preparedDocument)
     if (path !== scope.path) return
 
-    scope.preparedClaims += 1
+    scope.preparedJoins += 1
     scope.promotedBytes += estimatedBytes
-    const runtimeSessionIds = preparedDocument?.runtimeSessionIds()
-    for (const id of runtimeSessionIds?.highlighter ?? []) {
-      scope.transferredHighlighterRuntimeSessionIds.add(id)
-    }
-    for (const id of runtimeSessionIds?.structural ?? []) {
-      scope.transferredStructuralRuntimeSessionIds.add(id)
-    }
+    const runtimeSessionIds = preparedDocument.runtimeSessionIds()
+    for (const id of runtimeSessionIds.highlighter) scope.joinedHighlighterRuntimeSessionIds.add(id)
+    for (const id of runtimeSessionIds.structural) scope.joinedStructuralRuntimeSessionIds.add(id)
   }
 
   private noteBenchmarkRuntimeSessionIds(preparedDocument: EditorPreparedDocument | null): void {
@@ -2152,10 +2189,10 @@ function defaultStructuralRange(
 }
 
 function cleanFileIdentityMatches(
-  claim: PreparedCleanFileOpenClaim,
+  source: Extract<PreparedSource, { readonly kind: 'clean' }>,
   file: FileSnapshotIdentity,
 ): boolean {
-  return claim.path === file.path && claim.fileVersion === file.version
+  return source.path === file.path && source.fileVersion === file.version
 }
 
 function fileResultIdentity(value: unknown): FileSnapshotIdentity | null {

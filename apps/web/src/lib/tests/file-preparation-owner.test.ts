@@ -56,11 +56,9 @@ test.for(['late-release', 'admission-release'] as const)(
     expect(clock.queued()).toBe(1)
     clock.startNext()
     await clock.settled()
-    const claim = fixture.owner.service.claimLive(next)
-    expect(claim).not.toBeNull()
-    expect(claim?.preparedDocument).not.toBeNull()
-    claim?.preparedDocument?.dispose()
-    claim?.release()
+    const joined = fixture.owner.service.join(next)?.prepared
+    expect(joined).toBeTruthy()
+    joined?.release()
     expect(queryClient.getQueryState(queryKey)?.fetchStatus).toBe('fetching')
     transport.release()
     await activeFailure
@@ -69,7 +67,7 @@ test.for(['late-release', 'admission-release'] as const)(
     expect(
       transport.requests.filter((request) => new URL(request.url).pathname === '/fs/read'),
     ).toHaveLength(2)
-    expect(fixture.owner.service.claimLive(path)).toBeNull()
+    expect(fixture.owner.service.join(path)).toBeNull()
   },
 )
 
@@ -108,14 +106,15 @@ test('independent caller release preserves a held shared query and survivor prep
   transport.release()
   await sharedRead
   await clock.settled()
-  const claim = fixture.owner.service.claimLive(path)
-  expect(claim).not.toBeNull()
-  expect(claim?.preparedDocument).not.toBeNull()
-  expect(claim?.buffer).toBe(fixture.documents.getLiveDocument(claim!.documentKey)?.buffer)
-  fixture.documents.ensureViewForDocument(tabId('shared'), claim!.documentKey, claim)
+  const joined = fixture.owner.service.join(path)
+  expect(joined?.prepared).toBeTruthy()
+  expect(joined?.prepared?.buffer).toBe(
+    fixture.documents.getLiveDocument(joined!.documentKey)?.buffer,
+  )
+  fixture.documents.ensureViewForDocument(tabId('shared'), joined!.documentKey, joined!.prepared)
   second.release()
   expect(fixture.documents.getViewDocument(tabId('shared'))?.preparedDocument).toBe(
-    claim?.preparedDocument,
+    joined?.prepared?.document,
   )
 })
 
@@ -153,14 +152,12 @@ test('the existing caller deadline releases its held read without canceling the 
   expect(clock.queued()).toBe(1)
   clock.startNext()
   await clock.settled()
-  const nextClaim = fixture.owner.service.claimLive(next)
-  expect(nextClaim).not.toBeNull()
-  expect(nextClaim?.preparedDocument).not.toBeNull()
-  nextClaim?.preparedDocument?.dispose()
-  nextClaim?.release()
+  const nextJoin = fixture.owner.service.join(next)?.prepared
+  expect(nextJoin).toBeTruthy()
+  nextJoin?.release()
   transport.release()
   await sharedRead
-  expect(fixture.owner.service.claimLive(path)).toBeNull()
+  expect(fixture.owner.service.join(path)).toBeNull()
 })
 
 test('preparation identity rotates only after actual producer transitions settle', async ({

@@ -4,7 +4,6 @@ import { captureEditorScrollPositions } from '@/features/editor/state/scroll-per
 import {
   documentKey,
   fileDocument,
-  fileDocumentKey,
   fileResource,
   filesystemPath,
   workspaceRoot,
@@ -631,23 +630,12 @@ export function createEditorActivation(
       const filePath = content.document.resource.path
       if (historyReversing()) return null
 
-      const liveClaim = fileOpenIntent.claimLive(filePath)
-      if (liveClaim) {
-        documentStore
-          .getState()
-          .ensureEditorViewForDocument(tabId, liveClaim.documentKey, liveClaim)
-        return liveClaim.preparedDocument ? 'hit' : 'live'
-      }
-      const cleanClaim = fileOpenIntent.claimReadyClean(filePath)
-      if (cleanClaim) {
-        documentStore.getState().ensureEditorView(tabId, cleanClaim.file, cleanClaim)
-        return 'hit'
-      }
-
-      const liveDocument = documentStore.getState().getLiveEditorDocument(fileDocumentKey(filePath))
-      if (!liveDocument) return 'miss'
-      documentStore.getState().ensureEditorViewForDocument(tabId, liveDocument.key)
-      return 'live'
+      const joined = fileOpenIntent.join(filePath)
+      if (!joined) return 'miss'
+      documentStore
+        .getState()
+        .ensureEditorViewForDocument(tabId, joined.documentKey, joined.prepared)
+      return joined.prepared ? 'hit' : 'live'
     },
     setRoot: (rootPath) => rootOwner.setRoot(rootPath),
   }
