@@ -92,8 +92,14 @@ test.each([160, 320, 390])(
       expect(opened).toEqual(links.map(() => 'https://example.com'))
       const initialMounts = mounted
       container.style.width = '120px'
+      // Refresh the preview while ResizeObserver delivery is pending.
+      editor.setInlineReplacementProvider(() => specs, { trigger: 'edit' })
       await expect.poll(() => disposed).toBeGreaterThanOrEqual(initialMounts)
       await expect.poll(() => rowText(container)).toBe(`read ${LABEL} nowlast`)
+      // Replacement disposal can finish before the resize frame updates the editor's extent.
+      const scroller = container.querySelector<HTMLElement>('.editor-virtualized')!
+      await expect.poll(() => scroller.clientWidth).toBe(120)
+      await expect.poll(() => scroller.scrollWidth).toBe(120)
       expectContained(container)
       const resizedMounts = mounted
       editor.setSelection(TEXT.indexOf('long') + 1)
