@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import type { GhosttyRenderState } from '../../core/render-state.js'
 import type { GhosttyTerminal } from '../../core/terminal.js'
@@ -40,6 +40,16 @@ function expectPackedRow(row: RenderRow, expected: RenderRow, theme: CanonicalRe
       return expect.fail('Packed projection materialized styled cells')
     },
   }
+  for (const [index, cell] of expected.cells.entries()) {
+    expect(row.packed!.isDefaultEmpty(index)).toBe(
+      !cell.continuation &&
+        !cell.text &&
+        !cell.selected &&
+        !cell.foreground &&
+        !cell.background &&
+        !cell.style,
+    )
+  }
   for (const style of ['block', 'bar', 'underline', 'outline'] as const) {
     const cursor = { style, visible: true, x: 2, y: row.y }
     expect(renderRowRuns(protectedRow, cursor, probeFont, theme)).toEqual(
@@ -66,9 +76,34 @@ it('projects owned packed rows identically without materializing cells across st
       '\x1b[2J\x1b[H\x1b[8mhidden\x1b[0m 日本語 中文 🧪 👨‍👩‍👧‍👦',
       '\x1b[2J\x1b[H\x1b[38;2;12;24;36mF\x1b[48;2;50;60;70mG\x1b[0mH',
       '\x1b[2J\x1b[Habc\r\ndef\r\nghi',
+      '\x1b[2J\x1b[H' + 'a'.repeat(38) + '界',
+      '\x1b[2J\x1b[Habc   ',
+      '\x1b[2J\x1b[H\x1b[48;2;50;60;70m\x1b[2K',
     ]
     for (const [index, input] of cases.entries())
       expectPackedScreen({ terminal, state, input, index, theme })
+  } finally {
+    runtime.dispose()
+  }
+})
+
+it('finds default packed tails without decoding empty cells', async () => {
+  const runtime = await GhosttyRuntime.create()
+  try {
+    const terminal = runtime.createTerminal({ columns: 40, rows: 3 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('edit 0000')
+    state.update()
+    const row = state.readRows({ packed: true })[0]!
+    const theme = canonicalRendererTheme(mergeRendererTheme({}))
+    const expected = renderRowRuns(state.readRows()[0]!, undefined, probeFont, theme)
+    const read = vi.spyOn(row.packed!, 'read')
+    try {
+      expect(renderRowRuns(row, undefined, probeFont, theme)).toEqual(expected)
+      expect(read).toHaveBeenCalledTimes(9)
+    } finally {
+      read.mockRestore()
+    }
   } finally {
     runtime.dispose()
   }

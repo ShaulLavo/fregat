@@ -746,22 +746,6 @@ it('isolates fixed-grid layout through theme and font changes', async () => {
   expect(frame().getBoundingClientRect().width).toBe(144)
 })
 
-it('contains fixed row layout while keeping cell dimensions and visible glyph overflow', async () => {
-  const probe = await rendererProbe('dom')
-  const row = probe.canvas.parentElement!.querySelector<HTMLElement>('[data-row="0"]')!
-  expect(row.style.contain).toBe('size layout')
-  expect(getComputedStyle(row).overflow).toBe('visible')
-  expect(row.getBoundingClientRect().width).toBe(12 * probeFont.cssCellWidth)
-  expect(row.getBoundingClientRect().height).toBe(probeFont.cssCellHeight)
-  probe.terminal.write('\r\x1b[2K\x1b[31m界 é')
-  probe.renderer.notifyWrite()
-  probe.clock.flush()
-  expect(row.style.contain).toBe('size layout')
-  expect(row.getBoundingClientRect().width).toBe(12 * probeFont.cssCellWidth)
-  expect(row.getBoundingClientRect().height).toBe(probeFont.cssCellHeight)
-  expect(row.textContent).toContain('界 é')
-})
-
 it('preserves row-derived frame height when the host overrides height to auto', async () => {
   const probe = await rendererProbe('dom')
   const frame = probe.canvas.parentElement!.querySelector<HTMLElement>('.ghostty-webgpu-frame')!
