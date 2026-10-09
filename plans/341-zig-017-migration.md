@@ -26,6 +26,10 @@ Every Zig artifact we build or ship is produced by Zig 0.17.x from Ghostty revis
 
 ### Three Ghostty pins move, not one
 
+#### Pin target
+
+We build only libghostty-vt from Ghostty's source, never the app, so we are already pinned to libghostty. On 2026-10-09 libghostty-vt has no releases of its own: the Ghostty repository's tags are app releases (latest `v1.3.1`, 2026-03-13), and its README and `include/ghostty/vt.h` say the C API is still changing. Pin to the first tagged libghostty-vt release that requires 0.17 if one exists when the gate opens. Otherwise pin to the first Ghostty main commit that requires 0.17 and passes Ghostty's required CI. Once tagged libghostty-vt releases exist, later pin moves use releases only. Record the chosen tag or commit and the reason in this plan.
+
 | Purpose                                    | Current pin                                                                        | Where                                                                                                 |
 | ------------------------------------------ | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | Shipped terminal wasm and positional proof | `7b11f3dca034d8d24369ad3856afe57946d7902a` (118 commits behind main on 2026-10-09) | `ghostty-webgpu/src/core/version.ts:2`                                                                |
@@ -110,7 +114,7 @@ Not adopting now:
 ## Phases
 
 - [ ] **0. Before the gate.** Wasm builds reject Zig minor versions other than 0.16 (done in this plan's PR). Add compiler provenance for `canvas-compose.wasm`, which is shipped but not covered by `ghostty-vt.provenance.json`. Its bytes reproduce exactly under 0.16.0, so the receipt can be recorded now.
-- [ ] **1. Pins.** Move the three Ghostty pins to revisions that require 0.17. Rebuild `ghostty-vt.wasm` and confirm Ghostty's memset override is still linked.
+- [ ] **1. Pins.** Move the three Ghostty pins to the target chosen under [Pin target](#pin-target): a tagged libghostty-vt release if one exists, otherwise the first main commit that requires 0.17 and passes CI. Rebuild `ghostty-vt.wasm` and confirm Ghostty's memset override is still linked.
 - [ ] **2. Owned source.** Bridge, snapshot, unknown-OSC and C-controls translate C through `translate-c`. Apply the array, builtin and path changes and the generated-producer change. Add `@divCeil`.
 - [ ] **3. Contracts and receipts.** Update the archive contracts, CI and schemas, then regenerate recipes, input manifests, bootstrap, native artifacts and wasm receipts with the builders.
 - [ ] **4. tree-sitter-x.** Apply its source changes, declare configuration inputs and run CI with `--cache-poison=disallowed`. Ship it as its own PR in that repository.
