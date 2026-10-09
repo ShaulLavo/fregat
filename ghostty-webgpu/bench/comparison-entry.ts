@@ -66,7 +66,6 @@ let logs = ''
 interface PreparedBurst {
   fixture?: RollingFixture
   chunks: readonly InputChunk[]
-  text?: string
   bytes: number
   reset: InputChunk
 }
@@ -272,8 +271,7 @@ function createXterm(host: HTMLElement): Driver {
   }
 }
 
-async function prepare(testCase: ComparisonCase): Promise<void> {
-  await initialize(testCase)
+async function createTerminals(): Promise<void> {
   const faces = [400, 700].map(
     (weight) => `${weight} ${settings.fontSize}px "${settings.fontFamily}"`,
   )
@@ -335,7 +333,6 @@ async function initialize(testCase: ComparisonCase): Promise<void> {
     const text = corpus(fixtureText(name, logs), settings.chunkBytes)
     const bytes = encoder.encode(text)
     preparedBursts.set(name, {
-      text,
       chunks: [current.path === 'bytes' ? bytes : text],
       bytes: bytes.length,
       reset,
@@ -758,7 +755,7 @@ window.__compare = {
   legacyEmptyWrite,
   legacyOriginalUnicode,
   legacyWriteControl,
-  prepare,
+  createTerminals,
   correctness,
   parse,
   smokeParse,
@@ -802,7 +799,7 @@ declare global {
       legacyEmptyWrite: typeof legacyEmptyWrite
       legacyOriginalUnicode: typeof legacyOriginalUnicode
       legacyWriteControl: typeof legacyWriteControl
-      prepare: typeof prepare
+      createTerminals: typeof createTerminals
       correctness: typeof correctness
       parse: typeof parse
       burst: typeof burst

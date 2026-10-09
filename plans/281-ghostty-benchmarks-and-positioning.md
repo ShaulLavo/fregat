@@ -82,86 +82,43 @@ framing in the positioning copy.
 
 ## Approved follow-up: audit native-window input preparation
 
-The `r9-canvas-gc` follow-up is reproduced and its accounting-boundary fix is complete.
-The original Canvas research windows and rejection decisions keep their source and workload labels.
-Host-side evidence is in the terminal wave's `lanes/r10-fixture-boundary/`; set `$wave` to
-that wave artifact directory and `$lane` to its owned lane before running the commands below.
+Evidence lives in the terminal wave's `lanes/r10-fixture-boundary/`; `$lane` below names that
+artifact directory. Historical source labels, completed windows and Canvas rejections stay unchanged.
 
-- [x] Reproduce the original allocation finding without writing into another lane's evidence:
-
-  ```sh
-  python3 "$lane/reproduce-r9.py" pi-batch-buffer-interactive-edits-r01 pi-frame-buffer-interactive-edits-r01
-  ```
-
-  The frozen edit fixture allocates chunks through `Array.from(...matchAll(...), match =>
-new TextEncoder().encode(match[0]))`. Its recorded allocation site is
-  `batch-buffer-devices/packet/browser.js:455:824` and the matching candidate site. Both arms
-  prepare inside the outer native window. The reproduction retains dominant fixture-generation
-  allocation stacks; it establishes no product-only GC cause.
-
-- [x] Establish the native boundary for every burst workload. Repository output and traced/control
-      output call `measureCpu` around `__compare.burst`; native-before precedes the operation and
-      native-after follows it. Both rolling chunk generation and repeated-corpus encoding were
-      inside those brackets despite sitting outside the inner elapsed timer. Frozen R07, its
-      Unicode11 sibling and its Canvas sibling likewise bracket `__direct.measured`, which calls
-      `burst` after its observer snapshot. All five research workloads use that rolling path.
-      Parser corpus/chunk/expected-screen setup already precedes its inner parse timer; the
-      repository parser's GPU qualification has no native CPU bracket. Live echo encoding belongs
-      to the transport workload and stays unchanged.
-- [x] Measure preparation separately on Linux using trace marks, native endpoints, thread names,
-      GC wall intervals and collected-object heap sampling. Twenty count-1 windows cover all five
-      workloads, ghostty DOM and xterm 6 DOM; four more edits windows use the comparison's count17.
-      At count1, edits preparation is 51.6%/54.1% of renderer instructions and 82.9%/91.1% of sampled
-      JS allocation. At count17, those shares are 8.68%/12.17% and 27.1%/52.6%; all-Chrome instruction
-      shares are 4.94%/6.84%. Empty-boundary calibration is about 0.91–0.96 million instructions,
-      versus 635–739 million preparation instructions. Sampling is statistical, includes collector
-      setup/teardown, and excludes native/WASM allocation. See `preparation-analysis.json` and
-      `preparation-analysis-edits17.json` for every workload and per-thread GC evidence.
-- [x] Prebuild burst inputs in `initialize`, retain their bytes/strings and reset inputs across
-      warmup and measurement, and clear them at disposal. The measured span still contains reset,
-      pacing, terminal writes, rendering, observer work and logical settlement. All fixture inputs
-      are retained, including unused fixtures; this changes persistent heap lifetime and prevents
-      interpreting the result as an isolated renderer improvement. The failing-first regression
-      executes the actual entry functions for both write paths, refuses preparation inside the
-      measured span, and checks every fixture's tick bytes through a corpus wrap. Run from the
-      package with `bun run bench:compare:test`: 423 tests pass.
-- [x] Freeze R08, R08-u11 and R08-canvas at their R07 ancestors' runtime/dependency bytes with the
-      fixed harness pin `3dd6362a0613709b0b5f778c9b0879700ade51c4`. Preferred capsule directories
-      end in `-r02`; the wave README's Shared bundles section records all pins and hashes.
-      `bundle-byte-proof.json` verifies 66 complete byte/string fixture comparisons, including
-      every tick, wrap and reset. The first R08 overlay's nonrolling reset discrepancy was caught
-      and fixed in fresh R02 siblings; its completed Mac rolling-edits windows stay labelled R01.
-      No completed acquisition or old generation is relabelled or rescored.
-- [x] Acquire fresh descriptive edits comparisons. Sixteen accepted non-quiet Linux windows show
-      median ghostty/xterm renderer instruction ratios DOM 1.226 → 1.348 and WebGL 1.144 → 1.239;
-      all-Chrome ratios are 1.200 → 1.252 and 2.746 → 2.922. Both losses widen. SwiftShader all-Chrome
-      is descriptive, with no GPU-efficiency or timing verdict. Four valid R07 DOM windows are
-      retained from the original acquisition; only GL setup rejected before counters is replaced
-      under a new identity with the 32-context launch flag. Output/work and same-renderer pixels match.
-      One bounded 117.9-second Mac R08-u11-R01 turn supplies two balanced pairs per cell and clean
-      custody. All-Chrome estimated CPU energy/instruction medians are DOM 1.024/1.077 and WebGL
-      1.036/1.052: both remain losses. Against the brief's approximate cells, DOM energy is slightly
-      smaller, DOM instructions larger, and WebGL losses larger. These intentionally older frozen
-      runtime observations cannot update the current-runtime scoreboard. See `measurement-analysis.json`.
-- [ ] Establish whether setup-boundary GC explains the old Canvas guard variation. The frame-scoped
-      candidate recorded major-GC finalization in control0 and candidates1/2, while control3 had
-      scavenges only; paired all-Chrome instruction ratios were 0.878729 and 1.467704. Its forced
-      end-of-frame heap retained zero private scratch cells. Persistent scratch retention alone
-      therefore does not explain that loss. Neither a product-only GC cause nor a deopt/reopt storm
-      is established. Validate affected trace CPU clocks before assigning helper CPU time; preserve
-      native counters and unioned trace wall intervals. The new count17 diagnostic has one prep
-      scavenge per window, total renderer pause times 29.2–38.3 ms, and background marking/sweeping
-      wall work on named threads. It does not isolate the original candidate's cause.
-- [ ] Rebuild both Canvas arms from current main with the same prepared-input harness, driver and
-      assets before another screen. The acquired sources predate Canvas capture changes in
-      `97fa72ffc`; record that applicability difference and fresh protocol identities, and preserve
-      output/work/retention checks. Preparation moving outside a future window cannot qualify or
-      rescore old acquisitions. Reproduce the native and trace analysis with:
-
-  ```sh
-  python3 "$lane/analyze-preparation.py" linux-attribution-edits17-r01
-  node "$lane/analyze-results.mjs"
-  ```
+- [x] Reproduce the `r9-canvas-gc` finding and move burst corpus/chunk/path preparation outside the
+      outer native counters. Inputs stay live across warmup/output and clear at disposal. Parser
+      setup already precedes its inner timer; live echo conversion remains transport work.
+- [x] Record 24 Linux attribution windows. At count17, edits preparation accounts for ghostty/xterm
+      renderer instructions 8.68%/12.17% and sampled JS allocation 27.1%/52.6%. Sampling excludes
+      native/WASM allocation; diagnostic overhead is disclosed. See `preparation-analysis.json`
+      and `preparation-analysis-edits17.json` for all workloads and unioned per-thread GC evidence.
+- [x] Freeze byte-qualified R08/R08-u11/R08-canvas R02 siblings at harness pin `3dd6362a0613709b0b5f778c9b0879700ade51c4`.
+      The wave README records hashes; `bundle-byte-proof.json` passes 66 fixture/path comparisons.
+      Completed Mac rolling edits stay R01 after a nonrolling reset correction in fresh R02 siblings.
+- [x] Record 16 Linux edits windows and one 117.9-second Mac turn. Linux renderer instruction ratios
+      widen DOM 1.226 → 1.348 and WebGL 1.144 → 1.239. Mac all-Chrome estimated energy/instruction ratios
+      remain losses at DOM 1.024/1.077 and WebGL 1.036/1.052. See `measurement-analysis.json`.
+      These older frozen runtimes and changed persistent input lifetime do not isolate a renderer/GC
+      improvement or update the current-runtime scoreboard; SwiftShader totals are descriptive.
+- [x] Exclude retained inputs from terminal memory by sampling after `initialize` and before
+      `createTerminals`. Initialization runs once; every sample includes the same live inputs.
+      Runner/report regressions cover both paths, counts1/8/17, preparation-only and terminal deltas.
+      `bun run bench:compare:test` also checks reset/tick representation and complete corpus wraps.
+      This memory correction affects the repository runner; frozen R08 acquisitions are burst-only.
+- [ ] Establish the old Canvas GC cause. Its paired instruction ratios were 0.878729/1.467704;
+      control0 and candidates1/2 finalized major GC while control3 had scavenges only. Zero private
+      scratch cells survived its forced end-of-frame heap check. Persistent scratch retention alone
+      does not explain the loss; product-only GC and deopt/reopt causes remain unconfirmed.
+      Reproduce with `python3 "$lane/reproduce-r9.py" pi-batch-buffer-interactive-edits-r01 pi-frame-buffer-interactive-edits-r01`.
+      Validate trace CPU clocks before attributing helper CPU time; preserve native and per-thread wall evidence.
+- [ ] Rebuild both Canvas arms from current main with matching prepared inputs, driver and assets
+      before another screen. Acquired sources predate `97fa72ffc`; record fresh identities and check
+      output/work/retention. Use `python3 "$lane/analyze-preparation.py" linux-attribution-edits17-r01`
+      and `node "$lane/analyze-results.mjs"`. A future boundary fix cannot rescore old acquisitions.
+- [ ] Audit static latency preparation separately. `writeMarker` in `bench/comparison-entry.ts`
+      starts its clock before `input(marker(color))`; traced latency also sets up markers, echo
+      connection and input colors inside its operation. Prebuild static sequences and connect before
+      those windows, keeping event-driven echo conversion measured. This pre-existing path is unchanged here.
 
 ## Done when
 

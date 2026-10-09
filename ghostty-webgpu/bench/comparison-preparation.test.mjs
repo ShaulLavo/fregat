@@ -13,6 +13,15 @@ const initialize = section('async function initialize(', 'async function smokePa
 const bursts = section('async function rollingBurst(', 'async function history(')
 const encoder = new TextEncoder()
 
+function writeBytes(write, path, label) {
+  if (path === 'string') {
+    assert.equal(typeof write, 'string', `${label} must be a string`)
+    return encoder.encode(write)
+  }
+  assert(write instanceof Uint8Array, `${label} must be bytes`)
+  return write
+}
+
 // Execute the actual browser entry functions with external I/O supplied by the test.
 const entry = new Function(
   'bindings',
@@ -101,15 +110,12 @@ for (const path of ['bytes', 'string']) {
       }
       assert.equal(writes.length, ticks + 1)
       assert.equal(
-        new TextDecoder().decode(
-          typeof writes[0] === 'string' ? encoder.encode(writes[0]) : writes[0],
-        ),
+        new TextDecoder().decode(writeBytes(writes[0], path, `${name} reset`)),
         '\x1b[3J\x1b[2J\x1b[H',
       )
       let bytes = 0
       for (let tick = 0; tick < ticks; tick++) {
-        const actual =
-          typeof writes[tick + 1] === 'string' ? encoder.encode(writes[tick + 1]) : writes[tick + 1]
+        const actual = writeBytes(writes[tick + 1], path, `${name} tick ${tick}`)
         const chunk = expected[tick % expected.length]
         const wanted = typeof chunk === 'string' ? encoder.encode(chunk) : chunk
         assert.deepEqual(actual, wanted, `${name} tick ${tick}`)
