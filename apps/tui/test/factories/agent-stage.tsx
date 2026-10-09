@@ -24,6 +24,7 @@ export async function renderAgentStage(
   options: {
     readonly connection?: Parameters<typeof openTestChat>[1]
     readonly conversation?: boolean
+    readonly conversationText?: string
     readonly width?: number
     readonly height?: number
     readonly noColor?: boolean
@@ -36,7 +37,9 @@ export async function renderAgentStage(
   await chat.refresh()
   const worktree = chat.getSnapshot().projection.worktreeById[worktreeId]
   assert(worktree)
-  const submission = options.conversation ? draftChatTurn(worktreeId, 'Initial conversation') : null
+  const submission = options.conversation
+    ? draftChatTurn(worktreeId, options.conversationText ?? 'Initial conversation')
+    : null
   if (submission) await chat.dispatch(submission.command)
   if (options.terminalContext) {
     const state = session.getSnapshot()

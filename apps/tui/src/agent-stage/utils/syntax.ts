@@ -1,10 +1,4 @@
-import {
-  convertThemeToStyles,
-  MarkdownRenderable,
-  parseColor,
-  type Renderable,
-  type StyleDefinitionInput,
-} from '@opentui/core'
+import { convertThemeToStyles, parseColor, type StyleDefinitionInput } from '@opentui/core'
 import type { Theme } from '@/theme/utils/theme'
 
 export function promptStyles(theme: Theme) {
@@ -36,17 +30,4 @@ export function syntaxKey(styles: Readonly<Record<string, StyleDefinitionInput>>
       },
     ]),
   )
-}
-
-export function refreshMarkdownStyles(root: Renderable) {
-  const pending = [root]
-  while (pending.length) {
-    const node = pending.pop()
-    if (!node) continue
-    if (node instanceof MarkdownRenderable) {
-      node.refreshStyles()
-      continue
-    }
-    pending.push(...node.getChildren())
-  }
 }
