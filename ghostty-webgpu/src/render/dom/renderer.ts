@@ -44,10 +44,22 @@ interface MountedRun {
   value: RowRun
 }
 
+interface PaintedRow {
+  readonly source: RenderRow
+  readonly runs: readonly RowRun[]
+  snapshot?: RendererFrameRow
+}
+
+function paintedRowSnapshot(row: PaintedRow): RendererFrameRow {
+  return (row.snapshot ??= paintedFrameRow(row.source, () =>
+    row.runs.map((run) => run.text).join(''),
+  ))
+}
+
 interface MountedRow {
   readonly element: Element
   readonly runs: MountedRun[]
-  snapshot?: RendererFrameRow
+  painted?: PaintedRow
 }
 
 class DomSurface implements RowRendererSurface {
@@ -58,7 +70,7 @@ class DomSurface implements RowRendererSurface {
   private grid: RendererGridSize
   private theme: CanonicalRendererTheme
   private rows: MountedRow[] = []
-  private acceptedRows: readonly RendererFrameRow[] = []
+  private acceptedRows: readonly PaintedRow[] = []
   private readonly retainText: boolean
 
   constructor(options: WebGpuTerminalRendererOptions) {
@@ -130,16 +142,24 @@ class DomSurface implements RowRendererSurface {
       changed = true
     }
     // The snapshot closes over completed run values, never the mutable mounted spans.
-    if (this.retainText)
-      mounted.snapshot = paintedFrameRow(row, () => runs.map((run) => run.text).join(''))
+    if (this.retainText) mounted.painted = { source: row, runs }
     return changed
   }
 
   captureTextFrame(): PaintedTextFrame {
-    const previousRows = this.acceptedRows
-    const rows = Object.freeze(this.rows.map((row) => row.snapshot!))
-    this.acceptedRows = rows
-    return Object.freeze({ rows, previousRows })
+    const previous = this.acceptedRows
+    const painted = Object.freeze(this.rows.map((row) => row.painted!))
+    this.acceptedRows = painted
+    let rows: readonly RendererFrameRow[] | undefined
+    let previousRows: readonly RendererFrameRow[] | undefined
+    return Object.freeze({
+      get rows() {
+        return (rows ??= Object.freeze(painted.map(paintedRowSnapshot)))
+      },
+      get previousRows() {
+        return (previousRows ??= Object.freeze(previous.map(paintedRowSnapshot)))
+      },
+    })
   }
 
   resize(font: TerminalFittedFont, grid: RendererGridSize): void {
