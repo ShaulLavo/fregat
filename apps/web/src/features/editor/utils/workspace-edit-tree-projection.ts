@@ -93,7 +93,7 @@ function cloneTreeModel(model: TreeModel): TreeModel {
     errorByDirectoryPath: new Map(model.errorByDirectoryPath),
     loadedDirectoryPaths: new Set(model.loadedDirectoryPaths),
     loadingDirectoryPaths: new Set(model.loadingDirectoryPaths),
-    paths: [...model.paths],
+    paths: model.paths,
   }
 }
 

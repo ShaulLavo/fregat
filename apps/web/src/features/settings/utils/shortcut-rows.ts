@@ -108,7 +108,7 @@ export function shortcutRows(
         .flatMap((candidate) => (candidate.keys ? [candidate.keys] : [])),
     ),
   }))
-  return grouped.toSorted(
+  return grouped.sort(
     (left, right) =>
       Number(left.keys === null) - Number(right.keys === null) ||
       left.title.localeCompare(right.title) ||
@@ -121,10 +121,10 @@ export function shortcutListWith(
   row: ShortcutRow,
   change: { readonly add: string } | { readonly replace: string } | { readonly remove: true },
 ): readonly string[] {
-  if ('add' in change) return unique([...row.commandKeys, change.add])
+  if ('add' in change) return unique(row.commandKeys.concat([change.add]))
   if ('remove' in change) return row.commandKeys.filter((keys) => keys !== row.keys)
   if (row.keys === null) return [change.replace]
-  if (!row.commandKeys.includes(row.keys)) return unique([...row.commandKeys, change.replace])
+  if (!row.commandKeys.includes(row.keys)) return unique(row.commandKeys.concat([change.replace]))
   return unique(row.commandKeys.map((keys) => (keys === row.keys ? change.replace : keys)))
 }
 

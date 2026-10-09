@@ -3,9 +3,10 @@ import type { EditorSyntaxLanguageId } from '@singapore-editor/core/syntax'
 import { LANGUAGE_BY_BASENAME, LANGUAGE_BY_EXTENSION } from '@workspace/client-core/files/language'
 
 const nativeAliases = new Map<string, string>(
-  TREE_SITTER_LANGUAGE_METADATA.flatMap((language) =>
-    [language.id, ...language.aliases].map((alias) => [alias, language.id] as const),
-  ),
+  TREE_SITTER_LANGUAGE_METADATA.flatMap((language) => {
+    const aliases: readonly string[] = [language.id]
+    return aliases.concat(language.aliases).map((alias) => [alias, language.id] as const)
+  }),
 )
 const nativeFilenames = new Map<string, string>(
   TREE_SITTER_LANGUAGE_METADATA.flatMap((language) =>

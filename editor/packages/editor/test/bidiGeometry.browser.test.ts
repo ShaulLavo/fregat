@@ -387,7 +387,7 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')('BiDi geometry brow
 
     const oracle = collapsedRangeOracle(row, 12)
       .map((rect) => rect.left)
-      .toSorted((left, right) => left - right)
+      .sort((left, right) => left - right)
     expect(oracle).toHaveLength(2)
     fixture!.view.setSelection(hit!.offset, hit!.offset, hit!.affinity)
     assertCaretLayerPositions(fixture!.container, row, oracle[1]!, oracle[0]!)
@@ -434,7 +434,7 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')('BiDi geometry brow
       try {
         const oracle = collapsedRangeOracle(mounted.row, 12)
           .map((rect) => rect.left)
-          .toSorted((left, right) => left - right)
+          .sort((left, right) => left - right)
         expect(resolvedPrimary(mounted.session).affinity).toBe(testCase.affinity)
         assertCaretLayerPositions(
           mounted.container,
@@ -809,7 +809,7 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')('BiDi geometry brow
     const targetLine = `${prefix}${BIDI_CORPUS.mixed}${'x'.repeat(40)}`
     const leadingLines = Array.from({ length: 40 }, () => 'top')
     const targetRowIndex = leadingLines.length
-    const text = [...leadingLines, targetLine].join('\n')
+    const text = leadingLines.concat([targetLine]).join('\n')
     const targetOffset = leadingLines.join('\n').length + 1 + prefix.length + 8
     const caretCellWidth = 8
     const mounted = mountBidiEditor(
@@ -864,16 +864,18 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')('BiDi geometry brow
         primaryCaretLeft(mounted.container) - rows[0]!.element.getBoundingClientRect().left
       const sourceOracle = collapsedRangeOracle(rows[0]!, 4).map((rect) => rect.left)
       expect(distanceToSet(sourceOracle, goalX)).toBeLessThanOrEqual(1)
-      const steps = [
-        ...Array.from({ length: lines.length - 1 }, (_value, index) => ({
+      const steps = Array.from(
+        { length: lines.length - 1 },
+        (_value, index): { command: 'cursorDown' | 'cursorUp'; row: number } => ({
           command: 'cursorDown' as const,
           row: index + 1,
-        })),
-        ...Array.from({ length: lines.length - 1 }, (_value, index) => ({
+        }),
+      ).concat(
+        Array.from({ length: lines.length - 1 }, (_value, index) => ({
           command: 'cursorUp' as const,
           row: lines.length - index - 2,
         })),
-      ]
+      )
 
       for (const step of steps) {
         expect(mounted.editor.dispatchCommand(step.command)).toBe(true)
@@ -1556,10 +1558,10 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')('BiDi geometry brow
   })
 
   it('moves mounted cursors visually and unmounted cursors through the logical fallback', () => {
-    const text = [
-      BIDI_CORPUS.nested,
-      ...Array.from({ length: 80 }, () => BIDI_CORPUS.pureHebrew),
-    ].join('\n')
+    const firstLines: string[] = [BIDI_CORPUS.nested]
+    const text = firstLines
+      .concat(Array.from({ length: 80 }, () => BIDI_CORPUS.pureHebrew))
+      .join('\n')
     const farStart = text.lastIndexOf('\n') + 1
     const container = document.createElement('div')
     container.style.height = '24px'
@@ -2285,7 +2287,7 @@ describe.skipIf(typeof globalThis.Highlight === 'undefined')('BiDi geometry brow
         left: Number.parseFloat(marker.style.left),
         width: Number.parseFloat(marker.style.width),
       }))
-      .toSorted((left, right) => left.left - right.left)
+      .sort((left, right) => left.left - right.left)
     assertRectsClose(markers, mergedRangeOracle(row, range!.start, range!.end))
   })
 
@@ -3008,7 +3010,7 @@ function assertCaretTruthCase(testCase: (typeof CARET_TRUTH_CASES)[number]): voi
   try {
     const oracle = collapsedRangeOracle(mounted.row, 1)
       .map((rect) => rect.left)
-      .toSorted((left, right) => left - right)
+      .sort((left, right) => left - right)
     assertCaretPositionOrder(mounted, 'before', oracle, testCase.before)
     assertCaretPositionOrder(mounted, 'after', oracle, testCase.after)
   } finally {
@@ -3241,14 +3243,13 @@ function assertPaintedSelectionRects(
   row: BidiGeometryFixture['rows'][keyof BidiGeometryFixture['rows']],
   expected: readonly OracleRect[],
 ): void {
-  const painted = [
-    ...row.element.querySelectorAll<HTMLElement>('.editor-virtualized-selection-range'),
-  ]
-    .map((element) => ({
+  const painted = Array.from(
+    row.element.querySelectorAll<HTMLElement>('.editor-virtualized-selection-range'),
+    (element) => ({
       left: Number.parseFloat(element.style.left),
       width: Number.parseFloat(element.style.width),
-    }))
-    .toSorted((left, right) => left.left - right.left)
+    }),
+  ).sort((left, right) => left.left - right.left)
   assertRectsClose(painted, expected)
 }
 
@@ -3349,7 +3350,7 @@ function sortedCollapsedCaretXs(
 ): readonly number[] {
   return collapsedRangeOracle(row, localOffset)
     .map((rect) => rect.left)
-    .toSorted((left, right) => left - right)
+    .sort((left, right) => left - right)
 }
 
 const BOUNDARY_TWINS = new Map<string, ReadonlyMap<number, number>>([
@@ -3574,40 +3575,40 @@ function caretStates(
 }
 
 function simpleLtrVisualPath(length: number): VisualCaretPath {
+  const right: CaretState[] = [{ offset: 0, affinity: 'after' }]
+  const left: CaretState[] = [{ offset: length, affinity: 'before' }]
   return {
-    right: [
-      { offset: 0, affinity: 'after' },
-      ...Array.from({ length }, (_value, index) => ({
+    right: right.concat(
+      Array.from({ length }, (_value, index) => ({
         offset: index + 1,
         affinity: 'before' as const,
       })),
-    ],
-    left: [
-      { offset: length, affinity: 'before' },
-      ...Array.from({ length }, (_value, index) => ({
+    ),
+    left: left.concat(
+      Array.from({ length }, (_value, index) => ({
         offset: length - index - 1,
         affinity: 'after' as const,
       })),
-    ],
+    ),
   }
 }
 
 function simpleRtlVisualPath(length: number): VisualCaretPath {
+  const right: CaretState[] = [{ offset: length, affinity: 'before' }]
+  const left: CaretState[] = [{ offset: 0, affinity: 'after' }]
   return {
-    right: [
-      { offset: length, affinity: 'before' },
-      ...Array.from({ length }, (_value, index) => ({
+    right: right.concat(
+      Array.from({ length }, (_value, index) => ({
         offset: length - index - 1,
         affinity: 'after' as const,
       })),
-    ],
-    left: [
-      { offset: 0, affinity: 'after' },
-      ...Array.from({ length }, (_value, index) => ({
+    ),
+    left: left.concat(
+      Array.from({ length }, (_value, index) => ({
         offset: index + 1,
         affinity: 'before' as const,
       })),
-    ],
+    ),
   }
 }
 
@@ -3688,7 +3689,7 @@ function assertMixedBoundaryCaret(
 ): void {
   const positions = collapsedRangeOracle(mounted.row, 8)
     .map((rect) => rect.left)
-    .toSorted((left, right) => left - right)
+    .sort((left, right) => left - right)
   expect(positions).toHaveLength(2)
   const expectedX = affinity === 'before' ? positions[0]! : positions[1]!
   expect(resolvedPrimary(mounted.session)).toMatchObject({
@@ -3748,7 +3749,7 @@ function assertBoundaryCaret(
 ): void {
   const positions = collapsedRangeOracle(row, localOffset)
     .map((rect) => rect.left)
-    .toSorted((left, right) => left - right)
+    .sort((left, right) => left - right)
   expect(positions).toHaveLength(2)
   const expectedX = affinity === 'before' ? positions[0]! : positions[1]!
   const rowLeft = row.element.getBoundingClientRect().left

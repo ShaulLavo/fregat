@@ -226,7 +226,7 @@ export class EditorViewContributionController {
     also: readonly EditorViewContributionUpdateKind[] = [],
   ): void {
     if (!this.canPresent() || this.contributions.length === 0) return
-    const kinds = also.length === 0 ? [kind] : [kind, ...also.filter((other) => other !== kind)]
+    const kinds = also.length === 0 ? [kind] : [kind].concat(also.filter((other) => other !== kind))
     if (this.notifying) {
       this.queueReentrantUpdate(kinds, change)
       return
@@ -402,9 +402,7 @@ export class EditorViewContributionController {
 
     const merged = new Set<EditorViewContribution>()
     for (const list of nonEmpty) for (const contribution of list) merged.add(contribution)
-    return Array.from(merged).toSorted(
-      (left, right) => this.order.get(left)! - this.order.get(right)!,
-    )
+    return Array.from(merged).sort((left, right) => this.order.get(left)! - this.order.get(right)!)
   }
 
   private subscribersOf(kind: EditorViewContributionUpdateKind): readonly EditorViewContribution[] {

@@ -1,11 +1,12 @@
 import net from 'node:net'
+import { existsSync, realpathSync } from 'node:fs'
 import { htmlBootstrapPlugin } from './scripts/html-bootstrap-plugin.ts'
 import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, type Alias } from 'vite'
 import { portFromEnv } from '../../scripts/runtime-network.ts'
 import { createScriptError } from '../../scripts/structured-errors.ts'
 import { readDevSources, sourceAliases } from '../../scripts/dev-sources.ts'
@@ -25,6 +26,9 @@ import { shellChunkGroups } from './scripts/shell-chunk-groups.ts'
 const workspaceRoot = path.resolve(import.meta.dirname, '../..')
 const markdownRequire = createRequire(path.join(workspaceRoot, 'packages/markdown/package.json'))
 const sharedMarkdown = ['unified', 'remark-parse', 'remark-gfm', 'unist-util-visit']
+const appAliases: readonly Alias[] = [
+  { find: '@', replacement: path.resolve(import.meta.dirname, './src') },
+]
 
 const devServerHost = requireLiteralAddress(process.env.WEB_HOST, '127.0.0.1')
 const devServerPort = portFromEnv(process.env, 'WEB_PORT', 5173)
@@ -36,6 +40,11 @@ const devServerPort = portFromEnv(process.env, 'WEB_PORT', 5173)
  */
 export function bunInstallCacheRoot(env: NodeJS.ProcessEnv = process.env): string {
   return env.BUN_INSTALL_CACHE_DIR ?? path.join(os.homedir(), '.bun', 'install', 'cache')
+}
+
+export function bunDependencyRoots(root: string = workspaceRoot): string[] {
+  const store = path.join(root, 'node_modules/.bun')
+  return existsSync(store) ? [realpathSync(store)] : []
 }
 
 /**
@@ -92,7 +101,7 @@ export default defineConfig(({ command, isPreview }) => {
     },
     optimizeDeps: {
       // Theme subpaths are loaded after boot and must survive optimizer cache invalidation.
-      exclude: ['@shikijs/themes', 'ghostty-webgpu', ...packages.map((pkg) => pkg.name)],
+      exclude: ['@shikijs/themes', 'ghostty-webgpu'].concat(packages.map((pkg) => pkg.name)),
       // Linked workspace imports and editor workers can enter the graph after boot.
       // Prebundle their dependencies so opening a lazy screen keeps the optimizer graph.
       include: [
@@ -123,17 +132,16 @@ export default defineConfig(({ command, isPreview }) => {
       react({
         // Vitest configs keep `compiler: true`: the flag would reprint every diagnostic per run.
         compiler: { logDiagnostics: true },
-        exclude: [
-          /\/node_modules\//,
+        exclude: [/\/node_modules\//, /[?&]html-proxy\b.*\.css$/].concat(
           // Cached component modules retain WASM owners across Fast Refresh.
-          ...(packages.length > 0
+          packages.length > 0
             ? [/\/features\/terminal\/components\/(panel|saved-viewport)\.tsx$/]
-            : []),
-          ...linkedDist.map((pkg) => new RegExp(`^${escapeRegExp(pkg.root)}/`)),
-          ...packages
+            : [],
+          linkedDist.map((pkg) => new RegExp(`^${escapeRegExp(pkg.root)}/`)),
+          packages
             .filter((pkg) => pkg.name !== '@singapore-editor/react')
             .map((pkg) => new RegExp(`^${escapeRegExp(pkg.root)}/`)),
-        ],
+        ),
       }),
       tailwindcss(),
       phosphorImportPlugin(),
@@ -144,20 +152,22 @@ export default defineConfig(({ command, isPreview }) => {
       bundleStatsPlugin(),
     ],
     resolve: {
-      alias: [
-        { find: '@', replacement: path.resolve(import.meta.dirname, './src') },
-        ...sharedMarkdown.map((name) => ({
+      alias: appAliases.concat(
+        sharedMarkdown.map((name) => ({
           find: name,
           replacement: markdownRequire.resolve(name),
         })),
-        ...sourceAliases(packages),
-      ],
+        sourceAliases(packages),
+      ),
       // Linked checkouts share the app's React, hotkey manager and evlog globals.
       dedupe: ['react', 'react-dom', 'evlog', '@tanstack/hotkeys'],
     },
     server: {
       fs: {
-        allow: [workspaceRoot, bunInstallCacheRoot(), ...packages.map((pkg) => pkg.checkout)],
+        allow: [workspaceRoot, bunInstallCacheRoot()].concat(
+          bunDependencyRoots(),
+          packages.map((pkg) => pkg.checkout),
+        ),
       },
       // A literal address (see `requireLiteralAddress`), never a hostname Vite would resolve itself.
       host: devServerHost,

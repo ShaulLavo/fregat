@@ -225,7 +225,7 @@ function summarizeRuleWrap(
   }
   finishWordWrapLine(line, rules, runs)
   if (line.ends.length === 0) return uniformWrap(length, null)
-  const ends = Uint32Array.from([...line.ends, length])
+  const ends = Uint32Array.from(line.ends.concat([length]))
   return { kind: 'indexed', length, ends, rows: ends.length }
 }
 

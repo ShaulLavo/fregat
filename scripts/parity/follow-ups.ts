@@ -117,10 +117,9 @@ compare('latest-pairs', pairs.map(pinnedLatest), pairs.map(latestCompletedToolAc
 function permutations(values: Activity[]): Activity[][] {
   if (values.length === 0) return [[]]
   return values.flatMap((value, index) =>
-    permutations(values.filter((_, candidate) => candidate !== index)).map((rest) => [
-      value,
-      ...rest,
-    ]),
+    permutations(values.filter((_, candidate) => candidate !== index)).map((rest) =>
+      [value].concat(rest),
+    ),
   )
 }
 
@@ -158,7 +157,7 @@ control('array-position-instead-of-sequence', sequenceCase, sequenceWitness.at(-
 control(
   'timestamp-instead-of-sequence',
   sequenceCase,
-  sequenceWitness.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt))[0]?.id ??
+  sequenceWitness.sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0]?.id ??
     null,
 )
 const tieWitness = [

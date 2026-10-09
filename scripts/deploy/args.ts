@@ -22,7 +22,7 @@ export type InstallCommand =
 
 export function parseInstallArgs(args: readonly string[]): InstallCommand {
   const { values } = parseArgs({
-    args: [...args],
+    args,
     options: {
       from: { type: 'string' },
       help: { type: 'boolean', default: false },

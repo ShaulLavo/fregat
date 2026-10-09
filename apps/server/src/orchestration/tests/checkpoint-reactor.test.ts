@@ -677,7 +677,7 @@ async function turnDiffFiles(engine: OrchestrationEngine) {
   const completed = events.filter((event) => event.type === 'session.turn-diff-completed')
   const files = completed.at(-1)?.payload.files ?? []
 
-  return [...files].toSorted((left, right) => left.path.localeCompare(right.path))
+  return files.sort((left, right) => left.path.localeCompare(right.path))
 }
 
 function command(value: unknown) {

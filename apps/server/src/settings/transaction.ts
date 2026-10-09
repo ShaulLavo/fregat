@@ -181,7 +181,7 @@ export function hasSettingsRecoveryArtifacts(
   settingsPaths: readonly string[],
   secretsPath?: string,
 ): boolean {
-  const destinations = secretsPath ? [...settingsPaths, secretsPath] : settingsPaths
+  const destinations = secretsPath ? settingsPaths.concat([secretsPath]) : settingsPaths
   const directories = new Map<string, string[]>()
   for (const destination of destinations) {
     const directory = path.dirname(destination)

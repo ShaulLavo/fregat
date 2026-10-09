@@ -89,7 +89,7 @@ function control(args: string[]) {
       message: 'The private compositor control socket is unavailable.',
       internal: { stage: 'control' },
     })
-  return Bun.spawnSync(['hyprctl', ...args], { env })
+  return Bun.spawnSync(['hyprctl'].concat(args), { env })
 }
 let metadata: Record<string, unknown> = { scratch, compositor: 'Hyprland nested Wayland' }
 try {
@@ -168,7 +168,8 @@ try {
   }
   process.exitCode = await owned(command, 'verification', true, verificationEnv).exited
 } finally {
-  for (const child of children.toReversed()) {
+  for (let index = children.length - 1; index >= 0; index--) {
+    const child = children[index]!
     if (child.process.exitCode === null && identity(child.process.pid) === child.startTime)
       child.process.kill('SIGTERM')
     await Promise.race([child.process.exited, Bun.sleep(2000)])

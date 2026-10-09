@@ -20,7 +20,7 @@ import { streamPickerSearchEntries } from '@/features/file-picker/state/search'
 
 export type DirectoryLoadData = {
   currentEntry: DirectoryFsEntry | null
-  entries: FsEntry[]
+  entries: readonly FsEntry[]
 }
 
 export type DirectoryLoadOptions = {

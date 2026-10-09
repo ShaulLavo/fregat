@@ -22,7 +22,7 @@ test('paints complete graphemes on each wrapped display row', async () => {
   const rows = () =>
     [...container.querySelectorAll<HTMLElement>('[data-editor-virtual-row]')]
       .filter((row) => row.style.display !== 'none')
-      .toSorted(
+      .sort(
         (left, right) =>
           Number(left.dataset.editorVirtualRow) - Number(right.dataset.editorVirtualRow),
       )
@@ -34,7 +34,8 @@ test('paints complete graphemes on each wrapped display row', async () => {
     )
     .toBe(text)
   const boundaries = new Set(
-    [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)].map(
+    Array.from(
+      new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text),
       (part) => part.index,
     ),
   )

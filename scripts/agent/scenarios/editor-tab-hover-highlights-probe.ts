@@ -96,7 +96,7 @@ export function captureTokenPaint(probe: TokenPaintProbe): TokenPaintFrame {
         }
       : null
   const rules = new Map<string, CSSStyleDeclaration>()
-  for (const sheet of [...document.styleSheets, ...document.adoptedStyleSheets]) {
+  for (const sheet of Array.from(document.styleSheets).concat(document.adoptedStyleSheets)) {
     try {
       visitRules(sheet.cssRules)
     } catch {
@@ -246,7 +246,7 @@ export function tokenPaintMismatch(
   const rows = (value: TokenPaintFrame) =>
     value.rows
       .map(({ start, end, text }) => ({ start, end, text }))
-      .toSorted((left, right) => left.start - right.start || left.end - right.end)
+      .sort((left, right) => left.start - right.start || left.end - right.end)
   if (JSON.stringify(rows(frame)) !== JSON.stringify(rows(expected))) return 'source rows'
   if (reference.expected === 'colored' && reference.runs.length < 2) return 'uncalibrated reference'
   if (reference.expected === 'plain' && reference.runs.length !== 0)

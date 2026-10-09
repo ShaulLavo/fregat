@@ -39,10 +39,9 @@ export class ProviderTranscriptCollection {
       sources: [],
     }
     // Recorder supplements stay readable before native identity and scan initialization.
-    const records = [
-      ...(this.recordedHistory?.readUtilities(query) ?? []),
-      ...(this.recordedHistory?.readUncoveredSessions(query) ?? []),
-    ]
+    const records = (this.recordedHistory?.readUtilities(query) ?? []).concat(
+      this.recordedHistory?.readUncoveredSessions(query) ?? [],
+    )
     return { ...aggregateTranscriptHistory(records, query, Date.now()), coverage }
   }
 

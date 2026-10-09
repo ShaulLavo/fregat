@@ -20,7 +20,7 @@ export function randomChange(text: string, random: () => number) {
     if (count === 1 || random() < 0.5) {
       edits.push({ offset, deleteCount: 0, text: content.join('') })
     } else {
-      for (const scalar of [...content].reverse())
+      for (const scalar of content.toReversed())
         edits.push({ offset, deleteCount: 0, text: scalar })
     }
     scalars.splice(index, 0, ...content)

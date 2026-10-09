@@ -42,7 +42,7 @@ function mergeAccount(
     state: control.state === 'no-data' && other.windows.length > 0 ? other.state : control.state,
     checkedAt: latest(left.checkedAt, right.checkedAt),
     lastSeenAt: latest(left.lastSeenAt ?? left.checkedAt, right.lastSeenAt ?? right.checkedAt),
-    providerInstanceIds: [...new Set([...left.providerInstanceIds, ...right.providerInstanceIds])],
+    providerInstanceIds: [...new Set(left.providerInstanceIds.concat(right.providerInstanceIds))],
     windows: mergeObservedUsageWindows(left.windows, right.windows),
   }
 }

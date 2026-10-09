@@ -15,7 +15,7 @@ for (const field of ['browser', 'hardware', 'runtime']) {
 assert.notEqual(before.id, after.id, 'Runs must be independent')
 
 const baseline = groupLatencies(before)
-const metrics = [...groupLatencies(after)].map(([key, values]) => {
+const metrics = Array.from(groupLatencies(after), ([key, values]) => {
   const old = summarize(baseline.get(key))
   const next = summarize(values)
   return { key, before: old, after: next, p95Speedup: old.p95Ms / next.p95Ms }
@@ -40,14 +40,14 @@ function groupLatencies(result) {
   for (const sample of result.samples) {
     for (const [metric, values] of Object.entries(sample.latencyMs)) {
       const key = `${sample.fixture}/${sample.scenario}/${sample.state}/${metric}`
-      groups.set(key, [...(groups.get(key) ?? []), ...values])
+      groups.set(key, (groups.get(key) ?? []).concat(values))
     }
   }
   return groups
 }
 
 function summarize(values) {
-  const sorted = values.toSorted((a, b) => a - b)
+  const sorted = values.sort((a, b) => a - b)
   const at = (fraction) => sorted[Math.ceil(sorted.length * fraction) - 1]
   return { count: values.length, p50Ms: at(0.5), p95Ms: at(0.95) }
 }

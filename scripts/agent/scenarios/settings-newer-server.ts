@@ -36,7 +36,7 @@ async function answerAsNewerServer(page: Page) {
     const diagnostic = { kind: 'from-a-newer-server', id: 'editor.fontSize', layer: 'user' }
     await route.fulfill({
       response,
-      json: { ...snapshot, diagnostics: [...snapshot.diagnostics, diagnostic] },
+      json: { ...snapshot, diagnostics: snapshot.diagnostics.concat([diagnostic]) },
     })
   })
 }

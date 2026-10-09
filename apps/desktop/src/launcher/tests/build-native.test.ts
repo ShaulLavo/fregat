@@ -38,7 +38,7 @@ test.skipIf(!webkit || !compiler)(
       ['--data-dir', path.join(tmpdir(), 'unused-native-options'), '--vibrancy', '--vibrancy'],
       ['--vibrancy', '--data-dir', 'relative'],
     ]) {
-      const result = Bun.spawnSync([output!, 'http://127.0.0.1', 'unused-script', ...options], {
+      const result = Bun.spawnSync([output!, 'http://127.0.0.1', 'unused-script'].concat(options), {
         env: { ...process.env, DISPLAY: '', WAYLAND_DISPLAY: '' },
       })
       expect(result.exitCode).toBe(2)

@@ -66,7 +66,7 @@ export function syncChatProjectionShellSnapshot(
     lastAppliedShellSequence: snapshot.snapshotSequence,
     lastShellItemKeys: null,
     lastAppliedShellUpdatedAt: snapshot.updatedAt,
-    sessionIds: [...nextSessionIds],
+    sessionIds: Array.from(nextSessionIds),
   }
 
   for (const session of snapshot.sessions) {
@@ -138,7 +138,7 @@ function prependUnheld<TValue, TKey extends string>(
 ): TValue[] {
   const heldKeys = new Set(held.map(getKey))
 
-  return [...older.filter((value) => !heldKeys.has(getKey(value))), ...held]
+  return older.filter((value) => !heldKeys.has(getKey(value))).concat(held)
 }
 
 function markSessionHistorySequence(
@@ -257,7 +257,7 @@ export function applyChatProjectionShellStreamItem(
     lastShellItemKeys:
       item.sequence > state.lastAppliedShellSequence
         ? [key]
-        : [...(state.lastShellItemKeys ?? []), key],
+        : (state.lastShellItemKeys ?? []).concat([key]),
   }
 }
 
@@ -734,7 +734,7 @@ function snapshotRows<TValue, TKey extends string>({
     return { rows: incoming, hasEarlier: false }
   const start = held.findIndex((row) => getKey(row) === getKey(first))
   // Overlap proves continuity; without it, keeping old pages would hide a gap.
-  const rows = start < 0 ? incoming : [...held.slice(0, start), ...incoming]
+  const rows = start < 0 ? incoming : held.slice(0, start).concat(incoming)
   const max = Math.max(limit, held.length)
   return {
     rows: rows.length > max ? rows.slice(-max) : rows,
@@ -953,7 +953,7 @@ function applySessionMessageSentEvent(
   // this file, so record membership *is* the id-list membership test. A streamed
   // delta re-sends an id that is already held, and this runs once per token: a
   // linear `includes` over the retained transcript is the wrong instrument.
-  const appendedIds = heldMessage ? currentIds : [...currentIds, message.id]
+  const appendedIds = heldMessage ? currentIds : currentIds.concat([message.id])
   const nextIds = boundedTail(appendedIds, CHAT_MESSAGE_CACHE_LIMIT, currentIds.length)
   const grownById = {
     ...currentById,
@@ -1065,7 +1065,7 @@ function appendActivity(
   if (isTailAppend) {
     return {
       byId: { ...byId, [activity.id]: activity },
-      ids: [...ids, activity.id],
+      ids: ids.concat([activity.id]),
     }
   }
 
@@ -1090,7 +1090,7 @@ function applySessionProposedPlanUpsertedEvent(
     ...currentById,
     [event.payload.proposedPlan.id]: event.payload.proposedPlan,
   })
-    .toSorted(compareProposedPlans)
+    .sort(compareProposedPlans)
     .slice(-CHAT_PROPOSED_PLAN_CACHE_LIMIT)
 
   return {
@@ -1128,7 +1128,7 @@ function applySessionTurnDiffCompletedEvent(
     ...currentById,
     [summary.turnId]: summary,
   })
-    .toSorted((left, right) => left.checkpointTurnCount - right.checkpointTurnCount)
+    .sort((left, right) => left.checkpointTurnCount - right.checkpointTurnCount)
     .slice(-CHAT_CHECKPOINT_CACHE_LIMIT)
   const nextState = {
     ...patchSession(state, sessionId, { updatedAt: event.payload.completedAt }),
@@ -1392,7 +1392,7 @@ function ensureSessionRegistered(
   sessionId: SessionId,
 ): ChatProjectionSlice {
   if (state.sessionIds.includes(sessionId)) return state
-  return { ...state, sessionIds: [...state.sessionIds, sessionId] }
+  return { ...state, sessionIds: state.sessionIds.concat([sessionId]) }
 }
 
 function removeSessionState(state: ChatProjectionSlice, sessionId: SessionId): ChatProjectionSlice {
@@ -1511,7 +1511,7 @@ function buildProposedPlanSlice(plans: OrchestrationProposedPlan[]) {
 function buildTurnDiffSlice(sessionId: SessionId, checkpoints: OrchestrationCheckpointSummary[]) {
   const summaries = checkpoints
     .map((checkpoint): ChatTurnDiffSummary => ({ ...checkpoint, sessionId }))
-    .toSorted((left, right) => left.checkpointTurnCount - right.checkpointTurnCount)
+    .sort((left, right) => left.checkpointTurnCount - right.checkpointTurnCount)
     .slice(-CHAT_CHECKPOINT_CACHE_LIMIT)
 
   return {
@@ -1589,7 +1589,7 @@ function collectByIds<TKey extends string, TValue>(
 function appendId<T extends string>(ids: readonly T[], id: T): T[] {
   if (ids.includes(id)) return ids as T[]
 
-  return [...ids, id]
+  return ids.concat([id])
 }
 
 function removeId<T extends string>(ids: readonly T[], id: T): T[] {

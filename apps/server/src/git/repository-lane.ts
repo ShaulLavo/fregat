@@ -63,7 +63,8 @@ async function acquireLane(commonDirectory: string) {
   pending.set(commonDirectory, completion.promise)
   await previous
   const lease = { valid: true }
-  const context = new Map([...(active.getStore() ?? []), [commonDirectory, lease]])
+  const context = new Map(active.getStore())
+  context.set(commonDirectory, lease)
   const release = () => {
     lease.valid = false
     completion.resolve()

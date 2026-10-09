@@ -112,7 +112,7 @@ function burst(message: { edits: { path: string; text?: string }[] }): void {
 }
 
 function diagnosticsFor(fileName: string): readonly ts.Diagnostic[] {
-  return [...service.getSyntacticDiagnostics(fileName), ...service.getSemanticDiagnostics(fileName)]
+  return service.getSyntacticDiagnostics(fileName).concat(service.getSemanticDiagnostics(fileName))
 }
 
 function host(

@@ -228,15 +228,9 @@ it.each(cases)('doctor classifies $mode through the real CLI', async (fixture) =
       url = `${base}/platform/~fixture/workbench/f/file.ts?tabs=@`
     if (fixture.mode === 'nested-root-address') url = `${base}/~fixture/workbench/f/file.ts?tabs=@`
     const spawned = Bun.spawn(
-      [
-        'bun',
-        'scripts/agent/browser.ts',
-        'look',
-        '--doctor',
-        '--url',
-        url,
-        ...(fixture.consoleCapture ? [] : ['--no-console']),
-      ],
+      ['bun', 'scripts/agent/browser.ts', 'look', '--doctor', '--url', url].concat(
+        fixture.consoleCapture ? [] : ['--no-console'],
+      ),
       {
         cwd: checkoutRoot,
         env: {

@@ -41,7 +41,8 @@ export function formatSessionTitleContext(messages: ReadonlyArray<SessionTitleMe
     if (cached !== undefined) return cached
     const text = assistantCitationsToPlainText(section.message.text).trim()
     const names = section.message.attachments?.map((attachment) => attachment.name).join(', ')
-    const contents = [text, ...(names ? [`[Attachments: ${names}]`] : [])]
+    const contents = [text]
+      .concat(names ? [`[Attachments: ${names}]`] : [])
       .filter(Boolean)
       .join('\n')
     formatted.set(section.index, contents)
@@ -60,20 +61,21 @@ export function formatSessionTitleContext(messages: ReadonlyArray<SessionTitleMe
     remaining -= text.length + 2
   }
 
+  const latestSections = sections.toReversed()
   const firstUser = sections.find((section) => section.message.role === 'user')
   if (firstUser) add(firstUser, MAX_MESSAGE)
   // Up to 6,000 characters go to user messages. Assistant output cannot evict them.
-  for (const section of sections.toReversed()) {
+  for (const section of latestSections) {
     if (section.message.role === 'user') {
       add(section, Math.min(MAX_MESSAGE, remaining - 2_000))
     }
   }
-  for (const section of sections.toReversed()) {
+  for (const section of latestSections) {
     if (section.message.role === 'assistant') add(section, MAX_MESSAGE)
   }
   // Use spare space when the conversation has only a few messages.
   for (const role of ['user', 'assistant'] as const) {
-    for (const section of sections.toReversed()) {
+    for (const section of latestSections) {
       const previous = selected.get(section.index)
       if (section.message.role !== role || previous === undefined) continue
       const expanded =
@@ -94,9 +96,8 @@ export function formatSessionTitleContext(messages: ReadonlyArray<SessionTitleMe
   )
   return {
     message: `${truncated || retained.length < sections.length ? OMITTED : ''}${retained.map((section) => selected.get(section.index)).join('\n\n')}`,
-    attachments: [
-      ...(firstAttachment ? [firstAttachment] : []),
-      ...recentAttachments.slice(firstAttachment ? -3 : -4),
-    ],
+    attachments: (firstAttachment ? [firstAttachment] : []).concat(
+      recentAttachments.slice(firstAttachment ? -3 : -4),
+    ),
   }
 }

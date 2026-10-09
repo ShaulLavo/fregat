@@ -152,7 +152,7 @@ describe('syncTreePaneState', () => {
       syncTreePaneState({
         loadExpandedDirectoriesForCurrentModel: () => {},
         model,
-        previousPaths: [...model.paths, 'packages/editor-find/.turbo/'],
+        previousPaths: model.paths.concat(['packages/editor-find/.turbo/']),
         rootPath: root,
         selectedFilePath: null,
         tree: fileTree,

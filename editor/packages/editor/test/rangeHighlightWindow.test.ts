@@ -84,7 +84,7 @@ function paintedTexts(name: string): string[] {
   const highlight = highlightsMap.get(name)
   if (!highlight) throw new Error(`no highlight named ${name}`)
 
-  return [...highlight].map((range) => range.toString()).sort()
+  return Array.from(highlight, (range) => range.toString()).sort()
 }
 
 describe('range highlight visible window', () => {
@@ -149,7 +149,7 @@ describe('range highlight visible window', () => {
     const descending = Array.from({ length: 6 }, (_, index) => lineRange(5 - index))
     view.setRangeHighlight(
       'test-find',
-      [...descending, { start: 0, end: lineRange(5).end }],
+      descending.concat([{ start: 0, end: lineRange(5).end }]),
       HIGHLIGHT_STYLE,
     )
 

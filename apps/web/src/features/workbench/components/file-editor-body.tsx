@@ -105,7 +105,7 @@ export function FileEditorBody({
   const editorPlugins = useMemo(
     () =>
       splitMarkdown
-        ? [...visibleSnapshot.additionalPlugins, scrollSync.plugin]
+        ? visibleSnapshot.additionalPlugins.concat([scrollSync.plugin])
         : visibleSnapshot.additionalPlugins,
     [scrollSync, splitMarkdown, visibleSnapshot.additionalPlugins],
   )

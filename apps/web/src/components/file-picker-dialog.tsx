@@ -255,7 +255,7 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
       : []
   const listEntries = leadPending ? [] : entries
   // The rows in the order the list shows them; the keyboard walks these.
-  const shownEntries = leadingRecents.length > 0 ? [...leadingRecents, ...entries] : listEntries
+  const shownEntries = leadingRecents.length > 0 ? leadingRecents.concat(entries) : listEntries
   const selectedEntry = selectedVisibleEntry(shownEntries, session.selectedEntry)
   const viewSetting = useSettingValue('files.picker.view')
   const chosenView = pickerView(viewSetting)
@@ -296,12 +296,12 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
   const setLocations = (
     key: 'files.picker.pinnedLocations' | 'files.picker.hiddenLocations',
     next: readonly string[],
-  ) => machineSettingsActions.setSetting(key, [...new Set(next)], 'user')
+  ) => machineSettingsActions.setSetting(key, Array.from(new Set(next)), 'user')
   const locationActions: PickerLocationActions = {
     hiddenCount: hidden.length,
-    hide: (path) => setLocations('files.picker.hiddenLocations', [...hidden, path]),
+    hide: (path) => setLocations('files.picker.hiddenLocations', hidden.concat([path])),
     pin: (path) => {
-      setLocations('files.picker.pinnedLocations', [...pinned, path])
+      setLocations('files.picker.pinnedLocations', pinned.concat([path]))
       if (hidden.includes(path))
         setLocations(
           'files.picker.hiddenLocations',

@@ -71,7 +71,7 @@ export function mountDocsEditor(host: HTMLElement, options: DocsEditorOptions) {
   host.append(element)
   const plugins: EditorPlugin[] = [
     createTreeSitterLanguagePlugin(
-      ['markdown', ...FENCE_LANGUAGE_IDS].map((id) => languageContribution(id)),
+      ['markdown'].concat(FENCE_LANGUAGE_IDS).map((id) => languageContribution(id)),
       { name: 'tree-sitter-docs' },
     ),
     createMarkdownPreviewPlugin({ openLink: options.openLink }),
@@ -91,7 +91,7 @@ export function mountDocsEditor(host: HTMLElement, options: DocsEditorOptions) {
   const editor: Editor = new Editor(element, {
     presentationReady: false,
     plugins,
-    keymap: { packs: [...defaultEditorPacks, markdownPack] },
+    keymap: { packs: defaultEditorPacks.concat([markdownPack]) },
     fontFamily: options.fontFamily,
     fontSize: options.fontSize,
     lineHeight: options.lineHeight,

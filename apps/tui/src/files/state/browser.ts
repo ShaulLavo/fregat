@@ -65,7 +65,7 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
     try {
       const result = await readDirectory({ client, path, signal: controller.signal })
       controller.signal.throwIfAborted()
-      const entries = result.entries.toSorted(
+      const entries = result.entries.sort(
         (left, right) =>
           Number(isDirectoryEntry(right)) - Number(isDirectoryEntry(left)) ||
           left.name.localeCompare(right.name),

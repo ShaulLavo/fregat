@@ -40,7 +40,7 @@ export function sessionDeletion(ref: ScopedSessionRef, deleted: readonly ScopedS
         session.id !== ref.sessionId &&
         !removed.has(scopedSessionKey({ environmentId: ref.environmentId, sessionId: session.id })),
     )
-    .toSorted((left, right) =>
+    .sort((left, right) =>
       compareSessionsByActivity(
         slice.sessionById[left.id]!,
         slice.sessionById[right.id]!,

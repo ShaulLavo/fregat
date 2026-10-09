@@ -123,7 +123,7 @@ export class PullRequestSyncReactor {
       const projectId = candidate.worktree.projectId
       const backoff = this.backoff.get(projectId)
       if (backoff && backoff.until > this.now()) continue
-      groups.set(projectId, [...(groups.get(projectId) ?? []), candidate])
+      groups.set(projectId, (groups.get(projectId) ?? []).concat([candidate]))
     }
     return groups
   }

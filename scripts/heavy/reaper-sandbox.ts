@@ -92,11 +92,7 @@ if (operation === 'stop' && slice.endsWith('.slice')) writeFileSync(path.join(${
         proc,
         '--slice-root',
         sliceRoot,
-        ...(quiet ? ['--quiet'] : []),
-        'reaper',
-        '--',
-        'true',
-      ],
+      ].concat(quiet ? ['--quiet'] : [], ['reaper', '--', 'true']),
       { env: { ...process.env, PATH: bin }, stdio: ['ignore', 'pipe', 'pipe'] },
     )
     let stderr = ''

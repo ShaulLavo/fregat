@@ -910,7 +910,7 @@ function render(session: DocumentSession): string {
 
   let out = ''
   let cursor = 0
-  for (const mark of marks.toSorted((a, b) => a.offset - b.offset || a.order - b.order)) {
+  for (const mark of marks.sort((a, b) => a.offset - b.offset || a.order - b.order)) {
     out += text.slice(cursor, mark.offset) + mark.mark
     cursor = mark.offset
   }

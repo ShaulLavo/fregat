@@ -45,7 +45,7 @@ export const useFollowUpStore = create<FollowUpStore>((set, get) => ({
     const key = scopedSessionKey(ref)
     set((state) => ({
       owners: { ...state.owners, [key]: ref },
-      queues: { ...state.queues, [key]: [...(state.queues[key] ?? []), message] },
+      queues: { ...state.queues, [key]: (state.queues[key] ?? []).concat([message]) },
     }))
   },
   take: (ref, id, toolId) => {
@@ -79,10 +79,9 @@ export const useFollowUpStore = create<FollowUpStore>((set, get) => ({
       owners: { ...state.owners, [key]: ref },
       queues: {
         ...state.queues,
-        [key]: [
-          { ...message, held: true },
-          ...(state.queues[key] ?? []).filter((item) => item.id !== message.id),
-        ],
+        [key]: [{ ...message, held: true }].concat(
+          (state.queues[key] ?? []).filter((item) => item.id !== message.id),
+        ),
       },
     }))
   },

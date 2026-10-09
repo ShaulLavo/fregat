@@ -71,14 +71,9 @@ export class WebviewHost {
     const ready = Promise.withResolvers<void>()
     this.ready = ready.promise
     this.helper = new NativeHelper(
-      [
-        options.binary,
-        options.url,
-        options.initScriptPath,
-        '--data-dir',
-        options.dataDir,
-        ...(options.vibrancy ? ['--vibrancy'] : []),
-      ],
+      [options.binary, options.url, options.initScriptPath, '--data-dir', options.dataDir].concat(
+        options.vibrancy ? ['--vibrancy'] : [],
+      ),
       this.budget.stopGraceMs,
       options.signal,
       options.spawn,
@@ -237,7 +232,7 @@ export async function runNativeDialog(options: {
 }): Promise<WebviewEvent[]> {
   const budget = options.budget ?? nativeBudget()
   const helper = new NativeHelper(
-    [options.binary, ...options.args],
+    [options.binary].concat(options.args),
     budget.stopGraceMs,
     options.signal,
     options.spawn,

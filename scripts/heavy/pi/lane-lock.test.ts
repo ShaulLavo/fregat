@@ -28,7 +28,7 @@ function scratch(prefix: string) {
 function laneCheckout() {
   const source = scratch('lane-lock-source-')
   const git = (cwd: string, ...args: string[]) =>
-    execFileSync('git', ['-C', cwd, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args])
+    execFileSync('git', ['-C', cwd, '-c', 'user.name=t', '-c', 'user.email=t@t'].concat(args))
   git(source, 'init', '-q')
   writeFileSync(path.join(source, 'package.json'), '{ "packageManager": "bun@1.4.2" }\n')
   git(source, 'add', '.')
@@ -53,7 +53,7 @@ test.each([
   async (script, args) => {
     const locks = scratch('lane-lock-')
     const held = tryLock(path.join(locks, 'pi.lock'))!
-    const child = Bun.spawn(['bun', entry(script), '--lock-dir', locks, ...args], {
+    const child = Bun.spawn(['bun', entry(script), '--lock-dir', locks].concat(args), {
       cwd: laneCheckout(),
       stdout: 'ignore',
       stderr: 'pipe',

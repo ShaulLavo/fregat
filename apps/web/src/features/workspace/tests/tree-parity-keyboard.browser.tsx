@@ -47,7 +47,7 @@ describe('keyboard', () => {
     await vi.waitFor(() =>
       expect(treeScope().querySelector('input[aria-label^="Rename "]')).toBeTruthy(),
     )
-    const selected = [...model.getSelectedPaths()]
+    const selected = model.getSelectedPaths()
     const modifier = detectPlatform() === 'mac' ? 'Meta' : 'Control'
     await userEvent.keyboard(`{${modifier}>}a{/${modifier}}`)
     expect(model.getSelectedPaths()).toEqual(selected)
@@ -133,15 +133,11 @@ describe('keyboard', () => {
     await clickRow('src/a.ts')
     await userEvent.keyboard('{Shift>}{ArrowDown}{ArrowDown}{/Shift}')
     await vi.waitFor(() =>
-      expect([...model.getSelectedPaths()].toSorted()).toEqual([
-        'src/a.ts',
-        'src/b.ts',
-        'src/c.ts',
-      ]),
+      expect(model.getSelectedPaths().sort()).toEqual(['src/a.ts', 'src/b.ts', 'src/c.ts']),
     )
     await userEvent.keyboard('{Shift>}{ArrowUp}{/Shift}')
     await vi.waitFor(() =>
-      expect([...model.getSelectedPaths()].toSorted()).toEqual(['src/a.ts', 'src/b.ts']),
+      expect(model.getSelectedPaths().sort()).toEqual(['src/a.ts', 'src/b.ts']),
     )
   })
 
@@ -222,7 +218,7 @@ describe('pointer selection', () => {
     await clickRow('docs/guide.md')
     await clickRow('src/a.ts', { modifiers: ['ControlOrMeta'] })
     await vi.waitFor(() =>
-      expect([...model.getSelectedPaths()].toSorted()).toEqual(['docs/guide.md', 'src/a.ts']),
+      expect(model.getSelectedPaths().sort()).toEqual(['docs/guide.md', 'src/a.ts']),
     )
     await clickRow('src/a.ts', { modifiers: ['ControlOrMeta'] })
     await vi.waitFor(() => expect(model.getSelectedPaths()).toEqual(['docs/guide.md']))
@@ -230,18 +226,14 @@ describe('pointer selection', () => {
     await clickRow('src/a.ts')
     await clickRow('src/c.ts', { modifiers: ['Shift'] })
     await vi.waitFor(() =>
-      expect([...model.getSelectedPaths()].toSorted()).toEqual([
-        'src/a.ts',
-        'src/b.ts',
-        'src/c.ts',
-      ]),
+      expect(model.getSelectedPaths().sort()).toEqual(['src/a.ts', 'src/b.ts', 'src/c.ts']),
     )
 
     await clickRow('docs/guide.md')
     await clickRow('src/a.ts', { modifiers: ['ControlOrMeta'] })
     await clickRow('src/c.ts', { modifiers: ['ControlOrMeta', 'Shift'] })
     await vi.waitFor(() =>
-      expect([...model.getSelectedPaths()].toSorted()).toEqual([
+      expect(model.getSelectedPaths().sort()).toEqual([
         'docs/guide.md',
         'src/a.ts',
         'src/b.ts',

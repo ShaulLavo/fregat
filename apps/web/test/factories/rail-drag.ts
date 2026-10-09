@@ -4,7 +4,9 @@ import userEvent from '@testing-library/user-event'
 export function installVerticalRailRects() {
   const original = Element.prototype.getBoundingClientRect
   Element.prototype.getBoundingClientRect = function (this: Element) {
-    const rows = [...document.querySelectorAll('[data-slot="list-row"], [data-rail-shelf-target]')]
+    const rows = Array.from(
+      document.querySelectorAll('[data-slot="list-row"], [data-rail-shelf-target]'),
+    )
     const row = rows.includes(this) ? this : this.querySelector('[data-slot="list-row"]')
     const top = Math.max(0, rows.indexOf(row!)) * 30
     return new DOMRect(0, top, 100, 20)

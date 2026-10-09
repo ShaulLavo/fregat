@@ -31,7 +31,7 @@ test('reads real git status, renames included', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'platform-deploy-porcelain-'))
   try {
     const git = (...args: string[]) => {
-      const result = Bun.spawnSync(['git', ...args], { cwd: root, stderr: 'pipe' })
+      const result = Bun.spawnSync(['git'].concat(args), { cwd: root, stderr: 'pipe' })
       expect(result.exitCode, result.stderr.toString()).toBe(0)
       return result.stdout.toString()
     }
@@ -44,7 +44,7 @@ test('reads real git status, renames included', () => {
     git('mv', 'old name.txt', 'new name.txt')
     writeFileSync(path.join(root, 'untracked.txt'), '')
 
-    expect(porcelainPaths(git('status', '--porcelain', '-z')).toSorted()).toEqual([
+    expect(porcelainPaths(git('status', '--porcelain', '-z')).sort()).toEqual([
       'apps.txt',
       'new name.txt',
       'untracked.txt',
@@ -63,7 +63,7 @@ test.each([
   const root = mkdtempSync(path.join(tmpdir(), 'platform-deploy-checkout-'))
   try {
     const git = (...args: string[]) => {
-      const result = Bun.spawnSync(['git', ...args], { cwd: root, stderr: 'pipe' })
+      const result = Bun.spawnSync(['git'].concat(args), { cwd: root, stderr: 'pipe' })
       expect(result.exitCode, result.stderr.toString()).toBe(0)
       return result.stdout.toString().trim()
     }

@@ -341,14 +341,13 @@ function composerFixture(provider = providerSnapshot()) {
           snapshotSequence: snapshot.snapshotSequence + 1,
           session: {
             ...snapshot.session,
-            messages: [
-              ...snapshot.session.messages,
+            messages: snapshot.session.messages.concat([
               chatMessage({
                 id: command.message.messageId,
                 role: 'user',
                 text: command.message.text,
               }),
-            ],
+            ]),
           },
         }
       }

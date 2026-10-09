@@ -65,9 +65,9 @@ export class ConfirmedWindow {
       this.document = document
       return
     }
-    const additions = [...incoming]
-      .map(([key, envelope]) => ({ key, envelope }))
-      .sort((a, b) => compareEnvelopes(a.envelope, b.envelope))
+    const additions = Array.from(incoming, ([key, envelope]) => ({ key, envelope })).sort((a, b) =>
+      compareEnvelopes(a.envelope, b.envelope),
+    )
     const tail = this.ordered.at(-1)
     const appendOnly = !tail || compareEnvelopes(tail.envelope, additions[0]!.envelope) < 0
     const dropped = Math.min(
@@ -76,9 +76,10 @@ export class ConfirmedWindow {
     )
     const previous = appendOnly ? this.ordered.slice(dropped) : []
     // Increasing Lamport order keeps every path between retained edits inside the suffix.
+    const retained: readonly Pick<Confirmed, 'key' | 'envelope'>[] = this.ordered
     const combined = appendOnly
       ? additions
-      : [...this.ordered, ...additions].sort((a, b) => compareEnvelopes(a.envelope, b.envelope))
+      : retained.concat(additions).sort((a, b) => compareEnvelopes(a.envelope, b.envelope))
     const ordered = this.limit ? combined.slice(-this.limit) : []
     const contiguousLive: Interval[] = previous.length
       ? [[previous[0]!.position, this.sequence]]
@@ -99,10 +100,9 @@ export class ConfirmedWindow {
         const entry = next.get(dependency) ?? this.byId.get(dependency)
         if (!entry || !contains(live, entry.position)) return []
         if (entry.envelope.lamport >= envelope.lamport) throw new CollabFailure('invalid-lamport')
-        return [
-          ...intersectIntervals(entry.ancestors, live),
+        return intersectIntervals(entry.ancestors, live).concat([
           [entry.position, entry.position + 1] as const,
-        ]
+        ])
       })
       const copied = cloneEnvelope(envelope)
       const insertion = insertionOf(copied.change)
@@ -158,6 +158,16 @@ export class ConfirmedWindow {
       )
     this.sequence = sequence
     this.document = document
+  }
+
+  /** Whether a retained edit causally follows every supplied identity. Evicted identities are unknown. */
+  isAfter(id: EditId, predecessors: readonly EditId[]): boolean {
+    const entry = this.byId.get(editKey(id))
+    if (!entry) return false
+    return predecessors.every((predecessor) => {
+      const before = this.byId.get(editKey(predecessor))
+      return before !== undefined && contains(entry.ancestors, before.position)
+    })
   }
 
   /** Exact pairs; a supplied batch limits results to pairs touching that batch. */

@@ -217,6 +217,9 @@ describe('tab-focus mode', () => {
   }
 
   function regionTexts(role: 'alert' | 'status'): (string | null)[] {
-    return [...container.querySelectorAll(`[role="${role}"]`)].map((region) => region.textContent)
+    return Array.from(
+      container.querySelectorAll(`[role="${role}"]`),
+      (region) => region.textContent,
+    )
   }
 })

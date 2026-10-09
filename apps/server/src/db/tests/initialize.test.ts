@@ -30,11 +30,11 @@ describe('platform database schema', () => {
 
     expect(userVersion(handle)).toBe(SCHEMA_VERSION)
     expect(tableNames(handle).filter((name) => name !== 'sqlite_sequence')).toEqual(
-      drizzleTables.map((config) => config.name).toSorted(),
+      drizzleTables.map((config) => config.name).sort(),
     )
     for (const config of drizzleTables) {
-      expect(columnNames(handle, config.name).toSorted()).toEqual(
-        config.columns.map((column) => column.name).toSorted(),
+      expect(columnNames(handle, config.name).sort()).toEqual(
+        config.columns.map((column) => column.name).sort(),
       )
       expect(indexNames(handle, config.name)).toEqual(
         expect.arrayContaining(config.indexes.map((index) => index.config.name)),

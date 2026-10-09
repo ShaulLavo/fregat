@@ -24,8 +24,8 @@ const FILLER = Array.from({ length: 12 }, (_, index) => `export const filler${in
 const HEAD = ['export function target(): number {', '  return 1', '}']
 // The change sits right under the definition, so the definition is diff context and the filler
 // after it collapses into a separator.
-const BEFORE = [...HEAD, 'export const value = target() + 1', ...FILLER]
-const AFTER = [...HEAD, 'export const value = target() + 2', ...FILLER]
+const BEFORE = HEAD.concat(['export const value = target() + 1'], FILLER)
+const AFTER = HEAD.concat(['export const value = target() + 2'], FILLER)
 
 export const editorPressParticipants: Scenario = {
   name: 'editor-press-participants',

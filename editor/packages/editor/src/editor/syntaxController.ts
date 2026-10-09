@@ -346,7 +346,7 @@ export class EditorSyntaxController {
       ? oldCache.filter((cached) => syntaxRangeListsIntersect(cached.tokenRanges, ranges))
       : []
     const foldContributors = activeFoldContributors(oldCache, ranges)
-    const retained = new Set([...tokenContributors, ...foldContributors])
+    const retained = new Set(tokenContributors.concat(foldContributors))
     const scope = this.rangeScopeOwner
     const copy =
       this.rangeCopyOwner?.store === this.copyTokens ? this.rangeCopyOwner.contributor : null
@@ -2499,7 +2499,7 @@ const cachedSyntaxFoldsForRange = (
       foldsByKey.set(foldRangeKey(fold), fold)
     }
   }
-  return Array.from(foldsByKey.values()).toSorted(compareFoldRanges)
+  return Array.from(foldsByKey.values()).sort(compareFoldRanges)
 }
 
 const sameSyntaxRange = (left: EditorSyntaxRange, right: EditorSyntaxRange): boolean =>

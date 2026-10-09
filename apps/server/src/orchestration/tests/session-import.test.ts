@@ -64,9 +64,9 @@ test('imports long conversation text into SQL pagination and search without runn
       sessionId,
       beforeMessage: { id: first.id, createdAt: first.createdAt },
     })
-    expect(
-      [...earlier.messages, ...detail.session.messages].map((message) => message.text),
-    ).toEqual(source.messages.map((message) => message.text))
+    expect(earlier.messages.concat(detail.session.messages).map((message) => message.text)).toEqual(
+      source.messages.map((message) => message.text),
+    )
     expect(fixture.search.search({ query: 'kingfisher' }).matches).toMatchObject([
       { sessionId, source: 'user', snippet: 'Buried kingfisher decision' },
     ])

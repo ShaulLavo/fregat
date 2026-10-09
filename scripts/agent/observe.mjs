@@ -83,7 +83,7 @@ export function serializable(observed) {
 export function observedProblems(observed, { loopback = true } = {}) {
   const found = []
   const list = (label, items) => {
-    const unique = [...new Set(items.map((item) => JSON.stringify(item)))].map((item) =>
+    const unique = Array.from(new Set(items.map((item) => JSON.stringify(item))), (item) =>
       JSON.parse(item),
     )
     if (unique.length > 0) found.push(`${label}: ${JSON.stringify(unique.slice(0, 12))}`)

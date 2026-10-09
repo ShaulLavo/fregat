@@ -78,9 +78,9 @@ function recordDiagramPaints(diagram: string) {
         id: svg.id,
         viewBox: svg.getAttribute('viewBox'),
         // Node boxes carry the label measurement; the viewBox is rounded to whole pixels.
-        nodes: [...svg.querySelectorAll('.node rect')]
-          .map((rect) => rect.getAttribute('width'))
-          .join(' '),
+        nodes: Array.from(svg.querySelectorAll('.node rect'), (rect) =>
+          rect.getAttribute('width'),
+        ).join(' '),
         faceLoaded: document.fonts.check('1em "Inter Variable"', svg.textContent ?? ''),
       })
     }
