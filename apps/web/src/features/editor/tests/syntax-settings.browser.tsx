@@ -9,7 +9,7 @@ import { useSettingsActions } from '@/features/settings/hooks/use-settings-actio
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { previewEditorTheme } from '@/features/editor/state/color-theme-store'
 import { awaitEditorSyntaxWorkerIdleFences } from '@/features/editor/state/syntax-highlighting'
-import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-trace'
+import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-recording'
 import { editorPreparedDocumentTags } from '@/features/editor/utils/prepared-document'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import { projectSettings } from '@workspace/client-core/settings/projection'

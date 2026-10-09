@@ -51,3 +51,25 @@ export function collaborationConfigurationError(requirement: keyof typeof requir
     internal: { requirement },
   })
 }
+
+const recordingErrors = defineErrorCatalog('editorDiagnostics', {
+  RECORDING_LOAD_FAILED: {
+    status: 503,
+    message: 'Editor recording is unavailable',
+    why: 'The recording module could not be loaded.',
+    fix: 'Reload the app to try recording again. You can keep working.',
+  },
+})
+
+export function performanceRecordingLoadError(cause: unknown) {
+  const { code, status, message, why, fix } = recordingErrors.RECORDING_LOAD_FAILED
+  return createClientError({
+    code,
+    status,
+    message,
+    why,
+    fix,
+    cause,
+    internal: { phase: 'module-load' },
+  })
+}

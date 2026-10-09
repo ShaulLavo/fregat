@@ -39,7 +39,7 @@ function commandBoundary(args: unknown[]): Boundary {
   const executable = ownValue(command, '0')
   if (typeof executable !== 'string' || executable.length > 256) return 'other'
   const name = executable.slice(executable.lastIndexOf('/') + 1)
-  if (name === 'clang') return 'compiler'
+  if (name === 'swiftc' || name === 'zig') return 'compiler'
   if (name === 'plutil') return 'plutil'
   return 'other'
 }
