@@ -18,6 +18,57 @@ Comlink provides useful RPC and transfers. Its released and main teardown differ
 
 ## Contract
 
+### Shared callers and replaceable subjects
+
+[PR #1190](https://github.com/ShaulLavo/fregat/pull/1190) supplies two concrete qualification
+cases: cancelling one request on a pooled connection removed other requests, and retiring
+old work erased a newer request's marker. The response path already checked task identity;
+the cancellation path omitted it. [PR #1100](https://github.com/ShaulLavo/fregat/pull/1100)
+previously repaired shared file preparation by issuing independent holder leases.
+[197](197-editor-highlighting-service.md#approved-follow-up-retire-hover-tokens-across-theme-changes)
+records a reproduced late-publication failure across a theme change.
+
+Keep these identities separate in the owner API:
+
+- Caller interest: one request or view receives one idempotently releasable lease. A
+  connection may contain many interests. Individual cancellation releases its exact lease;
+  disconnect releases the connection's leases.
+- Task identity: each execution entry is unique, even when its logical key is reused.
+  Completion, failure, final release, retry, and cleanup affect only that captured entry.
+  Retiring an entry must not remove its replacement. Retire it before requesting a stop
+  so a new caller cannot join work already being cancelled.
+- Subject provenance: capture document incarnation and revision, theme, or configuration
+  with the work. A current execution entry does not prove its result still belongs to the
+  current subject. Publication needs domain authority as well as live task identity.
+- Execution generation: the process or worker lifetime is separate from task identity
+  and subject revision. Existing protocols retain their own correlation and generation rules.
+
+Callers receive result/release capabilities, never the shared controller or mutable waiter
+collection. The concrete owner owns coalescing, result delivery, and the final-interest
+policy. A caller signal cancels that caller's wait; owner and transport signals control shared
+execution. Cancellation requests do not prove execution has stopped.
+
+Start with concrete semantic-token and theme-bound snippet owners. A replacement subject
+gets fresh identity, including A→B→A and close/reopen. Retired owners cannot publish into
+their replacement's state. Shared destinations require a current-owner check at publication;
+an arbitrary captured callback does not establish that authority. Retirement immediately
+revokes new joins and current publication, while the domain defines whether existing callers
+may finish or receive cancellation. Final-interest release governs abandonment separately.
+Retained registries keep identity checks private. Extract shared bookkeeping only when two consumers
+demonstrate that the same implementation deletes meaningful machinery in both. Keep
+TanStack's query ownership and LSP JSON-RPC intact. This bounded qualification does not
+start the deferred worker transport or scheduling program.
+
+Extend [334](334-async-runtime-verification.md)'s deterministic contract suite with two
+requests on one connection, a third on another, individual cancellation, repeated release,
+disconnect, final-interest release followed by immediate reacquisition, and A replaced by B
+before A completes or cancels. Test reused client IDs and reopened subject identities.
+Assert surviving responses, backend stop counts, current registry identity, and cache values.
+The theme test must cover both A-before-B and B-before-A completion orders. A helper that
+guards deletion while permitting stale cache publication fails qualification.
+
+### Service lifetime and transport
+
 - Lifecycle is a discriminated state: idle, starting, ready, closing, closed, failed. Each started execution lifetime has a new generation. Calls during closing/closed fail before admission; concurrent starts share one attempt.
 - Startup means the execution adapter completed its domain initialization and replied ready. Creating a Worker or posting init does not establish readiness. Startup failure and missing ready have bounded outcomes.
 - The owner holds the actual worker/endpoint, request records, subscriptions, ports and accounting. Dispose is idempotent and immediately invalidates new operations. Its promise resolves after bounded cleanup or forced endpoint termination, with diagnostic facts about the path used.
