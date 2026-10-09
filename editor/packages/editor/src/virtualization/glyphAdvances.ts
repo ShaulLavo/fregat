@@ -9,6 +9,7 @@ export type GlyphAdvances = {
   advance(codePoint: number): number
   /** Native shaping of a complete run, including kerning and ligatures. */
   readonly measure?: (text: string) => number
+  readonly minimumTabAdvance?: number
 }
 
 type MeasureContext = {
@@ -42,7 +43,10 @@ export function glyphAdvancesFor(element: HTMLElement): GlyphAdvances | null {
   if (style.letterSpacing !== 'normal' && 'letterSpacing' in context) {
     context.letterSpacing = style.letterSpacing
   }
-  const advances = createGlyphAdvances(context, font, style.letterSpacing)
+  const advances = {
+    ...createGlyphAdvances(context, font, style.letterSpacing),
+    minimumTabAdvance: nativeMinimumTabAdvance(element, font),
+  }
   const byKey = advancesCache.get(element.ownerDocument) ?? new Map<string, GlyphAdvances>()
   byKey.set(key, advances)
   advancesCache.set(element.ownerDocument, byKey)
@@ -109,4 +113,21 @@ function fontShorthand(style: CSSStyleDeclaration): string {
     .filter((part) => part && part !== 'normal')
     .concat(`${style.fontSize} ${style.fontFamily}`)
     .join(' ')
+}
+
+/** Engines differ in the half-ch tab rule; measure the font policy once with the glyph metrics. */
+function nativeMinimumTabAdvance(element: HTMLElement, font: string): number {
+  const probe = element.ownerDocument.createElement('span')
+  probe.style.cssText =
+    'position:absolute;visibility:hidden;white-space:pre;letter-spacing:0;tab-size:1.25ch'
+  probe.style.font = font
+  probe.textContent = '0'
+  element.append(probe)
+  try {
+    const ch = probe.getBoundingClientRect().width
+    probe.textContent = '0\t'
+    return probe.getBoundingClientRect().width > ch * 1.75 ? ch / 2 : 0
+  } finally {
+    probe.remove()
+  }
 }

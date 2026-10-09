@@ -64,3 +64,22 @@ test.each([1, 257, 4096])('settles hanging tab runs across %i-unit input chunks'
     )
   }
 })
+
+test('moves a shaped tab to the following stop below its native half-ch minimum', () => {
+  const rules = {
+    width: 12,
+    words: false,
+    tabSize: 4,
+    advance: () => 1,
+    measure: (text: string) => text.length * 0.7,
+    minimumTabAdvance: 0.5,
+  }
+  const line = createWordWrapLine()
+  appendWordWrapText(line, 'iiiii\t', 0, 6, rules)
+  finishWordWrapLine(line, rules)
+  expect(line.visual).toBe(4)
+  const below = createWordWrapLine()
+  appendWordWrapText(below, 'iiiiii\t', 0, 7, { ...rules, measure: (text) => text.length * 0.6 })
+  finishWordWrapLine(below, { ...rules, measure: (text) => text.length * 0.6 })
+  expect(below.visual).toBe(8)
+})

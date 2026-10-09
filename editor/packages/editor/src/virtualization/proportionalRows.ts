@@ -1,3 +1,4 @@
+import { tabAdvance } from './tabAdvance'
 import type { TextContent } from '../textContent'
 import type { GlyphAdvances } from './glyphAdvances'
 
@@ -100,7 +101,7 @@ function advanceAcross(
       if (slice.charCodeAt(index) !== 9) continue
       total += glyphs.measure(slice.slice(runStart, index))
       const stop = tabSize * glyphs.advance(32)
-      total += stop - (total % stop)
+      total += tabAdvance(total, stop, glyphs.minimumTabAdvance ?? 0)
       runStart = index + 1
     }
     return total + glyphs.measure(slice.slice(runStart))

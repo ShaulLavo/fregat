@@ -216,6 +216,7 @@ function proportionalWrapAdvance(
     glyphs,
     advance: (codePoint) => glyphs.advance(codePoint),
     measure: view.monospace ? undefined : glyphs.measure,
+    minimumTabAdvance: view.monospace ? undefined : glyphs.minimumTabAdvance,
   }
 }
 

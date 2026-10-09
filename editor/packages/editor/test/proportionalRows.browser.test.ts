@@ -4,6 +4,7 @@ import { Editor } from '../src/editor/Editor'
 import { VirtualizedTextView } from '../src/virtualization'
 import '../src/style.css'
 import { loadFreeSans } from './fixtures/freefont/load'
+import { NATIVE_SHAPING_CEILING } from '../src/virtualization/nativeCarets'
 
 describe.each(['Noto Sans', 'Geometry FreeSans'])('%s geometry', (FACE) => {
   beforeAll(async () => {
@@ -74,7 +75,7 @@ describe.each(['Noto Sans', 'Geometry FreeSans'])('%s geometry', (FACE) => {
     expect(extent - full).toBeLessThan(Math.max(textWidth('W') * 2, full * 0.01))
   })
 
-  test('mounts the text a scroll offset reaches, under the spacer that stands for the rest', async () => {
+  test('retains native shaping while scrolling an intact proportional row', async () => {
     const { container, scroller } = await mount()
     const row = container.querySelector<HTMLElement>('[data-editor-virtual-row="0"]')!
     const rect = row.getBoundingClientRect()
@@ -84,9 +85,9 @@ describe.each(['Noto Sans', 'Geometry FreeSans'])('%s geometry', (FACE) => {
 
     for (const target of [30_000, 60_000, 90_000]) {
       scroller.scrollLeft = target
-      await expect
-        .poll(() => Number(row.dataset.editorVirtualWindowStart ?? '0'))
-        .toBeGreaterThan(0)
+      expect(Number(row.dataset.editorVirtualWindowStart ?? '0')).toBe(0)
+      expect((row.textContent ?? '').length).toBe(LONG.length)
+      expect((row.textContent ?? '').length).toBeLessThan(NATIVE_SHAPING_CEILING)
       await expect
         .poll(() => row.getBoundingClientRect().left + scroller.scrollLeft)
         .toBeCloseTo(scroller.getBoundingClientRect().left + gutterWidth, 0)
@@ -94,7 +95,6 @@ describe.each(['Noto Sans', 'Geometry FreeSans'])('%s geometry', (FACE) => {
       const expected = columnAtWidth(scroller.scrollLeft + scroller.clientWidth / 2)
       const nearby = new Set([LONG[expected - 1], LONG[expected], LONG[expected + 1]])
       expect(nearby.has(characterAt(x, y))).toBe(true)
-      expect((row.textContent ?? '').length).toBeLessThan(LONG.length)
     }
   })
 

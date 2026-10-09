@@ -1,3 +1,4 @@
+import { isSimpleRowText } from '../textCharacters'
 import type { EditorMarkerHit } from '../pointQueries'
 import type { TextContent } from '../textContent'
 import { measureWhitespaceDotGlyph, type WhitespaceDotGlyph } from './browserMetrics'
@@ -268,6 +269,16 @@ function appendWhitespaceMarkers(
   pass: HiddenCharacterPass,
 ): void {
   if (pass.mode === 'hidden') return
+  if (
+    pass.mode === 'show-on-selection' &&
+    !view.selections.some(
+      (selection) =>
+        selection.end > selection.start &&
+        selection.start < row.endOffset &&
+        selection.end > row.startOffset,
+    )
+  )
+    return
   const context: HiddenCharacterRowContext = {
     view,
     row,
@@ -285,7 +296,7 @@ function appendWhitespaceMarkersForChunk(
   chunk: VirtualizedTextChunk,
 ): void {
   for (let index = chunk.localStart; index < chunk.localEnd; index += 1) {
-    const char = context.row.text.charAt(index)
+    const char = chunk.text.charAt(index - chunk.localStart)
     appendWhitespaceMarker(markers, context, char, index)
   }
 }
@@ -334,7 +345,7 @@ function appendSuspiciousCharacterMarkers(
   pass: HiddenCharacterPass,
 ): void {
   const { options } = pass.suspicious
-  if (!suspiciousCharactersEnabled(options)) return
+  if (!suspiciousCharactersEnabled(options) || isSimpleRowText(row)) return
 
   const line = suspiciousCharacterScanLine(view, row)
   // A code point the seam runs through belongs to the window before it, which reported it already:

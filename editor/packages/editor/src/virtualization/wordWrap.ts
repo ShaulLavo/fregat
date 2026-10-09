@@ -1,3 +1,4 @@
+import { tabAdvance } from './tabAdvance'
 import {
   isCombiningMark,
   isVariationSelector,
@@ -37,6 +38,7 @@ export type LineBreakRules = {
   /** Pixel advance of one code point; null counts every code unit as one column. */
   readonly advance: ((codePoint: number) => number) | null
   readonly measure?: (text: string) => number
+  readonly minimumTabAdvance?: number
 }
 
 /** The wrap settings of a projection config, spelled out so this module imports nothing back. */
@@ -47,6 +49,7 @@ export type WrapConfig = {
     readonly width: number
     readonly advance: (codePoint: number) => number
     readonly measure?: (text: string) => number
+    readonly minimumTabAdvance?: number
   } | null
   readonly tabSize: number
 }
@@ -64,6 +67,7 @@ export function lineBreakRules(config: WrapConfig): LineBreakRules {
     words: config.wrapBreak === 'word',
     advance: measured ? measured.advance : null,
     measure: measured?.measure,
+    minimumTabAdvance: measured?.minimumTabAdvance,
   }
 }
 
@@ -158,6 +162,7 @@ function appendCompleteWrapText(
   segments: readonly TextSegment[] | null,
 ): void {
   const { width, words, advance, measure } = rules
+  const minimumTabAdvance = rules.minimumTabAdvance ?? 0
   const tabStop = advance ? rules.tabSize * advance(32) : rules.tabSize
   let { length, visual, segmentStart, segmentVisual, breakAt, breakVisual } = line
   let segmentText = line.segmentText
@@ -188,7 +193,8 @@ function appendCompleteWrapText(
 
     const unit = measure ? text.slice(index, end) : ''
     let cells = measure
-      ? appendedShapedWidth(segmentText, unit, segmentVisual, tabStop, measure) - segmentVisual
+      ? appendedShapedWidth(segmentText, unit, segmentVisual, tabStop, measure, minimumTabAdvance) -
+        segmentVisual
       : clusterCells(text, index, end, segmentVisual, tabStop, advance)
     const overflows = cells > 0 && segmentVisual > 0 && segmentVisual + cells > width
     if (overflows && !(words && space)) {
@@ -196,7 +202,9 @@ function appendCompleteWrapText(
         line.ends.push(breakAt)
         if (measure) segmentText = segmentText.slice(breakAt - segmentStart)
         segmentStart = breakAt
-        segmentVisual = measure ? shapedWidth(segmentText, tabStop, measure) : visual - breakVisual
+        segmentVisual = measure
+          ? shapedWidth(segmentText, tabStop, measure, minimumTabAdvance)
+          : visual - breakVisual
       } else if (!interior) {
         line.ends.push(length)
         segmentStart = length
@@ -204,7 +212,14 @@ function appendCompleteWrapText(
         segmentText = ''
       }
       cells = measure
-        ? appendedShapedWidth(segmentText, unit, segmentVisual, tabStop, measure) - segmentVisual
+        ? appendedShapedWidth(
+            segmentText,
+            unit,
+            segmentVisual,
+            tabStop,
+            measure,
+            minimumTabAdvance,
+          ) - segmentVisual
         : clusterCells(text, index, end, segmentVisual, tabStop, advance)
       if (!interior && segmentVisual > 0 && segmentVisual + cells > width) {
         line.ends.push(length)
@@ -212,7 +227,14 @@ function appendCompleteWrapText(
         segmentVisual = 0
         segmentText = ''
         cells = measure
-          ? appendedShapedWidth(segmentText, unit, segmentVisual, tabStop, measure) - segmentVisual
+          ? appendedShapedWidth(
+              segmentText,
+              unit,
+              segmentVisual,
+              tabStop,
+              measure,
+              minimumTabAdvance,
+            ) - segmentVisual
           : clusterCells(text, index, end, segmentVisual, tabStop, advance)
       }
     }
@@ -250,22 +272,28 @@ function appendedShapedWidth(
   width: number,
   tabStop: number,
   measure: (text: string) => number,
+  minimumTabAdvance: number,
 ): number {
   const tab = text.lastIndexOf('\t')
-  if (tab < 0) return shapedWidth(text + unit, tabStop, measure)
+  if (tab < 0) return shapedWidth(text + unit, tabStop, measure, minimumTabAdvance)
   const tail = text.slice(tab + 1)
   const settled = tail.length > 0 ? width - measure(tail) : width
-  return settled + shapedWidth(tail + unit, tabStop, measure)
+  return settled + shapedWidth(tail + unit, tabStop, measure, minimumTabAdvance)
 }
 
 /** Tabs end shaping runs and reach the next stop from the wrapped row's origin. */
-function shapedWidth(text: string, tabStop: number, measure: (text: string) => number): number {
+function shapedWidth(
+  text: string,
+  tabStop: number,
+  measure: (text: string) => number,
+  minimumTabAdvance: number,
+): number {
   let width = 0
   let start = 0
   for (let index = 0; index < text.length; index += 1) {
     if (text.charCodeAt(index) !== 9) continue
     if (index > start) width += measure(text.slice(start, index))
-    width += tabStop - (width % tabStop)
+    width += tabAdvance(width, tabStop, minimumTabAdvance)
     start = index + 1
   }
   return start < text.length ? width + measure(text.slice(start)) : width

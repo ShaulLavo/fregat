@@ -629,7 +629,7 @@ The original 200 MiB geometry failure remains a blocker for publishing a full co
 
 - [x] Reproduce and fix the original eight explicit FreeSans failures, and keep the unchanged
       native geometry assertions in CI with a licensed package-local font fixture.
-- [ ] Finish the native-run geometry redesign identified by independent review of draft
+- [x] Implement the native-run geometry redesign identified by independent review of draft
       [PR #1186](https://github.com/ShaulLavo/fregat/pull/1186). Mounted native insertion positions
       must survive ligatures and storage chunks, without document-wide native measurement.
 
@@ -680,7 +680,7 @@ four-`i` prefix is `11.2333` pixels wide, leaving `1.7667` pixels before the `13
 less than `0.5ch`, which is `3.6167` pixels here. Firefox advances the first tab to `26` pixels;
 the editor stops at `13`. This is an editor error, not a Firefox bug. WebKit reaches `13` in the
 same explicit `tab-size:4` native probe, so the eventual geometry must respect actual connected
-native layout. The separate tab-minimum fix waits behind native-run review.
+native layout. The draft now probes the font's native tab policy and applies the half-character minimum to shaped runs. The four-`i` regression passes in all three engines; monospace arithmetic is unchanged.
 
 Independent review found two additional correctness failures in the first shaped implementation:
 `'ffi'.repeat(10_000)` loses shaping across 512-unit blocks, and lookup inside `AV office ffi`
@@ -701,6 +701,67 @@ with linear bounds on measurement calls and measured code units. The full packag
 4,208 tests. Paired three-engine experiments and actual insertion controls are in
 `/work/reports/freesans-geometry/`; the draft PR records all methods, costs and cold-run variance.
 Caching and settled tabs do not resolve the remaining native-caret correctness failures.
+
+The native follow-up now retains one intact text node for each mounted plain proportional row
+strictly below `NATIVE_SHAPING_CEILING = 32_000`. The approved DOM contract changes only ordinary
+proportional rows: the horizontal window starts at zero and keeps the complete rendered row.
+Monospace and inline replacements keep their strict text windows, including nonzero starts when
+scrolled. Every caret, paint and extent oracle remains unchanged. Rows at or above the ceiling
+remain editable with bounded approximate geometry and the structured state documented in
+[known limits](https://github.com/ShaulLavo/fregat/blob/main/editor/docs/limitations.md#proportional-row-measurement).
+Existing oversized-BiDi refusal remains unchanged. Native lookup uses collapsed Ranges in the
+connected text node, caches unchanged mounted rows, and measures only the changed row on typing.
+Canvas shaping remains the document projection owner.
+
+- [ ] Complete independent review of the pushed native implementation and its long-row costs.
+- [ ] Bring 20,000–30,000-unit proportional typing within the 8.3 ms target in Firefox and
+      WebKit, and investigate WebKit's long-row scroll/paint frame regression. Keep #1186 draft
+      until the coordinator resolves these measured costs.
+
+The 2026-10-09 paired long-row run is an **experiment**, not a published performance claim.
+A 500×200 viewport displays 100 rows of repeated `AV office ffi ` in the licensed FreeSans fixture,
+with wrapping off, 512-unit chunks and zero horizontal overscan. The baseline is the pushed
+pre-native implementation `a3b5a3f320ba03340e4681d8d38149b8c4472231`. Each case has three setup
+frames and 33 actions; medians omit the first three actions. The actions scroll horizontally in
+3,000-pixel steps, vertically in 220-pixel steps, or insert one character at offset 15,000.
+Timers cover synchronous action plus forced rect reads, not key-to-paint. Chromium tracing
+records layout and paint across all 33 action frames. Firefox and WebKit expose frame intervals
+and synchronous/forced-layout timing here; exclusive paint duration was not measured there.
+
+Final typing medians, baseline → intact-node implementation: Chromium 20k **3.8 → 3.9 ms** and
+30k **5.1 → 5.6 ms**; Firefox **6 → 8 ms** and **7 → 11 ms**; WebKit **4 → 10 ms** and
+**6 → 14 ms**. WebKit horizontal frame intervals rise from **16 → 28 ms** at 20k and
+**16 → 34 ms** at 30k; vertical intervals rise from **16 → 22 ms** and **16 → 26 ms**.
+These results miss the target in Firefox at 30k and WebKit at both lengths.
+
+Chromium mean layout/paint per action frame, baseline → intact node, in milliseconds:
+
+| Length | Action            | Layout        | Paint         |
+| ------ | ----------------- | ------------- | ------------- |
+| 20k    | Horizontal scroll | 0.879 → 0.000 | 0.749 → 0.222 |
+| 20k    | Vertical scroll   | 0.057 → 0.692 | 0.201 → 0.200 |
+| 20k    | Typing            | 0.141 → 1.517 | 0.569 → 3.050 |
+| 30k    | Horizontal scroll | 0.788 → 0.000 | 0.715 → 0.232 |
+| 30k    | Vertical scroll   | 0.056 → 1.503 | 0.215 → 0.330 |
+| 30k    | Typing            | 0.145 → 2.290 | 0.649 → 4.851 |
+
+The first intact-node experiment took 29–43 ms for Chromium/Firefox typing. Its CPU profile
+attributed roughly 1,014 ms of sampled work across 33 actions to tree-backed character reads
+from inactive whitespace and suspicious-character scans. The fix skips ASCII suspicious scans,
+skips unselected show-on-selection rows and reads hydrated chunk text for active whitespace.
+The counter regression proves typing does no source-tree `charAt` or `codePointAt` marker reads,
+while a real nonempty selection still paints whitespace. This removes that scanning bottleneck;
+it does not remove the measured browser layout/paint cost above.
+
+Evidence is retained in `/work/reports/freesans-geometry/native-cost/`: `results.json`,
+`chromium-trace.json`, `chromium-layout-paint.json`, pre-scan-fix evidence, the CPU profile,
+`run.mjs`, `profile.mjs` and `harness/`. Restore the retained `.native-before/` and
+`.native-cost.*` inputs into `editor/packages/editor/`, start Vite on an explicit free port,
+and set the retained `run.mjs` target to that port to reproduce this experiment. Do not edit
+source while the paired run is active: Vite reload invalidates the comparison. The experiment
+uses no model providers. Retired mounted rows release native caches; unchanged rows survive
+horizontal scrolling and one-row edits. The final static-target `agent:browser look --site`
+reports healthy with no browser problems, and its screenshot was read back.
 
 ## Kickoff prompt for an executing coordinator
 
