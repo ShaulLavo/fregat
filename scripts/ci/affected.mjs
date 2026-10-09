@@ -118,6 +118,7 @@ function rootDocument(file) {
   return (
     file.startsWith('plans/') ||
     file.startsWith('docs/') ||
+    (file.startsWith('.agents/') && file.endsWith('.md')) ||
     (!file.includes('/') && file.endsWith('.md'))
   )
 }
@@ -216,6 +217,7 @@ export function selectAffected(graph, files, full = false) {
     '@singapore-editor/example-app',
   ].some((name) => affected.has(name))
   return {
+    exhaustive: full,
     code: packages.length > 0 || files.some((file) => file.startsWith('apps/mac/')),
     packages,
     web: affected.has('web'),
@@ -271,13 +273,11 @@ function main() {
     /^[a-f0-9]{40}$/.test(base ?? '') && /^[a-f0-9]{40}$/.test(head ?? ''),
     'CI selection requires base and head commit IDs',
   )
-  const files = execFileSync(
-    'git',
-    ['diff', '--name-only', '--no-renames', '-z', `${base}...${head}`],
-    { encoding: 'utf8' },
-  )
-    .split('\0')
-    .filter(Boolean)
+  const command =
+    mode === 'full'
+      ? ['ls-files', '-z']
+      : ['diff', '--name-only', '--no-renames', '-z', `${base}...${head}`]
+  const files = execFileSync('git', command, { encoding: 'utf8' }).split('\0').filter(Boolean)
   const selection = selectAffected(graph, files, mode === 'full')
   console.log(JSON.stringify(selection, null, 2))
   if (process.env.GITHUB_OUTPUT) {

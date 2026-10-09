@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 type Result<T> = { ok: true; value: T } | { ok: false; issue: string }
-type Event = 'pull_request' | 'push' | 'workflow_dispatch'
+type Event = 'pull_request' | 'push' | 'workflow_dispatch' | 'schedule'
 export type RunIdentity = {
   runId: number
   attempt: number
@@ -204,7 +204,7 @@ function parseContext(value: unknown, graph: Workflow, event: string): Result<Co
     if (typeof output !== 'string') return rejected('Changes output must be a string')
     outputs[key] = output
   }
-  if (!['pull_request', 'push', 'workflow_dispatch'].includes(event))
+  if (!['pull_request', 'push', 'workflow_dispatch', 'schedule'].includes(event))
     return rejected('Workflow event is unsupported')
   return { ok: true, value: { event, results, outputs } }
 }
@@ -491,7 +491,10 @@ function contextIdentity(workflowPath: string): Result<RunIdentity> {
     !headSha ||
     !/^[a-f0-9]{40}$/.test(headSha) ||
     !repository ||
-    (event !== 'pull_request' && event !== 'push' && event !== 'workflow_dispatch')
+    (event !== 'pull_request' &&
+      event !== 'push' &&
+      event !== 'workflow_dispatch' &&
+      event !== 'schedule')
   )
     return rejected('CI verdict workflow identity metadata is missing or invalid')
   return { ok: true, value: { runId, attempt, headSha, repository, event, workflowPath } }

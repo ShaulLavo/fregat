@@ -21,7 +21,7 @@ function runFixture(operation, names, failure = '') {
       path.join(root, 'task.mjs'),
       'import {appendFileSync} from "node:fs"; const task=process.argv.slice(2).join(" "); appendFileSync(process.env.RECEIPT,task+"\\n"); process.exit(task===process.env.FAIL_TASK?23:0)',
     )
-    for (const name of ['alpha', 'beta']) {
+    for (const name of ['alpha', 'beta', 'ghostty-webgpu', 'ghostty-webgpu-line-editor']) {
       const directory = path.join(root, 'packages', name)
       mkdirSync(directory, { recursive: true })
       const scripts = Object.fromEntries(
@@ -32,7 +32,10 @@ function runFixture(operation, names, failure = '') {
       )
       writeFileSync(
         path.join(directory, 'package.json'),
-        JSON.stringify({ name: `@workspace/${name}`, scripts }),
+        JSON.stringify({
+          name: name.startsWith('ghostty-') ? name : `@workspace/${name}`,
+          scripts,
+        }),
       )
     }
     const receipt = path.join(root, 'receipt')
@@ -71,6 +74,12 @@ test('a selected package failure propagates its exit status', () => {
 
 test('empty package selection executes no commands', () => {
   expect(runFixture('checks', [])).toMatchObject({ status: 0, calls: [] })
+})
+
+test('family verification owns Ghostty checks without a duplicate package execution', () => {
+  expect(
+    runFixture('checks', ['ghostty-webgpu', 'ghostty-webgpu-line-editor', '@workspace/alpha']),
+  ).toMatchObject({ status: 0, calls: ['alpha format:check', 'alpha lint', 'alpha typecheck'] })
 })
 
 test('package names are validated before command execution', () => {

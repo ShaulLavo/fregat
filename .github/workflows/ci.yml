@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: '41 1 * * *'
   workflow_dispatch:
     inputs:
       web_shards:
@@ -20,7 +22,7 @@ concurrency:
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 jobs:
-  # Main and manual runs validate the full graph; PRs select changed packages and consumers.
+  # PRs and main pushes select affected packages; scheduled and manual runs validate everything.
   changes:
     name: Changes
     runs-on: ubuntu-latest
@@ -28,8 +30,10 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      actions: read
     outputs:
       code: ${{ steps.plan.outputs.code }}
+      exhaustive: ${{ steps.plan.outputs.exhaustive }}
       packages: ${{ steps.plan.outputs.packages }}
       web: ${{ steps.plan.outputs.web }}
       server: ${{ steps.plan.outputs.server }}
@@ -41,21 +45,11 @@ jobs:
       hotkeys: ${{ steps.plan.outputs.hotkeys }}
       web_shards: >-
         ${{ github.event_name == 'workflow_dispatch' && inputs.web_shards == '2' && '["1/2","2/2"]' || '["1/4","2/4","3/4","4/4"]' }}
-      docs: ${{ steps.filter.outputs.docs == 'true' }}
-      docs_files: ${{ steps.filter.outputs.docs_files }}
+      mobile_shards: >-
+        ${{ steps.plan.outputs.exhaustive == 'true' && '["chromium-0","chromium-1","webkit-0","webkit-1"]' || '["chromium-0","webkit-0"]' }}
+      docs: ${{ steps.plan.outputs.docs }}
+      docs_files: ${{ steps.plan.outputs.docs_files }}
     steps:
-      - name: Classify changed documentation
-        id: filter
-        if: ${{ github.event_name == 'pull_request' }}
-        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
-        with:
-          predicate-quantifier: some-with-excludes
-          list-files: json
-          filters: |
-            docs:
-              - added|modified: 'plans/**'
-              - added|modified: 'docs/**'
-              - added|modified: '*.md'
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -67,10 +61,21 @@ jobs:
       - name: Select affected packages
         id: plan
         env:
-          MODE: ${{ github.event_name == 'pull_request' && 'changed' || 'full' }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          MODE: ${{ (github.event_name == 'pull_request' || github.event_name == 'push') && github.event.before != '0000000000000000000000000000000000000000' && 'changed' || 'full' }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: bun scripts/ci/affected.mjs "$MODE" "$BASE_SHA" "$HEAD_SHA"
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == 'push' && "$MODE" == 'changed' ]]; then
+            baseline=$(gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?branch=main&status=success&per_page=20" --jq '[.workflow_runs[] | select(.event == "push" or .event == "schedule" or .event == "workflow_dispatch")][0].head_sha // empty')
+            if [[ -n "$baseline" ]] && git merge-base --is-ancestor "$baseline" "$HEAD_SHA"; then
+              BASE_SHA="$baseline"
+            else
+              MODE=full
+            fi
+          fi
+          bun scripts/ci/affected.mjs "$MODE" "$BASE_SHA" "$HEAD_SHA"
 
   # No workspace's `format:check` reaches plans and docs, so their changed files are checked here.
   docs:
@@ -130,6 +135,9 @@ jobs:
 
       - name: Query API
         run: bun run query:check
+
+      - name: Array construction
+        run: bun run arrays:check
 
       - name: Document contribution ownership
         run: bun run documents:check
@@ -440,7 +448,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [chromium-0, chromium-1, webkit-0, webkit-1]
+        shard: ${{ fromJSON(needs.changes.outputs.mobile_shards) }}
     needs: [changes, site]
     if: ${{ needs.changes.outputs.site == 'true' }}
     runs-on: ubuntu-latest
@@ -474,11 +482,16 @@ jobs:
           playwright: scripts/node_modules/.bin/playwright
           browsers: ${{ startsWith(matrix.shard, 'webkit') && 'webkit' || 'chromium' }}
 
-      - name: Check every built page on mobile
+      - name: Check production pages on mobile
         env:
           SHARD: ${{ matrix.shard }}
+          EXHAUSTIVE: ${{ needs.changes.outputs.exhaustive }}
         run: |
-          bun scripts/product-sites/verify-mobile.mjs --directory "$RUNNER_TEMP/product-sites" --evidence "$RUNNER_TEMP/mobile-layout" --engines "${SHARD%-*}" --shards 2 --shard "${SHARD##*-}"
+          selection=(--paths '/fregat/,/singapore/,/singapore/docs/start-here/introduction/,/singapore/docs/start-here/playground/,/singapore/demo/,/ghostty-webgpu/')
+          if [[ "$EXHAUSTIVE" == 'true' ]]; then
+            selection=(--shards 2 --shard "${SHARD##*-}")
+          fi
+          bun scripts/product-sites/verify-mobile.mjs --directory "$RUNNER_TEMP/product-sites" --evidence "$RUNNER_TEMP/mobile-layout" --engines "${SHARD%-*}" "${selection[@]}"
 
       - name: Upload mobile layout evidence
         if: always()
@@ -498,6 +511,7 @@ jobs:
     uses: ./.github/workflows/workspace-libraries.yml
     with:
       packages: ${{ needs.changes.outputs.packages }}
+      exhaustive: ${{ needs.changes.outputs.exhaustive == 'true' }}
       editor: ${{ needs.changes.outputs.editor == 'true' }}
       ghostty: ${{ needs.changes.outputs.ghostty == 'true' }}
       standalone_editor: ${{ needs.changes.outputs.editor == 'true' }}

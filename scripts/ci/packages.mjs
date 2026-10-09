@@ -34,6 +34,8 @@ if (operation === 'build') {
   assert(['checks', 'tests', 'editor-tests'].includes(operation), 'Unknown CI package operation')
   for (const name of names) {
     const pkg = graph.packages.get(name)
+    if (operation === 'checks' && ['ghostty-webgpu', 'ghostty-webgpu-line-editor'].includes(name))
+      continue
     const sharedTest =
       name.startsWith('@workspace/') || name.startsWith('@fregat/') || name === 'desktop'
     const editorTest =
