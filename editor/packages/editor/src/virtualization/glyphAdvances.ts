@@ -1,3 +1,5 @@
+import { cacheShapedRuns } from './shapedRunCache'
+
 /**
  * Per-face glyph advances from a 2D canvas. Wrapping measures monospace faces too, because CJK and
  * fallback glyphs can exceed one cell. Proportional geometry measures complete shaped runs.
@@ -67,11 +69,11 @@ function createGlyphAdvances(
   }
 
   return {
-    measure(text) {
+    measure: cacheShapedRuns((text) => {
       context.font = font
       if ('letterSpacing' in context) context.letterSpacing = letterSpacing
       return context.measureText(text).width
-    },
+    }),
     advance(codePoint) {
       if (codePoint < BMP_SIZE) {
         const known = bmp[codePoint]!
