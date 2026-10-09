@@ -2516,6 +2516,9 @@ function isRowCurrent(
   if (row.source !== displayRowSource(displayRow)) return false
   if (row.injectedTextRowId !== injectedTextRowId(displayRow)) return false
   if (row.metadata !== displayRowMetadata(displayRow)) return false
+  // Rewrapping can move identical text to different source columns.
+  if (row.startOffset !== displayRow?.startOffset || row.endOffset !== displayRow?.endOffset)
+    return false
 
   const text = lineText(view, item.index)
   if (row.text !== text) return false

@@ -166,6 +166,8 @@ A separate editor implementation agent owns this section. First add a failing te
 
 Additional required regression inputs are tabs at wrap boundaries, trailing spaces, nonbreaking spaces, CJK, combining sequences, emoji/surrogate pairs at a chunk boundary, long identifiers, link replacements, emphasis and a caret revealing Markdown marks. These are test targets, not confirmed bugs from this investigation. If one fails, record its exact text, width and row ends here and fix it under this plan. Do not open issues or leave a new wrap failure unowned.
 
+- [x] Trailing-space regression: `ab   cd  ` at a 72 px viewport with a 24 px gutter and 8 px fallback advance has character-wrap ends `[4, 8, 9]` after the caret allowance, and word-wrap ends `[5, 9]`. Preserve trailing markers at source offsets `[7, 8]` in both modes. Rewrapping an unchanged space-only row must refresh its source range from `[2, 3]` to `[8, 9]`.
+
 ## Snapshot speed budget
 
 Treat restore speed as a landing-page requirement, separate from worker/parser startup. These are acceptance budgets, not achieved product claims:
