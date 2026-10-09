@@ -12,6 +12,7 @@ import { usePaneFocus } from '@/commands/hooks/use-pane-focus'
 import { useCommandHandlers } from '@/commands/hooks/use-command-handlers'
 import { diffRowColor, diffRowText } from '@/git/utils/rows'
 import type { Theme } from '@/theme/utils/theme'
+import { onRenderableResize } from '@/utils/renderable-events'
 
 export function DiffView({
   file,
@@ -64,9 +65,7 @@ export function DiffView({
       flexDirection='column'
       flexGrow={1}
       minHeight={0}
-      onSizeChange={function () {
-        setWidth(this.width)
-      }}
+      onSizeChange={onRenderableResize((view) => setWidth(view.width))}
     >
       <text fg={theme.mutedForeground} height={1}>
         {file.path} · {split ? 'split' : 'stacked'} · click a context row to expand

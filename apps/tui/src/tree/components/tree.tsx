@@ -1,3 +1,4 @@
+import { finalize } from '@/utils/finalize'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { useKeyboard, useTerminalDimensions } from '@opentui/react'
 import { useCommands } from '@/commands/hooks/use-commands'
@@ -14,6 +15,7 @@ import { treeRowIcon } from '@/tree/utils/paths'
 import type { SettingsSession } from '@/connection/state/session'
 import { connectionFailure } from '@/connection/utils/failure'
 import type { Theme } from '@/theme/utils/theme'
+import { onRenderableResize } from '@/utils/renderable-events'
 
 type TreePrompt = {
   readonly kind: 'file' | 'folder' | 'rename' | 'delete' | 'filter'
@@ -137,16 +139,23 @@ export function FileTree({
       setError('Enter one file or folder name.')
       return
     }
+    const kind = prompt.kind
+    const path = prompt.path
     setSaving(true)
-    try {
-      const destination = await tree.mutate(prompt.kind, prompt.path, next)
-      if (prompt.kind === 'file') onOpenFile(destination)
-      closePrompt()
-    } catch (caught) {
-      setError(connectionFailure(caught).message)
-    } finally {
-      setSaving(false)
-    }
+    return await finalize(
+      async () => {
+        try {
+          const destination = await tree.mutate(kind, path, next)
+          if (kind === 'file') onOpenFile(destination)
+          closePrompt()
+        } catch (caught) {
+          setError(connectionFailure(caught).message)
+        }
+      },
+      () => {
+        setSaving(false)
+      },
+    )
   }
   if (!status.initialized && status.pending)
     return <LoadingState label='Reading files…' theme={theme} />
@@ -173,9 +182,7 @@ export function FileTree({
         focused={active}
         flexGrow={1}
         scrollY={false}
-        onSizeChange={function () {
-          setPageSize(Math.max(1, this.height))
-        }}
+        onSizeChange={onRenderableResize((view) => setPageSize(Math.max(1, view.height)))}
       >
         {rows.map((row) => (
           <text
