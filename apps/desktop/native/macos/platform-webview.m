@@ -2,7 +2,6 @@
 #import <WebKit/WebKit.h>
 #import <QuartzCore/QuartzCore.h>
 #import <CommonCrypto/CommonDigest.h>
-#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -187,11 +186,10 @@ static void emit(NSDictionary *event) {
   if (self.picker) return;
   NSOpenPanel *panel = [NSOpenPanel openPanel];
   self.picker = panel;
-  BOOL folder = [options[@"mode"] isEqual:@"folder"];
-  panel.canChooseDirectories = folder;
-  panel.canChooseFiles = !folder;
-  panel.allowsMultipleSelection = [options[@"multiple"] boolValue];
-  panel.title = folder ? @"Choose folder" : @"Choose file";
+  panel.canChooseDirectories = YES;
+  panel.canChooseFiles = NO;
+  panel.allowsMultipleSelection = NO;
+  panel.title = @"Choose folder";
   NSString *starting = options[@"startingPath"];
   if ([starting isKindOfClass:NSString.class] && starting.length) {
     BOOL directory = NO;
@@ -199,16 +197,6 @@ static void emit(NSDictionary *event) {
     panel.directoryURL = [NSURL fileURLWithPath:directory ? starting : starting.stringByDeletingLastPathComponent];
     if (!directory) panel.nameFieldStringValue = starting.lastPathComponent;
   }
-  NSMutableArray<UTType *> *types = [NSMutableArray array];
-  NSArray *accept = options[@"accept"];
-  if (!folder && [accept isKindOfClass:NSArray.class]) {
-    for (NSString *item in accept) {
-      if (![item isKindOfClass:NSString.class]) continue;
-      UTType *type = [item hasPrefix:@"."] ? [UTType typeWithFilenameExtension:[item substringFromIndex:1]] : [UTType typeWithMIMEType:item];
-      if (type) [types addObject:type];
-    }
-  }
-  if (types.count) panel.allowedContentTypes = types;
   void (^completed)(NSModalResponse) = ^(NSModalResponse response) {
     NSMutableArray *paths = [NSMutableArray array];
     if (response == NSModalResponseOK) {

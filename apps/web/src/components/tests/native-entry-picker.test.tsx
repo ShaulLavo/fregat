@@ -110,7 +110,7 @@ test
       })
       await waitFor(() => expect(toast.getHistory()).toHaveLength(before + 1))
       expect(toast.getHistory().at(-1)).toMatchObject({
-        title: 'Could not open file chooser',
+        title: 'Could not open folder chooser',
         action: { label: 'Fix with AI' },
         description: expect.stringContaining(failure.fix!),
       })
@@ -124,6 +124,6 @@ test
     }
     expect(queryClient.getQueryState(filePickerKeys.recents())?.isInvalidated).toBe(true)
     expect(posts).toBe(1)
-    expect(await calls()).toEqual(outcome === 'not-local' ? [] : [{ mode: 'folder' }])
+    expect(await calls()).toEqual(outcome === 'not-local' ? [] : [{}])
   },
 )

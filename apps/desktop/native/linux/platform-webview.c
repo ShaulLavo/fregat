@@ -53,16 +53,8 @@ static void on_picked(GtkNativeDialog *dialog, gint response, gpointer data) {
 
 static void pick(JSCValue *options) {
   if (chooser) return;
-  JSCValue *mode_value = jsc_value_object_get_property(options, "mode");
-  char *mode = jsc_value_to_string(mode_value);
-  gboolean folder = g_strcmp0(mode, "folder") == 0;
-  g_free(mode);
-  g_object_unref(mode_value);
-  chooser = gtk_file_chooser_native_new(folder ? "Choose folder" : "Choose file", window ? GTK_WINDOW(window) : NULL,
-      folder ? GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER : GTK_FILE_CHOOSER_ACTION_OPEN, NULL, NULL);
-  JSCValue *multiple = jsc_value_object_get_property(options, "multiple");
-  gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(chooser), jsc_value_to_boolean(multiple));
-  g_object_unref(multiple);
+  chooser = gtk_file_chooser_native_new("Choose folder", window ? GTK_WINDOW(window) : NULL,
+      GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER, NULL, NULL);
   JSCValue *starting = jsc_value_object_get_property(options, "startingPath");
   if (jsc_value_is_string(starting)) {
     char *path = jsc_value_to_string(starting);
@@ -70,27 +62,6 @@ static void pick(JSCValue *options) {
     g_free(path);
   }
   g_object_unref(starting);
-  JSCValue *accept = jsc_value_object_get_property(options, "accept");
-  if (!folder && jsc_value_is_array(accept)) {
-    GtkFileFilter *filter = gtk_file_filter_new();
-    gtk_file_filter_set_name(filter, "Selected file types");
-    JSCValue *length = jsc_value_object_get_property(accept, "length");
-    gint count = jsc_value_to_int32(length);
-    g_object_unref(length);
-    for (gint i = 0; i < count; i++) {
-      JSCValue *item = jsc_value_object_get_property_at_index(accept, i);
-      char *type = jsc_value_to_string(item);
-      if (type[0] == '.') {
-        char *pattern = g_strconcat("*", type, NULL);
-        gtk_file_filter_add_pattern(filter, pattern);
-        g_free(pattern);
-      } else gtk_file_filter_add_mime_type(filter, type);
-      g_free(type);
-      g_object_unref(item);
-    }
-    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(chooser), filter);
-  }
-  g_object_unref(accept);
   g_signal_connect(chooser, "response", G_CALLBACK(on_picked), NULL);
   gtk_native_dialog_show(GTK_NATIVE_DIALOG(chooser));
 }

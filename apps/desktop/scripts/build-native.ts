@@ -45,8 +45,6 @@ export function buildNative(
     : [
         '-framework',
         'WebKit',
-        '-framework',
-        'UniformTypeIdentifiers',
         ...(arch ? ['-arch', arch === 'x64' ? 'x86_64' : arch] : []),
         '-fobjc-arc',
         '-mmacosx-version-min=11.0',

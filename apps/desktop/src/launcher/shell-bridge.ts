@@ -16,24 +16,12 @@ export function parsePickRequest(
   )
     return
   const options = body.options
-  if (options.mode !== 'folder' && options.mode !== 'file') return
-  if (options.multiple !== undefined && typeof options.multiple !== 'boolean') return
+  if (Object.keys(options).some((key) => key !== 'startingPath')) return
   if (options.startingPath !== undefined && typeof options.startingPath !== 'string') return
-  if (
-    options.accept !== undefined &&
-    (!Array.isArray(options.accept) ||
-      !options.accept.every((item: unknown) => typeof item === 'string'))
-  )
-    return
   return {
     id: body.id as number,
     documentId: body.documentId,
-    options: {
-      mode: options.mode,
-      multiple: options.multiple,
-      startingPath: options.startingPath,
-      accept: options.accept,
-    },
+    options: { startingPath: options.startingPath },
   }
 }
 export function shellBridge(
@@ -73,7 +61,7 @@ export function shellBridge(
       else request.resolve(response.paths);
     };
     bridge.pickEntry = options => new Promise((resolve, reject) => {
-      if (pending.size) { reject(new DOMException('A file chooser is already open.', 'InvalidStateError')); return; }
+      if (pending.size) { reject(new DOMException('A folder chooser is already open.', 'InvalidStateError')); return; }
       const id = ++next;
       pending.set(id, { resolve, reject });
       try { send({ id, documentId, method: 'pickEntry', options, origin: location.origin, token }); }
