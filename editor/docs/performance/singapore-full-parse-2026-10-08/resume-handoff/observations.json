@@ -1,0 +1,368 @@
+{
+  "classification": "Prospective single-pair diagnostics, not qualification or physical presentation.",
+  "sourceBaseline": "e68663768bee4bd3b7d7de3acbb9bc7549154406",
+  "completedBeforeWrapUp": true,
+  "method": "Cold baseline then candidate; warm candidate then baseline. Fresh measured document and tree each time. Strict comparisons and canonical output pass for all three pairs.",
+  "derivationProvenance": "The shared derivation helper retains a historical warm-counter correction note from the preceding error-free-walk experiment. It does not describe a failure in these three completed experiments. Original summaries and helper are preserved verbatim in the archive.",
+  "setupFailure": "The first fused-cursor shell setup failed before making changes or measuring. The error log and corrected Python setup are preserved. No sample was rerun.",
+  "archive": {
+    "file": "next-candidates-20261009.tar.gz",
+    "bytes": 7185856,
+    "sha256": "0a1d6e0a80e4aa9756fd084871d6cd2781edbaaef004777caaff967f8148c6d5",
+    "verifiedArtifacts": 77,
+    "availability": "Uncommitted historical full archive retained by the author; no machine-local address is published."
+  },
+  "experiments": [
+    {
+      "candidate": "bracket-prefilter",
+      "classification": {
+        "kind": "prospective paired diagnostic experiment, not qualification",
+        "date": "2026-10-09",
+        "baseline": "shipping error-free-walk candidate e68663768bee4bd3b7d7de3acbb9bc7549154406",
+        "candidate": "same source plus single-character prefilter before bracket set lookups",
+        "coldOrder": ["baseline", "candidate"],
+        "warmOrder": ["candidate", "baseline"],
+        "repetitionsPerSideAndCondition": 1,
+        "condition": "quiet",
+        "qualification": false,
+        "hostRecipe": "archival and host-specific; not a portable committed test"
+      },
+      "rows": [
+        {
+          "startup": "cold",
+          "role": "baseline",
+          "frameMs": 3773.300000011921,
+          "workerMs": 3586.100000023842,
+          "mainWorkMs": 26.023,
+          "diagnosticWorkMs": 3612.123000023842,
+          "structuralWalkMs": 854.0999999642372,
+          "phasesMs": {
+            "treeSitter.parseRoot": 760.6999999880791,
+            "treeSitter.injectionDiscovery": 340.3999999165535,
+            "treeSitter.structuralWalk": 854.0999999642372,
+            "treeSitter.highlightQueryAndPredicates": 978.5,
+            "treeSitter.foldQueryAndPredicates": 238.5,
+            "treeSitter.captureSorting": 7.199999988079071,
+            "treeSitter.overlapResolution": 176.89999997615814,
+            "treeSitter.packing": 13.200000047683716,
+            "treeSitter.parse": 1249.199999988079,
+            "treeSitter.query": 2336.900000035763
+          }
+        },
+        {
+          "startup": "cold",
+          "role": "candidate",
+          "frameMs": 3763.899999976158,
+          "workerMs": 3581.599999964237,
+          "mainWorkMs": 16.322,
+          "diagnosticWorkMs": 3597.9219999642373,
+          "structuralWalkMs": 809.6999999880791,
+          "phasesMs": {
+            "treeSitter.parseRoot": 771.8999999761581,
+            "treeSitter.injectionDiscovery": 341.70000010728836,
+            "treeSitter.structuralWalk": 809.6999999880791,
+            "treeSitter.highlightQueryAndPredicates": 980.7999999523163,
+            "treeSitter.foldQueryAndPredicates": 244.19999998807907,
+            "treeSitter.captureSorting": 8,
+            "treeSitter.overlapResolution": 184.89999997615814,
+            "treeSitter.packing": 13.199999988079071,
+            "treeSitter.parse": 1262.8999999761581,
+            "treeSitter.query": 2318.699999988079
+          }
+        },
+        {
+          "startup": "warm",
+          "role": "baseline",
+          "frameMs": 3524,
+          "workerMs": 3390.300000011921,
+          "mainWorkMs": 9.714,
+          "diagnosticWorkMs": 3400.014000011921,
+          "structuralWalkMs": 812.6000000238419,
+          "phasesMs": {
+            "treeSitter.parseRoot": 672.6000000238419,
+            "treeSitter.injectionDiscovery": 332.89999985694885,
+            "treeSitter.structuralWalk": 812.6000000238419,
+            "treeSitter.highlightQueryAndPredicates": 973.5,
+            "treeSitter.foldQueryAndPredicates": 237.9000000357628,
+            "treeSitter.captureSorting": 8.099999964237213,
+            "treeSitter.overlapResolution": 127.19999998807907,
+            "treeSitter.packing": 12.900000035762787,
+            "treeSitter.parse": 1143.699999988079,
+            "treeSitter.query": 2246.600000023842
+          }
+        },
+        {
+          "startup": "warm",
+          "role": "candidate",
+          "frameMs": 3542.899999976158,
+          "workerMs": 3402.199999988079,
+          "mainWorkMs": 10.105,
+          "diagnosticWorkMs": 3412.304999988079,
+          "structuralWalkMs": 818.2999999523163,
+          "phasesMs": {
+            "treeSitter.parseRoot": 662.3000000119209,
+            "treeSitter.injectionDiscovery": 340.4000001549721,
+            "treeSitter.structuralWalk": 818.2999999523163,
+            "treeSitter.highlightQueryAndPredicates": 980.2000000476837,
+            "treeSitter.foldQueryAndPredicates": 240,
+            "treeSitter.captureSorting": 8.100000023841858,
+            "treeSitter.overlapResolution": 135.79999995231628,
+            "treeSitter.packing": 13,
+            "treeSitter.parse": 1140.9000000357628,
+            "treeSitter.query": 2261.2999999523163
+          }
+        }
+      ],
+      "canonicalOutputEqual": true,
+      "fullProofEqualWithinEachStartupCondition": true,
+      "qualification": false,
+      "verdict": "Rejected: warm worker work increased, no shipping source retained."
+    },
+    {
+      "candidate": "mutable-capture-stamps",
+      "classification": {
+        "kind": "prospective paired diagnostic experiment, not qualification",
+        "date": "2026-10-09",
+        "baseline": "shipping error-free-walk candidate e68663768bee4bd3b7d7de3acbb9bc7549154406",
+        "candidate": "same source plus bounded mutable capture-name span stamps, with the mutable capture stamps removed",
+        "coldOrder": ["baseline", "candidate"],
+        "warmOrder": ["candidate", "baseline"],
+        "repetitionsPerSideAndCondition": 1,
+        "condition": "quiet",
+        "qualification": false,
+        "hostRecipe": "archival and host-specific; not a portable committed test"
+      },
+      "rows": [
+        {
+          "startup": "cold",
+          "role": "baseline",
+          "frameMs": 3749.399999976158,
+          "workerMs": 3563.300000011921,
+          "mainWorkMs": 15.123,
+          "diagnosticWorkMs": 3578.423000011921,
+          "structuralWalkMs": 816.8000000119209,
+          "phasesMs": {
+            "treeSitter.parseRoot": 758.8000000119209,
+            "treeSitter.injectionDiscovery": 341.6999999284744,
+            "treeSitter.structuralWalk": 816.8000000119209,
+            "treeSitter.highlightQueryAndPredicates": 973.0999999642372,
+            "treeSitter.foldQueryAndPredicates": 237.80000001192093,
+            "treeSitter.captureSorting": 8.100000023841858,
+            "treeSitter.overlapResolution": 186.30000001192093,
+            "treeSitter.packing": 13,
+            "treeSitter.parse": 1249.1000000238419,
+            "treeSitter.query": 2314.199999988079
+          }
+        },
+        {
+          "startup": "cold",
+          "role": "candidate",
+          "frameMs": 3708.800000011921,
+          "workerMs": 3523.300000011921,
+          "mainWorkMs": 16.182,
+          "diagnosticWorkMs": 3539.4820000119207,
+          "structuralWalkMs": 811.0999999642372,
+          "phasesMs": {
+            "treeSitter.parseRoot": 748.2000000476837,
+            "treeSitter.injectionDiscovery": 342.29999965429306,
+            "treeSitter.structuralWalk": 811.0999999642372,
+            "treeSitter.highlightQueryAndPredicates": 967.8000000119209,
+            "treeSitter.foldQueryAndPredicates": 237.30000001192093,
+            "treeSitter.captureSorting": 8.099999964237213,
+            "treeSitter.overlapResolution": 158.89999997615814,
+            "treeSitter.packing": 14,
+            "treeSitter.parse": 1239.300000011921,
+            "treeSitter.query": 2284
+          }
+        },
+        {
+          "startup": "warm",
+          "role": "baseline",
+          "frameMs": 3530.600000023842,
+          "workerMs": 3390.399999976158,
+          "mainWorkMs": 9.408,
+          "diagnosticWorkMs": 3399.807999976158,
+          "structuralWalkMs": 813.6999999880791,
+          "phasesMs": {
+            "treeSitter.parseRoot": 658.3999999761581,
+            "treeSitter.injectionDiscovery": 334.10000002384186,
+            "treeSitter.structuralWalk": 813.6999999880791,
+            "treeSitter.highlightQueryAndPredicates": 974.1999999880791,
+            "treeSitter.foldQueryAndPredicates": 236.60000002384186,
+            "treeSitter.captureSorting": 8.199999988079071,
+            "treeSitter.overlapResolution": 129.39999997615814,
+            "treeSitter.packing": 13.699999988079071,
+            "treeSitter.parse": 1130.3999999761581,
+            "treeSitter.query": 2260
+          }
+        },
+        {
+          "startup": "warm",
+          "role": "candidate",
+          "frameMs": 3545.199999988079,
+          "workerMs": 3407.699999988079,
+          "mainWorkMs": 9.305,
+          "diagnosticWorkMs": 3417.004999988079,
+          "structuralWalkMs": 821.0999999642372,
+          "phasesMs": {
+            "treeSitter.parseRoot": 660.4000000357628,
+            "treeSitter.injectionDiscovery": 342.799999833107,
+            "treeSitter.structuralWalk": 821.0999999642372,
+            "treeSitter.highlightQueryAndPredicates": 970.9000000357628,
+            "treeSitter.foldQueryAndPredicates": 237.5,
+            "treeSitter.captureSorting": 8.099999964237213,
+            "treeSitter.overlapResolution": 151,
+            "treeSitter.packing": 14,
+            "treeSitter.parse": 1141.6000000238419,
+            "treeSitter.query": 2266.099999964237
+          }
+        }
+      ],
+      "canonicalOutputEqual": true,
+      "fullProofEqualWithinEachStartupCondition": true,
+      "qualification": false,
+      "verdict": "Rejected: warm worker work increased, no shipping source retained."
+    },
+    {
+      "candidate": "fused-cursor",
+      "classification": {
+        "kind": "prospective paired diagnostic experiment, not qualification",
+        "date": "2026-10-09",
+        "baseline": "shipping error-free-walk candidate e68663768bee4bd3b7d7de3acbb9bc7549154406",
+        "candidate": "same source plus experiment-only full-walk gotoNext using one marshal/unmarshal pair and unchanged native movement functions",
+        "coldOrder": ["baseline", "candidate"],
+        "warmOrder": ["candidate", "baseline"],
+        "repetitionsPerSideAndCondition": 1,
+        "condition": "quiet",
+        "qualification": false,
+        "hostRecipe": "archival and host-specific; not a portable committed test"
+      },
+      "rows": [
+        {
+          "startup": "cold",
+          "role": "baseline",
+          "frameMs": 3846.199999988079,
+          "workerMs": 3619.0,
+          "mainWorkMs": 30.182,
+          "diagnosticWorkMs": 3649.182,
+          "structuralWalkMs": 855.1999999880791,
+          "phasesMs": {
+            "treeSitter.parseRoot": 757.3999999761581,
+            "treeSitter.injectionDiscovery": 349.8999999165535,
+            "treeSitter.structuralWalk": 855.1999999880791,
+            "treeSitter.highlightQueryAndPredicates": 1007.4000000357628,
+            "treeSitter.foldQueryAndPredicates": 236,
+            "treeSitter.captureSorting": 7.800000011920929,
+            "treeSitter.overlapResolution": 159.79999995231628,
+            "treeSitter.packing": 14.100000023841858,
+            "treeSitter.parse": 1256.1000000238419,
+            "treeSitter.query": 2362.899999976158
+          }
+        },
+        {
+          "startup": "cold",
+          "role": "candidate",
+          "frameMs": 3434.400000035763,
+          "workerMs": 3248.7999999523163,
+          "mainWorkMs": 15.156,
+          "diagnosticWorkMs": 3263.9559999523162,
+          "structuralWalkMs": 504.89999997615814,
+          "phasesMs": {
+            "treeSitter.parseRoot": 751.1999999880791,
+            "treeSitter.injectionDiscovery": 340.5,
+            "treeSitter.structuralWalk": 504.89999997615814,
+            "treeSitter.highlightQueryAndPredicates": 978.8000000119209,
+            "treeSitter.foldQueryAndPredicates": 237.70000004768372,
+            "treeSitter.captureSorting": 7.199999988079071,
+            "treeSitter.overlapResolution": 199.80000001192093,
+            "treeSitter.packing": 12.699999988079071,
+            "treeSitter.parse": 1240.5999999642372,
+            "treeSitter.query": 2008.199999988079
+          }
+        },
+        {
+          "startup": "warm",
+          "role": "baseline",
+          "frameMs": 3541.100000023842,
+          "workerMs": 3413.5,
+          "mainWorkMs": 10.414,
+          "diagnosticWorkMs": 3423.914,
+          "structuralWalkMs": 811.1000000238419,
+          "phasesMs": {
+            "treeSitter.parseRoot": 668.6000000238419,
+            "treeSitter.injectionDiscovery": 342.99999982118607,
+            "treeSitter.structuralWalk": 811.1000000238419,
+            "treeSitter.highlightQueryAndPredicates": 982.8999999761581,
+            "treeSitter.foldQueryAndPredicates": 242.29999995231628,
+            "treeSitter.captureSorting": 8.100000023841858,
+            "treeSitter.overlapResolution": 145,
+            "treeSitter.packing": 13.199999988079071,
+            "treeSitter.parse": 1149.699999988079,
+            "treeSitter.query": 2263.800000011921
+          }
+        },
+        {
+          "startup": "warm",
+          "role": "candidate",
+          "frameMs": 3210.899999976158,
+          "workerMs": 3076.2000000476837,
+          "mainWorkMs": 8.739,
+          "diagnosticWorkMs": 3084.9390000476837,
+          "structuralWalkMs": 503.9000000357628,
+          "phasesMs": {
+            "treeSitter.parseRoot": 661.7000000476837,
+            "treeSitter.injectionDiscovery": 336.70000022649765,
+            "treeSitter.structuralWalk": 503.9000000357628,
+            "treeSitter.highlightQueryAndPredicates": 984,
+            "treeSitter.foldQueryAndPredicates": 237.5,
+            "treeSitter.captureSorting": 7.300000011920929,
+            "treeSitter.overlapResolution": 133.5999999642372,
+            "treeSitter.packing": 12.400000035762787,
+            "treeSitter.parse": 1136.800000011921,
+            "treeSitter.query": 1939.4000000357628
+          }
+        }
+      ],
+      "canonicalOutputEqual": true,
+      "fullProofEqualWithinEachStartupCondition": true,
+      "qualification": false,
+      "verdict": "Promising prototype, source API not implemented or reviewed, no qualification."
+    }
+  ],
+  "committedCoreArchive": {
+    "file": "evidence.tar.gz",
+    "bytes": 365147,
+    "sha256": "fb7626daccdf5816ada8f4ba729eebf6ce9d54d4f9649af574cdb49af506a752",
+    "verifiedArtifacts": 53,
+    "contents": "Path-normalized archival copies of observations, sources, comparisons, classifications, summaries, recipes and logs. All measurement values are unchanged. Original traces and screenshots remain in the uncommitted full archive."
+  },
+  "archiveNormalization": {
+    "kind": "Path-normalized archival copies; measurement values unchanged.",
+    "originalCoreSha256": "a1917804b6c8568a5e798f0a15e7d8f3e8265b5a3d81fcddfd1e0cd92e2cdc3f",
+    "originals": "Unmodified historical core and full archives remain outside the repository.",
+    "changedMembers": [
+      "bracket-prefilter/cold/baseline/experiment.json",
+      "bracket-prefilter/cold/candidate/experiment.json",
+      "bracket-prefilter/warm/baseline/experiment.json",
+      "bracket-prefilter/warm/candidate/experiment.json",
+      "bracket-prefilter/experiment.sh",
+      "bracket-prefilter/experiment.log",
+      "bracket-prefilter/focused.log",
+      "mutable-capture-stamps/cold/baseline/experiment.json",
+      "mutable-capture-stamps/cold/candidate/experiment.json",
+      "mutable-capture-stamps/warm/baseline/experiment.json",
+      "mutable-capture-stamps/warm/candidate/experiment.json",
+      "mutable-capture-stamps/experiment.sh",
+      "mutable-capture-stamps/experiment.log",
+      "mutable-capture-stamps/focused.log",
+      "fused-cursor/cold/baseline/experiment.json",
+      "fused-cursor/cold/candidate/experiment.json",
+      "fused-cursor/warm/baseline/experiment.json",
+      "fused-cursor/warm/candidate/experiment.json",
+      "fused-cursor/experiment.sh",
+      "fused-cursor/experiment.log",
+      "provenance/prepare-fused-cursor.py"
+    ],
+    "recipes": "Setup accepts checkout, baseline-checkout and output-directory arguments. Measurement scripts require caller-supplied checkout/output paths, browser cache, canonical proof, scheduling wrappers and admission lock. No measurement was run."
+  }
+}
