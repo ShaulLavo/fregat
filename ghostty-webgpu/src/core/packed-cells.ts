@@ -55,7 +55,7 @@ export class PackedCells {
     return target
   }
 
-  defaultRunText(): string | undefined {
+  defaultRunText(padToColumns = false): string | undefined {
     const words = this.words
     let end = 0
     for (let offset = 0; offset < words.length; offset += PACKED_CELL_WORDS) {
@@ -70,7 +70,7 @@ export class PackedCells {
     let text = ''
     for (let offset = 0; offset < end; offset += PACKED_CELL_WORDS)
       text += this.textAt(offset) || ' '
-    return text
+    return padToColumns ? text + ' '.repeat((words.length - end) / PACKED_CELL_WORDS) : text
   }
 
   span(index: number): number {

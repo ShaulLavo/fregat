@@ -120,6 +120,42 @@ it('projects a default packed run without decoding scratch cells', async () => {
   }
 })
 
+it.each(['', ' '.repeat(40), 'a'.repeat(40), '\x1b[1;40Hx', '  é edit 0000   '])(
+  'projects full-width default snapshot text without decoding each trailing cell (%#)',
+  async (input) => {
+    const runtime = await GhosttyRuntime.create()
+    try {
+      const terminal = runtime.createTerminal({ columns: 40, rows: 3 })
+      const state = runtime.createRenderState(terminal)
+      terminal.write(input)
+      state.update()
+      const row = state.readRows({ packed: true })[0]!
+      const expected = copiedFrameRow(state.readRows()[0]!)
+      const text = vi.spyOn(row.packed!, 'text')
+      const continuation = vi.spyOn(row.packed!, 'continuation')
+      try {
+        const snapshot = copiedFrameRow(row)
+        expect(snapshot.text).toBe(expected.text)
+        expect(text).not.toHaveBeenCalled()
+        expect(continuation).not.toHaveBeenCalled()
+        terminal.write('\x1b[2J\x1b[Hlater')
+        state.update()
+        runtime.exports.memory.grow(1)
+        expect(snapshot.text).toBe(expected.text)
+        expect(snapshot.cells).toEqual(expected.cells)
+        expect(snapshot.continuations).toEqual(expected.continuations)
+        expect(snapshot.renderCells).toEqual(expected.renderCells)
+        expect(Object.isFrozen(snapshot.cells)).toBe(true)
+      } finally {
+        text.mockRestore()
+        continuation.mockRestore()
+      }
+    } finally {
+      runtime.dispose()
+    }
+  },
+)
+
 it('reuses full-width default run CSS without serializing the width again', async () => {
   const runtime = await GhosttyRuntime.create()
   try {
