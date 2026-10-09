@@ -820,7 +820,7 @@ export const SETTINGS_DOCUMENTATION = {
   'window.nativeDialogTimeoutSeconds': {
     title: 'Native dialog time limit',
     description:
-      'Seconds a desktop file chooser or startup message stays open before its helper closes.',
+      'Seconds a desktop folder chooser or startup message stays open before its helper closes.',
     keywords: ['window', 'picker', 'native', 'timeout'],
   },
   'window.nativeHostStopGraceSeconds': {

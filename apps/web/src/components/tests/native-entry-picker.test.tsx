@@ -1,7 +1,7 @@
 import { mkdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { useState } from 'react'
-import { onTestFinished } from 'vitest'
+import { afterEach, onTestFinished } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import { toast } from 'sonner'
 import { entryPickerMutationKeys } from '@/components/utils/mutation-keys'
@@ -16,6 +16,15 @@ import { installTestClient } from '../../../test/factories/client-binding'
 import { installNativePickerHelper } from '../../../test/factories/native-picker'
 import { expect, test } from '../../../test/fixtures'
 import { createTestQueryClient, renderWithProviders } from '../../../test/render'
+
+afterEach(() => {
+  delete window.platformBridge
+})
+
+// The shape the desktop shell bridge rejects with when the launcher answers with an error.
+function bridgeFailure(reply: { message: string; code: string; why: string; fix: string }) {
+  return Object.assign(Object.create(Error.prototype) as Error, reply)
+}
 
 function NativePickerFixture({
   onPick,
@@ -110,7 +119,7 @@ test
       })
       await waitFor(() => expect(toast.getHistory()).toHaveLength(before + 1))
       expect(toast.getHistory().at(-1)).toMatchObject({
-        title: 'Could not open file chooser',
+        title: 'Could not open folder chooser',
         action: { label: 'Fix with AI' },
         description: expect.stringContaining(failure.fix!),
       })
@@ -124,6 +133,41 @@ test
     }
     expect(queryClient.getQueryState(filePickerKeys.recents())?.isInvalidated).toBe(true)
     expect(posts).toBe(1)
-    expect(await calls()).toEqual(outcome === 'not-local' ? [] : [{ mode: 'folder' }])
+    expect(await calls()).toEqual(outcome === 'not-local' ? [] : [{}])
+  },
+)
+
+test.skipIf(process.platform === 'win32')(
+  'a refused desktop bridge request shows the launcher error and opens the web picker',
+  async ({ server, client }) => {
+    void client
+    await installNativePickerHelper(server, [])
+    const refusal = {
+      message: 'The folder chooser request is not valid.',
+      code: 'desktop.webview.PICKER_REFUSED',
+      why: 'The desktop app could not read the folder chooser request this window sent.',
+      fix: 'Reload the window, then open the folder again.',
+    }
+    window.platformBridge = {
+      backdrop: 'compositor',
+      platform: 'linux',
+      colorScheme: null,
+      titlebar: 'native',
+      pickEntry: () => Promise.reject(bridgeFailure(refusal)),
+    }
+    const queryClient = createTestQueryClient()
+    const before = toast.getHistory().length
+    renderWithProviders(<NativePickerFixture onPick={() => {}} onClose={() => {}} />, {
+      queryClient,
+    })
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+    await waitFor(() => expect(toast.getHistory()).toHaveLength(before + 1))
+    expect(toast.getHistory().at(-1)).toMatchObject({
+      title: 'Could not open folder chooser',
+      description: expect.stringContaining(refusal.fix),
+    })
+    expect(toast.getHistory().at(-1)).toMatchObject({
+      description: expect.stringContaining(refusal.why),
+    })
   },
 )

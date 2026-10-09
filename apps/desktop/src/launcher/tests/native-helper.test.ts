@@ -29,7 +29,7 @@ test.each(['cancel', 'success', 'message', 'malformed', 'error', 'timeout', 'abo
       const operation =
         behavior === 'message'
           ? runNativeDialog({ ...options, args: ['message', '/fixture/public-message'] })
-          : pick({ ...options, options: { mode: 'folder' } })
+          : pick({ ...options, options: {} })
       if (behavior === 'cancel') expect(await operation).toEqual([])
       else if (behavior === 'success') expect(await operation).toEqual(['/fixture/資料'])
       else if (behavior === 'message') expect(await operation).toEqual([{ event: 'closed' }])

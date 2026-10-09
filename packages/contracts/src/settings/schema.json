@@ -1708,7 +1708,7 @@
     },
     "window.nativeDialogTimeoutSeconds": {
       "default": 300,
-      "description": "Seconds a desktop file chooser or startup message stays open before its helper closes.",
+      "description": "Seconds a desktop folder chooser or startup message stays open before its helper closes.",
       "maximum": 3600,
       "minimum": 1,
       "type": "integer"
