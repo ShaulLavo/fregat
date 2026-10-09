@@ -5,6 +5,7 @@ import { createDocumentSession, createPieceTableSnapshot } from '../src/public/d
 import { createInlineMap } from '../src/inlineMap'
 import { createEditorFindPlugin } from '../../find/src/plugin'
 import '../src/style.css'
+import { glyphAdvancesFor } from '../src/virtualization/glyphAdvances'
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
@@ -151,7 +152,7 @@ it('uses the same content extent with a document session and switches scroll mod
 })
 
 it('updates the content extent when a bundled font loads after mount', async () => {
-  const { editor, host } = mount(180)
+  const { editor, host, parent } = mount(180)
   editor.setFontFamily('"Content Height Face", serif')
   editor.setText('iiii WWWW 0000 alpha beta '.repeat(20))
   await frames()
@@ -161,35 +162,60 @@ it('updates the content extent when a bundled font loads after mount', async () 
     document.fonts.add(await face.load())
     await expect.poll(() => editor.getContentHeight()).not.toBe(before)
     expect(host.getBoundingClientRect().height).toBe(editor.getContentHeight())
+    const probe = document.createElement('span')
+    probe.style.cssText = 'position:absolute;left:0;top:0;white-space:pre'
+    probe.textContent = 'W'
+    scroller(host).append(probe)
+    try {
+      expect(glyphAdvancesFor(scroller(host))!.advance(87)).toBeCloseTo(
+        probe.getBoundingClientRect().width,
+        1,
+      )
+    } finally {
+      probe.remove()
+    }
+    parent.scrollTop = 360
+    if ('proofContentLayoutScreenshot' in commands)
+      console.info('Late font content evidence', await commands.proofContentLayoutScreenshot(180))
   } finally {
     document.fonts.delete(face)
   }
 })
 
-it('publishes syntax replacement extent and restores the source extent', async () => {
-  const { editor, host } = mount(180)
-  const text = 'source'
-  editor.setText(text)
-  await frames()
-  expect(editor.getContentHeight()).toBe(20)
-  editor.setInlineMap(
-    createInlineMap(createPieceTableSnapshot(text), [
-      {
-        id: 'syntax-preview',
-        startIndex: 0,
-        endIndex: text.length,
-        text: 'rendered preview words '.repeat(30),
-        reveal: 'never',
-      },
-    ]),
-  )
-  await frames()
-  expect(editor.getContentHeight()).toBeGreaterThan(20)
-  expect(host.getBoundingClientRect().height).toBe(editor.getContentHeight())
-  editor.setInlineMap(null)
-  await frames()
-  expect(host.getBoundingClientRect().height).toBe(20)
-})
+it.each(['text', 'atomic'] as const)(
+  'publishes $0 syntax replacement extent and restores the source extent',
+  async (wrap) => {
+    const { editor, host } = mount(180)
+    const text = 'source'
+    editor.setText(text)
+    await frames()
+    expect(editor.getContentHeight()).toBe(20)
+    editor.setInlineMap(
+      createInlineMap(createPieceTableSnapshot(text), [
+        {
+          id: 'syntax-preview',
+          startIndex: 0,
+          endIndex: text.length,
+          text: 'rendered preview words '.repeat(30),
+          reveal: 'never',
+          ...(wrap === 'text' ? { wrap } : {}),
+        },
+      ]),
+    )
+    await frames()
+    if (wrap === 'text') {
+      expect(editor.getContentHeight()).toBeGreaterThan(20)
+      expect(host.querySelectorAll('[data-editor-virtual-row]').length).toBeGreaterThan(1)
+    } else {
+      expect(editor.getContentHeight()).toBe(20)
+      expect(host.querySelectorAll('[data-editor-virtual-row]')).toHaveLength(1)
+    }
+    expect(host.getBoundingClientRect().height).toBe(editor.getContentHeight())
+    editor.setInlineMap(null)
+    await frames()
+    expect(host.getBoundingClientRect().height).toBe(20)
+  },
+)
 
 it('find results and heading jumps reveal through the outside scroller', async () => {
   const { editor, host, parent } = mount()
