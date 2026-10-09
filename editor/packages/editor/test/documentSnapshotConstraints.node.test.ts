@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest'
 import {
   commitPreparedDocumentTransaction,
   createEditorTextBuffer,
+  createDocumentSession,
   createEditorBufferSession,
   prepareDocumentTransaction,
 } from '../src/public/document'
@@ -62,3 +63,56 @@ it('refuses prepared commits and oversized redo without changing history or snap
   session.redo()
   expect(buffer.getTextSnapshot().length).toBe(6)
 })
+
+it('ends ordinary session typing at a no-op redo command', () => {
+  const session = createDocumentSession('')
+  session.applyText('a')
+  expect(session.redo().kind).toBe('none')
+  session.applyText('b')
+  expect(session.undo().textSnapshot.materializeFullText()).toBe('a')
+})
+
+it.each([
+  ['redo', false],
+  ['redo', true],
+  ['checkout', false],
+  ['checkout', true],
+] as const)('ends typing at no-op %s with constraint=%s', (command, constrained) => {
+  const buffer = createEditorTextBuffer('')
+  const session = createEditorBufferSession(buffer)
+  const dispose = constrained ? registerDocumentSnapshotConstraint(buffer, () => {}) : () => {}
+  try {
+    session.applyText('a')
+    const change =
+      command === 'redo'
+        ? session.redo()
+        : buffer.checkoutHistoryState(buffer.getHistoryGraph().currentId, session.view)
+    expect(change.kind).toBe('none')
+    session.applyText('b')
+    expect(session.undo().textSnapshot.materializeFullText()).toBe('a')
+  } finally {
+    dispose()
+  }
+})
+
+it.each(['undo', 'checkout'] as const)(
+  'preserves typing when an actual %s is refused',
+  (command) => {
+    const buffer = createEditorTextBuffer('')
+    const session = createEditorBufferSession(buffer)
+    const initial = buffer.getHistoryGraph().currentId
+    session.applyText('a')
+    const dispose = registerDocumentSnapshotConstraint(buffer, (snapshot) => {
+      if (snapshot.length === 0) throw new RangeError('snapshot constraint')
+    })
+    try {
+      expect(() =>
+        command === 'undo' ? session.undo() : buffer.checkoutHistoryState(initial, session.view),
+      ).toThrow('snapshot constraint')
+      session.applyText('b')
+    } finally {
+      dispose()
+    }
+    expect(session.undo().textSnapshot.materializeFullText()).toBe('')
+  },
+)

@@ -1027,6 +1027,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     const transaction = this.history.undo?.transaction ?? null
     const next = undoEditorHistory(this.history)
     if (next === this.history) {
+      this.typingRun = null
       return appendTiming(this.createChange('none', []), 'session.undo', start)
     }
 
@@ -1069,6 +1070,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     const transaction = this.history.redo?.transaction ?? null
     const next = redoEditorHistory(this.history)
     if (next === this.history) {
+      this.typingRun = null
       return appendTiming(this.createChange('none', []), 'session.redo', start)
     }
 
@@ -1183,6 +1185,7 @@ class PieceTableEditorTextBuffer implements EditorTextBuffer {
     const next = checkoutEditorHistory(this.history, id)
     if (this.applyLocalEdits.history) return this.moveAuthoredHistory(next, 'checkout', sourceView)
     if (next === this.history) {
+      this.typingRun = null
       return appendTiming(this.createChange('none', []), 'session.checkout', start)
     }
 
