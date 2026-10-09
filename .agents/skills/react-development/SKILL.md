@@ -14,6 +14,7 @@ Apply these repository rules when writing, reviewing, or refactoring React compo
 - No prop-drilling of app commands or setters: a prop that is only forwarded, or a command crossing more than two components, gets a narrow provider/hook. Command providers expose small domain actions (`selectTab`).
 - State that outlives a component is a zustand store (web and TUI): `createStore` from `zustand/vanilla` when non-React code reads or writes it, read in React with `useStore(store, selector)`. A module `let` plus a listener set is a store; write it as one. A service with its own lifecycle keeps its state in a zustand store it exposes (`connections.store`), and components select from that.
 - Selectors return a primitive, a reference the store holds, or go through `useShallow`. A derived object needs a selector memoized on its inputs (`projectedTreeModel`); a `getSnapshot` that builds a fresh object or array each read re-renders forever.
+- Stable object identity does not make a mutable getter reactive. Read the needed value or revision through its owner's query, selector, or subscription before deriving JSX; the compiler cannot observe changes hidden behind `row.getIsSelected()` or another service method.
 - `useSyncExternalStore` is for sources zustand does not own: DOM and renderer events (`matchMedia`, held keys, geometry), mutable objects that publish a revision (an editor buffer), live sockets, and services with their own lifecycle. A zustand store is read with `useStore`, never through `useSyncExternalStore`. Convert a hand-built store only when the result is less code or measurably fewer renders.
 - The React Compiler memoizes the app. Do not add `memo`, `useMemo` or `useCallback` by hand, except for predictable reuse at an identity-sensitive consumer: a value in a dependency array, a value passed to a hook (store selector, `useSyncExternalStore` pair), or a ref callback. A kept manual memo names the dependent hook in a comment.
 - Both compiler caches and native `useMemo`/`useCallback` are disposable optimizations. Correctness must survive recomputation and effect cleanup/reconnection. Give mutable owners such as stores, coordinators, and resources a real lifetime through lazy `useState`, a ref used outside render, or their owning service. Define which input change replaces them; an empty dependency list is not a lifetime guarantee.
@@ -22,6 +23,13 @@ Apply these repository rules when writing, reviewing, or refactoring React compo
 - Removing `useMemo<T>(…)` drops its contextual type; write `const value: T = …`.
 - `exhaustive-deps` misreads compiler-memoized values. Use `useEffectEvent` when the dep is the action. When the effect truly keys on the value, suppress with `// oxlint-disable-next-line react/exhaustive-deps` and the compiler's keys; the `react-hooks/…` spelling makes the compiler refuse the component.
 - `bun run compiler:census` fails on any refused component not excused in `scripts/lint/react-compiler-allow.json`. Repairs: lazily filled ref → lazy `useState`; `try`/`finally` → module-scope function; suppressed deps → `useEffectEvent` with the trigger as an argument; declare handlers after those they call; pass `ref` through JSX, not `createElement`.
+
+## Composition
+
+- Reusable UI starts with props and children. Add named slots or compound pieces when flags and layout-specific props accumulate. Add a provider when descendants share domain actions or multiple real sources fill the same view contract. Each step needs a current use case; a provider is not required just to render fixture data in a test.
+- Keep source ownership separate from layout: Query owns reads and mutations, a feature provider may expose the relevant data and domain actions, and the reusable UI composes shared primitives. Follow existing names and feature boundaries rather than adding a naming layer for this pattern.
+
+Source: [Props, Composers, and Providers](https://backstage.orus.eu/react-composition-patterns-at-orus/).
 
 ## Context and render cost
 
