@@ -325,7 +325,7 @@ describe('review failure boundaries', () => {
 
 describe('review text publication reentrancy and device recovery', () => {
   it('keeps accessibility on the newest frame after a reentrant WebGPU layout update', async () => {
-    const { terminal, session, clock, host, errors } = await fixture('webgpu', true)
+    const { terminal, clock, host, errors } = await fixture('webgpu', true)
     terminal.write('row one\r\nrow two\r\nrow three\r\nrow four')
     clock.flush()
     let once = true
