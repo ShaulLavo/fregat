@@ -29,6 +29,7 @@ export class ConfirmedWindow {
   private ordered: readonly Confirmed[] = []
   private candidates: readonly Confirmed[] = []
   private positions: readonly number[] = []
+  private authors = new Map<string, number>()
   private monotone = true
   private contiguous = true
 
@@ -127,10 +128,13 @@ export class ConfirmedWindow {
       for (let i = 0; i < dropped; i++) {
         const entry = this.ordered[i]!
         this.byId.delete(entry.key)
-        if (entry.touch) droppedTouches++
+        if (!entry.touch) continue
+        droppedTouches++
+        countAuthor(this.authors, entry.envelope.id.actor, -1)
       }
       for (const entry of added) this.byId.set(entry.key, entry)
       const candidates = added.filter((entry) => entry.touch !== null)
+      for (const entry of candidates) countAuthor(this.authors, entry.envelope.id.actor, 1)
       this.candidates = this.candidates.slice(droppedTouches).concat(candidates)
       this.positions = this.positions
         .slice(droppedTouches)
@@ -141,6 +145,8 @@ export class ConfirmedWindow {
       this.byId = new Map(this.ordered.map((entry) => [entry.key, entry]))
       this.candidates = this.ordered.filter((entry) => entry.touch !== null)
       this.positions = this.candidates.map((entry) => entry.position)
+      this.authors = new Map()
+      for (const entry of this.candidates) countAuthor(this.authors, entry.envelope.id.actor, 1)
     }
     this.monotone =
       (appendOnly && this.monotone) ||
@@ -156,12 +162,10 @@ export class ConfirmedWindow {
 
   /** Exact pairs; a supplied batch limits results to pairs touching that batch. */
   pairs(batch?: readonly EditId[]): readonly ConcurrentPair[] {
-    const authors = new Set(this.candidates.map((entry) => entry.envelope.id.actor))
-    if (authors.size < 2) return []
+    if (this.authors.size < 2) return []
     const selected = batch ? new Set(batch.map(editKey)) : null
-    const inBatch = this.candidates.map((entry) => selected === null || selected.has(entry.key))
-    const first = inBatch.indexOf(true)
-    if (first === -1) return []
+    const first = this.firstSelected(selected)
+    if (first === this.candidates.length) return []
     const result: ConcurrentPair[] = []
     for (let right = Math.max(1, first); right < this.candidates.length; right++) {
       const later = this.candidates[right]!
@@ -169,9 +173,31 @@ export class ConfirmedWindow {
         ? unseenRanges(later.ancestors, this.positions, right)
         : [[0, right] as const]
       for (const [from, to] of ranges)
-        this.collectPairs(result, later, from, to, inBatch, inBatch[right]!)
+        this.collectPairs(
+          result,
+          later,
+          from,
+          to,
+          selected,
+          selected === null || selected.has(later.key),
+        )
     }
     return result
+  }
+
+  private firstSelected(selected: ReadonlySet<string> | null): number {
+    if (selected === null) return 0
+    if (!this.monotone) {
+      const index = this.candidates.findIndex((entry) => selected.has(entry.key))
+      return index < 0 ? this.candidates.length : index
+    }
+    let first = this.candidates.length
+    for (const key of selected) {
+      const entry = this.byId.get(key)
+      if (!entry?.touch) continue
+      first = Math.min(first, lowerBound(this.positions, entry.position, this.candidates.length))
+    }
+    return first
   }
 
   private collectPairs(
@@ -179,17 +205,23 @@ export class ConfirmedWindow {
     later: Confirmed,
     from: number,
     to: number,
-    inBatch: readonly boolean[],
+    batch: ReadonlySet<string> | null,
     selected: boolean,
   ): void {
     for (let left = from; left < to; left++) {
-      if (!inBatch[left] && !selected) continue
       const earlier = this.candidates[left]!
+      if (!selected && !batch?.has(earlier.key)) continue
       if (earlier.envelope.id.actor === later.envelope.id.actor) continue
       if (!this.monotone && contains(later.ancestors, earlier.position)) continue
       result.push([earlier.touch!, later.touch!])
     }
   }
+}
+
+function countAuthor(authors: Map<string, number>, actor: string, delta: number): void {
+  const count = (authors.get(actor) ?? 0) + delta
+  if (count) authors.set(actor, count)
+  else authors.delete(actor)
 }
 
 function unseenRanges(
