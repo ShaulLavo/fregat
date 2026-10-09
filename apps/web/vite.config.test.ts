@@ -79,6 +79,31 @@ test('a second dev server on a port already bound on 127.0.0.1 fails instead of 
   await expect(canConnect('::1', port)).resolves.toBe(false)
 }, 20_000)
 
+test.for([
+  'workbench?tabs=-',
+  'workbench/f/a.ts?tabs=@',
+  'workbench/f/a.tsx?tabs=@',
+  'workbench/f/a.js?tabs=@',
+  'workbench/f/a.jsx?tabs=@',
+])('inline boot CSS loads at %s', async (route) => {
+  const resolved = configFn({ command: 'serve', isPreview: false, mode: 'development' })
+  stray = await createServer({
+    ...resolved,
+    configFile: false,
+    root: import.meta.dirname,
+    logLevel: 'silent',
+    optimizeDeps: { noDiscovery: true, include: [] },
+    server: { ...resolved.server, middlewareMode: true, hmr: false },
+  })
+
+  const html = await stray.transformIndexHtml(
+    `/~fixture.workspace/${route}`,
+    '<!doctype html><html><head></head><body></body></html>',
+  )
+  expect(html).toContain('id="fregat-boot-style"')
+  expect(html).toContain('@layer boot')
+})
+
 function freePort() {
   return new Promise<number>((resolve) => {
     const probe = net.createServer()
