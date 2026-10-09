@@ -10,7 +10,7 @@ const initial = createPieceTableSnapshot(line.repeat(lines), {
 })
 export const characters = initial.length
 
-export function workload(authors: number, retained: number) {
+export function workload(authors: number, retained: number, marked = false) {
   const engine = new TextbufferEngine(initial)
   const prefix: Envelope[] = []
   const allocator = new CharIdAllocator('history')
@@ -35,22 +35,21 @@ export function workload(authors: number, retained: number) {
     const author = new TextbufferEngine()
     author.restore(base)
     const ids = new CharIdAllocator(`edit-${index}`)
+    const position = marked && index >= 96 ? index - (index % 2) : index
+    const offset = prefix.length + Math.floor((lines * (position + 1)) / 101) * line.length + 21
+    let edit = { offset, deleteCount: 1, text: '9' }
+    if (marked && index === 96) edit = { offset: offset - 2, deleteCount: 0, text: ' ' }
+    if (marked && index >= 98)
+      edit = { offset, deleteCount: 10, text: JSON.stringify(`name${index}`) }
     batch.push(
-      author.author(
-        {
-          offset: prefix.length + Math.floor((lines * (index + 1)) / 101) * line.length + 21,
-          deleteCount: 1,
-          text: '9',
-        },
-        {
-          document: 'review',
-          epoch: '1',
-          id: { actor: `author-${index % authors}`, seq: Math.floor(index / authors) + 1 },
-          lamport: prefix.length + 1,
-          deps: prefix.length ? [prefix.at(-1)!.id] : [],
-          allocate: (left, count) => ids.generateAfter(left, count),
-        },
-      ),
+      author.author(edit, {
+        document: 'review',
+        epoch: '1',
+        id: { actor: `author-${index % authors}`, seq: Math.floor(index / authors) + 1 },
+        lamport: prefix.length + 1,
+        deps: prefix.length ? [prefix.at(-1)!.id] : [],
+        allocate: (left, count) => ids.generateAfter(left, count),
+      }),
     )
   }
   for (const edit of batch) engine.apply(edit)
