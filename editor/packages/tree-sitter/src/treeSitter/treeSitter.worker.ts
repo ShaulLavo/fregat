@@ -3921,13 +3921,14 @@ const inspectRetention = async (): Promise<{
   for (const state of markdownDocuments.values()) resources.markdown.add(state.document)
   const documents = Array.from(documentCaches, ([runtimeSessionId, cache]) => ({
     runtimeSessionId,
-    snapshots: [
-      ...cache.snapshots,
-      ...Array.from(
-        projectedDocuments.get(runtimeSessionId)?.values() ?? [],
-        (entry) => entry.document,
-      ),
-    ].map((snapshot) => inspectSnapshotRetention(snapshot, resources)),
+    snapshots: cache.snapshots
+      .concat(
+        Array.from(
+          projectedDocuments.get(runtimeSessionId)?.values() ?? [],
+          (entry) => entry.document,
+        ),
+      )
+      .map((snapshot) => inspectSnapshotRetention(snapshot, resources)),
   }))
   const previews = Array.from(bootstrapDocuments, ([runtimeSessionId, staged]) => ({
     runtimeSessionId,
