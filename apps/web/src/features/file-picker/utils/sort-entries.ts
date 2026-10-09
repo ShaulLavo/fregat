@@ -1,7 +1,7 @@
 import type { FsEntry } from '@/lib/file-system-types'
-import { effectiveEntryType, isDirectoryEntry } from '@/lib/file-system-types'
+import { isDirectoryEntry } from '@/lib/file-system-types'
 
-export type FileListSortKey = 'name' | 'kind' | 'modified' | 'size'
+export type FileListSortKey = 'name' | 'modified'
 export type FileListSortDirection = 'ascending' | 'descending'
 
 export type FileListSort = {
@@ -35,10 +35,7 @@ function compareEntries(first: FsEntry, second: FsEntry, sort: FileListSort) {
 
 function comparePrimaryValue(first: FsEntry, second: FsEntry, key: FileListSortKey) {
   if (key === 'name') return textCollator.compare(first.name, second.name)
-  if (key === 'kind') return kindSortValue(first).localeCompare(kindSortValue(second))
-  if (key === 'modified') return first.mtimeMs - second.mtimeMs
-
-  return first.size - second.size
+  return first.mtimeMs - second.mtimeMs
 }
 
 function compareDirectoryOrder(first: FsEntry, second: FsEntry) {
@@ -46,13 +43,6 @@ function compareDirectoryOrder(first: FsEntry, second: FsEntry) {
   const secondRank = isDirectoryEntry(second) ? 0 : 1
 
   return firstRank - secondRank
-}
-
-function kindSortValue(entry: FsEntry) {
-  const type = effectiveEntryType(entry)
-  if (entry.type !== 'symlink') return type
-
-  return `alias-${type}`
 }
 
 function applyDirection(order: number, direction: FileListSortDirection) {

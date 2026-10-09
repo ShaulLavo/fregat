@@ -24,6 +24,7 @@ import {
   measureBrowserTextMetrics,
 } from '../src/virtualization/browserMetrics'
 import { type VirtualizedTextHighlightRegistry, VirtualizedTextView } from '../src/virtualization'
+import { ScrollViewport } from '../src/virtualization/scrollViewport'
 import type { VirtualizedTextViewInternal } from '../src/virtualization/virtualizedTextViewInternals'
 
 const highlightsMap = new Map<string, Highlight>()
@@ -217,7 +218,8 @@ describe('VirtualizedTextView', () => {
       const state = view.getState()
       expect(state.metrics.characterWidth).toBe(10)
       expect(state.gutterWidth).toBe(40)
-      expect(state.mountedRows[0]?.text.length).toBe(6)
+      // Five text columns and one caret column fit beside the measured 40 px gutter.
+      expect(state.mountedRows[0]?.text.length).toBe(5)
     } finally {
       measurement.mockRestore()
     }
@@ -440,6 +442,46 @@ describe('VirtualizedTextView', () => {
       ],
     })
   })
+
+  it.each(['virtualized', 'static'] as const)(
+    'defers native cap discovery until supplied-metrics content is tall in %s mode',
+    (scrollMode) => {
+      view.dispose()
+      const capSpy = vi.spyOn(ScrollViewport.prototype, 'maxScrollHeight', 'get')
+      const rectSpy = vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockReturnValue(new DOMRect(0, 0, 256, 256))
+      try {
+        view = new VirtualizedTextView(container, {
+          highlightRegistry: mockRegistry,
+          overscan: 0,
+          scrollMode,
+          scrollPastEnd: false,
+          textMetrics: { characterWidth: 7, rowHeight: 18 },
+        })
+        expect(capSpy).not.toHaveBeenCalled()
+        view.setScrollMetrics(0, 100)
+        view.setScrollMode('virtualized')
+        expect(capSpy).not.toHaveBeenCalled()
+        view.setText('x')
+        expect(capSpy).not.toHaveBeenCalled()
+        view.setText(createLines(1_000))
+        expect(capSpy).not.toHaveBeenCalled()
+        view.setText(createLines(200_000))
+        expect(capSpy).not.toHaveBeenCalled()
+        view.setText(createLines(250_000))
+        expect(capSpy).toHaveBeenCalledTimes(1)
+        view.setText(createLines(500_000))
+        view.setText(createLines(1_000))
+        view.setScrollMode('static')
+        view.setScrollMode('virtualized')
+        expect(capSpy).toHaveBeenCalledTimes(1)
+      } finally {
+        capSpy.mockRestore()
+        rectSpy.mockRestore()
+      }
+    },
+  )
 
   it('adds bottom scroll padding so the final row can align with the viewport top', () => {
     view.setText(createLines(10))
@@ -1448,13 +1490,15 @@ describe('VirtualizedTextView', () => {
     view.setText('abcdefghij')
     view.setScrollMetrics(0, 80, 72)
 
+    // Leave a caret column inside the viewport rather than admitting a fifth text column.
     expect(view.getState().wrapActive).toBe(true)
-    expect(view.getState().totalHeight).toBe(40)
-    expect(view.getState().mountedRows.map((row) => row.text)).toEqual(['abcde', 'fghij'])
+    expect(view.getState().totalHeight).toBe(60)
+    expect(view.getState().mountedRows.map((row) => row.text)).toEqual(['abcd', 'efgh', 'ij'])
     const labels = container.querySelectorAll<HTMLSpanElement>('.editor-virtualized-line-number')
     expect(labels[0]?.style.counterSet).toBe('editor-line 1')
     expect(labels[1]?.hidden).toBe(true)
-    expect(view.textOffsetFromViewportPoint(64, 25)).toBe(9)
+    expect(labels[2]?.hidden).toBe(true)
+    expect(view.textOffsetFromViewportPoint(64, 25)).toBe(8)
   })
 
   it('renders injected text rows without changing document offsets', () => {

@@ -10,6 +10,7 @@ import type {
   CharacterIdentity,
   Engine,
   Envelope,
+  Effect,
   IdSpan,
   Insert,
   LeftOrigin,
@@ -164,6 +165,16 @@ export class ReferenceEngine implements Engine<ReferenceSnapshot> {
         rightOrigin: node.rightOrigin ? { ...(node.rightOrigin.id as CharId) } : 'end',
         deleted: !this.effects.visible(node.id as CharId),
       })),
+    }
+  }
+
+  projectEffects(effects: readonly Effect[]): ReferenceSnapshot {
+    const snapshot = this.snapshot()
+    const projected = new Effects()
+    projected.restore(this.effects.project(effects))
+    return {
+      effects: projected.snapshot(),
+      nodes: snapshot.nodes.map((node) => ({ ...node, deleted: !projected.visible(node.id) })),
     }
   }
 

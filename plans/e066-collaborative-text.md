@@ -164,11 +164,40 @@ Types' and Fugue's test suites. The research settles the rest:
 
 - **Host-free upgrade gate.** Build a host-free ordering (FugueMax over `deps` with no host)
   only if the ported long-offline suites produce merges the owner rejects. The envelope already
-  carries what it needs.
+  carries what it needs. `collab/test/order-independence.test.ts` checks 1,024 distinct causal
+  schedules per authored edit set through Host and direct engine integration, including owned
+  undo effects, against the pinned FugueMax oracle. The host does not improve placement for the
+  same authored set. Arbitrary concurrent writes to one owner's effect state remain last-arrival
+  wins; the test documents that accepted-envelope counterexample separately.
 - **Retained metadata grows** with edit history while tombstones stay exact. Measure piece and
   identity-run growth over long sessions before deciding on identity compaction.
-- **Replay cost** grows with the pending queue; a long offline queue is the main latency risk.
-  Replay may run in slices if it exceeds the frame budget.
+- **Replay cost.** The approved rejoin follow-up is implemented in PR #1112 (2026-10-09).
+  The original single-record confirmation path restored confirmed state and replayed the
+  remaining queue after every acknowledgement. A 2,000-edit losing branch replayed
+  2,001,000 pending envelopes. `Participant` now retains one confirmed snapshot, an
+  acknowledged-envelope prefix, and an insertion-ordered pending map. Exact unchanged
+  head acknowledgements advance that prefix with zero engine applies or restores. Foreign
+  edits and rejections materialize the prefix and reconcile once per received batch.
+  Snapshot-copying engines retain no per-pending-edit snapshots.
+  - Session submission and confirmation carry arrays bounded by the replay window and
+    transport message size. The production document publishes one exact editor reconcile
+    per batch, including a valid prefix before an invalid confirmation suffix.
+  - A/B/B/A production-document experiment, shared machine, with 2,000 edits per branch
+    and a real editor snapshot buffer: original 58.704 s / 68.149 s; changed 403.875 ms /
+    526.624 ms. Pending replay fell to 2,000 envelopes in one pass; engine applies fell
+    from 2,005,001 to 4,001; editor publications fell from 2,001 to two. These are runtime
+    document measurements, not browser frame or isolated-machine headline claims.
+  - Reproduce the counted bounds and existing ordering assertions with
+    `COLLABORATION_LONG_RUN=1 bun run --cwd editor/packages/collab test
+test/offline-order.test.ts test/order-independence.test.ts test/replay-work.test.ts
+test/document-replay.test.ts --maxWorkers=1`. Both engines passed all 44 tests in
+    171.84 s. The counted 2,000/2,000 case bounds envelope applies by three times the
+    branch length and one restore; the production batch bounds them by twice the branch
+    length and two exact publications. Typing at 0, 1, 10 and 100 pending edits retains
+    one engine apply, zero restores and one snapshot per authored edit.
+  - Remaining foreign edits can still require pending replay. Measure that distinct
+    workload before adding scheduling or slicing; this change preserves placement,
+    identity, acceptance, rejection and undo assertions without deferring work.
 - **Host-rejected edits** that later pending edits depend on need a defined outcome: pending
   dependants are rejected with them and surfaced, never re-placed by offset.
 - **Unicode contract.** Code-unit IDs with whole-pair edits follow Loro's contract. Yjs's

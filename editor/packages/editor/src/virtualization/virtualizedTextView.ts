@@ -1,3 +1,4 @@
+import { isElementNode, isTextareaElement } from '../dom'
 import {
   acquireRowPresentation,
   invalidateRowPresentations,
@@ -31,7 +32,11 @@ import { EditorTokenStore, type EditorTokenInput } from '../syntax/tokenStore'
 import type { TextEdit } from '../tokens'
 import { applyEditorTheme } from '../theme'
 import { measureBrowserTextFace, type BrowserTextMetrics } from './browserMetrics'
-import { FixedRowVirtualizer, type FixedRowVirtualizerSnapshot } from './fixedRowVirtualizer'
+import {
+  DEFAULT_MAX_SCROLL_HEIGHT,
+  FixedRowVirtualizer,
+  type FixedRowVirtualizerSnapshot,
+} from './fixedRowVirtualizer'
 import {
   DEFAULT_OVERSCAN,
   DEFAULT_SELECTION_HIGHLIGHT,
@@ -79,6 +84,7 @@ import {
   renderSelectionHighlight,
   renderTokenHighlights,
   restoreHighlightsAfterBrowserResume,
+  restoreHighlightsAfterPresentation,
   setRangeHighlight,
   setSelection,
   setSelections,
@@ -128,8 +134,8 @@ import {
   homogeneousRtlCaretAtRowEdge,
   homogeneousRtlCaretMoveInRow,
   isBidiMeasurementRefusalRow,
-  knownRowContentWidth,
-  measureRowContentWidth,
+  knownRowScrollWidth,
+  measureRowScrollWidth,
   offsetFromDomBoundary,
   rowLocalXFromClientPoint,
   rowHasOnlyBidiControls,
@@ -307,6 +313,7 @@ export class VirtualizedTextView {
   /** Set when typed text arrives through EditContext rather than the textarea. */
   public readonly editContext: EditorEditContext | null
   private readonly view: VirtualizedTextViewInternal
+  private measuredMaxScrollHeight: number | undefined
   private readonly disposeForegroundHighlightRestore: () => void
   private cancelContentWidthMeasurement: (() => void) | null = null
   private provisionalPaint: { readonly paint: SavedPaint; readonly release: () => void } | null =
@@ -367,7 +374,6 @@ export class VirtualizedTextView {
     const tabSize = normalizeTabSize(options.tabSize)
     const virtualizer = new FixedRowVirtualizer({
       ...createVirtualizerOptions(rowHeight, overscan, rowGap, scrollMode, options.scrollPastEnd),
-      maxScrollHeight: scrollMode === 'virtualized' ? viewport.maxScrollHeight : undefined,
     })
     const initialTextSnapshot = createStringTextSnapshot('')
     const initialInjectedTextRows = options.injectedTextRows ?? []
@@ -383,8 +389,7 @@ export class VirtualizedTextView {
     this.scrollElement = scrollElement
     this.contentElement = contentElement
     this.inputElement = inputElement
-    this.editContext =
-      inputElement instanceof HTMLTextAreaElement ? null : createEditContext(inputElement)
+    this.editContext = isTextareaElement(inputElement) ? null : createEditContext(inputElement)
     this.view = {
       disposed: false,
       provisional: false,
@@ -991,7 +996,7 @@ export class VirtualizedTextView {
     view.lastRenderedRowsKey = ''
     view.virtualizer.updateOptions({
       scrollMode: nextScrollMode,
-      maxScrollHeight: nextScrollMode === 'virtualized' ? view.viewport.maxScrollHeight : undefined,
+      maxScrollHeight: nextScrollMode === 'virtualized' ? this.measuredMaxScrollHeight : undefined,
     })
     return true
   }
@@ -1075,6 +1080,10 @@ export class VirtualizedTextView {
     adoptViewTokens(this.view, tokens)
   }
 
+  public restorePresentationHighlights(): void {
+    restoreHighlightsAfterPresentation(this.view)
+  }
+
   public setTheme(theme: EditorTheme | null | undefined): void {
     applyEditorTheme(this.scrollElement, theme)
   }
@@ -1087,7 +1096,7 @@ export class VirtualizedTextView {
   /** An EditContext only receives text while attached, so a read-only view detaches it. */
   private setInputEditable(editable: boolean): void {
     const input = this.inputElement
-    if (input instanceof HTMLTextAreaElement) {
+    if (isTextareaElement(input)) {
       input.readOnly = !editable
       return
     }
@@ -1640,6 +1649,22 @@ export class VirtualizedTextView {
     }
 
     const view = this.view
+    if (
+      this.measuredMaxScrollHeight === undefined &&
+      view.scrollMode === 'virtualized' &&
+      snapshot.viewportHeight > 0 &&
+      view.model.textLength > 0 &&
+      // Discover before native caps are reached, while ordinary opens remain layout-free.
+      snapshot.totalSize > DEFAULT_MAX_SCROLL_HEIGHT / 4 &&
+      snapshot.scrollHeight > snapshot.viewportHeight
+    ) {
+      this.measuredMaxScrollHeight = view.viewport.maxScrollHeight
+      if (
+        this.measuredMaxScrollHeight !== undefined &&
+        view.virtualizer.updateOptions({ maxScrollHeight: this.measuredMaxScrollHeight })
+      )
+        return
+    }
     this.synchronizeScrollPaint(snapshot)
     this.view.viewport.setViewportSize(snapshot.viewportWidth, snapshot.viewportHeight)
     this.reportContentHeight(snapshot.totalSize)
@@ -1734,7 +1759,7 @@ export class VirtualizedTextView {
     for (const row of view.rowElements.values()) {
       if (row.kind !== 'text') continue
 
-      const width = knownRowContentWidth(view, row)
+      const width = knownRowScrollWidth(view, row)
       if (width === null) {
         unmeasured = true
         continue
@@ -1784,10 +1809,10 @@ export class VirtualizedTextView {
     for (const row of view.rowElements.values()) {
       if (row.kind !== 'text') continue
 
-      raised = raiseVisualColumnsSeen(view, measureRowContentWidth(view, row)) || raised
+      raised = raiseVisualColumnsSeen(view, measureRowScrollWidth(view, row)) || raised
     }
 
-    if (!raised) return
+    if (!raised && !view.wrapEnabled) return
     updateContentWidth(view, view.virtualizer.getSnapshot().virtualItems)
   }
 
@@ -2609,7 +2634,7 @@ function rowOffsetFromCaretHit(
 }
 
 function auxiliaryCaretHitElement(node: Node): HTMLElement | null {
-  const element = node instanceof Element ? node : node.parentElement
+  const element = isElementNode(node) ? node : node.parentElement
   return element?.closest<HTMLElement>(AUXILIARY_CARET_HIT_SELECTOR) ?? null
 }
 

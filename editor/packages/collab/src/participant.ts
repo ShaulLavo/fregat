@@ -4,7 +4,7 @@ import { cloneEnvelope } from './host'
 import { UndoManager } from './undo'
 import type { CaptureOptions, UndoOptions } from './undo'
 import type { HostMessage } from './host'
-import { editKey, insertionOf } from './types'
+import { editKey, insertionOf, sameEnvelope } from './types'
 import type { EditId, Effect, EffectiveEdit, Engine, Envelope, OffsetEdit } from './types'
 
 export type ParticipantOptions<Snapshot> = {
@@ -26,6 +26,7 @@ export type ParticipantChange = Omit<ParticipantState, 'text'> & {
   readonly edits: readonly EffectiveEdit[]
 }
 
+type PendingEdit = { readonly envelope: Envelope; applied: boolean }
 type Subscription = { readonly listener: (change: ParticipantChange) => void }
 type Publication = {
   readonly change: ParticipantChange
@@ -37,8 +38,10 @@ export class Participant<Snapshot = unknown> {
   readonly undoManager: UndoManager
   private historyRejected: EditId[] = []
   private confirmed: Snapshot
+  // Snapshot-copying engines retain one base and accepted prefix envelopes, never every prefix snapshot.
+  private acknowledged: Envelope[] = []
   private frontier = new Map<string, EditId>()
-  private pending: Envelope[] = []
+  private pending = new Map<string, PendingEdit>()
   private incoming = new Map<number, HostMessage>()
   private rejected = new Set<string>()
   private blocked: EditId[] = []
@@ -76,7 +79,7 @@ export class Participant<Snapshot = unknown> {
     return {
       frontier: [...this.frontier.values()].map((id) => ({ ...id })),
       hostSequence: this.sequence,
-      pending: this.pending.map(cloneEnvelope),
+      pending: Array.from(this.pending.values(), ({ envelope }) => cloneEnvelope(envelope)),
       blocked: this.blocked.map((id) => ({ ...id })),
     }
   }
@@ -98,7 +101,6 @@ export class Participant<Snapshot = unknown> {
   /** Author the entire offset batch before recording history or publishing it. */
   localBatch(edits: readonly OffsetEdit[], capture: CaptureOptions = {}): readonly Envelope[] {
     const before = this.options.engine.snapshot()
-    const pending = this.pending.length
     const sequence = this.editSequence
     const lamport = this.lamport
     const envelopes: Envelope[] = []
@@ -115,12 +117,15 @@ export class Participant<Snapshot = unknown> {
         this.options.engine.apply(envelope)
         this.editSequence++
         this.lamport++
-        this.pending.push(cloneEnvelope(envelope))
+        this.pending.set(editKey(envelope.id), {
+          envelope: cloneEnvelope(envelope),
+          applied: true,
+        })
         envelopes.push(envelope)
       }
     } catch (error) {
       this.options.engine.restore(before)
-      this.pending.length = pending
+      for (const envelope of envelopes) this.pending.delete(editKey(envelope.id))
       this.editSequence = sequence
       this.lamport = lamport
       throw error
@@ -154,7 +159,10 @@ export class Participant<Snapshot = unknown> {
     this.options.engine.apply(envelope)
     this.editSequence++
     this.lamport++
-    this.pending.push(cloneEnvelope(envelope))
+    this.pending.set(editKey(envelope.id), {
+      envelope: cloneEnvelope(envelope),
+      applied: true,
+    })
     return cloneEnvelope(envelope)
   }
 
@@ -170,14 +178,33 @@ export class Participant<Snapshot = unknown> {
     }
     if (!this.incoming.has(this.sequence + 1)) return
     this.historyRejected = []
-    this.options.engine.restore(this.confirmed)
+    let reconcile = false
     while (this.incoming.has(this.sequence + 1)) {
       const message = this.incoming.get(this.sequence + 1)!
       this.incoming.delete(++this.sequence)
-      this.confirm(message)
+      const head = this.pending.values().next().value
+      const promoted =
+        !reconcile &&
+        message.status === 'accepted' &&
+        head?.applied &&
+        sameEnvelope(head.envelope, message.envelope)
+      if (promoted) {
+        this.acknowledged.push(head!.envelope)
+      } else if (!reconcile) {
+        this.options.engine.restore(this.confirmed)
+        for (const envelope of this.acknowledged) this.options.engine.apply(envelope)
+        this.acknowledged = []
+        reconcile = true
+      }
+      this.confirm(message, !promoted)
     }
-    this.confirmed = this.options.engine.snapshot()
-    this.replay()
+    if (reconcile) {
+      this.confirmed = this.options.engine.snapshot()
+      this.replay()
+    } else if (!this.pending.size) {
+      this.confirmed = this.options.engine.snapshot()
+      this.acknowledged = []
+    }
     this.undoManager.reject([...this.historyRejected, ...this.blocked])
     this.publish()
   }
@@ -190,11 +217,17 @@ export class Participant<Snapshot = unknown> {
     allocated: readonly Envelope[] = [],
   ): void {
     const pending = new Map<string, Envelope>()
-    for (const edit of [...recovered, ...this.pending])
+    for (const edit of [
+      ...recovered,
+      ...Array.from(this.pending.values(), ({ envelope }) => envelope),
+    ])
       pending.set(editKey(edit.id), cloneEnvelope(edit))
-    this.pending = [...pending.values()]
-    for (const envelope of this.pending) this.reserveIdentities(envelope)
+    this.pending = new Map(
+      Array.from(pending, ([key, envelope]) => [key, { envelope, applied: false }]),
+    )
+    for (const { envelope } of this.pending.values()) this.reserveIdentities(envelope)
     this.confirmed = base
+    this.acknowledged = []
     this.sequence = 0
     this.frontier.clear()
     this.rejected.clear()
@@ -209,17 +242,17 @@ export class Participant<Snapshot = unknown> {
     this.publish()
   }
 
-  private confirm(message: HostMessage): void {
+  private confirm(message: HostMessage, apply: boolean): void {
     const id = message.status === 'accepted' ? message.envelope.id : message.id
     if (id.actor === this.actor) this.editSequence = Math.max(this.editSequence, id.seq)
     if (message.status === 'accepted') this.reserveIdentities(message.envelope)
-    this.pending = this.pending.filter((envelope) => editKey(envelope.id) !== editKey(id))
+    this.pending.delete(editKey(id))
     if (message.status === 'rejected') {
       this.rejected.add(editKey(id))
       this.historyRejected.push(id)
       return
     }
-    this.options.engine.apply(message.envelope)
+    if (apply) this.options.engine.apply(message.envelope)
     this.undoManager.remote(message.envelope)
     this.lamport = Math.max(this.lamport, message.envelope.lamport)
     for (const dependency of message.envelope.deps) this.frontier.delete(editKey(dependency))
@@ -242,7 +275,9 @@ export class Participant<Snapshot = unknown> {
   private replay(): void {
     this.blocked = []
     const blocked = new Set(this.rejected)
-    for (const envelope of this.pending) {
+    for (const entry of this.pending.values()) {
+      const { envelope } = entry
+      entry.applied = false
       if (envelope.deps.some((id) => blocked.has(editKey(id)))) {
         blocked.add(editKey(envelope.id))
         this.blocked.push(envelope.id)
@@ -250,6 +285,7 @@ export class Participant<Snapshot = unknown> {
       }
       try {
         this.options.engine.apply(envelope)
+        entry.applied = true
       } catch (error) {
         if (!(error instanceof CollabFailure) || error.code !== 'unknown-character') throw error
         blocked.add(editKey(envelope.id))
@@ -261,7 +297,7 @@ export class Participant<Snapshot = unknown> {
   private pendingFrontier(): readonly EditId[] {
     const frontier = new Map(this.frontier)
     const blocked = new Set(this.blocked.map(editKey))
-    for (const envelope of this.pending) {
+    for (const { envelope } of this.pending.values()) {
       if (blocked.has(editKey(envelope.id))) continue
       for (const dependency of envelope.deps) frontier.delete(editKey(dependency))
       frontier.set(editKey(envelope.id), envelope.id)

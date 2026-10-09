@@ -8,6 +8,10 @@ const connectivityErrorMessages = new Set([
   'unable to connect. is the computer able to access the url?',
 ])
 
+/** A request that never reached a server, bare or as the `value` an Eden fetch error wraps. */
 export function isConnectivityError(input: unknown): boolean {
-  return input instanceof TypeError && connectivityErrorMessages.has(input.message.toLowerCase())
+  if (input instanceof TypeError) return connectivityErrorMessages.has(input.message.toLowerCase())
+  if (!(input instanceof Error) || !('value' in input)) return false
+  const value = input.value
+  return value instanceof TypeError && connectivityErrorMessages.has(value.message.toLowerCase())
 }

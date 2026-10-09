@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
 
-import { openGitPanel, selectors } from '../selectors'
+import { openFolderPickerList, openGitPanel, selectors } from '../selectors'
 import type { Scenario } from './index'
 
 export const filePickerNavigation: Scenario = {
@@ -18,10 +18,7 @@ export const filePickerNavigation: Scenario = {
       ['empty', `${prefix}-a`, `${prefix}-b`].map((name) => mkdir(path.join(root, name))),
     )
     try {
-      await selectors.folderTree(page).waitFor()
-      await selectors.projectMenu(page).click()
-      await selectors.openFolderMenu(page).click()
-      await selectors.pickerDialog(page).waitFor()
+      await openFolderPickerList(page)
       await selectors.pickerOptions(page).first().waitFor()
       await step('folder-picker-ready')
       for (const key of ['Backspace', 'ArrowLeft']) {

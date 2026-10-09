@@ -47,17 +47,18 @@ import { fontsInUse } from '@/lib/fonts/utils/stack'
 import { runtimeCapabilities } from '@/lib/platform/capabilities'
 import { launchAddress } from '@/components/utils/launch-address'
 import { applyBackdrop, resolveBackdrop } from '@/lib/platform/backdrop.ts'
-import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-trace.ts'
+import { startEditorPerformanceRecording } from '@/features/editor/state/performance-recording-start'
 import { reportReactError } from '@/lib/react-error-reporting.ts'
 import { configureIntentPrediction } from '@/lib/intent-prefetch-options'
 import { takePairingCodeFromLocation } from '@/lib/pairing/state/link-claim'
 import { useShellStore, watchShellKind } from '@/lib/shell/state/store'
 import { COARSE_POINTER_QUERY } from '@/lib/shell/utils/kind'
 import { shellQueryOptions } from '@/features/workspace/utils/shell-query'
+import { warmDeferredOverlays } from '@/components/utils/overlay-modules'
 
-installEditorPerformanceTraceFromUrl()
 configureIntentPrediction()
 initializeClientLogging()
+void startEditorPerformanceRecording(resourceQueryClient)
 applyBackdrop(resolveBackdrop())
 // Before `createRoot`, deliberately. The mirrored appearance is initial
 // document state: descendants construct geometry and read computed styles on
@@ -249,7 +250,9 @@ async function start() {
 // Warm closed views on idle. A failed prefetch is silent: the query retries when opened.
 function prefetchDeferredChunks() {
   if (renderer.disposed) return
+  // The phone warms these once its first screen is ready.
   if (useShellStore.getState().kind === 'phone') return
+  warmDeferredOverlays()
   void resourceQueryClient
     .query(paletteContentQueryOptions)
     .then(() => undefined)

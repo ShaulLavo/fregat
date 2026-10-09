@@ -19,6 +19,9 @@ export type {
   TreeSitterError,
   TreeSitterInjectionInfo,
   TreeSitterParseResult,
+  TreeSitterMergeUnit,
+  TreeSitterMergeUnitResult,
+  TreeSitterSyntaxRange,
   TreeSitterPoint,
   TreeSitterWorkerRetentionSnapshot,
 } from './treeSitter/types'
@@ -29,6 +32,7 @@ export {
   type TreeSitterWorkerCacheSnapshot,
   type TreeSitterWorkerLifecycleState,
   type TreeSitterWorkerOwnerSnapshot,
+  type TreeSitterMergeUnitPayload,
 } from './treeSitter/workerClient'
 export {
   expandTreeSitterSelection,
@@ -308,6 +312,7 @@ const inlineAssetSignature = (
     foldQuerySource: contribution.foldQuerySource,
     highlightQuerySource: contribution.highlightQuerySource,
     injectionQuerySource: contribution.injectionQuerySource,
+    mergeUnitQuerySource: contribution.mergeUnitQuerySource,
     wasmUrl: contribution.wasmUrl,
   }
 }

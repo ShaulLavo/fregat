@@ -1,4 +1,5 @@
 import { createAttachmentTestOwnership } from '../../../test/factories/attachment-ownership'
+import { createTestMachineFiles } from '../../../test/factories/machine-files'
 import { withAttachmentLanes } from '../lanes'
 import type { AttachmentOwnership } from '../ownership'
 import type { ChatAttachment } from '@workspace/contracts'
@@ -18,9 +19,9 @@ import {
 } from '../uploads'
 
 const roots: string[] = []
-const handles: Array<() => void> = []
+const handles: Array<() => unknown> = []
 afterEach(async () => {
-  handles.splice(0).forEach((close) => close())
+  await Promise.all(handles.splice(0).map((close) => close()))
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 async function setup() {
@@ -29,10 +30,12 @@ async function setup() {
   const attachmentsDir = join(root, 'attachments')
   const { ownership, close } = createAttachmentTestOwnership()
   handles.push(close)
+  const machine = createTestMachineFiles(root)
+  handles.push(machine.close)
   return {
     attachmentsDir,
     ownership,
-    app: new Elysia().use(attachmentRoutes({ attachmentsDir, ownership })),
+    app: new Elysia().use(attachmentRoutes({ attachmentsDir, files: machine.files, ownership })),
   }
 }
 const input = { type: 'file' as const, name: 'notes.txt', mimeType: 'text/plain', sizeBytes: 5 }

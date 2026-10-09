@@ -1,3 +1,4 @@
+import type { EditorOpenSampleResetResult } from '@/features/editor/state/performance-trace'
 import { activeEditorTab as selectedGroupTab, allEditorGroups } from '@/lib/documents/utils/groups'
 import { filesystemPath, fileDocumentKey, tabId } from '@/lib/documents/utils/identity'
 import { testTabContent } from '../../../../test/factories/document-targets'
@@ -28,10 +29,7 @@ import {
   resetEditorColorThemeStore,
   syncEditorThemeSelection,
 } from '@/features/editor/state/color-theme-store'
-import {
-  installEditorPerformanceTraceFromUrl,
-  type EditorOpenSampleResetResult,
-} from '@/features/editor/state/performance-trace'
+import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-recording'
 import {
   awaitEditorSyntaxRuntimeSessionIdle,
   awaitEditorSyntaxWorkerIdleFences,

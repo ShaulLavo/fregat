@@ -1,0 +1,111 @@
+{
+  "qualification": "experiment, shared machine",
+  "environment": {
+    "node": "v26.7.0",
+    "cpu": "Intel(R) Core(TM) i7-14700K",
+    "platform": "linux"
+  },
+  "method": "100k-line TypeScript document. 100 independent confirmed replacements per batch, spread across 2/4/8 authors. Retained history is 100 or 8192 edits. 102 samples per mode after 40 warmups, in A/B/B/A order (A builds the full index, B appends the confirmed batch to a prefix index prepared outside the timer). Real TextbufferEngine author/apply and validation outside timers. Build-and-query includes canonical ordering, copying, causal indexing, footprint extraction and exact pair output. Append-and-query includes adding the new edits, evicting the canonical suffix, updating causal intervals and emitting pairs. Excludes parsing, merge-unit mapping and version reconstruction. No detector budget claim.",
+  "lines": 100000,
+  "characters": 3300000,
+  "results": [
+    {
+      "authors": 2,
+      "retained": 100,
+      "label": "build-and-query",
+      "pairCount": 2500,
+      "medianMs": 0.07519599999999826,
+      "p95Ms": 0.18165600000000381
+    },
+    {
+      "authors": 2,
+      "retained": 100,
+      "label": "append-and-query",
+      "pairCount": 2500,
+      "medianMs": 0.07393100000000175,
+      "p95Ms": 0.20034499999999866
+    },
+    {
+      "authors": 2,
+      "retained": 8192,
+      "label": "build-and-query",
+      "pairCount": 2500,
+      "medianMs": 8.900099000000182,
+      "p95Ms": 10.683199000000059
+    },
+    {
+      "authors": 2,
+      "retained": 8192,
+      "label": "append-and-query",
+      "pairCount": 2500,
+      "medianMs": 1.61587099999997,
+      "p95Ms": 2.7281319999999596
+    },
+    {
+      "authors": 4,
+      "retained": 100,
+      "label": "build-and-query",
+      "pairCount": 3750,
+      "medianMs": 0.08318599999984144,
+      "p95Ms": 0.08979600000020582
+    },
+    {
+      "authors": 4,
+      "retained": 100,
+      "label": "append-and-query",
+      "pairCount": 3750,
+      "medianMs": 0.08261399999992136,
+      "p95Ms": 0.08826499999986481
+    },
+    {
+      "authors": 4,
+      "retained": 8192,
+      "label": "build-and-query",
+      "pairCount": 3750,
+      "medianMs": 8.911961000000701,
+      "p95Ms": 14.23606699999982
+    },
+    {
+      "authors": 4,
+      "retained": 8192,
+      "label": "append-and-query",
+      "pairCount": 3750,
+      "medianMs": 1.5893959999993967,
+      "p95Ms": 2.749698000000535
+    },
+    {
+      "authors": 8,
+      "retained": 100,
+      "label": "build-and-query",
+      "pairCount": 4374,
+      "medianMs": 0.08911799999987124,
+      "p95Ms": 0.10053900000002614
+    },
+    {
+      "authors": 8,
+      "retained": 100,
+      "label": "append-and-query",
+      "pairCount": 4374,
+      "medianMs": 0.0889180000003762,
+      "p95Ms": 0.10190799999963929
+    },
+    {
+      "authors": 8,
+      "retained": 8192,
+      "label": "build-and-query",
+      "pairCount": 4374,
+      "medianMs": 8.940668999999616,
+      "p95Ms": 14.514312999999675
+    },
+    {
+      "authors": 8,
+      "retained": 8192,
+      "label": "append-and-query",
+      "pairCount": 4374,
+      "medianMs": 1.605640000000676,
+      "p95Ms": 2.88931600000069
+    }
+  ],
+  "date": "2026-10-09",
+  "note": "The full-retention case appends 100 edits to an existing 8192-edit window, evicts 100 old edits, and emits only pairs touching the new batch. Cold construction takes all 8292 supplied records and retains the same canonical suffix. These numbers cover the concurrency query only; the full detector budget remains unverified."
+}

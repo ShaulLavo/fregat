@@ -10,15 +10,10 @@ import { useElementWidth } from '@/hooks/use-element-width'
 import { FileTile } from '@/features/file-picker/components/file-tile'
 import { useFilePickerSessionActions } from '@/features/file-picker/hooks/use-file-picker-session-actions'
 import { TILE_ROW_PX, tileColumns, tileRows } from '@/features/file-picker/utils/tiles'
-import {
-  listLabel,
-  pickerCopy,
-  type EntriesLoadState,
-  type FilePickerMode,
-} from '@/features/file-picker/utils/model'
+import { PICKER_COPY, type EntriesLoadState } from '@/features/file-picker/utils/model'
 
 /**
- * The folder as a grid of tiles, for image and asset folders. The listbox moves by whole rows
+ * The folder's subfolders as a grid of tiles. The listbox moves by whole rows
  * with ↑↓ and by one tile with ←→; the list windows over rows of tiles sized to the width.
  */
 export function IconsView({
@@ -26,7 +21,6 @@ export function IconsView({
   isBusy,
   listRef,
   loadState,
-  mode,
   selectedPath,
   onCommitEntry,
   onEntryDoubleClick,
@@ -37,7 +31,6 @@ export function IconsView({
   isBusy: boolean
   listRef: RefObject<HTMLDivElement | null>
   loadState: EntriesLoadState
-  mode: FilePickerMode
   selectedPath: string | null
   onCommitEntry: (entry: FsEntry) => void
   onEntryDoubleClick: (entry: FsEntry) => void
@@ -83,7 +76,7 @@ export function IconsView({
       <VirtualList
         {...list.containerProps}
         activeIndex={list.activeIndex < 0 ? undefined : Math.floor(list.activeIndex / columns)}
-        aria-label={listLabel(mode)}
+        aria-label={PICKER_COPY.listLabel}
         aria-busy={isBusy || loadState.status === 'loading'}
         className='focus-ring-inset absolute inset-0 outline-none'
         estimateSize={() => TILE_ROW_PX}
@@ -126,7 +119,7 @@ export function IconsView({
       {loadState.status === 'ready' && entries.length === 0 ? (
         <EmptyState
           className='absolute inset-0'
-          description={pickerCopy(mode).emptyDescription}
+          description={PICKER_COPY.emptyDescription}
           title='Nothing here'
         />
       ) : null}

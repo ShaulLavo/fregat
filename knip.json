@@ -62,10 +62,7 @@
         "scripts/verify-workspace-navigation.mjs",
         "test/factories/chat-proof-workspace.tsx"
       ],
-      "ignoreFiles": [
-        "test/fixtures/workbench-file-server/repo/src/editor-tab-{a,b,c}.ts",
-        "test/fixtures/workbench-file-server/picker/editor-tab-a.ts"
-      ],
+      "ignoreFiles": ["test/fixtures/workbench-file-server/repo/src/editor-tab-{a,b,c}.ts"],
       "ignoreUnresolved": ["src/index.ts"]
     },
     "packages/contracts": {

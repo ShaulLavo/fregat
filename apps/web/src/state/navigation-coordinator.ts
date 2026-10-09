@@ -118,6 +118,16 @@ type Destination = {
   readonly draftWorktreeId?: WorktreeId
 }
 
+/**
+ * Marks a history entry a surface pushes over the current page, such as a picker's folder, so the
+ * system Back gesture can step through it. The address is unchanged, so navigation ignores it.
+ */
+export const PAGE_LOCAL_ENTRY_KEY = 'pageLocalDepth'
+
+function isPageLocalEntry(state: unknown) {
+  return typeof (state as Record<string, unknown> | undefined)?.[PAGE_LOCAL_ENTRY_KEY] === 'number'
+}
+
 export function createNavigationCoordinator(router: ApplicationRouter, initial: AddressIntent) {
   const resumedHref = takePendingPublication({
     identity: historyIdentity(),
@@ -590,6 +600,7 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
   function onHistory({ action }: Parameters<Parameters<typeof router.history.subscribe>[0]>[0]) {
     const href = router.history.location.href
     observedIdentity = historyIdentity()
+    if (isPageLocalEntry(router.history.location.state)) return
     const traversing = action.type === 'BACK' || action.type === 'FORWARD' || action.type === 'GO'
     if (!traversing && publication?.href === href) return
     if (!traversing && operation?.writing && operation.href === href) {
@@ -612,12 +623,14 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     subscriptions = [
       router.history.subscribe(onHistory),
       router.subscribe('onBeforeNavigate', () => {
+        if (isPageLocalEntry(router.history.location.state)) return
         const href = router.history.location.href
         if (publication?.href === href) return
         if (!operation || (operation.href !== null && operation.href !== href))
           begin('navigate', href)
       }),
       router.subscribe('onResolved', () => {
+        if (isPageLocalEntry(router.history.location.state)) return
         void apply()
       }),
     ]

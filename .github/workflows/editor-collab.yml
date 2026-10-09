@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'editor/packages/collab/**'
+      - 'editor/packages/collaboration/**'
+      - 'editor/packages/editor/**'
       - 'editor/packages/textbuffer/**'
       - 'editor/scripts/build-package.ts'
       - 'bun.lock'
@@ -12,6 +14,8 @@ on:
     branches: ['main']
     paths:
       - 'editor/packages/collab/**'
+      - 'editor/packages/collaboration/**'
+      - 'editor/packages/editor/**'
       - 'editor/packages/textbuffer/**'
       - 'bun.lock'
       - '.github/workflows/editor-collab.yml'
@@ -45,8 +49,7 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Build identity storage and collaboration
         run: |
-          bun run --cwd editor/packages/textbuffer build
-          bun run --cwd editor/packages/collab build
+          bunx turbo run build --filter=@singapore-editor/collaboration...
       - name: Check types, lint and formatting
         run: |
           bun run --cwd editor/packages/collab typecheck
@@ -56,4 +59,4 @@ jobs:
         env:
           COLLAB_STRESS: '1'
           COLLAB_STRESS_SHARD: '${{ matrix.shard }}/8'
-        run: bun run --cwd editor/packages/collab test
+        run: bun run --cwd editor/packages/collab test --maxWorkers=2

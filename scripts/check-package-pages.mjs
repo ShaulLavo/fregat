@@ -76,7 +76,7 @@ const sourceLinks = new Set()
 for (const link of links) {
   const prefix = 'https://github.com/ShaulLavo/fregat/blob/main/'
   if (!link.startsWith(prefix)) continue
-  const path = link.slice(prefix.length)
+  const path = link.slice(prefix.length).split('#')[0]
   assert(!path.split('/').includes('..'), `Source link must stay in the checkout: ${link}`)
   await readFile(join(root, path))
   sourceLinks.add(link)

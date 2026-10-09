@@ -207,6 +207,7 @@ delivered acceptance, monitoring/draft check, named follow-ons and owner-only re
 | [339](339-singapore-full-parse-speed.md)              | Measured complete-file parse and highlight targets for 10 MiB Singapore files        |
 | [338](338-singapore-docs-load-speed.md)               | Measured startup and byte budgets for Singapore docs in the real editor              |
 | [340](340-singapore-site-embedding.md)                | Editor-produced first paint, page scrolling and matching static/live Singapore pages |
+| [341](341-html-bootstrap.md)                          | Named HTML bootstrap, current first-paint appearance and native wallpaper preloads   |
 
 ## Package and client plans
 
@@ -235,6 +236,7 @@ in the [Editor inventory](editor-backlog.md); its [manifest](editor-backlog.json
 | [e065-injection-and-range-query-cost.md](e065-injection-and-range-query-cost.md)               | E065: Bound injection discovery and independent range-query scheduling                 |
 | [e066-collaborative-text.md](e066-collaborative-text.md)                                       | E066: Collaborative text with one ordering host                                        |
 | [e067-webrtc-collaboration-plugin.md](e067-webrtc-collaboration-plugin.md)                     | E067: Peer-to-peer collaboration plugin over WebRTC                                    |
+| [e068-meaning-level-merge-review.md](e068-meaning-level-merge-review.md)                       | E068: Review edits that merged cleanly but may not make sense together                 |
 | [editor-authoring.md](editor-authoring.md)                                                     | Editor backlog plan contract                                                           |
 | [editor-backlog.md](editor-backlog.md)                                                         | Editor backlog                                                                         |
 | [bubli-markdown-consumer.md](bubli-markdown-consumer.md)                                       | Shared Markdown semantics for Editor and Fregat TUI                                    |

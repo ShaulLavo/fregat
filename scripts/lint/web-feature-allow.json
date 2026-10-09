@@ -1420,5 +1420,23 @@
     "to": "server-update",
     "module": "features/server-update/components/update-popover.tsx",
     "reason": "owner: the /dev gallery renders the update confirmation with fixture sessions and unsaved files for desktop and phone verification."
+  },
+  {
+    "from": "dev",
+    "to": "onboarding",
+    "module": "features/onboarding/components/choose-dialog.tsx",
+    "reason": "owner: the /dev gallery shows the first-workspace screens over fixture state, so desktop and phone captures need no fresh state home."
+  },
+  {
+    "from": "dev",
+    "to": "onboarding",
+    "module": "features/onboarding/components/empty-chat.tsx",
+    "reason": "owner: the /dev gallery shows the first-workspace screens over fixture state, so desktop and phone captures need no fresh state home."
+  },
+  {
+    "from": "dev",
+    "to": "onboarding",
+    "module": "features/onboarding/components/progress-dialog.tsx",
+    "reason": "owner: the /dev gallery shows the first-workspace screens over fixture state, so desktop and phone captures need no fresh state home."
   }
 ]
