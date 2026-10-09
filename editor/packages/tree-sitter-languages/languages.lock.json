@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "manifestHash": "3d113f986dfeca7977ab900cf360c9522bbfa6d545455b6c3541d8cddac9d53e",
+  "manifestHash": "9c47441f6083df4a97f23dc2fe426e9ecf0a79070c0b71fdc6759bcee21ef098",
   "languages": [
     {
       "id": "javascript",
@@ -82,6 +82,14 @@
         {
           "file": "./queries/javascript-injections.scm",
           "sha256": "fc878d7c934ae77c70b5835aee4434c91f1ef87d0ed365a59d05b304ec6c7c09"
+        },
+        {
+          "file": "./queries/javascript-merge-units.scm",
+          "sha256": "c49ffd6da2d0482c707d81ce7d75de55f81c44f9ae2480b18141dcea0b06a782"
+        },
+        {
+          "file": "./queries/javascript-fields-merge-units.scm",
+          "sha256": "f1043016121f0d5fd511f7b0c957c237dad9bac7b60b55b041373dda15d3ed71"
         }
       ],
       "queries": [
@@ -96,6 +104,10 @@
         {
           "kind": "injections",
           "sha256": "fc878d7c934ae77c70b5835aee4434c91f1ef87d0ed365a59d05b304ec6c7c09"
+        },
+        {
+          "kind": "merge-units",
+          "sha256": "781b9a34d42f0f3cc6fac3c22efc088d7216135400ce2f2070c0553bc41f5ad3"
         }
       ]
     },
@@ -227,6 +239,14 @@
         {
           "file": "./queries/javascript-injections.scm",
           "sha256": "fc878d7c934ae77c70b5835aee4434c91f1ef87d0ed365a59d05b304ec6c7c09"
+        },
+        {
+          "file": "./queries/javascript-merge-units.scm",
+          "sha256": "c49ffd6da2d0482c707d81ce7d75de55f81c44f9ae2480b18141dcea0b06a782"
+        },
+        {
+          "file": "./queries/typescript-merge-units.scm",
+          "sha256": "38de4c75cd1f7f7669b6ac1bf72e9696383843384201e0b1062b092aa85d2c24"
         }
       ],
       "queries": [
@@ -241,6 +261,10 @@
         {
           "kind": "injections",
           "sha256": "fc878d7c934ae77c70b5835aee4434c91f1ef87d0ed365a59d05b304ec6c7c09"
+        },
+        {
+          "kind": "merge-units",
+          "sha256": "19a3d5248d17dc7bdd3e0d57a0fbc3a9c877d49a214d59ecb431b9754cdc5f34"
         }
       ]
     },
@@ -380,6 +404,18 @@
         {
           "file": "./queries/javascript-injections.scm",
           "sha256": "fc878d7c934ae77c70b5835aee4434c91f1ef87d0ed365a59d05b304ec6c7c09"
+        },
+        {
+          "file": "./queries/javascript-merge-units.scm",
+          "sha256": "c49ffd6da2d0482c707d81ce7d75de55f81c44f9ae2480b18141dcea0b06a782"
+        },
+        {
+          "file": "./queries/typescript-merge-units.scm",
+          "sha256": "38de4c75cd1f7f7669b6ac1bf72e9696383843384201e0b1062b092aa85d2c24"
+        },
+        {
+          "file": "./queries/tsx-merge-units.scm",
+          "sha256": "9a50877506d98a85c59bcca6f1fa3c388b176f132f7e7d5f2eeffb0624cb14ab"
         }
       ],
       "queries": [
@@ -394,6 +430,10 @@
         {
           "kind": "injections",
           "sha256": "fc878d7c934ae77c70b5835aee4434c91f1ef87d0ed365a59d05b304ec6c7c09"
+        },
+        {
+          "kind": "merge-units",
+          "sha256": "34fa30c7327ec880dfb30194c23b481875d6491ae4aa40491f474855971e4d02"
         }
       ]
     },
@@ -561,6 +601,10 @@
         {
           "file": "./queries/css-folds.scm",
           "sha256": "6948d107112f1799139d04e14b3de4e16b706f0422325a966d408e2dd80e2978"
+        },
+        {
+          "file": "./queries/css-merge-units.scm",
+          "sha256": "f9c55fd7ead969f8b5ba7be8ba698edef4d2cbafdd9963d8eed0ae1688d1f5e6"
         }
       ],
       "queries": [
@@ -575,6 +619,10 @@
         {
           "kind": "injections",
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "merge-units",
+          "sha256": "f9c55fd7ead969f8b5ba7be8ba698edef4d2cbafdd9963d8eed0ae1688d1f5e6"
         }
       ]
     },
@@ -642,6 +690,10 @@
         {
           "file": "./queries/json-folds.scm",
           "sha256": "22c4b185c8c3c6693e5d14af8a02b13d17c58c3cfe33d6fb5a0869406c2804a2"
+        },
+        {
+          "file": "./queries/json-merge-units.scm",
+          "sha256": "d55943127554c8ec37685d31774a4f9a01c8a753dd35d0fe4947e87efd4c064d"
         }
       ],
       "queries": [
@@ -656,6 +708,10 @@
         {
           "kind": "injections",
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "merge-units",
+          "sha256": "d55943127554c8ec37685d31774a4f9a01c8a753dd35d0fe4947e87efd4c064d"
         }
       ]
     },
@@ -704,6 +760,10 @@
         {
           "file": "tree-sitter-md/tree-sitter-markdown.wasm",
           "sha256": "4d71e4c53f38c368b3c80fad9a6ff5d000873b2e63d8666ac9dac8ff736b6367"
+        },
+        {
+          "file": "./queries/markdown-merge-units.scm",
+          "sha256": "34153d578dd327694102f18ce487d3eae3c368f2683cfe896d6f7120ce0b2b43"
         }
       ],
       "queries": [
@@ -718,6 +778,10 @@
         {
           "kind": "injections",
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "merge-units",
+          "sha256": "34153d578dd327694102f18ce487d3eae3c368f2683cfe896d6f7120ce0b2b43"
         }
       ]
     },
@@ -829,6 +893,10 @@
         {
           "file": "tree-sitter-python/queries/highlights.scm",
           "sha256": "a6708f209381618e2b398972c8f1ccd892f0c064eab35a2a3f911c3e22e79a7e"
+        },
+        {
+          "file": "./queries/python-merge-units.scm",
+          "sha256": "1c587c5a1e8742fb596fdfa7d9c7b8ee04a0e45a9589d8e182f6c2e0bb211b1e"
         }
       ],
       "queries": [
@@ -843,6 +911,10 @@
         {
           "kind": "injections",
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "merge-units",
+          "sha256": "1c587c5a1e8742fb596fdfa7d9c7b8ee04a0e45a9589d8e182f6c2e0bb211b1e"
         }
       ]
     },
@@ -991,6 +1063,10 @@
         {
           "file": "tree-sitter-rust/queries/highlights.scm",
           "sha256": "0f0343107f14a7690157f51090a979eb8f8bfe4eada7c61763ddb4c54b1311d1"
+        },
+        {
+          "file": "./queries/rust-merge-units.scm",
+          "sha256": "4403e188ce049c2e465c2180a8093699be3348e676969947aa6353abbcbe6c67"
         }
       ],
       "queries": [
@@ -1005,6 +1081,10 @@
         {
           "kind": "injections",
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "merge-units",
+          "sha256": "4403e188ce049c2e465c2180a8093699be3348e676969947aa6353abbcbe6c67"
         }
       ]
     },
@@ -1068,6 +1148,10 @@
         {
           "file": "tree-sitter-go/queries/highlights.scm",
           "sha256": "81182c986547eba7fa6316e82dfd621fb13b8fc89efac85432aee51a48ed0896"
+        },
+        {
+          "file": "./queries/go-merge-units.scm",
+          "sha256": "49b803100f0e0c94f97561be54fe28e746b3052314bd87181e6bfde418982739"
         }
       ],
       "queries": [
@@ -1082,6 +1166,10 @@
         {
           "kind": "injections",
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "kind": "merge-units",
+          "sha256": "49b803100f0e0c94f97561be54fe28e746b3052314bd87181e6bfde418982739"
         }
       ]
     },

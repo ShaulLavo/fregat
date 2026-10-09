@@ -121,6 +121,21 @@ them).
 2. **Merge-unit queries** in `packages/tree-sitter-languages`, first for TypeScript, TSX,
    JavaScript, JSON, CSS, Markdown, Python, Rust and Go; the other languages in `languages.json`
    use the line fallback until they get a file.
+   Delivered in the merge-unit query PR. All nine grammars ship and now load `merge-units`
+   through the language manifest and catalog generator. The worker's `mergeUnit` request
+   returns the smallest enclosing unit, its source-spelling signature, and its parent range
+   with a commutativity flag. Missing queries, unmatched ranges and damaged units use complete
+   lines. Missing snapshots report `stale`.
+   Query compilation is demand-only. Generic languages reuse the retained tree; Markdown
+   creates a structural block tree on the first request because its native renderer hides
+   that tree. The extra tree retires with its snapshot and appears in retention inspection.
+   Ordered arguments, arrays, CSS declarations and Python definitions stay ordered.
+   JavaScript class bodies and literal objects commute only when the query covers every
+   named child with an eligible method or literal property. Initializers, computed keys and
+   spreads keep the parent ordered. Signatures retain source spelling; the detector can
+   apply language-specific normalization when comparing escaped or differently quoted names.
+   Verification covers original fixtures for every grammar, complete-line fallback, lazy
+   compilation, incremental edits, stale requests, injected code and UTF-16 offsets.
 3. **Detector** in the tree-sitter worker: `overlap`, `parse`, `signature`, `orphan`, with author
    versions rebuilt through `setEffects`.
 4. **Marks, hover and resolutions** in the collaboration plugin, wired into the example page.
