@@ -45,7 +45,9 @@ export type InlineReplacementSpec = {
   readonly kind?: string
   readonly className?: string
   readonly cursorStops?: InlineCursorStops
-  /** Painted as a node this fills instead of as `text`, which then stands in only for its width. */
+  /** Wraps textual paint into independently rendered display-row fragments. */
+  readonly wrap?: 'text'
+  /** Paints the supplied display text as a node and returns its mount's cleanup. */
   readonly render?: InlineReplacementRender
   /** Replacements sharing a group reveal together, so both `**` fences of one construct unhide. */
   readonly groupId?: string
@@ -75,6 +77,8 @@ export type InlineReplacementRange = {
   readonly kind?: string
   readonly className?: string
   readonly cursorStops?: InlineCursorStops
+  /** Wraps textual paint into independently rendered display-row fragments. */
+  readonly wrap?: 'text'
   readonly render?: InlineReplacementRender
   readonly groupId?: string
   readonly reveal?: InlineReplacementReveal
@@ -147,6 +151,7 @@ const inlineSpecFromRange = (range: InlineReplacementRange): InlineReplacementSp
   ...(range.kind === undefined ? {} : { kind: range.kind }),
   ...(range.className === undefined ? {} : { className: range.className }),
   ...(range.cursorStops === undefined ? {} : { cursorStops: range.cursorStops }),
+  ...(range.wrap === undefined ? {} : { wrap: range.wrap }),
   ...(range.render === undefined ? {} : { render: range.render }),
   ...(range.groupId === undefined ? {} : { groupId: range.groupId }),
   ...(range.reveal === undefined ? {} : { reveal: range.reveal }),
@@ -262,6 +267,7 @@ const inlineRangeFromSpec = (
     ...(spec.cursorStops === undefined ? {} : { cursorStops: spec.cursorStops }),
     ...(spec.kind === undefined ? {} : { kind: spec.kind }),
     ...(spec.groupId === undefined ? {} : { groupId: spec.groupId }),
+    ...(spec.wrap === undefined ? {} : { wrap: spec.wrap }),
     ...(spec.render === undefined ? {} : { render: spec.render }),
     ...(spec.reveal === undefined ? {} : { reveal: spec.reveal }),
     ...(revealAnchors && spec.revealRange
@@ -412,6 +418,7 @@ const inlineReplacementFromRange = (
   ...(range.className === undefined ? {} : { className: range.className }),
   ...(range.cursorStops === undefined ? {} : { cursorStops: range.cursorStops }),
   ...(range.kind === undefined ? {} : { kind: range.kind }),
+  ...(range.wrap === undefined ? {} : { wrap: range.wrap }),
   ...(range.render === undefined ? {} : { render: range.render }),
   ...(key === undefined ? {} : { key }),
   ...(range.metadata === undefined ? {} : { metadata: range.metadata }),

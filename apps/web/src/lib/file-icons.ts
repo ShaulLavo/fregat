@@ -18,47 +18,6 @@ export type ResolvedFileIcon = {
 const SYMBOL_PREFIX = 'app-vscode-icon-'
 const GLYPH_NAMES = Object.keys(VSCODE_ICON_GLYPHS) as FileIconGlyph[]
 
-const MIME_BY_EXTENSION = new Map<string, string>([
-  ['.babelrc', 'application/json'],
-  ['.commitlintrc', 'application/json'],
-  ['.css', 'text/css'],
-  ['.csv', 'text/csv'],
-  ['.eslintrc', 'application/json'],
-  ['.gif', 'image/gif'],
-  ['.graphql', 'application/graphql'],
-  ['.hintrc', 'application/json'],
-  ['.htm', 'text/html'],
-  ['.html', 'text/html'],
-  ['.jpeg', 'image/jpeg'],
-  ['.jpg', 'image/jpeg'],
-  ['.js', 'text/javascript'],
-  ['.json', 'application/json'],
-  ['.jsonc', 'application/json'],
-  ['.lintstagedrc', 'application/json'],
-  ['.lock', 'application/json'],
-  ['.jsx', 'text/javascript'],
-  ['.md', 'text/markdown'],
-  ['.mdx', 'text/markdown'],
-  ['.mjs', 'text/javascript'],
-  ['.prettierrc', 'application/json'],
-  ['.releaserc', 'application/json'],
-  ['.stylelintrc', 'application/json'],
-  ['.swcrc', 'application/json'],
-  ['.png', 'image/png'],
-  ['.rss', 'application/rss+xml'],
-  ['.svg', 'image/svg+xml'],
-  ['.ts', 'text/typescript'],
-  ['.tsx', 'text/typescript'],
-  ['.watchmanconfig', 'application/json'],
-  ['.txt', 'text/plain'],
-  ['.wasm', 'application/wasm'],
-  ['.webp', 'image/webp'],
-  ['.xml', 'application/xml'],
-  ['.yaml', 'application/yaml'],
-  ['.yml', 'application/yaml'],
-  ['.zip', 'application/zip'],
-])
-
 export function iconForEntry(
   entry: FileIconEntry,
   options: { open?: boolean } = {},
@@ -93,21 +52,6 @@ export function fileIconSpriteSymbols() {
   }).join('')
 }
 
-export function fileMatchesAccept(name: string, accept?: readonly string[]) {
-  if (!accept || accept.length === 0) return true
-
-  return accept.some((token) => fileMatchesAcceptToken(name, token))
-}
-
-function mimeForFileName(name: string) {
-  for (const extension of extensionCandidates(name)) {
-    const mime = MIME_BY_EXTENSION.get(extension)
-    if (mime) return mime
-  }
-
-  return 'application/octet-stream'
-}
-
 function iconNameForFile(name: string): FileIconRuleName {
   const normalizedName = normalizeName(name)
   if (Object.hasOwn(FILE_ICON_FILE_NAMES, normalizedName)) {
@@ -119,27 +63,6 @@ function iconNameForFile(name: string): FileIconRuleName {
   }
 
   return 'file-duo'
-}
-
-function fileMatchesAcceptToken(name: string, token: string) {
-  const normalizedToken = token.trim().toLocaleLowerCase()
-  if (!normalizedToken) return false
-  if (normalizedToken.startsWith('*.')) {
-    return extensionCandidates(name).includes(normalizedToken.slice(1))
-  }
-  if (normalizedToken.startsWith('.')) {
-    return extensionCandidates(name).includes(normalizedToken)
-  }
-  if (normalizedToken.includes('/')) return mimeMatches(name, normalizedToken)
-
-  return normalizeName(name) === normalizedToken
-}
-
-function mimeMatches(name: string, token: string) {
-  const mime = mimeForFileName(name)
-  if (token.endsWith('/*')) return mime.startsWith(token.slice(0, -1))
-
-  return mime === token
 }
 
 // One frozen object per rule, so a row that re-renders passes its icon the same prop.

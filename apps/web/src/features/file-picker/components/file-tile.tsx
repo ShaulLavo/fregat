@@ -1,16 +1,10 @@
-import { useQueryClient } from '@tanstack/react-query'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 
 import type { FsEntry } from '@/lib/file-system-types'
-import { serverEndpoint } from '@/lib/client'
-import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { EntryPreviewTile } from '@/features/file-picker/components/entry-preview-tile'
-import { FileThumbnail } from '@/lib/file-preview/components/file-thumbnail'
-import { previewImageUrl } from '@/lib/file-preview/utils/preview'
-import { previewKind } from '@/features/file-picker/utils/preview'
 
-/** One entry in the icons grid: an image's own thumbnail, or the entry's icon tile. */
+/** One folder in the icons grid. */
 export function FileTile({
   entry,
   isBusy,
@@ -24,8 +18,6 @@ export function FileTile({
   selected: boolean
   onDoubleClick: (entry: FsEntry) => void
 }) {
-  const origin = serverEndpoint(originForQueryClient(useQueryClient()))
-
   return (
     <ListRow
       {...rowProps}
@@ -39,15 +31,7 @@ export function FileTile({
       }}
     >
       <span className='flex h-20 w-full items-center justify-center'>
-        {previewKind(entry) === 'image' ? (
-          <FileThumbnail
-            className='h-20'
-            fallback={<EntryPreviewTile entry={entry} />}
-            src={previewImageUrl(origin, entry.path)}
-          />
-        ) : (
-          <EntryPreviewTile entry={entry} />
-        )}
+        <EntryPreviewTile entry={entry} />
       </span>
       <span className='w-full truncate text-center text-xs'>{entry.name}</span>
     </ListRow>

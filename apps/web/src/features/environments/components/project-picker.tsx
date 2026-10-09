@@ -32,7 +32,6 @@ export function ProjectPicker({
       <QueryClientProvider key={selected.environmentId} client={queryClientFor(selected.origin)}>
         <DeferredFilePickerDialog
           open
-          mode='folder'
           value={null}
           onOpenChange={(open) => {
             if (!open) onClose()

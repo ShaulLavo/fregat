@@ -52,7 +52,6 @@ export function MachineFolder({
     <QueryClientProvider key={machine.environmentId} client={queryClientFor(machine.origin)}>
       <DeferredFilePickerDialog
         open
-        mode='folder'
         value={null}
         onOpenChange={(open) => {
           if (!open) onBack()

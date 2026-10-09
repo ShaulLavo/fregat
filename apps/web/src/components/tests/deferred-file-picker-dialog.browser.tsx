@@ -57,13 +57,7 @@ function PickerOpener() {
       <button data-picker-opener onClick={() => setOpen(true)} type='button'>
         Open
       </button>
-      <DeferredFilePickerDialog
-        mode='file'
-        onOpenChange={setOpen}
-        onPick={() => {}}
-        open={open}
-        value={null}
-      />
+      <DeferredFilePickerDialog onOpenChange={setOpen} onPick={() => {}} open={open} value={null} />
     </>
   )
 }
@@ -75,5 +69,5 @@ async function dialog() {
 
 function searchPlaceholder() {
   const label = useEnvironmentsStore.getState().entries[activeServerOrigin()]?.label
-  return label ? `Search files on ${label}` : 'Search files'
+  return label ? `Search folders on ${label}` : 'Search folders'
 }

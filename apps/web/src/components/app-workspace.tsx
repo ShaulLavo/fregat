@@ -33,7 +33,6 @@ export function AppWorkspace({ restoringWorkspace }: { readonly restoringWorkspa
     void openPickedWorkspaceRoot(entry, openWorkspaceRoot)
   }
   const picker = usePickEntry({
-    mode: 'folder',
     onOpenChange: setPickerOpen,
     onPick: handlePick,
     open: pickerOpen && !chooseMachine,

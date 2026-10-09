@@ -98,3 +98,7 @@ export const machineCapacityKeys = {
 export const chatPanelQueryKeys = {
   module: ['chat', 'sidePanelModule'] as const,
 }
+
+export const providerSignInDialogQueryKeys = {
+  module: ['chat', 'providerSignInDialogModule'] as const,
+}

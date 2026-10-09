@@ -40,3 +40,19 @@ export function entriesLoadState(
 
   return { status: 'idle' }
 }
+
+/**
+ * What the list shows while recent folders lead it: loading until the folder and the recents have
+ * both loaded, so rows appear together. An error shows at once; a recents failure leaves the
+ * folder alone. `pending` says the rows are held back.
+ */
+export function leadingListState(
+  folder: EntriesLoadState,
+  recents: EntriesLoadState,
+  leads: boolean,
+): { readonly pending: boolean; readonly state: EntriesLoadState } {
+  if (!leads || folder.status === 'error') return { pending: false, state: folder }
+  const folderPending = folder.status === 'loading' && !folder.data
+  if (!folderPending && recents.status !== 'loading') return { pending: false, state: folder }
+  return { pending: true, state: { status: 'loading' } }
+}

@@ -42,7 +42,7 @@ export const workspaceLinkError: Scenario = {
       await selectors.pickerGoToFolder(page).click()
       await selectors.pickerFolderPath(page).fill(replacement)
       await page.keyboard.press('Enter')
-      await selectors.pickerRow(page, 'src').waitFor()
+      await selectors.pickerBrowsing(page, replacement).waitFor()
       await selectors.pickerChoose(page).click()
       await selectors.pickerDialog(page).waitFor({ state: 'hidden' })
       await selectors.treeItem(page, 'a.txt').waitFor()
