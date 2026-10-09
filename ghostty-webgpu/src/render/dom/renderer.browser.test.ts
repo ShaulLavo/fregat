@@ -5,6 +5,7 @@ import { GhosttyRuntime } from '../../core/runtime.js'
 import type { RenderRow } from '../../core/types.js'
 import type { CursorState } from '../instances/types.js'
 import type { RendererFrameSnapshot } from '../renderer.js'
+import { FrameObserver } from '../frame-observer.js'
 import { Terminal } from '../../dom/terminal.js'
 import { CanvasTerminalRenderer } from '../canvas/renderer.js'
 import { snapshotRenderState } from '../frame.js'
@@ -835,6 +836,49 @@ it('rebinds the live canvas declaration after its host moves into another docume
     `left: ${canvas.offsetLeft + 31.25}px`,
   )
   expect(computed.mock.calls.filter(([element]) => element === canvas)).toHaveLength(1)
+})
+
+it('publishes supplied owned paint rows without allocating an unused selection mask', async () => {
+  const probe = await rendererProbe('dom')
+  const frames: RendererFrameSnapshot[] = []
+  const texts: string[][] = []
+  const observer = new FrameObserver({
+    canvas: probe.canvas,
+    columns: 12,
+    rows: 3,
+    font: probeFont,
+    renderState: probe.state,
+    onFrame: (frame) => frames.push(frame),
+    onTextFrame: (frame) => texts.push(frame.rows.map((row) => row.text)),
+  })
+  const initialRows = probe.state.readRows({ packed: true })
+  observer.emit(probe.state, probe.state.readCursor(), undefined, [0, 1, 2], initialRows)
+  const original = frames[0]!
+  const originalText = original.rows.map((row) => row.text)
+  probe.terminal.write('\rnext')
+  probe.state.update()
+  const rows = probe.state.readRows({ dirtyOnly: true, packed: true })
+  const changed = rows.map((row) => row.y)
+  const masks = vi.spyOn(globalThis, 'Set')
+  observer.emit(probe.state, probe.state.readCursor(), undefined, changed, rows)
+  expect(masks.mock.calls.filter(([values]) => values === changed)).toHaveLength(0)
+  const expected = probe.state
+    .readRows()
+    .map((row) => row.cells.map((cell) => (cell.continuation ? '' : cell.text || ' ')).join(''))
+  expect(frames[1]!.rows.map((row) => row.text)).toEqual(expected)
+  expect(texts[1]).toEqual(expected)
+  expect(original.rows.map((row) => row.text)).toEqual(originalText)
+  expect(Object.isFrozen(frames[1]!.rows)).toBe(true)
+  probe.terminal.write('\rfinal')
+  probe.state.update()
+  const fallbackChanged = [probe.state.readCursor().viewport!.y]
+  const queried = vi.spyOn(probe.state, 'readRows')
+  observer.emit(probe.state, probe.state.readCursor(), undefined, fallbackChanged)
+  expect(queried).toHaveBeenCalledTimes(1)
+  expect(Array.from(queried.mock.calls[0]![0]!.rows!)).toEqual(fallbackChanged)
+  expect(masks.mock.calls.filter(([values]) => values === fallbackChanged)).toHaveLength(1)
+  expect(texts[2]).toEqual(frames[2]!.rows.map((row) => row.text))
+  expect(original.rows.map((row) => row.text)).toEqual(originalText)
 })
 
 it('isolates fixed-grid layout through theme and font changes', async () => {

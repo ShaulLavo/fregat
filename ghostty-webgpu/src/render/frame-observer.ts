@@ -167,7 +167,8 @@ export class FrameObserver {
   ) {
     const fullRows = this.current ? this.fullRows.slice() : []
     const textRows = this.current ? this.textRows.slice() : []
-    const options = this.current ? { rows: new Set(changed), packed: true } : { packed: true }
+    const options =
+      this.current && !rows ? { rows: new Set(changed), packed: true } : { packed: true }
     if (this.options.onFrame) {
       const source =
         rows && (this.current || rows.length === this.rowCount) ? rows : state.readRows(options)
