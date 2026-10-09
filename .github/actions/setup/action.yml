@@ -1,6 +1,11 @@
 name: Setup
 description: Installs the toolchain and workspace dependencies, then builds Editor and ghostty packages.
 
+inputs:
+  build-packages:
+    description: JSON consumer workspace names, all workspaces, or the editor family.
+    default: all
+
 runs:
   using: composite
   steps:
@@ -138,4 +143,6 @@ runs:
 
     - name: Build workspace packages
       shell: bash
-      run: bun run build:workspaces
+      env:
+        BUILD_PACKAGES: ${{ inputs.build-packages }}
+      run: bun scripts/ci/packages.mjs build "$BUILD_PACKAGES"

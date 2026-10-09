@@ -3,6 +3,9 @@ name: Workspace libraries
 on:
   workflow_call:
     inputs:
+      packages:
+        type: string
+        default: all
       editor:
         type: boolean
         default: true
@@ -32,6 +35,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+        with:
+          build-packages: editor
       - name: Install Editor browsers
         timeout-minutes: 8
         uses: ./.github/actions/install-browsers
@@ -70,7 +75,9 @@ jobs:
       - name: Check architecture health
         run: bun run --cwd editor health
       - name: Test Editor packages and examples
-        run: bun x turbo run test --filter='./editor/packages/*' --filter='./editor/examples/*' --concurrency=1
+        env:
+          CI_PACKAGES: ${{ inputs.packages || 'all' }}
+        run: bun scripts/ci/packages.mjs editor-tests "$CI_PACKAGES"
       - name: Test tree-sitter browser worker
         run: bun run --cwd editor/packages/tree-sitter test:browser
       - name: Test collaboration presence in Chromium
@@ -84,6 +91,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+        with:
+          build-packages: '["ghostty-webgpu","ghostty-webgpu-line-editor"]'
       - name: Install Chromium
         timeout-minutes: 5
         uses: ./.github/actions/install-browsers
