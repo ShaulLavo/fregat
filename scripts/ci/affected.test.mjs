@@ -36,6 +36,71 @@ test('metadata code still receives full validation', () => {
   expect(select(['.agents/skills/helper.ts']).packages).toHaveLength(graph.packages.size)
 })
 
+const terminalPrFiles = [
+  '.changeset/desktop-linux-webgl-auto.md',
+  'ghostty-webgpu/docs/api.md',
+  'ghostty-webgpu/src/render/backend-order.test.ts',
+  'ghostty-webgpu/src/render/backend-order.ts',
+  'ghostty-webgpu/src/render/selector.ts',
+  'ghostty-webgpu/src/render/tests/platforms.ts',
+  'ghostty-webgpu/src/render/tests/selector.browser.test.ts',
+  'ghostty-webgpu/src/worker/runtime.ts',
+  'ghostty-webgpu/src/worker/terminal.browser.test.ts',
+  'ghostty-webgpu/src/worker/tests/platform-backend.worker.ts',
+]
+
+test('PR 1208 selects terminal verification and patch-note formatting only', () => {
+  expect(select(terminalPrFiles)).toMatchObject({
+    packages: ['ghostty-webgpu'],
+    ghostty: true,
+    shared: false,
+    docs: true,
+    web: false,
+    server: false,
+    tui: false,
+    editor: false,
+    hotkeys: false,
+    site: false,
+    desktop: false,
+  })
+})
+
+test('a changeset by itself does not select application or library tests', () => {
+  expect(select(['.changeset/patch.md'])).toMatchObject({
+    packages: [],
+    shared: false,
+    docs: true,
+    ghostty: false,
+    web: false,
+  })
+})
+
+test('mixed terminal and app changes retain affected app checks', () => {
+  expect(select(terminalPrFiles.concat(['apps/web/src/main.tsx']))).toMatchObject({
+    shared: true,
+    ghostty: true,
+    web: true,
+  })
+})
+
+test('full validation still covers terminal consumers and repository checks', () => {
+  expect(select(terminalPrFiles, true)).toMatchObject({
+    shared: true,
+    ghostty: true,
+    web: true,
+    server: true,
+    site: true,
+    exhaustive: true,
+  })
+})
+
+test('published terminal measurements still select the website that imports them', () => {
+  expect(select(['ghostty-webgpu/docs/correctness-results.json'])).toMatchObject({
+    shared: true,
+    site: true,
+  })
+})
+
 test('a web source reader runs contracts checks without treating contracts as changed code', () => {
   const plan = select(['apps/web/src/features/chat/components/message.tsx'])
   expect(plan.packages).toEqual(['@workspace/contracts', 'web'])

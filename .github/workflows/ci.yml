@@ -33,6 +33,7 @@ jobs:
       actions: read
     outputs:
       code: ${{ steps.plan.outputs.code }}
+      shared: ${{ steps.plan.outputs.shared }}
       exhaustive: ${{ steps.plan.outputs.exhaustive }}
       packages: ${{ steps.plan.outputs.packages }}
       web: ${{ steps.plan.outputs.web }}
@@ -106,7 +107,7 @@ jobs:
   lint:
     name: Format, lint, census
     needs: changes
-    if: ${{ needs.changes.outputs.code == 'true' }}
+    if: ${{ needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -162,7 +163,7 @@ jobs:
   typecheck:
     name: Typecheck, generated, packages
     needs: changes
-    if: ${{ needs.changes.outputs.code == 'true' }}
+    if: ${{ needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

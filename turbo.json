@@ -68,7 +68,12 @@
     },
     "ghostty-webgpu-site#build": {
       "dependsOn": ["^build", "ghostty-webgpu#build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*",
+        "$TURBO_ROOT$/ghostty-webgpu/docs/correctness-results.json",
+        "$TURBO_ROOT$/ghostty-webgpu/docs/benchmarks/**"
+      ],
       "outputs": ["dist/**"]
     },
     "lint": {
