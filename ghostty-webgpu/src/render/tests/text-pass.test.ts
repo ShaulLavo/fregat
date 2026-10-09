@@ -140,7 +140,7 @@ it.each([
     expect(fixture.buffers[2]!.bytes).toEqual(
       new Uint8Array(data.glyphData.buffer, data.glyphData.byteOffset + 192, 192),
     )
-    fixture.pass.encode(fixture.device.createCommandEncoder(), {} as GPUTextureView)
+    fixture.pass.encode({} as GPUTextureView)
     fixture.pass.acceptFrame()
     expect(fixture.draws).toEqual([4, 2, 2])
     expect(fixture.pass.metrics.draws).toBe(3)

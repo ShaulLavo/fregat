@@ -1704,9 +1704,6 @@ it('submits both default surfaces before callbacks can reenter a peer terminal',
   const before = pair.map((renderer) => renderer.metrics.submittedFrames)
   const acknowledgedBefore = sources[1]!.acknowledgements
   const submissions = vi.spyOn(GPUQueue.prototype, 'submit')
-  const encoders = vi.spyOn(GPUDevice.prototype, 'createCommandEncoder')
-  const finishes = vi.spyOn(GPUCommandEncoder.prototype, 'finish')
-  const passes = vi.spyOn(GPUCommandEncoder.prototype, 'beginRenderPass')
   armed = true
   sources[0]!.dirtyRow(0)
   sources[1]!.dirtyRow(0)
@@ -1715,14 +1712,8 @@ it('submits both default surfaces before callbacks can reenter a peer terminal',
   await expect.poll(() => pair[1]!.metrics.submittedFrames).toBe(before[1]! + 2)
   expect(pair[0]!.metrics.submittedFrames).toBe(before[0]! + 1)
   expect(acknowledgedAtCallback).toBe(acknowledgedBefore + 1)
-  expect(submissions.mock.calls.map((call) => Array.from(call[0]).length)).toEqual([1, 1])
-  expect(encoders).toHaveBeenCalledTimes(2)
-  expect(finishes).toHaveBeenCalledTimes(2)
-  expect(passes).toHaveBeenCalledTimes(3)
+  expect(submissions.mock.calls.map((call) => Array.from(call[0]).length)).toEqual([2, 1])
   submissions.mockRestore()
-  encoders.mockRestore()
-  finishes.mockRestore()
-  passes.mockRestore()
   for (const renderer of pair) renderer.dispose()
   for (const canvas of canvases) canvas.remove()
 })
@@ -1773,59 +1764,10 @@ it('repaints default surfaces after one combined queue failure without acknowled
   expect(frames.map((frame) => frame.mock.calls.length)).toEqual(
     callbacksBefore.map((value) => value + 1),
   )
-  expect(submissions.mock.calls.map((call) => Array.from(call[0]).length)).toEqual([1, 1])
+  expect(submissions.mock.calls.map((call) => Array.from(call[0]).length)).toEqual([2, 2])
   submissions.mockRestore()
   for (const renderer of pair) renderer.dispose()
   for (const canvas of canvases) canvas.remove()
-})
-
-it('repaints an abandoned shared encoder without acknowledging its peer', async () => {
-  const sources = [new FakeRenderState(2, 2), new FakeRenderState(2, 2)]
-  const canvases = [createCanvas(), createCanvas()]
-  const failures: number[][] = []
-  const pair = await Promise.all(
-    sources.map((source, index) =>
-      createRenderer({
-        canvas: canvases[index]!,
-        columns: 2,
-        rows: 2,
-        deviceFactory: undefined,
-        font: fittedFont(),
-        renderState: source,
-        onError: () => {
-          failures.push(sources.map((state) => state.acknowledgements))
-        },
-      }),
-    ),
-  )
-  await expect
-    .poll(() => pair.every((renderer) => renderer.metrics.submittedFrames >= 1))
-    .toBe(true)
-  const before = pair.map((renderer) => renderer.metrics.submittedFrames)
-  const acknowledgedBefore = sources.map((source) => source.acknowledgements)
-  const original = GPUCommandEncoder.prototype.beginRenderPass
-  let calls = 0
-  const passes = vi
-    .spyOn(GPUCommandEncoder.prototype, 'beginRenderPass')
-    .mockImplementation(function (this: GPUCommandEncoder, descriptor) {
-      if (++calls === 2) throw new TypeError('injected shared encoding failure')
-      return original.call(this, descriptor)
-    })
-  sources.forEach((source) => source.dirtyRow(0))
-  pair.forEach((renderer) => renderer.notifyWrite())
-  await expect
-    .poll(() =>
-      pair.every((renderer, index) => renderer.metrics.submittedFrames === before[index]! + 1),
-    )
-    .toBe(true)
-  expect(failures).toEqual([acknowledgedBefore, acknowledgedBefore])
-  expect(sources.map((source) => source.acknowledgements)).toEqual(
-    acknowledgedBefore.map((value) => value + 1),
-  )
-  expect(passes).toHaveBeenCalledTimes(4)
-  passes.mockRestore()
-  pair.forEach((renderer) => renderer.dispose())
-  canvases.forEach((canvas) => canvas.remove())
 })
 
 it('captures peer text snapshots before a callback updates that peers native state', async () => {

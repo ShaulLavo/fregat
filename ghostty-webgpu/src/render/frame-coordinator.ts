@@ -3,7 +3,7 @@ import type { RenderSchedulerClock } from './scheduler.js'
 export interface FrameSubmission {
   readonly owner: object
   readonly device: GPUDevice
-  readonly encoder: GPUCommandEncoder
+  readonly command: GPUCommandBuffer
   commit(): void
   notify(): void
   failed(cause: unknown): void
@@ -12,8 +12,6 @@ export interface FrameSubmission {
 export class FrameCoordinator implements RenderSchedulerClock {
   private readonly callbacks = new Map<number, () => void>()
   private readonly pending: FrameSubmission[] = []
-  private readonly encoders = new Map<GPUDevice, GPUCommandEncoder>()
-  private readonly abandoned = new WeakMap<GPUCommandEncoder, { cause: unknown }>()
   private nextHandle = 0
   private frameHandle?: number
   private active = false
@@ -42,24 +40,10 @@ export class FrameCoordinator implements RenderSchedulerClock {
     this.clock.clearTimer(handle)
   }
 
-  createEncoder(device: GPUDevice): GPUCommandEncoder {
-    if (!this.active) return device.createCommandEncoder()
-    const existing = this.encoders.get(device)
-    if (existing) return existing
-    const encoder = device.createCommandEncoder()
-    this.encoders.set(device, encoder)
-    return encoder
-  }
-
-  abandonEncoder(device: GPUDevice, encoder: GPUCommandEncoder, cause: unknown): void {
-    this.abandoned.set(encoder, { cause })
-    if (this.encoders.get(device) === encoder) this.encoders.delete(device)
-  }
-
   submit(frame: FrameSubmission): void {
     if (!this.active) {
       try {
-        frame.device.queue.submit([frame.encoder.finish()])
+        frame.device.queue.submit([frame.command])
         frame.commit()
       } catch (cause) {
         frame.failed(cause)
@@ -93,19 +77,18 @@ export class FrameCoordinator implements RenderSchedulerClock {
   }
 
   private flush(): void {
-    this.encoders.clear()
     const frames = this.pending.splice(0)
     if (frames.length === 0) return
-    const groups = new Map<GPUCommandEncoder, FrameSubmission[]>()
+    const groups = new Map<GPUDevice, FrameSubmission[]>()
     for (const frame of frames) {
-      const group = groups.get(frame.encoder) ?? []
+      const group = groups.get(frame.device) ?? []
       group.push(frame)
-      groups.set(frame.encoder, group)
+      groups.set(frame.device, group)
     }
     const submitted: FrameSubmission[] = []
     const failures: { frame: FrameSubmission; cause: unknown }[] = []
-    for (const [encoder, group] of groups) {
-      const result = this.submitGroup(encoder, group)
+    for (const [device, group] of groups) {
+      const result = this.submitGroup(device, group)
       if (result.kind === 'submitted') submitted.push(...result.frames)
       else failures.push(...result.frames.map((frame) => ({ frame, cause: result.cause })))
     }
@@ -124,15 +107,13 @@ export class FrameCoordinator implements RenderSchedulerClock {
   }
 
   private submitGroup(
-    encoder: GPUCommandEncoder,
+    device: GPUDevice,
     frames: readonly FrameSubmission[],
   ):
     | { kind: 'submitted'; frames: readonly FrameSubmission[] }
     | { kind: 'failed'; frames: readonly FrameSubmission[]; cause: unknown } {
-    const abandoned = this.abandoned.get(encoder)
-    if (abandoned) return { kind: 'failed', frames, cause: abandoned.cause }
     try {
-      frames[0]!.device.queue.submit([encoder.finish()])
+      device.queue.submit(frames.map((frame) => frame.command))
       return { kind: 'submitted', frames }
     } catch (cause) {
       return { kind: 'failed', frames, cause }

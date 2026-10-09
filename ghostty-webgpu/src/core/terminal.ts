@@ -14,6 +14,7 @@ import { readTerminalLines } from './grid-text.js'
 import { requireLayout } from './memory.js'
 import { readNativeBuffer } from './native-buffer.js'
 import { readSelectionText } from './native-text.js'
+import { TerminalQueryPacket } from './terminal-query-packet.js'
 import type { GhosttyRuntime } from './runtime.js'
 import type {
   ReadLinesOptions,
@@ -148,6 +149,8 @@ export class GhosttyTerminal {
   private disposed = false
   private handleValue: number
   private sizeValue: TerminalSize
+  private sizeReader?: TerminalQueryPacket
+  private cursorReader?: TerminalQueryPacket
 
   constructor(runtime: GhosttyRuntime, options: TerminalOptions) {
     this.runtime = runtime
@@ -187,11 +190,15 @@ export class GhosttyTerminal {
 
   get size(): TerminalSize {
     this.ensureActive()
-    return {
+    this.sizeReader ??= new TerminalQueryPacket(this.runtime, [
+      TerminalData.Columns,
+      TerminalData.Rows,
+    ])
+    return this.sizeReader.read(this.handleValue, (pointer) => ({
       ...this.sizeValue,
-      columns: this.readUint16(TerminalData.Columns, 'COLUMNS'),
-      rows: this.readUint16(TerminalData.Rows, 'ROWS'),
-    }
+      columns: this.runtime.memory.view.getUint16(pointer, true),
+      rows: this.runtime.memory.view.getUint16(pointer + 4, true),
+    }))
   }
 
   get title(): string {
@@ -204,12 +211,19 @@ export class GhosttyTerminal {
   }
 
   get cursor(): TerminalCursor {
-    return {
-      pendingWrap: this.readBoolean(TerminalData.CursorPendingWrap, 'CURSOR_PENDING_WRAP'),
-      visible: this.readBoolean(TerminalData.CursorVisible, 'CURSOR_VISIBLE'),
-      x: this.readUint16(TerminalData.CursorX, 'CURSOR_X'),
-      y: this.readUint16(TerminalData.CursorY, 'CURSOR_Y'),
-    }
+    this.ensureActive()
+    this.cursorReader ??= new TerminalQueryPacket(this.runtime, [
+      TerminalData.CursorPendingWrap,
+      TerminalData.CursorVisible,
+      TerminalData.CursorX,
+      TerminalData.CursorY,
+    ])
+    return this.cursorReader.read(this.handleValue, (pointer) => ({
+      pendingWrap: this.runtime.memory.view.getUint8(pointer) !== 0,
+      visible: this.runtime.memory.view.getUint8(pointer + 4) !== 0,
+      x: this.runtime.memory.view.getUint16(pointer + 8, true),
+      y: this.runtime.memory.view.getUint16(pointer + 12, true),
+    }))
   }
 
   get activeScreen(): TerminalScreen {
@@ -629,6 +643,8 @@ export class GhosttyTerminal {
 
   dispose(): void {
     if (this.disposed) return
+    this.sizeReader?.dispose()
+    this.cursorReader?.dispose()
     this.runtime.bridge.unregisterTerminal(this.handleValue)
     this.runtime.exports.ghostty_terminal_free(this.handleValue)
     this.runtime.releaseTerminal(this)
@@ -703,12 +719,6 @@ export class GhosttyTerminal {
   private readUint8(data: TerminalData, name: string): number {
     return this.readRequiredData(data, 1, name, (pointer) =>
       this.runtime.memory.view.getUint8(pointer),
-    )
-  }
-
-  private readUint16(data: TerminalData, name: string): number {
-    return this.readRequiredData(data, 2, name, (pointer) =>
-      this.runtime.memory.view.getUint16(pointer, true),
     )
   }
 

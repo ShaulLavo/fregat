@@ -21,13 +21,11 @@ function fixture() {
   const submit = vi.fn((commands: readonly GPUCommandBuffer[]) => {
     events.push(`submit:${commands.length}`)
   })
-  const finish = vi.fn(() => ({}) as GPUCommandBuffer)
-  const createCommandEncoder = vi.fn(() => ({ finish }) as unknown as GPUCommandEncoder)
-  const device = { queue: { submit }, createCommandEncoder } as unknown as GPUDevice
+  const device = { queue: { submit } } as unknown as GPUDevice
   const frame = (name: string): FrameSubmission => ({
     owner: {},
     device,
-    encoder: coordinator.createEncoder(device),
+    command: {} as GPUCommandBuffer,
     commit: () => {
       events.push(`commit:${name}`)
     },
@@ -40,8 +38,6 @@ function fixture() {
   })
   return {
     coordinator,
-    createCommandEncoder,
-    finish,
     device,
     events,
     frame,
@@ -63,11 +59,9 @@ it('encodes seventeen surfaces in one callback and submits before all acknowledg
   expect(f.submit).not.toHaveBeenCalled()
   f.run()
   expect(f.submit).toHaveBeenCalledOnce()
-  expect(f.submit.mock.calls[0]![0]).toHaveLength(1)
-  expect(f.createCommandEncoder).toHaveBeenCalledOnce()
-  expect(f.finish).toHaveBeenCalledOnce()
+  expect(f.submit.mock.calls[0]![0]).toHaveLength(17)
   expect(f.events).toEqual([
-    'submit:1',
+    'submit:17',
     ...Array.from({ length: 17 }, (_, index) => `commit:${index}`),
     ...Array.from({ length: 17 }, (_, index) => `notify:${index}`),
   ])
@@ -149,7 +143,6 @@ it('a clean or error notification barrier commits accepted peers before running 
 it('mixed device queue failures report only after accepted peers have committed', () => {
   const f = fixture()
   const failedDevice = {
-    createCommandEncoder: f.createCommandEncoder,
     queue: {
       submit() {
         throw new TypeError('other queue failed')
@@ -160,7 +153,6 @@ it('mixed device queue failures report only after accepted peers have committed'
   const failed = {
     ...f.frame('failed'),
     device: failedDevice,
-    encoder: f.coordinator.createEncoder(failedDevice),
     failed: () => {
       f.events.push(`error-after-peer:${f.events.includes('commit:peer')}`)
     },
@@ -169,41 +161,4 @@ it('mixed device queue failures report only after accepted peers have committed'
   f.coordinator.requestFrame(() => f.coordinator.submit(failed))
   f.run()
   expect(f.events).toEqual(['submit:1', 'commit:peer', 'error-after-peer:true', 'notify:peer'])
-})
-
-it('uses a fresh encoder after each ordinary display turn', () => {
-  const f = fixture()
-  f.coordinator.requestFrame(() => f.coordinator.submit(f.frame('first')))
-  f.run()
-  f.coordinator.requestFrame(() => f.coordinator.submit(f.frame('next')))
-  f.run()
-  expect(f.createCommandEncoder).toHaveBeenCalledTimes(2)
-  expect(f.finish).toHaveBeenCalledTimes(2)
-})
-
-it('does not acknowledge an abandoned shared encoder and accepts a fresh retry', () => {
-  const f = fixture()
-  f.coordinator.requestFrame(() => f.coordinator.submit(f.frame('peer')))
-  f.coordinator.requestFrame(() => {
-    const encoder = f.coordinator.createEncoder(f.device)
-    f.coordinator.abandonEncoder(f.device, encoder, new TypeError('encoding failed'))
-    f.coordinator.submit(f.frame('retry'))
-  })
-  f.run()
-  expect(f.createCommandEncoder).toHaveBeenCalledTimes(2)
-  expect(f.finish).toHaveBeenCalledOnce()
-  expect(f.events).toEqual(['submit:1', 'commit:retry', 'failed:peer', 'notify:retry'])
-})
-
-it('reports a failed finish to every affected surface without submitting or acknowledging', () => {
-  const f = fixture()
-  f.finish.mockImplementationOnce(() => {
-    throw new TypeError('finish failed')
-  })
-  f.coordinator.requestFrame(() => f.coordinator.submit(f.frame('first')))
-  f.coordinator.requestFrame(() => f.coordinator.submit(f.frame('second')))
-  f.run()
-  expect(f.finish).toHaveBeenCalledOnce()
-  expect(f.submit).not.toHaveBeenCalled()
-  expect(f.events).toEqual(['failed:first', 'failed:second'])
 })

@@ -1,14 +1,16 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { GhosttyResult, TerminalMode, TerminalScreen } from '../abi.js'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { GhosttyResult, TerminalData, TerminalMode, TerminalScreen } from '../abi.js'
 import type { AbiLayouts } from '../abi.js'
 import { GhosttyRuntime } from '../runtime.js'
 import { GhosttyTerminal } from '../terminal.js'
+import { TerminalQueryPacket } from '../terminal-query-packet.js'
 
 let runtime: GhosttyRuntime | undefined
 
 afterEach(() => {
   runtime?.dispose()
   runtime = undefined
+  vi.restoreAllMocks()
 })
 
 function createScrollbarTerminal(values: {
@@ -57,6 +59,34 @@ function createScrollbarTerminal(values: {
     sizeValue: { cellHeight: 16, cellWidth: 8, columns: 80, rows: 24 },
   }) as GhosttyTerminal
 }
+
+it('reads live size and cursor from reusable multi-query packets after native memory growth', async () => {
+  runtime = await GhosttyRuntime.create()
+  const terminal = runtime.createTerminal({ columns: 12, rows: 4 })
+  const initialSize = terminal.size
+  const initialCursor = terminal.cursor
+  const allocate = vi.spyOn(runtime.memory, 'allocate')
+  const free = vi.spyOn(runtime.memory, 'free')
+  expect(terminal.size).toEqual(initialSize)
+  expect(terminal.cursor).toEqual(initialCursor)
+  expect(allocate).not.toHaveBeenCalled()
+  expect(free).not.toHaveBeenCalled()
+  terminal.write('A界\x1b[?25l')
+  terminal.resize({ columns: 16, rows: 5 })
+  runtime.exports.memory.grow(1)
+  allocate.mockClear()
+  free.mockClear()
+  expect(terminal.size).toMatchObject({ columns: 16, rows: 5 })
+  expect(terminal.cursor).toEqual({ pendingWrap: false, visible: false, x: 3, y: 0 })
+  expect(initialSize).toMatchObject({ columns: 12, rows: 4 })
+  expect(initialCursor).toEqual({ pendingWrap: false, visible: true, x: 0, y: 0 })
+  expect(allocate).not.toHaveBeenCalled()
+  expect(free).not.toHaveBeenCalled()
+  terminal.dispose()
+  expect(free).toHaveBeenCalledTimes(2)
+  terminal.dispose()
+  expect(free).toHaveBeenCalledTimes(2)
+})
 
 describe('terminal state', () => {
   it('reads cursor, screen, and live terminal modes', async () => {
@@ -218,4 +248,21 @@ describe('scrollbar uint64 decoding', () => {
 
     expect(() => terminal.scrollbar).toThrow('scrollbar total exceeds Number.MAX_SAFE_INTEGER')
   })
+})
+
+it('does not decode a partially failed native terminal query', async () => {
+  runtime = await GhosttyRuntime.create()
+  const terminal = runtime.createTerminal({ columns: 12, rows: 4 })
+  const packet = new TerminalQueryPacket(runtime, [
+    TerminalData.Columns,
+    -1 as TerminalData.Columns,
+  ])
+  const read = vi.fn()
+  try {
+    expect(() => packet.read(terminal.handle, read)).toThrow('ghostty_terminal_get_multi')
+    expect(read).not.toHaveBeenCalled()
+    expect(terminal.size).toMatchObject({ columns: 12, rows: 4 })
+  } finally {
+    packet.dispose()
+  }
 })
