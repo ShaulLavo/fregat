@@ -31,7 +31,7 @@ function expression(source: string, context: Record<string, unknown>) {
 test('manual shard experiments keep the PR and main default at four', () => {
   const ci = readWorkflow('ci.yml')
   const source = ci.jobs.changes!.outputs!.web_shards!
-  for (const event of ['push', 'pull_request', 'workflow_dispatch']) {
+  for (const event of ['push', 'pull_request', 'schedule', 'workflow_dispatch']) {
     const result = expression(source, {
       github: { event_name: event },
       inputs: { web_shards: '2' },
@@ -167,6 +167,50 @@ test('CI shares one production site build with every mobile shard', () => {
   expect(mobile.steps.some((step) => step.run?.includes('product-sites/build.sh'))).toBe(false)
   const download = mobile.steps.find((step) => step.uses === 'actions/download-artifact@v4')
   expect(download?.with?.name).toBe(upload?.with?.name)
+})
+
+test('ordinary site checks use both phone engines and full runs retain disjoint exhaustive shards', () => {
+  const ci = readWorkflow('ci.yml')
+  const source = ci.jobs.changes!.outputs!.mobile_shards!
+  for (const exhaustive of ['false', 'true']) {
+    const values = expression(source, { steps: { plan: { outputs: { exhaustive } } } })
+    expect(JSON.parse(values)).toEqual(
+      exhaustive === 'true'
+        ? ['chromium-0', 'chromium-1', 'webkit-0', 'webkit-1']
+        : ['chromium-0', 'webkit-0'],
+    )
+  }
+  expect(ci.jobs['mobile-layout']!.strategy?.matrix).toEqual({
+    shard: '${{ fromJSON(needs.changes.outputs.mobile_shards) }}',
+  })
+})
+
+test('Editor benchmark smoke runs only during full validation and basic regression cases remain', () => {
+  const steps = readWorkflow('workspace-libraries.yml').jobs.editor!.steps
+  const smoke = steps.find((step) => step.name === 'Smoke dense syntax lifecycle')!
+  expect(
+    expression(smoke.if!, {
+      github: { event_name: 'pull_request' },
+      inputs: { exhaustive: false },
+    }),
+  ).toBe(false)
+  expect(
+    expression(smoke.if!, { github: { event_name: 'schedule' }, inputs: { exhaustive: true } }),
+  ).toBe(true)
+  expect(
+    expression(smoke.if!, {
+      github: { event_name: 'workflow_dispatch' },
+      inputs: { exhaustive: false },
+    }),
+  ).toBe(true)
+  expect(steps.map((step) => step.name)).toEqual(
+    expect.arrayContaining([
+      'Test collaboration signaling broker',
+      'Test collaboration presence in Chromium',
+      'Test collaboration transports in Chromium',
+      'Smoke concurrent editor input and author undo',
+    ]),
+  )
 })
 
 test('canonical Editor CI checks the generated language catalog', () => {

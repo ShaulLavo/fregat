@@ -1,24 +1,8 @@
 name: Collaborative text stress
 
 on:
-  pull_request:
-    paths:
-      - 'editor/packages/collab/**'
-      - 'editor/packages/collaboration/**'
-      - 'editor/packages/editor/**'
-      - 'editor/packages/textbuffer/**'
-      - 'editor/scripts/build-package.ts'
-      - 'bun.lock'
-      - '.github/workflows/editor-collab.yml'
-  push:
-    branches: ['main']
-    paths:
-      - 'editor/packages/collab/**'
-      - 'editor/packages/collaboration/**'
-      - 'editor/packages/editor/**'
-      - 'editor/packages/textbuffer/**'
-      - 'bun.lock'
-      - '.github/workflows/editor-collab.yml'
+  schedule:
+    - cron: '17 2 * * *'
   workflow_dispatch:
 
 permissions:

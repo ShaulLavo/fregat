@@ -9,6 +9,33 @@ const root = path.resolve(import.meta.dirname, '../..')
 const graph = readWorkspaceGraph(root)
 const select = (files, full = false) => selectAffected(graph, files, full)
 
+test('the four documentation files in PR 1207 do not consume application or library runners', () => {
+  const plan = select([
+    '.agents/skills/react-development/SKILL.md',
+    'PLAN.md',
+    'plans/342-app-reactivity-and-async-ownership.md',
+    'plans/README.md',
+  ])
+  expect(plan).toMatchObject({
+    packages: [],
+    code: false,
+    docs: true,
+    exhaustive: false,
+    web: false,
+    server: false,
+    tui: false,
+    site: false,
+    editor: false,
+    ghostty: false,
+    hotkeys: false,
+  })
+  expect(plan.docs_files).toContain('.agents/skills/react-development/SKILL.md')
+})
+
+test('metadata code still receives full validation', () => {
+  expect(select(['.agents/skills/helper.ts']).packages).toHaveLength(graph.packages.size)
+})
+
 test('a web source reader runs contracts checks without treating contracts as changed code', () => {
   const plan = select(['apps/web/src/features/chat/components/message.tsx'])
   expect(plan.packages).toEqual(['@workspace/contracts', 'web'])
