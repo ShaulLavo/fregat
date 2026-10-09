@@ -47,9 +47,7 @@ import { fontsInUse } from '@/lib/fonts/utils/stack'
 import { runtimeCapabilities } from '@/lib/platform/capabilities'
 import { launchAddress } from '@/components/utils/launch-address'
 import { applyBackdrop, resolveBackdrop } from '@/lib/platform/backdrop.ts'
-import { editorPerformanceRecordingRequested } from '@/features/editor/state/performance-trace'
-import { performanceRecordingMutationOptions } from '@/features/editor/utils/performance-recording-mutation'
-import { runMutation } from '@/lib/mutations/run'
+import { startEditorPerformanceRecording } from '@/features/editor/state/performance-recording-start'
 import { reportReactError } from '@/lib/react-error-reporting.ts'
 import { configureIntentPrediction } from '@/lib/intent-prefetch-options'
 import { takePairingCodeFromLocation } from '@/lib/pairing/state/link-claim'
@@ -60,6 +58,7 @@ import { warmDeferredOverlays } from '@/components/utils/overlay-modules'
 
 configureIntentPrediction()
 initializeClientLogging()
+void startEditorPerformanceRecording(resourceQueryClient)
 applyBackdrop(resolveBackdrop())
 // Before `createRoot`, deliberately. The mirrored appearance is initial
 // document state: descendants construct geometry and read computed styles on
@@ -155,12 +154,6 @@ void start().catch((cause: unknown) => {
 })
 
 async function start() {
-  if (editorPerformanceRecordingRequested())
-    await runMutation(
-      resourceQueryClient,
-      performanceRecordingMutationOptions(resourceQueryClient),
-      undefined,
-    )
   // Paired before the bootstrap asks the machine anything, so its first request carries the cookie.
   // Loaded only for a pairing link; if it fails to load, the pairing screen still takes the code.
   if (pairingCode)

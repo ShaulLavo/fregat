@@ -98,3 +98,23 @@ export function editorPerformanceRecordingRequested(): boolean {
     editorPerformanceDisabledFeatures().size > 0
   )
 }
+
+export function installDisabledFeatureStyles(features: ReadonlySet<string>): void {
+  if (typeof document === 'undefined') return
+  if (features.size === 0) return
+
+  document.documentElement.dataset.editorPerfDisable = Array.from(features).join(' ')
+  if (document.getElementById('editor-performance-trace-styles')) return
+
+  const style = document.createElement('style')
+  style.id = 'editor-performance-trace-styles'
+  style.textContent = [
+    "[data-editor-perf-disable~='caret'] .editor-virtualized-caret-layer { animation: none !important; }",
+    [
+      "[data-editor-perf-disable~='text'] .editor-virtualized-row",
+      "[data-editor-perf-disable~='text'] .editor-virtualized-fold-placeholder",
+      "[data-editor-perf-disable~='text'] .editor-virtualized-hidden-character-marker",
+    ].join(', ') + ' { color: transparent !important; }',
+  ].join('\n')
+  document.head.appendChild(style)
+}

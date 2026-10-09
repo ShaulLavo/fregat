@@ -1,8 +1,14 @@
+import {
+  MAX_TRACE_EVENTS,
+  type EditorPerformanceDiagnostic,
+  type InitialDiagnostics,
+} from '@/features/editor/utils/diagnostic-buffer'
 import { clientLoggingEnabled } from '@/lib/client-logging'
 import { createTraceBuffer } from '@/features/editor/utils/trace-buffer'
 import { roundMs as round } from '@workspace/utils/timing'
 import {
   editorPerformanceDisabledFeatures,
+  installDisabledFeatureStyles,
   editorPerformanceLayoutVariant,
   editorPerformanceTraceEnabled,
   requireEditorOpenBenchmarkControl,
@@ -11,12 +17,6 @@ import {
   type EditorOpenSampleTarget,
   type EditorOpenSampleResetResult,
 } from '@/features/editor/state/performance-trace'
-
-type EditorPerformanceDiagnostic = {
-  readonly name: string
-  readonly durationMs?: number
-  readonly detail?: Readonly<Record<string, unknown>>
-}
 
 type EditorPerformanceDiagnosticSink = {
   enabled: boolean
@@ -83,16 +83,15 @@ type EditorPerformanceTraceGlobal = typeof globalThis & {
 
 const SLOW_FRAME_MS = 16.7
 const LONG_FRAME_MS = 50
-const MAX_TRACE_EVENTS = 5000
 
-export function installEditorPerformanceTraceFromUrl(): void {
+export function installEditorPerformanceTraceFromUrl(initial?: InitialDiagnostics): void {
   if (typeof window === 'undefined' || !clientLoggingEnabled()) return
 
   editorPerformanceTraceGlobal().__editorPerfTrace?.stop()
   installDisabledFeatureStyles(editorPerformanceDisabledFeatures())
   if (!editorPerformanceTraceEnabled(window.location.search)) return
 
-  const trace = createEditorPerformanceTrace()
+  const trace = createEditorPerformanceTrace(initial)
   editorPerformanceTraceGlobal().__EDITOR_PERFORMANCE_DIAGNOSTICS__ = trace.sink
   editorPerformanceTraceGlobal().__editorPerfTrace = trace.handle
 
@@ -101,7 +100,7 @@ export function installEditorPerformanceTraceFromUrl(): void {
   )
 }
 
-function createEditorPerformanceTrace(): {
+function createEditorPerformanceTrace(initial?: InitialDiagnostics): {
   readonly handle: EditorPerformanceTraceHandle
   readonly sink: EditorPerformanceDiagnosticSink
 } {
@@ -111,7 +110,7 @@ function createEditorPerformanceTrace(): {
   const traceEvents = createTraceBuffer<EditorPerformanceTraceEvent>(MAX_TRACE_EVENTS)
   const diagnosticSummaries = new Map<string, { count: number; maxMs: number; totalMs: number }>()
   let frames = emptyFrameStats()
-  let startedAt = performance.now()
+  let startedAt = initial?.startedAt ?? performance.now()
   const eventCounts = new Map<string, number>()
   const targetCounts = new Map<string, number>()
   const recordLongTask = (entry: PerformanceEntry) => {
@@ -135,12 +134,15 @@ function createEditorPerformanceTrace(): {
       summary.totalMs += durationMs
       diagnosticSummaries.set(diagnostic.name, summary)
       traceEvents.push({
-        at: performance.now(),
+        at: diagnostic.timestampMs ?? performance.now(),
         diagnostic,
         kind: 'diagnostic',
       })
     },
   }
+
+  for (const event of initial?.events ?? [])
+    sink.record({ ...event.diagnostic, timestampMs: event.at })
 
   const recordInputEvent = (event: Event) => {
     if (stopped) return
@@ -380,26 +382,6 @@ function downloadJson(report: EditorPerformanceTraceReport): void {
   link.href = URL.createObjectURL(blob)
   link.click()
   URL.revokeObjectURL(link.href)
-}
-
-function installDisabledFeatureStyles(features: ReadonlySet<string>): void {
-  if (typeof document === 'undefined') return
-  if (features.size === 0) return
-
-  document.documentElement.dataset.editorPerfDisable = Array.from(features).join(' ')
-  if (document.getElementById('editor-performance-trace-styles')) return
-
-  const style = document.createElement('style')
-  style.id = 'editor-performance-trace-styles'
-  style.textContent = [
-    "[data-editor-perf-disable~='caret'] .editor-virtualized-caret-layer { animation: none !important; }",
-    [
-      "[data-editor-perf-disable~='text'] .editor-virtualized-row",
-      "[data-editor-perf-disable~='text'] .editor-virtualized-fold-placeholder",
-      "[data-editor-perf-disable~='text'] .editor-virtualized-hidden-character-marker",
-    ].join(', ') + ' { color: transparent !important; }',
-  ].join('\n')
-  document.head.appendChild(style)
 }
 
 function editorPerformanceTraceGlobal(): EditorPerformanceTraceGlobal {
