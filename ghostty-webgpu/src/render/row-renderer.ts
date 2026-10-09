@@ -232,19 +232,24 @@ export class RowTerminalRenderer {
     this.surface.beginFrame?.()
     for (const row of rows) this.paintRow(row, cursorState)
     // Native retention needs dirty rows while they still describe the accepted paint.
-    const deliver = this.frames.capture(
+    const frame = this.frames.capture(
       this.renderState,
       cursor,
       cursorState,
       rows.map((row) => row.y),
       rows,
     )
-    if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
-    this.metrics.paintedRows += rows.length
-    this.metrics.submittedFrames += 1
-    this.needsFullRebuild = false
-    this.overlayRows.clear()
-    deliver()
+    try {
+      if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
+      this.metrics.paintedRows += rows.length
+      this.metrics.submittedFrames += 1
+      this.needsFullRebuild = false
+      this.overlayRows.clear()
+      frame.accept()
+    } finally {
+      frame.discard()
+    }
+    frame.notify()
   }
 
   private gridEquals(grid: RendererGridSize): boolean {

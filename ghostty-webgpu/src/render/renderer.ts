@@ -1,7 +1,7 @@
 import { FrameCoordinator } from './frame-coordinator.js'
 import { DeviceOwner, type DeviceLease } from './device-owner.js'
 import { createGhosttyError } from '../core/error.js'
-import { FrameObserver } from './frame-observer.js'
+import { FrameObserver, type PreparedFrame } from './frame-observer.js'
 import { RenderStateDirty } from '../core/abi.js'
 import type { ZigFrameBuilder } from '../core/zig-frame.js'
 import { buildZigFrame } from './atlas/zig-glyphs.js'
@@ -618,17 +618,22 @@ export class WebGpuTerminalRenderer {
           ? this.renderState.readRows({ packed: true })
           : this.rowsToRebuild(damage)
       }
-      const notifyFrame = this.captureFrame(
+      const frame = this.captureFrame(
         rows,
         updates.map((update) => update.row),
       )
-      if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
-      this.recordFrame(rebuiltRows, operations)
-      this.metrics.zigFrames += 1
-      this.needsFullRebuild = false
-      this.frameFailed = false
-      this.overlayRows.clear()
-      notifyFrame?.()
+      try {
+        if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
+        this.recordFrame(rebuiltRows, operations)
+        this.metrics.zigFrames += 1
+        this.needsFullRebuild = false
+        this.frameFailed = false
+        this.overlayRows.clear()
+        frame?.accept()
+      } finally {
+        frame?.discard()
+      }
+      frame?.notify()
       return
     }
     let command: GPUCommandBuffer
@@ -644,27 +649,32 @@ export class WebGpuTerminalRenderer {
       rows = options.full ? this.renderState.readRows({ packed: true }) : this.rowsToRebuild(damage)
     }
     const textPass = this.textPass
-    let notifyFrame: (() => void) | undefined
+    let frame: PreparedFrame | undefined
     this.coordinator.submit({
       owner: this,
       device: this.device,
       command,
       commit: () => {
         if (this.disposed) return
-        notifyFrame = this.captureFrame(
+        frame = this.captureFrame(
           rows,
           updates.map((update) => update.row),
         )
-        textPass.acceptFrame()
-        if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
-        this.recordFrame(rebuiltRows, operations)
-        this.metrics.zigFrames += 1
-        this.needsFullRebuild = false
-        this.frameFailed = false
-        this.overlayRows.clear()
+        try {
+          textPass.acceptFrame()
+          if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
+          this.recordFrame(rebuiltRows, operations)
+          this.metrics.zigFrames += 1
+          this.needsFullRebuild = false
+          this.frameFailed = false
+          this.overlayRows.clear()
+          frame?.accept()
+        } finally {
+          frame?.discard()
+        }
       },
       notify: () => {
-        if (!this.disposed) notifyFrame?.()
+        if (!this.disposed) frame?.notify()
       },
       failed: (cause) => {
         const retry = !this.frameFailed
@@ -693,7 +703,7 @@ export class WebGpuTerminalRenderer {
   private captureFrame(
     rows: readonly RenderRow[] | undefined,
     changed = rows?.map((row) => row.y) ?? [],
-  ): (() => void) | undefined {
+  ): PreparedFrame | undefined {
     if (!this.cursor) return
     return this.frames.capture(
       this.renderState,

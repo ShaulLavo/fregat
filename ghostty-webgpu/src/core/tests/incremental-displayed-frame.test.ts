@@ -53,6 +53,7 @@ async function measuredState() {
     const expected = state.readRows().map(({ dirty: _dirty, ...row }) => row)
     expect(frame.readRows().map(({ dirty: _dirty, ...row }) => row)).toEqual(expected)
     state.acknowledge()
+    frame.accept()
     return { frame, reads }
   }
   return { terminal, state, capture }

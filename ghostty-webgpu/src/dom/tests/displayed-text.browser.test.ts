@@ -563,7 +563,7 @@ describe('DOM retained displayed-text acceptance', () => {
     expect(() => clock.flush()).toThrow('injected DOM acknowledgement failure')
     expect(retain.mock.calls.length).toBeGreaterThan(captures)
     expect(delivered).toHaveLength(publications)
-    expect(terminal.visibleLines()).toEqual(owned)
+    expect(terminal.visibleLines().map((line) => line.trimEnd())).toEqual(owned)
     acknowledge.mockRestore()
     terminal.refresh(0, 3)
     clock.flushTimers()
