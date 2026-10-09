@@ -5,7 +5,7 @@ import { history, peerSnapshot, syntaxFixture } from './merge-review-fixture'
 
 let fixture: Awaited<ReturnType<typeof syntaxFixture>>
 beforeEach(async () => {
-  fixture = await syntaxFixture()
+  fixture = await syntaxFixture('typescript', false, 'differential')
 })
 afterEach(() => fixture.dispose())
 
@@ -271,7 +271,7 @@ test('undo removes obsolete marks', async () => {
 
 test('equivalent JSON signature spellings collide', async () => {
   fixture.dispose()
-  fixture = await syntaxFixture('json')
+  fixture = await syntaxFixture('json', false, 'differential')
   const input = history('{"tail":0}', [
     { offset: 1, deleteCount: 0, text: '"name":1,' },
     { offset: 1, deleteCount: 0, text: '"\\u006eame":2,' },

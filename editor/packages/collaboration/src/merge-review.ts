@@ -31,6 +31,7 @@ export type MergeReviewSyntax = (
   ranges: readonly MergeReviewRange[],
   contentKey?: boolean,
   selection?: 'enclosing' | 'touching',
+  baseSnapshot?: PieceTableSnapshot,
 ) => Promise<readonly (readonly MergeReviewUnit[])[] | null>
 export type MergeReviewMark = {
   readonly kind: 'overlap' | 'parse' | 'signature' | 'orphan'
@@ -78,16 +79,19 @@ export class MergeReviewDetector {
       before: new Map(),
       formatting: new Map(),
     }
-    const active = new Map<ConcurrentEdit, boolean>()
-    const activePairs = pairs.filter((pair) =>
-      pair.every((edit) => {
-        if (!active.has(edit)) active.set(edit, engine.effectActive(edit.envelope.id))
-        return active.get(edit)
-      }),
-    )
+    const involved = new Set<ConcurrentEdit>()
+    for (const [left, right] of pairs) {
+      involved.add(left)
+      involved.add(right)
+    }
+    const active = new Set([...involved].filter((edit) => engine.effectActive(edit.envelope.id)))
+    const activePairs =
+      active.size === involved.size
+        ? pairs
+        : pairs.filter(([left, right]) => active.has(left) && active.has(right))
     if (!activePairs.length) return { status: 'complete', marks: [] }
-    const edits = new Set<ConcurrentEdit>()
-    for (const pair of activePairs) for (const edit of pair) edits.add(edit)
+    const edits =
+      active.size === involved.size ? involved : new Set(activePairs.flatMap((pair) => [...pair]))
     const ranges = [...edits.values()].flatMap((edit) =>
       touchedRanges(confirmed.buffer, edit).map((range) => ({ edit, range })),
     )
@@ -120,7 +124,13 @@ export class MergeReviewDetector {
       const edit = key
       if (edit.inserted.length || !edit.deleted.length) continue
       const base = without(state, [edit])
-      const original = await this.syntax(base, touchedRanges(base, edit), false, 'touching')
+      const original = await this.syntax(
+        base,
+        touchedRanges(base, edit),
+        false,
+        'touching',
+        state.current,
+      )
       if (!original) return { status: 'unavailable', marks: [] }
       const originalUnits = original.flat()
       touches.set(
@@ -231,7 +241,13 @@ export class MergeReviewDetector {
     if (!whitespaceEdit(edit, before)) return false
     const afterUnit = (await this.syntax(state.current, [unit], true))?.[0]?.[0]
     const beforeUnit = (
-      await this.syntax(before, [projectedRange(state.current, before, unit)], true)
+      await this.syntax(
+        before,
+        [projectedRange(state.current, before, unit)],
+        true,
+        'enclosing',
+        state.current,
+      )
     )?.[0]?.[0]
     if (!afterUnit || !beforeUnit) return null
     const formatting =
@@ -249,7 +265,13 @@ export class MergeReviewDetector {
         [...edits].filter((edit) => edit.envelope.id.actor !== actor),
       )
       const unit = (
-        await this.syntax(projected, [projectedRange(state.current, projected, candidate.unit)])
+        await this.syntax(
+          projected,
+          [projectedRange(state.current, projected, candidate.unit)],
+          false,
+          'enclosing',
+          state.current,
+        )
       )?.[0]?.[0]
       if (!unit) return null
       if (unit.hasErrors) return false
@@ -267,7 +289,9 @@ export class MergeReviewDetector {
     for (const unit of [left, right]) {
       const range = projectedRange(state.current, before, unit)
       if (range.startIndex === range.endIndex) return true
-      const previous = (await this.syntax(before, [range]))?.[0]?.[0]
+      const previous = (
+        await this.syntax(before, [range], false, 'enclosing', state.current)
+      )?.[0]?.[0]
       if (!previous) return null
       if (previous.type !== unit.type || normalizeSignature(previous) !== normalizeSignature(unit))
         return true
@@ -289,7 +313,13 @@ export class MergeReviewDetector {
       if (!left || !right || !insideSpans(insert.originLeft, deletion.deleted)) continue
       if (!insideSpans(insert.originRight, deletion.deleted)) continue
       const unit = (
-        await this.syntax(base, [{ startIndex: left.offset, endIndex: right.offset + 1 }])
+        await this.syntax(
+          base,
+          [{ startIndex: left.offset, endIndex: right.offset + 1 }],
+          false,
+          'enclosing',
+          state.current,
+        )
       )?.[0]?.[0]
       if (!unit) return null
       const covered = charIdSpansInRange(base, unit.startIndex, unit.endIndex).every((span) =>
@@ -643,19 +673,17 @@ function signatureEscape(
 }
 
 function orphanPair(pair: ConcurrentPair): boolean {
-  if (pair.every((edit) => edit.deleted.reduce((count, span) => count + span.count, 0) < 2))
-    return false
-  return [pair, [pair[1], pair[0]]].some(([deletion, insertion]) => {
-    const change = insertion.envelope.change
-    if (change.kind !== 'insert' && change.kind !== 'replace') return false
-    const insert = change.kind === 'insert' ? change : change.insert
-    return (
-      insert &&
-      insertion.inserted.length &&
-      typeof insert.originLeft !== 'string' &&
-      typeof insert.originRight !== 'string' &&
-      insideSpans(insert.originLeft, deletion.deleted) &&
-      insideSpans(insert.originRight, deletion.deleted)
-    )
-  })
+  return orphanInsertion(pair[0], pair[1]) || orphanInsertion(pair[1], pair[0])
+}
+
+function orphanInsertion(deletion: ConcurrentEdit, insertion: ConcurrentEdit): boolean {
+  const change = insertion.envelope.change
+  if (change.kind !== 'insert' && change.kind !== 'replace') return false
+  const insert = change.kind === 'insert' ? change : change.insert
+  if (typeof insert.originLeft === 'string' || typeof insert.originRight === 'string') return false
+  return (
+    insertion.inserted.length > 0 &&
+    insideSpans(insert.originLeft, deletion.deleted) &&
+    insideSpans(insert.originRight, deletion.deleted)
+  )
 }

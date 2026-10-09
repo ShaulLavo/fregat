@@ -4,7 +4,7 @@ import { appendEdit, history, peerSnapshot, syntaxFixture } from './merge-review
 
 let fixture: Awaited<ReturnType<typeof syntaxFixture>>
 beforeEach(async () => {
-  fixture = await syntaxFixture()
+  fixture = await syntaxFixture('typescript', false, 'differential')
 })
 afterEach(() => fixture.dispose())
 
@@ -95,7 +95,7 @@ test('operation-level formatting classification agrees for full-window and batch
 
 test('formatting existing duplicate JSON names never creates signature edges', async () => {
   fixture.dispose()
-  fixture = await syntaxFixture('json')
+  fixture = await syntaxFixture('json', false, 'differential')
   const text = '{"x":1,"x":2}'
   expect(
     await detect(
@@ -109,7 +109,7 @@ test('formatting existing duplicate JSON names never creates signature edges', a
 
 test('content edits to pre-existing duplicate signatures do not introduce a signature conflict', async () => {
   fixture.dispose()
-  fixture = await syntaxFixture('json')
+  fixture = await syntaxFixture('json', false, 'differential')
   const text = '{"x":1,"x":2}'
   expect(
     await detect(
