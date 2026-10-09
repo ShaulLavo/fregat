@@ -46,6 +46,7 @@ import { ColumnsView } from '@/features/file-picker/components/columns-view'
 import { IconsView } from '@/features/file-picker/components/icons-view'
 import {
   deepestPickable,
+  folderLabel,
   initialTrail,
   pickerView,
   shownPickerView,
@@ -80,7 +81,8 @@ import { NewFolderPopover } from '@/features/file-picker/components/new-folder-p
 import { CompactHeader } from '@/features/file-picker/components/compact-header'
 import { CompactMenu } from '@/features/file-picker/components/compact-menu'
 import { LocationBar } from '@/features/file-picker/components/location-bar'
-import { MobileLocations } from '@/features/file-picker/components/mobile-locations'
+import { PlacesSheet } from '@/features/file-picker/components/places-sheet'
+import { LEADING_RECENT_LIMIT } from '@/features/file-picker/utils/rows'
 import { PlacesSidebar } from '@/features/file-picker/components/places-sidebar'
 import { PinFolderButton } from '@/features/file-picker/components/pin-folder-button'
 import {
@@ -225,12 +227,26 @@ export function FilePickerDialog({
     [effectiveSort, loadedEntries],
   )
   const entries = filterPickerEntries(sortedEntries, mode, activeAccept)
-  const selectedEntry = selectedVisibleEntry(entries, session.selectedEntry)
+  const wide = useMediaQuery(WIDE_QUERY, true)
+  const compact = useMediaQuery(COMPACT_QUERY, false)
+  // A phone leads the folder it opened in with recent folders; the Places sheet has them anywhere.
+  const leadsWithRecents = compact && !isSearching && session.currentPath === session.openedPath
+  const leadingRecents = leadsWithRecents
+    ? filterPickerEntries(loadStateEntries(recentState), mode, activeAccept).slice(
+        0,
+        LEADING_RECENT_LIMIT,
+      )
+    : []
+  // Recents and the folder appear together, so no row moves under a finger once shown.
+  const recentsPending = leadsWithRecents && recentState.status === 'loading'
+  // The picked folder is usually a recent one too; its recent row keeps the top of the list in view.
+  const selectedEntry = selectedVisibleEntry(
+    leadingRecents.length > 0 ? [...leadingRecents, ...entries] : entries,
+    session.selectedEntry,
+  )
   const viewSetting = useSettingValue('files.picker.view')
   const chosenView = pickerView(viewSetting, mode)
   const [middleRef, middleWidth] = useElementWidth<HTMLDivElement>()
-  const wide = useMediaQuery(WIDE_QUERY, true)
-  const compact = useMediaQuery(COMPACT_QUERY, false)
   // A phone has room for one column of names, and no hover or double click to drive the others.
   const view = compact ? 'list' : shownPickerView(chosenView, isSearching, middleWidth)
   const [trailState, setTrailState] = useState<{ path: string; trail: ColumnTrail } | null>(null)
@@ -684,11 +700,11 @@ export function FilePickerDialog({
           )}
           <FileList
             accept={activeAccept}
-            entries={entries}
+            entries={recentsPending ? [] : entries}
             isBusy={listInteractionPending}
             isSearching={isSearching}
             listRef={listRef}
-            loadState={loadState}
+            loadState={recentsPending ? { status: 'loading' } : loadState}
             mode={mode}
             onDirectoryIntent={guessDirectory}
             onEntryDoubleClick={handleEntryDoubleClick}
@@ -697,6 +713,11 @@ export function FilePickerDialog({
               if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
             }}
             onRetry={refresh}
+            recents={
+              leadingRecents.length > 0
+                ? { entries: leadingRecents, folder: folderLabel(session.currentPath) }
+                : null
+            }
             touch={compact}
             selectedPath={selectedEntry?.path ?? null}
           />
@@ -769,7 +790,15 @@ export function FilePickerDialog({
                   onEditPath={pathInput.open}
                   onUp={() => navigateTo(pickerParentPath(session.currentPath))}
                 />
-                <div className='flex px-(--bar-padding-x)'>{searchField}</div>
+                <div className='flex gap-(--density-gap-tight) px-(--bar-padding-x)'>
+                  {searchField}
+                  <PlacesSheet
+                    currentPath={session.currentPath}
+                    labelled
+                    recentState={recentState}
+                    sections={sections}
+                  />
+                </div>
               </>
             ) : (
               <PaneBar>
@@ -834,6 +863,14 @@ export function FilePickerDialog({
                   onEdit={pathInput.open}
                   onSubmit={pathInput.submit}
                 />
+                {wide ? null : (
+                  <PlacesSheet
+                    currentPath={session.currentPath}
+                    labelled={false}
+                    recentState={recentState}
+                    sections={sections}
+                  />
+                )}
                 {searchField}
                 <Tabs value={chosenView} onValueChange={(next: PickerView) => chooseView(next)}>
                   <TabsList aria-label='View' variant='segmented'>
@@ -870,12 +907,6 @@ export function FilePickerDialog({
                 {folderActions}
               </PaneBar>
             )}
-
-            <MobileLocations
-              currentPath={session.currentPath}
-              recentState={recentState}
-              sections={sections}
-            />
 
             {wide ? (
               <PersistedResizablePanelGroup

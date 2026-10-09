@@ -14,12 +14,15 @@ type NavigationState = {
   readonly backHistory: readonly string[]
   readonly currentPath: string
   readonly forwardHistory: readonly string[]
+  /** The folder the picker opened in; the phone leads it with recent folders. */
+  readonly openedPath: string
 }
 
 const initialNavigationState: NavigationState = {
   backHistory: [],
   currentPath: ROOT_PATH,
   forwardHistory: [],
+  openedPath: ROOT_PATH,
 }
 
 export function useFilePickerSession(value: PickedFsEntry | null) {
@@ -35,10 +38,12 @@ export function useFilePickerSession(value: PickedFsEntry | null) {
     if (isInitialized) return
 
     setIsInitialized(true)
+    const openedPath = initialPathForOpen(value, info.defaultPath ?? info.homePath)
     setNavigation({
       backHistory: [],
-      currentPath: initialPathForOpen(value, info.defaultPath ?? info.homePath),
+      currentPath: openedPath,
       forwardHistory: [],
+      openedPath,
     })
     setQuery('')
     setSelectedEntry(value)
@@ -101,6 +106,7 @@ export function useFilePickerSession(value: PickedFsEntry | null) {
     currentPath: navigation.currentPath,
     effectiveQuery,
     forwardPath: navigation.forwardHistory[0] ?? null,
+    openedPath: navigation.openedPath,
     goBack,
     goForward,
     initializeOpenSession,
@@ -121,6 +127,7 @@ function navigate(current: NavigationState, path: string): NavigationState {
   if (path === current.currentPath) return current
 
   return {
+    ...current,
     backHistory: current.backHistory.concat(current.currentPath),
     currentPath: path,
     forwardHistory: [],
@@ -132,6 +139,7 @@ function back(current: NavigationState): NavigationState {
   if (previousPath === undefined) return current
 
   return {
+    ...current,
     backHistory: current.backHistory.slice(0, -1),
     currentPath: previousPath,
     forwardHistory: [current.currentPath, ...current.forwardHistory],
@@ -143,6 +151,7 @@ function forward(current: NavigationState): NavigationState {
   if (nextPath === undefined) return current
 
   return {
+    ...current,
     backHistory: current.backHistory.concat(current.currentPath),
     currentPath: nextPath,
     forwardHistory: current.forwardHistory.slice(1),
