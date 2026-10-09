@@ -224,6 +224,7 @@ export function createTooltipController(options: TooltipOptions): TooltipControl
     } else applyTooltipDimensions(tooltip, reentryElement, tooltip.hidden !== false)
     renderTooltip(tooltip, {
       actionRows,
+      controls,
       hoverText: showOptions.hoverText,
       parts,
       theme: showOptions.theme,
@@ -404,6 +405,7 @@ function createTooltipElement(document: Document, classNamespace: string): HTMLD
 }
 
 type TooltipContent = {
+  readonly controls: boolean
   readonly actionRows: WeakMap<TooltipAction, HTMLElement>
   readonly hoverText: string | null
   readonly parts: readonly TooltipPart[]
@@ -514,7 +516,7 @@ function createTooltipRow(
     position: 'relative',
     minWidth: '0',
     padding: '6px 30px 6px 10px',
-    borderTop: `1px solid ${HOVER_COLORS.separator}`,
+    borderTop: content.controls ? '0' : `1px solid ${HOVER_COLORS.separator}`,
     boxSizing: 'border-box',
     cursor: 'text',
   })
@@ -1131,6 +1133,8 @@ function tooltipControlStyle(document: Document): HTMLStyleElement {
   const style = document.createElement('style')
   style.textContent = `
     [data-editor-hover-presentation="controls"]:not([hidden]) { display: flex; flex-direction: column; }
+    [data-editor-hover-presentation="controls"] [role="document"] { outline: none; }
+    [data-editor-hover-presentation="controls"] [role="document"] + [role="document"] { background: ${HOVER_COLORS.controlBackground}; }
     .editor-hover-control { appearance: none; border: 0; border-radius: 4px; padding: 6px 10px; background: ${HOVER_COLORS.controlBackground}; color: ${HOVER_COLORS.foreground}; font: inherit; text-decoration: none; cursor: pointer; }
     .editor-hover-control:hover { background: ${HOVER_COLORS.controlHover}; }
     .editor-hover-control:active { background: ${HOVER_COLORS.controlPressed}; }

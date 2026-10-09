@@ -155,6 +155,10 @@ async function assertHover(page: Page, index: number, normal = true): Promise<vo
         owner: { left: owner.left, right: owner.right },
         anchor: { top: anchor.top, bottom: anchor.bottom, left: anchor.left },
         actions,
+        toneOnly: [...body.querySelectorAll<HTMLElement>('[role="document"]')].every((region) => {
+          const style = getComputedStyle(region)
+          return style.outlineStyle === 'none' && style.borderTopStyle === 'none'
+        }),
         scrollHeight: body.scrollHeight,
         clientHeight: body.clientHeight,
       }
@@ -172,6 +176,7 @@ async function assertHover(page: Page, index: number, normal = true): Promise<vo
       geometry.actions.every((action) => action.visible && action.button),
     JSON.stringify(geometry),
   )
+  ok(geometry.toneOnly, JSON.stringify(geometry))
   if (normal) ok(geometry.scrollHeight <= geometry.clientHeight + 1, JSON.stringify(geometry))
 }
 

@@ -285,7 +285,13 @@ them).
    the mark, both peers’ hovers, all resolutions, pane-edge hover, manual hover and separate
    `look` capture were read back. Revision evidence is
    `20261009T185446Z-scenario-collaboration-merge-review-N7qcLB`
-   and `20261009T185341Z-look-collaboration-html-1440x1000-qzmSYf`. Example theme type is
+   and `20261009T185341Z-look-collaboration-html-1440x1000-qzmSYf`. Final hover polish removes
+   host focus outlines from comparison regions, keeps keyboard focus visible on buttons, and
+   separates content sections by tone. A failing-first browser regression supplies the host focus
+   rule; all 22 shared-hover tests pass. The native scenario also checks outline-free, border-free
+   content sections before clicking. Refreshed screenshots were read back from
+   `20261009T190839Z-scenario-collaboration-merge-review-RQmT0p`; site-mode look evidence is
+   `20261009T190932Z-look-collaboration-html-1440x1000-LYR2LA`. Example theme type is
    explicit so its dark page and shared hover use the same palette. Detector cost and the
    dedicated projected query remain step 3 work.
 

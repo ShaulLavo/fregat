@@ -173,6 +173,25 @@ it('keeps all controls visible in a compact footer without scrolling', () => {
   }
 })
 
+it('keeps comparison content tone-only when the host outlines keyboard focus', async () => {
+  const style = document.createElement('style')
+  style.textContent = ':focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }'
+  document.body.append(style)
+  const hover = comparisonHover()
+  const content = hover.querySelector<HTMLElement>('[role="document"]')!
+  await commands.noteActionKey('Tab')
+  content.focus()
+  expect(content.matches(':focus-visible')).toBe(true)
+  expect(getComputedStyle(content).outlineStyle).toBe('none')
+  for (const region of hover.querySelectorAll<HTMLElement>('[role="document"]'))
+    expect(getComputedStyle(region).borderTopStyle).toBe('none')
+  const button = [...hover.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) => node.textContent === 'Keep both',
+  )!
+  button.focus()
+  expect(getComputedStyle(button).outlineStyle).toBe('solid')
+})
+
 it('presents hover controls as buttons with keyboard focus and press states', async () => {
   const hover = comparisonHover()
   const button = [...hover.querySelectorAll<HTMLButtonElement>('button')].find(
