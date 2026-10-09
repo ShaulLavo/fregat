@@ -6,6 +6,7 @@ import { createLineGutterPlugin } from '../../gutters/src/index'
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
+    proofType: (text: string) => Promise<void>
     proofImeComposition: (
       text: string,
       replacement?: readonly [number, number] | null,
@@ -36,11 +37,19 @@ it.each(['transform', 'top'] as const)(
       plugins: [createLineGutterPlugin()],
     })
     for (const lines of [900_000, 3_000_000]) {
-      const text = 'x\n'.repeat(lines) + 'final!'
+      const text = 'x\n'.repeat(lines) + 'final'
       editor.setText(text)
       editor.setSelection(text.length, text.length, { reveal: true })
       editor.focus()
       await frames()
+      await commands.proofType('!')
+      await frames()
+      expect(editor.getTextSnapshot().readRange(text.length, text.length + 1)).toBe('!')
+      expect(editor.getSelections()).toHaveLength(1)
+      expect(editor.getSelections()[0]).toMatchObject({
+        anchorOffset: text.length + 1,
+        headOffset: text.length + 1,
+      })
       const row = host.querySelector<HTMLElement>(`[data-editor-virtual-row="${lines}"]`)!
       expect(row.textContent).toBe('final!')
       const rect = row.getBoundingClientRect()
@@ -53,7 +62,7 @@ it.each(['transform', 'top'] as const)(
       expect(composition.textContent).toBe('候補')
       expect(composition.getBoundingClientRect().top).toBeCloseTo(rect.top, 0)
       await commands.proofImeComposition('')
-      expect(editor.getTextSnapshot().readRange(text.length - 6, text.length)).toBe('final!')
+      expect(editor.getTextSnapshot().readRange(text.length - 5, text.length + 1)).toBe('final!')
     }
   },
 )
