@@ -188,6 +188,12 @@ function appendCompleteWrapText(
         segmentVisual = 0
       }
       cells = clusterCells(text, index, end, segmentVisual, tabStop, advance)
+      if (!interior && segmentVisual > 0 && segmentVisual + cells > width) {
+        line.ends.push(length)
+        segmentStart = length
+        segmentVisual = 0
+        cells = clusterCells(text, index, end, segmentVisual, tabStop, advance)
+      }
     }
     visual += cells
     segmentVisual += cells

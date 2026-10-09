@@ -103,3 +103,33 @@ test('replaces overestimated joined-emoji extent with measured paint', async () 
   expect(scroller.scrollLeft).toBe(0)
   await page.elementLocator(container).screenshot()
 })
+
+test('keeps trailing-space markers on their source offsets after character rewrapping', async () => {
+  const container = document.createElement('div')
+  container.style.cssText = 'display:flex;width:36px;height:240px'
+  document.body.append(container)
+  const editor = new Editor(container, {
+    wordWrap: true,
+    wordWrapBreak: 'character',
+    hiddenCharacters: 'trailing',
+    fontFamily: 'wrap-home',
+    fontSize: 14,
+    lineHeight: 22,
+    plugins: [createLineGutterPlugin({ minWidth: 24 })],
+  })
+  mounted.push({ editor, container })
+  editor.setText('ab   cd  ')
+  const rows = () => [...container.querySelectorAll('.editor-virtualized-row:not([hidden])')]
+  await expect.poll(() => rows().length).toBe(9)
+  container.style.width = '80px'
+  await expect.poll(() => container.getBoundingClientRect().width).toBe(80)
+  await expect.poll(() => rows().length).toBe(3)
+  const markerOffsets = () =>
+    [...container.querySelectorAll<HTMLElement>('.editor-virtualized-hidden-character-marker')]
+      .map((marker) => Number(marker.dataset.editorHiddenCharacterOffset))
+      .sort((left, right) => left - right)
+  await expect.poll(markerOffsets).toEqual([7, 8])
+  const scroller = container.querySelector<HTMLElement>('.editor-virtualized')!
+  expect(scroller.scrollWidth).toBe(scroller.clientWidth)
+  await page.elementLocator(container).screenshot()
+})

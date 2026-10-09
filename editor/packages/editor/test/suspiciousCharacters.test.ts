@@ -258,9 +258,11 @@ describe('suspicious character markers', () => {
     const view = mountWrappedView('город город город город', 64)
 
     expect(view.getState().mountedRows.map((row) => row.text)).toEqual([
-      'город го',
-      'род горо',
-      'д город',
+      // Seven columns leave room for the caret inside the 64 px viewport.
+      'город г',
+      'ород го',
+      'род гор',
+      'од',
     ])
     expect(markerKinds()).toEqual([])
   })

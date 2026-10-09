@@ -1,5 +1,7 @@
 import { vi } from 'vitest'
-import { createEditorTextBuffer } from '@singapore-editor/core/document'
+import { createEditorTextBuffer, type EditorTextBuffer } from '@singapore-editor/core/document'
+import type { DocumentKey, FilesystemPath } from '@/lib/documents/utils/types'
+import type { FileOpenIntentPreparedLease } from '@/lib/file-open-intent/state/service'
 import {
   createEditorDocumentAnalysis,
   type EditorPreparedDocument,
@@ -29,5 +31,27 @@ export function preparedDocumentLease(
     runtimeSessionIds: () => runtimeSessionIds,
     startStage: vi.fn(() => null),
     borrow: vi.fn(() => null),
+  }
+}
+
+export function preparedLeaseFor(
+  document: {
+    readonly buffer: EditorTextBuffer
+    readonly key: DocumentKey
+    readonly localRevision: number
+  },
+  path: FilesystemPath,
+  preparedDocument: EditorPreparedDocument = preparedDocumentLease(),
+  fileVersion: string | null = null,
+): FileOpenIntentPreparedLease {
+  return {
+    buffer: document.buffer,
+    document: preparedDocument,
+    documentKey: document.key,
+    fileVersion,
+    localRevision: document.localRevision,
+    path,
+    release: vi.fn(),
+    snapshot: document.buffer.getSnapshot(),
   }
 }

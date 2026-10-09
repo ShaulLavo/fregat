@@ -38,6 +38,8 @@ const edit = participant.local({ offset: 5, deleteCount: 0, text: ' world' })
 - `Participant.local()` creates an optimistic local edit.
 - `Participant.receive()` applies ordered host messages.
 - `TextbufferEngine` stores text in persistent snapshots.
+- `ConfirmedWindow` finds concurrent edits by different authors and their character ID spans.
+- `Engine.projectEffects()` creates local author/base review snapshots while preserving live state.
 
 [Generated API reference](https://shaulavo.dev/singapore/docs/reference/api/collab/overview/)
 

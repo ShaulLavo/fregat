@@ -82,7 +82,7 @@ containment scopes counter properties to the element's subtree — which include
 its own pseudo-elements — and Chromium and Firefox render it that way.
 
 The failure needs both halves on one element. Style containment on
-*ancestors* of the counter-carrying element works fine in WebKit, which is why
+_ancestors_ of the counter-carrying element works fine in WebKit, which is why
 only the gutter cell (and not the row/root containment) ever broke.
 
 ### Repro matrix
@@ -91,14 +91,24 @@ Minimal repro, WebKit-only failure on the marked rows:
 
 ```html
 <style>
-  .num::before { content: counter(editor-line); }
-  .lps { contain: layout paint style; }
-  .lp  { contain: layout paint; }
+  .num::before {
+    content: counter(editor-line);
+  }
+  .lps {
+    contain: layout paint style;
+  }
+  .lp {
+    contain: layout paint;
+  }
 </style>
-<span class="num lps" style="counter-set: editor-line 42"></span> <!-- WebKit: 0 -->
-<span class="num" style="counter-set: editor-line 42; contain: style"></span> <!-- WebKit: 0 -->
-<span class="num lp" style="counter-set: editor-line 42"></span> <!-- 42 everywhere -->
-<span class="lps"><span class="num" style="counter-set: editor-line 42"></span></span> <!-- 42 everywhere -->
+<span class="num lps" style="counter-set: editor-line 42"></span>
+<!-- WebKit: 0 -->
+<span class="num" style="counter-set: editor-line 42; contain: style"></span>
+<!-- WebKit: 0 -->
+<span class="num lp" style="counter-set: editor-line 42"></span>
+<!-- 42 everywhere -->
+<span class="lps"><span class="num" style="counter-set: editor-line 42"></span></span>
+<!-- 42 everywhere -->
 ```
 
 Also verified unaffected: dynamic CSSOM assignment (`el.style.counterSet`),
@@ -213,3 +223,61 @@ The `draws spelling marks without a language or syntax tokens` regression in
 `packages/spellcheck/test/paint.browser.test.ts` checks underline pixels in all three engines.
 The core paint tests verify that syntax and semantic colors still win over the base. No upstream
 issue has been filed yet.
+
+## WebKit leaves hidden editor syntax highlights unpainted on reveal
+
+Verified 2026-10-09 with Playwright 1.63.0 on Linux: WebKit 26.6 reproduces the
+Singapore home/manual takeover failure. Chromium 153.0.8010.12 passes those
+production controls. Firefox 155.0 passes the native Highlight and simple-editor
+controls below. The iPhone descriptor uses Linux WebKit; real iOS Safari has not
+been verified by this automated matrix.
+
+### Trigger and workaround
+
+During the site's asynchronous syntax takeover, a host remains `visibility: hidden`
+while the editor registers syntax `StaticRange` objects. After the host is shown,
+WebKit can draw plain text with no syntax pixels. The ranges remain connected,
+registered and geometrically valid, with the correct computed highlight colours.
+Deleting and adding the same ranges to their existing `Highlight` restores paint.
+Re-registering the existing groups or reattaching their stylesheets did not restore it.
+
+`Editor.setPresentationReady(true)` refreshes this editor's existing syntax memberships
+on a hidden-to-visible presentation transition. It preserves range/group identity and
+other editors' ranges. Already-ready and disposed editors do no membership work.
+This is a browser workaround, not a new highlighting algorithm.
+
+### Capability check and behavioral probe
+
+`CSS.supports('-webkit-nbsp-mode', 'space')` selects WebKit's native text-layout
+capability without reading a user-agent string. This check identifies the engine;
+it does **not** detect stale Custom Highlight paint, and it can stay true after the
+bug is fixed. Chromium and Firefox skip membership churn and still restore groups
+and stylesheets. Refreshing 4,600 mounted ranges caused a 122–180 ms synchronous
+Firefox pause in the reviewed implementation; the guarded path measured 0–1 ms.
+These were bounded, non-quiet experiment samples, not throughput measurements.
+
+The behavioral probe is `editor/site/tests/presentation.browser.ts`, run against a
+production build with the membership-refresh loop removed. It checks native syntax
+pixels after home/manual takeover, including light/dark themes, cold reloads,
+desktop WebKit, phone-width WebKit and the iPhone descriptor. Screenshot animations
+must remain enabled: disabling animations forces a WebKit repaint and hides the bug.
+The unchanged control failed with zero native live syntax pixels; the workaround
+passed all 32 production cases. See [the fix and verification](https://github.com/ShaulLavo/fregat/pull/1117).
+
+A plain native-API fixture and a one-line editor with manually assigned tokens both
+paint correctly in Chromium 153, Firefox 155 and WebKit 26.6. Hidden registration
+alone is therefore insufficient to reproduce the site's failure. The async site
+fixture is the confirmed repro; a dependency-free failing reduction is still open.
+
+### Removal check and upstream status
+
+Remove the membership refresh and rerun the native production pixel probe on the
+oldest supported and latest WebKit. Once the probe stops detecting missing syntax
+paint, remove the capability gate and refresh loop, retain the production regression,
+and rerun shared ownership, repeated reveal, disposal and all-engine paint tests.
+Keep ordinary group/stylesheet restoration. Do not wait for the unrelated native
+text-layout property to disappear. Real Safari verification is required before
+claiming a Safari version fixed it.
+
+An upstream WebKit report is drafted locally; nothing has been filed. The draft
+records the confirmed site repro, the unsuccessful reductions and the removal check.

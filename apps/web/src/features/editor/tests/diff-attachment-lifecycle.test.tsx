@@ -96,7 +96,9 @@ test('two attached Saved views survive independent copy, move, Save, Undo, disk 
   expect(firstPresentation.regions.getExpandedRegions().size).toBe(0)
   expect(copyPresentation.regions.getExpandedRegions().size).toBe(1)
   await waitFor(() =>
-    expect(firstPresentation.diffPanes.stacked.scroll).toEqual(first.getScrollPosition()),
+    expect([...firstPresentation.diffPanes.stacked.views.values()][0]?.anchors.left).toBe(
+      first.getScrollPosition().left,
+    ),
   )
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
   const survivorState = { selection: first.getSelections(), scroll: first.getScrollPosition() }

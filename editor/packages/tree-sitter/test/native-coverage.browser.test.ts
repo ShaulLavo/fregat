@@ -80,6 +80,35 @@ browserTest.each([
   },
 )
 
+browserTest.each([
+  ['missing delimiter', 'const value = (1 + 2;\n', true],
+  ['unexpected symbol', 'const value = @;\n', false],
+] as const)(
+  'keeps native %s diagnostics in full and range walks',
+  async (name, text, isMissing) => {
+    const backend = new TreeSitterWorkerClient()
+    const session = createTreeDocument({
+      documentId: `diagnostics-${name}.ts`,
+      languageId: 'typescript',
+      languageResolver: registry([]),
+      backend,
+      syntaxMode: 'full',
+      text,
+    })
+    try {
+      const full = await session.run()
+      const ranged = await session.runtime.queryRange({ startIndex: 0, endIndex: text.length })
+      expect(full.degraded).toBeNull()
+      expect(full.errors.some((error) => error.isMissing === isMissing)).toBe(true)
+      expect(full.errors).toEqual(ranged.errors)
+      expect(full.brackets).toEqual(ranged.brackets)
+    } finally {
+      session.dispose()
+      await backend.dispose()
+    }
+  },
+)
+
 browserTest(
   'loads only TypeScript on a cold open and preserves angle-bracket assertions',
   async () => {

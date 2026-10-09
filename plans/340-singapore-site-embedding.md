@@ -58,7 +58,9 @@ After the switch:
 
 This reproduces in both engines, on local and hosted builds, at both widths. The sample box keeps the static height, 638 px on phone and 484 px on desktop. Its live scroll height is 1254 px on phone and 946 px on desktop. Phone scroll widths are 396 px in a 382 px Chromium box and 406 px in a 382 px WebKit box. The static sample therefore remains the wrong height authority after takeover.
 
-The home failure is paint invalidation, not a missing grammar or palette. Eight syntax highlight groups exist, ranges point to connected visible editor text nodes, and the computed `::highlight()` colour for `import` is the expected red. Re-registering the same highlight objects after revealing the host makes the colours appear without loading syntax again. See `highlight-diagnosis.json` and `home-highlight-reinstall.png` in the raw evidence. `home.ts` mounts under `visibility: hidden`, waits for `CSS.highlights.size`, then reveals the host. That readiness check accepts a registered but unpainted highlight.
+The home failure is paint invalidation. Eight syntax highlight groups exist, their ranges point to connected visible editor text nodes, and the computed `::highlight()` colour for `import` is the expected red. `home.ts` mounts under `visibility: hidden`, waits for `CSS.highlights.size`, then reveals the host. That readiness check accepts a registered but unpainted highlight. See `highlight-diagnosis.json` and `home-highlight-reinstall.png` in the raw evidence.
+
+The portable production-site scenario reproduces the failure with native screenshot animations. Disabling animations during capture repaints WebKit and conceals the failure. Registry-only re-registration leaves native paint unchanged. Removing and adding the same editor-owned StaticRanges at `setPresentationReady(true)` restores colours while preserving ranges, shared Highlight objects and other editors' memberships.
 
 The quick-start manual's code fences do show colours in the reviewed screenshots. Do not generalize the home failure to every code fence. Add pixel checks for both paths, since a nonempty global highlight registry can also belong to another editor.
 
@@ -164,6 +166,8 @@ A separate editor implementation agent owns this section. First add a failing te
 
 Additional required regression inputs are tabs at wrap boundaries, trailing spaces, nonbreaking spaces, CJK, combining sequences, emoji/surrogate pairs at a chunk boundary, long identifiers, link replacements, emphasis and a caret revealing Markdown marks. These are test targets, not confirmed bugs from this investigation. If one fails, record its exact text, width and row ends here and fix it under this plan. Do not open issues or leave a new wrap failure unowned.
 
+- [x] Trailing-space regression: `ab   cd  ` at a 72 px viewport with a 24 px gutter and 8 px fallback advance has character-wrap ends `[4, 8, 9]` after the caret allowance, and word-wrap ends `[5, 9]`. Preserve trailing markers at source offsets `[7, 8]` in both modes. Rewrapping an unchanged space-only row must refresh its source range from `[2, 3]` to `[8, 9]`.
+
 ## Snapshot speed budget
 
 Treat restore speed as a landing-page requirement, separate from worker/parser startup. These are acceptance budgets, not achieved product claims:
@@ -196,7 +200,7 @@ This is encouraging for a small captured viewport, but WebKit already misses the
 - [ ] Add portable failing scenarios for the phone and desktop overflow, content-height changes and hidden-to-visible highlight paint.
 - [ ] Implement `scrollMode: 'content'` by reusing static all-row rendering. Test outside scroll reveal, edits, resize, font load, syntax replacements and disposal.
 - [ ] Fix reproduced wrap/line-breaking failures from the list above. Separate wrap PRs where the root causes differ.
-- [ ] Make hidden-to-visible presentation restore existing highlight paint at the owning editor lifecycle boundary. Reuse the existing highlight restoration path where appropriate; no site-wide registry manipulation or timer retry loop.
+- [x] Make hidden-to-visible presentation restore existing highlight paint at the owning editor lifecycle boundary. Reuse the existing highlight restoration path where appropriate; no site-wide registry manipulation or timer retry loop.
 - [ ] Give each public editor behavior change a patch changeset for affected packages. Do not edit package version numbers.
 
 ### Phase 2: Complete and responsive snapshot paint

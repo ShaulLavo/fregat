@@ -133,8 +133,9 @@ All of it is the local machine; the logs hold no remote-machine reads.
 | Breadcrumb folder row              | `features/workbench/components/breadcrumb-folder-picker.tsx:58`                                                 | No                                               | `useListbox` active row                                                                                     |
 | Chat file links, stack-frame links | `features/chat/hooks/use-open-file-reference.ts:22`                                                             | No                                               | Hover                                                                                                       |
 
-All of them end in `createEditorActivation.activate` (`features/editor/state/apply-actions.ts:589`),
-which tries `claimLive`, then `claimReadyClean`. One preparer serves them all.
+All of them end in `createEditorActivation.activate` (`features/editor/state/apply-actions.ts`),
+which joins the file's live document and any preparation already working on it. One preparer serves
+them all.
 
 ### Diffs
 

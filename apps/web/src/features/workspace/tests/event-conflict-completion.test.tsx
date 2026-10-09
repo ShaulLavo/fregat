@@ -14,6 +14,7 @@ import { fetchFile } from '@/lib/file-server'
 import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
 import { fileSystemKeys } from '@/lib/query-keys'
 import {
+  markDeletedFilesystemDocument,
   notifyChangedFilesystemConflict,
   notifyRenamedFilesystemConflict,
   dismissFilesystemConflicts,
@@ -157,6 +158,72 @@ for (const change of [
     }
   })
 }
+
+for (const event of ['changed', 'deleted'] as const) {
+  test(`keeping my changes after a ${event} event saves the buffer as it is when clicked`, async ({
+    server,
+  }) => {
+    const {
+      editor: { conflictStore },
+      path,
+      remote,
+      queryClient,
+      documents,
+      destination,
+      context,
+    } = await createConflictCompletionFixture(server)
+    createEditorBufferSession(destination.buffer).applyText('before toast ')
+    if (event === 'deleted') await rm(join(server.root, path))
+    render(<Toaster />)
+    act(() => notifyChangedFilesystemConflict(path, remote, context))
+    if (event === 'deleted') act(() => markDeletedFilesystemDocument(path, context))
+    const conflict = Object.values(conflictStore.getState().conflicts)[0]!
+    act(() => createEditorBufferSession(destination.buffer).applyText('after toast '))
+    const clickedText = destination.buffer.materializeFullText()
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep my changes' }))
+    await waitFor(() =>
+      expect(
+        queryClient.getMutationCache().find({
+          mutationKey: workspaceMutationKeys.resolveConflict(conflict.id),
+        })?.state.status,
+      ).toBe('success'),
+    )
+    expect(await readFile(join(server.root, path), 'utf8')).toBe(clickedText)
+    const kept = documents.getLiveEditorDocument(fileDocumentKey(path))!
+    expect(kept.buffer.materializeFullText()).toBe(clickedText)
+    expect(kept.buffer.isDirty()).toBe(false)
+    expect(conflictStore.getState().conflicts).toEqual({})
+  })
+}
+
+test('keeping my changes after the buffer closed leaves the disk file alone', async ({
+  server,
+}) => {
+  const {
+    commands,
+    editor: { conflictStore },
+    path,
+    remote,
+    queryClient,
+    destination,
+    context,
+  } = await createConflictCompletionFixture(server)
+  createEditorBufferSession(destination.buffer).applyText('local ')
+  render(<Toaster />)
+  act(() => notifyChangedFilesystemConflict(path, remote, context))
+  const conflict = Object.values(conflictStore.getState().conflicts)[0]!
+  act(() => commands.discardLiveEditorDocument(fileDocument(fileResource(path))))
+  fireEvent.click(await screen.findByRole('button', { name: 'Keep my changes' }))
+  await waitFor(() =>
+    expect(
+      queryClient.getMutationCache().find({
+        mutationKey: workspaceMutationKeys.resolveConflict(conflict.id),
+      })?.state.status,
+    ).toBe('error'),
+  )
+  expect(await readFile(join(server.root, path), 'utf8')).toBe('remote text')
+  expect(conflictStore.getState().conflicts[conflict.id]).toBe(conflict)
+})
 
 test('toast completion adopts a normal renamed resolution', async ({ server }) => {
   const {

@@ -22,7 +22,6 @@
   --chrome: 'Source Serif 4', Georgia, serif;
   --row: 22px;
   --size: 14px;
-  --cw: 8px;
   --gw: 48px;
   --gap: 18px;
   /* Text measure: 88 columns of the 8 px advance. */
@@ -306,8 +305,6 @@ body[data-mode='editor'] .pane {
 
 /* The prerendered rows. */
 .src {
-  /* The editor fits ceil(width / advance) columns, so the static rows round up the same way. */
-  --wrap: round(up, 100cqw - var(--gw) - 0.01px, var(--cw));
   font-family: var(--mono);
   font-size: var(--size);
   line-height: var(--row);
@@ -328,15 +325,14 @@ body[data-mode='editor'] .pane {
   position: relative;
   min-height: var(--row);
   margin: 0;
-  padding: 0 0 0 var(--gw);
+  /* Reserve one measured glyph for the caret and the editor's 1 px shaping margin. */
+  padding: 0 calc(1ch + 1px) 0 var(--gw);
   font-size: var(--size);
   line-height: var(--row);
   font-weight: 400;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  /* Half an advance of slack: fonts can render a fraction wider than 8 px, while the editor
-     counts whole columns. */
-  width: calc(var(--gw) + var(--wrap) + var(--cw) / 2);
+  width: 100cqw;
 }
 .r::before {
   content: attr(data-n) / '';
@@ -503,11 +499,6 @@ body[data-mode='editor'] .pane {
   }
   .viewport {
     height: auto;
-  }
-  /* Phones read the static page, so rows fit whole columns inside the screen instead of
-     rounding up the way the editor does. */
-  .src {
-    --wrap: round(down, 100cqw - var(--gw) - var(--cw) / 2, var(--cw));
   }
   .nw.wide {
     white-space: inherit;
