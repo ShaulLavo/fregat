@@ -364,6 +364,25 @@ test('memo review signatures retain whitespace inside string literals', () => {
   expect(applyMemoReviews(changed, [review]).rows[0].approved).toBe(false)
 })
 
+test('memo review signatures distinguish non-finite numbers from null', () => {
+  const original = source([
+    "import { useMemo } from 'react'",
+    'export function Probe() {',
+    '  const value = useMemo(() => 1e400, [])',
+    '  return <div>{value}</div>',
+    '}',
+  ])
+  const [memo]: readonly AuditRow[] = auditManualMemos('probe.tsx', original)
+  const review = { ...memo, reason: 'Reviewed the non-finite numeric value.' }
+  const inspect = (literal: string): Reviewed =>
+    applyMemoReviews(auditManualMemos('probe.tsx', original.replace('1e400', literal)), [review])
+      .rows[0]
+
+  expect(inspect('10e399').approved).toBe(true)
+  expect(inspect('null').review).toBe('changed')
+  expect(inspect('"Infinity"').review).toBe('changed')
+})
+
 test('memo reviews require reasons and reject duplicate entries', () => {
   const entry = {
     file: 'probe.tsx',

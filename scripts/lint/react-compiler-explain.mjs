@@ -415,6 +415,7 @@ function memoSignature(site, inferred, status) {
   const serialized = JSON.stringify(semantic, function (key, value) {
     if (['start', 'end', 'loc', 'range', 'comments'].includes(key)) return undefined
     if (key === 'raw' && this.type === 'Literal') return undefined
+    if (typeof value === 'number' && !Number.isFinite(value)) return { number: String(value) }
     return typeof value === 'bigint' ? value.toString() : value
   })
   return createHash('sha256').update(serialized).digest('hex')
