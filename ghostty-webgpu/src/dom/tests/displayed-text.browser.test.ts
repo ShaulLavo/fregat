@@ -142,6 +142,7 @@ describe.each(['webgl', 'canvas'] as const)('%s displayed-text demand', (backend
     clock.flush()
     const accepted = terminal.visibleLines()
     const held = JSON.stringify(delivered)
+    const originalPaint = CanvasRowPainter.prototype.paint
     const submit = (
       backend === 'canvas'
         ? vi.spyOn(CanvasRowPainter.prototype, 'paint')
@@ -149,10 +150,19 @@ describe.each(['webgl', 'canvas'] as const)('%s displayed-text demand', (backend
     ).mockImplementation(() => {
       throw new TypeError('injected paint failure')
     })
+    if (backend === 'canvas') {
+      vi.mocked(CanvasRowPainter.prototype.paint).mockImplementationOnce(function (
+        this: CanvasRowPainter,
+        ...args
+      ) {
+        originalPaint.apply(this, args)
+      })
+    }
     cleanups.push(() => submit.mockRestore())
     terminal.write('\x1b[1;1Hpending\x1b[2;1Hnew é 🧑‍💻')
     if (backend === 'canvas') expect(() => clock.flush()).toThrow('injected paint failure')
     if (backend === 'webgl') clock.flush()
+    expect(submit).toHaveBeenCalledTimes(backend === 'canvas' ? 2 : 1)
     expect(errors).toHaveLength(backend === 'canvas' ? 0 : 1)
     expect(terminal.visibleLines()).toEqual(accepted)
     expect(JSON.stringify(delivered)).toBe(held)
