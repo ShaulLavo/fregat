@@ -13,7 +13,7 @@ import {
   type RowRendererSurface,
   type RowThemeInvalidation,
 } from '../row-renderer.js'
-import { frameStyle, renderFrameToHtml, renderRowRuns, type RowRun } from './html.js'
+import { frameStyle, renderFrameToHtml, RowProjection, type RowRun } from './html.js'
 
 export { renderFrameToHtml } from './html.js'
 export type { RenderFrameHtmlOptions } from './html.js'
@@ -53,6 +53,7 @@ class DomSurface implements RowRendererSurface {
   private font: TerminalFittedFont
   private grid: RendererGridSize
   private theme: CanonicalRendererTheme
+  private projection: RowProjection
   private rows: MountedRow[] = []
 
   constructor(options: WebGpuTerminalRendererOptions) {
@@ -63,6 +64,7 @@ class DomSurface implements RowRendererSurface {
     this.font = copyFittedFont(options.font)
     this.grid = normalizeRendererGrid(options)
     this.theme = canonicalRendererTheme(mergeRendererTheme(options.theme))
+    this.projection = new RowProjection(this.font, this.theme)
     this.container = this.canvas.ownerDocument.createElement('div')
     this.container.style.position = 'absolute'
     this.container.style.pointerEvents = 'none'
@@ -87,7 +89,7 @@ class DomSurface implements RowRendererSurface {
     const mounted = this.rows[row.y]
     if (!mounted) return false
     let changed = false
-    const runs = renderRowRuns(row, cursor, this.font, this.theme)
+    const runs = this.projection.project(row, cursor)
     for (let index = 0; index < runs.length; index += 1) {
       const run = runs[index]!
       const previous = mounted.runs[index]
@@ -135,6 +137,7 @@ class DomSurface implements RowRendererSurface {
     const html = renderFrameToHtml({ cursor, rows: [] }, { ...grid, font, theme: this.theme })
     this.font = font
     this.grid = grid
+    this.projection = new RowProjection(font, this.theme)
     this.canvas.width = grid.columns * font.deviceCellWidth
     this.canvas.height = grid.rows * font.deviceCellHeight
     this.canvas.style.width = `${grid.columns * font.cssCellWidth}px`
@@ -150,6 +153,7 @@ class DomSurface implements RowRendererSurface {
   setTheme(theme: CanonicalRendererTheme): RowThemeInvalidation {
     if (themesEqual(this.theme, theme)) return 'cursor'
     this.theme = theme
+    this.projection = new RowProjection(this.font, theme)
     this.container.firstElementChild?.setAttribute('style', frameStyle(this.font, this.grid, theme))
     return 'all'
   }

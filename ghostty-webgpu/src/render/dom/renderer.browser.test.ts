@@ -7,6 +7,7 @@ import type { CursorState } from '../instances/types.js'
 import type { RendererFrameSnapshot } from '../renderer.js'
 import { Terminal } from '../../dom/terminal.js'
 import { CanvasTerminalRenderer } from '../canvas/renderer.js'
+import { CanvasColorCache } from '../canvas/colors.js'
 import { snapshotRenderState } from '../frame.js'
 import { WebGpuUnavailableError } from '../renderer.js'
 import { createCompatibleTerminalRenderer } from '../selector.js'
@@ -234,6 +235,41 @@ describe('DOM terminal renderer', () => {
       probe.renderer.notifySelectionChange()
       probe.clock.flush()
       expectSerializedFrame()
+    }
+  })
+
+  it('retains appearance CSS across text edits without retaining mutable cell styles', async () => {
+    const probe = await rendererProbe('dom', '\x1b[?25l\x1b[31mfirst')
+    const frame = probe.canvas.parentElement!.querySelector('.ghostty-webgpu-frame')!
+    const firstSpan = frame.querySelector('span')!
+    const firstText = firstSpan.firstChild
+    const foreground = vi.spyOn(CanvasColorCache.prototype, 'foreground')
+    for (const text of ['second', 'third', 'fourth']) {
+      probe.terminal.write(`\r\x1b[31m${text}\x1b[K`)
+      probe.renderer.notifyWrite()
+      probe.clock.flush()
+      expect(foreground).not.toHaveBeenCalled()
+      expect(frame.querySelector('span')).toBe(firstSpan)
+      expect(firstSpan.firstChild).toBe(firstText)
+      expect(frame.textContent).toContain(text)
+    }
+    foreground.mockRestore()
+    for (const input of [
+      '\r\x1b[1;3;4:3;38;2;90;100;110mchanged\x1b[0m\x1b[K',
+      '\r\x1b[31magain\x1b[K',
+      '\r\x1b[32mgreen\x1b[K',
+      '\r\x1b[31mred\x1b[K',
+    ]) {
+      probe.terminal.write(input)
+      probe.renderer.notifyWrite()
+      probe.clock.flush()
+      expect(frame.parentElement!.innerHTML).toBe(
+        renderFrameToHtml(snapshotRenderState(probe.state), {
+          columns: 12,
+          rows: 3,
+          font: probeFont,
+        }),
+      )
     }
   })
 

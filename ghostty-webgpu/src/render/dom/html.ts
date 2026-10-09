@@ -145,28 +145,85 @@ export interface RowRun {
   readonly text: string
 }
 
+interface CachedAppearance {
+  readonly cell: RenderCell
+  readonly style: string
+  width: number
+  runStyle: string
+}
+
+export class RowProjection {
+  readonly colors: CanvasColorCache
+  readonly scratchA = emptyRenderCell()
+  readonly scratchB = emptyRenderCell()
+  private readonly appearances: CachedAppearance[] = []
+
+  constructor(
+    private readonly font: TerminalFittedFont,
+    private readonly theme: CanonicalRendererTheme,
+  ) {
+    this.colors = new CanvasColorCache(theme.minimumContrast)
+  }
+
+  project(row: RenderRow, cursor: CursorState | undefined): readonly RowRun[] {
+    return renderRowRuns(row, cursor, this.font, this.theme, this)
+  }
+
+  appearance(cell: RenderCell): CachedAppearance {
+    for (const cached of this.appearances) {
+      if (sameAppearance(cached.cell, cell)) return cached
+    }
+    const cached: CachedAppearance = {
+      // Packed reads mutate their scratch colors and styles on the next cell.
+      cell: {
+        ...emptyRenderCell(),
+        selected: cell.selected,
+        foreground: cell.foreground ? { ...cell.foreground } : undefined,
+        background: cell.background ? { ...cell.background } : undefined,
+        style: cell.style ? { ...cell.style } : undefined,
+      },
+      style: cellStyle(cell, undefined, this.font, this.theme, this.colors, 1),
+      width: 0,
+      runStyle: '',
+    }
+    if (this.appearances.length === 2) this.appearances.shift()
+    this.appearances.push(cached)
+    return cached
+  }
+}
+
 export function renderRowRuns(
   row: RenderRow,
   cursor: CursorState | undefined,
   font: TerminalFittedFont,
   theme: CanonicalRendererTheme,
+  projection?: RowProjection,
 ): readonly RowRun[] {
-  const colors = new CanvasColorCache(theme.minimumContrast)
+  const colors = projection?.colors ?? new CanvasColorCache(theme.minimumContrast)
   const packed = row.packed
-  const scratchA = emptyRenderCell()
-  const scratchB = emptyRenderCell()
+  const scratchA = projection?.scratchA ?? emptyRenderCell()
+  const scratchB = projection?.scratchB ?? emptyRenderCell()
   const length = packed?.length ?? row.cells.length
   const runs: RowRun[] = []
   let currentStyle = ''
   let currentText = ''
   let currentWidth = 0
   let currentCursor: CursorState['style'] | undefined
+  let currentAppearance: CachedAppearance | undefined
   let previousCell: RenderCell | undefined
   function flush(): void {
     if (currentWidth === 0) return
+    let style = currentAppearance?.runStyle ?? ''
+    if (!currentAppearance || currentAppearance.width !== currentWidth) {
+      style = `${currentStyle}width:calc(${currentWidth} * var(--ghostty-cell-width, ${font.cssCellWidth}px));`
+      if (currentAppearance) {
+        currentAppearance.width = currentWidth
+        currentAppearance.runStyle = style
+      }
+    }
     runs.push({
       cursor: currentCursor,
-      style: `${currentStyle}width:calc(${currentWidth} * var(--ghostty-cell-width, ${font.cssCellWidth}px));`,
+      style,
       text: currentText,
     })
     currentText = ''
@@ -182,13 +239,16 @@ export function renderRowRuns(
       cursor?.visible && cursor.y === row.y && cursor.x === cell.x ? cursor : undefined
     // Cursor and wide-cell paint stays isolated; font, theme and contrast are fixed for this row.
     const reusable = width === 1 && !paintedCursor
-    const style =
-      reusable && previousCell && sameAppearance(previousCell, cell)
-        ? currentStyle
-        : cellStyle(cell, paintedCursor, font, theme, colors, width)
+    const adjacent = reusable && previousCell && sameAppearance(previousCell, cell)
+    let appearance = currentAppearance
+    if (!adjacent) appearance = reusable ? projection?.appearance(cell) : undefined
+    const style = adjacent
+      ? currentStyle
+      : (appearance?.style ?? cellStyle(cell, paintedCursor, font, theme, colors, width))
     previousCell = reusable ? cell : undefined
     if (style !== currentStyle || paintedCursor || currentCursor || width > 1) flush()
     currentStyle = style
+    currentAppearance = appearance
     currentCursor = paintedCursor?.style
     currentText += cell.text || ' '
     currentWidth += width
