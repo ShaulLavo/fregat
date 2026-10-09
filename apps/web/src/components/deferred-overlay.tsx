@@ -1,5 +1,6 @@
 import { useQuery, type QueryKey, type UseQueryOptions } from '@tanstack/react-query'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@workspace/ui/components/dialog'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import type { ReactNode } from 'react'
 
@@ -25,16 +26,31 @@ export function DeferredOverlay<Module, Key extends QueryKey>({
 }) {
   const query = useQuery({ ...module, enabled: open }, resourceQueryClient)
   if (query.isSuccess)
-    return <RenderErrorBoundary label={label}>{children(query.data)}</RenderErrorBoundary>
-  if (!open || !query.isError) return null
+    return (
+      <RenderErrorBoundary label={label} resetKeys={[open]}>
+        {children(query.data)}
+      </RenderErrorBoundary>
+    )
+  if (!open) return null
 
+  // Loading swaps this shell for the real overlay, which places its own focus by then.
+  const returnFocusUnlessLoaded = () =>
+    resourceQueryClient.getQueryState(module.queryKey)?.status !== 'success'
   return (
     <Dialog open onOpenChange={(next) => next || onClose()}>
-      <DialogContent>
+      <DialogContent finalFocus={returnFocusUnlessLoaded}>
         <DialogHeader className='sr-only'>
           <DialogTitle>{label}</DialogTitle>
         </DialogHeader>
-        <ModuleLoadError label={label} onRetry={() => void query.refetch()} />
+        {query.isError ? (
+          <ModuleLoadError label={label} onRetry={() => void query.refetch()} />
+        ) : (
+          <Spinner
+            className='mx-auto my-(--density-section-padding)'
+            size='md'
+            label={`Loading ${label}`}
+          />
+        )}
       </DialogContent>
     </Dialog>
   )
