@@ -447,16 +447,39 @@ function normalizeSignature(unit: MergeReviewUnit): string | null {
     }
   }
   if (!['javascript', 'typescript', 'tsx'].includes(unit.languageId)) return signature
-  const unquoted = /^(["']).*\1$/.test(signature) ? signature.slice(1, -1) : signature
-  return unquoted
-    .replace(
-      /\\u\{([\da-fA-F]+)\}|\\u([\da-fA-F]{4})|\\x([\da-fA-F]{2})/g,
-      (match, point, unit, byte) => {
-        const code = Number.parseInt(point ?? unit ?? byte, 16)
-        return code <= 0x10ffff ? String.fromCodePoint(code) : match
-      },
-    )
-    .replace(/\\([\\"'])/g, '$1')
+  const unquoted = /^(["'])[\s\S]*\1$/.test(signature) ? signature.slice(1, -1) : signature
+  // Decode once so a literal backslash cannot expose a second escape.
+  return unquoted.replace(
+    /\\(?:u\{([\da-fA-F]+)\}|u([\da-fA-F]{4})|x([\da-fA-F]{2})|([0-3][0-7]{0,2}|[4-7][0-7]?)|(\r\n|[\s\S]))/g,
+    signatureEscape,
+  )
+}
+
+const simpleEscapes: Readonly<Record<string, string>> = {
+  b: '\b',
+  f: '\f',
+  n: '\n',
+  r: '\r',
+  t: '\t',
+  v: '\v',
+}
+function signatureEscape(
+  match: string,
+  point: string | undefined,
+  unit: string | undefined,
+  byte: string | undefined,
+  octal: string | undefined,
+  character: string | undefined,
+): string {
+  const hex = point ?? unit ?? byte
+  if (hex !== undefined) {
+    const code = Number.parseInt(hex, 16)
+    return code <= 0x10ffff ? String.fromCodePoint(code) : match
+  }
+  if (octal !== undefined) return String.fromCharCode(Number.parseInt(octal, 8))
+  if (character === undefined || character === 'u' || character === 'x') return match
+  if (/^[\n\r\u2028\u2029]+$/.test(character)) return ''
+  return simpleEscapes[character] ?? character
 }
 
 function orphanPair(pair: ConcurrentPair): boolean {

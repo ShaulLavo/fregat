@@ -177,7 +177,7 @@ them).
    pairs involving the supplied IDs; request the full window to replace marks after undo or
    retention changes. This step ships no marks UI or session scheduling.
 
-   Verification: original 18-case conflict corpus plus wide damaged-tree fallback regression; 10,000 seeded independent-function cases
+   Verification: original 18-case conflict corpus plus wide damaged-tree and quoted-escape regressions; 10,000 seeded independent-function cases
    with zero marks; 10,000 shared-unit cases all marked; five real E067 peer-session runs
    with reordered/duplicate delivery and identical converged mark sets. Package and worker
    regression suites pass. The corpus covers causal copy/move and edited descendants that

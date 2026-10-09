@@ -99,6 +99,30 @@ test('existing syntax damage alone never produces a parse signal', async () => {
   ).toEqual(['overlap'])
 })
 
+test('equivalent quoted escape spellings collide inside an interface', async () => {
+  const text = 'interface Pair { }'
+  expect(
+    await kinds(
+      history(text, [
+        { offset: text.indexOf('}'), deleteCount: 0, text: '"\\n": string; ' },
+        { offset: text.indexOf('}'), deleteCount: 0, text: '"\\u000a": string; ' },
+      ]),
+    ),
+  ).toEqual(['signature'])
+})
+
+test('literal backslashes keep quoted signatures distinct', async () => {
+  const text = 'interface Pair { }'
+  expect(
+    await kinds(
+      history(text, [
+        { offset: text.indexOf('}'), deleteCount: 0, text: '"\\\\u0061": string; ' },
+        { offset: text.indexOf('}'), deleteCount: 0, text: '"\\a": string; ' },
+      ]),
+    ),
+  ).toEqual([])
+})
+
 test('duplicate imports mark both children of the unordered parent', async () => {
   const text = 'import { } from "colors";'
   const input = history(text, [
