@@ -136,7 +136,7 @@ async function installAndActivate(options: {
   readinessMs: number
 }) {
   if (options.bundledRelease)
-    installBundledRelease(options.bundledRelease, options.productionRoot, options.intent, {
+    await installBundledRelease(options.bundledRelease, options.productionRoot, options.intent, {
       readinessMs: options.readinessMs,
     })
   const result = await verifiedService(

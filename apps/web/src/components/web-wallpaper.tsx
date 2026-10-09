@@ -3,6 +3,7 @@ import { useRef, useState } from 'react'
 
 import { cn } from '@workspace/ui/lib/utils'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
+import { wallpaperImageDecoded, wallpaperImageFailed } from '@/lib/html-bootstrap'
 
 import { useMediaBlobUrl } from '@/features/workbench/hooks/use-media-blob-url'
 import { useWallpaperPlayback } from '@/features/workbench/hooks/use-wallpaper-playback'
@@ -10,7 +11,6 @@ import { prefersReducedMotion, WALLPAPER_URL } from '@/features/workbench/utils/
 import {
   wallpaperInfoQueryOptions,
   wallpaperMediaQueryOptions,
-  wallpaperPreloadState,
   wallpaperStillUrl,
 } from '@/features/workbench/state/wallpaper-query'
 
@@ -33,9 +33,12 @@ export function WebWallpaper({ className }: { readonly className?: string }) {
   const [videoReady, setVideoReady] = useState(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const showVideo = !videoFailed && Boolean(videoMedia.data)
-  const preload = desktopSource ? wallpaperPreloadState(desktopSource) : 'unknown'
-  const desktopReady = loadedStillSource === desktopSource || preload === 'ready'
-  const desktopFailed = failedStillSource === desktopSource || preload === 'error'
+  const desktopReady =
+    loadedStillSource === desktopSource ||
+    Boolean(desktopSource && wallpaperImageDecoded(desktopSource))
+  const desktopFailed =
+    failedStillSource === desktopSource ||
+    Boolean(desktopSource && wallpaperImageFailed(desktopSource))
   const stillSources = desktopSource && desktopReady && !desktopFailed ? [] : [WALLPAPER_URL]
   if (desktopSource && !desktopFailed) stillSources.push(desktopSource)
 

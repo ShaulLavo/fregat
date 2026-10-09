@@ -19,28 +19,28 @@ import { stampWebRelease } from '../deploy/web-release'
 export type BundledInstall = { disposition: 'installed' | 'staged' | 'unchanged'; release: Release }
 
 /** Copies immutable payloads; only the first installation can change current without approval. */
-export function installBundledRelease(
+export async function installBundledRelease(
   source: string,
   root: string,
   intent: MachineServiceIntent,
   options: { readinessMs?: number } = {},
-): BundledInstall {
+): Promise<BundledInstall> {
   mkdirSync(root, { recursive: true })
   const lock = tryFileLock(path.join(root, 'release-install.lock'))
   if (!lock) throw serviceErrors.SETUP_BUSY({ internal: { stage: 'bundled-release' } })
   try {
-    return install(source, root, intent, options)
+    return await install(source, root, intent, options)
   } finally {
     lock.release()
   }
 }
 
-function install(
+async function install(
   source: string,
   root: string,
   intent: MachineServiceIntent,
   options: { readinessMs?: number },
-): BundledInstall {
+): Promise<BundledInstall> {
   const config = readConfig(source)
   const problem = releaseProblem(source)
   if (problem || !config)
@@ -56,7 +56,7 @@ function install(
   const release = createRelease(root, config.commit, 'app')
   try {
     cpSync(source, release.directory, { recursive: true, verbatimSymlinks: true })
-    stampWebRelease(release.web, release.name)
+    await stampWebRelease(release.web, release.name)
     writeFileSync(
       path.join(release.directory, 'build-config.json'),
       JSON.stringify({
