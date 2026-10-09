@@ -74,6 +74,60 @@ test('incremental batches, retries and eviction match fresh canonical windows', 
   }
 })
 
+test.each([0, 5, 10, 15, 20, 25])(
+  'causally ready arrivals alternate canonical insertion and tail appends from seed %i',
+  (start) => {
+    for (let seed = start; seed < start + 5; seed++) {
+      const pending = [...confirmedHistory(seed)]
+      const received: Envelope[] = []
+      const seen = new Set<string>()
+      const random = randomFor(seed + 200)
+      const windows = [0, 1, 7, 16, 32].map((limit) => ({
+        limit,
+        window: new ConfirmedWindow([], limit),
+      }))
+      while (pending.length) {
+        const ready = pending.filter((edit) => edit.deps.every((id) => seen.has(editKey(id))))
+        const edit = ready[Math.floor(random() * ready.length)]!
+        pending.splice(pending.indexOf(edit), 1)
+        received.push(edit)
+        seen.add(editKey(edit.id))
+        for (const { limit, window } of windows) {
+          window.append([edit])
+          window.append([])
+          window.append([edit])
+          const fresh = new ConfirmedWindow(received, limit)
+          expect(window.edits).toEqual(fresh.edits)
+          expect(window.pairs()).toEqual(fresh.pairs())
+        }
+      }
+    }
+  },
+)
+
+test('failed tail batches preserve the suffix and its causal index', () => {
+  const history = confirmedHistory(42)
+  const window = new ConfirmedWindow(history.slice(0, 16), 16)
+  const before = window.edits
+  const next = history[16]!
+  const invalid = { ...history[17]!, document: 'other' }
+  expect(() => window.append([next, invalid])).toThrow()
+  expect(window.edits).toEqual(before)
+  const conflict = { ...history[15]!, lamport: history[15]!.lamport + 1 }
+  expect(() => window.append([next, conflict])).toThrow()
+  expect(window.edits).toEqual(before)
+  const last = before.at(-1)!.envelope
+  const invalidLamport = {
+    ...last,
+    id: { actor: 'z', seq: 1 },
+    deps: [last.id],
+  }
+  expect(() => window.append([invalidLamport])).toThrow()
+  expect(window.edits).toEqual(before)
+  window.append(history.slice(16))
+  expect(window.pairs()).toEqual(new ConfirmedWindow(history, 16).pairs())
+})
+
 test('a bridge dependency and an effect command preserve transitive causality', () => {
   const peers = ['a', 'b', 'c'].map(
     (actor) => new Participant({ actor, document: 'review', epoch: '1', engine: createEngine() }),
@@ -92,6 +146,16 @@ test('a bridge dependency and an effect command preserve transitive causality', 
   peers[2]!.receive(messages)
   const c = peers[2]!.local({ offset: 0, deleteCount: 0, text: 'c' })
   expect(new ConfirmedWindow([c, b, undo, a]).pairs()).toEqual([])
+  const history = [a, undo, b, c]
+  for (const limit of [0, 1, 2, 3, 4]) {
+    const window = new ConfirmedWindow([], limit)
+    for (let end = 1; end <= history.length; end++) {
+      window.append([history[end - 1]!])
+      const fresh = new ConfirmedWindow(history.slice(0, end), limit)
+      expect(window.edits).toEqual(fresh.edits)
+      expect(window.pairs()).toEqual(fresh.pairs())
+    }
+  }
 })
 
 test('concurrency is represented by exact pairs, not transitive connected groups', () => {

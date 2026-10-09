@@ -26,9 +26,11 @@ export class ConfirmedWindow {
   private byId = new Map<string, Confirmed>()
   private sequence = 0
   private document: Pick<Envelope, 'document' | 'epoch'> | undefined
+  private ordered: readonly Confirmed[] = []
   private candidates: readonly Confirmed[] = []
   private positions: readonly number[] = []
   private monotone = true
+  private contiguous = true
 
   constructor(
     confirmed: readonly Envelope[] = [],
@@ -58,26 +60,43 @@ export class ConfirmedWindow {
         throw new CollabFailure('conflicting-confirmed-edit')
       if (!this.byId.has(key)) incoming.set(key, envelope)
     }
+    if (!incoming.size) {
+      this.document = document
+      return
+    }
+    const additions = [...incoming]
+      .map(([key, envelope]) => ({ key, envelope }))
+      .sort((a, b) => compareEnvelopes(a.envelope, b.envelope))
+    const tail = this.ordered.at(-1)
+    const appendOnly = !tail || compareEnvelopes(tail.envelope, additions[0]!.envelope) < 0
+    const dropped = Math.min(
+      this.ordered.length,
+      Math.max(0, this.ordered.length + additions.length - this.limit),
+    )
+    const previous = appendOnly ? this.ordered.slice(dropped) : []
     // Increasing Lamport order keeps every path between retained edits inside the suffix.
-    const combined = [
-      ...this.byId.values(),
-      ...[...incoming].map(([key, envelope]) => ({ key, envelope })),
-    ].sort((a, b) => compareEnvelopes(a.envelope, b.envelope))
+    const combined = appendOnly
+      ? additions
+      : [...this.ordered, ...additions].sort((a, b) => compareEnvelopes(a.envelope, b.envelope))
     const ordered = this.limit ? combined.slice(-this.limit) : []
-    const kept = new Set(ordered.map((entry) => entry.key))
+    const contiguousLive: Interval[] = previous.length
+      ? [[previous[0]!.position, this.sequence]]
+      : []
+    const live =
+      appendOnly && this.contiguous
+        ? contiguousLive
+        : liveIntervals(appendOnly ? previous : ordered, this.byId)
+    const pending = appendOnly ? ordered : ordered.filter(({ key }) => incoming.has(key))
     const next = new Map<string, Confirmed>()
-    const live = liveIntervals(ordered, this.byId)
     let sequence = this.sequence
-    for (const { key, envelope } of ordered) {
-      if (this.byId.has(key)) continue
+    for (const { key, envelope } of pending) {
       const last = live.at(-1)
       if (last?.[1] === sequence) live[live.length - 1] = [last[0], sequence + 1]
       else live.push([sequence, sequence + 1])
       const predecessors = envelope.deps.flatMap((id) => {
         const dependency = editKey(id)
-        const entry =
-          next.get(dependency) ?? (kept.has(dependency) ? this.byId.get(dependency) : undefined)
-        if (!entry) return []
+        const entry = next.get(dependency) ?? this.byId.get(dependency)
+        if (!entry || !contains(live, entry.position)) return []
         if (entry.envelope.lamport >= envelope.lamport) throw new CollabFailure('invalid-lamport')
         return [
           ...intersectIntervals(entry.ancestors, live),
@@ -102,16 +121,35 @@ export class ConfirmedWindow {
         touch,
       })
     }
-    const retained = ordered.map(({ key }) => next.get(key) ?? this.byId.get(key)!)
-    for (const key of this.byId.keys()) {
-      if (!kept.has(key)) this.byId.delete(key)
+    const added = [...next.values()]
+    if (appendOnly) {
+      let droppedTouches = 0
+      for (let i = 0; i < dropped; i++) {
+        const entry = this.ordered[i]!
+        this.byId.delete(entry.key)
+        if (entry.touch) droppedTouches++
+      }
+      for (const entry of added) this.byId.set(entry.key, entry)
+      const candidates = added.filter((entry) => entry.touch !== null)
+      this.candidates = this.candidates.slice(droppedTouches).concat(candidates)
+      this.positions = this.positions
+        .slice(droppedTouches)
+        .concat(candidates.map((entry) => entry.position))
+      this.ordered = previous.concat(added)
+    } else {
+      this.ordered = ordered.map(({ key }) => next.get(key) ?? this.byId.get(key)!)
+      this.byId = new Map(this.ordered.map((entry) => [entry.key, entry]))
+      this.candidates = this.ordered.filter((entry) => entry.touch !== null)
+      this.positions = this.candidates.map((entry) => entry.position)
     }
-    for (const [key, entry] of next) this.byId.set(key, entry)
-    this.candidates = retained.filter((entry) => entry.touch !== null)
-    this.positions = this.candidates.map((entry) => entry.position)
-    this.monotone = this.positions.every(
-      (position, i) => i === 0 || position > this.positions[i - 1]!,
-    )
+    this.monotone =
+      (appendOnly && this.monotone) ||
+      this.positions.every((position, i) => i === 0 || position > this.positions[i - 1]!)
+    this.contiguous =
+      (appendOnly && this.contiguous) ||
+      this.ordered.every(
+        (entry, i) => i === 0 || entry.position === this.ordered[i - 1]!.position + 1,
+      )
     this.sequence = sequence
     this.document = document
   }

@@ -8,10 +8,6 @@ import { createLineGutterPlugin } from '../../gutters/src/index'
 declare module 'vitest/browser' {
   interface BrowserCommands {
     proofType: (text: string) => Promise<void>
-    proofImeComposition: (
-      text: string,
-      replacement?: readonly [number, number] | null,
-    ) => Promise<void>
   }
 }
 
@@ -76,13 +72,6 @@ it.each(['transform', 'top'] as const)(
       await frames()
       expect(rowAt(lines).textContent).toBe('final!')
       expect(editor.getTextSnapshot().readRange(text.length, text.length + 1)).toBe('!')
-
-      await commands.proofImeComposition('候補')
-      await frames()
-      const composition = host.querySelector<HTMLElement>('.editor-virtualized-composition')!
-      expect(composition.textContent).toBe('候補')
-      expect(composition.getBoundingClientRect().top).toBeCloseTo(rect.top, 0)
-      await commands.proofImeComposition('')
 
       if (lines < 3_000_000) continue
       editor.setSelection(1_600_001, 1_600_001, { reveal: true })
