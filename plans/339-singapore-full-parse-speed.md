@@ -593,3 +593,22 @@ The full worker collector now applies the measured span-stamp algorithm to its o
 The grouping regression failed against the prior collector, then passed after the change. Focused worker/runtime checks pass 30 tests, including duplicates separated in input order, overlapping spans, empty and inverted spans, equal-span name ordering and independent language/query invocations. Package types pass. Real native browser checks pass 47 tests, including full versus whole-range capture, token, injection, fold and error equality for TypeScript documentation/regex, HTML script/style, Astro and fenced Markdown with Unicode and CRLF.
 
 A separate shipping-source 10 MiB smoke matches every field of the compact consumer's frozen canonical proof. It retains 1,198,376 tokens, identical token/style/structural hashes, full root coverage through 10,485,760, 42 query calls and an unexceeded match limit. The screenshot was read back. [Source, observation, trace and screenshot](https://github.com/ShaulLavo/fregat/tree/lane/plan-339-span-map/editor/docs/performance/singapore-full-parse-2026-10-08/normalization-span-map-source-smoke) have lossless archives and checked artifact hashes. This single noisy smoke establishes correctness only. It supplies no new paired speed, memory or milestone claim. M1 remains unpassed.
+
+### Error-free structural walk candidate, 2026-10-09
+
+The parser's root subtree error flag includes missing descendants. The worker reads it once per tree and skips per-node missing checks when it is clear. It still traverses every node and collects brackets. Trees containing errors keep the existing per-node checks. Both full and range walks use the same guard; independent injection trees supply their own flag.
+
+Known error-free full and range controls first observed four redundant missing checks each, then zero after the guard. Worker/runtime checks pass 32 tests, including deeply nested and malformed trees. Native checks pass 49 tests, including actual missing-delimiter and unexpected-symbol diagnostics and whole-range bracket equality. Package types pass.
+
+A prospective quiet pair kept the shipping span map and published runtime on both sides. Cold ran baseline then candidate; warm reversed the order. Both strict environment comparisons passed. All canonical token/style/structural fields equal the frozen fixture, and the entire output proof agrees between sides within each startup condition.
+
+| Single-pair diagnostic     | Cold baseline | Cold guarded walk | Warm baseline | Warm guarded walk |
+| -------------------------- | ------------: | ----------------: | ------------: | ----------------: |
+| Complete highlighted frame |    3,895.6 ms |        3,762.0 ms |    3,649.2 ms |        3,524.7 ms |
+| Worker parse plus query    |    3,686.7 ms |        3,575.6 ms |    3,512.1 ms |        3,389.3 ms |
+| Structural walk            |      929.8 ms |          813.7 ms |      926.4 ms |          817.5 ms |
+| Main-thread union work     |     25.048 ms |         17.219 ms |     10.266 ms |         10.287 ms |
+
+Cold diagnostic work is 3,592.819 ms, still 53.766 ms above the frozen 3,539.053 ms ceiling. Warm diagnostic work is 3,399.587 ms in this one observation. M1 remains unpassed. No qualification window or timing rescue rerun was attempted.
+
+The initial postprocessing assertion compared warm resource counters against a cold smoke and failed. Both warm sides retain the accepted prime document, with 350,683,136 bytes of WASM capacity and 48 observed queries, versus 329,187,328 bytes and 42 queries cold. The corrected derivation separates startup conditions and keeps every raw observation and strict comparison guard unchanged. [Exact sources, all four observations and traces, both comparisons, the failed analysis and its correction](https://github.com/ShaulLavo/fregat/tree/lane/plan-339-error-free-walk/editor/docs/performance/singapore-full-parse-2026-10-08/error-free-walk-experiment) are lossless archives with 26 checked artifact hashes. The cold candidate screenshot was read back. These samples establish a retained diagnostic improvement, not timing distributions, physical presentation or the whole-job memory gate.

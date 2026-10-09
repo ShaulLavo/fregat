@@ -2731,15 +2731,23 @@ const collectTreeData = (
   const brackets: BracketInfo[] = []
   const errors: TreeSitterError[] = []
   const bracketStack: { char: string; index: number }[] = []
-  const cursor = tree?.walk()
+  if (!tree) return emptyTreeData()
+  const cursor = tree.walk()
   if (!cursor) return emptyTreeData()
 
   try {
+    // The subtree error flag includes missing descendants.
+    const hasErrors = tree.rootNode.hasError
     if (range) {
-      walkTreeCursorRange(cursor, range, {
-        onBracket: (info) => brackets.push(info),
-        onError: (info) => errors.push(info),
-      })
+      walkTreeCursorRange(
+        cursor,
+        range,
+        {
+          onBracket: (info) => brackets.push(info),
+          onError: (info) => errors.push(info),
+        },
+        hasErrors,
+      )
       return { brackets, errors }
     }
 
@@ -2750,6 +2758,7 @@ const collectTreeData = (
         onError: (info) => errors.push(info),
       },
       bracketStack,
+      hasErrors,
     )
   } finally {
     cursor.delete()
@@ -2762,6 +2771,7 @@ const walkTreeCursorRange = (
   cursor: TreeCursor,
   range: TreeSitterSyntaxRange,
   visitors: TreeWalkVisitors,
+  hasErrors: boolean,
 ): void => {
   const bracketStack: { char: string; index: number }[] = []
 
@@ -2773,7 +2783,7 @@ const walkTreeCursorRange = (
     // Following subtrees start at or after this position in tree-sitter's source order.
     if (cursor.startIndex >= range.endIndex) return
 
-    collectCursorDiagnostics(cursor, visitors, bracketStack)
+    collectCursorDiagnostics(cursor, visitors, bracketStack, hasErrors)
     if (cursor.gotoFirstChild()) continue
     if (advanceCursorPastSubtree(cursor)) continue
     return
@@ -2797,9 +2807,10 @@ const walkTreeCursor = (
   cursor: TreeCursor,
   visitors: TreeWalkVisitors,
   bracketStack: { char: string; index: number }[],
+  hasErrors: boolean,
 ): void => {
   while (true) {
-    collectCursorDiagnostics(cursor, visitors, bracketStack)
+    collectCursorDiagnostics(cursor, visitors, bracketStack, hasErrors)
 
     if (cursor.gotoFirstChild()) continue
     if (cursor.gotoNextSibling()) continue
@@ -2815,9 +2826,10 @@ const collectCursorDiagnostics = (
   cursor: TreeCursor,
   visitors: TreeWalkVisitors,
   bracketStack: { char: string; index: number }[],
+  hasErrors: boolean,
 ): void => {
   const type = cursor.nodeType
-  const isMissing = cursor.nodeIsMissing
+  const isMissing = hasErrors && cursor.nodeIsMissing
   const isBracket = OPEN_BRACKETS.has(type) || CLOSE_BRACKETS.has(type)
   const isError = type === 'ERROR' || isMissing
   if (!isBracket && !isError) return
