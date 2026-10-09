@@ -57,9 +57,13 @@ test.each(['flex', 'grid'] as const)('fills a sized %s host after resizing', asy
 })
 
 test.each([
-  ['1,000 character', 1000],
   ['10 MiB', 10 * 1024 * 1024],
-] as const)('keeps a %s document windowed while typing in a block host', async (_size, bytes) => {
+  ['1,000 character', 1000],
+  ...Array.from(
+    { length: 11 },
+    (_, trial) => [`10 MiB trial ${trial + 2}`, 10 * 1024 * 1024] as const,
+  ),
+] as const)('keeps a %s document windowed while typing in a block host', async (size, bytes) => {
   const host = document.createElement('div')
   host.style.cssText = 'display:block;width:600px;height:120px'
   document.body.append(host)
@@ -82,7 +86,6 @@ test.each([
   expect(scroll.clientHeight).toBe(120)
   expect(rows()).toBeLessThan(100)
 
-  const deliveries: unknown[] = []
   const input = editor.getInputElement()
   const events = { keydown: 0, beforeinput: 0, input: 0, keyup: 0 }
   for (const type of ['keydown', 'beforeinput', 'input', 'keyup'] as const)
@@ -91,26 +94,54 @@ test.each([
     const offset = where === 'end' ? editor.getState().length : Math.floor(bytes / 2)
     editor.setSelection(offset, offset, { reveal: true })
     editor.focus()
-    await expect.poll(() => document.activeElement === input && document.hasFocus()).toBe(true)
+    const focusBefore = {
+      focused: document.activeElement === input,
+      documentFocused: document.hasFocus(),
+    }
     const initialLength = editor.getState().length
     const letter = where === 'end' ? 'q' : 'z'
+    const deliveries: unknown[] = []
     for (let key = 0; key < 20; key++) {
       await commands.proofKeyPress(letter)
-      const observed = {
-        where,
+      deliveries.push({
         key,
         expectedLength: initialLength + key + 1,
         length: editor.getState().length,
-        inputKind: input.tagName,
         focused: document.activeElement === input,
         documentFocused: document.hasFocus(),
         events: { ...events },
-      }
-      deliveries.push(observed)
-      await expect
-        .poll(() => editor.getState().length, { message: JSON.stringify(observed) })
-        .toBe(initialLength + key + 1)
+      })
     }
+    const submitted = {
+      size,
+      bytes,
+      where,
+      inputKind: input.tagName,
+      focusBefore,
+      expectedLength: initialLength + 20,
+      length: editor.getState().length,
+      snapshotLength: editor.getTextSnapshot().length,
+      events: { ...events },
+      deliveries,
+    }
+    await commands.proofInputDelivery(JSON.stringify({ stage: 'submitted', ...submitted }))
+    await expect
+      .poll(() => editor.getState().length, { message: JSON.stringify(submitted) })
+      .toBe(initialLength + 20)
+    await commands.proofInputDelivery(
+      JSON.stringify({
+        stage: 'settled',
+        size,
+        bytes,
+        where,
+        length: editor.getState().length,
+        snapshotLength: editor.getTextSnapshot().length,
+        focused: document.activeElement === input,
+        documentFocused: document.hasFocus(),
+        events: { ...events },
+      }),
+    )
+    expect(editor.getTextSnapshot().length).toBe(initialLength + 20)
     expect(editor.getTextSnapshot().readRange(offset, offset + 20)).toBe(letter.repeat(20))
     await expect
       .poll(() =>
@@ -120,5 +151,4 @@ test.each([
     expect(scroll.clientHeight).toBe(120)
     expect(rows()).toBeLessThan(100)
   }
-  await commands.proofInputDelivery(JSON.stringify({ bytes, deliveries }))
 })
