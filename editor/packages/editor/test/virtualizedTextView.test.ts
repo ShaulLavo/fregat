@@ -218,7 +218,8 @@ describe('VirtualizedTextView', () => {
       const state = view.getState()
       expect(state.metrics.characterWidth).toBe(10)
       expect(state.gutterWidth).toBe(40)
-      expect(state.mountedRows[0]?.text.length).toBe(6)
+      // Five text columns and one caret column fit beside the measured 40 px gutter.
+      expect(state.mountedRows[0]?.text.length).toBe(5)
     } finally {
       measurement.mockRestore()
     }
@@ -1489,13 +1490,15 @@ describe('VirtualizedTextView', () => {
     view.setText('abcdefghij')
     view.setScrollMetrics(0, 80, 72)
 
+    // Leave a caret column inside the viewport rather than admitting a fifth text column.
     expect(view.getState().wrapActive).toBe(true)
-    expect(view.getState().totalHeight).toBe(40)
-    expect(view.getState().mountedRows.map((row) => row.text)).toEqual(['abcde', 'fghij'])
+    expect(view.getState().totalHeight).toBe(60)
+    expect(view.getState().mountedRows.map((row) => row.text)).toEqual(['abcd', 'efgh', 'ij'])
     const labels = container.querySelectorAll<HTMLSpanElement>('.editor-virtualized-line-number')
     expect(labels[0]?.style.counterSet).toBe('editor-line 1')
     expect(labels[1]?.hidden).toBe(true)
-    expect(view.textOffsetFromViewportPoint(64, 25)).toBe(9)
+    expect(labels[2]?.hidden).toBe(true)
+    expect(view.textOffsetFromViewportPoint(64, 25)).toBe(8)
   })
 
   it('renders injected text rows without changing document offsets', () => {

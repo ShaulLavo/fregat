@@ -223,7 +223,7 @@ function replacementHref(spec: InlineReplacementSpec): string {
     addEventListener() {},
   }
   const container = { ownerDocument: { createElement: () => anchor }, append() {} }
-  spec.render?.(container as unknown as HTMLElement)
+  spec.render?.(container as unknown as HTMLElement, spec.text, 0)
   return href
 }
 

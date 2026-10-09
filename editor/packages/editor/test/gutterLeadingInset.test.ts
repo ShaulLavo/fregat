@@ -141,9 +141,10 @@ describe('gutter leading inset', () => {
       view.setScrollMetrics(0, 100, 104)
     }
 
-    // (104 - 24) / 8 = 10 columns flush, (104 - 40) / 8 = 8 with the inset.
-    expect(flush.getState().mountedRows[0]?.text).toHaveLength(10)
-    expect(inset.getState().mountedRows[0]?.text).toHaveLength(8)
+    // Reserve one column for the caret so scrollWidth stays within clientWidth.
+    // (104 - 24) / 8 - 1 = 9 flush, (104 - 40) / 8 - 1 = 7 with the inset.
+    expect(flush.getState().mountedRows[0]?.text).toHaveLength(9)
+    expect(inset.getState().mountedRows[0]?.text).toHaveLength(7)
   })
 
   it('extends the cursor-line band over the inset only when every lane is highlighted', () => {

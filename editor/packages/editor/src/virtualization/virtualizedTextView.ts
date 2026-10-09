@@ -133,8 +133,8 @@ import {
   homogeneousRtlCaretAtRowEdge,
   homogeneousRtlCaretMoveInRow,
   isBidiMeasurementRefusalRow,
-  knownRowContentWidth,
-  measureRowContentWidth,
+  knownRowScrollWidth,
+  measureRowScrollWidth,
   offsetFromDomBoundary,
   rowLocalXFromClientPoint,
   rowHasOnlyBidiControls,
@@ -1759,7 +1759,7 @@ export class VirtualizedTextView {
     for (const row of view.rowElements.values()) {
       if (row.kind !== 'text') continue
 
-      const width = knownRowContentWidth(view, row)
+      const width = knownRowScrollWidth(view, row)
       if (width === null) {
         unmeasured = true
         continue
@@ -1809,10 +1809,10 @@ export class VirtualizedTextView {
     for (const row of view.rowElements.values()) {
       if (row.kind !== 'text') continue
 
-      raised = raiseVisualColumnsSeen(view, measureRowContentWidth(view, row)) || raised
+      raised = raiseVisualColumnsSeen(view, measureRowScrollWidth(view, row)) || raised
     }
 
-    if (!raised) return
+    if (!raised && !view.wrapEnabled) return
     updateContentWidth(view, view.virtualizer.getSnapshot().virtualItems)
   }
 
