@@ -195,7 +195,7 @@ async function writeHook(root: string, name: string, lines: readonly string[]) {
   const hooks = path.join(root, '.git', 'hooks')
   await mkdir(hooks, { recursive: true })
   const hook = path.join(hooks, name)
-  await writeFile(hook, ['#!/bin/sh', ...lines, ''].join('\n'))
+  await writeFile(hook, ['#!/bin/sh'].concat(lines, ['']).join('\n'))
   await chmod(hook, 0o755)
 }
 

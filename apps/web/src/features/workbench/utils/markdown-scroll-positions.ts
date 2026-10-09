@@ -45,9 +45,9 @@ export function sourceAnchors(container: HTMLElement): SourceAnchor[] {
 }
 
 /** Nested blocks share tops and footnotes render out of order; keep lines rising with the page. */
-export function risingAnchors(anchors: readonly SourceAnchor[]): SourceAnchor[] {
+export function risingAnchors(anchors: SourceAnchor[]): SourceAnchor[] {
   const rising: SourceAnchor[] = []
-  const byTop = anchors.toSorted((left, right) => left.top - right.top || left.line - right.line)
+  const byTop = anchors.sort((left, right) => left.top - right.top || left.line - right.line)
   for (const anchor of byTop) {
     const last = rising.at(-1)
     if (last && anchor.line <= last.line) continue

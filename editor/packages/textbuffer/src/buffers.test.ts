@@ -174,7 +174,7 @@ describe('branches over a shared log', () => {
     expect(materializePieceTableFullText(base)).toBe(original)
 
     // Every retained intermediate state on every branch still reads exactly.
-    for (const [snapshot, text] of [...trunk.history, ...left.history, ...right.history]) {
+    for (const [snapshot, text] of trunk.history.concat(left.history, right.history)) {
       expect(materializePieceTableFullText(snapshot)).toBe(text)
     }
   })

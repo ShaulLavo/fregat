@@ -133,11 +133,12 @@
       "entry": ["hotkeys/scripts/check-samples.mjs"],
       "ignoreDependencies": ["typescript-api"],
       "vitest": {
-        "config": ["vitest.scripts.config.mjs"]
+        "config": ["vitest.scripts.config.mjs", "vitest.t3code.config.mjs"]
       }
     },
     "apps/tui": {
       "entry": [
+        "scripts/compiler-preload.ts",
         "src/search/tests/replacement.test-d.ts",
         "test/processes/job-control-launcher.ts",
         "test/processes/job-control-session.ts",

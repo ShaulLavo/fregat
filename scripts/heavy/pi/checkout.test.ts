@@ -20,9 +20,13 @@ function scratch(prefix: string) {
 }
 
 function git(cwd: string, ...args: string[]) {
-  return execFileSync('git', ['-C', cwd, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
-    encoding: 'utf8',
-  }).trim()
+  return execFileSync(
+    'git',
+    ['-C', cwd, '-c', 'user.name=t', '-c', 'user.email=t@t'].concat(args),
+    {
+      encoding: 'utf8',
+    },
+  ).trim()
 }
 
 /** A two-commit repository with a subdirectory; its root commit stands in for Fregat's. */

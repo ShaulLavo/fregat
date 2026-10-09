@@ -152,8 +152,9 @@ them).
    Verification covers original fixtures for every grammar, separator-enclosing LF/CRLF fallback,
    lazy compilation, incremental edits, stale requests, deepest nested injections, MDX fences,
    injected-language fallback, UTF-16 offsets and all ten independent-review blockers.
-3. **Detector:** functional implementation verified 2026-10-09; **step incomplete** until
-   worker integration and the unchanged **under-2-ms batch gate** pass. The demand-only
+3. **Detector:** functional implementation and live worker wiring verified 2026-10-09;
+   **step incomplete** until projected-query integration and the unchanged
+   **under-2-ms batch gate** pass. The demand-only
    `@singapore-editor/collaboration/merge-review` export combines confirmed concurrency and an
    injectable syntax reader without adding a dependency between collab and tree-sitter.
    It emits `overlap`, `parse`, `signature` and `orphan`, retains exact concurrent edges,
@@ -176,12 +177,16 @@ them).
    The detector coordinator, effect visibility, identity mapping, signatures, orphan checks
    and projections run on the **invoking thread**. The supplied syntax reader determines the
    query/parse thread; worker `mergeUnit` support runs in the parser worker, while the real
-   grammar test adapter runs on the Node test thread. There are no typing hooks, subscriptions
+   grammar test adapter runs on the Node test thread. The detector itself has no typing hooks
    or automatic calls. Null session windows and logs without cross-author pairs return before
-   syntax work. A production bridge must still register confirmed/projected snapshots in the
-   parser worker and schedule review after accepted batches. Batch-scoped results describe
-   pairs involving the supplied IDs; request the full window to replace marks after undo or
-   retention changes. This step ships no marks UI or session scheduling.
+   syntax work. Step 4 supplies the opt-in production bridge and schedules review after accepted
+   batches. Immutable confirmed/projected snapshots use existing worker source readers, and
+   touching requests return intersected units with their ancestors. Batch-scoped results describe
+   pairs involving the supplied IDs; the live owner requests the full window when replacing marks
+   after undo or retention changes. The reader accepts a projected base snapshot through one
+   admission seam. Step 4 now wires that seam to the step 3 review-only projected query, retaining
+   the confirmed base tree and passing base-relative input edits without admitting projected
+   snapshots through the ordinary full-parse path. Detector cost measurements remain step 3 evidence.
 
    Verification: original 18-case conflict corpus plus wide damaged-tree and quoted-escape
    regressions; 10,000 seeded independent-function cases with zero marks; 10,000 shared-unit
@@ -204,30 +209,115 @@ them).
    Projection snapshots are reused per detect call, and mark edges are accumulated once.
    No changes were made to `packages/collab/src/concurrency.ts`; its append tuning is separate.
 
-   **Cost gate remains incomplete.** Run
-   `bun run --cwd editor/packages/collaboration bench:merge-review` after workspace builds.
-   Evidence: `editor/packages/collaboration/bench/detector-evidence.json`, with a separately
-   instrumented profile in `detector-profile-evidence.json`. Both are **experiment, shared
-   machine**, A/B/B/A. Current retained parsing is prepared outside timing, as detection runs
-   after parsing; IPC and UI are excluded. The complete detector includes concurrency append,
-   pair selection, identity mapping and real queries. For 100 retained records, median
-   2/4/8-author batches are 1.140/1.160/1.266 ms (p95 2.491/2.255/2.708 ms). At 8,192 records
-   they are **3.218/3.058/3.100 ms**, p95 **5.478/4.823/5.060 ms**. These do not satisfy 2 ms.
-   `detector-baseline-evidence.json` records the intermediate cached-state implementation
-   before demand-only fingerprints, not the initial implementation.
+   **The independent-unit median and marked 8 ms median pass; the 2 ms tail gate remains open.**
+   Run `bun run --cwd editor/packages/collaboration bench:merge-review` after workspace builds.
+   The 2026-10-09 detector-cost follow-up includes append, exact pairs, identity mapping and
+   real syntax queries. Current parsing, authoring, window construction, application, IPC and
+   UI remain outside timing. `bench/detector-cost-comparison.json` records four complete
+   before/after A/B/B/A invocations against `2266ab2c0`, raw samples, source hashes and separate
+   profiles. Every run uses bench-class admission without quiet mode. These are
+   **experiment, shared machine**, with 120 complete detector samples per version and setting.
+   Each optimized invocation passes the unchanged independent-unit median budget.
 
-   The separately profiled representative batch has 100k lines, 100 edits, four authors and
-   8,192 retained records. Mean append is 1.728 ms; exact pair selection alone is 0.486 ms;
-   detector work after append is 2.298 ms. Current-unit lookup totals 0.878 ms, including
-   0.258 ms inside real query matching: one unit range and four query matches per edit.
-   V8 samples estimate 0.159 ms append, 0.456 ms pair selection, 0.757 ms unit selection/query,
-   0.121 ms signature/candidate checks, 0.057 ms orphan checks, 0.145 ms identity/effect work
-   and 0.487 ms bookkeeping per complete batch. These sampled estimates exclude harness/GC
-   and are not additive wall timings. Parsing, token fingerprints and `projectEffects` rebuilds
-   are zero in this independent-unit timed workload; reconstruction cost remains unbounded by
-   this experiment. Append is the largest separately timed component; unit/query selection
-   is the largest sampled category. Keep the existing budget and include marked projection
-   workloads and worker transport in the remaining proof.
+   | Retained records | Authors | Median before | Median after | p95 before | p95 after |
+   | ---------------- | ------- | ------------- | ------------ | ---------- | --------- |
+   | 100              | 2       | 1.243 ms      | 1.158 ms     | 2.526 ms   | 2.189 ms  |
+   | 100              | 4       | 1.249 ms      | 1.107 ms     | 2.464 ms   | 2.020 ms  |
+   | 100              | 8       | 1.325 ms      | 1.136 ms     | 2.096 ms   | 1.804 ms  |
+   | 8,192            | 2       | 2.030 ms      | 1.573 ms     | 3.919 ms   | 3.293 ms  |
+   | 8,192            | 4       | 2.029 ms      | 1.656 ms     | 3.841 ms   | 3.246 ms  |
+   | 8,192            | 8       | 2.097 ms      | 1.682 ms     | 3.609 ms   | 3.300 ms  |
+
+   Repeated retained-history traversal and per-pair effect bookkeeping were the ordinary
+   bottlenecks. `ConfirmedWindow` maintains retained-author counts; ordered batch selection
+   looks up supplied IDs and binary-searches causal positions. Nonmonotone arrivals still scan
+   canonical candidates. The detector reuses its involved-edit set on the all-active path and
+   checks identity origins directly for orphan eligibility. Failed appends, eviction,
+   missing/repeated batch IDs and non-tail selection preserve pair order and results.
+
+   Separately instrumented four-author profiles put exact-pair means at
+   0.524/0.515 ms before and
+   0.100/0.089 ms after. Detector work after append falls from
+   2.536/2.462 ms to
+   1.860/1.761 ms. Unit lookup remains
+   0.958/0.906 ms after, with 100 ranges and 400 real query matches.
+   These profiles include instrumentation overhead; they are separate from the median gate.
+   No unmeasured explanation is assigned to shared-machine tails. `detector-evidence.json` and
+   `detector-profile-evidence.json` contain the last optimized run. Historical intermediate
+   `detector-baseline-evidence.json` predates demand-only fingerprints.
+
+   `bench/candidates.test.ts` measures a marked 100k-line, 100-edit, four-author, 8,192-record
+   batch: 96 independent replacements, one formatting/content pair and two conflicting string
+   replacements. Each timed batch creates three projected snapshots, parses three versions
+   and fingerprints two ranges. Current parsing stays outside timing; projected trees are
+   released between batches. Sixteen samples per version give median/p95
+   **811.451/871.644 ms cold before** and
+   **3.615/7.096 ms bounded after**. Projected parsing alone changes from
+   807.759 ms to 0.235 ms at the median; every optimized sample uses three bounded parses.
+   Every run asserts overlap and parse marks, the exact conflicting edit IDs and formatting
+   exclusion. `candidate-evidence.json` contains the last optimized run; the comparison file
+   retains both versions, raw samples and excluded exploratory failures.
+
+   Whole-document version parsing dominated the marked path. Copy/edit alone was cheap, but
+   incremental parsing of a 100k-child flat root still missed one frame in exploratory pilots.
+   The language-neutral projected reader parses affected top-level units with neighboring
+   parent context at absolute source coordinates. It expands through damaged recovery nodes,
+   checks unchanged clean boundaries and uses copied-tree incremental parsing when the context
+   remains damaged, is not self-contained, has injection layers or a later range lies outside
+   the cached bounded tree. Full-document parent geometry is restored for bounded query results.
+   Damaged-line error lookup now descends at the exact point and visits overlapping siblings.
+   Both benchmark versions use this final query helper; the cold A path still reparses each
+   projected document in full. No retained highlighting tree is edited directly.
+
+   Minimal bridge contract: the optional fifth `MergeReviewSyntax` argument is the retained
+   current/base snapshot for a projected read. `createTreeSitterInputEdits(baseRead, edits)`
+   creates base-relative UTF-16 parser edits. `TreeSitterWorkerOwner.projectMergeUnits()` takes
+   the retained `baseSnapshotVersion`, a distinct projected `snapshotVersion`, projected `source`,
+   `inputEdits`, `ranges` and optional analysis, fingerprint, selection and cancellation flags.
+   It returns one unit group per range with `ok`, or an empty result with `stale`/`cancelled`.
+   Each projected unit carries its own `languageId` for nested injections.
+   Projected versions have an isolated per-runtime cache, bounded by the existing six-snapshot
+   and eight-million-source-unit limits; eviction of a base also releases its projections.
+   The distinct request leaves highlighting and the existing `mergeUnit` contract unchanged.
+
+   Projection ownership follow-up: a new projected tree stays request-owned until every unit
+   query and the final cancellation/stale check succeeds. All other exits dispose its trees,
+   source reference and native Markdown document; a completed cached projection remains owned
+   by retention when a later request is cancelled. Replacement projections commit only after
+   success. Each base snapshot holds its own dependency set, allocated only after a successful
+   projected read. Highlighting disposal traverses that set only; ordinary documents perform
+   no projection-cache lookup or traversal. The retention diagnostic `projectionCleanupVisits`
+   counts dependencies visited during base disposal. A failing-first real-worker regression
+   with eight review sessions and six unrelated highlighting evictions changes from 48 visits
+   to zero, while disposing a review base visits exactly its one owned projection. Mid-query
+   cancellation regressions cover new and reused TypeScript/Markdown projections, resource
+   counts and source pins; an invalid-query regression proves exception cleanup.
+
+   The review-fix **experiment, shared machine** repeats complete A/B/B/A under bench-class
+   admission without quiet mode. The comparison file's `reviewFixVerification` retains all raw
+   samples and source hashes. Ordinary 8,192-record before/after medians are
+   2.191/1.715, 2.219/1.854 and 2.223/1.873 ms for 2/4/8 authors; after p95 is
+   3.579/4.115/3.721 ms. Marked before/after median/p95 is
+   801.082/903.444 versus 4.607/9.545 ms, with three bounded parses in every after sample.
+   All ordinary medians and the additional marked 8 ms median gate pass; the ordinary 2 ms
+   p95 gate remains open. This detector fixture bypasses worker transport and retention;
+   real-worker cancellation/resource and dependency-visit tests prove the ownership fixes.
+
+   Differential corpus, regression and seeded detector cases compare projected results with
+   cold full reparses across JavaScript, TypeScript, TSX, CSS, JSON, Markdown, Python, Rust and
+   Go. They assert retained-tree serialization stays unchanged, including incremental fallback.
+   A real-worker browser test also checks identical groups, later-range expansion, concurrency,
+   missing bases, cancellation, projection-cache eviction and runtime disposal. Markdown/MDX
+   nested-fence cases compare against full worker parses and release every owned tree/document.
+   Native Markdown needs a separate full-text native document to discover projected fences;
+   it never reuses the highlighting document. This fallback is outside the TypeScript cost proof.
+
+   The ordinary p95 and marked batch still exceed the unchanged 2 ms budget. The representative
+   marked median passes the additional 8 ms frame target; this is not a dense-conflict worst-case
+   bound. Remaining proof: run the production bridge including worker transport after UI wiring,
+   and bound wide/damaged or injected contexts that take incremental fallback. Reproduce with
+   the benchmark command above and `bench/workload.ts`; retain the ordinary budget and the exact
+   full-reparse differential control while investigating these tails.
 
    A separate **experiment, shared machine** in `paste-evidence.json` compares reviewed head
    `d8ff8d97b4249cf3842e6c72b250c82f9137c6ea` with the revision, using two concurrent insertions
@@ -237,7 +327,73 @@ them).
    multi-unit paste uses two ranges and 20 real query matches, retaining both signature marks.
    This bounds the paste range-collection regression, independently of the ordinary batch gate.
 
-4. **Marks, hover and resolutions** in the collaboration plugin, wired into the example page.
+4. **Marks, hover and resolutions. Delivered 2026-10-09** in the collaboration plugin and
+   the real Edit together example. `mergeReview` opts an attachment into a confirmed-window owner;
+   sessionless views, uninterested plugins and single-author documents do no detection work.
+   A cancellable MessageChannel task coalesces accepted remote batches outside authoring; local-only
+   confirmations dispatch no detector work. A remote request waits for an already-pending local
+   acknowledgement, including histories already containing multiple authors, so both confirmed sides
+   can be compared. Rejected-only batches leave existing
+   marks intact and schedule no syntax work. History resets
+   and newer confirmations invalidate published marks; obsolete work releases source snapshots
+   before the next run. Detach unsubscribes and releases the review lifetime.
+
+   Unit highlights and an opt-in native gutter lane paint review dots beside text, including
+   editors with no line-number gutter. Dots live inside gutter cells so text clipping preserves
+   their paint. The shared hover names authors and shows Base, Theirs and Yours.
+   Keep both dismisses locally. Keep yours / Keep theirs project author-selective effects in a
+   local engine, then submit a bounded ordinary edit through the editor's collaboration author.
+   Foreign `setEffects` are never transmitted. Every removed insertion/deletion identity and the
+   resulting diff must lie wholly inside the unit; cross-unit edits offer Jump to edit for manual
+   review. Actions from dismissed, pending or obsolete versions change no text. A resolution immediately
+   retires its local action. On every peer, a causally later accepted edit within the unit supersedes
+   the old concurrency edges; replay and fresh attachments derive the same retirement from the
+   retained log. New concurrent edits remain reviewable.
+   `onMergeReview(unit, versions)` lets hosts append actions. Shared hover controls use a compact
+   button footer outside the version scroller. Content-sized placement starts beside the owning
+   unit, flips vertically when needed and shifts within its pane and viewport margins.
+
+   Node regressions cover scheduling exclusions, local dismissal, version reconstruction,
+   cross-unit safety, stale actions, history reset, obsolete work, release failures and disposal.
+   Real-editor browser tests cover both resolutions reaching every peer as accepted ordinary
+   edits, shared-hover action handlers, host actions, uninterested attachments and the production
+   parser bridge. Fixture hover handlers run synchronously; the standalone scenario owns native
+   keyboard and pointer verification. The portable `collaboration-merge-review` scenario holds
+   only the example's real BroadcastChannel delivery,
+   types through native editor inputs, then clicks each resolution. It checks convergence,
+   local dismissal, dot bounds outside text and hover contrast. Revision coverage checks settled
+   resolution retirement, reopened hovers, both peers, a unit at a pane edge and a real cross-unit
+   manual action. The manual fixture orders peer identities to retain Alice's insertion in the
+   first declaration; the other cases retain random identities. Every offered action must be
+   hit-testable inside the hover before any click; Playwright auto-scrolling cannot make a clipped
+   action pass. Three consecutive native runs passed. Twelve screenshots cover these states;
+   the mark, both peers’ hovers, all resolutions, pane-edge hover, manual hover and separate
+   `look` capture were read back. Revision evidence is
+   `20261009T185446Z-scenario-collaboration-merge-review-N7qcLB`
+   and `20261009T185341Z-look-collaboration-html-1440x1000-qzmSYf`. Final hover polish removes
+   host focus outlines from comparison regions, keeps keyboard focus visible on buttons, and
+   separates content sections by tone. A failing-first browser regression supplies the host focus
+   rule; all 22 shared-hover tests pass. The native scenario also checks outline-free, border-free
+   content sections before clicking. Refreshed screenshots were read back from
+   `20261009T190839Z-scenario-collaboration-merge-review-RQmT0p`; site-mode look evidence is
+   `20261009T190932Z-look-collaboration-html-1440x1000-LYR2LA`. Example theme type is
+   explicit so its dark page and shared hover use the same palette.
+
+   Integration after the step 3 query and fixed parser runtime merged: author projections now call
+   `projectMergeUnits` with the retained base version, a distinct projected version, a scoped source
+   reader and `createTreeSitterInputEdits` from the minimal snapshot diff. Each returned unit keeps
+   its own injected language; stale/cancelled requests return unavailable and release their loans.
+   Two failing-first real-worker tests observed two `parse` calls where one was required. The bridge
+   now parses the base once and sends all nine projections through `projectMergeUnits`; its 29-test
+   worker suite includes nested Markdown → JavaScript → JSON identities and real stale/cancelled
+   replies with source cleanup. The real-editor suite has 55 passes and one existing skip, including
+   fenced JSON review and peer-convergent resolution wholly inside the marked unit. Existing Node
+   review/detector tests pass (225), as does the two-engine causal oracle (30). The integrated native
+   scenario has twelve captures and no page problems. Screenshots were read back from
+   `20261009T195503Z-scenario-collaboration-merge-review-m4qxMV`; site-mode look is healthy at
+   `20261009T195509Z-look-collaboration-html-1440x1000-oDT0WK`. The cursor-index workaround is
+   unchanged for its separate follow-up; this integration makes no new performance claim.
+
 5. **Fregat:** marks for agent edits racing human typing, review annotations on the host, and the
    "Fix with AI" action. Detection runs in the browser, where the parser lives; the server host
    does not parse. Lands with Delta DB phase 4.

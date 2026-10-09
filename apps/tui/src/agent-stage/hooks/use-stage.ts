@@ -1,5 +1,6 @@
+import { finalize } from '@/utils/finalize'
 import { useStore } from 'zustand'
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ClientOrchestrationCommand, SessionWorktreeTarget } from '@workspace/contracts'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import {
@@ -44,7 +45,9 @@ export function useStage({
     }
   }, [])
   const currentTarget = useRef(target)
-  currentTarget.current = target
+  useLayoutEffect(() => {
+    currentTarget.current = target
+  }, [target])
   const key = draftKey(target)
   const storedDraft = drafts.read(key)
   const defaultRuntimeMode = useSettingValue(ready.owner, 'chat.defaultRuntimeMode')
@@ -170,22 +173,25 @@ export function useStage({
     drafts.retain(key, sent, intent, command)
     inFlight.current = true
     setSubmitting(true)
-    try {
-      if (!(await run(command))) return false
-      drafts.discardPending(key, command.commandId)
-      if (!implementing) drafts.remember(sent, command)
-      if (implementing !== 'new') drafts.clearContent(key, sent)
-      if (
-        mounted.current &&
-        draftKey(currentTarget.current) === key &&
-        command.sessionId !== conversation?.id
-      )
-        onSelect({ kind: 'conversation', sessionId: command.sessionId })
-      return true
-    } finally {
-      inFlight.current = false
-      setSubmitting(false)
-    }
+    return await finalize(
+      async () => {
+        if (!(await run(command))) return false
+        drafts.discardPending(key, command.commandId)
+        if (!implementing) drafts.remember(sent, command)
+        if (implementing !== 'new') drafts.clearContent(key, sent)
+        if (
+          mounted.current &&
+          draftKey(currentTarget.current) === key &&
+          command.sessionId !== conversation?.id
+        )
+          onSelect({ kind: 'conversation', sessionId: command.sessionId })
+        return true
+      },
+      () => {
+        inFlight.current = false
+        setSubmitting(false)
+      },
+    )
   }
   return {
     snapshot,

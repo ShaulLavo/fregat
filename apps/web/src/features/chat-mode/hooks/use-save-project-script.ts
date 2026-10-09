@@ -45,7 +45,7 @@ export function useSaveProjectScript() {
       action: 'chat.project.scripts.set',
       command: createProjectScriptsCommand({
         projectId: project.id,
-        scripts: [existing ?? script, ...remaining],
+        scripts: [existing ?? script].concat(remaining),
       }),
       dispatchCommand: transport.dispatchCommand,
       onFailed: (error) => notifyChatCommandError(error, 'Could not save the project script'),

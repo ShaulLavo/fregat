@@ -46,10 +46,10 @@ describe('bracket match plugin inside a real editor', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     editor = new Editor(container, {
-      plugins: [
-        syntaxPlugin,
-        ...[createBracketMatchPlugin(), snapshotProbePlugin((s) => seenSnapshots.push(s))],
-      ],
+      plugins: [syntaxPlugin].concat([
+        createBracketMatchPlugin(),
+        snapshotProbePlugin((s) => seenSnapshots.push(s)),
+      ]),
     })
   })
 

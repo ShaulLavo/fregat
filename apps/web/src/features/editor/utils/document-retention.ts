@@ -73,13 +73,12 @@ function retainedSlices({
   const active = slices.filter((slice) => slice.rootPath === activeRootPath)
   const parked = slices
     .filter((slice) => slice.rootPath !== activeRootPath)
-    .toSorted((left, right) => right.lastActiveAt - left.lastActiveAt)
+    .sort((left, right) => right.lastActiveAt - left.lastActiveAt)
     .slice(0, Math.max(0, projectLimit - active.length))
 
-  return [
-    ...active,
-    ...withinByteBudget(active, parked, byteBudget, documentSizes, unevictableDocumentKeys),
-  ]
+  return active.concat(
+    withinByteBudget(active, parked, byteBudget, documentSizes, unevictableDocumentKeys),
+  )
 }
 
 /** The active project is never trimmed; parked slices are admitted newest-first, each skipped if it would not fit. */

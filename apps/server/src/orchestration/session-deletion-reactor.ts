@@ -164,10 +164,9 @@ export class SessionDeletionReactor implements OrchestrationDomainEventReactor {
       const ownership = createAttachmentOwnership(this.options.database)
       const attachments = [
         ...new Map(
-          [
-            ...sessionAttachments(this.options.database, sessionId),
-            ...ownership.attachmentsForSession(sessionId),
-          ].map((attachment) => [attachment.id, attachment]),
+          sessionAttachments(this.options.database, sessionId)
+            .concat(ownership.attachmentsForSession(sessionId))
+            .map((attachment) => [attachment.id, attachment]),
         ).values(),
       ]
       await deleteAttachmentBlobs({

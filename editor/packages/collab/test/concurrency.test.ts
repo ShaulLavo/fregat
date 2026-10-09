@@ -37,7 +37,9 @@ test('seeded confirmed histories match transitive dependency walks and both engi
     const identities = new Set(reference.characters().map(({ id }) => charKey(id)))
     for (const edit of window.edits) {
       expect(
-        [...expand(edit.inserted), ...expand(edit.deleted)].every((id) => identities.has(id)),
+        expand(edit.inserted)
+          .concat(expand(edit.deleted))
+          .every((id) => identities.has(id)),
       ).toBe(true)
     }
     for (const limit of [0, 1, 7, 16]) {
@@ -176,6 +178,25 @@ test('concurrency is represented by exact pairs, not transitive connected groups
   )
 })
 
+test('batch selection preserves exact order for missing, evicted and non-tail edits', () => {
+  for (let seed = 0; seed < 20; seed++) {
+    const history = confirmedHistory(seed)
+    const window = new ConfirmedWindow([], 16)
+    for (const envelope of shuffled(history, randomFor(seed + 400))) window.append([envelope])
+    const all = window.pairs()
+    for (const envelope of history) {
+      const batch = [envelope.id, envelope.id, { actor: 'missing', seq: 1 }]
+      const selected = new Set(batch.map(editKey))
+      expect(window.pairs(batch)).toEqual(
+        all.filter(
+          ([a, b]) => selected.has(editKey(a.envelope.id)) || selected.has(editKey(b.envelope.id)),
+        ),
+      )
+    }
+    expect(window.pairs([])).toEqual([])
+  }
+})
+
 test('the replay cap retains the same canonical suffix regardless of arrival order', () => {
   const history: Envelope[] = Array.from({ length: 8193 }, (_, i) => ({
     document: 'review',
@@ -246,4 +267,19 @@ test('touches preserve exact UTF-16 spans for insert, delete and replace', () =>
         insert.change.kind === 'insert' ? expand([{ start: insert.change.start, count: 1 }]) : [],
     },
   ])
+})
+
+test('causal successors cover every dependency and exclude concurrent or evicted identities', () => {
+  const history = confirmedHistory(23)
+  const window = new ConfirmedWindow(history)
+  const ancestors = new Map<string, Set<string>>()
+  for (const edit of history) {
+    const seen = new Set(edit.deps.flatMap((id) => [editKey(id), ...ancestors.get(editKey(id))!]))
+    ancestors.set(editKey(edit.id), seen)
+    for (const previous of history) {
+      expect(window.isAfter(edit.id, [previous.id])).toBe(seen.has(editKey(previous.id)))
+    }
+  }
+  const suffix = new ConfirmedWindow(history, 2)
+  expect(suffix.isAfter(history.at(-1)!.id, [history[0]!.id])).toBe(false)
 })

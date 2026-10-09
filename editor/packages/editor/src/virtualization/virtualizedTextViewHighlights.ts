@@ -1657,7 +1657,7 @@ function overlayKey(overlay: HighlightOverlay): string {
 }
 
 function nextOverlayBaseName(view: VirtualizedTextViewInternal): string {
-  const names = new Set([...view.overlayBaseGroups.values()].map((group) => group.name))
+  const names = new Set(Array.from(view.overlayBaseGroups.values(), (group) => group.name))
   for (let index = 0; ; index++) {
     const name = `${view.highlightScope}-overlay-base-${index}`
     if (!names.has(name)) return name
@@ -1764,7 +1764,7 @@ function orderRangeHighlights(view: VirtualizedTextViewInternal): void {
 function orderOverlayBases(view: VirtualizedTextViewInternal): void {
   const registry = view.highlightRegistry
   if (!registry?.entries) return
-  const bases = new Set([...view.overlayBaseGroups.values()].map((group) => group.name))
+  const bases = new Set(Array.from(view.overlayBaseGroups.values(), (group) => group.name))
   const producers = new Set(orderedPaintGroups(view).map((group) => group.name))
   const isProducer = (name: string) =>
     name.startsWith(SHARED_TOKEN_HIGHLIGHT_PREFIX) || producers.has(name)

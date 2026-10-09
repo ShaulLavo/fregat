@@ -111,7 +111,7 @@ function icns(pngs: ReadonlyMap<number, Buffer>) {
   const header = Buffer.alloc(8)
   header.write('icns', 0, 'ascii')
   header.writeUInt32BE(8 + chunks.reduce((total, chunk) => total + chunk.length, 0), 4)
-  return Buffer.concat([header, ...chunks])
+  return Buffer.concat([header].concat(chunks))
 }
 
 function write(file: string, data: Buffer) {

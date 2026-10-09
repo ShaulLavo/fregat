@@ -175,7 +175,7 @@ function validateComparable(run, reference) {
 }
 
 function validateBlock(block, first) {
-  same([...block.order].sort(), [...arms].sort(), 'block order')
+  same(block.order.toSorted(), arms.toSorted(), 'block order')
   const times = block.order.map((arm) => Date.parse(block[arm].createdAt))
   assert.ok(
     times.every((time, index) => index === 0 || time > times[index - 1]),
@@ -207,7 +207,7 @@ export function validateFinalBlocks(blocks) {
   validateFinalBlockCount(blocks.length)
   const orders = new Map()
   for (const block of blocks) {
-    same([...block.order].sort(), [...arms].sort(), 'block order')
+    same(block.order.toSorted(), arms.toSorted(), 'block order')
     orders.set(block.order.join(','), (orders.get(block.order.join(',')) ?? 0) + 1)
   }
   same(orders.size, 6, 'all six run orders required')
@@ -309,7 +309,7 @@ function randomGenerator(seed) {
 }
 
 function percentile(values, fraction) {
-  const sorted = values.toSorted((left, right) => left - right)
+  const sorted = values.sort((left, right) => left - right)
   return sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)]
 }
 
@@ -379,7 +379,7 @@ export function analyze(design, blocks) {
   validateExperiment(design, blocks)
   const groups = [...new Set(blocks[0].baseline.samples.map(identity))].sort()
   const endpoints = groups.flatMap((group) =>
-    [...primaryMetrics, ...secondaryMetrics].map((metric) => endpoint(blocks, group, metric)),
+    primaryMetrics.concat(secondaryMetrics).map((metric) => endpoint(blocks, group, metric)),
   )
   const boundsAvailable = blocks.length >= 6
   if (boundsAvailable) bootstrap(endpoints, design, blocks.length)

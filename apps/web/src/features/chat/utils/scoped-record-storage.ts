@@ -38,7 +38,7 @@ function pruneEntries<T extends { readonly updatedAt: number }>(
   if (pairs.length <= limit) return { ...entries }
 
   return Object.fromEntries(
-    pairs.toSorted(([, left], [, right]) => right.updatedAt - left.updatedAt).slice(0, limit),
+    pairs.sort(([, left], [, right]) => right.updatedAt - left.updatedAt).slice(0, limit),
   )
 }
 

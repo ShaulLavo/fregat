@@ -143,7 +143,8 @@ export function ProviderAccount({
         {state.attempt && (
           <box flexDirection='column'>
             <text fg={theme.foreground}>
-              {[state.attempt.state, state.attempt.message, ...state.attempt.outputTail]
+              {[state.attempt.state, state.attempt.message]
+                .concat(state.attempt.outputTail)
                 .filter(Boolean)
                 .join('\n')}
             </text>

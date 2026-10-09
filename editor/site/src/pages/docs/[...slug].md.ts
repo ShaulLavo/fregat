@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro'
 import { MANUAL_SOURCES } from '../../manual/content'
 
 export function getStaticPaths() {
-  return [...MANUAL_SOURCES.keys()].map((file) => ({
+  return Array.from(MANUAL_SOURCES.keys(), (file) => ({
     params: { slug: file.replace(/\.md$/, '') },
     props: { text: MANUAL_SOURCES.get(file)! },
   }))

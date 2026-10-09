@@ -9,15 +9,16 @@ export function mount(host, text, highlighted) {
     parent: host,
     state: EditorState.create({
       doc: text,
-      extensions: [
-        ...(highlighted ? [basicSetup] : []),
-        ...(highlighted ? [javascript({ typescript: true })] : []),
-        EditorView.theme({
-          '&': { fontSize: '14px' },
-          '.cm-scroller': { fontFamily: 'monospace', lineHeight: '20px' },
-          '.cm-gutters': { display: 'none' },
-        }),
-      ],
+      extensions: (highlighted ? [basicSetup] : []).concat(
+        highlighted ? [javascript({ typescript: true })] : [],
+        [
+          EditorView.theme({
+            '&': { fontSize: '14px' },
+            '.cm-scroller': { fontFamily: 'monospace', lineHeight: '20px' },
+            '.cm-gutters': { display: 'none' },
+          }),
+        ],
+      ),
     }),
   })
   let fullHighlight

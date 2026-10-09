@@ -190,7 +190,7 @@ test.each([null, 'invalid', 'configured'])(
     expect(result.stderr).not.toContain('git status')
     expect(readdirSync(home)).toEqual(['.platform'])
     expect(readdirSync(path.join(home, '.platform'))).toEqual(['settings.json'])
-    expect(readdirSync(scratch).toSorted()).toEqual(['cache', 'home'])
+    expect(readdirSync(scratch).sort()).toEqual(['cache', 'home'])
   },
 )
 
@@ -247,7 +247,7 @@ test.skipIf(!userScopes || !checkoutClean)(
     const installed = run('bun', [INSTALL, '--root', root, '--commit', head])
     expect(installed.code, installed.stderr).toBe(0)
     expect(readlinkSync(path.join(root, 'current'))).toBe(head)
-    expect(readdirSync(path.join(root, head)).toSorted()).toEqual([
+    expect(readdirSync(path.join(root, head)).sort()).toEqual([
       'commit',
       'deadline.sh',
       'nested-scope.sh',

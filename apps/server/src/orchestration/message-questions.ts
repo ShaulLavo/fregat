@@ -44,10 +44,10 @@ export function retainMessageQuestions(
 ) {
   const recent = activities.slice(-limit)
   const retained = new Set(recent.map((activity) => activity.id))
-  const olderPending = pendingMessageQuestions(activities).filter(
+  const olderPending: OrchestrationSessionActivity[] = pendingMessageQuestions(activities).filter(
     (activity) => !retained.has(activity.id),
   )
-  return [...olderPending, ...recent]
+  return olderPending.concat(recent)
 }
 
 export function messageQuestionAnswer(

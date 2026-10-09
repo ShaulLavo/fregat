@@ -1199,7 +1199,7 @@ class ClaudeAgentSession extends SessionContext {
     const off = this.mcpOff
       .filter((name) => !listed.has(name) && !this.unapprovedProjectMcp.includes(name))
       .map(sessionOffPlaceholder)
-    return [...servers, ...gated, ...off]
+    return servers.concat(gated, off)
   }
 
   /** Claude has no status stream: read it at `init` and each turn end, and warn on a new failure. */

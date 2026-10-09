@@ -32,10 +32,9 @@ export async function probeAddress(
   fetcher: typeof fetch = fetch,
 ): Promise<ProbeOutcome> {
   const url = new URL(probe.address)
-  const signal = AbortSignal.any([
-    AbortSignal.timeout(probe.timeoutMs),
-    ...(probe.signal ? [probe.signal] : []),
-  ])
+  const signal = AbortSignal.any(
+    [AbortSignal.timeout(probe.timeoutMs)].concat(probe.signal ? [probe.signal] : []),
+  )
   if (!(await listening(url.hostname, Number(url.port), signal))) {
     probe.signal?.throwIfAborted()
     return signal.aborted ? { kind: 'unverified', reason: 'timeout' } : { kind: 'free' }

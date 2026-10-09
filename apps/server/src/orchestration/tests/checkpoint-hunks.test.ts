@@ -24,7 +24,7 @@ import { runGit } from '../../testing/git'
 const cleanups: (() => Promise<void> | void)[] = []
 
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).toReversed()) await cleanup()
+  for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
 })
 
 const before = Array.from({ length: 20 }, (_, index) => `line ${index + 1}`)

@@ -234,9 +234,9 @@ class Tree<T> {
         if (entry.node !== this.root) yield entry.node
         continue
       }
-      for (const node of [...entry.node.rightChildren].reverse()) stack.push({ node, emit: false })
+      for (const node of entry.node.rightChildren.toReversed()) stack.push({ node, emit: false })
       stack.push({ node: entry.node, emit: true })
-      for (const node of [...entry.node.leftChildren].reverse()) stack.push({ node, emit: false })
+      for (const node of entry.node.leftChildren.toReversed()) stack.push({ node, emit: false })
     }
   }
 

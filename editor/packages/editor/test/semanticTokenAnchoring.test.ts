@@ -79,9 +79,9 @@ function harness(): Harness {
     groups,
     resyncs,
     paintedRanges: () =>
-      [...groups.values()]
+      Array.from(groups.values())
         .flat()
-        .toSorted((left, right) => left.start - right.start || left.end - right.end),
+        .sort((left, right) => left.start - right.start || left.end - right.end),
     documentId: () => viewContext.getSnapshot().documentId as string,
     textVersion: () => viewContext.getSnapshot().textVersion,
     type: (at, text) => editor.edit({ from: at, to: at, text }),

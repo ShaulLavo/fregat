@@ -685,8 +685,7 @@ export class WorkspaceEditController {
       .filter((candidate) => candidate.state === 'undone')
     const evicted =
       manifest.category === 'file-operation' ? [] : dependentFileOperations(manifest, older)
-    for (const candidate of [...cleared, ...evicted])
-      await this.releaseStable(candidate.operationId)
+    for (const candidate of cleared.concat(evicted)) await this.releaseStable(candidate.operationId)
     if (cleared.length === 0 && evicted.length === 0) return
 
     recordRequestContext({
@@ -1733,7 +1732,7 @@ export class WorkspaceEditController {
   ): Promise<CompensationResult> {
     return this.executeRecoveryProgram(
       manifest,
-      executed.toReversed().map(invertRecoveryStep),
+      executed.map(invertRecoveryStep).reverse(),
       transitionId,
       true,
     )
@@ -2576,7 +2575,7 @@ export class WorkspaceEditController {
     manifest: WorkspaceEditJournalManifest,
     executed: readonly WorkspaceEditRecoveryStep[],
   ) {
-    const recoveryProgram = executed.toReversed().map(invertRecoveryStep)
+    const recoveryProgram = executed.map(invertRecoveryStep).reverse()
     const partial = advanceManifest(manifest, 'partial', this.clock(), {
       activeTransition: undefined,
       recoveryGuards: await this.snapshotRecoveryGuards(manifest),

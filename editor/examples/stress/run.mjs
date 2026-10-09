@@ -165,10 +165,9 @@ try {
       configFile: false,
       logLevel: 'warn',
       resolve: { alias: packageSet?.aliases ?? core.aliases },
-      plugins: [
-        recordModules(runtimeModules),
-        ...(values['profile-directory'] ? [profileSourceMaps()] : []),
-      ],
+      plugins: [recordModules(runtimeModules)].concat(
+        values['profile-directory'] ? [profileSourceMaps()] : [],
+      ),
       worker: { format: 'es', plugins: () => [recordModules(runtimeModules)] },
       build: {
         outDir: directory,
@@ -184,10 +183,9 @@ try {
       outDir: directory,
       instrumentRoot: root,
       packageSetDirectory: packageSet.directory,
-      receiptRoots: [
-        ...packageSet.manifest.external.packages.map((entry) => entry.root),
-        ...instrumentReceipt.packages.map((entry) => entry.root),
-      ],
+      receiptRoots: packageSet.manifest.external.packages
+        .map((entry) => entry.root)
+        .concat(instrumentReceipt.packages.map((entry) => entry.root)),
     })
     if (runtimeGraph.escaped.length)
       fail(

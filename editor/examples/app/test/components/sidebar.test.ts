@@ -35,7 +35,7 @@ describe('createSidebar', () => {
 })
 
 function entryLabels(container: HTMLElement): string[] {
-  return Array.from(container.querySelectorAll('.entry')).map((entry) =>
+  return Array.from(container.querySelectorAll('.entry'), (entry) =>
     (entry.textContent ?? '').slice(3),
   )
 }

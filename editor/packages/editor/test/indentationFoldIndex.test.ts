@@ -204,11 +204,12 @@ describe('snapshot indentation fold index', () => {
   })
 
   it('propagates distant indentation and unmatched region dependencies exactly', () => {
-    const text = [
-      'root',
-      ...Array.from({ length: 600 }, (_, row) => `${' '.repeat(2 + (row % 3))}body`),
-      'end',
-    ].join('\n')
+    const text = ['root']
+      .concat(
+        Array.from({ length: 600 }, (_, row) => `${' '.repeat(2 + (row % 3))}body`),
+        ['end'],
+      )
+      .join('\n')
     const previous = new IndentationFoldIndex({
       snapshot: createStringTextSnapshot(text),
       languageId: null,
@@ -305,10 +306,9 @@ describe('snapshot indentation fold index', () => {
 
   it('resumes a deep dedent without exceeding the stack-work budget', () => {
     const depth = 1024
-    const text = [
-      'root',
-      ...Array.from({ length: depth }, (_, row) => ' '.repeat(depth - row) + 'body'),
-    ].join('\n')
+    const text = ['root']
+      .concat(Array.from({ length: depth }, (_, row) => ' '.repeat(depth - row) + 'body'))
+      .join('\n')
     const value = new IndentationFoldIndex({
       snapshot: guardedSnapshot(text),
       languageId: null,

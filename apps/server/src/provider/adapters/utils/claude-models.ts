@@ -84,18 +84,16 @@ export function claudeCatalog(rows: readonly ModelInfo[]): ClaudeCatalog {
   const legacy = mergeRows(LEGACY_ROWS).filter((row) => !listed.has(row.slug))
   const cliDefault = rows.find((row) => row.value === CLI_DEFAULT_ROW)
   const defaultModel = catalogDefault(listed, cliDefault)
-  const ordered = [
-    ...current.filter((row) => row.slug === defaultModel),
-    ...current.filter((row) => row.slug !== defaultModel),
-  ]
+  const ordered = current
+    .filter((row) => row.slug === defaultModel)
+    .concat(current.filter((row) => row.slug !== defaultModel))
 
   return {
     defaultModel,
     defaultFallback: defaultModel !== DEFAULT_CLAUDE_MODEL,
-    models: [
-      ...ordered.map((row) => providerModel(row, 'current')),
-      ...legacy.map((row) => providerModel(row, 'legacy')),
-    ],
+    models: ordered
+      .map((row) => providerModel(row, 'current'))
+      .concat(legacy.map((row) => providerModel(row, 'legacy'))),
   }
 }
 
@@ -195,7 +193,7 @@ function effortDescriptor(
   levels: readonly string[],
   overlay: ClaudeModelOverlay,
 ): ProviderOptionDescriptor {
-  const ids = [...levels, ...(overlay.ultracode ? ['ultracode'] : []), 'ultrathink']
+  const ids = levels.concat(overlay.ultracode ? ['ultracode'] : [], ['ultrathink'])
 
   return {
     id: 'effort',

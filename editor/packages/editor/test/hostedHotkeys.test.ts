@@ -105,13 +105,14 @@ test('read-only refusal protects direct and hosted commands', () => {
   expect(bold).not.toHaveBeenCalled()
 })
 test('widget child nodes retain app shortcuts and leave field navigation local', () => {
+  const bindings: NonNullable<Parameters<typeof createBrowserDispatcher>[0]>['keymap'] =
+    baseEditorKeymap.linux
   const dispatcher = createBrowserDispatcher({
     root: document,
     platform: 'linux',
-    keymap: [
-      ...baseEditorKeymap.linux,
+    keymap: bindings.concat([
       { keys: 'Control+B', command: 'sidebar', context: 'Workspace', source: 'default' },
-    ],
+    ]),
   })
   dispatchers.push(dispatcher)
   const sidebar = vi.fn(() => true)
@@ -166,13 +167,14 @@ test('widget commands share the readonly mutation gate', () => {
 })
 
 test('same-element plugin nodes share commands and live contexts until their own disposal', () => {
+  const bindings: NonNullable<Parameters<typeof createBrowserDispatcher>[0]>['keymap'] =
+    baseEditorKeymap.linux
   const dispatcher = createBrowserDispatcher({
     root: document,
     platform: 'linux',
-    keymap: [
-      ...baseEditorKeymap.linux,
+    keymap: bindings.concat([
       { keys: 'Control+B', command: 'probe', context: 'Barrier && HoverVisible' },
-    ],
+    ]),
   })
   dispatchers.push(dispatcher)
   const editor = create({ hotkeys: dispatcher })

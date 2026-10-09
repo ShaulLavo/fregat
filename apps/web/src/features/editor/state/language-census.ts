@@ -48,6 +48,6 @@ function usableCensusCounts() {
 function workspaceHighlightingLanguages(): readonly HighlightingLanguage[] | null {
   const grammars = workspacePreloadLanguages()
   if (!grammars) return null
-  const ids = new Set([...grammars, ...workspaceWarmLanguages()])
-  return [...ids].map((languageId) => ({ languageId }))
+  const ids = new Set(grammars.concat(workspaceWarmLanguages()))
+  return Array.from(ids, (languageId) => ({ languageId }))
 }

@@ -166,7 +166,9 @@ export function snapshotTargetForReference(
   }
   const historical = reference.source === 'historical'
   if (
-    [...fields.keys()].some((key) => !['s', 'r', ...(historical ? ['c', 'p'] : [])].includes(key))
+    Array.from(fields.keys()).some(
+      (key) => !['s', 'r'].concat(historical ? ['c', 'p'] : []).includes(key),
+    )
   )
     return null
   const oldPath = toWorkspaceAbsolute(rootPath, fields.get('r') ?? '')
@@ -252,7 +254,7 @@ function normalizedMetadata(token: string) {
     if (equals < 0 || !validExtra(key, extra.slice(equals + 1))) continue
     fields.set(key, extra)
   }
-  return [range, ...fields.values()].join(',') + suffix
+  return [range].concat(Array.from(fields.values())).join(',') + suffix
 }
 
 function validExtra(key: string, raw: string) {

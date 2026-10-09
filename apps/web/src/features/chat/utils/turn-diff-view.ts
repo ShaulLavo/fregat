@@ -12,7 +12,7 @@ export type TurnDiffRow = {
 
 export function collectDirectoryPaths(nodes: readonly ChatTurnDiffTreeNode[]): string[] {
   return nodes.flatMap((node) =>
-    node.kind === 'directory' ? [node.path, ...collectDirectoryPaths(node.children)] : [],
+    node.kind === 'directory' ? [node.path].concat(collectDirectoryPaths(node.children)) : [],
   )
 }
 
@@ -35,6 +35,8 @@ export function turnDiffRows(
       node,
     }
     if (node.kind !== 'directory' || !expanded) return [row]
-    return [row, ...turnDiffRows(node.children, defaultsExpanded, overrides, depth + 1, node.path)]
+    return [row].concat(
+      turnDiffRows(node.children, defaultsExpanded, overrides, depth + 1, node.path),
+    )
   })
 }

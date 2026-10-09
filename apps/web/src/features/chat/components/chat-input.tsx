@@ -144,7 +144,7 @@ export function ChatInput({
   const terminalContexts = useChatInputDraftStore(terminalContextsSelector)
   const activeFile = useActiveFileChip(rootPath)
   const aliasRoots = use(ComposerRootsContext)
-  const reviewComments = useReviewDraft({ environmentId, rootPaths: [rootPath, ...aliasRoots] })
+  const reviewComments = useReviewDraft({ environmentId, rootPaths: [rootPath].concat(aliasRoots) })
   const persistenceError = useChatInputDraftStore((store) => store.persistenceError)
   const clearStoredDraft = useChatInputDraftStore((store) => store.clearDraft)
   const clearStoredDraftContent = useChatInputDraftStore((store) => store.clearDraftContent)

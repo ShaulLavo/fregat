@@ -262,7 +262,7 @@ export class HotkeySequenceRecorder {
         return
       }
       this.#events.push(event)
-      this.#patchSteps((prev) => [...prev, finalHotkey])
+      this.#patchSteps((prev) => prev.concat([finalHotkey]))
       this.#scheduleIdleTimer()
     }
 

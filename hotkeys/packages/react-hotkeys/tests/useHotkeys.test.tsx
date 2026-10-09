@@ -226,7 +226,9 @@ describe('useHotkeys', () => {
 
     const manager = getHotkeyRegistry()
     expect(manager.registrations.state.size).toBe(2)
-    const disabledReg = [...manager.registrations.state.values()].find((r) => r.hotkey === 'Mod+Z')
+    const disabledReg = Array.from(manager.registrations.state.values()).find(
+      (r) => r.hotkey === 'Mod+Z',
+    )
     expect(disabledReg?.options.enabled).toBe(false)
   })
 
@@ -390,15 +392,15 @@ describe('useHotkeys', () => {
         { initialProps: { enabled: true } },
       )
 
-      const idBefore = [...manager.registrations.state.keys()][0]
+      const idBefore = Array.from(manager.registrations.state.keys())[0]
       expect(manager.registrations.state.size).toBe(1)
 
       rerender({ enabled: false })
       expect(manager.registrations.state.size).toBe(1)
-      expect([...manager.registrations.state.keys()][0]).toBe(idBefore)
+      expect(Array.from(manager.registrations.state.keys())[0]).toBe(idBefore)
 
       rerender({ enabled: true })
-      expect([...manager.registrations.state.keys()][0]).toBe(idBefore)
+      expect(Array.from(manager.registrations.state.keys())[0]).toBe(idBefore)
     })
   })
 })

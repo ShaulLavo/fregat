@@ -74,7 +74,7 @@ function themeValue(theme: EditorVisibleSnapshotJSON['theme'] | undefined) {
 
 function stableValue(value: unknown): string | undefined {
   if (!value || typeof value !== 'object') return JSON.stringify(value)
-  const entries = Object.entries(value).toSorted(([left], [right]) => left.localeCompare(right))
+  const entries = Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
   return JSON.stringify(entries.map(([key, child]) => [key, stableValue(child)]))
 }
 
@@ -155,7 +155,7 @@ export function retentionAcceptanceProjection(input: {
     starts.push(offset)
     offset += line.length + 1
   }
-  const runs = [...chunks].flatMap(([index, parts]) =>
+  const runs = Array.from(chunks).flatMap(([index, parts]) =>
     parts.flatMap((part) => {
       const rowStart = starts[index]
       if (rowStart === undefined) return []
@@ -245,7 +245,7 @@ export function retentionAcceptanceFoldMismatch(
     const row =
       projection.binding.presentation === 'live'
         ? viewport.querySelector<HTMLElement>(`[data-editor-virtual-row="${metadata.index}"]`)
-        : [...viewport.querySelectorAll<HTMLElement>('[data-editor-provisional-row]')].find(
+        : Array.from(viewport.querySelectorAll<HTMLElement>('[data-editor-provisional-row]')).find(
             (candidate) => Number.parseFloat(candidate.style.top) === metadata.top,
           )
     if (!row) continue

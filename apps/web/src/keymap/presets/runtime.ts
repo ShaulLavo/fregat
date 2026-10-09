@@ -300,6 +300,14 @@ export const presetRuntimeRows: readonly RuntimeRow[] = [
     '["pane::ActivateItem",7]',
   ],
   [
+    293,
+    'linux',
+    'Alt+0',
+    'workspace.selectItem9',
+    '(Editor || Terminal || Chat || Settings || Problems || Search)',
+    'pane::ActivateLastItem',
+  ],
+  [
     294,
     'linux',
     'Ctrl+PageUp',
@@ -695,6 +703,14 @@ export const presetRuntimeRows: readonly RuntimeRow[] = [
     'workspace::ToggleLeftDock',
   ],
   [435, 'linux', 'Ctrl+J', 'workspace.togglePanel', 'Workspace', 'workspace::ToggleBottomDock'],
+  [
+    436,
+    'linux',
+    'Ctrl+Alt+J',
+    'workspace.toggleSessionRail',
+    'Workspace',
+    'multi_workspace::ToggleWorkspaceSidebar',
+  ],
   [
     448,
     'linux',
@@ -1860,6 +1876,14 @@ export const presetRuntimeRows: readonly RuntimeRow[] = [
     '["pane::ActivateItem",7]',
   ],
   [
+    1357,
+    'mac',
+    'Ctrl+0',
+    'workspace.selectItem9',
+    '(Editor || Terminal || Chat || Settings || Problems || Search)',
+    'pane::ActivateLastItem',
+  ],
+  [
     1358,
     'mac',
     'Ctrl+-',
@@ -1911,6 +1935,14 @@ export const presetRuntimeRows: readonly RuntimeRow[] = [
     'workspace::ToggleLeftDock',
   ],
   [1392, 'mac', 'Meta+J', 'workspace.togglePanel', 'Workspace', 'workspace::ToggleBottomDock'],
+  [
+    1393,
+    'mac',
+    'Meta+Alt+J',
+    'workspace.toggleSessionRail',
+    'Workspace',
+    'multi_workspace::ToggleWorkspaceSidebar',
+  ],
   [
     1404,
     'mac',

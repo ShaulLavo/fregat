@@ -38,10 +38,9 @@ function readiness(id, overrides = {}) {
     shiki: configuration.shiki
       ? { ...owner, maxTokenizationLineLength: 20_000, untokenizedLines: 0 }
       : null,
-    sessions: [
-      ...(configuration.treeSitter ? [session('treeSitter')] : []),
-      ...(configuration.shiki ? [session('shiki')] : []),
-    ],
+    sessions: (configuration.treeSitter ? [session('treeSitter')] : []).concat(
+      configuration.shiki ? [session('shiki')] : [],
+    ),
     minimaps: configuration.minimap ? [{ current: true, renderedAfterSource: true }] : [],
     overLimitLines: 0,
     lineCount: 1,
@@ -56,11 +55,10 @@ function readiness(id, overrides = {}) {
         gutterElements: configuration.platform ? 2 : 0,
       },
     ],
-    workers: [
-      ...(configuration.treeSitter ? [worker('treeSitter')] : []),
-      ...(configuration.shiki ? [worker('shiki')] : []),
-      ...(configuration.minimap ? [minimap()] : []),
-    ],
+    workers: (configuration.treeSitter ? [worker('treeSitter')] : []).concat(
+      configuration.shiki ? [worker('shiki')] : [],
+      configuration.minimap ? [minimap()] : [],
+    ),
     ...overrides,
   }
 }

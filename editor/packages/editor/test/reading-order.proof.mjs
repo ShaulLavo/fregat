@@ -166,7 +166,7 @@ try {
     visit(readingGroup.nodeId)
     assert.deepEqual(
       accessibleRows,
-      [...rows].sort((a, b) => a - b),
+      rows.toSorted((a, b) => a - b),
     )
   }
   await page.evaluate((text) => window.readingProof.loadPlain(text), fixture(1))

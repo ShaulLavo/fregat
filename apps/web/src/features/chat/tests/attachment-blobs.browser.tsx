@@ -56,7 +56,7 @@ test('picked screenshot files persist as raw bytes and retain their media type',
 
 test('the staged-byte budget rejects an oversized blob without storing it', async () => {
   const part = new Blob([new Uint8Array(1024 * 1024)])
-  const oversized = new Blob([...Array.from({ length: 400 }, () => part), 'x'])
+  const oversized = new Blob(Array.from({ length: 400 }, (): BlobPart => part).concat(['x']))
   await expect(storeAttachmentBlob('large', oversized)).rejects.toThrow(
     'Attachment recovery storage is full.',
   )

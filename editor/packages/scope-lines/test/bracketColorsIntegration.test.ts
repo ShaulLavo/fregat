@@ -103,8 +103,7 @@ function levelHighlightNames(): readonly string[] {
 }
 
 function highlightRules(): string {
-  return [...document.head.querySelectorAll('style')]
-    .map((element) => element.textContent ?? '')
+  return Array.from(document.head.querySelectorAll('style'), (element) => element.textContent ?? '')
     .filter((text) => text.includes('::highlight('))
     .join('\n')
 }

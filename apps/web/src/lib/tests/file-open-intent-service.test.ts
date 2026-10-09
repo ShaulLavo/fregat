@@ -1,4 +1,3 @@
-// Complete the real server fixture's cold imports during test collection.
 import '../../../test/server'
 import { preparedDocumentLease } from '../../../test/factories/prepared-document'
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
@@ -1747,7 +1746,7 @@ function mergeEventContext(target: Record<string, unknown>, source: Record<strin
   for (const [key, value] of Object.entries(source)) {
     const current = target[key]
     if (Array.isArray(current) && Array.isArray(value)) {
-      target[key] = [...current, ...value]
+      target[key] = current.concat(value)
       continue
     }
     if (isRecord(current) && isRecord(value)) {

@@ -8,7 +8,7 @@ export function editorHistoryForSelection(
   selected: TabContent | null,
 ) {
   if (selected === null) return contents
-  return uniqueRecentContents([selected, ...contents])
+  return uniqueRecentContents([selected].concat(contents))
 }
 
 export function editorHistoryForClosedContent(contents: readonly TabContent[], closed: TabContent) {
@@ -24,7 +24,7 @@ export function editorHistoryForRenamedFile(
 }
 
 export function recentlyClosedTabsForClose(contents: readonly TabContent[], closed: TabContent) {
-  return uniqueRecentContents([closed, ...contents])
+  return uniqueRecentContents([closed].concat(contents))
 }
 
 export function recentlyClosedTabsForReopen(contents: readonly TabContent[], reopened: TabContent) {

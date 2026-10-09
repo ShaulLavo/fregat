@@ -76,7 +76,7 @@ export class UpstreamFetchScheduler {
     try {
       const identity = await this.repositoryIdentity(rootAbsolutePath)
       return await this.lookups.query({
-        queryKey: ['git', 'common-directory', rootAbsolutePath, ...(identity ?? [])],
+        queryKey: ['git', 'common-directory', rootAbsolutePath].concat(identity ?? []),
         queryFn: () => this.resolveCommonDir(rootAbsolutePath),
         staleTime: identity === null ? 0 : 'static',
         gcTime: 60_000,

@@ -1,8 +1,8 @@
 {
   "source": "fd1729638c6c7fc1b78244f05a4acba7dfa66ea8",
   "inventory": {
-    "zed": "0c53c85e654c23a8e68b4bec1b645386a56d9e64238e9f5fd9a384f0183b6555",
-    "ours": "71f0e03f491811728f443cef2187747aeb2f792fdf9052ecdc27d9d66173ba08",
+    "zed": "fa5fb73d686075e3939020136eeef56c3ffb9fb0f5169695f432f6425c1f388a",
+    "ours": "fb2b4d8a51e3fdf3c63e5a8028a9416702dc44cd6acd91b4042e5bc27fcaf8da",
     "rows": 1885
   },
   "bindings": [
@@ -10,33 +10,33 @@
       "platform": "linux",
       "preset": "ours",
       "shellKeys": false,
-      "count": 353,
-      "bindings": "75c56bb9d5b6f41999f7931afac367772b97e019423870dc77c2702c14c9914e",
-      "unmapped": "3ace8efb24dce48184e1b1f60ad4413a653cbfa33c0af795f6734f090e9799c1"
+      "count": 379,
+      "bindings": "0649e599701641642c14a0a44864092551f2f4973d069d43903288732055f723",
+      "unmapped": "91c3721a541dc76880237b7b1ba74cd6d31c63e128ff6a2253bb9a4f11888d4d"
     },
     {
       "platform": "linux",
       "preset": "ours",
       "shellKeys": true,
-      "count": 400,
-      "bindings": "f697e03f71348f45eaea74bd7a5fb3e85e549fab5573f11c716323fd883ac7c8",
-      "unmapped": "3ace8efb24dce48184e1b1f60ad4413a653cbfa33c0af795f6734f090e9799c1"
+      "count": 426,
+      "bindings": "5e7c1f48245a1b89a00f6f1be243ac690ca767572284c8361d1827c595a877a7",
+      "unmapped": "91c3721a541dc76880237b7b1ba74cd6d31c63e128ff6a2253bb9a4f11888d4d"
     },
     {
       "platform": "linux",
       "preset": "zed",
       "shellKeys": false,
-      "count": 353,
-      "bindings": "be9e9cda6d5cdd796af20c6a1348b45254a651f397a723d47cc6c31b8fb6132d",
-      "unmapped": "3ace8efb24dce48184e1b1f60ad4413a653cbfa33c0af795f6734f090e9799c1"
+      "count": 355,
+      "bindings": "ee58b49ee5b3e28b9f5f78bb2c4f0c0e057df1e049bc166d75b851de00106f48",
+      "unmapped": "91c3721a541dc76880237b7b1ba74cd6d31c63e128ff6a2253bb9a4f11888d4d"
     },
     {
       "platform": "linux",
       "preset": "zed",
       "shellKeys": true,
-      "count": 400,
-      "bindings": "487fadd8f702f5f33355b5e54538a1627f0874a98e82bbbac8b110b00766cda8",
-      "unmapped": "3ace8efb24dce48184e1b1f60ad4413a653cbfa33c0af795f6734f090e9799c1"
+      "count": 402,
+      "bindings": "2a9a30e33d067b63814e2c8e1a1b48231d8432f0204362c417dfb88c4f8552a2",
+      "unmapped": "91c3721a541dc76880237b7b1ba74cd6d31c63e128ff6a2253bb9a4f11888d4d"
     },
     {
       "platform": "linux",
@@ -58,33 +58,33 @@
       "platform": "mac",
       "preset": "ours",
       "shellKeys": false,
-      "count": 371,
-      "bindings": "56007eab96c01c79d56bd2706abdd35f08ebd9777e61d45acc3593afcc01186c",
-      "unmapped": "f23aaa6c56dc61704549e89b13407ba00583bf7a797d95e2d9c177e5d7649bd1"
+      "count": 397,
+      "bindings": "6b03ce854155c1c0df0dfb6cfcc456aec045c7858523b7b648c498ec88906505",
+      "unmapped": "a0dfabad1d2e0f888c1db4cf3e27b1d0cf2627f6aaa57a3c00b9a0de29e49a34"
     },
     {
       "platform": "mac",
       "preset": "ours",
       "shellKeys": true,
-      "count": 418,
-      "bindings": "0996b10e8202829905fdee6a027450905c733bf67cd2ae3e1f8c31943c0c8f3e",
-      "unmapped": "f23aaa6c56dc61704549e89b13407ba00583bf7a797d95e2d9c177e5d7649bd1"
+      "count": 444,
+      "bindings": "ebd4d5dddf6c36e04037fc1682089da04bf9b050d8bde61a030cb0f30daad8f3",
+      "unmapped": "a0dfabad1d2e0f888c1db4cf3e27b1d0cf2627f6aaa57a3c00b9a0de29e49a34"
     },
     {
       "platform": "mac",
       "preset": "zed",
       "shellKeys": false,
-      "count": 371,
-      "bindings": "79718d30b6c401eb459ccd0865a2fbca2426eff193968395bcde0bf3a9458215",
-      "unmapped": "f23aaa6c56dc61704549e89b13407ba00583bf7a797d95e2d9c177e5d7649bd1"
+      "count": 373,
+      "bindings": "76adcbbad25a93cc317d3a7b8b6cd349b1a0ed2dd3c38a63b1e9c74ce5bd44a5",
+      "unmapped": "a0dfabad1d2e0f888c1db4cf3e27b1d0cf2627f6aaa57a3c00b9a0de29e49a34"
     },
     {
       "platform": "mac",
       "preset": "zed",
       "shellKeys": true,
-      "count": 418,
-      "bindings": "1b207dbfa7d047ca24b55271499cc813b2f9fcf4bc37ea04354fdbd2e81c4b91",
-      "unmapped": "f23aaa6c56dc61704549e89b13407ba00583bf7a797d95e2d9c177e5d7649bd1"
+      "count": 420,
+      "bindings": "3337deb2790fd521d190767e7cc0cf0f212c866b90122ee9f66020ba3d03b362",
+      "unmapped": "a0dfabad1d2e0f888c1db4cf3e27b1d0cf2627f6aaa57a3c00b9a0de29e49a34"
     },
     {
       "platform": "mac",
@@ -106,33 +106,33 @@
       "platform": "windows",
       "preset": "ours",
       "shellKeys": false,
-      "count": 353,
-      "bindings": "4af6d2affaece3911c8dd2e787094ae9c6d124989fd6564d99b46925fe278ea7",
-      "unmapped": "99b4756cac4baf5ffad051ea0ba73397fddd7205c2cd11bd7a0d5659dd928d14"
+      "count": 379,
+      "bindings": "e3bcd98e5bd2dcb7171e09fcc7759174ae77789db229e56531191b6e16613c94",
+      "unmapped": "0b2de827bbeef243d901773912956297d36d3f8b6918f4182c152fd8a1e8171b"
     },
     {
       "platform": "windows",
       "preset": "ours",
       "shellKeys": true,
-      "count": 400,
-      "bindings": "6982ac6dd1769ed3c91b499f1072b89a7a7f186fa24931ef6eb1a51b05189467",
-      "unmapped": "99b4756cac4baf5ffad051ea0ba73397fddd7205c2cd11bd7a0d5659dd928d14"
+      "count": 426,
+      "bindings": "f361289f0d916031181f6dcb002efb32e02fdb3bde7584ef03984da045cf98dd",
+      "unmapped": "0b2de827bbeef243d901773912956297d36d3f8b6918f4182c152fd8a1e8171b"
     },
     {
       "platform": "windows",
       "preset": "zed",
       "shellKeys": false,
-      "count": 353,
-      "bindings": "d303ede19e26c13f901efd77ab0ba91544600d588c95d76395cf59c227ef579d",
-      "unmapped": "99b4756cac4baf5ffad051ea0ba73397fddd7205c2cd11bd7a0d5659dd928d14"
+      "count": 355,
+      "bindings": "527117b0438a44e25a7a7e72bf710e186be3b5b691b39fb253b09cfab8ea7ad7",
+      "unmapped": "0b2de827bbeef243d901773912956297d36d3f8b6918f4182c152fd8a1e8171b"
     },
     {
       "platform": "windows",
       "preset": "zed",
       "shellKeys": true,
-      "count": 400,
-      "bindings": "7582ec9ee0147eb05ddd10f8f95565b847104a54634f91bfa29a6477fdc2a4ce",
-      "unmapped": "99b4756cac4baf5ffad051ea0ba73397fddd7205c2cd11bd7a0d5659dd928d14"
+      "count": 402,
+      "bindings": "44738922dd82462460dbf17b3ab2de70c1129f610f4d473287b616a6d8737d52",
+      "unmapped": "0b2de827bbeef243d901773912956297d36d3f8b6918f4182c152fd8a1e8171b"
     },
     {
       "platform": "windows",

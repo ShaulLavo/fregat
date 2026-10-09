@@ -8,5 +8,5 @@ export function logBreakdownOptionValues(
   if (selected === 'all') return values
   if (values.includes(selected)) return values
 
-  return [selected, ...values]
+  return [selected].concat(values)
 }

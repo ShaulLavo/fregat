@@ -92,9 +92,10 @@ describe('mermaid fences', () => {
     async (_name, chart, label) => {
       renderDiagram(false, `\`\`\`mermaid\n${chart}\n\`\`\``)
       await vi.waitFor(() => expect(mermaidDiagram()).not.toBeNull(), { timeout: 15_000 })
-      const labels = [...mermaidDiagram()!.querySelectorAll('text, foreignObject')]
-        .map((node) => node.textContent)
-        .join(' ')
+      const labels = Array.from(
+        mermaidDiagram()!.querySelectorAll('text, foreignObject'),
+        (node) => node.textContent,
+      ).join(' ')
       expect(labels).toContain(label)
       expect(labels).not.toContain('mermaid_user_')
     },
@@ -207,7 +208,7 @@ describe('mermaid fences', () => {
     const startedAt = performance.now()
     renderDiagram(false, chart)
     const painted = () =>
-      [...document.querySelectorAll('[data-markdown="mermaid-block"] [role="img"]')].filter(
+      Array.from(document.querySelectorAll('[data-markdown="mermaid-block"] [role="img"]')).filter(
         (host) => host.shadowRoot?.querySelector('svg'),
       ).length
     await vi.waitFor(() => expect(painted()).toBe(3), { timeout: 15_000 })
@@ -261,7 +262,7 @@ describe('mermaid fences', () => {
         },
         { timeout: 15_000 },
       )
-      const shapes = [...(mermaidDiagram()?.querySelectorAll('rect, polygon, path') ?? [])]
+      const shapes = Array.from(mermaidDiagram()?.querySelectorAll('rect, polygon, path') ?? [])
       expect(
         shapes.map((shape) => getComputedStyle(shape).fill),
         chart,

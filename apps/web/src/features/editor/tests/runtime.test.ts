@@ -366,10 +366,11 @@ test('finishes every A save and cache update on A after its first write is delay
   const pathB = 'first.ts'
 
   try {
-    await Promise.all([
-      ...pathsA.map((path) => writeFile(join(server.root, path), 'A saved')),
-      writeFile(join(serverB.root, pathB), 'B saved'),
-    ])
+    await Promise.all(
+      pathsA
+        .map((path) => writeFile(join(server.root, path), 'A saved'))
+        .concat([writeFile(join(serverB.root, pathB), 'B saved')]),
+    )
     for (const path of pathsA) {
       const file = await fetchFile(
         filesystemPath(path),

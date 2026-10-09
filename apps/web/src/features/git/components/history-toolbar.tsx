@@ -41,13 +41,14 @@ export function HistoryToolbar({
   const choices = [
     { value: 'all', label: 'All branches & tags' },
     { value: 'HEAD', label: 'Current branch' },
-    ...refs
+  ].concat(
+    refs
       .filter((ref) => ref.kind !== 'head')
       .map((ref) => ({
         value: ref.name,
         label: `${ref.kind === 'tag' ? 'Tag: ' : ''}${historyRefLabel(ref)}`,
       })),
-  ]
+  )
   return (
     <>
       <PaneBar>

@@ -81,7 +81,7 @@ export function redoLatestSessionAction() {
 
 function batchIds() {
   const { undo, redo } = history.getSnapshot()
-  return [...undo, ...redo].map((batch) => batch.id)
+  return undo.concat(redo).map((batch) => batch.id)
 }
 function noticeId(id: number) {
   return `session-lifecycle-undo-${id}`

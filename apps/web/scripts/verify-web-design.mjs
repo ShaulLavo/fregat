@@ -22,7 +22,7 @@ const loadingPanes = [
   'file-picker',
   'model-picker',
   'settings-narrow',
-]
+].sort()
 const report = {
   startedAt: new Date().toISOString(),
   fixture: options.fixture,
@@ -268,7 +268,7 @@ async function verifyVariant(density, colorScheme) {
         colorScheme,
         capture,
       })
-      expect(entry.loading.map((lane) => lane.name).toSorted()).toEqual(loadingPanes.toSorted())
+      expect(entry.loading.map((lane) => lane.name).sort()).toEqual(loadingPanes)
       expect(
         entry.loading
           .filter((lane) => lane.status !== 'passed')
@@ -441,7 +441,7 @@ async function captureSurface(page, entry, outputDir, name, locator) {
   expect(record.pixels.uniqueColors).toBeGreaterThan(30)
   expect(record.pixels.nonDominantFraction).toBeGreaterThan(0.02)
   validateMetrics(record, entry.density)
-  await page.evaluate(drawRulers, [...metrics.bars, ...metrics.contentHeaders])
+  await page.evaluate(drawRulers, metrics.bars.concat(metrics.contentHeaders))
   try {
     await page.screenshot({ path: join(outputDir, `${name}-rulers.png`), fullPage: true })
   } finally {
@@ -516,42 +516,42 @@ function measureDesign() {
   const roots = [document]
   for (let index = 0; index < roots.length; index++) {
     roots.push(
-      ...[...roots[index].querySelectorAll('*')].flatMap((element) =>
+      ...Array.from(roots[index].querySelectorAll('*')).flatMap((element) =>
         element.shadowRoot ? [element.shadowRoot] : [],
       ),
     )
   }
   const treeRows = roots
-    .flatMap((treeRoot) => [...treeRoot.querySelectorAll('button[data-type="item"]')])
+    .flatMap((treeRoot) => Array.from(treeRoot.querySelectorAll('button[data-type="item"]')))
     .filter(visible)
     .map(describe)
-  const bars = [
-    ...document.querySelectorAll(
+  const bars = Array.from(
+    document.querySelectorAll(
       'header:not([class*="@max-3xl/settings"]), [role="tablist"][aria-label="Editor tabs"], [data-workbench-tool-pane-header], [class~="h-(--bar-height)"]',
     ),
-  ]
+  )
     .filter(visible)
     .filter((element) => element.tagName !== 'BUTTON' && element.getAttribute('role') !== 'button')
     .map(describe)
-  const contentHeaders = [
-    ...document.querySelectorAll(
+  const contentHeaders = Array.from(
+    document.querySelectorAll(
       'header[class*="@max-3xl/settings"], [data-slot="dialog-header"], [data-slot="dialog-footer"]',
     ),
-  ]
+  )
     .filter(visible)
     .map(describe)
-  const floating = [
-    ...document.querySelectorAll(
+  const floating = Array.from(
+    document.querySelectorAll(
       '[data-slot="dialog-content"], [data-slot="dropdown-menu-content"], [data-slot="context-menu-content"], [data-slot="popover-content"], [data-slot="tooltip-content"]',
     ),
-  ]
+  )
     .filter(visible)
     .map(describe)
-  const controls = [
-    ...document.querySelectorAll(
+  const controls = Array.from(
+    document.querySelectorAll(
       '[data-slot="button"], [data-slot="input"], [data-slot="select-trigger"], [data-slot="input-group"]',
     ),
-  ]
+  )
     .filter(visible)
     .map(describe)
   const rail = document.querySelector('nav[aria-label="Sidebar tabs"]')
@@ -662,11 +662,9 @@ function drawRulers(bars) {
 }
 
 function writeGallery() {
-  const names = [
-    ...new Set(
-      report.variants.flatMap((variant) => variant.surfaces.map((surface) => surface.name)),
-    ),
-  ]
+  const names = Array.from(
+    new Set(report.variants.flatMap((variant) => variant.surfaces.map((surface) => surface.name))),
+  )
   const sections = names.map((name) => gallerySection(name)).join('\n')
   writeFileSync(
     join(options.outputDir, 'index.html'),

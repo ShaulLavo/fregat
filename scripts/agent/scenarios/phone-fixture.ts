@@ -48,10 +48,9 @@ export async function createSessions(page: Page, base: string, fixture: string, 
     },
   ])
   // The extra sessions first, so the named ones are newest and top the list.
-  const titles = [
-    ...Array.from({ length: extra }, (_, index) => `Older task ${index + 1}`),
-    ...PHONE_SESSIONS,
-  ]
+  const titles = Array.from({ length: extra }, (_, index) => `Older task ${index + 1}`).concat(
+    PHONE_SESSIONS,
+  )
   for (const title of titles)
     await dispatch(page, base, {
       type: 'session.create',

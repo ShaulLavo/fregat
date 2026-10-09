@@ -1,5 +1,6 @@
 import { useRenderer } from '@opentui/react'
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, type RefObject } from 'react'
+import type { Renderable } from '@opentui/core'
 
 import { useCommands } from '@/commands/hooks/use-commands'
 import type { FocusRegistration, FocusToken } from '@/commands/state/focus'
@@ -28,27 +29,14 @@ export function useCommandFocus(input: Omit<FocusRegistration, 'isFocused'>, act
   }, [onFocus, available])
   useLayoutEffect(() => {
     const renderable = () => renderer.root.findDescendantById(id)
-    const registration = focus.register({
-      id,
-      area,
-      screen,
-      environmentId,
-      projectId,
-      textEntry,
-      overlay,
-      get available() {
-        return availability.current !== false && (!overlay || renderable() !== undefined)
-      },
-      focus: (intent) => {
-        if (!callback.current(intent)) return false
-        renderable()?.focus()
-        return true
-      },
-      isFocused: () => {
-        const widget = renderable()
-        return widget?.focused === true || widget?.hasFocusedDescendant === true
-      },
-    })
+    const registration = focus.register(
+      createRegistration({
+        scope: { id, area, screen, environmentId, projectId, textEntry, overlay },
+        callback,
+        availability,
+        renderable,
+      }),
+    )
     const acceptNativeFocus = () => {
       focus.activate(registration.token)
     }
@@ -71,4 +59,32 @@ export function useCommandFocus(input: Omit<FocusRegistration, 'isFocused'>, act
     if (active && token.current) focus.activate(token.current)
   })
   return token
+}
+
+function createRegistration({
+  scope,
+  callback,
+  availability,
+  renderable,
+}: {
+  scope: Omit<FocusRegistration, 'available' | 'focus' | 'isFocused'>
+  callback: RefObject<FocusRegistration['focus']>
+  availability: RefObject<FocusRegistration['available']>
+  renderable: () => Renderable | undefined
+}): FocusRegistration {
+  return {
+    ...scope,
+    get available() {
+      return availability.current !== false && (!scope.overlay || renderable() !== undefined)
+    },
+    focus: (intent) => {
+      if (!callback.current(intent)) return false
+      renderable()?.focus()
+      return true
+    },
+    isFocused: () => {
+      const widget = renderable()
+      return widget?.focused === true || widget?.hasFocusedDescendant === true
+    },
+  }
 }

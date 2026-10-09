@@ -51,7 +51,7 @@ export function summarizeChangedFileScopes(
   })
 
   return Array.from(scopes, ([label, scope]) => ({ label, ...scope }))
-    .toSorted(compareScopes)
+    .sort(compareScopes)
     .slice(0, limit)
     .map(({ fileCount, label }) => ({ fileCount, label }))
 }

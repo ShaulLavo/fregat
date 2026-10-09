@@ -196,7 +196,8 @@ function settle() {
 function dispose() {
   probe.dispose()
   if (!active) return
-  released = [new WeakRef(active.buffer), ...active.editors.map((editor) => new WeakRef(editor))]
+  const buffer: WeakRef<object>[] = [new WeakRef(active.buffer)]
+  released = buffer.concat(active.editors.map((editor) => new WeakRef(editor)))
   for (const editor of active.editors) editor.dispose()
   hosts.replaceChildren()
   active = null

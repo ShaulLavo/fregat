@@ -84,13 +84,13 @@ export function searchFontOptions(
   role: FontRole,
   catalog: readonly FontCatalogEntry[],
 ): FontOption[] {
-  const ranked = [...BUNDLED_ENTRIES, ...catalog].flatMap((entry) => rankedEntry(entry, query))
+  const ranked = BUNDLED_ENTRIES.concat(catalog).flatMap((entry) => rankedEntry(entry, query))
   ranked.sort((left, right) => compareRanked(left, right, role))
   const results = ranked.slice(0, SEARCH_LIMIT).map(({ entry }) => entryOption(entry))
   // Fuzzy matching almost always finds something, and a font installed only on this device
   // is never in the catalog; offer it unless the catalog already has that exact family.
   const installed = ranked[0]?.exact ? null : installedFontOption(query)
-  return installed ? [...results, installed] : results
+  return installed ? results.concat([installed]) : results
 }
 
 function installedFontOption(query: string): FontOption | null {
@@ -130,7 +130,7 @@ function refLabel(ref: FontRef) {
 }
 
 function curatedLabel(ref: string) {
-  return [...CURATED_FONTS.ui, ...CURATED_FONTS.code].find((font) => font.ref === ref)?.label
+  return CURATED_FONTS.ui.concat(CURATED_FONTS.code).find((font) => font.ref === ref)?.label
 }
 
 type RankedEntry = {

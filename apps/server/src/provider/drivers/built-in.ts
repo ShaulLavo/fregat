@@ -39,13 +39,12 @@ export const HARNESS_FIXTURE_ROOT_ENV = 'PLATFORM_AGENT_FIXTURE_ROOT'
 
 export function productProviderDrivers(env: NodeJS.ProcessEnv = process.env) {
   if (env[HARNESS_ENV] !== '1') return BUILT_IN_PROVIDER_DRIVERS
-  if (env[HARNESS_REAL_PROVIDERS_ENV] === '1') return [...BUILT_IN_PROVIDER_DRIVERS, mockDriver]
+  if (env[HARNESS_REAL_PROVIDERS_ENV] === '1') return BUILT_IN_PROVIDER_DRIVERS.concat([mockDriver])
 
   const fixtureRoot = env[HARNESS_FIXTURE_ROOT_ENV]
-  return [
-    ...BUILT_IN_PROVIDER_DRIVERS.map((driver) => fixtureOnlyDriver(driver, fixtureRoot)),
+  return BUILT_IN_PROVIDER_DRIVERS.map((driver) => fixtureOnlyDriver(driver, fixtureRoot)).concat([
     mockDriver,
-  ]
+  ])
 }
 
 /**

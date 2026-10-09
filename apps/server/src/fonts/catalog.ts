@@ -46,11 +46,12 @@ export class FontCatalogService {
       this.fontsource.catalog(),
       this.installed.fonts(),
     ])
-    const entries = [
-      ...(installed.status === 'fulfilled' ? installed.value.map(installedEntry) : []),
-      ...(nerd.status === 'fulfilled' ? Object.keys(nerd.value).map(nerdEntry) : []),
-      ...(fontsource.status === 'fulfilled' ? fontsource.value.map(fontsourceEntry) : []),
-    ]
+    const entries = (
+      installed.status === 'fulfilled' ? installed.value.map(installedEntry) : []
+    ).concat(
+      nerd.status === 'fulfilled' ? Object.keys(nerd.value).map(nerdEntry) : [],
+      fontsource.status === 'fulfilled' ? fontsource.value.map(fontsourceEntry) : [],
+    )
     // Offline on a first run, the installed fonts are still a catalog worth answering with.
     if (entries.length === 0 && nerd.status === 'rejected') throw nerd.reason
 

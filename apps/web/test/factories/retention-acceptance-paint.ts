@@ -186,9 +186,10 @@ export async function awaitRetentionAcceptanceReady(
     .poll(
       () => {
         const subject = retentionAcceptanceSubject(app, path)
-        const mounted = [...app.read().ui.getState().controllersByTabId.values()]
-          .map((controller) => controller.getSnapshot())
-          .filter((snapshot) => snapshot?.documentId === subject.document.analysis.documentId)
+        const mounted = Array.from(
+          app.read().ui.getState().controllersByTabId.values(),
+          (controller) => controller.getSnapshot(),
+        ).filter((snapshot) => snapshot?.documentId === subject.document.analysis.documentId)
         const revision = subject.document.buffer.getRevision()
         const poll: RetentionAcceptanceReadyDiagnostics['last'] = diagnostics
           ? {

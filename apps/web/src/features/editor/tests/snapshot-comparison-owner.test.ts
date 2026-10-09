@@ -53,9 +53,10 @@ test('query settlement adopts only the captured current subject and rejects late
   if (read?.kind === 'ready' && read.input.kind === 'snapshot')
     expect(read.input.comparison.target).toMatchObject({ kind: 'moving', changeSource: 'staged' })
   owner.dispose()
-  queries.setQueryData(snapshotComparisonQueryOptions(f.stagedInput.comparison).queryKey, [
-    ...f.historicalDiffs,
-  ])
+  queries.setQueryData(
+    snapshotComparisonQueryOptions(f.stagedInput.comparison).queryKey,
+    f.historicalDiffs,
+  )
   expect(documents.getState().snapshotComparisons.size).toBe(0)
   documents.getState().disposeEditorDocuments()
   queries.clear()

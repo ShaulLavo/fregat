@@ -98,7 +98,7 @@ test('paging pins public tips when new commits arrive and retains merge topology
   expect(second.error).toBeNull()
   expect(second.data?.next).toBeNull()
   expect(second.data?.refs).toEqual([])
-  const commits = [...(first.data?.commits ?? []), ...(second.data?.commits ?? [])]
+  const commits = (first.data?.commits ?? []).concat(second.data?.commits ?? [])
   expect(commits).toHaveLength(107)
   expect(new Set(commits.map((commit) => commit.id)).size).toBe(107)
   expect(commits.some((commit) => commit.id === moved)).toBe(false)
@@ -269,7 +269,7 @@ test('search covers the full history, filters literal messages and authors, and 
   })
   expect(second.error).toBeNull()
   expect(second.data?.next).toBeNull()
-  const results = [...(first.data?.commits ?? []), ...(second.data?.commits ?? [])]
+  const results = (first.data?.commits ?? []).concat(second.data?.commits ?? [])
   expect(results.filter((commit) => !commit.subject.startsWith('Searchable'))).toEqual([])
   expect(results.filter((commit) => commit.id === hidden || commit.id === newer)).toEqual([])
   expect(results).toHaveLength(106)
