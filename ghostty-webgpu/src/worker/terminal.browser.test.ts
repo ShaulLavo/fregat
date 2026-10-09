@@ -638,7 +638,8 @@ describe.each(['main', 'webgl', 'webgpu'] as const)('%s shared await-style termi
     const summary = terminal.submittedFrame!
     expect(Object.isFrozen(summary)).toBe(true)
     expect(Object.isFrozen(summary.grid)).toBe(true)
-    expect(Object.isFrozen(summary.rows)).toBe(true)
+    expect(summary).not.toHaveProperty('rows')
+    expect(Object.isFrozen(terminal.visibleLines())).toBe(true)
     expect(summary.font.settings.family).toBe(family)
     expect(summary.grid.cellWidth).toBe(summary.font.cssCellWidth)
     expect(summary.grid.cellHeight).toBe(summary.font.cssCellHeight)

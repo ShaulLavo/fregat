@@ -42,7 +42,7 @@ import type {
 } from '../term/types.js'
 import type { TerminalElementPadding } from './elements.js'
 import type { GhosttyWebGpuRenderer, GhosttyWebGpuRendererFactory } from './types.js'
-import { submittedFrame, type TerminalSubmittedFrame } from './submitted-frame.js'
+import { submittedFrame, type TerminalSubmittedSnapshot } from './submitted-frame.js'
 import { encodeTerminalViewport } from './viewport.js'
 
 interface SubmittedLayout {
@@ -78,7 +78,7 @@ export class LocalTerminalExecution {
   private lastFullFrame?: RendererFrameSnapshot
   private lastFrameVersion?: number
   private rendererValue?: GhosttyWebGpuRenderer
-  private summaryValue?: TerminalSubmittedFrame
+  private summaryValue?: TerminalSubmittedSnapshot
   private linkEpoch = 0
 
   private readonly selectionHistory: NativeSelectionHistory
@@ -216,7 +216,7 @@ export class LocalTerminalExecution {
   get revision() {
     return this.session.revision
   }
-  get submittedFrame(): TerminalSubmittedFrame | undefined {
+  get submittedFrame(): TerminalSubmittedSnapshot | undefined {
     return this.summaryValue
   }
 
@@ -365,6 +365,7 @@ export class LocalTerminalExecution {
 
   frameSnapshot(): RendererFrameSnapshot | undefined {
     if (!this.lastFrame) return undefined
+    if (!this.canReadSubmittedState && this.lastFullFrame) return this.lastFullFrame
     if (this.lastFrame.nativeFrame) {
       const rows = Object.freeze(
         this.lastFrame.nativeFrame.readRows({ packed: true }).map(copiedFrameRow),
@@ -473,7 +474,12 @@ export class LocalTerminalExecution {
       selection: this.session.selectionCoordinates(),
       scrollbar: this.session.scrollbar,
       snapshot: this.lastFrame,
-      previousTextRows: nativeFrame ? () => nativeFrame.readPreviousTextRows() : undefined,
+      previousTextRows: nativeFrame
+        ? () =>
+            nativeFrame
+              .readPreviousTextRows()
+              .map((row) => Object.freeze({ y: row.y, text: row.text }))
+        : undefined,
     })
     return this.lastFrame
   }
@@ -488,6 +494,10 @@ export class LocalTerminalExecution {
       this.rendererValue.hasPendingFrame
     )
       return
+    if (!this.lastFrame?.nativeFrame) {
+      this.summaryValue = Object.freeze({ ...summary, nativeRevision: this.session.revision })
+      return
+    }
     this.summaryValue = Object.freeze(
       Object.defineProperties(
         {},
@@ -496,7 +506,7 @@ export class LocalTerminalExecution {
           nativeRevision: { enumerable: true, value: this.session.revision },
         },
       ),
-    ) as TerminalSubmittedFrame
+    ) as TerminalSubmittedSnapshot
   }
 
   async createRenderer(

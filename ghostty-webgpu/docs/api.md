@@ -144,17 +144,32 @@ allocated when there are no listeners.
 
 Resizing inside a frame callback repaints after that frame's callbacks finish, in the same turn.
 
-`terminal.submittedFrame` is the owned, text-only state of the last submitted frame. Its frame,
-native revision, snapshot version and layout identity accompany the grid, fitted font, padding,
-theme, cursor, selection coordinates, scrollbar and visible row text. The value appears after the
-first submission and holds together while new output or layout is pending. `rows` contains the
-whole visible text viewport; `rowPatches` contains changed row text, with every row included when
-the layout changes. Both can be structured-cloned.
+`terminal.submittedFrame` describes the last accepted displayed frame. Its frame, native
+revision, snapshot version and layout identity accompany the grid, fitted font, padding,
+theme, cursor, selection coordinates and scrollbar. The value appears after the first
+submission and holds together while new output or layout is pending. Reading this metadata
+keeps text publication idle.
 
-Each text-frame submission owns its row text. Styled cells remain an on-demand read through
-`frameSnapshot()` and `captureViewport()`. A capture is available only while the native revision,
-render snapshot and layout still match the submission. Canvas resizing and context replacement
-can invalidate the displayed pixels independently of the retained submitted state.
+`terminal.onText(({ frame, rows, rowPatches }) => …)` publishes owned text after every accepted
+frame while a listener is registered. It returns a subscription with `dispose()`, like
+`onFrame` and `onResize`. Registration starts with the next accepted frame. `rows` contains
+the whole viewport as `{ y, text }` objects. `rowPatches` contains changed row text, with every
+row included after a layout change. The data is structured-cloneable and remains valid after
+later frames and terminal disposal. The last listener's disposal stops text publication.
+
+`terminal.visibleLines()` pulls the displayed viewport's text once. WebGL and WebGPU retain
+native displayed state and materialize owned text on demand. Canvas and DOM keep eager owned
+rows internally. All renderers expose the same text API. Internal native frame identities stay
+inside the library.
+
+Accessibility defaults to off. Pass `accessibility: {}` or configure its label and live-region
+limits to enable the mirror. `setAccessibilityEnabled(true)` enables it after opening. The
+mirror subscribes through `onText` and starts from the current displayed viewport. Disabling
+accessibility or disposing the terminal releases its subscription.
+
+Styled cells remain an on-demand read through `frameSnapshot()` and `captureViewport()`.
+Canvas resizing and context replacement can invalidate the displayed pixels independently of
+the retained submitted state.
 
 ## GPU frame ownership
 

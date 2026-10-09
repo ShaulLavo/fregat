@@ -77,14 +77,21 @@ export class FrameObserver {
         })
       : undefined
     const ownedTextRows = this.rowsNeeded ? Object.freeze(this.textRows.filter(defined)) : undefined
-    const textFrame = onTextFrame
+    const nativeTextFrame = nativeFrame
       ? Object.freeze({
           ...snapshot,
           nativeFrame,
           get rows() {
-            return ownedTextRows ?? nativeFrame?.readTextRows() ?? Object.freeze([])
+            return ownedTextRows ?? nativeFrame.readTextRows()
           },
         })
+      : undefined
+    const textFrame = onTextFrame
+      ? (nativeTextFrame ??
+        Object.freeze({
+          ...snapshot,
+          rows: Object.freeze(this.textRows.filter(defined)),
+        }))
       : undefined
     return () => {
       if (generation !== this.generation) return

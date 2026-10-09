@@ -8,7 +8,7 @@ import type {
   TerminalSelectionFormatOptions,
 } from '../core/types.js'
 import type { InactiveCursorStyle } from '../render/cursor.js'
-import type { RendererFrameSnapshot, RendererTextFrameSnapshot } from '../render/renderer.js'
+import type { RendererFrameSnapshot } from '../render/renderer.js'
 import type { LinkProvider, LinkProviderRegistration } from '../term/links.js'
 import type {
   TerminalAppearance,
@@ -22,7 +22,7 @@ import type {
   TerminalMutationResult,
   TerminalTheme,
 } from '../term/types.js'
-import type { TerminalSubmittedFrame } from './submitted-frame.js'
+import type { TerminalSubmittedFrame, TerminalSubmittedText } from './submitted-frame.js'
 import type {
   GhosttyWebGpuTerminalDiagnostics,
   GhosttyWebGpuTerminalEventType,
@@ -69,10 +69,7 @@ export interface TerminalApi<Mode extends 'sync' | 'async' = 'sync' | 'async'> {
   focusNextLink(): Promise<boolean>
   registerLinkProvider(provider: LinkProvider<Event>): LinkProviderRegistration
   setAccessibilityEnabled(enabled: boolean): boolean
-  readDisplayedText(): RendererTextFrameSnapshot | undefined
-  subscribeDisplayedText(
-    listener: (frame: RendererTextFrameSnapshot) => void,
-  ): GhosttyWebGpuTerminalSubscription
+  onText(listener: (text: TerminalSubmittedText) => void): GhosttyWebGpuTerminalSubscription
   visibleLines(): readonly string[]
 
   geometry(): TerminalResult<Mode, TerminalGeometry>

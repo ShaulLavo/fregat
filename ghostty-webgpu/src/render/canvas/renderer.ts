@@ -111,7 +111,6 @@ class CanvasSurface implements RowRendererSurface {
         return source.snapshotVersion
       },
       createFrameBuilder: source.createFrameBuilder?.bind(source),
-      retainDisplayedFrame: source.retainDisplayedFrame?.bind(source),
       readTextRows: source.readTextRows?.bind(source),
       readCursor: () => source.readCursor(),
       acknowledge: () => source.acknowledge(),
