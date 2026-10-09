@@ -1,0 +1,124 @@
+{
+  "declaredAt": "2026-10-08T23:11:47.355334+00:00",
+  "baselineCommit": "9d78f3e84f683325d57ebcb4b3b1b1b86518f407",
+  "candidateBaseCommit": "9d78f3e84f683325d57ebcb4b3b1b1b86518f407",
+  "candidateDiffSha256": "39484d6fac4876790327622e9518dcec35f334a5c4f9a7f3831821b013c924e9",
+  "runtimeArtifact": {
+    "sha": "a052adf5c2c34ef78f97d1631c41ca83db9816d3",
+    "message": "web-tree-sitter built from 89300c9"
+  },
+  "wasmBeforeAndAfterSha256": "65aa79c497fe2172b9d635af91f7004129ba2728eeb41eb226c17de208ed5eed",
+  "protocol": "Complete 10 MiB repeated TypeScript document through ordinary Editor and language plugin; unchanged full-document benchmark transform; fresh measured document/tree, no measured-tree reuse.",
+  "order": [
+    {
+      "startup": "cold",
+      "pair": 1,
+      "order": ["baseline", "candidate"]
+    },
+    {
+      "startup": "cold",
+      "pair": 2,
+      "order": ["candidate", "baseline"]
+    },
+    {
+      "startup": "cold",
+      "pair": 3,
+      "order": ["baseline", "candidate"]
+    },
+    {
+      "startup": "cold",
+      "pair": 4,
+      "order": ["candidate", "baseline"]
+    },
+    {
+      "startup": "cold",
+      "pair": 5,
+      "order": ["baseline", "candidate"]
+    },
+    {
+      "startup": "warm",
+      "pair": 1,
+      "order": ["baseline", "candidate"]
+    },
+    {
+      "startup": "warm",
+      "pair": 2,
+      "order": ["candidate", "baseline"]
+    },
+    {
+      "startup": "warm",
+      "pair": 3,
+      "order": ["baseline", "candidate"]
+    },
+    {
+      "startup": "warm",
+      "pair": 4,
+      "order": ["candidate", "baseline"]
+    },
+    {
+      "startup": "warm",
+      "pair": 5,
+      "order": ["baseline", "candidate"]
+    }
+  ],
+  "repetitionsPerRoleAndStartup": 5,
+  "sampleOptions": {
+    "profileOpen": true,
+    "openOnly": true,
+    "fullDocument": true,
+    "sizes": [10],
+    "editors": ["singapore"],
+    "repetitions": 1,
+    "timeoutMs": 60000,
+    "condition": "quiet"
+  },
+  "gates": {
+    "M1": {
+      "workerFullMaxMs": 4000,
+      "highlightedFrameMaxMs": 4500,
+      "medianTotalWorkProxyMaxMs": {
+        "cold": 3539.052750035763,
+        "warm": 3576.3765000357625
+      },
+      "phaseRegression": "Reject a median increase above max(1 ms, baseline maximum minus baseline minimum), using the five frozen baseline samples for that phase and startup condition.",
+      "memory": "Reject a matched whole-job peak at least twice baseline, unless the smaller-memory variant meets the latency target.",
+      "repetitions": 5
+    },
+    "totalWorkProxy": "Sum each sample worker parse/query elapsed durations and main-thread union work. This is a diagnostic work proxy, not CPU seconds or elapsed open time."
+  },
+  "frozenQualificationSha256": "d00e05e3dc2d50212970feefdee491475ab760b9dd82b6f03f7d74ceb0985dad",
+  "phaseGuard": "Use original M0 five-sample per-phase/startup max-minus-min allowances; report and require both paired-baseline and original-M0 median comparisons.",
+  "memoryGuard": "Reject matched whole-job peak >= 2x baseline. Individual baseline/candidate jobs produce matched receipts.",
+  "controls": {
+    "sizes": [1, 10],
+    "corpora": [
+      "realistic",
+      "long-line",
+      "unicode",
+      "malformed",
+      "injected",
+      "dense-injected",
+      "dense-recovery",
+      "html"
+    ],
+    "lifecycle": "1 MiB dense-injected baseline/candidate"
+  },
+  "intentionalIdentityDifferences": [
+    "Singapore source/bundles",
+    "runtime JS artifact",
+    "root lockfile runtime pin and its dependent peer-resolution entries"
+  ],
+  "mustRemainIdentical": [
+    "browser",
+    "machine",
+    "tooling",
+    "benchmark scripts",
+    "fixture identities",
+    "package versions",
+    "competitor bundles",
+    "runtime WASM"
+  ],
+  "failurePolicy": "Keep every completed attempt and trace. No retries, replacement samples, pooled rescue or widened thresholds.",
+  "driverSha256": "2e7d0e3421f95f08fa3237a48cdc53279c0f27f30e9b284c03ddedc2906a25a0",
+  "controlDriverSha256": "bfbecd925a6d4d2a45ce15955bf9ed3eddfe158d9b9f3360f2fe37748fc99832"
+}

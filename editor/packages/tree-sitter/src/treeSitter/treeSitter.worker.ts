@@ -1216,8 +1216,10 @@ const parseTreeSlices = async (
   const parser = new Parser()
   parser.setLanguage(runtime.language)
   const ranges = options.ranges ? Array.from(options.ranges) : undefined
-  const input = (index: number) =>
-    ranges ? readInjectedInput(source, ranges, index) : readTreeSitterPieceTableInput(source, index)
+  const input = (index: number, _position?: unknown, endIndex?: number) =>
+    ranges
+      ? readInjectedInput(source, ranges, index, endIndex)
+      : readTreeSitterPieceTableInput(source, index, endIndex)
   try {
     return await resumeTreeSlices(parser, input, context, { ...options, ranges })
   } finally {
@@ -1357,9 +1359,13 @@ const parseSource = (
   oldTree: Tree | null,
   context: CancellationContext,
 ): Tree => {
-  const tree = parser.parse((index) => readTreeSitterPieceTableInput(source, index), oldTree, {
-    progressCallback: () => isCancelled(context),
-  })
+  const tree = parser.parse(
+    (index, _position, endIndex?: number) => readTreeSitterPieceTableInput(source, index, endIndex),
+    oldTree,
+    {
+      progressCallback: () => isCancelled(context),
+    },
+  )
   if (tree) return tree
   parser.reset()
   if (isCancelled(context)) throw new SyntaxRequestCancelled()
@@ -2363,10 +2369,14 @@ const parseInjectedSource = (
   oldTree: Tree | null,
   context: CancellationContext,
 ): Tree => {
-  const tree = parser.parse((index) => readInjectedInput(source, ranges, index), oldTree, {
-    includedRanges: [...ranges],
-    progressCallback: () => isCancelled(context),
-  })
+  const tree = parser.parse(
+    (index, _position, endIndex?: number) => readInjectedInput(source, ranges, index, endIndex),
+    oldTree,
+    {
+      includedRanges: [...ranges],
+      progressCallback: () => isCancelled(context),
+    },
+  )
   if (tree) return tree
   parser.reset()
   if (isCancelled(context)) throw new SyntaxRequestCancelled()
@@ -2379,11 +2389,12 @@ const readInjectedInput = (
   source: TreeSitterPieceTableInput,
   ranges: readonly TreeSitterRange[],
   index: number,
+  endIndex?: number,
 ): string | undefined => {
   const end = readEndForRanges(ranges, index)
   if (end === null) return undefined
 
-  const text = readTreeSitterPieceTableInput(source, index)
+  const text = readTreeSitterPieceTableInput(source, index, endIndex)
   if (text === undefined || index + text.length <= end) return text
   return text.slice(0, end - index)
 }
