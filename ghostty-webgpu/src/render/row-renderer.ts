@@ -1,3 +1,4 @@
+import type { PaintedTextFrame } from './painted-text-frame.js'
 import { FrameObserver } from './frame-observer.js'
 import { RenderStateDirty } from '../core/abi.js'
 import type { ReadRowsOptions, RenderCursorSnapshot, RenderRow } from '../core/types.js'
@@ -29,6 +30,7 @@ export type RowThemeInvalidation = 'all' | 'cursor'
 
 export interface RowRendererSurface {
   beginFrame?(): void
+  captureTextFrame?(): PaintedTextFrame
   dispose(): void
   paint(row: RenderRow, cursor: CursorState | undefined): void
   resize(font: TerminalFittedFont, grid: RendererGridSize): void
@@ -81,9 +83,12 @@ export class RowTerminalRenderer {
       rows: options.rows,
     })
     this.frames = new FrameObserver(
-      options.retainDisplayedText
+      options.retainDisplayedText && !surface.captureTextFrame
         ? { ...options, retainDisplayedText: false, needsFrameRows: () => true }
         : options,
+      options.retainDisplayedText && surface.captureTextFrame
+        ? () => surface.captureTextFrame!()
+        : undefined,
     )
     this.renderState = options.renderState
     this.themeInput = mergeRendererTheme(options.theme)

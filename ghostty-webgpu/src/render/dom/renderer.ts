@@ -6,6 +6,9 @@ import {
   mergeRendererTheme,
   normalizeRendererGrid,
 } from '../config.js'
+import { paintedFrameRow } from '../frame-row.js'
+import type { PaintedTextFrame } from '../painted-text-frame.js'
+import type { RendererFrameRow } from '../renderer.js'
 import type { CanonicalRendererTheme, CursorState } from '../instances/types.js'
 import type { RendererGridSize, WebGpuTerminalRendererOptions } from '../renderer.js'
 import {
@@ -44,6 +47,7 @@ interface MountedRun {
 interface MountedRow {
   readonly element: Element
   readonly runs: MountedRun[]
+  snapshot?: RendererFrameRow
 }
 
 class DomSurface implements RowRendererSurface {
@@ -54,11 +58,14 @@ class DomSurface implements RowRendererSurface {
   private grid: RendererGridSize
   private theme: CanonicalRendererTheme
   private rows: MountedRow[] = []
+  private acceptedRows: readonly RendererFrameRow[] = []
+  private readonly retainText: boolean
 
   constructor(options: WebGpuTerminalRendererOptions) {
     if (!('ownerDocument' in options.canvas) || !options.canvas.parentElement) {
       throw new TypeError('The DOM renderer requires a canvas mounted in a terminal host')
     }
+    this.retainText = options.retainDisplayedText ?? false
     this.canvas = options.canvas
     this.font = copyFittedFont(options.font)
     this.grid = normalizeRendererGrid(options)
@@ -76,6 +83,7 @@ class DomSurface implements RowRendererSurface {
   dispose(): void {
     this.container.remove()
     this.rows = []
+    this.acceptedRows = []
     this.canvas.style.opacity = this.previousOpacity
   }
 
@@ -121,7 +129,17 @@ class DomSurface implements RowRendererSurface {
       mounted.runs.pop()!.element.remove()
       changed = true
     }
+    // The snapshot closes over completed run values, never the mutable mounted spans.
+    if (this.retainText)
+      mounted.snapshot = paintedFrameRow(row, () => runs.map((run) => run.text).join(''))
     return changed
+  }
+
+  captureTextFrame(): PaintedTextFrame {
+    const previousRows = this.acceptedRows
+    const rows = Object.freeze(this.rows.map((row) => row.snapshot!))
+    this.acceptedRows = rows
+    return Object.freeze({ rows, previousRows })
   }
 
   resize(font: TerminalFittedFont, grid: RendererGridSize): void {

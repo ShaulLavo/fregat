@@ -4,7 +4,7 @@ import { RenderStateDirty } from '../../core/abi.js'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import type { RenderRow } from '../../core/types.js'
 import type { CursorState } from '../instances/types.js'
-import type { RendererFrameSnapshot } from '../renderer.js'
+import type { RendererFrameSnapshot, RendererTextFrameSnapshot } from '../renderer.js'
 import { Terminal } from '../../dom/terminal.js'
 import { CanvasTerminalRenderer } from '../canvas/renderer.js'
 import { snapshotRenderState } from '../frame.js'
@@ -747,4 +747,60 @@ it('reads live canvas geometry without repeating unchanged overlay declarations'
   probe.clock.flush()
   expect(container.style.left).toBe('30px')
   expect(container.style.top).toBe('11px')
+})
+
+it('publishes completed painted rows through failures and grid changes', async () => {
+  const runtime = await GhosttyRuntime.create()
+  cleanups.push(() => runtime.dispose())
+  const terminal = runtime.createTerminal({ columns: 12, rows: 3 })
+  const state = runtime.createRenderState(terminal)
+  terminal.write('old first\r\nold second')
+  const clock = new ProbeClock()
+  const frames: RendererTextFrameSnapshot[] = []
+  const renderer = await DomTerminalRenderer.create({
+    canvas: mountedCanvas(),
+    columns: 12,
+    rows: 3,
+    font: probeFont,
+    renderState: state,
+    schedulerClock: clock,
+    retainDisplayedText: true,
+    needsFrameRows: () => false,
+    onTextFrame: (frame) => frames.push(frame),
+  })
+  cleanups.push(() => renderer.dispose())
+  clock.flush()
+  const accepted = frames[0]!
+  terminal.write('\x1b[H\x1b[2Knew first\r\n\x1b[2Knew second')
+  const readRows = state.readRows.bind(state)
+  const failure = vi.spyOn(state, 'readRows').mockImplementation((options) => {
+    const rows = readRows(options)
+    for (const row of rows) {
+      if (row.y !== 1) continue
+      vi.spyOn(row.packed!, 'read').mockImplementation(() => {
+        throw new TypeError('Injected second-row paint failure')
+      })
+    }
+    return rows
+  })
+  renderer.notifyWrite()
+  expect(() => clock.flush()).toThrow('Injected second-row paint failure')
+  expect(frames).toHaveLength(1)
+  expect(accepted.rows[0]!.text).toContain('old first')
+  expect(accepted.rows[1]!.text).toContain('old second')
+  failure.mockRestore()
+  renderer.notifyWrite()
+  clock.flush()
+  expect(frames).toHaveLength(2)
+  expect(frames[1]!.rows[0]!.text).toContain('new first')
+  expect(frames[1]!.rows[1]!.text).toContain('new second')
+  const saved = JSON.stringify(accepted)
+  runtime.exports.memory.grow(1)
+  terminal.resize({ columns: 5, rows: 1 })
+  renderer.resize({ columns: 5, rows: 1 })
+  expect(frames.at(-1)!.rows).toHaveLength(1)
+  terminal.resize({ columns: 12, rows: 3 })
+  renderer.resize({ columns: 12, rows: 3 })
+  expect(frames.at(-1)!.rows).toHaveLength(3)
+  expect(JSON.stringify(accepted)).toBe(saved)
 })

@@ -343,7 +343,7 @@ describe('worker displayed-text correctness fallback', () => {
 })
 
 describe.each(['canvas', 'dom'] as const)('%s owned displayed-text publication', (backend) => {
-  it('does no native retention or capture and preserves eager owned rows', async () => {
+  it('publishes owned rows without native retention or capture', async () => {
     const bridge = runtime.bridge
     const allocate = bridge.createRetainedFrame.bind(bridge)
     const capture = bridge.captureRetainedFrame.bind(bridge)
@@ -372,7 +372,7 @@ describe.each(['canvas', 'dom'] as const)('%s owned displayed-text publication',
       submittedFrame: TerminalSubmittedSnapshot
     }
     const summary = execution.submittedFrame
-    expect(Object.getOwnPropertyDescriptor(summary, 'rows')?.get).toBeUndefined()
+    expect(Boolean(Object.getOwnPropertyDescriptor(summary, 'rows')?.get)).toBe(backend === 'dom')
     expect(summary.rows.map((row) => row.text)).toEqual(displayed)
     expect(delivered.at(-1)!.rows).toEqual(summary.rows)
     terminal.write('\rnew pending')

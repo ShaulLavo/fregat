@@ -1,7 +1,11 @@
 import { createGhosttyError } from '../core/error.js'
 import type { NativeDisplayedFrame } from '../core/displayed-frame.js'
+import type { PaintedTextFrame } from '../render/painted-text-frame.js'
 
-type RetainedTextFrame = RendererTextFrameSnapshot & { readonly nativeFrame?: NativeDisplayedFrame }
+type RetainedTextFrame = RendererTextFrameSnapshot & {
+  readonly nativeFrame?: NativeDisplayedFrame
+  readonly paintedFrame?: PaintedTextFrame
+}
 import { copiedFrameRow } from '../render/frame-row.js'
 import type { SelectionPoint } from '../core/selection.js'
 import type { ReadLinesOptions, TerminalSelectionFormatOptions } from '../core/types.js'
@@ -428,11 +432,13 @@ export class LocalTerminalExecution {
     this.lastFrameVersion = this.session.renderState.snapshotVersion
     this.lastFullFrame = undefined
     const nativeFrame = (snapshot as RetainedTextFrame).nativeFrame
-    if (nativeFrame) {
+    const paintedFrame = (snapshot as RetainedTextFrame).paintedFrame
+    if (nativeFrame || paintedFrame) {
       this.lastFrame = Object.freeze({
         cursor: snapshot.cursor,
         paintedCursor: snapshot.paintedCursor,
         nativeFrame,
+        paintedFrame,
         get rows() {
           return snapshot.rows
         },
@@ -458,6 +464,13 @@ export class LocalTerminalExecution {
       layout = Object.freeze({ ...layout, identity: layout.identity + 1 })
       this.layout = layout
     }
+    let previousTextRows:
+      | (() => readonly { readonly y: number; readonly text: string }[])
+      | undefined
+    if (nativeFrame)
+      previousTextRows = () =>
+        nativeFrame.readPreviousTextRows().map((row) => Object.freeze({ y: row.y, text: row.text }))
+    if (paintedFrame) previousTextRows = () => paintedFrame.previousRows
     this.summaryValue = submittedFrame(previous, {
       nativeRevision: this.session.revision,
       snapshotVersion: this.lastFrameVersion,
@@ -474,12 +487,7 @@ export class LocalTerminalExecution {
       selection: this.session.selectionCoordinates(),
       scrollbar: this.session.scrollbar,
       snapshot: this.lastFrame,
-      previousTextRows: nativeFrame
-        ? () =>
-            nativeFrame
-              .readPreviousTextRows()
-              .map((row) => Object.freeze({ y: row.y, text: row.text }))
-        : undefined,
+      previousTextRows,
     })
     return this.lastFrame
   }
@@ -494,7 +502,7 @@ export class LocalTerminalExecution {
       this.rendererValue.hasPendingFrame
     )
       return
-    if (!this.lastFrame?.nativeFrame) {
+    if (!this.lastFrame?.nativeFrame && !this.lastFrame?.paintedFrame) {
       this.summaryValue = Object.freeze({ ...summary, nativeRevision: this.session.revision })
       return
     }

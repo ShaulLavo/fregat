@@ -1,5 +1,6 @@
 import type { RenderCursorSnapshot, RenderRow } from '../core/types.js'
 import type { CursorState } from './instances/types.js'
+import type { PaintedTextFrame } from './painted-text-frame.js'
 import { copiedFrameRow } from './frame-row.js'
 import type {
   RendererFrameRow,
@@ -17,7 +18,10 @@ export class FrameObserver {
 
   private rowCount: number
 
-  constructor(private readonly options: WebGpuTerminalRendererOptions) {
+  constructor(
+    private readonly options: WebGpuTerminalRendererOptions,
+    private readonly capturePaintedRows?: () => PaintedTextFrame,
+  ) {
     this.rowCount = options.rows
   }
 
@@ -66,11 +70,13 @@ export class FrameObserver {
     const { onFrame, onTextFrame, onRowsChanged, onRowsPainted } = this.options
     const changedRows = Object.freeze([...changed])
     if (!onFrame && !onTextFrame) return this.rowDelivery(generation, changedRows, rows)
-    const nativeFrame = this.options.retainDisplayedText
-      ? state.retainDisplayedFrame?.({ full: !this.retained })
-      : undefined
+    const paintedFrame = this.capturePaintedRows?.()
+    const nativeFrame =
+      !paintedFrame && this.options.retainDisplayedText
+        ? state.retainDisplayedFrame?.({ full: !this.retained })
+        : undefined
     if (nativeFrame) this.retained = true
-    if (this.rowsNeeded) this.updateRows(state, changed, rows)
+    if (this.rowsNeeded && (!paintedFrame || onFrame)) this.updateRows(state, changed, rows)
     else this.clearRows()
     const viewport = cursor.viewport ? Object.freeze({ ...cursor.viewport }) : undefined
     const snapshot = {
@@ -93,8 +99,18 @@ export class FrameObserver {
           },
         })
       : undefined
+    const paintedTextFrame = paintedFrame
+      ? Object.freeze({
+          ...snapshot,
+          paintedFrame,
+          get rows() {
+            return paintedFrame.rows
+          },
+        })
+      : undefined
     const textFrame = onTextFrame
-      ? (nativeTextFrame ??
+      ? (paintedTextFrame ??
+        nativeTextFrame ??
         Object.freeze({
           ...snapshot,
           rows: Object.freeze(this.textRows.filter(defined)),

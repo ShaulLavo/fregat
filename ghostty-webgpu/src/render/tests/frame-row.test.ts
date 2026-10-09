@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import { GhosttyRuntime } from '../../core/runtime.js'
-import { copiedFrameRow } from '../frame-row.js'
+import { copiedFrameRow, paintedFrameRow } from '../frame-row.js'
 
 it.each([
   '',
@@ -57,6 +57,38 @@ it.each([
         if (cell.style) expect(Object.isFrozen(cell.style)).toBe(true)
       }
     }
+  } finally {
+    runtime.dispose()
+  }
+})
+
+it('retains painted text lazily with owned cell and continuation storage', async () => {
+  const runtime = await GhosttyRuntime.create()
+  try {
+    const terminal = runtime.createTerminal({ columns: 24, rows: 1 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('A界👩‍💻é')
+    state.update()
+    const source = state.readRows({ packed: true })[0]!
+    const expected = copiedFrameRow(source)
+    const saved = JSON.stringify(expected)
+    const textReads = vi.spyOn(source.packed!, 'text')
+    const readText = vi.fn(() => expected.text)
+    const actual = paintedFrameRow(source, readText)
+    expect(textReads).not.toHaveBeenCalled()
+    expect(readText).not.toHaveBeenCalled()
+    runtime.exports.memory.grow(1)
+    terminal.resize({ columns: 5, rows: 1 })
+    terminal.write('other')
+    state.update()
+    expect(actual.text).toBe(expected.text)
+    expect(actual.text).toBe(expected.text)
+    expect(readText).toHaveBeenCalledTimes(1)
+    expect(textReads).not.toHaveBeenCalled()
+    expect(JSON.stringify(actual)).toBe(saved)
+    expect(Object.isFrozen(actual)).toBe(true)
+    expect(Object.isFrozen(actual.cells)).toBe(true)
+    expect(Object.isFrozen(actual.continuations)).toBe(true)
   } finally {
     runtime.dispose()
   }

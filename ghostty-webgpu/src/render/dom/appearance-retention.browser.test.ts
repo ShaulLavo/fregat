@@ -1,4 +1,7 @@
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
+import { PackedCells } from '../../core/packed-cells.js'
+import { copiedFrameRow } from '../frame-row.js'
+import type { TerminalSubmittedText } from '../../dom/submitted-frame.js'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import { createGhosttyWebGpuTerminalFromSession } from '../../dom/terminal.js'
 import { TerminalSession } from '../../term/session.js'
@@ -8,6 +11,7 @@ const cleanups: (() => void)[] = []
 afterEach(() => {
   for (const cleanup of cleanups.reverse()) cleanup()
   cleanups.length = 0
+  vi.restoreAllMocks()
 })
 async function settle(): Promise<void> {
   for (let index = 0; index < 3; index += 1)
@@ -50,6 +54,26 @@ it('retains cursor appearance rows while publishing frames and observing current
   terminal.write('\x1b[?25lretained rows\r\nsecond row')
   await settle()
   const renderer = mounted!
+  const textReads = vi.spyOn(PackedCells.prototype, 'text')
+  session.renderState.readRows({ packed: true }).map(copiedFrameRow)
+  expect(textReads).toHaveBeenCalled()
+  textReads.mockClear()
+  terminal.write('\x1b[H\x1b[2Kretained rows 2')
+  await settle()
+  terminal.write('\x1b[H\x1b[2Kretained rows 3')
+  await settle()
+  expect(terminal.visibleLines()[0]).toContain('retained rows 3')
+  expect(textReads).not.toHaveBeenCalled()
+  const textFrames: TerminalSubmittedText[] = []
+  const textSubscription = terminal.onText((frame) => textFrames.push(frame))
+  terminal.write('\x1b[2;1H\x1b[2Ksecond row 2')
+  await settle()
+  expect(textFrames).toHaveLength(1)
+  expect(textFrames[0]!.rowPatches.map((row) => row.y)).toEqual([1])
+  expect(textFrames[0]!.rows[0]!.text).toContain('retained rows 3')
+  expect(textReads).not.toHaveBeenCalled()
+  const savedText = JSON.stringify(textFrames[0])
+  textSubscription.dispose()
   let frames = 0
   let appearances = 0
   terminal.onFrame(() => (frames += 1))
@@ -113,4 +137,5 @@ it('retains cursor appearance rows while publishing frames and observing current
     'rgb(33, 44, 55)',
   )
   expect(JSON.stringify(snapshot.rows.map((row) => row.renderCells))).toBe(retained)
+  expect(JSON.stringify(textFrames[0])).toBe(savedText)
 })
