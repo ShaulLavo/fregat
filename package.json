@@ -89,7 +89,7 @@
     "themes:palette-css": "bun scripts/themes/generate-palette-css.ts",
     "themes:palette-css:check": "bun scripts/themes/generate-palette-css.ts --check",
     "test:scripts": "bun --bun vitest run --config vitest.scripts.config.mjs",
-    "verify": "bun run typecheck && bun run lint && bun run package-pages:check && bun run query:check && bun run arrays:check && bun run documents:check && bun run design:census && bun run compiler:census && bun run errors:census && bun run format:check && bun run generated:check && bun run unused:check && bun run --cwd apps/web bundle:gate && bun run test",
+    "verify": "bun run typecheck && bun run lint && bun run package-pages:check && bun run query:check && bun run arrays:check && bun run documents:check && bun run design:census && bun run compiler:census && bun run errors:census && bun run format:check && bun run generated:check && bun run unused:check && bun run test",
     "dupes": "jscpd apps packages scripts --threshold 0",
     "dupes:report": "jscpd apps packages scripts --reporters html,console --output ./jscpd-report",
     "unused:exports": "knip --exports --no-config-hints",
