@@ -1,23 +1,15 @@
-export const textShader = /* wgsl */ `
+import { rowRemapShader } from './row-remap.wgsl.js'
+
+export const cellShader = /* wgsl */ `
 const FLAG_CURSOR: u32 = 1u;
 const FLAG_OVERLINE: u32 = 2u;
 const FLAG_STRIKETHROUGH: u32 = 4u;
-const FLAG_GLYPH: u32 = 1u;
 
-struct CellInstance {
+struct Instance {
   rect: vec4f,
   foreground: vec4f,
   background: vec4f,
   metadata: vec4f,
-}
-
-struct GlyphInstance {
-  rect: vec4f,
-  color: vec4f,
-  uv: vec4f,
-  background: vec4f,
-  metadata: vec4f,
-  atlas: vec4f,
 }
 
 struct Viewport {
@@ -36,73 +28,37 @@ struct VertexOutput {
   @location(2) metadata: vec4f,
   @location(3) local: vec2f,
   @location(4) size: vec2f,
-  @location(5) uv: vec2f,
-  @location(6) @interpolate(flat) kind: u32,
 }
 
-@group(0) @binding(0) var<storage, read> cells: array<CellInstance>;
+@group(0) @binding(0) var<storage, read> instances: array<Instance>;
 @group(0) @binding(1) var<uniform> viewport: Viewport;
-@group(0) @binding(2) var atlasSampler: sampler;
-@group(0) @binding(3) var grayscaleAtlas: texture_2d_array<f32>;
-@group(0) @binding(4) var colorAtlas: texture_2d_array<f32>;
-@group(0) @binding(5) var<storage, read> glyphs: array<GlyphInstance>;
 
-fn physicalIndex(index: u32) -> u32 {
-  if (viewport.columns != 0u) {
-    return (index + viewport.rowOffset * viewport.columns) % viewport.instanceCount;
-  }
-  return index;
-}
-
-fn cellVertex(index: u32, corner: vec2f) -> VertexOutput {
-  let instance = cells[physicalIndex(index)];
-  var origin = instance.rect.xy;
-  if (viewport.columns != 0u && instance.rect.w != 0.0) {
-    origin.y = f32(index / viewport.columns) * viewport.rowHeight + origin.y;
-  }
+@vertex
+fn vertexMain(
+  @builtin(vertex_index) vertexIndex: u32,
+  @builtin(instance_index) instanceIndex: u32,
+) -> VertexOutput {
+  let corners = array<vec2f, 6>(
+    vec2f(0.0, 0.0), vec2f(1.0, 0.0), vec2f(0.0, 1.0),
+    vec2f(0.0, 1.0), vec2f(1.0, 0.0), vec2f(1.0, 1.0),
+  );
+${rowRemapShader}
+  let corner = corners[vertexIndex];
   let local = corner * instance.rect.zw;
   let pixel = origin + local;
   var output: VertexOutput;
-  output.position = vec4f(pixel.x / viewport.size.x * 2.0 - 1.0,
-    1.0 - pixel.y / viewport.size.y * 2.0, 0.0, 1.0);
+  output.position = vec4f(
+    pixel.x / viewport.size.x * 2.0 - 1.0,
+    1.0 - pixel.y / viewport.size.y * 2.0,
+    0.0,
+    1.0,
+  );
   output.foreground = instance.foreground;
   output.background = instance.background;
   output.metadata = instance.metadata;
   output.local = local;
   output.size = instance.rect.zw;
-  output.kind = 0u;
   return output;
-}
-
-fn glyphVertex(index: u32, corner: vec2f) -> VertexOutput {
-  let instance = glyphs[physicalIndex(index)];
-  var origin = instance.rect.xy;
-  if (viewport.columns != 0u && instance.rect.w != 0.0) {
-    origin.y = f32(index / viewport.columns) * viewport.rowHeight + origin.y;
-  }
-  let pixel = origin + corner * instance.rect.zw;
-  var output: VertexOutput;
-  output.position = vec4f(pixel.x / viewport.size.x * 2.0 - 1.0,
-    1.0 - pixel.y / viewport.size.y * 2.0, 0.0, 1.0);
-  output.foreground = instance.color;
-  output.uv = mix(instance.uv.xy, instance.uv.zw, corner);
-  output.background = instance.background;
-  output.metadata = vec4f(instance.metadata.x, instance.metadata.z, instance.atlas.x, instance.atlas.z);
-  output.kind = 1u;
-  return output;
-}
-
-@vertex
-fn vertexMain(@builtin(vertex_index) vertexIndex: u32,
-  @builtin(instance_index) instanceIndex: u32) -> VertexOutput {
-  let corners = array<vec2f, 6>(
-    vec2f(0.0, 0.0), vec2f(1.0, 0.0), vec2f(0.0, 1.0),
-    vec2f(0.0, 1.0), vec2f(1.0, 0.0), vec2f(1.0, 1.0),
-  );
-  if (instanceIndex < viewport.instanceCount) {
-    return cellVertex(instanceIndex, corners[vertexIndex]);
-  }
-  return glyphVertex(instanceIndex - viewport.instanceCount, corners[vertexIndex]);
 }
 
 fn srgbChannelToLinear(value: f32) -> f32 {
@@ -196,7 +152,8 @@ fn cursorCoverage(flags: u32, style: u32, local: vec2f, size: vec2f) -> f32 {
   return select(0.0, 1.0, edge < thickness);
 }
 
-fn cellFragment(input: VertexOutput) -> vec4f {
+@fragment
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let flags = u32(input.metadata.x);
   let underline = u32(input.metadata.y);
   let cursorStyle = u32(input.metadata.z);
@@ -208,27 +165,5 @@ fn cellFragment(input: VertexOutput) -> vec4f {
   let background = vec4f(input.background.rgb * input.background.a, input.background.a);
   let effect = vec4f(adjusted * effectAlpha, effectAlpha);
   return effect + background * (1.0 - effectAlpha);
-}
-fn glyphFragment(input: VertexOutput) -> vec4f {
-  let flags = u32(input.metadata.x);
-  let minimumContrast = input.metadata.y;
-  let hasGlyph = hasFlag(flags, FLAG_GLYPH);
-  let layer = i32(input.metadata.z);
-  let grayscale = textureSampleLevel(grayscaleAtlas, atlasSampler, input.uv, layer, 0.0).r;
-  let colorSample = textureSampleLevel(colorAtlas, atlasSampler, input.uv, layer, 0.0);
-  let colorGlyph = input.metadata.w >= 0.5;
-  let coverage = select(0.0, select(grayscale, colorSample.a, colorGlyph), hasGlyph);
-  let adjusted = contrastColor(input.foreground.rgb, input.background.rgb, minimumContrast);
-  let rgb = select(adjusted, colorSample.rgb, colorGlyph && hasGlyph);
-  let alpha = coverage * input.foreground.a;
-  return vec4f(rgb * alpha, alpha);
-}
-
-@fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-  if (input.kind == 0u) {
-    return cellFragment(input);
-  }
-  return glyphFragment(input);
 }
 `

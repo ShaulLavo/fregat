@@ -10,6 +10,7 @@ import type {
 } from '../render/instances/types.js'
 
 const frameBytes = 144
+const cursorStyles = ['block', 'bar', 'underline', 'outline'] as const
 
 function packedColor(color: RgbColor): number {
   return color.r | (color.g << 8) | (color.b << 16)
@@ -170,19 +171,15 @@ export class ZigFrameBuilder {
     view.setFloat32(this.frame + 52, options.cellHeight, true)
     view.setFloat32(this.frame + 56, options.theme.minimumContrast, true)
     view.setFloat64(this.frame + 104, options.theme.minimumContrast, true)
-    const colors = [
-      options.theme.foreground,
-      options.theme.background,
-      options.theme.cursor,
-      options.theme.cursorText,
-    ]
-    for (const [index, color] of colors.entries()) this.setUint(60 + index * 4, packedColor(color))
+    view.setUint32(this.frame + 60, packedColor(options.theme.foreground), true)
+    view.setUint32(this.frame + 64, packedColor(options.theme.background), true)
+    view.setUint32(this.frame + 68, packedColor(options.theme.cursor), true)
+    view.setUint32(this.frame + 72, packedColor(options.theme.cursorText), true)
     const cursor = options.cursor
     this.setUint(76, cursor?.x ?? 0)
     this.setUint(80, cursor?.y ?? 0)
     this.setUint(84, cursor?.visible ? 1 : 0)
-    const styles = ['block', 'bar', 'underline', 'outline']
-    this.setUint(88, cursor ? styles.indexOf(cursor.style) : 0)
+    this.setUint(88, cursor ? cursorStyles.indexOf(cursor.style) : 0)
     this.setUint(92, packedColor(options.theme.selectionForeground))
     this.setUint(96, packedColor(options.theme.selectionBackground))
     assertGhosttyResult(
