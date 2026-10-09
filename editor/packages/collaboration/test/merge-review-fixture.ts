@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module'
 import { Language, Parser, Query } from 'web-tree-sitter'
 import { ConfirmedWindow, TextbufferEngine } from '@singapore-editor/collab'
-import type { Envelope, OffsetEdit, TextbufferSnapshot } from '@singapore-editor/collab'
+import type { EditId, Envelope, OffsetEdit, TextbufferSnapshot } from '@singapore-editor/collab'
 import {
   CharIdAllocator,
   createPieceTableSnapshot,
@@ -145,4 +145,29 @@ export function peerSnapshot(snapshot: TextbufferSnapshot, confirmed: readonly E
   engine.restore(snapshot)
   for (const edit of confirmed) engine.apply(edit)
   return engine.snapshot()
+}
+
+export function appendEdit(
+  input: ReturnType<typeof history>,
+  edit: OffsetEdit,
+  actor: string,
+  deps: readonly EditId[] = input.confirmed.map((envelope) => envelope.id),
+  snapshot = input.base.snapshot(),
+) {
+  const peer = new TextbufferEngine()
+  peer.restore(snapshot)
+  const seq = input.confirmed.length + 1
+  const allocator = new CharIdAllocator(`causal-${seq}`)
+  const envelope = peer.author(edit, {
+    document: 'review',
+    epoch: '1',
+    id: { actor, seq },
+    lamport: seq,
+    deps,
+    allocate: (left, count) => allocator.generateAfter(left, count),
+  })
+  input.base.apply(envelope)
+  input.confirmed.push(envelope)
+  input.window.append([envelope])
+  return envelope
 }

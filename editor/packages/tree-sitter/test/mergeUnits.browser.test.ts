@@ -267,3 +267,52 @@ it('releases cancelled lazy Markdown structural work', async () => {
     }),
   ).toMatchObject({ status: 'stale', unit: null })
 }, 120_000)
+
+it('analyzes damaged HTML line fallbacks and preserves ordinary responses', async () => {
+  const identity = { ...document, languageId: 'html', snapshotVersion: 1 }
+  await parseTreeDocument(client, { ...identity, text: '<div><', resultMode: 'parseOnly' })
+  const request = { ...identity, range: { startIndex: 5, endIndex: 6 } }
+  const ordinary = await client.mergeUnit(request)
+  expect(ordinary).toMatchObject({ status: 'ok', unit: { source: 'line' } })
+  if (ordinary?.status === 'ok') {
+    expect(ordinary.unit.hasErrors).toBeUndefined()
+    expect(ordinary.unit.contentKey).toBeUndefined()
+  }
+  const result = await client.mergeUnit({ ...request, analysis: true, contentKey: true })
+  expect(result).toMatchObject({ status: 'ok', unit: { source: 'line', hasErrors: true } })
+  if (result?.status === 'ok') expect(result.unit.contentKey).toBeTypeOf('string')
+})
+
+it.each(['html', 'typescript'])('cancels pre-cancelled %s merge queries', async (languageId) => {
+  const identity = { ...document, languageId, snapshotVersion: 1 }
+  const text = languageId === 'html' ? '<div><' : 'const value = 1;'
+  await parseTreeDocument(client, { ...identity, text, resultMode: 'parseOnly' })
+  const cancellationBuffer = new SharedArrayBuffer(4)
+  Atomics.store(new Int32Array(cancellationBuffer), 0, 1)
+  expect(
+    await client.mergeUnit({
+      ...identity,
+      range: { startIndex: 0, endIndex: 1 },
+      cancellationBuffer,
+      analysis: true,
+    }),
+  ).toMatchObject({ status: 'cancelled', unit: null })
+})
+
+it('fingerprints an unmatched TypeScript line fallback', async () => {
+  await parseTreeDocument(client, {
+    ...document,
+    snapshotVersion: 1,
+    text: '// comment\n',
+    resultMode: 'parseOnly',
+  })
+  const result = await client.mergeUnit({
+    ...document,
+    snapshotVersion: 1,
+    range: { startIndex: 3, endIndex: 5 },
+    analysis: true,
+    contentKey: true,
+  })
+  expect(result).toMatchObject({ status: 'ok', unit: { source: 'line', hasErrors: false } })
+  if (result?.status === 'ok') expect(result.unit.contentKey).toContain('comment')
+})
