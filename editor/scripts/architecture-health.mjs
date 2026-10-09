@@ -64,11 +64,14 @@ function main() {
     return
   }
 
-  const failures = [
-    ...compareJsonBaseline('health baseline', baselineFiles.health, current.health),
-    ...comparePublicApi(current.publicApi, readRequiredJson(baselineFiles.publicApi)),
-    ...compareTimers(current.timers, readRequiredJson(baselineFiles.timers)),
-  ]
+  const failures = compareJsonBaseline(
+    'health baseline',
+    baselineFiles.health,
+    current.health,
+  ).concat(
+    comparePublicApi(current.publicApi, readRequiredJson(baselineFiles.publicApi)),
+    compareTimers(current.timers, readRequiredJson(baselineFiles.timers)),
+  )
 
   printCheckSummary(current)
   if (failures.length === 0) return
@@ -87,7 +90,7 @@ function collectHealthBaseline() {
 
   return {
     schemaVersion: 1,
-    ignoredRoots: [...config.ignoredRoots].sort(),
+    ignoredRoots: config.ignoredRoots.toSorted(),
     expectedPackageScripts: [...config.expectedPackageScripts],
     missingPackageScripts: missingPackageScripts(packages),
     packageCycles: stronglyConnectedComponents(packageGraph),
@@ -385,13 +388,12 @@ function collectModuleExports(source, seen) {
   seen.add(source)
 
   const content = stripComments(readText(source))
-  return [
-    ...namedReExports(content, source),
-    ...starReExports(content, source, seen),
-    ...localExportLists(content, source),
-    ...declarationExports(content, source),
-    ...defaultExports(content, source),
-  ]
+  return namedReExports(content, source).concat(
+    starReExports(content, source, seen),
+    localExportLists(content, source),
+    declarationExports(content, source),
+    defaultExports(content, source),
+  )
 }
 
 function namedReExports(content, source) {
@@ -691,7 +693,7 @@ function publicApiKeys(inventory) {
 }
 
 function compareTimers(current, baseline) {
-  return [...timerIdFailures(current, baseline), ...timerJustificationFailures(current)]
+  return timerIdFailures(current, baseline).concat(timerJustificationFailures(current))
 }
 
 function timerIdFailures(current, baseline) {

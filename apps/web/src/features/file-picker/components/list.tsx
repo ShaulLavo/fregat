@@ -41,7 +41,7 @@ export function FileList({
     readonly toggle: (entry: FsEntry) => void
   } | null
   copy?: PickerListCopy
-  entries: FsEntry[]
+  entries: readonly FsEntry[]
   isBusy: boolean
   isSearching: boolean
   listRef?: RefObject<HTMLDivElement | null>

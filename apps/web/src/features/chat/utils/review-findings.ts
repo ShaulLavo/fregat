@@ -36,7 +36,7 @@ function findingQuote(finding: AgentReviewFinding, lines: readonly string[] | nu
   const body = lines.map((line) => ` ${line}`)
   const fence = markdownFence(body)
   const span = `${finding.startLine},${lines.length}`
-  return [heading, '', `${fence}diff`, `@@ -${span} +${span} @@`, ...body, fence].join('\n')
+  return [heading, '', `${fence}diff`, `@@ -${span} +${span} @@`].concat(body, [fence]).join('\n')
 }
 
 /** The toast after a review: how many findings joined the draft, or the reviewer's verdict. */

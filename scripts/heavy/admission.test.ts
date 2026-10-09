@@ -468,7 +468,7 @@ describe.skipIf(!userScopes)('the job slice', () => {
     const direct = start(box, 'literal', literal, { jobClass: 'light', machine: true })
     await direct.done
     expect(direct.stdout()).toBe('${HEAVY_JOB_SLICE%.slice}|$$\n')
-    const nested = start(box, 'nested-literal', [NESTED, ...literal], {
+    const nested = start(box, 'nested-literal', [NESTED].concat(literal), {
       jobClass: 'light',
       machine: true,
     })

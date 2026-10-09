@@ -84,18 +84,19 @@ export class ReviewView implements EditorViewContribution {
             })
           const yours = versions.authors.find(({ author }) => author === review.peer)
           const theirs = versions.authors.filter(({ author }) => author !== review.peer)
-          const markdown = [
-            code('Base', versions.base),
-            ...theirs.map(({ author, text }) => code(`Theirs (${displayName(author)})`, text)),
-            ...(yours ? [code('Yours', yours.text)] : []),
-          ].join('\n\n')
+          const markdown = [code('Base', versions.base)]
+            .concat(
+              theirs.map(({ author, text }) => code(`Theirs (${displayName(author)})`, text)),
+              yours ? [code('Yours', yours.text)] : [],
+            )
+            .join('\n\n')
           const part: HoverPart = {
             ordinal: 10,
             presentation: 'controls',
             range: { start: range.startIndex, end: range.endIndex },
             markdown,
             notes: [{ text: `Review edits by ${mark.authors.map(displayName).join(' and ')}.` }],
-            actions: [...actions, ...(review.options.onMergeReview?.(mark.unit, versions) ?? [])],
+            actions: actions.concat(review.options.onMergeReview?.(mark.unit, versions) ?? []),
           }
           return [part]
         },

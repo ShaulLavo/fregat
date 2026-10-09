@@ -1483,4 +1483,6 @@ const documentExtensions = new Set([
   '.xml',
 ])
 
-const textExtensions = new Set([...configExtensions, ...sourceExtensions, ...documentExtensions])
+const textExtensions = new Set(
+  Array.from(configExtensions).concat(Array.from(sourceExtensions), Array.from(documentExtensions)),
+)

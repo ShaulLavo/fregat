@@ -18,7 +18,7 @@ export function queuePrompt(
   const key = `agent.inbox.worktree:${worktreeId}`
   storage.updateItem(key, (value) => {
     const contexts = readContexts(storage, key, value)
-    return JSON.stringify([...contexts, normalized])
+    return JSON.stringify(contexts.concat([normalized]))
   })
 }
 

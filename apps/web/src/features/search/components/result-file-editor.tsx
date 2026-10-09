@@ -271,5 +271,5 @@ export const SearchResultFileEditor = memo(
 )
 
 function createFileResultEditorPlugins(syntaxPlugins: readonly EditorPlugin[]) {
-  return [...syntaxPlugins, createPlatformSearchResultEditorLoggingPlugin()]
+  return syntaxPlugins.concat([createPlatformSearchResultEditorLoggingPlugin()])
 }

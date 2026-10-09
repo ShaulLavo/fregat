@@ -216,7 +216,7 @@ describe.runIf(process.platform === 'linux')('git state changes', () => {
     await mkdir(path.join(root, 'other'))
     await writeFile(path.join(repo, 'sub/a.txt'), 'a')
     const git = (cwd: string, ...args: string[]) =>
-      execFileAsync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd })
+      execFileAsync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t'].concat(args), { cwd })
     await git(repo, 'init', '-q', '-b', 'main')
     await git(repo, 'add', '.')
     await git(repo, 'commit', '-qm', 'base')

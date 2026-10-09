@@ -60,7 +60,7 @@ export function buildNative(
   mkdirSync(path.dirname(output), { recursive: true })
   const command = linux
     ? linuxCommand({ desktopDir, source, output, flags })
-    : [compiler, ...args, '-O', '-warnings-as-errors', '-o', output, source]
+    : [compiler].concat(args, ['-O', '-warnings-as-errors', '-o', output, source])
   const result = Bun.spawnSync(command)
   if (result.exitCode !== 0) {
     process.stderr.write(result.stderr)
@@ -124,14 +124,12 @@ function linuxCommand({
     })
   const cache = ['--cache-dir', path.join(path.dirname(output), '.zig-cache')]
   const bindings = path.join(path.dirname(output), 'native.zig')
-  const translated = Bun.spawnSync([
-    'zig',
-    'translate-c',
-    path.join(desktopDir, 'native/linux/native.h'),
-    '-lc',
-    ...flags,
-    ...cache,
-  ])
+  const translated = Bun.spawnSync(
+    ['zig', 'translate-c', path.join(desktopDir, 'native/linux/native.h'), '-lc'].concat(
+      flags,
+      cache,
+    ),
+  )
   if (translated.exitCode !== 0) {
     process.stderr.write(translated.stderr)
     throw buildErrors.BUILD_FAILED({
@@ -139,20 +137,12 @@ function linuxCommand({
     })
   }
   writeFileSync(bindings, translated.stdout)
-  return [
-    'zig',
-    'build-exe',
-    '-O',
-    'ReleaseSafe',
-    '-lc',
-    ...flags,
-    '--dep',
-    'native',
-    `-Mroot=${source}`,
-    `-Mnative=${bindings}`,
-    ...cache,
-    `-femit-bin=${output}`,
-  ]
+  return ['zig', 'build-exe', '-O', 'ReleaseSafe', '-lc'].concat(
+    flags,
+    ['--dep', 'native', `-Mroot=${source}`, `-Mnative=${bindings}`],
+    cache,
+    [`-femit-bin=${output}`],
+  )
 }
 
 function writeDevelopmentBundle(desktopDir: string, binary: string) {

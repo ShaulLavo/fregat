@@ -105,7 +105,7 @@ test('coalesced fanout keeps its causal cursor before later unrelated events', a
   const next = iterator.next()
   const deleted = fixture.dispatch({ type: 'session.delete', sessionId: DOMAIN_IDS.session })
   const unrelated = fixture.dispatch({ type: 'session.pin', sessionId: SECOND_SESSION_ID })
-  streams.publish([...deleted, ...unrelated])
+  streams.publish(deleted.concat(unrelated))
   expect((await next).value).toMatchObject({ kind: 'session-removed' })
   expect((await iterator.next()).value).toMatchObject({
     kind: 'worktree-upserted',

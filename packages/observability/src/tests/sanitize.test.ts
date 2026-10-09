@@ -44,7 +44,9 @@ test('custom sanitization keeps its string and error policies throughout nested 
 })
 
 test('every default sensitive key redacts with no policy options', () => {
-  const record = Object.fromEntries([...sensitiveDiagnosticFields].map((key) => [key, 'private']))
+  const record = Object.fromEntries(
+    Array.from(sensitiveDiagnosticFields, (key) => [key, 'private']),
+  )
   const redacted = Object.fromEntries(Object.keys(record).map((key) => [key, '[redacted]']))
   const sanitize = createDiagnosticSanitizer({ formatString: (value) => value })
 

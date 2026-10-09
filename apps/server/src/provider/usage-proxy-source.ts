@@ -138,7 +138,7 @@ async function refreshAccount(
   if (!selector) return account
   const now = options.now ?? Date.now
   const latest = refresh.latest(account) ?? account
-  const observations = [...currentWindows, ...latest.windows]
+  const observations = currentWindows.concat(latest.windows)
   const intervalMs = refresh.requestIntervalMs(account)
   if (
     observations.some(

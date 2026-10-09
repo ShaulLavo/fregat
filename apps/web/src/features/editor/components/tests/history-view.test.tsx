@@ -444,7 +444,8 @@ function requireBuffer(buffer: EditorTextBuffer | null): EditorTextBuffer {
 }
 
 function diffRowTexts() {
-  return [
-    ...document.querySelectorAll<HTMLElement>('.editor-diff-pane [data-editor-virtual-row]'),
-  ].map((row) => row.textContent ?? '')
+  return Array.from(
+    document.querySelectorAll<HTMLElement>('.editor-diff-pane [data-editor-virtual-row]'),
+    (row) => row.textContent ?? '',
+  )
 }

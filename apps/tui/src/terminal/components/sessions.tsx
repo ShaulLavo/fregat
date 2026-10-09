@@ -50,7 +50,7 @@ export function TerminalSessions({
       'terminal.new': {
         run: () => {
           const id = crypto.randomUUID()
-          select({ ids: [...tabs.ids, id], selected: id })
+          select({ ids: tabs.ids.concat([id]), selected: id })
         },
       },
       'terminal.next': { run: () => select({ ...tabs, selected: nextTerminal(tabs, 1) }) },

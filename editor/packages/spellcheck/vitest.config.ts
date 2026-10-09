@@ -35,7 +35,7 @@ const browser = (instances: { browser: 'chromium' | 'firefox' | 'webkit'; name?:
       await profiling.detach()
       profiling = null
       return profile.nodes
-        .toSorted((a, b) => (b.hitCount ?? 0) - (a.hitCount ?? 0))
+        .sort((a, b) => (b.hitCount ?? 0) - (a.hitCount ?? 0))
         .slice(0, 20)
         .map((node) => ({
           function: node.callFrame.functionName,

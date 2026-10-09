@@ -549,7 +549,7 @@ export function validatePieceTreeInvariants(
     report('snapshot', 'snapshot', 'pieceCount', rootTotals.subtreePieces, snapshot.pieceCount)
   }
   // Document order is the order of the orders; a cyclic tree cannot be walked for it.
-  const ordered = visited.toSorted((a, b) => a.piece.order - b.piece.order)
+  const ordered = visited.sort((a, b) => a.piece.order - b.piece.order)
   const byOrder = new Map(ordered.map((node) => [node.piece.order, node]))
   const leadsToStandIn = (buffer: number, unit: number): boolean => {
     const order = lookupReverseIndex(snapshot.reverseIndex, buffer as PieceBufferId, unit)

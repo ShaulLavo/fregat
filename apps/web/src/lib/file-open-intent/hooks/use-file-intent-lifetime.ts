@@ -42,7 +42,7 @@ export function useFileIntentLifetime(
     const heldInterests = interests.current
     return () => {
       heldReasons.delete('trajectory')
-      const captured = [...heldInterests.values()]
+      const captured = Array.from(heldInterests.values())
       heldInterests.clear()
       for (const interest of captured) interest.release()
     }

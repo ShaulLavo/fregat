@@ -180,7 +180,7 @@ export class EditorDisplayProjectionRegistry {
       values.push(stored as StoredDisplayProjection<K>)
     }
 
-    return values.toSorted(compareStoredDisplayProjections)
+    return values.sort(compareStoredDisplayProjections)
   }
 
   private storedValuesWithReplacement<K extends EditorDisplayProjectionKind>(
@@ -197,7 +197,7 @@ export class EditorDisplayProjectionRegistry {
     }
 
     values.push(next)
-    return values.toSorted(compareStoredDisplayProjections)
+    return values.sort(compareStoredDisplayProjections)
   }
 
   private validateNextProjectionState<K extends EditorDisplayProjectionKind>(

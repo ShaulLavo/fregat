@@ -263,11 +263,10 @@ export class EditorTokenStore {
       options.keepsLiveRanges === null
         ? null
         : { revision: this.revision, keepsLiveRanges: options.keepsLiveRanges }
-    const segments = [
-      ...this.segmentsInRange(0, first, 0),
-      ...(inserted.starts.length > 0 ? [wholeRunSegment(inserted)] : NO_SEGMENTS),
-      ...this.segmentsInRange(last, this.length, options.delta),
-    ]
+    const segments = this.segmentsInRange(0, first, 0).concat(
+      inserted.starts.length > 0 ? [wholeRunSegment(inserted)] : NO_SEGMENTS,
+      this.segmentsInRange(last, this.length, options.delta),
+    )
     const flags = this.monotonicEnd ? this.flagsAfterReplace(first, last, inserted, options) : null
     if (!flags) return EditorTokenStore.fromUnchecked(segments, styles, derivedFrom)
 

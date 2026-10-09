@@ -142,22 +142,21 @@ test('a stored selection preserves all advertised native options, including fals
       providerModel({
         ...opus,
         capabilities: {
-          optionDescriptors: [
-            ...reasoningClaude.models.flatMap(
-              (model) => model.capabilities?.optionDescriptors ?? [],
-            ),
-            {
-              id: 'contextWindow',
-              label: 'Context window',
-              type: 'select',
-              options: [
-                { id: 'standard', label: 'Standard' },
-                { id: '1m', label: '1M' },
-              ],
-            },
-            { id: 'fastMode', label: 'Fast mode', type: 'boolean', currentValue: true },
-            { id: 'thinking', label: 'Extended thinking', type: 'boolean' },
-          ],
+          optionDescriptors: reasoningClaude.models
+            .flatMap((model) => model.capabilities?.optionDescriptors ?? [])
+            .concat([
+              {
+                id: 'contextWindow',
+                label: 'Context window',
+                type: 'select',
+                options: [
+                  { id: 'standard', label: 'Standard' },
+                  { id: '1m', label: '1M' },
+                ],
+              },
+              { id: 'fastMode', label: 'Fast mode', type: 'boolean', currentValue: true },
+              { id: 'thinking', label: 'Extended thinking', type: 'boolean' },
+            ]),
         },
       }),
     ],

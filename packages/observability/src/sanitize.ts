@@ -102,7 +102,7 @@ function resolvePolicy(policy: DiagnosticPolicy): Omit<Walk, 'seen'> {
 function sensitiveFieldsFor(policy: DiagnosticPolicy): ReadonlySet<string> {
   if (!policy.extraSensitiveFields?.length) return sensitiveDiagnosticFields
 
-  return new Set([...sensitiveDiagnosticFields, ...policy.extraSensitiveFields])
+  return new Set(Array.from(sensitiveDiagnosticFields).concat(policy.extraSensitiveFields))
 }
 
 function sanitizeFields(record: Record<string, unknown>, depth: number, walk: Walk) {

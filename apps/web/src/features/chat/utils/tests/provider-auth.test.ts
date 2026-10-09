@@ -38,7 +38,7 @@ function attempt(state: ProviderLoginState, message?: string): ProviderLoginAtte
 
 test('the subscription method comes first so the dialog can make it primary', () => {
   expect(PROVIDER_AUTH_METHODS[0]).toBe('subscription')
-  expect([...PROVIDER_AUTH_METHODS]).toEqual(['subscription', 'console', 'sso'])
+  expect(PROVIDER_AUTH_METHODS).toEqual(['subscription', 'console', 'sso'])
 })
 
 test('every method has a label, a one-line description and a CLI command', () => {

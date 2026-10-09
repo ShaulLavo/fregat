@@ -51,7 +51,7 @@ export function recordKey(
       error:
         'A shortcut has at most two strokes. Press Enter to review or Backspace to remove one.',
     }
-  const strokes = [...state.strokes, stroke]
+  const strokes = state.strokes.concat([stroke])
   return {
     ...state,
     strokes,

@@ -92,7 +92,7 @@ export function createEnvironmentConnections({
     error: string | null
   }>(() => ({ prompt: null, pending: false, error: null }))
   const desired = new Set(readConnectedMachines())
-  let cachedBindings = readCachedEnvironmentBindings(['local', ...desired])
+  let cachedBindings = readCachedEnvironmentBindings(['local'].concat(Array.from(desired)))
   const connections = new Map<EnvironmentId, LiveConnection>()
   const owners = new Map<EnvironmentId, string>()
   const attempts = new Map<string, AbortController>()
@@ -500,7 +500,7 @@ export function createEnvironmentConnections({
     })
     for (const machine of changed) notices.reset(`machine:${machine.name}`)
     const obsoleteNames =
-      authority === 'settings' ? [...desired].filter((name) => !config[name]) : []
+      authority === 'settings' ? Array.from(desired).filter((name) => !config[name]) : []
     for (const name of obsoleteNames) {
       desired.delete(name)
       attempts.get(name)?.abort()
@@ -526,12 +526,15 @@ export function createEnvironmentConnections({
         }
       }),
     })
-    const removedIdentities = new Set([
-      ...removed.flatMap((machine) => machine.environmentId ?? []),
-      ...cachedBindings
-        .filter((binding) => binding.names.some((name) => obsoleteNames.includes(name)))
-        .map((binding) => binding.descriptor.environmentId),
-    ])
+    const removedIdentities = new Set(
+      removed
+        .flatMap((machine) => machine.environmentId ?? [])
+        .concat(
+          cachedBindings
+            .filter((binding) => binding.names.some((name) => obsoleteNames.includes(name)))
+            .map((binding) => binding.descriptor.environmentId),
+        ),
+    )
     for (const environmentId of removedIdentities) {
       if (serverHasPrimaryIdentity(environmentId)) continue
       if (store.getState().machines.some((machine) => machine.environmentId === environmentId))

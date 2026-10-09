@@ -308,9 +308,9 @@ export class FileChangeHub {
     this.gitState.close()
     const releases = (
       await Promise.all(
-        [...this.nativeWatchers.values(), ...this.shallowWatchers.values()].map(
-          (entry) => entry.attached,
-        ),
+        Array.from(this.nativeWatchers.values())
+          .concat(Array.from(this.shallowWatchers.values()))
+          .map((entry) => entry.attached),
       )
     ).map((attached) => attached.close)
     this.native.close()
@@ -539,7 +539,7 @@ export class FileChangeHub {
   private evictIdleWatchers(needed: number, limit: number) {
     const idle = [...this.nativeWatchers]
       .filter(([, entry]) => isIdle(entry))
-      .toSorted(([, a], [, b]) => (a.idleSince ?? 0) - (b.idleSince ?? 0))
+      .sort(([, a], [, b]) => (a.idleSince ?? 0) - (b.idleSince ?? 0))
     for (const [root, entry] of idle) {
       if (this.reservedDirectories + needed <= limit) return
       this.nativeWatchers.delete(root)
@@ -581,7 +581,7 @@ export class FileChangeHub {
     const limit = this.directoryLimit()
     const recursive = [...this.nativeWatchers]
       .filter(([, entry]) => entry.resolved?.coverage.mode === 'recursive')
-      .toSorted(([, a], [, b]) => directoryCountOf(b) - directoryCountOf(a))
+      .sort(([, a], [, b]) => directoryCountOf(b) - directoryCountOf(a))
     for (const [root, entry] of recursive) {
       if (this.closing || this.reservedDirectories <= limit) return
       const current = entry.resolved
@@ -608,7 +608,9 @@ export class FileChangeHub {
 
   // The worker is gone and every watch in it with it; holders reattach through a fresh worker.
   private evictNativeWatchers() {
-    const entries = [...this.nativeWatchers.values(), ...this.shallowWatchers.values()]
+    const entries = Array.from(this.nativeWatchers.values()).concat(
+      Array.from(this.shallowWatchers.values()),
+    )
     this.nativeWatchers.clear()
     this.shallowWatchers.clear()
     for (const entry of entries) {

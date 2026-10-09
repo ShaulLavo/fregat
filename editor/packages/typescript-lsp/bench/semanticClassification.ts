@@ -61,7 +61,7 @@ const fixtureFilePaths = (): readonly string[] =>
     const absolute = join(REPO_ROOT, directory)
     return readdirSync(absolute)
       .filter((entry) => entry.endsWith('.ts'))
-      .toSorted()
+      .sort()
       .map((entry) => join(absolute, entry))
   })
 
@@ -179,8 +179,8 @@ const measure = (name: string, run: () => void): Sample => {
 const average = (values: readonly number[]): number =>
   values.reduce((sum, value) => sum + value, 0) / values.length
 
-const percentile = (values: readonly number[], percentileValue: number): number => {
-  const sorted = values.toSorted((left, right) => left - right)
+const percentile = (values: number[], percentileValue: number): number => {
+  const sorted = values.sort((left, right) => left - right)
   const index = Math.ceil(sorted.length * percentileValue) - 1
   return sorted[Math.max(0, index)] ?? 0
 }

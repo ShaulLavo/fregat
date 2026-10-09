@@ -25,12 +25,14 @@ export function searchQuery(rootPath: string, options: SearchOptions): Workspace
 }
 export function resultOptions(matches: readonly WorkspaceSearchMatch[]) {
   return matches
-    .toSorted(
-      (left, right) => left.path.localeCompare(right.path) || (left.line ?? 0) - (right.line ?? 0),
-    )
     .map((match) => ({
       name: `${match.path}:${match.line ?? 1}:${match.column ?? 1}`,
       description: match.preview ?? match.path,
       value: match,
     }))
+    .sort(
+      (left, right) =>
+        left.value.path.localeCompare(right.value.path) ||
+        (left.value.line ?? 0) - (right.value.line ?? 0),
+    )
 }

@@ -202,7 +202,8 @@ async function renderCheckpoint(
   const panes = () => [...painted.values()]
   return {
     blobQueries: () =>
-      queryClient.getQueryCache().findAll({ queryKey: [...gitKeys.diffs(), 'blob'] }).length,
+      queryClient.getQueryCache().findAll({ queryKey: [...gitKeys.diffs(), 'blob'] as const })
+        .length,
     misplacedTokens: () => panes().flatMap(misplacedTokens),
     paintedText: () =>
       panes()

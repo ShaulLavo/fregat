@@ -175,7 +175,7 @@ function htmlHookFixture() {
     mkdirSync(path.dirname(file), { recursive: true })
     writeFileSync(file, source)
   }
-  const entries = [...Object.values(SHELL_ENTRIES), ...PHONE_BOOT_SCREENS]
+  const entries = Object.values(SHELL_ENTRIES).concat(PHONE_BOOT_SCREENS)
   for (const [index, entry] of entries.entries()) write(entry, `export const value = ${index}`)
   write(
     'src/main.ts',

@@ -4,7 +4,7 @@ import type { GitStatusEntry } from './public-types'
 /**
  * Produces a stable cache key for a git status array.
  */
-export const getGitStatusSignature = (entries: GitStatusEntry[] | undefined): string => {
+export const getGitStatusSignature = (entries: readonly GitStatusEntry[] | undefined): string => {
   if (entries == null || entries.length === 0) {
     return '0'
   }

@@ -472,7 +472,10 @@ async function analyzePixels({ captures, lane, inputs }) {
   const end = inputs.at(-1).at
   const active = samples.filter((sample) => sample.at >= start && sample.at <= end + 30)
   const changes = active.filter((sample) => sample.changedPixels > 50)
-  const boundaries = [start, ...changes.map((sample) => sample.at), end]
+  const boundaries = [start].concat(
+    changes.map((sample) => sample.at),
+    [end],
+  )
   const gaps = boundaries.slice(1).map((at, index) => Math.max(0, at - boundaries[index]))
   return {
     framesDuringScroll: active.length,

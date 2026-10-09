@@ -17,8 +17,7 @@ export function paletteOptions(
       row.command.category,
       row.command.description ?? '',
       row.command.id,
-      ...(row.command.aliases ?? []),
-    ],
+    ].concat(row.command.aliases ?? []),
     reason: row.status === 'disabled' ? row.reason : null,
     shortcut: commandShortcut(bindings, row.command.id),
   }))
@@ -32,7 +31,7 @@ export function paletteOptions(
     })),
   )
   if (!search) return options
-  return options.toSorted(
+  return options.sort(
     (left, right) =>
       Number(exactCommandMatch(right.value, search)) -
       Number(exactCommandMatch(left.value, search)),

@@ -626,7 +626,7 @@ describe('virtualized text view geometry', () => {
   it('forgets a measured width when a scroll recycles the element onto another line', () => {
     const restore = stubProportionalLayout()
     try {
-      const lines = ['ééééé', ...Array.from({ length: 79 }, () => '漢字漢字漢')]
+      const lines = ['ééééé'].concat(Array.from({ length: 79 }, () => '漢字漢字漢'))
       view = mountView(container, lines.join('\n'))
       const internal = internals(view)
       const latin = textRows(view)[0]!

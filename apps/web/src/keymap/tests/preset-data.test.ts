@@ -66,7 +66,7 @@ test.each([
   {
     name: 'the generator derives exactly the live web command authority without loading its handlers',
     args: [fileURLToPath(new URL('../../../test/env/preset-command-ids.ts', import.meta.url))],
-    expectedStdout: `${JSON.stringify(platformCommands.map(({ id }) => id).toSorted())}\n`,
+    expectedStdout: `${JSON.stringify(platformCommands.map(({ id }) => id).sort())}\n`,
   },
   {
     name: 'the documented bare Bun CLI checks the exact authoritative projection without browser initialization',
@@ -77,7 +77,7 @@ test.each([
   '$name',
   async ({ args, expectedStdout }) => {
     const child = Bun.spawn({
-      cmd: [process.execPath, ...args],
+      cmd: [process.execPath].concat(args),
       cwd: fileURLToPath(new URL('../../../../../', import.meta.url)),
       stdout: 'pipe',
       stderr: 'pipe',

@@ -61,7 +61,7 @@ function seamPaints(page: Page) {
     const sidebar = document.querySelector('[data-workbench] aside, [data-chat-mode] aside')
     const region = document.querySelector('[data-surface-region]')
     return {
-      panels: [...panels, sidebar].filter(painted).length,
+      panels: panels.filter(painted).length + Number(painted(sidebar)),
       region: [region].filter(painted).length,
     }
   })

@@ -30,12 +30,11 @@ const CODE_FALLBACK = [
  */
 export function fontStack(value: string, role: FontRole): string {
   const ref = roleFontRef(value, role)
-  const families = [
-    cssFamily(fontFamilyName(ref)),
-    ...(role === 'code' && needsNerdSymbols(ref) ? [nerdSymbolsFamily()] : []),
-    ...(role === 'ui' ? UI_FALLBACK : CODE_FALLBACK),
-  ]
-  return [...new Set(families)].join(', ')
+  const families = [cssFamily(fontFamilyName(ref))].concat(
+    role === 'code' && needsNerdSymbols(ref) ? [nerdSymbolsFamily()] : [],
+    role === 'ui' ? UI_FALLBACK : CODE_FALLBACK,
+  )
+  return Array.from(new Set(families)).join(', ')
 }
 
 /** A stored value the schema rejected still renders, in the role's default. */
@@ -57,9 +56,7 @@ export function fontsInUse(
   values: Readonly<Record<'workbench.fontFamily' | 'editor.fontFamily', string>>,
 ): string[] {
   const code = roleFontRef(values['editor.fontFamily'], 'code')
-  return [
-    values['workbench.fontFamily'],
-    values['editor.fontFamily'],
-    ...(needsNerdSymbols(code) ? [NERD_SYMBOLS_FONT] : []),
-  ]
+  return [values['workbench.fontFamily'], values['editor.fontFamily']].concat(
+    needsNerdSymbols(code) ? [NERD_SYMBOLS_FONT] : [],
+  )
 }

@@ -17,13 +17,9 @@ function selectionBlock(path: string, { endLine, startLine, text }: SelectedLine
   const fence = markdownFence(lines)
   const where = startLine === endLine ? `line ${startLine}` : `lines ${startLine}–${endLine}`
 
-  return [
-    `About \`${path}\`, ${where}:`,
-    '',
-    `${fence}${fenceLanguage(path)}`,
-    ...lines,
-    fence,
-  ].join('\n')
+  return [`About \`${path}\`, ${where}:`, '', `${fence}${fenceLanguage(path)}`]
+    .concat(lines, [fence])
+    .join('\n')
 }
 
 function fenceLanguage(path: string) {

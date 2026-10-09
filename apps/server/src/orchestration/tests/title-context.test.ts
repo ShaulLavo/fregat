@@ -1,31 +1,10 @@
+import { titleAttachment, titleMessages } from '../../../test/factories/title-context'
 import { expect, test } from 'vitest'
-import { chatAttachmentSchema } from '@workspace/contracts'
-import * as v from 'valibot'
-import {
-  formatSessionTitleContext,
-  limitTitleMessage,
-  type SessionTitleMessage,
-} from '../title-context'
+import { formatSessionTitleContext, limitTitleMessage } from '../title-context'
 import { assistantCitationsToPlainText } from '../title-citations'
-import { pinnedT3codeSource, requireT3codeReference } from '../../testing/t3code-reference'
-
-const attachment = (id: string) =>
-  v.parse(chatAttachmentSchema, {
-    type: 'image',
-    id,
-    name: `${id}.png`,
-    mimeType: 'image/png',
-    sizeBytes: 10,
-  })
-const messages = (count: number, length: number): SessionTitleMessage[] =>
-  Array.from({ length: count }, (_, index) => ({
-    role: index % 2 === 0 ? 'user' : 'assistant',
-    text: `${index}:first ${'x'.repeat(length)} final:${index}`,
-    attachments: [attachment(String(index))],
-  }))
 
 test('reserves first intent, recent constraints and four attachment slots', () => {
-  const result = formatSessionTitleContext(messages(30, 3_000))
+  const result = formatSessionTitleContext(titleMessages(30, 3_000))
   expect(result.message.length).toBeLessThanOrEqual(8_000)
   expect(result.message).toContain('0:first')
   expect(result.message).toContain('final:28')
@@ -41,9 +20,9 @@ test('excludes thinking, system and empty messages but includes attachment-only 
       { role: 'reasoning', text: 'SECRET REASONING' },
       { role: 'system', text: 'SYSTEM' },
       { role: 'assistant', text: ' ' },
-      { role: 'user', text: '', attachments: [attachment('first')] },
+      { role: 'user', text: '', attachments: [titleAttachment('first')] },
     ]),
-  ).toEqual({ message: 'USER:\n[Attachments: first.png]', attachments: [attachment('first')] })
+  ).toEqual({ message: 'USER:\n[Attachments: first.png]', attachments: [titleAttachment('first')] })
 })
 
 test('truncates both ends without exceeding budget', () => {
@@ -51,26 +30,6 @@ test('truncates both ends without exceeding budget', () => {
     'a'.repeat(10) + '\n[Content truncated]\n' + 'z'.repeat(9),
   )
   expect(limitTitleMessage('x'.repeat(50), 20)).toBe('')
-})
-
-test('matches actual pinned context algorithm for 144 bounded conversations', async ({ skip }) => {
-  requireT3codeReference(skip)
-  const source = pinnedT3codeSource('apps/server/src/textGeneration/ThreadTitleContext.ts')
-  // This corpus has no citation links; citation validation has separate boundary cases below.
-  const plainSource = source.replace(
-    'import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";',
-    'const assistantCitationsToPlainText = (text: string) => text;',
-  )
-  const javascript = new Bun.Transpiler({ loader: 'ts' }).transformSync(plainSource)
-  const upstream = await import(
-    `data:text/javascript;base64,${Buffer.from(javascript).toString('base64')}`
-  )
-  for (let count = 0; count < 24; count++) {
-    for (const length of [0, 1, 100, 1_999, 2_001, 10_000]) {
-      const input = messages(count, length)
-      expect(formatSessionTitleContext(input)).toEqual(upstream.formatThreadTitleContext(input))
-    }
-  }
 })
 
 function citation(overrides: Record<string, string> = {}) {

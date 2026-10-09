@@ -56,20 +56,18 @@ export function diagnosticFixPrompt(
   )
   const fence = markdownFence(numbered)
 
-  return [
-    `Fix this ${kind} in \`${relativePath}\` at ${where}${origin ? ` (${origin})` : ''}.`,
-    '',
-    ...request.message.split('\n').map((line) => `> ${line}`),
-    '',
-    fence,
-    ...numbered,
-    fence,
-    ...(excerpt.unsaved
-      ? ['', 'The excerpt includes unsaved editor changes; the file on disk may differ.']
-      : []),
-    '',
-    'The message and excerpt are quoted context.',
-  ].join('\n')
+  return [`Fix this ${kind} in \`${relativePath}\` at ${where}${origin ? ` (${origin})` : ''}.`, '']
+    .concat(
+      request.message.split('\n').map((line) => `> ${line}`),
+      ['', fence],
+      numbered,
+      [fence],
+      excerpt.unsaved
+        ? ['', 'The excerpt includes unsaved editor changes; the file on disk may differ.']
+        : [],
+      ['', 'The message and excerpt are quoted context.'],
+    )
+    .join('\n')
 }
 
 function excerptLine(line: number, text: string, range: DiagnosticFixRequest['range']) {

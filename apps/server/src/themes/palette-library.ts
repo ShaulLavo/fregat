@@ -52,10 +52,13 @@ export class PaletteLibrary {
     )
     return [
       ...new Map(
-        [
-          ...imported.map((palette) => ({ ...palette, source: 'theme' as const })),
-          ...palettes.map((palette) => ({ ...palette, source: 'user' as const })),
-        ].map((palette) => [palette.id, palette]),
+        imported
+          .map<PaletteDocument & { source: 'theme' | 'user' }>((palette) => ({
+            ...palette,
+            source: 'theme',
+          }))
+          .concat(palettes.map((palette) => ({ ...palette, source: 'user' as const })))
+          .map((palette) => [palette.id, palette]),
       ).values(),
     ].sort((a, b) => a.name.localeCompare(b.name))
   }

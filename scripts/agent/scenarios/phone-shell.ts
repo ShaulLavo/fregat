@@ -422,7 +422,7 @@ async function expectDiffTintAtScreenEdge(page: Page, type: 'addition' | 'deleti
 /** The notes file, long enough that its change sits on a three-digit line. */
 function notesWith(line: string) {
   const filler = Array.from({ length: 118 }, (_, index) => `Note ${index + 1}.`)
-  return ['# Notes', ...filler.slice(0, 108), line, ...filler.slice(108)]
+  return ['# Notes'].concat(filler.slice(0, 108), [line], filler.slice(108))
 }
 
 /** The editor tabs the address records: one token per open tab. */

@@ -89,7 +89,7 @@ export function installOpenProbe() {
 }
 
 function unionMs(spans) {
-  const sorted = spans.toSorted((a, b) => a[0] - b[0])
+  const sorted = spans.sort((a, b) => a[0] - b[0])
   let end = -Infinity
   let total = 0
   for (const [start, stop] of sorted) {

@@ -46,7 +46,7 @@ function prunedSessionReads(seenBySessionKey: SessionSeenStamps): SessionSeenSta
 
   return Object.fromEntries(
     entries
-      .toSorted(([, left], [, right]) => right.localeCompare(left))
+      .sort(([, left], [, right]) => right.localeCompare(left))
       .slice(0, MAX_SESSION_READ_ENTRIES),
   )
 }

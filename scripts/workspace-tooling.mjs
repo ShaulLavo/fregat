@@ -25,7 +25,7 @@ const sharedPatches = Object.entries(root.patchedDependencies ?? {}).filter(([ke
   tools.includes(key.slice(0, key.lastIndexOf('@'))),
 )
 const files = new Set(['package.json'])
-for (const pattern of [...patterns, ...families]) {
+for (const pattern of patterns.concat(families)) {
   for await (const file of new Glob(`${pattern}/package.json`).scan('.')) files.add(file)
 }
 const write = process.argv.includes('--write')

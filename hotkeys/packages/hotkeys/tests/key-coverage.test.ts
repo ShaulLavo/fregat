@@ -22,39 +22,40 @@ it('types corresponding logical and physical names without conflating their spel
   >().toBeNever()
 })
 
-it.each([...FUNCTION_KEYS, ...SHARED_NAMED_KEYS])(
-  'validates, records, and matches both identities for %s',
-  (key) => {
-    const logical: Hotkey = `Alt+${key}`
-    const physical: Hotkey = `Alt+[${key}]`
-    const event = new KeyboardEvent('keydown', { key, code: key, altKey: true })
-    expect(ALL_KEYS.has(key)).toBe(true)
-    expect(normalizeKeyName(key.toLowerCase())).toBe(key)
-    expect(parseHotkey(logical.toLowerCase()).key).toBe(key)
-    expect(validateHotkey(logical.toLowerCase())).toEqual({
-      valid: true,
-      warnings: [],
-      errors: [],
-    })
-    expect(validateHotkey(physical)).toEqual({
-      valid: true,
-      warnings: [],
-      errors: [],
-    })
-    expect(hotkeyChordFromKeydown(event, 'mac', 'key')).toBe(logical)
-    expect(hotkeyChordFromKeydown(event, 'mac', 'code')).toBe(physical)
-    expect(matchesKeyboardEvent(event, logical, 'mac')).toBe(true)
-    expect(matchesKeyboardEvent(event, physical, 'mac')).toBe(true)
-    expect(
-      matchesKeyboardEvent(
-        new KeyboardEvent('keydown', { key, code: 'KeyA', altKey: true }),
-        physical,
-        'windows',
-      ),
-    ).toBe(false)
-    expect(formatForDisplay(logical, { platform: 'windows', useSymbols: false })).toBe(`Alt+${key}`)
-  },
-)
+it.each(
+  Array.from<FunctionKey | (typeof SHARED_NAMED_KEYS)[number]>(FUNCTION_KEYS).concat(
+    SHARED_NAMED_KEYS,
+  ),
+)('validates, records, and matches both identities for %s', (key) => {
+  const logical: Hotkey = `Alt+${key}`
+  const physical: Hotkey = `Alt+[${key}]`
+  const event = new KeyboardEvent('keydown', { key, code: key, altKey: true })
+  expect(ALL_KEYS.has(key)).toBe(true)
+  expect(normalizeKeyName(key.toLowerCase())).toBe(key)
+  expect(parseHotkey(logical.toLowerCase()).key).toBe(key)
+  expect(validateHotkey(logical.toLowerCase())).toEqual({
+    valid: true,
+    warnings: [],
+    errors: [],
+  })
+  expect(validateHotkey(physical)).toEqual({
+    valid: true,
+    warnings: [],
+    errors: [],
+  })
+  expect(hotkeyChordFromKeydown(event, 'mac', 'key')).toBe(logical)
+  expect(hotkeyChordFromKeydown(event, 'mac', 'code')).toBe(physical)
+  expect(matchesKeyboardEvent(event, logical, 'mac')).toBe(true)
+  expect(matchesKeyboardEvent(event, physical, 'mac')).toBe(true)
+  expect(
+    matchesKeyboardEvent(
+      new KeyboardEvent('keydown', { key, code: 'KeyA', altKey: true }),
+      physical,
+      'windows',
+    ),
+  ).toBe(false)
+  expect(formatForDisplay(logical, { platform: 'windows', useSymbols: false })).toBe(`Alt+${key}`)
+})
 
 it.each(LOGICAL_ONLY_NAMED_KEYS)('recognizes the distinct logical name %s', (key) => {
   expect(validateHotkey(key.toLowerCase())).toEqual({

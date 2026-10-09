@@ -122,10 +122,9 @@ test('scrolling up mid-stream stops the transcript following', () => {
 
 test('keyboard disclosure activation keeps the expanded message in place during new output', async () => {
   // A history the virtualizer itself measures as tall: end anchoring writes its own offsets.
-  const history = [
-    ...conversation(59),
+  const history = conversation(59).concat([
     userMessage('u60', 'Keep my reading position.\n'.repeat(20)),
-  ]
+  ])
   const { rerender } = renderTimeline(history)
   const disclosure = await screen.findByRole('button', { name: 'Show full message' })
   // The opening scroll to the end re-checks its target each frame until it lands.
@@ -141,7 +140,7 @@ test('keyboard disclosure activation keeps the expanded message in place during 
     createdAt: new Date(Date.UTC(2026, 4, 28, 0, 2)).toISOString(),
     text: 'The assistant continues responding.',
   })
-  rerender(timelineOf([...history, reply]))
+  rerender(timelineOf(history.concat([reply])))
 
   expect(jumpToLatest()).not.toHaveClass('opacity-0')
   expect(transcript().scrollTop).toBe(scrollTop)
@@ -206,7 +205,7 @@ test('sending a message parks it at the top instead of pinning to the bottom', (
   // An opened session sits at the live edge: its last row is down at the bottom.
   expect(rowOffsetInViewport(history.length - 1)).toBeGreaterThan(VIEWPORT_HEIGHT / 2)
 
-  const sent = [...history, userMessage('u14', 'Fourteenth question')]
+  const sent = history.concat([userMessage('u14', 'Fourteenth question')])
   rerender(timelineOf(sent))
   fireEvent.scroll(transcript())
 

@@ -74,7 +74,7 @@ export function seedWorkspaceCache({
     ...directoryEntry(rootPath),
     workspaceAddress,
   })
-  writeWorkspaceIndexCache(testScopedStorage, [rootPath, ...knownRoots])
+  writeWorkspaceIndexCache(testScopedStorage, [rootPath].concat(knownRoots))
   writeWorkspaceSliceCache(testScopedStorage, rootPath, {
     editorHistory: [],
     recentlyClosedTabs: [],

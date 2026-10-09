@@ -6,9 +6,9 @@ import DurationSequencer from './shard-sequencer'
 
 const root = path.join(import.meta.dirname, '..')
 const recorded = Object.keys(durations)
-const files = [...recorded, 'src/features/new-feature/tests/unrecorded.test.ts'].map(
-  (key) => ({ moduleId: path.join(root, key) }) as TestSpecification,
-)
+const files = recorded
+  .concat(['src/features/new-feature/tests/unrecorded.test.ts'])
+  .map((key) => ({ moduleId: path.join(root, key) }) as TestSpecification)
 
 async function shardsOf(count: number) {
   const shards: TestSpecification[][] = []

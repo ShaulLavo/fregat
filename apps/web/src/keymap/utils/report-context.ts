@@ -8,13 +8,12 @@ import {
 type ContextSeed = { identifiers: readonly string[]; values: Readonly<Record<string, string>> }
 type ContextPath = readonly ContextSeed[]
 const empty: ContextSeed = { identifiers: [], values: {} }
+const workspacePath: ContextPath = [{ identifiers: ['Workspace'], values: {} }]
 
 export function reportContextPaths(source: string | undefined): readonly (readonly KeyContext[])[] {
   const paths = source ? predicatePaths(parseContextPredicate(source)) : [[empty]]
   return paths.map((path) => {
-    const seeds = path[0]?.identifiers.includes('Workspace')
-      ? path
-      : [{ identifiers: ['Workspace'], values: {} }, ...path]
+    const seeds = path[0]?.identifiers.includes('Workspace') ? path : workspacePath.concat(path)
     return seeds.map((seed) => createKeyContext(seed))
   })
 }
@@ -29,7 +28,7 @@ function predicatePaths(predicate: ContextPredicate): readonly ContextPath[] {
     case 'not':
       return [[empty]]
     case 'or':
-      return [...predicatePaths(predicate.left), ...predicatePaths(predicate.right)]
+      return predicatePaths(predicate.left).concat(predicatePaths(predicate.right))
     case 'descendant':
       return combinePaths(predicatePaths(predicate.parent), predicatePaths(predicate.child), false)
     case 'and':
@@ -44,14 +43,14 @@ function combinePaths(
 ): readonly ContextPath[] {
   return left.flatMap((a) =>
     right.map((b) => {
-      if (!merge) return [...a, ...b]
+      if (!merge) return a.concat(b)
       const first = a.at(-1) ?? empty
       const second = b.at(-1) ?? empty
       const combined = {
-        identifiers: [...first.identifiers, ...second.identifiers],
+        identifiers: first.identifiers.concat(second.identifiers),
         values: { ...first.values, ...second.values },
       }
-      return [...a.slice(0, -1), ...b.slice(0, -1), combined]
+      return a.slice(0, -1).concat(b.slice(0, -1), [combined])
     }),
   )
 }
@@ -59,7 +58,9 @@ function combinePaths(
 export function contextPathLabel(path: readonly KeyContext[]): string {
   return path
     .map(({ identifiers, values }) =>
-      [...identifiers, ...[...values].map(([key, value]) => `${key}=${value}`)].join(' '),
+      Array.from(identifiers)
+        .concat(Array.from(values, ([key, value]) => `${key}=${value}`))
+        .join(' '),
     )
     .join(' > ')
 }

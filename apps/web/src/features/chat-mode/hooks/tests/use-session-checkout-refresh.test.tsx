@@ -29,7 +29,7 @@ test('a session commit invalidates only that checkout and its file reads', async
     gitKeys.pullRequestState('other'),
     gitKeys.diff('other/a.ts', false),
   ]
-  for (const key of [...relevant, ...unrelated]) queryClient.setQueryData(key, { value: 'cached' })
+  for (const key of relevant.concat(unrelated)) queryClient.setQueryData(key, { value: 'cached' })
   const rendered = renderInRailHarness(harness, <CheckoutRefresh />)
   await screen.findByText('Checkout refresh ready')
   const snapshot = await harness.refresh()

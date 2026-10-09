@@ -49,7 +49,7 @@ export class CursorProviderAdapter extends AcpProviderAdapter {
   constructor(options: CursorAdapterOptions) {
     super({
       ...options,
-      args: (input) => [...(input.runtimeMode === 'full-access' ? ['--force'] : []), 'acp'],
+      args: (input) => (input.runtimeMode === 'full-access' ? ['--force'] : []).concat(['acp']),
       resumeMethod: 'load',
       defaultModel: 'auto',
       steering: 'parallel',

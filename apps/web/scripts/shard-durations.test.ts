@@ -14,13 +14,13 @@ test.each([
     v.record(v.string(), v.number()),
     JSON.parse(fs.readFileSync(new URL('../test/shard-durations.json', import.meta.url), 'utf8')),
   )
-  const entries = [
-    ...new Map(
+  const entries = Array.from(
+    new Map(
       Object.entries(recorded)
         .sort(([, a], [, b]) => b - a)
         .map(([key, seconds]) => [seconds, key] as const),
     ),
-  ]
+  )
     .slice(0, 3)
     .map(([seconds, key]) => [key, seconds] as const)
   expect(entries).toHaveLength(3)
@@ -58,7 +58,7 @@ test.each([
     expect(second.map((file) => file.moduleId)).toEqual(
       entries.slice(1).map(([key]) => paths.join(root, key)),
     )
-    expect(new Set([...first, ...second])).toEqual(new Set(files))
+    expect(new Set(first.concat(second))).toEqual(new Set(files))
   } finally {
     relative.mockRestore()
     await ctx.close()
