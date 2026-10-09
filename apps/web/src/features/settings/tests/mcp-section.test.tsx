@@ -325,3 +325,40 @@ async function exerciseMcpAction({
     expect(second.signIns).toEqual([])
   }
 }
+
+test('a literal tilde folder keeps its own MCP list and filesystem owner across Home visits', async () => {
+  const adapter = new McpConfigAdapter()
+  const server = await makeTestServer({ providerAdapter: adapter })
+  const folder = path.join(server.root, '~')
+  await mkdir(folder)
+  adapter.folders.set(folder, [{ ...adapter.servers[0]!, origin: 'https://tilde.example.test' }])
+  const restore = installTestClient(createInProcessClient(server))
+  const rendered = renderWithProviders(<McpSection />)
+  try {
+    await userEvent.click(await screen.findByRole('tab', { name: 'Claude' }))
+    await screen.findByText('linear')
+    expect(adapter.listFolders).toEqual([server.root])
+    await userEvent.click(screen.getByRole('button', { name: 'Choose folder…' }))
+    const picker = await screen.findByRole('dialog', { name: 'Choose folder' })
+    await userEvent.click(within(picker).getByRole('button', { name: 'Go to folder' }))
+    const input = within(picker).getByRole('textbox', { name: 'Folder path' })
+    await userEvent.clear(input)
+    await userEvent.type(input, `${folder}{Enter}`)
+    await waitFor(() => expect(input).not.toBeVisible())
+    const open = within(picker).getByRole('button', { name: /^Open$/ })
+    await waitFor(() => expect(open).toBeEnabled())
+    await userEvent.click(open)
+    await waitFor(() => expect(adapter.listFolders).toEqual([server.root, folder]))
+    expect(await screen.findByText(/tilde.example.test/)).toBeVisible()
+    expect(screen.getByText('~', { selector: '[data-mcp-folder]' })).toBeVisible()
+    await userEvent.click(screen.getByRole('button', { name: 'Home' }))
+    expect(await screen.findByText('Home folder')).toBeVisible()
+    expect(screen.getByText(/mcp.linear.app/)).toBeVisible()
+    expect(screen.queryByText(/tilde.example.test/)).toBeNull()
+    expect(adapter.listFolders).toEqual([server.root, folder])
+  } finally {
+    rendered.unmount()
+    restore()
+    await server.cleanup()
+  }
+})
