@@ -32,8 +32,29 @@ Palette data already has one CSS renderer, `paletteStylesheet()` in `packages/cl
 - Give all startup consumers one parsed in-memory result.
 - Give production, Vite development, and isolated browser verification the same bootstrap contract.
 - Document the mechanism alongside its code and in the development/architecture docs.
+- Align existing Bun release-document editing with `HTMLRewriter` and replace the two Vite build-time insertions with Vite's structured HTML tag API.
 
 Keep React rendering in the browser. This plan does not migrate to TanStack Start, render React on the server, inject a complete settings document, or create a general HTML plugin registry. Keep unrelated address, workspace, and other browser storage behavior under its existing ownership.
+
+## Server HTML alignment inventory
+
+Read-only audit on 2026-10-09 covered `apps/server/`, release/deployment helpers, browser-verification helpers, and the app's Vite HTML plugins. The runtime server has no existing HTML rewrite implementation or HTML parser dependency. Its HTML responses return file bytes unchanged. The adjacent release pipeline has one HTML-editing function, used by three release/install paths.
+
+| Location                                                                                        | Current behavior                                                                                             | Required alignment                                                                                                                                                   |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/server/src/web/routes.ts`, `document()`                                                   | Serves app documents and navigation fallbacks without modification.                                          | Add the named `renderHtmlBootstrap()` response transformation using Bun `HTMLRewriter`.                                                                              |
+| Same module, `webFile()` / `staticFile()`                                                       | Existing files are returned before fallback resolution; direct `/index.html` and `/dev.html` take this path. | Apply the bootstrap/admission policy to every designated app document, including direct filenames. Leave license pages and unrelated static assets unchanged.        |
+| `apps/server/src/fs/routes.ts`, `fileResponse()`                                                | Returns user/repository HTML unchanged with sandbox response headers.                                        | Preserve these bytes and headers; this is user content.                                                                                                              |
+| `scripts/deploy/web-release.ts`, `stampWebRelease()`                                            | Removes release meta tags with regex and inserts a new tag by replacing `</head>`.                           | Use Bun `HTMLRewriter` for selector-based replacement and attribute serialization. Preserve one release tag across repeated stamping of `index.html` and `dev.html`. |
+| `scripts/deploy/release.ts`, `scripts/install-release.ts`, `scripts/service/bundled-release.ts` | All three call the same release stamper.                                                                     | Propagate asynchronous transformation completion through all callers and tests together. Packaging and installation must await fully stamped files.                  |
+| `apps/web/scripts/boot-appearance-plugin.ts`                                                    | A Vite hook replaces a comment with inline style/script strings.                                             | Use Vite's structured HTML tag descriptors and preserve before-paint ordering and Node-side configuration/test compatibility.                                        |
+| `apps/web/scripts/shell-chunks-plugin.ts`                                                       | A Vite hook replaces a comment with a shell-manifest JSON script.                                            | Use Vite's structured HTML tag descriptors; preserve JSON escaping and manifest availability before the boot script executes.                                        |
+
+Browser fixture HTML construction, unchanged static-preview forwarding, injected browser initialization JavaScript, and desktop XML/plist parsing are separate operations. They do not need an HTML response rewriter.
+
+Use Bun's native API for backend HTML editing. Use Vite's own tag API inside its build hooks rather than require a Bun-only global in a Node-compatible plugin. JSON serialization and palette CSS generation remain domain functions. This rule does not convert non-HTML string operations or parse user files into application markup.
+
+Qualify the release stamper with repeated stamping, duplicate existing tags, escaped attribute values, optional `dev.html`, and completion before packaging/installation. Follow `scripts/deploy/web-release.test.ts` and the existing installation fixtures. Add a direct-document case proving `/index.html` and `/dev.html` cannot bypass the designated document policy. Review future app-document transformations against this inventory.
 
 ## Design
 
@@ -100,7 +121,7 @@ Add a Vite adapter that produces the same elements and payload through the share
 ## Steps
 
 1. [ ] Reproduce on a fresh browser profile and the historical appearance-cache case. Record baseline HTML timing, wallpaper request initiators, transfer count, decode/first-painted-frame timing, and frame samples. Resolve document admission, native backdrop context, and library-image preload adoption.
-2. [ ] Add the shared schema/IDs, `createAppearanceBootstrap()`, and `renderHtmlBootstrap()`. Declare template elements. Test both mode resolutions, admission, escaping, element invariants, base paths, and conditional preloads against real transformed responses.
+2. [ ] Add the shared schema/IDs, `createAppearanceBootstrap()`, and `renderHtmlBootstrap()`. Declare template elements. Align release stamping and both Vite insertion hooks according to the HTML inventory. Test mode resolution, admission, escaping, element invariants, base paths, conditional preloads, direct-document routing, release-stamp idempotence/completion, and build-script ordering against real transformed responses.
 3. [ ] Add `readHtmlBootstrap()` and migrate all appearance startup consumers together. Remove superseded appearance storage/preload logic while preserving live queries, decoded-image transitions, and non-appearance storage consumers.
 4. [ ] Wire the Vite and isolated-server adapters. Replace storage-seeded wallpaper bootstrap scenarios with real document production. Add stable selectors to the verification selector module.
 5. [ ] Qualify built production HTML in Chromium and WebKit at phone and desktop sizes. Compare matched cold-load traces and image transfers. Add a concise architecture explanation and correct obsolete palette comments.
