@@ -10,7 +10,9 @@ import type { TextEdit } from '../src/tokens'
 
 const apply = (text: string, edits: readonly TextEdit[]) => {
   let result = text
-  for (const edit of edits.toSorted((left, right) => right.from - left.from)) {
+  for (const edit of edits.toSorted(
+    (left, right) => right.from - left.from || right.to - left.to,
+  )) {
     result = result.slice(0, edit.from) + edit.text + result.slice(edit.to)
   }
   return result
@@ -184,6 +186,30 @@ describe('DocumentEditChain', () => {
     expect(apply(base, edits!)).toBe(apply(apply(base, first), second))
   })
 
+  it('applies a replacement before insertions at the same batch offset', () => {
+    const chain = new DocumentEditChain()
+    const point = chain.point
+    record(chain, [
+      { from: 2, to: 2, text: 'I' },
+      { from: 2, to: 4, text: 'R' },
+    ])
+
+    const edits = editsSince(chain, point)
+    expect(edits).toEqual([{ from: 2, to: 4, text: 'IR' }])
+    expect(apply('012345', edits!)).toBe('01IR45')
+  })
+
+  it('preserves the input order of equal-offset insertions', () => {
+    const chain = new DocumentEditChain()
+    const point = chain.point
+    record(chain, [
+      { from: 2, to: 2, text: 'A' },
+      { from: 2, to: 2, text: 'B' },
+    ])
+
+    expect(editsSince(chain, point)).toEqual([{ from: 2, to: 2, text: 'BA' }])
+  })
+
   it('retains exactly 128 edits of history', () => {
     const chain = new DocumentEditChain(0, 0)
     const expired = chain.point
@@ -296,7 +322,7 @@ function expectRandomEditsToMapPositions(random: () => number): void {
       const from = cursor + Math.floor(random() * (text.length - cursor + 1))
       const to = from + Math.floor(random() * (text.length - from + 1))
       batch.push({ from, to, text: 'XYZ'.slice(0, Math.floor(random() * 4)) })
-      cursor = to + 1
+      cursor = to + Math.floor(random() * 2)
     }
     for (let offset = 0; offset < positions.length; offset += 1) {
       positions[offset] = mapSourcePosition(positions[offset]!, batch)
