@@ -162,6 +162,11 @@ native displayed state and materialize owned text on demand. Canvas and DOM keep
 rows internally. All renderers expose the same text API. Internal native frame identities stay
 inside the library.
 
+WebGL and WebGPU update retained text from native logical row damage. Grid or fitted-font
+changes and native full damage refresh the complete viewport. Retention advances after every
+required row has been captured successfully. Pending writes and failed submissions preserve
+text from the last accepted frame; previously returned owned rows remain valid.
+
 Accessibility defaults to off. Pass `accessibility: {}` or configure its label and live-region
 limits to enable the mirror. `setAccessibilityEnabled(true)` enables it after opening. The
 mirror subscribes through `onText` and starts from the current displayed viewport. Disabling
