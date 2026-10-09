@@ -164,11 +164,30 @@ Types' and Fugue's test suites. The research settles the rest:
 
 - **Host-free upgrade gate.** Build a host-free ordering (FugueMax over `deps` with no host)
   only if the ported long-offline suites produce merges the owner rejects. The envelope already
-  carries what it needs.
+  carries what it needs. `collab/test/order-independence.test.ts` checks 1,024 distinct causal
+  schedules per authored edit set through Host and direct engine integration, including owned
+  undo effects, against the pinned FugueMax oracle. The host does not improve placement for the
+  same authored set. Arbitrary concurrent writes to one owner's effect state remain last-arrival
+  wins; the test documents that accepted-envelope counterexample separately.
 - **Retained metadata grows** with edit history while tombstones stay exact. Measure piece and
   identity-run growth over long sessions before deciding on identity compaction.
 - **Replay cost** grows with the pending queue; a long offline queue is the main latency risk.
   Replay may run in slices if it exceeds the frame budget.
+  - Approved follow-up, 2026-10-09: measure and reduce repeated pending replay during rejoin.
+    Reproduce with `COLLABORATION_LONG_RUN=1 bun run --cwd editor/packages/collab test
+test/offline-order.test.ts --project textbuffer -t 'effects=false, adapter=document'
+--reporter verbose`, through the host's job runner. Two groups author 2,000 edits each;
+    the production document emitted `4001 total; 2000 unchanged losing-branch envelopes
+replayed; four peers; zero rejected/blocked/pending`, then exceeded the original
+    120-second test timeout at 241 seconds in a shared-machine run. The long-run timeout is
+    now 600 seconds; default cases remain small. Ordering and edit loss were ruled out by
+    text, retained-ID, visible-ID, acceptance and replay-envelope assertions.
+    Start at `editor/packages/collaboration/src/document.ts:159` and
+    `editor/packages/collab/src/participant.ts:161,242`: single-record confirmations restore
+    confirmed state and replay the remaining queue. Count replayed operations at 1, 10, 100,
+    1,000 and 2,000 pending edits before changing batching or reconciliation; preserve the
+    existing correctness assertions. The engine fixture batches projection in stress mode,
+    while the production document still confirms each record normally.
 - **Host-rejected edits** that later pending edits depend on need a defined outcome: pending
   dependants are rejected with them and surfaced, never re-placed by offset.
 - **Unicode contract.** Code-unit IDs with whole-pair edits follow Loro's contract. Yjs's

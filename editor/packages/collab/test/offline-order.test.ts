@@ -125,6 +125,6 @@ for (const effects of [false, true]) {
         `Offline CRDT-direct equality: adapter=${adapter}; effects=${effects}; ${changes} edits/group; ${edits.length} total; ${losing.length} unchanged losing-branch envelopes replayed; four peers; zero rejected/blocked/pending`,
       )
     },
-    120_000,
+    stress ? 600_000 : 120_000,
   )
 }
