@@ -543,7 +543,7 @@
       "file": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts",
       "id": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts:setTimeout:00a37bab4d",
       "justification": "Yields one macrotask between warm-up compiles so a parse or edit message queued meanwhile runs before the next language; worker-task tracking keeps idle fences behind warm-up.",
-      "line": 277,
+      "line": 278,
       "snippet": "const yieldToMessages = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))"
     },
     {
@@ -551,7 +551,7 @@
       "file": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts",
       "id": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts:setTimeout:73df9747ea",
       "justification": "Yields a macrotask between parse slices and injection batches so queued edits and cancellation messages can run; it only resolves the awaited promise, and cancellation, staleness and the request budget are checked before work resumes.",
-      "line": 1204,
+      "line": 1205,
       "snippet": "const yieldWorker = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))"
     },
     {
@@ -559,7 +559,7 @@
       "file": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts",
       "id": "packages/tree-sitter/src/treeSitter/treeSitter.worker.ts:setTimeout:74252f76bf",
       "justification": "Runs once after the parse answer is posted; it re-checks that the document is still cached and idle, so a late or stale callback does nothing.",
-      "line": 783,
+      "line": 784,
       "snippet": "setTimeout(() => reparseIdleDocument(runtimeSessionId, document, runtime), 0)"
     },
     {

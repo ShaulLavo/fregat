@@ -207,3 +207,112 @@ it('preserves the injected language when its query falls back to lines', async (
     await client.mergeUnit({ ...identity, range: { startIndex, endIndex: startIndex + 5 } }),
   ).toMatchObject({ status: 'ok', languageId: 'html', unit: { source: 'line' } })
 })
+
+it('reports missing syntax and token spelling on demand for review projections', async () => {
+  const text = 'const answer = "alpha""beta";'
+  await parseTreeDocument(client, {
+    ...document,
+    snapshotVersion: 1,
+    text,
+    includeHighlights: false,
+    resultMode: 'parseOnly',
+  })
+  const result = await client.mergeUnit({
+    ...document,
+    snapshotVersion: 1,
+    range: { startIndex: 15, endIndex: 22 },
+    analysis: true,
+    contentKey: true,
+  })
+  expect(result).toMatchObject({
+    status: 'ok',
+    unit: { type: 'lexical_declaration', hasErrors: true },
+  })
+  if (result?.status === 'ok') expect(result.unit.contentKey).toContain('alpha')
+})
+
+it('releases cancelled lazy Markdown structural work', async () => {
+  const identity = {
+    ...document,
+    documentId: 'review.md',
+    runtimeSessionId: 'cancel-merge-markdown',
+    languageId: 'markdown',
+  }
+  const text = '# Title\n\nA paragraph for review.\n\n'.repeat(100_000)
+  await parseTreeDocument(client, {
+    ...identity,
+    snapshotVersion: 1,
+    text,
+    includeHighlights: false,
+    resultMode: 'parseOnly',
+  })
+  const pending = client.mergeUnit({
+    ...identity,
+    snapshotVersion: 1,
+    range: { startIndex: 12, endIndex: 20 },
+    analysis: true,
+  })
+  client.disposeDocument(identity.runtimeSessionId)
+  await pending.catch(() => undefined)
+  await client.awaitRuntimeSessionIdle(identity.runtimeSessionId)
+  const retention = await client.inspectRetention()
+  expect(
+    retention!.documents.some((entry) => entry.runtimeSessionId === identity.runtimeSessionId),
+  ).toBe(false)
+  expect(
+    await client.mergeUnit({
+      ...identity,
+      snapshotVersion: 1,
+      range: { startIndex: 12, endIndex: 20 },
+    }),
+  ).toMatchObject({ status: 'stale', unit: null })
+}, 120_000)
+
+it('analyzes damaged HTML line fallbacks and preserves ordinary responses', async () => {
+  const identity = { ...document, languageId: 'html', snapshotVersion: 1 }
+  await parseTreeDocument(client, { ...identity, text: '<div><', resultMode: 'parseOnly' })
+  const request = { ...identity, range: { startIndex: 5, endIndex: 6 } }
+  const ordinary = await client.mergeUnit(request)
+  expect(ordinary).toMatchObject({ status: 'ok', unit: { source: 'line' } })
+  if (ordinary?.status === 'ok') {
+    expect(ordinary.unit.hasErrors).toBeUndefined()
+    expect(ordinary.unit.contentKey).toBeUndefined()
+  }
+  const result = await client.mergeUnit({ ...request, analysis: true, contentKey: true })
+  expect(result).toMatchObject({ status: 'ok', unit: { source: 'line', hasErrors: true } })
+  if (result?.status === 'ok') expect(result.unit.contentKey).toBeTypeOf('string')
+})
+
+it.each(['html', 'typescript'])('cancels pre-cancelled %s merge queries', async (languageId) => {
+  const identity = { ...document, languageId, snapshotVersion: 1 }
+  const text = languageId === 'html' ? '<div><' : 'const value = 1;'
+  await parseTreeDocument(client, { ...identity, text, resultMode: 'parseOnly' })
+  const cancellationBuffer = new SharedArrayBuffer(4)
+  Atomics.store(new Int32Array(cancellationBuffer), 0, 1)
+  expect(
+    await client.mergeUnit({
+      ...identity,
+      range: { startIndex: 0, endIndex: 1 },
+      cancellationBuffer,
+      analysis: true,
+    }),
+  ).toMatchObject({ status: 'cancelled', unit: null })
+})
+
+it('fingerprints an unmatched TypeScript line fallback', async () => {
+  await parseTreeDocument(client, {
+    ...document,
+    snapshotVersion: 1,
+    text: '// comment\n',
+    resultMode: 'parseOnly',
+  })
+  const result = await client.mergeUnit({
+    ...document,
+    snapshotVersion: 1,
+    range: { startIndex: 3, endIndex: 5 },
+    analysis: true,
+    contentKey: true,
+  })
+  expect(result).toMatchObject({ status: 'ok', unit: { source: 'line', hasErrors: false } })
+  if (result?.status === 'ok') expect(result.unit.contentKey).toContain('comment')
+})

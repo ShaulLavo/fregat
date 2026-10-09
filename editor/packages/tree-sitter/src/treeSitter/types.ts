@@ -123,6 +123,8 @@ export type TreeSitterParseAckResult = {
 
 export type TreeSitterMergeUnit = TreeSitterSyntaxRange & {
   readonly source: 'syntax' | 'line'
+  readonly hasErrors?: boolean
+  readonly contentKey?: string
   readonly type: string
   readonly signature: string | null
   readonly parent:
@@ -135,6 +137,9 @@ export type TreeSitterMergeUnit = TreeSitterSyntaxRange & {
 
 export type TreeSitterMergeUnitRequest = {
   readonly type: 'mergeUnit'
+  readonly analysis?: true
+  readonly contentKey?: true
+  readonly cancellationBuffer?: SharedArrayBuffer
   readonly documentId: string
   readonly runtimeSessionId: string
   readonly snapshotVersion: number
@@ -148,7 +153,7 @@ export type TreeSitterMergeUnitResult = {
   readonly languageId: TreeSitterLanguageId
 } & (
   | { readonly status: 'ok'; readonly unit: TreeSitterMergeUnit }
-  | { readonly status: 'stale'; readonly unit: null }
+  | { readonly status: 'stale' | 'cancelled'; readonly unit: null }
 )
 
 export type TreeSitterRangeResult = TreeSitterParseResult & {

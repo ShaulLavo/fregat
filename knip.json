@@ -342,12 +342,20 @@
       "entry": [
         "src/index.ts",
         "src/transports.ts",
+        "src/merge-review.ts",
+        "bench/**/*.ts",
         "server/signaling.ts",
         "examples/signaling-server.ts",
         "test/peer.html",
         "test/broker-process.ts"
       ],
-      "project": ["src/**/*.ts", "server/**/*.ts", "examples/**/*.ts", "test/**/*.ts"]
+      "project": [
+        "src/**/*.ts",
+        "server/**/*.ts",
+        "examples/**/*.ts",
+        "test/**/*.ts",
+        "bench/**/*.ts"
+      ]
     },
     "editor/site": {
       "ignoreDependencies": ["@singapore-editor/*", "satteri", "react", "@types/react", "solid-js"]

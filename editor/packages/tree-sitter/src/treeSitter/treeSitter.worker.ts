@@ -1,5 +1,5 @@
 import { TREE_SITTER_BOOTSTRAP_UNITS } from './source'
-import { enclosingMergeUnit, lineMergeUnit } from './mergeUnits'
+import { analyzeLineMergeUnit, enclosingMergeUnit, lineMergeUnit } from './mergeUnits'
 import type { EditorSyntaxAnalysis } from '@singapore-editor/core/syntax'
 import {
   Edit,
@@ -96,6 +96,7 @@ type ParsedDocument = {
   readonly markdown?: MarkdownDocument
   markdownDefinitions?: Uint32Array
   mergeUnitTree?: Tree
+  mergeUnitParents?: WeakMap<Query, Map<number, boolean>>
   readonly snapshotVersion: number
   readonly languageId: TreeSitterLanguageId
   readonly source: TreeSitterPieceTableInput
@@ -2924,28 +2925,64 @@ const queryMergeUnit = async (
     ) !== cached
   )
     return { ...identity, status: 'stale', unit: null }
-  const source = runtime.descriptor.mergeUnitQuerySource
-  if (!source?.trim())
-    return {
-      ...identity,
-      languageId,
-      status: 'ok',
-      unit: lineMergeUnit(cached.source.read.text, range),
+  const context: CancellationContext = {
+    ...createCancellationContext(request.cancellationBuffer, PARSE_BUDGET_MS),
+    isStale: () =>
+      cachedDocumentForVersion(
+        request.runtimeSessionId,
+        request.languageId,
+        request.snapshotVersion,
+      ) !== cached,
+  }
+  try {
+    assertNotCancelled(context)
+    const source = runtime.descriptor.mergeUnitQuerySource
+    if (!source?.trim() && !request.analysis && !request.contentKey)
+      return {
+        ...identity,
+        languageId,
+        status: 'ok',
+        unit: lineMergeUnit(cached.source.read.text, range),
+      }
+
+    // The native Markdown renderer does not expose its block tree.
+    let tree = layer?.tree ?? cached.mergeUnitTree
+    if (!tree) {
+      const parsed = await parseTreeSlices(runtime, cached.source, context, { phase: 'parseRoot' })
+      if (isCancelled(context)) {
+        parsed.delete()
+        return { ...identity, status: 'cancelled', unit: null }
+      }
+      tree = cached.mergeUnitTree ??= parsed
+      if (tree !== parsed) parsed.delete()
     }
-  const query = (runtime.mergeUnitQuery ??= new Query(runtime.language, source))
-  // The native Markdown renderer does not expose its block tree.
-  const tree =
-    layer?.tree ??
-    (cached.mergeUnitTree ??=
-      runtime.parser.parse((index, _position, end) =>
-        readTreeSitterPieceTableInput(cached.source, index, end),
-      ) ?? undefined)
-  const unit = tree && enclosingMergeUnit(tree.rootNode, query, range)
-  return {
-    ...identity,
-    languageId,
-    status: 'ok',
-    unit: unit ?? lineMergeUnit(cached.source.read.text, range),
+    const query = source?.trim()
+      ? (runtime.mergeUnitQuery ??= new Query(runtime.language, source))
+      : null
+    const parents = (cached.mergeUnitParents ??= new WeakMap())
+    const eligibility = query ? (parents.get(query) ?? new Map<number, boolean>()) : undefined
+    if (query && eligibility) parents.set(query, eligibility)
+    const queryContext = {
+      analysis: request.analysis,
+      contentKey: request.contentKey,
+      parents: eligibility,
+      progressCallback: () => isCancelled(context),
+    }
+    const unit = query ? enclosingMergeUnit(tree.rootNode, query, range, queryContext) : null
+    assertNotCancelled(context)
+    const selected =
+      unit ??
+      analyzeLineMergeUnit(
+        tree.rootNode,
+        lineMergeUnit(cached.source.read.text, range),
+        queryContext,
+      )
+    assertNotCancelled(context)
+    return { ...identity, languageId, status: 'ok', unit: selected }
+  } catch (error) {
+    if (error instanceof SyntaxRequestCancelled)
+      return { ...identity, status: 'cancelled', unit: null }
+    throw error
   }
 }
 
