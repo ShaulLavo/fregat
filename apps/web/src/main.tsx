@@ -54,6 +54,7 @@ import { takePairingCodeFromLocation } from '@/lib/pairing/state/link-claim'
 import { useShellStore, watchShellKind } from '@/lib/shell/state/store'
 import { COARSE_POINTER_QUERY } from '@/lib/shell/utils/kind'
 import { shellQueryOptions } from '@/features/workspace/utils/shell-query'
+import { warmDeferredOverlays } from '@/components/utils/overlay-modules'
 
 installEditorPerformanceTraceFromUrl()
 configureIntentPrediction()
@@ -249,7 +250,9 @@ async function start() {
 // Warm closed views on idle. A failed prefetch is silent: the query retries when opened.
 function prefetchDeferredChunks() {
   if (renderer.disposed) return
+  // The phone warms these once its first screen is ready.
   if (useShellStore.getState().kind === 'phone') return
+  warmDeferredOverlays()
   void resourceQueryClient
     .query(paletteContentQueryOptions)
     .then(() => undefined)

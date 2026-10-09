@@ -23,6 +23,7 @@ import {
   appliedEffect,
   effectPayloads,
   initialEffects,
+  projectEffectStates,
   recordEffects,
   setEffectStates,
 } from './textbuffer-effects'
@@ -33,6 +34,7 @@ import type {
   CharacterIdentity,
   Engine,
   Envelope,
+  Effect,
   Insert,
   LeftOrigin,
   OffsetEdit,
@@ -139,6 +141,22 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
     retainPieceTableSnapshot(this.state.buffer)
     return this.state
   }
+  projectEffects(effects: readonly Effect[]): TextbufferSnapshot {
+    const saved = this.snapshot()
+    const result = projectEffectStates(saved.effects, effects)
+    let buffer
+    try {
+      buffer = setCharIdVisibility(saved.buffer, result.visibility)
+    } catch (cause) {
+      if (cause instanceof ReclaimedTextError) throw new CollabFailure('expired-character-payload')
+      throw cause
+    }
+    const projected = { ...saved, buffer, effects: result.state }
+    retainPieceTableSnapshot(buffer)
+    this.retainPayloads(projected)
+    return projected
+  }
+
   restore(snapshot: TextbufferSnapshot): void {
     retainPieceTableSnapshot(snapshot.buffer)
     this.retainPayloads(snapshot)

@@ -13,7 +13,11 @@
           "tree-sitter-javascript/queries/highlights-jsx.scm"
         ],
         "folds": ["./queries/javascript-folds.scm", "./queries/jsx-folds.scm"],
-        "injections": ["./queries/javascript-injections.scm"]
+        "injections": ["./queries/javascript-injections.scm"],
+        "merge-units": [
+          "./queries/javascript-merge-units.scm",
+          "./queries/javascript-fields-merge-units.scm"
+        ]
       },
       "injectionDependencies": ["regex", "jsdoc"],
       "source": "tree-sitter-javascript",
@@ -36,7 +40,11 @@
           "./queries/javascript-highlights.scm"
         ],
         "folds": ["./queries/typescript-folds.scm", "./queries/javascript-folds.scm"],
-        "injections": ["./queries/javascript-injections.scm"]
+        "injections": ["./queries/javascript-injections.scm"],
+        "merge-units": [
+          "./queries/javascript-merge-units.scm",
+          "./queries/typescript-merge-units.scm"
+        ]
       },
       "injectionDependencies": ["regex", "jsdoc"],
       "source": "tree-sitter-typescript",
@@ -64,7 +72,12 @@
           "./queries/javascript-folds.scm",
           "./queries/jsx-folds.scm"
         ],
-        "injections": ["./queries/javascript-injections.scm"]
+        "injections": ["./queries/javascript-injections.scm"],
+        "merge-units": [
+          "./queries/javascript-merge-units.scm",
+          "./queries/typescript-merge-units.scm",
+          "./queries/tsx-merge-units.scm"
+        ]
       },
       "injectionDependencies": ["regex", "jsdoc"],
       "source": "tree-sitter-typescript",
@@ -104,7 +117,8 @@
       "queries": {
         "highlights": ["tree-sitter-css/queries/highlights.scm"],
         "folds": ["./queries/css-folds.scm"],
-        "injections": []
+        "injections": [],
+        "merge-units": ["./queries/css-merge-units.scm"]
       },
       "injectionDependencies": [],
       "source": "tree-sitter-css",
@@ -124,7 +138,8 @@
       "queries": {
         "highlights": ["tree-sitter-json/queries/highlights.scm"],
         "folds": ["./queries/json-folds.scm"],
-        "injections": []
+        "injections": [],
+        "merge-units": ["./queries/json-merge-units.scm"]
       },
       "injectionDependencies": [],
       "source": "tree-sitter-json",
@@ -144,7 +159,8 @@
       "queries": {
         "highlights": [],
         "folds": [],
-        "injections": []
+        "injections": [],
+        "merge-units": ["./queries/markdown-merge-units.scm"]
       },
       "injectionDependencies": [],
       "source": "tree-sitter-md",
@@ -184,7 +200,8 @@
       "queries": {
         "highlights": ["tree-sitter-python/queries/highlights.scm"],
         "folds": [],
-        "injections": []
+        "injections": [],
+        "merge-units": ["./queries/python-merge-units.scm"]
       },
       "injectionDependencies": [],
       "source": "tree-sitter-python",
@@ -224,7 +241,8 @@
       "queries": {
         "highlights": ["tree-sitter-rust/queries/highlights.scm"],
         "folds": [],
-        "injections": []
+        "injections": [],
+        "merge-units": ["./queries/rust-merge-units.scm"]
       },
       "injectionDependencies": [],
       "source": "tree-sitter-rust",
@@ -244,7 +262,8 @@
       "queries": {
         "highlights": ["tree-sitter-go/queries/highlights.scm"],
         "folds": [],
-        "injections": []
+        "injections": [],
+        "merge-units": ["./queries/go-merge-units.scm"]
       },
       "injectionDependencies": [],
       "source": "tree-sitter-go",

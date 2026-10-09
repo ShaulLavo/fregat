@@ -51,7 +51,7 @@ test.for(['row', 'path'])(
       await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Folder path' })).toBeNull())
       await screen.findByRole('button', { name: 'only-on-b' })
     }
-    await userEvent.click(screen.getByRole('button', { name: 'Choose folder' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Open' }))
     await waitFor(() => expect(h.application.getSnapshot().origin).toBe(h.originB))
     await waitFor(() =>
       expect(h.application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path).toBe(

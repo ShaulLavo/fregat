@@ -181,7 +181,7 @@ Local review experiments on 2026-10-09 used Bun 1.4.2 on Linux with an Intel Cor
 
 A separate large-Markdown experiment on the same host used 1,048,616 UTF-16 units with 12,788 links, a fresh parser for each of three runs and wrap width 40. It validated 12,788 textual link replacements within 38,364 mapped replacements and 25,577 projected rows. Median construction time was 7,768.62 ms; median stage times were 40.97 ms parsing, 7,612.24 ms replacement construction, 45.69 ms inline-map construction and 40.79 ms projection construction. Stage medians are independent and do not sum to the total median. This excludes browser layout and measures initial construction, not interactive wrapping.
 
-- [ ] Make large link-heavy replacement construction linear while preserving nested labels and markers. The validated experiment above places the cost in replacement construction, before projection. Inspect `editor/packages/markdown/src/linkRender.ts:24` (`links.some` per link) and lines 44–56 (full replacement filters and splice per label); these are suspected quadratic paths, not individually profiled causes. Reproduce with `bun /work/reports/plan-336/evidence/site-embed/wrap/review-fixes/markdown-bench.ts <checkout>` after root installation and workspace build. The fixture repeats `read [the long label with words and averylongidentifier](https://example.com) now\n` to at least 1 Mi UTF-16 units. All three runs spent 7,525.64–8,378.97 ms constructing replacements; parsing, mapping and projection each remained below 55 ms. Add a structural failing-first work counter and paired 1 Mi-unit measurements before changing the owning loops. Evidence and raw timings are in the same directory. This substantial pre-existing construction cost is scheduled separately from the approved link-fragment wrap fix.
+- [x] Make large link-heavy replacement construction linear while preserving nested labels and markers. Completed in [PR #1135](https://github.com/ShaulLavo/fregat/pull/1135) with structural work counters and paired construction measurements. See [Follow-up: Markdown replacement construction](#follow-up-markdown-replacement-construction).
 
 The width fixtures also cover fractional glyph boundaries, prose, long identifiers, CJK, URLs, package names, nonbreaking spaces, combining sequences, emoji and trailing spaces. Screenshots were read back. These checks prove live editor containment and source preservation, not static/live pixel parity.
 
@@ -247,3 +247,31 @@ This is encouraging for a small captured viewport, but WebKit already misses the
 - [ ] Pass site build, link/sample checks and `bun run --cwd editor/site test:browser`. Extend browser coverage to WebKit and mobile for the new paths.
 - [ ] Keep all four `mobile-layout` CI shards green. Run `bun scripts/product-sites/test-mobile.mjs` and the portable `verify-mobile.mjs` flow against built product sites, including live phone takeover.
 - [ ] Pass `bun run plans:check`, record final evidence and measured budgets here, and mark the implementing phases complete. No package-performance headline is published from experiment-only numbers.
+
+### Follow-up: Markdown replacement construction
+
+- [x] Profile and remove the repeated full-array scans and rebuilds during link replacement construction. Preserve replacement order, formatted labels, reveal ranges and per-line fragment boundaries. Add a bounded-work regression and a patch changeset.
+
+The link-heavy reproduction has 1,048,616 UTF-16 units and 12,788 links. The original experiment measured a 7,768.62 ms median for complete construction, with replacement derivation taking 7,612.24 ms. Browser layout was excluded. CPU profiles confirm that each link scanned the complete link list, filtered all replacement specs twice and spliced the retained array back into place. Formatted labels also rebuilt their complete string for each hidden marker.
+
+The fix orders unsigned parser offsets with stable radix passes, visits the markers once across source-ordered link labels, joins label chunks once and compacts retained specs once. It restores the original provider order after the sweep. Existing link mounting and wrapped-fragment rendering are unchanged.
+
+Matched three-run experiments, using a fresh Bun process for each version and size, on 2026-10-09, Linux 7.2.8-arch1-2, Intel Core i7-14700K, Bun 1.4.2:
+
+| UTF-16 units | Links  | Replacement median before | Replacement median after | Complete construction before | Complete construction after |
+| ------------ | ------ | ------------------------- | ------------------------ | ---------------------------- | --------------------------- |
+| 524,308      | 6,394  | 1,577.21 ms               | 17.80 ms                 | 1,651.09 ms                  | 82.10 ms                    |
+| 1,048,616    | 12,788 | 9,007.32 ms               | 41.63 ms                 | 9,138.05 ms                  | 188.31 ms                   |
+
+These are construction experiments on one shared host. They include a fresh parser, piece table, replacement specs, inline map and projection row count, and exclude browser layout, paint, fonts, workers and network. They support no general browser-startup or competitor claim. The full-size result still has 38,364 replacements and 25,577 projected rows.
+
+The regression counts source-range visits at 128 and 1,024 links, including reversed input order. The old code fails at 128 links with 33,024 visits against a 5,120-visit bound. A saved snapshot covers formatted multiline labels and source boundaries. An additional 144-case experiment matched every replacement field except render-function identity. Chromium and WebKit each passed the six existing fragment, resize, reveal and table-link tests.
+
+Portable reproduction after building the workspaces:
+
+```sh
+bun editor/packages/editor/bench/markdownConstruction.ts 524288
+bun editor/packages/editor/bench/markdownConstruction.ts 1048576
+```
+
+Raw timing samples, method and machine details are in `editor/docs/performance/markdown-construction-2026-10-09/results.json`. The failing-test commit records the baseline algorithm. This follow-up makes no change to the other unchecked embedding and snapshot phases.
