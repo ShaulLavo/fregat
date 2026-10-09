@@ -135,9 +135,19 @@ async function expectWideGlyphCursorPaint(font = probeFont) {
 }
 
 describe('DOM terminal renderer', () => {
-  it('refreshes default cell styles when contrast, theme, and font change', async () => {
+  it('refreshes default run styles when contrast, theme, font, and grid change', async () => {
     const probe = await rendererProbe('dom', '\x1b[?25ledit 0000')
-    for (const minimumContrast of [1, 7, 1]) {
+    for (const [minimumContrast, weight, columns, cellWidth] of [
+      [1, 400, 12, 10],
+      [7, 400, 12, 10],
+      [1, 400, 12, 10],
+      [1, 600, 12, 10],
+      [1, 400, 12, 10],
+      [1, 400, 20, 10],
+      [1, 400, 12, 10],
+      [1, 400, 12, 12],
+      [1, 400, 12, 10],
+    ] as const) {
       const theme = {
         background: { r: 80, g: 80, b: 80 },
         foreground: { r: 90, g: 90, b: 90 },
@@ -145,15 +155,19 @@ describe('DOM terminal renderer', () => {
       }
       const font = {
         ...probeFont,
-        settings: { ...probeFont.settings, weight: minimumContrast === 7 ? 600 : 400 },
+        cssCellWidth: cellWidth,
+        deviceCellWidth: cellWidth,
+        settings: { ...probeFont.settings, weight },
       }
       probe.renderer.setTheme(theme)
       probe.renderer.setFont(font)
+      probe.terminal.resize({ columns, rows: 3 })
+      probe.renderer.resize({ columns, rows: 3 })
       probe.clock.flush()
       const frame = probe.canvas.parentElement!.querySelector('.ghostty-webgpu-frame')!
       expect(frame.parentElement!.innerHTML).toBe(
         renderFrameToHtml(snapshotRenderState(probe.state), {
-          columns: 12,
+          columns,
           rows: 3,
           font,
           theme,
@@ -450,7 +464,9 @@ describe('DOM terminal renderer', () => {
     expect(probe.canvas.style.opacity).toBe('')
   })
 
-  it('continues through DOM when a lost WebGL context cannot acquire Canvas2D', async () => {
+  it('continues through DOM when a lost WebGL context cannot acquire Canvas2D', async ({
+    skip,
+  }) => {
     const runtime = await GhosttyRuntime.create()
     cleanups.push(() => runtime.dispose())
     const terminal = runtime.createTerminal({ columns: 12, rows: 3 })
@@ -458,6 +474,11 @@ describe('DOM terminal renderer', () => {
     terminal.write('before')
     const canvas = mountedCanvas()
     const host = canvas.parentElement!
+    const extension = canvas.getContext('webgl2')?.getExtension('WEBGL_lose_context')
+    if (!extension) {
+      skip('WebGL2 and WEBGL_lose_context are required for this fallback regression')
+      return
+    }
     const clock = new ProbeClock()
     const renderer = await createCompatibleTerminalRenderer({
       canvas,
@@ -479,7 +500,6 @@ describe('DOM terminal renderer', () => {
     cleanups.push(() => renderer.dispose())
     clock.flush()
     expect(renderer.backend).toBe('webgl2')
-    const extension = canvas.getContext('webgl2')!.getExtension('WEBGL_lose_context')!
     const lost = new Promise<void>((resolve) =>
       canvas.addEventListener('webglcontextlost', () => resolve(), { once: true }),
     )

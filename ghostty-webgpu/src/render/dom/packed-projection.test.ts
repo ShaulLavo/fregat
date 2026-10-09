@@ -7,7 +7,7 @@ import type { CanonicalRendererTheme } from '../instances/types.js'
 import type { RenderRow } from '../../core/types.js'
 import { canonicalRendererTheme, mergeRendererTheme } from '../config.js'
 import { copiedFrameRow } from '../frame-row.js'
-import { defaultCellStyle, renderRowRuns } from './html.js'
+import { defaultCellStyle, renderRowRuns, rowRunStyle } from './html.js'
 import { probeFont, probeInput } from './tests/probe.js'
 
 function expectPackedScreen({
@@ -45,8 +45,16 @@ function expectPackedRow(row: RenderRow, expected: RenderRow, theme: CanonicalRe
     const cursor = { style, visible: true, x: 2, y: row.y }
     const expectedRuns = renderRowRuns(expected, cursor, probeFont, theme)
     expect(renderRowRuns(protectedRow, cursor, probeFont, theme)).toEqual(expectedRuns)
+    const defaultStyle = defaultCellStyle(probeFont, theme)
     expect(
-      renderRowRuns(protectedRow, cursor, probeFont, theme, defaultCellStyle(probeFont, theme)),
+      renderRowRuns(
+        protectedRow,
+        cursor,
+        probeFont,
+        theme,
+        defaultStyle,
+        rowRunStyle(defaultStyle, row.packed!.length, probeFont),
+      ),
     ).toEqual(expectedRuns)
   }
   const snapshot = copiedFrameRow(protectedRow)
@@ -74,6 +82,33 @@ it('reuses default CSS without resolving cell colors during packed row projectio
     } finally {
       foreground.mockRestore()
     }
+  } finally {
+    runtime.dispose()
+  }
+})
+
+it('reuses full-width default run CSS without serializing the width again', async () => {
+  const runtime = await GhosttyRuntime.create()
+  try {
+    const terminal = runtime.createTerminal({ columns: 40, rows: 3 })
+    const state = runtime.createRenderState(terminal)
+    terminal.write('edit 0000')
+    state.update()
+    const row = state.readRows({ packed: true })[0]!
+    const theme = canonicalRendererTheme(mergeRendererTheme({}))
+    const expected = renderRowRuns(row, undefined, probeFont, theme)
+    const fullStyle = expected[0]!.style
+    const css = fullStyle.slice(0, fullStyle.lastIndexOf('width:calc('))
+    let widthReads = 0
+    const font = {
+      ...probeFont,
+      get cssCellWidth() {
+        widthReads += 1
+        return probeFont.cssCellWidth
+      },
+    }
+    expect(renderRowRuns(row, undefined, font, theme, css, fullStyle)).toEqual(expected)
+    expect(widthReads).toBe(0)
   } finally {
     runtime.dispose()
   }

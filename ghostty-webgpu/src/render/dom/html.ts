@@ -156,12 +156,17 @@ export function defaultCellStyle(font: TerminalFittedFont, theme: CanonicalRende
   )
 }
 
+export function rowRunStyle(style: string, width: number, font: TerminalFittedFont): string {
+  return `${style}width:calc(${width} * var(--ghostty-cell-width, ${font.cssCellWidth}px));`
+}
+
 export function renderRowRuns(
   row: RenderRow,
   cursor: CursorState | undefined,
   font: TerminalFittedFont,
   theme: CanonicalRendererTheme,
   defaultStyle?: string,
+  defaultRunStyle?: string,
 ): readonly RowRun[] {
   let colors: CanvasColorCache | undefined
   const packed = row.packed
@@ -191,7 +196,10 @@ export function renderRowRuns(
     if (currentWidth === 0) return
     runs.push({
       cursor: currentCursor,
-      style: `${currentStyle}width:calc(${currentWidth} * var(--ghostty-cell-width, ${font.cssCellWidth}px));`,
+      style:
+        defaultRunStyle !== undefined && currentStyle === defaultStyle && currentWidth === columns
+          ? defaultRunStyle
+          : rowRunStyle(currentStyle, currentWidth, font),
       text: currentText,
     })
     currentText = ''
