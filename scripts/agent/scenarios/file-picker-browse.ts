@@ -6,24 +6,13 @@ import type { Locator, Page } from 'playwright'
 import { selectors } from '../selectors'
 import type { Scenario } from './index'
 
-// A 2×2 red PNG, so the image preview has real pixels to load.
-const PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==',
-  'base64',
-)
-
+// The folder picker lists folders only; `app.ts` stays on disk so the listing has a file to hide.
 async function createTree() {
   const root = await mkdtemp(scratchPath('fregat-picker-browse-'))
+  await mkdir(path.join(root, 'alpha', 'one'), { recursive: true })
   await mkdir(path.join(root, 'nested', 'deeper'), { recursive: true })
-  await writeFile(
-    path.join(root, 'app.ts'),
-    'export function greet(name: string) {\n  return `hi ${name}`\n}\n',
-  )
-  await writeFile(path.join(root, 'pixel.png'), PNG)
-  // Past the 64 KB preview budget, with a first line far wider than the preview.
-  const lines = Array.from({ length: 4000 }, (_, index) => `export const line${index} = ${index}`)
-  await writeFile(path.join(root, 'long.ts'), [`// ${'wide '.repeat(80)}`, ...lines].join('\n'))
-  await writeFile(path.join(root, 'nested', 'inside.md'), '# Inside\n')
+  await mkdir(path.join(root, 'nested', 'inside', 'core'), { recursive: true })
+  await writeFile(path.join(root, 'app.ts'), 'export const app = 1\n')
   return root
 }
 
@@ -64,13 +53,13 @@ async function goTo(page: Page, folder: string) {
   await selectors.pickerGoToFolder(page).click()
   await selectors.pickerFolderPath(page).fill(folder)
   await page.keyboard.press('Enter')
-  await selectors.pickerRow(page, 'app.ts').waitFor()
+  await selectors.pickerRow(page, 'alpha').waitFor()
 }
 
 export const filePickerBrowse: Scenario = {
   name: 'file-picker-browse',
   description:
-    'Browse a fixture folder in the web picker: columns three deep with the keyboard, then in the list the code, image and folder previews, the item count and the ⌘[ ⌘] ⌘↓ chords, then the icons grid.',
+    'Browse a fixture folder in the web picker: columns three deep with the keyboard, then in the list the folder preview, the item count and the ⌘[ ⌘] ⌘↓ chords, then the icons grid.',
   async run(page, { step }) {
     const root = await createTree()
     try {
@@ -123,7 +112,7 @@ export const filePickerBrowse: Scenario = {
 
       // Columns are the default when choosing a folder.
       await selectors.pickerRow(page, 'nested').click()
-      await selectors.pickerColumn(page, 1).getByText('inside.md', { exact: true }).waitFor()
+      await selectors.pickerColumn(page, 1).getByText('deeper', { exact: true }).waitFor()
       await page.keyboard.press('ArrowRight')
       await selectors.pickerColumn(page, 2).waitFor()
       await page.keyboard.press('ArrowRight')
@@ -142,11 +131,7 @@ export const filePickerBrowse: Scenario = {
       )
       await step('empty-column-return')
       await page.keyboard.press('ArrowDown')
-      await selectors
-        .pickerPreview(page)
-        .locator('[data-file-preview-text]')
-        .getByText('Inside')
-        .waitFor()
+      await selectors.pickerPreview(page).getByText('core', { exact: true }).waitFor()
       await step('columns-path')
       await page.keyboard.press('ArrowLeft')
       ok(
@@ -159,95 +144,34 @@ export const filePickerBrowse: Scenario = {
       await selectors.pickerView(page, 'List').click()
       await selectors.pickerList(page).waitFor()
       await selectors
-        .pickerRow(page, 'inside.md')
+        .pickerRow(page, 'inside')
         .and(page.locator('[aria-selected="true"]'))
         .waitFor()
       await viewTabSettled(page)
       await step('list-keeps-selection')
       await page.keyboard.press('ControlOrMeta+ArrowUp')
 
-      await selectors.pickerRow(page, 'app.ts').click()
-      await selectors
-        .pickerPreview(page)
-        .locator('[data-file-preview-text]')
-        .getByText('greet')
-        .waitFor()
-      await step('code-preview')
-
-      await selectors.pickerRow(page, 'long.ts').click()
-      await selectors.pickerPreviewNote(page).waitFor()
-      ok(
-        /^First 64 KB of \d/.test(await selectors.pickerPreviewNote(page).innerText()),
-        'A file past the budget says how much the preview shows',
-      )
-      await selectors.pickerPreviewScroll(page).hover()
-      await page.mouse.wheel(0, 200_000)
-      await page.mouse.wheel(20_000, 0)
-      // Wheel scrolling lands over a few frames; wait for it rather than read mid-flight.
-      await page
-        .waitForFunction(
-          () => {
-            const lines = document.querySelector('[data-file-preview-lines]')
-            return lines !== null && lines.scrollLeft > 0
-          },
-          undefined,
-          { timeout: 3000 },
-        )
-        .catch(() => undefined)
-      const edges = await page.evaluate(() => {
-        const vertical = document.querySelector('[data-file-preview-scroll]')
-        const horizontal = document.querySelector('[data-file-preview-lines]')
-        if (!vertical || !horizontal) return null
-        return {
-          bottom: vertical.scrollHeight - vertical.scrollTop - vertical.clientHeight,
-          right: horizontal.scrollWidth - horizontal.scrollLeft - horizontal.clientWidth,
-          wide: horizontal.scrollWidth > horizontal.clientWidth,
-        }
-      })
-      ok(edges?.wide, 'The first line is wider than the preview')
-      ok(edges.bottom <= 1, `The preview scrolls to its end (${edges.bottom}px left)`)
-      ok(edges.right <= 1, `The preview scrolls to its right edge (${edges.right}px left)`)
-      await step('long-preview-end')
-
-      await selectors.pickerRow(page, 'pixel.png').click()
-      await page.waitForFunction(() => {
-        const image = document.querySelector<HTMLImageElement>('[data-file-preview] img')
-        return (
-          image !== null &&
-          image.complete &&
-          image.naturalWidth > 0 &&
-          getComputedStyle(image).opacity === '1'
-        )
-      })
-      await step('image-preview')
-
       await selectors.pickerRow(page, 'nested').click()
-      await selectors.pickerPreview(page).getByText('inside.md', { exact: true }).waitFor()
+      await selectors.pickerPreview(page).getByText('deeper', { exact: true }).waitFor()
       await step('folder-preview')
 
       await page.keyboard.press('ControlOrMeta+ArrowDown')
-      await selectors.pickerRow(page, 'inside.md').waitFor()
+      await selectors.pickerRow(page, 'inside').waitFor()
       await page.keyboard.press('ControlOrMeta+BracketLeft')
-      await selectors.pickerRow(page, 'app.ts').waitFor()
+      await selectors.pickerRow(page, 'alpha').waitFor()
       await page.keyboard.press('ControlOrMeta+BracketRight')
-      await selectors.pickerRow(page, 'inside.md').waitFor()
+      await selectors.pickerRow(page, 'inside').waitFor()
       await step('history-chords')
 
       await page.keyboard.press('ControlOrMeta+BracketLeft')
       await selectors.pickerView(page, 'Icons').click()
-      await selectors.pickerRow(page, 'pixel.png').waitFor()
-      await page.waitForFunction(() =>
-        [...document.querySelectorAll<HTMLImageElement>('[role="option"] img')].some(
-          (image) =>
-            image.complete && image.naturalWidth > 0 && getComputedStyle(image).opacity === '1',
-        ),
-      )
+      await selectors.pickerRow(page, 'alpha').waitFor()
       await selectors.pickerList(page).focus()
       await page.keyboard.press('Home')
       await page.keyboard.press('ArrowRight')
       ok(
         (await selectors.pickerList(page).getAttribute('aria-activedescendant'))?.endsWith(
-          'app.ts',
+          'nested',
         ),
         '→ moves one tile in the grid',
       )

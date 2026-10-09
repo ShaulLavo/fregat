@@ -37,7 +37,7 @@ export const workspaceLinkError: Scenario = {
       await selectors.pickerDialog(page).waitFor()
       await step('choose-current-folder')
       const replacement = path.join(fixture, 'current-project')
-      await mkdir(replacement)
+      await mkdir(path.join(replacement, 'src'), { recursive: true })
       await writeFile(path.join(replacement, 'a.txt'), 'Workspace recovery fixture\n')
       await selectors.pickerGoToFolder(page).click()
       await selectors.pickerFolderPath(page).fill(replacement)
