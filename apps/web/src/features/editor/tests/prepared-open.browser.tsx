@@ -205,7 +205,7 @@ test(
     expect(performance.getEntriesByName('editor.file_open.buffer_built')).toEqual([])
     expect(performance.getEntriesByName('editor.file_open.file_read')).toEqual([])
     expect(performance.getEntriesByName('editor.authoritative_text_paint')).toHaveLength(1)
-    assertDistinctTransferredRuntimeIds(await resetBenchmarkSample(sampleId))
+    assertDistinctJoinedRuntimeIds(await resetBenchmarkSample(sampleId))
   },
 )
 
@@ -555,7 +555,50 @@ test(
       })
       .toBe(1)
     expect(postActivationTransferRequestTypes()).toEqual([])
-    assertDistinctTransferredRuntimeIds(await resetBenchmarkSample(sampleId))
+    assertDistinctJoinedRuntimeIds(await resetBenchmarkSample(sampleId))
+  },
+)
+
+test(
+  'joins hover work on click and on a repeated activation without a second session or request',
+  { timeout: 30_000 },
+  async () => {
+    seedBootMirrorTheme('dark')
+    resetEditorColorThemeStore()
+    syncEditorThemeSelection('dark', 'dark-plus')
+    installBenchmarkTrace()
+    await mountHarness()
+    await expect.poll(() => runtime).not.toBeNull()
+    await expect.poll(activeThemeIdentity, { timeout: 10_000 }).toBe('dark-plus|dark-plus')
+    const harness = requiredRuntime()
+    expect(await harness.commands.openSearchEditor(ROOT_PATH)).toEqual({ status: 'applied' })
+    const sampleId = await beginBenchmarkSampleWhenReady()
+    performance.clearMarks('editor.worker.request')
+    workerRequestGate = installEditorWorkerRequestGate(['queryRange'])
+    holdWallClock()
+
+    await triggerForesightIntent()
+    await expect.poll(workerRequestGate.heldTypes, { timeout: 20_000 }).toEqual(['queryRange'])
+    diagnostics = []
+    await activateAndCaptureFirstFrame()
+    await activateAndCaptureFirstFrame()
+
+    expect(attachmentDiagnostic()?.detail).toMatchObject({ prepared: true })
+    workerRequestGate.restore()
+    workerRequestGate = null
+    await expect
+      .poll(() => performance.getEntriesByName('editor.authoritative_highlight_paint').length, {
+        timeout: 10_000,
+      })
+      .toBe(1)
+    await awaitEditorSyntaxWorkerIdleFences()
+    expect(workerRuntimeSessionIds('shiki')).toHaveLength(1)
+    expect(workerRuntimeSessionIds('tree-sitter')).toHaveLength(1)
+    expect(workerRequestCount('shiki', 'open')).toBe(1)
+    expect(workerRequestCount('tree-sitter', 'parse')).toBe(1)
+    const result = await resetBenchmarkSample(sampleId)
+    expect(result.preparedJoins).toBe(1)
+    assertDistinctJoinedRuntimeIds(result)
   },
 )
 
@@ -758,6 +801,13 @@ function postActivationTransferRequestTypes(): string[] {
   return preparationRequestTypes().filter((type) => transferRequests.has(type))
 }
 
+function workerRequestCount(family: string, type: string): number {
+  return performance.getEntriesByName('editor.worker.request', 'mark').filter((entry) => {
+    const detail = (entry as PerformanceMark).detail
+    return detail?.family === family && detail?.type === type
+  }).length
+}
+
 function workerRuntimeSessionIds(family: string): string[] {
   return [
     ...new Set(
@@ -873,11 +923,11 @@ async function resetBenchmarkSample(sampleId: string): Promise<EditorOpenSampleR
   })
 }
 
-function assertDistinctTransferredRuntimeIds(result: EditorOpenSampleResetResult): void {
-  expect(result.transferredHighlighterRuntimeSessionIds).toHaveLength(1)
-  expect(result.transferredStructuralRuntimeSessionIds).toHaveLength(1)
-  const highlighter = result.transferredHighlighterRuntimeSessionIds[0]
-  const structural = result.transferredStructuralRuntimeSessionIds[0]
+function assertDistinctJoinedRuntimeIds(result: EditorOpenSampleResetResult): void {
+  expect(result.joinedHighlighterRuntimeSessionIds).toHaveLength(1)
+  expect(result.joinedStructuralRuntimeSessionIds).toHaveLength(1)
+  const highlighter = result.joinedHighlighterRuntimeSessionIds[0]
+  const structural = result.joinedStructuralRuntimeSessionIds[0]
   expect(highlighter).toBeDefined()
   expect(structural).toBeDefined()
   expect(highlighter).not.toBe(structural)

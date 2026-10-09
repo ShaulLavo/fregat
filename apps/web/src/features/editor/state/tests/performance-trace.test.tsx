@@ -117,14 +117,14 @@ test('trace-only bridge forwards opaque sample controls and unregisters ownershi
   const resetResult: EditorOpenSampleResetResult = {
     evictions: 0,
     nonTargetIntents: 0,
-    preparedClaims: 1,
+    preparedJoins: 1,
     promotedBytes: 20,
     highlighterRuntimeSessionIds: ['shiki:1'],
     quiescent: true,
     structuralRuntimeSessionIds: ['tree:1'],
     targetIntents: 1,
-    transferredHighlighterRuntimeSessionIds: ['shiki:1'],
-    transferredStructuralRuntimeSessionIds: ['tree:1'],
+    joinedHighlighterRuntimeSessionIds: ['shiki:1'],
+    joinedStructuralRuntimeSessionIds: ['tree:1'],
     wastedIntents: 0,
   }
   const reset = vi.fn(async () => resetResult)
