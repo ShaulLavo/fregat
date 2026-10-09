@@ -71,26 +71,19 @@ function focusNeutral() {
   return button
 }
 
-test('Ours leaves Mod+Z unclaimed with real session history and keeps menu Undo available', async ({
-  client,
-  server,
-}) => {
+test('Ours undoes a settle by Mod+Z and redoes it by Mod+Shift+Z', async ({ client, server }) => {
   const h = await createRailHarness(client, server)
   const first = h.sessionIds[0]!
   renderRailHarness(h)
   const current = async () => (await h.refresh()).sessions.find((session) => session.id === first)!
   await menu('Mark as settled')
   await waitFor(async () => expect((await current()).settledOverride).toBe('settled'))
-  const history = useSessionUndoStore.getState().undo.at(-1)
-  expect(history).not.toBeUndefined()
   const neutral = focusNeutral()
-  expect(pressUndo(neutral).defaultPrevented).toBe(false)
-  expect(pressUndo(neutral, true).defaultPrevented).toBe(false)
-  expect(useSessionUndoStore.getState().undo.at(-1)).toBe(history)
-  expect((await current()).settledOverride).toBe('settled')
-  neutral.remove()
-  await userEvent.click(await undoButton('1 settled'))
+  expect(pressUndo(neutral).defaultPrevented).toBe(true)
   await waitFor(async () => expect((await current()).settledOverride).toBeNull())
+  expect(pressUndo(neutral, true).defaultPrevented).toBe(true)
+  await waitFor(async () => expect((await current()).settledOverride).toBe('settled'))
+  neutral.remove()
 })
 
 test('unpin Undo restores the pin key the row had', async ({ client, server }) => {

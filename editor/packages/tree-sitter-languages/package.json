@@ -87,7 +87,7 @@
     "oxlint": "1.85.0",
     "typescript": "7.0.2",
     "vitest": "5.0.2",
-    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#0fb6e61c7396727c49b8c6e4d757f6bf8dcfd6ed"
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#121cf0d206a57a98e704dcee0c53e6804c619633"
   },
   "peerDependencies": {
     "@singapore-editor/core": "workspace:*",

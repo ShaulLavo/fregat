@@ -29,6 +29,9 @@ inventing a compatibility wrapper or silently upgrading dependencies.
   Query GC does not dispose sockets, database handles, or highlighters.
 - Include every result-changing input in keys. Share options between consumers and
   preloaders. Feature keys belong with the feature under this repository's AGENTS.md.
+- A cache getter is a one-time read. Reactive UI uses `useQuery` or `useInfiniteQuery`
+  with `select`; a cache-only observer can use `enabled: false` while another owner
+  fetches. Prefer these hooks before building a custom observer and snapshot bridge.
 - Query functions resolve a defined value. For opaque runtime objects, choose
   `structuralSharing: false`, explicit disposal, and no persistence/dehydration.
 - Local acquisition may need `networkMode: 'always'`; remote reads need their actual
