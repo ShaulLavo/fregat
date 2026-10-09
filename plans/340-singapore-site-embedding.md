@@ -228,3 +228,31 @@ This is encouraging for a small captured viewport, but WebKit already misses the
 - [ ] Pass site build, link/sample checks and `bun run --cwd editor/site test:browser`. Extend browser coverage to WebKit and mobile for the new paths.
 - [ ] Keep all four `mobile-layout` CI shards green. Run `bun scripts/product-sites/test-mobile.mjs` and the portable `verify-mobile.mjs` flow against built product sites, including live phone takeover.
 - [ ] Pass `bun run plans:check`, record final evidence and measured budgets here, and mark the implementing phases complete. No package-performance headline is published from experiment-only numbers.
+
+### Follow-up: Markdown replacement construction
+
+- [x] Profile and remove the repeated full-array scans and rebuilds during link replacement construction. Preserve replacement order, formatted labels, reveal ranges and per-line fragment boundaries. Add a bounded-work regression and a patch changeset.
+
+The link-heavy reproduction has 1,048,616 UTF-16 units and 12,788 links. The original experiment measured a 7,768.62 ms median for complete construction, with replacement derivation taking 7,612.24 ms. Browser layout was excluded. CPU profiles confirm that each link scanned the complete link list, filtered all replacement specs twice and spliced the retained array back into place. Formatted labels also rebuilt their complete string for each hidden marker.
+
+The fix orders unsigned parser offsets with stable radix passes, visits the markers once across source-ordered link labels, joins label chunks once and compacts retained specs once. It restores the original provider order after the sweep. Existing link mounting and wrapped-fragment rendering are unchanged.
+
+Matched three-run experiments, using a fresh Bun process for each version and size, on 2026-10-09, Linux 7.2.8-arch1-2, Intel Core i7-14700K, Bun 1.4.2:
+
+| UTF-16 units | Links  | Replacement median before | Replacement median after | Complete construction before | Complete construction after |
+| ------------ | ------ | ------------------------- | ------------------------ | ---------------------------- | --------------------------- |
+| 524,308      | 6,394  | 1,577.21 ms               | 17.80 ms                 | 1,651.09 ms                  | 82.10 ms                    |
+| 1,048,616    | 12,788 | 9,007.32 ms               | 41.63 ms                 | 9,138.05 ms                  | 188.31 ms                   |
+
+These are construction experiments on one shared host. They include a fresh parser, piece table, replacement specs, inline map and projection row count, and exclude browser layout, paint, fonts, workers and network. They support no general browser-startup or competitor claim. The full-size result still has 38,364 replacements and 25,577 projected rows.
+
+The regression counts source-range visits at 128 and 1,024 links, including reversed input order. The old code fails at 128 links with 33,024 visits against a 5,120-visit bound. A saved snapshot covers formatted multiline labels and source boundaries. An additional 144-case experiment matched every replacement field except render-function identity. Chromium and WebKit each passed the six existing fragment, resize, reveal and table-link tests.
+
+Portable reproduction after building the workspaces:
+
+```sh
+bun editor/packages/editor/bench/markdownConstruction.ts 524288
+bun editor/packages/editor/bench/markdownConstruction.ts 1048576
+```
+
+Raw timing samples, method and machine details are in `editor/docs/performance/markdown-construction-2026-10-09/results.json`. The failing-test commit records the baseline algorithm. This follow-up makes no change to the other unchecked embedding and snapshot phases.
