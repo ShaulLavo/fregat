@@ -235,6 +235,16 @@
       "outputs": [],
       "cache": false
     },
+    "@singapore-editor/collab#test": {
+      "dependsOn": ["^build", "@singapore-editor/collaboration#build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/packages/collaboration/src/**"],
+      "env": ["COLLAB_STRESS", "COLLABORATION_LONG_RUN"],
+      "outputs": []
+    },
+    "@singapore-editor/collab#typecheck": {
+      "dependsOn": ["^typecheck", "@singapore-editor/collaboration#build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/packages/collaboration/src/**"]
+    },
     "@singapore-editor/collaboration#test": {
       "dependsOn": ["^build", "@singapore-editor/diff#build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/examples/app/src/**"],
