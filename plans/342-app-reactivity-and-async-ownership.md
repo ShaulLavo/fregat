@@ -2,26 +2,28 @@
 
 ## Status and scope
 
-- Status: Approved repair work, recorded 2026-10-09. Audit complete; implementation has not started.
+- Status: Approved repair work, recorded 2026-10-09. The owner authorized execution on 2026-10-09. Repairs are in delivery; remaining merges, merged-main checks, and installation gate completion.
 - Audited at: `847e696846ab85150f89ed1deeef49e5757f4d0b`.
 - Scope: focused application audit following the React Compiler, Query/Router, composition, and state-boundary research. This is a bounded repair queue, not a framework migration.
 - Owners: each unit below names its application domain and existing plan. This file owns the exact new defects, reproduction evidence, ordering, and acceptance. Broader programs retain their scope.
 
 Read the cited source before execution. Run `git diff --stat 847e696846ab85150f89ed1deeef49e5757f4d0b..HEAD -- <unit paths>` and reconcile intervening fixes. Do not reproduce a resolved finding or overwrite another session's changes. Use repository React, Query, TypeScript, UI, and verification skills, plus the execution host's scheduling instructions.
 
+The unit descriptions preserve the audited baseline and repair contract. The delivery record below names the final behavior and checks.
+
 ## Execution order
 
-| Unit | Problem                                                                      | Priority | Effort | Fix risk | Confidence                                                    | Dependency                                    | Status                 |
-| ---- | ---------------------------------------------------------------------------- | -------- | ------ | -------- | ------------------------------------------------------------- | --------------------------------------------- | ---------------------- |
-| 1    | MCP actions combine old data with a new provider or folder                   | P1       | M      | Medium   | High; Query observer proof and complete action-source trace   | None                                          | Approved               |
-| 2    | Semantic-token cancellation removes other waiters and newer flight ownership | P1       | S      | Low      | High; actual public server API proof                          | None                                          | Approved               |
-| 3    | App DOM tests silently omit React Compiler                                   | P1       | M      | Medium   | High; actual plugin transform and controlled test pass/fail   | None                                          | Approved               |
-| 4    | Diff live text remains cached after the buffer changes                       | P1       | S      | Low      | High; exact compiled hook execution                           | 3, or an existing compiled browser regression | Approved               |
-| 5    | Tree mutation availability ignores cache confirmation changes                | P1       | S      | Low      | High; actual compiled hook test failure                       | 3, or an existing compiled browser regression | Approved               |
-| 6    | Recent-folder restoration keeps the initial navigation permission            | P2       | S      | Low      | High; exact compiled hook execution                           | 3, or an existing compiled browser regression | Approved               |
-| 7    | Site player child timers overwrite a skipped or replayed story               | P2       | S      | Low      | High; actual player and replica runtime proof                 | None                                          | Approved               |
-| 8    | TUI syntax resources retain the initial theme                                | P2       | S      | Medium   | High in source lifetime; native rerender still needs proof    | None                                          | Approved               |
-| 9    | An old TUI dialog completion can close a newer dialog                        | P2       | S      | Low      | Medium; continuation proof, navigation integration unverified | Reproduce actual TUI navigation first         | Approved investigation |
+| Unit | Problem                                                                      | Priority | Effort | Fix risk | Confidence                                                  | Dependency                                          | Status            |
+| ---- | ---------------------------------------------------------------------------- | -------- | ------ | -------- | ----------------------------------------------------------- | --------------------------------------------------- | ----------------- |
+| 1    | MCP actions combine old data with a new provider or folder                   | P1       | M      | Medium   | High; Query observer proof and complete action-source trace | None                                                | Awaiting delivery |
+| 2    | Semantic-token cancellation removes other waiters and newer flight ownership | P1       | S      | Low      | High; actual public server API proof                        | None                                                | Awaiting delivery |
+| 3    | App DOM tests silently omit React Compiler                                   | P1       | M      | Medium   | High; actual plugin transform and controlled test pass/fail | None                                                | Awaiting delivery |
+| 4    | Diff live text remains cached after the buffer changes                       | P1       | S      | Low      | High; exact compiled hook execution                         | 3, or an existing compiled browser regression       | Awaiting delivery |
+| 5    | Tree mutation availability ignores cache confirmation changes                | P1       | S      | Low      | High; actual compiled hook test failure                     | 3, or an existing compiled browser regression       | Awaiting delivery |
+| 6    | Recent-folder restoration keeps the initial navigation permission            | P2       | S      | Low      | High; exact compiled hook execution                         | 3, or an existing compiled browser regression       | Awaiting delivery |
+| 7    | Site player child timers overwrite a skipped or replayed story               | P2       | S      | Low      | High; actual player and replica runtime proof               | None                                                | Awaiting delivery |
+| 8    | TUI syntax resources retain the initial theme                                | P2       | M      | Medium   | High; native frames, compiled and selection controls pass   | None                                                | Awaiting delivery |
+| 9    | An old TUI dialog completion can close a newer dialog                        | P2       | S      | Low      | High; real mounted Back/Forward export regression           | Original operation settles; current dialog survives | Awaiting delivery |
 
 Start 1 and 2 independently. Establish 3 before accepting compiler-sensitive DOM regressions for 4–6. Units 7 and 8 can run independently. Unit 9 starts with a real interaction proof. No public package API needs to change for these application repairs; add patch changesets if execution expands into shipped packages.
 
@@ -29,7 +31,7 @@ Start 1 and 2 independently. Establish 3 before accepting compiler-sensitive DOM
 
 Owner: [174](174-external-mcp-servers.md), with [192](192-no-swap-flash.md)'s held-subject contract.
 
-Current source:
+Audited source:
 
 - `apps/web/src/features/settings/hooks/use-instance-mcp.ts:10` applies `placeholderData: keepPreviousData` across provider and folder changes.
 - `utils/mcp-query.ts:18` fetches the selected provider and folder. `utils/query-keys.ts:15` correctly includes both in the key; key identity is not the defect.
@@ -63,7 +65,7 @@ Exit: delayed subject switches preserve action ownership and all fixture tests p
 
 Owner: [088](088-native-code-intelligence.md)'s backend request ownership; preserve [333](333-async-terminal-and-server-adapters.md)'s existing LSP pool.
 
-Current source in `apps/server/src/lsp/proxy-session.ts`:
+Audited source in `apps/server/src/lsp/proxy-session.ts`:
 
 - `:1187` identifies cancellation's client request ID, but `:1200` passes only its connection to waiter removal.
 - `:792` coalesces several client request IDs onto one backend flight, including IDs from the same pooled connection.
@@ -122,7 +124,7 @@ Callers are `features/git/components/diff-view.tsx:99` and `features/editor/comp
 
 Execution:
 
-1. Extend `features/editor/hooks/tests/use-diff-language-context.test.tsx`, or add its compiled-browser counterpart. Mutate a real editor buffer in place and publish the document revision. Assert current `ownedText` and the downstream drift refusal. Initial-publication tests already exist.
+1. Extend `features/editor/hooks/tests/use-diff-language-context.compiler.test.tsx`. Mutate a real editor buffer in place and publish the document revision. Assert current `ownedText` and the downstream drift refusal. Initial-publication tests already exist.
 2. Make the text acquisition itself depend on the observed revision. A revision-tagged snapshot helper or owner-published immutable snapshot may express this. Merely placing `revision` beside a cached getter repeats the defect.
 3. Run `bun run compiler:explain apps/web/src/features/editor/hooks/use-diff-language-context.ts --component useDiffLanguageContext`; verify that the acquisition cache includes the revision. Run the compiled regression and existing diff-language tests.
 4. Exercise the working-tree diff while another editor makes an unsaved same-buffer edit, with browser evidence of the refusal behavior.
@@ -139,9 +141,9 @@ Owner: [192](192-no-swap-flash.md)'s restored tree, with workspace mutation owne
 
 Execution:
 
-1. Use the existing regression `workspace/tests/use-fs-actions.test.tsx:414` through the compiled path. Add missing-data to confirmed-data arrival alongside confirmed-data removal.
+1. Use `workspace/tests/use-fs-actions.compiler.test.tsx` through the compiler project. Add missing-data to confirmed-data arrival alongside confirmed-data removal.
 2. Expose confirmation through an observed query value or an explicit confirmation input from the tree owner. Keep saved rows usable for display while mutations follow actual confirmation.
-3. Run `bun run compiler:explain apps/web/src/features/workspace/hooks/use-fs-actions.ts --component useFsActions`, then `bun --bun vitest run --project dom src/features/workspace/tests/use-fs-actions.test.tsx` from `apps/web`, plus the compiled regression.
+3. Run `bun run compiler:explain apps/web/src/features/workspace/hooks/use-fs-actions.ts --component useFsActions`, then `bun --bun vitest run --project compiler src/features/workspace/tests/use-fs-actions.compiler.test.tsx` from `apps/web`.
 4. Verify a restored tree with its confirmation read deliberately delayed: creation, renaming, deletion, and drag must enable only after confirmation. Removing confirmation disables them without requiring an unrelated state change.
 
 Exit: both confirmation transitions update the action gate under production compilation. Preserve the journal, intent queue, and workspace edit service.
@@ -156,7 +158,7 @@ Bootstrap attaches navigation before mounting the app at `state/bootstrap.ts:57`
 
 Execution:
 
-1. Extend `workspace/tests/use-restore-recent-root.test.tsx` through the compiled path. Start with empty workspace state and pending navigation, then publish applied status without replacing the coordinator. Require the recent read and restoration.
+1. Extend `workspace/tests/use-restore-recent-root.compiler.test.tsx`. Start with empty workspace state and pending navigation, then publish applied status without replacing the coordinator. Require the recent read and restoration.
 2. Derive permission from an observed snapshot or expose the permission in that snapshot. Keep initial explicit workspace and unavailable-address rules; they still claim their own destination.
 3. Run `bun run compiler:explain apps/web/src/features/workspace/hooks/use-restore-recent-root.ts --component useRestoreRecentWorkspaceRoot` and the targeted compiled regression. Preserve existing no-recents and explicit-address controls.
 4. Verify startup at the root address with an isolated persisted recent folder, plus an explicit workspace address that must win over recents.
@@ -185,7 +187,7 @@ Execution:
 
 Exit: final frames remain final and replay admits only the new run's callbacks. Do not replace the replica with the live web app.
 
-## Unit 8: Replace TUI syntax resources with their theme
+## Unit 8: Repaint mounted TUI content with its theme
 
 Owner: [202](202-tui-ui.md). This is terminal rendering correctness, independent of web parity work.
 
@@ -203,7 +205,7 @@ Exit: all mounted content uses the new theme and old native resources are releas
 
 ## Unit 9: Qualify late TUI dialog completion
 
-Owner: [202](202-tui-ui.md)'s navigation and focus ownership. Status: Approved investigation; native navigation reproduction remains required.
+Owner: [202](202-tui-ui.md)'s navigation and focus ownership. The actual mounted Back/Forward export race is reproduced and repaired in [PR 1192](https://github.com/ShaulLavo/fregat/pull/1192); landing remains pending.
 
 `apps/tui/src/agent-stage/components/path-dialog.tsx:43` awaits submitted work then invokes captured `onClose`. The stage's `close()` at `stage.tsx:147` clears the shared modal slot unconditionally and requests composer focus. `agent/components/screen.tsx:159` retains the unkeyed stage, and Back/Forward handlers at `components/workspace.tsx:332` remain callable.
 
@@ -216,6 +218,36 @@ Execution:
 3. If navigation cannot occur while work is pending, document that tested invariant and close this investigation without adding a guard for an unreachable race.
 
 Exit: the real path is either repaired with a regression or ruled out with direct evidence. Do not treat temporary focus retention as a defect by itself.
+
+## Related boundary and gate repairs found during execution
+
+- MCP picker paths are relative to their filesystem owner. Passing them directly as provider working directories produced `ENOENT` in the real fixture sign-in path. [PR 1196](https://github.com/ShaulLavo/fregat/pull/1196) resolves list/add/remove/copy/sign-in paths through the owning filesystem, including Home and root selection. Its independent picker review also found that Home and a literal `~` folder shared one key; the corrected key preserves `null` separately. Real picker and route regressions cover both findings.
+- Vite's React plugin parsed inline CSS as TypeScript when a document route ended in `.ts`, `.tsx`, `.js`, or `.jsx`. The bare workbench control returned 200 and the deep file route returned 500 at `@layer boot`. [PR 1198](https://github.com/ShaulLavo/fregat/pull/1198) excludes CSS HTML proxies from that parser. Actual reloads then return 200 with no browser errors, and all 13 configuration cases pass. Evidence: `/work/reports/plan342-wave/vite-proxy/`; the upstream report is ready to file and has not been posted.
+- The CI first-load package pin predates the approved `cn` implementation in PR 1185. Main and the unchanged TUI branch both measured UI ownership at 34,178 bytes against 32,101 pinned bytes, exceeding the 2,048-byte allowance by 29. [PR 1201](https://github.com/ShaulLavo/fregat/pull/1201) qualified a baseline-only repair with unchanged allowances and totals. Separate owner work removed the required gate in [PR 1202](https://github.com/ShaulLavo/fregat/pull/1202), so the baseline repair was closed without merging. Evidence remains in `/work/reports/plan342-wave/ui-pin/`.
+- The compiler test configuration imported local files without extensions. The existing native-config portability test caught the new warning. Explicit `.ts` imports repair both configurations; all 22 existing cases pass, and the dedicated compiler configuration loads with both loaders with zero warnings. Evidence: `/work/reports/plan342-wave/compiler-config-after.log` and `compiler-dedicated-config-load.log`.
+- Reactive recent-folder restoration exposed retention fixtures that opened a workspace directly, outside the navigation owner. Four CI reload cases stopped before their baseline file opened. The fixtures now enter through `navigation.openWorkspace`; peer setup awaits the public connection owner. All five reload and three layout controls pass with their original limits and assertions. The old cold peer form remained pending, but its exact save-versus-connect stage was not captured; that observation does not establish an application defect. Evidence: `/work/reports/plan342-wave/fixture-cleanup/` and the retained retention qualification manifest.
+- The new reactive scenario removed its still-mounted fixture root after its six successful assertions, allowing a late Git-status request to return `ENOENT` and 500. Teardown now leaves the page before killing fixture processes and removing its root, while still releasing the fixture if navigation fails. The final local integration passes all six steps with zero server errors, HTTP 500 records, or `ENOENT` strings. Evidence: `/work/reports/plan342-wave/integrated-final/`.
+- A single large native mouse move expands the installed OpenTUI fork's selection container only one ancestor, before any theme change. Complete cross-message selection controls pass. The separate [ready-to-file report](/work/reports/upstream-bugs/opentui-single-move-selection/README.md) covers `0.5.12-bubli.2`; official upstream and a standalone reproduction remain untested. No dependency patch or upstream post is included in this wave.
+
+The execution ledger lives at `/work/reports/plan342-wave/units.tsv`; `/work/reports/plan342-wave/decisions.tsv` retains design and verification pivots. Final delivery receipts live in `/work/reports/plan342-wave/delivery/`.
+
+## Verified repairs
+
+Installation and the final merged-main checks remain pending.
+
+| Units | Result                                                                                                                                                                  | Pull request                                          | Verification                                                                                                                                                                           |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | MCP rows and dialogs retain their displayed provider and folder until the next subject is ready. Folder paths resolve through their filesystem owner.                   | [1196](https://github.com/ShaulLavo/fregat/pull/1196) | Fixture routes and the merged-source 11-step MCP browser scenario pass.                                                                                                                |
+| 2     | Individual semantic cancellation retires the requested waiter; older cancellation preserves the newer flight.                                                           | [1190](https://github.com/ShaulLavo/fregat/pull/1190) | All 91 public session-pool checks and the original coalescing proof pass.                                                                                                              |
+| 3     | The `compiler` project compiles browser application source with the installed production OXC compiler.                                                                  | [1191](https://github.com/ShaulLavo/fregat/pull/1191) | The sentinel passes with compilation and fails when compilation is removed. Fixture and loader controls pass.                                                                          |
+| 4–6   | Immutable text snapshots invalidate diff reads, observed tree confirmation updates action availability, and observed navigation status enables recent-root restoration. | [1199](https://github.com/ShaulLavo/fregat/pull/1199) | Compiled regressions and all six browser steps pass, including explicit-address precedence and wrong-revision hover refusal. Teardown produces no server error, HTTP 500, or `ENOENT`. |
+| 7     | Skip and replay revoke the old playback's typing and pointer timers.                                                                                                    | [1193](https://github.com/ShaulLavo/fregat/pull/1193) | Nine Chromium controls and nine-step desktop and phone playback captures pass.                                                                                                         |
+| 8     | Mounted native prompt and transcript styles repaint with the current theme and release their resources.                                                                 | [1204](https://github.com/ShaulLavo/fregat/pull/1204) | Native and compiled checks preserve undo, cursor, selection, scroll, and focus. Reviewed frames show the expected colors.                                                              |
+| 9     | An unmounted dialog cannot close a newer dialog when its original export completes.                                                                                     | [1192](https://github.com/ShaulLavo/fregat/pull/1192) | Mounted Back/Forward export frames retain the newer attachment dialog and its focus; normal completion controls pass.                                                                  |
+
+Compiler regressions run once through normal web tests and CI. Their current files are `use-diff-language-context.compiler.test.tsx`, `use-fs-actions.compiler.test.tsx`, and `use-restore-recent-root.compiler.test.tsx`. The React development skill and [web fixture guide](../apps/web/test/README.md) document this route.
+
+The release installer packages the web app and server. The TUI is a checkout client: `bun run dev:tui` launches `apps/tui/src/main.tsx` through its compiler preload. Updating the checkout delivers units 8 and 9 to the next TUI launch. Its native fixture checks qualify theme and dialog behavior separately from web release checks.
 
 ## Rerunnable audit evidence
 

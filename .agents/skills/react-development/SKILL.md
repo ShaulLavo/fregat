@@ -26,6 +26,11 @@ Apply these repository rules when writing, reviewing, or refactoring React compo
 - `exhaustive-deps` misreads compiler-memoized values. Use `useEffectEvent` when the dep is the action. When the effect truly keys on the value, suppress with `// oxlint-disable-next-line react/exhaustive-deps` and the compiler's keys; the `react-hooks/…` spelling makes the compiler refuse the component.
 - `bun run compiler:census` fails on any refused component not excused in `scripts/lint/react-compiler-allow.json`. Repairs: lazily filled ref → lazy `useState`; `try`/`finally` → module-scope function; suppressed deps → `useEffectEvent` with the trigger as an argument; declare handlers after those they call; pass `ref` through JSX, not `createElement`.
 
+## Compiler-sensitive tests
+
+- Name web regressions `*.compiler.test.tsx` when they depend on memoization, mutable-owner snapshots, or owner replacement. The compiler project uses the production OXC transform and runs once in normal tests and CI. The ordinary Happy DOM project uses the SSR consumer, which omits compilation despite the React plugin's `compiler: true` option.
+- To qualify an existing DOM test before migrating it, run `bun --bun vitest run --config vitest.compiler.config.ts <test-file> -t '<case>'` from `apps/web`. Keep the file filter narrow and use the shared fixtures. See [Web test fixtures](../../../apps/web/test/README.md).
+
 ## Composition
 
 - Reusable UI starts with props and children. Add named slots or compound pieces when flags and layout-specific props accumulate. Add a provider when descendants share domain actions or multiple real sources fill the same view contract. Each step needs a current use case; a provider is not required just to render fixture data in a test.

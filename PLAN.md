@@ -174,10 +174,10 @@ an independent bounded web/server startup change. Implement it when the owner st
 the work, after resolving document admission and native backdrop context with Plans
 337 and 114; preserve Plan 320's shared palette generator.
 
-[342](plans/342-app-reactivity-and-async-ownership.md) records the October 9 focused app
-audit and its Approved bounded repairs. MCP subject ownership and shared LSP cancellation
-can run independently; compiler-sensitive web repairs first establish actual compiled test
-coverage. Site playback and TUI theme lifetime repairs retain their existing domain gates.
+[342](plans/342-app-reactivity-and-async-ownership.md) is Approved and in delivery.
+The nine repairs cover MCP action ownership, shared LSP cancellation, compiled web
+reactivity, site playback, and TUI theme and dialog lifetimes. Final merged-main checks
+and installation still gate completion.
 
 [335](plans/335-stroke-icons.md) retains the current stroke-icon migration, shared registry
 and selected morph sites. Its broad swap takes the structural window after the keymap
