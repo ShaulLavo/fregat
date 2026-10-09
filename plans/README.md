@@ -162,7 +162,7 @@ delivered acceptance, monitoring/draft check, named follow-ons and owner-only re
 | [288](288-pr-preview-environments.md)                 | Preview environments for feature PRs                                                 |
 | [289](289-proxy-usage-feed.md)                        | Historical gateway feed, retired producer, and the Mesh TV panel                     |
 | [290](290-mesh-device-authorization.md)               | Approve devices before Mesh control                                                  |
-| [291](291-mesh-private-services.md)                   | Private temporary apps and reusable floating pill                                    |
+| [291](291-mesh-private-services.md)                   | Retire Mesh public hosting and preserve private apps                                 |
 | [292](292-mesh-zerotier.md)                           | ZeroTier adoption after authentication                                               |
 | [293](293-mesh-durable-job-state.md)                  | Durable job definitions and run records                                              |
 | [294](294-mesh-job-coordination.md)                   | Scheduled execution and failover                                                     |
