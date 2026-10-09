@@ -443,10 +443,13 @@ describe('VirtualizedTextView', () => {
   })
 
   it.each(['virtualized', 'static'] as const)(
-    'defers native cap discovery until supplied-metrics content scrolls from %s mode',
+    'defers native cap discovery until supplied-metrics content is tall in %s mode',
     (scrollMode) => {
       view.dispose()
       const capSpy = vi.spyOn(ScrollViewport.prototype, 'maxScrollHeight', 'get')
+      const rectSpy = vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockReturnValue(new DOMRect(0, 0, 256, 256))
       try {
         view = new VirtualizedTextView(container, {
           highlightRegistry: mockRegistry,
@@ -462,13 +465,19 @@ describe('VirtualizedTextView', () => {
         view.setText('x')
         expect(capSpy).not.toHaveBeenCalled()
         view.setText(createLines(1_000))
+        expect(capSpy).not.toHaveBeenCalled()
+        view.setText(createLines(200_000))
+        expect(capSpy).not.toHaveBeenCalled()
+        view.setText(createLines(250_000))
         expect(capSpy).toHaveBeenCalledTimes(1)
-        view.setText(createLines(2_000))
+        view.setText(createLines(500_000))
+        view.setText(createLines(1_000))
         view.setScrollMode('static')
         view.setScrollMode('virtualized')
         expect(capSpy).toHaveBeenCalledTimes(1)
       } finally {
         capSpy.mockRestore()
+        rectSpy.mockRestore()
       }
     },
   )

@@ -31,7 +31,11 @@ import { EditorTokenStore, type EditorTokenInput } from '../syntax/tokenStore'
 import type { TextEdit } from '../tokens'
 import { applyEditorTheme } from '../theme'
 import { measureBrowserTextFace, type BrowserTextMetrics } from './browserMetrics'
-import { FixedRowVirtualizer, type FixedRowVirtualizerSnapshot } from './fixedRowVirtualizer'
+import {
+  DEFAULT_MAX_SCROLL_HEIGHT,
+  FixedRowVirtualizer,
+  type FixedRowVirtualizerSnapshot,
+} from './fixedRowVirtualizer'
 import {
   DEFAULT_OVERSCAN,
   DEFAULT_SELECTION_HIGHLIGHT,
@@ -1650,6 +1654,8 @@ export class VirtualizedTextView {
       view.scrollMode === 'virtualized' &&
       snapshot.viewportHeight > 0 &&
       view.model.textLength > 0 &&
+      // Discover before native caps are reached, while ordinary opens remain layout-free.
+      snapshot.totalSize > DEFAULT_MAX_SCROLL_HEIGHT / 4 &&
       snapshot.scrollHeight > snapshot.viewportHeight
     ) {
       this.measuredMaxScrollHeight = view.viewport.maxScrollHeight
