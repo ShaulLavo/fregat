@@ -2,8 +2,11 @@ import { createClientInvariantError } from '@/lib/structured-errors'
 import { mutationOptions, type QueryClient } from '@tanstack/react-query'
 import type { StoreApi } from 'zustand/vanilla'
 import type {
+  DocumentSyncPoint,
   DocumentTextSnapshot,
   EditorTextBuffer,
+  TextEdit,
+  TextOffsetRange,
   TextSnapshot,
   TextReadSnapshot,
 } from '@singapore-editor/core/document'
@@ -44,6 +47,7 @@ export type PreviewSourceRead =
       readonly key: DocumentKey
       readonly buffer: EditorTextBuffer
       readonly revision: number
+      readonly syncPoint: DocumentSyncPoint
       readonly snapshot: DocumentTextSnapshot
       readonly range: { readonly start: 0; readonly end: number }
       readonly text: string
@@ -94,6 +98,27 @@ export type PreviewViewRequest = {
   readonly scope: SnapshotComparisonScope | null
   readonly signal: AbortSignal
 }
+
+// Holds its buffer: drop it with the lease it was captured from.
+export type SourceRangeRef = {
+  readonly scope: SnapshotComparisonScope
+  readonly key: DocumentKey
+  readonly buffer: EditorTextBuffer
+  readonly revision: number
+  readonly syncPoint: DocumentSyncPoint
+  readonly range: TextOffsetRange
+}
+type SourceRangeInvalidReason =
+  | 'not-live'
+  | 'partial'
+  | 'stale'
+  | 'ended'
+  | 'replaced'
+  | 'edited'
+  | 'history-unavailable'
+export type SourceRangeResolution =
+  | { readonly kind: 'valid'; readonly ref: SourceRangeRef }
+  | { readonly kind: 'invalid'; readonly reason: SourceRangeInvalidReason }
 
 export function attachmentPreviewMutationOptions(
   capability: PreviewSourceCapability | null,
@@ -177,6 +202,88 @@ export function samePreviewScope(
       left.rootPath === right.rootPath,
     )
   )
+}
+
+// `expectedText` is the text the caller's offsets were computed from; offsets from another
+// revision or from disk capture only when the live text at them still matches.
+export function captureSourceRange(
+  read: PreviewSourceRead,
+  range: TextOffsetRange,
+  expectedText: string,
+): SourceRangeResolution {
+  if (read.kind !== 'live') return { kind: 'invalid', reason: nonLiveSourceReason(read) }
+  const { start, end } = range
+  assertSourceRange(start, end, read.snapshot.length)
+  if (end > read.range.end) return { kind: 'invalid', reason: 'partial' }
+  if (read.snapshot.readRange(start, end) !== expectedText)
+    return { kind: 'invalid', reason: 'stale' }
+  const { scope, key, buffer, revision, syncPoint } = read
+  return { kind: 'valid', ref: { scope, key, buffer, revision, syncPoint, range: { start, end } } }
+}
+
+export function resolveSourceRange(
+  ref: SourceRangeRef,
+  read: PreviewSourceRead,
+): SourceRangeResolution {
+  if (read.kind !== 'live') return { kind: 'invalid', reason: nonLiveSourceReason(read) }
+  if (read.key !== ref.key || !samePreviewScope(read.scope, ref.scope))
+    throw createClientInvariantError('Source range belongs to a different document', {
+      keyMatches: read.key === ref.key,
+      scopeMatches: samePreviewScope(read.scope, ref.scope),
+    })
+  if (read.buffer !== ref.buffer) return { kind: 'invalid', reason: 'replaced' }
+  const changes = read.buffer.changesBetweenDocumentSyncPoints(ref.syncPoint, read.syncPoint, null)
+  if (!changes?.edits) return { kind: 'invalid', reason: 'history-unavailable' }
+  const range = mapSourceRange(ref.range, changes.edits)
+  if (!range) return { kind: 'invalid', reason: 'edited' }
+  if (range.end > read.range.end) return { kind: 'invalid', reason: 'partial' }
+  return {
+    kind: 'valid',
+    ref: { ...ref, revision: read.revision, syncPoint: read.syncPoint, range },
+  }
+}
+
+function nonLiveSourceReason(
+  read: Exclude<PreviewSourceRead, { kind: 'live' }>,
+): SourceRangeInvalidReason {
+  if (read.kind === 'released' || read.kind === 'unavailable') return 'ended'
+  if (read.kind === 'disk' && read.input.head.truncated) return 'partial'
+  return 'not-live'
+}
+
+function assertSourceRange(start: number, end: number, length: number): void {
+  if (
+    Number.isSafeInteger(start) &&
+    Number.isSafeInteger(end) &&
+    start >= 0 &&
+    start <= end &&
+    end <= length
+  )
+    return
+  throw createClientInvariantError('Source range must lie inside its snapshot', {
+    start,
+    end,
+    length,
+  })
+}
+
+// The chain composes publications into net edits, which lose where each edit sat relative
+// to the range. Any composed edit that touches or abuts the range invalidates it, empty ones
+// included, so one resolve across many publications agrees with a resolve after each.
+function mapSourceRange(
+  range: TextOffsetRange,
+  edits: readonly TextEdit[],
+): TextOffsetRange | null {
+  let delta = 0
+  for (const edit of edits) {
+    if (edit.to < range.start) {
+      delta += edit.text.length - (edit.to - edit.from)
+      continue
+    }
+    if (edit.from > range.end) continue
+    return null
+  }
+  return { start: range.start + delta, end: range.end + delta }
 }
 
 export function previewViewMutationOptions(

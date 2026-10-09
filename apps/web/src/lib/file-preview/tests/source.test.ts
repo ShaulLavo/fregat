@@ -36,6 +36,7 @@ import {
 import { previewQueryOptions } from '@/lib/file-preview/utils/preview-query'
 import { createAddressTestRuntime } from '../../../../test/factories/address-runtime'
 import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
+import { switchToRootWorkspace } from '../../../../test/factories/live-preview-source'
 import { expect, test } from '../../../../test/fixtures'
 
 test('short disk calibrates; a dirty live preview reads the actual buffer instead of its disk capture', async ({
@@ -44,11 +45,7 @@ test('short disk calibrates; a dirty live preview reads the actual buffer instea
 }) => {
   await writeFile(join(server.root, 'preview.txt'), 'saved disk\n')
   const f = await createAddressTestRuntime(client)
-  const root = await statPath(filesystemPath(''), new AbortController().signal, client)
-  const workspaceAddress = await registerTestWorkspaceAddress(client, '')
-  f.editor.workspaceStore
-    .getState()
-    .switchWorkspace({ ...root, workspaceAddress, name: 'Root', type: 'directory' })
+  const root = await switchToRootWorkspace(client, f.editor)
   const file = await fetchFile(filesystemPath('preview.txt'), new AbortController().signal, client)
   const document = f.editor.documentStore.getState().ensureLiveEditorDocument(file)
   createEditorBufferSession(document.buffer).applyText('dirty ')
@@ -82,11 +79,7 @@ test('real live prefix preserves UTF8/surrogate coverage, independent pins and t
   server,
 }) => {
   const f = await createAddressTestRuntime(client)
-  const root = await statPath(filesystemPath(''), new AbortController().signal, client)
-  const workspaceAddress = await registerTestWorkspaceAddress(client, '')
-  f.editor.workspaceStore
-    .getState()
-    .switchWorkspace({ ...root, workspaceAddress, name: 'Root', type: 'directory' })
+  await switchToRootWorkspace(client, f.editor)
   const docs = f.editor.documentStore.getState()
   await writeFile(join(server.root, 'unicode.txt'), 'a😀' + 'z'.repeat(400))
   const file = await fetchFile(filesystemPath('unicode.txt'), new AbortController().signal, client)
@@ -164,11 +157,7 @@ test('matched view acquisition has zero preview head/full reads; foreign and roo
   server,
 }) => {
   const f = await createAddressTestRuntime(client)
-  const root = await statPath(filesystemPath(''), new AbortController().signal, client)
-  const workspaceAddress = await registerTestWorkspaceAddress(client, '')
-  f.editor.workspaceStore
-    .getState()
-    .switchWorkspace({ ...root, workspaceAddress, name: 'Root', type: 'directory' })
+  await switchToRootWorkspace(client, f.editor)
   await writeFile(join(server.root, 'owned.txt'), 'disk owner\n')
   const file = await fetchFile(filesystemPath('owned.txt'), new AbortController().signal, client)
   const document = f.editor.documentStore.getState().ensureLiveEditorDocument(file)
@@ -240,11 +229,7 @@ test('canceling a pending view leaves its imperative query peer and admitted sou
   server,
 }) => {
   const f = await createAddressTestRuntime(client)
-  const root = await statPath(filesystemPath(''), new AbortController().signal, client)
-  const workspaceAddress = await registerTestWorkspaceAddress(client, '')
-  f.editor.workspaceStore
-    .getState()
-    .switchWorkspace({ ...root, workspaceAddress, name: 'Root', type: 'directory' })
+  await switchToRootWorkspace(client, f.editor)
   await writeFile(join(server.root, 'a.txt'), 'surviving A\n')
   await writeFile(join(server.root, 'b.txt'), 'delayed B\n')
   const docs = f.editor.documentStore.getState()
@@ -402,11 +387,7 @@ test('adopted partial capture remains readonly while explicit open uses the exis
   server,
 }) => {
   const f = await createAddressTestRuntime(client)
-  const root = await statPath(filesystemPath(''), new AbortController().signal, client)
-  const workspaceAddress = await registerTestWorkspaceAddress(client, '')
-  f.editor.workspaceStore
-    .getState()
-    .switchWorkspace({ ...root, workspaceAddress, name: 'Root', type: 'directory' })
+  await switchToRootWorkspace(client, f.editor)
   const path = filesystemPath('open.txt')
   await writeFile(join(server.root, path), 'original whole document\n')
   const queries = f.application.getSnapshot().queryClient
@@ -507,11 +488,7 @@ test('common attachment interests retain real bytes and readers beside a dirty l
   expect(first.read.input.bytes).toBe(capture.bytes)
   expect(first.read.input.reader).toBe(capture.reader)
   expect(first.read.input.decoded).toBe(capture.decoded)
-  const root = await statPath(filesystemPath(''), new AbortController().signal, client)
-  const workspaceAddress = await registerTestWorkspaceAddress(client, '')
-  f.editor.workspaceStore
-    .getState()
-    .switchWorkspace({ ...root, workspaceAddress, name: 'Root', type: 'directory' })
+  await switchToRootWorkspace(client, f.editor)
   expect(first.lease?.read()).toBe(first.read)
   await writeFile(join(server.root, 'survivor.txt'), 'saved')
   const saved = await fetchFile(
