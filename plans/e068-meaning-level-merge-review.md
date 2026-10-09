@@ -455,9 +455,16 @@ below remains open; this follow-up does not waive the 2 ms target.
 hashes, complete Mac A/B/B/A invocations, raw samples, per-message measurements, power/load
 records and Linux allocation profiles. The baseline is
 `73cca5d261ab9b2a987c53b90d461b218593053c`. All numbers below are **experiment, shared machine**.
-Timing verdicts use the Apple M1 on AC, macOS 26.4, Node 25.2.1 and headless Chromium, admitted
-through the shared Mac turn with one-minute load below 3. Linux uses the i7-14700K and Node
-26.7.0 through non-quiet bench-class admission; its wall times are not verdicts.
+Mac measurements use the Apple M1, macOS 26.4, Node 25.2.1 and headless Chromium. Power
+records show AC. The shared Mac turn serializes cooperating controllers, but those controllers
+recorded load and power without enforcing either guard. These are **unguarded, lock-serialized
+shared-machine experiments**. Browser after runs recorded one-minute loads 3.48/3.54; cursor
+after/after/before runs recorded 3.15/3.30/3.25; detector-gate after/after/before runs recorded
+3.06/3.10/3.08. The earlier load-below-3 qualification was unsupported and is withdrawn.
+All Mac timing numbers below are descriptive observations; they establish neither a qualified
+latency result nor cursor cost-regression proof. No guarded rerun was performed. Linux uses
+the i7-14700K and Node 26.7.0 through non-quiet bench-class admission; its wall times are not
+verdicts. Raw samples, source hashes and arithmetic summaries remain unchanged.
 
 #### Ordinary batches and allocation
 
@@ -505,11 +512,12 @@ the M1 Mac on AC, with 8,192 retained records:
 | 4       | 2.020 ms      | 2.037 ms     | 6.489 ms   | 6.307 ms  |
 | 8       | 2.146 ms      | 2.145 ms     | 3.534 ms   | 6.345 ms  |
 
-Only the two-author median meets 2 ms on this machine; no p95 meets it. The allocation change
-has no established latency win. The attribution probe includes query instrumentation and
-yields with `setImmediate` between samples so GC events can arrive; the existing gate has
-its original scheduling. Their p95 values are not interchangeable. The prior Linux median
-passes remain historical evidence, not a new Mac verdict.
+In these unguarded samples only the two-author median is below 2 ms; no p95 is below it.
+These observations cannot establish a qualified gate pass or failure. The allocation change
+has no established latency win, and the 2 ms target remains open. The attribution probe includes
+query instrumentation and yields with `setImmediate` between samples so GC events can arrive;
+the existing gate has its original scheduling. Their p95 values are not interchangeable.
+The prior Linux median passes remain historical evidence, not a new Mac verdict.
 
 #### Worker requests, dense conflicts and UI
 
@@ -532,8 +540,9 @@ queries. Byte counts cover these query envelopes, are computed after timing and 
 reproducible JSON-size proxy. They are not structured-clone wire bytes or a count of all
 worker traffic. Round trips include worker query/projection work and any source reads.
 Current parsing and window setup are excluded. The approximately 53 ms measures review
-completion, not 53 ms of blocked editor-thread execution. This proves the previously excluded
-worker path is substantially larger than the synchronous detector fixture.
+completion, not 53 ms of blocked editor-thread execution. These unguarded observations do
+not establish a qualified cost comparison with the synchronous detector fixture. The actual
+100/150 sequential exchanges identify work to investigate independently of timing.
 
 UI measurements use real two-peer EditorRoom sessions and ReviewView over 100k lines, with
 an injected line syntax reader to isolate painting from parsing. Timers sum every ReviewView
@@ -564,8 +573,9 @@ The isolated M1 Mac AC A/B/B/A cursor benchmark measures 100 late comment-line e
 in a retained 100k-line TypeScript tree with an early damaged declaration. Parsing and
 merge-unit query execution are excluded. Five warmups and 20 samples per invocation provide
 40 samples per version. Median/p95 is 289.120/290.172 ms before and 249.637/249.954 ms after.
-Results are identical, with no measured cost regression. This damaged-root case remains
-expensive and does not establish a bound for every damaged or injected context.
+Results are identical. The numerical decrease is an unguarded observation and does not
+establish a latency improvement or absence of cost regression. Guarded cursor cost-regression
+proof remains open, together with a bound for damaged or injected contexts.
 
 Rerun from the checkout after workspace builds, with an absolute evidence directory:
 
@@ -579,12 +589,16 @@ COLLABORATION_EVIDENCE_DIR="$PWD/evidence" bun run --cwd editor/packages/collabo
 Keep benchmark sources fixed while alternating the recorded baseline and current production
 `merge-review.ts` and `mergeUnits.ts` in A/B/B/A order. Each uninstrumented detector invocation
 writes `bench/detector-evidence.json`; retain it separately before the next invocation.
-Use the execution host's admission and AC/load guards. Linux runs remain non-quiet and
-report allocation counts only. Early pilots with unavailable GC, interleaved controls and
+For qualified Mac reruns, use the shared Mac turn and have the controller enforce and record
+AC power and one-minute load below 3 before each sample block. Holding the turn lock alone
+does not enforce these conditions. Linux runs remain non-quiet and report allocation counts
+only. Early pilots with unavailable GC, interleaved controls and
 an overly broad cursor timer are excluded from the final comparisons.
 
 Remaining Approved work:
 
+- [ ] Establish cursor cost-regression proof with an A/B/B/A rerun that enforces and records
+      AC power and one-minute load below 3 before each sample block. Retain exact-result checks.
 - [ ] Continue the ordinary 2 ms tail investigation using the uninstrumented detector gate and
       instrumented probe together. Do not assign all tails to GC or close the gate from a median.
 - [ ] Reduce the 100 sequential current-unit worker exchanges in `mergeReview.ts:160–182`.

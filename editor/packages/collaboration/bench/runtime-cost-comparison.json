@@ -1,5 +1,6 @@
 {
-  "qualification": "experiment, shared machine; Apple M1 on AC, shared Mac turn admission requires one-minute load below 3; Linux allocation estimates only",
+  "qualification": "unguarded, lock-serialized shared-machine experiment; Apple M1 recorded on AC; load and power recorded but not enforced by the controllers; Linux non-quiet allocation estimates only; Mac timings are descriptive observations, not latency or regression verdicts",
+  "qualificationCorrection": "The original load-below-3 qualification was unsupported. Browser 2-after/3-after recorded loads 3.48/3.54; cursor 2-after/3-after/4-before recorded 3.15/3.30/3.25; gate 2-after/3-after/4-before recorded 3.06/3.10/3.08. Raw runs, embedded method strings, source hashes and arithmetic summaries remain unchanged. Embedded timing-verdict language describes intended qualification, not enforced admission. No guarded Mac rerun was performed; the 2 ms target and cursor cost-regression proof remain open.",
   "baseCommit": "73cca5d261ab9b2a987c53b90d461b218593053c",
   "sourceHashes": {
     "editor/packages/collaboration/bench/tail.test.ts": "4a6ad926bb2c45c617b7a47563eaa975f62b2e84d21c44ea52050e38645137a0",
