@@ -100,6 +100,7 @@ type InlineCursorStops = 'both' | 'left' | 'right' | 'none'
 type InlineReplacementRender = (
   container: HTMLElement,
   displayText: string,
+  displayStart: number,
 ) => void | { dispose(): void }
 
 /**

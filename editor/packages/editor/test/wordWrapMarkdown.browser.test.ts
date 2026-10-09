@@ -162,3 +162,32 @@ test.each([
     }
   },
 )
+
+test('wraps padded Markdown table links without repeating the label', async () => {
+  const container = document.createElement('div')
+  container.style.cssText = 'display:flex;width:160px;height:600px'
+  document.body.append(container)
+  const editor = new Editor(container, { wordWrap: true, wordWrapBreak: 'word' })
+  const parser = new MarkdownDocument()
+  const text = `| Item |\n| --- |\n| [**${LABEL}**](https://example.com) |\nlast`
+  try {
+    parser.setText(text)
+    const specs = markdownInlineReplacements(
+      createStringTextSnapshot(text),
+      parser.decorations(0, text.length),
+    )
+    editor.setText(text)
+    editor.setSelection(text.length)
+    editor.setInlineReplacementProvider(() => specs, { trigger: 'edit' })
+    await expect
+      .poll(() =>
+        [...container.querySelectorAll('a')].map((anchor) => anchor.textContent ?? '').join(''),
+      )
+      .toBe(LABEL)
+    expectContained(container)
+  } finally {
+    editor.dispose()
+    parser.dispose()
+    container.remove()
+  }
+})

@@ -157,6 +157,7 @@ type InlineWidgetRun = {
   readonly replacementId: string
   readonly fragment: boolean
   readonly displayText: string
+  readonly displayStart: number
   /** The mount's key: the replacement's `key`, else its id. */
   readonly id: string
   readonly localStart: number
@@ -1240,6 +1241,7 @@ function inlineRowRuns(mapping: RowInlineMapping | null, text: TextContent): Inl
         replacementId,
         fragment,
         displayText: text.slice(localStart, localEnd),
+        displayStart: mapping.displayStartColumn + localStart - segment.displayStartColumn,
         localStart,
         localEnd,
         render,
@@ -1655,7 +1657,7 @@ function mountInlineWidget(
   // descend into, and the replacement is one indivisible stop.
   element.setAttribute('contenteditable', 'false')
 
-  const mountDisposable = run.render(element, run.displayText) ?? null
+  const mountDisposable = run.render(element, run.displayText, run.displayStart) ?? null
   if (view.disposed) {
     try {
       mountDisposable?.dispose()

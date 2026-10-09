@@ -109,12 +109,14 @@ export type InlineCursorStops = 'both' | 'left' | 'right' | 'none'
 
 /**
  * Fills the node a replacement is painted as. Returning a disposable lets the run take down whatever
- * it attached — a listener, an observer — when the replacement leaves the map.
+ * it attached — a listener, an observer — when the replacement leaves the map. The display text is
+ * the complete replacement, or its current display-row fragment when `wrap` is `text`.
+ * `displayStart` is the fragment's offset within the complete replacement text.
  */
-/** Receives the replacement text, or the current display-row fragment when `wrap` is `text`. */
 export type InlineReplacementRender = (
   container: HTMLElement,
   displayText: string,
+  displayStart: number,
 ) => void | { dispose(): void }
 
 /**
