@@ -14,6 +14,28 @@ as in Matthew Weidner's
 owns identity, placement, reconciliation and undo (E066); this plan owns the server host, disk
 and agent edits, provenance, and history.
 
+## Where the host runs (owner direction, 2026-10-09)
+
+One protocol, three places to host it. The editor core does not know which one it runs under.
+
+1. **Singapore on its own: browsers only.** Peers connect over WebRTC and one browser hosts
+   ([E067](e067-webrtc-collaboration-plugin.md), delivered). No server sees the text. This stays
+   the standalone editor's path.
+2. **Fregat: the person's own Fregat server hosts.** Each machine server hosts its open
+   documents, as this plan describes. Its browsers and desktop windows are participants over the
+   connection they already have to the server; agents run on the server. The host only orders
+   edits and places characters, so it needs no parser: syntax trees, highlighting and merge
+   review ([E068](e068-meaning-level-merge-review.md)) stay in the browser. How teammates on
+   other machines reach the server is D4. Nothing goes through company servers.
+3. **Hosted Delta DB: a paid service run by the Fregat company.** A company server hosts shared
+   documents and keeps durable history and provenance for teams whose machines are not always on.
+   It is a participant that reads the text, so it is opt-in per workspace.
+
+A middle option for tier 2: the company runs only signaling and TURN relays. Peers still connect
+end to end (DTLS), so relays cannot read the text. Host choice follows the dynamic-host idea in
+E067: always-on servers win over laptops and phones. The product name is open (owner floated
+"Sigma"); this plan keeps "Delta DB" until it is decided.
+
 ---
 
 ## 1. Ground truth — what already exists
@@ -197,8 +219,8 @@ disconnected participants are accounted for.
 
 ## 6. Explicit non-goals
 
-- No peer-to-peer topology inside Fregat; the server is the host. The standalone editor's
-  peer-to-peer plugin is [E067](e067-webrtc-collaboration-plugin.md).
+- No browser-hosted documents inside Fregat; the machine server is the host. It may join an
+  [E067](e067-webrtc-collaboration-plugin.md) room as a peer to reach teammates.
 - No custom B-tree or KV store; SQLite and drizzle carry the log.
 - No third-party CRDT engine owning the buffer.
 
@@ -215,6 +237,20 @@ cost and agent-branch spawn latency against `git/worktrees.ts` on a realistic re
 
 **D3 — what compilers and shells read.** Before phase 2 ships: whether the host materializes
 accepted edits to disk continuously, on save only, or per agent turn.
+
+**D4 — how a teammate reaches someone's Fregat server.** Before phase 4. The model is a remote
+server everyone opens, as in Google Docs: one machine holds the project and the others edit it
+through its server. Fregat does not sync two copies of a project between machines. Options: the
+existing browser connection when the server is reachable (same tailnet, a machine shared with
+another tailnet, a tunnel); WebRTC with the server
+as a peer, which needs a native data-channel library in Bun; or server-to-server QUIC with NAT
+traversal and relays (iroh-style) when both sides run Fregat. Criterion: works across home NATs
+without setup, and no company server can read the text. WebRTC stays the only option between two
+browsers with no server (Singapore on its own).
+
+Presence already carries up to 32 selections per window, so each person can have several
+cursors. One person with two windows or devices shows up twice; group presence by person before
+phase 4.
 
 ---
 
