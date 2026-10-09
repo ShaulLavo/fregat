@@ -1,8 +1,8 @@
 import { scratchPath } from '../paths'
-import { ok, strictEqual } from 'node:assert/strict'
+import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import path from 'node:path'
-import type { Page } from 'playwright'
+import type { Locator, Page } from 'playwright'
 
 import { openFolderPickerList, openGitPanel, selectors } from '../selectors'
 import type { Scenario } from './index'
@@ -33,6 +33,7 @@ export const filePickerNavigation: Scenario = {
           .first()
           .waitFor({ timeout: 5000 })
         await step(`parent-after-${key}`)
+        await expectNoFadeWhenFits(selectors.pickerList(page))
       }
       await selectors.pickerSearch(page).fill(prefix)
       const list = selectors.pickerList(page)
@@ -58,6 +59,21 @@ export const filePickerNavigation: Scenario = {
       await rm(root, { recursive: true, force: true })
     }
   },
+}
+
+/** A list whose rows all fit fades neither edge, whatever it showed before. */
+async function expectNoFadeWhenFits(list: Locator) {
+  const state = await list.evaluate((element) => {
+    const scroller = element.closest<HTMLElement>('[data-slot="virtual-list"]') ?? element
+    const style = getComputedStyle(scroller)
+    return {
+      fits: scroller.scrollHeight <= scroller.clientHeight,
+      top: style.getPropertyValue('--scroll-fade-top'),
+      bottom: style.getPropertyValue('--scroll-fade-bottom'),
+    }
+  })
+  ok(state.fits, 'The parent folder rows must fit without scrolling')
+  deepStrictEqual({ top: state.top, bottom: state.bottom }, { top: '0px', bottom: '0px' })
 }
 
 export const gitHistoryScroll: Scenario = {
