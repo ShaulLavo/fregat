@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config'
 import { playwright } from '@vitest/browser-playwright'
 
 export default defineConfig({
+  optimizeDeps: { include: ['@singapore-editor/core > diff'] },
   test: {
     projects: [
       {
@@ -19,6 +20,7 @@ export default defineConfig({
           browser: {
             enabled: true,
             headless: true,
+            viewport: { width: 1440, height: 1100 },
             provider: playwright(),
             instances: [{ browser: 'chromium' }],
             commands: {

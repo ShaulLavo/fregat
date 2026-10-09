@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import { McpFolderField } from '@/features/settings/components/mcp-folder-field'
 import { McpServerList } from '@/features/settings/components/mcp-server-list'
 import { ProviderLoading } from '@/features/settings/components/provider-loading'
+import { useInstanceMcp } from '@/features/settings/hooks/use-instance-mcp'
 import { mcpInstances } from '@/features/settings/utils/mcp'
 import { providerListQueryOptions } from '@/lib/provider-query'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
@@ -20,7 +21,10 @@ export function McpSection() {
   const instances = mcpInstances(providers.data?.providers ?? [])
   const [selected, setSelected] = useState<ProviderInstanceId | null>(null)
   const [folder, setFolder] = useState<string | null>(null)
-  const instance = instances.find((entry) => entry.providerInstanceId === selected) ?? null
+  const mcp = useInstanceMcp(selected, folder)
+  const shownProvider = mcp.data ? mcp.data.subject.providerInstanceId : selected
+  const shownFolder = mcp.data ? mcp.data.subject.folder : folder
+  const instance = instances.find((entry) => entry.providerInstanceId === shownProvider) ?? null
 
   if (providers.isPending) return <ProviderLoading />
   if (instances.length === 0)
@@ -42,7 +46,7 @@ export function McpSection() {
               null,
           )
         }
-        value={selected ?? ''}
+        value={shownProvider ?? ''}
       >
         <TabsList aria-label='Provider' variant='segmented'>
           {instances.map((entry) => (
@@ -52,9 +56,15 @@ export function McpSection() {
           ))}
         </TabsList>
       </Tabs>
-      <McpFolderField folder={folder} onChange={setFolder} />
+      <McpFolderField folder={shownFolder} onChange={setFolder} />
       {instance ? (
-        <McpServerList folder={folder} instance={instance} instances={instances} />
+        <McpServerList
+          folder={shownFolder}
+          instance={instance}
+          instances={instances}
+          key={JSON.stringify([shownProvider, shownFolder])}
+          mcp={mcp}
+        />
       ) : (
         <EmptyState
           align='start'

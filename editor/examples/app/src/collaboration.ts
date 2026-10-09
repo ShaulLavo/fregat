@@ -15,6 +15,11 @@ import {
   createRoomInvitation,
 } from '@singapore-editor/collaboration/transports'
 import type { Envelope } from '@singapore-editor/collab'
+import {
+  createTreeSitterReviewSyntax,
+  resolveTreeSitterLanguageContribution,
+} from '@singapore-editor/tree-sitter'
+import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
 
 const form = document.querySelector<HTMLFormElement>('#configuration')!
 const signaling = document.querySelector<HTMLInputElement>('#signaling')!
@@ -129,14 +134,25 @@ async function mountPeer(
     panel.append(header, element)
     peers.append(panel)
     cleanups.push(() => panel.remove())
+    const syntax = createTreeSitterReviewSyntax({
+      languageId: 'typescript',
+      languages: [
+        await resolveTreeSitterLanguageContribution(
+          TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === 'typescript')!,
+        ),
+      ],
+    })
+    cleanups.push(() => syntax.dispose())
     let router: TransportRouter<Envelope> | undefined
     const editor = new Editor(element, {
       defaultText: initialText,
+      theme: { type: 'dark' },
       wordWrap: true,
       plugins: [
         createCollaborationPlugin({
           session: { peer, room, document: 'example-document', epoch: room, text: initialText },
           presence: { displayName, colour: name === 'Peer one' ? '#a8ddc4' : '#e8be82' },
+          mergeReview: { syntax, onError: report },
           transport: { send: (target, message) => router?.send(target, message) },
           onReady: (ready) => {
             connection = ready

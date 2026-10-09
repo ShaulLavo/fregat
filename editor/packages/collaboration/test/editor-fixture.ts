@@ -2,6 +2,7 @@ import { Editor } from '@singapore-editor/core/editor'
 import { createCollaborationPlugin, type CollaborationConnection } from '../src/plugin'
 import type { Envelope } from '@singapore-editor/collab'
 import type { Message } from '../src/protocol'
+import type { MergeReviewOptions } from '../src/review'
 
 export class EditorRoom {
   readonly editors: Editor[] = []
@@ -11,7 +12,12 @@ export class EditorRoom {
   readonly host = document.createElement('section')
   clock = 0
 
-  constructor(count: number, text = '', presence = false) {
+  constructor(
+    count: number,
+    text = '',
+    presence = false,
+    review?: MergeReviewOptions | ((index: number) => MergeReviewOptions),
+  ) {
     this.host.id = 'collaboration-editors'
     this.host.style.cssText = 'display:flex;gap:24px;width:100%;height:420px;'
     document.body.append(this.host)
@@ -32,6 +38,7 @@ export class EditorRoom {
           send: (peer, message) => this.packets.push({ to: Number(peer.slice(5)), message }),
         },
         presence: presence ? { displayName: `Peer ${index}`, colour: '#3775c5' } : undefined,
+        mergeReview: typeof review === 'function' ? review(index) : review,
         manualClock: true,
         onReady: (connection) => {
           this.connections[index] = connection

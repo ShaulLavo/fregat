@@ -827,6 +827,7 @@ export const selectors = {
   navigationError: (page: Page) => page.getByRole('alert').filter({ hasText: 'Fix with AI' }),
   settingsDialog: (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true }),
   mcpSettings: (page: Page) => page.locator('[data-mcp-section]'),
+  mcpSettingsFolder: (page: Page) => page.locator('[data-mcp-folder]'),
   mcpSettingsRow: (page: Page, name: string) => page.locator(`[data-mcp-server="${name}"]`),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
   quickOpenPreviewToggle: (page: Page) =>
@@ -2334,4 +2335,25 @@ export function filePreviewIdentityFacts(
     controllerRetainsInitialNative: initial.controller?.getEditor() === initial.native,
     controllerRetainsCurrentNative: current.controller?.getEditor() === current.native,
   }
+}
+
+export const collaborationReviewSelectors = {
+  css: {
+    editor: '.peer-editor',
+    status: '.peer-header span',
+    row: '.editor-virtualized-row',
+    dot: '.editor-merge-review-dot',
+  },
+  hover: (page: Page) => page.getByRole('dialog', { name: 'Editor hover', exact: true }),
+  start: (page: Page) => page.getByRole('button', { name: 'Start session', exact: true }),
+  invitation: (page: Page) => page.getByRole('textbox', { name: 'Invitation link', exact: true }),
+  connected: (page: Page) =>
+    page.locator('.peer-header span').filter({ hasText: '2 peers' }).nth(1),
+  input: (page: Page, index: number) =>
+    page.locator('.peer-editor').nth(index).getByRole('textbox', { name: 'Editor input' }),
+  rows: (page: Page) => page.locator('.peer-editor .editor-virtualized-row'),
+  dots: (page: Page) => page.getByRole('img', { name: 'Review merged edits' }),
+  action: (page: Page, name: string) => page.getByRole('button', { name, exact: true }),
+  base: (page: Page) => page.getByRole('heading', { name: 'Base', exact: true }),
+  yours: (page: Page) => page.getByRole('heading', { name: 'Yours', exact: true }),
 }
