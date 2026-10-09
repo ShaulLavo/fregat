@@ -21,6 +21,7 @@ import { chordKeys, parsedChord, type PlatformName } from '@workspace/client-cor
 import type { KeybindingPreset } from '@workspace/client-core/commands/metadata'
 
 import { presetRuntimeRows, oursRuntimePatches } from '@/keymap/presets/runtime'
+import oursFregat from '@/keymap/presets/ours-fregat.json'
 import vscodeApp from '@/keymap/presets/vscode-app.json'
 import { editorCommandIdFromPlatform, editorPlatformCommandId } from '@/keymap/editor-keymap'
 import { isPlatformCommandId, platformCommand } from '@/keymap/table'
@@ -55,33 +56,12 @@ export function defaultPlatformKeyBindings(
   const widgets = baseEditorKeymap[platform].map((entry) => presetBinding(entry, platform))
   const readOnly = readonlyDiffPack[platform].map((entry) => presetBinding(entry, platform))
   if (preset === 'vscode') {
-    const app = vscodeApp.flatMap((row) => {
-      if (row.platforms && !row.platforms.includes(platform)) return []
-      if (!isPlatformCommandId(row.command)) return []
-      const context = areaContext(row.pane, row.command)
-      return [
-        presetBinding(
-          {
-            keys: row.keys,
-            command: editorCommandIdFromPlatform(row.command) ?? row.command,
-            context,
-            source: 'default',
-            preventDefault: row.preventDefault,
-            stopPropagation: row.stopPropagation,
-          },
-          platform,
-          row.vscodeCommandId,
-          row.yieldsToTextEntry,
-        ),
-      ]
-    })
+    const app = vscodeApp.flatMap((row) => applicationBinding(row, platform))
     const editor = vscodePacks.flatMap((pack) =>
       pack[platform].map((entry) => presetBinding(entry, platform)),
     )
     const terminal = terminalDefaultPack[platform].map((entry) => presetBinding(entry, platform))
-    return [...app, ...appWidgets, ...widgets, ...editor, ...terminal, ...readOnly, ...shell].map(
-      itemKeyTyping,
-    )
+    return [...app, ...appWidgets, ...widgets, ...editor, ...terminal, ...readOnly, ...shell]
   }
   const current = presetRuntimeRows.filter(
     (row) => row[1] === (platform === 'mac' ? 'mac' : 'linux'),
@@ -102,8 +82,9 @@ export function defaultPlatformKeyBindings(
       upstreamCommand,
     )
   })
+  const fregat = preset === 'ours' ? fregatBindings(platform, bindings) : []
   const cancel = editorCancelRows(platform).map((entry) => presetBinding(entry, platform))
-  return [...appWidgets, ...widgets, ...bindings, ...cancel, ...readOnly, ...shell].map(
+  return [...appWidgets, ...widgets, ...bindings, ...fregat, ...cancel, ...readOnly, ...shell].map(
     itemKeyTyping,
   )
 }
@@ -115,8 +96,9 @@ const ITEM_COMMANDS: ReadonlySet<string> = new Set([
 ])
 
 /**
- * Tab and chat keys work from the terminal and the chat composer, as Zed's and VS Code's do.
- * Their Alt+digit form types no character outside macOS; AltGr text still wins.
+ * Zed's tab keys act in every pane, the terminal and the chat composer included, so the Zed-based
+ * layouts fire them while typing. Alt+digit types no character outside macOS; AltGr text and
+ * keypad Alt codes still type. The VS Code layout leaves them to the shell, as VS Code does.
  */
 function itemKeyTyping(binding: PlatformKeyBinding): PlatformKeyBinding {
   if (!binding.command || !ITEM_COMMANDS.has(binding.command)) return binding
@@ -135,9 +117,77 @@ const EDITOR_CANCEL_COMMANDS: ReadonlySet<string> = new Set([
  * layouts take their Escape rows from the VS Code packs; later rows win ties.
  */
 function editorCancelRows(platform: PlatformName) {
-  return [...vscodeFindPack[platform], ...suggestPack[platform]].filter((entry) =>
-    EDITOR_CANCEL_COMMANDS.has(entry.command),
+  return [...vscodeFindPack[platform], ...suggestPack[platform]].filter(
+    (entry) => isEscape(entry.keys) && EDITOR_CANCEL_COMMANDS.has(entry.command),
   )
+}
+
+function isEscape(keys: KeymapEntry['keys']) {
+  if (typeof keys === 'string') return keys === 'Escape'
+  if (keys.length !== 1) return false
+  const [stroke] = keys
+  return (
+    typeof stroke === 'object' &&
+    stroke.key === 'Escape' &&
+    !stroke.alt &&
+    !stroke.ctrl &&
+    !stroke.mod &&
+    !stroke.shift &&
+    !stroke.meta
+  )
+}
+
+type ApplicationRow = (typeof vscodeApp)[number]
+type Override = (typeof oursFregat)[number]
+
+/**
+ * Fregat's own commands, which Zed has no action for, keep their application keys in `ours`.
+ * A key Zed already uses in an overlapping context moves per `ours-fregat.json`.
+ */
+function fregatBindings(
+  platform: PlatformName,
+  zedBindings: readonly PlatformKeyBinding[],
+): readonly PlatformKeyBinding[] {
+  const bound = new Set<string | null>(zedBindings.map(({ command }) => command))
+  return vscodeApp.flatMap((row) => {
+    if (bound.has(row.command)) return []
+    return applicationBinding(row, platform, oursOverride(row, platform))
+  })
+}
+
+function oursOverride(row: ApplicationRow, platform: PlatformName): Override | undefined {
+  return oursFregat.find(
+    (entry) =>
+      entry.command === row.command &&
+      entry.keys === row.keys &&
+      (!entry.platforms || entry.platforms.includes(platform)),
+  )
+}
+
+function applicationBinding(
+  row: ApplicationRow,
+  platform: PlatformName,
+  override?: Override,
+): PlatformKeyBinding[] {
+  if (row.platforms && !row.platforms.includes(platform)) return []
+  if (!isPlatformCommandId(row.command)) return []
+  const replacement: { readonly keys?: string; readonly context?: string } =
+    override?.replacement ?? {}
+  return [
+    presetBinding(
+      {
+        keys: replacement.keys ?? row.keys,
+        command: editorCommandIdFromPlatform(row.command) ?? row.command,
+        context: replacement.context ?? areaContext(row.pane, row.command),
+        source: 'default',
+        preventDefault: row.preventDefault,
+        stopPropagation: row.stopPropagation,
+      },
+      platform,
+      row.vscodeCommandId,
+      row.yieldsToTextEntry,
+    ),
+  ]
 }
 
 export function presetBinding(

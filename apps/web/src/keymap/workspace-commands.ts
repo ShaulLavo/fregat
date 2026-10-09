@@ -165,7 +165,10 @@ function runSessionCommand(
   return dispositionFor(result)
 }
 
-/** A keyboard chat switch leaves focus in the chat's composer, as a tab switch does in the editor. */
+/**
+ * A keyboard chat switch leaves focus in the chat's composer, as a tab switch does in the editor.
+ * The request lapses once another chat is selected, so a later pointer switch keeps its focus.
+ */
 function switchSessionCommand(
   context: WorkspaceCommandHandlerContext,
   run: () => boolean | Promise<boolean>,
@@ -181,12 +184,14 @@ function switchSessionCommand(
     completion: Promise.resolve(run()).then((accepted) => {
       const rootPath = runtime.workspace.getState().rootFolder?.path
       if (!accepted || !rootPath) return declined
+      const destination = selectedChatKey()
       // The old chat's composer stays registered until the new one replaces it.
-      const switched = selectedChatKey() !== before
+      const switched = destination !== before
       const id = { key: rootPath, kind: 'chat-composer' } as const
       return transitionStart(
         runtime.focus.request({
-          isValid: () => runtime.workspace.getState().uiMode === 'chat',
+          isValid: () =>
+            runtime.workspace.getState().uiMode === 'chat' && selectedChatKey() === destination,
           kind: 'match',
           matches: (target) =>
             target.layout === 'chat' &&

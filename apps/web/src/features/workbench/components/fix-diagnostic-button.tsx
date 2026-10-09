@@ -6,7 +6,7 @@ import { useKeyShortcuts } from '@/keymap/hooks/use-key-shortcuts'
 
 /**
  * Fix with AI beside one problem. Out of the Tab order so the list keeps one stop; the
- * VS Code preset reaches it as Mod+. on the active problem.
+ * keyboard reaches it as Mod+. on the active problem.
  */
 export function FixDiagnosticButton({
   pending,

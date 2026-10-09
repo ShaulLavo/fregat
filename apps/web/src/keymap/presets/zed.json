@@ -2640,10 +2640,10 @@
     "platform": "linux",
     "context": "(Editor || Terminal || Chat || Settings || Problems || Search)",
     "keys": "Alt+0",
-    "command": null,
+    "command": "workspace.selectItem9",
     "upstreamCommand": "pane::ActivateLastItem",
     "upstreamContext": "Pane",
-    "reason": "Activate the last tab; workspace.selectItem9 means last in Fregat but Zed ActivateItem(8) means ninth."
+    "reason": null
   },
   {
     "platform": "linux",
@@ -3927,10 +3927,10 @@
     "platform": "linux",
     "context": "Workspace",
     "keys": "Ctrl+Alt+J",
-    "command": null,
+    "command": "workspace.toggleSessionRail",
     "upstreamCommand": "multi_workspace::ToggleWorkspaceSidebar",
     "upstreamContext": "Workspace",
-    "reason": "Toggle workspace sidebar in the multi-workspace sidebar."
+    "reason": null
   },
   {
     "platform": "linux",
@@ -12271,10 +12271,10 @@
     "platform": "mac",
     "context": "(Editor || Terminal || Chat || Settings || Problems || Search)",
     "keys": "Ctrl+0",
-    "command": null,
+    "command": "workspace.selectItem9",
     "upstreamCommand": "pane::ActivateLastItem",
     "upstreamContext": "Pane",
-    "reason": "Activate the last tab; workspace.selectItem9 means last in Fregat but Zed ActivateItem(8) means ninth."
+    "reason": null
   },
   {
     "platform": "mac",
@@ -12595,10 +12595,10 @@
     "platform": "mac",
     "context": "Workspace",
     "keys": "Meta+Alt+J",
-    "command": null,
+    "command": "workspace.toggleSessionRail",
     "upstreamCommand": "multi_workspace::ToggleWorkspaceSidebar",
     "upstreamContext": "Workspace",
-    "reason": "Toggle workspace sidebar in the multi-workspace sidebar."
+    "reason": null
   },
   {
     "platform": "mac",

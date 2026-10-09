@@ -156,3 +156,27 @@ test.each(Array.from({ length: 12 }, (_, index) => `F${index + 1}`))(
     view.unmount()
   },
 )
+
+test('Alt with a keypad digit types an Alt code; Alt with a top-row digit runs the binding', () => {
+  const view = mount('Alt+2')
+  const altDigit = (code: string) => {
+    const event = new KeyboardEvent('keydown', {
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+      code,
+      key: '2',
+    })
+    // happy-dom reports AltGraph for any Alt press; a real browser reports it only for AltGr.
+    Object.defineProperty(event, 'getModifierState', { value: (key: string) => key === 'Alt' })
+    act(() => {
+      document.body.dispatchEvent(event)
+    })
+    return event
+  }
+  expect(altDigit('Numpad2').defaultPrevented).toBe(false)
+  expect(view.calls).toEqual([])
+  expect(altDigit('Digit2').defaultPrevented).toBe(true)
+  expect(view.calls).toEqual([false])
+  view.unmount()
+})

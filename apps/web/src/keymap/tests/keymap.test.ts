@@ -106,13 +106,34 @@ test('Escape in the text closes the completion list, then the signature hint, th
   }
 })
 
-test('item keys fire from the terminal and the chat composer in every layout', () => {
-  for (const preset of ['ours', 'zed', 'vscode'] as const) {
-    const items = defaultPlatformKeyBindings('linux', preset).filter(({ command }) =>
-      /^workspace\.(selectItem\d|nextItem|previousItem)$/.test(command ?? ''),
-    )
-    expect(items.map(({ keys }) => keys)).toContain('Alt+1')
-    expect(items.every(({ firesWhileTyping }) => firesWhileTyping === true)).toBe(true)
+test.each([
+  ['ours', true],
+  ['zed', true],
+  ['vscode', undefined],
+] as const)('%s item keys fire while typing: %s', (preset, fires) => {
+  const items = defaultPlatformKeyBindings('linux', preset).filter(({ command }) =>
+    /^workspace\.(selectItem\d|nextItem|previousItem)$/.test(command ?? ''),
+  )
+  const altTwo = items.find(({ keys }) => keys === 'Alt+2')
+  expect(altTwo?.command).toBe('workspace.selectItem2')
+  expect(altTwo?.firesWhileTyping).toBe(fires)
+})
+
+test('the Zed-based layouts add one Escape row per editor widget', () => {
+  for (const preset of ['ours', 'zed'] as const) {
+    const added = defaultPlatformKeyBindings('linux', preset)
+      .filter(
+        ({ keys, context }) =>
+          keys === 'Escape' &&
+          context?.startsWith('Editor && !EditorWidget') &&
+          context.endsWith('Visible'),
+      )
+      .map(({ command }) => command)
+    expect(added.toSorted()).toEqual([
+      'editor.closeFind',
+      'editor.closeParameterHints',
+      'editor.hideSuggestWidget',
+    ])
   }
 })
 
