@@ -1,6 +1,7 @@
 import { browserTestResponses } from '../../scripts/browser-test-responses.ts'
 import { workspaceRoot } from '../../scripts/workspace-root.ts'
 import { playwright } from '@vitest/browser-playwright'
+import { devices } from '@playwright/test'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
@@ -35,7 +36,12 @@ export default defineConfig({
         server: { fs: { allow: [workspaceRoot] } },
         optimizeDeps: {
           // tree-sitter-md is plain ESM over web-tree-sitter; served as-is, it is never discovered.
-          exclude: ['web-tree-sitter', 'tree-sitter-md'],
+          exclude: [
+            'web-tree-sitter',
+            'tree-sitter-md',
+            'micromark-util-decode-string',
+            'micromark-util-normalize-identifier',
+          ],
           include: [
             '@fregat/hotkeys',
             'diff',
@@ -127,6 +133,33 @@ export default defineConfig({
             'test/markdownFencePaint.browser.test.ts',
             'test/paintOrigin.browser.test.ts',
           ],
+        },
+      },
+      {
+        plugins: [browserTestResponses()],
+        server: { fs: { allow: [workspaceRoot] } },
+        optimizeDeps: {
+          exclude: [
+            'web-tree-sitter',
+            'tree-sitter-md',
+            'micromark-util-decode-string',
+            'micromark-util-normalize-identifier',
+          ],
+        },
+        test: {
+          name: 'wrap-layout',
+          include: ['test/wrapExtent.browser.test.ts', 'test/wordWrapMarkdown.browser.test.ts'],
+          browser: {
+            enabled: true,
+            headless: true,
+            viewport: { width: 390, height: 844 },
+            fileParallelism: false,
+            provider: playwright({ contextOptions: devices['iPhone 13'] }),
+            instances: [
+              { browser: 'chromium', name: 'wrap-layout-chromium' },
+              { browser: 'webkit', name: 'wrap-layout-iphone-webkit' },
+            ],
+          },
         },
       },
       {

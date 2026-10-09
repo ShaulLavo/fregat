@@ -6,10 +6,7 @@ import { TouchRow } from '@/features/file-picker/components/touch-row'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FsEntry } from '@/lib/file-system-types'
 
-test.each([
-  ['directory', ['src']],
-  ['file', []],
-] as const)('one tap on a %s row opens %j', (type, expected) => {
+test('one tap on a folder row opens it', () => {
   const opened: string[] = []
   let selections = 0
   const entry: FsEntry = {
@@ -18,7 +15,7 @@ test.each([
     name: 'src',
     path: filesystemPath('src'),
     size: 0,
-    type,
+    type: 'directory',
     version: 'test',
   }
   renderWithProviders(
@@ -26,7 +23,6 @@ test.each([
       <TouchRow
         entry={entry}
         isBusy={false}
-        mode='folder'
         onOpen={(tapped) => opened.push(tapped.name)}
         position={1}
         rowProps={{
@@ -47,5 +43,5 @@ test.each([
   )
   fireEvent.click(screen.getByRole('option'))
   expect(selections).toBe(1)
-  expect(opened).toEqual(expected)
+  expect(opened).toEqual(['src'])
 })

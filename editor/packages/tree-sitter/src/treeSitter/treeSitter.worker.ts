@@ -1,4 +1,5 @@
 import { TREE_SITTER_BOOTSTRAP_UNITS } from './source'
+import { enclosingMergeUnit, lineMergeUnit } from './mergeUnits'
 import type { EditorSyntaxAnalysis } from '@singapore-editor/core/syntax'
 import {
   Edit,
@@ -55,6 +56,8 @@ import type {
   TreeSitterRangeResult,
   TreeSitterSelectionRange,
   TreeSitterSelectionRequest,
+  TreeSitterMergeUnitRequest,
+  TreeSitterMergeUnitResult,
   TreeSitterSelectionResult,
   TreeSitterSyntaxRange,
   TreeSitterWorkerRequest,
@@ -70,6 +73,7 @@ type Runtime = {
   highlightQuery: Query | null
   foldQuery: Query | null
   injectionQuery: Query | null
+  mergeUnitQuery: Query | null
 }
 
 type LayerKind = 'root' | 'injection' | 'combined-injection'
@@ -91,6 +95,7 @@ type ParsedLayer = {
 type ParsedDocument = {
   readonly markdown?: MarkdownDocument
   markdownDefinitions?: Uint32Array
+  mergeUnitTree?: Tree
   readonly snapshotVersion: number
   readonly languageId: TreeSitterLanguageId
   readonly source: TreeSitterPieceTableInput
@@ -297,6 +302,7 @@ const createRuntime = async (languageId: TreeSitterLanguageId): Promise<Runtime>
     highlightQuery: null,
     foldQuery: null,
     injectionQuery: null,
+    mergeUnitQuery: null,
   }
 }
 
@@ -2883,6 +2889,66 @@ const collectError = (node: Node): TreeSitterError | null => {
   }
 }
 
+const queryMergeUnit = async (
+  request: TreeSitterMergeUnitRequest,
+): Promise<TreeSitterMergeUnitResult> => {
+  const identity = {
+    documentId: request.documentId,
+    snapshotVersion: request.snapshotVersion,
+    languageId: request.languageId,
+  }
+  const cached = cachedDocumentForVersion(
+    request.runtimeSessionId,
+    request.languageId,
+    request.snapshotVersion,
+  )
+  if (!cached) return { ...identity, status: 'stale', unit: null }
+  const startIndex = Math.max(
+    0,
+    Math.min(request.range.startIndex, request.range.endIndex, cached.size),
+  )
+  const endIndex = Math.max(
+    startIndex,
+    Math.min(Math.max(request.range.startIndex, request.range.endIndex), cached.size),
+  )
+  const range = { startIndex, endIndex }
+  const layer = deepestLayerForSelection(cached, range)
+  const languageId = layer?.languageId ?? cached.languageId
+  const runtime = await ensureRuntime(languageId)
+  assertRuntimeSessionActive(request.runtimeSessionId)
+  if (
+    cachedDocumentForVersion(
+      request.runtimeSessionId,
+      request.languageId,
+      request.snapshotVersion,
+    ) !== cached
+  )
+    return { ...identity, status: 'stale', unit: null }
+  const source = runtime.descriptor.mergeUnitQuerySource
+  if (!source?.trim())
+    return {
+      ...identity,
+      languageId,
+      status: 'ok',
+      unit: lineMergeUnit(cached.source.read.text, range),
+    }
+  const query = (runtime.mergeUnitQuery ??= new Query(runtime.language, source))
+  // The native Markdown renderer does not expose its block tree.
+  const tree =
+    layer?.tree ??
+    (cached.mergeUnitTree ??=
+      runtime.parser.parse((index, _position, end) =>
+        readTreeSitterPieceTableInput(cached.source, index, end),
+      ) ?? undefined)
+  const unit = tree && enclosingMergeUnit(tree.rootNode, query, range)
+  return {
+    ...identity,
+    languageId,
+    status: 'ok',
+    unit: unit ?? lineMergeUnit(cached.source.read.text, range),
+  }
+}
+
 const selectDocument = async (
   request: TreeSitterSelectionRequest,
 ): Promise<TreeSitterSelectionResult> => {
@@ -2967,11 +3033,16 @@ const clampSelectionIndex = (root: Node, index: number): number => {
 const layerForSelection = (
   document: ParsedDocument,
   range: TreeSitterSelectionRange,
-): ParsedLayer => {
-  let best = rootLayerForDocument(document)
+): ParsedLayer => deepestLayerForSelection(document, range) ?? rootLayerForDocument(document)
+
+const deepestLayerForSelection = (
+  document: ParsedDocument,
+  range: TreeSitterSelectionRange,
+): ParsedLayer | null => {
+  let best: ParsedLayer | null = null
   for (const layer of document.layers) {
     if (!layerContainsSelection(layer, range)) continue
-    if (layer.depth < best.depth) continue
+    if (best && layer.depth < best.depth) continue
     best = layer
   }
 
@@ -3130,6 +3201,7 @@ const disposeLayer = (layer: ParsedLayer): void => {
 }
 
 const disposeCachedSnapshot = (snapshot: ParsedDocument): void => {
+  snapshot.mergeUnitTree?.delete()
   for (const layer of snapshot.layers) disposeLayer(layer)
   snapshot.source.dispose()
 }
@@ -3209,6 +3281,7 @@ const disposeRuntime = (runtime: Runtime): void => {
   runtime.highlightQuery?.delete()
   runtime.foldQuery?.delete()
   runtime.injectionQuery?.delete()
+  runtime.mergeUnitQuery?.delete()
   runtime.parser.delete()
 }
 
@@ -3230,6 +3303,7 @@ const normalizeLanguageDescriptor = (
   highlightQuerySource: descriptor.highlightQuerySource,
   foldQuerySource: descriptor.foldQuerySource,
   injectionQuerySource: descriptor.injectionQuerySource,
+  mergeUnitQuerySource: descriptor.mergeUnitQuerySource,
 })
 
 const moveLanguageToEnd = (languageId: TreeSitterLanguageId): void => {
@@ -3248,7 +3322,8 @@ const languageDescriptorsEqual = (
   sameItems(left.aliases, right.aliases) &&
   left.highlightQuerySource === right.highlightQuerySource &&
   left.foldQuerySource === right.foldQuerySource &&
-  left.injectionQuerySource === right.injectionQuerySource
+  left.injectionQuerySource === right.injectionQuerySource &&
+  left.mergeUnitQuerySource === right.mergeUnitQuerySource
 
 const sameItems = (left: readonly string[], right: readonly string[]): boolean => {
   if (left.length !== right.length) return false
@@ -3344,6 +3419,7 @@ const handleRequest = async (
   if (payload.type === 'edit') return editDocument(payload, source!)
   if (payload.type === 'queryRange') return queryDocumentRange(payload)
   if (payload.type === 'selection') return selectDocument(payload)
+  if (payload.type === 'mergeUnit') return queryMergeUnit(payload)
 
   disposeAll()
   return undefined
@@ -3445,6 +3521,10 @@ const inspectSnapshotRetention = (
 ): TreeSitterWorkerRetentionSnapshot['documents'][number]['snapshots'][number] => {
   resources.snapshots.add(snapshot)
   const trees = new Set<Tree>()
+  if (snapshot.mergeUnitTree) {
+    trees.add(snapshot.mergeUnitTree)
+    resources.trees.add(snapshot.mergeUnitTree)
+  }
   const markdown = new Set<MarkdownDocument>()
   if (snapshot.markdown) markdown.add(snapshot.markdown)
   for (const layer of snapshot.layers) {
@@ -3491,6 +3571,7 @@ const inspectSharedRetention = async (): Promise<TreeSitterWorkerRetentionSnapsh
     if (runtime.highlightQuery) queries.add(runtime.highlightQuery)
     if (runtime.foldQuery) queries.add(runtime.foldQuery)
     if (runtime.injectionQuery) queries.add(runtime.injectionQuery)
+    if (runtime.mergeUnitQuery) queries.add(runtime.mergeUnitQuery)
   }
   const initialization = await Promise.allSettled(parserInitPromise ? [parserInitPromise] : [])
   const memoryBytes = initialization[0]?.status === 'fulfilled' ? heap().buffer.byteLength : null
@@ -3510,6 +3591,7 @@ const inspectSharedRetention = async (): Promise<TreeSitterWorkerRetentionSnapsh
       highlightQueryCount: Number(runtime.highlightQuery !== null),
       foldQueryCount: Number(runtime.foldQuery !== null),
       injectionQueryCount: Number(runtime.injectionQuery !== null),
+      mergeUnitQueryCount: Number(runtime.mergeUnitQuery !== null),
     })),
   }
 }

@@ -12,21 +12,14 @@ import { TouchRow } from '@/features/file-picker/components/touch-row'
 import { useFilePickerSessionActions } from '@/features/file-picker/hooks/use-file-picker-session-actions'
 import { fileListRows, type LeadingRecents } from '@/features/file-picker/utils/rows'
 import { SCROLL_INTENT_SETTLE_MS } from '@/features/file-picker/utils/intent'
-import {
-  listLabel,
-  pickerCopy,
-  type EntriesLoadState,
-  type FilePickerMode,
-} from '@/features/file-picker/utils/model'
+import { PICKER_COPY, type EntriesLoadState } from '@/features/file-picker/utils/model'
 
 export function FileList({
-  accept,
   entries,
   isBusy,
   isSearching,
   listRef,
   loadState,
-  mode,
   onDirectoryIntent,
   onEntryDoubleClick,
   onCommitEntry,
@@ -36,13 +29,11 @@ export function FileList({
   selectedPath,
   touch,
 }: {
-  accept?: readonly string[]
   entries: FsEntry[]
   isBusy: boolean
   isSearching: boolean
   listRef?: RefObject<HTMLDivElement | null>
   loadState: EntriesLoadState
-  mode: FilePickerMode
   onDirectoryIntent: (path: string) => void
   onEntryDoubleClick: (entry: FsEntry) => void
   onCommitEntry: (entry: FsEntry) => void
@@ -140,7 +131,7 @@ export function FileList({
         getKey={(row) => row.key}
         aria-busy={isBusy || loadState.status === 'loading'}
         aria-describedby={showStatus ? statusId : undefined}
-        aria-label={listLabel(mode)}
+        aria-label={PICKER_COPY.listLabel}
         className='focus-ring-inset absolute inset-0 outline-none'
         renderRow={(row) => {
           if (row.kind === 'section')
@@ -155,12 +146,9 @@ export function FileList({
           if (touch)
             return (
               <TouchRow
-                accept={accept}
                 entry={row.entry}
                 isBusy={isBusy}
-                mode={mode}
                 onOpen={row.recent ? revealEntry : onEntryDoubleClick}
-                opensOnTap={row.recent}
                 position={row.position}
                 rowProps={list.rowProps(row.key)}
                 selected={row.key === activeKey}
@@ -170,11 +158,9 @@ export function FileList({
             )
           return (
             <FileRow
-              accept={accept}
               entry={row.entry}
               rowProps={list.rowProps(row.key)}
               isBusy={isBusy}
-              mode={mode}
               onDirectoryIntent={signalDirectoryIntent}
               onDoubleClick={row.recent ? revealEntry : onEntryDoubleClick}
               position={row.position}
@@ -204,14 +190,14 @@ export function FileList({
       ) : null}
       {showLoading ? (
         <div className='absolute inset-0' id={statusId}>
-          <ListLoading mode={mode} />
+          <ListLoading />
         </div>
       ) : null}
       {showEmpty ? (
         <div className='absolute inset-0' id={statusId}>
           <EmptyState
             className='h-full'
-            description={pickerCopy(mode).emptyDescription}
+            description={PICKER_COPY.emptyDescription}
             icon={<FolderOpenIcon className='size-(--icon-size)' weight='duotone' />}
             title='Nothing here'
           />

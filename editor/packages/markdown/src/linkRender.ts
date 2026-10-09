@@ -60,22 +60,22 @@ function appendLinkRun(
     endIndex: label.end,
     text,
     kind: 'link',
+    wrap: 'text',
     className: 'editor-markdown-text',
     groupId: `link:${link.span.start}:${link.span.end}`,
     revealRange: link.span,
-    render: linkMount(link, text, options),
+    render: linkMount(link, options),
   })
 }
 
 function linkMount(
   link: MarkdownLink,
-  text: string,
   options: MarkdownLinkOptions,
 ): InlineReplacementSpec['render'] {
-  return (container) => {
+  return (container, displayText) => {
     const anchor = container.ownerDocument.createElement('a')
     anchor.href = link.href
-    anchor.textContent = text
+    anchor.textContent = displayText
     anchor.title = link.href
     anchor.className = 'editor-markdown-link'
     anchor.target = '_blank'

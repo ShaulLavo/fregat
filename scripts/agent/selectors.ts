@@ -516,13 +516,12 @@ export const selectors = {
   fontSampleReadySelector: '[aria-label="Code font"] span[style]:not(:has([data-slot="shimmer"]))',
   settingsFormView: (page: Page) => page.getByRole('tab', { name: 'Settings', exact: true }),
   pickerDialog: (page: Page) => page.getByRole('dialog', { name: 'Choose folder', exact: true }),
-  pickerList: (page: Page) => page.getByRole('listbox', { name: 'Folders and files', exact: true }),
+  pickerList: (page: Page) => page.getByRole('listbox', { name: 'Folders', exact: true }),
   pickerOptions: (page: Page) =>
-    page.getByRole('listbox', { name: 'Folders and files', exact: true }).getByRole('option'),
+    page.getByRole('listbox', { name: 'Folders', exact: true }).getByRole('option'),
   pickerGoToFolder: (page: Page) => page.getByRole('button', { name: 'Go to folder', exact: true }),
   pickerFolderPath: (page: Page) => page.getByRole('textbox', { name: 'Folder path', exact: true }),
-  pickerSearch: (page: Page) =>
-    page.getByRole('textbox', { name: 'Search files and folders', exact: true }),
+  pickerSearch: (page: Page) => page.getByRole('textbox', { name: 'Search folders', exact: true }),
   pickerEmpty: (page: Page) => page.getByText('Nothing here', { exact: true }),
   /** The folder the picker shows, from its screen-reader description; a folder picker lists no files. */
   pickerBrowsing: (page: Page, path: string) =>
@@ -548,15 +547,11 @@ export const selectors = {
       name: pinned ? 'Unpin this folder' : 'Pin this folder',
       exact: true,
     }),
-  /** A preview showing content: code, a decoded image or a folder's children. */
-  pickerPreviewContentSelector:
-    '[data-file-preview] [data-file-preview-text], [data-file-preview] img, [data-file-preview] ul',
+  /** A preview showing content: the folder's children. */
+  pickerPreviewContentSelector: '[data-file-preview] ul',
   paletteImportText: (page: Page) =>
     page.getByRole('textbox', { name: 'Palette JSON', exact: true }),
   pickerPreview: (page: Page) => page.locator('[data-file-preview]'),
-  pickerPreviewText: (page: Page) =>
-    selectors.pickerDialog(page).locator('[data-file-preview-text]'),
-  pickerPreviewFacts: (page: Page) => selectors.pickerPreview(page).locator('dl'),
   palettePreviewText: (page: Page) =>
     selectors.quickOpenPreview(page).locator('[data-file-preview-text]'),
   themeStudio: (page: Page) => page.getByRole('region', { name: 'Theme studio', exact: true }),
@@ -613,7 +608,7 @@ export const selectors = {
       .locator('[data-item-section="decoration"]'),
   pickerCurrentFolderHeading: (page: Page) =>
     page
-      .getByRole('listbox', { name: 'Folders and files', exact: true })
+      .getByRole('listbox', { name: 'Folders', exact: true })
       .getByText('Current folder', { exact: true }),
   searchResultTree: (page: Page) => page.getByRole('tree', { name: 'Search results', exact: true }),
   activeResultReplace: (page: Page) =>

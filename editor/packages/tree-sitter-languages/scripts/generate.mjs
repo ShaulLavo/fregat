@@ -76,6 +76,7 @@ const loaders = manifest.languages
         highlights: 'highlightQuerySource',
         folds: 'foldQuerySource',
         injections: 'injectionQuerySource',
+        'merge-units': 'mergeUnitQuerySource',
       }[kind]
       parts.push(
         `${key}: mapQueryCaptures([${sources.map(() => `assets[${index++}]!`).join(', ')}].join('\\n'), captureMappings)`,

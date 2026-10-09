@@ -296,7 +296,7 @@ describe('inline replacements that render their own DOM', () => {
   it('leaves a replacement the wrap boundary cuts in two as the text it stands for', () => {
     const mount = createMount()
     // One unbreakable token, so the wrap has to fall in the middle of it rather than on a space.
-    const line = `${'x'.repeat(23)}![img](x.png)${'y'.repeat(5)}`
+    const line = `${'x'.repeat(21)}![img](x.png)${'y'.repeat(5)}`
     view = mountView(container, line)
     view.setWrapEnabled(true)
     view.setScrollMetrics(0, ROW_HEIGHT * 40, 24 * CHARACTER_WIDTH)

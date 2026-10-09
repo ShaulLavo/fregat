@@ -25,11 +25,11 @@ export const filePickerKeys = {
   serverInfo: () => [...filePickerKeys.all, 'server-info'] as const,
   places: () => [...filePickerKeys.all, 'places'] as const,
   directories: () => [...filePickerKeys.all, 'directories'] as const,
-  directory: (path: string, query: string, mode: 'file' | 'folder', showHidden: boolean) =>
-    [...filePickerKeys.directories(), { mode, path, query, showHidden }] as const,
+  directory: (path: string, query: string, showHidden: boolean) =>
+    [...filePickerKeys.directories(), { path, query, showHidden }] as const,
   recents: () => [...filePickerKeys.all, 'recents'] as const,
-  recentList: (mode: 'file' | 'folder', showHidden: boolean) =>
-    [...filePickerKeys.recents(), 'list', { mode, showHidden }] as const,
+  recentList: (showHidden: boolean) =>
+    [...filePickerKeys.recents(), 'list', { showHidden }] as const,
 }
 
 export const filePreviewKeys = {
