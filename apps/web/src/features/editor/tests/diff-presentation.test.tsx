@@ -42,6 +42,12 @@ test('restores a moved diff view before its old editor finishes disposal, and a 
   const saved = [...original.values()][0]!.anchors
   const copy = mountDiffProjectionControl(attachment, 'new', tabs.get(copiedId).diffPanes.new)
   await waitFor(() => expect(copy.snapshot().viewport.clientHeight).toBe(120))
+  // A live source can recapture identical anchors while the copy mounts.
+  await Promise.resolve().then(() =>
+    second.editor.setSelection(selections[0]!.anchorOffset, selections[0]!.headOffset, {
+      reveal: false,
+    }),
+  )
   expect(copy.editor.getScrollPosition()).toEqual(position)
   copy.editor.setScrollPosition({ top: 40, left: 0 })
   copy.binding.detach()
