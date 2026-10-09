@@ -11,7 +11,13 @@ import {
 
 const KEY = 'git.view.v1'
 const VIEW_MAX_BYTES = 65_536
-const owners = new WeakMap<QueryClient, { storage: ScopedStorage; record: GitViewRecord }>()
+type ReloadState = {
+  storage: ScopedStorage
+  record: GitViewRecord
+  /** The diff view this page load started with; handed out once, never refreshed by captures. */
+  saved: GitViewRecord['diff']
+}
+const owners = new WeakMap<QueryClient, ReloadState>()
 
 const listeners = new Set<() => void>()
 export function subscribeGitReload(listener: () => void) {
@@ -23,7 +29,8 @@ export function subscribeGitReload(listener: () => void) {
 
 export function prepareGitReload(owner: QueryClient, storage: ScopedStorage, root: string | null) {
   const saved = readReloadCache<GitViewRecord>(KEY, gitViewSchema, storage, VIEW_MAX_BYTES)
-  owners.set(owner, { storage, record: saved?.root === root ? saved : { root } })
+  const record = saved?.root === root ? saved : { root }
+  owners.set(owner, { storage, record, saved: record.diff })
   for (const listener of listeners) listener()
 }
 
@@ -46,9 +53,12 @@ export function captureGitView(
   write(state, { ...state.record, list })
 }
 
-export function savedDiffView(owner: QueryClient, identity: DiffReloadIdentity) {
-  const diff = owners.get(owner)?.record.diff
-  return diff && JSON.stringify(diff.identity) === JSON.stringify(identity) ? diff.view : undefined
+export function takeSavedDiffView(owner: QueryClient, identity: DiffReloadIdentity) {
+  const state = owners.get(owner)
+  const saved = state?.saved
+  if (!state || !saved || JSON.stringify(saved.identity) !== JSON.stringify(identity)) return
+  state.saved = undefined
+  return saved.view
 }
 
 export function captureDiffView(
@@ -62,10 +72,7 @@ export function captureDiffView(
   write(state, { ...state.record, diff: { identity, view } })
 }
 
-function write(
-  state: { storage: ScopedStorage; record: GitViewRecord },
-  record: GitViewRecord,
-): void {
+function write(state: ReloadState, record: GitViewRecord): void {
   state.record = record
   const result = writeWorkspaceCacheEntry(KEY, record, {
     storage: state.storage,

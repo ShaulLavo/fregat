@@ -29,6 +29,9 @@ export const phoneSurfaces: Scenario = {
     try {
       await fixtureGit(fixture, ['branch', '-m', BRANCH])
       await mkdir(path.join(fixture, 'alpha'))
+      for (let index = 0; index < 30; index++)
+        await mkdir(path.join(fixture, `folder-${String(index).padStart(2, '0')}`))
+      await mkdir(path.join(fixture, 'zulu'))
       await folderPicker(page, step, fixture)
       await openFixtureChat(page, fixture)
       await newSessionPalette(page, step)
@@ -47,13 +50,13 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>, 
   home.pathname = `${home.pathname.split('/~')[0]}/`
   home.search = ''
   home.hash = ''
-  // The capture opened a workspace; the picker's own entry point is a window with none.
+  // The capture opened a workspace; the phone opens the picker from an empty session rail.
   await page.evaluate(() => {
     localStorage.clear()
     sessionStorage.clear()
   })
   await page.goto(home.href, { waitUntil: 'domcontentloaded' })
-  await selectors.chooseFolder(page).click()
+  await page.getByRole('button', { name: 'Add project', exact: true }).click()
   const dialog = selectors.pickerDialog(page)
   await dialog.waitFor()
   // Opened on a small folder: this machine's root and home listings are not under test.
@@ -90,7 +93,49 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>, 
   await page
     .getByRole('button', { name: `Choose ${path.basename(fixture)}`, exact: true })
     .waitFor()
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  // A folder picker lists folders only.
+  ok(
+    (await list.getByRole('option', { name: /^notes\.md/ }).count()) === 0,
+    'A folder picker hides files',
+  )
+
+  // A tap far down a scrolled list opens that row; focusing the list must not jump to the top.
+  await list.evaluate((element) => element.scrollTo({ top: element.scrollHeight }))
+  const last = list.getByRole('option', { name: /^zulu/ })
+  await last.waitFor()
+  await page.waitForTimeout(300)
+  await last.tap()
+  await page
+    .getByRole('button', { name: `Go to folder, now ${fixture}/zulu`, exact: true })
+    .waitFor({ timeout: 10_000 })
+  await step('picker-tapped-last-folder')
+  await page.getByRole('button', { name: `Back to ${path.basename(fixture)}`, exact: true }).tap()
+  await page
+    .getByRole('button', { name: `Go to folder, now ${fixture}`, exact: true })
+    .waitFor({ timeout: 10_000 })
+  // The filesystem root is the empty path; Back must still return to it.
+  await page.getByRole('button', { name: /^Go to folder/ }).click()
+  await selectors.pickerFolderPath(page).fill('/')
+  await page.keyboard.press('Enter')
+  await list.getByRole('option', { name: /^tmp/ }).tap()
+  await page
+    .getByRole('button', { name: 'Go to folder, now /tmp', exact: true })
+    .waitFor({ timeout: 10_000 })
+  await page.getByRole('button', { name: 'Back to Root', exact: true }).tap()
+  await page
+    .getByRole('button', { name: 'Go to folder, now /', exact: true })
+    .waitFor({ timeout: 10_000 })
+
+  // The system Back gesture steps through the picker's folders; it is the browser's history Back.
+  await list.getByRole('option', { name: /^tmp/ }).tap()
+  await page
+    .getByRole('button', { name: 'Go to folder, now /tmp', exact: true })
+    .waitFor({ timeout: 10_000 })
+  await page.goBack({ waitUntil: 'commit' })
+  await page
+    .getByRole('button', { name: 'Go to folder, now /', exact: true })
+    .waitFor({ timeout: 10_000 })
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
   await dialog.waitFor({ state: 'hidden' })
 }
 

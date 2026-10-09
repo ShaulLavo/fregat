@@ -51,6 +51,14 @@ export class BrowserEngine implements DocumentEngine<BrowserEdit> {
     this.history.push(record)
     return true
   }
+  sequenceBatch(
+    edits: readonly { readonly edit: BrowserEdit; readonly rejection?: string }[],
+  ): readonly Confirmation<BrowserEdit>[] {
+    return edits.map(({ edit, rejection }) => this.sequence(edit, rejection))
+  }
+  applyBatch(records: readonly Confirmation<BrowserEdit>[]): boolean {
+    return records.every((record) => this.apply(record))
+  }
   exportHistory(from: Checkpoint): readonly Confirmation<BrowserEdit>[] | undefined {
     if (
       !sameTip(

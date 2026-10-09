@@ -1,5 +1,4 @@
 import type { HistoryNodeId } from '@singapore-editor/core/document'
-import type { EditorResolvedSelection } from '@singapore-editor/core/extensions'
 import {
   createDiffRegionStore,
   type DiffFile,
@@ -46,12 +45,58 @@ export type DiffInputClaim = {
   readonly references: readonly WeakRef<object>[]
 }
 
+type DiffViewClaim = DiffInputClaim & {
+  readonly subject: string
+  readonly anchors: DiffPaneAnchors
+}
+
 export type DiffPanePresentation = {
   plugin: DiffPlugin | null
-  reload: (DiffInputClaim & { readonly file: WeakRef<DiffFile>; readonly subject: string }) | null
-  scroll: DiffScrollPosition | null
-  selections: readonly EditorResolvedSelection[]
   views: Map<string, DiffInputClaim & { readonly anchors: DiffPaneAnchors }>
+  /** A reloaded view, applied once over the current place when its input next matches. */
+  pendingRestore: DiffViewClaim | null
+}
+
+/** A diff view in plain data, so it survives a page reload. */
+export type DiffViewRecord = {
+  readonly expanded: readonly string[]
+  readonly layout?: Record<string, number>
+  readonly old: DiffPaneAnchors | null
+  readonly new: DiffPaneAnchors | null
+  readonly stacked: DiffPaneAnchors | null
+}
+
+export function diffInputClaim(attachment: DiffAttachment): DiffInputClaim {
+  const subject = diffAttachmentSubject(attachment)
+  return {
+    buffer: subject.buffer ? new WeakRef(subject.buffer) : null,
+    revision: diffAttachmentRevision(attachment),
+    references: diffAttachmentReferences(attachment).map((reference) => new WeakRef(reference)),
+  }
+}
+
+function claimsDiffInput(claim: DiffInputClaim, attachment: DiffAttachment): boolean {
+  const subject = diffAttachmentSubject(attachment)
+  const references = diffAttachmentReferences(attachment)
+  return (
+    claim.revision === diffAttachmentRevision(attachment) &&
+    (claim.buffer?.deref() ?? null) === subject.buffer &&
+    claim.references.length === references.length &&
+    claim.references.every((reference, index) => reference.deref() === references[index])
+  )
+}
+
+export function pendingDiffRestore(presentation: DiffPanePresentation, attachment: DiffAttachment) {
+  const pending = presentation.pendingRestore
+  return pending?.subject === diffAttachmentSubject(attachment).key &&
+    claimsDiffInput(pending, attachment)
+    ? pending
+    : null
+}
+
+export function matchingDiffView(presentation: DiffPanePresentation, attachment: DiffAttachment) {
+  const saved = presentation.views.get(diffAttachmentSubject(attachment).key)
+  return saved && claimsDiffInput(saved, attachment) ? saved : null
 }
 
 export type HistoryPresentation = {
@@ -63,9 +108,9 @@ export type HistoryPresentation = {
 export class TabPresentation {
   readonly regions: DiffRegionStore = createDiffRegionStore()
   readonly diffPanes: Readonly<Record<DiffGutterSide, DiffPanePresentation>> = {
-    old: { scroll: null, selections: [], plugin: null, reload: null, views: new Map() },
-    new: { scroll: null, selections: [], plugin: null, reload: null, views: new Map() },
-    stacked: { scroll: null, selections: [], plugin: null, reload: null, views: new Map() },
+    old: { plugin: null, views: new Map(), pendingRestore: null },
+    new: { plugin: null, views: new Map(), pendingRestore: null },
+    stacked: { plugin: null, views: new Map(), pendingRestore: null },
   }
   readonly history: HistoryPresentation = {
     focusedId: null,
@@ -75,36 +120,32 @@ export class TabPresentation {
   diffLayout: Record<string, number> | undefined
   diffFile: DiffFile | null = null
 
-  restoreDiffView(
-    attachment: DiffAttachment,
-    view: {
-      expanded: readonly string[]
-      layout?: Record<string, number>
-      oldSelections?: readonly EditorResolvedSelection[]
-      newSelections?: readonly EditorResolvedSelection[]
-      stackedSelections?: readonly EditorResolvedSelection[]
-      old: DiffScrollPosition | null
-      new: DiffScrollPosition | null
-      stacked: DiffScrollPosition | null
-    },
-  ): void {
-    const file = attachment.file
-    const subject = diffAttachmentSubject(attachment)
-    this.regions.setFile(file)
+  restoreDiffView(attachment: DiffAttachment, view: DiffViewRecord): void {
+    this.regions.setFile(attachment.file)
     for (const key of view.expanded) {
       if (!this.regions.getExpandedRegions().has(key)) this.regions.toggleRegion(key)
     }
     this.diffLayout = view.layout
+    const subject = diffAttachmentSubject(attachment).key
     for (const side of ['old', 'new', 'stacked'] as const) {
-      this.diffPanes[side].reload = {
-        file: new WeakRef(file),
-        subject: subject.key,
-        buffer: subject.buffer ? new WeakRef(subject.buffer) : null,
-        revision: diffAttachmentRevision(attachment),
-        references: diffAttachmentReferences(attachment).map((reference) => new WeakRef(reference)),
-      }
-      this.diffPanes[side].scroll = view[side]
-      this.diffPanes[side].selections = view[`${side}Selections`] ?? []
+      const anchors = view[side]
+      this.diffPanes[side].pendingRestore = anchors
+        ? { ...diffInputClaim(attachment), subject, anchors }
+        : null
+    }
+  }
+
+  diffViewRecord(attachment: DiffAttachment): DiffViewRecord {
+    const anchors = (side: DiffGutterSide) =>
+      pendingDiffRestore(this.diffPanes[side], attachment)?.anchors ??
+      matchingDiffView(this.diffPanes[side], attachment)?.anchors ??
+      null
+    return {
+      expanded: [...this.regions.getExpandedRegions()],
+      layout: this.diffLayout,
+      old: anchors('old'),
+      new: anchors('new'),
+      stacked: anchors('stacked'),
     }
   }
 
@@ -151,10 +192,8 @@ export class TabPresentations {
     target.regions.setFile(source.diffFile)
     for (const key of source.regions.getExpandedRegions()) target.regions.toggleRegion(key)
     for (const side of ['old', 'new', 'stacked'] as const) {
-      target.diffPanes[side].scroll = source.diffPanes[side].scroll
-      target.diffPanes[side].selections = source.diffPanes[side].selections
-      target.diffPanes[side].reload = source.diffPanes[side].reload
       target.diffPanes[side].views = new Map(source.diffPanes[side].views)
+      target.diffPanes[side].pendingRestore = source.diffPanes[side].pendingRestore
     }
     Object.assign(target.history, source.history)
     this.tabs.set(toTabId, target)

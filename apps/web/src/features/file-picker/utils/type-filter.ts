@@ -17,7 +17,8 @@ export function filterPickerEntries(
   mode: FilePickerMode,
   accept?: readonly string[],
 ) {
-  if (mode !== 'file' || !accept?.length) return entries
+  if (mode === 'folder') return entries.filter(isDirectoryEntry)
+  if (!accept?.length) return entries
   return entries.filter((entry) => isDirectoryEntry(entry) || fileMatchesAccept(entry.name, accept))
 }
 

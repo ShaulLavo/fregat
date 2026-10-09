@@ -92,6 +92,7 @@ export function useFilePickerSession(value: PickedFsEntry | null) {
   }
 
   return {
+    backDepth: navigation.backHistory.length,
     backPath: navigation.backHistory.at(-1) ?? null,
     canGoBack: navigation.backHistory.length > 0,
     canGoForward: navigation.forwardHistory.length > 0,

@@ -1230,7 +1230,7 @@ describe('retained document analysis', () => {
     expect(parser.dispose).toHaveBeenCalledTimes(3)
   })
 
-  it('inspects shared record backing without charging token or provider allocations', async () => {
+  it('measures shared record and token backing without charging provider allocations', async () => {
     const buffer = createEditorTextBuffer('alpha beta')
     const backing = new ArrayBuffer(256)
     const tokens = EditorTokenStore.fromTokens([{ start: 0, end: 5, style: { color: 'red' } }])
@@ -1261,6 +1261,7 @@ describe('retained document analysis', () => {
         tokenCount: 1,
         cachedRangeCount: 1,
         syntaxRecordBackingBytes: 256,
+        tokenStoreBackingBytes: 12,
       },
       {
         leaseCount: 1,
@@ -1268,11 +1269,12 @@ describe('retained document analysis', () => {
         tokenCount: 1,
         cachedRangeCount: 0,
         syntaxRecordBackingBytes: 256,
+        tokenStoreBackingBytes: 12,
       },
     ])
     expect(inspection.syntaxRecordBackingBytes).toBe(256)
+    expect(inspection.tokenStoreBackingBytes).toBe(12)
     expect(inspection.unmeasuredBytes).toEqual([
-      'token-store-backing',
       'javascript-objects',
       'provider-sessions',
       'worker-heaps',
@@ -1286,9 +1288,11 @@ describe('retained document analysis', () => {
       cachedRangeCount: 1,
     })
     expect(analysis.inspectRetention().syntaxRecordBackingBytes).toBe(256)
+    expect(analysis.inspectRetention().tokenStoreBackingBytes).toBe(12)
     right.dispose()
     analysis.reclaimInactive({ reason: 'inactive-budget' })
     expect(analysis.inspectRetention().syntaxRecordBackingBytes).toBe(0)
+    expect(analysis.inspectRetention().tokenStoreBackingBytes).toBe(0)
     analysis.dispose()
   })
 
