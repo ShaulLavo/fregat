@@ -120,6 +120,11 @@ Not in scope: accounts, permissions, persistent rooms, a server peer, and rooms 
 
 ## Risks and decisions
 
+- Owner direction (2026-10-09): in Fregat, peer-to-peer WebRTC collaboration belongs in a Fregat
+  plugin once Fregat has plugins; until then it may ship built in and be split out with the other
+  pieces leaving the main package. A Fregat UI for starting sessions is not needed yet. The
+  server-hosted path (Fregat's server as host) is built into Fregat; see the Delta DB plan.
+
 - Concurrent multi-way reconciliation has no proof yet; step 2's simulation is the gate before
   any adapter work ships.
 - Rooms over 8 peers need forwarding and membership reconciliation; deferred.
