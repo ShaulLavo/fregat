@@ -55,19 +55,6 @@ export class PackedCells {
     return target
   }
 
-  isDefaultEmpty(index: number): boolean {
-    const offset = index * PACKED_CELL_WORDS
-    const flags = this.words[offset + 3]!
-    return (
-      (flags & 3) !== 2 &&
-      (flags & 12) === 0 &&
-      this.words[offset] === 0 &&
-      this.words[offset + 1] === 0xffffffff &&
-      this.words[offset + 2] === 0xffffffff &&
-      this.words[offset + 5] === 0
-    )
-  }
-
   span(index: number): number {
     let span = 1
     while (

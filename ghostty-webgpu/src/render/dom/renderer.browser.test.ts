@@ -135,6 +135,31 @@ async function expectWideGlyphCursorPaint(font = probeFont) {
 }
 
 describe('DOM terminal renderer', () => {
+  it('retains text nodes and changes only the edited UTF-16 interval', async () => {
+    const probe = await rendererProbe('dom', '\x1b[?25ledit 0000')
+    const frame = probe.canvas.parentElement!.querySelector('.ghostty-webgpu-frame')!
+    const span = frame.querySelector('span')!
+    const text = span.firstChild as Text
+    const replace = vi.spyOn(text, 'replaceData')
+    const edits = [
+      ['edit 0001', 8, 1, '1'],
+      ['edit 1001', 5, 1, '1'],
+      ['edit 100', 8, 1, ''],
+      ['edit 1002', 8, 0, '2'],
+      ['éit 1002', 1, 1, '́'],
+      ['èit 1002', 1, 1, '̀'],
+    ] as const
+    for (const [value, offset, count, replacement] of edits) {
+      replace.mockClear()
+      probe.terminal.write(`\r\x1b[2K${value}`)
+      probe.renderer.notifyWrite()
+      probe.clock.flush()
+      expect(span.firstChild).toBe(text)
+      expect(text.data).toBe(value)
+      expect(replace).toHaveBeenCalledExactlyOnceWith(offset, count, replacement)
+    }
+  })
+
   it('matches Node-safe serialized markup and Canvas2D SGR and cursor colors on the same real core input', async () => {
     const dom = await rendererProbe('dom')
     const canvas = await rendererProbe('canvas2d')

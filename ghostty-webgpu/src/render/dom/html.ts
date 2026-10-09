@@ -145,23 +145,6 @@ export interface RowRun {
   readonly text: string
 }
 
-function rowLength(row: RenderRow, cursorEnd: number): number {
-  const packed = row.packed
-  let length = packed?.length ?? row.cells.length
-  if (packed) {
-    while (length > cursorEnd && packed.isDefaultEmpty(length - 1)) length -= 1
-    // Retain trailing cells after wide glyphs to preserve their browser paint.
-    return length > cursorEnd && packed.continuation(length - 1) ? packed.length : length
-  }
-  while (length > cursorEnd) {
-    const cell = row.cells[length - 1]!
-    if (cell.continuation) return row.cells.length
-    if (cell.text || cell.selected || cell.foreground || cell.background || cell.style) break
-    length -= 1
-  }
-  return length
-}
-
 export function renderRowRuns(
   row: RenderRow,
   cursor: CursorState | undefined,
@@ -173,9 +156,19 @@ export function renderRowRuns(
   const scratchA = emptyRenderCell()
   const scratchB = emptyRenderCell()
   const columns = packed?.length ?? row.cells.length
+  let length = columns
   const cursorEnd = cursor?.visible && cursor.y === row.y ? cursor.x + 1 : 0
   // The fixed-grid frame paints the default background; empty tails need no glyph layout.
-  const length = rowLength(row, cursorEnd)
+  while (length > cursorEnd) {
+    const cell = packed ? packed.read(length - 1, scratchB) : row.cells[length - 1]!
+    // Retain trailing cells after wide glyphs to preserve their browser paint.
+    if (cell.continuation) {
+      length = columns
+      break
+    }
+    if (cell.text || cell.selected || cell.foreground || cell.background || cell.style) break
+    length -= 1
+  }
   const runs: RowRun[] = []
   let currentStyle = ''
   let currentText = ''
