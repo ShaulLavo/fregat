@@ -3,6 +3,7 @@
 ## Status and ownership
 
 - Status: Approved. Owner request, 2026-10-08. Make the entire 10 MiB file fast first. Incremental and viewport-first work comes later.
+- Execution: Open, paused at the owner's request on 2026-10-09 after the approved capture-normalization and structural-walk changes. M1 remains unpassed. Resume from the ranked handoff below.
 - Kind: Editor performance, with bounded tree-sitter-x work when measurements justify it.
 - Owner: Singapore syntax lane. Coordinate parser changes with the tree-sitter-x owner and prepared-document changes with the async editor lane.
 - Parent: [Plan 336](336-packages-as-products.md). [Plan 338](338-singapore-docs-load-speed.md) owns docs asset delivery and takeover. This plan owns complete-file syntax throughput.
@@ -612,3 +613,64 @@ A prospective quiet pair kept the shipping span map and published runtime on bot
 Cold diagnostic work is 3,592.819 ms, still 53.766 ms above the frozen 3,539.053 ms ceiling. Warm diagnostic work is 3,399.587 ms in this one observation. M1 remains unpassed. No qualification window or timing rescue rerun was attempted.
 
 The initial postprocessing assertion compared warm resource counters against a cold smoke and failed. Both warm sides retain the accepted prime document, with 350,683,136 bytes of WASM capacity and 48 observed queries, versus 329,187,328 bytes and 42 queries cold. The corrected derivation separates startup conditions and keeps every raw observation and strict comparison guard unchanged. [Exact sources, all four observations and traces, both comparisons, the failed analysis and its correction](https://github.com/ShaulLavo/fregat/tree/lane/plan-339-error-free-walk/editor/docs/performance/singapore-full-parse-2026-10-08/error-free-walk-experiment) are lossless archives with 26 checked artifact hashes. The cold candidate screenshot was read back. These samples establish a retained diagnostic improvement, not timing distributions, physical presentation or the whole-job memory gate.
+
+## Resume handoff, 2026-10-09
+
+Status stays Approved and open. The owner stopped this run after the in-flight changes. This is a pause, not a measured ceiling or a completed milestone. No further candidate or qualification run started after that direction.
+
+### Completed changes and current M1 gap
+
+- Compact capture ranges landed in [tree-sitter-x #25](https://github.com/ShaulLavo/tree-sitter-x/pull/25), with the published artifact pinned by [Fregat #1087](https://github.com/ShaulLavo/fregat/pull/1087). Full highlights use compact ranges; range highlights, folds and injection discovery keep their existing APIs.
+- Bounded capture-name span stamps landed in [#1089](https://github.com/ShaulLavo/fregat/pull/1089). Equal-span precedence, empty/inverted spans and independent language-layer deduplication have focused and native coverage.
+- The independently approved error-free structural walk is [#1090](https://github.com/ShaulLavo/fregat/pull/1090). Its reviewed source has 32 worker/runtime tests, package types and 49 native browser tests. Squash reconciliation was pushed at `6a5af70a2ec9bcf0285fc8d39aaf77f9533c7f0d`. Those checks and a fresh complete 10 MiB canonical proof passed again. The reviewed worker, tests, plan and evidence remain unchanged; the four differing paths are main's browser-artifact repair from [#1088](https://github.com/ShaulLavo/fregat/pull/1088).
+- Earlier structural-read and predicate-read changes, failed qualification windows and rejected experiments remain documented above. The unresolved large Markdown proof in Phase 0 remains unresolved.
+
+The latest retained shipping-source pair has cold worker work of 3,575.6 ms and a complete highlighted-frame opportunity of 3,762.0 ms. Its diagnostic work is **3,592.819 ms**, which is **53.766 ms above** the frozen cold ceiling of 3,539.053 ms. This is the requested rounded 54 ms shortfall. Warm diagnostic work is 3,399.587 ms against a ceiling of 3,576.377 ms, in one observation. M1 has not passed. There is no qualified five-repetition distribution or matched whole-job memory acceptance for these final optimizations.
+
+All four retained shipping-source samples preserve 1,198,376 tokens, identical token/style/structural hashes, full UTF-16 root coverage through 10,485,760 and no exceeded match limit. Cold and warm still parse fresh measured documents. Their accepted priming and resource counters stay separate.
+
+### Ranked remaining work
+
+1. **Ship and qualify fused cursor movement.** This is the strongest already-measured next step. An experiment-only `TreeCursor.gotoNext()` keeps cursor state in the existing native transfer buffer across first-child, next-sibling and parent movement. It marshals once at entry and unmarshals in `finally`. It visits the same nodes in the same order, preserves the cursor's original-root boundary and uses the unchanged native movement functions. The full walker uses it; the range walker is unchanged. No runtime source API was implemented, published or pinned.
+
+   | Single-pair diagnostic     | Cold baseline | Cold fused prototype | Warm baseline | Warm fused prototype |
+   | -------------------------- | ------------: | -------------------: | ------------: | -------------------: |
+   | Complete highlighted frame |    3,846.2 ms |           3,434.4 ms |    3,541.1 ms |           3,210.9 ms |
+   | Worker parse plus query    |    3,619.0 ms |           3,248.8 ms |    3,413.5 ms |           3,076.2 ms |
+   | Diagnostic work            |  3,649.182 ms |         3,263.956 ms |  3,423.914 ms |         3,084.939 ms |
+   | Structural walk            |      855.2 ms |             504.9 ms |      811.1 ms |             503.9 ms |
+
+   Both strict environment comparisons and all canonical-output guards passed. Each side parsed a fresh 10 MiB document, with cold baseline first and warm candidate first. These are prospective diagnostics, not qualification, physical presentation or a memory claim. The experiment finished before the pause. Its promising clocks do not change the shipping 54 ms gap or M1 status.
+
+   Implement the small API in `tree-sitter-x/lib/binding_web/src/tree_cursor.ts`. Prove equality with ordinary movement for wide trees, deep trees, anonymous/aliased nodes, Unicode, missing nodes, subtree-root cursors and traversal exhaustion. The existing native wrappers in `lib/binding_web/lib/tree-sitter.c` marshal the updated cursor after each movement, which is the invariant the prototype uses. Keep the native WASM and grammar binaries unchanged. Obtain a separate reviewed runtime PR before publishing and pinning its artifact. Then update the full worker traversal, retain the existing range path and repeat native output controls before qualification.
+
+2. **Profile remaining query materialization and normalization allocations.** After fused movement, the prototype's highlight-query phase is 978.8 ms cold and 984.0 ms warm, larger than its 504.9/503.9 ms structural walk. Root parse is 751.2/661.7 ms, injection discovery 340.5/336.7 ms and fold queries 237.7/237.5 ms. Reuse the retained trace to distinguish native query/predicate work from range-object decoding and the separate normalized capture allocation. A direct capture visitor or another bounded representation is an unmeasured hypothesis, not an approved API design. Preserve complete-match predicate decisions and equal-span precedence. Any runtime API again needs its own reviewed source PR.
+
+3. **Consider more native structural batching only after the small fused API.** The fused prototype still spends about 504 ms on the complete walk. It still crosses into native code for individual movement and property reads. A native traversal operation may remove more crossings, but its benefit, memory cost and API are unmeasured. Do not add a bulk format before measuring those costs. Packing is only 12.7/12.4 ms and capture sorting 7.2/7.3 ms in the prototype, so they rank below the walk and query work.
+
+Do not replace the linear walker with indexed `gotoDescendant(i)` by assumption. [Native cursor source](https://github.com/ShaulLavo/tree-sitter-x/blob/c374752c470fbaac605d12f30e16d7112405daa0/lib/src/tree_cursor.c#L430) ascends to an ancestor and starts its child iterator at child zero. Repeated adjacent indexed jumps can rescan earlier siblings in a wide tree. This is a source-inspection warning; no indexed-walk experiment ran.
+
+### Rejected small candidates and retained evidence
+
+These independent experiments used the same shipping error-free-walk baseline and published runtime. Neither change remains in shipping source.
+
+| Candidate                          | Cold worker, baseline to candidate | Warm worker, baseline to candidate | Decision                                                                                                           |
+| ---------------------------------- | ---------------------------------: | ---------------------------------: | ------------------------------------------------------------------------------------------------------------------ |
+| Single-character bracket prefilter |              3,586.1 to 3,581.6 ms |              3,390.3 to 3,402.2 ms | Reject. Warm worker work increased; cold diagnostic work still misses M1.                                          |
+| Mutable capture-name stamp records |              3,563.3 to 3,523.3 ms |              3,390.4 to 3,407.7 ms | Reject. Warm worker work increased; cold diagnostic work is 3,539.482 ms, still 0.429 ms above the frozen ceiling. |
+
+No sample was rerun for a rescue, pooled with another experiment or used to widen a threshold. Each experiment's strict cold and warm comparisons passed and all complete canonical outputs agree. The first fused-cursor shell setup failed before changes or measurements; its log and the corrected Python setup are preserved.
+
+[Structured observations](https://github.com/ShaulLavo/fregat/blob/lane/plan-339-wrap-up/editor/docs/performance/singapore-full-parse-2026-10-08/resume-handoff/observations.json) record all twelve samples, phase clocks, decisions and hashes. The adjacent [core archive](https://github.com/ShaulLavo/fregat/blob/lane/plan-339-wrap-up/editor/docs/performance/singapore-full-parse-2026-10-08/resume-handoff/evidence.tar.gz) preserves 53 checked artifacts: raw observations, both exact worker and transform sources, comparisons, classifications, original derivations, host recipes and logs. Its SHA-256 is `a1917804b6c8568a5e798f0a15e7d8f3e8265b5a3d81fcddfd1e0cd92e2cdc3f`. The shared derivation helper carries a historical warm-counter correction note from the preceding error-free-walk experiment; it does not describe a failed sample or assertion in these three successful experiments.
+
+The complete local archive, including all traces and screenshots, is `/work/reports/plan-339/qualification/next-candidates-20261009.tar.gz`, with 77 checked artifacts and SHA-256 `0a1d6e0a80e4aa9756fd084871d6cd2781edbaaef004777caaff967f8148c6d5`. It is preserved outside the removed worktrees. Raw runs remain in the adjacent `bracket-prefilter-experiment/`, `mutable-capture-stamps-experiment/` and `fused-cursor-experiment/` directories. These host-specific archival recipes are evidence, not portable tests or repository commands.
+
+### Restart checklist
+
+- [ ] Start from main containing #1087, #1088, #1089 and #1090. Install at the repository root and build workspaces with the documented commands.
+- [ ] Read the frozen M0 thresholds and the retained failed windows above. Preserve every earlier observation.
+- [ ] Extract `resume-handoff/evidence.tar.gz` into an owned scratch directory and verify each member against `artifacts.json`. Read the fused candidate's `candidate-full-document.mjs` for the exact prototype and `provenance/prepare-fused-cursor.py` for its setup.
+- [ ] Implement and independently review the small runtime API. Pin only its reviewed published artifact, then prove the shipping worker against the native full/range, injection, malformed and Unicode controls.
+- [ ] Run a short prospective paired experiment with fresh documents and canonical equality. If it still appears to meet M1, run the full frozen five-pair cold and warm window, alternating order, and the existing 1 MiB/10 MiB control matrix with lifecycle/retention checks.
+- [ ] Evaluate all frame/worker samples, each phase's frozen regression allowance, median diagnostic work and matched whole-job memory. Preserve failures and report cold/warm separately. Headless frame opportunities remain proxies. Do not rescue a failed window by rerunning it or editing raw metadata.
+- [ ] Keep M1 open unless the full qualification passes. M2 and M3 remain later work.
