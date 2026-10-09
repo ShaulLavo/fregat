@@ -247,7 +247,8 @@ them).
    sessionless views, uninterested plugins and single-author documents do no detection work.
    A cancellable MessageChannel task coalesces accepted remote batches outside authoring; local-only
    confirmations dispatch no detector work. A remote request waits for an already-pending local
-   acknowledgement so both confirmed sides can be compared. Rejected-only batches leave existing
+   acknowledgement, including histories already containing multiple authors, so both confirmed sides
+   can be compared. Rejected-only batches leave existing
    marks intact and schedule no syntax work. History resets
    and newer confirmations invalidate published marks; obsolete work releases source snapshots
    before the next run. Detach unsubscribes and releases the review lifetime.

@@ -468,3 +468,31 @@ test('a causal follow-up in another unit preserves the competing alternatives', 
   expect(f.review.marks[0]!.authors).toEqual(['alice', 'bob'])
   f.review.dispose()
 })
+
+test('remote demand waits for pending acknowledgement even with multiple retained authors', async () => {
+  const detect = vi.spyOn(MergeReviewDetector.prototype, 'detect')
+  const f = fixture()
+  try {
+    const left = f.a.participant.local({ offset: 14, deleteCount: 1, text: '1' })
+    const right = f.b.participant.local({ offset: 14, deleteCount: 1, text: '2' })
+    f.b.applyBatch(f.a.sequenceBatch([{ edit: left }, { edit: right }]))
+    await f.flush()
+    const before = detect.mock.calls.length
+    const pending = f.a.participant.local({ offset: 14, deleteCount: 2, text: '3' })
+    const remote = f.b.participant.local({ offset: 14, deleteCount: 2, text: '4' })
+    f.b.apply(f.a.sequence(remote))
+    await f.flush()
+    expect(detect).toHaveBeenCalledTimes(before)
+    f.b.apply(f.a.sequence(pending))
+    await f.flush()
+    expect(detect).toHaveBeenCalledTimes(before + 1)
+    expect(f.review.marks).toHaveLength(1)
+    expect(f.review.versions(f.review.marks[0]!)!.authors.map(({ text }) => text)).toEqual([
+      'const value = 3;\n',
+      'const value = 4;\n',
+    ])
+  } finally {
+    f.review.dispose()
+    detect.mockRestore()
+  }
+})

@@ -111,9 +111,10 @@ export class MergeReview {
     this.allMarks = []
     this.changed()
     if (remote && accepted.some((record) => record.id.actor !== this.peer)) this.requested = true
+    // Remote delivery can precede our concurrent acknowledgement, even in a multi-author history.
+    if (this.document.participant.state().pending.length) return
     if (new Set(this.window.edits.map((edit) => edit.envelope.id.actor)).size < 2) {
-      // A remote batch can precede the acknowledgement of our concurrent pending edit.
-      if (!this.document.participant.state().pending.length) this.requested = false
+      this.requested = false
       return
     }
     if (!this.requested) return
@@ -125,6 +126,7 @@ export class MergeReview {
     this.queued = this.schedule(() => {
       this.queued = undefined
       if (!this.requested || this.disposed) return this.settled()
+      if (this.document.participant.state().pending.length) return this.settled()
       this.requested = false
       const revision = this.revision
       const snapshot = this.snapshot

@@ -281,7 +281,7 @@ export const collaborationMergeReview: Scenario = {
     await hold(page)
     const from = source.indexOf('base')
     await replace(page, 0, from, from + 4, 'Alice')
-    await replace(page, 1, from, source.indexOf('0') + 1, 'Bob";\nconst second = 1')
+    await replace(page, 1, from, source.indexOf('0') + 1, 'Bob";\nconst second = 1;\n// ')
     await release(page)
     await ui.dots(page).nth(1).waitFor()
     await ui.invitation(page).evaluate((input) => {
