@@ -209,6 +209,7 @@ delivered acceptance, monitoring/draft check, named follow-ons and owner-only re
 | [339](339-singapore-full-parse-speed.md)              | Measured complete-file parse and highlight targets for 10 MiB Singapore files        |
 | [338](338-singapore-docs-load-speed.md)               | Measured startup and byte budgets for Singapore docs in the real editor              |
 | [340](340-singapore-site-embedding.md)                | Editor-produced first paint, page scrolling and matching static/live Singapore pages |
+| [341](341-zig-017-migration.md)                       | Zig 0.17 migration after Ghostty upgrades, and the 0.17 features we adopt            |
 
 ## Package and client plans
 
