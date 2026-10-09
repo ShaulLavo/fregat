@@ -302,6 +302,18 @@ describe('DOM terminal renderer', () => {
     expect(empty.children).toHaveLength(0)
     expect(row.getBoundingClientRect().height).toBe(probeFont.cssCellHeight)
     expect(snapshots[0]!.rows[0]!.renderCells).toHaveLength(12)
+    const span = row.firstElementChild!
+    const style = span.getAttribute('style')
+    expect(span.getBoundingClientRect().width).toBe(12 * probeFont.cssCellWidth)
+    probe.terminal.write('\rshorter')
+    probe.renderer.notifyWrite()
+    probe.clock.flush()
+    expect(row.firstElementChild).toBe(span)
+    expect(span.getAttribute('style')).toBe(style)
+    expect(row.textContent).toBe('shorter')
+    probe.terminal.write('\rshort\x1b[K')
+    probe.renderer.notifyWrite()
+    probe.clock.flush()
 
     probe.terminal.write('\x1b[?25h\x1b[1;12H')
     probe.renderer.notifyWrite()

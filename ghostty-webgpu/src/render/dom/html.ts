@@ -155,7 +155,8 @@ export function renderRowRuns(
   const packed = row.packed
   const scratchA = emptyRenderCell()
   const scratchB = emptyRenderCell()
-  let length = packed?.length ?? row.cells.length
+  const columns = packed?.length ?? row.cells.length
+  let length = columns
   const cursorEnd = cursor?.visible && cursor.y === row.y ? cursor.x + 1 : 0
   // The fixed-grid frame paints the default background; empty tails need no glyph layout.
   while (length > cursorEnd) {
@@ -209,6 +210,14 @@ export function renderRowRuns(
     currentWidth += width
     // Wide glyphs occupy two cells but one character; their following run must start at its own cell.
     if (width > 1 || paintedCursor) flush()
+  }
+  if (length > 0 && length < columns) {
+    const style = cellStyle(emptyRenderCell(), undefined, font, theme, colors, 1)
+    // Keep default run widths stable as text changes, without laying out empty glyphs.
+    if (style !== currentStyle || currentCursor) flush()
+    currentStyle = style
+    currentCursor = undefined
+    currentWidth += columns - length
   }
   flush()
   return runs
