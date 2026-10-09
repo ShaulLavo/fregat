@@ -4,7 +4,7 @@ import { RenderStateDirty } from '../../core/abi.js'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import type { RenderRow } from '../../core/types.js'
 import type { CursorState } from '../instances/types.js'
-import type { RendererFrameSnapshot } from '../renderer.js'
+import type { RendererFrameSnapshot, RendererTextFrameSnapshot } from '../renderer.js'
 import { FrameObserver } from '../frame-observer.js'
 import { Terminal } from '../../dom/terminal.js'
 import { CanvasTerminalRenderer } from '../canvas/renderer.js'
@@ -879,6 +879,64 @@ it('publishes supplied owned paint rows without allocating an unused selection m
   expect(masks.mock.calls.filter(([values]) => values === fallbackChanged)).toHaveLength(1)
   expect(texts[2]).toEqual(frames[2]!.rows.map((row) => row.text))
   expect(original.rows.map((row) => row.text)).toEqual(originalText)
+})
+
+it('shares frozen full and text rows with one owned working copy', async () => {
+  const probe = await rendererProbe('dom')
+  const frames: RendererFrameSnapshot[] = []
+  const texts: RendererTextFrameSnapshot[] = []
+  const observer = new FrameObserver({
+    canvas: probe.canvas,
+    columns: 12,
+    rows: 3,
+    font: probeFont,
+    renderState: probe.state,
+    onFrame: (frame) => frames.push(frame),
+    onTextFrame: (frame) => texts.push(frame),
+  })
+  observer.emit(
+    probe.state,
+    probe.state.readCursor(),
+    undefined,
+    [0, 1, 2],
+    probe.state.readRows({ packed: true }),
+  )
+  const original = frames[0]!
+  const originalText = original.rows.map((row) => row.text)
+  probe.terminal.write('\rshared')
+  probe.state.update()
+  const rows = probe.state.readRows({ dirtyOnly: true, packed: true })
+  const copies = vi.spyOn(Array.prototype, 'slice')
+  observer.emit(
+    probe.state,
+    probe.state.readCursor(),
+    undefined,
+    rows.map((row) => row.y),
+    rows,
+  )
+  const ownedCopies = copies.mock.contexts.filter(
+    (source) => Array.isArray(source) && source.includes(original.rows[0]),
+  )
+  copies.mockRestore()
+  expect(ownedCopies).toHaveLength(1)
+  expect(frames[1]!.rows).toBe(texts[1]!.rows)
+  expect(Object.isFrozen(texts[1]!.rows)).toBe(true)
+  expect(texts[1]!.rows.map((row) => row.text)).toEqual(
+    probe.state
+      .readRows()
+      .map((row) => row.cells.map((cell) => (cell.continuation ? '' : cell.text || ' ')).join('')),
+  )
+  probe.terminal.write('\rlater')
+  probe.state.update()
+  observer.emit(
+    probe.state,
+    probe.state.readCursor(),
+    undefined,
+    [0],
+    probe.state.readRows({ dirtyOnly: true, packed: true }),
+  )
+  expect(original.rows.map((row) => row.text)).toEqual(originalText)
+  expect(texts[2]!.rows).toBe(frames[2]!.rows)
 })
 
 it('isolates fixed-grid layout through theme and font changes', async () => {

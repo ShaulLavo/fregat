@@ -107,7 +107,7 @@ export class FrameObserver {
         })
       : undefined
     const ownedTextRows = preparedRows
-      ? Object.freeze(preparedRows.textRows.filter(defined))
+      ? (fullFrame?.rows ?? Object.freeze(preparedRows.textRows.filter(defined)))
       : undefined
     const displayedFrame: DisplayedTextFrame | undefined = onDisplayedFrame
       ? Object.freeze({
@@ -166,7 +166,8 @@ export class FrameObserver {
     rows: readonly RenderRow[] | undefined,
   ) {
     const fullRows = this.current ? this.fullRows.slice() : []
-    const textRows = this.current ? this.textRows.slice() : []
+    let textRows: (RendererTextFrameRow | undefined)[] = fullRows
+    if (!this.options.onFrame) textRows = this.current ? this.textRows.slice() : []
     const options =
       this.current && !rows ? { rows: new Set(changed), packed: true } : { packed: true }
     if (this.options.onFrame) {
@@ -175,10 +176,10 @@ export class FrameObserver {
       for (const row of source) fullRows[row.y] = copiedFrameRow(row)
     }
     if (
-      this.options.onTextFrame ||
-      (this.options as DisplayedFrameOptions)[observeDisplayedFrame]
+      !this.options.onFrame &&
+      (this.options.onTextFrame || (this.options as DisplayedFrameOptions)[observeDisplayedFrame])
     ) {
-      const source = this.readTextRows(state, options, rows, fullRows)
+      const source = this.readTextRows(state, options, rows)
       for (const row of source) textRows[row.y] = row
     }
     return { fullRows, textRows }
@@ -188,9 +189,7 @@ export class FrameObserver {
     state: RenderStateSource,
     options: { packed: boolean; rows?: ReadonlySet<number> },
     rows: readonly RenderRow[] | undefined,
-    fullRows: readonly (RendererFrameRow | undefined)[],
   ): readonly RendererTextFrameRow[] {
-    if (this.options.onFrame) return fullRows.filter(defined)
     if (rows && (this.current || rows.length === this.rowCount)) return rows.map(copiedPaintTextRow)
     if (state.readTextRows) return state.readTextRows(options)
     const source = this.current && rows ? rows : state.readRows(options)
