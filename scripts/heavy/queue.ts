@@ -127,7 +127,7 @@ function scan(stateDir: string, place: Place) {
   const dir = path.join(stateDir, place)
   return (unlessMissing(() => readdirSync(dir)) ?? [])
     .filter((name) => name.endsWith('.json'))
-    .toSorted()
+    .sort()
     .flatMap((name) => {
       const file = path.join(dir, name)
       const read = readEntry(file, NAMES[place].test(name))

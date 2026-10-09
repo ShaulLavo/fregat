@@ -204,10 +204,9 @@ async function logNoise(directory) {
     const result = JSON.parse(stdout)
     const groups = result.failures.map(({ key, count, reasons }) => ({ key, count, reasons }))
     return {
-      failures: [
-        ...groups.map((group) => `log noise: ${group.key}`),
-        ...result.allowProblems.map((problem) => `log noise allow list: ${problem}`),
-      ],
+      failures: groups
+        .map((group) => `log noise: ${group.key}`)
+        .concat(result.allowProblems.map((problem) => `log noise allow list: ${problem}`)),
       groups,
     }
   } catch (error) {

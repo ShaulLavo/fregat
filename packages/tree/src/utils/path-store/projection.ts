@@ -201,7 +201,7 @@ function selectVisibleRowContextWithinSubtree(
     index - 1,
     rowIndex + 1,
     currentCursor.visibleDepth,
-    [...ancestors, { cursor: currentCursor, index: rowIndex, posInSet, setSize }],
+    ancestors.concat([{ cursor: currentCursor, index: rowIndex, posInSet, setSize }]),
   )
 }
 

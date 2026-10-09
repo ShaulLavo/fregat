@@ -43,7 +43,7 @@ export function macBrowserCandidates(
   )
   const preferred = handler?.LSHandlerRoleAll
   const priority = (id: string) => Number(id === 'com.google.Chrome') * 2 + Number(id === preferred)
-  const ordered = [...bundles].sort((a, b) => priority(b[1]) - priority(a[1]))
+  const ordered = bundles.toSorted((a, b) => priority(b[1]) - priority(a[1]))
   const result: BrowserCandidate[] = []
   for (const [family, id, name] of ordered) {
     const indexed =
@@ -51,7 +51,7 @@ export function macBrowserCandidates(
     const roots = ['/Applications', path.join(env.home, 'Applications')].map((root) =>
       path.join(root, name),
     )
-    const executable = bundleExecutable([...roots, ...indexed], id, fs, run)
+    const executable = bundleExecutable(roots.concat(indexed), id, fs, run)
     if (!executable) continue
     result.push({
       kind: 'chromium',
@@ -84,6 +84,6 @@ function bundleExecutable(
 }
 
 export function runMacCommand(args: readonly string[]): string | undefined {
-  const result = Bun.spawnSync([...args], { stderr: 'ignore' })
+  const result = Bun.spawnSync(Array.from(args), { stderr: 'ignore' })
   return result.exitCode === 0 ? new TextDecoder().decode(result.stdout) : undefined
 }

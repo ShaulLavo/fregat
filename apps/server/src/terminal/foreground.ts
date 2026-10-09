@@ -45,7 +45,7 @@ async function readFromPs(pid: number) {
 
 async function ps(args: string[]) {
   try {
-    const child = Bun.spawn(['ps', ...args], { stderr: 'ignore', stdout: 'pipe' })
+    const child = Bun.spawn(['ps'].concat(args), { stderr: 'ignore', stdout: 'pipe' })
     const output = await new Response(child.stdout).text()
     await child.exited
     return output.trim()

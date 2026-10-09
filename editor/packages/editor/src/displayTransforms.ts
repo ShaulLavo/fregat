@@ -480,7 +480,7 @@ export const normalizeInlineReplacements = (
         ? replacement.endColumn === replacement.startColumn
         : replacement.endColumn > replacement.startColumn,
     )
-    .toSorted((left, right) => {
+    .sort((left, right) => {
       return (
         left.startColumn - right.startColumn ||
         insertionOrder(left) - insertionOrder(right) ||

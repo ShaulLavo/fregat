@@ -207,7 +207,7 @@ export function createDispatcher<Source = unknown>(
     if (disposed) return false
     const notifications = path.map((state) => ({
       state,
-      registrations: [...(state.handlers.get(command) ?? [])],
+      registrations: Array.from(state.handlers.get(command) ?? []),
     }))
     for (let index = notifications.length - 1; index >= 0; index -= 1) {
       const { state, registrations } = notifications[index]!

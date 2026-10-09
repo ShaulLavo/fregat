@@ -120,12 +120,14 @@ test('mounted public source reads and bounded cursors share each nested publicat
   session.applyText('b')
 
   expect(contexts).toHaveLength(3)
-  expect(observed).toEqual([
-    ['ab', 'abc', 'abc'],
-    ...contexts.map(() => ['ab', 'ab', 'ab', 1, 1]),
-    ['abc', 'abc', 'abc'],
-    ...contexts.map(() => ['abc', 'abc', 'abc', 2, 2]),
-  ])
+  const expectedInitial: (string | number)[][] = [['ab', 'abc', 'abc']]
+  expect(observed).toEqual(
+    expectedInitial.concat(
+      contexts.map(() => ['ab', 'ab', 'ab', 1, 1]),
+      [['abc', 'abc', 'abc']],
+      contexts.map(() => ['abc', 'abc', 'abc', 2, 2]),
+    ),
+  )
   expect(currentSources).toEqual(Array.from({ length: 4 }, () => ['abc', 2]))
   expect(editor.getTextSnapshot()).toBe(buffer.getTextSnapshot())
 })

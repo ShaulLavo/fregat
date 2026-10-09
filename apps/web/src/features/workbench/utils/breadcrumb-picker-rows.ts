@@ -51,7 +51,7 @@ export function folderPickerRows(
       failed: open && (child?.failed ?? false),
     }
     if (!open) return [row]
-    return [row, ...folderPickerRows(entry.path, listings, expanded, depth + 1, entry.path)]
+    return [row].concat(folderPickerRows(entry.path, listings, expanded, depth + 1, entry.path))
   })
 }
 
@@ -75,7 +75,7 @@ export function symbolPickerRows(
       symbol,
     }
     if (!open) return [row]
-    return [row, ...symbolPickerRows(children, expanded, depth + 1, id)]
+    return [row].concat(symbolPickerRows(children, expanded, depth + 1, id))
   })
 }
 

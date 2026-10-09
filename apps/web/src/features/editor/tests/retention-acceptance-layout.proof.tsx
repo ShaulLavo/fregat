@@ -276,10 +276,9 @@ test.for(['original', 'copy'] as const)(
           retentionAcceptanceProjectionMismatch(
             {
               ...sample.frame,
-              runs: [
-                { ...token, style: { ...token.style, color: 'rgb(0, 0, 0)' } },
-                ...sample.frame.runs.slice(1),
-              ],
+              runs: [{ ...token, style: { ...token.style, color: 'rgb(0, 0, 0)' } }].concat(
+                sample.frame.runs.slice(1),
+              ),
             },
             sample.projection,
           ),
@@ -458,7 +457,7 @@ test.for(['original', 'copy'] as const)(
     } finally {
       const finalReservations: unknown[] = []
       failureArchive.points.finalReservations = finalReservations
-      await finalizeRetentionLayoutEvidence(primaryFailed, evidenceFailures, [
+      const actions: Parameters<typeof finalizeRetentionLayoutEvidence>[2] = [
         { stage: 'stop-recorder', run: () => recording?.stop() },
         {
           stage: 'recorded-frames',
@@ -466,24 +465,32 @@ test.for(['original', 'copy'] as const)(
             failureArchive.frames = recording?.frames ?? []
           },
         },
-        ...reservationCaptures.map((capture, index) => ({
-          stage: 'final-reservation-' + index,
-          run: () => {
-            finalReservations[index] = capture()
-          },
-        })),
-        {
-          stage: 'archive-and-annotate',
-          run: async () => {
-            await archiveRetentionLayoutEvidence(
-              context,
-              failureArchive,
-              `layout-interval-${departing}`,
-              'layout-interval-always',
-            )
-          },
-        },
-      ])
+      ]
+      await finalizeRetentionLayoutEvidence(
+        primaryFailed,
+        evidenceFailures,
+        actions.concat(
+          reservationCaptures.map((capture, index) => ({
+            stage: 'final-reservation-' + index,
+            run: () => {
+              finalReservations[index] = capture()
+            },
+          })),
+          [
+            {
+              stage: 'archive-and-annotate',
+              run: async () => {
+                await archiveRetentionLayoutEvidence(
+                  context,
+                  failureArchive,
+                  `layout-interval-${departing}`,
+                  'layout-interval-always',
+                )
+              },
+            },
+          ],
+        ),
+      )
     }
   },
 )

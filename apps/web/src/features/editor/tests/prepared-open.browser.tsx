@@ -1087,7 +1087,7 @@ function installEditorWorkerRequestGate(
   Object.defineProperty(Worker.prototype, 'postMessage', { ...descriptor, value: replacement })
 
   return {
-    heldTypes: () => [...new Set(heldRequests.map((request) => request.type))].toSorted(),
+    heldTypes: () => [...new Set(heldRequests.map((request) => request.type))].sort(),
     restore: () => {
       if (restored) return
 

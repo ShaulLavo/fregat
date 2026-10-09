@@ -173,7 +173,7 @@ const preloadLanguages = (
 ): readonly string[] => {
   const languages = options.preloadLanguages
   const extra = typeof languages === 'function' ? languages() : languages
-  return [lang, ...Array.from(extra ?? [])]
+  return [lang].concat(extra ?? [])
 }
 
 type ShikiRegistrationCache = {
@@ -236,15 +236,14 @@ const resolveDocumentRegistrations = async (
   // carrying it here made every open wait on grammars it does not use.
   const languageRegistrations = language ? await cache.resolveLanguage(language) : []
   const themeRegistration = await cache.resolveTheme(theme)
-  const preloadThemeNames = [theme, ...(preloadThemes(options) ?? [])]
+  const preloadThemeNames = [theme].concat(preloadThemes(options) ?? [])
 
   return {
     languageRegistrations: uniqueLanguageRegistrations(languageRegistrations),
     themeRegistration,
-    themeRegistrations: uniqueThemeRegistrations([
-      themeRegistration,
-      ...cache.loadedThemes(preloadThemeNames),
-    ]),
+    themeRegistrations: uniqueThemeRegistrations(
+      [themeRegistration].concat(cache.loadedThemes(preloadThemeNames)),
+    ),
   }
 }
 
@@ -256,7 +255,7 @@ const resolvePreloadRegistrations = async (
 ): Promise<ShikiPreloadRegistrations> => {
   const [languageRegistrations, themeRegistrations] = await Promise.all([
     Promise.all(preloadLanguages(language, options).map(cache.resolveLanguage)),
-    Promise.all([theme, ...(preloadThemes(options) ?? [])].map(cache.resolveTheme)),
+    Promise.all([theme].concat(preloadThemes(options) ?? []).map(cache.resolveTheme)),
   ])
 
   return {
@@ -272,7 +271,7 @@ const resolveThemePreload = async (
 ): Promise<ShikiPreloadRegistrations> => ({
   languageRegistrations: [],
   themeRegistrations: uniqueThemeRegistrations(
-    await Promise.all([theme, ...(preloadThemes(options) ?? [])].map(cache.resolveTheme)),
+    await Promise.all([theme].concat(preloadThemes(options) ?? []).map(cache.resolveTheme)),
   ),
 })
 

@@ -148,11 +148,9 @@ export function authoredPathChanges(
   const to = path(toId)
   let common = 0
   while (common < from.length && from[common] === to[common]) common++
-  return [
-    ...from
-      .slice(common)
-      .reverse()
-      .map((id) => ({ transaction: nodes.get(id)!.authored!, active: false })),
-    ...to.slice(common).map((id) => ({ transaction: nodes.get(id)!.authored!, active: true })),
-  ]
+  return from
+    .slice(common)
+    .reverse()
+    .map((id) => ({ transaction: nodes.get(id)!.authored!, active: false }))
+    .concat(to.slice(common).map((id) => ({ transaction: nodes.get(id)!.authored!, active: true })))
 }

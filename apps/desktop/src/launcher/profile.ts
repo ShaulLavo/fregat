@@ -35,28 +35,26 @@ export function chromiumArguments(
 ): string[] {
   const prefix =
     candidate.confinement === 'flatpak'
-      ? [
-          candidate.args[0]!,
-          `--filesystem=${profile}`,
-          ...(app ? [] : ['--forward-fd=3', '--forward-fd=4']),
-          ...candidate.args.slice(1),
-        ]
+      ? [candidate.args[0]!, `--filesystem=${profile}`].concat(
+          app ? [] : ['--forward-fd=3', '--forward-fd=4'],
+          candidate.args.slice(1),
+        )
       : candidate.args
-  return [
-    ...prefix,
-    ...(app
+  return prefix.concat(
+    app
       ? [`--app-id=${app.appId}`, `--app-launch-url-for-shortcuts-menu-item=${app.url}`]
-      : ['about:blank', '--headless=new']),
-    `--user-data-dir=${profile}`,
-    '--profile-directory=Platform',
-    ...(app ? [] : ['--remote-debugging-pipe']),
-    '--no-first-run',
-    '--no-default-browser-check',
-    '--disable-sync',
-    '--disable-background-networking',
-    '--disable-component-update',
-    '--disable-default-apps',
-    '--disable-extensions',
-    '--window-size=1440,960',
-  ]
+      : ['about:blank', '--headless=new'],
+    [`--user-data-dir=${profile}`, '--profile-directory=Platform'],
+    app ? [] : ['--remote-debugging-pipe'],
+    [
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--disable-sync',
+      '--disable-background-networking',
+      '--disable-component-update',
+      '--disable-default-apps',
+      '--disable-extensions',
+      '--window-size=1440,960',
+    ],
+  )
 }

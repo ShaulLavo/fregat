@@ -270,16 +270,11 @@ describe('createStickyScrollPlugin', () => {
  * two nested regions: the function, and the `if` whose last row is the last `step()` call.
  */
 const MOUNTED_BODY_ROWS = 30
-const MOUNTED_LINES = [
-  'function outer() {',
-  '  const a = 1',
-  '  if (a) {',
-  ...Array.from({ length: MOUNTED_BODY_ROWS }, (_, index) => `    step(${index})`),
-  '  }',
-  '  tail()',
-  '}',
-  ...Array.from({ length: 20 }, (_, index) => `after(${index})`),
-]
+const MOUNTED_LINES = ['function outer() {', '  const a = 1', '  if (a) {'].concat(
+  Array.from({ length: MOUNTED_BODY_ROWS }, (_, index) => `    step(${index})`),
+  ['  }', '  tail()', '}'],
+  Array.from({ length: 20 }, (_, index) => `after(${index})`),
+)
 /** Last row of the inner region, and so the row the stack is pinned until. */
 const MOUNTED_INNER_END_ROW = 2 + MOUNTED_BODY_ROWS
 
@@ -362,11 +357,12 @@ function mountedStack(): HTMLElement | null {
 }
 
 function mountedStickyLines(): readonly string[] {
-  return [
-    ...document.querySelectorAll<HTMLElement>(
+  return Array.from(
+    document.querySelectorAll<HTMLElement>(
       '.editor-sticky-scroll .editor-virtualized-row:not([hidden])',
     ),
-  ].map((row) => row.textContent ?? '')
+    (row) => row.textContent ?? '',
+  )
 }
 
 function registeredProvider(plugin: ReturnType<typeof createStickyScrollPlugin>) {
@@ -421,11 +417,12 @@ function stickyLineView(context: EditorViewContributionContext): HTMLElement | n
 }
 
 function mirroredLines(context: EditorViewContributionContext): readonly string[] {
-  return [
-    ...context.scrollElement.querySelectorAll<HTMLElement>(
+  return Array.from(
+    context.scrollElement.querySelectorAll<HTMLElement>(
       '.editor-sticky-scroll .editor-virtualized-row:not([hidden])',
     ),
-  ].map((row) => row.textContent ?? '')
+    (row) => row.textContent ?? '',
+  )
 }
 
 /** Scrolled far enough that both scope headers are above the viewport. */

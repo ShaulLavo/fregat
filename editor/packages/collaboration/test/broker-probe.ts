@@ -78,10 +78,12 @@ export async function probe(
           'Upgrade: websocket',
           'Sec-WebSocket-Version: 13',
           'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
-          ...Object.entries(headers).map(([name, value]) => `${name}: ${value}`),
-          '',
-          '',
-        ].join('\r\n'),
+        ]
+          .concat(
+            Object.entries(headers).map(([name, value]) => `${name}: ${value}`),
+            ['', ''],
+          )
+          .join('\r\n'),
       ),
     )
   })

@@ -38,7 +38,7 @@ test('only live arrivals enter; initial rows, prepend and virtualized remount st
   const initial = [{ id: 'one' }]
   flushSync(() => root!.render(<Rows element={element} ids={initial} />))
   expect(element.querySelectorAll('[data-entering]')).toHaveLength(0)
-  const next = [...initial, { id: 'two' }]
+  const next = initial.concat([{ id: 'two' }])
   flushSync(() => root!.render(<Rows element={element} ids={next} />))
   const arriving = element.querySelector<HTMLElement>('[data-entering]')!
   expect(arriving.dataset.timelineRowId).toBe('two')
@@ -48,6 +48,6 @@ test('only live arrivals enter; initial rows, prepend and virtualized remount st
   flushSync(() => root!.render(<Rows element={element} ids={next} visible={false} />))
   flushSync(() => root!.render(<Rows element={element} ids={next} />))
   expect(element.querySelectorAll('[data-entering]')).toHaveLength(0)
-  flushSync(() => root!.render(<Rows element={element} ids={[{ id: 'older' }, ...next]} />))
+  flushSync(() => root!.render(<Rows element={element} ids={[{ id: 'older' }].concat(next)} />))
   expect(element.querySelectorAll('[data-entering]')).toHaveLength(0)
 })

@@ -9,7 +9,7 @@ export function replacementText(text: string, query: WorkspaceSearchQuery, repla
     count += matches.length
     if (query.matchMode === 'regex') return replaceRegexLine(line, query, replacement, matches)
     let output = line
-    for (const match of matches.toReversed())
+    for (const match of matches.reverse())
       output = `${output.slice(0, match.start)}${replacement}${output.slice(match.end)}`
     return output
   })
@@ -24,7 +24,7 @@ function replaceRegexLine(
   const regex = new RegExp(query.query, query.caseSensitive ? 'gu' : 'giu')
   const allowed = new Set(matches.map((match) => `${match.start}:${match.end}`))
   let output = line
-  const results = Array.from(line.matchAll(regex)).toReversed()
+  const results = Array.from(line.matchAll(regex)).reverse()
   for (const result of results) {
     const start = result.index
     if (!allowed.has(`${start}:${start + result[0].length}`)) continue

@@ -75,24 +75,26 @@ export function shellManifest(
     session: [PHONE_BOOT_SCREENS[1]],
   }
   for (const [kind, entries] of Object.entries(entriesByKind)) {
-    const files = [
-      ...new Set(
+    const files = Array.from(
+      new Set(
         entries.flatMap((relative) => {
           const facade = path.join(webRoot, relative)
           const root = chunks.find((chunk) => chunk.facadeModuleId === facade)
           if (!root) throw createScriptError(`shell-chunks: no chunk for ${relative}`)
           if (!lazyRoots.has(root.fileName))
             throw createScriptError(`shell-chunks: ${relative} must remain dynamically imported`)
-          return [...staticClosure(root, byFile)].filter((fileName) => !loaded.has(fileName))
+          return Array.from(staticClosure(root, byFile)).filter((fileName) => !loaded.has(fileName))
         }),
       ),
-    ]
+    )
     // The shell's stylesheets too: the dynamic import waits for them, so they would otherwise
     // start only once the entry runs.
-    const styles = files.flatMap((fileName) => [
-      ...(byFile.get(fileName)?.viteMetadata?.importedCss ?? []),
-    ])
-    manifest[kind] = [...files, ...new Set(styles)].map((fileName) => `${base}${fileName}`)
+    const styles = files.flatMap((fileName) =>
+      Array.from(byFile.get(fileName)?.viteMetadata?.importedCss ?? []),
+    )
+    manifest[kind] = files
+      .concat(Array.from(new Set(styles)))
+      .map((fileName) => `${base}${fileName}`)
   }
   return manifest
 }
@@ -121,7 +123,7 @@ function dynamicRoots(
     const chunk = byFile.get(file)
     if (!chunk) continue
     for (const target of chunk.dynamicImports) lazy.add(target)
-    for (const target of [...chunk.imports, ...chunk.dynamicImports]) pending.add(target)
+    for (const target of chunk.imports.concat(chunk.dynamicImports)) pending.add(target)
   }
   return lazy
 }

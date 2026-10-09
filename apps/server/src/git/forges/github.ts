@@ -45,11 +45,12 @@ export const github: ForgeProvider = {
     const read = async (path: string) =>
       requireSuccess(
         context,
-        await gh(context, [
-          'api',
-          ...hostname(context),
-          `repos/${context.repository}/pulls/${number}/${path}?per_page=100`,
-        ]),
+        await gh(
+          context,
+          ['api'].concat(hostname(context), [
+            `repos/${context.repository}/pulls/${number}/${path}?per_page=100`,
+          ]),
+        ),
         `activity-${path}`,
       ).stdout
     const [reviews, commits, discussions] = await Promise.all([
@@ -67,11 +68,12 @@ export const github: ForgeProvider = {
     async read(context, number) {
       const result = requireSuccess(
         context,
-        await gh(context, [
-          'api',
-          ...hostname(context),
-          `repos/${context.repository}/issues/${number}/comments?per_page=100`,
-        ]),
+        await gh(
+          context,
+          ['api'].concat(hostname(context), [
+            `repos/${context.repository}/issues/${number}/comments?per_page=100`,
+          ]),
+        ),
         'comments',
       )
       return parseIssueComments(context, result.stdout, 'page')
@@ -104,7 +106,7 @@ export const github: ForgeProvider = {
     },
   },
   async support(context) {
-    return cliSupport(await gh(context, ['auth', 'status', ...hostname(context)]))
+    return cliSupport(await gh(context, ['auth', 'status'].concat(hostname(context))))
   },
   async pullRequests(context, { branches, state }) {
     const [only] = branches
@@ -123,20 +125,21 @@ export const github: ForgeProvider = {
     return found
   },
   async createPullRequest(context, input) {
-    const result = await gh(context, [
-      'pr',
-      'create',
-      '--repo',
-      context.remoteUrl,
-      '--head',
-      input.branch,
-      '--title',
-      input.title,
-      '--body',
-      input.body,
-      ...(input.base ? ['--base', input.base] : []),
-      ...(input.draft ? ['--draft'] : []),
-    ])
+    const result = await gh(
+      context,
+      [
+        'pr',
+        'create',
+        '--repo',
+        context.remoteUrl,
+        '--head',
+        input.branch,
+        '--title',
+        input.title,
+        '--body',
+        input.body,
+      ].concat(input.base ? ['--base', input.base] : [], input.draft ? ['--draft'] : []),
+    )
     requireCreated(context, input.branch, result)
   },
   async getPullRequest(context, number) {
@@ -249,18 +252,21 @@ async function graphqlChunk(
   const query = `query($owner: String!, $name: String!, ${variables}) { repository(owner: $owner, name: $name) { ${fields} } }`
   const result = requireSuccess(
     context,
-    await gh(context, [
-      'api',
-      'graphql',
-      ...hostname(context),
-      '-f',
-      `query=${query}`,
-      '-f',
-      `owner=${repository.owner}`,
-      '-f',
-      `name=${repository.name}`,
-      ...branches.flatMap((branch, index) => ['-f', `h${index}=${branch}`]),
-    ]),
+    await gh(
+      context,
+      ['api', 'graphql'].concat(
+        hostname(context),
+        [
+          '-f',
+          `query=${query}`,
+          '-f',
+          `owner=${repository.owner}`,
+          '-f',
+          `name=${repository.name}`,
+        ],
+        branches.flatMap((branch, index) => ['-f', `h${index}=${branch}`]),
+      ),
+    ),
     'graphql',
   )
   const parsed = parseForgeJson(context, graphqlSchema, result.stdout, 'graphql')
@@ -281,18 +287,21 @@ async function graphqlNumbers(context: ForgeContext, numbers: readonly number[])
     .join(' ')
   const result = requireSuccess(
     context,
-    await gh(context, [
-      'api',
-      'graphql',
-      ...hostname(context),
-      '-f',
-      `query=query($owner: String!, $name: String!, ${variables}) { repository(owner: $owner, name: $name) { ${fields} } }`,
-      '-f',
-      `owner=${repository.owner}`,
-      '-f',
-      `name=${repository.name}`,
-      ...numbers.flatMap((number, index) => ['-F', `n${index}=${number}`]),
-    ]),
+    await gh(
+      context,
+      ['api', 'graphql'].concat(
+        hostname(context),
+        [
+          '-f',
+          `query=query($owner: String!, $name: String!, ${variables}) { repository(owner: $owner, name: $name) { ${fields} } }`,
+          '-f',
+          `owner=${repository.owner}`,
+          '-f',
+          `name=${repository.name}`,
+        ],
+        numbers.flatMap((number, index) => ['-F', `n${index}=${number}`]),
+      ),
+    ),
     'graphql-numbers',
   )
   const parsed = parseForgeJson(
@@ -317,7 +326,7 @@ function ownerAndName(context: ForgeContext) {
 
 function gh(context: ForgeContext, args: readonly string[], input?: string) {
   const env = context.forge.host === 'github.com' ? undefined : { GH_HOST: context.forge.host }
-  return forgeCommand(context, ['gh', ...args], {
+  return forgeCommand(context, ['gh'].concat(args), {
     ...(env ? { env } : {}),
     ...(input === undefined ? {} : { input }),
   })
@@ -341,15 +350,13 @@ function toPullRequest(node: v.InferOutput<typeof pullRequestSchema>): GitPullRe
 function ghPost(context: ForgeContext, path: string, payload: unknown) {
   return gh(
     context,
-    [
-      'api',
-      ...hostname(context),
+    ['api'].concat(hostname(context), [
       '--method',
       'POST',
       `repos/${context.repository}/${path}`,
       '--input',
       '-',
-    ],
+    ]),
     JSON.stringify(payload),
   )
 }

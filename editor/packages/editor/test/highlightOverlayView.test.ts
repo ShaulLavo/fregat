@@ -117,7 +117,7 @@ it('rebuilds surrogate-safe mask edges when text changes under existing overlays
   view.setText('😀abcdefgh')
   const base = [...highlights.entries()].find(([name]) => name.includes('-overlay-base-'))?.[1]
   expect(base).toBeDefined()
-  expect([...base!].map((range) => [range.startOffset, range.endOffset])).toEqual([[0, 2]])
+  expect(Array.from(base!, (range) => [range.startOffset, range.endOffset])).toEqual([[0, 2]])
 })
 
 it('repaints a plain-text overlay after an edit preserves its offsets', () => {
@@ -127,7 +127,7 @@ it('repaints a plain-text overlay after an edit preserves its offsets', () => {
   const paintedText = () =>
     [...highlights.entries()]
       .filter(([name]) => name.includes('-overlay-base-'))
-      .flatMap(([, highlight]) => [...highlight].map((range) => range.toString()))
+      .flatMap(([, highlight]) => Array.from(highlight, (range) => range.toString()))
   expect(paintedText()).toEqual(['cde'])
 
   view.applyEdit({ from: 2, to: 5, text: 'xyz' }, 'abxyzfghij')
@@ -145,7 +145,7 @@ it('rebuilds the overlay after a same-line edit takes the token reconciliation p
   view.applyEdit({ from: 0, to: 2, text: '😀' }, '😀cdefghij')
   view.setTokens([{ start: 0, end: 10, style: { color: '#ff0000' } }])
   const base = [...highlights.entries()].find(([name]) => name.includes('-overlay-base-'))?.[1]
-  expect([...base!].map((range) => [range.startOffset, range.endOffset])).toEqual([[0, 2]])
+  expect(Array.from(base!, (range) => [range.startOffset, range.endOffset])).toEqual([[0, 2]])
 })
 
 it('retains syntax above a multiline edit while overlay twins remain active', () => {

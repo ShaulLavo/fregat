@@ -21,7 +21,7 @@ export async function appendUserInputAttachmentPaths(
     if (!references.length) continue
     const answer = result[questionId]
     const text = references.join('\n')
-    if (Array.isArray(answer)) result[questionId] = [...answer, text]
+    if (Array.isArray(answer)) result[questionId] = answer.concat([text])
     else result[questionId] = answer ? `${answer}\n\n${text}` : text
   }
   return result

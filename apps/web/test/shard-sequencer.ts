@@ -47,7 +47,7 @@ function readDurations(): Record<string, number> {
   return JSON.parse(readFileSync(DURATIONS_FILE, 'utf8')) as Record<string, number>
 }
 
-function median(values: readonly number[]) {
-  const sorted = [...values].sort((a, b) => a - b)
+function median(values: number[]) {
+  const sorted = values.sort((a, b) => a - b)
   return sorted[Math.floor(sorted.length / 2)] ?? 0
 }

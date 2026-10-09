@@ -297,14 +297,13 @@ export function updateWorkspaceEditPublications(
     return next.length === current.length ? current : next
   }
   if (current.includes(incoming)) return current
-  return [
-    ...current.filter(
+  return current
+    .filter(
       (publication) =>
         publication.side !== incoming.side ||
         publication.attachment.file !== incoming.attachment.file,
-    ),
-    incoming,
-  ]
+    )
+    .concat([incoming])
 }
 
 function targetLabel(row: WorkspaceEditPreviewRow): string {

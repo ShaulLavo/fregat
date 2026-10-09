@@ -207,9 +207,9 @@ const boundaryOf = (snapshot: PieceTableSnapshot, boundary: CharIdBoundary): Bou
   return { piece: node.piece, offset: after ? 0 : node.piece.length }
 }
 
-const mergeRanges = (ranges: readonly PieceVisibilityRange[]): readonly PieceVisibilityRange[] => {
+const mergeRanges = (ranges: PieceVisibilityRange[]): readonly PieceVisibilityRange[] => {
   const merged: PieceVisibilityRange[] = []
-  for (const range of ranges.toSorted((a, b) => a.from - b.from)) {
+  for (const range of ranges.sort((a, b) => a.from - b.from)) {
     const previous = merged.at(-1)
     if (previous && range.from <= previous.to) {
       merged[merged.length - 1] = { from: previous.from, to: Math.max(previous.to, range.to) }
@@ -426,11 +426,7 @@ export const setCharIdVisibility = (
     }
   }
   if (!targets.size) return snapshot
-  for (const [order, ranges] of targets)
-    targets.set(
-      order,
-      ranges.toSorted((a, b) => a.from - b.from),
-    )
+  for (const ranges of targets.values()) ranges.sort((a, b) => a.from - b.from)
   const changes: Piece[] = []
   const context = { changes, normalizeOrders: false, snap: null }
   const root = setAtPieceRanges(

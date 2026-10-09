@@ -287,7 +287,7 @@ export class MergeReview {
       ),
     )
     for (const edit of edits) {
-      for (const span of [...edit.inserted, ...edit.deleted]) {
+      for (const span of edit.inserted.concat(edit.deleted)) {
         const snapshot = this.document.engine.snapshot().buffer
         const first = locateCharId(snapshot, span.start)
         const last = locateCharId(snapshot, {
@@ -346,7 +346,7 @@ function touchesUnit(
   edit: ConcurrentEdit,
   unit: MergeReviewUnit,
 ): boolean {
-  for (const span of [...edit.inserted, ...edit.deleted]) {
+  for (const span of edit.inserted.concat(edit.deleted)) {
     const first = locateCharId(snapshot, span.start)
     const last = locateCharId(snapshot, {
       bunch: span.start.bunch,

@@ -320,10 +320,12 @@ describe('InlineMap insertion reveal', () => {
 
   it('leaves the construct a phantom decorates hidden when only the phantom is touched', () => {
     const snapshot = createPieceTableSnapshot(BOLD_LINE)
-    const map = createInlineMap(snapshot, [
-      ...boldSpecs(),
-      { id: 'hint', startIndex: 12, endIndex: 12, text: '?', insertion: true, groupId: 'bold' },
-    ])
+    const map = createInlineMap(
+      snapshot,
+      boldSpecs().concat([
+        { id: 'hint', startIndex: 12, endIndex: 12, text: '?', insertion: true, groupId: 'bold' },
+      ]),
+    )
 
     expect(revealInlineMap(map, [{ start: 12, end: 12 }]).ranges.map((range) => range.id)).toEqual([
       'open',
@@ -334,10 +336,12 @@ describe('InlineMap insertion reveal', () => {
 
   it('keeps phantom text a revealed group would otherwise take with it', () => {
     const snapshot = createPieceTableSnapshot(BOLD_LINE)
-    const map = createInlineMap(snapshot, [
-      ...boldSpecs(),
-      { id: 'hint', startIndex: 5, endIndex: 5, text: '?', insertion: true, groupId: 'bold' },
-    ])
+    const map = createInlineMap(
+      snapshot,
+      boldSpecs().concat([
+        { id: 'hint', startIndex: 5, endIndex: 5, text: '?', insertion: true, groupId: 'bold' },
+      ]),
+    )
 
     expect(revealInlineMap(map, [{ start: 2, end: 2 }]).ranges.map((range) => range.id)).toEqual([
       'hint',

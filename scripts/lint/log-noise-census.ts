@@ -74,7 +74,7 @@ export async function logNoiseCensus(options: NoiseOptions): Promise<NoiseCensus
     else buckets.set(key, [event])
   }
 
-  const groups = [...buckets].map(([key, bucket]) => judge(key, bucket, budget, allow.entries))
+  const groups = Array.from(buckets, ([key, bucket]) => judge(key, bucket, budget, allow.entries))
   groups.sort((left, right) => right.count - left.count || left.key.localeCompare(right.key))
   return {
     since: options.since.toISOString(),
@@ -150,7 +150,7 @@ function sampleOf(event: LogEvent) {
     (field) => `${field}=${String(event[field])}`,
   )
   const message = errorMessage(event) ?? stringField(event.message) ?? ''
-  return [event.timestamp, stringField(event.source) ?? '-', message, ...facts].join(' ')
+  return [event.timestamp, stringField(event.source) ?? '-', message].concat(facts).join(' ')
 }
 
 function errorMessage(event: LogEvent) {

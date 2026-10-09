@@ -46,13 +46,15 @@ test('reports a ref read during render as a refusal with its line', () => {
 })
 
 test('gates a refused component even when a sibling in the file compiles', () => {
-  const subject = census('probe.tsx', [
-    ...REFUSED,
-    '',
-    'export function Sibling({ items }: { readonly items: readonly string[] }) {',
-    '  return <ul>{items.map((item) => <li key={item}>{item}</li>)}</ul>',
-    '}',
-  ])
+  const subject = census(
+    'probe.tsx',
+    REFUSED.concat([
+      '',
+      'export function Sibling({ items }: { readonly items: readonly string[] }) {',
+      '  return <ul>{items.map((item) => <li key={item}>{item}</li>)}</ul>',
+      '}',
+    ]),
+  )
 
   expect(subject.hits.coverage.map((hit) => hit.value)).toEqual(['memoized, partly refused'])
   expect(evaluate(subject).passed).toBe(false)
@@ -131,6 +133,7 @@ test('every whole-tree gate runs in the commit hook, in verify and in CI', () =>
     'bun run compiler:memos:check',
     'bun run errors:census',
     'bun run query:check',
+    'bun run arrays:check',
     'bun run documents:check',
     'bun run unused:check',
   ])

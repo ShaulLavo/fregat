@@ -45,18 +45,20 @@ export const azureDevOps: ForgeProvider = {
       const organization = organizationUrl(context)
       const locationResult = requireSuccess(
         context,
-        await az(context, [
-          'repos',
-          'pr',
-          'show',
-          '--detect',
-          'true',
-          '--org',
-          organization,
-          '--id',
-          String(number),
-          ...JSON_ARGS,
-        ]),
+        await az(
+          context,
+          [
+            'repos',
+            'pr',
+            'show',
+            '--detect',
+            'true',
+            '--org',
+            organization,
+            '--id',
+            String(number),
+          ].concat(JSON_ARGS),
+        ),
         'discussion-location',
       )
       const location = parseForgeJson(
@@ -72,25 +74,27 @@ export const azureDevOps: ForgeProvider = {
       )
       const result = requireSuccess(
         context,
-        await az(context, [
-          'devops',
-          'invoke',
-          '--detect',
-          'true',
-          '--org',
-          organization,
-          '--area',
-          'git',
-          '--resource',
-          'pullRequestThreads',
-          '--api-version',
-          '7.1',
-          '--route-parameters',
-          `project=${location.repository.project.name}`,
-          `repositoryId=${location.repository.name}`,
-          `pullRequestId=${number}`,
-          ...JSON_ARGS,
-        ]),
+        await az(
+          context,
+          [
+            'devops',
+            'invoke',
+            '--detect',
+            'true',
+            '--org',
+            organization,
+            '--area',
+            'git',
+            '--resource',
+            'pullRequestThreads',
+            '--api-version',
+            '7.1',
+            '--route-parameters',
+            `project=${location.repository.project.name}`,
+            `repositoryId=${location.repository.name}`,
+            `pullRequestId=${number}`,
+          ].concat(JSON_ARGS),
+        ),
         'discussion-threads',
       )
       return parseAzureThreads(context, result.stdout)
@@ -106,37 +110,35 @@ export const azureDevOps: ForgeProvider = {
     return perBranch(branches, (branch) => newestPullRequest(context, branch, state))
   },
   async createPullRequest(context, input) {
-    const result = await az(context, [
-      'repos',
-      'pr',
-      'create',
-      '--detect',
-      'true',
-      '--source-branch',
-      input.branch,
-      '--title',
-      input.title,
-      '--description',
-      input.body,
-      ...(input.base ? ['--target-branch', input.base] : []),
-      ...(input.draft ? ['--draft', 'true'] : []),
-      ...JSON_ARGS,
-    ])
+    const result = await az(
+      context,
+      [
+        'repos',
+        'pr',
+        'create',
+        '--detect',
+        'true',
+        '--source-branch',
+        input.branch,
+        '--title',
+        input.title,
+        '--description',
+        input.body,
+      ].concat(
+        input.base ? ['--target-branch', input.base] : [],
+        input.draft ? ['--draft', 'true'] : [],
+        JSON_ARGS,
+      ),
+    )
     requireCreated(context, input.branch, result)
   },
   async getPullRequest(context, number) {
     const result = requireSuccess(
       context,
-      await az(context, [
-        'repos',
-        'pr',
-        'show',
-        '--detect',
-        'true',
-        '--id',
-        String(number),
-        ...JSON_ARGS,
-      ]),
+      await az(
+        context,
+        ['repos', 'pr', 'show', '--detect', 'true', '--id', String(number)].concat(JSON_ARGS),
+      ),
       'pr-show',
     )
     const detail = parseForgeJson(
@@ -180,17 +182,19 @@ export const azureDevOps: ForgeProvider = {
     const [organization, project, name] = repositoryParts(context, 3, 'organization/project/name')
     const result = requireRepositoryCreated(
       context,
-      await az(context, [
-        'repos',
-        'create',
-        '--org',
-        `https://dev.azure.com/${organization}`,
-        '--project',
-        project ?? '',
-        '--name',
-        name ?? '',
-        ...JSON_ARGS,
-      ]),
+      await az(
+        context,
+        [
+          'repos',
+          'create',
+          '--org',
+          `https://dev.azure.com/${organization}`,
+          '--project',
+          project ?? '',
+          '--name',
+          name ?? '',
+        ].concat(JSON_ARGS),
+      ),
     )
     const repository = parseForgeJson(
       context,
@@ -205,20 +209,22 @@ export const azureDevOps: ForgeProvider = {
 async function newestPullRequest(context: ForgeContext, branch: string, state: 'open' | 'all') {
   const result = requireSuccess(
     context,
-    await az(context, [
-      'repos',
-      'pr',
-      'list',
-      '--detect',
-      'true',
-      '--source-branch',
-      branch,
-      '--status',
-      state === 'open' ? 'active' : 'all',
-      '--top',
-      '1',
-      ...JSON_ARGS,
-    ]),
+    await az(
+      context,
+      [
+        'repos',
+        'pr',
+        'list',
+        '--detect',
+        'true',
+        '--source-branch',
+        branch,
+        '--status',
+        state === 'open' ? 'active' : 'all',
+        '--top',
+        '1',
+      ].concat(JSON_ARGS),
+    ),
     'pr-list',
   )
   const [request] = parseForgeJson(context, v.array(pullRequestSchema), result.stdout, 'pr-list')
@@ -226,7 +232,7 @@ async function newestPullRequest(context: ForgeContext, branch: string, state: '
 }
 
 function az(context: ForgeContext, args: readonly string[]) {
-  return forgeCommand(context, ['az', ...args])
+  return forgeCommand(context, ['az'].concat(args))
 }
 
 function toPullRequest(request: v.InferOutput<typeof pullRequestSchema>): GitPullRequest {

@@ -334,5 +334,5 @@ function indexEntries<T>(
   root: IdentityTree<T> | null,
 ): readonly (readonly [{ readonly bunch: string; readonly counter: number }, T])[] {
   if (!root) return []
-  return [...indexEntries(root.left), [root.key, root.value] as const, ...indexEntries(root.right)]
+  return indexEntries(root.left).concat([[root.key, root.value] as const], indexEntries(root.right))
 }

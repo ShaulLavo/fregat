@@ -42,7 +42,7 @@ test('a new owner in first load is named when it passes the floor', () => {
     firstLoad: { scriptGzip: 1_030_000 },
     phoneFirstLoad: { scriptGzip: 600_000 },
     phoneSessionFirstLoad: { scriptGzip: 600_000 },
-    owners: [...baseline.owners, { owner: 'node_modules/shiki', firstLoadGzip: 30_000 }],
+    owners: baseline.owners.concat([{ owner: 'node_modules/shiki', firstLoadGzip: 30_000 }]),
   }
   expect(checkFirstLoad(added, pins).failures).toEqual([
     { owner: 'node_modules/shiki', pinned: 0, now: 30_000 },

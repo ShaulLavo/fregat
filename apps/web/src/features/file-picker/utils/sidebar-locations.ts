@@ -54,7 +54,7 @@ export function sidebarSectionsFor({
     {
       id: 'places',
       label: 'Places',
-      locations: [homeLocation(homePath), ...placeLocations(data)].filter(automatic),
+      locations: [homeLocation(homePath)].concat(placeLocations(data)).filter(automatic),
     },
     {
       id: 'projects',

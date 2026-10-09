@@ -295,10 +295,8 @@ export const injectedLanguageIdsAtOffset = (
 ): readonly EditorSyntaxLanguageId[] => {
   const covering = injections
     .filter((injection) => offset >= injection.startIndex && offset < injection.endIndex)
-    .toSorted(
-      (left, right) => left.endIndex - left.startIndex - (right.endIndex - right.startIndex),
-    )
+    .sort((left, right) => left.endIndex - left.startIndex - (right.endIndex - right.startIndex))
     .map((injection) => injection.languageId)
 
-  return hostLanguageId ? [...covering, hostLanguageId] : covering
+  return hostLanguageId ? covering.concat([hostLanguageId]) : covering
 }

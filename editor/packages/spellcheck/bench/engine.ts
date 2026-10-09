@@ -61,7 +61,7 @@ console.log(
 function readCorpus(directory: string): string {
   const files = readdirSync(directory)
     .filter((name) => name.endsWith('.md'))
-    .toSorted()
+    .sort()
   const text = files.map((name) => readFileSync(path.join(directory, name), 'utf8')).join('\n')
   return text.split('\n').slice(0, CORPUS_LINES).join('\n')
 }
@@ -131,8 +131,8 @@ function timeRepeated(times: number, run: () => void): number {
   return (performance.now() - start) / times
 }
 
-function percentile(values: readonly number[], fraction: number): number {
-  const sorted = values.toSorted((a, b) => a - b)
+function percentile(values: number[], fraction: number): number {
+  const sorted = values.sort((a, b) => a - b)
   return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))] ?? 0
 }
 

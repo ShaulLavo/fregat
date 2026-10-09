@@ -52,50 +52,50 @@ export function localCommand({
   readonly runtimeLimitSeconds?: number | null
   readonly runtimeDeadline?: number
 }) {
-  return [
-    ...(runtimeDeadline === undefined
+  return (
+    runtimeDeadline === undefined
       ? []
-      : ['bash', '-p', SCOPE_SHIM, '--launch-deadline', String(Math.floor(runtimeDeadline * 100))]),
-    'systemd-run',
-    '--user',
-    '--scope',
-    '--quiet',
-    `--unit=${unit}`,
-    `--slice=${slice}`,
-    // systemd-run expands `$VAR` in the command itself, mangling `${x%y}` and `$$`.
-    '--expand-environment=no',
-    // The default `stop` SIGTERMs the scope after an OOM kill, and a second OOM during that
-    // stop SIGKILLs the shim, losing the record. The kernel still kills only the offender.
-    '-p',
-    'OOMPolicy=continue',
-    // systemd ends the scope at the limit even when the wrapper cannot (suspended, say); its
+      : ['bash', '-p', SCOPE_SHIM, '--launch-deadline', String(Math.floor(runtimeDeadline * 100))]
+  ).concat(
+    [
+      'systemd-run',
+      '--user',
+      '--scope',
+      '--quiet',
+      `--unit=${unit}`,
+      `--slice=${slice}`, // systemd-run expands `$VAR` in the command itself, mangling `${x%y}` and `$$`.
+      '--expand-environment=no', // The default `stop` SIGTERMs the scope after an OOM kill, and a second OOM during that
+      // stop SIGKILLs the shim, losing the record. The kernel still kills only the offender.
+      '-p',
+      'OOMPolicy=continue',
+    ], // systemd ends the scope at the limit even when the wrapper cannot (suspended, say); its
     // stop timeout leaves the shim time to drain the slice before what remains is killed.
-    ...(runtimeLimitSeconds === null
+    runtimeLimitSeconds === null
       ? []
       : [
           '-p',
           `RuntimeMaxSec=${runtimeLimitSeconds}s`,
           '-p',
           `TimeoutStopSec=${stopTimeoutSeconds(graceSeconds)}s`,
-        ]),
-    // Privileged mode: Bash runs no BASH_ENV, ENV or imported function before the shim's first
-    // line, so nothing can inherit the entry lock it closes there. The command still gets them.
-    'bash',
-    '-p',
-    SCOPE_SHIM,
-    '--stderr',
-    '--slice',
-    '--grace',
-    String(graceSeconds),
-    ...(runtimeLimitSeconds === null
+        ],
+    [
+      // Privileged mode: Bash runs no BASH_ENV, ENV or imported function before the shim's first
+      // line, so nothing can inherit the entry lock it closes there. The command still gets them.
+      'bash',
+      '-p',
+      SCOPE_SHIM,
+      '--stderr',
+      '--slice',
+      '--grace',
+      String(graceSeconds),
+    ],
+    runtimeLimitSeconds === null
       ? []
-      : ['--runtime', String(runtimeLimitSeconds), '--startup', String(DEADLINE_START_SECONDS)]),
-    ...(runtimeDeadline === undefined
-      ? []
-      : ['--deadline', String(Math.floor(runtimeDeadline * 100))]),
-    accountingFile,
-    ...command,
-  ]
+      : ['--runtime', String(runtimeLimitSeconds), '--startup', String(DEADLINE_START_SECONDS)],
+    runtimeDeadline === undefined ? [] : ['--deadline', String(Math.floor(runtimeDeadline * 100))],
+    [accountingFile],
+    command,
+  )
 }
 
 /** The job runs on the Pi in its own capped slice; the launcher writes that slice's totals. */
@@ -111,8 +111,7 @@ export function piCommand({
     unit,
     accountingFile,
     String(maxWallSec ?? DEFAULT_LIMITS.maxWallSec),
-    ...command,
-  ]
+  ].concat(command)
 }
 
 export type JobAccounting = {
@@ -319,6 +318,19 @@ function spawnJob(
         })
       }
     }
+    const stdio: ['inherit', 'inherit', 'pipe' | 'inherit', ...(number | 'ignore')[]] = [
+      'inherit',
+      'inherit',
+      job.host === 'local' ? 'pipe' : 'inherit',
+    ]
+    if (job.host === 'local')
+      stdio.push(
+        job.slotLocks[0] ?? 'ignore',
+        job.slotLocks[1] ?? 'ignore',
+        job.slotLocks[2] ?? 'ignore',
+        job.entryLock,
+        stderrDescriptor!,
+      )
     return publish(() =>
       Bun.spawn({
         cmd: command,
@@ -328,20 +340,7 @@ function spawnJob(
           ...(job.host === 'local' ? { HEAVY_JOB_SLICE: jobSlice(job) } : {}),
           VITEST_MAX_WORKERS: process.env.VITEST_MAX_WORKERS ?? VITEST_WORKERS,
         },
-        stdio: [
-          'inherit',
-          'inherit',
-          job.host === 'local' ? 'pipe' : 'inherit',
-          ...(job.host === 'local'
-            ? [
-                job.slotLocks[0] ?? 'ignore',
-                job.slotLocks[1] ?? 'ignore',
-                job.slotLocks[2] ?? 'ignore',
-                job.entryLock,
-                stderrDescriptor!,
-              ]
-            : []),
-        ],
+        stdio,
       }),
     )
   } finally {
@@ -443,7 +442,7 @@ async function reaperSystemctl(
   expectedOutput?: string,
 ) {
   if (signal.aborted) return false
-  const child = Bun.spawn(['systemctl', '--user', ...args], {
+  const child = Bun.spawn(['systemctl', '--user'].concat(args), {
     stdin: 'ignore',
     stderr: 'ignore',
     stdout: expectedOutput === undefined ? 'ignore' : 'pipe',
@@ -505,7 +504,7 @@ function limitSlice(slice: string, ceilingBytes: number) {
 }
 
 function systemctl(args: readonly string[]) {
-  return Bun.spawnSync(['systemctl', '--user', ...args], { stderr: 'pipe', stdout: 'pipe' })
+  return Bun.spawnSync(['systemctl', '--user'].concat(args), { stderr: 'pipe', stdout: 'pipe' })
 }
 
 export function readAccounting(file: string): JobAccounting {

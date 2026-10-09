@@ -250,10 +250,13 @@ export async function verifyCandidateFiles(release: Release, base = '/') {
     !readdirSync(path.join(release.web, 'assets')).some((file) => file.endsWith('.wasm')) &&
       'no wasm artifact in web/assets',
     !existsSync(path.join(release.server, 'index.js')) && 'server/index.js is missing',
-    ...(await missingReleaseFiles(release.server)).map(
-      (file) => `server/${file} is missing; install with --server to rebuild the server`,
-    ),
-  ].filter((problem): problem is string => typeof problem === 'string')
+  ]
+    .concat(
+      (await missingReleaseFiles(release.server)).map(
+        (file) => `server/${file} is missing; install with --server to rebuild the server`,
+      ),
+    )
+    .filter((problem): problem is string => typeof problem === 'string')
   if (problems.length === 0) return
 
   throw createScriptError(

@@ -482,7 +482,7 @@ export class Session<E extends EditEnvelope> {
     if (entries.some((entry) => !this.historyAt(entry.branch.tip))) return
     const histories = entries.map((entry) => this.historyAt(entry.branch.tip)!)
     const linear = inOneLineage(histories)
-    const sorted = entries.toSorted((a, b) => {
+    const sorted = entries.sort((a, b) => {
       if (linear) return b.branch.tip.depth - a.branch.tip.depth || compareIds(a.peer, b.peer)
       return compareBranches(a.branch, b.branch) || compareIds(a.peer, b.peer)
     })
@@ -495,7 +495,7 @@ export class Session<E extends EditEnvelope> {
         if (!represented.has(editKey(record.id))) replay.set(editKey(record.id), record.edit)
       }
     }
-    const term = Math.max(this.maxTerm, ...[...offers.values()].map((offer) => offer.term)) + 1
+    const term = Math.max(this.maxTerm, ...Array.from(offers.values(), (offer) => offer.term)) + 1
     const authority = { host: winner.peer, term, epoch: roundKey(round) }
     const commit = {
       round,
@@ -906,10 +906,9 @@ export class Session<E extends EditEnvelope> {
   private transferHistory(transfer: HistoryTransfer<E>): readonly Confirmation<E>[] | undefined {
     const base = sameTip(transfer.from, this.options.genesis) ? [] : this.historyAt(transfer.from)
     if (!base) return
-    return [
-      ...base,
-      ...Array.from({ length: transfer.next }, (_, index) => transfer.chunks.get(index)!).flat(),
-    ]
+    return base.concat(
+      Array.from({ length: transfer.next }, (_, index) => transfer.chunks.get(index)!).flat(),
+    )
   }
 
   private transferPrefix(transfer: HistoryTransfer<E>, from: Checkpoint): Checkpoint {
@@ -1005,7 +1004,7 @@ export class Session<E extends EditEnvelope> {
     if (payload.authority.epoch === this.authority.epoch) {
       if (payload.stage !== 'commit' || payload.successor !== this.authority.host) return
       const edits = new Map<string, E>()
-      for (const edit of [...(this.lastHandoff?.pending ?? []), ...payload.pending])
+      for (const edit of (this.lastHandoff?.pending ?? []).concat(payload.pending))
         edits.set(editKey(edit.id), edit)
       const added = edits.size !== (this.lastHandoff?.pending.length ?? 0)
       this.lastHandoff = { ...payload, pending: [...edits.values()] }

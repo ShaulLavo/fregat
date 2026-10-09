@@ -4,10 +4,9 @@ import { shellRunsCommand, type ProcessEntry } from '../foreground'
 const SHELL = 100
 
 function table(...children: readonly (readonly [number, number, string])[]) {
-  const entries: ProcessEntry[] = [
-    { pid: SHELL, parent: 1, command: 'zsh' },
-    ...children.map(([pid, parent, command]) => ({ pid, parent, command })),
-  ]
+  const entries: ProcessEntry[] = [{ pid: SHELL, parent: 1, command: 'zsh' }].concat(
+    children.map(([pid, parent, command]) => ({ pid, parent, command })),
+  )
   return new Map(entries.map((entry) => [entry.pid, entry]))
 }
 

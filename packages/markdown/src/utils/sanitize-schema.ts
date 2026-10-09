@@ -18,12 +18,12 @@ export const MARKDOWN_SANITIZE_SCHEMA: Schema = {
   ...defaultSchema,
   attributes: {
     ...attributes,
-    a: [...(attributes.a ?? []), 'dataIncomplete'],
-    code: [...(attributes.code ?? []), 'dataMeta'],
+    a: (attributes.a ?? []).concat(['dataIncomplete']),
+    code: (attributes.code ?? []).concat(['dataMeta']),
   },
   clobberPrefix: MARKDOWN_ID_PREFIX,
   protocols: {
     ...protocols,
-    href: [...(protocols.href ?? []), 'tel', 'vscode', 'vscode-insiders', 'ssh'],
+    href: (protocols.href ?? []).concat(['tel', 'vscode', 'vscode-insiders', 'ssh']),
   },
 }

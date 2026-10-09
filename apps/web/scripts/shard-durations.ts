@@ -36,7 +36,7 @@ export function mergeDurations(reports: readonly Report[]) {
     samples.set(key, values)
   }
   return Object.fromEntries(
-    [...samples]
+    Array.from(samples)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, values]) => {
         const sorted = values.sort((a, b) => a - b)

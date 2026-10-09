@@ -292,14 +292,13 @@ test('hosted keyboard undo runs the existing barrier contribution before documen
 })
 
 test('Tab focus mode lets a native editor release and regain Tab editing', async () => {
-  const bindings = [
-    ...defaultPlatformKeyBindings(),
+  const bindings = defaultPlatformKeyBindings().concat([
     binding('Control+Alt+F8', {
       command: 'editor.action.toggleTabFocusMode',
       context: 'Editor',
       platform: detectPlatform(),
     }),
-  ]
+  ])
   const view = renderHookWithProviders(
     () => ({ command: useCommand(), focus: useFocusService() }),
     { command: { bindings } },
@@ -858,12 +857,9 @@ test.each(['input', 'textarea', 'contenteditable', 'editor'])(
       () => ({ command: useCommand(), focus: useFocusService() }),
       {
         command: {
-          bindings: [
-            ...defaultPlatformKeyBindings(),
-            ...(kind === 'editor'
-              ? []
-              : [binding('x', { command: 'workspace.showCommandPalette' })]),
-          ],
+          bindings: defaultPlatformKeyBindings().concat(
+            kind === 'editor' ? [] : [binding('x', { command: 'workspace.showCommandPalette' })],
+          ),
         },
       },
     )

@@ -129,7 +129,7 @@ export function mountApp(): void {
   )
   const diffPlugins: readonly EditorPlugin[] = languagePlugins.concat(liveDiff, sharedPlugins)
   const editor = new Editor(editorPane.editorHost, {
-    keymap: { packs: [...defaultEditorPacks, ...(modal.length ? [modalPack] : [])] },
+    keymap: { packs: defaultEditorPacks.concat(modal.length ? [modalPack] : []) },
     cursorLineHighlight: {
       gutterNumber: true,
       gutterBackground: ['fold-gutter'],

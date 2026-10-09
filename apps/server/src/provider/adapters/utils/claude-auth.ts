@@ -218,7 +218,7 @@ export function claudeLoginArgs(input: ClaudeLoginInput) {
   const args = ['auth', 'login', SIGN_IN_METHOD_FLAGS[input.method]]
   if (!input.email) return args
 
-  return [...args, '--email', input.email]
+  return args.concat(['--email', input.email])
 }
 
 function expireAttempt(attempt: MutableLoginAttempt) {
@@ -327,7 +327,7 @@ function defaultClaudeAuthSpawn(
 }
 
 function spawnClaudeAuth(executable: string, args: readonly string[], env: NodeJS.ProcessEnv) {
-  return Bun.spawn([executable, ...args], {
+  return Bun.spawn([executable].concat(args), {
     env,
     stderr: 'pipe',
     stdin: 'ignore',

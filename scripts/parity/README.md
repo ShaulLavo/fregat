@@ -1,7 +1,8 @@
 # Alignment records and executable comparisons
 
-These checks run locally only; CI does not fetch t3code. They need the pinned checkout at
-`references/t3code`:
+These manual checks compare Fregat with the pinned T3 Code checkout at
+`references/t3code`. The default test suites, CI and pre-commit checks run Fregat
+checks independently of this reference checkout.
 
 ```sh
 git clone https://github.com/pingdotgg/t3code references/t3code
@@ -11,6 +12,7 @@ git -C references/t3code checkout 7445aa733ada33e45289e5aa5055f79142556513
 Then, from the repository root:
 
 ```sh
+bun run test:t3code
 python3 -B scripts/parity/check.py
 python3 -B scripts/parity/source.py --reference references/t3code
 python3 -B -m unittest discover -s scripts/parity -p 'test_*.py'
@@ -24,6 +26,11 @@ python3 -B scripts/parity/run.py --operation client-command:thread.turn.start \
   --scenario follow-up-queue-policy --check
 bun scripts/parity/follow-ups.ts --summary
 ```
+
+`bun run test:t3code` runs the title-context, source-control link and terminal-history
+comparisons in `*.t3code.test.ts`. These files are excluded from the default app
+suites. The manual suite reports a skip with setup commands when the reference
+checkout is absent.
 
 The record checker reads Plan 126's committed inventory, reports, ledger and contract
 assignments, plus provenance fields in `test/parity/t3code/*.json`. Incomplete records

@@ -46,7 +46,7 @@ test('external bytes invalidate controls and source ordering is stable', () => {
     { path: 'input-output.mjs', bytes: 'assertions' },
   ]
   const identity = inputSourceIdentity(sources, 'external')
-  expect(inputSourceIdentity([...sources].reverse(), 'external')).toEqual(identity)
+  expect(inputSourceIdentity(sources.toReversed(), 'external')).toEqual(identity)
   expect(inputSourceIdentity(sources, 'changed external').measurementHash).not.toBe(
     identity.measurementHash,
   )

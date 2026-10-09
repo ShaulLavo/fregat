@@ -164,7 +164,7 @@ export function orphanSlices(
   const unowned = liveSlices(root).filter(
     (slice) => !owned(slice.id) && !named.some((n) => n.slice === slice.slice),
   )
-  return [...named, ...unowned]
+  return named.concat(unowned)
 }
 
 /** The slice's `memory.current`, or null once it is gone. */

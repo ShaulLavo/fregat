@@ -19,7 +19,7 @@ export async function run(
   options: RunOptions = {},
 ): Promise<RunResult> {
   const child = Bun.spawn({
-    cmd: [...command],
+    cmd: Array.from(command),
     cwd: options.cwd,
     env: options.env,
     stderr: 'pipe',

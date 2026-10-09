@@ -80,7 +80,7 @@ export function ProjectTitleModelRow({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value='default'>Default · {projectModelLabel(fallback)}</SelectItem>
-          {[...choices].map(([key, option]) => (
+          {Array.from(choices, ([key, option]) => (
             <SelectItem key={key} value={key}>
               {option.label}
             </SelectItem>

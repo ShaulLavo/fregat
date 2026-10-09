@@ -20,9 +20,13 @@ import {
   TextIndentIcon,
   TextOutdentIcon,
   TrashIcon,
+  type Icon,
 } from '@phosphor-icons/react'
 
-const decoratedCommands = [
+type EditorCommand = (typeof editorCommandMetadata)[keyof typeof editorCommandMetadata] & {
+  readonly icon?: Icon
+}
+const decoratedCommands: readonly EditorCommand[] = [
   { ...editorCommandMetadata['markdown.bold'] },
   { ...editorCommandMetadata['markdown.italic'] },
   { ...editorCommandMetadata['markdown.strikethrough'] },
@@ -245,7 +249,6 @@ const decoratedCommands = [
 
 const decoratedIds = new Set<string>(decoratedCommands.map(({ id }) => id))
 
-export const editorCommands = [
-  ...decoratedCommands,
-  ...Object.values(editorCommandMetadata).filter(({ id }) => !decoratedIds.has(id)),
-]
+export const editorCommands = decoratedCommands.concat(
+  Object.values(editorCommandMetadata).filter(({ id }) => !decoratedIds.has(id)),
+)

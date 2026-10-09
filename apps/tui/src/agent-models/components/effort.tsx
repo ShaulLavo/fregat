@@ -25,18 +25,17 @@ export function ModelEffort({
   const commands = useCommands()
   const descriptor = modelEffortDescriptor(option.optionDescriptors)
   const [selected, setSelected] = useState(0)
-  const options = [
-    {
-      name: 'Provider default',
-      description: 'Let the provider choose the reasoning effort',
-      value: null,
-    },
-    ...option.effortLevels.map((level) => ({
+  const options = Array.of<{ name: string; description: string; value: string | null }>({
+    name: 'Provider default',
+    description: 'Let the provider choose the reasoning effort',
+    value: null,
+  }).concat(
+    option.effortLevels.map((level) => ({
       name: level.label,
       description: level.description ?? '',
       value: level.effort,
     })),
-  ]
+  )
   useCommandFocus(
     {
       ...commands.focus.getSnapshot().scope,

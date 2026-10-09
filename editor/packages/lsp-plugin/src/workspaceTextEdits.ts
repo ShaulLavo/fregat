@@ -382,7 +382,7 @@ function convertWorkspaceTextBatch(
     converted.push({ edit: result.value, editIndex })
   }
 
-  const sorted = converted.toSorted(compareIndexedEdits)
+  const sorted = converted.sort(compareIndexedEdits)
   const conflict = textBatchConflict(sorted, operationIndex)
   if (conflict) return { error: conflict, ok: false }
 

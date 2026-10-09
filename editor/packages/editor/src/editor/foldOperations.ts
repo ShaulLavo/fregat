@@ -70,7 +70,7 @@ const FOLD_LEVEL_BY_COMMAND = new Map<EditorFoldPlanCommandId, EditorFoldLevel>(
   EDITOR_FOLD_LEVELS.map((level) => [`editor.foldLevel${level}`, level] as const),
 )
 
-const FOLD_COMMANDS = new Set<EditorCommandId>([
+const BASE_FOLD_COMMANDS: readonly EditorCommandId[] = [
   'editor.fold',
   'editor.unfold',
   'editor.foldRecursively',
@@ -79,8 +79,10 @@ const FOLD_COMMANDS = new Set<EditorCommandId>([
   'editor.unfoldAll',
   'editor.createFoldingRangeFromSelection',
   'editor.removeManualFoldingRanges',
-  ...EDITOR_FOLD_LEVELS.map((level) => `editor.foldLevel${level}` as const),
-])
+]
+const FOLD_COMMANDS = new Set(
+  BASE_FOLD_COMMANDS.concat(EDITOR_FOLD_LEVELS.map((level) => `editor.foldLevel${level}` as const)),
+)
 
 export function isEditorFoldCommand(command: EditorCommandId): command is EditorFoldCommandId {
   return FOLD_COMMANDS.has(command)
@@ -96,7 +98,7 @@ export function foldNesting(folds: readonly FoldRange[]): FoldNesting {
   const openIndexes: number[] = []
   const innermostOpenEnd = (): number => entries[openIndexes.at(-1)!]!.fold.endIndex
 
-  for (const fold of [...folds].toSorted(compareFoldsOutermostFirst)) {
+  for (const fold of folds.toSorted(compareFoldsOutermostFirst)) {
     while (openIndexes.length > 0 && innermostOpenEnd() <= fold.startIndex) openIndexes.pop()
 
     entries.push({ fold, parentIndex: openIndexes.at(-1) ?? -1, level: openIndexes.length + 1 })
@@ -254,7 +256,7 @@ function subtreeFoldPlan(
     const entry = innermostFoldEntryAt(nesting, location)
     if (!entry) return NO_FOLDS
 
-    return [entry.fold, ...foldsInside(nesting, entry.fold, () => true)]
+    return [entry.fold].concat(foldsInside(nesting, entry.fold, () => true))
   })
 
   return foldPlan(request, operation, folds)

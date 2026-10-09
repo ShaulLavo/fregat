@@ -16,7 +16,7 @@ const TEXT = `${LINE}\nlast`
 function rowText(container: HTMLElement): string {
   return [...container.querySelectorAll<HTMLElement>('[data-editor-virtual-row]')]
     .filter((row) => row.style.display !== 'none')
-    .toSorted(
+    .sort(
       (left, right) =>
         Number(left.dataset.editorVirtualRow) - Number(right.dataset.editorVirtualRow),
     )
@@ -187,7 +187,7 @@ test('wraps padded Markdown table links without repeating the label', async () =
     editor.setInlineReplacementProvider(() => specs, { trigger: 'edit' })
     await expect
       .poll(() =>
-        [...container.querySelectorAll('a')].map((anchor) => anchor.textContent ?? '').join(''),
+        Array.from(container.querySelectorAll('a'), (anchor) => anchor.textContent ?? '').join(''),
       )
       .toBe(LABEL)
     expectContained(container)

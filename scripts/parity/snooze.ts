@@ -63,7 +63,11 @@ async function compareZone() {
   deepStrictEqual(presetActual, presetExpected, `${process.env.TZ}: calendar presets`)
   const duplicateSunday = presetActual.map((presets, index) =>
     moments[index]!.getDay() === 0
-      ? [...presets, { ...presets.find((preset) => preset.id === 'tomorrow'), id: 'next-week' }]
+      ? presets.concat(
+          presets.flatMap((preset) =>
+            preset.id === 'tomorrow' ? [{ ...preset, id: 'next-week' }] : [],
+          ),
+        )
       : presets,
   )
   notDeepStrictEqual(duplicateSunday, presetExpected, 'Sunday duplicate negative control must fail')
@@ -118,9 +122,9 @@ async function compareZone() {
     for (const time of ['01:30', '02:30', '03:30', '09:00', '24:00', 'bad'])
       customInputs.push({ mode: 'date', date, time })
   }
-  const customCases = [new Date('2026-01-01T00:00:00'), ...moments, new Date(NaN)].flatMap((now) =>
-    customInputs.map((input) => ({ now, input })),
-  )
+  const customCases = [new Date('2026-01-01T00:00:00')]
+    .concat(moments, [new Date(NaN)])
+    .flatMap((now) => customInputs.map((input) => ({ now, input })))
   const customExpected = customCases.map(({ now, input }) =>
     upstream.resolveCustomSnooze(input, now),
   )
@@ -142,7 +146,7 @@ async function compareZone() {
     'Calendar round-trip negative control must fail',
   )
 
-  const effectiveCases = [...makeEffectiveCases(), ...wakeCases]
+  const effectiveCases = makeEffectiveCases().concat(wakeCases)
   const effectiveExpected = effectiveCases.map(({ session, now }) =>
     upstream.effectiveSnoozed(upstreamSnoozeInput(session), { now: new Date(now).toISOString() }),
   )

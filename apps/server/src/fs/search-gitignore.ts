@@ -179,8 +179,7 @@ function ignoreSourcePaths(root: string, directory: string, globalExcludes: bool
   return [
     globalExcludes ? globalExcludesFile() : null,
     path.join(root, GIT_INFO_EXCLUDE_PATH),
-    ...directorySources,
-  ]
+  ].concat(directorySources)
 }
 
 function readIgnoreFile(absolutePath: string | null) {

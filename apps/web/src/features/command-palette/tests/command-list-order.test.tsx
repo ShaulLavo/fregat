@@ -90,9 +90,8 @@ test.each(['>', '> mode'])(
       'workspace.showSettings',
     )
 
-    expect(rendered).toEqual([
-      ...baseline.filter((id) => id !== 'workspace.showSettings'),
-      'workspace.showSettings',
-    ])
+    expect(rendered).toEqual(
+      baseline.filter((id) => id !== 'workspace.showSettings').concat(['workspace.showSettings']),
+    )
   },
 )

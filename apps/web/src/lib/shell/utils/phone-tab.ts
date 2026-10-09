@@ -1,4 +1,3 @@
-/** The editor tab the phone opened in a workspace; a tab it found already open is never its own. */
 export type PhoneTab = { readonly rootPath: string | null; readonly token: string }
 
 /**
@@ -14,6 +13,6 @@ export function tabsForPhoneOpen(
     if (own === token) return { tabs, own }
     return { tabs: own === null ? tabs : tabs.filter((entry) => entry !== own), own: null }
   }
-  if (own === null || !tabs.includes(own)) return { tabs: [...tabs, token], own: token }
+  if (own === null || !tabs.includes(own)) return { tabs: tabs.concat([token]), own: token }
   return { tabs: tabs.map((entry) => (entry === own ? token : entry)), own: token }
 }

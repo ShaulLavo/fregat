@@ -732,10 +732,9 @@ export class ProviderRuntimeIngestion {
     const activities = this.getReadModel?.().sessions.get(event.sessionId)?.activities ?? []
     const taskTitle =
       event.type === 'task.completed' ? taskTitleFromActivities(event, activities) : undefined
-    for (const activity of [
-      ...activitiesForRuntimeEvent(event, taskTitle),
-      ...this.silentHookSummary(event),
-    ]) {
+    for (const activity of activitiesForRuntimeEvent(event, taskTitle).concat(
+      this.silentHookSummary(event),
+    )) {
       await this.dispatch(
         {
           activity,

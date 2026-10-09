@@ -107,7 +107,7 @@ test('checkpoint cancellation, logical copy, trim and stale settlement preserve 
   documents.getState().retainEditorDocuments({ documentKeys: new Set(), tabIds: new Set([copyId]) })
   expect(first.read().kind).toBe('released')
   expect(copy.read()).toBe(read)
-  queries.setQueryData(key, [...diffs])
+  queries.setQueryData(key, diffs)
   owner.prepare(firstId, scope, comparison, { activate: false })
   expect(documents.getState().snapshotComparisons.size).toBe(1)
   copy.release()

@@ -100,7 +100,7 @@ describe('filesystem recents', () => {
     const paths = async (showHidden: boolean) => {
       const response = await recentEntries(app, { limit: 10, showHidden })
       const payload = (await response.json()) as { entries: Array<{ path: string }> }
-      return payload.entries.map((entry) => entry.path).toSorted()
+      return payload.entries.map((entry) => entry.path).sort()
     }
 
     expect(await paths(true)).toEqual(['.hidden-folder', 'folder'])
