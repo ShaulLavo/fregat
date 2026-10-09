@@ -316,3 +316,56 @@ it('fingerprints an unmatched TypeScript line fallback', async () => {
   expect(result).toMatchObject({ status: 'ok', unit: { source: 'line', hasErrors: false } })
   if (result?.status === 'ok') expect(result.unit.contentKey).toContain('comment')
 })
+
+it('touching selection returns every intersected unit', async () => {
+  const text = 'interface Palette { amber: string; violet: number; }'
+  await parseTreeDocument(client, {
+    ...document,
+    snapshotVersion: 1,
+    text,
+    resultMode: 'parseOnly',
+  })
+  const result = await client.mergeUnit({
+    ...document,
+    snapshotVersion: 1,
+    range: { startIndex: text.indexOf('amber'), endIndex: text.indexOf('number') + 6 },
+    selection: 'touching',
+    analysis: true,
+  })
+  expect(result?.status).toBe('ok')
+  if (result?.status !== 'ok') return
+  expect(result.units?.map((unit) => unit.signature)).toEqual(['amber', 'Palette', 'violet'])
+})
+
+it('the live review reader admits snapshots and retires worker sources', async () => {
+  const { createTreeSitterReviewSyntax } = await import('../src/mergeReview')
+  const { createPieceTableSnapshot, applyBatchToPieceTable } =
+    await import('@singapore-editor/core/document')
+  const descriptor = await resolveTreeSitterLanguageContribution(
+    TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === 'typescript')!,
+  )
+  const syntax = createTreeSitterReviewSyntax({
+    languageId: 'typescript',
+    languages: [descriptor],
+    backend: client,
+  })
+  const base = createPieceTableSnapshot('const value = 0;\n')
+  const projected = applyBatchToPieceTable(base, [{ from: 14, to: 15, text: '1' }])
+  const ranges = [{ startIndex: 14, endIndex: 15 }]
+  expect((await syntax(base, ranges))?.[0]?.[0]?.type).toBe('lexical_declaration')
+  expect((await syntax(projected, ranges, false, 'enclosing', base))?.[0]?.[0]?.type).toBe(
+    'lexical_declaration',
+  )
+  expect((await client.inspectRetention())?.documentCount).toBe(1)
+  for (let index = 0; index < 8; index++) {
+    const next = applyBatchToPieceTable(base, [{ from: 14, to: 15, text: String(index + 2) }])
+    expect((await syntax(next, ranges, false, 'enclosing', base))?.[0]?.[0]?.type).toBe(
+      'lexical_declaration',
+    )
+  }
+  await syntax.release()
+  const retired = await client.inspectRetention()
+  expect(retired?.documentCount).toBe(0)
+  expect(retired?.source.readCount).toBe(0)
+  await syntax.dispose()
+})

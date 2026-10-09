@@ -152,8 +152,9 @@ them).
    Verification covers original fixtures for every grammar, separator-enclosing LF/CRLF fallback,
    lazy compilation, incremental edits, stale requests, deepest nested injections, MDX fences,
    injected-language fallback, UTF-16 offsets and all ten independent-review blockers.
-3. **Detector:** functional implementation verified 2026-10-09; **step incomplete** until
-   worker integration and the unchanged **under-2-ms batch gate** pass. The demand-only
+3. **Detector:** functional implementation and live worker wiring verified 2026-10-09;
+   **step incomplete** until projected-query integration and the unchanged
+   **under-2-ms batch gate** pass. The demand-only
    `@singapore-editor/collaboration/merge-review` export combines confirmed concurrency and an
    injectable syntax reader without adding a dependency between collab and tree-sitter.
    It emits `overlap`, `parse`, `signature` and `orphan`, retains exact concurrent edges,
@@ -176,12 +177,16 @@ them).
    The detector coordinator, effect visibility, identity mapping, signatures, orphan checks
    and projections run on the **invoking thread**. The supplied syntax reader determines the
    query/parse thread; worker `mergeUnit` support runs in the parser worker, while the real
-   grammar test adapter runs on the Node test thread. There are no typing hooks, subscriptions
+   grammar test adapter runs on the Node test thread. The detector itself has no typing hooks
    or automatic calls. Null session windows and logs without cross-author pairs return before
-   syntax work. A production bridge must still register confirmed/projected snapshots in the
-   parser worker and schedule review after accepted batches. Batch-scoped results describe
-   pairs involving the supplied IDs; request the full window to replace marks after undo or
-   retention changes. This step ships no marks UI or session scheduling.
+   syntax work. Step 4 supplies the opt-in production bridge and schedules review after accepted
+   batches. Immutable confirmed/projected snapshots use existing worker source readers, and
+   touching requests return intersected units with their ancestors. Batch-scoped results describe
+   pairs involving the supplied IDs; the live owner requests the full window when replacing marks
+   after undo or retention changes. The reader accepts a projected base snapshot through one
+   admission seam. The dedicated review-only projected query and its input-edit integration remain
+   owned by the detector-cost lane; this delivery uses the existing parse-only snapshot reader
+   there and makes no large-document cost claim.
 
    Verification: original 18-case conflict corpus plus wide damaged-tree and quoted-escape
    regressions; 10,000 seeded independent-function cases with zero marks; 10,000 shared-unit
@@ -237,7 +242,37 @@ them).
    multi-unit paste uses two ranges and 20 real query matches, retaining both signature marks.
    This bounds the paste range-collection regression, independently of the ordinary batch gate.
 
-4. **Marks, hover and resolutions** in the collaboration plugin, wired into the example page.
+4. **Marks, hover and resolutions. Delivered 2026-10-09** in the collaboration plugin and
+   the real Edit together example. `mergeReview` opts an attachment into a confirmed-window owner;
+   sessionless views, uninterested plugins and single-author documents do no detection work.
+   A cancellable MessageChannel task coalesces accepted batches outside authoring; rejected-only
+   batches leave existing marks intact and schedule no syntax work. History resets
+   and newer confirmations invalidate published marks; obsolete work releases source snapshots
+   before the next run. Detach unsubscribes and releases the review lifetime.
+
+   Unit highlights and an opt-in native gutter lane paint review dots beside text, including
+   editors with no line-number gutter. Dots live inside gutter cells so text clipping preserves
+   their paint. The shared hover names authors and shows Base, Theirs and Yours.
+   Keep both dismisses locally. Keep yours / Keep theirs project author-selective effects in a
+   local engine, then submit a bounded ordinary edit through the editor's collaboration author.
+   Foreign `setEffects` are never transmitted. Every removed insertion/deletion identity and the
+   resulting diff must lie wholly inside the unit; cross-unit edits offer Jump to edit for manual
+   review. Actions from dismissed, pending or obsolete versions change no text.
+   `onMergeReview(unit, versions)` lets hosts append actions.
+
+   Node regressions cover scheduling exclusions, local dismissal, version reconstruction,
+   cross-unit safety, stale actions, history reset, obsolete work, release failures and disposal.
+   Real-editor browser tests cover both resolutions reaching every peer as accepted ordinary
+   edits, shared-hover action handlers, host actions, uninterested attachments and the production
+   parser bridge. Fixture hover handlers run synchronously; the standalone scenario owns native
+   keyboard and pointer verification. The portable `collaboration-merge-review` scenario holds
+   only the example's real BroadcastChannel delivery,
+   types through native editor inputs, then clicks each resolution. It checks convergence,
+   local dismissal, dot bounds outside text and hover contrast. Nine screenshots capture each
+   mark, hover and resolution; all five distinct states were read back. Example theme type is
+   explicit so its dark page and shared hover use the same palette. Detector cost and the
+   dedicated projected query remain step 3 work.
+
 5. **Fregat:** marks for agent edits racing human typing, review annotations on the host, and the
    "Fix with AI" action. Detection runs in the browser, where the parser lives; the server host
    does not parse. Lands with Delta DB phase 4.

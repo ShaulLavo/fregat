@@ -1,4 +1,9 @@
 export {
+  createTreeSitterReviewSyntax,
+  type TreeSitterReviewSyntax,
+  type TreeSitterReviewUnit,
+} from './mergeReview'
+export {
   TreeSitterLanguageRegistry,
   createTreeSitterLanguageRegistry,
   isTreeSitterLanguageId,

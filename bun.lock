@@ -253,6 +253,7 @@
         "@singapore-editor/scope-lines": "workspace:*",
         "@singapore-editor/spellcheck": "workspace:*",
         "@singapore-editor/textbuffer": "workspace:*",
+        "@singapore-editor/tree-sitter": "workspace:*",
         "@singapore-editor/tree-sitter-languages": "workspace:*",
         "@singapore-editor/typescript-lsp": "workspace:*",
       },
@@ -314,6 +315,7 @@
         "@noble/hashes": "2.4.0",
         "@singapore-editor/collab": "workspace:*",
         "@singapore-editor/core": "workspace:*",
+        "@singapore-editor/plugin-ui": "workspace:*",
         "@singapore-editor/textbuffer": "workspace:*",
       },
       "devDependencies": {

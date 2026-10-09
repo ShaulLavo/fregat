@@ -137,6 +137,7 @@ export type TreeSitterMergeUnit = TreeSitterSyntaxRange & {
 
 export type TreeSitterMergeUnitRequest = {
   readonly type: 'mergeUnit'
+  readonly selection?: 'enclosing' | 'touching'
   readonly analysis?: true
   readonly contentKey?: true
   readonly cancellationBuffer?: SharedArrayBuffer
@@ -152,7 +153,11 @@ export type TreeSitterMergeUnitResult = {
   readonly snapshotVersion: number
   readonly languageId: TreeSitterLanguageId
 } & (
-  | { readonly status: 'ok'; readonly unit: TreeSitterMergeUnit }
+  | {
+      readonly status: 'ok'
+      readonly unit: TreeSitterMergeUnit
+      readonly units?: readonly TreeSitterMergeUnit[]
+    }
   | { readonly status: 'stale' | 'cancelled'; readonly unit: null }
 )
 
