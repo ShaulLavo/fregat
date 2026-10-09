@@ -1,7 +1,7 @@
 import { createGhosttyError } from '../core/error.js'
 import type { AtlasGpuTextures } from './atlas/gpu-textures.js'
 import type { RowInstanceUpdate } from './instances/types.js'
-import { planSparseUploadRanges, planUploadRanges } from './instances/upload-ranges.js'
+import { planSparseUploadRanges, planWrappedUploadRanges } from './instances/upload-ranges.js'
 import { CELL_INSTANCE_BYTES, GLYPH_INSTANCE_BYTES } from './instances/layout.js'
 import { cellShader } from './shaders/cell.wgsl.js'
 import { glyphShader } from './shaders/glyph.wgsl.js'
@@ -93,6 +93,7 @@ export class WebGpuTextPass {
   private rowHeight = 0
   private rowColumns = 0
   private rowsInitialized = false
+  private wrapRow = Infinity
 
   constructor(options: WebGpuTextPassOptions) {
     this.device = options.device
@@ -171,7 +172,10 @@ export class WebGpuTextPass {
       this.uploadRows(data)
       this.rowsInitialized = true
     }
-    const plan = (changes & 1) === 0 ? planUploadRanges(updates) : planSparseUploadRanges(updates)
+    const plan =
+      (changes & 1) === 0
+        ? planWrappedUploadRanges(updates, this.wrapRow)
+        : planSparseUploadRanges(updates)
     const cellData = data.cellData
     const glyphData = data.glyphData
     for (const range of plan.cell) this.writeRange(this.cellBuffer, cellData, range)
@@ -247,6 +251,7 @@ export class WebGpuTextPass {
     this.rowColumns = columns
     this.rowHeight = height
     this.rowOffset = offset
+    this.wrapRow = offset === 0 ? Infinity : this.instanceCount / columns - offset
     this.rowView.setUint32(0, columns, true)
     this.rowView.setFloat32(4, height, true)
     this.rowView.setUint32(8, offset, true)

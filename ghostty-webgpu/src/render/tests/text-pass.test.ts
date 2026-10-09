@@ -243,6 +243,59 @@ it.each([0, 1, 11])('does zero mapping work on edit frames at offset %s', (rowOf
   }
 })
 
+it('bounds each side of wrapped edit rows without mapping work or clean-row uploads', () => {
+  const fixture = gpuFixture()
+  const data = {
+    ...frame(),
+    columns: 40,
+    rowHeight: 16,
+    rowOffset: 1,
+    stableRows: true,
+    rowChanges: 1,
+  }
+  fixture.pass.uploadFrame(data, [update(0, 0, 30720, 0, 46080)])
+  fixture.writes.length = 0
+  let mappingReads = 0
+  for (const key of ['columns', 'rowHeight', 'rowOffset', 'stableRows'] as const) {
+    const value = data[key]
+    Object.defineProperty(data, key, {
+      get() {
+        mappingReads += 1
+        return value
+      },
+    })
+  }
+  data.rowChanges = 0
+  data.cellData.fill(-1, 7040, 7056)
+  data.cellData.fill(-2, 0, 16)
+  data.glyphData.fill(-3, 10560, 10584)
+  data.glyphData.fill(-4, 0, 24)
+  expect(
+    fixture.pass.uploadFrame(data, [update(10, 28160, 64, 42240, 96), update(11, 0, 64, 0, 96)]),
+  ).toBe(4)
+  expect(mappingReads).toBe(0)
+  expect(fixture.pass.frameUploadedBytes).toBe(320)
+  expect(fixture.writes.map((write) => [write.offset, write.bytes.byteLength])).toEqual([
+    [28160, 64],
+    [0, 64],
+    [42240, 96],
+    [0, 96],
+  ])
+  for (const write of fixture.writes) {
+    const source = write.buffer === fixture.buffers[0] ? data.cellData : data.glyphData
+    expect(write.sourceBuffer).toBe(source.buffer)
+    expect(write.bytes).toEqual(
+      new Uint8Array(source.buffer, source.byteOffset + write.offset, write.bytes.byteLength),
+    )
+  }
+  expect(fixture.buffers[0]!.bytes).toEqual(
+    new Uint8Array(data.cellData.buffer, data.cellData.byteOffset, data.cellData.byteLength),
+  )
+  expect(fixture.buffers[1]!.bytes).toEqual(
+    new Uint8Array(data.glyphData.buffer, data.glyphData.byteOffset, data.glyphData.byteLength),
+  )
+})
+
 it.each([0, 1])('uses sparse spans only on moved rows: rowChanges=%s', (rowChanges) => {
   const fixture = gpuFixture()
   const data = { ...frame(), rowChanges }
