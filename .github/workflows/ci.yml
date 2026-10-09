@@ -20,8 +20,7 @@ concurrency:
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 jobs:
-  # A PR runs only the jobs its files can affect. Main runs everything.
-  # Web and TUI tests drive the real server, so a server change runs them too.
+  # Main and manual runs validate the full graph; PRs select changed packages and consumers.
   changes:
     name: Changes
     runs-on: ubuntu-latest
@@ -30,20 +29,22 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      code: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' || steps.filter.outputs.generated == 'true' }}
-      web: ${{ github.event_name != 'pull_request' || steps.filter.outputs.web == 'true' }}
-      server: ${{ github.event_name != 'pull_request' || steps.filter.outputs.server == 'true' }}
-      tui: ${{ github.event_name != 'pull_request' || steps.filter.outputs.tui == 'true' }}
-      site: ${{ github.event_name != 'pull_request' || steps.filter.outputs.site == 'true' }}
-      editor: ${{ github.event_name != 'pull_request' || steps.filter.outputs.editor == 'true' || steps.filter.outputs.library_tools == 'true' }}
-      ghostty: ${{ github.event_name != 'pull_request' || steps.filter.outputs.ghostty == 'true' || steps.filter.outputs.library_tools == 'true' }}
-      hotkeys: ${{ github.event_name != 'pull_request' || steps.filter.outputs.hotkeys == 'true' || steps.filter.outputs.library_tools == 'true' }}
+      code: ${{ steps.plan.outputs.code }}
+      packages: ${{ steps.plan.outputs.packages }}
+      web: ${{ steps.plan.outputs.web }}
+      server: ${{ steps.plan.outputs.server }}
+      tui: ${{ steps.plan.outputs.tui }}
+      desktop: ${{ steps.plan.outputs.desktop }}
+      site: ${{ steps.plan.outputs.site }}
+      editor: ${{ steps.plan.outputs.editor }}
+      ghostty: ${{ steps.plan.outputs.ghostty }}
+      hotkeys: ${{ steps.plan.outputs.hotkeys }}
       web_shards: >-
         ${{ github.event_name == 'workflow_dispatch' && inputs.web_shards == '2' && '["1/2","2/2"]' || '["1/4","2/4","3/4","4/4"]' }}
       docs: ${{ steps.filter.outputs.docs == 'true' }}
       docs_files: ${{ steps.filter.outputs.docs_files }}
     steps:
-      - name: Classify changed files
+      - name: Classify changed documentation
         id: filter
         if: ${{ github.event_name == 'pull_request' }}
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -51,88 +52,25 @@ jobs:
           predicate-quantifier: some-with-excludes
           list-files: json
           filters: |
-            code:
-              - '**'
-              - '!plans/**'
-              - '!docs/**'
-              - '!*.md'
-            web:
-              - '**'
-              - '!apps/tui/**'
-              - '!apps/desktop/**'
-              - '!apps/mac/**'
-              - '!apps/site/**'
-              - '!plans/**'
-              - '!docs/**'
-              - '!*.md'
-            server:
-              - '**'
-              - '!apps/web/**'
-              - '!apps/tui/**'
-              - '!apps/desktop/**'
-              - '!apps/mac/**'
-              - '!apps/site/**'
-              - '!plans/**'
-              - '!docs/**'
-              - '!*.md'
-            tui:
-              - '**'
-              - '!apps/web/**'
-              - '!apps/desktop/**'
-              - '!apps/mac/**'
-              - '!apps/site/**'
-              - '!plans/**'
-              - '!docs/**'
-              - '!*.md'
-            site:
-              - 'apps/site/**'
-              - 'packages/**'
-              - 'editor/**'
-              - 'ghostty-webgpu/**'
-              - 'scripts/build-site.ts'
-              - 'scripts/dev-sources.ts'
-              - 'scripts/runtime-network.ts'
-              - 'scripts/structured-errors.ts'
-              - 'scripts/product-sites/**'
-              - 'hotkeys/**'
-              - 'patches/**'
-              - '.github/actions/setup/**'
-              - '.github/actions/install-browsers/**'
-              - '.github/workflows/ci.yml'
-              - 'package.json'
-              - 'bun.lock'
-              - 'bunfig.toml'
-              - '.npmrc'
-              - '.env*'
-              - 'tsconfig*.json'
-              - 'turbo.json'
-              - '.github/workflows/site.yml'
-            # Root tooling and Turbo's cross-family global inputs invalidate every family.
-            library_tools:
-              - '*'
-              - '.github/**'
-              - 'scripts/**'
-              - 'patches/**'
-              - '{editor,ghostty-webgpu,hotkeys}/{.oxlintrc.json,.oxfmtrc.json,tsconfig.json}'
-              - 'editor/global.d.ts'
-              - 'editor/scripts/build-package.ts'
-              - 'editor/scripts/workspace-root*'
-              - 'editor/examples/app/tsconfig.json'
-              - '!*.md'
-            editor:
-              - 'editor/**'
-            ghostty:
-              - 'ghostty-webgpu/**'
-            hotkeys:
-              - 'hotkeys/**'
-            # Written by `generated:check`'s generators, so a hand edit is a code change.
-            generated:
-              - 'docs/settings-reference.md'
-              - 'docs/native-syntax-coverage.*'
             docs:
               - added|modified: 'plans/**'
               - added|modified: 'docs/**'
               - added|modified: '*.md'
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - name: Select affected packages
+        id: plan
+        env:
+          MODE: ${{ github.event_name == 'pull_request' && 'changed' || 'full' }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bun scripts/ci/affected.mjs "$MODE" "$BASE_SHA" "$HEAD_SHA"
 
   # No workspace's `format:check` reaches plans and docs, so their changed files are checked here.
   docs:
@@ -172,6 +110,8 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
+        with:
+          build-packages: '[]'
 
       - name: Check shared tooling
         run: bun run workspace:check
@@ -182,12 +122,11 @@ jobs:
       # `format:check`, never `format` — a CI job that rewrites files and then
       # passes is a job that reports on a tree nobody reviewed.
       - name: Format
-        run: bun run format:check
+        run: bun run format:check:root && bun run --cwd editor format:check:root && bun run --cwd hotkeys format:check
 
-      # Workspaces lint in parallel (no dependency order to respect), and `apps/web`'s lint
-      # already runs the root config's feature-boundary rules over all of `apps/web`.
+      # Package formatting and linting run with the affected package checks.
       - name: Lint
-        run: bun run lint
+        run: bun run plans:check && bun run --cwd editor lint:root && bun run dupes:functions && bun run dupes
 
       - name: Query API
         run: bun run query:check
@@ -224,20 +163,35 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
+        with:
+          # Script tests import runtime code across the repository.
+          build-packages: all
 
       - name: Validate dev task graph
+        if: ${{ needs.changes.outputs.web == 'true' }}
         env:
           TURBO_TELEMETRY_DISABLED: '1'
         run: bun run dev:web -- --dry-run=json > /dev/null
 
       - name: Install Linux webview build dependencies
+        if: ${{ needs.changes.outputs.desktop == 'true' }}
         uses: ./.github/actions/linux-webview-deps
 
       - name: Build Linux webview host
+        if: ${{ needs.changes.outputs.desktop == 'true' }}
         run: bun run --cwd apps/desktop build:native
 
-      - name: Typecheck
-        run: bun run typecheck
+      - name: Package checks
+        env:
+          CI_PACKAGES: ${{ needs.changes.outputs.packages }}
+        run: bun scripts/ci/packages.mjs checks "$CI_PACKAGES"
+
+      - name: Check script types
+        run: bun run --cwd scripts typecheck
+
+      - name: Check Hotkeys documentation
+        if: ${{ needs.changes.outputs.hotkeys == 'true' }}
+        run: bun run --cwd hotkeys docs:check
 
       - name: Check generated artifacts
         run: bun run generated:check
@@ -251,13 +205,19 @@ jobs:
       # calibration identity is a hash of `apps/web/src`, so any PR invalidates
       # it before a measurement happens.
       - name: Benchmark gate (file tree prepared input)
+        if: ${{ needs.changes.outputs.web == 'true' }}
         run: bun run --cwd apps/web bench:file-tree-prepared-input:gate
 
-      # Package tests also read app sources (the session vocabulary scans `apps/web`), so they
-      # run for any code change.
+      # Script tests inspect the whole repository; package source readers are declared in Turbo.
+      - name: Script tests
+        if: ${{ !cancelled() }}
+        run: bun run test:scripts
+
       - name: Package tests
         if: ${{ !cancelled() }}
-        run: bun run test:scripts && bun run --filter '@workspace/*' test && bun run --filter '@fregat/*' test && bun run --cwd apps/desktop test
+        env:
+          CI_PACKAGES: ${{ needs.changes.outputs.packages }}
+        run: bun scripts/ci/packages.mjs tests "$CI_PACKAGES"
 
   # Web is most of the time, so it is sharded by file, balanced by recorded durations
   # (`apps/web/test/shard-sequencer.ts`). The `test` scripts in `apps/web` and `packages/tree`
@@ -278,6 +238,8 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
+        with:
+          build-packages: '["web"]'
 
       - name: Test
         run: bun run --cwd apps/web test --shard=${{ matrix.shard }} --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/web-tests.json"
@@ -308,6 +270,8 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
+        with:
+          build-packages: '["server"]'
 
       - name: Test
         run: bun run --cwd apps/server test --shard=${{ matrix.shard }}
@@ -324,6 +288,8 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
+        with:
+          build-packages: '["tui"]'
 
       - name: Test
         run: bun run --cwd apps/tui test
@@ -340,6 +306,8 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
+        with:
+          build-packages: '["web"]'
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -440,29 +408,30 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
+        with:
+          build-packages: '[]'
 
-      - name: Build landing page
-        working-directory: apps/site
-        run: bun run site:build
-      - name: Build Editor example
-        env:
-          VITE_BASE_PATH: /${{ github.event.repository.name }}/editor/
-        run: bun x turbo run build --filter=@singapore-editor/example-app
+      - name: Build production sites
+        run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites"
       - name: Test Singapore documentation checks
         run: bun run --cwd editor/site test
-      - name: Build Singapore docs and check samples and internal links
-        run: bun run --cwd editor/site build --base /singapore/
       - name: Install Singapore browser test dependencies
         uses: ./.github/actions/install-browsers
         with:
           playwright: editor/site/node_modules/.bin/playwright
-          browsers: chromium
+          browsers: chromium webkit
+      - name: Test mobile overflow detection
+        run: bun scripts/product-sites/test-mobile.mjs
       - name: Test Singapore editor history restoration
         run: bun run --cwd editor/site test:browser
       - name: Check landing page focus, contrast and motion controls
         run: bun run --cwd apps/site verify:a11y
-      - name: Build ghostty site
-        run: bun run --cwd ghostty-webgpu/site build --base /${{ github.event.repository.name }}/ghostty-webgpu/
+      - name: Share production sites with mobile checks
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-product-sites
+          path: ${{ runner.temp }}/product-sites
+          retention-days: 1
 
   mobile-layout:
     name: Mobile layout (${{ matrix.shard }})
@@ -470,8 +439,8 @@ jobs:
       fail-fast: false
       matrix:
         shard: [chromium-0, chromium-1, webkit-0, webkit-1]
-    needs: changes
-    if: ${{ needs.changes.outputs.site == 'true' || needs.changes.outputs.docs == 'true' }}
+    needs: [changes, site]
+    if: ${{ needs.changes.outputs.site == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -482,9 +451,14 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
+        with:
+          build-packages: '[]'
 
-      - name: Build production sites
-        run: bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites"
+      - name: Download production sites
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-product-sites
+          path: ${{ runner.temp }}/product-sites
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -496,10 +470,7 @@ jobs:
         uses: ./.github/actions/install-browsers
         with:
           playwright: scripts/node_modules/.bin/playwright
-          browsers: chromium webkit
-
-      - name: Test mobile overflow detection
-        run: bun scripts/product-sites/test-mobile.mjs
+          browsers: ${{ startsWith(matrix.shard, 'webkit') && 'webkit' || 'chromium' }}
 
       - name: Check every built page on mobile
         env:
@@ -524,6 +495,7 @@ jobs:
       contents: read
     uses: ./.github/workflows/workspace-libraries.yml
     with:
+      packages: ${{ needs.changes.outputs.packages }}
       editor: ${{ needs.changes.outputs.editor == 'true' }}
       ghostty: ${{ needs.changes.outputs.ghostty == 'true' }}
       standalone_editor: ${{ needs.changes.outputs.editor == 'true' }}

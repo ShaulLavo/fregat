@@ -70,6 +70,8 @@
     },
     "scripts": {
       "entry": [
+        "ci/affected.mjs",
+        "ci/packages.mjs",
         "check-editor-backlog.mjs",
         "check-package-pages.mjs",
         "agent/browser.ts",
