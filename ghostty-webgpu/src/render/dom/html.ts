@@ -155,7 +155,22 @@ export function renderRowRuns(
   const packed = row.packed
   const scratchA = emptyRenderCell()
   const scratchB = emptyRenderCell()
-  const length = packed?.length ?? row.cells.length
+  let length = packed?.length ?? row.cells.length
+  const cursorEnd = cursor?.visible && cursor.y === row.y ? cursor.x + 1 : 0
+  // The fixed-grid frame paints the default background; empty tails need no glyph layout.
+  while (length > cursorEnd) {
+    const cell = packed ? packed.read(length - 1, scratchB) : row.cells[length - 1]!
+    if (
+      cell.continuation ||
+      cell.text ||
+      cell.selected ||
+      cell.foreground ||
+      cell.background ||
+      cell.style
+    )
+      break
+    length -= 1
+  }
   const runs: RowRun[] = []
   let currentStyle = ''
   let currentText = ''
