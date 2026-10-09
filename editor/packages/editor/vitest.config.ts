@@ -3,6 +3,10 @@ import { workspaceRoot } from '../../scripts/workspace-root.ts'
 import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
 
+const crossEngineScrollTests = [
+  'test/{virtualizedTextView,virtualizedTextViewGeometry,wheelScrollTarget,gutterScroll,gutterLeadingInset,gutterPointerEvents,wrappedLineGutter,mouseSelectionAutoScroll,navigationReveal,initialViewport,firstPaint,longLineMeasurements,millionLinePaint,codeViewport,renderDisposal,rowPresentation,proportionalRows,proportionalWrap,wordWrap,defaultLargeDocument,metricProbeScrollExtent}.browser.test.ts',
+]
+
 export default defineConfig({
   server: { fs: { allow: [workspaceRoot] } },
   test: {
@@ -119,7 +123,11 @@ export default defineConfig({
                 return image.toString('base64')
               },
             },
-            instances: [{ browser: 'chromium' }],
+            instances: [
+              { browser: 'chromium' },
+              { browser: 'firefox', name: 'scroll-firefox', include: crossEngineScrollTests },
+              { browser: 'webkit', name: 'scroll-webkit', include: crossEngineScrollTests },
+            ],
           },
           include: ['test/**/*.browser.test.ts'],
           exclude: [
