@@ -71,6 +71,7 @@ import { chatQueueStopUpload } from './chat-queue-stop-upload'
 import { providerModelOptions } from './provider-model-options'
 import { screenshotDrop } from './screenshot-drop'
 import { binaryFileAttachment, fileAttachments } from './file-attachments'
+import { machineFileAttach, phoneMachineFileAttach } from './machine-file-attach'
 import {
   pdfDocuments,
   pdfAttachment,
@@ -540,6 +541,8 @@ export const scenarios: readonly Scenario[] = [
   claudeApprovalRules,
   codexApprovalRules,
   fileAttachments,
+  machineFileAttach,
+  phoneMachineFileAttach,
   binaryFileAttachment,
   pdfDocuments,
   pdfAttachment,

@@ -42,7 +42,47 @@ export const PICKER_COPY = {
   listLabel: 'Folders',
 } as const
 
-/** The picker lists folders only; a search or listing may still return files. */
+/** Choosing files to attach: folders still list, so the person can walk into them. */
+export const FILES_PICKER_COPY = {
+  title: 'Choose files',
+  searchLabel: 'Search files and folders',
+  searchPlaceholder: 'Search files and folders',
+  emptyDescription: 'This folder has no visible files or folders.',
+  listLabel: 'Files and folders',
+} as const
+
+/** The words a list needs: its accessible name and what an empty folder says. */
+export type PickerListCopy = { readonly emptyDescription: string; readonly listLabel: string }
+
+/** Names what the commit button does: attach the files chosen so far. */
+export function attachLabel(count: number) {
+  if (count === 0) return 'Attach'
+  return `Attach ${count} ${count === 1 ? 'file' : 'files'}`
+}
+
+/** Names the chosen files, or says how many may be chosen when none are. */
+export function chosenSummaryLabel(chosen: readonly FsEntry[], limit: number) {
+  if (chosen.length === 0) return `Choose up to ${limit} ${limit === 1 ? 'file' : 'files'}`
+  const names = chosen.map((entry) => entry.name).join(', ')
+  if (chosen.length < limit) return names
+  return `${names} (the most this message holds)`
+}
+
+/** Adds or removes a file, in choice order. A full set takes no more; folders never join. */
+export function toggleChosen(
+  chosen: readonly FsEntry[],
+  entry: FsEntry,
+  limit: number,
+): readonly FsEntry[] {
+  if (!isFileEntry(entry)) return chosen
+  if (chosen.some((item) => item.path === entry.path))
+    return chosen.filter((item) => item.path !== entry.path)
+  if (chosen.length >= limit) return chosen
+
+  return [...chosen, entry]
+}
+
+/** The folder picker lists folders only; a search or listing may still return files. */
 export function folderEntries(entries: readonly FsEntry[]) {
   return entries.filter(isDirectoryEntry)
 }

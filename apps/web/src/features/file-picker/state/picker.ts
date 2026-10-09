@@ -25,7 +25,8 @@ const initialNavigationState: NavigationState = {
   openedPath: ROOT_PATH,
 }
 
-export function useFilePickerSession(value: PickedFsEntry | null) {
+/** `startPath` opens that folder itself; otherwise the picker opens beside `value`, or at home. */
+export function useFilePickerSession(value: PickedFsEntry | null, startPath: string | null = null) {
   const [isInitialized, setIsInitialized] = useState(false)
   const [navigation, setNavigation] = useState(initialNavigationState)
   const [query, setQuery] = useState('')
@@ -39,7 +40,7 @@ export function useFilePickerSession(value: PickedFsEntry | null) {
     if (isInitialized) return
 
     setIsInitialized(true)
-    const openedPath = initialPathForOpen(value, info.defaultPath ?? info.homePath)
+    const openedPath = startPath ?? initialPathForOpen(value, info.defaultPath ?? info.homePath)
     setNavigation({
       backHistory: [],
       currentPath: openedPath,

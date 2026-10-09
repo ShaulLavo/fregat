@@ -5,16 +5,22 @@ import { EmptyState } from '@workspace/ui/components/empty-state'
 import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virtual-list'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import type { FsEntry } from '@/lib/file-system-types'
-import { isDirectoryEntry } from '@/lib/file-system-types'
+import { isDirectoryEntry, isFileEntry } from '@/lib/file-system-types'
 import { ListLoading } from '@/features/file-picker/components/list-loading'
 import { FileRow } from '@/features/file-picker/components/file-row'
 import { TouchRow } from '@/features/file-picker/components/touch-row'
 import { useFilePickerSessionActions } from '@/features/file-picker/hooks/use-file-picker-session-actions'
 import { fileListRows, type LeadingRecents } from '@/features/file-picker/utils/rows'
 import { SCROLL_INTENT_SETTLE_MS } from '@/features/file-picker/utils/intent'
-import { PICKER_COPY, type EntriesLoadState } from '@/features/file-picker/utils/model'
+import {
+  PICKER_COPY,
+  type EntriesLoadState,
+  type PickerListCopy,
+} from '@/features/file-picker/utils/model'
 
 export function FileList({
+  choice = null,
+  copy = PICKER_COPY,
   entries,
   isBusy,
   isSearching,
@@ -29,6 +35,12 @@ export function FileList({
   selectedPath,
   touch,
 }: {
+  /** Files are choosable: the ones chosen so far, and what a tap, click or Space does to one. */
+  choice?: {
+    readonly chosen: ReadonlySet<string>
+    readonly toggle: (entry: FsEntry) => void
+  } | null
+  copy?: PickerListCopy
   entries: FsEntry[]
   isBusy: boolean
   isSearching: boolean
@@ -61,6 +73,15 @@ export function FileList({
   const selectedRows = rows.filter((row) => row.kind === 'entry' && row.entry.path === selectedPath)
   const activeKey =
     selectedRows.find((row) => row.key === lastActiveKey)?.key ?? selectedRows[0]?.key ?? null
+  function choosable(entry: FsEntry) {
+    return choice !== null && isFileEntry(entry)
+  }
+
+  function chosenState(entry: FsEntry) {
+    if (!choice || !choosable(entry)) return null
+    return choice.chosen.has(entry.path)
+  }
+
   const list = useListbox({
     role: 'listbox',
     containerRef,
@@ -82,7 +103,10 @@ export function FileList({
       if (row.recent) return revealEntry(row.entry)
       onCommitEntry(row.entry)
     },
-    onSelect() {},
+    onSelect(id) {
+      const row = rows.find((row) => row.key === id)
+      if (row?.kind === 'entry' && choosable(row.entry)) choice?.toggle(row.entry)
+    },
     typeahead: true,
     scrollToIndex: (index) => virtualRef.current?.scrollToIndex(index, { align: 'auto' }),
     onActiveKeyDown(event, id) {
@@ -98,6 +122,12 @@ export function FileList({
   // With recent folders above it, an empty folder says so in its section label.
   const showEmpty = !showLoading && !showError && rows.length === 0
   const showStatus = showLoading || showError || showEmpty
+
+  function touchOpen(entry: FsEntry, recent: boolean) {
+    if (choice && choosable(entry)) return choice.toggle(entry)
+    if (recent) return revealEntry(entry)
+    onEntryDoubleClick(entry)
+  }
 
   function signalDirectoryIntent(path: string) {
     if (performance.now() - lastScrollAt.current < SCROLL_INTENT_SETTLE_MS) return
@@ -131,7 +161,7 @@ export function FileList({
         getKey={(row) => row.key}
         aria-busy={isBusy || loadState.status === 'loading'}
         aria-describedby={showStatus ? statusId : undefined}
-        aria-label={PICKER_COPY.listLabel}
+        aria-label={copy.listLabel}
         className='focus-ring-inset absolute inset-0 outline-none'
         renderRow={(row) => {
           if (row.kind === 'section')
@@ -146,9 +176,10 @@ export function FileList({
           if (touch)
             return (
               <TouchRow
+                chosen={chosenState(row.entry)}
                 entry={row.entry}
                 isBusy={isBusy}
-                onOpen={row.recent ? revealEntry : onEntryDoubleClick}
+                onOpen={(entry) => touchOpen(entry, row.recent)}
                 position={row.position}
                 rowProps={list.rowProps(row.key)}
                 selected={row.key === activeKey}
@@ -158,11 +189,13 @@ export function FileList({
             )
           return (
             <FileRow
+              chosen={chosenState(row.entry)}
               entry={row.entry}
               rowProps={list.rowProps(row.key)}
               isBusy={isBusy}
               onDirectoryIntent={signalDirectoryIntent}
               onDoubleClick={row.recent ? revealEntry : onEntryDoubleClick}
+              onToggle={choice?.toggle}
               position={row.position}
               selected={row.key === activeKey}
               setSize={setSize}
@@ -197,7 +230,7 @@ export function FileList({
         <div className='absolute inset-0' id={statusId}>
           <EmptyState
             className='h-full'
-            description={PICKER_COPY.emptyDescription}
+            description={copy.emptyDescription}
             icon={<FolderOpenIcon className='size-(--icon-size)' weight='duotone' />}
             title='Nothing here'
           />
