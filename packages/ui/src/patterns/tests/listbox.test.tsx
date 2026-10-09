@@ -83,6 +83,37 @@ describe('useListbox', () => {
     expect(onActiveChange).toHaveBeenLastCalledWith('a')
   })
 
+  it('neither paints nor announces the fallback row after the active row vanishes', () => {
+    const onActiveChange = vi.fn()
+    const onCommit = vi.fn()
+    const mounted = mount(
+      <Listbox activeId='d' onActiveChange={onActiveChange} onCommit={onCommit} typeahead />,
+    )
+    cleanups.push(mounted.unmount)
+    const list = mounted.container.querySelector<HTMLElement>('[role="listbox"]')!
+    act(() => list.focus())
+    expect(list.querySelector('[aria-selected="true"]')?.textContent).toContain('Delta')
+    mounted.render(
+      <Listbox
+        activeId='d'
+        items={items.slice(0, 3)}
+        onActiveChange={onActiveChange}
+        onCommit={onCommit}
+        typeahead
+      />,
+    )
+    expect(list.querySelector('[aria-selected="true"]')).toBeNull()
+    expect(list.querySelector('[data-active]')).toBeNull()
+    expect(list.hasAttribute('aria-activedescendant')).toBe(false)
+    press(list, 'Enter')
+    expect(onCommit).toHaveBeenLastCalledWith('a')
+    press(list, 'c')
+    expect(onActiveChange).toHaveBeenLastCalledWith('c')
+    onActiveChange.mockClear()
+    press(list, 'ArrowDown')
+    expect(onActiveChange).toHaveBeenLastCalledWith('a')
+  })
+
   it('preserves nested action focus and lets its keys bubble untouched', () => {
     const { list } = renderListbox()
     const action = list.querySelector('button')!

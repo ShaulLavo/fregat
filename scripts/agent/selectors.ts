@@ -521,6 +521,8 @@ export const selectors = {
   pickerOptions: (page: Page) =>
     page.getByRole('listbox', { name: 'Folders', exact: true }).getByRole('option'),
   pickerGoToFolder: (page: Page) => page.getByRole('button', { name: 'Go to folder', exact: true }),
+  pickerUpOneFolder: (page: Page) =>
+    page.getByRole('button', { name: 'Up one folder', exact: true }),
   pickerFolderPath: (page: Page) => page.getByRole('textbox', { name: 'Folder path', exact: true }),
   pickerSearch: (page: Page) => page.getByRole('textbox', { name: 'Search folders', exact: true }),
   pickerEmpty: (page: Page) => page.getByText('Nothing here', { exact: true }),

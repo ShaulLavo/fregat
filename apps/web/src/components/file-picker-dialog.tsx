@@ -809,7 +809,7 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
                   onBack={goBack}
                   onClose={close}
                   onEditPath={pathInput.open}
-                  onUp={() => navigateTo(pickerParentPath(session.currentPath))}
+                  onUp={goParent}
                 />
                 <div className='flex gap-(--density-gap-tight) px-(--bar-padding-x)'>
                   {searchField}
@@ -862,7 +862,7 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
                       aria-label='Up one folder'
                       disabled={!session.canGoUp}
                       focusableWhenDisabled
-                      onClick={() => navigateTo(pickerParentPath(session.currentPath))}
+                      onClick={goParent}
                       size='icon-sm'
                       type='button'
                       variant='ghost'

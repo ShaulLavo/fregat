@@ -10,7 +10,7 @@ import type { Scenario } from './index'
 export const filePickerNavigation: Scenario = {
   name: 'file-picker-navigation',
   description:
-    'Leave empty folders with keyboard navigation, keeping the folder left selected, and page above search section headers.',
+    'Leave empty folders with the keyboard and the Up button, keeping the folder left selected, and page above search section headers.',
   async run(page, { step }) {
     const root = await mkdtemp(scratchPath('fregat-picker-navigation-'))
     const prefix = `picker-${crypto.randomUUID()}`
@@ -23,12 +23,13 @@ export const filePickerNavigation: Scenario = {
       await openFolderPickerList(page)
       await selectors.pickerOptions(page).first().waitFor()
       await step('folder-picker-ready')
-      for (const key of ['Backspace', 'ArrowLeft']) {
+      for (const key of ['Backspace', 'ArrowLeft', 'up-button']) {
         await openFolderPath(page, path.join(root, child))
         await selectors.pickerEmpty(page).waitFor()
         await selectors.pickerList(page).focus()
         await step(`empty-folder-before-${key}`)
-        await page.keyboard.press(key)
+        if (key === 'up-button') await selectors.pickerUpOneFolder(page).click()
+        else await page.keyboard.press(key)
         await selectors
           .pickerOptions(page)
           .filter({ hasText: prefix })
