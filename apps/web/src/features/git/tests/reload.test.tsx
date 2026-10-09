@@ -58,8 +58,10 @@ test('a diff view captured against a superseded generation is dropped', () => {
     { kind: 'checkpoint', identity: 'superseded:identity' },
     diffView,
   )
+  const reloaded = new QueryClient()
+  prepareGitReload(reloaded, storage, 'repo')
   expect(
-    takeSavedDiffView(owner, { kind: 'checkpoint', identity: 'superseded:identity' }),
+    takeSavedDiffView(reloaded, { kind: 'checkpoint', identity: 'superseded:identity' }),
   ).toBeUndefined()
 })
 

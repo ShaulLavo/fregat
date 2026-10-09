@@ -15,6 +15,7 @@ import {
 import { diffPaneSelector, openGitPanel, selectors } from '../selectors'
 
 type Mode = 'stacked' | 'split'
+const SHARED = 3
 type Position = { top: number; left: number; width: number; contentWidth: number }
 type Subject = { tab: string; source: string; rows: string[] }
 const files = ['b.txt', 'c.txt', 'split-b.txt', 'split-c.txt', 'late.txt', 'current.txt']
@@ -250,7 +251,7 @@ async function verifyCopyAndRefresh(
   const line = Number(match[1])
   strictEqual(
     copied,
-    fixtureText(file, 'after').split('\n')[line],
+    fixtureLines(file, 'after')[line],
     'The copied text is the selected source line, exactly',
   )
   ok(line > 20, `The selection sits at the scrolled reading position: line ${line}`)
@@ -258,8 +259,13 @@ async function verifyCopyAndRefresh(
   await step(`${mode}-selection-copied`)
 
   const readsBefore = reads.length
-  const inserted = Array.from({ length: 5 }, (_, i) => `${file} inserted line ${i}`).join('\n')
-  await writeFile(path.join(fixture, file), `${inserted}\n${fixtureText(file, 'after')}`)
+  const inserted = Array.from({ length: 5 }, (_, i) => `${file} inserted line ${i}`)
+  const at = mode === 'stacked' ? 0 : SHARED
+  const lines = fixtureLines(file, 'after')
+  await writeFile(
+    path.join(fixture, file),
+    [...lines.slice(0, at), ...inserted, ...lines.slice(at)].join('\n'),
+  )
   for (let waited = 0; reads.length === readsBefore; waited += 100) {
     ok(waited < 10_000, 'The diff rereads after its file changes on disk')
     await page.waitForTimeout(100)
@@ -271,12 +277,10 @@ async function verifyCopyAndRefresh(
     copied,
     'The refreshed diff keeps the selected source line',
   )
-  const shifts = mode === 'stacked' ? [5] : [0, 5]
+  const reading = before.at(-1)!.top + 5 * height
   ok(
-    after.every(
-      ({ top }, index) => Math.abs(top - (before[index]!.top + shifts[index]! * height)) <= 1,
-    ),
-    `Five new-side lines inserted above move each pane by its own source anchor: ${JSON.stringify({ before, after, height, shifts })}`,
+    after.every(({ top }) => Math.abs(top - reading) <= 1),
+    `Five new-side lines inserted above move the reading pane five rows, and a split keeps both panes on that row: ${JSON.stringify({ before, after, height })}`,
   )
   deepStrictEqual(
     after.map(({ left }) => left),
@@ -284,6 +288,30 @@ async function verifyCopyAndRefresh(
     'The refresh keeps the horizontal offset',
   )
   await step(`${mode}-revision-refreshed`)
+  if (mode === 'split') await verifyContinuousSplit(page, observations, step)
+}
+
+async function verifyContinuousSplit(
+  page: Page,
+  observations: unknown[],
+  step: (label: string) => Promise<void>,
+) {
+  for (const [pane, side] of [
+    [0, 'old'],
+    [1, 'new'],
+  ] as const) {
+    const prior = await positions(page)
+    await scrollers(page).nth(pane).hover()
+    await page.mouse.wheel(0, 48)
+    await page.waitForTimeout(300)
+    const moved = await capture(page, observations, `split-scrolled-over-${side}`)
+    ok(
+      moved.every(({ top }) => top === moved[0]!.top) &&
+        moved.every(({ top }, index) => top > prior[index]!.top),
+      `Scrolling down over the ${side} pane moves both panes down together: ${JSON.stringify({ prior, moved })}`,
+    )
+  }
+  await step('split-scrolled-after-refresh')
 }
 
 async function copySelection(page: Page) {
@@ -300,10 +328,17 @@ async function prepareFixture(fixture: string) {
 }
 
 function fixtureText(file: string, version: string) {
-  return Array.from(
-    { length: 300 },
-    (_, i) => `${file} ${version} line ${i} ${`${file} ${version} wide `.repeat(20)}`,
-  ).join('\n')
+  return fixtureLines(file, version).join('\n')
+}
+
+// Split files keep three shared context lines at each end around one replaced block, so the
+// paired split rows include real context rows.
+function fixtureLines(file: string, version: string) {
+  const shared = (i: number) => file.startsWith('split-') && (i < SHARED || i >= 300 - SHARED)
+  return Array.from({ length: 300 }, (_, i) => {
+    const kind = shared(i) ? 'shared' : version
+    return `${file} ${kind} line ${i} ${`${file} ${kind} wide `.repeat(20)}`
+  })
 }
 
 async function disablePrefetch(page: Page) {
