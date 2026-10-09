@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { useState } from 'react'
 import { onTestFinished } from 'vitest'
@@ -26,8 +26,6 @@ function NativePickerFixture({
 }) {
   const [open, setOpen] = useState(true)
   return usePickEntry({
-    accept: ['.txt'],
-    mode: 'file',
     open,
     value: null,
     onPick,
@@ -45,8 +43,8 @@ test
   async (outcome, { server, client }) => {
     void client
     delete window.platformBridge
-    const chosen = path.join(server.root, 'chosen.txt')
-    await writeFile(chosen, 'native picker integration')
+    const chosen = path.join(server.root, 'chosen')
+    await mkdir(chosen)
     let paths: readonly string[] | null = [chosen]
     if (outcome === 'rejected') paths = null
     if (outcome === 'cancelled') paths = []
@@ -87,13 +85,13 @@ test
       if (outcome === 'selected') {
         const backendPath = clientPathFromOsPath(chosen)
         expect(selected).toHaveLength(1)
-        expect(selected[0]).toMatchObject({ name: 'chosen.txt', path: backendPath, type: 'file' })
+        expect(selected[0]).toMatchObject({ name: 'chosen', path: backendPath, type: 'directory' })
         expect(queryClient.getQueryData(entryPickerQueryKeys.selection)).toBe(selected[0])
         expect(queryClient.getQueryData(fileSystemKeys.fileMetadata(backendPath))).toMatchObject({
           path: backendPath,
-          type: 'file',
+          type: 'directory',
         })
-        expect(await readFile(chosen, 'utf8')).toBe('native picker integration')
+        expect((await stat(chosen)).isDirectory()).toBe(true)
       } else {
         expect(selected).toHaveLength(0)
         expect(queryClient.getQueryData(entryPickerQueryKeys.selection)).toBeNull()
@@ -126,8 +124,6 @@ test
     }
     expect(queryClient.getQueryState(filePickerKeys.recents())?.isInvalidated).toBe(true)
     expect(posts).toBe(1)
-    expect(await calls()).toEqual(
-      outcome === 'not-local' ? [] : [{ mode: 'file', accept: ['.txt'] }],
-    )
+    expect(await calls()).toEqual(outcome === 'not-local' ? [] : [{ mode: 'folder' }])
   },
 )

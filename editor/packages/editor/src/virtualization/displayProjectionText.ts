@@ -19,6 +19,7 @@ import type {
 import {
   appendWordWrapText,
   createWordWrapLine,
+  finishWordWrapLine,
   lineBreakRules,
   needsLineBreakRules,
   type UnbreakableRuns,
@@ -155,7 +156,7 @@ export function summarizeDocumentWrap(
   )
 }
 
-function summarizeMeasuredWrap(
+export function summarizeMeasuredWrap(
   measured: TextMeasurements,
   width: number,
   tabSize: number,
@@ -165,14 +166,12 @@ function summarizeMeasuredWrap(
   const ends: number[] = []
   let start = 0
   const normalizedWidth = Math.max(1, Math.floor(width))
-  while (start < measured.length) {
-    const column = measured.columnAt(start, tabSize, 'utf16')
-    start = Math.max(
-      start + 1,
-      measured.offsetAt(column + normalizedWidth, 'before', tabSize, 'utf16'),
-    )
-    ends.push(start)
-  }
+  const state = { visual: 0, segmentVisual: 0, hasTabs: false }
+  measured.forEachTextChunk((text) => {
+    appendWrapEnds(text, start, normalizedWidth, tabSize, ends, state)
+    start += text.length
+  })
+  ends.push(measured.length)
   return {
     kind: 'indexed',
     length: measured.length,
@@ -224,6 +223,7 @@ function summarizeRuleWrap(
     const text = readRange(start, Math.min(length, start + 4096))
     appendWordWrapText(line, text, 0, text.length, rules, runs)
   }
+  finishWordWrapLine(line, rules, runs)
   if (line.ends.length === 0) return uniformWrap(length, null)
   const ends = Uint32Array.from([...line.ends, length])
   return { kind: 'indexed', length, ends, rows: ends.length }
@@ -232,9 +232,14 @@ function summarizeRuleWrap(
 /** A replacement is painted as one box, so no row break may fall inside its display span. */
 function unbreakableRuns(inline: InlineSummary | null): UnbreakableRuns {
   if (!inline) return []
-  return inline.parts
-    .filter((part) => part.replacement !== null && part.end > part.start)
-    .map((part) => [part.start, part.end] as const)
+  return inline.mapping.segments
+    .filter(
+      (segment) =>
+        segment.kind === 'replacement' &&
+        segment.wrap !== 'text' &&
+        segment.displayEndColumn > segment.displayStartColumn,
+    )
+    .map((segment) => [segment.displayStartColumn, segment.displayEndColumn] as const)
 }
 
 function appendWrapEnds(
@@ -247,11 +252,12 @@ function appendWrapEnds(
 ): void {
   for (let column = 0; column < text.length; column += 1) {
     const tab = text.charCodeAt(column) === 9
-    const cells = tab ? tabSize - (state.visual % tabSize) : 1
+    let cells = tab ? tabSize - (state.segmentVisual % tabSize) : 1
     state.hasTabs ||= tab
     if (state.segmentVisual > 0 && state.segmentVisual + cells > width) {
       ends.push(start + column)
       state.segmentVisual = 0
+      cells = tab ? tabSize : 1
     }
     state.visual += cells
     state.segmentVisual += cells

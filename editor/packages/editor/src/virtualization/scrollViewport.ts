@@ -100,7 +100,7 @@ export class ScrollViewport {
       this.layers[1].content.style.transform = gutterTransform
   }
 
-  public get maxScrollHeight(): number {
+  public get maxScrollHeight(): number | undefined {
     return stickyScrollHeightLimit(this.scrollElement.ownerDocument)
   }
 
@@ -133,10 +133,10 @@ export class ScrollViewport {
   }
 }
 
-function stickyScrollHeightLimit(document: Document): number {
+function stickyScrollHeightLimit(document: Document): number | undefined {
   const cached = stickyScrollHeightLimits.get(document)
   if (cached !== undefined) return cached
-  if (!document.body) return DEFAULT_MAX_SCROLL_HEIGHT
+  if (!document.body) return undefined
 
   // Gecko's sticky translation limit is lower than its element-height limit.
   // A viewport-sized probe avoids single-pixel rounding near the native height cap.
@@ -156,7 +156,7 @@ function stickyScrollHeightLimit(document: Document): number {
   const displacement = sticky.getBoundingClientRect().top - probeRect.top
   const reached = probe.scrollTop + (displacement * probe.clientHeight) / probeRect.height
   probe.remove()
-  if (!Number.isFinite(reached) || reached <= 0) return DEFAULT_MAX_SCROLL_HEIGHT
+  if (!Number.isFinite(reached) || reached <= 0) return undefined
 
   const limit =
     displacement === 0

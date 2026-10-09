@@ -1,10 +1,6 @@
 import type { FsEntry, PickedFsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
-import {
-  pickerParentPath,
-  toPickedEntry,
-  type FilePickerMode,
-} from '@/features/file-picker/utils/model'
+import { pickerParentPath, toPickedEntry } from '@/features/file-picker/utils/model'
 
 // Below the browsing pane's minimum (BROWSE_MIN_PX), so dragging panes never flips columns to a
 // list; only a phone-narrow dialog is too tight for a column.
@@ -13,10 +9,9 @@ const COLUMNS_MIN_WIDTH = 300
 export type PickerViewSetting = 'auto' | 'columns' | 'list' | 'icons'
 export type PickerView = 'columns' | 'list' | 'icons'
 
-/** Auto means columns when choosing a folder, where the whole path matters, and a list for files. */
-export function pickerView(setting: PickerViewSetting, mode: FilePickerMode): PickerView {
-  if (setting !== 'auto') return setting
-  return mode === 'folder' ? 'columns' : 'list'
+/** Auto means columns, where the whole path to the folder shows. */
+export function pickerView(setting: PickerViewSetting): PickerView {
+  return setting === 'auto' ? 'columns' : setting
 }
 
 /**
@@ -72,14 +67,10 @@ export function visibleTrail(trail: ColumnTrail, showHidden: boolean): ColumnTra
   return hidden === -1 ? trail : trail.slice(0, hidden)
 }
 
-/** The deepest entry in the trail that the mode can pick: a file past the folder is skipped. */
-export function deepestPickable(
-  trail: ColumnTrail,
-  mode: FilePickerMode,
-  accept?: readonly string[],
-): PickedFsEntry | null {
+/** The deepest folder in the trail. */
+export function deepestPickable(trail: ColumnTrail): PickedFsEntry | null {
   for (let index = trail.length - 1; index >= 0; index -= 1) {
-    const picked = toPickedEntry(trail[index] ?? null, mode, accept)
+    const picked = toPickedEntry(trail[index] ?? null)
     if (picked) return picked
   }
   return null

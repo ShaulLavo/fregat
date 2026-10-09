@@ -5,11 +5,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../service'
 import {
+  createReadControl,
   defaultTimeoutMs,
   HOOK_TIMEOUT_MS,
   gitProcessErrors,
   LOCAL_TIMEOUT_MS,
   NETWORK_TIMEOUT_MS,
+  readCapped,
   runBoundedProcess,
   runProcess,
 } from '../utils/process'
@@ -19,6 +21,57 @@ const roots: string[] = []
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+})
+
+describe('capped stream reads', () => {
+  it('preserves output exactly at the byte cap across UTF-8 chunks', async () => {
+    const text = 'é'.repeat(512)
+    const bytes = new TextEncoder().encode(text)
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes.subarray(0, 511))
+        controller.enqueue(bytes.subarray(511))
+        controller.close()
+      },
+    })
+
+    const result = await readCapped(stream, bytes.byteLength, createReadControl())
+
+    expect(result).toEqual({ bytes: 1024, text, truncated: false })
+  })
+
+  it.for([
+    { chunks: [512, 512, 1, BIG_BLOB_BYTES], expectedReads: 3, observedBytes: 1025 },
+    { chunks: [512, 1_703_936, BIG_BLOB_BYTES], expectedReads: 2, observedBytes: 1_704_448 },
+    { chunks: [BIG_BLOB_BYTES, BIG_BLOB_BYTES], expectedReads: 1, observedBytes: BIG_BLOB_BYTES },
+  ])('stops after the first chunk past the cap: $observedBytes bytes', async (fixture) => {
+    const maxBytes = 1024
+    let reads = 0
+    let cancelled = false
+    const stream = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          const size = fixture.chunks[reads++]
+          if (size === undefined) {
+            controller.close()
+            return
+          }
+          controller.enqueue(new Uint8Array(size))
+        },
+        cancel() {
+          cancelled = true
+        },
+      },
+      { highWaterMark: 0 },
+    )
+
+    const result = await readCapped(stream, maxBytes, createReadControl())
+
+    expect(result).toEqual({ bytes: fixture.observedBytes, text: '', truncated: true })
+    expect(reads).toBe(fixture.expectedReads)
+    expect(cancelled).toBe(true)
+    expect(result.bytes).toBeLessThanOrEqual(maxBytes + fixture.chunks[reads - 1]!)
+  })
 })
 
 describe('git process limits', () => {
@@ -32,7 +85,7 @@ describe('git process limits', () => {
     expect(result.limit).toBeUndefined()
   })
 
-  it('stops reading at the byte cap instead of buffering the whole output', async () => {
+  it('drops command output when the byte cap is exceeded', async () => {
     const root = await fixtureRepo()
     await writeFile(path.join(root, 'big.txt'), 'x'.repeat(BIG_BLOB_BYTES))
     const objectId = (await runProcess({ args: ['hash-object', '-w', 'big.txt'], cwd: root }))
@@ -48,7 +101,6 @@ describe('git process limits', () => {
     expect(result.stdout).toBe('')
     const observedBytes = result.limit?.kind === 'output-limit' ? result.limit.observedBytes : 0
     expect(observedBytes).toBeGreaterThan(1024)
-    expect(observedBytes).toBeLessThan(BIG_BLOB_BYTES / 2)
   })
 
   it('kills a command that never exits and reports the timeout', async () => {

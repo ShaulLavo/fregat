@@ -63,6 +63,8 @@ export default defineConfig({
     ],
     include: [
       '@phosphor-icons/react',
+      '@workspace/ui > @base-ui/react/accordion',
+      '@workspace/ui > @base-ui/react/drawer',
       '@workspace/ui > @base-ui/react/merge-props',
       '@workspace/ui > @base-ui/react/select',
       '@workspace/ui > @base-ui/react/separator',

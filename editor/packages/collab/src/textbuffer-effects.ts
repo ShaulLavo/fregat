@@ -126,13 +126,29 @@ export function setEffectStates(
   command: EditId,
   effects: readonly Effect[],
 ): { readonly state: TextbufferEffects; readonly visibility: readonly VisibilityChange[] } {
+  if (effects.some((effect) => effect.op.actor !== command.actor))
+    throw new CollabFailure('foreign-effect')
+  if (!effects.length) throw new CollabFailure('empty-effects')
+  const result = projectEffectStates(state, effects)
+  return {
+    ...result,
+    state: {
+      ...result.state,
+      operations: put(result.state.operations, operationKey(command), { kind: 'command' }),
+    },
+  }
+}
+
+export function projectEffectStates(
+  state: TextbufferEffects,
+  effects: readonly Effect[],
+): { readonly state: TextbufferEffects; readonly visibility: readonly VisibilityChange[] } {
   const desired = new Map<
     string,
     { readonly id: EditId; readonly active: boolean; readonly spans: readonly IdSpan[] }
   >()
   for (const effect of effects) {
     const key = JSON.stringify([effect.op.actor, effect.op.seq])
-    if (effect.op.actor !== command.actor) throw new CollabFailure('foreign-effect')
     const operation = get(state.operations, operationKey(effect.op))
     if (operation?.kind !== 'edit') throw new CollabFailure('unknown-effect')
     if (typeof effect.active !== 'boolean') throw new CollabFailure('invalid-effect-state')
@@ -140,7 +156,6 @@ export function setEffectStates(
       throw new CollabFailure('conflicting-effects')
     desired.set(key, { id: { ...effect.op }, active: effect.active, spans: operation.spans })
   }
-  if (!desired.size) throw new CollabFailure('empty-effects')
   let operations = state.operations
   const affected: IdSpan[] = []
   for (const operation of desired.values()) {
@@ -151,7 +166,6 @@ export function setEffectStates(
     })
     affected.push(...operation.spans)
   }
-  operations = put(operations, operationKey(command), { kind: 'command' })
   const next = { ...state, operations }
   const visibility: VisibilityChange[] = []
   for (const target of mergeSpans(affected)) {

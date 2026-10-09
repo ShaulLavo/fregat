@@ -22,6 +22,8 @@ export const TREE_SITTER_LANGUAGE_CONTRIBUTIONS: readonly TreeSitterLanguageCont
         import('./queries/javascript-folds.scm?raw').then((module) => module.default),
         import('./queries/jsx-folds.scm?raw').then((module) => module.default),
         import('./queries/javascript-injections.scm?raw').then((module) => module.default),
+        import('./queries/javascript-merge-units.scm?raw').then((module) => module.default),
+        import('./queries/javascript-fields-merge-units.scm?raw').then((module) => module.default),
       ])
       return {
         wasmUrl: assets[0]!,
@@ -31,6 +33,10 @@ export const TREE_SITTER_LANGUAGE_CONTRIBUTIONS: readonly TreeSitterLanguageCont
         ),
         foldQuerySource: mapQueryCaptures([assets[3]!, assets[4]!].join('\n'), captureMappings),
         injectionQuerySource: mapQueryCaptures([assets[5]!].join('\n'), captureMappings),
+        mergeUnitQuerySource: mapQueryCaptures(
+          [assets[6]!, assets[7]!].join('\n'),
+          captureMappings,
+        ),
       }
     },
   },
@@ -50,6 +56,8 @@ export const TREE_SITTER_LANGUAGE_CONTRIBUTIONS: readonly TreeSitterLanguageCont
         import('./queries/typescript-folds.scm?raw').then((module) => module.default),
         import('./queries/javascript-folds.scm?raw').then((module) => module.default),
         import('./queries/javascript-injections.scm?raw').then((module) => module.default),
+        import('./queries/javascript-merge-units.scm?raw').then((module) => module.default),
+        import('./queries/typescript-merge-units.scm?raw').then((module) => module.default),
       ])
       return {
         wasmUrl: assets[0]!,
@@ -59,6 +67,10 @@ export const TREE_SITTER_LANGUAGE_CONTRIBUTIONS: readonly TreeSitterLanguageCont
         ),
         foldQuerySource: mapQueryCaptures([assets[3]!, assets[4]!].join('\n'), captureMappings),
         injectionQuerySource: mapQueryCaptures([assets[5]!].join('\n'), captureMappings),
+        mergeUnitQuerySource: mapQueryCaptures(
+          [assets[6]!, assets[7]!].join('\n'),
+          captureMappings,
+        ),
       }
     },
   },
@@ -80,6 +92,9 @@ export const TREE_SITTER_LANGUAGE_CONTRIBUTIONS: readonly TreeSitterLanguageCont
         import('./queries/javascript-folds.scm?raw').then((module) => module.default),
         import('./queries/jsx-folds.scm?raw').then((module) => module.default),
         import('./queries/javascript-injections.scm?raw').then((module) => module.default),
+        import('./queries/javascript-merge-units.scm?raw').then((module) => module.default),
+        import('./queries/typescript-merge-units.scm?raw').then((module) => module.default),
+        import('./queries/tsx-merge-units.scm?raw').then((module) => module.default),
       ])
       return {
         wasmUrl: assets[0]!,
@@ -92,6 +107,10 @@ export const TREE_SITTER_LANGUAGE_CONTRIBUTIONS: readonly TreeSitterLanguageCont
           captureMappings,
         ),
         injectionQuerySource: mapQueryCaptures([assets[7]!].join('\n'), captureMappings),
+        mergeUnitQuerySource: mapQueryCaptures(
+          [assets[8]!, assets[9]!, assets[10]!].join('\n'),
+          captureMappings,
+        ),
       }
     },
   },
@@ -127,12 +146,14 @@ export const TREE_SITTER_LANGUAGE_CONTRIBUTIONS: readonly TreeSitterLanguageCont
         import('tree-sitter-css/tree-sitter-css.wasm?url').then((module) => module.default),
         import('tree-sitter-css/queries/highlights.scm?raw').then((module) => module.default),
         import('./queries/css-folds.scm?raw').then((module) => module.default),
+        import('./queries/css-merge-units.scm?raw').then((module) => module.default),
       ])
       return {
         wasmUrl: assets[0]!,
         highlightQuerySource: mapQueryCaptures([assets[1]!].join('\n'), captureMappings),
         foldQuerySource: mapQueryCaptures([assets[2]!].join('\n'), captureMappings),
         injectionQuerySource: mapQueryCaptures([].join('\n'), captureMappings),
+        mergeUnitQuerySource: mapQueryCaptures([assets[3]!].join('\n'), captureMappings),
       }
     },
   },
@@ -147,12 +168,14 @@ export const TREE_SITTER_LANGUAGE_CONTRIBUTIONS: readonly TreeSitterLanguageCont
         import('tree-sitter-json/tree-sitter-json.wasm?url').then((module) => module.default),
         import('tree-sitter-json/queries/highlights.scm?raw').then((module) => module.default),
         import('./queries/json-folds.scm?raw').then((module) => module.default),
+        import('./queries/json-merge-units.scm?raw').then((module) => module.default),
       ])
       return {
         wasmUrl: assets[0]!,
         highlightQuerySource: mapQueryCaptures([assets[1]!].join('\n'), captureMappings),
         foldQuerySource: mapQueryCaptures([assets[2]!].join('\n'), captureMappings),
         injectionQuerySource: mapQueryCaptures([].join('\n'), captureMappings),
+        mergeUnitQuerySource: mapQueryCaptures([assets[3]!].join('\n'), captureMappings),
       }
     },
   },
@@ -165,12 +188,14 @@ export const TREE_SITTER_LANGUAGE_CONTRIBUTIONS: readonly TreeSitterLanguageCont
     async load() {
       const assets = await Promise.all([
         import('tree-sitter-md/tree-sitter-markdown.wasm?url').then((module) => module.default),
+        import('./queries/markdown-merge-units.scm?raw').then((module) => module.default),
       ])
       return {
         wasmUrl: assets[0]!,
         highlightQuerySource: mapQueryCaptures([].join('\n'), captureMappings),
         foldQuerySource: mapQueryCaptures([].join('\n'), captureMappings),
         injectionQuerySource: mapQueryCaptures([].join('\n'), captureMappings),
+        mergeUnitQuerySource: mapQueryCaptures([assets[1]!].join('\n'), captureMappings),
       }
     },
   },
@@ -205,12 +230,14 @@ export const TREE_SITTER_LANGUAGE_CONTRIBUTIONS: readonly TreeSitterLanguageCont
       const assets = await Promise.all([
         import('tree-sitter-python/tree-sitter-python.wasm?url').then((module) => module.default),
         import('tree-sitter-python/queries/highlights.scm?raw').then((module) => module.default),
+        import('./queries/python-merge-units.scm?raw').then((module) => module.default),
       ])
       return {
         wasmUrl: assets[0]!,
         highlightQuerySource: mapQueryCaptures([assets[1]!].join('\n'), captureMappings),
         foldQuerySource: mapQueryCaptures([].join('\n'), captureMappings),
         injectionQuerySource: mapQueryCaptures([].join('\n'), captureMappings),
+        mergeUnitQuerySource: mapQueryCaptures([assets[2]!].join('\n'), captureMappings),
       }
     },
   },
@@ -243,12 +270,14 @@ export const TREE_SITTER_LANGUAGE_CONTRIBUTIONS: readonly TreeSitterLanguageCont
       const assets = await Promise.all([
         import('tree-sitter-rust/tree-sitter-rust.wasm?url').then((module) => module.default),
         import('tree-sitter-rust/queries/highlights.scm?raw').then((module) => module.default),
+        import('./queries/rust-merge-units.scm?raw').then((module) => module.default),
       ])
       return {
         wasmUrl: assets[0]!,
         highlightQuerySource: mapQueryCaptures([assets[1]!].join('\n'), captureMappings),
         foldQuerySource: mapQueryCaptures([].join('\n'), captureMappings),
         injectionQuerySource: mapQueryCaptures([].join('\n'), captureMappings),
+        mergeUnitQuerySource: mapQueryCaptures([assets[2]!].join('\n'), captureMappings),
       }
     },
   },
@@ -262,12 +291,14 @@ export const TREE_SITTER_LANGUAGE_CONTRIBUTIONS: readonly TreeSitterLanguageCont
       const assets = await Promise.all([
         import('tree-sitter-go/tree-sitter-go.wasm?url').then((module) => module.default),
         import('tree-sitter-go/queries/highlights.scm?raw').then((module) => module.default),
+        import('./queries/go-merge-units.scm?raw').then((module) => module.default),
       ])
       return {
         wasmUrl: assets[0]!,
         highlightQuerySource: mapQueryCaptures([assets[1]!].join('\n'), captureMappings),
         foldQuerySource: mapQueryCaptures([].join('\n'), captureMappings),
         injectionQuerySource: mapQueryCaptures([].join('\n'), captureMappings),
+        mergeUnitQuerySource: mapQueryCaptures([assets[2]!].join('\n'), captureMappings),
       }
     },
   },
