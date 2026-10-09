@@ -163,7 +163,7 @@ export async function chooseFixtureFolder(
   await selectors.pickerGoToFolder(page).click()
   await selectors.pickerFolderPath(page).fill(fixture)
   await page.keyboard.press('Enter')
-  await selectors.pickerRow(page, 'a.txt').waitFor()
+  await selectors.pickerBrowsing(page, fixture).waitFor()
   await beforeChoose?.()
   await selectors.pickerChoose(page).click()
   await selectors.pickerDialog(page).waitFor({ state: 'hidden' })

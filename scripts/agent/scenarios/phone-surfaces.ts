@@ -3,7 +3,12 @@ import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
 
-import { createModifiedFileFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
+import {
+  createModifiedFileFixture,
+  fixtureApiBase,
+  fixtureGit,
+  releaseFixture,
+} from '../fixture-workspace'
 import { selectors } from '../selectors'
 import { openFixtureChat } from './phone-fixture'
 import type { Scenario } from './index'
@@ -17,7 +22,7 @@ const BRANCH = 'fix/phone-composer-controls-stay-readable-on-narrow-screens'
 export const phoneSurfaces: Scenario = {
   name: 'phone-surfaces',
   description:
-    'At a touch phone viewport: the folder picker fills the screen and opens folders on tap, a new session reaches the command palette, and Settings never scrolls sideways.',
+    'At a touch phone viewport: the folder picker fills the screen, leads with recent folders, reaches places through its Places sheet and opens folders on tap; a new session reaches the command palette, and Settings never scrolls sideways.',
   capture: { width: 390, height: 844, scale: 2, touch: true },
   async run(page, { step }) {
     const fixture = await createModifiedFileFixture(
@@ -56,9 +61,39 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>, 
     sessionStorage.clear()
   })
   await page.goto(home.href, { waitUntil: 'domcontentloaded' })
+  // Newest first: alpha leads the recent folders.
+  for (const folder of ['zulu', 'alpha']) {
+    const response = await page.request.post(`${fixtureApiBase(page)}/fs/recents`, {
+      data: { path: path.join(fixture, folder).slice(1) },
+      headers: { Origin: new URL(page.url()).origin },
+    })
+    ok(response.ok(), `Recording a recent folder answered ${response.status()}`)
+  }
+  // A slow folder read: the recents answer first, and must not show before the folder does.
+  let releaseFolder = () => {}
+  const folderHeld = new Promise<void>((resolve) => {
+    releaseFolder = resolve
+  })
+  await page.route('**/fs/tree?**', async (route) => {
+    await folderHeld
+    await route.fallback()
+  })
   await page.getByRole('button', { name: 'Add project', exact: true }).click()
   const dialog = selectors.pickerDialog(page)
   await dialog.waitFor()
+  await page.getByRole('status', { name: 'Loading folder' }).waitFor({ timeout: 20_000 })
+  await page.waitForTimeout(800)
+  ok(
+    (await selectors.pickerList(page).getByRole('option').count()) === 0,
+    'No row shows while the opened folder loads',
+  )
+  ok(
+    !(await selectors.pickerList(page).innerText()).toLowerCase().includes('recent'),
+    'Recent folders wait for the folder they lead',
+  )
+  releaseFolder()
+  await page.unroute('**/fs/tree?**')
+  await recentsAndPlaces(page, step, fixture)
   // Opened on a small folder: this machine's root and home listings are not under test.
   // The folder name in the bar is where a path is typed, as a phone's Files app does.
   await page.getByRole('button', { name: /^Go to folder/ }).click()
@@ -74,7 +109,7 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>, 
     box.x <= 0.5 && box.width >= viewport.width - 0.5 && box.height >= viewport.height - 0.5,
     `The picker fills the phone screen: ${JSON.stringify(box)}`,
   )
-  await expectNoSidewaysScroll(page, '[data-slot="dialog-content"]', '[aria-label="Places"]')
+  await expectNoSidewaysScroll(page, '[data-slot="dialog-content"]')
   await step('picker')
 
   // Folders show a trailing chevron: a tap drills in, and the bar's title follows.
@@ -83,16 +118,14 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>, 
   await page
     .getByRole('button', { name: `Go to folder, now ${fixture}/alpha`, exact: true })
     .waitFor({ timeout: 10_000 })
-  await page.getByRole('button', { name: 'Choose alpha', exact: true }).waitFor()
+  await expectOpenNames(page, `${fixture}/alpha`)
   await step('picker-tapped-folder')
   await page.getByRole('button', { name: 'More folder actions', exact: true }).click()
   await page.getByRole('menuitemradio', { name: 'Newest first' }).waitFor()
   await step('picker-menu')
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Up one folder', exact: true }).click()
-  await page
-    .getByRole('button', { name: `Choose ${path.basename(fixture)}`, exact: true })
-    .waitFor()
+  await expectOpenNames(page, fixture)
   // A folder picker lists folders only.
   ok(
     (await list.getByRole('option', { name: /^notes\.md/ }).count()) === 0,
@@ -137,6 +170,110 @@ async function folderPicker(page: Page, step: (label: string) => Promise<void>, 
     .waitFor({ timeout: 10_000 })
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
   await dialog.waitFor({ state: 'hidden' })
+}
+
+/**
+ * The folder the picker opened in leads with recent folders, which a tap opens wherever they
+ * live; other folders list only themselves. Places opens a sheet of recent folders, places,
+ * project folders and drives, and going to one closes it.
+ */
+async function recentsAndPlaces(
+  page: Page,
+  step: (label: string) => Promise<void>,
+  fixture: string,
+) {
+  await page.emulateMedia({ colorScheme: 'dark' })
+  const list = selectors.pickerList(page)
+  const first = list.getByRole('option').first()
+  await first.waitFor({ timeout: 20_000 })
+  const opened = await openedFolder(page)
+  await expectOpenNames(page, opened)
+  ok(
+    (await list.locator('[aria-selected="true"]').count()) === 0,
+    'Nothing is selected until a tap',
+  )
+  ok(
+    (await first.textContent())?.trim().startsWith('alpha'),
+    `The first row is the newest recent folder: ${await first.textContent()}`,
+  )
+  ok((await first.textContent())?.includes(`${fixture}/alpha`), 'A recent folder shows its path')
+  const labels = (await list.innerText()).toLowerCase()
+  ok(
+    labels.indexOf('recent\n') < labels.indexOf('alpha') && labels.includes('\nin '),
+    `Recent folders lead, then the opened folder's own: ${labels.slice(0, 200)}`,
+  )
+  await step('picker-recents')
+
+  await first.tap()
+  await page
+    .getByRole('button', { name: `Go to folder, now ${fixture}/alpha`, exact: true })
+    .waitFor({ timeout: 10_000 })
+  await page.waitForTimeout(300)
+  ok(
+    !(await list.innerText()).toLowerCase().includes('recent\n'),
+    'Recent folders lead only the folder the picker opened in',
+  )
+  await step('picker-into-recent-folder')
+  await page.goBack({ waitUntil: 'commit' })
+  await page
+    .getByRole('button', { name: `Go to folder, now ${opened}`, exact: true })
+    .waitFor({ timeout: 10_000 })
+
+  await page.getByRole('button', { name: 'Places', exact: true }).tap()
+  const sheet = page.locator('[data-presentation="sheet"][data-open]')
+  await sheet.waitFor()
+  await sheet.getByText('Recent', { exact: true }).waitFor()
+  const places = sheet.getByRole('region', { name: 'Places', exact: true })
+  await places.waitFor()
+  await sheet.getByRole('region', { name: 'Drives', exact: true }).waitFor()
+  await page.waitForTimeout(400)
+  await step('picker-places-sheet')
+  // The system Back gesture closes the sheet before it leaves the folder.
+  await page.goBack({ waitUntil: 'commit' })
+  await sheet.waitFor({ state: 'hidden' })
+  await page.waitForTimeout(300)
+  await page
+    .getByRole('button', { name: `Go to folder, now ${opened}`, exact: true })
+    .waitFor({ timeout: 10_000 })
+  await page.getByRole('button', { name: 'Places', exact: true }).tap()
+  await places.waitFor()
+  const place = places.locator('button:not([aria-current="page"])').first()
+  const target = await place.getAttribute('title')
+  ok(target, 'A place names its path')
+  await place.tap()
+  await sheet.waitFor({ state: 'hidden' })
+  await page
+    .getByRole('button', { name: `Go to folder, now ${target}`, exact: true })
+    .waitFor({ timeout: 10_000 })
+  await list
+    .getByRole('option')
+    .first()
+    .waitFor({ timeout: 20_000 })
+    .catch(() => undefined)
+  await page.waitForTimeout(300)
+  await step('picker-after-place')
+  await page.goBack({ waitUntil: 'commit' })
+  await page
+    .getByRole('button', { name: `Go to folder, now ${opened}`, exact: true })
+    .waitFor({ timeout: 10_000 })
+  await page.emulateMedia({ colorScheme: null })
+}
+
+/** The phone's Open button opens the folder the header names, whatever is selected. */
+async function expectOpenNames(page: Page, folder: string) {
+  await selectors
+    .pickerDialog(page)
+    .getByRole('button', { name: 'Open', exact: true })
+    .and(page.locator(`[title="${folder}"]`))
+    .waitFor({ timeout: 10_000 })
+}
+
+async function openedFolder(page: Page) {
+  const label = await page
+    .getByRole('button', { name: /^Go to folder, now / })
+    .getAttribute('aria-label')
+  ok(label, 'The bar names the folder')
+  return label.replace(/^Go to folder, now /, '')
 }
 
 async function newSessionPalette(page: Page, step: (label: string) => Promise<void>) {
@@ -215,8 +352,9 @@ async function draftContext(page: Page, step: (label: string) => Promise<void>) 
   await sheet.getByRole('menuitem', { name: 'Back to session setup', exact: true }).click()
   await row('Starts from').waitFor()
   await step('draft-setup-new-worktree')
-  await page.keyboard.press('Escape')
+  await page.goBack({ waitUntil: 'commit' })
   await sheet.waitFor({ state: 'hidden' })
+  await page.waitForTimeout(300)
   ok(
     (await setup.textContent())?.includes('New worktree from'),
     'The summary names the new worktree',
@@ -228,8 +366,9 @@ async function draftContext(page: Page, step: (label: string) => Promise<void>) 
   await row('Workspace').click()
   await page.getByRole('menuitemradio', { name: 'Current checkout', exact: true }).click()
   await row('Workspace').waitFor()
-  await page.keyboard.press('Escape')
+  await page.goBack({ waitUntil: 'commit' })
   await sheet.waitFor({ state: 'hidden' })
+  await page.waitForTimeout(300)
 }
 
 /** The setup control is one row inside the phone, with no space between it and the bottom edge. */
