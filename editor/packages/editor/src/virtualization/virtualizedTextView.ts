@@ -1783,7 +1783,7 @@ export class VirtualizedTextView {
       raised = raiseVisualColumnsSeen(view, measureRowScrollWidth(view, row)) || raised
     }
 
-    if (!raised) return
+    if (!raised && !view.wrapEnabled) return
     updateContentWidth(view, view.virtualizer.getSnapshot().virtualItems)
   }
 
