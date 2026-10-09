@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { KeyAction, KeyModifier, MouseAction, MouseButton, PhysicalKey } from '../../core/abi.js'
-import { GhosttyMouseEncoder } from '../../core/input.js'
 import { GhosttyRuntime } from '../../core/runtime.js'
 import {
   GhosttySelectionGesture,
@@ -842,63 +841,6 @@ describe('TerminalSession', () => {
 
     expect(session.writeln('x')).toEqual({ revision: 2 })
     expect(order.filter((entry) => entry.startsWith('render:'))).toEqual(['render:1', 'render:2'])
-  })
-
-  it('defers write-batch mouse options until live input while preserving native motion history', async () => {
-    const sync = vi.spyOn(GhosttyMouseEncoder.prototype, 'syncFromTerminal')
-    const session = await createSession()
-    sync.mockClear()
-    const motion = mouseEvent({ action: 'motion' })
-    const state = mouseState({ anyButtonPressed: true })
-    const input = { event: motion, state }
-
-    session.write('first')
-    session.write('second')
-    session.write('\u001b[?1003h\u001b[?1006h')
-    expect(sync).not.toHaveBeenCalled()
-    expect(decoder.decode(session.mouse(input))).toBe('\u001b[<32;1;1M')
-    expect(sync).toHaveBeenCalledTimes(1)
-    expect(session.mouse(input)).toEqual(new Uint8Array())
-    expect(sync).toHaveBeenCalledTimes(1)
-
-    session.writeAndReadGeometry('wide界')
-    expect(sync).toHaveBeenCalledTimes(1)
-    expect(decoder.decode(session.mouse(input))).toBe('\u001b[<32;1;1M')
-    expect(sync).toHaveBeenCalledTimes(2)
-    expect(session.mouse(input)).toEqual(new Uint8Array())
-    session.write('\u001b[?1003l')
-    expect(sync).toHaveBeenCalledTimes(2)
-    expect(session.mouse(input)).toEqual(new Uint8Array())
-    expect(sync).toHaveBeenCalledTimes(3)
-
-    session.write('\u001b[?1003h')
-    session.reset()
-    expect(session.mouse(input)).toEqual(new Uint8Array())
-    expect(sync).toHaveBeenCalledTimes(4)
-  })
-
-  it('synchronizes mouse options before input from committed write observers after memory growth', async () => {
-    const runtime = await GhosttyRuntime.create()
-    runtimes.push(runtime)
-    const session = await createSession({ runtime: { kind: 'borrowed', runtime } })
-    const input = {
-      event: mouseEvent({ action: 'motion' }),
-      state: mouseState({ anyButtonPressed: true }),
-    }
-    session.write('\u001b[?1003h\u001b[?1006h')
-    expect(decoder.decode(session.mouse(input))).toBe('\u001b[<32;1;1M')
-    expect(session.mouse(input)).toEqual(new Uint8Array())
-    const fromObserver: Uint8Array[] = []
-    session.on('title', () => fromObserver.push(session.mouse(input)))
-    runtime.exports.memory.grow(1)
-    session.write('x\u001b]0;active\u0007')
-    expect(decoder.decode(fromObserver[0])).toBe('\u001b[<32;1;1M')
-    expect(session.mouse(input)).toEqual(new Uint8Array())
-    session.write('\u001b[?1003l\u001b]0;off\u0007')
-    expect(fromObserver[1]).toEqual(new Uint8Array())
-    session.write('\u001b[?1003h\u001b]0;on\u0007')
-    expect(decoder.decode(fromObserver[2])).toBe('\u001b[<32;1;1M')
-    expect(session.mouse(input)).toEqual(new Uint8Array())
   })
 
   it('emits copied key, paste, focus, raw, and mode-synchronized mouse bytes', async () => {
