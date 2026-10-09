@@ -702,8 +702,8 @@ with linear bounds on measurement calls and measured code units. The full packag
 `/work/reports/freesans-geometry/`; the draft PR records all methods, costs and cold-run variance.
 Caching and settled tabs do not resolve the remaining native-caret correctness failures.
 
-The native follow-up now retains one intact text node for each mounted plain proportional row
-strictly below `NATIVE_SHAPING_CEILING = 32_000`. The approved DOM contract changes only ordinary
+The initial native follow-up retained one intact text node for each mounted plain proportional row
+strictly below the initial 32,000-unit ceiling. That shared ceiling is superseded by the measured independent budget below. The approved DOM contract changes only ordinary
 proportional rows: the horizontal window starts at zero and keeps the complete rendered row.
 Monospace and inline replacements keep their strict text windows, including nonzero starts when
 scrolled. Every caret, paint and extent oracle remains unchanged. Rows at or above the ceiling
@@ -714,9 +714,12 @@ connected text node, caches unchanged mounted rows, and measures only the change
 Canvas shaping remains the document projection owner.
 
 - [ ] Complete independent review of the pushed native implementation and its long-row costs.
-- [ ] Bring 20,000–30,000-unit proportional typing within the 8.3 ms target in Firefox and
-      WebKit, and investigate WebKit's long-row scroll/paint frame regression. Keep #1186 draft
-      until the coordinator resolves these measured costs.
+- [x] Select an independent proportional intact-node budget from the approved 2k, 5k, 10k
+      and 15k cross-engine experiments. Retain editable bounded approximation above it and
+      the independent 32,000-unit BiDi ceiling.
+- [x] Verify the selected budget and its fallback costs in all three engines.
+- [ ] Obtain independent review of the selected budget and final checks. Keep #1186 draft
+      until the coordinator completes review.
 
 The 2026-10-09 paired long-row run is an **experiment**, not a published performance claim.
 A 500×200 viewport displays 100 rows of repeated `AV office ffi ` in the licensed FreeSans fixture,
@@ -773,3 +776,78 @@ reports healthy with no browser problems, and its screenshot was read back.
 > now on the VPS. Track N comes last:
 > ask the owner for npm setup only when everything else is done.
 > Send screenshots of every site and README at each milestone.
+
+### Approved measured proportional budget
+
+The coordinator approved selecting the largest tested intact-node size whose edits stay within
+8.3 ms in all three engines and whose WebKit horizontal/vertical scroll frames stay near 16 ms.
+The quiet 2026-10-10 experiment used the same 100-row FreeSans harness and engine versions as
+above, with lengths 2,000, 5,000, 10,000 and 15,000. Each edit now inserts at half the row length;
+scroll steps shrink when needed and use the actual clamped native offsets. This keeps smaller
+rows on a real scrolling path and edits within the first row. The native source stayed frozen
+at `1c8df51ee17c310257a0f5f609a8a5ee62d744a0` throughout the candidate matrix.
+
+| Units  | Chromium edit median / max ms | Firefox edit median / max ms | WebKit edit median / max ms | WebKit horizontal / vertical median frame ms |
+| ------ | ----------------------------- | ---------------------------- | --------------------------- | -------------------------------------------- |
+| 2,000  | 1.0 / 1.7                     | 1 / 2                        | 2 / 2                       | 16 / 16                                      |
+| 5,000  | 1.3 / 1.7                     | 3 / 5                        | 3 / 4                       | 16 / 16                                      |
+| 10,000 | 2.0 / 3.3                     | 4 / 7                        | 5 / 7                       | 26 / 20                                      |
+| 15,000 | 2.9 / 4.6                     | 5 / 10                       | 7 / 10                      | 31 / 22                                      |
+
+**5,000 is the largest passing candidate.** `PROPORTIONAL_INTACT_NODE_CEILING = 5_000`
+admits plain proportional native rows strictly below 5,000 UTF-16 units. At 5,000 or more,
+the existing bounded editable approximation and structured degraded state apply. The strict
+boundary leaves margin below the tested 5,000-unit row, which grew through 33 insertions.
+`BIDI_LINE_MEASUREMENT_CEILING = 32_000` is independent; RTL rows between these limits retain
+their existing geometry owner. The new BiDi control covers that separation. The 20k DOM test
+returns to bounded windows and nonzero starts; its caret, paint and extent oracles stay unchanged.
+Intact ligature controls still cross several former 512-unit boundaries below the new budget.
+
+Candidate evidence: `/work/reports/freesans-geometry/native-budget/` contains all 72 paired
+cases in `results.json`, Chromium tracing, engine problem lists and `run.mjs`. The selected-budget
+run is retained in `final/`, including the same paired method at 2k, 4,936, 5k, 10k, 15k, 20k and
+30k. The 4,936-unit row remains below the ceiling throughout all 33 insertions; each result
+records the mounted shaping path and ceiling to distinguish intact from approximate cases.
+These are synchronous edit/layout and frame-interval experiments, with no key-to-paint claim.
+
+Selected-budget verification retained all 126 paired cases without browser errors. At 4,936 units,
+the row remains native through every insertion; at 5,000 and above every measured row reports
+`approximate` with ceiling `5000`.
+
+| Units / path         | Chromium edit median / max ms | Firefox edit median / max ms | WebKit edit median / max ms | WebKit horizontal / vertical median frame ms |
+| -------------------- | ----------------------------- | ---------------------------- | --------------------------- | -------------------------------------------- |
+| 4,936 / native       | 1.2 / 2.5                     | 2 / 3                        | 3 / 3                       | 16 / 16                                      |
+| 5,000 / approximate  | 1.2 / 1.8                     | 2 / 4                        | 2 / 2                       | 16 / 16                                      |
+| 10,000 / approximate | 1.7 / 2.6                     | 3 / 6                        | 2 / 3                       | 16 / 16                                      |
+| 15,000 / approximate | 2.3 / 3                       | 3 / 6                        | 3 / 4                       | 16 / 16                                      |
+| 20,000 / approximate | 2.8 / 3.8                     | 4 / 10                       | 3 / 3                       | 16 / 16                                      |
+| 30,000 / approximate | 4 / 4.2                       | 5 / 11                       | 3 / 4                       | 16 / 16                                      |
+
+The admitted native case meets the measured edit/frame target in all engines. Approximate
+Firefox edits have 10 ms and 11 ms tails at 20k and 30k despite 4 ms and 5 ms medians:
+the fallback keeps its bounded shaping and editable contract, with no universal edit-latency
+promise. Chromium scroll-frame medians stay near 16.7 ms; Firefox stays near 17.05 ms.
+The final near-limit Chromium layout/paint per action frame, baseline → native, is
+0.610/0.571 → 0.000/0.173 ms horizontally, 0.051/0.138 → 0.195/0.110 ms vertically,
+and 0.103/0.513 → 0.368/0.824 ms during edits. Parsed totals are recorded in
+`final/chromium-layout-paint.json`, alongside the raw trace. The strict geometry tests need the initial ResizeObserver snapshot to settle before the
+first native scroll change; their setup now waits two animation frames. No geometry tolerance,
+timeout, skip or retry changed.
+
+The first full selected-budget suite exposed a delayed extent defect: WebKit settled a mounted
+2,048-unit window as the complete 20k row width (14,265 px versus the unchanged 139,180.21875 px
+native oracle). Approximate plain rows now keep their complete shaped-run width as the scroll
+extent owner. A direct measurement regression failed in Chromium and Firefox before the fix;
+the earlier full WebKit failure provides its on-surface evidence. The initial direct WebKit
+proof stopped without completing and was cancelled after 607 seconds; the repaired three-engine
+control finishes normally. The native path below the budget is unchanged.
+
+The same full run timed out the source import inventory at 5,906 ms. Its parser now skips files
+that contain neither the removed directory name nor a path escape. Escaped imports still receive
+full TypeScript parsing, with a regression for an escaped directory name. The timeout stays
+unchanged. These two findings are fixed in this lane; their logs are retained under
+`native-budget/final/`. Selected-budget costs before the extent fix are preserved in
+`native-budget/final-before-extent/`; the final table above comes from the completed rerun
+against the complete extent owner. All 126 cases completed with empty browser problem lists.
+Final source checks pass: 312 test files and 4,255 tests, with one skipped file/test; package
+typecheck, lint, format and root gates pass. The repaired focused run passes 7 files and 81 tests.

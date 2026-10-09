@@ -101,7 +101,7 @@ import {
 import { memoizedContainsRTL } from './virtualizedTextViewBidi'
 import type { GlyphAdvances } from './glyphAdvances'
 import { columnAtPixels, pixelsBeforeColumn } from './proportionalRows'
-import { NATIVE_SHAPING_CEILING } from './nativeCarets'
+import { PROPORTIONAL_INTACT_NODE_CEILING } from './nativeCarets'
 
 const GUTTER_CELL_CLASS = 'editor-virtualized-gutter-cell'
 const CURSOR_LINE_ROW_CLASS = 'editor-virtualized-cursor-line-row'
@@ -112,7 +112,7 @@ const gutterCursorLineBandStates = new WeakMap<HTMLElement, boolean>()
 const MAX_ROW_TEXT_NODE_LENGTH = 50
 const MAX_SINGLE_NODE_ROW_LENGTH = 512
 /** Above this, the row shows a fixed endpoint-only placeholder instead of laying out unbounded text. */
-export const BIDI_LINE_MEASUREMENT_CEILING = NATIVE_SHAPING_CEILING
+export const BIDI_LINE_MEASUREMENT_CEILING = 32_000
 
 type BidiMeasurementRefusal = 'line-length' | 'grapheme-length'
 const INLINE_WIDGET_CLASS = 'editor-inline-widget'
@@ -971,20 +971,22 @@ function updateRowTextChunks(
   const { text } = content
   setCoreBidiRefusal(row, false)
   if (!view.monospace) {
+    const rtl = memoizedContainsRTL(view, content)
+    const ceiling = rtl ? BIDI_LINE_MEASUREMENT_CEILING : PROPORTIONAL_INTACT_NODE_CEILING
     let geometry = 'native'
     if (!isSimpleRowText(content)) geometry = 'rendered'
     if (mapping) geometry = 'inline'
-    if (text.length >= NATIVE_SHAPING_CEILING) {
+    if (!rtl && text.length >= ceiling) {
       geometry = 'approximate'
       recordEditorPerformanceDiagnostic('view.nativeShaping.degraded', () => ({
         reason: 'line-length',
         length: text.length,
-        ceiling: NATIVE_SHAPING_CEILING,
+        ceiling,
         path: 'bounded-shaped-runs',
       }))
     }
     row.element.dataset.editorShapingGeometry = geometry
-    row.element.dataset.editorShapingCeiling = String(NATIVE_SHAPING_CEILING)
+    row.element.dataset.editorShapingCeiling = String(ceiling)
   } else {
     delete row.element.dataset.editorShapingGeometry
     delete row.element.dataset.editorShapingCeiling
@@ -2055,7 +2057,7 @@ function shouldChunkLine(
 ): boolean {
   const { text } = content
   if (!view.monospace) {
-    if (text.length >= NATIVE_SHAPING_CEILING) return !memoizedContainsRTL(view, content)
+    if (text.length >= PROPORTIONAL_INTACT_NODE_CEILING) return !memoizedContainsRTL(view, content)
     if (!inline) return false
   }
   if (typeof text !== 'string') return !memoizedContainsRTL(view, content)

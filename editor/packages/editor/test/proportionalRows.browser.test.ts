@@ -4,7 +4,7 @@ import { Editor } from '../src/editor/Editor'
 import { VirtualizedTextView } from '../src/virtualization'
 import '../src/style.css'
 import { loadFreeSans } from './fixtures/freefont/load'
-import { NATIVE_SHAPING_CEILING } from '../src/virtualization/nativeCarets'
+import { measureRowContentWidth } from '../src/virtualization/virtualizedTextViewGeometry'
 
 describe.each(['Noto Sans', 'Geometry FreeSans'])('%s geometry', (FACE) => {
   beforeAll(async () => {
@@ -39,6 +39,9 @@ describe.each(['Noto Sans', 'Geometry FreeSans'])('%s geometry', (FACE) => {
     editor.setText(text)
     const scroller = container.querySelector<HTMLElement>('.editor-virtualized')!
     await expect.poll(() => scroller.scrollWidth).toBeGreaterThan(1000)
+    // Settle the initial ResizeObserver snapshot before changing the native scroll position.
+    await new Promise(requestAnimationFrame)
+    await new Promise(requestAnimationFrame)
     return { container, editor, scroller }
   }
 
@@ -75,7 +78,7 @@ describe.each(['Noto Sans', 'Geometry FreeSans'])('%s geometry', (FACE) => {
     expect(extent - full).toBeLessThan(Math.max(textWidth('W') * 2, full * 0.01))
   })
 
-  test('retains native shaping while scrolling an intact proportional row', async () => {
+  test('keeps a bounded proportional text window while scrolling', async () => {
     const { container, scroller } = await mount()
     const row = container.querySelector<HTMLElement>('[data-editor-virtual-row="0"]')!
     const rect = row.getBoundingClientRect()
@@ -85,9 +88,10 @@ describe.each(['Noto Sans', 'Geometry FreeSans'])('%s geometry', (FACE) => {
 
     for (const target of [30_000, 60_000, 90_000]) {
       scroller.scrollLeft = target
-      expect(Number(row.dataset.editorVirtualWindowStart ?? '0')).toBe(0)
-      expect((row.textContent ?? '').length).toBe(LONG.length)
-      expect((row.textContent ?? '').length).toBeLessThan(NATIVE_SHAPING_CEILING)
+      await expect
+        .poll(() => Number(row.dataset.editorVirtualWindowStart ?? '0'))
+        .toBeGreaterThan(0)
+      expect((row.textContent ?? '').length).toBeLessThan(LONG.length)
       await expect
         .poll(() => row.getBoundingClientRect().left + scroller.scrollLeft)
         .toBeCloseTo(scroller.getBoundingClientRect().left + gutterWidth, 0)
@@ -205,4 +209,29 @@ describe.each(['Noto Sans', 'Geometry FreeSans'])('%s geometry', (FACE) => {
       })
       .toBe(true)
   })
+})
+
+test('keeps the complete approximate extent after measuring a mounted proportional window', async () => {
+  await loadFreeSans()
+  const text = 'WWWWWWW iiiiiii '.repeat(1250)
+  const host = document.createElement('div')
+  host.style.cssText = 'width:500px;height:200px'
+  document.body.append(host)
+  const view = new VirtualizedTextView(host, { fontFamily: '"Geometry FreeSans"', wrap: false })
+  try {
+    view.setText(text)
+    view.setScrollMetrics(0, 200, 500)
+    const row = view.getState().mountedRows[0]!
+    const before = view.getState().contentWidth
+    expect(row.element.textContent!.length).toBeLessThan(text.length)
+    const width = measureRowContentWidth(
+      (view as unknown as { view: Parameters<typeof measureRowContentWidth>[0] }).view,
+      row,
+    )
+    expect(width).toBeGreaterThan(before - 1)
+    expect(width).toBeLessThan(before + 1)
+  } finally {
+    view.dispose()
+    host.remove()
+  }
 })

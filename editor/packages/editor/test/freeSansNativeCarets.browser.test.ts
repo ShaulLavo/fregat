@@ -1,8 +1,12 @@
 import { beforeAll, expect, test, vi } from 'vitest'
 import { VirtualizedTextView } from '../src/virtualization'
-import { createNativeCarets, NATIVE_SHAPING_CEILING } from '../src/virtualization/nativeCarets'
+import {
+  createNativeCarets,
+  PROPORTIONAL_INTACT_NODE_CEILING,
+} from '../src/virtualization/nativeCarets'
 import type { EditorPerformanceDiagnostic } from '../src/editor/performanceDiagnostics'
 import { RangeText } from '../src/textContent'
+import { BIDI_LINE_MEASUREMENT_CEILING } from '../src/virtualization/virtualizedTextViewRows'
 import { loadFreeSans } from './fixtures/freefont/load'
 import '../src/style.css'
 
@@ -47,8 +51,9 @@ test('looks up insertion boundaries inside an unchanged native ligature run', ()
 test.each(['Geometry FreeSans', 'Geometry Source Serif 4'])(
   'places a scrolled %s caret at its intact native insertion position',
   (face) => {
-    const text = 'ffi'.repeat(10_000)
-    const target = 15_000
+    const repeats = Math.floor((PROPORTIONAL_INTACT_NODE_CEILING - 1) / 3)
+    const text = 'ffi'.repeat(repeats)
+    const target = 3 * Math.floor(repeats / 2)
     const probe = nativeProbe(text, face)
     const host = document.createElement('div')
     host.style.cssText = 'width:360px;height:100px'
@@ -102,42 +107,47 @@ test('uses native insertion positions in the mounted editor ligature run', () =>
   }
 })
 
-test.each([NATIVE_SHAPING_CEILING - 1, NATIVE_SHAPING_CEILING, NATIVE_SHAPING_CEILING + 1])(
-  'keeps a %i-unit row editable across the native shaping ceiling',
-  (length) => {
-    const text = 'i'.repeat(length)
-    const host = document.createElement('div')
-    host.style.cssText = 'width:360px;height:100px'
-    document.body.append(host)
-    const view = new VirtualizedTextView(host, {
-      fontFamily: '"Geometry FreeSans"',
-      wrap: false,
-      longLineChunkSize: 512,
-      longLineChunkThreshold: 1024,
-      horizontalOverscanColumns: 0,
-    })
-    try {
-      view.setText(text)
-      view.setScrollMetrics(0, 100, 360, 30_000)
-      const row = view.getState().mountedRows[0]!
-      if (length < NATIVE_SHAPING_CEILING) {
-        expect(row.element.dataset.editorShapingGeometry).toBe('native')
-        expect(row.element.textContent?.length).toBe(length)
-        expect(row.textNode.length).toBe(length)
-      } else {
-        expect(row.element.dataset.editorShapingGeometry).toBe('approximate')
-        expect(row.element.textContent!.length).toBeLessThan(length)
-        expect(Number(row.element.dataset.editorVirtualWindowStart)).toBeGreaterThan(0)
-      }
-      view.applyEdit({ from: 0, to: 0, text: 'x' }, 'x' + text)
-      expect(view.getState().mountedRows[0]!.text.length).toBe(length + 1)
-      expect(view.createRange(0, 1)).not.toBeNull()
-    } finally {
-      view.dispose()
-      host.remove()
+test.each([
+  PROPORTIONAL_INTACT_NODE_CEILING - 1,
+  PROPORTIONAL_INTACT_NODE_CEILING,
+  PROPORTIONAL_INTACT_NODE_CEILING + 1,
+])('keeps a %i-unit row editable across the native shaping ceiling', (length) => {
+  const text = 'i'.repeat(length)
+  const host = document.createElement('div')
+  host.style.cssText = 'width:360px;height:100px'
+  document.body.append(host)
+  const view = new VirtualizedTextView(host, {
+    fontFamily: '"Geometry FreeSans"',
+    wrap: false,
+    longLineChunkSize: 512,
+    longLineChunkThreshold: 1024,
+    horizontalOverscanColumns: 0,
+  })
+  try {
+    view.setText(text)
+    view.setScrollMetrics(0, 100, 360, 30_000)
+    const row = view.getState().mountedRows[0]!
+    expect(row.element.dataset.editorShapingCeiling).toBe(String(PROPORTIONAL_INTACT_NODE_CEILING))
+    if (length < PROPORTIONAL_INTACT_NODE_CEILING) {
+      expect(row.element.dataset.editorShapingGeometry).toBe('native')
+      expect(row.element.textContent?.length).toBe(length)
+      expect(row.textNode.length).toBe(length)
+    } else {
+      expect(row.element.dataset.editorShapingGeometry).toBe('approximate')
+      expect(row.element.textContent!.length).toBeLessThan(length)
+      expect(Number(row.element.dataset.editorVirtualWindowStart)).toBeGreaterThan(0)
     }
-  },
-)
+    view.applyEdit({ from: 0, to: 0, text: 'x' }, 'x' + text)
+    expect(view.getState().mountedRows[0]!.text.length).toBe(length + 1)
+    expect(view.getState().mountedRows[0]!.element.dataset.editorShapingGeometry).toBe(
+      'approximate',
+    )
+    expect(view.createRange(0, 1)).not.toBeNull()
+  } finally {
+    view.dispose()
+    host.remove()
+  }
+})
 
 test.each([20, 2000])(
   'measures only mounted rows in a %i-line document and invalidates one edit',
@@ -203,7 +213,8 @@ test('keeps the strict horizontal text window for monospace rows', () => {
 })
 
 test('leaves source-tree character reads out of inactive markers on intact proportional rows', () => {
-  const text = Array.from({ length: 30 }, () => 'AV office ffi '.repeat(2000)).join('\n')
+  const repeats = Math.floor((PROPORTIONAL_INTACT_NODE_CEILING - 64) / 14)
+  const text = Array.from({ length: 30 }, () => 'AV office ffi '.repeat(repeats)).join('\n')
   const host = document.createElement('div')
   host.style.cssText = 'width:360px;height:100px'
   document.body.append(host)
@@ -240,5 +251,27 @@ test('keeps an empty proportional row caret at its origin', () => {
     expect(createNativeCarets(probe, node).position(0)).toBe(0)
   } finally {
     probe.remove()
+  }
+})
+
+test('keeps the BiDi ceiling independent of the proportional intact-node budget', () => {
+  expect(BIDI_LINE_MEASUREMENT_CEILING).toBe(32_000)
+  expect(PROPORTIONAL_INTACT_NODE_CEILING).toBeLessThan(BIDI_LINE_MEASUREMENT_CEILING)
+  const text = 'א'.repeat(PROPORTIONAL_INTACT_NODE_CEILING + 1)
+  const host = document.createElement('div')
+  host.style.cssText = 'width:360px;height:100px'
+  document.body.append(host)
+  const view = new VirtualizedTextView(host, { fontFamily: '"Geometry FreeSans"', wrap: false })
+  try {
+    view.setText(text)
+    view.setScrollMetrics(0, 100, 360)
+    const row = view.getState().mountedRows[0]!
+    expect(row.element.dataset.editorShapingGeometry).toBe('rendered')
+    expect(row.element.dataset.editorShapingCeiling).toBe(String(BIDI_LINE_MEASUREMENT_CEILING))
+    expect(row.element.querySelector('[data-editor-bidi-measurement-refusal]')).toBeNull()
+    expect(row.element.textContent).toBe(text)
+  } finally {
+    view.dispose()
+    host.remove()
   }
 })

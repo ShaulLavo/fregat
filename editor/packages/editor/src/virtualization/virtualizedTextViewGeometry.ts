@@ -1,5 +1,9 @@
 import { isHtmlElement } from '../dom'
-import { createNativeCarets, NATIVE_SHAPING_CEILING, type NativeCarets } from './nativeCarets'
+import {
+  createNativeCarets,
+  PROPORTIONAL_INTACT_NODE_CEILING,
+  type NativeCarets,
+} from './nativeCarets'
 import type { TextContent } from '../textContent'
 import type { MeasuredText } from '../textMeasurements'
 import {
@@ -38,6 +42,7 @@ import type {
 } from './virtualizedTextViewTypes'
 import type { VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
 import { bidiVisualRunIndexAt, memoizedContainsRTL } from './virtualizedTextViewBidi'
+import { pixelsBeforeColumn } from './proportionalRows'
 
 const CONTROL_CHARACTER_CLASS = 'editor-virtualized-control-character'
 // These are exactly the code units the renderer replaces with visible labels or fixed-width boxes.
@@ -486,7 +491,8 @@ function nativeRowCarets(
   view: VirtualizedTextViewInternal,
   row: MountedVirtualizedTextRow,
 ): NativeCarets | null {
-  if (view.monospace || row.inlineMapping || row.text.length >= NATIVE_SHAPING_CEILING) return null
+  if (view.monospace || row.inlineMapping || row.text.length >= PROPORTIONAL_INTACT_NODE_CEILING)
+    return null
   if (!isSimpleRowText(row) || row.textRenderMode !== 'simple') return null
   if (row.chunks[0]?.localStart !== 0 || row.chunks.at(-1)?.localEnd !== row.text.length)
     return null
@@ -511,7 +517,7 @@ function nativeRowCarets(
   })
   recordEditorPerformanceDiagnostic('view.nativeShaping', () => ({
     length: row.text.length,
-    ceiling: NATIVE_SHAPING_CEILING,
+    ceiling: PROPORTIONAL_INTACT_NODE_CEILING,
     path: 'mounted-intact',
   }))
   return carets
@@ -555,6 +561,15 @@ export function knownRowContentWidth(
 ): number | null {
   const native = nativeRowCarets(view, row)
   if (native) return native.position(row.text.length)
+  // A mounted window cannot supply the complete scroll extent of an approximate source row.
+  if (
+    !view.monospace &&
+    !row.inlineMapping &&
+    view.glyphs &&
+    row.text.length >= PROPORTIONAL_INTACT_NODE_CEILING &&
+    isSimpleRowText(row)
+  )
+    return pixelsBeforeColumn(row.text, row.text.length, view.glyphs, view.tabSize)
   const key = rowGeometryCacheKey(view, row)
   const cached = row.geometryCache as RowGeometryCache | null
   if (cached?.key === key && !cached.geometry.plan && Number.isFinite(cached.geometry.width))

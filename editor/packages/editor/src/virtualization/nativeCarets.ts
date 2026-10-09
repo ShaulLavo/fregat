@@ -1,4 +1,4 @@
-export const NATIVE_SHAPING_CEILING = 32_000
+export const PROPORTIONAL_INTACT_NODE_CEILING = 5_000
 
 /** Positions belong to the intact connected row, including insertion points inside ligatures. */
 export function createNativeCarets(
