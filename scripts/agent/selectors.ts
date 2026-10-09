@@ -814,6 +814,7 @@ export const selectors = {
   navigationError: (page: Page) => page.getByRole('alert').filter({ hasText: 'Fix with AI' }),
   settingsDialog: (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true }),
   mcpSettings: (page: Page) => page.locator('[data-mcp-section]'),
+  mcpSettingsFolder: (page: Page) => page.locator('[data-mcp-folder]'),
   mcpSettingsRow: (page: Page, name: string) => page.locator(`[data-mcp-server="${name}"]`),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
   quickOpenPreviewToggle: (page: Page) =>

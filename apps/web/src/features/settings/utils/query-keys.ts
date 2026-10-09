@@ -12,7 +12,7 @@ export const settingsQueryKeys = {
   usageHistory: (days: number, utcOffsetMinutes: number) =>
     ['providers', 'usage', 'history', days, utcOffsetMinutes] as const,
   mcpServersAll: ['providers', 'mcp-config'] as const,
-  mcpServers: (providerInstanceId: string, folder: string | null) =>
+  mcpServers: (providerInstanceId: string | null, folder: string | null) =>
     ['providers', 'mcp-config', providerInstanceId, folder ?? '~'] as const,
   pushDevices: ['push', 'devices'] as const,
   pushThisDevice: ['push', 'this-device'] as const,
