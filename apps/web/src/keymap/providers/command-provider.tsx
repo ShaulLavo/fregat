@@ -332,8 +332,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     () => resolvedPlatformKeyBindings(defaults, overrides),
     [defaults, overrides],
   )
-  // Badge snapshots and menu contexts depend on this table's identity.
-  const displayBindings = useMemo(() => displayPlatformKeyBindings(bindings), [bindings])
+  const displayBindings = displayPlatformKeyBindings(bindings)
   const { keymap, pendingChord } = useAppKeymap({
     bindings,
     bus,
