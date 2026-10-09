@@ -177,7 +177,9 @@ it('refreshes only the revealed editor ranges and preserves shared syntax groups
     const removed = vi.spyOn(group, 'delete')
     host.style.visibility = 'visible'
     editor.setPresentationReady(true)
-    expect(removed.mock.calls.map(([range]) => range)).toEqual(owned)
+    expect(removed.mock.calls.map(([range]) => range)).toEqual(
+      CSS.supports('-webkit-nbsp-mode', 'space') ? owned : [],
+    )
     expect(CSS.highlights.get(name)).toBe(group)
     expect(new Set(group)).toEqual(new Set(ranges))
     removed.mockClear()
@@ -185,7 +187,9 @@ it('refreshes only the revealed editor ranges and preserves shared syntax groups
     expect(removed).not.toHaveBeenCalled()
     editor.setPresentationReady(false)
     editor.setPresentationReady(true)
-    expect(removed.mock.calls.map(([range]) => range)).toEqual(owned)
+    expect(removed.mock.calls.map(([range]) => range)).toEqual(
+      CSS.supports('-webkit-nbsp-mode', 'space') ? owned : [],
+    )
     editor.dispose()
     expect([...group]).toEqual(peerRanges)
     removed.mockClear()
@@ -193,6 +197,64 @@ it('refreshes only the revealed editor ranges and preserves shared syntax groups
     editor.setPresentationReady(true)
     expect(removed).not.toHaveBeenCalled()
     removed.mockRestore()
+  } finally {
+    editor.dispose()
+    host.remove()
+  }
+})
+
+it('limits native presentation invalidation to the engine capability that needs it', async () => {
+  const host = document.createElement('div')
+  host.style.cssText = 'width:1280px;height:600px;visibility:hidden'
+  document.body.append(host)
+  const editor = new Editor(host, { presentationReady: false, lineHeight: 18 })
+  try {
+    editor.setText(('x '.repeat(100) + '\n').repeat(50_000))
+    const styles = [{ color: '#ff0000' }, { color: '#0000ff' }]
+    editor.setTokens(
+      Array.from({ length: 40_000 }, (_, index) => {
+        const start = Math.floor(index / 100) * 201 + (index % 100) * 2
+        return { start, end: start + 1, style: styles[index % 2]! }
+      }),
+    )
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    const entries = [...CSS.highlights].filter(([, group]) =>
+      [...group].some((range) => host.contains(range.startContainer)),
+    )
+    const count = entries.reduce(
+      (sum, [, group]) =>
+        sum + [...group].filter((range) => host.contains(range.startContainer)).length,
+      0,
+    )
+    expect(count).toBeGreaterThan(1_000)
+    host.style.visibility = 'visible'
+    const samples: number[] = []
+    for (let index = 0; index < 10; index++) {
+      editor.setPresentationReady(false)
+      const start = performance.now()
+      editor.setPresentationReady(true)
+      samples.push(performance.now() - start)
+    }
+    console.info(
+      'presentation membership cost',
+      JSON.stringify({
+        count,
+        samples,
+        nativeCapability: CSS.supports('-webkit-nbsp-mode', 'space'),
+        touchCallout: CSS.supports('-webkit-touch-callout', 'none'),
+        nbspMode: CSS.supports('-webkit-nbsp-mode', 'space'),
+      }),
+    )
+    const removed = entries.map(([, group]) => vi.spyOn(group, 'delete'))
+    try {
+      editor.setPresentationReady(false)
+      editor.setPresentationReady(true)
+      expect(removed.reduce((sum, spy) => sum + spy.mock.calls.length, 0)).toBe(
+        CSS.supports('-webkit-nbsp-mode', 'space') ? count : 0,
+      )
+    } finally {
+      for (const spy of removed) spy.mockRestore()
+    }
   } finally {
     editor.dispose()
     host.remove()

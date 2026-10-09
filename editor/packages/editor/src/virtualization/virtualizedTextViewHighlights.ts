@@ -653,6 +653,10 @@ export function restoreHighlightsAfterPresentation(view: VirtualizedTextViewInte
   restoreRangeHighlightGroups(view, registry)
   restoreStyleRuleElements(view)
 
+  // This native text-layout capability selects WebKit without consulting the user agent.
+  if (!view.scrollElement.ownerDocument.defaultView?.CSS.supports('-webkit-nbsp-mode', 'space'))
+    return
+
   // WebKit retains unpainted StaticRanges registered under a hidden host. Refresh only this
   // view's memberships: token groups can also contain ranges owned by other editors.
   for (const rangesByStyle of view.rowTokenRanges.values()) {
