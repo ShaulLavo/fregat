@@ -28,7 +28,9 @@ export function matchesHeldModifiers(
   // AltGraph (AltGr) types alternate characters such as @ or € on many layouts.
   // It can synthesize Ctrl+Alt; character entry should not reveal shortcut hints.
   if (heldKeys.includes('AltGraph')) return false
-  const held = [...new Set(heldKeys.map(normalizeKeyName).filter((key) => MODIFIER_KEYS.has(key)))]
+  const held = Array.from(
+    new Set(heldKeys.map(normalizeKeyName).filter((key) => MODIFIER_KEYS.has(key))),
+  )
   const { modifiers } = parseRegisterableHotkey(hotkey, options.platform)
   return (
     held.length > 0 &&

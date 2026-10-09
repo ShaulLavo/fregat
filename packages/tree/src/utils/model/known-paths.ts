@@ -76,7 +76,7 @@ export class KnownPaths {
       }
     }
 
-    this.#knownPaths = [...knownPaths].sort()
+    this.#knownPaths = Array.from(knownPaths).sort()
     return this.#knownPaths
   }
 }

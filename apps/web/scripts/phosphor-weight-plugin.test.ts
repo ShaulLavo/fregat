@@ -56,7 +56,7 @@ test('collects literal weights and keeps regular for the unset default', async (
     'b.tsx': '<PlusIcon weight="bold" />\n<StopIcon weight={\'fill\'} />',
     'c.ts': 'const weight = 400',
   })
-  expect([...kept].sort()).toEqual(['bold', 'duotone', 'fill', 'regular'])
+  expect(Array.from(kept).sort()).toEqual(['bold', 'duotone', 'fill', 'regular'])
 })
 
 test('fails on a weight that is not a string literal', async () => {

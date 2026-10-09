@@ -118,10 +118,13 @@ if (values.phase !== 'files') {
   }
 }
 if (values.phase !== 'workbench') {
-  const cases = [
+  const cases = Array.of<
+    Pick<Parameters<typeof runCase>[0], 'sizeMiB' | 'extension' | 'twoByte' | 'analysis'>
+  >(
     { sizeMiB: 1, extension: 'txt' as const, twoByte: true, analysis: 'default' as const },
     { sizeMiB: 200, extension: 'txt' as const, twoByte: true, analysis: 'default' as const },
-    ...[0.0625, 1, 10].flatMap((sizeMiB) =>
+  ).concat(
+    [0.0625, 1, 10].flatMap((sizeMiB) =>
       ['off', 'on'].map((analysis) => ({
         sizeMiB,
         extension: 'ts' as const,
@@ -129,7 +132,7 @@ if (values.phase !== 'workbench') {
         analysis: analysis as 'off' | 'on',
       })),
     ),
-  ]
+  )
   const results = []
   for (const item of cases) {
     const result = await runCase({

@@ -54,7 +54,7 @@ function mergeLiveSearch(stored: string, liveSearch: string) {
     .slice(1)
     .split('&')
     .filter((pair) => Boolean(pair) && !overridden.has(searchPairKey(pair)))
-  const query = [...kept, live].join('&')
+  const query = kept.concat([live]).join('&')
 
   return `${url.pathname}?${query}${url.hash}`
 }

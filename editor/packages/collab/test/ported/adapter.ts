@@ -73,14 +73,15 @@ export function network(size: number) {
     return envelope
   }
   function flushOne(random: () => number) {
-    const candidates = [
-      ...outbound.flatMap((packet, index) =>
+    const candidates = outbound
+      .flatMap((packet, index) =>
         online.has(packet.user) ? [{ direction: 'out' as const, index }] : [],
-      ),
-      ...inbound.flatMap((packet, index) =>
-        online.has(packet.user) ? [{ direction: 'in' as const, index }] : [],
-      ),
-    ]
+      )
+      .concat(
+        inbound.flatMap((packet, index) =>
+          online.has(packet.user) ? [{ direction: 'in' as const, index }] : [],
+        ),
+      )
     if (candidates.length === 0) return false
     const chosen = candidates[Math.floor(random() * candidates.length)]!
     if (chosen.direction === 'out') {

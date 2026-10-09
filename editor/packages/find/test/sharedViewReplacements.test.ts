@@ -90,7 +90,7 @@ test.each([
     expect(buffer.materializeFullText()).toBe(expected)
     expect(second['view'].contentElement.textContent).toBe(expected)
     const paintedMatches = [...highlights].flatMap(([name, ranges]) =>
-      name.endsWith('-find-match') ? [...ranges].map((range) => range.toString()) : [],
+      name.endsWith('-find-match') ? Array.from(ranges, (range) => range.toString()) : [],
     )
     expect(paintedMatches).toEqual(command === 'replaceOne' && !inSelection ? ['foo'] : [])
   },
@@ -236,7 +236,7 @@ test('a selection listener edit carries the current match onto the committed tex
   editor.findNext()
 
   const currentMatches = [...highlights].flatMap(([name, ranges]) =>
-    name.endsWith('-find-current') ? [...ranges].map((range) => range.toString()) : [],
+    name.endsWith('-find-current') ? Array.from(ranges, (range) => range.toString()) : [],
   )
   expect(editor.materializeFullText()).toBe('PREFIXfoo foo abc')
   expect(currentMatches).toEqual(['foo'])

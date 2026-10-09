@@ -50,9 +50,10 @@ function fixAction(error: AgentErrorInput, fix: (error: AgentErrorInput) => void
  * identity changes far more often than anything a row shows.
  */
 export function treeDecorationKey(model: TreeModel) {
-  const errors = [...model.errorByDirectoryPath].map(
+  const errors = Array.from(
+    model.errorByDirectoryPath,
     ([path, error]) => `${error.denied ? 'denied' : 'error'}:${path}:${error.message}`,
   )
-  const loading = [...model.loadingDirectoryPaths].map((path) => `loading:${path}`)
-  return [...errors, ...loading].toSorted().join('\n')
+  const loading = Array.from(model.loadingDirectoryPaths, (path) => `loading:${path}`)
+  return errors.concat(loading).sort().join('\n')
 }

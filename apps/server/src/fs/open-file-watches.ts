@@ -142,7 +142,7 @@ export class OpenFileWatches {
       if (++links > 40) throw new FsError('INVALID_PATH')
       const target = path.resolve(directory, await readlink(candidate))
       this.paths.assertRealInside(target)
-      remaining = [...path.relative(root, target).split(path.sep), ...remaining]
+      remaining = path.relative(root, target).split(path.sep).concat(remaining)
       directory = root
     }
   }

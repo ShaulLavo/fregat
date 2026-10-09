@@ -210,10 +210,10 @@ function lineBreaks(text: string): number {
 }
 
 /** Ranges in row order, with overlapping and adjacent ones joined. */
-export function mergeRowRanges(ranges: readonly RowRange[]): readonly RowRange[] {
+export function mergeRowRanges(ranges: RowRange[]): readonly RowRange[] {
   const merged: RowRange[] = []
 
-  for (const range of ranges.toSorted((left, right) => left.startRow - right.startRow)) {
+  for (const range of ranges.sort((left, right) => left.startRow - right.startRow)) {
     const previous = merged[merged.length - 1]
     if (!previous || range.startRow > previous.endRow + 1) {
       merged.push(range)

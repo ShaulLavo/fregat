@@ -39,7 +39,7 @@ function buildFixture(shellLoader: string, screenImport: string) {
     JSON.stringify({
       chunks: ['shell.js', 'sessions.js', 'session.js'].map((file, index) => ({
         fileName: `assets/${file}`,
-        modules: [{ id: `/web/${[SHELL_ENTRIES.phone, ...PHONE_BOOT_SCREENS][index]}` }],
+        modules: [{ id: `/web/${[SHELL_ENTRIES.phone].concat(PHONE_BOOT_SCREENS)[index]}` }],
       })),
     }),
   )

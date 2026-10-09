@@ -21,6 +21,7 @@ test.each([
   ['image-only changes', images, 0],
   ['empty changes', {}, 0],
   ['unsupported Astro', { 'docs/example.astro': '<div>unsupported' }, 0],
+  ['unformatted agent instructions', { '.agents/skills/example/SKILL.md': '# Skill' }, 123],
   ['unformatted JSON5', { 'docs/example.json5': '{answer:42}' }, 123],
   ['unformatted Markdown alias', { 'docs/example.markdown': '# Heading' }, 123],
   ['mixed changes with unformatted text', { ...images, 'docs/example.json5': '{answer:42}' }, 123],
@@ -66,12 +67,13 @@ test.each([
       return
     }
     const args = (await readFile(output, 'utf8')).split('\0').filter(Boolean)
-    expect(args).toEqual([
-      `oxfmt@${JSON.parse(manifest).workspaces.catalog.oxfmt}`,
-      '--check',
-      '--no-error-on-unmatched-pattern',
-      ...Object.keys(fixtures).map((file) => `./${file}`),
-    ])
+    expect(args).toEqual(
+      [
+        `oxfmt@${JSON.parse(manifest).workspaces.catalog.oxfmt}`,
+        '--check',
+        '--no-error-on-unmatched-pattern',
+      ].concat(Object.keys(fixtures).map((file) => `./${file}`)),
+    )
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

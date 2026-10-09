@@ -74,7 +74,7 @@ export function decideOrchestrationCommand(
   const at = new Date().toISOString()
   const events = decideCommandEvents(command, model, at, restoreReceipt)
 
-  return [...events, ...endedApprovalEvents(command, events, model, at)]
+  return events.concat(endedApprovalEvents(command, events, model, at))
 }
 
 function decideCommandEvents(
@@ -434,18 +434,19 @@ function projectDeleted(
     }),
   )
 
-  return [
-    ...cascade,
-    ...Array.from(model.worktrees.values())
+  return cascade.concat(
+    Array.from(model.worktrees.values())
       .filter((worktree) => worktree.projectId === command.projectId && !worktree.retiredAt)
       .map((worktree) =>
         event(command, at, 'worktree.retired', { worktreeId: worktree.id, retiredAt: at }),
       ),
-    event(command, at, 'project.deleted', {
-      deletedAt: at,
-      projectId: command.projectId,
-    }),
-  ]
+    [
+      event(command, at, 'project.deleted', {
+        deletedAt: at,
+        projectId: command.projectId,
+      }),
+    ],
+  )
 }
 
 function sessionCreated(
@@ -473,8 +474,7 @@ function sessionCreated(
   }
   requireSessionAbsent(model, command.sessionId)
 
-  return [
-    ...creation,
+  return creation.concat([
     event(command, at, 'session.created', {
       ...(command.agent ? { agent: command.agent } : {}),
       createdAt: at,
@@ -487,7 +487,7 @@ function sessionCreated(
       title: command.title,
       updatedAt: at,
     }),
-  ]
+  ])
 }
 
 function sessionForked(
@@ -632,16 +632,12 @@ function sessionSettled(
     sessionId: command.sessionId,
     updatedAt: settledAt ? session.updatedAt : at,
   })
-  return [
-    ...messageQuestionDismissalEvents(
-      command,
-      session.id,
-      pendingMessageQuestions(session.activities),
-      at,
-    ),
-    settled,
-    ...settlementCompanions(command, session, at),
-  ]
+  return messageQuestionDismissalEvents(
+    command,
+    session.id,
+    pendingMessageQuestions(session.activities),
+    at,
+  ).concat([settled], settlementCompanions(command, session, at))
 }
 
 /**
@@ -670,8 +666,7 @@ function sessionAutoSettled(
       sessionId: command.sessionId,
       updatedAt: at,
     }),
-    ...settlementCompanions(command, session, at),
-  ]
+  ].concat(settlementCompanions(command, session, at))
 }
 
 function settlementCompanions(
@@ -767,7 +762,7 @@ function sessionPinned(
     updatedAt: pinnedAt ? session.updatedAt : at,
   })
 
-  return [pinned, ...promotionEvents(command, session, at)]
+  return [pinned].concat(promotionEvents(command, session, at))
 }
 
 function promotionEvents(
@@ -868,7 +863,7 @@ function sessionSet(
   const status = command.runtime.status
   const wakes = status === 'starting' || status === 'running'
   if (!wakes) return [sessionSetEvent]
-  return [...settlementActivityEvents(command, session, at), sessionSetEvent]
+  return settlementActivityEvents(command, session, at).concat([sessionSetEvent])
 }
 
 /**
@@ -895,7 +890,7 @@ function activityAppended(
     command.activity.kind === 'approval.requested' ||
     command.activity.kind === 'user-input.requested'
   if (!wakes) return [appended]
-  return [...settlementActivityEvents(command, session, at), appended]
+  return settlementActivityEvents(command, session, at).concat([appended])
 }
 
 /**
@@ -957,8 +952,11 @@ function turnStartRequested(
     turnId: command.turnId,
     updatedAt: at,
   })
-  const turnEvents = [
-    ...userEngagementEvents(command, model.sessions.get(command.sessionId), at),
+  const turnEvents = userEngagementEvents(
+    command,
+    model.sessions.get(command.sessionId),
+    at,
+  ).concat([
     messageEvent,
     // The turn exists because the message asked for it; without the link the
     // message→turn causal chain is unreconstructible from the log.
@@ -980,7 +978,7 @@ function turnStartRequested(
       },
       { causationEventId: messageEvent.eventId },
     ),
-  ]
+  ])
 
   const source = command.sourceProposedPlan
   if (source) {
@@ -994,7 +992,7 @@ function turnStartRequested(
       }),
     )
   }
-  return bootstrapEvent ? [...bootstrapEvent, ...turnEvents] : turnEvents
+  return bootstrapEvent ? bootstrapEvent.concat(turnEvents) : turnEvents
 }
 
 function turnSteerRequested(
@@ -1057,8 +1055,7 @@ function bootstrapSessionCreated(
   )
   requireSessionAbsent(model, command.sessionId)
 
-  return [
-    ...creation,
+  return creation.concat([
     event(command, at, 'session.created', {
       ...(createSession.agent ? { agent: createSession.agent } : {}),
       createdAt: at,
@@ -1071,7 +1068,7 @@ function bootstrapSessionCreated(
       title: createSession.title,
       updatedAt: at,
     }),
-  ]
+  ])
 }
 
 function proposedPlanUpserted(
@@ -1100,9 +1097,8 @@ function userInputResponse(
   if (!request) {
     if (command.requestId.startsWith('codex-async:'))
       throw createInternalError('This question has already been answered or dismissed.')
-    return [
-      ...questionAnswerHistory(command, session.activities, at),
-      ...one(
+    return questionAnswerHistory(command, session.activities, at).concat(
+      one(
         command,
         at,
         'session.user-input-response-requested',
@@ -1115,7 +1111,7 @@ function userInputResponse(
         },
         { metadata: { requestId: command.requestId } },
       ),
-    ]
+    )
   }
   const message = {
     messageId: v.parse(messageIdSchema, `async-answer:${command.requestId}`),
@@ -1132,9 +1128,8 @@ function userInputResponse(
     command.attachmentsByQuestionId,
   )
   if (session.latestTurn?.state === 'running') {
-    return [
-      resolution,
-      ...turnSteerRequested(
+    return [resolution].concat(
+      turnSteerRequested(
         {
           ...command,
           type: 'session.turn.steer',
@@ -1144,11 +1139,10 @@ function userInputResponse(
         model,
         at,
       ),
-    ]
+    )
   }
-  return [
-    resolution,
-    ...turnStartRequested(
+  return [resolution].concat(
+    turnStartRequested(
       {
         ...command,
         type: 'session.turn.start',
@@ -1160,5 +1154,5 @@ function userInputResponse(
       model,
       at,
     ),
-  ]
+  )
 }

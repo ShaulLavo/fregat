@@ -41,7 +41,7 @@ async function mount(wordWrapBreak: EditorWrapBreak, fontFamily = `"${FACE}"`) {
 function rows(container: HTMLElement): readonly HTMLElement[] {
   return [...container.querySelectorAll<HTMLElement>('.editor-virtualized-row')]
     .filter((row) => row.dataset.editorVirtualRow !== undefined && row.style.display !== 'none')
-    .toSorted(
+    .sort(
       (left, right) =>
         Number(left.dataset.editorVirtualRow) - Number(right.dataset.editorVirtualRow),
     )

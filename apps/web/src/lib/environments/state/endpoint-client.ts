@@ -39,7 +39,7 @@ export function createEndpointClient({
   }
   function route(path: readonly PropertyKey[]): unknown {
     return new Proxy(() => {}, {
-      get: (_target, key) => route([...path, key]),
+      get: (_target, key) => route(path.concat([key])),
       // Resolving at invocation keeps every in-flight request on its original endpoint.
       apply: (_target, _receiver, args) => invoke(path, args),
     })

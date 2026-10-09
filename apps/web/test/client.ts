@@ -219,7 +219,7 @@ class SettingsStreamFetchController {
     const snapshot = (await response.json()) as { diagnostics: unknown[] }
     const diagnostic = { kind: 'from-a-newer-server', id: 'editor.fontSize', layer: 'user' }
     return Response.json(
-      { ...snapshot, diagnostics: [...snapshot.diagnostics, diagnostic] },
+      { ...snapshot, diagnostics: snapshot.diagnostics.concat([diagnostic]) },
       { status: response.status, headers: response.headers },
     )
   }
@@ -238,12 +238,12 @@ class SettingsStreamFetchController {
 
   async settingsRawWriteRequests() {
     await Promise.all(this.rawWriteObservations)
-    return [...this.rawWriteRequests]
+    return Array.from(this.rawWriteRequests)
   }
 
   async settingsWriteRequests() {
     await Promise.all(this.settingsWriteObservations)
-    return [...this.settingsWriteRequestsSeen]
+    return Array.from(this.settingsWriteRequestsSeen)
   }
 
   waitForSettingsWriteRequest(attempt: number): Promise<void> {

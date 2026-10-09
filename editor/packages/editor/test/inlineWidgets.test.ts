@@ -271,9 +271,9 @@ describe('inline replacements that render their own DOM', () => {
 
   it('keeps one mount across a scroll that recycles the row it is painted into', () => {
     const mount = createMount()
-    const text = [IMAGE_LINE, ...Array.from({ length: 400 }, (_, index) => `line ${index}`)].join(
-      '\n',
-    )
+    const text = [IMAGE_LINE]
+      .concat(Array.from({ length: 400 }, (_, index) => `line ${index}`))
+      .join('\n')
     view = mountView(container, text, 5)
     applyReplacements(view, text, [imageSpec(mount)])
 

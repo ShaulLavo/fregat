@@ -37,14 +37,14 @@ export function McpConfigRow({
     (entry) => entry.providerInstanceId !== instance.providerInstanceId,
   )
 
+  const titleParts: (string | null | undefined)[] = [server.name, mcpStatusLabel(server.status)]
+
   return (
     <li className='flex flex-col py-2' data-mcp-server={server.name}>
       <div className='flex items-center gap-3'>
         <div
           className='flex min-w-0 flex-1 flex-col'
-          title={[server.name, mcpStatusLabel(server.status), ...facts, server.file, detail]
-            .filter(Boolean)
-            .join(' · ')}
+          title={titleParts.concat(facts, [server.file, detail]).filter(Boolean).join(' · ')}
         >
           <span className='flex min-w-0 items-center gap-(--density-control-gap)'>
             <span className='text-foreground truncate text-sm'>{server.name}</span>

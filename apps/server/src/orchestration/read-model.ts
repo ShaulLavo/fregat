@@ -242,7 +242,7 @@ export function boundCheckpoints(
   if (entries.length <= MAX_SESSION_CHECKPOINTS) return checkpoints
 
   const retained = entries
-    .toSorted(([, left], [, right]) => left.checkpointTurnCount - right.checkpointTurnCount)
+    .sort(([, left], [, right]) => left.checkpointTurnCount - right.checkpointTurnCount)
     .slice(-MAX_SESSION_CHECKPOINTS)
 
   return Object.fromEntries(retained) as Record<TurnId, OrchestrationProjectedCheckpoint>

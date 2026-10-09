@@ -563,9 +563,7 @@ describe('createTypeScriptLspPlugin', () => {
     plugin.setWorkspaceFiles([{ path: 'src/other.ts', text: 'export const other = 1;' }])
     await flushPromises()
 
-    const workspaceMessage = worker.sent
-      .toReversed()
-      .find(hasMethod('editor/typescript/setWorkspaceFiles'))
+    const workspaceMessage = worker.sent.findLast(hasMethod('editor/typescript/setWorkspaceFiles'))
     expect(message(workspaceMessage).params).toEqual({
       files: [{ path: 'src/other.ts', text: 'export const other = 1;' }],
     })
@@ -779,9 +777,7 @@ describe('createTypeScriptLspPlugin', () => {
       new PointerEvent('pointermove', { clientX: 12, clientY: 16, buttons: 0 }),
     )
     await vi.advanceTimersByTimeAsync(260)
-    const hoverRequest = jsonMessage(
-      socket.sent.toReversed().find(hasSocketMethod('textDocument/hover')),
-    )
+    const hoverRequest = jsonMessage(socket.sent.findLast(hasSocketMethod('textDocument/hover')))
     socket.receive({
       jsonrpc: '2.0',
       id: hoverRequest.id,
@@ -860,7 +856,7 @@ describe('createTypeScriptLspPlugin', () => {
     )
     await flushPromises()
 
-    const didChange = message(worker.sent.toReversed().find(hasMethod('textDocument/didChange')))
+    const didChange = message(worker.sent.findLast(hasMethod('textDocument/didChange')))
     expect(contentChangesFor(didChange)).toEqual([
       {
         range: {
@@ -947,7 +943,7 @@ describe('createTypeScriptLspPlugin', () => {
       new PointerEvent('pointermove', { clientX: 12, clientY: 16, buttons: 0 }),
     )
     await vi.advanceTimersByTimeAsync(260)
-    const request = message(worker.sent.toReversed().find(hasMethod('textDocument/hover')))
+    const request = message(worker.sent.findLast(hasMethod('textDocument/hover')))
     worker.receive({ jsonrpc: '2.0', id: request.id, result: null })
     await flushPromises()
     await finishHoverReveal()
@@ -996,7 +992,7 @@ describe('createTypeScriptLspPlugin', () => {
       new PointerEvent('pointermove', { clientX: 12, clientY: 16, buttons: 0 }),
     )
     await vi.advanceTimersByTimeAsync(260)
-    const hoverRequest = message(worker.sent.toReversed().find(hasMethod('textDocument/hover')))
+    const hoverRequest = message(worker.sent.findLast(hasMethod('textDocument/hover')))
     expect(hoverRequest.params).toMatchObject({
       textDocument: { uri: 'file:///src/index.ts' },
       position: { line: 0, character: 22 },
@@ -1090,7 +1086,7 @@ describe('createTypeScriptLspPlugin', () => {
     )
     await vi.advanceTimersByTimeAsync(260)
 
-    const hoverRequest = message(worker.sent.toReversed().find(hasMethod('textDocument/hover')))
+    const hoverRequest = message(worker.sent.findLast(hasMethod('textDocument/hover')))
     worker.receive({
       jsonrpc: '2.0',
       id: hoverRequest.id,
@@ -1129,7 +1125,7 @@ describe('createTypeScriptLspPlugin', () => {
     )
     await vi.advanceTimersByTimeAsync(260)
 
-    const hoverRequest = message(worker.sent.toReversed().find(hasMethod('textDocument/hover')))
+    const hoverRequest = message(worker.sent.findLast(hasMethod('textDocument/hover')))
     worker.receive({
       jsonrpc: '2.0',
       id: hoverRequest.id,
@@ -1172,9 +1168,7 @@ describe('createTypeScriptLspPlugin', () => {
     await flushPromises()
     expect(contribution.goToDefinitionFromSelection()).toBe(true)
 
-    const definitionRequest = message(
-      worker.sent.toReversed().find(hasMethod('textDocument/definition')),
-    )
+    const definitionRequest = message(worker.sent.findLast(hasMethod('textDocument/definition')))
     worker.receive({
       jsonrpc: '2.0',
       id: definitionRequest.id,
@@ -1217,9 +1211,7 @@ describe('createTypeScriptLspPlugin', () => {
       }),
     )
 
-    const definitionRequest = message(
-      worker.sent.toReversed().find(hasMethod('textDocument/definition')),
-    )
+    const definitionRequest = message(worker.sent.findLast(hasMethod('textDocument/definition')))
     expect(definitionRequest.params).toMatchObject({
       textDocument: { uri: 'file:///src/index.ts' },
       position: { line: 0, character: 15 },
@@ -1280,7 +1272,7 @@ describe('createTypeScriptLspPlugin', () => {
 
     expect(worker.sent.some(hasMethod('textDocument/definition'))).toBe(true)
     await vi.advanceTimersByTimeAsync(260)
-    const hoverRequest = message(worker.sent.toReversed().find(hasMethod('textDocument/hover')))
+    const hoverRequest = message(worker.sent.findLast(hasMethod('textDocument/hover')))
     expect(hoverRequest.params).toMatchObject({
       textDocument: { uri: 'file:///src/index.ts' },
       position: { line: 0, character: 15 },
@@ -1323,9 +1315,7 @@ describe('createTypeScriptLspPlugin', () => {
       }),
     )
 
-    const definitionRequest = message(
-      worker.sent.toReversed().find(hasMethod('textDocument/definition')),
-    )
+    const definitionRequest = message(worker.sent.findLast(hasMethod('textDocument/definition')))
     worker.receive({
       jsonrpc: '2.0',
       id: definitionRequest.id,
@@ -1379,9 +1369,7 @@ describe('createTypeScriptLspPlugin', () => {
     await flushPromises()
     expect(contribution.goToDefinitionFromSelection()).toBe(true)
 
-    const definitionRequest = message(
-      worker.sent.toReversed().find(hasMethod('textDocument/definition')),
-    )
+    const definitionRequest = message(worker.sent.findLast(hasMethod('textDocument/definition')))
     worker.receive({
       jsonrpc: '2.0',
       id: definitionRequest.id,
@@ -1460,7 +1448,7 @@ describe('createTypeScriptLspPlugin', () => {
     )
     await vi.advanceTimersByTimeAsync(90)
 
-    const request = message(worker.sent.toReversed().find(hasMethod('textDocument/completion')))
+    const request = message(worker.sent.findLast(hasMethod('textDocument/completion')))
     expect(request.params).toMatchObject({
       textDocument: { uri: 'file:///src/index.ts' },
       position: { line: 0, character: 9 },
@@ -1523,7 +1511,7 @@ describe('createTypeScriptLspPlugin', () => {
     await flushPromises()
     expect(command(commands, 'editor.action.goToImplementation')({})).toBe(true)
 
-    const request = message(worker.sent.toReversed().find(hasMethod('textDocument/implementation')))
+    const request = message(worker.sent.findLast(hasMethod('textDocument/implementation')))
     worker.receive({
       jsonrpc: '2.0',
       id: request.id,
@@ -1563,7 +1551,7 @@ describe('createTypeScriptLspPlugin', () => {
     await flushPromises()
     expect(command(commands, 'editor.action.goToReferences')({})).toBe(true)
 
-    const request = message(worker.sent.toReversed().find(hasMethod('textDocument/references')))
+    const request = message(worker.sent.findLast(hasMethod('textDocument/references')))
     expect(request.params).toMatchObject({
       textDocument: { uri: 'file:///src/index.ts' },
       position: { line: 0, character: 6 },
@@ -2152,7 +2140,7 @@ function contentChangesFor(item: JsonMessage): unknown {
 }
 
 function latestMessage(items: readonly unknown[], method: string): JsonMessage {
-  return message(items.toReversed().find(hasMethod(method)))
+  return message(items.findLast(hasMethod(method)))
 }
 
 function hasCancelRequestFor(id: unknown): (item: unknown) => boolean {
@@ -2192,9 +2180,8 @@ function latestRangeHighlightRanges(
   name: string,
 ): readonly { readonly start: number; readonly end: number }[] {
   const calls = vi.mocked(context.setRangeHighlight!).mock.calls
-  for (const call of calls.toReversed()) {
-    if (call[0] === name) return call[1]
-  }
+  const call = calls.findLast((call) => call[0] === name)
+  if (call) return call[1]
 
   throw new Error(`Missing range highlight call: ${name}`)
 }

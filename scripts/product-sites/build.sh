@@ -6,7 +6,7 @@ mkdir "$output"
 output=$(cd "$output" && pwd)
 cd "$root"
 export SITE_ORIGIN=https://shaulavo.dev
-bun run build:workspaces
+bun scripts/ci/packages.mjs build '["site","singapore-editor-site","ghostty-webgpu-site","@singapore-editor/example-app"]'
 bun run --cwd apps/site site:build
 bun run --cwd editor/site build --base /singapore/
 cp -R editor/site/dist "$output/singapore"

@@ -182,8 +182,7 @@ for await (const chunk of Bun.file(3).stream()) {
         targetInfos: [
           { targetId: 'controller', type: 'page', url: 'about:blank' },
           { targetId: 'worker', type: 'service_worker', url: 'http://localhost:123/worker.js' },
-          ...targets,
-        ],
+        ].concat(targets),
       }
     }
     writeSync(4, JSON.stringify({ id: message.id, result }) + '\0')

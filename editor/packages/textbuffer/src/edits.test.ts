@@ -265,7 +265,7 @@ describe('one pass per edit call', () => {
     const batched = applyBatchToPieceTable(snapshot, edits)
 
     expect(materializePieceTableFullText(batched)).toBe(
-      edits.toReversed().reduce(applyToString, materializePieceTableFullText(snapshot)),
+      edits.reverse().reduce(applyToString, materializePieceTableFullText(snapshot)),
     )
     expect(validatePieceTreeInvariants(batched).issues).toEqual([])
     expect(materializePieceTableFullText(snapshot)).toContain('alpha beta')

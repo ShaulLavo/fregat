@@ -19,8 +19,8 @@ export type Engine = (typeof ENGINES)[number]
 export async function prepareBrowserTemp(root = browserTempRoot) {
   const owned: string[] = []
   const remove = async () => {
-    for (const directory of owned.toReversed())
-      await rm(directory, { recursive: true, force: true })
+    for (let index = owned.length - 1; index >= 0; index--)
+      await rm(owned[index]!, { recursive: true, force: true })
   }
   try {
     await mkdir(root, { recursive: true })

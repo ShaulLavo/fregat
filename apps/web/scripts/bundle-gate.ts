@@ -1,12 +1,3 @@
-/**
- * First-load gate (Plan 109 Phase 4). Builds through `bundle-report.ts` and compares first-load
- * script gzip, in total and per owner, against `first-load-pins.json`, and the phone shell's
- * first load in total. A ratchet: the pins are the last accepted build plus a margin, re-pinned
- * with `--write --reason=…` when a growth is intended.
- *
- *   bun scripts/bundle-gate.ts                       build, compare, exit 1 on growth
- *   bun scripts/bundle-gate.ts --write --reason=…    build and re-pin
- */
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -68,7 +59,7 @@ export function checkFirstLoad(report: GateReport, pins: Pins): GateResult {
     pinned: 0,
     now: 1,
   }))
-  const failures = [...owners, ...totalFailures, ...phoneFailures, ...startupFailures]
+  const failures = owners.concat(totalFailures, phoneFailures, startupFailures)
   const passed = total.now <= total.limit && failures.length === 0
   return { total, phone, failures, passed }
 }
@@ -111,7 +102,7 @@ export function pinsFrom(
     scriptGzip: report.firstLoad.scriptGzip,
     phoneScriptGzip,
     owners,
-    history: [...(previous?.history ?? []), entry],
+    history: (previous?.history ?? []).concat([entry]),
   }
 }
 

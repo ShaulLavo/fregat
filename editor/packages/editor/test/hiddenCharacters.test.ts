@@ -100,7 +100,7 @@ function stubLayerMutations(): void {
       configurable: true,
       writable: true,
       value: function recordMutation(this: HTMLElement, ...args: unknown[]) {
-        if (renderPhases.events && touchesMarkerLayer([this, ...args])) {
+        if (renderPhases.events && (touchesMarkerLayer([this]) || touchesMarkerLayer(args))) {
           renderPhases.events.push('write')
         }
 

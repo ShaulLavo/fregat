@@ -27,7 +27,7 @@ export function toggledSessionIds(
   sessionIds: readonly SessionId[],
   sessionId: SessionId,
 ): readonly SessionId[] {
-  if (!sessionIds.includes(sessionId)) return [...sessionIds, sessionId]
+  if (!sessionIds.includes(sessionId)) return sessionIds.concat([sessionId])
 
   return sessionIds.filter((candidate) => candidate !== sessionId)
 }

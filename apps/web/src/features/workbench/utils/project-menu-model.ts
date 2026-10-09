@@ -53,7 +53,7 @@ export function projectMenuModel({
     byRootPath.set(project.workspaceRoot, project.title)
   }
 
-  const entries = [...byRootPath].map(([rootPath, title]) => ({
+  const entries = Array.from(byRootPath, ([rootPath, title]) => ({
     id: rootPath,
     title,
     workspaceRoot: rootPath,

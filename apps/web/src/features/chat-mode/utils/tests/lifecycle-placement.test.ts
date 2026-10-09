@@ -245,7 +245,7 @@ test('settled order ignores malformed timestamps, resolves equal dates by identi
   for (const rows of [
     sessions,
     sessions.toReversed(),
-    [...sessions.slice(2), ...sessions.slice(0, 2)],
+    sessions.slice(2).concat(sessions.slice(0, 2)),
   ]) {
     const model = sessionRailModel({ environments: [railEnvironment({ capabilities }, rows)], now })
     expect(model.sessions.map((row) => row.id)).toEqual([

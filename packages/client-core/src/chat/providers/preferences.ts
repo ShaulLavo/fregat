@@ -24,7 +24,7 @@ export function applyModelPreferences(
   const hidden = new Set(preferences.hidden.map(modelRefKey))
   const visible = options.filter((option) => !hidden.has(modelRefKey(option.modelSelection)))
   const favorites = preferences.favorites ?? []
-  const leading = [...favorites, ...preferences.order]
+  const leading = favorites.concat(preferences.order)
   if (leading.length === 0) return visible
 
   // Favorites lead, then the explicit order; a model in both keeps its favorite rank.
@@ -45,7 +45,7 @@ export function applyModelPreferences(
     )
   const rest = visible.filter((option) => !rank.has(modelRefKey(option.modelSelection)))
 
-  return [...ranked, ...rest]
+  return ranked.concat(rest)
 }
 
 export type ModelPreferenceRow = {

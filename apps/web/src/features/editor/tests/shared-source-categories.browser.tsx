@@ -158,7 +158,7 @@ async function sharedCategories(run: Run, fixture: RetentionFixture, signal: Abo
     signal.throwIfAborted()
     host = await retentionCountHost(fixture, signal)
     signal.throwIfAborted()
-    expect([host.a, host.b, ...host.working, ...host.secondaryWorking]).toHaveLength(7)
+    expect([host.a, host.b].concat(host.working, host.secondaryWorking)).toHaveLength(7)
     expect(host.expectedSource.length).toBeGreaterThanOrEqual(4096)
     const initial = host.application.getSnapshot()
     const survivor = host.b

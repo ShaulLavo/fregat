@@ -354,7 +354,7 @@ function visibleFoldMarkers(
     markers.push(marker)
   }
 
-  return markers.toSorted(compareMarkersByContainment)
+  return markers.sort(compareMarkersByContainment)
 }
 
 /** Outermost first, which is the order a containment stack can be built in one pass. */

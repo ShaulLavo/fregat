@@ -32,7 +32,7 @@ const MASKS = [
 function editorShapedTable(size: number): RawHotkey[][] {
   const chords: RawHotkey[][] = []
   for (let index = 0; chords.length < size; index += 1) {
-    const keys = [...LETTERS, ...NAMED]
+    const keys = LETTERS.concat(NAMED)
     const key = keys[index % keys.length]!
     const mask = MASKS[Math.floor(index / keys.length) % MASKS.length]!
     const stroke = { key, ...mask } as RawHotkey

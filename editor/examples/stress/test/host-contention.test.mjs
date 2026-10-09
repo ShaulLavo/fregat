@@ -41,7 +41,7 @@ function linuxCounters() {
   vi.mocked(readFile).mockImplementation(async (path) => {
     if (path.endsWith('/status')) return 'Cpus_allowed_list: 0'
     if (path === '/proc/stat') return `cpu0 ${++ticks * 2} 0 0 0 0 0 0 0`
-    const fields = ['S', '0', ...Array(9).fill('0'), '1', '0', '0', '0']
+    const fields = ['S', '0'].concat(Array(9).fill('0'), ['1', '0', '0', '0'])
     return `${process.pid} (runner) ${fields.join(' ')}`
   })
 }

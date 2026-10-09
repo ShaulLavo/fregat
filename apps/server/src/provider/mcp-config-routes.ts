@@ -1,4 +1,3 @@
-import { homedir } from 'node:os'
 import { Elysia } from 'elysia'
 import {
   providerInstanceIdSchema,
@@ -17,6 +16,7 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
+import type { WorkspacePaths } from '../fs/path'
 import { recordChatPipelineInfo } from '../orchestration/orchestration-logging'
 import { providerErrors } from '../observability/structured-errors'
 import type { McpSignInAttempts } from './mcp-sign-in'
@@ -37,7 +37,22 @@ const serverParamsSchema = v.object({
 export function mcpConfigRoutes(
   adapterRegistry: ProviderAdapterRegistry,
   signIns: McpSignInAttempts,
+  { paths, homePath }: { readonly paths: WorkspacePaths; readonly homePath: string },
 ) {
+  const resolveFolder = (folder: string | null | undefined) =>
+    paths.resolve(folder ?? homePath).absolutePath
+  const writeFolder = (
+    scopes: readonly ProviderMcpScope[],
+    scope: ProviderMcpScope,
+    folder: string | null,
+  ) => {
+    if (!scopes.includes(scope))
+      throw mcpConfigErrors.MCP_SCOPE_UNSUPPORTED({ internal: { scope } })
+    if (scope !== 'user' && folder === null)
+      throw mcpConfigErrors.MCP_FOLDER_REQUIRED({ internal: { scope } })
+    return resolveFolder(folder)
+  }
+
   const access = (providerInstanceId: ProviderInstanceId) => {
     const adapter = adapterRegistry.adapter(providerInstanceId)
     if (!adapter) throw providerErrors.INSTANCE_NOT_FOUND({ providerInstanceId })
@@ -52,7 +67,7 @@ export function mcpConfigRoutes(
       '/providers/:providerInstanceId/mcp',
       async ({ params, query }) => {
         const config = access(params.providerInstanceId)
-        const folder = query.folder ?? homedir()
+        const folder = resolveFolder(query.folder)
         return { folder, scopes: [...config.scopes], servers: await config.list({ folder }) }
       },
       {
@@ -103,7 +118,7 @@ export function mcpConfigRoutes(
           name: params.name,
           providerInstanceId: params.providerInstanceId,
         })
-        const flow = await config.signIn({ folder: body.folder ?? homedir(), name: params.name })
+        const flow = await config.signIn({ folder: resolveFolder(body.folder), name: params.name })
         return signIns.start(params.name, flow)
       },
       {
@@ -151,17 +166,4 @@ export function mcpConfigRoutes(
       },
       { body: providerMcpCopyBodySchema, params: serverParamsSchema },
     )
-}
-
-/** User servers are written from the home folder; local and project ones need their project. */
-function writeFolder(
-  scopes: readonly ProviderMcpScope[],
-  scope: ProviderMcpScope,
-  folder: string | null,
-) {
-  if (!scopes.includes(scope)) throw mcpConfigErrors.MCP_SCOPE_UNSUPPORTED({ internal: { scope } })
-  if (scope === 'user') return folder ?? homedir()
-  if (folder) return folder
-
-  throw mcpConfigErrors.MCP_FOLDER_REQUIRED({ internal: { scope } })
 }

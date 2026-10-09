@@ -140,7 +140,7 @@ export class TreeViewModel implements FileTreeMutationHandle, FileTreeSearchSess
     return this.#controller.getFocusedPath()
   }
 
-  public getSelectedPaths(): readonly string[] {
+  public getSelectedPaths(): string[] {
     return this.#controller.getSelectedPaths()
   }
 

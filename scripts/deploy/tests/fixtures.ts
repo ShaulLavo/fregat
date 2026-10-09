@@ -61,7 +61,7 @@ return new Response('fixture');}})`,
 export function compilerFixture(root: string): typeof run {
   mkdirSync(root, { recursive: true })
   const git = (...args: string[]) => {
-    const result = Bun.spawnSync(['git', ...args], { cwd: root })
+    const result = Bun.spawnSync(['git'].concat(args), { cwd: root })
     expect(result.exitCode, result.stderr.toString()).toBe(0)
   }
   git('init', '-qb', 'fixture')

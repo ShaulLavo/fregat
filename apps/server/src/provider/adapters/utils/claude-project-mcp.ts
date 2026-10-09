@@ -64,7 +64,7 @@ export async function splitSessionOffMcp(
   cwd: string,
   off: readonly string[],
 ): Promise<SessionOffMcp> {
-  const all = [...off].sort()
+  const all = off.toSorted()
   if (all.length === 0) return { all, other: [], project: [] }
 
   const project = new Set((await projectMcpServers(cwd)).map((server) => server.name))

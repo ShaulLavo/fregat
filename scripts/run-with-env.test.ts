@@ -11,7 +11,7 @@ function childSees(args: readonly string[]) {
   const out = path.join(directory, 'seen')
   const probe = `require('node:fs').writeFileSync(${JSON.stringify(out)}, String(process.env.PLATFORM_PRODUCTION_ROOT))`
   try {
-    const result = spawnSync(process.execPath, [script, ...args, '-e', probe], {
+    const result = spawnSync(process.execPath, [script].concat(args, ['-e', probe]), {
       env: { ...process.env, PLATFORM_PRODUCTION_ROOT: '/srv/platform' },
     })
     expect(result.status).toBe(0)

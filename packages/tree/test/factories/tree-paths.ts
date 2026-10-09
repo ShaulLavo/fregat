@@ -56,7 +56,7 @@ export function generatePaths(rng: () => number, options: GeneratePathsOptions =
     paths.add(`${parent}f${padded(index)}${pick(rng, maxChildren)}.ts`)
   }
 
-  return [...paths].sort()
+  return Array.from(paths).sort()
 }
 
 /**

@@ -119,7 +119,7 @@ async function publishTarball(tarballPath: string): Promise<void> {
     access,
   ]
 
-  await run(dryRun ? [...command, '--dry-run'] : command)
+  await run(dryRun ? command.concat(['--dry-run']) : command)
 }
 
 async function assertPublishPrerequisites(): Promise<void> {

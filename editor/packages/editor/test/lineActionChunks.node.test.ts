@@ -181,7 +181,7 @@ function selectionsAroundSeams(seams: readonly number[], length: number): Resolv
 function caretsAcross(start: number, end: number): readonly number[] {
   const carets: number[] = []
   for (let offset = start; offset <= end; offset += 2_003) carets.push(offset)
-  return [...carets, start, end, start + 12 + 4_000, start + 12 + 9_999, start + 12 + 10_000]
+  return carets.concat([start, end, start + 12 + 4_000, start + 12 + 9_999, start + 12 + 10_000])
 }
 
 function selection(start: number, end = start, reversed = false): ResolvedSelection {

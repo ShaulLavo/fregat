@@ -47,13 +47,13 @@ export function createMarkerStore(): MarkerStore {
   }
 
   function build(): readonly MarkerResource[] {
-    const built = [...byResource.entries()].flatMap(([uri, owners]) => {
-      const markers = [...owners.values()].flat()
+    const built = Array.from(byResource.entries()).flatMap(([uri, owners]) => {
+      const markers = Array.from(owners.values()).flat()
       if (markers.length === 0) return []
       const path = documentUriToFileName(uri)?.replace(/^\/+/, '') ?? uri
       return [{ uri, path, summary: summarizeDiagnostics(uri, null, markers) }]
     })
-    return built.toSorted(
+    return built.sort(
       (left, right) =>
         worstSeverity(left.summary) - worstSeverity(right.summary) ||
         left.path.localeCompare(right.path),
@@ -69,7 +69,7 @@ export function createMarkerStore(): MarkerStore {
         return
       }
       const owners = byResource.get(uri) ?? new Map<string, readonly Marker[]>()
-      owners.set(owner, [...markers])
+      owners.set(owner, Array.from(markers))
       byResource.set(uri, owners)
       const uris = byOwner.get(owner) ?? new Set<string>()
       uris.add(uri)
@@ -79,7 +79,7 @@ export function createMarkerStore(): MarkerStore {
     removeOwner: (owner) => {
       const uris = byOwner.get(owner)
       if (!uris || uris.size === 0) return
-      for (const uri of [...uris]) detach(owner, uri)
+      for (const uri of Array.from(uris)) detach(owner, uri)
       publish()
     },
     clear: () => {
@@ -95,7 +95,7 @@ export function createMarkerStore(): MarkerStore {
     forUri: (uri) => {
       const owners = byResource.get(uri)
       if (!owners) return null
-      const markers = [...owners.values()].flat()
+      const markers = Array.from(owners.values()).flat()
       return markers.length > 0 ? summarizeDiagnostics(uri, null, markers) : null
     },
     total: () => {

@@ -144,7 +144,7 @@ function back(current: NavigationState): NavigationState {
     ...current,
     backHistory: current.backHistory.slice(0, -1),
     currentPath: previousPath,
-    forwardHistory: [current.currentPath, ...current.forwardHistory],
+    forwardHistory: [current.currentPath].concat(current.forwardHistory),
   }
 }
 

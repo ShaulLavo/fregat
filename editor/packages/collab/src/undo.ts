@@ -456,7 +456,7 @@ export class UndoManager {
 function affectedSpans(change: Change): readonly IdSpan[] {
   const insert = insertionOf(change)
   const spans = change.kind === 'delete' || change.kind === 'replace' ? change.spans : []
-  return insert ? [...spans, { start: insert.start, count: insert.text.length }] : spans
+  return insert ? spans.concat([{ start: insert.start, count: insert.text.length }]) : spans
 }
 function contains(span: IdSpan, id: CharId): boolean {
   return (

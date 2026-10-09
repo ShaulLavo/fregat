@@ -60,7 +60,7 @@ export function readSessionCache(
     return {
       ...turn,
       ...cache,
-      models: models.map((row) => row.model).toSorted(),
+      models: models.map((row) => row.model).sort(),
       requestedAt: models[0]?.requestedAt ?? null,
       startedAt: models[0]?.startedAt ?? null,
       completedAt: models[0]?.completedAt ?? null,

@@ -53,8 +53,8 @@ export function firstLoadFiles(
 function shellChunks(html: string, shell: string): string[] {
   const json = /<script type="application\/json" id="shell-chunks">([^<]*)<\/script>/u.exec(html)
   if (!json?.[1]) return []
-  const manifest = JSON.parse(json[1]) as Partial<Record<string, readonly string[]>>
-  return [...(manifest[shell] ?? [])]
+  const manifest = JSON.parse(json[1]) as Partial<Record<string, string[]>>
+  return manifest[shell] ?? []
 }
 
 function firstLoadKind(tag: string, attributes: string): FirstLoadFile['kind'] | null {

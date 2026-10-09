@@ -106,12 +106,8 @@ function selectionIncludesOffset(selection: VirtualizedStoredSelection, offset: 
   return selection.start <= offset && offset < selection.end
 }
 
-function mergeSelectionSegments(
-  segments: readonly SelectionSegment[],
-): readonly SelectionSegment[] {
-  const sorted = segments.toSorted(
-    (left, right) => left.left - right.left || left.width - right.width,
-  )
+function mergeSelectionSegments(segments: SelectionSegment[]): readonly SelectionSegment[] {
+  const sorted = segments.sort((left, right) => left.left - right.left || left.width - right.width)
   const merged: SelectionSegment[] = []
   for (const segment of sorted) mergeSelectionSegment(merged, segment)
   return merged

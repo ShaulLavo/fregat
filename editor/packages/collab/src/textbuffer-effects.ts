@@ -76,7 +76,7 @@ export function recordEffects(
     operations: put(state.operations, operationKey(op), {
       kind: 'edit',
       active: true,
-      spans: [...(insertion ? [copySpan(insertion)] : []), ...deletions.map(copySpan)],
+      spans: (insertion ? [copySpan(insertion)] : []).concat(deletions.map(copySpan)),
     }),
   }
   if (insertion) {
@@ -105,7 +105,7 @@ function recordDeletion(state: TextbufferEffects, id: EditId, target: IdSpan): T
       ...span,
       start: { bunch: target.start.bunch, counter },
       count: stop - counter,
-      deletions: [...span.deletions, id],
+      deletions: span.deletions.concat([id]),
     }
     next = { ...next, provenance: put(next.provenance, middle.start, middle) }
     if (stop < span.start.counter + span.count) {

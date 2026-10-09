@@ -185,7 +185,8 @@ function rect(host: HTMLElement, selector: string): DOMRect {
 
 function laneLefts(host: HTMLElement): number[] {
   const row = host.querySelector<HTMLElement>('.editor-virtualized-gutter-row:not([hidden])')!
-  return [...row.querySelectorAll<HTMLElement>('.editor-virtualized-gutter-cell')].map(
+  return Array.from(
+    row.querySelectorAll<HTMLElement>('.editor-virtualized-gutter-cell'),
     (cell) => cell.getBoundingClientRect().left,
   )
 }

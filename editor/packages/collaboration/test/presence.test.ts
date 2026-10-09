@@ -131,46 +131,47 @@ test('validates and copies bounded hostile state at the wire boundary', () => {
     { ...valid, state: { ...valid.state, peerSessionId: 'other' } },
     { ...valid, state: { ...valid.state, documentId: 'other' } },
     { ...valid, state: { ...valid.state, presenceClock: 9 } },
-    ...['', 'a'.repeat(129), 'bad\nname', String.fromCharCode(0x202e) + 'name'].map(
-      (displayName) => ({
-        ...valid,
-        state: { ...valid.state, displayName },
-      }),
-    ),
-    ...['red', '#123', '#12345678', 'url(bad)', '#zzzzzz'].map((colour) => ({
+  ].concat(
+    ['', 'a'.repeat(129), 'bad\nname', String.fromCharCode(0x202e) + 'name'].map((displayName) => ({
+      ...valid,
+      state: { ...valid.state, displayName },
+    })),
+    ['red', '#123', '#12345678', 'url(bad)', '#zzzzzz'].map((colour) => ({
       ...valid,
       state: { ...valid.state, colour },
     })),
-    { ...valid, state: { ...valid.state, focusedViewId: 'x'.repeat(257) } },
-    { ...valid, state: { ...valid.state, tip: { depth: -1, hash: 'tip' } } },
-    { ...valid, state: { ...valid.state, epoch: 'x'.repeat(257) } },
-    {
-      ...valid,
-      state: {
-        ...valid.state,
-        selections: Array(33).fill({
-          anchor: { left: 'start', right: 'end', bias: 'left' },
-          head: { left: 'start', right: 'end', bias: 'left' },
-        }),
+    [
+      { ...valid, state: { ...valid.state, focusedViewId: 'x'.repeat(257) } },
+      { ...valid, state: { ...valid.state, tip: { depth: -1, hash: 'tip' } } },
+      { ...valid, state: { ...valid.state, epoch: 'x'.repeat(257) } },
+      {
+        ...valid,
+        state: {
+          ...valid.state,
+          selections: Array(33).fill({
+            anchor: { left: 'start', right: 'end', bias: 'left' },
+            head: { left: 'start', right: 'end', bias: 'left' },
+          }),
+        },
       },
-    },
-    {
-      ...valid,
-      state: {
-        ...valid.state,
-        selections: [
-          { anchor: { left: { bunch: 'x', counter: -1 }, right: 'end', bias: 'left' }, head: {} },
-        ],
+      {
+        ...valid,
+        state: {
+          ...valid.state,
+          selections: [
+            { anchor: { left: { bunch: 'x', counter: -1 }, right: 'end', bias: 'left' }, head: {} },
+          ],
+        },
       },
-    },
-    {
-      ...valid,
-      state: {
-        ...valid.state,
-        selections: [{ anchor: { left: 'end', right: 'start', bias: 'left' }, head: {} }],
+      {
+        ...valid,
+        state: {
+          ...valid.state,
+          selections: [{ anchor: { left: 'end', right: 'start', bias: 'left' }, head: {} }],
+        },
       },
-    },
-  ]
+    ],
+  )
   for (const input of hostile) expect(parsePresence(input, 'remote', 'document')).toBeUndefined()
   const parsed = parsePresence(
     { ...valid, ignored: 'x'.repeat(10_000), state: { ...valid.state, extra: 'x'.repeat(10_000) } },

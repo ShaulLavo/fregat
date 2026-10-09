@@ -84,13 +84,12 @@ export function bundleStatsPlugin(): Plugin {
         import.meta.dirname,
         '../node_modules/@singapore-editor/tree-sitter-languages',
       )
-      const grammarFiles = [
-        'NOTICE',
-        ...fs
+      const grammarFiles = ['NOTICE'].concat(
+        fs
           .readdirSync(path.join(grammars, 'notices'))
           .sort()
           .map((name) => `notices/${name}`),
-      ]
+      )
       this.emitFile({
         type: 'asset',
         fileName: 'licenses/editor-grammars.txt',

@@ -8,7 +8,7 @@ describe('standard library files', () => {
   it('bundles exactly the installed TypeScript library set', () => {
     const installed = Array.from(typeScriptLibraryFilesFromDisk().keys(), (path) => path.slice(1))
 
-    expect(Object.keys(BUNDLED_LIBRARY_FILES).toSorted()).toEqual(installed.toSorted())
+    expect(Object.keys(BUNDLED_LIBRARY_FILES).sort()).toEqual(installed.sort())
   })
 
   it('names a library the way a tsconfig may spell it', () => {

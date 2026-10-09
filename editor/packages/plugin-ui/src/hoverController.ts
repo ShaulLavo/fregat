@@ -143,7 +143,7 @@ export function createHoverController(options: HoverControllerOptions): HoverCon
       theme,
       loading: current.loading && pending,
       focus: current.focusOnShow && !current.shown,
-      preferredPlacement: 'top',
+      preferredPlacement: parts.some((part) => part.presentation === 'controls') ? 'bottom' : 'top',
     })
     current.shown = true
   }
@@ -338,7 +338,7 @@ function orderedParts(operation: HoverOperation): readonly HoverPart[] {
     if (!result) continue
     parts.push(...result.sync, ...result.async)
   }
-  return parts.toSorted((left, right) => left.ordinal - right.ordinal)
+  return parts.sort((left, right) => left.ordinal - right.ordinal)
 }
 
 function clearTimers(operation: HoverOperation): void {

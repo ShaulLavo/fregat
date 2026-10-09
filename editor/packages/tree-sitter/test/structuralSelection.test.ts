@@ -90,10 +90,9 @@ describe('tree-sitter structural selection', () => {
   it('refuses to shrink after the cursor count changed', async () => {
     const snapshot = createPieceTableSnapshot(TEXT)
     const expanded = await climbFrom(snapshot, 7)
-    const extraCursor = createSelectionSet([
-      ...expanded.selections.selections,
-      createAnchorSelection(snapshot, TEXT.length - 1),
-    ])
+    const extraCursor = createSelectionSet(
+      expanded.selections.selections.concat([createAnchorSelection(snapshot, TEXT.length - 1)]),
+    )
 
     const shrunk = shrinkTreeSitterSelection({
       ...request(snapshot),

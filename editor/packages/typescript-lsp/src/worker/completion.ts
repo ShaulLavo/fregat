@@ -51,7 +51,7 @@ export function completion(ctx: DocumentContext, params: unknown): lsp.Completio
     isSubsequence(typed, entry.filterText ?? entry.name),
   )
   const capped = matching.length > MAX_COMPLETION_ITEMS
-  const kept = capped ? matching.toSorted(compareEntries).slice(0, MAX_COMPLETION_ITEMS) : matching
+  const kept = capped ? matching.sort(compareEntries).slice(0, MAX_COMPLETION_ITEMS) : matching
   return {
     // A capped list is incomplete, so the client asks again as the word grows and the cap moves on.
     isIncomplete: info.isIncomplete === true || capped,
