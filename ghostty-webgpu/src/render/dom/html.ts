@@ -161,15 +161,12 @@ export function renderRowRuns(
   // The fixed-grid frame paints the default background; empty tails need no glyph layout.
   while (length > cursorEnd) {
     const cell = packed ? packed.read(length - 1, scratchB) : row.cells[length - 1]!
-    if (
-      cell.continuation ||
-      cell.text ||
-      cell.selected ||
-      cell.foreground ||
-      cell.background ||
-      cell.style
-    )
+    // Retain trailing cells after wide glyphs to preserve their browser paint.
+    if (cell.continuation) {
+      length = columns
       break
+    }
+    if (cell.text || cell.selected || cell.foreground || cell.background || cell.style) break
     length -= 1
   }
   const runs: RowRun[] = []

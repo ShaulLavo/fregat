@@ -327,7 +327,7 @@ describe('DOM terminal renderer', () => {
     probe.terminal.write('\x1b[?25l\x1b[2J\x1b[H界')
     probe.renderer.notifyWrite()
     probe.clock.flush()
-    expect(row.textContent).toBe('界')
+    expect(row.textContent).toBe('界          ')
     expect(row.firstElementChild!.getBoundingClientRect().width).toBe(2 * probeFont.cssCellWidth)
 
     probe.terminal.write('\x1b[48;2;40;50;60m\x1b[K\x1b[0m')
