@@ -814,7 +814,7 @@ it('contains fixed row layout while preserving visible glyph overflow and frame 
   for (const row of frame.querySelectorAll<HTMLElement>('[data-row]')) {
     const style = getComputedStyle(row)
     expect(style.contain).toBe('size layout')
-    expect(style.display).toBe('flex')
+    expect(style.display).toBe('block')
     expect(style.overflowX).toBe('visible')
     expect(style.overflowY).toBe('visible')
     expect(row.getBoundingClientRect().height).toBe(probeFont.cssCellHeight)

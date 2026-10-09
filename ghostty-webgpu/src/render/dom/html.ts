@@ -296,7 +296,7 @@ function renderRowToHtml(
     const cursorAttribute = run.cursor ? ` data-cursor="${escapeHtml(run.cursor, true)}"` : ''
     return `<span${cursorAttribute} style="${escapeHtml(run.style, true)}">${escapeHtml(run.text)}</span>`
   })
-  return `<div data-row="${row.y}" style="display:flex;contain:size layout;direction:ltr;unicode-bidi:bidi-override;height:var(--ghostty-cell-height, ${font.cssCellHeight}px);">${runs.join('')}</div>`
+  return `<div data-row="${row.y}" style="display:block;contain:size layout;direction:ltr;unicode-bidi:bidi-override;height:var(--ghostty-cell-height, ${font.cssCellHeight}px);">${runs.join('')}</div>`
 }
 
 export function renderFrameToHtml(
