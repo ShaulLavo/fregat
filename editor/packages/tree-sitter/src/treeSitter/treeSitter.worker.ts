@@ -8,7 +8,6 @@ import {
   heap,
   type Node,
   type QueryCapture,
-  type QueryCaptureRange,
   type Range as TreeSitterRange,
   type Tree,
   type TreeCursor,
@@ -2164,8 +2163,8 @@ const collectCaptures = (
   if (!rootNode) return []
 
   const captures: TreeSitterCapture[] = []
-  const seen = new Set<string>()
   if (range) {
+    const seen = new Set<string>()
     const queryCaptures = measurePhase(context, 'highlightQueryAndPredicates', () =>
       query.captures(rootNode, queryOptions(context, range)),
     )
@@ -2191,8 +2190,24 @@ const collectCaptures = (
   assertNotCancelled(context)
   incrementCount(context, 'rawCaptures', queryCaptures.length)
 
+  // Stable sorting keeps accepted-match precedence within equal spans.
+  queryCaptures.sort((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
+  const lastSpanByName = new Map<string, number>()
+  let span = 0
+  let previousStart = -1
+  let previousEnd = -1
   for (const capture of queryCaptures) {
-    collectCapture(capture, captures, seen, runtime.descriptor.id, range)
+    const { startIndex, endIndex } = capture
+    if (startIndex >= endIndex) continue
+    if (startIndex !== previousStart || endIndex !== previousEnd) {
+      span++
+      previousStart = startIndex
+      previousEnd = endIndex
+    }
+    const captureName = capture.name ?? ''
+    if (lastSpanByName.get(captureName) === span) continue
+    lastSpanByName.set(captureName, span)
+    captures.push({ startIndex, endIndex, captureName, languageId: runtime.descriptor.id })
   }
 
   incrementCount(context, 'uniqueCaptures', captures.length)
@@ -2225,13 +2240,13 @@ const collectFolds = (
 }
 
 const collectCapture = (
-  capture: QueryCapture | QueryCaptureRange,
+  capture: QueryCapture,
   captures: TreeSitterCapture[],
   seen: Set<string>,
   languageId: TreeSitterLanguageId,
   range?: TreeSitterSyntaxRange,
 ): void => {
-  const node = 'node' in capture ? capture.node : capture
+  const node = capture.node
   if (!node) return
 
   const startIndex = node.startIndex
