@@ -455,6 +455,7 @@
   left: -10000px;
   line-height: inherit;
   position: absolute;
+  top: 0;
   tab-size: inherit;
   visibility: hidden;
   white-space: pre;
