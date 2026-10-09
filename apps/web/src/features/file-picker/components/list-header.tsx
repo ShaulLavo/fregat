@@ -16,7 +16,7 @@ export function ListHeader({
 }) {
   return (
     <div
-      aria-label='File list sorting'
+      aria-label='Folder list sorting'
       className={cn(
         'h-(--bar-height) text-muted-foreground grid items-center gap-(--density-control-gap) px-(--density-control-padding-x) section-label',
         FILE_LIST_GRID,
