@@ -91,6 +91,7 @@ export class ReviewView implements EditorViewContribution {
           ].join('\n\n')
           const part: HoverPart = {
             ordinal: 10,
+            presentation: 'controls',
             range: { start: range.startIndex, end: range.endIndex },
             markdown,
             notes: [{ text: `Review edits by ${mark.authors.map(displayName).join(' and ')}.` }],

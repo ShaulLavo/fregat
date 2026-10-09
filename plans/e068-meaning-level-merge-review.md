@@ -245,8 +245,10 @@ them).
 4. **Marks, hover and resolutions. Delivered 2026-10-09** in the collaboration plugin and
    the real Edit together example. `mergeReview` opts an attachment into a confirmed-window owner;
    sessionless views, uninterested plugins and single-author documents do no detection work.
-   A cancellable MessageChannel task coalesces accepted batches outside authoring; rejected-only
-   batches leave existing marks intact and schedule no syntax work. History resets
+   A cancellable MessageChannel task coalesces accepted remote batches outside authoring; local-only
+   confirmations dispatch no detector work. A remote request waits for an already-pending local
+   acknowledgement so both confirmed sides can be compared. Rejected-only batches leave existing
+   marks intact and schedule no syntax work. History resets
    and newer confirmations invalidate published marks; obsolete work releases source snapshots
    before the next run. Detach unsubscribes and releases the review lifetime.
 
@@ -257,8 +259,13 @@ them).
    local engine, then submit a bounded ordinary edit through the editor's collaboration author.
    Foreign `setEffects` are never transmitted. Every removed insertion/deletion identity and the
    resulting diff must lie wholly inside the unit; cross-unit edits offer Jump to edit for manual
-   review. Actions from dismissed, pending or obsolete versions change no text.
-   `onMergeReview(unit, versions)` lets hosts append actions.
+   review. Actions from dismissed, pending or obsolete versions change no text. A resolution immediately
+   retires its local action. On every peer, a causally later accepted edit within the unit supersedes
+   the old concurrency edges; replay and fresh attachments derive the same retirement from the
+   retained log. New concurrent edits remain reviewable.
+   `onMergeReview(unit, versions)` lets hosts append actions. Shared hover controls use a compact
+   button footer outside the version scroller. Content-sized placement starts beside the owning
+   unit, flips vertically when needed and shifts within its pane and viewport margins.
 
    Node regressions cover scheduling exclusions, local dismissal, version reconstruction,
    cross-unit safety, stale actions, history reset, obsolete work, release failures and disposal.
@@ -268,8 +275,14 @@ them).
    keyboard and pointer verification. The portable `collaboration-merge-review` scenario holds
    only the example's real BroadcastChannel delivery,
    types through native editor inputs, then clicks each resolution. It checks convergence,
-   local dismissal, dot bounds outside text and hover contrast. Nine screenshots capture each
-   mark, hover and resolution; all five distinct states were read back. Example theme type is
+   local dismissal, dot bounds outside text and hover contrast. Revision coverage checks settled
+   resolution retirement, reopened hovers, both peers, a unit at a pane edge and a real cross-unit
+   manual action. Every offered action must be hit-testable inside the hover before any click;
+   Playwright auto-scrolling cannot make a clipped action pass. Twelve screenshots cover these
+   states; the mark, both peers’ hovers, all resolutions, pane-edge hover, manual hover and separate
+   `look` capture were read back. Revision evidence is
+   `20261009T183916Z-scenario-collaboration-merge-review-R64bce`
+   and `20261009T183922Z-look-collaboration-html-1440x1000-3ItKbl`. Example theme type is
    explicit so its dark page and shared hover use the same palette. Detector cost and the
    dedicated projected query remain step 3 work.
 

@@ -84,11 +84,28 @@ for (const keep of ['yours', 'theirs'] as const) {
     await expect
       .poll(() => room!.texts())
       .toEqual(Array(2).fill(`const value = ${keep === 'yours' ? 1 : 2};\n`))
+    await Promise.all(room.connections.map(({ review }) => review!.idle()))
+    expect(room.connections.map(({ review }) => review!.marks)).toEqual([[], []])
+    room.editors[0]!.dispatchCommand('editor.action.showHover')
+    expect(
+      [...document.querySelectorAll('[role=dialog]')].some(
+        (node) => !(node as HTMLElement).hidden && node.textContent?.includes('Keep theirs'),
+      ),
+    ).toBe(false)
     for (const { document } of room.connections) {
       const history = document.exportHistory(document.genesis)!
       expect(history.at(-1)!.edit.change.kind).not.toBe('setEffects')
       expect(history.at(-1)!.outcome.kind).toBe('accepted')
     }
+    for (let index = 0; index < 2; index++)
+      room.editors[index]!.edit({ from: 14, to: 15, text: String(index + 3) })
+    room.flush()
+    await marked()
+    expect(
+      room.connections[0]!.review!.versions(room.connections[0]!.review!.marks[0]!)!.authors.map(
+        ({ text }) => text,
+      ),
+    ).toEqual(['const value = 3;\n', 'const value = 4;\n'])
   })
 }
 

@@ -2,6 +2,7 @@ import {
   ConfirmedWindow,
   TextbufferEngine,
   type TextbufferSnapshot,
+  type ConcurrentEdit,
 } from '@singapore-editor/collab'
 import {
   charIdAt,
@@ -62,6 +63,7 @@ export class MergeReview {
   private readonly unsubscribe: () => void
   private queued: (() => void) | undefined
   private running: Promise<void> | undefined
+  private requested = false
   private disposed = false
   private readonly waiters = new Set<() => void>()
 
@@ -75,8 +77,8 @@ export class MergeReview {
     this.detector = new MergeReviewDetector(options.syntax)
     this.tip = document.genesis
     this.snapshot = document.confirmedSnapshot()
-    this.unsubscribe = document.subscribeConfirmed((reset) => this.confirmed(reset))
-    this.confirmed(false)
+    this.unsubscribe = document.subscribeConfirmed((reset, remote) => this.confirmed(reset, remote))
+    this.confirmed(false, true)
   }
 
   get marks(): readonly MergeReviewMark[] {
@@ -88,9 +90,10 @@ export class MergeReview {
     return () => this.listeners.delete(listener)
   }
 
-  private confirmed(reset: boolean): void {
+  private confirmed(reset: boolean, remote: boolean): void {
     if (this.disposed) return
     if (reset) {
+      this.requested = false
       this.window = new ConfirmedWindow()
       this.tip = this.document.genesis
     }
@@ -107,7 +110,13 @@ export class MergeReview {
     this.revision++
     this.allMarks = []
     this.changed()
-    if (new Set(this.window.edits.map((edit) => edit.envelope.id.actor)).size < 2) return
+    if (remote && accepted.some((record) => record.id.actor !== this.peer)) this.requested = true
+    if (new Set(this.window.edits.map((edit) => edit.envelope.id.actor)).size < 2) {
+      // A remote batch can precede the acknowledgement of our concurrent pending edit.
+      if (!this.document.participant.state().pending.length) this.requested = false
+      return
+    }
+    if (!this.requested) return
     if (this.queued || this.running) return
     this.queue()
   }
@@ -115,6 +124,8 @@ export class MergeReview {
   private queue(): void {
     this.queued = this.schedule(() => {
       this.queued = undefined
+      if (!this.requested || this.disposed) return this.settled()
+      this.requested = false
       const revision = this.revision
       const snapshot = this.snapshot
       this.running = this.detector
@@ -122,7 +133,8 @@ export class MergeReview {
         .then((result) => {
           if (this.disposed || revision !== this.revision) return
           this.publishedRevision = revision
-          this.allMarks = result.status === 'complete' ? result.marks : []
+          this.allMarks =
+            result.status === 'complete' ? this.unsuperseded(result.marks, snapshot) : []
           this.changed()
         })
         .catch((error: unknown) => {
@@ -135,15 +147,40 @@ export class MergeReview {
             if (!this.disposed) this.options.onError?.(error)
           } finally {
             this.running = undefined
-            if (
-              !this.disposed &&
-              revision !== this.revision &&
-              new Set(this.window.edits.map((edit) => edit.envelope.id.actor)).size > 1
-            )
-              this.queue()
+            if (!this.disposed && this.requested) this.queue()
             this.settled()
           }
         })
+    })
+  }
+
+  private unsuperseded(
+    marks: readonly MergeReviewMark[],
+    snapshot: TextbufferSnapshot,
+  ): readonly MergeReviewMark[] {
+    const engine = new TextbufferEngine()
+    engine.restore(snapshot)
+    const edits = this.window.edits.filter((edit) => engine.effectActive(edit.envelope.id))
+    return marks.flatMap((mark) => {
+      // A causal follow-up in this unit replaces the old competing alternatives on every peer.
+      const pairs = mark.pairs.filter(
+        (pair) =>
+          !edits.some(
+            (edit) =>
+              this.window.isAfter(edit.envelope.id, pair) &&
+              touchesUnit(snapshot.buffer, edit, mark.unit),
+          ),
+      )
+      if (!pairs.length) return []
+      const ids = new Map(pairs.flat().map((id) => [JSON.stringify(id), id]))
+      return [
+        {
+          ...mark,
+          pairs,
+          edits: [...ids.values()],
+          authors: [...new Set([...ids.values()].map((id) => id.actor))].sort(),
+        },
+      ]
     })
   }
 
@@ -235,6 +272,7 @@ export class MergeReview {
   resolve(mark: MergeReviewMark, author: string): boolean {
     const edit = this.resolution(mark, author)
     if (!edit) return false
+    this.dismiss(mark)
     this.apply(edit)
     return true
   }
@@ -299,4 +337,25 @@ function projectUnit(
   const end = right ? locateCharId(projected, right) : null
   const startIndex = start ? start.offset + Number(start.liveness === 'live') : 0
   return { startIndex, endIndex: Math.max(startIndex, end?.offset ?? projected.length) }
+}
+
+function touchesUnit(
+  snapshot: PieceTableSnapshot,
+  edit: ConcurrentEdit,
+  unit: MergeReviewUnit,
+): boolean {
+  for (const span of [...edit.inserted, ...edit.deleted]) {
+    const first = locateCharId(snapshot, span.start)
+    const last = locateCharId(snapshot, {
+      bunch: span.start.bunch,
+      counter: span.start.counter + span.count - 1,
+    })
+    if (!first || !last) continue
+    if (
+      Math.min(first.offset, last.offset) < unit.endIndex &&
+      Math.max(first.offset, last.offset) >= unit.startIndex
+    )
+      return true
+  }
+  return false
 }

@@ -1,4 +1,5 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
+import { MergeReviewDetector } from '../src/merge-review'
 import { CollaborationDocument } from '../src/document'
 import { MergeReview } from '../src/review'
 import type { MergeReviewSyntax } from '../src/merge-review'
@@ -203,7 +204,7 @@ test('obsolete detection retires its snapshots before the next confirmed batch p
   const right = f.b.participant.local({ offset: 14, deleteCount: 1, text: '2' })
   f.a.sequenceBatch([{ edit: left }, { edit: right }])
   for (const task of f.tasks.splice(0)) task()
-  f.a.sequence(f.a.participant.local({ offset: 0, deleteCount: 0, text: '// after\n' }))
+  f.a.sequence(f.b.participant.local({ offset: 0, deleteCount: 0, text: '// after\n' }))
   unblock()
   // The injected scheduler holds the replacement run until this assertion has observed staleness.
   await new Promise<void>((resolve) => {
@@ -246,7 +247,7 @@ test('a release failure reports the error and allows the next confirmed review',
   const right = f.b.participant.local({ offset: 14, deleteCount: 1, text: '2' })
   f.a.sequenceBatch([{ edit: left }, { edit: right }])
   await f.flush()
-  f.a.sequence(f.a.participant.local({ offset: 0, deleteCount: 0, text: '// after\n' }))
+  f.a.sequence(f.b.participant.local({ offset: 0, deleteCount: 0, text: '// after\n' }))
   await f.flush()
   expect(errors).toEqual([failure])
   expect(releases).toBe(2)
@@ -309,4 +310,161 @@ test('disposed reviews unsubscribe before another confirmed batch', async () => 
   await f.flush()
   expect(f.calls).toBe(0)
   expect(f.tasks).toEqual([])
+})
+
+for (const author of ['alice', 'bob']) {
+  test(`a settled ${author} resolution retires the group on every peer`, async () => {
+    const f = fixture()
+    const left = f.a.participant.local({ offset: 14, deleteCount: 1, text: '1' })
+    const right = f.b.participant.local({ offset: 14, deleteCount: 1, text: '2' })
+    f.b.applyBatch(f.a.sequenceBatch([{ edit: left }, { edit: right }]))
+    const peer = new MergeReview(
+      f.b,
+      'bob',
+      { syntax },
+      () => {},
+      (run) => {
+        f.tasks.push(run)
+        return () => {}
+      },
+    )
+    await f.flush()
+    await peer.idle()
+    const mark = f.review.marks[0]!
+    expect(f.review.resolve(mark, author)).toBe(true)
+    const opposite = author === 'alice' ? 'bob' : 'alice'
+    const staleApplied = f.review.resolve(mark, opposite)
+    const edit = f.applied[0]!
+    f.b.applyBatch(
+      f.a.sequenceBatch([
+        {
+          edit: f.a.participant.local({
+            offset: edit.from,
+            deleteCount: edit.to - edit.from,
+            text: edit.text,
+          }),
+        },
+      ]),
+    )
+    await f.flush()
+    await peer.idle()
+    expect([f.review.marks, peer.marks]).toEqual([[], []])
+    expect(staleApplied).toBe(false)
+    expect(f.applied).toHaveLength(1)
+    expect(f.review.versions(mark)).toBeNull()
+    expect(f.review.resolve(mark, opposite)).toBe(false)
+    // A later remote confirmation cannot resurrect the superseded concurrency edge.
+    f.a.sequence(f.b.participant.local({ offset: 0, deleteCount: 0, text: '// after\n' }))
+    await f.flush()
+    expect(f.review.marks).toEqual([])
+    f.review.dispose()
+    peer.dispose()
+  })
+}
+
+test('a local-only confirmation in a multi-author document dispatches no detector', async () => {
+  const detector = vi.spyOn(MergeReviewDetector.prototype, 'detect')
+  const f = fixture()
+  try {
+    const left = f.a.participant.local({ offset: 14, deleteCount: 1, text: '1' })
+    const right = f.b.participant.local({ offset: 14, deleteCount: 1, text: '2' })
+    f.a.sequenceBatch([{ edit: left }, { edit: right }])
+    await f.flush()
+    const calls = detector.mock.calls.length
+    expect(calls).toBeGreaterThan(0)
+    const old = f.review.marks[0]!
+    f.a.sequence(f.a.participant.local({ offset: 0, deleteCount: 0, text: '// local only\n' }))
+    await f.flush()
+    expect(detector.mock.calls).toHaveLength(calls)
+    expect(f.review.resolve(old, 'alice')).toBe(false)
+  } finally {
+    f.review.dispose()
+    detector.mockRestore()
+  }
+})
+
+test('remote demand waits for our concurrent pending confirmation without running on later local batches', async () => {
+  const f = fixture()
+  const local = f.a.participant.local({ offset: 14, deleteCount: 1, text: '1' })
+  f.a.sequence(f.b.participant.local({ offset: 14, deleteCount: 1, text: '2' }))
+  await f.flush()
+  expect(f.calls).toBe(0)
+  f.a.sequence(local)
+  await f.flush()
+  expect(f.review.marks).toHaveLength(1)
+  const calls = f.calls
+  f.a.sequence(f.a.participant.local({ offset: 0, deleteCount: 0, text: '// local\n' }))
+  await f.flush()
+  expect(f.calls).toBe(calls)
+  f.review.dispose()
+})
+
+for (const author of ['alice', 'bob']) {
+  test(`a deletion-only ${author} resolution retires the group for a fresh attachment`, async () => {
+    const f = fixture()
+    const left = f.a.participant.local({ offset: 6, deleteCount: 2, text: '' })
+    const right = f.b.participant.local({ offset: 7, deleteCount: 2, text: '' })
+    f.b.applyBatch(f.a.sequenceBatch([{ edit: left }, { edit: right }]))
+    await f.flush()
+    expect(f.review.resolve(f.review.marks[0]!, author)).toBe(true)
+    const edit = f.applied[0]!
+    f.b.applyBatch(
+      f.a.sequenceBatch([
+        {
+          edit: f.a.participant.local({
+            offset: edit.from,
+            deleteCount: edit.to - edit.from,
+            text: edit.text,
+          }),
+        },
+      ]),
+    )
+    const peer = new MergeReview(
+      f.b,
+      'bob',
+      { syntax },
+      () => {},
+      (run) => {
+        f.tasks.push(run)
+        return () => {}
+      },
+    )
+    await f.flush()
+    await peer.idle()
+    expect(f.b.engine.text()).toBe(author === 'alice' ? 'const lue = 0;\n' : 'const vue = 0;\n')
+    expect([f.review.marks, peer.marks]).toEqual([[], []])
+    f.review.dispose()
+    peer.dispose()
+  })
+}
+
+test('a causal follow-up in another unit preserves the competing alternatives', async () => {
+  const f = fixture(async (_snapshot, ranges) =>
+    ranges.map(() => [
+      {
+        startIndex: 0,
+        endIndex: 16,
+        type: 'line',
+        languageId: 'text',
+        signature: null,
+        hasErrors: false,
+        parent: null,
+      },
+    ]),
+  )
+  const left = f.a.participant.local({ offset: 14, deleteCount: 1, text: '1' })
+  const right = f.b.participant.local({ offset: 14, deleteCount: 1, text: '2' })
+  f.b.applyBatch(f.a.sequenceBatch([{ edit: left }, { edit: right }]))
+  await f.flush()
+  expect(f.review.marks).toHaveLength(1)
+  const later = f.b.participant.local({
+    offset: f.b.confirmedSnapshot().buffer.length,
+    deleteCount: 0,
+    text: 'const other = 3;\n',
+  })
+  f.b.apply(f.a.sequence(later))
+  await f.flush()
+  expect(f.review.marks).toHaveLength(1)
+  expect(f.review.marks[0]!.authors).toEqual(['alice', 'bob'])
+  f.review.dispose()
 })
