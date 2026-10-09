@@ -11,6 +11,7 @@ import { markdownSyntax } from '@/agent-stage/utils/syntax'
 import { TimelineRow } from '@/agent-stage/components/timeline-row'
 import { OrbitLoader } from '@/components/orbit-loader'
 import type { Theme } from '@/theme/utils/theme'
+import { onRenderableResize } from '@/utils/renderable-events'
 
 export function Timeline({
   conversation,
@@ -153,12 +154,12 @@ export function Timeline({
         </box>
       )}
       <scrollbox
-        onSizeChange={function () {
-          const next = { width: this.viewport.width, height: this.viewport.height }
+        onSizeChange={onRenderableResize<ScrollBoxRenderable>((view) => {
+          const next = { width: view.viewport.width, height: view.viewport.height }
           setViewport((current) =>
             current?.width === next.width && current.height === next.height ? current : next,
           )
-        }}
+        })}
         id='agent-timeline'
         ref={scroll}
         focused={focused}
