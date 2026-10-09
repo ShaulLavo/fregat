@@ -333,7 +333,7 @@ bun run --cwd apps/tui test
 
 The first narrowed census reports 31 diagnostics across 25 files: 23 classified refusals
 and 8 unclassified diagnostics. A diagnostic can appear twice across the normal and strict
-compiler passes. The new gate intentionally fails until these are repaired. OpenTUI's
+compiler passes. The baseline is resolved by the October 10 repair pass; the compiler gate now passes. OpenTUI's
 React reconciler and the compiler runtime work; these are source/compiler syntax problems,
 not renderer incompatibility. Keep refusals visible and inspect emitted output after each
 repair. Do not remove the command provider's remaining memo: its `useEffect` uses the
@@ -377,3 +377,19 @@ handler simple. Trace the render-ref warning to the mutable owner's lifetime. Th
 `ThisExpression`, getter expression, and logs-pane code-generation diagnostics require
 small source reductions before deciding whether to restructure the source or record an
 upstream compiler bug. No upstream bugs have been confirmed or filed for these diagnostics.
+
+### Repair verification, 2026-10-10
+
+- [x] Resolve all 31 source diagnostics without new compiler exceptions.
+- [x] Preserve latest-ref defaults inside handlers, committed target refs, live focus availability,
+      OpenTUI resize callback receivers, and async-operation finalization.
+- [x] Pass the full compiler census and manual memo check.
+- [x] Pass all 420 TUI tests, including real renderable resize and finalization checks.
+- [x] Pass the TUI build/typecheck and whole-tree gates.
+- [ ] Pass PR CI, merge, and update the owner's instance.
+
+`finalize` keeps cleanup outside compiler-transformed React functions. It runs cleanup after
+an operation settles and before its returned promise settles, including rejection.
+`onRenderableResize` keeps OpenTUI's receiver binding in a module-scope adapter while React
+callbacks read the renderable as an explicit argument. Current-main dependencies were installed
+and workspace packages rebuilt before checking consumers.
