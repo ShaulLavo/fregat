@@ -526,7 +526,9 @@ export const selectors = {
   pickerEmpty: (page: Page) => page.getByText('Nothing here', { exact: true }),
   /** The folder the picker shows, from its screen-reader description; a folder picker lists no files. */
   pickerBrowsing: (page: Page, path: string) =>
-    selectors.pickerDialog(page).getByText(`Browsing ${path}.`, { exact: true }),
+    selectors
+      .pickerDialog(page)
+      .getByText(new RegExp(`^Browsing ${RegExp.escape(path)}( on .+)?\\.$`)),
   pickerRow: (page: Page, name: string) =>
     page
       .getByRole('dialog', { name: 'Choose folder', exact: true })
