@@ -1,5 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { WebGpuTextPass } from '../text-pass.js'
+import { GhosttyRuntime } from '../../core/runtime.js'
+import { defaultRendererTheme } from '../instances/types.js'
 import { AtlasGpuTextures } from '../atlas/gpu-textures.js'
 import type { RowInstanceUpdate } from '../instances/types.js'
 import { planUploadRanges, planWrappedUploadRanges } from '../instances/upload-ranges.js'
@@ -409,6 +411,80 @@ it('counts row-remap uniform writes separately from instance uploads', () => {
   expect(fixture.pass.uploadFrame(data, [])).toBe(0)
   expect(fixture.pass.frameUploadedBytes).toBe(0)
   expect(fixture.writes).toHaveLength(1)
+})
+
+it('restores the row remap after atlas synchronization fails between building and uploading', async () => {
+  const fixture = gpuFixture(16)
+  const runtime = await GhosttyRuntime.create()
+  const terminal = runtime.createTerminal({ columns: 4, rows: 4 })
+  const state = runtime.createRenderState(terminal)
+  const builder = state.createFrameBuilder(4, 4)
+  const textures = new AtlasGpuTextures(fixture.device, {
+    layerCount: 1,
+    pageHeight: 8,
+    pageWidth: 8,
+  })
+  const options = {
+    cellWidth: 8,
+    cellHeight: 16,
+    theme: { ...defaultRendererTheme, cursorText: defaultRendererTheme.background },
+    full: true,
+    stableRows: true,
+    overlayRows: new Set<number>(),
+  }
+  const viewport = new DataView(fixture.buffers.at(-1)!.bytes.buffer)
+  const build = (full: boolean) => {
+    const frameOptions = { ...options, full }
+    let status = builder.build(frameOptions)
+    if (status === 2) {
+      for (const key of builder.missingGlyphs) builder.registerGlyph(key, undefined)
+      status = builder.build(frameOptions)
+    }
+    expect(status).toBe(0)
+  }
+  try {
+    terminal.write('\x1b[?25l\x1b[41m   \r\n\x1b[42m   \r\n\x1b[43m   \r\n\x1b[44m   ')
+    state.update()
+    build(true)
+    fixture.pass.uploadFrame(builder, builder.changedRanges())
+    state.acknowledge()
+    terminal.write('\r\n\x1b[45m   ')
+    state.update()
+    build(false)
+    expect(builder.rowOffset).toBe(1)
+    fixture.pass.uploadFrame(builder, builder.changedRanges())
+    expect(viewport.getUint32(16, true)).toBe(1)
+    state.acknowledge()
+
+    terminal.write('\r\n\x1b[46m   ')
+    state.update()
+    build(false)
+    expect(builder.rowOffset).toBe(2)
+    const failure = new RangeError('Injected atlas capacity failure')
+    const sync = vi.spyOn(textures, 'sync').mockImplementationOnce(() => {
+      throw failure
+    })
+    expect(() => {
+      textures.sync([])
+      fixture.pass.uploadFrame(builder, builder.changedRanges())
+    }).toThrow(failure)
+    expect(viewport.getUint32(16, true)).toBe(1)
+
+    build(true)
+    expect(builder.rowOffset).toBe(2)
+    textures.sync([])
+    fixture.pass.uploadFrame(builder, builder.changedRanges())
+    expect(viewport.getUint32(8, true)).toBe(4)
+    expect(viewport.getFloat32(12, true)).toBe(16)
+    expect(viewport.getUint32(16, true)).toBe(builder.rowOffset)
+    expect(builder.changedRanges().map((range) => range.row)).toEqual([0, 1, 2, 3])
+    sync.mockRestore()
+  } finally {
+    textures.destroy()
+    fixture.pass.destroy()
+    builder.dispose()
+    runtime.dispose()
+  }
 })
 
 it('reads each frame view once even when several rows change', () => {

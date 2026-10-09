@@ -206,6 +206,56 @@ describe('WASM frame records', () => {
     expect(builder.rowChanges).toBe(0)
   })
 
+  it.each(['row slots', 'glyph'] as const)(
+    'recovers a full frame after a native %s allocation fails during row movement',
+    async (allocation) => {
+      let remaining = 0
+      const instantiate = WebAssembly.instantiate
+      vi.spyOn(WebAssembly, 'instantiate').mockImplementation(async (module, imports) => {
+        const allocate = imports?.env?.ghostty_wasm_alloc
+        if (typeof allocate !== 'function') return instantiate(module, imports)
+        return instantiate(module, {
+          ...imports,
+          env: {
+            ...imports?.env,
+            ghostty_wasm_alloc: (length: number) => {
+              if (remaining > 0 && --remaining === 0) return 0
+              return allocate(length)
+            },
+          },
+        })
+      })
+      runtime = await GhosttyRuntime.create()
+      const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
+      const state = runtime.createRenderState(terminal)
+      terminal.write('\x1b[?25la0\r\na1\r\na2\r\na3')
+      state.update()
+      builder = state.createFrameBuilder(24, 4)
+      readyFrame({ ...options, stableRows: true })
+      state.acknowledge()
+      terminal.write('\r\nB0')
+      state.update()
+      remaining = allocation === 'row slots' ? 1 : 2
+      expect(() => builder!.build({ ...options, stableRows: true, full: false })).toThrow(
+        'out of memory',
+      )
+      expect(remaining).toBe(0)
+      if (allocation === 'row slots') {
+        expect(builder.stableRows).toBe(false)
+        terminal.scrollBy(-1)
+        state.update()
+      }
+      readyFrame({ ...options, stableRows: true })
+      expect(builder.rowChanges).not.toBe(0)
+      expect(builder.changedRanges().map((range) => range.row)).toEqual([0, 1, 2, 3])
+      const cells = builder.cellData.slice()
+      const glyphs = builder.glyphData.slice()
+      readyFrame({ ...options, stableRows: true })
+      expect(builder.cellData).toEqual(cells)
+      expect(builder.glyphData).toEqual(glyphs)
+    },
+  )
+
   it('reports every logical row moved by a physical instance ring', async () => {
     runtime = await GhosttyRuntime.create()
     const terminal = runtime.createTerminal({ columns: 24, rows: 4 })
