@@ -163,6 +163,7 @@ export default defineConfig({
             },
             instances: [
               { browser: 'chromium', name: 'content-layout-chromium' },
+              { browser: 'firefox', name: 'content-layout-firefox' },
               { browser: 'webkit', name: 'content-layout-webkit' },
               {
                 browser: 'webkit',

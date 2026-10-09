@@ -14,6 +14,8 @@ declare module 'vitest/browser' {
 }
 
 const fontUrl = new URL('../../../site/src/fonts/jetbrains-mono.woff2', import.meta.url).href
+const fallbackFontUrl = new URL('../../../site/src/fonts/source-serif-4.woff2', import.meta.url)
+  .href
 
 const mounted: { editor: Editor; host: HTMLElement; parent: HTMLElement }[] = []
 
@@ -151,36 +153,67 @@ it('uses the same content extent with a document session and switches scroll mod
   editor.dispose()
 })
 
-it('updates the content extent when a bundled font loads after mount', async () => {
-  const { editor, host, parent } = mount(180)
-  editor.setFontFamily('"Content Height Face", serif')
-  editor.setText('iiii WWWW 0000 alpha beta '.repeat(20))
-  await frames()
-  const before = editor.getContentHeight()
-  const face = new FontFace('Content Height Face', `url(${fontUrl})`)
-  try {
-    document.fonts.add(await face.load())
-    await expect.poll(() => editor.getContentHeight()).not.toBe(before)
-    expect(host.getBoundingClientRect().height).toBe(editor.getContentHeight())
+it.each(['cold', 'prefetched'] as const)(
+  'updates the content extent when a bundled font loads after mount with %s bytes',
+  async (cache) => {
+    const family = `Content Height ${cache}`
+    const fallbackFamily = `Content Height Fallback ${cache}`
+    const fallback = new FontFace(fallbackFamily, `url(${fallbackFontUrl})`)
+    let face: FontFace | undefined
+    await fallback.load()
+    document.fonts.add(fallback)
+    const { editor, host, parent } = mount(180)
     const probe = document.createElement('span')
-    probe.style.cssText = 'position:absolute;left:0;top:0;white-space:pre'
-    probe.textContent = 'W'
-    scroller(host).append(probe)
     try {
-      expect(glyphAdvancesFor(scroller(host))!.advance(87)).toBeCloseTo(
-        probe.getBoundingClientRect().width,
-        1,
-      )
+      // Downloading bytes cannot activate the target face before the baseline is measured.
+      const prefetched =
+        cache === 'prefetched'
+          ? await fetch(fontUrl, { cache: 'no-store' }).then((response) => response.arrayBuffer())
+          : undefined
+      editor.setFontFamily(`"${family}", "${fallbackFamily}"`)
+      editor.setText('W'.repeat(400))
+      probe.style.cssText = 'position:absolute;left:0;top:0;white-space:pre;visibility:hidden'
+      probe.textContent = 'W'
+      scroller(host).append(probe)
+      await frames()
+      const before = editor.getContentHeight()
+      const beforeAdvance = probe.getBoundingClientRect().width
+      const beforeCachedAdvance = glyphAdvancesFor(scroller(host))!.advance(87)
+      const bytes: ArrayBuffer =
+        prefetched ??
+        (await fetch(fontUrl, { cache: 'no-store' }).then((response) => response.arrayBuffer()))
+      face = new FontFace(family, bytes)
+      document.fonts.add(await face.load())
+      await expect.poll(() => probe.getBoundingClientRect().width).toBeLessThan(beforeAdvance - 1)
+      const loadedAdvance = probe.getBoundingClientRect().width
+      await expect
+        .poll(() => glyphAdvancesFor(scroller(host))!.advance(87))
+        .toBeLessThan(beforeCachedAdvance - 1)
+      expect(beforeAdvance - loadedAdvance).toBeGreaterThan(1)
+      await expect
+        .poll(() => glyphAdvancesFor(scroller(host))!.advance(87))
+        .toBeCloseTo(loadedAdvance, 1)
+      await expect.poll(() => editor.getContentHeight()).toBeLessThan(before)
+      expect(host.getBoundingClientRect().height).toBe(editor.getContentHeight())
+      console.info('Controlled late font metrics', {
+        cache,
+        beforeAdvance,
+        beforeCachedAdvance,
+        loadedAdvance,
+        before,
+        after: editor.getContentHeight(),
+      })
+      parent.scrollTop = 360
+      if ('proofContentLayoutScreenshot' in commands)
+        console.info('Late font content evidence', await commands.proofContentLayoutScreenshot(180))
     } finally {
+      editor.dispose()
       probe.remove()
+      if (face) document.fonts.delete(face)
+      document.fonts.delete(fallback)
     }
-    parent.scrollTop = 360
-    if ('proofContentLayoutScreenshot' in commands)
-      console.info('Late font content evidence', await commands.proofContentLayoutScreenshot(180))
-  } finally {
-    document.fonts.delete(face)
-  }
-})
+  },
+)
 
 it.each(['text', 'atomic'] as const)(
   'publishes $0 syntax replacement extent and restores the source extent',
