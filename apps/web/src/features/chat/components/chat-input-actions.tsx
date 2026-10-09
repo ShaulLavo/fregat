@@ -97,7 +97,7 @@ export function ChatInputActions({
       ref={actionsRef}
     >
       <div className='flex min-w-0 items-center justify-between gap-2'>
-        {/* Every control and readout in one run from the left; Send stands alone in the corner.
+        {/* Every control and readout in one run from the left; dictation and Send hold the corner.
             On a phone the 40px targets already space the glyphs, so the gap goes to the model name. */}
         <div className='phone:gap-0 flex min-w-0 flex-1 items-center gap-1'>
           <ModelPicker busy={busy} disabled={disabled} narrow={narrow} />
@@ -146,7 +146,7 @@ export function ChatInputActions({
             </span>
           ) : null}
         </div>
-        <div className='flex shrink-0 items-center gap-1'>
+        <div className='phone:gap-0 flex shrink-0 items-center gap-1'>
           {voice ? <ChatInputDictation voice={voice} disabled={disabled} /> : null}
           <PromptStashBadge disabled={disabled} draftTarget={draftTarget} />
           <ChatInputSubmitButton
