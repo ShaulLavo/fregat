@@ -1,3 +1,4 @@
+import { dismissTopSheet } from '@workspace/ui/patterns/sheet'
 import { useEffect, useEffectEvent, useRef } from 'react'
 
 import { useNavigation } from '@/hooks/use-navigation'
@@ -16,6 +17,7 @@ function markEntry(depth: number | null) {
 /**
  * Gives the phone picker one browser history entry per folder it has opened, so the system Back
  * gesture previews and returns to the previous folder, and closes the picker from the first one.
+ * With a sheet open, Back closes the sheet.
  * Safari's swipe shows the entry it returns to, so blocking the pop would show the wrong screen.
  *
  * The entries copy the router's own state, so the router keeps the page. While they exist the
@@ -70,6 +72,9 @@ export function usePickerBackGesture({
         if (action.type === 'PUSH' || action.type === 'REPLACE') return
         const reached = entryDepth(window.history.state)
         if (reached === null || reached >= pushed.current) return
+        // Back closes an open sheet (Places, New folder, the menu) first and keeps the folder. The
+        // router's Back blocker misses these entries: they share its index, so it sees a GO.
+        if (dismissTopSheet()) return window.history.go(pushed.current - reached)
 
         pushed.current = reached
         if (reached > 0) return back()

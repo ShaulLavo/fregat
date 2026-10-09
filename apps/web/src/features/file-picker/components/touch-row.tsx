@@ -23,6 +23,7 @@ export function TouchRow({
   isBusy,
   mode,
   onOpen,
+  opensOnTap = false,
   position,
   rowProps,
   selected,
@@ -34,6 +35,8 @@ export function TouchRow({
   isBusy: boolean
   mode: FilePickerMode
   onOpen: (entry: FsEntry) => void
+  /** A tap opens files too, as a recent file does by going to its folder. */
+  opensOnTap?: boolean
   position: number
   rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   selected: boolean
@@ -48,7 +51,7 @@ export function TouchRow({
 
   function handleClick(event: MouseEvent<HTMLElement>) {
     rowProps.onClick(event)
-    if (directory && !isBusy) onOpen(entry)
+    if ((directory || opensOnTap) && !isBusy) onOpen(entry)
   }
 
   return (

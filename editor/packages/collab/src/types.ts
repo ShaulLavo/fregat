@@ -55,6 +55,8 @@ export interface Engine<Snapshot = unknown> {
   /** Author against the current projection, reserve IDs once, and leave text unchanged. */
   author(edit: OffsetEdit, context: AuthorContext): Envelope
   snapshot(): Snapshot
+  /** A local review snapshot with selected effect states; the live engine and log stay unchanged. */
+  projectEffects(effects: readonly Effect[]): Snapshot
   restore(snapshot: Snapshot): void
 }
 

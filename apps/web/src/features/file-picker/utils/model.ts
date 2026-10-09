@@ -34,7 +34,7 @@ export function pickerCopy(mode: FilePickerMode) {
   if (mode === 'file') {
     return {
       title: 'Choose file',
-      chooseLabel: 'Choose file',
+      chooseLabel: 'Open',
       searchLabel: 'Search files',
       searchPlaceholder: 'Search files',
       emptyDescription: 'This folder has no visible files or folders.',
@@ -45,7 +45,7 @@ export function pickerCopy(mode: FilePickerMode) {
 
   return {
     title: 'Choose folder',
-    chooseLabel: 'Choose folder',
+    chooseLabel: 'Open',
     searchLabel: 'Search files and folders',
     searchPlaceholder: 'Search files and folders',
     emptyDescription: 'This folder has no visible files or folders.',

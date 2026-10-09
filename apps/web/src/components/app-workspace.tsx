@@ -1,4 +1,4 @@
-import { EmptyWorkspace } from '@/components/empty-workspace'
+import { DeferredFirstWorkspace } from '@/features/onboarding/components/deferred-first-workspace'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { ProjectPicker } from '@/features/environments/components/project-picker'
 import { useConnectedMachines } from '@/hooks/use-connected-machines'
@@ -7,6 +7,8 @@ import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { primaryServerOrigin } from '@/lib/client'
 import { usePickEntry } from '@/components/use-pick-entry'
 import { WorkspaceView } from '@/features/workspace/components/view'
+import { ShellBody } from '@/features/workspace/components/shell-body'
+import { useDisplayedShell } from '@/features/workspace/hooks/use-displayed-shell'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { useOpenWorkspaceRoot } from '@/features/workspace/hooks/use-open-root'
 import { useValidateRootFolder } from '@/features/workspace/hooks/use-validate-root-folder'
@@ -20,9 +22,9 @@ export function AppWorkspace({ restoringWorkspace }: { readonly restoringWorkspa
   const chooseMachine = machines.length > 1 || origin !== primaryServerOrigin()
   const pickerOpen = useEditorWorkspaceState((state) => state.pickerOpen)
   const rootFolder = useEditorWorkspaceState((state) => state.rootFolder)
-  const openPicker = useEditorWorkspaceState((state) => state.openPicker)
   const setPickerOpen = useEditorWorkspaceState((state) => state.setPickerOpen)
   const openWorkspaceRoot = useOpenWorkspaceRoot()
+  const { query } = useDisplayedShell()
 
   useValidateRootFolder()
   useWorkspaceEvents(rootFolder)
@@ -53,7 +55,10 @@ export function AppWorkspace({ restoringWorkspace }: { readonly restoringWorkspa
         {rootFolder ? (
           <WorkspaceView rootFolder={rootFolder} />
         ) : (
-          <EmptyWorkspace onChooseFolder={openPicker} />
+          // The shell decides its own chrome before any workspace exists: a phone gets phone screens.
+          <ShellBody query={query} rootPath={null}>
+            <DeferredFirstWorkspace />
+          </ShellBody>
         )}
       </div>
       {picker}
