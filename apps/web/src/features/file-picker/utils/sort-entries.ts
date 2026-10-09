@@ -1,7 +1,7 @@
 import type { FsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 
-export type FileListSortKey = 'name' | 'modified' | 'size'
+export type FileListSortKey = 'name' | 'modified'
 export type FileListSortDirection = 'ascending' | 'descending'
 
 export type FileListSort = {
@@ -35,9 +35,7 @@ function compareEntries(first: FsEntry, second: FsEntry, sort: FileListSort) {
 
 function comparePrimaryValue(first: FsEntry, second: FsEntry, key: FileListSortKey) {
   if (key === 'name') return textCollator.compare(first.name, second.name)
-  if (key === 'modified') return first.mtimeMs - second.mtimeMs
-
-  return first.size - second.size
+  return first.mtimeMs - second.mtimeMs
 }
 
 function compareDirectoryOrder(first: FsEntry, second: FsEntry) {

@@ -9,7 +9,6 @@ import {
   ENTRY_NAME_TEXT,
   FILE_LIST_GRID,
   formatFileListModified,
-  fileListSizeLabel,
 } from '@/features/file-picker/utils/rows'
 import { EntryIcon } from '@/features/file-picker/components/entry-icon'
 import { DIRECTORY_QUERY_STALE_MS } from '@/features/file-picker/utils/directory-query'
@@ -83,9 +82,6 @@ export function FileRow({
       </div>
       <div className='text-muted-foreground truncate tabular-nums max-sm:hidden'>
         {formatFileListModified(entry.mtimeMs)}
-      </div>
-      <div className='text-muted-foreground text-right tabular-nums max-sm:hidden'>
-        {fileListSizeLabel(entry)}
       </div>
     </ListRow>
   )

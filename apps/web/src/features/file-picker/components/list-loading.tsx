@@ -19,7 +19,6 @@ export function ListLoading() {
               <div className='skeleton-sweep h-3 w-2/3 max-w-48 rounded-md' />
             </div>
             <div className='skeleton-sweep h-2.5 w-16 rounded-md max-sm:hidden' />
-            <div className='skeleton-sweep ml-auto h-2.5 w-10 rounded-md max-sm:hidden' />
           </div>
         ))}
       </div>

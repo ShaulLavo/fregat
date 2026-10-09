@@ -29,7 +29,6 @@ const SORTS: readonly {
 }[] = [
   { key: 'name', label: 'Name', direction: 'ascending' },
   { key: 'modified', label: 'Newest first', direction: 'descending' },
-  { key: 'size', label: 'Largest first', direction: 'descending' },
 ]
 
 /** The phone picker's less frequent actions, which the desktop bar shows as buttons. */

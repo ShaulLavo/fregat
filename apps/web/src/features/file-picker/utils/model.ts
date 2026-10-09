@@ -7,7 +7,6 @@ import {
   isPickedFsEntry,
 } from '@/lib/file-system-types'
 import type { LoadState } from '@/lib/load-state'
-import { formatSize } from '@/lib/path-formatters'
 
 export { basename, displayPath } from '@/lib/path-formatters'
 import { compareFuzzyRankedTargets } from '@workspace/contracts'
@@ -118,12 +117,6 @@ export function kindLabel(entry: FsEntry) {
   if (entry.type === 'symlink') return 'Alias'
 
   return 'Other'
-}
-
-export function formatSizeLabel(entry: FsEntry) {
-  if (isDirectoryEntry(entry)) return ''
-
-  return formatSize(entry.size)
 }
 
 export function formatModified(mtimeMs: number) {

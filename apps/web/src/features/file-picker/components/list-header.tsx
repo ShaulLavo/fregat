@@ -37,14 +37,6 @@ export function ListHeader({
         onSort={onSort}
         sort={sort}
       />
-      <SortableColumnHeader
-        align='end'
-        className='max-sm:hidden'
-        keyName='size'
-        label='Size'
-        onSort={onSort}
-        sort={sort}
-      />
     </div>
   )
 }
