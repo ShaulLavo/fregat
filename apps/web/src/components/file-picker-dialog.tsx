@@ -36,6 +36,8 @@ import { openingPopupTrigger } from '@workspace/ui/patterns/popup-trigger'
 import { deriveWriteTarget, policyControlledIds } from '@workspace/contracts'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useEnvironmentsStore } from '@/lib/environments/state/store'
+import { originForQueryClient } from '@/lib/environments/state/query-clients'
 
 import { useDirectoryTransition } from '@/features/file-picker/hooks/use-directory-transition'
 import { useIntentHitLog } from '@/features/file-picker/hooks/use-intent-hit-log'
@@ -279,6 +281,10 @@ export function FilePickerDialog({
   const machine = useQueryClient()
   const machineSettings = useSettingsProjection(machine)
   const machineSettingsActions = useSettingsActions(machine)
+  // Named wherever the picker can be on another machine than the screen: a phone, a remote server.
+  const machineLabel = useEnvironmentsStore(
+    (state) => state.entries[originForQueryClient(machine)]?.label ?? null,
+  )
   const pinned = machineSettings?.values['files.picker.pinnedLocations'] ?? []
   const hidden = machineSettings?.values['files.picker.hiddenLocations'] ?? []
   const sections = sidebarSectionsFor({ data: places, hidden, homePath, pinned })
@@ -611,8 +617,7 @@ export function FilePickerDialog({
         className='h-full text-xs'
         onChange={handleSearchChange}
         onKeyDown={handleSearchKeyDown}
-        // The phone's Places button shares the row, so its field keeps a word that always fits.
-        placeholder={compact ? 'Search' : copy.searchPlaceholder}
+        placeholder={searchPlaceholder(copy.searchPlaceholder, machineLabel, compact)}
         spellCheck={false}
         value={session.query}
       />
@@ -749,7 +754,11 @@ export function FilePickerDialog({
               will happen, so a title bar repeating both is chrome for nothing. */}
             <DialogHeader className='sr-only'>
               <DialogTitle>{copy.title}</DialogTitle>
-              <DialogDescription>{`Browsing ${displayPath(session.currentPath)}.`}</DialogDescription>
+              <DialogDescription>
+                {machineLabel
+                  ? `Browsing ${displayPath(session.currentPath)} on ${machineLabel}.`
+                  : `Browsing ${displayPath(session.currentPath)}.`}
+              </DialogDescription>
             </DialogHeader>
 
             {compact ? (
@@ -1039,4 +1048,10 @@ function selectedVisibleEntry(entries: readonly FsEntry[], selected: FsEntry | n
   if (!selected) return null
 
   return entries.find((entry) => entry.path === selected.path) ?? null
+}
+
+/** The phone's Places button shares the row, so its field keeps a word that always fits. */
+function searchPlaceholder(placeholder: string, machineLabel: string | null, compact: boolean) {
+  if (compact) return 'Search'
+  return machineLabel ? `${placeholder} on ${machineLabel}` : placeholder
 }

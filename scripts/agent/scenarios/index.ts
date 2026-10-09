@@ -30,6 +30,7 @@ import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
 import { startupFailure } from './startup-failure'
 import { phoneFolderRetry } from './phone-folder-retry'
+import { firstWorkspaceMachines } from './first-workspace-machines'
 import { phoneDraftRestore } from './phone-draft-restore'
 import { settingsModuleFailure } from './settings-module-failure'
 import { settingsNewerServer, settingsStreamGiveUp } from './settings-newer-server'
@@ -798,6 +799,7 @@ export const scenarios: readonly Scenario[] = [
   settingsStreamGiveUp,
   startupFailure,
   phoneFolderRetry,
+  firstWorkspaceMachines,
   phoneDraftRestore,
   deferredDialogs,
   deferredChat,
