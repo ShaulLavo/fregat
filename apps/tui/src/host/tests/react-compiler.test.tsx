@@ -1,37 +1,14 @@
-import { act, useEffect, useState } from 'react'
+import { act } from 'react'
 
 import { expect, test } from '../../../test/fixtures'
 import { renderTui } from '../../../test/render'
-
-type Controls = {
-  tick(): void
-  label(value: string): void
-}
-
-function Child({ label, record }: { label: string; record(): void }) {
-  record()
-  return <text>{label}</text>
-}
-
-function Probe({ ready, record }: { ready(controls: Controls): void; record(): void }) {
-  const [tick, setTick] = useState(0)
-  const [label, setLabel] = useState('alpha')
-  useEffect(() => {
-    ready({ tick: () => setTick((value) => value + 1), label: setLabel })
-  }, [ready])
-  return (
-    <box flexDirection='column'>
-      <text>tick:{tick}</text>
-      <Child label={label} record={record} />
-    </box>
-  )
-}
+import { CompilerProbe, type CompilerControls } from '../../../test/factories/compiler-probe'
 
 test('compiled terminal components reuse children and still apply state and prop changes', async () => {
-  let controls: Controls | undefined
+  let controls: CompilerControls | undefined
   let childRenders = 0
   const frame = await renderTui(
-    <Probe
+    <CompilerProbe
       ready={(value) => {
         controls = value
       }}
