@@ -77,7 +77,7 @@ export class FrameObserver {
         : undefined
     if (nativeFrame) this.retained = true
     if (this.rowsNeeded && (!paintedFrame || onFrame)) this.updateRows(state, changed, rows)
-    else this.clearRows()
+    else if (!paintedFrame || this.current) this.clearRows()
     const viewport = cursor.viewport ? Object.freeze({ ...cursor.viewport }) : undefined
     const snapshot = {
       cursor: Object.freeze({ ...cursor, viewport }),
@@ -89,7 +89,8 @@ export class FrameObserver {
           rows: Object.freeze(this.fullRows.filter(defined)),
         })
       : undefined
-    const ownedTextRows = this.rowsNeeded ? Object.freeze(this.textRows.filter(defined)) : undefined
+    const ownedTextRows =
+      this.rowsNeeded && !paintedFrame ? Object.freeze(this.textRows.filter(defined)) : undefined
     const nativeTextFrame = nativeFrame
       ? Object.freeze({
           ...snapshot,

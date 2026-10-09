@@ -433,7 +433,10 @@ export class LocalTerminalExecution {
     this.lastFullFrame = undefined
     const nativeFrame = (snapshot as RetainedTextFrame).nativeFrame
     const paintedFrame = (snapshot as RetainedTextFrame).paintedFrame
-    if (nativeFrame || paintedFrame) {
+    if (paintedFrame) {
+      // The private completed-paint snapshot already owns its frozen cursor and lazy rows.
+      this.lastFrame = snapshot
+    } else if (nativeFrame) {
       this.lastFrame = Object.freeze({
         cursor: snapshot.cursor,
         paintedCursor: snapshot.paintedCursor,

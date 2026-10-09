@@ -56,6 +56,30 @@ function paintedRowSnapshot(row: PaintedRow): RendererFrameRow {
   ))
 }
 
+class PaintedRows implements PaintedTextFrame {
+  #rows?: readonly RendererFrameRow[]
+  #previousRows?: readonly { readonly y: number; readonly text: string }[]
+
+  constructor(
+    private readonly painted: readonly PaintedRow[],
+    private readonly previous: readonly (readonly RowRun[])[],
+  ) {
+    Object.freeze(this)
+  }
+
+  get rows(): readonly RendererFrameRow[] {
+    return (this.#rows ??= Object.freeze(this.painted.map(paintedRowSnapshot)))
+  }
+
+  get previousRows(): readonly { readonly y: number; readonly text: string }[] {
+    return (this.#previousRows ??= Object.freeze(
+      this.previous.map((runs, y) =>
+        Object.freeze({ y, text: runs.map((run) => run.text).join('') }),
+      ),
+    ))
+  }
+}
+
 interface MountedRow {
   readonly element: Element
   readonly runs: MountedRun[]
@@ -70,7 +94,7 @@ class DomSurface implements RowRendererSurface {
   private grid: RendererGridSize
   private theme: CanonicalRendererTheme
   private rows: MountedRow[] = []
-  private acceptedRows: readonly PaintedRow[] = []
+  private acceptedRuns: readonly (readonly RowRun[])[] = []
   private readonly retainText: boolean
 
   constructor(options: WebGpuTerminalRendererOptions) {
@@ -95,7 +119,7 @@ class DomSurface implements RowRendererSurface {
   dispose(): void {
     this.container.remove()
     this.rows = []
-    this.acceptedRows = []
+    this.acceptedRuns = []
     this.canvas.style.opacity = this.previousOpacity
   }
 
@@ -147,19 +171,11 @@ class DomSurface implements RowRendererSurface {
   }
 
   captureTextFrame(): PaintedTextFrame {
-    const previous = this.acceptedRows
+    const previous = this.acceptedRuns
     const painted = Object.freeze(this.rows.map((row) => row.painted!))
-    this.acceptedRows = painted
-    let rows: readonly RendererFrameRow[] | undefined
-    let previousRows: readonly RendererFrameRow[] | undefined
-    return Object.freeze({
-      get rows() {
-        return (rows ??= Object.freeze(painted.map(paintedRowSnapshot)))
-      },
-      get previousRows() {
-        return (previousRows ??= Object.freeze(previous.map(paintedRowSnapshot)))
-      },
-    })
+    // Patch comparisons need prior run text; packed cells belong only to the current snapshot.
+    this.acceptedRuns = Object.freeze(painted.map((row) => row.runs))
+    return new PaintedRows(painted, previous)
   }
 
   resize(font: TerminalFittedFont, grid: RendererGridSize): void {
