@@ -1,3 +1,4 @@
+import { finalize } from '@/utils/finalize'
 import { useStore } from 'zustand'
 import type { ProviderSnapshot } from '@workspace/contracts'
 import { writeFile } from 'node:fs/promises'
@@ -152,11 +153,14 @@ export function AgentStage({
     if (pendingSend.current) return
     pendingSend.current = true
     setResponding(requestId)
-    try {
-      if (!(await state.run(command))) setResponding(null)
-    } finally {
-      pendingSend.current = false
-    }
+    return await finalize(
+      async () => {
+        if (!(await state.run(command))) setResponding(null)
+      },
+      () => {
+        pendingSend.current = false
+      },
+    )
   }
   async function attachFile(filename: string) {
     const key = state.key
