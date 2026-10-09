@@ -8,7 +8,7 @@ import type {
   TerminalSelectionFormatOptions,
 } from '../core/types.js'
 import type { InactiveCursorStyle } from '../render/cursor.js'
-import type { RendererFrameSnapshot } from '../render/renderer.js'
+import type { RendererFrameSnapshot, RendererTextFrameSnapshot } from '../render/renderer.js'
 import type { LinkProvider, LinkProviderRegistration } from '../term/links.js'
 import type {
   TerminalAppearance,
@@ -69,6 +69,10 @@ export interface TerminalApi<Mode extends 'sync' | 'async' = 'sync' | 'async'> {
   focusNextLink(): Promise<boolean>
   registerLinkProvider(provider: LinkProvider<Event>): LinkProviderRegistration
   setAccessibilityEnabled(enabled: boolean): boolean
+  readDisplayedText(): RendererTextFrameSnapshot | undefined
+  subscribeDisplayedText(
+    listener: (frame: RendererTextFrameSnapshot) => void,
+  ): GhosttyWebGpuTerminalSubscription
   visibleLines(): readonly string[]
 
   geometry(): TerminalResult<Mode, TerminalGeometry>

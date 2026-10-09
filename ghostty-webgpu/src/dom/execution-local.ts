@@ -1,4 +1,7 @@
 import { createGhosttyError } from '../core/error.js'
+import type { NativeDisplayedFrame } from '../core/displayed-frame.js'
+
+type RetainedTextFrame = RendererTextFrameSnapshot & { readonly nativeFrame?: NativeDisplayedFrame }
 import { copiedFrameRow } from '../render/frame-row.js'
 import type { SelectionPoint } from '../core/selection.js'
 import type { ReadLinesOptions, TerminalSelectionFormatOptions } from '../core/types.js'
@@ -71,7 +74,7 @@ export class LocalTerminalExecution {
   readonly kind = 'sync' as const
   private disposed = false
   private layout?: SubmittedLayout
-  private lastFrame?: RendererTextFrameSnapshot
+  private lastFrame?: RetainedTextFrame
   private lastFullFrame?: RendererFrameSnapshot
   private lastFrameVersion?: number
   private rendererValue?: GhosttyWebGpuRenderer
@@ -362,6 +365,17 @@ export class LocalTerminalExecution {
 
   frameSnapshot(): RendererFrameSnapshot | undefined {
     if (!this.lastFrame) return undefined
+    if (this.lastFrame.nativeFrame) {
+      const rows = Object.freeze(
+        this.lastFrame.nativeFrame.readRows({ packed: true }).map(copiedFrameRow),
+      )
+      this.lastFullFrame = copiedFrame({
+        cursor: this.lastFrame.cursor,
+        paintedCursor: this.lastFrame.paintedCursor,
+        rows,
+      })
+      return this.lastFullFrame
+    }
     if (!this.canReadSubmittedState) return this.lastFullFrame
     const rows = Object.freeze(
       this.session.renderState.readRows({ packed: true }).map(copiedFrameRow),
@@ -412,16 +426,27 @@ export class LocalTerminalExecution {
   submit(snapshot: RendererTextFrameSnapshot): RendererTextFrameSnapshot {
     this.lastFrameVersion = this.session.renderState.snapshotVersion
     this.lastFullFrame = undefined
-    // Native rows are copied at submission, before a later update can replace the render snapshot.
-    const rows =
-      snapshot.rows.length > 0
-        ? snapshot.rows
-        : Object.freeze(
-            this.session.renderState.readTextRows
-              ? this.session.renderState.readTextRows()
-              : this.session.renderState.readRows({ packed: true }).map(copiedFrameRow),
-          )
-    this.lastFrame = Object.freeze({ ...snapshot, rows })
+    const nativeFrame = (snapshot as RetainedTextFrame).nativeFrame
+    if (nativeFrame) {
+      this.lastFrame = Object.freeze({
+        cursor: snapshot.cursor,
+        paintedCursor: snapshot.paintedCursor,
+        nativeFrame,
+        get rows() {
+          return snapshot.rows
+        },
+      })
+    } else {
+      const rows =
+        snapshot.rows.length > 0
+          ? snapshot.rows
+          : Object.freeze(
+              this.session.renderState.readTextRows
+                ? this.session.renderState.readTextRows()
+                : this.session.renderState.readRows({ packed: true }).map(copiedFrameRow),
+            )
+      this.lastFrame = Object.freeze({ ...snapshot, rows })
+    }
     let layout = this.layout
     if (!layout) return this.lastFrame
     const grid = this.session.grid
@@ -448,6 +473,7 @@ export class LocalTerminalExecution {
       selection: this.session.selectionCoordinates(),
       scrollbar: this.session.scrollbar,
       snapshot: this.lastFrame,
+      previousTextRows: nativeFrame ? () => nativeFrame.readPreviousTextRows() : undefined,
     })
     return this.lastFrame
   }
@@ -462,7 +488,15 @@ export class LocalTerminalExecution {
       this.rendererValue.hasPendingFrame
     )
       return
-    this.summaryValue = Object.freeze({ ...summary, nativeRevision: this.session.revision })
+    this.summaryValue = Object.freeze(
+      Object.defineProperties(
+        {},
+        {
+          ...Object.getOwnPropertyDescriptors(summary),
+          nativeRevision: { enumerable: true, value: this.session.revision },
+        },
+      ),
+    ) as TerminalSubmittedFrame
   }
 
   async createRenderer(

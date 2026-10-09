@@ -40,22 +40,33 @@ export interface TerminalSubmission {
   readonly selection: Readonly<SelectionCoordinates> | undefined
   readonly scrollbar: Readonly<TerminalScrollbar>
   readonly snapshot: RendererTextFrameSnapshot
+  readonly previousTextRows?: () => readonly TerminalSubmittedRow[]
 }
 
 export function submittedFrame(
   previous: TerminalSubmittedFrame | undefined,
   input: TerminalSubmission,
 ): TerminalSubmittedFrame {
-  const rowPatches: TerminalSubmittedRow[] = []
   const sameLayout = previous?.layout === input.layout
-  const previousRows = sameLayout ? previous.rows : []
-  const rows = input.snapshot.rows.map((row) => {
-    const old = previousRows[row.y]
-    if (old?.y === row.y && old.text === row.text) return old
-    const owned = Object.freeze({ y: row.y, text: row.text })
-    rowPatches.push(owned)
-    return owned
-  })
+  const eagerPreviousRows = sameLayout && !input.previousTextRows ? previous.rows : []
+  let rows: readonly TerminalSubmittedRow[] | undefined
+  let rowPatches: readonly TerminalSubmittedRow[] | undefined
+  const materialize = () => {
+    if (rows) return
+    const patches: TerminalSubmittedRow[] = []
+    const previousRows = sameLayout ? (input.previousTextRows?.() ?? eagerPreviousRows) : []
+    rows = Object.freeze(
+      input.snapshot.rows.map((row) => {
+        const old = previousRows[row.y]
+        if (old?.y === row.y && old.text === row.text) return old
+        const owned = Object.freeze({ y: row.y, text: row.text })
+        patches.push(owned)
+        return owned
+      }),
+    )
+    rowPatches = Object.freeze(patches)
+  }
+  if (!input.previousTextRows) materialize()
   const viewport = input.snapshot.cursor.viewport
   return Object.freeze({
     frame: (previous?.frame ?? 0) + 1,
@@ -81,7 +92,13 @@ export function submittedFrame(
         })
       : undefined,
     scrollbar: Object.freeze({ ...input.scrollbar }),
-    rows: Object.freeze(rows),
-    rowPatches: Object.freeze(rowPatches),
+    get rows() {
+      materialize()
+      return rows!
+    },
+    get rowPatches() {
+      materialize()
+      return rowPatches!
+    },
   })
 }

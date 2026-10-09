@@ -60,6 +60,9 @@ export class FrameObserver {
     const { onFrame, onTextFrame, onRowsChanged, onRowsPainted } = this.options
     const changedRows = Object.freeze([...changed])
     if (!onFrame && !onTextFrame) return this.rowDelivery(generation, changedRows, rows)
+    const nativeFrame = this.options.retainDisplayedText
+      ? state.retainDisplayedFrame?.()
+      : undefined
     if (this.rowsNeeded) this.updateRows(state, changed, rows)
     else this.resize()
     const viewport = cursor.viewport ? Object.freeze({ ...cursor.viewport }) : undefined
@@ -73,10 +76,14 @@ export class FrameObserver {
           rows: Object.freeze(this.fullRows.filter(defined)),
         })
       : undefined
+    const ownedTextRows = this.rowsNeeded ? Object.freeze(this.textRows.filter(defined)) : undefined
     const textFrame = onTextFrame
       ? Object.freeze({
           ...snapshot,
-          rows: Object.freeze(this.textRows.filter(defined)),
+          nativeFrame,
+          get rows() {
+            return ownedTextRows ?? nativeFrame?.readTextRows() ?? Object.freeze([])
+          },
         })
       : undefined
     return () => {

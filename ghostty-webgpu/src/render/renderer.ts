@@ -37,8 +37,11 @@ import {
 import { RenderScheduler, type RenderSchedulerClock } from './scheduler.js'
 import { textPassGlyphCapacity, WebGpuTextPass } from './text-pass.js'
 
+import type { NativeDisplayedFrame } from '../core/displayed-frame.js'
+
 export interface RenderStateSource {
   readonly snapshotVersion?: number
+  retainDisplayedFrame?(): NativeDisplayedFrame
   createFrameBuilder?(columns: number, rows: number): ZigFrameBuilder
   acknowledge(): number
   readCursor(): RenderCursorSnapshot
@@ -109,6 +112,7 @@ export interface WebGpuTerminalRendererOptions {
   onTextFrame?: (snapshot: RendererTextFrameSnapshot) => void
   /** Return false for cursor-only snapshots; row data resumes with the full viewport. */
   needsFrameRows?: () => boolean
+  retainDisplayedText?: boolean
   /** Painted row IDs without requesting cell data. */
   onRowsChanged?: (rows: readonly number[]) => void
   onRowsPainted?: (rows: readonly RenderRow[]) => void
