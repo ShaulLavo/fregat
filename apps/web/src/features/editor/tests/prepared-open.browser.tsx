@@ -143,10 +143,16 @@ test(
   },
 )
 
-test.for([0, 200, 2_000, 35_000])(
-  'promotes a ready real Foresight prediction after $0 ms without duplicate work',
+test.for([
+  { delay: 0, prepared: true, opening: 'promotes a ready real Foresight prediction' },
+  { delay: 200, prepared: true, opening: 'promotes a ready real Foresight prediction' },
+  { delay: 2_000, prepared: true, opening: 'promotes a ready real Foresight prediction' },
+  // The preparation's 30-second lifetime expires; the canonical document stays warm.
+  { delay: 35_000, prepared: false, opening: 'warmly reopens after Foresight preparation expires' },
+])(
+  '$opening after $delay ms without duplicate worker work',
   { timeout: 30_000 },
-  async (delay) => {
+  async ({ delay, prepared }) => {
     seedBootMirrorTheme('dark')
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
@@ -216,7 +222,24 @@ test.for([0, 200, 2_000, 35_000])(
       delay < FILE_SNAPSHOT_STALE_MS ? 0 : 1,
     )
     expect(performance.getEntriesByName('editor.authoritative_text_paint')).toHaveLength(1)
-    await resetBenchmarkSample(sampleId)
+    const sample = await resetBenchmarkSample(sampleId)
+    if (prepared) {
+      expect(attachmentDiagnostic()?.detail).toMatchObject({
+        highlighter: 'ready',
+        prepared: true,
+        structural: 'ready',
+      })
+      expect(postActivationStructuralDiagnostics()).toEqual([])
+      assertDistinctJoinedRuntimeIds(sample)
+      return
+    }
+    expect(attachmentDiagnostic()?.detail).toMatchObject({ prepared: false })
+    expect(postActivationStructuralDiagnostics()).toEqual([
+      'editor.syntax.session_created',
+      'editor.syntax.session_created',
+    ])
+    expect(sample.joinedHighlighterRuntimeSessionIds).toEqual([])
+    expect(sample.joinedStructuralRuntimeSessionIds).toEqual([])
   },
 )
 
@@ -385,16 +408,16 @@ test(
       throw new RangeError('split editing controllers unavailable')
     firstController.commands.setSelection(3)
     secondController.commands.setSelection(lowerFrame.rows[0]!.start + 3)
-    const firstRow = firstFrame.rows[0]!
-    const lowerRow = lowerFrame.rows[0]!
-    for (const [editing, other, row, replacement] of [
-      [firstController, secondController, firstRow, '0'],
-      [secondController, firstController, lowerRow, '""'],
+    for (const [editing, other, selector, replacement] of [
+      [firstController, secondController, firstSelector, '"mapped"'],
+      [secondController, firstController, secondSelector, '""'],
     ] as const) {
+      const row = currentTokenPaint(selector).rows[0]!
       expect(row.text.indexOf('= ')).toBeGreaterThan(0)
       const offset = row.start + row.text.indexOf('= ') + 2
       const revision = retained.buffer.getRevision()
-      const replacementText = replacement.padEnd(row.end - offset)
+      const replacementText = replacement
+      const delta = replacementText.length - (row.end - offset)
       const otherSelection = other.getEditor()?.getSelections()
       const scroll = [firstController, secondController].map((controller) =>
         controller.getEditor()?.getScrollPosition(),
@@ -405,7 +428,9 @@ test(
         text: replacementText,
       })
       expect(retained.buffer.getRevision()).toBe(revision + 1)
-      expect(retained.buffer.materializeFullText().slice(offset, row.end)).toBe(replacementText)
+      expect(retained.buffer.materializeFullText().slice(offset, row.end + delta)).toBe(
+        replacementText,
+      )
       await nextAnimationFrame()
       await awaitEditorSyntaxWorkerIdleFences()
       await expect.poll(() => currentHighlighterRead().kind).toBe('ready')
@@ -416,7 +441,17 @@ test(
       await expect
         .poll(() => tokenPaintMismatch(currentTokenPaint(secondSelector), current))
         .toBeNull()
-      expect(other.getEditor()?.getSelections()).toEqual(otherSelection)
+      expect(otherSelection).toBeDefined()
+      const shift = (position: number) => (position >= row.end ? position + delta : position)
+      expect(other.getEditor()?.getSelections()).toEqual(
+        otherSelection?.map((selection) => ({
+          ...selection,
+          anchorOffset: shift(selection.anchorOffset),
+          headOffset: shift(selection.headOffset),
+          startOffset: shift(selection.startOffset),
+          endOffset: shift(selection.endOffset),
+        })),
+      )
       expect(
         [firstController, secondController].map((controller) =>
           controller.getEditor()?.getScrollPosition(),
@@ -530,6 +565,8 @@ test(
     const retained = harness.documentStore.getState().getLiveEditorDocument(fileDocumentKey(PATH))
     if (!retained) throw new RangeError('retained browser document unavailable')
     const originalText = retained.buffer.materializeFullText()
+    await awaitEditorSyntaxWorkerIdleFences()
+    const originalReference = currentTokenReference()
     const activeTabId = selectedGroupTab(
       harness.workspaceStore.getState().workbenchPanels.editorGroups,
     )?.id
@@ -590,8 +627,15 @@ test(
       await nextAnimationFrame()
       await awaitEditorSyntaxWorkerIdleFences()
       await expect.poll(() => currentHighlighterRead().kind).toBe('ready')
+      const expectedTokens = command === 'undo' ? originalReference : reference
+      expect(currentTokenReference().runs).toEqual(expectedTokens.runs)
       await expect
-        .poll(() => tokenPaintMismatch(currentTokenPaint(), currentTokenReference()))
+        .poll(() =>
+          tokenPaintMismatch(currentTokenPaint(), {
+            ...expectedTokens,
+            identity: currentTokenReference().identity,
+          }),
+        )
         .toBeNull()
       expect(currentTokenPaint().rows.every((row) => row.presentation === 'live')).toBe(true)
     }
@@ -642,7 +686,50 @@ test(
       })
       .toBe(1)
     expect(postActivationTransferRequestTypes()).toEqual([])
-    assertDistinctTransferredRuntimeIds(await resetBenchmarkSample(sampleId))
+    assertDistinctJoinedRuntimeIds(await resetBenchmarkSample(sampleId))
+  },
+)
+
+test(
+  'joins hover work on click and on a repeated activation without a second session or request',
+  { timeout: 30_000 },
+  async () => {
+    seedBootMirrorTheme('dark')
+    resetEditorColorThemeStore()
+    syncEditorThemeSelection('dark', 'dark-plus')
+    installBenchmarkTrace()
+    await mountHarness()
+    await expect.poll(() => runtime).not.toBeNull()
+    await expect.poll(activeThemeIdentity, { timeout: 10_000 }).toBe('dark-plus|dark-plus')
+    const harness = requiredRuntime()
+    expect(await harness.commands.openSearchEditor(ROOT_PATH)).toEqual({ status: 'applied' })
+    const sampleId = await beginBenchmarkSampleWhenReady()
+    performance.clearMarks('editor.worker.request')
+    workerRequestGate = installEditorWorkerRequestGate(['queryRange'])
+    holdWallClock()
+
+    await triggerForesightIntent()
+    await expect.poll(workerRequestGate.heldTypes, { timeout: 20_000 }).toEqual(['queryRange'])
+    diagnostics = []
+    await activateAndCaptureFirstFrame()
+    await activateAndCaptureFirstFrame()
+
+    expect(attachmentDiagnostic()?.detail).toMatchObject({ prepared: true })
+    workerRequestGate.restore()
+    workerRequestGate = null
+    await expect
+      .poll(() => performance.getEntriesByName('editor.authoritative_highlight_paint').length, {
+        timeout: 10_000,
+      })
+      .toBe(1)
+    await awaitEditorSyntaxWorkerIdleFences()
+    expect(workerRuntimeSessionIds('shiki')).toHaveLength(1)
+    expect(workerRuntimeSessionIds('tree-sitter')).toHaveLength(1)
+    expect(workerRequestCount('shiki', 'open')).toBe(1)
+    expect(workerRequestCount('tree-sitter', 'parse')).toBe(1)
+    const result = await resetBenchmarkSample(sampleId)
+    expect(result.preparedJoins).toBe(1)
+    assertDistinctJoinedRuntimeIds(result)
   },
 )
 
@@ -845,6 +932,13 @@ function postActivationTransferRequestTypes(): string[] {
   return preparationRequestTypes().filter((type) => transferRequests.has(type))
 }
 
+function workerRequestCount(family: string, type: string): number {
+  return performance.getEntriesByName('editor.worker.request', 'mark').filter((entry) => {
+    const detail = (entry as PerformanceMark).detail
+    return detail?.family === family && detail?.type === type
+  }).length
+}
+
 function workerRuntimeSessionIds(family: string): string[] {
   return [
     ...new Set(
@@ -859,6 +953,13 @@ function workerRuntimeSessionIds(family: string): string[] {
 
 function attachmentDiagnostic(): EditorDiagnostic | undefined {
   return diagnostics.findLast((diagnostic) => diagnostic.name === 'editor.document.attach')
+}
+
+function postActivationStructuralDiagnostics(): string[] {
+  const structuralNames = new Set(['editor.line_starts.scan', 'editor.syntax.session_created'])
+  return diagnostics
+    .filter((diagnostic) => structuralNames.has(diagnostic.name))
+    .map((diagnostic) => diagnostic.name)
 }
 
 function registeredForesightTarget() {
@@ -953,11 +1054,11 @@ async function resetBenchmarkSample(sampleId: string): Promise<EditorOpenSampleR
   })
 }
 
-function assertDistinctTransferredRuntimeIds(result: EditorOpenSampleResetResult): void {
-  expect(result.transferredHighlighterRuntimeSessionIds).toHaveLength(1)
-  expect(result.transferredStructuralRuntimeSessionIds).toHaveLength(1)
-  const highlighter = result.transferredHighlighterRuntimeSessionIds[0]
-  const structural = result.transferredStructuralRuntimeSessionIds[0]
+function assertDistinctJoinedRuntimeIds(result: EditorOpenSampleResetResult): void {
+  expect(result.joinedHighlighterRuntimeSessionIds).toHaveLength(1)
+  expect(result.joinedStructuralRuntimeSessionIds).toHaveLength(1)
+  const highlighter = result.joinedHighlighterRuntimeSessionIds[0]
+  const structural = result.joinedStructuralRuntimeSessionIds[0]
   expect(highlighter).toBeDefined()
   expect(structural).toBeDefined()
   expect(highlighter).not.toBe(structural)

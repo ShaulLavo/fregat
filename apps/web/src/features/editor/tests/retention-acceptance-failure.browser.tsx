@@ -87,12 +87,26 @@ test(
         .inspectRetention()
         .entries.some((entry) => entry.family === 'highlighter' && entry.status === 'failed'),
     ).toBe(true)
+    const workerAttempts = unavailable.length
     controller.commands.setSelection(0)
     controller.commands.focus()
     await commands.proofKeyPress({ key: 'x' })
     expect(document.buffer.materializeFullText()).toBe('x' + before)
+    await assertTerminalFallback('x' + before)
     expect(controller.commands.dispatchCommand('undo')).toBe(true)
     expect(document.buffer.materializeFullText()).toBe(before)
+    await assertTerminalFallback(before)
+
+    async function assertTerminalFallback(source: string) {
+      await awaitEditorSyntaxWorkerIdleFences()
+      const current = captureRetentionAcceptancePaint(app, failedPath, failed.id)
+      expect(unavailable).toHaveLength(workerAttempts)
+      expect(current.installed.initialHighlightStatus).toBe('error')
+      expect(current.source).toBe(source)
+      expect(current.frame.rows.length).toBeGreaterThan(0)
+      expect(current.frame.rows.every((row) => row.presentation === 'live')).toBe(true)
+      expect(current.frame.runs).toEqual([])
+    }
     await context.annotate(JSON.stringify({ unavailable, sample }), 'highlighter-failure-fallback')
   },
 )

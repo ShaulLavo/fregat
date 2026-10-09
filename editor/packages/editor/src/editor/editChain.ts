@@ -179,9 +179,7 @@ function composeEntries(entries: readonly EditChainEntry[]): readonly TextEdit[]
     if (!entry.textChanged) continue
     if (!entry.edits) return null
 
-    const next = composeBatch(composed, entry.edits)
-    if (!next) return null
-    composed = next
+    composed = composeBatch(composed, entry.edits)
   }
   return composed
 }
@@ -189,80 +187,63 @@ function composeEntries(entries: readonly EditChainEntry[]): readonly TextEdit[]
 function composeBatch(
   composed: readonly ComposedEdit[],
   batch: readonly TextEdit[],
-): ComposedEdit[] | null {
+): ComposedEdit[] {
   const next = composed.map((edit) => ({ ...edit }))
-  const inserts: ComposedEdit[] = []
-  const sortedBatch = batch.toSorted((left, right) => right.from - left.from)
-
-  for (const edit of sortedBatch) {
-    if (!placeBatchEdit(next, inserts, edit)) return null
-  }
-
-  for (const insert of inserts) {
-    if (!insertComposedEdit(next, insert)) return null
-  }
+  const sortedBatch = batch.toSorted((left, right) => right.from - left.from || right.to - left.to)
+  for (const edit of sortedBatch) placeBatchEdit(next, edit)
   return next
 }
 
-function placeBatchEdit(
-  composed: ComposedEdit[],
-  inserts: ComposedEdit[],
-  edit: TextEdit,
-): boolean {
+function placeBatchEdit(composed: ComposedEdit[], edit: TextEdit): void {
   const from = Math.min(edit.from, edit.to)
   const to = Math.max(edit.from, edit.to)
   let delta = 0
+  let index = 0
 
-  for (const target of composed) {
+  while (index < composed.length) {
+    const target = composed[index]!
     const currentStart = target.from + delta
     const currentEnd = currentStart + target.text.length
-
-    if (to <= currentStart) break
+    if (from > currentEnd) {
+      delta += target.text.length - (target.to - target.from)
+      index += 1
+      continue
+    }
     if (from >= currentStart && to <= currentEnd) {
       const offset = from - currentStart
       target.text =
         target.text.slice(0, offset) + edit.text + target.text.slice(offset + (to - from))
-      return true
+      return
     }
-    if (from < currentEnd) return false
+    break
+  }
+
+  const first = composed[index]
+  const currentStart = first ? first.from + delta : from
+  const baseFrom = first && from >= currentStart ? first.from : from - delta
+  const prefix = first && from >= currentStart ? first.text.slice(0, from - currentStart) : ''
+  let baseTo = to - delta
+  let suffix = ''
+  let endIndex = index
+
+  while (endIndex < composed.length) {
+    const target = composed[endIndex]!
+    const currentStart = target.from + delta
+    if (to < currentStart) break
+    const currentEnd = currentStart + target.text.length
+    endIndex += 1
+    if (to <= currentEnd) {
+      baseTo = target.to
+      suffix = target.text.slice(to - currentStart)
+      break
+    }
     delta += target.text.length - (target.to - target.from)
+    baseTo = to - delta
   }
 
-  inserts.push({ from: from - delta, to: to - delta, text: edit.text })
-  return true
-}
-
-function insertComposedEdit(composed: ComposedEdit[], edit: ComposedEdit): boolean {
-  let index = 0
-  while (index < composed.length && composed[index]!.from < edit.from) index += 1
-
-  const previous = composed[index - 1]
-  if (previous && previous.to > edit.from) return false
-  const following = composed[index]
-  if (following && edit.to > following.from) return false
-
-  if (following && edit.to === following.from) {
-    following.from = edit.from
-    following.text = edit.text + following.text
-    mergeWithPrevious(composed, index)
-    return true
-  }
-  if (previous && previous.to === edit.from) {
-    previous.to = edit.to
-    previous.text += edit.text
-    return true
-  }
-
-  composed.splice(index, 0, edit)
-  return true
-}
-
-function mergeWithPrevious(composed: ComposedEdit[], index: number): void {
-  const previous = composed[index - 1]
-  const current = composed[index]
-  if (!previous || !current || previous.to !== current.from) return
-
-  previous.to = current.to
-  previous.text += current.text
-  composed.splice(index, 1)
+  composed.splice(index, endIndex - index, {
+    from: baseFrom,
+    to: baseTo,
+    text: prefix + edit.text + suffix,
+  })
 }

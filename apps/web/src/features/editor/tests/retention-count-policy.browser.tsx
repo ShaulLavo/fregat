@@ -131,6 +131,9 @@ test(
     context.onTestFinished(() => container.remove())
     const samples: {
       entries: number
+      activeEntries: number
+      leases: number
+      runtimeSessionIds: string[]
       structuralSessions: number
       highlighterSessions: number
       tokenStoreBackingBytes: number
@@ -165,6 +168,14 @@ test(
       expect(sample.bound.passes).toBe(true)
       const resources = {
         entries: sample.entryCount,
+        activeEntries: sample.activeEntries,
+        leases: sample.inspections
+          .flatMap((inspection) => inspection.entries)
+          .reduce((sum, entry) => sum + entry.leaseCount, 0),
+        runtimeSessionIds: sample.inspections
+          .flatMap((inspection) => inspection.entries)
+          .map((entry) => entry.runtimeSessionId)
+          .sort(),
         structuralSessions: sample.treeWorker?.documentCount ?? 0,
         highlighterSessions: sample.shikiWorker?.documentCount ?? 0,
         tokenStoreBackingBytes: sample.inspections.reduce(
@@ -172,6 +183,9 @@ test(
           0,
         ),
       }
+      expect(resources.activeEntries).toBe(0)
+      expect(resources.leases).toBe(0)
+      expect(resources.runtimeSessionIds.length).toBe(resources.entries)
       expect(resources.entries).toBeGreaterThan(0)
       expect(resources.structuralSessions).toBeGreaterThan(0)
       expect(resources.highlighterSessions).toBeGreaterThan(0)

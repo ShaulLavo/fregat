@@ -72,11 +72,13 @@ type AnalysisDisplayInspection = {
   readonly queryWaiters: number
   readonly queryRanges: readonly EditorSyntaxRange[]
 }
-type AnalysisRetentionEntry = {
-  readonly family: 'structural' | 'highlighter'
+type AnalysisLeaseInspection = {
   readonly runtimeSessionId: string
   readonly leaseCount: number
   readonly lastLeaseReleasedAt: number | null
+}
+type AnalysisRetentionEntry = AnalysisLeaseInspection & {
+  readonly family: 'structural' | 'highlighter'
   readonly revision: number
   readonly status: EditorAnalysisRead<unknown>['kind']
   readonly resultCount: number
@@ -210,6 +212,7 @@ export type EditorDocumentAnalysis = {
     request: EditorAnalysisHighlighterRequest,
   ): EditorRetainedHighlighterSession | null
   subscribeRetention(listener: () => void): () => void
+  inspectLeases(): readonly AnalysisLeaseInspection[]
   inspectRetention(): AnalysisRetentionInspection
   reclaimInactive(options: AnalysisReclamationOptions): AnalysisReclamation
   dispose(): void
@@ -415,6 +418,17 @@ export class AnalysisEntry<T> {
     if (this.scheduling === 'pinned') return
     if (read.revision.point === this.queuedPoint && this.isConfigurationCurrent()) return
     this.enqueue(read)
+  }
+
+  protected retainFailure(read: DocumentRead): boolean {
+    if (this.scheduling === 'pinned') return false
+    if (this.state.kind !== 'failed' || !this.isConfigurationCurrent()) return false
+    if (this.queuedPoint === read.revision.point) return true
+    this.queuedPoint = read.revision.point
+    this.queuedRead = read
+    this.state = { ...this.state, revision: read.revision.point.revision }
+    if (this.active) this.retention.changed()
+    return true
   }
 
   synchronize(): void {
@@ -1248,6 +1262,11 @@ export class HighlighterEntry extends AnalysisEntry<EditorHighlightResult> {
       ? { ...state, providerTheme: this.highlighter.themeOutcome() }
       : state
   }
+  override changed(read: DocumentRead): void {
+    // Failed providers retry through explicit refreshes or configuration changes.
+    if (this.retainFailure(read)) return
+    super.changed(read)
+  }
   override refresh(): void {
     this.highlighter.invalidateTheme()
     super.refresh()
@@ -1419,6 +1438,18 @@ function createAnalysis(options: {
     borrowStructural: (request) => retention.mutate(() => borrowStructural(request)),
     borrowHighlighter: (request) => retention.mutate(() => borrowHighlighter(request)),
     subscribeRetention: (listener) => retention.subscribe(listener),
+    inspectLeases() {
+      const leases = []
+      for (const entry of entries) {
+        if (!(entry instanceof StructuralEntry || entry instanceof HighlighterEntry)) continue
+        leases.push({
+          runtimeSessionId: entry.runtimeSessionId,
+          leaseCount: entry.leaseCount,
+          lastLeaseReleasedAt: entry.lastLeaseReleasedAt,
+        })
+      }
+      return leases
+    },
     inspectRetention() {
       const records = new Set<ArrayBufferLike>()
       const tokenStores = new Set<EditorTokenStore>()

@@ -242,6 +242,39 @@ describe('active range retention', () => {
     }
   })
 
+  it('keeps failed highlighting terminal across edits until an explicit retry', async () => {
+    const buffer = createEditorTextBuffer('alpha')
+    const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'terminal-highlighter' })
+    let attempts = 0
+    let available = false
+    const result = { tokens: EditorTokenStore.empty() }
+    const highlighter = {
+      operation: createEditorHighlighterOperation(() => ({
+        analyze: async () => {
+          attempts++
+          if (!available) throw new TypeError('Controlled unavailable highlighter')
+          return result
+        },
+        dispose: () => undefined,
+      })),
+    }
+    const lease = analysis.borrowHighlighter({ provider: highlighter, languageId: 'typescript' })!
+    try {
+      await expect(lease.refresh(buffer.getTextSnapshot())).rejects.toBeInstanceOf(TypeError)
+      const attemptsBeforeEdit = attempts
+      createEditorBufferSession(buffer).applyText('beta')
+      expect(lease.read()).toMatchObject({ kind: 'failed', revision: buffer.getRevision() })
+      expect(attempts).toBe(attemptsBeforeEdit)
+      available = true
+      await expect(lease.refresh(buffer.getTextSnapshot())).resolves.toEqual(result)
+      expect(lease.read()).toMatchObject({ kind: 'ready', revision: buffer.getRevision() })
+      expect(attempts).toBe(attemptsBeforeEdit + 1)
+    } finally {
+      lease.dispose()
+      analysis.dispose()
+    }
+  })
+
   it('joins the current retry generation while the obsolete queued query settles', async () => {
     const buffer = createEditorTextBuffer('alpha')
     const analysis = createEditorDocumentAnalysis({ buffer, documentId: 'retry-head' })

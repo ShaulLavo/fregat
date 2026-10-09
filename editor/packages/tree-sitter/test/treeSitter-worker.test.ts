@@ -170,6 +170,31 @@ describe('tree-sitter worker internals', () => {
     },
   )
 
+  it.each([undefined, { startIndex: 0, endIndex: 100 }])(
+    'keeps brackets and skips missing-node checks on an error-free tree for range %j',
+    (range) => {
+      const children = [node('(', 1), node('identifier', 2, 3), node(')', 4)]
+      const root = Object.assign(node('program', 0, 100), { children })
+      let missingReads = 0
+      for (const current of [root, ...children]) {
+        Object.defineProperty(current, 'isMissing', {
+          get: () => {
+            missingReads++
+            return false
+          },
+        })
+      }
+      expect(collectTreeData(fakeTree(root, false), range)).toEqual({
+        brackets: [
+          { index: 1, char: '(', depth: 1 },
+          { index: 4, char: ')', depth: 1 },
+        ],
+        errors: [],
+      })
+      expect(missingReads).toBe(0)
+    },
+  )
+
   it('walks deeply nested trees without recursive stack overflow', () => {
     const root = nestedNode(12_000)
 
@@ -423,7 +448,8 @@ function nestedNode(depth: number): TestNode {
   return current
 }
 
-function fakeTree(root: TestNode): Tree {
+function fakeTree(root: TestNode, hasError = true): Tree {
+  Object.defineProperty(root, 'hasError', { value: hasError, configurable: true })
   return {
     rootNode: root,
     walk: () => new FakeTreeCursor(root),
