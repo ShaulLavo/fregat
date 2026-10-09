@@ -80,6 +80,36 @@ source or a benchmark artifact before it is written:
 Keep the README's current voice (short, lowercase headings). No "rather than" or "instead of"
 framing in the positioning copy.
 
+## Approved follow-up: audit native-window input preparation
+
+- [ ] Separate fixture preparation from terminal work in a fresh native-counter protocol. Keep
+      the original Canvas GC research windows and rejection decisions unchanged.
+- [ ] First reproduce the boundary finding from the `r9-canvas-gc` evidence directory in the
+      current host research binding:
+
+  ```sh
+  python3 "$lane/analyze-r8.py" pi-batch-buffer-interactive-edits-r01 pi-frame-buffer-interactive-edits-r01
+  ```
+
+  The frozen edit fixture allocates chunks through `Array.from(...matchAll(...), match =>
+new TextEncoder().encode(match[0]))`; its observed allocation site is
+  `batch-buffer-devices/packet/browser.js:455:824` and the matching candidate site. Both arms
+  run this preparation inside the native window. The repository's `rollingBurst` similarly
+  prepares input before its inner elapsed timer (`ghostty-webgpu/bench/comparison-entry.ts:596–603`).
+
+- [ ] Use trace marks to locate preparation, the first write, and GC finalization. The frame-scoped
+      candidate's edit windows recorded major-GC finalization in control 0 and candidates 1/2,
+      while control 3 had scavenges only; its paired all-Chrome instruction ratios were 0.878729
+      and 1.467704. The forced end-of-frame heap retained zero private scratch cells. Persistent
+      scratch retention alone therefore does not explain the observed guard loss.
+- [ ] Establish whether setup-boundary GC explains that variation. This remains unconfirmed;
+      neither a product-only GC cause nor a deopt/reopt storm was established. Validate affected
+      trace CPU clocks before assigning helper CPU time; keep native counters and trace wall times.
+- [ ] Rebuild both arms from current main with the same driver and assets before another Canvas
+      screen. The acquired sources predate the Canvas capture changes in `97fa72ffc`; record that
+      applicability difference, new protocol identities, and unchanged output/work checks. A future
+      setup change cannot qualify or rescore the old acquisitions.
+
 ## Done when
 
 - `docs/benchmarks.md` and its JSON artifacts are published in `ghostty-webgpu/`, losses included.
