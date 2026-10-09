@@ -151,16 +151,63 @@ them).
    Verification covers original fixtures for every grammar, separator-enclosing LF/CRLF fallback,
    lazy compilation, incremental edits, stale requests, deepest nested injections, MDX fences,
    injected-language fallback, UTF-16 offsets and all ten independent-review blockers.
-3. **Detector** in the tree-sitter worker: `overlap`, `parse`, `signature`, `orphan`, with author
-   versions rebuilt through local `projectEffects` snapshots.
-   Before frequent batch requests, route the lazy Markdown parse in
-   `packages/tree-sitter/src/treeSitter/treeSitter.worker.ts` (`queryMergeUnit`) through the
-   existing `parseTreeSlices` / `resumeTreeSlices` cancellation and progress path. Apply query
-   progress/deadline checks in `packages/tree-sitter/src/treeSitter/mergeUnits.ts` (`unitAt`),
-   and reuse parent eligibility per snapshot within a batch. Current single-range requests
-   synchronously parse Markdown and rebuild parent coverage; no batch latency claim is made.
-   Reproduce with 100k-line Markdown and TypeScript fixtures and 100 concurrent edit ranges,
-   then measure the plan's 2 ms budget and confirm stale or cancelled snapshots release work.
+3. **Detector:** functional implementation verified 2026-10-09; **step incomplete** until
+   worker integration and the unchanged **under-2-ms batch gate** pass. The demand-only
+   `@singapore-editor/collaboration/merge-review` export combines confirmed concurrency and an
+   injectable syntax reader without adding a dependency between collab and tree-sitter.
+   It emits `overlap`, `parse`, `signature` and `orphan`, retains exact concurrent edges,
+   builds unit IDs from unit kind/first-character identity, filters inactive effects and
+   reconstructs author/base versions through local `projectEffects` snapshots. Equivalent
+   JSON and JavaScript/TypeScript quoted/escaped signatures normalize before comparison.
+   Token/shape fingerprints are requested only for formatting projections.
+
+   Worker merge-unit analysis retains damaged syntax units and reports errors. Lazy Markdown
+   structural parsing now uses `parseTreeSlices` / `resumeTreeSlices`; query progress checks
+   use the existing cancellation/deadline context, and parent eligibility is reused per
+   retained snapshot/query. Cancellation/disposal of a 100k-block Markdown request releases
+   the retained snapshot, and subsequent requests report stale.
+
+   The detector coordinator, effect visibility, identity mapping, signatures, orphan checks
+   and projections run on the **invoking thread**. The supplied syntax reader determines the
+   query/parse thread; worker `mergeUnit` support runs in the parser worker, while the real
+   grammar test adapter runs on the Node test thread. There are no typing hooks, subscriptions
+   or automatic calls. Null session windows and logs without cross-author pairs return before
+   syntax work. A production bridge must still register confirmed/projected snapshots in the
+   parser worker and schedule review after accepted batches. Batch-scoped results describe
+   pairs involving the supplied IDs; request the full window to replace marks after undo or
+   retention changes. This step ships no marks UI or session scheduling.
+
+   Verification: original 18-case conflict corpus plus wide damaged-tree fallback regression; 10,000 seeded independent-function cases
+   with zero marks; 10,000 shared-unit cases all marked; five real E067 peer-session runs
+   with reordered/duplicate delivery and identical converged mark sets. Package and worker
+   regression suites pass. The corpus covers causal copy/move and edited descendants that
+   survive wrapper removal; arbitrary copy/delete moves do not preserve character identities.
+
+   **Cost gate remains incomplete.** Run
+   `bun run --cwd editor/packages/collaboration bench:merge-review` after workspace builds.
+   Evidence: `editor/packages/collaboration/bench/detector-evidence.json`, with a separately
+   instrumented profile in `detector-profile-evidence.json`. Both are **experiment, shared
+   machine**, A/B/B/A. Current retained parsing is prepared outside timing, as detection runs
+   after parsing; IPC and UI are excluded. The complete detector includes concurrency append,
+   pair selection, identity mapping and real queries. For 100 retained records, median
+   2/4/8-author batches are 0.945/1.005/1.050 ms (p95 2.011/1.988/1.770 ms). At 8,192 records
+   they are **2.645/2.734/2.723 ms**, p95 **4.181/4.790/4.918 ms**. These do not satisfy 2 ms.
+   `detector-baseline-evidence.json` records the intermediate cached-state implementation
+   before demand-only fingerprints, not the initial implementation.
+
+   The separately profiled representative batch has 100k lines, 100 edits, four authors and
+   8,192 retained records. Mean append is 1.677 ms; exact pair selection alone is 0.507 ms;
+   detector work after append is 2.031 ms. Current-unit lookup totals 0.821 ms, including
+   0.245 ms inside real query matching: one unit range and four query matches per edit.
+   V8 samples estimate 1.548 ms append, 0.447 ms pair selection, 0.762 ms unit selection/query,
+   0.082 ms signature/candidate checks, 0.044 ms orphan checks, 0.079 ms identity/effect work
+   and 0.323 ms bookkeeping per complete batch. These sampled estimates are not additive wall
+   timings. Parsing, token fingerprints and `projectEffects` rebuilds are zero in this
+   independent-unit timed workload; reconstruction cost remains unbounded by this experiment.
+   Follow-up starts with retained-window append (about 47% of measured CPU samples), then
+   unit/query selection (about 23%) and pair selection (about 14%). Keep the existing budget
+   and include marked projection workloads and worker transport in the remaining proof.
+
 4. **Marks, hover and resolutions** in the collaboration plugin, wired into the example page.
 5. **Fregat:** marks for agent edits racing human typing, review annotations on the host, and the
    "Fix with AI" action. Detection runs in the browser, where the parser lives; the server host

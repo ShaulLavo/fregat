@@ -56,6 +56,43 @@ presence.dispose()
 
 [Integration guide](https://github.com/ShaulLavo/fregat/blob/main/editor/packages/collaboration/docs/integration.md)
 
+## Confirmed merge review
+
+Import `MergeReviewDetector` from `@singapore-editor/collaboration/merge-review` and supply a
+`MergeReviewSyntax` reader. `detect(window, confirmedSnapshot, batch?)` returns `overlap`,
+`parse`, `signature` and `orphan` marks. Pass the snapshot produced by the accepted history;
+local pending typing stays outside that input. Each mark contains a unit ID built from the
+unit kind and its first character's identity, sorted authors/edit IDs, and exact concurrent
+pairs. Concurrency edges remain distinct because concurrency is non-transitive.
+
+The syntax reader returns one enclosing unit per requested range, in request order, using
+UTF-16 offsets into the supplied snapshot. Units include language, original signature spelling,
+error state, and parent range/commutativity. A `contentKey` request asks for syntax shape and
+leaf spelling with inter-token whitespace excluded; it is used to recognize formatting-only
+changes. Return `null` when a snapshot is unavailable or a request is cancelled. The detector
+then returns `unavailable` with an empty mark set so a host can retry the whole batch.
+
+With `batch` supplied, results concern concurrent pairs involving those IDs. A host that needs
+a replacement mark set after undo, eviction or dismissal should request the whole retained
+window by omitting `batch`. Marks and their settlement are caller-owned.
+
+The detector is demand-only: it adds no subscriptions, timers, typing hooks or default syntax
+reader. A null session window or a window without cross-author pairs returns before syntax
+work. The coordinator, identity mapping, signature/orphan checks and `projectEffects` run on
+the invoking thread; the supplied reader determines where syntax queries and projected-snapshot
+parsing run. Worker `mergeUnit` requests support `analysis: true`, optional `contentKey: true`,
+and cancellation. A production bridge that registers confirmed/projected snapshots in that
+worker and schedules review after confirmed batches remains to be wired. The Node correctness
+and cost fixtures use real grammars and queries on the test thread.
+
+Run `bun run bench:merge-review` from this package for the shared-machine cost experiment and
+CPU profile. The current 8,192-record workload exceeds the plan's unchanged 2 ms budget;
+`bench/detector-evidence.json` records gate measurements and `bench/detector-profile-evidence.json`
+records separately instrumented attribution. `bench/detector-baseline-evidence.json` is the
+intermediate cached-state baseline before token fingerprints became demand-only. The profile
+uses independent units, so projected-snapshot rebuilding and parsing are zero inside its timed
+region; their cost is still unbounded by that experiment.
+
 ## Transport status
 
 Transport options accept an optional `onRecovery` callback. Match all scope arguments

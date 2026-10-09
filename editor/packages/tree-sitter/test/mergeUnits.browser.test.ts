@@ -207,3 +207,63 @@ it('preserves the injected language when its query falls back to lines', async (
     await client.mergeUnit({ ...identity, range: { startIndex, endIndex: startIndex + 5 } }),
   ).toMatchObject({ status: 'ok', languageId: 'html', unit: { source: 'line' } })
 })
+
+it('reports missing syntax and token spelling on demand for review projections', async () => {
+  const text = 'const answer = "alpha""beta";'
+  await parseTreeDocument(client, {
+    ...document,
+    snapshotVersion: 1,
+    text,
+    includeHighlights: false,
+    resultMode: 'parseOnly',
+  })
+  const result = await client.mergeUnit({
+    ...document,
+    snapshotVersion: 1,
+    range: { startIndex: 15, endIndex: 22 },
+    analysis: true,
+    contentKey: true,
+  })
+  expect(result).toMatchObject({
+    status: 'ok',
+    unit: { type: 'lexical_declaration', hasErrors: true },
+  })
+  if (result?.status === 'ok') expect(result.unit.contentKey).toContain('alpha')
+})
+
+it('releases cancelled lazy Markdown structural work', async () => {
+  const identity = {
+    ...document,
+    documentId: 'review.md',
+    runtimeSessionId: 'cancel-merge-markdown',
+    languageId: 'markdown',
+  }
+  const text = '# Title\n\nA paragraph for review.\n\n'.repeat(100_000)
+  await parseTreeDocument(client, {
+    ...identity,
+    snapshotVersion: 1,
+    text,
+    includeHighlights: false,
+    resultMode: 'parseOnly',
+  })
+  const pending = client.mergeUnit({
+    ...identity,
+    snapshotVersion: 1,
+    range: { startIndex: 12, endIndex: 20 },
+    analysis: true,
+  })
+  client.disposeDocument(identity.runtimeSessionId)
+  await pending.catch(() => undefined)
+  await client.awaitRuntimeSessionIdle(identity.runtimeSessionId)
+  const retention = await client.inspectRetention()
+  expect(
+    retention!.documents.some((entry) => entry.runtimeSessionId === identity.runtimeSessionId),
+  ).toBe(false)
+  expect(
+    await client.mergeUnit({
+      ...identity,
+      snapshotVersion: 1,
+      range: { startIndex: 12, endIndex: 20 },
+    }),
+  ).toMatchObject({ status: 'stale', unit: null })
+}, 120_000)

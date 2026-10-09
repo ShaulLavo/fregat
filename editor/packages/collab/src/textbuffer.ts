@@ -33,6 +33,7 @@ import type {
   CharId,
   CharacterIdentity,
   Engine,
+  EditId,
   Envelope,
   Effect,
   Insert,
@@ -161,6 +162,10 @@ export class TextbufferEngine implements Engine<TextbufferSnapshot> {
     retainPieceTableSnapshot(snapshot.buffer)
     this.retainPayloads(snapshot)
     this.state = snapshot
+  }
+  effectActive(id: EditId): boolean {
+    const operation = get(this.state.effects.operations, { bunch: id.actor, counter: id.seq })
+    return operation?.kind === 'edit' && operation.active
   }
   visibleOffset(id: CharId): number | null {
     return locateCharId(this.state.buffer, id)?.offset ?? null

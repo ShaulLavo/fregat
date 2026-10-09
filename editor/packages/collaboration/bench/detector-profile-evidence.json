@@ -1,0 +1,54 @@
+{
+  "qualification": "experiment, shared machine; profiling overhead included, not the cost-gate result",
+  "workload": {
+    "lines": 100000,
+    "edits": 100,
+    "authors": 4,
+    "retained": 8192,
+    "detectorBatches": 80
+  },
+  "method": "Retained current parse prepared outside timing. 20 warmups, then A/B/B/A with 80 samples per mode. A: exact pairs. B: complete detector. Append separately timed in both modes. Query instrumentation calls the original real Query.matches. V8 CPU sampling at 100 microseconds starts after each window setup and stops before validation; GC/harness remain separately reported. CPU categories normalize append and pair samples across both modes to one complete batch. CPU shares are sampling estimates, not additive wall timings.",
+  "wall": {
+    "appendMeanMs": 1.676545656250002,
+    "exactPairsMeanMs": 0.5068012749999937,
+    "detectorWithoutAppendMeanMs": 2.0305626875000486,
+    "currentUnitLookupsMeanMs": 0.8205606125004664,
+    "queryMatchesMeanMs": 0.24493915000148547,
+    "unitLookupsPerBatch": 100,
+    "unitLookupsPerEdit": 1,
+    "queryMatchesPerBatch": 400,
+    "queryMatchesPerEdit": 4,
+    "parseCallsInsideTiming": 0,
+    "parseMsInsideTiming": 0,
+    "projectEffectsRebuildsInsideTiming": 0
+  },
+  "reconstruction": "This independent-unit batch produces no candidates: no projected snapshots, version parsing, content fingerprints or projectEffects rebuilds. The conflict corpus separately exercises reconstruction; this profile does not bound its cost.",
+  "cpuSampledMs": {
+    "outside-timer: setup, validation, GC, harness": 13278.929000000006,
+    "concurrency append": 247.72200000000004,
+    "exact concurrent pairs": 71.499,
+    "detector bookkeeping": 25.855999999999984,
+    "identity mapping/effect visibility": 6.3249999999999975,
+    "parse/query and unit selection": 60.92100000000003,
+    "orphan checks": 3.4919999999999987,
+    "signature/candidate checks": 6.571999999999999
+  },
+  "cpuPerBatchEstimatedMs": {
+    "concurrency append": 1.5482625000000003,
+    "exact concurrent pairs": 0.44686875,
+    "detector bookkeeping": 0.3231999999999998,
+    "identity mapping/effect visibility": 0.07906249999999997,
+    "parse/query and unit selection": 0.7615125000000004,
+    "orphan checks": 0.04364999999999998,
+    "signature/candidate checks": 0.08214999999999999
+  },
+  "cpuMeasuredShares": {
+    "concurrency append": 0.47135493470687073,
+    "exact concurrent pairs": 0.1360452704104058,
+    "detector bookkeeping": 0.09839540445968337,
+    "identity mapping/effect visibility": 0.024069884483582046,
+    "parse/query and unit selection": 0.23183579962439574,
+    "orphan checks": 0.013288859544137312,
+    "signature/candidate checks": 0.025009846770925097
+  }
+}
