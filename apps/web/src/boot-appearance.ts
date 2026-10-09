@@ -16,6 +16,16 @@ import { phoneStartAddress, phoneBaseScreen } from '@/features/address/utils/pho
 // inline script in index.html, because a module script would run after first paint.
 // applyAppearance in main.tsx re-applies the full appearance once the app boots.
 
+// Chromium exposes the keyboard API and supports this hint; WebKit warns when parsing it.
+if ('virtualKeyboard' in navigator) {
+  const viewport = document.querySelector('meta[name="viewport"]')
+  if (viewport)
+    viewport.setAttribute(
+      'content',
+      `${viewport.getAttribute('content')}, interactive-widget=resizes-content`,
+    )
+}
+
 const values = initialAppearanceValues()
 const appearance = {
   mode: bootstrapMode(values['workbench.colorTheme']),
