@@ -58,7 +58,7 @@ function blockKeys(condition, code) {
   if (condition.type === 'LogicalExpression' && condition.operator === '||') {
     const left = blockKeys(condition.left, code)
     const right = blockKeys(condition.right, code)
-    return left && right ? [...left, ...right] : null
+    return left && right ? left.concat(right) : null
   }
   if (condition.type !== 'BinaryExpression' || !isCacheSlot(condition.left)) return null
   if (condition.operator === '===') return []
@@ -110,7 +110,7 @@ function memoBlocks(body, code) {
     blocks.push({
       keys,
       temporaries: names,
-      yields: [...new Set(names.map((name) => aliases.get(name) ?? name))],
+      yields: Array.from(new Set(names.map((name) => aliases.get(name) ?? name))),
       summary: summarize(node.consequent, code),
     })
   })
@@ -137,11 +137,12 @@ function namedKeys(keys, blocks, derived, seen) {
   const resolved = keys.flatMap((key) => {
     if (!/^t\d+$/.test(key) || seen.has(key)) return [key]
     const producer = producerOf(key, blocks)
-    const next = new Set([...seen, key])
+    const next = new Set(seen)
+    next.add(key)
     if (producer) return namedKeys(producer.keys, blocks, derived, next)
     return [derived.get(key) ?? key]
   })
-  return [...new Set(resolved)]
+  return Array.from(new Set(resolved))
 }
 
 function producerOf(temporary, blocks) {
@@ -164,7 +165,7 @@ function collectFunctions(node, name, found) {
     return node.arguments.forEach((argument) => collectFunctions(argument, name, found))
   if (!isFunction(node) || node.body.type !== 'BlockStatement') return undefined
   const resolved = node.id?.name ?? name
-  if (resolved) found.push({ name: resolved, body: node.body })
+  if (resolved) found.push({ name: resolved, body: node.body, params: node.params })
   return undefined
 }
 
@@ -193,27 +194,123 @@ function rootIdentifier(node) {
   return cursor?.type === 'Identifier' ? cursor.name : null
 }
 
-/**
- * Every identifier a hook keys on: named in a dependency array, or handed to a hook as an argument
- * the way a store selector is. Such a value must keep its identity, and the compiler's cache is a
- * cache rather than a guarantee — when it recomputes, the effect re-runs or the store re-subscribes.
- * A manual memo is load-bearing there however well the inferred keys match.
- */
-function dependencyNames(tree) {
+function referencedNames(tree) {
+  const names = new Set()
+  if (!tree) return names
+  walk(tree, (node) => {
+    if (node.type === 'Identifier') names.add(node.name)
+    if (node.type === 'Property' && !node.computed) {
+      for (const name of referencedNames(node.value)) names.add(name)
+      return false
+    }
+    if (node.type === 'MemberExpression' && !node.computed) {
+      for (const name of referencedNames(node.object)) names.add(name)
+      return false
+    }
+  })
+  return names
+}
+
+function reactImports(tree) {
+  const named = new Map()
+  const namespaces = new Set()
+  for (const statement of tree.body) {
+    if (statement.type !== 'ImportDeclaration' || statement.source.value !== 'react') continue
+    for (const specifier of statement.specifiers) {
+      if (specifier.type === 'ImportSpecifier') {
+        named.set(specifier.local.name, specifier.imported.name ?? specifier.imported.value)
+        continue
+      }
+      namespaces.add(specifier.local.name)
+    }
+  }
+  return { named, namespaces }
+}
+
+function reactHook(callee, imports) {
+  if (callee?.type === 'Identifier') return imports.named.get(callee.name) ?? null
+  if (callee?.type !== 'MemberExpression' || !imports.namespaces.has(callee.object.name))
+    return null
+  const name = callee.computed ? callee.property.value : callee.property.name
+  return typeof name === 'string' ? name : null
+}
+
+function bindingNames(pattern, names) {
+  if (!pattern) return
+  if (pattern.type === 'Identifier') {
+    names.add(pattern.name)
+    return
+  }
+  if (pattern.type === 'RestElement') return bindingNames(pattern.argument, names)
+  if (pattern.type === 'AssignmentPattern') return bindingNames(pattern.left, names)
+  if (pattern.type === 'ArrayPattern') {
+    for (const element of pattern.elements) bindingNames(element, names)
+    return
+  }
+  if (pattern.type === 'ObjectPattern')
+    for (const property of pattern.properties)
+      bindingNames(property.value ?? property.argument, names)
+}
+
+function scopedImports(entry, imports) {
+  const shadowed = new Set()
+  for (const parameter of entry.params) bindingNames(parameter, shadowed)
+  walk(entry.body, (node) => {
+    if (isFunction(node)) {
+      bindingNames(node.id, shadowed)
+      return false
+    }
+    if (node.type === 'VariableDeclarator') bindingNames(node.id, shadowed)
+  })
+  return {
+    named: new Map(Array.from(imports.named).filter(([name]) => !shadowed.has(name))),
+    namespaces: new Set(Array.from(imports.namespaces).filter((name) => !shadowed.has(name))),
+  }
+}
+
+function addAliasReads(names, alias, reads) {
+  if (!names.has(alias)) return false
+  let changed = false
+  for (const read of reads) {
+    if (names.has(read)) continue
+    names.add(read)
+    changed = true
+  }
+  return changed
+}
+
+function expandAliases(tree, names) {
+  const aliases = []
+  walk(tree, (node) => {
+    if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && node.init)
+      aliases.push([node.id.name, referencedNames(node.init)])
+  })
+  let changed
+  do {
+    changed = aliases.reduce(
+      (changed, [alias, reads]) => addAliasReads(names, alias, reads) || changed,
+      false,
+    )
+  } while (changed)
+  return names
+}
+
+function dependencyNames(tree, imports) {
   const names = new Set()
   walk(tree, (node) => {
-    if (node.type !== 'CallExpression' || !node.callee?.name?.startsWith('use')) return
-    if (DEPENDENCY_HOOKS.has(node.callee.name)) {
+    if (node.type !== 'CallExpression') return
+    const hook = reactHook(node.callee, imports) ?? node.callee?.name
+    if (!hook?.startsWith('use')) return
+    if (DEPENDENCY_HOOKS.has(hook)) {
       const deps = node.arguments[1]
       for (const element of deps?.type === 'ArrayExpression' ? (deps.elements ?? []) : []) {
         const name = rootIdentifier(element)
         if (name) names.add(name)
       }
     }
-    // An identifier argument is the store shape: `useStore(select)`, `useStore(source.subscribe)`.
+    // Selectors and options can carry the memo through objects or callback closures.
     for (const argument of node.arguments) {
-      const name = rootIdentifier(argument)
-      if (name) names.add(name)
+      for (const name of referencedNames(argument)) names.add(name)
     }
   })
   // React keys on a ref callback's identity too: it calls the old one with null on every change.
@@ -228,18 +325,23 @@ function dependencyNames(tree) {
     const name = rootIdentifier(node.value)
     if (name) names.add(name)
   })
-  return names
+  return expandAliases(tree, names)
 }
 
-function manualMemoSites(tree) {
+function manualMemoSites(tree, imports) {
   const sites = []
   walk(tree, (node) => {
     const declared =
       node.type === 'VariableDeclarator' &&
       node.id.type === 'Identifier' &&
       node.init?.type === 'CallExpression' &&
-      MANUAL_MEMO_HOOKS.has(node.init.callee.name)
-    if (declared) sites.push({ name: node.id.name, call: node.init })
+      MANUAL_MEMO_HOOKS.has(reactHook(node.init.callee, imports))
+    if (declared)
+      sites.push({
+        name: node.id.name,
+        hook: reactHook(node.init.callee, imports),
+        call: node.init,
+      })
   })
   return sites
 }
@@ -249,7 +351,7 @@ function withoutManualMemo(site, source) {
   const [callback] = site.call.arguments
   if (!callback) return null
   const text = source.slice(callback.start, callback.end)
-  if (site.call.callee.name === 'useCallback') return text
+  if (site.hook === 'useCallback') return text
   if (!isFunction(callback)) return null
   if (callback.body.type === 'BlockStatement') return `(${text})()`
   return `(${source.slice(callback.body.start, callback.body.end)})`
@@ -258,26 +360,50 @@ function withoutManualMemo(site, source) {
 function manualDeps(site, source) {
   const deps = site.call.arguments[1]
   if (deps?.type !== 'ArrayExpression') return null
+  if (deps.elements.some((element) => !element || element.type === 'SpreadElement')) return null
   return deps.elements.map((element) => source.slice(element.start, element.end))
 }
 
-function keysFor(explained, name) {
-  for (const entry of explained.functions) {
-    const block = entry.blocks.find((candidate) => candidate.yields.includes(name))
-    if (block) return block.keys
-  }
-  return null
+function keysFor(explained, component, name) {
+  const entry = explained.functions.find((entry) => entry.name === component)
+  return entry?.blocks.find((candidate) => candidate.yields.includes(name))?.keys ?? null
 }
 
 function sameSet(left, right) {
   return left.length === right.length && left.every((value) => right.includes(value))
 }
 
-function verdict(manual, inferred, refusedWithout, isDependency) {
-  if (isDependency)
-    return 'needed: a hook depends on this value, and compiler memoization is a cache, not identity'
+function escapingNames(tree, imports) {
+  const names = new Set()
+  const record = (node) => {
+    for (const name of referencedNames(node)) names.add(name)
+  }
+  walk(tree, (node) => {
+    if (
+      node.type === 'ReturnStatement' &&
+      !['JSXElement', 'JSXFragment'].includes(node.argument?.type)
+    )
+      record(node.argument)
+    if (node.type === 'JSXElement') {
+      const tag = node.openingElement.name
+      if (tag.type === 'JSXIdentifier' && /^[a-z]/.test(tag.name)) return
+      record(node)
+    }
+    if (node.type !== 'CallExpression' && node.type !== 'NewExpression') return
+    const hook = reactHook(node.callee, imports) ?? node.callee?.name
+    if (hook?.startsWith('use')) return
+    if (node.callee.type === 'MemberExpression') record(node.callee.object)
+    for (const argument of node.arguments) record(argument)
+  })
+  return expandAliases(tree, names)
+}
+
+function verdict(manual, inferred, refusedWithout, isDependency, escapes) {
+  if (isDependency) return "needed: a hook depends on this value's identity"
   if (refusedWithout) return 'needed: the compiler refuses the component without it'
-  if (inferred === null) return 'needed: the compiler does not memoize this value on its own'
+  if (inferred === null) return "review: the compiler output does not isolate this value's cache"
+  if (manual !== null && sameSet(manual, inferred) && escapes)
+    return 'review: the compiler picks the same keys, but a caller can depend on this value'
   if (manual !== null && sameSet(manual, inferred))
     return 'redundant: the compiler picks the same keys'
   return 'differs: read both key lists and decide'
@@ -289,33 +415,60 @@ function lineOf(source, offset) {
 
 /** Compiles the file once per manual memo with that memo removed, and compares the keys. */
 export function auditManualMemos(file, source) {
-  const baseline = compileLikeBuild(file, source).errors.length
   const tree = parse(file, source)
-  const dependencies = dependencyNames(tree)
-  return manualMemoSites(tree).flatMap((site) => {
-    const replacement = withoutManualMemo(site, source)
-    if (replacement === null) return []
-    const variant = source.slice(0, site.call.start) + replacement + source.slice(site.call.end)
-    const explained = explainSource(file, variant)
-    const manual = manualDeps(site, source)
-    const inferred = keysFor(explained, site.name)
-    return [
-      {
-        file,
-        line: lineOf(source, site.call.start),
-        name: site.name,
-        hook: site.call.callee.name,
-        manual,
-        inferred,
-        verdict: verdict(
-          manual,
-          inferred,
-          explained.diagnostics.length > baseline,
-          dependencies.has(site.name),
-        ),
-      },
-    ]
+  const imports = reactImports(tree)
+  const functions = []
+  for (const statement of tree.body) collectFunctions(statement, null, functions)
+  const owned = functions
+    .filter((entry) => isReactFunction(entry.name))
+    .map((entry) => {
+      const localImports = scopedImports(entry, imports)
+      return { ...entry, imports: localImports, sites: manualMemoSites(entry.body, localImports) }
+    })
+  if (!owned.some((entry) => entry.sites.length > 0)) return []
+  const baseline = compileLikeBuild(file, source).errors.length
+  return owned.flatMap((entry) => {
+    const dependencies = dependencyNames(entry.body, entry.imports)
+    const escapes = escapingNames(entry.body, entry.imports)
+    return entry.sites.flatMap((site) =>
+      auditMemoSite(file, source, baseline, entry, dependencies, escapes, site),
+    )
   })
+}
+
+function auditMemoSite(file, source, baseline, entry, dependencies, escapes, site) {
+  const replacement = withoutManualMemo(site, source)
+  if (replacement === null) return []
+  const variant = source.slice(0, site.call.start) + replacement + source.slice(site.call.end)
+  const explained = explainSource(file, variant)
+  const manual = manualDeps(site, source)
+  const inferred = keysFor(explained, entry.name, site.name)
+  let comparison = 'unavailable'
+  if (manual !== null && inferred !== null)
+    comparison = sameSet(manual, inferred) ? 'same' : 'different'
+  const decision = verdict(
+    manual,
+    inferred,
+    explained.diagnostics.length > baseline,
+    dependencies.has(site.name),
+    escapes.has(site.name),
+  )
+  return [
+    {
+      file,
+      component: entry.name,
+      line: lineOf(source, site.call.start),
+      name: site.name,
+      hook: site.hook,
+      manual,
+      inferred,
+      status: decision.split(':')[0],
+      comparison,
+      manualOnly: manual && inferred ? manual.filter((key) => !inferred.includes(key)) : [],
+      compilerOnly: manual && inferred ? inferred.filter((key) => !manual.includes(key)) : [],
+      verdict: decision,
+    },
+  ]
 }
 
 function sourceFiles(target) {
@@ -364,7 +517,16 @@ function formatAudit(rows) {
         `    ${row.verdict}`,
         `    manual:   ${formatKeys(row.manual)}`,
         `    compiler: ${formatKeys(row.inferred)}`,
-      ].join('\n'),
+      ]
+        .concat(
+          row.comparison === 'different'
+            ? [
+                `    manual-only: ${row.manualOnly.join(', ') || '(none)'}`,
+                `    compiler-only: ${row.compilerOnly.join(', ') || '(none)'}`,
+              ]
+            : [],
+        )
+        .join('\n'),
     )
     .join('\n')
 }
@@ -377,6 +539,7 @@ function main() {
       json: { type: 'boolean', default: false },
       // `memos` only: hide the rows that need no decision.
       undecided: { type: 'boolean', default: false },
+      check: { type: 'boolean', default: false },
     },
   })
   const [verb, ...targets] = positionals
@@ -394,8 +557,17 @@ function main() {
   if (verb === 'memos') {
     const rows = files
       .flatMap((file) => auditManualMemos(...read(file)))
-      .filter((row) => !values.undecided || !row.verdict.startsWith('needed'))
-    return print(values.json, rows, `${formatAudit(rows)}\n\n${tally(rows)}`)
+      .filter(
+        (row) => !values.undecided || row.status !== 'needed' || row.comparison === 'different',
+      )
+    const shown =
+      values.check && !values.json ? rows.filter((row) => row.status === 'redundant') : rows
+    print(values.json, shown, [formatAudit(shown), tally(rows)].filter(Boolean).join('\n\n'))
+    if (values.check && rows.some((row) => row.status === 'redundant')) {
+      process.stderr.write('Manual memo check failed: redundant memoization remains.\n')
+      process.exitCode = 1
+    }
+    return
   }
   process.stderr.write('usage: react-compiler-explain.mjs <explain|memos> [file-or-dir…]\n')
   process.exitCode = 2
@@ -407,7 +579,7 @@ function tally(rows) {
     const kind = row.verdict.split(':')[0]
     counts.set(kind, (counts.get(kind) ?? 0) + 1)
   }
-  return [...counts].map(([kind, count]) => `${kind} ${count}`).join(', ') || 'no manual memos'
+  return Array.from(counts, ([kind, count]) => `${kind} ${count}`).join(', ') || 'no manual memos'
 }
 
 function print(json, data, text) {

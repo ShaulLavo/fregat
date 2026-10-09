@@ -205,6 +205,9 @@ jobs:
       - name: React Compiler census
         run: bun run compiler:census
 
+      - name: Manual React memo check
+        run: bun run compiler:memos:check
+
       - name: Unused code
         run: bun run unused:check
 
