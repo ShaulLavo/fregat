@@ -402,6 +402,7 @@ export class WebGlTerminalRenderer {
         this.focused ? undefined : this.inactiveCursorStyle,
       ),
       full: this.needsFullRebuild,
+      stableRows: true,
       overlayRows: this.overlayRows,
     }
     const status = buildZigFrame(builder, this.atlas, this.rasterizer, options)
@@ -415,7 +416,7 @@ export class WebGlTerminalRenderer {
     pass.syncAtlas(this.atlas.consumeUploads())
     const operations = pass.uploadFrame(builder, updates)
     // Persistent records can report terminal damage without changing either GPU buffer.
-    if (operations > 0) pass.submit()
+    if (pass.frameChanged) pass.submit()
     if (this.context.isContextLost()) {
       this.suspendContext()
       return
@@ -425,7 +426,7 @@ export class WebGlTerminalRenderer {
       rows = options.full ? this.renderState.readRows({ packed: true }) : this.rowsToRebuild(damage)
     }
     if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
-    if (operations > 0) {
+    if (pass.frameChanged) {
       this.recordFrame(pass, builder.rowRebuilds, operations)
       this.metrics.zigFrames += 1
     }
@@ -509,7 +510,7 @@ export class WebGlTerminalRenderer {
     this.metrics.atlasUploadedBytes = this.atlasUploadedBytesOffset + pass.atlasUploadedBytes
     this.metrics.atlasUploadOperations =
       this.atlasUploadOperationsOffset + pass.atlasUploadOperations
-    this.metrics.draws += 2
+    this.metrics.draws += pass.drawCount
     this.metrics.instanceUploadOperations += operations
     this.metrics.rebuiltRows += rebuiltRows
     this.metrics.submittedFrames += 1

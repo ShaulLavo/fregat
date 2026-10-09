@@ -22,7 +22,7 @@ import { expectPixelsEqual } from './tests/pixels.js'
 const disposables: (() => void)[] = []
 const paintObservers = new Map<
   WebGlTerminalRenderer,
-  { canvas: HTMLCanvasElement; count: () => number; reset: () => void; submitted: number }
+  { canvas: HTMLCanvasElement; count: () => number; reset: () => void; draws: number }
 >()
 
 afterEach(() => {
@@ -65,7 +65,7 @@ async function rendererFixture(
     canvas,
     count: () => draw.mock.calls.length,
     reset: () => draw.mockClear(),
-    submitted: 0,
+    draws: 0,
   })
   return { canvas, clock, renderer }
 }
@@ -81,8 +81,8 @@ async function nativeFixture(content: string) {
 
 async function expectPainted(native: WebGlTerminalRenderer): Promise<Uint8Array> {
   const observer = paintObservers.get(native)!
-  expect(observer.count()).toBe((native.metrics.submittedFrames - observer.submitted) * 2)
-  observer.submitted = native.metrics.submittedFrames
+  expect(observer.count()).toBe(native.metrics.draws - observer.draws)
+  observer.draws = native.metrics.draws
   const displayed = await displayedPixels(observer.canvas)
   expect(displayed.byteLength).toBe(observer.canvas.width * observer.canvas.height * 4)
   const pixels = await native.capturePixels()
@@ -145,15 +145,15 @@ describe('WebGL WASM frame pixels', () => {
     expect(readRows).not.toHaveBeenCalled()
   })
 
-  it('diffs viewport scroll records while preserving scheduled pixels', async () => {
+  it('remaps resident viewport scroll records while preserving scheduled pixels', async () => {
     const { native, nativeSource, readRows, build } = await nativeFixture(
       '\x1b[?25lsame\r\nsame\r\nother\r\nsame',
     )
     native.clock.flushFrame()
     const bottom = await expectPainted(native.renderer)
-    const fullBufferBytes = 32 * 3 * (64 + 96)
     for (const delta of [-1, 1]) {
       const uploaded = native.renderer.metrics.uploadedBytes
+      const submitted = native.renderer.metrics.submittedFrames
       build.mockClear()
       nativeSource.terminal.scrollBy(delta)
       native.renderer.notifyScroll()
@@ -162,12 +162,9 @@ describe('WebGL WASM frame pixels', () => {
       if (delta === -1) expect(pixels).not.toEqual(bottom)
       if (delta === 1) expect(pixels).toEqual(bottom)
       const uploadedBytes = native.renderer.metrics.uploadedBytes - uploaded
-      expect(uploadedBytes).toBeGreaterThan(0)
-      expect({ full: build.mock.calls.map(([options]) => options.full), uploadedBytes }).toEqual({
-        full: [false],
-        uploadedBytes: expect.any(Number),
-      })
-      expect(uploadedBytes).toBeLessThan(fullBufferBytes)
+      expect(uploadedBytes).toBe(0)
+      expect(native.renderer.metrics.submittedFrames).toBe(submitted + 1)
+      expect(build.mock.calls.map(([options]) => options.full)).toEqual([false])
       expect(readRows).not.toHaveBeenCalled()
     }
   })
