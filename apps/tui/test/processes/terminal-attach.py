@@ -67,7 +67,7 @@ def check_attach(bun, directory):
         await_nvim_size(terminal, "40x120")
         terminal.buffer = b""
         terminal.send(b"\x1dd")
-        terminal.expect_screen("PLATFORM")
+        terminal.expect_screen("Fregat  workspace")
         terminal.expect_modes((False, False))
         terminal.send(b"\x0bn")
         terminal.expect_screen("Terminal 2")
