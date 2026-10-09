@@ -75,7 +75,7 @@
     "format:check": "bun run format:check:root && bun run --cwd editor format:check:root && bun run --cwd hotkeys format:check && bun run --filter '*' format:check",
     "typecheck": "bun run build:workspaces && bun run --sequential --filter '*' typecheck && bun run --cwd hotkeys docs:check",
     "test": "bun run build:workspaces && bun run test:scripts && bun run --sequential --filter '*' test",
-    "generated:check": "bun run workspace:check && bun run icons:generate:check && bun run settings:schema:check && bun run settings:reference:check && bun run themes:palette-css:check && bun run --cwd apps/server codex-protocol:check && bun run syntax:coverage:check && bun run native:workflow:check",
+    "generated:check": "bun run workspace:check && bun run icons:generate:check && bun run settings:schema:check && bun run settings:reference:check && bun run themes:palette-css:check && bun run --cwd apps/server codex-protocol:check && bun run syntax:coverage:check && bun run native:workflow:check && bun run --cwd packages/ui tables:check",
     "native:workflow": "bun ghostty-webgpu/scripts/config-resolver-native/generate-workspace-workflow.ts --write",
     "native:workflow:check": "bun ghostty-webgpu/scripts/config-resolver-native/generate-workspace-workflow.ts --check",
     "settings:reference": "bun --tsconfig-override scripts/tsconfig.settings.json scripts/generate-settings-reference.ts",
