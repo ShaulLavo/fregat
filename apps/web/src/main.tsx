@@ -47,7 +47,9 @@ import { fontsInUse } from '@/lib/fonts/utils/stack'
 import { runtimeCapabilities } from '@/lib/platform/capabilities'
 import { launchAddress } from '@/components/utils/launch-address'
 import { applyBackdrop, resolveBackdrop } from '@/lib/platform/backdrop.ts'
-import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-trace.ts'
+import { editorPerformanceRecordingRequested } from '@/features/editor/state/performance-trace'
+import { performanceRecordingMutationOptions } from '@/features/editor/utils/performance-recording-mutation'
+import { runMutation } from '@/lib/mutations/run'
 import { reportReactError } from '@/lib/react-error-reporting.ts'
 import { configureIntentPrediction } from '@/lib/intent-prefetch-options'
 import { takePairingCodeFromLocation } from '@/lib/pairing/state/link-claim'
@@ -56,7 +58,6 @@ import { COARSE_POINTER_QUERY } from '@/lib/shell/utils/kind'
 import { shellQueryOptions } from '@/features/workspace/utils/shell-query'
 import { warmDeferredOverlays } from '@/components/utils/overlay-modules'
 
-installEditorPerformanceTraceFromUrl()
 configureIntentPrediction()
 initializeClientLogging()
 applyBackdrop(resolveBackdrop())
@@ -154,6 +155,12 @@ void start().catch((cause: unknown) => {
 })
 
 async function start() {
+  if (editorPerformanceRecordingRequested())
+    await runMutation(
+      resourceQueryClient,
+      performanceRecordingMutationOptions(resourceQueryClient),
+      undefined,
+    )
   // Paired before the bootstrap asks the machine anything, so its first request carries the cookie.
   // Loaded only for a pairing link; if it fails to load, the pairing screen still takes the code.
   if (pairingCode)
