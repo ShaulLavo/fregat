@@ -124,7 +124,14 @@ Not in scope: accounts, permissions, persistent rooms, a server peer, and rooms 
   plugin once Fregat has plugins; until then it may ship built in and be split out with the other
   pieces leaving the main package. A Fregat UI for starting sessions is not needed yet. The
   server-hosted path (Fregat's server as host) is built into Fregat; see the Delta DB plan.
-
+- Idea (owner, 2026-10-09): choose the host dynamically from network and device conditions so
+  hosting is seamless. Today any peer with the full confirmed history can host, election picks the
+  freshest history then the lowest peer ID, and clean handoff loses no edits. Sketch: score
+  eligible peers (full confirmed history required) by median round-trip time and loss to the other
+  peers, connection uptime, and device class or power; hand off proactively when a challenger beats
+  the current host by a clear margin for a sustained period (for example 30% for 10 seconds) to
+  avoid flapping. A host-free ordering is not needed: FugueMax placement at the host already makes
+  merges independent of arrival order.
 - Concurrent multi-way reconciliation has no proof yet; step 2's simulation is the gate before
   any adapter work ships.
 - Rooms over 8 peers need forwarding and membership reconciliation; deferred.
