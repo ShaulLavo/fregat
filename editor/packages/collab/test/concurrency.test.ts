@@ -74,33 +74,36 @@ test('incremental batches, retries and eviction match fresh canonical windows', 
   }
 })
 
-test('causally ready arrivals alternate canonical insertion and tail appends', () => {
-  for (let seed = 0; seed < 30; seed++) {
-    const pending = [...confirmedHistory(seed)]
-    const received: Envelope[] = []
-    const seen = new Set<string>()
-    const random = randomFor(seed + 200)
-    const windows = [0, 1, 7, 16, 32].map((limit) => ({
-      limit,
-      window: new ConfirmedWindow([], limit),
-    }))
-    while (pending.length) {
-      const ready = pending.filter((edit) => edit.deps.every((id) => seen.has(editKey(id))))
-      const edit = ready[Math.floor(random() * ready.length)]!
-      pending.splice(pending.indexOf(edit), 1)
-      received.push(edit)
-      seen.add(editKey(edit.id))
-      for (const { limit, window } of windows) {
-        window.append([edit])
-        window.append([])
-        window.append([edit])
-        const fresh = new ConfirmedWindow(received, limit)
-        expect(window.edits).toEqual(fresh.edits)
-        expect(window.pairs()).toEqual(fresh.pairs())
+test.each([0, 5, 10, 15, 20, 25])(
+  'causally ready arrivals alternate canonical insertion and tail appends from seed %i',
+  (start) => {
+    for (let seed = start; seed < start + 5; seed++) {
+      const pending = [...confirmedHistory(seed)]
+      const received: Envelope[] = []
+      const seen = new Set<string>()
+      const random = randomFor(seed + 200)
+      const windows = [0, 1, 7, 16, 32].map((limit) => ({
+        limit,
+        window: new ConfirmedWindow([], limit),
+      }))
+      while (pending.length) {
+        const ready = pending.filter((edit) => edit.deps.every((id) => seen.has(editKey(id))))
+        const edit = ready[Math.floor(random() * ready.length)]!
+        pending.splice(pending.indexOf(edit), 1)
+        received.push(edit)
+        seen.add(editKey(edit.id))
+        for (const { limit, window } of windows) {
+          window.append([edit])
+          window.append([])
+          window.append([edit])
+          const fresh = new ConfirmedWindow(received, limit)
+          expect(window.edits).toEqual(fresh.edits)
+          expect(window.pairs()).toEqual(fresh.pairs())
+        }
       }
     }
-  }
-})
+  },
+)
 
 test('failed tail batches preserve the suffix and its causal index', () => {
   const history = confirmedHistory(42)
