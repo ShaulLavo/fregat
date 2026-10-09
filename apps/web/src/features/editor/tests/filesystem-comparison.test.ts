@@ -177,7 +177,7 @@ test('watcher entry captures local source before save/query awaits while current
   if (local.kind !== 'text') throw new RangeError('Actual event capture required')
   expect(local.snapshot).toBe(beforeAwait)
   expect(local.snapshot.materializeFullText()).toBe('remote text at event')
-  expect(conflict.localText).toBe('remote text at event after await')
+  expect(f.destination.buffer.materializeFullText()).toBe('remote text at event after await')
   expect(conflict.latest.input.scope.environmentId).toBe(f.environmentId)
   expect(conflict.latest.input.scope.rootPath).toBe(filesystemPath(''))
   scope.end()

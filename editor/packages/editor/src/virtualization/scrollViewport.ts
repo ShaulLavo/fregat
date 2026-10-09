@@ -1,7 +1,10 @@
+import { DEFAULT_MAX_SCROLL_HEIGHT } from './fixedRowVirtualizer'
 import type { VirtualizedTextViewOptions } from './virtualizedTextViewTypes'
 import { invalidateScrollElementPadding, scrollElementPadding } from './virtualizedTextViewHelpers'
 
 type ScrollLayer = ReturnType<typeof createScrollLayer>
+
+const stickyScrollHeightLimits = new WeakMap<Document, number>()
 
 export class ScrollViewport {
   public readonly textContent: HTMLDivElement
@@ -97,6 +100,10 @@ export class ScrollViewport {
       this.layers[1].content.style.transform = gutterTransform
   }
 
+  public get maxScrollHeight(): number | undefined {
+    return stickyScrollHeightLimit(this.scrollElement.ownerDocument)
+  }
+
   public get paintOffsetY(): number {
     return -this.originY
   }
@@ -124,6 +131,39 @@ export class ScrollViewport {
     this.frame.style.left = `${padding.left}px`
     this.frame.style.top = `${padding.top}px`
   }
+}
+
+function stickyScrollHeightLimit(document: Document): number | undefined {
+  const cached = stickyScrollHeightLimits.get(document)
+  if (cached !== undefined) return cached
+  if (!document.body) return undefined
+
+  // Gecko's sticky translation limit is lower than its element-height limit.
+  // A viewport-sized probe avoids single-pixel rounding near the native height cap.
+  const probe = document.createElement('div')
+  probe.style.cssText =
+    'position:fixed;top:0;left:0;width:256px;height:256px;overflow:auto;scrollbar-width:none;visibility:hidden;contain:strict;margin:0;padding:0;border:0;box-sizing:content-box'
+  const extent = document.createElement('div')
+  extent.style.cssText = `height:${DEFAULT_MAX_SCROLL_HEIGHT}px;margin:0;padding:0;border:0;box-sizing:content-box`
+  const sticky = document.createElement('div')
+  sticky.style.cssText =
+    'position:sticky;top:0;height:256px;margin:0;padding:0;border:0;box-sizing:content-box'
+  extent.append(sticky)
+  probe.append(extent)
+  document.body.append(probe)
+  probe.scrollTop = DEFAULT_MAX_SCROLL_HEIGHT
+  const probeRect = probe.getBoundingClientRect()
+  const displacement = sticky.getBoundingClientRect().top - probeRect.top
+  const reached = probe.scrollTop + (displacement * probe.clientHeight) / probeRect.height
+  probe.remove()
+  if (!Number.isFinite(reached) || reached <= 0) return undefined
+
+  const limit =
+    displacement === 0
+      ? DEFAULT_MAX_SCROLL_HEIGHT
+      : Math.min(DEFAULT_MAX_SCROLL_HEIGHT, Math.floor(reached))
+  stickyScrollHeightLimits.set(document, limit)
+  return limit
 }
 
 function createScrollLayer(document: Document, kind: 'text' | 'gutter') {

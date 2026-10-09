@@ -34,7 +34,7 @@ jobs:
       - name: Build workspace libraries
         run: bun run build:workspaces
       - name: Check native compiler
-        run: xcrun --find clang
+        run: xcrun --find swiftc
       - name: Build macOS webview host
         run: bun run --cwd apps/desktop build:native
       - name: Test native build, bundle resolution and layout checker

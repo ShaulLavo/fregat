@@ -97,7 +97,11 @@ type InlineCursorStops = 'both' | 'left' | 'right' | 'none'
  * Fills the node a replacement is painted as. Returning a disposable lets the run take down whatever
  * it attached — a listener, an observer — when the replacement leaves the map.
  */
-type InlineReplacementRender = (container: HTMLElement) => void | { dispose(): void }
+type InlineReplacementRender = (
+  container: HTMLElement,
+  displayText: string,
+  displayStart: number,
+) => void | { dispose(): void }
 
 /**
  * A single-line source span painted as `text` instead of its own characters. An empty `text` hides
@@ -582,12 +586,13 @@ const textSegments = (
   let visual = 0
 
   for (let column = 0; column < text.length; column += 1) {
-    const charWidth = visualWidthForChar(text[column]!, visual, tabSize)
+    let charWidth = visualWidthForChar(text[column]!, segmentVisual, tabSize)
     if (segmentVisual > 0 && segmentVisual + charWidth > width) {
       segments.push(segmentForColumns(segments.length, text, segmentStartColumn, column, tabSize))
       segmentStartColumn = column
       segmentStartVisual = visual
       segmentVisual = 0
+      charWidth = visualWidthForChar(text[column]!, 0, tabSize)
     }
 
     segmentVisual += charWidth

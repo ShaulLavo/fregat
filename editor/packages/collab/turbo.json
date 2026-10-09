@@ -1,4 +1,6 @@
 {
   "extends": ["//"],
-  "tasks": { "test": { "env": ["COLLAB_STRESS"] } }
+  "tasks": {
+    "test": { "env": ["COLLAB_STRESS", "COLLAB_STRESS_SHARD", "COLLABORATION_LONG_RUN"] }
+  }
 }

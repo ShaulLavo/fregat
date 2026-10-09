@@ -1,12 +1,13 @@
 {
   "name": "desktop",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "bun run build:native && bun ../../scripts/run-with-env.ts bun src/launcher/index.ts --dev",
     "build": "bun run build:native",
     "build:native": "bun scripts/build-native.ts",
+    "verify:native": "bun scripts/verify-native.ts",
     "test": "bun --bun vitest run",
     "lint": "oxlint .",
     "format": "oxfmt --write .",

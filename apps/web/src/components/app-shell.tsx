@@ -7,7 +7,6 @@ import { usePanelSurface } from '@/hooks/use-panel-surface'
 import { cn } from '@workspace/ui/lib/utils'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import { useDisplayedShell } from '@/features/workspace/hooks/use-displayed-shell'
-import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 
 export function AppShell({
   dirtyTabCloseDialog,
@@ -19,7 +18,6 @@ export function AppShell({
   const surface = usePanelSurface()
   const shell = useDisplayedShell().kind
   const phone = shell === 'phone'
-  const hasWorkspace = useEditorWorkspaceState((state) => state.rootFolder !== null)
   // The phone density step keys on this; the boot script sets it before the first paint.
   useLayoutEffect(() => {
     const root = document.documentElement
@@ -76,8 +74,8 @@ export function AppShell({
         className={cn(!phone && surface.region, 'relative z-10 flex min-h-0 flex-1 flex-col')}
         data-surface-region=''
       >
-        {/* The phone shell's screens carry their own header; with no folder open there is none. */}
-        {shell === 'workbench' || !hasWorkspace ? <AppTitlebar /> : null}
+        {/* The phone shell's screens carry their own header, with or without a folder open. */}
+        {phone ? null : <AppTitlebar />}
         <NavigationStatus />
         <main className='min-h-0 flex-1'>
           <AppWorkspace restoringWorkspace={restoringWorkspace} />

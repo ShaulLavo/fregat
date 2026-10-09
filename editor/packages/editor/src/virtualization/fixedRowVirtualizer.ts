@@ -87,7 +87,7 @@ type PendingResizeMetrics = {
 const DEFAULT_ROW_HEIGHT = 1
 const DEFAULT_ROW_GAP = 0
 // Keep native spacer heights below browser element-size caps while preserving logical scroll size.
-const DEFAULT_MAX_SCROLL_HEIGHT = 16_000_000
+export const DEFAULT_MAX_SCROLL_HEIGHT = 16_000_000
 // Quiet period before a scroll-only change delivers its trailing snapshot.
 const TRAILING_SCROLL_EMIT_DELAY_MS = 100
 const TRAILING_SCROLL_EMIT_KEY = 'editor.virtualizer.trailingScroll'

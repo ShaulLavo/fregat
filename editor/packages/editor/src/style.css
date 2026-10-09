@@ -152,10 +152,6 @@
   contain: style size;
 }
 
-.editor-virtualized[data-editor-scroll-mode='content'] .editor-virtualized-metric-probe {
-  top: 0;
-}
-
 .editor-virtualized-viewport {
   clip-path: inset(0);
   left: 0;
@@ -483,6 +479,7 @@
   left: -10000px;
   line-height: inherit;
   position: absolute;
+  top: 0;
   tab-size: inherit;
   visibility: hidden;
   white-space: pre;

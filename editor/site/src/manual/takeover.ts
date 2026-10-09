@@ -102,6 +102,7 @@ async function takeOver() {
   await new Promise((resolve) => requestAnimationFrame(resolve))
   host.dataset.state = 'ready'
   body.dataset.mode = 'editor'
+  docs.editor.setPresentationReady(true)
   if (pane.contains(document.activeElement)) docs.editor.focus()
   metrics.takeoverMs = performance.now() - (metrics.started as number)
   offerPage()

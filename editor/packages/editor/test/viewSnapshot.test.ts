@@ -492,14 +492,16 @@ describe('editor view snapshot serialization', () => {
     wrappedView.setSelection(8, 8)
     const wrappedSnapshot = snapshotHarnessFromView(wrappedView, 'abcdefghij').snapshot
     const wrappedRows = wrappedSnapshot.visibleRows
-    expect(wrappedRows.map((row) => row.primaryText)).toEqual([true, true])
-    expect(wrappedRows.map((row) => row.firstWrapSegment)).toEqual([true, false])
+    // Four text columns plus the caret fit beside the gutter in the 72 px viewport.
+    expect(wrappedRows.map((row) => row.primaryText)).toEqual([true, true, true])
+    expect(wrappedRows.map((row) => row.firstWrapSegment)).toEqual([true, false, false])
     expect(wrappedSnapshot.toVisibleSnapshot()!.rows.map((row) => row.firstWrapSegment)).toEqual([
       true,
       false,
+      false,
     ])
-    expect(wrappedRows.map((row) => row.contentCursorLine)).toEqual([false, true])
-    expect(wrappedRows.map((row) => row.gutterNumberCursorLine)).toEqual([false, false])
+    expect(wrappedRows.map((row) => row.contentCursorLine)).toEqual([false, false, true])
+    expect(wrappedRows.map((row) => row.gutterNumberCursorLine)).toEqual([false, false, false])
 
     wrappedView.dispose()
     container.remove()

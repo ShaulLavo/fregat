@@ -7,7 +7,6 @@ import {
   selectInColumn,
   type ColumnTrail,
 } from '@/features/file-picker/utils/columns'
-import type { FilePickerMode } from '@/features/file-picker/utils/model'
 import type { ColumnWidths } from '@/features/file-picker/utils/column-widths'
 
 /**
@@ -15,11 +14,9 @@ import type { ColumnWidths } from '@/features/file-picker/utils/column-widths'
  * first mount from a deferred trail, so holding an arrow key does not build a column per step.
  */
 export function ColumnsView({
-  accept,
   columnWidths,
   currentPath,
   isBusy,
-  mode,
   showHidden,
   trail,
   onCommit,
@@ -28,11 +25,9 @@ export function ColumnsView({
   onOpen,
   onTrailChange,
 }: {
-  accept?: readonly string[]
   columnWidths: ColumnWidths
   currentPath: string
   isBusy: boolean
-  mode: FilePickerMode
   showHidden: boolean
   trail: ColumnTrail
   onCommit: (entry: FsEntry) => void
@@ -102,13 +97,11 @@ export function ColumnsView({
     >
       {folders.map((path, column) => (
         <PickerColumn
-          accept={accept}
           active={column === Math.min(activeColumn, folders.length - 1)}
           column={column}
           width={columnWidths.get(column) ?? null}
           isBusy={isBusy}
           key={path}
-          mode={mode}
           path={path}
           selectFirst={entering === path}
           selectedPath={trail[column]?.path ?? null}

@@ -30,6 +30,7 @@ import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
 import { startupFailure } from './startup-failure'
 import { phoneFolderRetry } from './phone-folder-retry'
+import { firstWorkspaceMachines } from './first-workspace-machines'
 import { phoneDraftRestore } from './phone-draft-restore'
 import { settingsModuleFailure } from './settings-module-failure'
 import { settingsNewerServer, settingsStreamGiveUp } from './settings-newer-server'
@@ -405,6 +406,7 @@ export type Scenario = {
 }
 
 import { editorDiagnosticsLifecycle } from './editor-diagnostics-lifecycle'
+import { editorRecordingStartup } from './editor-recording-startup'
 import { editorFastScroll } from './editor-fast-scroll'
 import { editorLargePaste } from './editor-large-paste'
 import { editorFind } from './editor-find'
@@ -798,6 +800,7 @@ export const scenarios: readonly Scenario[] = [
   settingsStreamGiveUp,
   startupFailure,
   phoneFolderRetry,
+  firstWorkspaceMachines,
   phoneDraftRestore,
   deferredDialogs,
   deferredChat,
@@ -816,6 +819,7 @@ export const scenarios: readonly Scenario[] = [
   editorLargePaste,
   editorFastScroll,
   editorDiagnosticsLifecycle,
+  editorRecordingStartup,
   editorFind,
   problemsPanelRows,
   problemsPanelWorkspace,

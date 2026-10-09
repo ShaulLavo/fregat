@@ -50,6 +50,7 @@ Read the applicable skills before writing or reviewing code, or running their wo
 - Fix readonly/mutable contract mismatches by widening the callee's parameter to readonly; never copy (`[...x]`) to satisfy TypeScript.
 - Do not repeat folder names in files or symbols (`workspace/sidebar.tsx`). Rename files, exports, and callers together.
 - Greenfield, no users: no compatibility shims, aliases, or migrations. Update all callers, delete obsolete tests, and delete invalidated persisted state rather than healing it.
+- No version-skew code. Web app, server, desktop launcher, native hosts and remote machines ship together; when versions differ, things may break until a refresh or restart. Write no fallback, timeout, error path or test whose only purpose is one particular mismatch, and treat review findings that only matter across versions as out of scope. Generic handling that also serves future changes and bugs stays: a bridge that answers every request it cannot read with a structured error is fine.
 - Measure performance before and after. Identify whether data layout or design is the bottleneck before tuning.
 - Before debugging, prove the observation works on a known-good case. A theory needing a second special case must be re-derived from raw evidence.
 
@@ -102,7 +103,7 @@ Read the applicable skills before writing or reviewing code, or running their wo
 
 ## Desktop app
 
-- `apps/desktop/src/launcher/index.ts` is the desktop entry point. On machines with registered Mesh dev routes, `bun run desktop:dev` opens those routes; `bun run app:mac` builds the self-contained macOS bundle. Automatic selection uses the native WebKit host on macOS and prefers the installed Chrome app on Linux. Transparent-window mode selects the native system-webview host; an explicit browser executable overrides automatic selection. Native hosts are C on Linux and Objective-C on macOS.
+- `apps/desktop/src/launcher/index.ts` is the desktop entry point. On machines with registered Mesh dev routes, `bun run desktop:dev` opens those routes; `bun run app:mac` builds the self-contained macOS bundle. Automatic selection uses the native WebKit host on macOS and prefers the installed Chrome app on Linux. Transparent-window mode selects the native system-webview host; an explicit browser executable overrides automatic selection. Native hosts are Zig 0.17 on Linux and Swift with AppKit and WKWebView on macOS.
 - Installed-browser features work from OS shortcuts without a running launcher or injected globals. Native window transport belongs to the retained host. Production clients share one server per machine/state home; installation reuses its service or registers OS activation. Closing a client leaves shared services and terminals running. [Plan 114](plans/114-installed-app.md) owns these contracts.
 
 ## Dev, Gates, Verification

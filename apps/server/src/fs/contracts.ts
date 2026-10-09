@@ -24,7 +24,6 @@ const matchModeQueryValueSchema = v.union([
   v.literal('regex'),
   v.literal('fuzzy'),
 ])
-const pickerModeQueryValueSchema = v.union([v.literal('file'), v.literal('folder')])
 const globQueryValueSchema = v.pipe(
   v.union([v.string(), v.array(v.string())]),
   v.transform((value) => workspaceSearchGlobPatterns(value)),
@@ -188,7 +187,6 @@ export const eventsQuerySchema = v.object({
 
 export const recentsQuerySchema = v.object({
   limit: v.optional(recentLimitQueryValueSchema, '20'),
-  mode: pickerModeQueryValueSchema,
   showHidden: booleanQueryValueSchema,
 })
 

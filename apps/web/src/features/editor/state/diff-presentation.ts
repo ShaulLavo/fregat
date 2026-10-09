@@ -9,15 +9,16 @@ import { joinRenderLines } from '@singapore-editor/diff'
 import type { EditorPlugin, EditorViewContributionContext } from '@singapore-editor/core/extensions'
 import type { Editor } from '@singapore-editor/core/editor'
 import type { EditorToken } from '@singapore-editor/core/syntax'
-import type {
-  DiffPanePresentation,
-  DiffInputClaim,
-  DiffPanePublication,
-  DiffPanePublicationSink,
+import {
+  diffInputClaim,
+  matchingDiffView,
+  pendingDiffRestore,
+  type DiffPanePresentation,
+  type DiffPanePublication,
+  type DiffPanePublicationSink,
 } from '@/features/editor/state/tab-presentation'
 import {
   diffAttachmentRevision,
-  diffAttachmentReferences,
   diffAttachmentSubject,
   sameDiffAttachmentSubject,
   type DiffAttachment,
@@ -102,24 +103,6 @@ export function createDiffPresentationBinding(
     })
   }
 
-  function matchesInput(attachment: DiffAttachment, saved: DiffInputClaim) {
-    const subject = diffAttachmentSubject(attachment)
-    const references = diffAttachmentReferences(attachment)
-    if (
-      saved.revision !== diffAttachmentRevision(attachment) ||
-      (saved.buffer?.deref() ?? null) !== subject.buffer ||
-      saved.references.length !== references.length ||
-      !saved.references.every((reference, index) => reference.deref() === references[index])
-    )
-      return false
-    return true
-  }
-
-  function matchingView(attachment: DiffAttachment) {
-    const saved = presentation.views.get(diffAttachmentSubject(attachment).key)
-    return saved && matchesInput(attachment, saved) ? saved : null
-  }
-
   function installedAnchors(
     entry: NonNullable<typeof installed>,
     snapshot: ReturnType<EditorViewContributionContext['getSnapshot']>,
@@ -132,35 +115,20 @@ export function createDiffPresentationBinding(
       !entry.editor.isWordWrapEnabled(),
     )
     if (anchors.viewport || snapshot.viewport.clientHeight > 0) return anchors
-    const saved = matchingView(entry.attachment)
+    const saved = matchingDiffView(presentation, entry.attachment)
     return saved ? { ...anchors, viewport: saved.anchors.viewport } : anchors
   }
 
   function capture() {
     schedulePublication()
-    if (!view || !restored) return
-    if (presentation.reload?.file.deref()) return
-    const snapshot = view.getSnapshot()
-    presentation.selections = snapshot.selections
-    presentation.scroll = { left: snapshot.viewport.scrollLeft, top: snapshot.viewport.scrollTop }
-    if (!installed) return
-    const subject = diffAttachmentSubject(installed.attachment)
-    presentation.views.set(subject.key, {
-      buffer: subject.buffer ? new WeakRef(subject.buffer) : null,
-      revision: diffAttachmentRevision(installed.attachment),
-      references: diffAttachmentReferences(installed.attachment).map(
-        (reference) => new WeakRef(reference),
-      ),
-      anchors: installedAnchors(installed, snapshot),
+    if (!view || !restored || !installed) return
+    presentation.views.set(diffAttachmentSubject(installed.attachment).key, {
+      ...diffInputClaim(installed.attachment),
+      anchors: installedAnchors(installed, view.getSnapshot()),
     })
   }
 
   function detach() {
-    if (presentation.reload && !installed) {
-      presentation.scroll = null
-      presentation.selections = []
-    }
-    presentation.reload = null
     capture()
     restored = false
     installed = null
@@ -183,67 +151,48 @@ export function createDiffPresentationBinding(
     activate: (context) => context.registerViewContribution({ createContribution }),
   }
 
-  function restore(editor: Editor) {
-    if (restored || !view) return
-    const length = editor.getState().length
-    const selections = presentation.selections.map((selection) => ({
-      anchor: Math.min(selection.anchorOffset, length),
-      head: Math.min(selection.headOffset, length),
-      affinity: selection.affinity,
-    }))
-    view.setSelections(
-      selections.length > 0 ? selections : [{ anchor: 0, head: 0 }],
-      'editor.restoreDiffSelection',
-    )
-    editor.setScrollPosition(presentation.scroll ?? { left: 0, top: 0 })
-    restored = true
-  }
-
   function publish(
     editor: Editor,
     attachment: DiffAttachment,
     rows: readonly DiffRenderRow[],
     tokens: readonly EditorToken[],
     configuration: SyntaxConfiguration,
-  ) {
-    if (!view) return
+  ): boolean {
+    if (!view) return false
     const previous = installed
-    const pendingReload = presentation.reload
-    const reload =
-      pendingReload?.file.deref() === attachment.file &&
-      pendingReload.subject === diffAttachmentSubject(attachment).key &&
-      matchesInput(attachment, pendingReload)
+    const restoring = pendingDiffRestore(presentation, attachment)
     if (
-      !pendingReload &&
+      !presentation.pendingRestore &&
       previous?.editor === editor &&
       sameAttachment(previous.attachment, attachment) &&
       previous.rows === rows &&
       previous.tokens === tokens &&
       sameConfiguration(previous.configuration, configuration)
     )
-      return
-    presentation.reload = null
+      return false
+    presentation.pendingRestore = null
     const subject = diffAttachmentSubject(attachment)
     const sameSubject =
       previous?.editor === editor &&
       sameDiffAttachmentSubject(diffAttachmentSubject(previous.attachment), subject)
     const snapshot = view.getSnapshot()
     const anchors = sameSubject && previous ? installedAnchors(previous, snapshot) : null
-    if (!reload) capture()
+    capture()
     restored = false
-    const saved = matchingView(attachment)
-    const selected = anchors ?? saved?.anchors ?? null
+    const saved = matchingDiffView(presentation, attachment)
+    const selected = restoring?.anchors ?? anchors ?? saved?.anchors ?? null
     const lines =
       previous && sameAttachment(previous.attachment, attachment)
         ? previous.lines
         : diffAttachmentLines(attachment)
     const sameInput =
       !previous ||
+      Boolean(restoring) ||
       diffAttachmentRevision(previous.attachment) === diffAttachmentRevision(attachment)
     const mapped = selected
       ? resolveDiffAnchors(
           selected,
-          sameSubject ? (previous?.lines ?? null) : null,
+          sameSubject && !restoring ? (previous?.lines ?? null) : null,
           lines,
           rows,
           snapshot.metrics.rowHeight,
@@ -275,19 +224,16 @@ export function createDiffPresentationBinding(
       textVersion: installedSnapshot.textVersion,
       projectionLength: text.length,
     }
-    if (reload) {
-      restore(editor)
-    } else if (mapped) {
+    if (mapped) {
       view.setSelections(mapped.selections, 'editor.restoreDiffAnchor')
       if (snapshot.metrics.rowHeight > 0) editor.setScrollPosition(mapped.scroll)
-    } else if (!pendingReload && !previous && presentation.views.size === 0) {
-      restore(editor)
     } else {
       view.setSelections([{ anchor: 0, head: 0 }], 'editor.startDiffSubject')
       editor.setScrollPosition({ left: 0, top: 0 })
     }
     restored = true
     capture()
+    return true
   }
 
   function publishTokens(
@@ -310,7 +256,7 @@ export function createDiffPresentationBinding(
     schedulePublication()
   }
 
-  return { plugin, detach, restore, publish, publishTokens, isRestoringProjection: () => !restored }
+  return { plugin, detach, publish, publishTokens, isRestoringProjection: () => !restored }
 }
 
 function sameAttachment(left: DiffAttachment, right: DiffAttachment): boolean {

@@ -108,7 +108,8 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/editor/examples/stress/src/fixtures.ts",
         "$TURBO_ROOT$/editor/bench/compare/fixture.mjs",
-        "$TURBO_ROOT$/editor/bench/compare/protocol.mjs"
+        "$TURBO_ROOT$/editor/bench/compare/protocol.mjs",
+        "$TURBO_ROOT$/editor/site/src/fonts/jetbrains-mono.woff2"
       ]
     },
     "@singapore-editor/react#typecheck": {
@@ -234,6 +235,16 @@
       "env": ["COLLABORATION_MEASURE", "COLLABORATION_EVIDENCE_DIR"],
       "outputs": [],
       "cache": false
+    },
+    "@singapore-editor/collab#test": {
+      "dependsOn": ["^build", "@singapore-editor/collaboration#build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/packages/collaboration/src/**"],
+      "env": ["COLLAB_STRESS", "COLLAB_STRESS_SHARD", "COLLABORATION_LONG_RUN"],
+      "outputs": []
+    },
+    "@singapore-editor/collab#typecheck": {
+      "dependsOn": ["^typecheck", "@singapore-editor/collaboration#build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/editor/packages/collaboration/src/**"]
     },
     "@singapore-editor/collaboration#test": {
       "dependsOn": ["^build", "@singapore-editor/diff#build"],
