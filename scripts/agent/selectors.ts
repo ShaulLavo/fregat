@@ -573,9 +573,6 @@ export const selectors = {
   /** 0 sits right of the places sidebar, 1 left of the preview. */
   pickerPaneHandle: (page: Page, index: number) =>
     selectors.pickerDialog(page).locator('[data-slot="resizable-handle"]').nth(index),
-  pickerPreviewScroll: (page: Page) => page.locator('[data-file-preview-scroll]'),
-  pickerPreviewLines: (page: Page) => page.locator('[data-file-preview-lines]'),
-  pickerPreviewNote: (page: Page) => page.locator('[data-file-preview-scroll] [role="note"]'),
   pickerView: (page: Page, view: 'Columns' | 'List' | 'Icons') =>
     page
       .getByRole('tablist', { name: 'View', exact: true })
