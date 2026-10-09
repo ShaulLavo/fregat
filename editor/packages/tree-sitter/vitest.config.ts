@@ -14,6 +14,7 @@ const languagePackageDir = resolve(packageDir, '../tree-sitter-languages')
 const servedDependencyRoots = uniqueItems(
   [
     'web-tree-sitter',
+    'tree-sitter-md',
     'tree-sitter-css',
     'tree-sitter-html',
     'tree-sitter-javascript',
@@ -39,7 +40,7 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
     fs: {
-      allow: [workspaceRoot, screenshotDirectory, ...servedDependencyRoots],
+      allow: [workspaceRoot, screenshotDirectory].concat(servedDependencyRoots),
     },
   },
   test: {

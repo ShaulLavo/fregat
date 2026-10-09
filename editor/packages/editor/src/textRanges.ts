@@ -52,7 +52,7 @@ export function normalizeTextOffsetRanges(
   return ranges
     .map((range) => clampTextOffsetRange(text, range))
     .filter((range) => range.start <= range.end)
-    .toSorted(compareTextOffsetRanges)
+    .sort(compareTextOffsetRanges)
 }
 
 export function lineRangeAtOffset(text: string, rawOffset: number): TextOffsetRange {

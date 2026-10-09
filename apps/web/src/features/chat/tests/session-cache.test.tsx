@@ -15,7 +15,7 @@ test('session cache details read recorded counters through the real session rout
     const region = await screen.findByRole('region', { name: 'Recent prompt cache' })
     expect(within(region).getByText('1 turn', { exact: true })).toBeInTheDocument()
     expect(region.querySelectorAll('dd')).toHaveLength(3)
-    expect([...region.querySelectorAll('dd')].map((cell) => cell.textContent)).toEqual([
+    expect(Array.from(region.querySelectorAll('dd'), (cell) => cell.textContent)).toEqual([
       '60',
       '40',
       '40%',
@@ -41,7 +41,7 @@ test('a missing cache write counter remains unknown on the session surface', asy
   const view = renderWithProviders(<SessionUsageTotal sessionRef={ref} />)
   try {
     const region = await screen.findByRole('region', { name: 'Recent prompt cache' })
-    expect([...region.querySelectorAll('dd')].map((cell) => cell.textContent)).toEqual([
+    expect(Array.from(region.querySelectorAll('dd'), (cell) => cell.textContent)).toEqual([
       '60',
       'Unknown',
       '—',

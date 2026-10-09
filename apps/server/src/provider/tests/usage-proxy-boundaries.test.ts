@@ -31,7 +31,7 @@ test.each([false, true])(
   'fresh passive aliases share one genuine full-account request regardless of row order (%s)',
   async (freshFirst) => {
     const f = await proxyUsageFixture(cleanup)
-    const freshAlias = {
+    const freshAlias: (typeof f.files)[number] = {
       ...f.files[0],
       id: 'synthetic-other-file',
       auth_index: 'other-selector',
@@ -43,7 +43,7 @@ test.each([false, true])(
         },
       },
     }
-    f.files = freshFirst ? [freshAlias, ...f.files] : [...f.files, freshAlias]
+    f.files = freshFirst ? [freshAlias].concat(f.files) : f.files.concat([freshAlias])
     const store = f.makeStore()
     await store.refresh()
     expect(f.requests).toBe(1)

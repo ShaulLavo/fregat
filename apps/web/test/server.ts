@@ -135,7 +135,7 @@ export async function makeTestServer({
         // real CLIs, so any route that touches a provider would spawn a binary,
         // read the developer's own machine, and answer differently per checkout.
         providerAdapterRegistry: new ProviderAdapterRegistry({
-          adapters: [providerAdapter, ...additionalProviderAdapters],
+          adapters: [providerAdapter].concat(additionalProviderAdapters),
           services: { cwd: process.cwd() },
         }),
       },

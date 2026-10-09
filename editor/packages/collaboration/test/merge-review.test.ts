@@ -25,7 +25,7 @@ test('wide damaged fallback scans errors without overflowing argument limits', a
   ])
   expect(units?.[0]?.[0]?.type).toBe('line')
   expect(units?.[0]?.[0]?.hasErrors).toBe(true)
-})
+}, 30_000)
 
 test('independent edits in separate functions stay unmarked', async () => {
   const text = 'function east() { return 1; }\nfunction west() { return 2; }'

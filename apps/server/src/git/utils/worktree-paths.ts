@@ -103,7 +103,7 @@ export async function verifyWorktreeAdministration(runner: GitRepositoryRunner, 
   }
   const observed = await gitCommonDirectory({
     rootAbsolutePath: checkout,
-    run: (args) => runner.run(['-C', checkout, ...args]),
+    run: (args) => runner.run(['-C', checkout].concat(args)),
   })
   if (observed !== common) {
     throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({

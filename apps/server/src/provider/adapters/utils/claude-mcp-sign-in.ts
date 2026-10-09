@@ -32,7 +32,7 @@ export function defaultClaudeMcpLoginSpawn(
     const exited = executable().then((path) => {
       if (killed) return 1
       // Wide enough that the address never wraps across lines.
-      child = Bun.spawn([path, ...args], {
+      child = Bun.spawn([path].concat(args), {
         cwd: options.cwd,
         env,
         terminal: {

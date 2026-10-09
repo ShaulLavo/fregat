@@ -51,7 +51,7 @@ function openedByParent(paths: WorkspacePaths, metadata: FsMetadataStore) {
     .listWorkspaceAddressPaths(paths.workspaceRootReal)
     .flatMap((absolute) => realRelative(paths, absolute))
   const byParent = new Map<string, Set<string>>()
-  for (const folder of [...metadata.listPickedDirectories(PICKED_SCAN_LIMIT), ...workspaces]) {
+  for (const folder of metadata.listPickedDirectories(PICKED_SCAN_LIMIT).concat(workspaces)) {
     if (folder === '') continue
     const parent = path.posix.dirname(folder)
     const key = parent === '.' ? '' : parent

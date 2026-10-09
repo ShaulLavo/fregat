@@ -119,13 +119,12 @@ test('selecting a cached session keeps its transcript readable and resumes detai
               ...cached,
               deletedAt: null,
               deletion: null,
-              messages: [
-                ...cached.messages,
+              messages: cached.messages.concat([
                 chatMessage({
                   id: v.parse(messageIdSchema, 'recovered-message'),
                   text: 'Recovered reply',
                 }),
-              ],
+              ]),
             },
           },
         },

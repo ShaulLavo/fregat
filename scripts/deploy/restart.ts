@@ -74,8 +74,7 @@ export function busyText(busy: readonly BusySession[], options: RestartOptions) 
   const minutes = Math.round(options.waitMs / 60_000)
   const lines = [
     `[restart] waiting up to ${minutes}m for ${busy.length} busy session${busy.length === 1 ? '' : 's'}:`,
-    ...busy.map((session) => `  ${sessionLabel(session)} (${session.state})`),
-  ]
+  ].concat(busy.map((session) => `  ${sessionLabel(session)} (${session.state})`))
   if (options.insidePlatform)
     lines.push(
       '[restart] This command runs inside a Platform session, whose own turn is busy until it ends.',
@@ -87,8 +86,9 @@ export function busyText(busy: readonly BusySession[], options: RestartOptions) 
 function sleepingText(sleeping: readonly BusySession[]) {
   return [
     `[restart] ending the schedules of ${sleeping.length} sleeping session${sleeping.length === 1 ? '' : 's'}:`,
-    ...sleeping.map((session) => `  ${sessionLabel(session)}`),
-  ].join('\n')
+  ]
+    .concat(sleeping.map((session) => `  ${sessionLabel(session)}`))
+    .join('\n')
 }
 
 function sessionLabel(session: BusySession) {

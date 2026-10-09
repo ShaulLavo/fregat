@@ -32,8 +32,7 @@ function mount(options: ConstructorParameters<typeof Editor>[1] = {}) {
   const editor = new Editor(host, {
     defaultText: 'abc',
     ...options,
-    plugins: [
-      ...(options.plugins ?? []),
+    plugins: (options.plugins ?? []).concat([
       createPlugin({
         name: 'reconciliation-proof',
         view(api) {
@@ -41,7 +40,7 @@ function mount(options: ConstructorParameters<typeof Editor>[1] = {}) {
           api.onDidTransaction((event) => transactions.push(event))
         },
       }),
-    ],
+    ]),
   })
   editors.push(editor)
   return { editor, host, transactions, scope }

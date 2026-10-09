@@ -62,7 +62,7 @@ export function SessionMcpList({
     },
     select: (mutation) => (mutation.state.variables as { name: string } | undefined)?.name,
   })
-  const busy = [...approving, ...reconnecting, ...signingIn, ...switching]
+  const busy = approving.concat(reconnecting, signingIn, switching)
 
   if (mcp.isPending)
     return (

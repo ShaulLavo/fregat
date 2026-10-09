@@ -14,5 +14,5 @@ export function readConnectedMachines(): readonly string[] {
 }
 
 export function writeConnectedMachines(names: ReadonlySet<string>) {
-  globalChromeStorage.setItem(KEY, JSON.stringify([...names]))
+  globalChromeStorage.setItem(KEY, JSON.stringify(Array.from(names)))
 }

@@ -213,7 +213,7 @@ export function validateWarmInputLifecycle(
     const fixture = result.manifest.fixtures.find((entry) => entry.id === sample.fixture)
     validateWarmReset(sample, result, fixture)
   }
-  const reloads = [...result.samples, ...warmups].filter((sample) => sample.reset.documentReloaded)
+  const reloads = result.samples.concat(warmups).filter((sample) => sample.reset.documentReloaded)
   const editors = subjects.some((subject) => subject.endsWith('/multiple')) ? 3 : 1
   const trackedObjects = (subjects.length + reloads.length) * 2 + editors
   same(cleanup.trackedObjects, trackedObjects, 'tracked configuration objects')
@@ -509,7 +509,9 @@ function addGroups(grouped, sample) {
 
 export function summarizeInputResult(result) {
   validateInputResult(result)
-  return Object.fromEntries([...groups(result)].map(([key, values]) => [key, distribution(values)]))
+  return Object.fromEntries(
+    Array.from(groups(result), ([key, values]) => [key, distribution(values)]),
+  )
 }
 
 export function assertInputComparable(left, right, allowSlowdown = false) {

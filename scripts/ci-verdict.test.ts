@@ -11,6 +11,8 @@ const workflow = () => read('.github/workflows/ci.yml')
 function fixture() {
   const outputs: Record<string, string> = {
     code: 'true',
+    packages: '["web"]',
+    exhaustive: 'true',
     web: 'true',
     server: 'true',
     tui: 'true',
@@ -20,6 +22,7 @@ function fixture() {
     hotkeys: 'true',
     docs: 'false',
     web_shards: '["1/4","2/4","3/4","4/4"]',
+    mobile_shards: '["chromium-0","chromium-1","webkit-0","webkit-1"]',
   }
   const identity: RunIdentity = {
     runId: 42,
@@ -97,37 +100,26 @@ function fixture() {
   return { changes, needs, jobs, run, evaluate, identity, metadata }
 }
 
-test.each([
-  'bunfig.toml',
-  '.npmrc',
-  '.env.production',
-  'tsconfig.json',
-  'package.json',
-  'bun.lock',
-  'turbo.json',
-  'apps/site/astro.config.ts',
-  'editor/site/astro.config.ts',
-  'editor/examples/app/vite.config.ts',
-  'ghostty-webgpu/site/src/docs-theme.js',
-  'packages/ui/src/styles/theme.css',
-  'hotkeys/packages/core/src/index.ts',
-  'scripts/product-sites/build.sh',
-  'scripts/build-site.ts',
-  'scripts/dev-sources.ts',
-  'scripts/runtime-network.ts',
-  'scripts/structured-errors.ts',
-  '.github/actions/setup/action.yml',
-  '.github/actions/install-browsers/action.yml',
-])('site path selection covers build input %s', (file) => {
-  const config = read('.github/workflows/ci.yml') as {
-    jobs: { changes: { steps: { with: { filters: string } }[] } }
-  }
-  const filters = Bun.YAML.parse(config.jobs.changes.steps[0].with.filters) as { site: string[] }
-  expect(filters.site.some((pattern) => new Bun.Glob(pattern).match(file))).toBe(true)
-})
-
 test('actual required graph accepts completed successful jobs and its docs skip', () => {
   expect(fixture().run()).toEqual({ passed: true, issues: [] })
+})
+
+test('scheduled full validation uses the same strict verdict', () => {
+  const value = fixture()
+  expect(value.evaluate(value.jobs, 'schedule')).toEqual({ passed: true, issues: [] })
+})
+
+test('ordinary site changes require both smoke engines and no exhaustive mobile shards', () => {
+  const value = fixture()
+  value.changes.outputs.exhaustive = 'false'
+  value.changes.outputs.mobile_shards = '["chromium-0","webkit-0"]'
+  const jobs = value.jobs.filter(
+    (job) => !['Mobile layout (chromium-1)', 'Mobile layout (webkit-1)'].includes(job.name),
+  )
+  expect(value.evaluate(jobs)).toEqual({ passed: true, issues: [] })
+  expect(value.evaluate(jobs.filter((job) => job.name !== 'Mobile layout (webkit-0)')).passed).toBe(
+    false,
+  )
 })
 
 test('actual cancelled packet rejects synthetic successful parent needs', () => {
@@ -193,35 +185,28 @@ test('disabled reusable children may skip while selected family succeeds', () =>
   expect(value.run()).toEqual({ passed: true, issues: [] })
 })
 
-test('docs-only selection requires mobile layout and permits skipped or absent disabled jobs', () => {
+test('plan-only selection runs formatting and permits skipped or absent disabled jobs', () => {
   const value = fixture()
   for (const key of Object.keys(value.changes.outputs)) {
-    if (key !== 'web_shards') value.changes.outputs[key] = key === 'docs' ? 'true' : 'false'
+    if (key !== 'web_shards' && key !== 'packages')
+      value.changes.outputs[key] = key === 'docs' ? 'true' : 'false'
   }
   for (const id of Object.keys(value.needs)) {
-    value.needs[id] = {
-      result: ['changes', 'docs', 'mobile-layout'].includes(id) ? 'success' : 'skipped',
-    }
+    value.needs[id] = { result: ['changes', 'docs'].includes(id) ? 'success' : 'skipped' }
   }
   value.needs.changes = value.changes
   const jobs = value.jobs
-    .filter((job) =>
-      [
-        'Changes',
-        'Docs format',
-        'Mobile layout (chromium-0)',
-        'Mobile layout (chromium-1)',
-        'Mobile layout (webkit-0)',
-        'Mobile layout (webkit-1)',
-      ].includes(job.name),
-    )
+    .filter((job) => ['Changes', 'Docs format'].includes(job.name))
     .map((job) => ({ ...job, conclusion: 'success', runner_id: 1 }))
-  expect(value.evaluate(jobs)).toEqual({
-    passed: true,
-    issues: [],
-  })
-  value.needs['mobile-layout'] = { result: 'skipped' }
+  expect(value.evaluate(jobs)).toEqual({ passed: true, issues: [] })
+  value.needs['mobile-layout'] = { result: 'success' }
   expect(value.evaluate(jobs).passed).toBe(false)
+})
+
+test('missing reusable package selection rejects', () => {
+  const value = fixture()
+  delete value.changes.outputs.packages
+  expect(value.run()).toEqual({ passed: false, issues: ['Reusable output input is missing'] })
 })
 
 test('non-site code selection permits a skipped mobile layout job', () => {

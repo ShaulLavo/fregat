@@ -21,7 +21,10 @@ test('every explicitly dispatched workflow accepts workflow_dispatch', () => {
     const workflow = readWorkflow(file)
     return Object.values(workflow.jobs).flatMap((job) =>
       job.steps.flatMap((step) =>
-        [...(step.run ?? '').matchAll(/gh workflow run ([\w.-]+\.yml)/g)].map((match) => match[1]!),
+        Array.from(
+          (step.run ?? '').matchAll(/gh workflow run ([\w.-]+\.yml)/g),
+          (match) => match[1]!,
+        ),
       ),
     )
   })
@@ -48,7 +51,7 @@ function updaterFixture(existingBranch: boolean) {
   const bin = path.join(root, 'bin')
   for (const entry of [directory, github, bin]) mkdirSync(entry)
   const git = (...args: string[]) => {
-    const result = Bun.spawnSync(['git', '-c', 'core.hooksPath=/dev/null', ...args], {
+    const result = Bun.spawnSync(['git', '-c', 'core.hooksPath=/dev/null'].concat(args), {
       cwd: directory,
     })
     expect(result.exitCode, result.stderr.toString()).toBe(0)

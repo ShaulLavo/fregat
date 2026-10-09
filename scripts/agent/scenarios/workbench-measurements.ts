@@ -195,7 +195,7 @@ export const workbenchMeasurements: Scenario = {
       ok(backAt !== null)
       const serverBackToReplayMs = performance.now() - backAt
       strictEqual(
-        new Set([...terminals.values()].map((item) => item.terminalId)).size,
+        new Set(Array.from(terminals.values(), (item) => item.terminalId)).size,
         1,
         'Reload and restart retain the same shell identity',
       )
@@ -235,7 +235,7 @@ export const workbenchMeasurements: Scenario = {
             matches: Object.fromEntries(
               Object.entries(queries).map(([name, query]) => [
                 name,
-                [...document.querySelectorAll(query)].map((element) => ({
+                Array.from(document.querySelectorAll(query), (element) => ({
                   text: element.textContent?.slice(0, 100),
                   visible: element.checkVisibility(),
                   visibility: getComputedStyle(element).visibility,

@@ -11,10 +11,9 @@ export function openLanguageServerBuffers(
   documents: EditorDocumentStore,
 ): ReadonlyMap<string, EditorTextBuffer> {
   const buffers = new Map<string, EditorTextBuffer>()
-  const panels = [
-    workspace.workbenchPanels,
-    ...Array.from(workspace.parkedWorkspaces.values(), (slice) => slice.workbenchPanels),
-  ]
+  const panels = [workspace.workbenchPanels].concat(
+    Array.from(workspace.parkedWorkspaces.values(), (slice) => slice.workbenchPanels),
+  )
   for (const panel of panels) {
     for (const tab of allEditorTabs(panel.editorGroups)) {
       addTabBuffers(buffers, tabDocuments(tab.content).map(documentKey), documents)

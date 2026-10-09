@@ -130,7 +130,7 @@ function dropLastVisibleViewRanges(viewCount: number) {
   const host = visible.at(-1)
   if (!host || visible.length < 2) return
   for (const [, ranges] of tokenHighlights())
-    for (const range of [...ranges]) if (host.contains(range.startContainer)) ranges.delete(range)
+    for (const range of ranges) if (host.contains(range.startContainer)) ranges.delete(range)
 }
 
 function linesLongerThan(text: string, limit: number): number {
@@ -208,7 +208,7 @@ export function readInputOutput(
   if (globalThis.__inputReadinessNegative === 'drop-view-ranges')
     dropLastVisibleViewRanges(readiness.views.length)
   const colors = highlightColors()
-  const highlights = [...CSS.highlights].map(([name, ranges]) => ({
+  const highlights = Array.from(CSS.highlights, ([name, ranges]) => ({
     name,
     ranges: ranges.size,
     color: colors.get(name) ?? null,

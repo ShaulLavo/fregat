@@ -57,24 +57,25 @@ export class BundleLibrary {
         ),
       ),
     )
-    return [...BUNDLED_THEMES, ...themes].sort((a, b) => a.name.localeCompare(b.name))
+    return BUNDLED_THEMES.concat(themes).sort((a, b) => a.name.localeCompare(b.name))
   }
 
   async assertPartUnused(kind: 'palette' | 'wallpaper', id: string) {
     const values = this.options.settings.snapshot().values
-    const themes = [
-      ...(await this.list()),
-      ...(values['workbench.theme'] ? [values['workbench.theme']] : []),
-    ]
-    const variants = themes.flatMap((theme) => Object.values(theme.variants))
+    const themes = (await this.list()).concat(
+      values['workbench.theme'] ? [values['workbench.theme']] : [],
+    )
+    const variants: ThemeVariantPatch[] = themes.flatMap((theme) => Object.values(theme.variants))
     const patches = Object.values(values['workbench.theme.customizations']).flatMap((theme) =>
       Object.values(theme),
     )
-    const used = [...variants, ...patches].some((part) =>
-      kind === 'palette'
-        ? part?.palette === id
-        : part?.wallpaper?.source.kind === 'library' && part.wallpaper.source.asset === id,
-    )
+    const used = variants
+      .concat(patches)
+      .some((part) =>
+        kind === 'palette'
+          ? part?.palette === id
+          : part?.wallpaper?.source.kind === 'library' && part.wallpaper.source.asset === id,
+      )
     if (used)
       throw themeErrors.BUNDLE_INVALID({
         detail: `This ${kind} belongs to a theme. Change that theme’s parts before deleting it.`,
@@ -101,20 +102,21 @@ export class BundleLibrary {
     const snapshot = this.options.settings.snapshot()
     const others = (await this.list()).filter((theme) => theme.id !== id)
     if (selected && selected.id !== id) others.push(selected)
-    const references: ThemeVariantPatch[] = [
-      ...others.flatMap((theme) => Object.values(theme.variants)),
-      ...Object.entries(snapshot.values['workbench.theme.customizations'])
-        .filter(([themeId]) => themeId !== id)
-        .flatMap(([, modes]) => Object.values(modes)),
-      ...snapshot.layers.map((layer) => {
-        const wallpaper = v.safeParse(wallpaperSelectionSchema, layer.raw['workbench.wallpaper'])
-        const palette = layer.raw['workbench.palette']
-        return {
-          ...(typeof palette === 'string' ? { palette } : {}),
-          ...(wallpaper.success ? { wallpaper: wallpaper.output } : {}),
-        }
-      }),
-    ]
+    const references: ThemeVariantPatch[] = others
+      .flatMap<ThemeVariantPatch>((theme) => Object.values(theme.variants))
+      .concat(
+        Object.entries(snapshot.values['workbench.theme.customizations'])
+          .filter(([themeId]) => themeId !== id)
+          .flatMap(([, modes]) => Object.values(modes)),
+        snapshot.layers.map((layer) => {
+          const wallpaper = v.safeParse(wallpaperSelectionSchema, layer.raw['workbench.wallpaper'])
+          const palette = layer.raw['workbench.palette']
+          return {
+            ...(typeof palette === 'string' ? { palette } : {}),
+            ...(wallpaper.success ? { wallpaper: wallpaper.output } : {}),
+          }
+        }),
+      )
     if (references.some((part) => usesOwnedPart(part, ownedPalettes, ownedWallpapers)))
       throw themeErrors.BUNDLE_INVALID({
         detail: 'Another theme or setting uses parts from this imported bundle',

@@ -347,7 +347,7 @@ export function rankedLanguageServerLanes<
 >(lanes: readonly TLane[], feature: LanguageServerFeatureId): readonly TLane[] {
   return lanes
     .filter((lane) => lane.features[feature] !== undefined)
-    .toSorted((left, right) => compareFeatureRank(left, right, feature, lanes))
+    .sort((left, right) => compareFeatureRank(left, right, feature, lanes))
 }
 
 export function allLanguageServerFeatures(rank = 0): LanguageServerFeatureRanks {

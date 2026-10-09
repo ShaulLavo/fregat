@@ -317,7 +317,7 @@ export function ChatDraftView({
   }
 
   return (
-    <ComposerRootsContext value={worktree ? [...outerRoots, worktree.path] : outerRoots}>
+    <ComposerRootsContext value={worktree ? outerRoots.concat([worktree.path]) : outerRoots}>
       <section className='flex min-h-0 flex-1 flex-col'>
         <ChatWelcomeView />
         {/* No session exists yet, so a mode pick only lands in the draft — the turn

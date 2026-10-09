@@ -174,7 +174,7 @@ async function maintain(page, cdp, completed) {
 }
 
 function latencySummary(samples) {
-  const sorted = samples.toSorted((a, b) => a - b)
+  const sorted = samples.sort((a, b) => a - b)
   return {
     count: sorted.length,
     p50Ms: sorted[Math.floor(sorted.length * 0.5)] ?? null,
@@ -506,7 +506,7 @@ function heapSummary(samples, strings = false) {
         assert.ok(before > 0, 'string growth must exceed the baseline')
         return 1 - after / before
       })
-      .toSorted((a, b) => a - b)
+      .sort((a, b) => a - b)
     return {
       workload,
       samples: group.length,

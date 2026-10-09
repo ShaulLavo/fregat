@@ -1,4 +1,5 @@
 import { INITIAL } from 'shiki/textmate'
+import type { ThemeRegistration } from 'shiki'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   ShikiWorkerRequest,
@@ -601,17 +602,19 @@ function externalHighlighter(
     }),
     getTheme: () => {
       const theme = api.getTheme?.() ?? { bg: '#ffffff', fg: '#24292e' }
+      const settings: NonNullable<ThemeRegistration['settings']> = [
+        { settings: { foreground: theme.fg, background: theme.bg } },
+      ]
       return {
         ...theme,
-        settings: [
-          { settings: { foreground: theme.fg, background: theme.bg } },
-          ...(colored
+        settings: settings.concat(
+          colored
             ? [
                 { scope: 'keyword', settings: { foreground: '#ff0000' } },
                 { scope: 'changed', settings: { foreground: '#00ff00' } },
               ]
-            : []),
-        ],
+            : [],
+        ),
       }
     },
   }

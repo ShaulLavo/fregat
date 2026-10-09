@@ -8,9 +8,16 @@ afterEach(async () => {
   for (const fixture of fixtures.splice(0)) await fixture.close()
 })
 
-const transports = [
+const nativeTransports: {
+  name: string
+  env: Record<string, string>
+  auth: string | null
+  accepted: boolean
+}[] = [
   { name: 'direct native OAuth with current none init', env: {}, auth: 'none', accepted: true },
-  ...[
+]
+const transports = nativeTransports.concat(
+  [
     'CLAUDE_CODE_USE_BEDROCK',
     'CLAUDE_CODE_USE_VERTEX',
     'CLAUDE_CODE_USE_FOUNDRY',
@@ -24,26 +31,28 @@ const transports = [
     auth: 'none',
     accepted: false,
   })),
-  {
-    name: 'gateway transport with current none init',
-    env: { ANTHROPIC_BASE_URL: 'https://gateway.example.test' },
-    auth: 'none',
-    accepted: false,
-  },
-  {
-    name: 'API-key transport',
-    env: { ANTHROPIC_API_KEY: 'synthetic-fixture-key' },
-    auth: 'ANTHROPIC_API_KEY',
-    accepted: false,
-  },
-  {
-    name: 'token transport with current none init',
-    env: { ANTHROPIC_AUTH_TOKEN: 'synthetic-fixture-token' },
-    auth: 'none',
-    accepted: false,
-  },
-  { name: 'unattributed pre-init frame', env: {}, auth: null, accepted: false },
-]
+  [
+    {
+      name: 'gateway transport with current none init',
+      env: { ANTHROPIC_BASE_URL: 'https://gateway.example.test' },
+      auth: 'none',
+      accepted: false,
+    },
+    {
+      name: 'API-key transport',
+      env: { ANTHROPIC_API_KEY: 'synthetic-fixture-key' },
+      auth: 'ANTHROPIC_API_KEY',
+      accepted: false,
+    },
+    {
+      name: 'token transport with current none init',
+      env: { ANTHROPIC_AUTH_TOKEN: 'synthetic-fixture-token' },
+      auth: 'none',
+      accepted: false,
+    },
+    { name: 'unattributed pre-init frame', env: {}, auth: null, accepted: false },
+  ],
+)
 
 describe('native Claude usage subscription lifecycle', () => {
   it('rejects an old runtime epoch before the usage subscription sees numeric quota', async () => {

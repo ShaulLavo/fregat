@@ -298,8 +298,7 @@ function onPath(command: string): string | null {
   const directories = [
     path.join(lspRoot, 'bin'),
     path.join(lspRoot, 'node', 'node_modules', '.bin'),
-    ...(process.env.PATH?.split(path.delimiter) ?? []),
-  ]
+  ].concat(process.env.PATH?.split(path.delimiter) ?? [])
   for (const directory of directories) {
     const candidate = path.join(directory, command)
     if (isExecutable(candidate)) return candidate
@@ -319,7 +318,7 @@ function onPath(command: string): string | null {
 function rustAnalyzerBinary(): string | null {
   const toolchains = path.join(homedir(), '.rustup', 'toolchains')
   const entries = safeReaddir(toolchains)
-  for (const entry of entries.toSorted()) {
+  for (const entry of entries.sort()) {
     const candidate = path.join(toolchains, entry, 'bin', 'rust-analyzer')
     if (isExecutable(candidate)) return candidate
   }

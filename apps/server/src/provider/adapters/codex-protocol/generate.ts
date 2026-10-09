@@ -459,15 +459,9 @@ export function renderSchemaModule(
     '',
   )
   schemaNames.set(noParams.typeName, noParamsCanonical)
-  const text = [
-    ...generatedPrelude(),
-    "import * as v from 'valibot'",
-    '',
-    OPEN_ENUM_HELPER_SOURCE,
-    '',
-    ...sections,
-    '',
-  ].join('\n')
+  const text = generatedPrelude()
+    .concat(["import * as v from 'valibot'", '', OPEN_ENUM_HELPER_SOURCE, ''], sections, [''])
+    .join('\n')
   return { text, schemaNames }
 }
 
@@ -620,7 +614,7 @@ function withSharedProperties(schema: JsonObject, variants: readonly JsonValue[]
       ...variant,
       title: objectSchemaName(variant),
       properties: { ...properties, ...objectField(variant, 'properties') },
-      required: [...required, ...stringArrayField(variant, 'required')],
+      required: required.concat(stringArrayField(variant, 'required')),
     }
   })
 }
@@ -745,7 +739,7 @@ function renderSharedObjectEntries(
   const shared = new Set(best.keys)
   const remaining = [...entries].filter(([key]) => !shared.has(key)).map(([, entry]) => entry)
   const picked = `...v.pick(${schemaConstName(best.object.typeName)}, ${JSON.stringify(best.keys)}).entries`
-  return `{${[picked, ...remaining].join(', ')}}`
+  return `{${[picked].concat(remaining).join(', ')}}`
 }
 
 function renderObjectEntry(
@@ -808,65 +802,64 @@ function renderMetaModule(
   },
   schemaNames: ReadonlyMap<string, string>,
 ) {
-  return [
-    ...generatedPrelude(),
-    "import * as v from 'valibot'",
-    "import * as CodexSchema from './schema.gen'",
-    '',
-    renderMethodConstants('CODEX_CLIENT_REQUEST_METHODS', methodMaps.clientRequests),
-    renderMethodConstants('CODEX_SERVER_NOTIFICATION_METHODS', methodMaps.serverNotifications),
-    'export type CodexClientRequestMethod = keyof typeof CODEX_CLIENT_REQUEST_METHODS',
-    'export type CodexServerNotificationMethod = keyof typeof CODEX_SERVER_NOTIFICATION_METHODS',
-    '',
-    renderMethodTypeInterface(
-      'CodexClientRequestParamsByMethod',
-      methodMaps.clientRequests,
-      (entry) =>
-        `CodexSchema.${schemaFileForMethodType(entry.method, requestParamsType(entry)).typeName}${entry.paramsOptional ? ' | undefined' : ''}`,
-    ),
-    renderMethodTypeInterface(
-      'CodexClientRequestResultByMethod',
-      methodMaps.clientRequests,
-      (entry) =>
-        `CodexSchema.${schemaFileForMethodType(entry.method, responseTypeName(entry)).typeName}`,
-    ),
-    renderMethodTypeInterface(
-      'CodexServerNotificationParamsByMethod',
-      methodMaps.serverNotifications,
-      (entry) =>
-        `CodexSchema.${schemaFileForMethodType(entry.method, requiredType(entry)).typeName}`,
-    ),
-    renderSchemaMap(
-      'CODEX_CLIENT_REQUEST_PARAMS',
-      methodMaps.clientRequests,
-      (entry) => schemaFileForMethodType(entry.method, requestParamsType(entry)).typeName,
-      schemaNames,
-      (entry) => entry.paramsOptional === true,
-    ),
-    renderSchemaMap(
-      'CODEX_CLIENT_REQUEST_RESULTS',
-      methodMaps.clientRequests,
-      (entry) => schemaFileForMethodType(entry.method, responseTypeName(entry)).typeName,
-      schemaNames,
-    ),
-    renderSchemaMap(
-      'CODEX_SERVER_NOTIFICATION_PARAMS',
-      methodMaps.serverNotifications,
-      (entry) => schemaFileForMethodType(entry.method, requiredType(entry)).typeName,
-      schemaNames,
-    ),
-  ].join('\n')
+  return generatedPrelude()
+    .concat([
+      "import * as v from 'valibot'",
+      "import * as CodexSchema from './schema.gen'",
+      '',
+      renderMethodConstants('CODEX_CLIENT_REQUEST_METHODS', methodMaps.clientRequests),
+      renderMethodConstants('CODEX_SERVER_NOTIFICATION_METHODS', methodMaps.serverNotifications),
+      'export type CodexClientRequestMethod = keyof typeof CODEX_CLIENT_REQUEST_METHODS',
+      'export type CodexServerNotificationMethod = keyof typeof CODEX_SERVER_NOTIFICATION_METHODS',
+      '',
+      renderMethodTypeInterface(
+        'CodexClientRequestParamsByMethod',
+        methodMaps.clientRequests,
+        (entry) =>
+          `CodexSchema.${schemaFileForMethodType(entry.method, requestParamsType(entry)).typeName}${entry.paramsOptional ? ' | undefined' : ''}`,
+      ),
+      renderMethodTypeInterface(
+        'CodexClientRequestResultByMethod',
+        methodMaps.clientRequests,
+        (entry) =>
+          `CodexSchema.${schemaFileForMethodType(entry.method, responseTypeName(entry)).typeName}`,
+      ),
+      renderMethodTypeInterface(
+        'CodexServerNotificationParamsByMethod',
+        methodMaps.serverNotifications,
+        (entry) =>
+          `CodexSchema.${schemaFileForMethodType(entry.method, requiredType(entry)).typeName}`,
+      ),
+      renderSchemaMap(
+        'CODEX_CLIENT_REQUEST_PARAMS',
+        methodMaps.clientRequests,
+        (entry) => schemaFileForMethodType(entry.method, requestParamsType(entry)).typeName,
+        schemaNames,
+        (entry) => entry.paramsOptional === true,
+      ),
+      renderSchemaMap(
+        'CODEX_CLIENT_REQUEST_RESULTS',
+        methodMaps.clientRequests,
+        (entry) => schemaFileForMethodType(entry.method, responseTypeName(entry)).typeName,
+        schemaNames,
+      ),
+      renderSchemaMap(
+        'CODEX_SERVER_NOTIFICATION_PARAMS',
+        methodMaps.serverNotifications,
+        (entry) => schemaFileForMethodType(entry.method, requiredType(entry)).typeName,
+        schemaNames,
+      ),
+    ])
+    .join('\n')
 }
 
 function renderMethodConstants(constantName: string, entries: readonly MethodEntry[]) {
-  return [
-    `export const ${constantName} = {`,
-    ...entries.map(
-      (entry) => `  ${JSON.stringify(entry.method)}: ${JSON.stringify(entry.method)},`,
-    ),
-    '} as const',
-    '',
-  ].join('\n')
+  return [`export const ${constantName} = {`]
+    .concat(
+      entries.map((entry) => `  ${JSON.stringify(entry.method)}: ${JSON.stringify(entry.method)},`),
+      ['} as const', ''],
+    )
+    .join('\n')
 }
 
 function renderMethodTypeInterface(
@@ -874,12 +867,12 @@ function renderMethodTypeInterface(
   entries: readonly MethodEntry[],
   typeName: (entry: MethodEntry) => string,
 ) {
-  return [
-    `export interface ${interfaceName} {`,
-    ...entries.map((entry) => `  readonly ${JSON.stringify(entry.method)}: ${typeName(entry)}`),
-    '}',
-    '',
-  ].join('\n')
+  return [`export interface ${interfaceName} {`]
+    .concat(
+      entries.map((entry) => `  readonly ${JSON.stringify(entry.method)}: ${typeName(entry)}`),
+      ['}', ''],
+    )
+    .join('\n')
 }
 
 function renderSchemaMap(
@@ -889,15 +882,15 @@ function renderSchemaMap(
   schemaNames: ReadonlyMap<string, string>,
   optional: (entry: MethodEntry) => boolean = () => false,
 ) {
-  return [
-    `export const ${constantName} = {`,
-    ...entries.map((entry) => {
-      const schema = `CodexSchema.${schemaConstName(requiredSchemaName(typeName(entry), schemaNames))}`
-      return `  ${JSON.stringify(entry.method)}: ${optional(entry) ? `v.optional(${schema})` : schema},`
-    }),
-    '} as const',
-    '',
-  ].join('\n')
+  return [`export const ${constantName} = {`]
+    .concat(
+      entries.map((entry) => {
+        const schema = `CodexSchema.${schemaConstName(requiredSchemaName(typeName(entry), schemaNames))}`
+        return `  ${JSON.stringify(entry.method)}: ${optional(entry) ? `v.optional(${schema})` : schema},`
+      }),
+      ['} as const', ''],
+    )
+    .join('\n')
 }
 
 function requiredSchemaName(typeName: string, schemaNames: ReadonlyMap<string, string>) {

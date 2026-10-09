@@ -419,10 +419,9 @@ const parseMarkdownDocument = async (
   assertRuntimeSessionActive(request.runtimeSessionId)
   assertNotCancelled(context)
   replaceCachedDocument(request.runtimeSessionId, prepared)
-  const timings = [
-    { name: 'treeSitter.parse', durationMs: nowMs() - start },
-    ...phaseTimings(context),
-  ]
+  const timings = [{ name: 'treeSitter.parse', durationMs: nowMs() - start }].concat(
+    phaseTimings(context),
+  )
   if (request.resultMode === 'parseOnly')
     return parseAckResult(
       request,
@@ -639,7 +638,7 @@ const parseDocument = async (
         ...parseAckResult(
           request,
           [],
-          [{ name: 'treeSitter.parse', durationMs: parseMs }, ...phaseTimings(context)],
+          [{ name: 'treeSitter.parse', durationMs: parseMs }].concat(phaseTimings(context)),
           parsedDocument.degraded,
           parsedDocument.missingLanguages,
         ),
@@ -677,11 +676,10 @@ const parseDocument = async (
       tokens: result.tokens,
       tokensPacked: result.tokensPacked,
       records: result.records,
-      timings: [
-        ...phaseTimings(context),
+      timings: phaseTimings(context).concat([
         { name: 'treeSitter.parse', durationMs: parseMs },
         { name: 'treeSitter.query', durationMs: queryMs },
-      ],
+      ]),
     }
   })
 
@@ -819,7 +817,7 @@ const reparseIdleDocument = (
   const context = createCancellationContext(undefined, PARSE_BUDGET_MS)
   try {
     const tree = parseSource(runtime.parser, document.source, root.tree, context)
-    cache.snapshots[index] = { ...document, layers: [{ ...root, tree }, ...injections] }
+    cache.snapshots[index] = { ...document, layers: [{ ...root, tree }].concat(injections) }
     root.tree.delete()
   } catch (error) {
     recordOptionalWorkerPhaseFailure('idle reparse', error, [], 'optional-phase-failed')
@@ -866,7 +864,7 @@ const editDocument = async (
     // A delimiter edit that moves structure outside the edited range shows up in the root's
     // changed ranges; an edit inside an injection's text may change no root structure at all.
     const injectionRanges = enclosingRanges(
-      [...changedRanges, ...editedRanges(request.inputEdits, source.length)],
+      changedRanges.concat(editedRanges(request.inputEdits, source.length)),
       [reusableTree, rootLayer.tree],
     )
     const degraded: TreeSitterDegradedState[] = []
@@ -895,11 +893,10 @@ const editDocument = async (
       return parseAckResult(
         request,
         changedRanges,
-        [
-          ...phaseTimings(context),
+        phaseTimings(context).concat([
           { name: 'treeSitter.edit', durationMs: editMs },
           { name: 'treeSitter.parse', durationMs: parseMs },
-        ],
+        ]),
         degraded,
         parsedDocument.missingLanguages,
       )
@@ -932,12 +929,11 @@ const editDocument = async (
       tokens: result.tokens,
       tokensPacked: result.tokensPacked,
       records: result.records,
-      timings: [
-        ...phaseTimings(context),
+      timings: phaseTimings(context).concat([
         { name: 'treeSitter.edit', durationMs: editMs },
         { name: 'treeSitter.parse', durationMs: parseMs },
         { name: 'treeSitter.query', durationMs: queryMs },
-      ],
+      ]),
     }
   })
 
@@ -1007,10 +1003,9 @@ const queryDocumentRangeWithContext = async (
     tokensPacked: result.tokensPacked,
     records: result.records,
     statistics: resultStatistics(cached, result, context, range),
-    timings: [
-      { name: 'treeSitter.queryRange', durationMs: nowMs() - queryStart },
-      ...phaseTimings(context),
-    ],
+    timings: [{ name: 'treeSitter.queryRange', durationMs: nowMs() - queryStart }].concat(
+      phaseTimings(context),
+    ),
   }
 }
 
@@ -1131,7 +1126,7 @@ const measurePhase = <T>(context: CancellationContext, name: string, run: () => 
 }
 
 const phaseTimings = (context: CancellationContext): TreeSitterParseResult['timings'] =>
-  [...(context.measurements ?? [])].map(([name, durationMs]) => ({
+  Array.from(context.measurements ?? [], ([name, durationMs]) => ({
     name: `treeSitter.${name}`,
     durationMs,
   }))
@@ -1840,7 +1835,7 @@ const appendCarriedLayers = async (
     // Its reparse may have grown children its old tree did not have.
     const firstChild = layers.length
     await appendInjectionLayers(layers, carried, options)
-    for (const layer of [carried, ...layers.slice(firstChild)]) availableParentIds.add(layer.id)
+    for (const layer of [carried].concat(layers.slice(firstChild))) availableParentIds.add(layer.id)
   }
 }
 
@@ -1940,7 +1935,7 @@ const appendOrderedChildren = (
   parentId: string,
   children: ReadonlyMap<string, ParsedLayer[]>,
 ): void => {
-  const childLayers = children.get(parentId)?.toSorted(compareParsedLayers) ?? []
+  const childLayers = children.get(parentId)?.sort(compareParsedLayers) ?? []
   for (const layer of childLayers) {
     ordered.push(layer)
     appendOrderedChildren(ordered, layer.id, children)
@@ -2126,7 +2121,7 @@ const groupsToPlans = (
   groups: Map<string, InjectionGroup>,
   source: TreeSitterPieceTableInput,
 ): InjectionPlan[] =>
-  [...groups.entries()].map(([key, group]) => {
+  Array.from(groups.entries(), ([key, group]) => {
     const ranges = rangesWithBridgeNewlines(sortRanges(group.ranges), source)
     return {
       parentId: group.parentId,
@@ -2618,10 +2613,8 @@ const rangeForNode = (node: Node): TreeSitterRange => ({
   endPosition: node.endPosition,
 })
 
-const sortRanges = (ranges: readonly TreeSitterRange[]): TreeSitterRange[] =>
-  ranges.toSorted(
-    (left, right) => left.startIndex - right.startIndex || left.endIndex - right.endIndex,
-  )
+const sortRanges = (ranges: TreeSitterRange[]): TreeSitterRange[] =>
+  ranges.sort((left, right) => left.startIndex - right.startIndex || left.endIndex - right.endIndex)
 
 const rangeSpan = (
   ranges: readonly TreeSitterRange[],
@@ -2722,22 +2715,20 @@ const bridgeNewlineRange = (
   return null
 }
 
-const sortCaptures = (captures: readonly TreeSitterCapture[]): TreeSitterCapture[] =>
-  captures.toSorted((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
+const sortCaptures = (captures: TreeSitterCapture[]): TreeSitterCapture[] =>
+  captures.sort((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
 
-const sortFolds = (folds: readonly FoldRange[]): FoldRange[] =>
-  folds.toSorted((a, b) => a.startLine - b.startLine || a.endLine - b.endLine)
+const sortFolds = (folds: FoldRange[]): FoldRange[] =>
+  folds.sort((a, b) => a.startLine - b.startLine || a.endLine - b.endLine)
 
-const sortBrackets = (brackets: readonly BracketInfo[]): BracketInfo[] =>
-  brackets.toSorted((a, b) => a.index - b.index || a.depth - b.depth)
+const sortBrackets = (brackets: BracketInfo[]): BracketInfo[] =>
+  brackets.sort((a, b) => a.index - b.index || a.depth - b.depth)
 
-const sortErrors = (errors: readonly TreeSitterError[]): TreeSitterError[] =>
-  errors.toSorted((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
+const sortErrors = (errors: TreeSitterError[]): TreeSitterError[] =>
+  errors.sort((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
 
-const sortInjections = (
-  injections: readonly TreeSitterInjectionInfo[],
-): TreeSitterInjectionInfo[] =>
-  injections.toSorted((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
+const sortInjections = (injections: TreeSitterInjectionInfo[]): TreeSitterInjectionInfo[] =>
+  injections.sort((a, b) => a.startIndex - b.startIndex || a.endIndex - b.endIndex)
 
 const collectTreeData = (
   tree: Tree | null,
@@ -3941,13 +3932,14 @@ const inspectRetention = async (): Promise<{
   for (const state of markdownDocuments.values()) resources.markdown.add(state.document)
   const documents = Array.from(documentCaches, ([runtimeSessionId, cache]) => ({
     runtimeSessionId,
-    snapshots: [
-      ...cache.snapshots,
-      ...Array.from(
-        projectedDocuments.get(runtimeSessionId)?.values() ?? [],
-        (entry) => entry.document,
-      ),
-    ].map((snapshot) => inspectSnapshotRetention(snapshot, resources)),
+    snapshots: cache.snapshots
+      .concat(
+        Array.from(
+          projectedDocuments.get(runtimeSessionId)?.values() ?? [],
+          (entry) => entry.document,
+        ),
+      )
+      .map((snapshot) => inspectSnapshotRetention(snapshot, resources)),
   }))
   const previews = Array.from(bootstrapDocuments, ([runtimeSessionId, staged]) => ({
     runtimeSessionId,
@@ -3955,29 +3947,30 @@ const inspectRetention = async (): Promise<{
   }))
   const unmeasuredWasm: readonly 'wasm-committed'[] =
     shared.wasmMemory.kind === 'uninitialized' ? ['wasm-committed'] : []
+  const unmeasuredBytes: TreeSitterWorkerRetentionSnapshot['unmeasuredBytes'] = [
+    'javascript-objects',
+    'source-strings',
+    'grammars-parsers-queries',
+    'trees',
+    'markdown-documents',
+    'worker-heap',
+  ]
   return {
     retention: {
-      documentCount: new Set([...documentCaches.keys(), ...bootstrapDocuments.keys()]).size,
+      documentCount: new Set(
+        Array.from(documentCaches.keys()).concat(Array.from(bootstrapDocuments.keys())),
+      ).size,
       snapshotCount: resources.snapshots.size,
       projectionCleanupVisits,
       treeCount: resources.trees.size,
       markdownDocumentEntries: markdownDocuments.size,
       markdownDocumentCount: resources.markdown.size,
       injectedMarkdownDocumentCount: resources.injectedMarkdown.size,
-      documents: [...documents, ...previews],
+      documents: documents.concat(previews),
       source: inspectSourceRetention(),
       shared,
       unmeasuredResources: ['markdown-parser-language-query-handles', 'markdown-tree-handles'],
-      unmeasuredBytes: [
-        'javascript-objects',
-        'source-strings',
-        'grammars-parsers-queries',
-        'trees',
-        'markdown-documents',
-        'worker-heap',
-        ...unmeasuredWasm,
-        'wasm-allocator-live',
-      ],
+      unmeasuredBytes: unmeasuredBytes.concat(unmeasuredWasm, ['wasm-allocator-live']),
     },
   }
 }

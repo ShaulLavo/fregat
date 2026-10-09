@@ -31,7 +31,7 @@ test.each([
   `${recordName}Shell`,
   `${noun}.turn.start`,
 ])('detects forbidden session-domain vocabulary: %s', (symbol) => {
-  expect([...symbol.matchAll(vocabulary)].map(([match]) => match)).toEqual([symbol])
+  expect(Array.from(symbol.matchAll(vocabulary), ([match]) => match)).toEqual([symbol])
 })
 
 test('retains only exact upstream protocol vocabulary across the session domain', () => {
@@ -78,5 +78,5 @@ function symbolsInSource(source: string) {
   )
   for (const [symbol] of code.matchAll(vocabulary))
     counts.set(symbol, (counts.get(symbol) ?? 0) + 1)
-  return Object.fromEntries([...counts].sort(([left], [right]) => left.localeCompare(right)))
+  return Object.fromEntries(Array.from(counts).sort(([left], [right]) => left.localeCompare(right)))
 }

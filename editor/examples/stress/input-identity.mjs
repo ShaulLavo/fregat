@@ -9,7 +9,7 @@ export function inputSourceIdentity(sources, externalHash, launch = {}) {
   const validation = createHash('sha256').update(externalHash)
   const measurementFiles = []
   const validationFiles = []
-  for (const { path, bytes } of [...sources].sort((left, right) =>
+  for (const { path, bytes } of sources.toSorted((left, right) =>
     left.path.localeCompare(right.path),
   )) {
     const validationOnly = validationSources.has(path.replace(/^examples\/stress\//, ''))

@@ -274,7 +274,7 @@ function mean(values) {
 
 function quantile(values, q) {
   if (!values.length) return null
-  const sorted = values.toSorted((left, right) => left - right)
+  const sorted = values.sort((left, right) => left - right)
   return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))]
 }
 

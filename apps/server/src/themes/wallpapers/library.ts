@@ -78,7 +78,7 @@ export class WallpaperLibrary {
         v.parse(wallpaperAssetSchema, JSON.parse(await readFile(file, 'utf8'))),
       ),
     )
-    return [...new Map([...imported, ...local].map((asset) => [asset.id, asset])).values()].sort(
+    return [...new Map(imported.concat(local).map((asset) => [asset.id, asset])).values()].sort(
       (a, b) => a.name.localeCompare(b.name),
     )
   }
@@ -335,7 +335,7 @@ export class WallpaperLibrary {
       if (!header) await this.#completeDerived(existing, bytes)
       if (existing.provenance.some((item) => JSON.stringify(item) === JSON.stringify(provenance)))
         return existing
-      const updated = { ...existing, provenance: [...existing.provenance, provenance] }
+      const updated = { ...existing, provenance: existing.provenance.concat([provenance]) }
       await this.#writeIndex(updated)
       return updated
     }

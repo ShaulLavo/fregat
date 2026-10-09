@@ -57,7 +57,7 @@ export function columnFolders(currentPath: string, trail: ColumnTrail): readonly
 
 /** Selecting in a column replaces that column's selection and closes every column after it. */
 export function selectInColumn(trail: ColumnTrail, column: number, entry: FsEntry): ColumnTrail {
-  return [...trail.slice(0, column), entry]
+  return trail.slice(0, column).concat([entry])
 }
 
 /** A hidden selection ends the trail, including the descendants it opened. */

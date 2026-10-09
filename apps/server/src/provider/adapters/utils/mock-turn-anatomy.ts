@@ -92,10 +92,9 @@ export function mockTurnAnatomySteps(
     }),
   )
 
-  return [
-    ...reasoning,
-    step(stepDelayMs, planEvent(base('plan-1'), 'first')),
-    ...toolSteps(base, stepDelayMs, 'search', {
+  return reasoning.concat(
+    [step(stepDelayMs, planEvent(base('plan-1'), 'first'))],
+    toolSteps(base, stepDelayMs, 'search', {
       itemType: 'command_execution',
       data: {
         command: 'rg parseConfig apps/web/src',
@@ -103,7 +102,7 @@ export function mockTurnAnatomySteps(
         exitCode: 0,
       },
     }),
-    ...toolSteps(base, stepDelayMs, 'issue', {
+    toolSteps(base, stepDelayMs, 'issue', {
       itemType: 'mcp_tool_call',
       title: 'linear · get_issue',
       data: {
@@ -111,7 +110,7 @@ export function mockTurnAnatomySteps(
         output: 'ENG-12 · In progress',
       },
     }),
-    ...toolSteps(base, stepDelayMs, 'test', {
+    toolSteps(base, stepDelayMs, 'test', {
       itemType: 'command_execution',
       status: 'failed',
       data: {
@@ -120,30 +119,34 @@ export function mockTurnAnatomySteps(
         exitCode: 1,
       },
     }),
-    step(stepDelayMs, agentEvent(base('reviewer-start'), REVIEWER, 'task.started')),
-    step(stepDelayMs, agentEvent(base('checker-start'), CHECKER, 'task.started')),
-    step(
-      stepDelayMs,
-      agentEvent(base('checker-done'), { ...CHECKER, status: 'idle' }, 'task.completed'),
-    ),
-    step(
-      stepDelayMs,
-      agentEvent(base('reviewer-done'), { ...REVIEWER, status: 'idle' }, 'task.completed'),
-    ),
-    step(stepDelayMs, planEvent(base('plan-2'), 'second')),
-    ...toolSteps(base, stepDelayMs, 'edit', {
+    [
+      step(stepDelayMs, agentEvent(base('reviewer-start'), REVIEWER, 'task.started')),
+      step(stepDelayMs, agentEvent(base('checker-start'), CHECKER, 'task.started')),
+      step(
+        stepDelayMs,
+        agentEvent(base('checker-done'), { ...CHECKER, status: 'idle' }, 'task.completed'),
+      ),
+      step(
+        stepDelayMs,
+        agentEvent(base('reviewer-done'), { ...REVIEWER, status: 'idle' }, 'task.completed'),
+      ),
+      step(stepDelayMs, planEvent(base('plan-2'), 'second')),
+    ],
+    toolSteps(base, stepDelayMs, 'edit', {
       itemType: 'file_change',
       data: {
         changes: [{ kind: 'update', path: 'apps/web/src/features/chat/utils/stack-frames.ts' }],
       },
     }),
-    step(stepDelayMs, {
-      ...base('answer'),
-      delta: 'Fixed the frame match; the suite passes again.',
-      messageId: `assistant:${input.turnId}`,
-      type: 'assistant.delta',
-    }),
-  ]
+    [
+      step(stepDelayMs, {
+        ...base('answer'),
+        delta: 'Fixed the frame match; the suite passes again.',
+        messageId: `assistant:${input.turnId}`,
+        type: 'assistant.delta',
+      }),
+    ],
+  )
 }
 
 type ToolPayload = {

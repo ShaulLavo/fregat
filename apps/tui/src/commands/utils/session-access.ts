@@ -19,7 +19,7 @@ export function sessionAccessRows(
       ]),
     }))
     .filter((row) => row.score > 0)
-    .toSorted(
+    .sort(
       (left, right) =>
         right.score - left.score ||
         compareSessionsByActivity(

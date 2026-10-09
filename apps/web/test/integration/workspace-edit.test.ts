@@ -1210,7 +1210,7 @@ function request(
   documents: readonly WorkspaceTextDocumentProvenance[] = [],
 ): ApplyWorkspaceEditRequest {
   const plan: ParsedWorkspaceEdit = { annotations: new Map(), operations }
-  const currentUris = new Set([originUri, ...documents.map((document) => document.uri)])
+  const currentUris = new Set([originUri].concat(documents.map((document) => document.uri)))
   return {
     guard: {
       documents,

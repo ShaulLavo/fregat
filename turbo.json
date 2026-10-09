@@ -259,6 +259,16 @@
       "dependsOn": ["^build"],
       "outputs": ["src/lib/generated/cn-tables.ts"],
       "inputs": ["$TURBO_DEFAULT$", "!src/lib/generated/cn-tables.ts"]
+    },
+    "@workspace/contracts#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/server/src/orchestration/**",
+        "$TURBO_ROOT$/apps/server/src/provider/**",
+        "$TURBO_ROOT$/apps/web/src/features/{chat,chat-mode,address}/**",
+        "$TURBO_ROOT$/scripts/generate-settings-schema.ts"
+      ]
     }
   },
   "agentGuidance": false,

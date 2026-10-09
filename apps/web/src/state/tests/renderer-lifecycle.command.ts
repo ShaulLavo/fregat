@@ -93,7 +93,7 @@ function observe(page: Page) {
 }
 
 function requireHealthy(observed: ReturnType<typeof observe>) {
-  const problems = [...observed.errors, ...observed.consoleErrors]
+  const problems = observed.errors.concat(observed.consoleErrors)
   if (!problems.length && !observed.failedResponses.length) return
   throw createScriptError('The renderer reload test observed a browser failure', {
     internal: {

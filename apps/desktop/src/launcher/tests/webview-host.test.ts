@@ -320,14 +320,11 @@ test.each(['darwin', 'linux'] as const)(
         const closing = window.close()
         fake.finish()
         await closing
-        expect(argv).toEqual([
-          '/host',
-          'http://localhost:3301/',
-          script,
-          '--data-dir',
-          dataDir,
-          ...(platform === 'darwin' ? ['--vibrancy'] : []),
-        ])
+        expect(argv).toEqual(
+          ['/host', 'http://localhost:3301/', script, '--data-dir', dataDir].concat(
+            platform === 'darwin' ? ['--vibrancy'] : [],
+          ),
+        )
         expect(existsSync(script)).toBe(false)
         expect(existsSync(dataDir)).toBe(true)
         const marker = path.join(dataDir, 'stored-view-state')

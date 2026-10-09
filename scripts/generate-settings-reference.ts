@@ -37,11 +37,9 @@ function table(ids: readonly SettingId[]) {
     }${parent}${flags.length > 0 ? ` _(${flags.join(', ')})_` : ''} |`
   })
 
-  return align([
-    '| Setting | Default | Scope | What it does |',
-    '| --- | --- | --- | --- |',
-    ...rows,
-  ])
+  return align(
+    ['| Setting | Default | Scope | What it does |', '| --- | --- | --- | --- |'].concat(rows),
+  )
 }
 
 /** A table cell holds one line, so each key's details follow its category's table. */
@@ -87,12 +85,12 @@ function pad(cell: string, width: number, delimiter: boolean): string {
 const byCategory = new Map<string, SettingId[]>()
 for (const id of SETTING_IDS) {
   const category = presentSetting(id).category
-  byCategory.set(category, [...(byCategory.get(category) ?? []), id])
+  byCategory.set(category, (byCategory.get(category) ?? []).concat([id]))
 }
 
 const sections = [...byCategory]
   .sort(([left], [right]) => left.localeCompare(right))
-  .map(([category, ids]) => [`## ${category}`, table(ids), ...detailsList(ids)].join('\n\n'))
+  .map(([category, ids]) => [`## ${category}`, table(ids)].concat(detailsList(ids)).join('\n\n'))
 
 const body = `> [!NOTE]
 > Generated from the settings registry by \`bun run settings:reference\`.

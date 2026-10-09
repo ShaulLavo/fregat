@@ -131,7 +131,7 @@ export function resolveSettings(
   const contributions = collectContributions(registry, layers, diagnostics)
   const values = buildValues(registry, contributions, options.previous)
 
-  return { values, diagnostics: [...diagnostics, ...themePartDiagnostics(values, contributions)] }
+  return { values, diagnostics: diagnostics.concat(themePartDiagnostics(values, contributions)) }
 }
 
 /**

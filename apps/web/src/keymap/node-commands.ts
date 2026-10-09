@@ -7,7 +7,7 @@ import {
   terminalSendKeystrokeMetadata,
 } from '@workspace/client-core/commands/node'
 
-const metadata = [
+const baseMetadata = [
   chatCommandMetadata['chat.stashPrompt'],
   chatCommandMetadata['chat.sendMessage'],
   workbenchCommandMetadata['git.commit'],
@@ -17,9 +17,13 @@ const metadata = [
   workbenchCommandMetadata['terminal.copy'],
   workbenchCommandMetadata['terminal.paste'],
   terminalSendKeystrokeMetadata,
-  ...questionCommandMetadata,
-  ...localCommandMetadata,
 ]
+type NodeCommandMetadata =
+  | (typeof baseMetadata)[number]
+  | (typeof questionCommandMetadata)[number]
+  | (typeof localCommandMetadata)[number]
+const selectedMetadata: readonly NodeCommandMetadata[] = baseMetadata
+const metadata = selectedMetadata.concat(questionCommandMetadata, localCommandMetadata)
 
 // Mounted feature nodes execute these commands; the workspace ancestor declines them.
 export const nodeCommands = metadata.map((command) => ({

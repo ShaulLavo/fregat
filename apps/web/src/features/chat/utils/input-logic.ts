@@ -80,7 +80,7 @@ export type ChatInputCommandItem =
 
 export type ChatInputCommandGroup = {
   id: string
-  items: ChatInputCommandItem[]
+  items: readonly ChatInputCommandItem[]
   label: string | null
 }
 
@@ -329,10 +329,9 @@ export function chatInputCommandItems(
   // Built-ins first: they are two fixed modes the user picks constantly, and a
   // provider with forty commands would otherwise bury them.
   if (trigger.kind === 'slash-command') {
-    return [
-      ...(planModeEnabled ? searchChatInputSlashCommands(trigger.query) : []),
-      ...chatInputProviderCommandItems(catalog, trigger.query),
-    ]
+    return (planModeEnabled ? searchChatInputSlashCommands(trigger.query) : []).concat(
+      chatInputProviderCommandItems(catalog, trigger.query),
+    )
   }
 
   return chatInputMentionCommandItems(entries)
@@ -362,16 +361,16 @@ export function groupChatInputCommandItems(
   triggerKind: ChatInputTriggerKind,
 ): ChatInputCommandGroup[] {
   if (items.length === 0) return []
-  if (triggerKind !== 'slash-command')
-    return [{ id: 'default', items: Array.from(items), label: null }]
+  if (triggerKind !== 'slash-command') return [{ id: 'default', items, label: null }]
 
   const builtIn = items.filter((item) => item.type === 'slash-command')
   const provider = items.filter((item) => item.type === 'provider-command')
 
-  return [
-    ...(builtIn.length > 0 ? [{ id: 'built-in', items: builtIn, label: 'Built-in' }] : []),
-    ...(provider.length > 0 ? [{ id: 'provider', items: provider, label: 'Provider' }] : []),
-  ]
+  const groups: ChatInputCommandGroup[] =
+    builtIn.length > 0 ? [{ id: 'built-in', items: builtIn, label: 'Built-in' }] : []
+  return groups.concat(
+    provider.length > 0 ? [{ id: 'provider', items: provider, label: 'Provider' }] : [],
+  )
 }
 
 export function activeChatInputCommandItem(

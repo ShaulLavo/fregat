@@ -198,10 +198,11 @@ test.each(PATHS)('chat selection %s survives omission of an oversized tab collec
     mode: 'chat',
     sessionToken: SESSION,
     activeTabContent: testNullableTabContent(path),
-    editorTabContents: testTabContents([
-      ...PATHS,
-      ...Array.from({ length: 20 }, (_, index) => `${ROOT}/${'nested/'.repeat(15)}${index}.ts`),
-    ]),
+    editorTabContents: testTabContents(
+      PATHS.concat(
+        Array.from({ length: 20 }, (_, index) => `${ROOT}/${'nested/'.repeat(15)}${index}.ts`),
+      ),
+    ),
   })
   const restored = addressedWorkspaceCache(cachedWorkspace(), parseAddress(formatAddress(address)))
 

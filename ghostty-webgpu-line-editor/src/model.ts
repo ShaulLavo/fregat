@@ -23,7 +23,7 @@ const wordCharacter = /[\p{L}\p{N}\p{M}_]/u
 const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
 function boundaries(text: string): number[] {
-  return [...segmenter.segment(text)].map((segment) => segment.index).concat(text.length)
+  return Array.from(segmenter.segment(text), (segment) => segment.index).concat(text.length)
 }
 
 export class EditModel {

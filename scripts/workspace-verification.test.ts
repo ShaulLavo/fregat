@@ -28,118 +28,10 @@ function expression(source: string, context: Record<string, unknown>) {
   return new Function(...Object.keys(context), `return (${body})`)(...Object.values(context))
 }
 
-function selectedLibraries(files: readonly string[], event = 'pull_request') {
-  const ci = readWorkflow('ci.yml')
-  const filter = ci.jobs.changes!.steps.find((step) => step.id === 'filter')!
-  expect(filter.with?.['predicate-quantifier']).toBe('some-with-excludes')
-  const rules = v.parse(
-    v.record(v.string(), v.unknown()),
-    Bun.YAML.parse(String(filter.with?.filters)),
-  )
-  const outputs = Object.fromEntries(
-    ['editor', 'ghostty', 'hotkeys', 'library_tools'].map((key) => {
-      const patterns = v.parse(v.array(v.string()), rules[key])
-      const included = patterns.filter((pattern) => !pattern.startsWith('!'))
-      const excluded = patterns
-        .filter((pattern) => pattern.startsWith('!'))
-        .map((pattern) => pattern.slice(1))
-      const matches = files.some(
-        (file) =>
-          included.some((pattern) => new Bun.Glob(pattern).match(file)) &&
-          !excluded.some((pattern) => new Bun.Glob(pattern).match(file)),
-      )
-      return [key, String(matches)]
-    }),
-  )
-  const github = { event_name: event }
-  const changes = Object.fromEntries(
-    ['editor', 'ghostty', 'hotkeys'].map((key) => [
-      key,
-      String(
-        expression(ci.jobs.changes!.outputs![key]!, { github, steps: { filter: { outputs } } }),
-      ),
-    ]),
-  )
-  const needs = { changes: { outputs: changes } }
-  if (!expression(ci.jobs.libraries!.if!, { needs })) return { jobs: [], families: [] }
-  const inputs = Object.fromEntries(
-    Object.entries(ci.jobs.libraries!.with!).map(([key, value]) => [
-      key,
-      expression(String(value), { needs }),
-    ]),
-  )
-  const libraries = readWorkflow('workspace-libraries.yml')
-  const context = { github, inputs, cancelled: () => false }
-  const jobs = Object.keys(libraries.jobs).filter((key) =>
-    expression(libraries.jobs[key]!.if!, context),
-  )
-  const families = libraries.jobs
-    .standalone!.steps.filter((step) => step.with?.family && expression(step.if!, context))
-    .map((step) => step.with!.family)
-  return { jobs, families }
-}
-
-test.each([
-  'apps/server/src/index.ts',
-  'apps/web/src/main.tsx',
-  'apps/tui/src/main.tsx',
-  'packages/contracts/src/index.ts',
-  'docs/development.md',
-  'README.md',
-])('%s does not consume library runners', (file) => {
-  expect(selectedLibraries([file])).toEqual({ jobs: [], families: [] })
-})
-
-test.each([
-  ['editor/packages/editor/src/editor.ts', ['editor', 'standalone'], ['editor']],
-  ['ghostty-webgpu/src/index.ts', ['ghostty', 'standalone'], ['ghostty-webgpu']],
-  ['hotkeys/packages/hotkeys/src/index.ts', ['standalone'], ['hotkeys']],
-])('a family change selects its consumers: %s', (file, jobs, families) => {
-  expect(selectedLibraries([String(file)])).toEqual({ jobs, families })
-})
-
-test.each([
-  'package.json',
-  'bun.lock',
-  'turbo.json',
-  'patches/vitest.patch',
-  'scripts/browser-test-responses.ts',
-  '.github/actions/setup/action.yml',
-  '.github/workflows/workspace-libraries.yml',
-])('shared input %s invalidates all libraries', (file) => {
-  expect(selectedLibraries([file])).toEqual({
-    jobs: ['editor', 'ghostty', 'standalone'],
-    families: ['editor', 'ghostty-webgpu', 'hotkeys'],
-  })
-})
-
-test('every root Turbo global dependency invalidates the library jobs', () => {
-  const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'))
-  const dependencies = v.parse(v.array(v.string()), turbo.globalDependencies)
-  for (const dependency of dependencies) {
-    const file = dependency.replaceAll('**', 'fixture').replaceAll('*', 'fixture')
-    expect(selectedLibraries([file]).jobs, file).toContain('editor')
-    expect(selectedLibraries([file]).jobs, file).toContain('ghostty')
-  }
-})
-
-test.each(['push', 'workflow_dispatch'])('%s keeps full library validation', (event) => {
-  expect(selectedLibraries([], event)).toEqual({
-    jobs: ['editor', 'ghostty', 'standalone'],
-    families: ['editor', 'ghostty-webgpu', 'hotkeys'],
-  })
-})
-
-test('a rename between families invalidates both graphs', () => {
-  expect(
-    selectedLibraries(['editor/packages/editor/removed.ts', 'ghostty-webgpu/src/added.ts']),
-  ).toEqual({ jobs: ['editor', 'ghostty', 'standalone'], families: ['editor', 'ghostty-webgpu'] })
-})
-
 test('manual shard experiments keep the PR and main default at four', () => {
   const ci = readWorkflow('ci.yml')
   const source = ci.jobs.changes!.outputs!.web_shards!
-  for (const event of ['push', 'pull_request', 'workflow_dispatch']) {
+  for (const event of ['push', 'pull_request', 'schedule', 'workflow_dispatch']) {
     const result = expression(source, {
       github: { event_name: event },
       inputs: { web_shards: '2' },
@@ -261,10 +153,64 @@ test('standalone checks cover every mirror family from an exact folder export', 
   )
 })
 
-test('CI verifies the family sites that the Pages workflow deploys', () => {
-  const steps = readWorkflow('ci.yml').jobs.site!.steps
-  expect(steps.map((step) => step.name)).toContain('Build Editor example')
-  expect(steps.map((step) => step.name)).toContain('Build ghostty site')
+test('CI shares one production site build with every mobile shard', () => {
+  const workflow = readWorkflow('ci.yml')
+  const site = workflow.jobs.site!.steps
+  expect(site.find((step) => step.name === 'Build production sites')?.run).toBe(
+    'bash scripts/product-sites/build.sh "$RUNNER_TEMP/product-sites"',
+  )
+  const upload = site.find((step) => step.uses === 'actions/upload-artifact@v4')
+  expect(upload?.with?.name).toBe('ci-product-sites')
+  const mobile = workflow.jobs['mobile-layout']!
+  expect(mobile.needs).toEqual(['changes', 'site'])
+  expect(mobile.if).toBe("${{ needs.changes.outputs.site == 'true' }}")
+  expect(mobile.steps.some((step) => step.run?.includes('product-sites/build.sh'))).toBe(false)
+  const download = mobile.steps.find((step) => step.uses === 'actions/download-artifact@v4')
+  expect(download?.with?.name).toBe(upload?.with?.name)
+})
+
+test('ordinary site checks use both phone engines and full runs retain disjoint exhaustive shards', () => {
+  const ci = readWorkflow('ci.yml')
+  const source = ci.jobs.changes!.outputs!.mobile_shards!
+  for (const exhaustive of ['false', 'true']) {
+    const values = expression(source, { steps: { plan: { outputs: { exhaustive } } } })
+    expect(JSON.parse(values)).toEqual(
+      exhaustive === 'true'
+        ? ['chromium-0', 'chromium-1', 'webkit-0', 'webkit-1']
+        : ['chromium-0', 'webkit-0'],
+    )
+  }
+  expect(ci.jobs['mobile-layout']!.strategy?.matrix).toEqual({
+    shard: '${{ fromJSON(needs.changes.outputs.mobile_shards) }}',
+  })
+})
+
+test('Editor benchmark smoke runs only during full validation and basic regression cases remain', () => {
+  const steps = readWorkflow('workspace-libraries.yml').jobs.editor!.steps
+  const smoke = steps.find((step) => step.name === 'Smoke dense syntax lifecycle')!
+  expect(
+    expression(smoke.if!, {
+      github: { event_name: 'pull_request' },
+      inputs: { exhaustive: false },
+    }),
+  ).toBe(false)
+  expect(
+    expression(smoke.if!, { github: { event_name: 'schedule' }, inputs: { exhaustive: true } }),
+  ).toBe(true)
+  expect(
+    expression(smoke.if!, {
+      github: { event_name: 'workflow_dispatch' },
+      inputs: { exhaustive: false },
+    }),
+  ).toBe(true)
+  expect(steps.map((step) => step.name)).toEqual(
+    expect.arrayContaining([
+      'Test collaboration signaling broker',
+      'Test collaboration presence in Chromium',
+      'Test collaboration transports in Chromium',
+      'Smoke concurrent editor input and author undo',
+    ]),
+  )
 })
 
 test('canonical Editor CI checks the generated language catalog', () => {

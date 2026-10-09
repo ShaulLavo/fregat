@@ -374,10 +374,12 @@ describe('web routes', () => {
   })
 })
 
+const defaultOrigins: readonly string[] = DEFAULT_ALLOWED_ORIGINS
+
 async function webApp({
   devPage = true,
   development = false,
-  allowedOrigins = [...DEFAULT_ALLOWED_ORIGINS, 'http://local'],
+  allowedOrigins = defaultOrigins.concat(['http://local']),
   webBase = '/',
 }: {
   devPage?: boolean

@@ -56,11 +56,9 @@ function auditSurfaces() {
   const describe = (element: Element) => {
     const surface = Array.from(element.classList).filter((name) => /^(bg-|backdrop-)/.test(name))
     const slot = element.getAttribute('data-slot')
-    return [
-      element.tagName.toLowerCase(),
-      slot ? `[${slot}]` : '',
-      ...surface.map((name) => `.${name}`),
-    ].join('')
+    return [element.tagName.toLowerCase(), slot ? `[${slot}]` : '']
+      .concat(surface.map((name) => `.${name}`))
+      .join('')
   }
   const stacks = new Map<
     string,

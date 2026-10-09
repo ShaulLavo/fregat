@@ -396,8 +396,8 @@ function round(value: number): number {
   return Math.round(value * 100) / 100
 }
 
-function median(values: readonly number[]): number {
-  const sorted = values.toSorted((left, right) => left - right)
+function median(values: number[]): number {
+  const sorted = values.sort((left, right) => left - right)
   return sorted[Math.floor(sorted.length / 2)]!
 }
 

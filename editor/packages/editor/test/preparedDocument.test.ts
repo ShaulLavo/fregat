@@ -365,10 +365,10 @@ describe('prepared editor documents', () => {
         onInitialPaint: (event) => events.push(event),
         plugins: [
           {
-            activate: (context) => [
-              context.registerSyntaxProvider(structural),
-              ...providers.map((provider) => context.registerHighlighter(provider)),
-            ],
+            activate: (context) =>
+              [context.registerSyntaxProvider(structural)].concat(
+                providers.map((provider) => context.registerHighlighter(provider)),
+              ),
           },
         ],
       })

@@ -44,8 +44,8 @@ describe('reverse index maintenance', () => {
 
     const inserted = flattenPieces(snapshot.root, []).filter((piece) => piece.buffer !== 0)
     const entries = reverseIndexEntries(snapshot.reverseIndex)
-    expect(entries.map((entry) => entry.order).toSorted()).toEqual(
-      inserted.map((piece) => piece.order).toSorted(),
+    expect(entries.map((entry) => entry.order).sort()).toEqual(
+      inserted.map((piece) => piece.order).sort(),
     )
     expect(entries.every((entry) => entry.buffer !== 0)).toBe(true)
     expectValid(snapshot)

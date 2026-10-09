@@ -36,10 +36,9 @@ export async function openWorkspaceRootForOwner(
   options: { readonly isCurrent?: () => boolean; readonly signal?: AbortSignal } = {},
 ): Promise<OpenWorkspaceRootResult> {
   const origin = originForQueryClient(queryClient)
-  const activity = AbortSignal.any([
-    environmentActivitySignal(origin),
-    ...(options.signal ? [options.signal] : []),
-  ])
+  const activity = AbortSignal.any(
+    [environmentActivitySignal(origin)].concat(options.signal ? [options.signal] : []),
+  )
   if (activity.aborted || options.isCurrent?.() === false) return 'superseded'
   const reservation = workspaceEdits?.acquireRootSwitchReservation() ?? null
   if (workspaceEdits && !reservation) return 'failed'

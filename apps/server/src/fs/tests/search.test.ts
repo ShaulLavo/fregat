@@ -336,32 +336,34 @@ describe('workspace disk search provider', () => {
       rootSearchPath: '.',
     })
 
-    expect(args).toEqual([
-      '--json',
-      '--follow',
-      '--hidden',
-      '--no-config',
-      '--no-require-git',
-      '--max-filesize',
-      '12345',
-      '--fixed-strings',
-      '--ignore-case',
-      '--word-regexp',
-      '--max-depth',
-      '2',
-      ...defaultRgIgnoredGlobArgs(),
-      '--glob',
-      'src/*.ts',
-      '--glob',
-      '!*.test.ts',
-      '--glob',
-      '!**/*.test.ts',
-      '--glob',
-      '!pixel.png',
-      '--regexp',
-      'needle',
-      '.',
-    ])
+    expect(args).toEqual(
+      [
+        '--json',
+        '--follow',
+        '--hidden',
+        '--no-config',
+        '--no-require-git',
+        '--max-filesize',
+        '12345',
+        '--fixed-strings',
+        '--ignore-case',
+        '--word-regexp',
+        '--max-depth',
+        '2',
+      ].concat(defaultRgIgnoredGlobArgs(), [
+        '--glob',
+        'src/*.ts',
+        '--glob',
+        '!*.test.ts',
+        '--glob',
+        '!**/*.test.ts',
+        '--glob',
+        '!pixel.png',
+        '--regexp',
+        'needle',
+        '.',
+      ]),
+    )
   })
 
   it('caps index-derived ripgrep exclude globs', () => {
@@ -412,22 +414,20 @@ describe('workspace disk search provider', () => {
       rootSearchPath: '.',
     })
 
-    expect(args).toEqual([
-      '--json',
-      '--follow',
-      '--hidden',
-      '--no-config',
-      '--no-require-git',
-      '--max-filesize',
-      '1000000',
-      '--crlf',
-      '--engine',
-      'auto',
-      ...defaultRgIgnoredGlobArgs(),
-      '--regexp',
-      '^needle$',
-      '.',
-    ])
+    expect(args).toEqual(
+      [
+        '--json',
+        '--follow',
+        '--hidden',
+        '--no-config',
+        '--no-require-git',
+        '--max-filesize',
+        '1000000',
+        '--crlf',
+        '--engine',
+        'auto',
+      ].concat(defaultRgIgnoredGlobArgs(), ['--regexp', '^needle$', '.']),
+    )
   })
 
   it('keeps slash-containing exclude globs anchored for content search', async () => {
@@ -835,7 +835,7 @@ describe('workspace disk search provider', () => {
       ),
     )
 
-    expect(nameMatchPaths(events).toSorted()).toEqual([
+    expect(nameMatchPaths(events).sort()).toEqual([
       'needle-local.ts',
       'packages/linked/src/needle-created-later.ts',
       'packages/linked/src/needle-linked.ts',

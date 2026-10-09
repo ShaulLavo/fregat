@@ -99,15 +99,16 @@ window.chatScrollProof = {
     this.render(session.messages, session)
   },
   append() {
-    this.render([
-      ...messages,
-      factories.chatMessage({
-        id: 'scroll-proof-reply',
-        role: 'assistant',
-        text: 'I found the editor gutter theme rule and am checking the scroll behavior.',
-        createdAt: '2026-09-11T00:01:00.000Z',
-      }),
-    ])
+    this.render(
+      messages.concat([
+        factories.chatMessage({
+          id: 'scroll-proof-reply',
+          role: 'assistant',
+          text: 'I found the editor gutter theme rule and am checking the scroll behavior.',
+          createdAt: '2026-09-11T00:01:00.000Z',
+        }),
+      ]),
+    )
   },
 }
 window.chatScrollProof.render()
@@ -138,7 +139,7 @@ function longWorkSession({ count = 30, outputLines = 80, commentary = false, new
       text: `Earlier note ${index + 1}.\n\nReview the editor gutters and theme tokens.`,
     }),
   )
-  const messages = [...history, ...base.messages]
+  const messages = history.concat(base.messages)
   if (commentary)
     messages.push(
       factories.chatMessage({
@@ -298,7 +299,7 @@ function workSession(kind) {
   return factories.session({
     latestTurn: { ...endedTurn, assistantMessageId: final.id },
     messages: [prompt, reply, final],
-    activities: [...activities, completedCheck],
+    activities: activities.concat([completedCheck]),
   })
 }
 

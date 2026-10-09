@@ -230,7 +230,7 @@ const resolveOverlappingCaptures = (captures: readonly EditorSyntaxCapture[]): E
   // entry point, so the unsorted case still has to work.
   const byStart = isSortedByStart(candidates)
     ? candidates
-    : candidates.toSorted((left, right) => left.start - right.start)
+    : candidates.sort((left, right) => left.start - right.start)
   const tokens: EditorToken[] = []
   const active: CaptureCandidate[] = []
   let admitted = 0
