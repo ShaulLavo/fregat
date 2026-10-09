@@ -134,10 +134,7 @@ async function chooseFolder(page: Page, folder: string) {
   await selectors.pickerFolderPath(page).fill(folder)
   await selectors.pickerFolderPath(page).press('Enter')
   await selectors.pickerFolderPath(page).waitFor({ state: 'hidden' })
-  await picker
-    .getByRole('button', { name: /^Choose / })
-    .last()
-    .click()
+  await picker.getByRole('button', { name: 'Open', exact: true }).click()
 }
 
 function leaf(folder: string) {

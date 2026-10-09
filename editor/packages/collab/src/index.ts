@@ -15,6 +15,8 @@ export type {
   EffectiveEdit,
   RightOrigin,
 } from './types'
+export { ConfirmedWindow, MAX_REVIEW_EDITS } from './concurrency'
+export type { ConcurrentEdit, ConcurrentPair } from './concurrency'
 export { CollabFailure } from './failure'
 export { ReferenceEngine } from './reference'
 export type { ReferenceSnapshot } from './reference'

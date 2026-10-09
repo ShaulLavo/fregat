@@ -121,6 +121,36 @@ export type TreeSitterParseAckResult = {
     }
 )
 
+export type TreeSitterMergeUnit = TreeSitterSyntaxRange & {
+  readonly source: 'syntax' | 'line'
+  readonly type: string
+  readonly signature: string | null
+  readonly parent:
+    | (TreeSitterSyntaxRange & {
+        readonly type: string
+        readonly commutative: boolean
+      })
+    | null
+}
+
+export type TreeSitterMergeUnitRequest = {
+  readonly type: 'mergeUnit'
+  readonly documentId: string
+  readonly runtimeSessionId: string
+  readonly snapshotVersion: number
+  readonly languageId: TreeSitterLanguageId
+  readonly range: TreeSitterSyntaxRange
+}
+
+export type TreeSitterMergeUnitResult = {
+  readonly documentId: string
+  readonly snapshotVersion: number
+  readonly languageId: TreeSitterLanguageId
+} & (
+  | { readonly status: 'ok'; readonly unit: TreeSitterMergeUnit }
+  | { readonly status: 'stale'; readonly unit: null }
+)
+
 export type TreeSitterRangeResult = TreeSitterParseResult & {
   readonly range: TreeSitterSyntaxRange
 }
@@ -236,6 +266,7 @@ export type TreeSitterWorkerRequestPayload =
   | TreeSitterEditRequest
   | TreeSitterRangeRequest
   | TreeSitterSelectionRequest
+  | TreeSitterMergeUnitRequest
   | TreeSitterDisposeDocumentRequest
   | TreeSitterRuntimeBarrierRequest
   | TreeSitterIdleFenceRequest
@@ -247,6 +278,7 @@ export type TreeSitterWorkerResult =
   | TreeSitterParseAckResult
   | TreeSitterRangeResult
   | TreeSitterSelectionResult
+  | TreeSitterMergeUnitResult
   | { readonly retention: TreeSitterWorkerRetentionSnapshot }
   | undefined
 
@@ -299,6 +331,7 @@ export type TreeSitterWorkerRetentionSnapshot = {
       readonly highlightQueryCount: number
       readonly foldQueryCount: number
       readonly injectionQueryCount: number
+      readonly mergeUnitQueryCount: number
     }[]
   }
   readonly unmeasuredResources: readonly (

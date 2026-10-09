@@ -168,6 +168,12 @@ wrap fixes and complete responsive snapshots ship in their own PRs before site i
 This replaces the separate Node prerenderer and owns snapshot restore qualification;
 Plan 338's asset work continues alongside it.
 
+[341](plans/341-html-bootstrap.md) is Approved for a named HTML bootstrap mechanism
+that supplies current appearance and native wallpaper preloads before React. This is
+an independent bounded web/server startup change. Implement it when the owner starts
+the work, after resolving document admission and native backdrop context with Plans
+337 and 114; preserve Plan 320's shared palette generator.
+
 [335](plans/335-stroke-icons.md) retains the current stroke-icon migration, shared registry
 and selected morph sites. Its broad swap takes the structural window after the keymap
 cutover and before broad new UI batches; registry/mapping preparation can proceed earlier.

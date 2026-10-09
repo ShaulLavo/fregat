@@ -56,7 +56,7 @@ test('a fresh install opens the remote folder on its own machine, apart from the
   await userEvent.type(path, join(h.serverB.root, 'same'))
   await userEvent.keyboard('{Enter}')
   await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Folder path' })).toBeNull())
-  await userEvent.click(screen.getByRole('button', { name: 'Choose folder' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Open' }))
 
   await waitFor(() => expect(h.application.getSnapshot().origin).toBe(h.originB))
   await waitFor(() => expect(rootPath(h)).toBe('same'))
@@ -89,7 +89,7 @@ test('the chosen folder opens its chat while the machine has not yet sent the pr
   await userEvent.type(path, join(h.serverB.root, 'held'))
   await userEvent.keyboard('{Enter}')
   await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Folder path' })).toBeNull())
-  await userEvent.click(screen.getByRole('button', { name: 'Choose folder' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Open' }))
 
   await waitFor(() => expect(navigation.currentAddress().document).toMatch(/^t\/draft-/))
   expect(rootPath(h)).toBe('held')
@@ -109,7 +109,7 @@ test('cancelling the remote folder step opens nothing and keeps the machine', as
 
   await userEvent.click(await screen.findByRole('button', { name: /^Connect a remote machine/ }))
   await userEvent.click(await screen.findByRole('button', { name: /Remote fixture/ }))
-  await screen.findByRole('listbox', { name: 'Folders and files' })
+  await screen.findByRole('listbox', { name: 'Folders' })
   await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
   // Back on the machine list, the saved machine still connected.
   await screen.findByRole('button', { name: /Remote fixture/ })

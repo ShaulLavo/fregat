@@ -12,7 +12,6 @@ export function LocalPicker({
   readonly onPick: (machine: ConfirmedMachine, path: string) => void
 }) {
   return usePickEntry({
-    mode: 'folder',
     open: true,
     value: null,
     onOpenChange: (open) => {

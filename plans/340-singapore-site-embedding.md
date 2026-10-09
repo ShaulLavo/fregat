@@ -166,6 +166,27 @@ A separate editor implementation agent owns this section. First add a failing te
 
 Additional required regression inputs are tabs at wrap boundaries, trailing spaces, nonbreaking spaces, CJK, combining sequences, emoji/surrogate pairs at a chunk boundary, long identifiers, link replacements, emphasis and a caret revealing Markdown marks. These are test targets, not confirmed bugs from this investigation. If one fails, record its exact text, width and row ends here and fix it under this plan. Do not open issues or leave a new wrap failure unowned.
 
+### Wrap implementation evidence
+
+- [x] Keep streamed graphemes intact across storage chunks. [PR #1098](https://github.com/ShaulLavo/fregat/pull/1098) fixes `aaa😀bb` at width 4, whose old row ends were `[4, 7]`, and `aaa ébc` at width 2, whose old ends were `[2, 4, 6, 8]`. Tests cover every chunk split, ZWJ emoji, flags and real 4,096/16,384-unit projection boundaries.
+- [x] Admit wrapped text within the measured content width. [PR #1099](https://github.com/ShaulLavo/fregat/pull/1099) measures fallback glyphs, budgets the gutter and caret, floors the column fallback and separates hanging-space scroll width from caret geometry. Before the fix, the home sample had 9/17 px extra extent at 320/390 px in iPhone-descriptor WebKit. The portable phone extent project passes 122 tests across Chromium and WebKit, including a 60 px joined-family-emoji case whose old extent was 90 px, with exact `scrollWidth === clientWidth` before and after caret reveal.
+- [x] Restart tabs on each displayed row. [PR #1104](https://github.com/ShaulLavo/fregat/pull/1104) fixes `\t a\ta aa` at width 4, whose old soft ends were `[2, 6]` and whose middle row painted five columns. [PR #1106](https://github.com/ShaulLavo/fregat/pull/1106) completes the column-only paths: `aaaaa\tb\tcdefgh\tij` at widths 5/6 had row ends `[5, 7, 10, 14, 17]`/`[5, 7, 11, 16, 17]`, painting `\tcd`/`\tcde` as six/seven columns. The projection tests include inline-map and block paths, measured and column wrapping, and deterministic edits/fold toggles.
+- [x] Wrap long Markdown link labels through row-local rendered fragments. [PR #1114](https://github.com/ShaulLavo/fregat/pull/1114) fixes the real-parser input `read [the long label with words and averylongidentifier](https://example.com) now`, whose old display ends were `[5, 55, 58]` at width 10, leaving a 49-column label. The corrected node fixture fits every row and preserves all preview text. Browser fixtures cover link destinations, keyboard-node disposal, resize, source reveal, emphasis, long inline code and padded table labels, including 320/390 px in Chromium and iPhone-descriptor WebKit. Twelve phone-engine cases pass; the existing Markdown replacement/preview suites pass 55 tests.
+- [x] Recheck an oversized word after moving it beyond a space. [PR #1123](https://github.com/ShaulLavo/fregat/pull/1123) fixes ` bbb` at measured width 4 with advances 1 for space and 1.5 for `b`. The old soft ends `[1]` left a 4.5-wide word; the corrected ends `[1, 3]` keep both word fragments within the width.
+- [x] Trailing-space regression: `ab   cd  ` at a 72 px viewport with a 32 px gutter and 8 px fallback advance has character-wrap ends `[4, 8, 9]` after the caret allowance, and word-wrap ends `[5, 9]`. Preserve trailing markers at source offsets `[7, 8]` in both modes. Rewrapping an unchanged space-only row must refresh its source range from `[2, 3]` to `[8, 9]`.
+- [x] Include patch changesets for core and Markdown behavior changes, with no package version edits.
+- [x] Remove repeated grapheme-boundary searches and fragmented tab-prefix rescans found in review. The scanner segments each new storage chunk once and caches only its latest chunk. The tab fallback visits each measured source range once. Failing-first counters recorded 997 segmentation calls for a 1,050-unit line and 422,093 range-end reads for 1,024 source ranges. Their regression tests require at most two segmentations and four range-end reads per source range.
+
+Local review experiments on 2026-10-09 used Bun 1.4.2 on Linux with an Intel Core i7-14700K. Paired medians at 1,075,200 UTF-16 units were 582.01 ms before and 8.54 ms after for the repeated mixed-Unicode fixture; the earlier scanner was 4.46 ms but split graphemes. A unique-chunk control was 689.86 ms before and 37.02 ms after, exposing the remaining cost of one segmentation per new chunk. At 1,048,576 units across 16,384 source fragments, tab wrapping fell from 276.94 ms to 2.06 ms. These are bounded scanner experiments, not browser interaction or product speed claims.
+
+A separate large-Markdown experiment on the same host used 1,048,616 UTF-16 units with 12,788 links, a fresh parser for each of three runs and wrap width 40. It validated 12,788 textual link replacements within 38,364 mapped replacements and 25,577 projected rows. Median construction time was 7,768.62 ms; median stage times were 40.97 ms parsing, 7,612.24 ms replacement construction, 45.69 ms inline-map construction and 40.79 ms projection construction. Stage medians are independent and do not sum to the total median. This excludes browser layout and measures initial construction, not interactive wrapping.
+
+- [x] Make large link-heavy replacement construction linear while preserving nested labels and markers. Completed in [PR #1135](https://github.com/ShaulLavo/fregat/pull/1135) with structural work counters and paired construction measurements. See [Follow-up: Markdown replacement construction](#follow-up-markdown-replacement-construction).
+
+The width fixtures also cover fractional glyph boundaries, prose, long identifiers, CJK, URLs, package names, nonbreaking spaces, combining sequences, emoji and trailing spaces. Screenshots were read back. These checks prove live editor containment and source preservation, not static/live pixel parity.
+
+The home height numbers alone do not prove duplicate wrapped rows. Their excesses exactly match the existing `scrollPastEnd` padding: `1254 - 638 = 638 - 22`, and `946 - 484 = 484 - 22`. Content-height ownership and hidden-to-visible highlights remain with their separate implementation lane. Deleting the site's independent break policy and proving static/live parity remain Phase 3 work.
+
 ## Snapshot speed budget
 
 Treat restore speed as a landing-page requirement, separate from worker/parser startup. These are acceptance budgets, not achieved product claims:
@@ -226,3 +247,31 @@ This is encouraging for a small captured viewport, but WebKit already misses the
 - [ ] Pass site build, link/sample checks and `bun run --cwd editor/site test:browser`. Extend browser coverage to WebKit and mobile for the new paths.
 - [ ] Keep all four `mobile-layout` CI shards green. Run `bun scripts/product-sites/test-mobile.mjs` and the portable `verify-mobile.mjs` flow against built product sites, including live phone takeover.
 - [ ] Pass `bun run plans:check`, record final evidence and measured budgets here, and mark the implementing phases complete. No package-performance headline is published from experiment-only numbers.
+
+### Follow-up: Markdown replacement construction
+
+- [x] Profile and remove the repeated full-array scans and rebuilds during link replacement construction. Preserve replacement order, formatted labels, reveal ranges and per-line fragment boundaries. Add a bounded-work regression and a patch changeset.
+
+The link-heavy reproduction has 1,048,616 UTF-16 units and 12,788 links. The original experiment measured a 7,768.62 ms median for complete construction, with replacement derivation taking 7,612.24 ms. Browser layout was excluded. CPU profiles confirm that each link scanned the complete link list, filtered all replacement specs twice and spliced the retained array back into place. Formatted labels also rebuilt their complete string for each hidden marker.
+
+The fix orders unsigned parser offsets with stable radix passes, visits the markers once across source-ordered link labels, joins label chunks once and compacts retained specs once. It restores the original provider order after the sweep. Existing link mounting and wrapped-fragment rendering are unchanged.
+
+Matched three-run experiments, using a fresh Bun process for each version and size, on 2026-10-09, Linux 7.2.8-arch1-2, Intel Core i7-14700K, Bun 1.4.2:
+
+| UTF-16 units | Links  | Replacement median before | Replacement median after | Complete construction before | Complete construction after |
+| ------------ | ------ | ------------------------- | ------------------------ | ---------------------------- | --------------------------- |
+| 524,308      | 6,394  | 1,577.21 ms               | 17.80 ms                 | 1,651.09 ms                  | 82.10 ms                    |
+| 1,048,616    | 12,788 | 9,007.32 ms               | 41.63 ms                 | 9,138.05 ms                  | 188.31 ms                   |
+
+These are construction experiments on one shared host. They include a fresh parser, piece table, replacement specs, inline map and projection row count, and exclude browser layout, paint, fonts, workers and network. They support no general browser-startup or competitor claim. The full-size result still has 38,364 replacements and 25,577 projected rows.
+
+The regression counts source-range visits at 128 and 1,024 links, including reversed input order. The old code fails at 128 links with 33,024 visits against a 5,120-visit bound. A saved snapshot covers formatted multiline labels and source boundaries. An additional 144-case experiment matched every replacement field except render-function identity. Chromium and WebKit each passed the six existing fragment, resize, reveal and table-link tests.
+
+Portable reproduction after building the workspaces:
+
+```sh
+bun editor/packages/editor/bench/markdownConstruction.ts 524288
+bun editor/packages/editor/bench/markdownConstruction.ts 1048576
+```
+
+Raw timing samples, method and machine details are in `editor/docs/performance/markdown-construction-2026-10-09/results.json`. The failing-test commit records the baseline algorithm. This follow-up makes no change to the other unchecked embedding and snapshot phases.

@@ -50,6 +50,7 @@ Read the applicable skills before writing or reviewing code, or running their wo
 - Fix readonly/mutable contract mismatches by widening the callee's parameter to readonly; never copy (`[...x]`) to satisfy TypeScript.
 - Do not repeat folder names in files or symbols (`workspace/sidebar.tsx`). Rename files, exports, and callers together.
 - Greenfield, no users: no compatibility shims, aliases, or migrations. Update all callers, delete obsolete tests, and delete invalidated persisted state rather than healing it.
+- No version-skew code. Web app, server, desktop launcher, native hosts and remote machines ship together; when versions differ, things may break until a refresh or restart. Write no fallback, timeout, error path or test whose only purpose is one particular mismatch, and treat review findings that only matter across versions as out of scope. Generic handling that also serves future changes and bugs stays: a bridge that answers every request it cannot read with a structured error is fine.
 - Measure performance before and after. Identify whether data layout or design is the bottleneck before tuning.
 - Before debugging, prove the observation works on a known-good case. A theory needing a second special case must be re-derived from raw evidence.
 
