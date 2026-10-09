@@ -1,6 +1,6 @@
 {
   "name": "@singapore-editor/minimap",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "A worker-rendered file overview with scroll controls for the Singapore editor.",
   "keywords": [
     "browser",
