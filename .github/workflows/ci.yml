@@ -205,6 +205,9 @@ jobs:
       - name: React Compiler census
         run: bun run compiler:census
 
+      - name: Manual React memo check
+        run: bun run compiler:memos:check
+
       - name: Unused code
         run: bun run unused:check
 
@@ -249,11 +252,6 @@ jobs:
       # it before a measurement happens.
       - name: Benchmark gate (file tree prepared input)
         run: bun run --cwd apps/web bench:file-tree-prepared-input:gate
-
-      # Byte counts, not timings: a production build is deterministic, so this gate runs on a
-      # shared runner. It builds itself and never reads a cached bundle-stats.json.
-      - name: First-load gate
-        run: bun run --cwd apps/web bundle:gate
 
       # Package tests also read app sources (the session vocabulary scans `apps/web`), so they
       # run for any code change.

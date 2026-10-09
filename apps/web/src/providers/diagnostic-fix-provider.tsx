@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { use, useMemo, type ReactNode } from 'react'
+import { use, type ReactNode } from 'react'
 
 import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
@@ -16,12 +16,9 @@ export function DiagnosticFixProvider({ children }: { readonly children: ReactNo
   const documents = useEditorDocumentStoreApi()
   const workspace = useEditorWorkspaceStoreApi()
   const queryClient = useQueryClient()
-  // Manual memo: every diagnostic surface's mutation reads this from context; a recompute
-  // would re-render all of them.
-  const requestFix = useMemo(
-    () => (attach ? createDiagnosticFix({ attach, documents, queryClient, workspace }) : null),
-    [attach, documents, queryClient, workspace],
-  )
+  const requestFix = attach
+    ? createDiagnosticFix({ attach, documents, queryClient, workspace })
+    : null
 
   return <DiagnosticFixContext value={requestFix}>{children}</DiagnosticFixContext>
 }

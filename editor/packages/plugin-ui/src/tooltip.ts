@@ -88,6 +88,8 @@ export type TooltipNote = {
 
 /** One row group of the tooltip; shown in the order given. */
 export type TooltipPart = {
+  /** A content-sized surface with button actions in a persistent footer. */
+  readonly presentation?: 'controls'
   readonly markdown?: string
   readonly notes?: readonly TooltipNote[]
   readonly actions?: readonly TooltipAction[]
@@ -142,15 +144,21 @@ export function createTooltipController(options: TooltipOptions): TooltipControl
   let disposed = false
   let anchorRect: DOMRect | null = null
   let placement: AnchoredSurfacePlacement = 'top'
+  let controls = false
   let closestPointerDistance: number | null = null
 
   const surface = createAnchoredSurface({
     element: tooltip,
     anchorClassName: tooltipClassName(classNamespace, 'anchor'),
     preferredPlacement: 'top',
+    alignment: () => (controls ? 'start' : 'center'),
+    horizontalBounds: () => (controls ? reentryElement.getBoundingClientRect() : undefined),
     gapPx: TOOLTIP_GAP_PX,
     viewportMarginPx: TOOLTIP_VIEWPORT_MARGIN_PX,
-    maxHeightPx: () => tooltipMaximumHeight(reentryElement, document),
+    maxHeightPx: () =>
+      controls
+        ? (document.defaultView?.innerHeight ?? 0) - TOOLTIP_VIEWPORT_MARGIN_PX * 2
+        : tooltipMaximumHeight(reentryElement, document),
     onPlaced: (maxHeightPx, nextPlacement) => {
       placement = nextPlacement
       setTooltipBodyMaxHeight(tooltip, maxHeightPx)
@@ -200,12 +208,23 @@ export function createTooltipController(options: TooltipOptions): TooltipControl
     if (anchorChanged) closestPointerDistance = null
     anchorRect = showOptions.anchor
     const parts = showOptions.parts ?? []
+    controls = parts.some((part) => part.presentation === 'controls')
+    tooltip.dataset.editorHoverPresentation = controls ? 'controls' : 'text'
     const hasNotes = parts.some((part) => part.notes && part.notes.length > 0)
-    placement = showOptions.preferredPlacement ?? (hasNotes ? 'bottom' : 'top')
+    placement = showOptions.preferredPlacement ?? (controls || hasNotes ? 'bottom' : 'top')
     syncEditorThemeVariables(tooltip, themeSource)
-    applyTooltipDimensions(tooltip, reentryElement, tooltip.hidden !== false)
+    if (controls) {
+      const bounds = reentryElement.getBoundingClientRect()
+      const width =
+        Math.min(bounds.right, document.defaultView?.innerWidth ?? 0) - Math.max(0, bounds.left)
+      tooltip.style.maxWidth = `${Math.max(TOOLTIP_MIN_WIDTH_PX, width - TOOLTIP_VIEWPORT_MARGIN_PX * 2)}px`
+      tooltip.style.maxHeight = `${(document.defaultView?.innerHeight ?? 0) - TOOLTIP_VIEWPORT_MARGIN_PX * 2}px`
+      tooltip.style.width = 'max-content'
+      tooltip.style.height = 'auto'
+    } else applyTooltipDimensions(tooltip, reentryElement, tooltip.hidden !== false)
     renderTooltip(tooltip, {
       actionRows,
+      controls,
       hoverText: showOptions.hoverText,
       parts,
       theme: showOptions.theme,
@@ -386,6 +405,7 @@ function createTooltipElement(document: Document, classNamespace: string): HTMLD
 }
 
 type TooltipContent = {
+  readonly controls: boolean
   readonly actionRows: WeakMap<TooltipAction, HTMLElement>
   readonly hoverText: string | null
   readonly parts: readonly TooltipPart[]
@@ -403,6 +423,15 @@ function renderTooltip(element: HTMLDivElement, content: TooltipContent): void {
   const parts = content.hoverText
     ? [{ markdown: content.hoverText }, ...content.parts]
     : content.parts
+  const footer = element.ownerDocument.createElement('div')
+  footer.className = tooltipClassName(content.classNamespace, 'controls')
+  Object.assign(footer.style, {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '6px',
+    padding: '8px 10px',
+    flexShrink: '0',
+  })
   let markdownIndex = 0
   for (const part of parts) {
     if (part.markdown) {
@@ -414,7 +443,9 @@ function renderTooltip(element: HTMLDivElement, content: TooltipContent): void {
       body.append(noteSection(content, element.ownerDocument, note))
     }
     for (const action of part.actions ?? []) {
-      body.append(tooltipAction(element.ownerDocument, content, action))
+      const control = part.presentation === 'controls'
+      const row = tooltipAction(element.ownerDocument, content, action, control)
+      ;(control ? footer : body).append(row)
     }
   }
   if (content.loading) body.append(loadingSection(content, element.ownerDocument))
@@ -427,6 +458,11 @@ function renderTooltip(element: HTMLDivElement, content: TooltipContent): void {
     createResizeHandle(element.ownerDocument, content.classNamespace, 'top'),
     createResizeHandle(element.ownerDocument, content.classNamespace, 'bottom'),
   )
+  if (footer.childElementCount) {
+    body.style.height = 'auto'
+    body.style.flex = '1 1 auto'
+    element.append(footer, tooltipControlStyle(element.ownerDocument))
+  }
   element.hidden = false
 }
 
@@ -480,7 +516,7 @@ function createTooltipRow(
     position: 'relative',
     minWidth: '0',
     padding: '6px 30px 6px 10px',
-    borderTop: `1px solid ${HOVER_COLORS.separator}`,
+    borderTop: content.controls ? '0' : `1px solid ${HOVER_COLORS.separator}`,
     boxSizing: 'border-box',
     cursor: 'text',
   })
@@ -901,7 +937,10 @@ function tooltipMaximumHeight(editor: HTMLElement, document: Document): number {
 function setTooltipBodyMaxHeight(element: HTMLDivElement, maxHeight: number): void {
   const body = tooltipBody(element)
   if (!body) return
-  body.style.maxHeight = `${Math.max(1, maxHeight - 2)}px`
+  const footer = element.querySelector<HTMLElement>(
+    `.${tooltipClassNameForElement(element, 'controls')}`,
+  )
+  body.style.maxHeight = `${Math.max(1, maxHeight - 2 - (footer?.getBoundingClientRect().height ?? 0))}px`
 }
 
 function tooltipBody(element: HTMLElement): HTMLElement | null {
@@ -1059,6 +1098,7 @@ function tooltipAction(
   document: Document,
   content: TooltipContent,
   action: TooltipAction,
+  control = false,
 ): HTMLElement {
   const existing = content.actionRows.get(action)
   if (existing) return existing
@@ -1075,6 +1115,11 @@ function tooltipAction(
     font: 'inherit',
     textDecoration: 'underline',
   })
+  if (control) {
+    button.removeAttribute('style')
+    button.className = 'editor-hover-control'
+    Object.assign(row.style, { border: '0', padding: '0' })
+  }
   const failure = document.createElement('span')
   failure.setAttribute('role', 'status')
   button.addEventListener('click', () => {
@@ -1082,4 +1127,19 @@ function tooltipAction(
   })
   row.append(button, failure)
   return row
+}
+
+function tooltipControlStyle(document: Document): HTMLStyleElement {
+  const style = document.createElement('style')
+  style.textContent = `
+    [data-editor-hover-presentation="controls"]:not([hidden]) { display: flex; flex-direction: column; }
+    [data-editor-hover-presentation="controls"] [role="document"] { outline: none; }
+    [data-editor-hover-presentation="controls"] [role="document"] + [role="document"] { background: ${HOVER_COLORS.controlBackground}; }
+    .editor-hover-control { appearance: none; border: 0; border-radius: 4px; padding: 6px 10px; background: ${HOVER_COLORS.controlBackground}; color: ${HOVER_COLORS.foreground}; font: inherit; text-decoration: none; cursor: pointer; }
+    .editor-hover-control:hover { background: ${HOVER_COLORS.controlHover}; }
+    .editor-hover-control:active { background: ${HOVER_COLORS.controlPressed}; }
+    .editor-hover-control:focus-visible { outline: 2px solid ${HOVER_COLORS.foreground}; outline-offset: 2px; }
+    .editor-hover-control[aria-disabled="true"] { opacity: 0.5; cursor: wait; }
+  `
+  return style
 }

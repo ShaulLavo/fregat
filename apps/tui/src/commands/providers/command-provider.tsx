@@ -41,7 +41,7 @@ export function CommandProvider({
       signal,
     }),
   )
-  // Stable binding identity keeps pending chords alive across unrelated renders.
+  // The binding update useEffect depends on this identity to preserve pending chords.
   const resolution = useMemo(() => effectiveTerminalBindings(overrides, kitty), [overrides, kitty])
   const [pending, setPending] = useState<PendingChord | null>(null)
   const [keymap] = useState(() =>
