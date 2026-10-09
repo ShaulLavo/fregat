@@ -13,6 +13,7 @@ import {
   type RowRendererSurface,
   type RowThemeInvalidation,
 } from '../row-renderer.js'
+import { DocumentFrames } from './frames.js'
 import { frameStyle, renderFrameToHtml, renderRowRuns, type RowRun } from './html.js'
 
 export { renderFrameToHtml } from './html.js'
@@ -54,12 +55,16 @@ class DomSurface implements RowRendererSurface {
   private grid: RendererGridSize
   private theme: CanonicalRendererTheme
   private rows: MountedRow[] = []
+  readonly frames: DocumentFrames
+  private left = 0
+  private top = 0
 
   constructor(options: WebGpuTerminalRendererOptions) {
     if (!('ownerDocument' in options.canvas) || !options.canvas.parentElement) {
       throw new TypeError('The DOM renderer requires a canvas mounted in a terminal host')
     }
     this.canvas = options.canvas
+    this.frames = DocumentFrames.forDocument(this.canvas.ownerDocument)
     this.font = copyFittedFont(options.font)
     this.grid = normalizeRendererGrid(options)
     this.theme = canonicalRendererTheme(mergeRendererTheme(options.theme))
@@ -71,15 +76,19 @@ class DomSurface implements RowRendererSurface {
     // Transparency preserves the canvas as the terminal pointer target.
     this.canvas.style.opacity = '0'
     this.canvas.after(this.container)
+    this.frames.add(this)
   }
 
   dispose(): void {
+    this.frames.remove(this)
     this.container.remove()
     this.rows = []
     this.canvas.style.opacity = this.previousOpacity
   }
 
   beginFrame(): void {
+    if (this.frames.painting) return
+    this.measure()
     this.position()
   }
 
@@ -144,6 +153,7 @@ class DomSurface implements RowRendererSurface {
       element,
       runs: [],
     }))
+    this.measure()
     this.position()
   }
 
@@ -154,13 +164,16 @@ class DomSurface implements RowRendererSurface {
     return 'all'
   }
 
-  private position(): void {
+  measure(): void {
     const style = this.canvas.ownerDocument.defaultView!.getComputedStyle(this.canvas)
-    const left = this.canvas.offsetLeft + (parseFloat(style.paddingLeft) || 0)
-    const top = this.canvas.offsetTop + (parseFloat(style.paddingTop) || 0)
+    this.left = this.canvas.offsetLeft + (parseFloat(style.paddingLeft) || 0)
+    this.top = this.canvas.offsetTop + (parseFloat(style.paddingTop) || 0)
+  }
+
+  position(): void {
     const declarations = this.container.style
-    const leftDeclaration = `${left}px`
-    const topDeclaration = `${top}px`
+    const leftDeclaration = `${this.left}px`
+    const topDeclaration = `${this.top}px`
     if (declarations.left !== leftDeclaration || declarations.getPropertyPriority('left') !== '')
       declarations.left = leftDeclaration
     if (declarations.top !== topDeclaration || declarations.getPropertyPriority('top') !== '')
@@ -172,7 +185,8 @@ export class DomTerminalRenderer extends RowTerminalRenderer {
   readonly backend = 'dom' as const
 
   private constructor(options: WebGpuTerminalRendererOptions) {
-    super(options, new DomSurface(options))
+    const surface = new DomSurface(options)
+    super({ ...options, schedulerClock: options.schedulerClock ?? surface.frames }, surface)
   }
 
   protected override readRows(options: ReadRowsOptions = {}): readonly RenderRow[] {

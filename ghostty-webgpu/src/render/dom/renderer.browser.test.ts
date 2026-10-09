@@ -564,41 +564,51 @@ describe('DOM terminal renderer', () => {
   })
 })
 
-it('observes peer canvas CSS changes between participating native callbacks', async () => {
-  const runtime = await GhosttyRuntime.create()
-  cleanups.push(() => runtime.dispose())
-  const events: string[] = []
-  const make = async (name: string) => {
-    const terminal = runtime.createTerminal({ columns: 12, rows: 3 })
-    const state = runtime.createRenderState(terminal)
-    terminal.write(probeInput)
-    const canvas = mountedCanvas()
-    const renderer = await DomTerminalRenderer.create({
-      canvas,
-      columns: 12,
-      rows: 3,
-      font: probeFont,
-      renderState: state,
-      onRowsPainted: () => events.push(`paint-${name}`),
+it.each(['idle', 'busy'])(
+  'converges next frame after peer CSS changes while %s',
+  async (activity) => {
+    const runtime = await GhosttyRuntime.create()
+    cleanups.push(() => runtime.dispose())
+    const events: string[] = []
+    const make = async (name: string) => {
+      const terminal = runtime.createTerminal({ columns: 12, rows: 3 })
+      const state = runtime.createRenderState(terminal)
+      terminal.write(probeInput)
+      const canvas = mountedCanvas()
+      const renderer = await DomTerminalRenderer.create({
+        canvas,
+        columns: 12,
+        rows: 3,
+        font: probeFont,
+        renderState: state,
+        onRowsPainted: () => events.push(`paint-${name}`),
+      })
+      cleanups.push(() => renderer.dispose())
+      return { canvas, renderer, terminal }
+    }
+    await make('a')
+    let peer: HTMLCanvasElement | undefined
+    requestAnimationFrame(() => {
+      events.push('peer-css-change')
+      peer!.style.marginLeft = '30px'
+      peer!.style.paddingLeft = '11px'
+      peer!.parentElement!.style.paddingLeft = '10px'
     })
-    cleanups.push(() => renderer.dispose())
-    return { canvas, renderer }
-  }
-  await make('a')
-  let peer: HTMLCanvasElement | undefined
-  requestAnimationFrame(() => {
-    events.push('peer-css-change')
-    peer!.style.marginLeft = '30px'
-    peer!.style.paddingLeft = '11px'
-    peer!.parentElement!.style.paddingLeft = '10px'
-  })
-  const b = await make('b')
-  peer = b.canvas
-  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-  expect(events).toEqual(['paint-a', 'peer-css-change', 'paint-b'])
-  const expected = `${b.canvas.offsetLeft + parseFloat(getComputedStyle(b.canvas).paddingLeft)}px`
-  expect(b.canvas.nextElementSibling!.getAttribute('style')).toContain(`left: ${expected}`)
-})
+    const b = await make('b')
+    peer = b.canvas
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    expect(events).toContain('peer-css-change')
+    if (activity === 'busy') {
+      b.terminal.write('\rnext')
+      b.renderer.notifyWrite()
+    }
+    const container = b.canvas.nextElementSibling as HTMLElement
+    for (let frame = 0; frame < 3; frame += 1) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      expect(container.style.left).toBe('51px')
+    }
+  },
+)
 
 it('packed DOM rows keep styled callbacks and lazy snapshots owned across writes and memory growth', async () => {
   const snapshots: RendererFrameSnapshot[] = []
@@ -746,4 +756,125 @@ it('reads live canvas geometry without repeating unchanged overlay declarations'
   probe.clock.flush()
   expect(container.style.left).toBe('30px')
   expect(container.style.top).toBe('11px')
+})
+
+it('measures participating DOM surfaces before the first surface paints', async () => {
+  const runtime = await GhosttyRuntime.create()
+  cleanups.push(() => runtime.dispose())
+  const events: string[] = []
+  const style = window.getComputedStyle.bind(window)
+  vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+    if (element instanceof HTMLCanvasElement) events.push(`measure-${element.dataset.probe}`)
+    return style(element, pseudo)
+  })
+  for (const name of ['a', 'b']) {
+    const host = document.createElement('div')
+    host.style.position = 'relative'
+    const canvas = document.createElement('canvas')
+    canvas.dataset.probe = name
+    canvas.style.padding = '7px'
+    host.append(canvas)
+    document.body.append(host)
+    cleanups.push(() => host.remove())
+    const terminal = runtime.createTerminal({ columns: 12, rows: 3 })
+    terminal.write(probeInput)
+    const renderer = await DomTerminalRenderer.create({
+      canvas,
+      columns: 12,
+      rows: 3,
+      font: probeFont,
+      renderState: runtime.createRenderState(terminal),
+      onRowsPainted: () => events.push(`paint-${name}`),
+    })
+    cleanups.push(() => renderer.dispose())
+  }
+  events.length = 0
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  expect(events).toEqual(['measure-a', 'measure-b', 'paint-a', 'paint-b'])
+})
+
+it('follows idle layout changes, transforms, cascade and percentage padding on the next frame', async () => {
+  const probe = await rendererProbe('dom')
+  const canvas = probe.canvas
+  const host = canvas.parentElement!
+  const container = canvas.nextElementSibling as HTMLElement
+  const sheet = document.createElement('style')
+  document.head.append(sheet)
+  cleanups.push(() => sheet.remove())
+  canvas.dataset.idleGeometry = ''
+  const sibling = document.createElement('div')
+  const oracle = document.createElement('div')
+  oracle.style.position = 'absolute'
+  host.append(oracle)
+  const expectNextFrame = async () => {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    const style = getComputedStyle(canvas)
+    oracle.style.left = `${canvas.offsetLeft + parseFloat(style.paddingLeft)}px`
+    oracle.style.top = `${canvas.offsetTop + parseFloat(style.paddingTop)}px`
+    const expected = oracle.getBoundingClientRect()
+    const actual = container.getBoundingClientRect()
+    expect(actual.left).toBeCloseTo(expected.left, 5)
+    expect(actual.top).toBeCloseTo(expected.top, 5)
+  }
+  host.style.padding = '3.25px 4.5px'
+  canvas.style.margin = '2.5px 5.5px'
+  await expectNextFrame()
+  sibling.style.height = '17.25px'
+  host.prepend(sibling)
+  await expectNextFrame()
+  host.style.transform = 'translate(13.25px, 7.5px) scale(1.1)'
+  canvas.style.transform = 'translate(31px, 19px)'
+  await expectNextFrame()
+  sheet.sheet!.insertRule(
+    'canvas[data-idle-geometry] { padding-left: 19.25px !important; margin-top: 23.25px !important }',
+  )
+  await expectNextFrame()
+  sheet.sheet!.deleteRule(0)
+  canvas.style.padding = '5% 7%'
+  host.style.width = '400px'
+  await expectNextFrame()
+  host.style.width = '350px'
+  await expectNextFrame()
+  probe.terminal.resize({ columns: 8, rows: 2 })
+  probe.renderer.resize({ columns: 8, rows: 2 })
+  await expectNextFrame()
+})
+
+it('owns geometry and animation frames in each canvas document', async () => {
+  const runtime = await GhosttyRuntime.create()
+  cleanups.push(() => runtime.dispose())
+  const iframe = document.createElement('iframe')
+  document.body.append(iframe)
+  cleanups.push(() => iframe.remove())
+  const nested = iframe.contentDocument!
+  const view = iframe.contentWindow!
+  const canvases = [mountedCanvas(), nested.createElement('canvas')]
+  const host = nested.createElement('div')
+  host.style.position = 'relative'
+  host.append(canvases[1]!)
+  nested.body.append(host)
+  for (const canvas of canvases) {
+    const terminal = runtime.createTerminal({ columns: 12, rows: 3 })
+    terminal.write(probeInput)
+    const renderer = await DomTerminalRenderer.create({
+      canvas,
+      columns: 12,
+      rows: 3,
+      font: probeFont,
+      renderState: runtime.createRenderState(terminal),
+    })
+    cleanups.push(() => renderer.dispose())
+  }
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  await new Promise<void>((resolve) => view.requestAnimationFrame(() => resolve()))
+  for (const canvas of canvases) canvas.style.marginLeft = '23px'
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  await new Promise<void>((resolve) => view.requestAnimationFrame(() => resolve()))
+  for (const canvas of canvases) {
+    const style = canvas.ownerDocument.defaultView!.getComputedStyle(canvas)
+    expect((canvas.nextElementSibling as HTMLElement).style.left).toBe(
+      `${canvas.offsetLeft + parseFloat(style.paddingLeft)}px`,
+    )
+    expect(canvas.nextElementSibling!.textContent).toContain('AB界')
+  }
 })

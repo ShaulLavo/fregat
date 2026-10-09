@@ -62,6 +62,18 @@ Publication, full interaction parity and presentation acceptance wait for their 
 Packaged-entry Chromium software-GPU checks qualify correctness only.
 OSC 52 remains denied by default.
 
+## DOM geometry timing
+
+The DOM renderer follows page layout changes within one animation frame, including while the
+terminal is idle. All DOM terminals in one document share a frame-start geometry read before
+painting their rows. A page change made after that read appears in the next animation frame.
+Hidden documents resume geometry updates when they become visible.
+
+Positions use the canvas's layout offsets and resolved padding. Canvas-only transforms leave
+those offsets unchanged; ancestor transforms move the canvas and DOM rows together. Each
+iframe owns its document's frame queue. An explicit `schedulerClock` controls row painting;
+geometry continues to follow the owning document's animation frames.
+
 ## scrollback retention
 
 `appearance.scrollbackLimit` sets a page-granular budget for physical history rows, excluding the
