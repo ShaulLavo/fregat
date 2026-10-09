@@ -119,7 +119,20 @@ it('lays a tab out at a new width and keeps the caret on the glyph after it', as
       const rowLeft = text.getBoundingClientRect().left
 
       expect(Math.abs(caret - glyph)).toBeLessThanOrEqual(1)
-      expect(glyph - rowLeft).toBeCloseTo(tabSize * metrics().characterWidth, 0)
+      const reference = document.createElement('span')
+      reference.style.cssText = `position:absolute;white-space:pre;font:${getComputedStyle(scroll).font};tab-size:${tabSize}`
+      reference.textContent = '\tx'
+      document.body.append(reference)
+      try {
+        const nativeRange = document.createRange()
+        nativeRange.setStart(reference.firstChild!, 1)
+        nativeRange.collapse(true)
+        const nativeAdvance =
+          nativeRange.getBoundingClientRect().left - reference.getBoundingClientRect().left
+        expect(glyph - rowLeft).toBeCloseTo(nativeAdvance, 0)
+      } finally {
+        reference.remove()
+      }
     }
   } finally {
     dispose()

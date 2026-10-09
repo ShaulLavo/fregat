@@ -1367,6 +1367,8 @@ export const selectors = {
   editorFindWidget: (page: Page) => page.locator('.editor-find-widget'),
   editorLargeFileNotice: (page: Page) => page.getByTestId('large-file-mode'),
   editorMinimap: (page: Page) => page.locator('.editor-minimap-right'),
+  terminalAccessibilityMirror: (page: Page) =>
+    page.getByRole('list', { name: 'Terminal screen', exact: true, includeHidden: true }),
   terminalOpening: (page: Page) => page.getByRole('status', { name: 'Opening terminal' }),
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
