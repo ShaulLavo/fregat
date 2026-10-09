@@ -33,6 +33,37 @@ it('retains two appearances and completed run widths across packed row edits', a
   }
 })
 
+it('retains both ordinary run widths separated by the visible cursor', async () => {
+  const runtime = await GhosttyRuntime.create()
+  try {
+    const terminal = runtime.createTerminal({ columns: 12, rows: 1 })
+    const state = runtime.createRenderState(terminal)
+    const theme = canonicalRendererTheme(mergeRendererTheme({}))
+    let widthReads = 0
+    const font = {
+      ...probeFont,
+      get cssCellWidth() {
+        widthReads += 1
+        return probeFont.cssCellWidth
+      },
+    }
+    const projection = new RowProjection(font, theme)
+    const cursor = { style: 'block' as const, visible: true, x: 6, y: 0 }
+    terminal.write('AAAAAAAAAAAA')
+    state.update()
+    projection.project(state.readRows({ packed: true })[0]!, cursor)
+    widthReads = 0
+    terminal.write('\rBBBBBBBBBBBB')
+    state.update()
+    const row = state.readRows({ packed: true })[0]!
+    const actual = projection.project(row, cursor)
+    expect(widthReads).toBe(2)
+    expect(actual).toEqual(renderRowRuns(row, cursor, probeFont, theme))
+  } finally {
+    runtime.dispose()
+  }
+})
+
 it('matches cold projection through packed scratch mutations, selections, wide glyphs and cursors', async () => {
   const runtime = await GhosttyRuntime.create()
   try {

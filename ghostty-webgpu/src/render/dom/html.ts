@@ -150,6 +150,8 @@ interface CachedAppearance {
   readonly style: string
   width: number
   runStyle: string
+  alternateWidth: number
+  alternateRunStyle: string
 }
 
 export class RowProjection {
@@ -185,6 +187,8 @@ export class RowProjection {
       style: cellStyle(cell, undefined, this.font, this.theme, this.colors, 1),
       width: 0,
       runStyle: '',
+      alternateWidth: 0,
+      alternateRunStyle: '',
     }
     if (this.appearances.length === 2) this.appearances.shift()
     this.appearances.push(cached)
@@ -214,9 +218,13 @@ export function renderRowRuns(
   function flush(): void {
     if (currentWidth === 0) return
     let style = currentAppearance?.runStyle ?? ''
-    if (!currentAppearance || currentAppearance.width !== currentWidth) {
+    if (currentAppearance && currentAppearance.alternateWidth === currentWidth) {
+      style = currentAppearance.alternateRunStyle
+    } else if (!currentAppearance || currentAppearance.width !== currentWidth) {
       style = `${currentStyle}width:calc(${currentWidth} * var(--ghostty-cell-width, ${font.cssCellWidth}px));`
       if (currentAppearance) {
+        currentAppearance.alternateWidth = currentAppearance.width
+        currentAppearance.alternateRunStyle = currentAppearance.runStyle
         currentAppearance.width = currentWidth
         currentAppearance.runStyle = style
       }
