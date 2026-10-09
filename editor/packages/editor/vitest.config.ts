@@ -47,6 +47,7 @@ export default defineConfig({
             'micromark-util-normalize-identifier',
           ],
           include: [
+            'evlog/client',
             '@fregat/hotkeys',
             'diff',
             '@shikijs/engine-oniguruma',
@@ -78,6 +79,13 @@ export default defineConfig({
                 await page.mouse.down()
                 await page.mouse.move(end.x, end.y, { steps: 5 })
                 await page.mouse.up()
+              },
+              proofInputDelivery: async ({ page }, details: string) => {
+                console.info(
+                  'native-input-delivery',
+                  page.context().browser()!.browserType().name(),
+                  details,
+                )
               },
               proofKeyPress: async ({ page }, key: string) => {
                 await page.keyboard.press(key)

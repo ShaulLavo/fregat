@@ -7,6 +7,7 @@ import '../src/style.css'
 declare module 'vitest/browser' {
   interface BrowserCommands {
     proofKeyPress: (key: string) => Promise<void>
+    proofInputDelivery: (details: string) => Promise<void>
   }
 }
 
@@ -55,7 +56,10 @@ test.each(['flex', 'grid'] as const)('fills a sized %s host after resizing', asy
   expect(host.querySelectorAll('.editor-virtualized-row').length).toBeLessThan(100)
 })
 
-test('keeps a 10 MiB document windowed while typing in a block host', async () => {
+test.each([
+  ['1,000 character', 1000],
+  ['10 MiB', 10 * 1024 * 1024],
+] as const)('keeps a %s document windowed while typing in a block host', async (_size, bytes) => {
   const host = document.createElement('div')
   host.style.cssText = 'display:block;width:600px;height:120px'
   document.body.append(host)
@@ -72,19 +76,41 @@ test('keeps a 10 MiB document windowed while typing in a block host', async () =
   expect(rows()).toBeLessThan(100)
 
   const line = 'export const value: number = 123; // deterministic TypeScript fixture\n'
-  const bytes = 10 * 1024 * 1024
   const text = line.repeat(Math.ceil(bytes / line.length)).slice(0, bytes)
   editor.setText(text)
   await expect.poll(() => editor.getState().length).toBe(bytes)
   expect(scroll.clientHeight).toBe(120)
   expect(rows()).toBeLessThan(100)
 
+  const deliveries: unknown[] = []
+  const input = editor.getInputElement()
+  const events = { keydown: 0, beforeinput: 0, input: 0, keyup: 0 }
+  for (const type of ['keydown', 'beforeinput', 'input', 'keyup'] as const)
+    input.addEventListener(type, () => events[type]++)
   for (const where of ['end', 'middle'] as const) {
     const offset = where === 'end' ? editor.getState().length : Math.floor(bytes / 2)
     editor.setSelection(offset, offset, { reveal: true })
     editor.focus()
+    await expect.poll(() => document.activeElement === input && document.hasFocus()).toBe(true)
+    const initialLength = editor.getState().length
     const letter = where === 'end' ? 'q' : 'z'
-    for (let key = 0; key < 20; key++) await commands.proofKeyPress(letter)
+    for (let key = 0; key < 20; key++) {
+      await commands.proofKeyPress(letter)
+      const observed = {
+        where,
+        key,
+        expectedLength: initialLength + key + 1,
+        length: editor.getState().length,
+        inputKind: input.tagName,
+        focused: document.activeElement === input,
+        documentFocused: document.hasFocus(),
+        events: { ...events },
+      }
+      deliveries.push(observed)
+      await expect
+        .poll(() => editor.getState().length, { message: JSON.stringify(observed) })
+        .toBe(initialLength + key + 1)
+    }
     expect(editor.getTextSnapshot().readRange(offset, offset + 20)).toBe(letter.repeat(20))
     await expect
       .poll(() =>
@@ -94,4 +120,5 @@ test('keeps a 10 MiB document windowed while typing in a block host', async () =
     expect(scroll.clientHeight).toBe(120)
     expect(rows()).toBeLessThan(100)
   }
+  await commands.proofInputDelivery(JSON.stringify({ bytes, deliveries }))
 })
