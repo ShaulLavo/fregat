@@ -143,31 +143,53 @@ describe('review failure boundaries', () => {
     expect(terminal.visibleLines()).toEqual(accepted)
   })
 
-  it('reports and recovers capture failure through coordinated WebGPU commits', async () => {
+  it.each(['captureRetainedFrame', 'readTextRows'] as const)(
+    'reports and recovers %s failure through coordinated WebGPU commits',
+    async (operation) => {
+      const { terminal, clock, errors } = await fixture('webgpu', true)
+      terminal.write('accepted')
+      clock.flush()
+      const accepted = terminal.visibleLines()
+      terminal.onText(() => {})
+      const capture = vi.spyOn(runtime.bridge, operation).mockReturnValue(-1)
+      const escaped: (() => void)[] = []
+      const microtask = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((fn) => {
+        escaped.push(fn)
+      })
+      cleanups.push(() => {
+        capture.mockRestore()
+        microtask.mockRestore()
+      })
+      terminal.write('\rpending')
+      clock.flush()
+      capture.mockRestore()
+      microtask.mockRestore()
+      expect(terminal.visibleLines()).toEqual(accepted)
+      expect({ reported: errors.length, escaped: escaped.length }).toEqual({
+        reported: 1,
+        escaped: 0,
+      })
+      clock.flush()
+      expect(terminal.visibleLines()[0]).toContain('pending')
+    },
+  )
+
+  it('bounds coordinated failure retries until another render action', async () => {
     const { terminal, clock, errors } = await fixture('webgpu', true)
     terminal.write('accepted')
     clock.flush()
     const accepted = terminal.visibleLines()
     const capture = vi.spyOn(runtime.bridge, 'captureRetainedFrame').mockReturnValue(-1)
-    const escaped: (() => void)[] = []
-    const microtask = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((fn) => {
-      escaped.push(fn)
-    })
-    cleanups.push(() => {
-      capture.mockRestore()
-      microtask.mockRestore()
-    })
-    terminal.write('\rpending')
-    clock.flush()
-    capture.mockRestore()
-    microtask.mockRestore()
+    cleanups.push(() => capture.mockRestore())
+    terminal.write('pending')
+    for (let attempt = 0; attempt < 6; attempt += 1) clock.flush()
+    expect(capture).toHaveBeenCalledTimes(2)
+    expect(errors).toHaveLength(1)
     expect(terminal.visibleLines()).toEqual(accepted)
-    expect({ reported: errors.length, escaped: escaped.length }).toEqual({
-      reported: 1,
-      escaped: 0,
-    })
+    capture.mockRestore()
+    terminal.write(' recovered')
     clock.flush()
-    expect(terminal.visibleLines()[0]).toContain('pending')
+    expect(terminal.visibleLines()[0]).toContain('recovered')
   })
 
   it('defers pre-open text listeners until public operations are available', async () => {

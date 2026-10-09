@@ -654,11 +654,11 @@ export class WebGpuTerminalRenderer {
       command,
       commit: () => {
         if (this.disposed) return
-        textPass.acceptFrame()
         notifyFrame = this.captureFrame(
           rows,
           updates.map((update) => update.row),
         )
+        textPass.acceptFrame()
         if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
         this.recordFrame(rebuiltRows, operations)
         this.metrics.zigFrames += 1
@@ -670,8 +670,9 @@ export class WebGpuTerminalRenderer {
         if (!this.disposed) notifyFrame?.()
       },
       failed: (cause) => {
+        const retry = !this.frameFailed
         this.reportFrameFailure(cause)
-        this.scheduler.schedule()
+        if (retry && !this.disposed) this.scheduler.schedule()
       },
     })
   }
