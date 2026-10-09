@@ -19,7 +19,7 @@ function random(seed: number) {
 test.each(Array.from({ length: 10 }, (_, index) => index))(
   'seeded separation and shared-unit simulation shard %i',
   async (shard) => {
-    const fixture = await syntaxFixture()
+    const fixture = await syntaxFixture('typescript', false, 'differential')
     let independentMarks = 0
     let sharedMarked = 0
     try {
@@ -61,7 +61,7 @@ test.each([1, 17, 43, 91, 120])(
   'real peer sessions converge on identical marks, seed %i',
   async (seed) => {
     const next = random(seed)
-    const fixture = await syntaxFixture()
+    const fixture = await syntaxFixture('typescript', false, 'differential')
     const count = 3 + Math.floor(next() * 4)
     const text = 'function combine() { return 1; }\nfunction separate() { return 2; }'
     const documents = Array.from(

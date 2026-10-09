@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { build, type Plugin, type ResolvedConfig, type Rolldown } from 'vite'
+import { build, type HtmlTagDescriptor, type Plugin, type ResolvedConfig } from 'vite'
+import { createScriptError } from '../../../scripts/structured-errors.ts'
 
 type BootScript = { code: string; moduleIds: readonly string[] }
 
@@ -24,14 +25,14 @@ export function bootAppearancePlugin(webRoot: string): Plugin {
     },
     transformIndexHtml: {
       order: 'pre',
-      async handler(html, context) {
+      async handler(_html, context): Promise<HtmlTagDescriptor[]> {
         const { code, moduleIds } = await bootScript()
         context.server?.watcher.add([...moduleIds])
         const css = readFileSync(stylesheet, 'utf8')
-        return html.replace(
-          '<!-- boot-appearance -->',
-          () => `<style>\n${css}</style>\n    <script>\n${code}</script>`,
-        )
+        return [
+          { tag: 'style', attrs: { id: 'fregat-boot-style' }, children: css, injectTo: 'head' },
+          { tag: 'script', attrs: { id: 'fregat-boot-script' }, children: code, injectTo: 'head' },
+        ]
       },
     },
   }
@@ -57,9 +58,12 @@ async function bundleBootScript(webRoot: string, config: ResolvedConfig): Promis
       lib: { entry: path.join(webRoot, 'src/boot-appearance.ts'), formats: ['iife'], name: 'boot' },
     },
   })
-  const [result] = [output].flat() as Rolldown.RolldownOutput[]
-  const chunk = result?.output[0]
-  if (chunk?.type !== 'chunk') throw new Error('boot-appearance: expected a script chunk')
+  const result = Array.isArray(output) ? output[0] : output
+  const chunk = result && 'output' in result ? result.output[0] : undefined
+  if (chunk?.type !== 'chunk')
+    throw createScriptError('The appearance boot script could not be bundled.', {
+      internal: { expected: 'chunk', observed: chunk?.type ?? 'missing' },
+    })
 
   return { code: chunk.code, moduleIds: chunk.moduleIds }
 }

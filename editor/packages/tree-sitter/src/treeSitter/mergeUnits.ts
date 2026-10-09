@@ -10,6 +10,8 @@ export type MergeUnitQueryContext = {
   readonly progressCallback?: () => boolean
   readonly parents?: Map<number, boolean>
   readonly matches?: Map<number, readonly QueryMatch[]>
+  readonly parentRange?: TreeSitterSyntaxRange
+  readonly parentRoot?: Node
 }
 
 export function enclosingMergeUnit(
@@ -117,7 +119,12 @@ function unitAt(
     parent: parent
       ? {
           ...nodeRange(parent),
-          commutative: parentEligibility(parent, query, context),
+          ...(parent.parent === null ? context.parentRange : {}),
+          commutative: parentEligibility(
+            parent.parent === null ? (context.parentRoot ?? parent) : parent,
+            query,
+            context,
+          ),
         }
       : null,
   }
@@ -165,6 +172,35 @@ function nodeContentKey(node: Node, cancelled?: () => boolean): string | undefin
 }
 
 function mergeRangeHasErrors(
+  root: Node,
+  range: TreeSitterSyntaxRange,
+  cancelled?: () => boolean,
+): boolean {
+  if (
+    (root.isError || root.isMissing) &&
+    root.endIndex >= range.startIndex &&
+    root.startIndex <= range.endIndex
+  )
+    return true
+  // Indexed cursor descent ignores its goal offset; point descent finds the starting sibling.
+  let first = root.descendantForIndex(
+    range.startIndex,
+    Math.min(root.endIndex, range.startIndex + 1),
+  )
+  while (first?.parent && first.parent.id !== root.id) first = first.parent
+  if (!first || first.id === root.id) first = root.firstChild
+  if (first?.previousSibling && first.previousSibling.endIndex >= range.startIndex)
+    first = first.previousSibling
+  for (let node = first; node && node.startIndex <= range.endIndex; node = node.nextSibling) {
+    if (cancelled?.()) return false
+    if (node.endIndex < range.startIndex || (!node.hasError && !node.isError && !node.isMissing))
+      continue
+    if (subtreeHasErrors(node, range, cancelled)) return true
+  }
+  return false
+}
+
+function subtreeHasErrors(
   root: Node,
   range: TreeSitterSyntaxRange,
   cancelled?: () => boolean,

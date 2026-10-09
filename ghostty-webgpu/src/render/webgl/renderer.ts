@@ -1,5 +1,5 @@
 import { createGhosttyError } from '../../core/error.js'
-import { FrameObserver } from '../frame-observer.js'
+import { FrameObserver, type PreparedFrame } from '../frame-observer.js'
 import { RenderStateDirty } from '../../core/abi.js'
 import type { RenderCursorSnapshot, RenderRow } from '../../core/types.js'
 import type { ZigFrameBuilder } from '../../core/zig-frame.js'
@@ -415,7 +415,7 @@ export class WebGlTerminalRenderer {
     pass.syncAtlas(this.atlas.consumeUploads())
     const operations = pass.uploadFrame(builder, updates)
     // Persistent records can report terminal damage without changing either GPU buffer.
-    if (operations > 0) pass.submit()
+    const draws = operations > 0 ? pass.submit() : 0
     if (this.context.isContextLost()) {
       this.suspendContext()
       return
@@ -424,18 +424,24 @@ export class WebGlTerminalRenderer {
     if (this.frames.requiresFullRows) {
       rows = options.full ? this.renderState.readRows({ packed: true }) : this.rowsToRebuild(damage)
     }
-    if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
-    if (operations > 0) {
-      this.recordFrame(pass, builder.rowRebuilds, operations)
-      this.metrics.zigFrames += 1
-    }
-    this.needsFullRebuild = false
-    this.frameFailed = false
-    this.overlayRows.clear()
-    this.emitFrame(
+    const frame = this.captureFrame(
       rows,
       updates.map((update) => update.row),
     )
+    try {
+      if (damage !== RenderStateDirty.False) this.renderState.acknowledge()
+      if (operations > 0) {
+        this.recordFrame(pass, builder.rowRebuilds, operations, draws)
+        this.metrics.zigFrames += 1
+      }
+      this.needsFullRebuild = false
+      this.frameFailed = false
+      this.overlayRows.clear()
+      frame?.accept()
+    } finally {
+      frame?.discard()
+    }
+    frame?.notify()
   }
 
   private rowsToRebuild(damage: RenderStateDirty): readonly RenderRow[] {
@@ -501,7 +507,12 @@ export class WebGlTerminalRenderer {
     this.scheduler.flush()
   }
 
-  private recordFrame(pass: WebGlTextPass, rebuiltRows: number, operations: number): void {
+  private recordFrame(
+    pass: WebGlTextPass,
+    rebuiltRows: number,
+    operations: number,
+    draws: number,
+  ): void {
     this.metrics.atlasCacheHits = this.atlas.cacheHitCount
     this.metrics.atlasCacheMisses = this.atlas.cacheMissCount
     this.metrics.atlasEvictions = this.atlas.evictionCount
@@ -509,19 +520,19 @@ export class WebGlTerminalRenderer {
     this.metrics.atlasUploadedBytes = this.atlasUploadedBytesOffset + pass.atlasUploadedBytes
     this.metrics.atlasUploadOperations =
       this.atlasUploadOperationsOffset + pass.atlasUploadOperations
-    this.metrics.draws += 2
+    this.metrics.draws += draws
     this.metrics.instanceUploadOperations += operations
     this.metrics.rebuiltRows += rebuiltRows
     this.metrics.submittedFrames += 1
     this.metrics.uploadedBytes += pass.frameUploadedBytes
   }
 
-  private emitFrame(
+  private captureFrame(
     rows: readonly RenderRow[] | undefined,
     changed = rows?.map((row) => row.y) ?? [],
-  ): void {
+  ): PreparedFrame | undefined {
     if (!this.cursor) return
-    this.frames.emit(
+    return this.frames.capture(
       this.renderState,
       this.cursor,
       renderCursorState(

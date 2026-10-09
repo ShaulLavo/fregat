@@ -75,7 +75,7 @@
     "format:check": "bun run format:check:root && bun run --cwd editor format:check:root && bun run --cwd hotkeys format:check && bun run --filter '*' format:check",
     "typecheck": "bun run build:workspaces && bun run --sequential --filter '*' typecheck && bun run --cwd hotkeys docs:check",
     "test": "bun run build:workspaces && bun run test:scripts && bun run --sequential --filter '*' test",
-    "generated:check": "bun run workspace:check && bun run icons:generate:check && bun run settings:schema:check && bun run settings:reference:check && bun run themes:palette-css:check && bun run --cwd apps/server codex-protocol:check && bun run syntax:coverage:check && bun run native:workflow:check",
+    "generated:check": "bun run workspace:check && bun run icons:generate:check && bun run settings:schema:check && bun run settings:reference:check && bun run themes:palette-css:check && bun run --cwd apps/server codex-protocol:check && bun run syntax:coverage:check && bun run native:workflow:check && bun run --cwd packages/ui tables:check",
     "native:workflow": "bun ghostty-webgpu/scripts/config-resolver-native/generate-workspace-workflow.ts --write",
     "native:workflow:check": "bun ghostty-webgpu/scripts/config-resolver-native/generate-workspace-workflow.ts --check",
     "settings:reference": "bun --tsconfig-override scripts/tsconfig.settings.json scripts/generate-settings-reference.ts",
@@ -108,7 +108,7 @@
     "syntax:coverage": "bun apps/web/scripts/syntax-coverage.ts",
     "syntax:coverage:check": "bun apps/web/scripts/syntax-coverage.ts --check",
     "query:check": "node scripts/lint/query-api.mjs",
-    "build:workspaces": "turbo run build --filter='./editor/packages/*' --filter=ghostty-webgpu --filter=ghostty-webgpu-line-editor --filter='@fregat/*'",
+    "build:workspaces": "turbo run build --filter='./editor/packages/*' --filter=ghostty-webgpu --filter=ghostty-webgpu-line-editor --filter='@fregat/*' --filter=@workspace/ui",
     "changeset": "node node_modules/@changesets/cli/bin.js",
     "version-packages": "changeset version && bun install --lockfile-only",
     "release": "bun x turbo run build --filter=\"@singapore-editor/*\" --filter=\"@fregat/*\" --filter=ghostty-webgpu && bun scripts/release/prepare.mjs && node node_modules/@changesets/cli/bin.js publish",
@@ -141,7 +141,7 @@
     "@opentui/core": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-core-0.5.12-bubli.2.tgz",
     "@opentui/react": "https://github.com/ShaulLavo/bubli/releases/download/v0.5.12-bubli.2/opentui-react-0.5.12-bubli.2.tgz",
     "lodash-es": "4.18.1",
-    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#0fb6e61c7396727c49b8c6e4d757f6bf8dcfd6ed"
+    "web-tree-sitter": "github:ShaulLavo/tree-sitter-x#121cf0d206a57a98e704dcee0c53e6804c619633"
   },
   "engines": {
     "node": ">=22.12"

@@ -127,7 +127,8 @@ export function useListbox<Id extends string>({
       key: event.key,
       role,
       count: items.length,
-      activeIndex: cursorIndex,
+      // The unpainted fallback cursor is no position to move from: the first move lands on row 0.
+      activeIndex,
       pageSize: pageSize ?? visibleCount,
       canCollapse: cursor?.hasChildren ?? cursor?.expanded !== undefined,
       isCollapsed: !cursor?.expanded,
@@ -136,7 +137,7 @@ export function useListbox<Id extends string>({
     if (action.kind === 'none') return handleTypeahead(event)
     event.preventDefault()
     if (action.kind === 'move') {
-      let direction: 1 | -1 = action.index < cursorIndex || event.key === 'End' ? -1 : 1
+      let direction: 1 | -1 = action.index < activeIndex || event.key === 'End' ? -1 : 1
       if (event.key === 'Home') direction = 1
       let index = enabledListboxIndex(items, action.index, direction)
       if (index < 0 && (event.key === 'PageUp' || event.key === 'PageDown')) {
@@ -181,11 +182,12 @@ export function useListbox<Id extends string>({
 
   const focus = () => ref.current?.focus({ preventScroll: true })
 
-  const cursorId = cursor?.id
+  // The fallback cursor is only where keys start; nothing paints or announces it until it is active.
+  const activeRowId = activeIndex < 0 ? undefined : cursor?.id
   const rowProps = (id: Id) => ({
     ...rowBindings(id),
-    'aria-selected': cursorId === id,
-    'data-active': cursorId === id || undefined,
+    'aria-selected': activeRowId === id,
+    'data-active': activeRowId === id || undefined,
   })
 
   return {
@@ -196,7 +198,7 @@ export function useListbox<Id extends string>({
       role,
       tabIndex: 0,
       className: 'focus-ring-inset',
-      'aria-activedescendant': cursor ? rowId(cursor.id) : undefined,
+      'aria-activedescendant': activeRowId === undefined ? undefined : rowId(activeRowId),
       onKeyDown,
       onFocus: (event: FocusEvent<HTMLDivElement>) => {
         if (pointerFocus.current) return

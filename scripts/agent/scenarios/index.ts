@@ -207,6 +207,7 @@ import {
   workspaceSwitchClickDuringOpen,
 } from './large-folder'
 import { wallpaperBootHandoff } from './wallpaper-boot-handoff'
+import { wallpaperFirstLoad, desktopWallpaperFirstLoad } from './html-bootstrap-first-load'
 import { chatGitTabSwitch } from './chat-git-tab-switch'
 import { chatGitTurnRows } from './chat-git-turn-rows'
 import { chatModelPicker } from './chat-model-picker'
@@ -229,6 +230,7 @@ import { terminalBackground } from './terminal-background'
 import { terminalCancelledStartup } from './terminal-cancelled-startup'
 import { terminalWasmCancelledStartup } from './terminal-wasm-cancelled-startup'
 import { terminalWasmNavigationStartup } from './terminal-wasm-navigation-startup'
+import { terminalScreenReader } from './terminal-screen-reader'
 import { terminalRenderer, terminalRendererDom, terminalRendererWebgl } from './terminal-renderer'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { sidebarToggle } from './sidebar-toggle'
@@ -673,6 +675,7 @@ export const scenarios: readonly Scenario[] = [
   terminalWasmCancelledStartup,
   terminalWasmNavigationStartup,
   terminalOfflineHost,
+  terminalScreenReader,
   terminalRenderer,
   terminalRendererDom,
   terminalRendererWebgl,
@@ -881,6 +884,8 @@ export const scenarios: readonly Scenario[] = [
   workspaceSwitchClickDuringOpen,
   filePickerPrefetchBound,
   wallpaperBootHandoff,
+  wallpaperFirstLoad,
+  desktopWallpaperFirstLoad,
   chatGitTabSwitch,
   chatGitTurnRows,
   editorUndoReopen,

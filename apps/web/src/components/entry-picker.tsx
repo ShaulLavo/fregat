@@ -27,7 +27,7 @@ export function EntryPicker({ open, value, onOpenChange, onPick }: UsePickEntryO
   const failed = useEffectEvent((error: unknown) => {
     const failure = toClientError(error)
     toastError(
-      'Could not open file chooser',
+      'Could not open folder chooser',
       { description: [failure.why, clientErrorDescription(failure)].filter(Boolean).join(' ') },
       failure,
     )
@@ -50,7 +50,7 @@ export function EntryPicker({ open, value, onOpenChange, onPick }: UsePickEntryO
     queueMicrotask(() => {
       if (controller.signal.aborted) return
       void runMutation(queryClient, nativeSelectionOptions(queryClient), {
-        request: { mode: 'folder', startingPath },
+        request: { startingPath },
         signal: controller.signal,
       }).then(
         (entry) => {

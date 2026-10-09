@@ -5,7 +5,7 @@ import { flushSync } from 'react-dom'
 import { afterEach, expect, test } from 'vitest'
 
 import { settingsSnapshot } from '../../../../test/factories/settings'
-import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/render'
 import { useTheme } from '@/features/settings/hooks/use-theme'
 import { getClient, activeServerOrigin, setClient, type Client } from '@/lib/client'
 import { clientInstanceId, instanceHeaderName } from '@/lib/instance-id'
@@ -34,7 +34,7 @@ test('preview-to-pending handoff has no paint gap before final rejection', async
   const failure = deferredResponse()
   restoreClient = getClient()
   setClient(controlledFailureClient(failure.response))
-  seedBootMirrorTheme('light')
+  seedHtmlTheme('light')
   resetSettingsIntentStore()
   const queryClient = createTestQueryClient()
   queryClient.setQueryData(

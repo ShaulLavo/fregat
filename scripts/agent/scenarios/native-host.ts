@@ -98,10 +98,10 @@ export const nativeHost: Scenario = {
         if (action === 'close') {
           const window = current
           await continuity.afterNative('NATIVE_PICKER_TIMEOUT', async () => {
-            await rejects(window.host.pick({ mode: 'folder' }), {
+            await rejects(window.host.pick({}), {
               code: 'desktop.webview.PICKER_TIMEOUT',
             })
-            const reopened = rejects(window.host.pick({ mode: 'folder' }), {
+            const reopened = rejects(window.host.pick({}), {
               code: 'desktop.webview.PICKER_TIMEOUT',
             })
             await page.waitForTimeout(300)

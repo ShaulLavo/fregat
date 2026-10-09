@@ -1,4 +1,5 @@
-import type { PieceTableSnapshot } from '@singapore-editor/core/document'
+import { diffPieceTableSnapshots, type PieceTableSnapshot } from '@singapore-editor/core/document'
+import { createTreeSitterInputEdits } from './treeSitter/edits'
 import {
   DocumentDelivery,
   createEditorSnapshotBuffer,
@@ -93,9 +94,51 @@ export function createTreeSitterReviewSyntax(options: {
     return entry
   }
 
-  // Projected reads use the existing reader until the dedicated projected-unit query is wired.
-  async function admitProjection(snapshot: PieceTableSnapshot): Promise<SnapshotEntry> {
-    return admit(snapshot)
+  async function project(
+    snapshot: PieceTableSnapshot,
+    baseSnapshot: PieceTableSnapshot,
+    ranges: readonly TreeSitterSyntaxRange[],
+    contentKey: boolean,
+    selection: 'enclosing' | 'touching',
+  ): Promise<readonly (readonly TreeSitterReviewUnit[])[] | null> {
+    if (!backend.projectMergeUnits) return null
+    const base = await admit(baseSnapshot)
+    if (!(await base.ready) || disposed) return null
+    const delivery = new DocumentDelivery(createEditorSnapshotBuffer(snapshot), base.id)
+    const scope = delivery.createScope()
+    try {
+      const loan = await scope.source.prepareReader(backend.sourceEndpoint, delivery.current()!)
+      if (!loan) return null
+      try {
+        if (disposed) return null
+        const edit = diffPieceTableSnapshots(baseSnapshot, snapshot)
+        const result = await backend.projectMergeUnits({
+          documentId: base.id,
+          runtimeSessionId: base.id,
+          languageId: options.languageId,
+          baseSnapshotVersion: base.version,
+          snapshotVersion: ++version,
+          source: loan.reference,
+          inputEdits: createTreeSitterInputEdits(
+            createEditorSnapshotBuffer(baseSnapshot).getTextSnapshot(),
+            edit ? [edit] : [],
+          ),
+          ranges,
+          selection,
+          analysis: true,
+          ...(contentKey ? { contentKey: true as const } : {}),
+        })
+        if (!result || result.status !== 'ok' || disposed) return null
+        return result.units.map((units) =>
+          units.map((unit) => ({ ...unit, hasErrors: unit.hasErrors ?? false })),
+        )
+      } finally {
+        await loan.dispose()
+      }
+    } finally {
+      scope.dispose()
+      delivery.dispose()
+    }
   }
 
   const read: TreeSitterReviewSyntax = Object.assign(
@@ -110,7 +153,8 @@ export function createTreeSitterReviewSyntax(options: {
         if (disposed || !backend.mergeUnit) return null
         await (registration ??= backend.registerLanguages(options.languages))
         if (disposed) return null
-        const entry = baseSnapshot ? await admitProjection(snapshot) : await admit(snapshot)
+        if (baseSnapshot) return project(snapshot, baseSnapshot, ranges, contentKey, selection)
+        const entry = await admit(snapshot)
         if (!(await entry.ready) || disposed) return null
         const result: (readonly TreeSitterReviewUnit[])[] = []
         for (const range of ranges) {

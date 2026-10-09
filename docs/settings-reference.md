@@ -215,10 +215,10 @@ stays safe to read, share and export.
 
 ## Keyboard shortcuts
 
-| Setting                 | Default  | Scope       | What it does                                                                                                                                       |
-| ----------------------- | -------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `keybindings.preset`    | `"ours"` | application | The shortcuts your contextual bindings build on. Ours starts with Zed’s keys; Zed tracks its defaults; VS Code uses its editing and app shortcuts. |
-| `keybindings.overrides` | `[]`     | application | Shortcuts and the focus contexts where they apply.                                                                                                 |
+| Setting                 | Default  | Scope       | What it does                                                                                                                                                                               |
+| ----------------------- | -------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `keybindings.preset`    | `"ours"` | application | The shortcuts your contextual bindings build on. Ours starts with Zed’s keys and adds keys for Fregat’s own commands; Zed tracks its defaults; VS Code uses its editing and app shortcuts. |
+| `keybindings.overrides` | `[]`     | application | Shortcuts and the focus contexts where they apply.                                                                                                                                         |
 
 ### Details
 
@@ -341,6 +341,7 @@ stays safe to read, share and export.
 | Setting                              | Default | Scope       | What it does                                                               |
 | ------------------------------------ | ------- | ----------- | -------------------------------------------------------------------------- |
 | `terminal.shellKeys`                 | `false` | application | Send Ctrl+letter and readline Alt shortcuts to the focused terminal shell. |
+| `terminal.integrated.screenReader`   | `true`  | application | Expose terminal text and announce new output to screen readers.            |
 | `terminal.integrated.fontSize`       | `12`    | window      | Terminal font size in pixels.                                              |
 | `terminal.integrated.scrollback`     | `10000` | window      | How many lines of output the terminal keeps.                               |
 | `terminal.integrated.cursorBlinking` | `true`  | window      | Blink the terminal cursor while the terminal has focus.                    |
@@ -352,7 +353,7 @@ stays safe to read, share and export.
 | `window.browser`                    | `"auto"`       | machine | The desktop window engine: auto uses the native WebKit window on macOS. On Linux, auto tries Chrome, the default supported Chromium browser, other installed Chromium browsers, then the system window. With window transparency, auto uses the system window. webview selects the system window, and an absolute path selects a browser executable first. _(restart)_ |
 | `window.browserStartupIdleSeconds`  | `5`            | machine | Seconds a starting browser may spend without reading its files, using the CPU or answering the launcher before the launcher stops it. _(restart)_                                                                                                                                                                                                                      |
 | `window.browserStartupLimitSeconds` | `60`           | machine | Seconds a starting browser gets to answer the launcher, however steadily it is loading, before the launcher stops it. _(restart)_                                                                                                                                                                                                                                      |
-| `window.nativeDialogTimeoutSeconds` | `300`          | machine | Seconds a desktop file chooser or startup message stays open before its helper closes. _(restart)_                                                                                                                                                                                                                                                                     |
+| `window.nativeDialogTimeoutSeconds` | `300`          | machine | Seconds a desktop folder chooser or startup message stays open before its helper closes. _(restart)_                                                                                                                                                                                                                                                                   |
 | `window.nativeHostStopGraceSeconds` | `2`            | machine | Seconds the desktop gives an owned native helper to stop before terminating it. _(restart)_                                                                                                                                                                                                                                                                            |
 | `window.transparency`               | `"compositor"` | machine | Choose window-manager transparency or a see-through native window using the system webview. _(restart)_                                                                                                                                                                                                                                                                |
 

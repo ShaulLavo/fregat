@@ -129,6 +129,7 @@ export const transientAlertSelector =
   '[role="alert"], [data-sonner-toast], [role="status"].text-warning'
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperImageSelector = 'img[data-workbench-wallpaper-layer]'
+export const wallpaperMediaSelector = '[data-workbench-wallpaper-layer]'
 export const diffPaneSelector = '.editor-diff-pane'
 /** A diff pane whose syntax tokens for its current rows have landed. */
 export const diffPaneSyntaxReadySelector = '.editor-diff-pane[data-syntax="ready"]'
@@ -520,6 +521,8 @@ export const selectors = {
   pickerOptions: (page: Page) =>
     page.getByRole('listbox', { name: 'Folders', exact: true }).getByRole('option'),
   pickerGoToFolder: (page: Page) => page.getByRole('button', { name: 'Go to folder', exact: true }),
+  pickerUpOneFolder: (page: Page) =>
+    page.getByRole('button', { name: 'Up one folder', exact: true }),
   pickerFolderPath: (page: Page) => page.getByRole('textbox', { name: 'Folder path', exact: true }),
   pickerSearch: (page: Page) => page.getByRole('textbox', { name: 'Search folders', exact: true }),
   pickerEmpty: (page: Page) => page.getByText('Nothing here', { exact: true }),
@@ -1366,6 +1369,8 @@ export const selectors = {
   editorFindWidget: (page: Page) => page.locator('.editor-find-widget'),
   editorLargeFileNotice: (page: Page) => page.getByTestId('large-file-mode'),
   editorMinimap: (page: Page) => page.locator('.editor-minimap-right'),
+  terminalAccessibilityMirror: (page: Page) =>
+    page.getByRole('list', { name: 'Terminal screen', exact: true, includeHidden: true }),
   terminalOpening: (page: Page) => page.getByRole('status', { name: 'Opening terminal' }),
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
@@ -1408,6 +1413,7 @@ export const selectors = {
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
   phoneTerminalCanvas: (page: Page) => page.locator('[data-phone-level="terminal"] canvas').first(),
   phoneFirstScreenSelector: '[data-phone-level="sessions"] section[aria-label="Sessions"]',
+  phoneViewportPolicy: `({virtualKeyboard:'virtualKeyboard' in navigator,resizesContent:document.querySelector('meta[name="viewport"]')?.content.includes('interactive-widget=resizes-content') ?? false})`,
   phoneLevelSelector: '[data-phone-level]',
   desktopFirstScreenSelector: '[aria-label="Window toolbar"]',
   phoneShell: (page: Page) => page.locator('[data-phone-shell]'),
@@ -2023,7 +2029,7 @@ export const nativeHostSelectors = {
   settledPickerError: `Promise.all(Array.from(document.querySelectorAll('[data-sonner-toast]')).flatMap(toast => toast.getAnimations({subtree:true})).map(animation => animation.finished.catch(() => {}))).then(() => true)`,
   openProjectMenu: `document.querySelector('button[aria-label="Switch project"]')?.click()`,
   openFolderMenu: `Array.from(document.querySelectorAll('[role="menuitem"]')).find(row => row.textContent?.trim() === 'Open folder…')?.click()`,
-  pickerError: `document.body.innerText.includes('The file chooser closed after its time limit.')`,
+  pickerError: `document.body.innerText.includes('The folder chooser closed after its time limit.')`,
   bridgeFacts: `({picker:typeof globalThis.platformBridge?.pickEntry,capture:globalThis.platformBridge?.capabilities?.displayCapture,titlebar:globalThis.platformBridge?.titlebar})`,
   readiness: `({ready:Boolean(document.querySelector('[aria-label="Window toolbar"]') && document.querySelector('[aria-label="Folder tree"] [role="treeitem"][aria-label="a.txt"]')),picker:typeof globalThis.platformBridge?.pickEntry,capture:globalThis.platformBridge?.capabilities?.displayCapture})`,
 } as const

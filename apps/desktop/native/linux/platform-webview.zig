@@ -29,24 +29,15 @@ const Host = struct {
 
     fn pick(self: *Host, options: *c.JSCValue) void {
         if (self.chooser != null) return;
-        const mode = c.jsc_value_object_get_property(options, "mode");
-        defer c.g_object_unref(mode);
-        const name = c.jsc_value_to_string(mode);
-        defer c.g_free(name);
-        const folder = c.g_strcmp0(name, "folder") == 0;
         const chooser = c.gtk_file_chooser_native_new(
-            if (folder) "Choose folder" else "Choose file",
+            "Choose folder",
             @ptrCast(self.window),
-            if (folder) c.GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER else c.GTK_FILE_CHOOSER_ACTION_OPEN,
+            c.GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER,
             null,
             null,
         );
         self.chooser = chooser;
-        const multiple = c.jsc_value_object_get_property(options, "multiple");
-        defer c.g_object_unref(multiple);
-        c.gtk_file_chooser_set_select_multiple(@ptrCast(@alignCast(chooser)), c.jsc_value_to_boolean(multiple));
         setStartingPath(chooser.?, options);
-        if (!folder) setFilter(chooser.?, options);
         connect(chooser, "response", &onPicked, self);
         c.gtk_native_dialog_show(@ptrCast(@alignCast(chooser)));
     }
@@ -141,36 +132,6 @@ fn setStartingPath(chooser: *c.GtkFileChooserNative, options: *c.JSCValue) void 
     const filename = c.jsc_value_to_string(starting);
     defer c.g_free(filename);
     _ = c.gtk_file_chooser_set_filename(@ptrCast(@alignCast(chooser)), filename);
-}
-
-fn setFilter(chooser: *c.GtkFileChooserNative, options: *c.JSCValue) void {
-    const accept = c.jsc_value_object_get_property(options, "accept");
-    defer c.g_object_unref(accept);
-    if (c.jsc_value_is_array(accept) == 0) return;
-    const filter = c.gtk_file_filter_new();
-    c.gtk_file_filter_set_name(filter, "Selected file types");
-    const length = c.jsc_value_object_get_property(accept, "length");
-    defer c.g_object_unref(length);
-    const count = c.jsc_value_to_int32(length);
-    var index: c_uint = 0;
-    while (index < count) : (index += 1) {
-        const item = c.jsc_value_object_get_property_at_index(accept, index);
-        defer c.g_object_unref(item);
-        const kind = c.jsc_value_to_string(item);
-        defer c.g_free(kind);
-        addFilterType(filter.?, kind);
-    }
-    c.gtk_file_chooser_add_filter(@ptrCast(@alignCast(chooser)), filter);
-}
-
-fn addFilterType(filter: *c.GtkFileFilter, kind: [*c]const u8) void {
-    if (kind[0] == '.') {
-        const pattern = c.g_strconcat(@as([*c]const u8, "*"), kind, @as([*c]const u8, null));
-        defer c.g_free(pattern);
-        c.gtk_file_filter_add_pattern(filter, pattern);
-        return;
-    }
-    c.gtk_file_filter_add_mime_type(filter, kind);
 }
 
 fn onStdin(channel: ?*c.GIOChannel, condition: c.GIOCondition, data: ?*anyopaque) callconv(.c) c.gboolean {
@@ -280,6 +241,7 @@ fn openWindow(host: *Host, uri: [*c]const u8, text: [*c]const u8, directory: [*c
     const view: *c.WebKitWebView = @ptrCast(@alignCast(c.g_object_new(c.webkit_web_view_get_type(), @as([*c]const u8, "web-context"), context, @as([*c]const u8, "user-content-manager"), manager, @as([*c]const u8, null))));
     host.view = view;
     const settings = c.webkit_web_view_get_settings(view);
+    c.webkit_settings_set_user_agent_with_application_details(settings, "FregatBackdrop", "compositor");
     c.webkit_settings_set_enable_developer_extras(settings, 1);
     c.webkit_settings_set_hardware_acceleration_policy(settings, c.WEBKIT_HARDWARE_ACCELERATION_POLICY_ALWAYS);
     connect(view, "web-process-terminated", &onWebProcessTerminated, host);

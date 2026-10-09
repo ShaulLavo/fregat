@@ -171,31 +171,53 @@ test('uninstalled and uninterested plugins have no review work; one author never
   expect(calls).toBe(0)
 })
 
-test('production worker reviews confirmed and projected snapshots and releases every source', async () => {
-  const descriptor = await resolveTreeSitterLanguageContribution(
-    TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === 'typescript')!,
+test.each([
+  {
+    languageId: 'typescript',
+    languages: ['typescript'],
+    text: 'const value = 0;\n',
+    unit: { type: 'lexical_declaration', languageId: 'typescript' },
+    base: 'const value = 0;',
+  },
+  {
+    languageId: 'markdown',
+    languages: ['markdown', 'javascript', 'json'],
+    text: '```javascript\nconst palette = json`{"amber": "shade0tone", "violet": 2}`;\n```\n',
+    unit: { type: 'pair', languageId: 'json' },
+    base: '"amber": "shade0tone"',
+  },
+])('production worker reviews and resolves $languageId projections', async (fixture) => {
+  const languages = await Promise.all(
+    fixture.languages.map((id) =>
+      resolveTreeSitterLanguageContribution(
+        TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((language) => language.id === id)!,
+      ),
+    ),
   )
   const errors: unknown[] = []
-  room = new EditorRoom(2, 'const value = 0;\n', true, () => {
-    const syntax = createTreeSitterReviewSyntax({
-      languageId: 'typescript',
-      languages: [descriptor],
-    })
+  room = new EditorRoom(2, fixture.text, true, () => {
+    const syntax = createTreeSitterReviewSyntax({ languageId: fixture.languageId, languages })
     cleanups.push(() => syntax.dispose())
     return { syntax, onError: (error) => errors.push(error) }
   })
-  concurrent()
+  const from = fixture.text.indexOf('0')
+  for (let index = 0; index < 2; index++)
+    room.editors[index]!.edit({ from, to: from + 1, text: String(index + 1) })
+  room.flush()
   await expect
     .poll(() => ({
       errors: errors.map(String),
       marks: room!.connections.map(({ review }) => review!.marks.length),
     }))
     .toEqual({ errors: [], marks: [1, 1] })
-  expect(errors).toEqual([])
   const review = room.connections[0]!.review!
-  expect(review.marks[0]!.unit.type).toBe('lexical_declaration')
-  expect(review.versions(review.marks[0]!)!.base).toBe('const value = 0;')
+  expect(review.marks[0]!.unit).toMatchObject(fixture.unit)
+  expect(review.versions(review.marks[0]!)!.base).toBe(fixture.base)
   expect(review.resolve(review.marks[0]!, review.peer)).toBe(true)
   room.flush()
-  await expect.poll(() => room!.texts()).toEqual(['const value = 1;\n', 'const value = 1;\n'])
+  const resolved = fixture.text.slice(0, from) + '1' + fixture.text.slice(from + 1)
+  await expect.poll(() => room!.texts()).toEqual([resolved, resolved])
+  await Promise.all(room.connections.map(({ review }) => review!.idle()))
+  expect(room.connections.map(({ review }) => review!.marks)).toEqual([[], []])
+  expect(errors).toEqual([])
 })

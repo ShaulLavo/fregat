@@ -9,7 +9,7 @@ import {
   AppProviders,
   createTestQueryClient,
   renderWithProviders,
-  seedBootMirrorTheme,
+  seedHtmlTheme,
 } from '../../../../test/render'
 import { useTheme } from '@/features/settings/hooks/use-theme'
 import { useSettingsIntentStore } from '@/features/settings/state/intent-store'
@@ -72,9 +72,9 @@ test('committing the effective theme is a noop that clears hover preview', () =>
   queryClient.clear()
 })
 
-test('before confirmed settings arrive, the provider keeps the seeded boot theme', () => {
+test('before confirmed settings arrive, the provider keeps the document boot theme', () => {
   const queryClient = createTestQueryClient()
-  seedBootMirrorTheme('dark')
+  seedHtmlTheme('dark')
   const theme = renderHook(() => useTheme(), { wrapper: wrapper(queryClient) })
 
   expect(theme.result.current.theme).toBe('dark')

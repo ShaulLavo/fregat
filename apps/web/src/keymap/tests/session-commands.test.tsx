@@ -71,6 +71,19 @@ test('jumping selects the requested scoped row only after its real root opens', 
     h.context.worktree!.path,
   )
 })
+test('the ninth position opens the last session, as it selects the last tab', async ({
+  client,
+  server,
+}) => {
+  const h = await createRailHarness(client, server, ['First', 'Second', 'Third'])
+  renderWithProviders(<></>, { application: h.application })
+  await waitForNavigation(getNavigation())
+  expect(await jumpToSession(3)).toBe(true)
+  const last = selectedSessionId()
+  expect(await jumpToSession(1)).toBe(true)
+  expect(await jumpToSession(9)).toBe(true)
+  expect(selectedSessionId()).toBe(last)
+})
 test('session navigation and new drafts accept the workspace root empty relative path', async ({
   client,
   server,

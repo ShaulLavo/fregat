@@ -109,8 +109,9 @@ export class ScrollViewport {
   }
 
   public setDocumentHeight(height: number, offsetY: number, scrollTop = 0): boolean {
-    // Keep each painted coordinate within one native scroll extent, before browser clamping.
-    const originY = height > 0 ? Math.floor(scrollTop / height) * height : 0
+    // Capped scrolling needs viewport-sized row coordinates to retain fractional paint precision.
+    const originStep = offsetY !== 0 && this.viewportHeight > 0 ? this.viewportHeight : height
+    const originY = height > 0 ? Math.floor(scrollTop / originStep) * originStep : 0
     const originChanged = this.originY !== originY
     this.originY = originY
     const value = `${height}px`

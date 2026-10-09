@@ -1,3 +1,4 @@
+export { createTreeSitterInputEdits } from './treeSitter/edits'
 export {
   createTreeSitterReviewSyntax,
   type TreeSitterReviewSyntax,
@@ -26,6 +27,7 @@ export type {
   TreeSitterParseResult,
   TreeSitterMergeUnit,
   TreeSitterMergeUnitResult,
+  TreeSitterProjectedMergeUnitsResult,
   TreeSitterSyntaxRange,
   TreeSitterPoint,
   TreeSitterWorkerRetentionSnapshot,
@@ -38,6 +40,7 @@ export {
   type TreeSitterWorkerLifecycleState,
   type TreeSitterWorkerOwnerSnapshot,
   type TreeSitterMergeUnitPayload,
+  type TreeSitterProjectedMergeUnitsPayload,
 } from './treeSitter/workerClient'
 export {
   expandTreeSitterSelection,

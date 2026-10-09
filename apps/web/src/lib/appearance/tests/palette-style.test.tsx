@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  applyPaletteStylesheet,
-  bootPaletteStylesheet,
-  writePaletteBootCache,
-} from '../utils/palette-style'
+import { applyPaletteStylesheet, bootPaletteStylesheet } from '../utils/palette-style'
 import { PALETTE_STYLE_ID } from '@/lib/boot-keys'
+import { installHtmlBootstrap } from '../../../../test/factories/html-bootstrap'
 
 describe('applyPaletteStylesheet', () => {
   it('creates, rewrites and removes one style element', () => {
@@ -23,10 +20,9 @@ describe('applyPaletteStylesheet', () => {
 })
 
 describe('bootPaletteStylesheet', () => {
-  it('restores both palette identities from a confirmed bundle stylesheet', () => {
-    writePaletteBootCache(['light-palette', 'dark-palette'], ':root { --paired: 1; }')
-    expect(bootPaletteStylesheet('light-palette')).toBe(':root { --paired: 1; }')
-    expect(bootPaletteStylesheet('dark-palette')).toBe(':root { --paired: 1; }')
+  it('restores the document palette', () => {
+    installHtmlBootstrap({ 'workbench.palette': 'sage' })
+    expect(bootPaletteStylesheet('sage')).toContain('--background-solid: oklch(0.98 0.003 90);')
   })
 
   it('resolves a bundled palette without a cache and Graphite to the stylesheet default', () => {
@@ -35,13 +31,7 @@ describe('bootPaletteStylesheet', () => {
     expect(bootPaletteStylesheet('sage')).toContain('--background-solid: oklch(0.98 0.003 90);')
   })
 
-  it('serves a user palette only from a cache written for that id', () => {
-    localStorage.clear()
-    expect(bootPaletteStylesheet('mine')).toBeNull()
-    writePaletteBootCache(['mine'], ':root { --mine: 1; }')
-    expect(bootPaletteStylesheet('mine')).toBe(':root { --mine: 1; }')
-    expect(bootPaletteStylesheet('other')).toBeNull()
-    localStorage.setItem('platform.palette-boot.v1', '{not json')
+  it('returns no stylesheet for an unknown palette without document data', () => {
     expect(bootPaletteStylesheet('mine')).toBeNull()
   })
 })

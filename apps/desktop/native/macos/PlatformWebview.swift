@@ -1,7 +1,6 @@
 import AppKit
 import CryptoKit
 import WebKit
-import UniformTypeIdentifiers
 
 // A negligible behind-window effect keeps live wallpaper updating.
 private let liveDesktopAlpha: CGFloat = 0.0001
@@ -184,18 +183,11 @@ private final class PlatformHost: NSObject, NSApplicationDelegate, NSWindowDeleg
         guard picker == nil else { return }
         let panel = NSOpenPanel()
         picker = panel
-        let folder = options["mode"] as? String == "folder"
-        panel.canChooseDirectories = folder
-        panel.canChooseFiles = !folder
-        panel.allowsMultipleSelection = options["multiple"] as? Bool ?? false
-        panel.title = folder ? "Choose folder" : "Choose file"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.title = "Choose folder"
         setStartingPath(panel, options: options)
-        if !folder, let accept = options["accept"] as? [String] {
-            let types = accept.compactMap { item in
-                item.hasPrefix(".") ? UTType(filenameExtension: String(item.dropFirst())) : UTType(mimeType: item)
-            }
-            if !types.isEmpty { panel.allowedContentTypes = types }
-        }
         let completed: (NSApplication.ModalResponse) -> Void = { [weak self] response in
             self?.picked(panel, response: response)
         }
@@ -336,6 +328,7 @@ private final class PlatformHost: NSObject, NSApplicationDelegate, NSWindowDeleg
         window.isReleasedWhenClosed = false
         if options.vibrant { mountEffects(window) }
         let configuration = WKWebViewConfiguration()
+        configuration.applicationNameForUserAgent = options.vibrant ? "FregatBackdrop/transparent" : "FregatBackdrop/app"
         configuration.websiteDataStore = persistentStore(options.directory)
         let source = script + "\n;if (globalThis.platformBridge) globalThis.platformBridge.capabilities.windowGlass = \(glassEffect != nil);"
         startupScript = WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true)

@@ -52,6 +52,20 @@ This plan does not delete it. It gives markdown **two modes**: a split view, whi
 | Split view          | Does not exist.                                                                                                                                                                                                                                                                                                                      |
 | Renderer            | None on the editor side. Plan 107 supplies it.                                                                                                                                                                                                                                                                                       |
 
+## TanStack rendering references, 2026-10-09
+
+For the rendered pane and remaining block widgets, study
+[TanStack Markdown](https://tanstack.com/markdown/latest) and its
+[syntax-highlighting integration](https://github.com/TanStack/markdown/blob/d9b5ef7133ba514f7269cd8f29b5719cd34f5836/docs/guides/syntax-highlighting.md)
+with [TanStack Highlight](https://tanstack.com/highlight/latest).
+Local clones are `references/tanstack-markdown` and `references/tanstack-highlight`.
+[Plan 176](176-markdown-parser.md#tanstack-markdown-reference-2026-10-09) records
+the inspected Markdown revision and parser/rendering research.
+[Plan 197](197-editor-highlighting-service.md#tanstack-highlight-reference-2026-10-09)
+records the Highlight revision and snippet/theme research. Compare their renderer
+and code-container boundaries while preserving this plan's source mapping,
+selection, and shared-highlighter contracts.
+
 ## Decisions
 
 | Decision                                         | Proposed behavior                                                                                                                                                                                                                                             |

@@ -135,7 +135,7 @@ try {
   assert.equal(evaluated.body.value, 'café "quoted"')
   first.host.child.stdin.write('invalid JSON\n{"eval":42}\n')
   for (let attempt = 0; attempt < 2; attempt++) {
-    first.host.send({ pick: { mode: 'file', multiple: true, accept: ['.txt', 'text/plain'] } })
+    first.host.send({ pick: { startingPath: evidence } })
     first.host.send({ cancelPick: true })
     await first.host.event('pickCancelled')
   }
@@ -158,12 +158,12 @@ try {
   await isolated.host.event('closed')
   await isolated.host.finish()
 
-  const picker = helper(['pick', '{"mode":"folder"}'])
+  const picker = helper(['pick', '{}'])
   picker.send({ cancelPick: true })
   await picker.event('pickCancelled')
   await picker.finish()
 
-  const abandoned = helper(['pick', '{"mode":"file"}'])
+  const abandoned = helper(['pick', JSON.stringify({ startingPath: evidence })])
   abandoned.child.stdin.end()
   await abandoned.event('closed')
   await abandoned.finish()

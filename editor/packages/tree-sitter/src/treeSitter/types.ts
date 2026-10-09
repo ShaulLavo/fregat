@@ -161,6 +161,36 @@ export type TreeSitterMergeUnitResult = {
   | { readonly status: 'stale' | 'cancelled'; readonly unit: null }
 )
 
+export type TreeSitterProjectedMergeUnitsRequest = {
+  readonly type: 'projectMergeUnits'
+  readonly documentId: string
+  readonly runtimeSessionId: string
+  readonly baseSnapshotVersion: number
+  readonly snapshotVersion: number
+  readonly languageId: TreeSitterLanguageId
+  readonly source: DocumentWorkerReadReference
+  readonly inputEdits: readonly TreeSitterInputEdit[]
+  readonly ranges: readonly TreeSitterSyntaxRange[]
+  readonly analysis?: true
+  readonly contentKey?: true
+  readonly selection?: 'enclosing' | 'touching'
+  readonly cancellationBuffer?: SharedArrayBuffer
+}
+
+export type TreeSitterProjectedMergeUnitsResult = {
+  readonly documentId: string
+  readonly snapshotVersion: number
+  readonly languageId: TreeSitterLanguageId
+} & (
+  | {
+      readonly status: 'ok'
+      readonly units: readonly (readonly (TreeSitterMergeUnit & {
+        readonly languageId: TreeSitterLanguageId
+      })[])[]
+    }
+  | { readonly status: 'stale' | 'cancelled'; readonly units: readonly [] }
+)
+
 export type TreeSitterRangeResult = TreeSitterParseResult & {
   readonly range: TreeSitterSyntaxRange
 }
@@ -277,6 +307,7 @@ export type TreeSitterWorkerRequestPayload =
   | TreeSitterRangeRequest
   | TreeSitterSelectionRequest
   | TreeSitterMergeUnitRequest
+  | TreeSitterProjectedMergeUnitsRequest
   | TreeSitterDisposeDocumentRequest
   | TreeSitterRuntimeBarrierRequest
   | TreeSitterIdleFenceRequest
@@ -289,12 +320,15 @@ export type TreeSitterWorkerResult =
   | TreeSitterRangeResult
   | TreeSitterSelectionResult
   | TreeSitterMergeUnitResult
+  | TreeSitterProjectedMergeUnitsResult
   | { readonly retention: TreeSitterWorkerRetentionSnapshot }
   | undefined
 
 export type TreeSitterWorkerRetentionSnapshot = {
   readonly documentCount: number
   readonly snapshotCount: number
+  /** Projection dependencies visited while disposing cached highlighting snapshots. */
+  readonly projectionCleanupVisits: number
   /** Unique generic layer Tree objects. Markdown internal trees are unavailable. */
   readonly treeCount: number
   readonly markdownDocumentEntries: number
