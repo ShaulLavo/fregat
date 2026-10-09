@@ -208,6 +208,11 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
       if (entry) selectSessionEntry(entry)
     })
   }
+  // Like Finder, the folder just left stays selected in its parent. A phone row has no selection.
+  const goParent = () => {
+    if (!session.canGoUp) return
+    navigateSelecting(pickerParentPath(session.currentPath), compact ? null : currentEntry)
+  }
   const revealEntry = (entry: FsEntry) => {
     if (isDirectoryEntry(entry)) return navigateSelecting(entry.path, null)
     navigateSelecting(pickerParentPath(entry.path), entry)
@@ -561,7 +566,7 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
       },
       'filePicker.goUp': ({ source }) => {
         if (!open || openingPopupTrigger(source?.target ?? null) || !session.canGoUp) return false
-        navigateTo(pickerParentPath(session.currentPath))
+        goParent()
         return true
       },
     },
@@ -680,11 +685,7 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
           trail={trail}
           onCommit={commitEntry}
           onDirectoryIntent={guessDirectory}
-          onGoParent={() => {
-            // Finder keeps the folder just left selected in the new first column.
-            if (session.canGoUp)
-              navigateSelecting(pickerParentPath(session.currentPath), currentEntry)
-          }}
+          onGoParent={goParent}
           onOpen={handleEntryDoubleClick}
           onTrailChange={changeTrail}
         />
@@ -698,9 +699,7 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
           selectedPath={selectedEntry?.path ?? null}
           onCommitEntry={commitEntry}
           onEntryDoubleClick={handleEntryDoubleClick}
-          onGoParent={() => {
-            if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
-          }}
+          onGoParent={goParent}
         />
       ) : (
         <div
@@ -729,9 +728,7 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
             onDirectoryIntent={guessDirectory}
             onEntryDoubleClick={handleEntryDoubleClick}
             onCommitEntry={commitEntry}
-            onGoParent={() => {
-              if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
-            }}
+            onGoParent={goParent}
             onRetry={refresh}
             recents={
               leadingRecents.length > 0
@@ -812,7 +809,7 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
                   onBack={goBack}
                   onClose={close}
                   onEditPath={pathInput.open}
-                  onUp={() => navigateTo(pickerParentPath(session.currentPath))}
+                  onUp={goParent}
                 />
                 <div className='flex gap-(--density-gap-tight) px-(--bar-padding-x)'>
                   {searchField}
@@ -865,7 +862,7 @@ export function FilePickerDialog(props: FilePickerDialogProps) {
                       aria-label='Up one folder'
                       disabled={!session.canGoUp}
                       focusableWhenDisabled
-                      onClick={() => navigateTo(pickerParentPath(session.currentPath))}
+                      onClick={goParent}
                       size='icon-sm'
                       type='button'
                       variant='ghost'
