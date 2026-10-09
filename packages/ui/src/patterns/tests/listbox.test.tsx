@@ -75,6 +75,14 @@ describe('useListbox', () => {
     expect(list.querySelector('[aria-selected="true"]')?.textContent).toContain('Delta')
   })
 
+  it('moves onto the first row when the list keeps focus while nothing is active', () => {
+    const onActiveChange = vi.fn()
+    const { list } = renderListbox({ activeId: null, onActiveChange })
+    onActiveChange.mockClear()
+    press(list, 'ArrowDown')
+    expect(onActiveChange).toHaveBeenLastCalledWith('a')
+  })
+
   it('preserves nested action focus and lets its keys bubble untouched', () => {
     const { list } = renderListbox()
     const action = list.querySelector('button')!

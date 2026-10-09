@@ -127,7 +127,8 @@ export function useListbox<Id extends string>({
       key: event.key,
       role,
       count: items.length,
-      activeIndex: cursorIndex,
+      // With nothing active the cursor is unpainted, so the first move lands on the first row.
+      activeIndex,
       pageSize: pageSize ?? visibleCount,
       canCollapse: cursor?.hasChildren ?? cursor?.expanded !== undefined,
       isCollapsed: !cursor?.expanded,
@@ -136,7 +137,7 @@ export function useListbox<Id extends string>({
     if (action.kind === 'none') return handleTypeahead(event)
     event.preventDefault()
     if (action.kind === 'move') {
-      let direction: 1 | -1 = action.index < cursorIndex || event.key === 'End' ? -1 : 1
+      let direction: 1 | -1 = action.index < activeIndex || event.key === 'End' ? -1 : 1
       if (event.key === 'Home') direction = 1
       let index = enabledListboxIndex(items, action.index, direction)
       if (index < 0 && (event.key === 'PageUp' || event.key === 'PageDown')) {

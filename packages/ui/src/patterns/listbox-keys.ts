@@ -23,6 +23,7 @@ export function listboxKeyAction(input: ListboxKeyInput): ListboxKeyAction {
   if (count === 0) return { kind: 'none' }
   if (input.columns !== undefined) {
     const grid = gridKeyAction(key, count, Math.max(0, activeIndex), input.columns)
+    if (grid && activeIndex < 0) return { kind: 'move', index: 0 }
     if (grid) return grid
   }
   const index = Math.max(0, activeIndex)
