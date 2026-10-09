@@ -158,10 +158,7 @@ it.each(cases)(
       await expect.poll(() => gate.held.length, { timeout: 20_000 }).toBeGreaterThan(0)
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
       if (_name === 'scope text predicate' || _name === 'typescript future string spanning host')
-        await page.screenshot({
-          element: host,
-          path: `../../../docs/performance/singapore-viewport-first-2026-10-08/atomic-replacement/${_name.replaceAll(' ', '-')}-provisional.png`,
-        })
+        await page.screenshot({ element: host })
       gate.releaseAll()
       await expect
         .poll(() => mountedColors(editor, prefix.length), { timeout: 20_000 })
@@ -203,10 +200,7 @@ it.each(cases)(
         }),
       )
       if (_name === 'scope text predicate' || _name === 'typescript future string spanning host')
-        await page.screenshot({
-          element: host,
-          path: `../../../docs/performance/singapore-viewport-first-2026-10-08/atomic-replacement/${_name.replaceAll(' ', '-')}.png`,
-        })
+        await page.screenshot({ element: host })
     } finally {
       cancelAnimationFrame(frame)
       gate.releaseAll()
