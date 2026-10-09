@@ -15,7 +15,7 @@
     "apps/web/src/features/git": 38264,
     "apps/web/src/keymap": 33548,
     "apps/web/src/features/chat": 32610,
-    "packages/ui": 32101,
+    "packages/ui": 34178,
     "packages/tree": 23600,
     "apps/web/src/state": 18766,
     "apps/web/src/components": 17906,
@@ -177,6 +177,12 @@
       "scriptGzip": 1482750,
       "phoneScriptGzip": 1468128,
       "reason": "Phone first load: four closed overlays (session delete/snooze/worktree dialogs, theme studio drawer, machine picker, provider sign-in) now load on first open or after the first screen instead of with the entry. Matched main 91001cdd8 vs this branch, same CI=1 build: desktop 1517486 -> 1482750 (-34736); phone sessions list 1213630 -> 1179305 (-34325); phone conversation 1499663 -> 1468128 (-31535). Re-pinned totals and every owner to the measured build; margins unchanged."
+    },
+    {
+      "at": "2026-10-09T20:47:54.989Z",
+      "scriptGzip": 1486829,
+      "phoneScriptGzip": 1473364,
+      "reason": "Accept packages/ui compiled cn tables from #1185, retaining all Tailwind groups and custom focus conflicts. Re-pin only packages/ui; keep existing total, phone and other-owner budgets."
     }
   ]
 }
