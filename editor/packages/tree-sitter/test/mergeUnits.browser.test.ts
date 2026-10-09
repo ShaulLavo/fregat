@@ -13,7 +13,7 @@ let client: TreeSitterWorkerClient
 beforeEach(async () => {
   client = new TreeSitterWorkerClient()
   const descriptors = await Promise.all(
-    ['typescript', 'html', 'markdown', 'json'].map((id) =>
+    ['typescript', 'javascript', 'html', 'markdown', 'mdx', 'json'].map((id) =>
       resolveTreeSitterLanguageContribution(
         TREE_SITTER_LANGUAGE_CONTRIBUTIONS.find((entry) => entry.id === id)!,
       ),
@@ -167,4 +167,43 @@ it('keeps UTF-16 ranges and duplicate signatures distinct from unit identity', a
   expect(units[1]).toMatchObject({
     unit: { signature: '"😀"', startIndex: 10, endIndex: 17, parent: { commutative: true } },
   })
+})
+
+it('chooses the deepest language inside a Markdown fence', async () => {
+  const identity = { ...document, languageId: 'markdown', snapshotVersion: 1 }
+  const text = '```javascript\nconst palette = json`{"amber": 1, "violet": 2}`;\n```\n'
+  const parsed = await parseTreeDocument(client, { ...identity, text })
+  expect(parsed?.injections?.map((layer) => layer.languageId)).toEqual(['javascript', 'json'])
+  const startIndex = text.indexOf('1')
+  expect(
+    await client.mergeUnit({ ...identity, range: { startIndex, endIndex: startIndex + 1 } }),
+  ).toMatchObject({
+    status: 'ok',
+    languageId: 'json',
+    unit: { source: 'syntax', type: 'pair', signature: '"amber"', parent: { commutative: true } },
+  })
+})
+
+it('selects the TypeScript fence over the MDX root', async () => {
+  const identity = { ...document, languageId: 'mdx', snapshotVersion: 1 }
+  const text = '# Paint\n\n```typescript\nconst amber = 1;\n```\n'
+  await parseTreeDocument(client, { ...identity, text })
+  const startIndex = text.indexOf('amber')
+  expect(
+    await client.mergeUnit({ ...identity, range: { startIndex, endIndex: startIndex + 5 } }),
+  ).toMatchObject({
+    status: 'ok',
+    languageId: 'typescript',
+    unit: { source: 'syntax', type: 'lexical_declaration' },
+  })
+})
+
+it('preserves the injected language when its query falls back to lines', async () => {
+  const identity = { ...document, languageId: 'markdown', snapshotVersion: 1 }
+  const text = '```html\n<p>Amber</p>\n```\n'
+  await parseTreeDocument(client, { ...identity, text })
+  const startIndex = text.indexOf('Amber')
+  expect(
+    await client.mergeUnit({ ...identity, range: { startIndex, endIndex: startIndex + 5 } }),
+  ).toMatchObject({ status: 'ok', languageId: 'html', unit: { source: 'line' } })
 })
