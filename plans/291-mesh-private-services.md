@@ -1,10 +1,10 @@
 # Plan 291: Retire Mesh public hosting and preserve private apps
 
-- Status: Approved, in progress. Mesh source changes and local checks are complete; CI, merge, release, and installed-fleet verification remain open.
+- Status: Approved, complete. Mesh v0.1.232 is released and verified on every saved fleet machine, including the local private app registry and gateway.
 - Date: 2026-10-03
 - Owner clarification: 2026-10-09.
 - Implementation owner: `ShaulLavo/mesh`.
-- Implementation: [Mesh PR #290](https://github.com/ShaulLavo/mesh/pull/290), awaiting CI and merge. Earlier app and widget removal merged in [Mesh PR #285](https://github.com/ShaulLavo/mesh/pull/285).
+- Implementation: [Mesh PR #290](https://github.com/ShaulLavo/mesh/pull/290) removes all public hosting. [PR #291](https://github.com/ShaulLavo/mesh/pull/291) fixes the worker startup ordering found by main CI, and [PR #292](https://github.com/ShaulLavo/mesh/pull/292) removes remaining stale instructions. All are merged. Earlier app and widget removal merged in [Mesh PR #285](https://github.com/ShaulLavo/mesh/pull/285).
 - Reported in: [Mesh #81](https://github.com/ShaulLavo/mesh/issues/81).
 - Coordination: Preserve the private-app observability work from [Mesh #55](https://github.com/ShaulLavo/mesh/issues/55). Device authorization remains [Plan 290](290-mesh-device-authorization.md).
 
@@ -43,11 +43,11 @@ Origin-scoped app routing is deferred. Moving the registry now also requires a s
 - [x] Prepare removal of Share, Make public, Make private, visibility state, management frame, widget routes, and runtime HTML injection.
 - [x] Prepare private app-state storage with preserved bytes and name reservations.
 - [x] Prepare removal of public service metadata and public route/tunnel tables while preserving private apps, named services, sessions, and workers.
-- [ ] Validate prepared source changes, including static apps, server apps, cleanup, downloads, expiry, renew, delete, and owner-only failure inspection.
-- [ ] Inventory existing managed app data before rollout. Retire public app routes without deleting owner source directories or managed workspaces merely to simplify state. Quarantine obsolete app-sharing metadata from route restoration. Obtain a separate explicit approval for any necessary deletion of kept data.
-- [ ] Audit `internal/apps/safety*`, `internal/webauth`, HTTP policies, and security-wave findings by surviving callers. Keep private browser admission, request isolation, credential handling, process checks, and protection for private named services. Delete public-hosting machinery and retire obsolete findings with evidence.
-- [ ] Rewrite `docs/plan/06-temporary-apps.md`, `docs/plan/01-decisions.md` D30, overview/status, T29, and the temporary-app parts of `07-quality-and-security-wave.md`. Document the new package home and the remaining private trust boundary.
-- [ ] Complete independent review, required gates, merge, patch release, and installed-fleet verification. Prepared source is not a shipped result.
+- [x] Validate prepared source changes, including static apps, server apps, cleanup, downloads, expiry, renew, delete, and owner-only failure inspection.
+- [x] Inventory existing managed app data before rollout. Retire public app routes without deleting owner source directories or managed workspaces merely to simplify state. Quarantine obsolete app-sharing metadata from route restoration. Obtain a separate explicit approval for any necessary deletion of kept data.
+- [x] Audit `internal/apps/safety*`, `internal/webauth`, HTTP policies, and security-wave findings by surviving callers. Keep private browser admission, request isolation, credential handling, process checks, and protection for private named services. Delete public-hosting machinery and retire obsolete findings with evidence.
+- [x] Rewrite `docs/plan/06-temporary-apps.md`, `docs/plan/01-decisions.md` D30, overview/status, T29, and the temporary-app parts of `07-quality-and-security-wave.md`. Document the new package home and the remaining private trust boundary.
+- [x] Complete independent review, required gates, merge, patch release, and installed-fleet verification. Prepared source is not a shipped result.
 
 ## Verification and delivery
 
@@ -62,3 +62,13 @@ Upgrade stored state containing former public routes, cached replies, and pendin
 Coordinate registry, origin, renewer, and gateway deployment. Preserve the installed wildcard certificate when moving its purpose to private-service, keep terminal workers running, and verify private HTTPS and app lifecycle recovery after daemon restarts.
 
 Run narrow app, pill, routing, and CLI tests, followed by Mesh's required integration gates through the heavy runner. Apply Subtract Before You Add by removing sharing before introducing further app features. Commit, push, release with a patch version, and verify private apps, private named services, and terminal continuity on the installed fleet. Closure of #81 transfers execution to this plan.
+
+## Delivered on October 9, 2026
+
+[Mesh v0.1.232](https://github.com/ShaulLavo/mesh/releases/tag/v0.1.232) contains the public-hosting removal and worker startup fix at `ac27ef7ba7a7b7f003f3a510f212bd8f505dafb1`. The [tested-main release run](https://github.com/ShaulLavo/mesh/actions/runs/37979411715) passed the complete CI gate and final archive upgrade/restart proofs for Linux amd64, Linux arm64, and macOS arm64. Local validation also passed all 64 integration scripts, race tests, vet, tidy, and quality gates. The reusable pill build and browser fixtures remain green.
+
+Installed verification covered the local origin, private app registry, private gateway, Pi, VPS, and Mac. Every daemon reports the exact published version, commit, platform hash, and schema 13. The saved-fleet native control check reports all four machines updated. Retired public controls return the ordinary unknown-control error. Public routing and tunnel tables are absent. Remote private rows survived both schema 10 and schema 12 upgrades.
+
+The ten existing private apps kept their IDs, revisions, generations, source hashes, and renewed leases. All seven local terminal worker PID/start identities and the Mac's existing worker survived. All ten app URLs and three named service URLs returned HTTP 200 locally and from the Mac, with no injected widget loader. Daemon identities and authorization files were preserved.
+
+The registry received the existing newer private-service wildcard certificate after signed reconciliation. Old public certificate and issuer stores, retired configurations, and the obsolete demo redirect service were withdrawn from active locations and preserved in a private deployment backup. Owner app sources and managed workspaces were retained. The remaining observability work stays in [Plan 302](302-mesh-private-app-observability.md).
