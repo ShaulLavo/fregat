@@ -31,7 +31,11 @@ import { EditorTokenStore, type EditorTokenInput } from '../syntax/tokenStore'
 import type { TextEdit } from '../tokens'
 import { applyEditorTheme } from '../theme'
 import { measureBrowserTextFace, type BrowserTextMetrics } from './browserMetrics'
-import { FixedRowVirtualizer, type FixedRowVirtualizerSnapshot } from './fixedRowVirtualizer'
+import {
+  DEFAULT_MAX_SCROLL_HEIGHT,
+  FixedRowVirtualizer,
+  type FixedRowVirtualizerSnapshot,
+} from './fixedRowVirtualizer'
 import {
   DEFAULT_OVERSCAN,
   DEFAULT_SELECTION_HIGHLIGHT,
@@ -308,6 +312,7 @@ export class VirtualizedTextView {
   /** Set when typed text arrives through EditContext rather than the textarea. */
   public readonly editContext: EditorEditContext | null
   private readonly view: VirtualizedTextViewInternal
+  private measuredMaxScrollHeight: number | undefined
   private readonly disposeForegroundHighlightRestore: () => void
   private cancelContentWidthMeasurement: (() => void) | null = null
   private provisionalPaint: { readonly paint: SavedPaint; readonly release: () => void } | null =
@@ -366,9 +371,9 @@ export class VirtualizedTextView {
       longLineChunkSize,
     )
     const tabSize = normalizeTabSize(options.tabSize)
-    const virtualizer = new FixedRowVirtualizer(
-      createVirtualizerOptions(rowHeight, overscan, rowGap, scrollMode, options.scrollPastEnd),
-    )
+    const virtualizer = new FixedRowVirtualizer({
+      ...createVirtualizerOptions(rowHeight, overscan, rowGap, scrollMode, options.scrollPastEnd),
+    })
     const initialTextSnapshot = createStringTextSnapshot('')
     const initialInjectedTextRows = options.injectedTextRows ?? []
     const initialModel = createVirtualizedTextViewModel({
@@ -989,7 +994,10 @@ export class VirtualizedTextView {
     view.scrollMode = nextScrollMode
     setScrollModeAttribute(view.scrollElement, nextScrollMode)
     view.lastRenderedRowsKey = ''
-    view.virtualizer.updateOptions({ scrollMode: nextScrollMode })
+    view.virtualizer.updateOptions({
+      scrollMode: nextScrollMode,
+      maxScrollHeight: nextScrollMode === 'virtualized' ? this.measuredMaxScrollHeight : undefined,
+    })
     return true
   }
 
@@ -1641,6 +1649,22 @@ export class VirtualizedTextView {
     }
 
     const view = this.view
+    if (
+      this.measuredMaxScrollHeight === undefined &&
+      view.scrollMode === 'virtualized' &&
+      snapshot.viewportHeight > 0 &&
+      view.model.textLength > 0 &&
+      // Discover before native caps are reached, while ordinary opens remain layout-free.
+      snapshot.totalSize > DEFAULT_MAX_SCROLL_HEIGHT / 4 &&
+      snapshot.scrollHeight > snapshot.viewportHeight
+    ) {
+      this.measuredMaxScrollHeight = view.viewport.maxScrollHeight
+      if (
+        this.measuredMaxScrollHeight !== undefined &&
+        view.virtualizer.updateOptions({ maxScrollHeight: this.measuredMaxScrollHeight })
+      )
+        return
+    }
     this.synchronizeScrollPaint(snapshot)
     this.view.viewport.setViewportSize(snapshot.viewportWidth, snapshot.viewportHeight)
     this.reportContentHeight(snapshot.totalSize)
