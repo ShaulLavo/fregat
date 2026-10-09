@@ -48,18 +48,18 @@ test('command groups rank strong command matches above earlier weak fuzzy groups
 
 test('includes both strokes in a chord shortcut hint', () => {
   const defaults = defaultPlatformKeyBindings('linux')
+  const overrides: Parameters<typeof resolvedPlatformKeyBindings>[1] = defaults
+    .filter((binding) => binding.command === 'workspace.showSettings')
+    .map((binding) => ({
+      keys: binding.keys,
+      unbind: 'workspace.showSettings',
+      context: binding.context,
+    }))
   const bindings = resolvedPlatformKeyBindings(
     defaults,
-    [
-      ...defaults
-        .filter((binding) => binding.command === 'workspace.showSettings')
-        .map((binding) => ({
-          keys: binding.keys,
-          unbind: 'workspace.showSettings',
-          context: binding.context,
-        })),
+    overrides.concat([
       { command: 'workspace.showSettings', keys: 'Mod+K Mod+S', context: 'Workspace' },
-    ],
+    ]),
     'linux',
   )
   const items = commandPaletteItems(

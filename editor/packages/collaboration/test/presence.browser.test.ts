@@ -40,7 +40,7 @@ function mount(
     wordWrap,
     wordWrapBreak: 'word',
     lineHeight: 24,
-    plugins: [...extra, createPresencePlugin({ presence, resolver })],
+    plugins: extra.concat([createPresencePlugin({ presence, resolver })]),
   })
   editor.setText(text)
   editors.push(editor)

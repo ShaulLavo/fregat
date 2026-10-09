@@ -26,7 +26,7 @@ export class History {
       })
     }
     this.limit = limit
-    this.values = this.limit === 0 ? [] : [...(options.entries ?? [])].slice(-this.limit)
+    this.values = this.limit === 0 ? [] : (options.entries ?? []).slice(-this.limit)
     this.store = options.store
   }
 
@@ -37,7 +37,7 @@ export class History {
   async load(): Promise<void> {
     if (!this.store) return
     const entries = await this.store.load()
-    this.values = this.limit === 0 ? [] : [...entries].slice(-this.limit)
+    this.values = this.limit === 0 ? [] : entries.slice(-this.limit)
   }
 
   add(text: string): void {

@@ -204,13 +204,12 @@ function eventDiagnostics(sample, event) {
     revision: event.revisionAfter,
     documentVersion: event.revisionAfter,
   }))
-  return [
-    ...views.flatMap((view) => [
+  return views
+    .flatMap((view) => [
       { name: 'editor.document.committed', timestampMs: event.dispatchAt, operation, view },
       { name: 'editor.view.updated', timestampMs: event.appliedAt, operation, view },
-    ]),
-    end,
-  ]
+    ])
+    .concat([end])
 }
 
 describe('input latency result contract', () => {
@@ -843,7 +842,7 @@ describe('paired input latency', () => {
     second.order = first.order
     expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(/pair order/)
     for (const pair of schedule)
-      pair.order = inputPairOrder(17, pair.group, pair.repetition).toReversed()
+      pair.order = inputPairOrder(17, pair.group, pair.repetition).reverse()
     expect(() => comparePairedInput(baseline, candidate, schedule, 17)).toThrow(/pair order/)
   })
 
@@ -1132,7 +1131,7 @@ describe('paired input latency', () => {
     stored.frameDetectionFloor = {
       key: frameDetectionFloorKey,
       delayMs: 30,
-      attempts: [...stored.frameDetectionFloor.attempts, next],
+      attempts: stored.frameDetectionFloor.attempts.concat([next]),
     }
     expect(verifyInputSensitivity(stored, 'b'.repeat(64), 200)).toBe(stored)
   })
@@ -1148,11 +1147,9 @@ describe('paired input latency', () => {
     const stored = sensitivityCache()
     stored.measurementHash = original.measurementHash
     stored.validationHash = original.validationHash
-    for (const control of [
-      stored.controls.input,
-      stored.controls.frame,
-      ...stored.frameDetectionFloor.attempts,
-    ]) {
+    for (const control of [stored.controls.input, stored.controls.frame].concat(
+      stored.frameDetectionFloor.attempts,
+    )) {
       for (const run of [control.baseline, control.candidate]) {
         run.environment.measurementHash = original.measurementHash
         run.environment.validationHash = original.validationHash
@@ -1410,7 +1407,7 @@ describe('warm configuration lifecycle', () => {
     run.cleanup.trackedObjects = 5
     const subjects = ['short-lines/multiple']
     expect(() => validateWarmInputLifecycle(run, subjects)).not.toThrow()
-    for (const sample of [...run.samples, ...run.warmupResets]) {
+    for (const sample of run.samples.concat(run.warmupResets)) {
       sample.reset.documentReloaded = true
       sample.reset.rejectedSource = [{ current: false, renderedAfterSource: true }]
     }

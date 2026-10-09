@@ -70,7 +70,7 @@ function enqueueInModel(model: Model, intentId: string, resources: readonly stri
 }
 
 function settleInModel(model: Model, intentId: string, settlement: IntentSettlement) {
-  model.settlements.set(intentId, [...(model.settlements.get(intentId) ?? []), settlement])
+  model.settlements.set(intentId, (model.settlements.get(intentId) ?? []).concat([settlement]))
 }
 
 function removeActive(model: Model, intentId: string) {
@@ -83,10 +83,10 @@ function replaceActive(model: Model, next: ModelIntent) {
 
 function trackSettlement(real: Real, intent: Intent<Patch>) {
   void intent.settled.then((settlement) => {
-    real.settlements.set(intent.intentId, [
-      ...(real.settlements.get(intent.intentId) ?? []),
-      settlement,
-    ])
+    real.settlements.set(
+      intent.intentId,
+      (real.settlements.get(intent.intentId) ?? []).concat([settlement]),
+    )
   })
 }
 
@@ -113,7 +113,7 @@ async function expectRealMatchesModel(model: Model, real: Real) {
   expect(pendingIntents(state.active).map((intent) => intent.intentId)).toEqual(
     model.active
       .filter((entry) => entry.status === 'pending')
-      .toSorted((left, right) => left.sequence - right.sequence)
+      .sort((left, right) => left.sequence - right.sequence)
       .map((entry) => entry.intentId),
   )
 
@@ -132,7 +132,8 @@ class SubmitCommand implements QueueCommand {
 
   // Every caller mints a fresh id, so a live id is never submitted twice.
   check(model: Readonly<Model>) {
-    const live = [...model.active, ...model.failed]
+    const active: (ModelIntent | ModelFailed)[] = model.active
+    const live = active.concat(model.failed)
     return !live.some((entry) => entry.intentId === this.intentId)
   }
 

@@ -83,10 +83,9 @@ test('restoration appends complete captured content and holds every attachment b
   restoreFollowUps(owner, useFollowUpStore.getState().drain(owner))
   const recovered = drafts.getDraft(target)
   expect(recovered.prompt).toBe('Current draft\n\nQueued prompt')
-  expect(recovered.attachments.map((entry) => entry.id)).toEqual([
-    ...existing.map((entry) => entry.id),
-    'first-file',
-  ])
+  expect(recovered.attachments.map((entry) => entry.id)).toEqual(
+    existing.map((entry) => entry.id).concat(['first-file']),
+  )
   expect(recovered.terminalContexts).toEqual(captured.content.terminalContexts)
   const overflow = queuedFollowUps(useFollowUpStore.getState(), owner)
   expect(overflow).toHaveLength(1)

@@ -91,7 +91,7 @@ export function groupedCommandItems(
     const available = group.filter((item) => !item.disabledReason)
     return available.length > 0 ? [[heading, available] as const] : []
   })
-  return [...enabled, ['Unavailable Commands', disabled]]
+  return enabled.concat([['Unavailable Commands', disabled]])
 }
 
 export function filePaletteItems(state: LoadState<TreeModel>): readonly FilePaletteItem[] {
@@ -159,14 +159,10 @@ export function editorPaletteItems(
 }
 
 function commandKeywords(spec: CommandSpec) {
-  return [
-    spec.title,
-    spec.category,
-    spec.description ?? '',
-    spec.id,
-    ...(spec.aliases ?? []),
-    ...(spec.vscodeCommandIds ?? []),
-  ]
+  return [spec.title, spec.category, spec.description ?? '', spec.id].concat(
+    spec.aliases ?? [],
+    spec.vscodeCommandIds ?? [],
+  )
 }
 
 /** The palette scopes that repaint the app for the highlighted row. */

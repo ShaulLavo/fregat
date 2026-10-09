@@ -216,7 +216,7 @@ function serializeImage(image: Element) {
 
 function serializeList(list: Element, ordered: boolean) {
   const start = Number.parseInt(list.getAttribute('start') ?? '1', 10) || 1
-  const items = [...list.children].filter((child) => child.tagName === 'LI')
+  const items = Array.from(list.children).filter((child) => child.tagName === 'LI')
   if (items.length === 0) return ''
 
   const lines = items.map((item, index) => serializeListItem(item, ordered, start + index))
@@ -232,7 +232,9 @@ function serializeListItem(item: Element, ordered: boolean, index: number) {
   const indent = ' '.repeat(marker.length)
   const [first = '', ...rest] = content.split('\n')
 
-  return [`${marker}${first}`, ...rest.map((line) => (line ? `${indent}${line}` : line))].join('\n')
+  return [`${marker}${first}`]
+    .concat(rest.map((line) => (line ? `${indent}${line}` : line)))
+    .join('\n')
 }
 
 function listItemContent(item: Element) {
@@ -260,12 +262,16 @@ function serializeBlockquote(quote: Element) {
 }
 
 function serializeTable(table: Element) {
-  const rows = [...table.querySelectorAll(':scope > thead > tr, :scope > tbody > tr, :scope > tr')]
+  const rows = Array.from(
+    table.querySelectorAll(':scope > thead > tr, :scope > tbody > tr, :scope > tr'),
+  )
   const lines: string[] = []
   let separated = false
 
   for (const row of rows) {
-    const cells = [...row.children].filter((cell) => cell.tagName === 'TH' || cell.tagName === 'TD')
+    const cells = Array.from(row.children).filter(
+      (cell) => cell.tagName === 'TH' || cell.tagName === 'TD',
+    )
     if (cells.length === 0) continue
 
     lines.push(`| ${cells.map((cell) => serializeTableCell(cell)).join(' | ')} |`)

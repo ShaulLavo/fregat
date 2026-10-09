@@ -59,7 +59,7 @@ function completionCommitApplication(
   const [insertion, ...additional] = application.edits
   if (!insertion) return application
 
-  const edits = [{ ...insertion, text: `${insertion.text}${character}` }, ...additional]
+  const edits = [{ ...insertion, text: `${insertion.text}${character}` }].concat(additional)
   // A snippet's caret belongs on its first placeholder, and the character lands past the end of the
   // insertion, so every stop measured inside it is still where it was.
   if (application.snippetStops) return { ...application, edits }

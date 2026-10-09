@@ -1,14 +1,3 @@
-/**
- * First-load weight report. Builds the web app, then answers "which dependency
- * costs what" for the bytes a cold browser downloads before the first frame.
- *
- *   bun scripts/bundle-report.ts                 build `dist`, print the table
- *   bun scripts/bundle-report.ts --json=out.json also write the machine form
- *   bun scripts/bundle-report.ts --dir=<web dir> report an existing build
- *
- * `--dir` skips the build. Without `bundle-stats.json` beside that directory
- * the desktop report has file totals but no per-package attribution. The phone graph requires stats.
- */
 import fs from 'node:fs'
 import path from 'node:path'
 import { firstLoadFiles } from './first-load-files'
@@ -161,11 +150,10 @@ function buildReport(dir: string): Report {
   const packages = attributePackages(stats.chunks, firstLoadNames)
   return {
     dir,
-    eagerStartupModules: eagerModulesInStartup(stats.chunks, [
-      ...files,
-      ...phoneFiles,
-      ...phoneSessionFiles,
-    ]),
+    eagerStartupModules: eagerModulesInStartup(
+      stats.chunks,
+      files.concat(phoneFiles, phoneSessionFiles),
+    ),
     phoneFirstLoad,
     phoneSessionFirstLoad,
     firstLoad: { scriptGzip, stylesheetGzip, files },
@@ -215,14 +203,12 @@ function attributePackages(
       if (identity.version) versionsFor(versions, identity.name).add(identity.version)
     }
   }
-  return [...total.keys()]
-    .map((name) => ({
-      name,
-      versions: [...(versions.get(name) ?? [])].sort(),
-      firstLoadGzip: Math.round(firstLoad.get(name) ?? 0),
-      totalGzip: Math.round(total.get(name) ?? 0),
-    }))
-    .sort((a, b) => b.firstLoadGzip - a.firstLoadGzip || b.totalGzip - a.totalGzip)
+  return Array.from(total.keys(), (name) => ({
+    name,
+    versions: Array.from(versions.get(name) ?? []).sort(),
+    firstLoadGzip: Math.round(firstLoad.get(name) ?? 0),
+    totalGzip: Math.round(total.get(name) ?? 0),
+  })).sort((a, b) => b.firstLoadGzip - a.firstLoadGzip || b.totalGzip - a.totalGzip)
 }
 
 function versionsFor(versions: Map<string, Set<string>>, name: string): Set<string> {
@@ -301,7 +287,7 @@ function duplicateChunkNames(chunks: readonly BundleStatsChunk[]) {
     files.push(chunk.fileName)
     byName.set(base, files)
   }
-  return [...byName]
+  return Array.from(byName)
     .filter(([, files]) => files.length > 1)
     .map(([name, files]) => ({ name, files: files.sort() }))
     .sort((a, b) => b.files.length - a.files.length || a.name.localeCompare(b.name))

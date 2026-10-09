@@ -24,12 +24,12 @@ export function referenceGroups(
   }
 
   return Array.from(byPath.entries())
-    .toSorted(([left], [right]) => compareSearchPaths(left, right))
+    .sort(([left], [right]) => compareSearchPaths(left, right))
     .map(([path, pathTargets]) => ({
       name: basename(path),
       path,
       pathLabel: referencePathLabel(path, rootPath),
-      targets: pathTargets.toSorted(compareTargets),
+      targets: pathTargets.sort(compareTargets),
     }))
 }
 
@@ -144,15 +144,15 @@ export function referenceListRows(
       expanded: !collapsedPaths.has(group.path),
     }
     if (!row.expanded) return [row]
-    return [
-      row,
-      ...group.targets.map((target, index): ReferenceListRow => ({
+    const rows: ReferenceListRow[] = [row]
+    return rows.concat(
+      group.targets.map((target, index): ReferenceListRow => ({
         kind: 'target',
         id: `${target.uri}:${target.range.start.line}:${target.range.start.character}:${index}`,
         label: `${group.name}:${target.range.start.line + 1}`,
         target,
         parentId: id,
       })),
-    ]
+    )
   })
 }

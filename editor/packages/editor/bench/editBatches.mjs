@@ -294,7 +294,7 @@ function sourceHash(directory) {
 }
 
 function visitSources(directory, hash) {
-  for (const entry of readdirSync(directory, { withFileTypes: true }).toSorted((a, b) =>
+  for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) =>
     a.name.localeCompare(b.name),
   )) {
     const path = join(directory, entry.name)

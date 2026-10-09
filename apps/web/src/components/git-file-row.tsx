@@ -8,7 +8,7 @@ import { FileLabel } from '@/components/file-label'
 import { FileStatusCell } from '@/components/file-status-cell'
 import { toTreePath } from '@/lib/path-formatters'
 import type { GitLineStat } from '@workspace/contracts'
-import { encodeTooltipParts } from '@workspace/ui/patterns/tooltip-parts'
+import { encodeTooltipParts, type TooltipPart } from '@workspace/ui/patterns/tooltip-parts'
 import { DiffStatLabel } from '@/components/diff-stat-label'
 import type { StatusPresentation } from '@/lib/git-status-symbols'
 
@@ -48,13 +48,16 @@ export function GitFileRow({
   const intent = useDiffIntent(prefetch ?? null, rootPath, rowProps?.['data-active'] === true)
   const relativePath = toTreePath(path, rootPath)
   const changed = stat && stat.additions + stat.deletions > 0 ? stat : undefined
-  const tooltip = encodeTooltipParts([
+  const tooltipParts: TooltipPart[] = [
     { text: oldPath ? `${toTreePath(oldPath, rootPath)} → ` : '' },
     { text: relativePath },
     { text: ` · ${status.title}`, tone: 'muted' },
-    ...(changed ? diffParts(changed) : []),
-    { text: disabledReason ? ` · ${disabledReason}` : '', tone: 'muted' },
-  ])
+  ]
+  const tooltip = encodeTooltipParts(
+    tooltipParts.concat(changed ? diffParts(changed) : [], [
+      { text: disabledReason ? ` · ${disabledReason}` : '', tone: 'muted' },
+    ]),
+  )
   function handleOpen() {
     if (disabledReason) return
     onOpen()

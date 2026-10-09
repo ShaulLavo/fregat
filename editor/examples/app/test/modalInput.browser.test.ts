@@ -43,7 +43,7 @@ async function open(route: Route, options: { readonly readonly?: boolean } = {})
     inputRoute: route,
     editability: options.readonly ? 'readonly' : 'editable',
     plugins: [createModalEditingPlugin()],
-    keymap: { packs: [...defaultEditorPacks, modalPack] },
+    keymap: { packs: defaultEditorPacks.concat([modalPack]) },
   })
   editors.push(editor)
   await frames()
@@ -149,7 +149,7 @@ it('keeps each view of one document in its own mode', async () => {
       hosts.push(host)
       const editor = new Editor(host, {
         plugins: [createModalEditingPlugin()],
-        keymap: { packs: [...defaultEditorPacks, modalPack] },
+        keymap: { packs: defaultEditorPacks.concat([modalPack]) },
       })
       editors.push(editor)
       editor.attachSession(createEditorBufferSession(buffer), { documentId: 'shared.txt' })

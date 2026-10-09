@@ -479,7 +479,7 @@ export function writeWorkspaceIndexCache(
   const locations = rootPaths.map((path) => workspaceLocation(path, worktreeIds[path] ?? null))
   const kept = locations.slice(0, WORKSPACE_SLICE_LIMIT)
   const keptSet = new Set(kept.map((location) => location.rootPath))
-  for (const location of [...readWorkspaceIndex(storage), ...locations]) {
+  for (const location of readWorkspaceIndex(storage).concat(locations)) {
     if (keptSet.has(location.rootPath)) continue
     const worktreeId = locationWorktreeId(location)
     removeCacheEntry(workspaceSliceStorageKey(location.rootPath, worktreeId), storage)
@@ -553,10 +553,9 @@ function workspaceOrderFromCache(storage: ScopedStorage, activePath: string | nu
   const stored = readWorkspaceIndex(storage).map((location) => location.rootPath)
   if (activePath === null) return stored.slice(0, WORKSPACE_SLICE_LIMIT)
 
-  return [activePath, ...stored.filter((rootPath) => rootPath !== activePath)].slice(
-    0,
-    WORKSPACE_SLICE_LIMIT,
-  )
+  return [activePath]
+    .concat(stored.filter((rootPath) => rootPath !== activePath))
+    .slice(0, WORKSPACE_SLICE_LIMIT)
 }
 
 export function readWorkspaceCheckoutIds(storage: ScopedStorage): WorktreeIdsByRootPath {

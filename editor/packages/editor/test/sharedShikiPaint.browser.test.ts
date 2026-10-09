@@ -72,7 +72,7 @@ function paint(host: HTMLElement) {
     if (!name.startsWith('editor-shared-token-')) continue
     for (const range of highlight) append(range, name)
   }
-  return runs.toSorted((left, right) => left.row - right.row || left.from - right.from)
+  return runs.sort((left, right) => left.row - right.row || left.from - right.from)
 
   function append(range: AbstractRange, style: string) {
     if (!host.contains(range.startContainer) || !host.contains(range.endContainer)) return
@@ -105,7 +105,7 @@ function sourceRows(host: HTMLElement) {
   return Array.from(host.querySelectorAll<HTMLElement>('[data-editor-virtual-row]'), (row) => ({
     row: Number(row.dataset.editorVirtualRow),
     text: row.textContent,
-  })).toSorted((left, right) => left.row - right.row)
+  })).sort((left, right) => left.row - right.row)
 }
 
 function retained(text: string) {

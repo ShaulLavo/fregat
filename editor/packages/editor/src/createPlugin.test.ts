@@ -141,7 +141,7 @@ describe('createPlugin view scope', () => {
 
     editor.edit({ from: 0, to: 0, text: 'x' })
 
-    expect(released.toSorted()).toEqual(['cleanup', 'own'])
+    expect(released.sort()).toEqual(['cleanup', 'own'])
     expect(texts).toBe(0)
   })
 
@@ -335,7 +335,7 @@ describe('createPlugin view scope', () => {
 function createEditorWith(plugins: readonly EditorPlugin[]): Editor {
   const container = document.createElement('div')
   document.body.appendChild(container)
-  const editor = new Editor(container, { defaultText: 'alpha', plugins: [...plugins] })
+  const editor = new Editor(container, { defaultText: 'alpha', plugins })
   editors.push(editor)
   return editor
 }

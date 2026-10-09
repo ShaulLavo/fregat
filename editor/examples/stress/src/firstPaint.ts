@@ -129,7 +129,7 @@ async function configure(options: Configuration) {
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source))
   const facts = {
     ...fixtureFacts(source),
-    sha256: [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, '0')).join(''),
+    sha256: Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join(''),
   }
   preparationMs = 0
   bufferMs = 0

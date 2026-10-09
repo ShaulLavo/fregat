@@ -331,12 +331,13 @@ export class ChatOwner {
   private async reconcile(command: ClientOrchestrationCommand, afterSequence: number) {
     if (this.lifetime.signal.aborted) return
     const signal = this.lifetime.signal
-    const results = await Promise.allSettled([
-      this.resnapshotShell(signal),
-      ...commandSessions(command).map((sessionId) =>
-        this.resnapshotSession(sessionId, afterSequence, signal),
+    const results = await Promise.allSettled(
+      [this.resnapshotShell(signal)].concat(
+        commandSessions(command).map((sessionId) =>
+          this.resnapshotSession(sessionId, afterSequence, signal),
+        ),
       ),
-    ])
+    )
     const failure = results.find((result) => result.status === 'rejected')
     if (failure?.status !== 'rejected' || signal.aborted) return
     this.fail(
@@ -401,7 +402,7 @@ function commandSessions(command: ClientOrchestrationCommand): SessionId[] {
   const ids = [command.sessionId]
   if (command.type === 'session.turn.start' && command.sourceProposedPlan)
     ids.push(command.sourceProposedPlan.sessionId)
-  return [...new Set(ids)]
+  return Array.from(new Set(ids))
 }
 
 function retryableDispatch(error: unknown) {

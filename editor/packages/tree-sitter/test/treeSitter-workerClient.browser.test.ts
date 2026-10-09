@@ -610,7 +610,7 @@ describe.skipIf(typeof Worker === 'undefined')('tree-sitter worker client', () =
     })
     const languages = Array.from(
       new Set(parsed?.injections.map((injection) => injection.languageId)),
-    ).toSorted()
+    ).sort()
 
     expect(languages).toEqual(['css', 'html', 'json'])
     expect(parsed?.captures.some((capture) => capture.languageId === 'html')).toBe(true)

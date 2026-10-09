@@ -37,7 +37,9 @@ test('seeded confirmed histories match transitive dependency walks and both engi
     const identities = new Set(reference.characters().map(({ id }) => charKey(id)))
     for (const edit of window.edits) {
       expect(
-        [...expand(edit.inserted), ...expand(edit.deleted)].every((id) => identities.has(id)),
+        expand(edit.inserted)
+          .concat(expand(edit.deleted))
+          .every((id) => identities.has(id)),
       ).toBe(true)
     }
     for (const limit of [0, 1, 7, 16]) {

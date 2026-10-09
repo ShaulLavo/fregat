@@ -4,6 +4,7 @@ import type {
   EditingKey,
   FunctionKey,
   LetterKey,
+  LogicalKey,
   NavigationKey,
   NumberKey,
   PunctuationKey,
@@ -286,16 +287,18 @@ export const PUNCTUATION_CODE_MAP: Record<string, string> = {
  * @see {@link EDITING_KEYS}
  * @see {@link PUNCTUATION_KEYS}
  */
-export const ALL_KEYS = new Set([
-  ...LETTER_KEYS,
-  ...NUMBER_KEYS,
-  ...FUNCTION_KEYS,
-  ...NAVIGATION_KEYS,
-  ...EDITING_KEYS,
-  ...PUNCTUATION_KEYS,
-  ...SHARED_NAMED_KEYS,
-  ...LOGICAL_ONLY_NAMED_KEYS,
-])
+const logicalKeys: LogicalKey[] = Array.from(LETTER_KEYS)
+export const ALL_KEYS = new Set(
+  logicalKeys.concat(
+    Array.from(NUMBER_KEYS),
+    Array.from(FUNCTION_KEYS),
+    Array.from(NAVIGATION_KEYS),
+    Array.from(EDITING_KEYS),
+    Array.from(PUNCTUATION_KEYS),
+    SHARED_NAMED_KEYS,
+    LOGICAL_ONLY_NAMED_KEYS,
+  ),
+)
 
 // Share canonical spellings with validation, including newly supported named keys.
 const CANONICAL_KEY_NAMES = new Map<string, string>(

@@ -142,7 +142,7 @@ function relativeToken(
   const relative = toWorkspaceRelative(rootPath, path)
   if (!relative) return { kind: 'unaddressable', reason: 'document is outside this workspace' }
 
-  return { kind: 'token', token: [kind, ...leading, encodePath(relative)].join('/') }
+  return { kind: 'token', token: [kind].concat(leading, [encodePath(relative)]).join('/') }
 }
 
 function tokenExtras({

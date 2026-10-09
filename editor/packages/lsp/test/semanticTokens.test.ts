@@ -50,8 +50,8 @@ describe('semanticTokensClientCapability', () => {
       semanticTokensClientCapability({ requests: { full: true } }),
     )
 
-    expect(semanticTokens?.tokenTypes).toEqual([...SEMANTIC_TOKEN_TYPES])
-    expect(semanticTokens?.tokenModifiers).toEqual([...SEMANTIC_TOKEN_MODIFIERS])
+    expect(semanticTokens?.tokenTypes).toEqual(SEMANTIC_TOKEN_TYPES)
+    expect(semanticTokens?.tokenModifiers).toEqual(SEMANTIC_TOKEN_MODIFIERS)
     expect(semanticTokens?.formats).toEqual(['relative'])
     expect(semanticTokens?.requests).toEqual({ full: true })
   })

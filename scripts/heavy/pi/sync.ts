@@ -33,7 +33,8 @@ export function builtWorkspaces(root: string) {
   const parents = BUILD_PARENTS.flatMap((parent) =>
     readdirSync(path.join(root, parent)).map((name) => path.join(parent, name)),
   )
-  return [...parents, 'ghostty-webgpu']
+  return parents
+    .concat(['ghostty-webgpu'])
     .map((dir) => path.join(dir, 'dist'))
     .filter((dist) => existsSync(path.join(root, dist)))
 }
@@ -43,7 +44,10 @@ export function builtWorkspaces(root: string) {
  * relative path starts, so the copy works from any directory, as `--host pi` runs it.
  */
 export function buildsTransfer(root: string, builds: readonly string[], destination: string) {
-  return ['rsync', '-aR', '--delete', ...builds.map((dist) => `${root}/./${dist}`), destination]
+  return ['rsync', '-aR', '--delete'].concat(
+    builds.map((dist) => `${root}/./${dist}`),
+    [destination],
+  )
 }
 
 /**

@@ -202,10 +202,10 @@ test('shift selection includes intervening scoped rows and archives the whole se
   await user.keyboard('{Shift>}')
   await user.click(screen.getByTitle('Last'))
   await user.keyboard('{/Shift}')
-  expect(useSessionMultiSelectStore.getState().refs.map(scopedSessionKey).toSorted()).toEqual(
+  expect(useSessionMultiSelectStore.getState().refs.map(scopedSessionKey).sort()).toEqual(
     harness.sessionIds
       .map((sessionId) => scopedSessionKey({ environmentId: harness.environmentId, sessionId }))
-      .toSorted(),
+      .sort(),
   )
   await user.click(
     within(screen.getByRole('toolbar', { name: 'Selected sessions' })).getByRole('button', {

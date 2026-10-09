@@ -20,7 +20,8 @@ export function logsParamsFor(filters: LogsFilterState, defaults: LogsFilterStat
   return Object.keys(params).length > 0 ? params : null
 }
 
-const LEVELS = ['all', ...LOG_DASHBOARD_LEVELS] as const
+const allLevels: readonly LogsFilterState['level'][] = ['all']
+const LEVELS = allLevels.concat(LOG_DASHBOARD_LEVELS)
 
 export function logsFiltersFor(
   params: Readonly<Record<string, string>> | null,

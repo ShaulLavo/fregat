@@ -117,7 +117,7 @@ test('a second release reuses the runtime, keeps the one before it and prunes ol
     runtimeReused: true,
     pruned: ['first'],
   })
-  expect((await readdir(path.join(serverRoot, 'releases'))).toSorted()).toEqual(['second', 'third'])
+  expect((await readdir(path.join(serverRoot, 'releases'))).sort()).toEqual(['second', 'third'])
   expect(await readlink(path.join(serverRoot, 'current'))).toBe('releases/third')
   expect(await runtimeInstalls(home)).toBe(1)
 })

@@ -31,7 +31,7 @@ it('deletes the files of days before the kept window and leaves other files alon
   ])
 
   expect(await pruneExpiredLogs(dir, 2, NOW)).toBe(3)
-  expect((await readdir(dir)).toSorted()).toEqual([
+  expect((await readdir(dir)).sort()).toEqual([
     '.gitignore',
     '2026-09-25.jsonl',
     '2026-09-26.jsonl',

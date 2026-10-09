@@ -26,7 +26,7 @@ test('ordinary admission, expired holds and disabled concurrency retain full FIF
 
 test('new light servers wait during a hold while finite light jobs pass them', () => {
   const server = { id: 'server', jobClass: 'light', quiet: false, server: true }
-  const waiting = [server, ...queue]
+  const waiting = [server].concat(queue)
   expect(allowedDuringQuiet(server, ['light'])).toBe(false)
   expect(jobsAhead(waiting, queue[2]!, true, ['light'])).toBe(0)
   expect(jobsAhead(waiting, queue[4]!, true, ['light'])).toBe(1)

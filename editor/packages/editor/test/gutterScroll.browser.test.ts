@@ -223,13 +223,9 @@ function mount(options: { gutterScroll?: 'fixed' | 'content'; wordWrap?: boolean
   document.body.append(host)
   const editor = new Editor(host, {
     ...options,
-    defaultText: [
-      'alpha { ' + 'abcdefghij '.repeat(80),
-      '  beta',
-      '  gamma',
-      '}',
-      ...Array.from({ length: 300 }, (_, index) => `line ${index}`),
-    ].join('\n'),
+    defaultText: ['alpha { ' + 'abcdefghij '.repeat(80), '  beta', '  gamma', '}']
+      .concat(Array.from({ length: 300 }, (_, index) => `line ${index}`))
+      .join('\n'),
     lineHeight: 20,
     gutterLeadingInset: 12,
     plugins: [createLineGutterPlugin(), createFoldGutterPlugin()],

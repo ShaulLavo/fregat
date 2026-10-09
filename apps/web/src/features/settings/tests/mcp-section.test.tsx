@@ -60,10 +60,9 @@ class McpConfigAdapter extends MockProviderAdapter {
     },
     add: async (input: Write & { definition: ProviderMcpDefinition }) => {
       this.writes.push(input)
-      this.servers = [
-        ...this.servers,
+      this.servers = this.servers.concat([
         { ...this.servers[0]!, name: input.name, origin: null, tools: [], transport: 'stdio' },
-      ]
+      ])
     },
     remove: async (input: Write) => {
       this.writes.push(input)

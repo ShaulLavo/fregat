@@ -14,227 +14,228 @@ type Probe = {
 }
 
 const probes: readonly Probe[] = [
-  ...[
-    "import { value } from '@/features/beta/value'; export { value }",
-    "import { value } from '../beta/value'; export { value }",
-    "import type { Value } from '@/features/beta/value'; export type Result = Value",
-    "export { value } from '@/features/beta/value'",
-    "export * from '@/features/beta/value'",
-    "import('@/features/beta/value')",
-    'import(`@/features/beta/value`)',
-    "require('@/features/beta/value')",
-    'require(`@/features/beta/value`)',
-    "import value = require('@/features/beta/value'); export { value }",
-  ].map((source, index) => ({
+  "import { value } from '@/features/beta/value'; export { value }",
+  "import { value } from '../beta/value'; export { value }",
+  "import type { Value } from '@/features/beta/value'; export type Result = Value",
+  "export { value } from '@/features/beta/value'",
+  "export * from '@/features/beta/value'",
+  "import('@/features/beta/value')",
+  'import(`@/features/beta/value`)',
+  "require('@/features/beta/value')",
+  'require(`@/features/beta/value`)',
+  "import value = require('@/features/beta/value'); export { value }",
+]
+  .map((source, index): Probe => ({
     file: `apps/web/src/features/alpha/probe-${index}.ts`,
     source,
     rules: ['feature-imports'],
-  })),
-  {
-    file: 'apps/web/src/features/alpha/import-type.ts',
-    source: "export type Value = import('@/features/beta/value').Value",
-    rules: ['feature-imports'],
-    column: 21,
-  },
-  {
-    file: 'apps/web/src/features/alpha/own.ts',
-    source: "export { value } from '@/features/alpha/value'",
-    rules: [],
-  },
-  {
-    file: 'apps/web/src/features/alpha/shared.ts',
-    source: "export { value } from '@/lib/example/value'",
-    rules: [],
-  },
-  {
-    file: 'apps/web/src/features/alpha/example.test.ts',
-    source: "export { value } from '@/features/beta/value'",
-    rules: [],
-  },
-  {
-    file: 'apps/web/src/lib/alias.ts',
-    source: "import { value } from '@/features/example/value'; export { value }",
-    rules: ['lib-imports'],
-  },
-  {
-    file: 'apps/web/src/lib/relative.ts',
-    source: "import { value } from '../features/example/value'; export { value }",
-    rules: ['lib-imports'],
-  },
-  {
-    file: 'apps/web/src/lib/type-only.ts',
-    source: "import type { Value } from '@/features/example/value'; export type Result = Value",
-    rules: ['lib-imports'],
-  },
-  {
-    file: 'apps/web/src/lib/re-export.ts',
-    source: "export { value } from '@/features/example/value'",
-    rules: ['lib-imports'],
-  },
-  {
-    file: 'apps/web/src/lib/export-all.ts',
-    source: "export * from '../features/example/value'",
-    rules: ['lib-imports'],
-  },
-  {
-    file: 'apps/web/src/lib/dynamic.ts',
-    source: "import('@/features/example/value')",
-    rules: ['lib-imports'],
-  },
-  {
-    file: 'apps/web/src/lib/dynamic-template.ts',
-    source: 'import(`@/features/example/value`)',
-    rules: ['lib-imports'],
-  },
-  {
-    file: 'apps/web/src/lib/require-template.ts',
-    source: 'require(`../features/example/value`)',
-    rules: ['lib-imports'],
-  },
-  {
-    file: 'apps/web/src/lib/shared-template.ts',
-    source: 'import(`@/lib/example/value`)',
-    rules: [],
-  },
-  {
-    file: 'apps/web/src/lib/import-type.ts',
-    source: "export type Value = import('@/features/example/value').Value",
-    rules: ['lib-imports'],
-    column: 21,
-  },
-  {
-    file: 'apps/web/src/lib/tests/helper.ts',
-    source: "export { value } from '@/features/example/value'",
-    rules: ['lib-imports'],
-  },
-  {
-    file: 'apps/web/src/lib/import-equals.ts',
-    source: "import value = require('@/features/example/value'); export { value }",
-    rules: ['lib-imports'],
-  },
-  {
-    file: 'apps/web/src/lib/documents/utils/runtime.ts',
-    source: "import { useState } from 'react'; export { useState }",
-    rules: ['document-dependencies'],
-  },
-  {
-    file: 'apps/web/src/lib/documents/utils/store.ts',
-    source: "export { store } from '@/lib/environments/state/store'",
-    rules: ['document-dependencies'],
-  },
-  {
-    file: 'apps/web/src/lib/documents/utils/dynamic.ts',
-    source: "import('./identity')",
-    rules: ['document-dependencies'],
-  },
-  {
-    file: 'apps/web/src/lib/documents/utils/computed.ts',
-    source: "const name = './identity'; import(name)",
-    rules: ['document-dependencies'],
-    column: 28,
-  },
-  {
-    file: 'apps/web/src/lib/documents/utils/require.ts',
-    source: "require('./identity')",
-    rules: ['document-dependencies'],
-  },
-  {
-    file: 'apps/web/src/lib/documents/utils/import-equals.ts',
-    source: "import value = require('./identity'); export { value }",
-    rules: ['document-dependencies'],
-  },
-  {
-    file: 'apps/web/src/lib/documents/utils/contract-runtime.ts',
-    source: "export { executable } from '@workspace/contracts'",
-    rules: ['document-dependencies'],
-  },
-  {
-    file: 'apps/web/src/features/editor/utils/classifier.ts',
-    source: "export const prefix = 'git-ref:'",
-    rules: ['document-codecs'],
-    column: 23,
-  },
-  {
-    file: 'apps/web/src/features/editor/utils/regex-classifier.ts',
-    source: 'export const pattern = /^git-ref:/',
-    rules: ['document-codecs'],
-    column: 24,
-  },
-  {
-    file: 'apps/web/src/lib/path-formatters.ts',
-    source: "export { value } from '@/features/example/value'",
-    rules: ['lib-imports', 'document-dependencies'],
-  },
-  {
-    file: 'packages/client-core/src/files/path.ts',
-    source: "export { useState } from 'react'",
-    rules: ['document-dependencies'],
-  },
-  {
-    file: 'apps/web/src/lib/documents/utils/identity.ts',
-    source: "import type { Value } from '@workspace/contracts'; export type Identity = Value",
-    rules: [],
-  },
-  {
-    file: 'apps/web/src/lib/documents/utils/codec.ts',
-    source:
-      "import { sessionIdSchema } from '@workspace/contracts'; export const prefix = 'git-ref:'; export { sessionIdSchema }",
-    rules: [],
-  },
-  {
-    file: 'apps/web/src/lib/documents/utils/shared.ts',
-    source: "export { value } from '@/lib/path-formatters'",
-    rules: [],
-  },
-  {
-    file: 'apps/web/src/lib/documents/utils/git-schemas.ts',
-    source:
-      "import { gitCommitOriginSchema, resolvedGitObjectIdSchema, gitSnapshotTargetSchema } from '@workspace/contracts'; export const schemas = [gitCommitOriginSchema, resolvedGitObjectIdSchema, gitSnapshotTargetSchema]",
-    rules: [],
-  },
-  {
-    file: 'apps/web/src/lib/documents/utils/git-runtime.ts',
-    source:
-      "import { gitSnapshotTargetSchema, executable } from '@workspace/contracts'; export const values = [gitSnapshotTargetSchema, executable]",
-    rules: ['document-dependencies'],
-  },
-  {
-    file: 'apps/web/src/lib/documents/utils/contract-type.ts',
-    source: "export type Value = import('@workspace/contracts').Value",
-    rules: [],
-  },
-  {
-    file: 'apps/web/src/features/editor/utils/consumer.ts',
-    source: "export type { Identity } from '@/lib/documents/utils/identity'",
-    rules: [],
-  },
-  {
-    file: 'apps/web/src/lib/tests/integration.test.ts',
-    source: "export { value } from '@/features/example/value'; export const id = 'git-ref:test'",
-    rules: [],
-  },
-  {
-    file: 'apps/web/src/lib/documents/tests/contracts.test-d.ts',
-    source: "export { save } from '@/features/editor/state/save-service'",
-    rules: [],
-  },
-  {
-    file: 'apps/web/src/features/settings/container-classes.ts',
-    source: "export const className = 'flex @max-3xl/settings:grid @3xl/settings:gap-2'",
-    rules: [],
-  },
-  {
-    file: 'apps/web/src/features/settings/invalid-mixed-prefix.ts',
-    column: 22,
-    source: "export const value = '@max-3xl/settings:grid settings:'",
-    rules: ['document-codecs'],
-  },
-  {
-    file: 'apps/web/test/factories/documents.ts',
-    source: "export const id = 'git-ref:test'",
-    rules: [],
-  },
-]
+  }))
+  .concat([
+    {
+      file: 'apps/web/src/features/alpha/import-type.ts',
+      source: "export type Value = import('@/features/beta/value').Value",
+      rules: ['feature-imports'],
+      column: 21,
+    },
+    {
+      file: 'apps/web/src/features/alpha/own.ts',
+      source: "export { value } from '@/features/alpha/value'",
+      rules: [],
+    },
+    {
+      file: 'apps/web/src/features/alpha/shared.ts',
+      source: "export { value } from '@/lib/example/value'",
+      rules: [],
+    },
+    {
+      file: 'apps/web/src/features/alpha/example.test.ts',
+      source: "export { value } from '@/features/beta/value'",
+      rules: [],
+    },
+    {
+      file: 'apps/web/src/lib/alias.ts',
+      source: "import { value } from '@/features/example/value'; export { value }",
+      rules: ['lib-imports'],
+    },
+    {
+      file: 'apps/web/src/lib/relative.ts',
+      source: "import { value } from '../features/example/value'; export { value }",
+      rules: ['lib-imports'],
+    },
+    {
+      file: 'apps/web/src/lib/type-only.ts',
+      source: "import type { Value } from '@/features/example/value'; export type Result = Value",
+      rules: ['lib-imports'],
+    },
+    {
+      file: 'apps/web/src/lib/re-export.ts',
+      source: "export { value } from '@/features/example/value'",
+      rules: ['lib-imports'],
+    },
+    {
+      file: 'apps/web/src/lib/export-all.ts',
+      source: "export * from '../features/example/value'",
+      rules: ['lib-imports'],
+    },
+    {
+      file: 'apps/web/src/lib/dynamic.ts',
+      source: "import('@/features/example/value')",
+      rules: ['lib-imports'],
+    },
+    {
+      file: 'apps/web/src/lib/dynamic-template.ts',
+      source: 'import(`@/features/example/value`)',
+      rules: ['lib-imports'],
+    },
+    {
+      file: 'apps/web/src/lib/require-template.ts',
+      source: 'require(`../features/example/value`)',
+      rules: ['lib-imports'],
+    },
+    {
+      file: 'apps/web/src/lib/shared-template.ts',
+      source: 'import(`@/lib/example/value`)',
+      rules: [],
+    },
+    {
+      file: 'apps/web/src/lib/import-type.ts',
+      source: "export type Value = import('@/features/example/value').Value",
+      rules: ['lib-imports'],
+      column: 21,
+    },
+    {
+      file: 'apps/web/src/lib/tests/helper.ts',
+      source: "export { value } from '@/features/example/value'",
+      rules: ['lib-imports'],
+    },
+    {
+      file: 'apps/web/src/lib/import-equals.ts',
+      source: "import value = require('@/features/example/value'); export { value }",
+      rules: ['lib-imports'],
+    },
+    {
+      file: 'apps/web/src/lib/documents/utils/runtime.ts',
+      source: "import { useState } from 'react'; export { useState }",
+      rules: ['document-dependencies'],
+    },
+    {
+      file: 'apps/web/src/lib/documents/utils/store.ts',
+      source: "export { store } from '@/lib/environments/state/store'",
+      rules: ['document-dependencies'],
+    },
+    {
+      file: 'apps/web/src/lib/documents/utils/dynamic.ts',
+      source: "import('./identity')",
+      rules: ['document-dependencies'],
+    },
+    {
+      file: 'apps/web/src/lib/documents/utils/computed.ts',
+      source: "const name = './identity'; import(name)",
+      rules: ['document-dependencies'],
+      column: 28,
+    },
+    {
+      file: 'apps/web/src/lib/documents/utils/require.ts',
+      source: "require('./identity')",
+      rules: ['document-dependencies'],
+    },
+    {
+      file: 'apps/web/src/lib/documents/utils/import-equals.ts',
+      source: "import value = require('./identity'); export { value }",
+      rules: ['document-dependencies'],
+    },
+    {
+      file: 'apps/web/src/lib/documents/utils/contract-runtime.ts',
+      source: "export { executable } from '@workspace/contracts'",
+      rules: ['document-dependencies'],
+    },
+    {
+      file: 'apps/web/src/features/editor/utils/classifier.ts',
+      source: "export const prefix = 'git-ref:'",
+      rules: ['document-codecs'],
+      column: 23,
+    },
+    {
+      file: 'apps/web/src/features/editor/utils/regex-classifier.ts',
+      source: 'export const pattern = /^git-ref:/',
+      rules: ['document-codecs'],
+      column: 24,
+    },
+    {
+      file: 'apps/web/src/lib/path-formatters.ts',
+      source: "export { value } from '@/features/example/value'",
+      rules: ['lib-imports', 'document-dependencies'],
+    },
+    {
+      file: 'packages/client-core/src/files/path.ts',
+      source: "export { useState } from 'react'",
+      rules: ['document-dependencies'],
+    },
+    {
+      file: 'apps/web/src/lib/documents/utils/identity.ts',
+      source: "import type { Value } from '@workspace/contracts'; export type Identity = Value",
+      rules: [],
+    },
+    {
+      file: 'apps/web/src/lib/documents/utils/codec.ts',
+      source:
+        "import { sessionIdSchema } from '@workspace/contracts'; export const prefix = 'git-ref:'; export { sessionIdSchema }",
+      rules: [],
+    },
+    {
+      file: 'apps/web/src/lib/documents/utils/shared.ts',
+      source: "export { value } from '@/lib/path-formatters'",
+      rules: [],
+    },
+    {
+      file: 'apps/web/src/lib/documents/utils/git-schemas.ts',
+      source:
+        "import { gitCommitOriginSchema, resolvedGitObjectIdSchema, gitSnapshotTargetSchema } from '@workspace/contracts'; export const schemas = [gitCommitOriginSchema, resolvedGitObjectIdSchema, gitSnapshotTargetSchema]",
+      rules: [],
+    },
+    {
+      file: 'apps/web/src/lib/documents/utils/git-runtime.ts',
+      source:
+        "import { gitSnapshotTargetSchema, executable } from '@workspace/contracts'; export const values = [gitSnapshotTargetSchema, executable]",
+      rules: ['document-dependencies'],
+    },
+    {
+      file: 'apps/web/src/lib/documents/utils/contract-type.ts',
+      source: "export type Value = import('@workspace/contracts').Value",
+      rules: [],
+    },
+    {
+      file: 'apps/web/src/features/editor/utils/consumer.ts',
+      source: "export type { Identity } from '@/lib/documents/utils/identity'",
+      rules: [],
+    },
+    {
+      file: 'apps/web/src/lib/tests/integration.test.ts',
+      source: "export { value } from '@/features/example/value'; export const id = 'git-ref:test'",
+      rules: [],
+    },
+    {
+      file: 'apps/web/src/lib/documents/tests/contracts.test-d.ts',
+      source: "export { save } from '@/features/editor/state/save-service'",
+      rules: [],
+    },
+    {
+      file: 'apps/web/src/features/settings/container-classes.ts',
+      source: "export const className = 'flex @max-3xl/settings:grid @3xl/settings:gap-2'",
+      rules: [],
+    },
+    {
+      file: 'apps/web/src/features/settings/invalid-mixed-prefix.ts',
+      column: 22,
+      source: "export const value = '@max-3xl/settings:grid settings:'",
+      rules: ['document-codecs'],
+    },
+    {
+      file: 'apps/web/test/factories/documents.ts',
+      source: "export const id = 'git-ref:test'",
+      rules: [],
+    },
+  ])
 
 test('the configured CLI rejects shared imports of features at their source and accepts controls', async () => {
   const fixture = await mkdtemp(join(tmpdir(), 'platform-web-boundaries-'))
@@ -248,8 +249,7 @@ test('the configured CLI rejects shared imports of features at their source and 
         join(fixture, '.oxlintrc.json'),
         '--format',
         'json',
-        ...probes.map((probe) => probe.file),
-      ],
+      ].concat(probes.map((probe) => probe.file)),
       { cwd: fixture, stderr: 'pipe', stdout: 'pipe' },
     )
     const [exitCode, output, errors] = await Promise.all([
@@ -350,8 +350,8 @@ function readDiagnostic(value: unknown): Diagnostic {
 
 function assertProbe(probe: Probe, diagnostics: readonly Diagnostic[]): void {
   const actual = diagnostics.filter((entry) => entry.filename === probe.file)
-  expect(actual.map((entry) => entry.code).toSorted(), probe.file).toEqual(
-    probe.rules.map((rule) => `${RULE_PREFIX}${rule})`).toSorted(),
+  expect(actual.map((entry) => entry.code).sort(), probe.file).toEqual(
+    probe.rules.map((rule) => `${RULE_PREFIX}${rule})`).sort(),
   )
   for (const entry of actual) {
     expect(entry.severity, probe.file).toBe('error')
@@ -491,8 +491,7 @@ async function lintFixture(fixture: string, files: readonly string[]) {
       join(fixture, '.oxlintrc.json'),
       '--format',
       'json',
-      ...files,
-    ],
+    ].concat(files),
     { cwd: fixture, stderr: 'pipe', stdout: 'pipe' },
   )
   const [exitCode, output, errors] = await Promise.all([

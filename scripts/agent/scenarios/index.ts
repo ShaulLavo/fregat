@@ -763,7 +763,7 @@ export const scenarios: readonly Scenario[] = [
   fileIcons,
   searchInputUndo,
   visualSearchPerformance,
-  ...visualSearchTiers,
+].concat(visualSearchTiers, [
   searchViewAllMatches,
   visualSearchHeaders,
   visualSearchScrollContent,
@@ -921,7 +921,7 @@ export const scenarios: readonly Scenario[] = [
   inlineRenameTree,
   filterFields,
   treeFileClicks,
-]
+])
 
 export function scenarioNamed(name: string): Scenario {
   const scenario = scenarios.find((entry) => entry.name === name)

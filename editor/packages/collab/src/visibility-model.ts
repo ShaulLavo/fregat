@@ -88,7 +88,7 @@ export class VisibilityModel {
       const character = this.characters.get(key)
       if (!character) throw new CollabFailure('oracle-unknown-delete')
       if (character.deletions.includes(operation)) continue
-      this.characters.set(key, { ...character, deletions: [...character.deletions, operation] })
+      this.characters.set(key, { ...character, deletions: character.deletions.concat([operation]) })
     }
   }
 }

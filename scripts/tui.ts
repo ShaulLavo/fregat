@@ -24,7 +24,7 @@ export async function launchTui({
   // The TUI stops its job group only when it or this launcher leads it.
   env.PLATFORM_TUI_LAUNCHER_PID = String(process.pid)
   const child = Bun.spawn({
-    cmd: [process.execPath, ...(watch ? ['--watch'] : []), entrypoint, ...args],
+    cmd: [process.execPath].concat(watch ? ['--watch'] : [], [entrypoint], args),
     cwd: path.join(root, 'apps/tui'),
     env,
     stdin: 'inherit',

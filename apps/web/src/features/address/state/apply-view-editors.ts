@@ -138,7 +138,7 @@ function orderTabs(contents: readonly TabContent[], { workspaceStore }: EditorAp
       group.id,
       {
         ...group,
-        tabs: [...group.tabs].sort(
+        tabs: group.tabs.toSorted(
           (a, b) =>
             (order.get(tabContentKey(a.content)) ?? Infinity) -
             (order.get(tabContentKey(b.content)) ?? Infinity),

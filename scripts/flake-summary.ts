@@ -35,11 +35,9 @@ function flakeRows(reports: readonly (VitestReport | null)[], root: string): Fla
     }
     for (const file of report.testResults ?? []) countFile(file, root, count)
   }
-  return [...failures]
-    .map(([test, total]) => ({ test, failures: total }))
-    .toSorted(
-      (left, right) => right.failures - left.failures || left.test.localeCompare(right.test),
-    )
+  return Array.from(failures, ([test, total]) => ({ test, failures: total })).sort(
+    (left, right) => right.failures - left.failures || left.test.localeCompare(right.test),
+  )
 }
 
 function countFile(file: FileResult, root: string, count: (test: string) => void) {

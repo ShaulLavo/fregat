@@ -23,7 +23,7 @@ export function geometrySample({
 
 export function percentile(values, fraction) {
   if (!values.length) return null
-  const sorted = values.slice().sort((a, b) => a - b)
+  const sorted = values.toSorted((a, b) => a - b)
   return sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)]
 }
 

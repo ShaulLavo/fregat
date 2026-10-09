@@ -88,9 +88,9 @@ function zedCollisions(binding: PlatformKeyBinding, platform: Platform) {
 function contextsOverlap(left: string, right: string): boolean {
   const a = parseContextPredicate(left)
   const b = parseContextPredicate(right)
-  return [...stacks(a), ...stacks(b)].some(
-    (stack) => predicateDepth(a, stack) !== null && predicateDepth(b, stack) !== null,
-  )
+  return stacks(a)
+    .concat(stacks(b))
+    .some((stack) => predicateDepth(a, stack) !== null && predicateDepth(b, stack) !== null)
 }
 
 type Frame = {
@@ -99,10 +99,11 @@ type Frame = {
 }
 
 function stacks(predicate: ContextPredicate): readonly KeyContext[][] {
-  return witnesses(predicate).map((frames) => [
-    createKeyContext({ identifiers: ['Workspace'] }),
-    ...frames.map((frame) => createKeyContext(frame)),
-  ])
+  return witnesses(predicate).map((frames) =>
+    [createKeyContext({ identifiers: ['Workspace'] })].concat(
+      frames.map((frame) => createKeyContext(frame)),
+    ),
+  )
 }
 
 function witnesses(predicate: ContextPredicate): readonly (readonly Frame[])[] {
@@ -115,10 +116,10 @@ function witnesses(predicate: ContextPredicate): readonly (readonly Frame[])[] {
     case 'not':
       return [[{ identifiers: [], values: [] }]]
     case 'or':
-      return [...witnesses(predicate.left), ...witnesses(predicate.right)]
+      return witnesses(predicate.left).concat(witnesses(predicate.right))
     case 'descendant':
       return witnesses(predicate.parent).flatMap((parent) =>
-        witnesses(predicate.child).map((child) => [...parent, ...child]),
+        witnesses(predicate.child).map((child) => parent.concat(child)),
       )
     case 'and':
       return witnesses(predicate.left).flatMap((left) =>
@@ -131,11 +132,10 @@ function mergeInnermost(left: readonly Frame[], right: readonly Frame[]): readon
   const [long, short] = left.length >= right.length ? [left, right] : [right, left]
   const inner = long.at(-1)!
   const other = short.at(-1)!
-  return [
-    ...long.slice(0, -1),
+  return long.slice(0, -1).concat([
     {
-      identifiers: [...inner.identifiers, ...other.identifiers],
-      values: [...inner.values, ...other.values],
+      identifiers: inner.identifiers.concat(other.identifiers),
+      values: inner.values.concat(other.values),
     },
-  ]
+  ])
 }

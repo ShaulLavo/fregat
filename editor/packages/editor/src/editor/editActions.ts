@@ -405,7 +405,7 @@ function sortLinesAction(
       rows.push(lineContentText(map, row))
     }
 
-    const sorted = rows.toSorted((left, right) => left.localeCompare(right))
+    const sorted = rows.sort((left, right) => left.localeCompare(right))
     if (direction === 'descending') sorted.reverse()
 
     edits.push({
@@ -669,10 +669,9 @@ export function listItemLineBreak(
   const inserted = `\n${leader.indent}${continuedLeader(leader)}`
   return {
     caretOffset: options.caretOffset + inserted.length,
-    edits: [
-      { from: options.caretOffset, text: inserted, to: options.caretOffset },
-      ...renumberedItemEdits(options, leader),
-    ],
+    edits: [{ from: options.caretOffset, text: inserted, to: options.caretOffset }].concat(
+      renumberedItemEdits(options, leader),
+    ),
   }
 }
 
@@ -1372,8 +1371,8 @@ function collapseSelectionsAfterRanges(
   return selections
 }
 
-function mergeOffsetRanges(ranges: readonly OffsetRange[]): readonly OffsetRange[] {
-  const sorted = ranges.toSorted((left, right) => left.start - right.start || left.end - right.end)
+function mergeOffsetRanges(ranges: OffsetRange[]): readonly OffsetRange[] {
+  const sorted = ranges.sort((left, right) => left.start - right.start || left.end - right.end)
   const merged: OffsetRange[] = []
 
   for (const range of sorted) {

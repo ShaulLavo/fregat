@@ -234,14 +234,14 @@ function animateSteppedClip(
   const frames = steppedFrames(stops, (width) => ({
     clipPath: `inset(0 calc(100% - ${left + width}px) 0 0)`,
   }))
-  return element.animate(
-    [{ clipPath: `inset(0 calc(100% - ${left}px) 0 0)`, offset: 0, easing: 'step-end' }, ...frames],
-    {
-      duration: item.duration,
-      delay: item.delay,
-      fill: 'both',
-    },
-  )
+  const initial: Keyframe[] = [
+    { clipPath: `inset(0 calc(100% - ${left}px) 0 0)`, offset: 0, easing: 'step-end' },
+  ]
+  return element.animate(initial.concat(frames), {
+    duration: item.duration,
+    delay: item.delay,
+    fill: 'both',
+  })
 }
 
 function animateSteppedCaret(
@@ -250,7 +250,8 @@ function animateSteppedCaret(
   item: ScheduleItem,
 ): Animation {
   const frames = steppedFrames(stops, (width) => ({ transform: `translateX(${width}px)` }))
-  return caret.animate([{ transform: 'translateX(0)', offset: 0, easing: 'step-end' }, ...frames], {
+  const initial: Keyframe[] = [{ transform: 'translateX(0)', offset: 0, easing: 'step-end' }]
+  return caret.animate(initial.concat(frames), {
     duration: item.duration,
     delay: item.delay,
     fill: 'both',

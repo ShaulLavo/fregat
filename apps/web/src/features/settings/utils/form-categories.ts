@@ -121,14 +121,14 @@ function withChildrenUnderParents(ids: readonly SettingId[]): SettingId[] {
     const parent = settingParentId(id)
     if (parent === undefined || !present.has(parent)) continue
 
-    childrenOf.set(parent, [...(childrenOf.get(parent) ?? []), id])
+    childrenOf.set(parent, (childrenOf.get(parent) ?? []).concat([id]))
   }
 
   return ids.flatMap((id) => {
     const parent = settingParentId(id)
     if (parent !== undefined && present.has(parent)) return []
 
-    return [id, ...(childrenOf.get(id) ?? [])]
+    return [id].concat(childrenOf.get(id) ?? [])
   })
 }
 

@@ -3,7 +3,7 @@ import Manual from '../../layouts/Manual.astro'
 import { MANUAL_PAGES, MANUAL_SOURCES, NAV, renderPage } from '../../manual/content'
 
 export function getStaticPaths() {
-  return [...MANUAL_SOURCES.keys()].map((file) => ({
+  return Array.from(MANUAL_SOURCES.keys(), (file) => ({
     params: { slug: file.replace(/\.md$/, '') },
     props: { file },
   }))

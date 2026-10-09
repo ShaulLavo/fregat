@@ -46,7 +46,7 @@ export const treeLargeScroll: Scenario = {
       await page.waitForTimeout(1500)
       await step('expanded')
       await selectors.folderTree(page).hover()
-      const deltas = [...Array(16).fill(100), ...Array(4).fill(2000), ...Array(4).fill(-100)]
+      const deltas = Array(16).fill(100).concat(Array(4).fill(2000), Array(4).fill(-100))
       for (const [index, delta] of deltas.entries()) {
         await page.mouse.wheel(0, delta)
         await page.waitForTimeout(250)

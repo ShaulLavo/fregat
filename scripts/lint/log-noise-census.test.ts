@@ -48,10 +48,11 @@ function census(allow: Record<string, string> = {}) {
 
 test('a group over its daily budget is noise', async () => {
   const quiet = { level: 'warn', area: 'git', action: 'git.status' }
-  writeLog([
-    ...Array.from({ length: 51 }, (_, index) => line(index * 20, reaper)),
-    ...Array.from({ length: 3 }, (_, index) => line(index, quiet)),
-  ])
+  writeLog(
+    Array.from({ length: 51 }, (_, index) => line(index * 20, reaper)).concat(
+      Array.from({ length: 3 }, (_, index) => line(index, quiet)),
+    ),
+  )
 
   const result = await census()
 
@@ -89,11 +90,14 @@ test('an allow entry with a reason excuses a group, and one without a reason fai
 })
 
 test('checkpoint lines and info lines are not counted', async () => {
-  writeLog([
-    ...Array.from({ length: 60 }, (_, index) => line(index, { ...reaper, checkpoint: 'failure' })),
-    ...Array.from({ length: 60 }, (_, index) => line(index, { ...reaper, level: 'info' })),
-    line(1, reaper),
-  ])
+  writeLog(
+    Array.from({ length: 60 }, (_, index) =>
+      line(index, { ...reaper, checkpoint: 'failure' }),
+    ).concat(
+      Array.from({ length: 60 }, (_, index) => line(index, { ...reaper, level: 'info' })),
+      [line(1, reaper)],
+    ),
+  )
 
   const result = await census()
 

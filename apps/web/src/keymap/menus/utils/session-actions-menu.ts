@@ -102,9 +102,8 @@ export function sessionActionsMenu(
   context: SessionActionsMenuContext,
   contributions: SessionMenuContributions = {},
 ): Menu {
-  return [
-    ...(contributions.open ? [contributions.open] : []),
-    ...(context.lifecycle && !context.archived
+  return (contributions.open ? [contributions.open] : []).concat(
+    context.lifecycle && !context.archived
       ? [
           section('lifecycle', [
             context.lifecycle.settlement &&
@@ -141,118 +140,122 @@ export function sessionActionsMenu(
               }),
           ]),
         ]
-      : []),
-    section('edit', [
-      context.canMarkUnread &&
+      : [],
+    [
+      section('edit', [
+        context.canMarkUnread &&
+          actionItem({
+            icon: EnvelopeSimpleIcon,
+            id: 'markUnread',
+            label: 'Mark as unread',
+            run: context.markUnread,
+          }),
+        context.woke &&
+          actionItem({
+            icon: AlarmIcon,
+            id: 'acknowledgeWake',
+            label: 'Acknowledge wake',
+            run: context.acknowledgeWake,
+          }),
         actionItem({
-          icon: EnvelopeSimpleIcon,
-          id: 'markUnread',
-          label: 'Mark as unread',
-          run: context.markUnread,
+          icon: PencilSimpleIcon,
+          id: 'rename',
+          label: 'Rename',
+          run: context.rename,
+          takesFocus: true,
         }),
-      context.woke &&
+        context.titleGeneration?.supported
+          ? actionItem({
+              icon: ArrowsClockwiseIcon,
+              id: 'regenerateTitle',
+              label: titleGenerationLabel(context.titleGeneration),
+              disabled: context.titleGeneration.pending || context.titleGeneration.requesting,
+              run: context.titleGeneration.regenerate,
+            })
+          : false,
+        !context.archived &&
+          actionItem({
+            icon: ArchiveIcon,
+            id: 'archive',
+            label: 'Archive',
+            run: context.archive,
+          }),
+        context.archived &&
+          actionItem({
+            icon: ArrowUUpLeftIcon,
+            id: 'unarchive',
+            label: 'Unarchive',
+            run: context.unarchive,
+          }),
         actionItem({
-          icon: AlarmIcon,
-          id: 'acknowledgeWake',
-          label: 'Acknowledge wake',
-          run: context.acknowledgeWake,
+          destructive: true,
+          icon: TrashIcon,
+          id: 'delete',
+          label: 'Delete',
+          run: context.deleteSession,
         }),
-      actionItem({
-        icon: PencilSimpleIcon,
-        id: 'rename',
-        label: 'Rename',
-        run: context.rename,
-        takesFocus: true,
-      }),
-      context.titleGeneration?.supported
-        ? actionItem({
-            icon: ArrowsClockwiseIcon,
-            id: 'regenerateTitle',
-            label: titleGenerationLabel(context.titleGeneration),
-            disabled: context.titleGeneration.pending || context.titleGeneration.requesting,
-            run: context.titleGeneration.regenerate,
-          })
-        : false,
-      !context.archived &&
-        actionItem({
-          icon: ArchiveIcon,
-          id: 'archive',
-          label: 'Archive',
-          run: context.archive,
-        }),
-      context.archived &&
-        actionItem({
-          icon: ArrowUUpLeftIcon,
-          id: 'unarchive',
-          label: 'Unarchive',
-          run: context.unarchive,
-        }),
-      actionItem({
-        destructive: true,
-        icon: TrashIcon,
-        id: 'delete',
-        label: 'Delete',
-        run: context.deleteSession,
-      }),
-    ]),
-    section('copy', [
-      actionItem({ icon: CopyIcon, id: 'copyPath', label: 'Copy Path', run: context.copyPath }),
-      context.copyBranch &&
+      ]),
+      section('copy', [
+        actionItem({ icon: CopyIcon, id: 'copyPath', label: 'Copy Path', run: context.copyPath }),
+        context.copyBranch &&
+          actionItem({
+            icon: CopyIcon,
+            id: 'copyBranch',
+            label: 'Copy Branch',
+            run: context.copyBranch,
+          }),
         actionItem({
           icon: CopyIcon,
-          id: 'copyBranch',
-          label: 'Copy Branch',
-          run: context.copyBranch,
+          id: 'copySessionId',
+          label: 'Copy Session ID',
+          run: context.copySessionId,
         }),
-      actionItem({
-        icon: CopyIcon,
-        id: 'copySessionId',
-        label: 'Copy Session ID',
-        run: context.copySessionId,
-      }),
-    ]),
-    section('export', [
-      actionItem({
-        disabled: !context.hasMessages,
-        icon: MarkdownLogoIcon,
-        id: 'copyTranscript',
-        label: 'Copy as Markdown',
-        run: context.copyTranscript,
-      }),
-      actionItem({
-        disabled: !context.hasMessages,
-        icon: DownloadSimpleIcon,
-        id: 'exportMarkdown',
-        label: 'Export as Markdown…',
-        run: () => context.exportTranscript('markdown'),
-      }),
-      actionItem({
-        disabled: !context.hasMessages,
-        icon: BracketsCurlyIcon,
-        id: 'exportJson',
-        label: 'Export as JSON…',
-        run: () => context.exportTranscript('json'),
-      }),
-    ]),
-    ...(contributions.project ? [contributions.project] : []),
-    section('agent', [
-      context.compact &&
+      ]),
+      section('export', [
         actionItem({
-          disabled: context.compactPending,
-          icon: ArrowsInIcon,
-          id: 'compact',
-          label: 'Compact Conversation',
-          run: context.compact,
+          disabled: !context.hasMessages,
+          icon: MarkdownLogoIcon,
+          id: 'copyTranscript',
+          label: 'Copy as Markdown',
+          run: context.copyTranscript,
         }),
-      context.canStopAgent &&
         actionItem({
-          icon: StopCircleIcon,
-          id: 'stopAgent',
-          label: 'Stop Agent Session',
-          run: context.stopAgent,
+          disabled: !context.hasMessages,
+          icon: DownloadSimpleIcon,
+          id: 'exportMarkdown',
+          label: 'Export as Markdown…',
+          run: () => context.exportTranscript('markdown'),
         }),
-    ]),
-  ]
+        actionItem({
+          disabled: !context.hasMessages,
+          icon: BracketsCurlyIcon,
+          id: 'exportJson',
+          label: 'Export as JSON…',
+          run: () => context.exportTranscript('json'),
+        }),
+      ]),
+    ],
+    contributions.project ? [contributions.project] : [],
+    [
+      section('agent', [
+        context.compact &&
+          actionItem({
+            disabled: context.compactPending,
+            icon: ArrowsInIcon,
+            id: 'compact',
+            label: 'Compact Conversation',
+            run: context.compact,
+          }),
+        context.canStopAgent &&
+          actionItem({
+            icon: StopCircleIcon,
+            id: 'stopAgent',
+            label: 'Stop Agent Session',
+            run: context.stopAgent,
+          }),
+      ]),
+    ],
+  )
 }
 
 function titleGenerationLabel(state: { readonly pending: boolean; readonly error: string | null }) {

@@ -70,7 +70,7 @@ type PublicTypesAreNameable = PublicTypeAllowlist extends readonly unknown[] ? t
 const publicTypesAreNameable: PublicTypesAreNameable = true
 
 test('exports the model and the helpers the app view renders with', () => {
-  expect(Object.keys(treePackage).toSorted()).toEqual([
+  expect(Object.keys(treePackage).sort()).toEqual([
     'FileTreeController',
     'GIT_STATUS_DESCENDANT_TITLE',
     'GIT_STATUS_LABEL',

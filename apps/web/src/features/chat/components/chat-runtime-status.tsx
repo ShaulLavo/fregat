@@ -44,7 +44,7 @@ export function ChatRuntimeStatus({
     if (!alert.dismissKey) return
 
     const dismissKey = alert.dismissKey
-    setDismissedKeys((keys) => (keys.includes(dismissKey) ? keys : [...keys, dismissKey]))
+    setDismissedKeys((keys) => (keys.includes(dismissKey) ? keys : keys.concat([dismissKey])))
   }
 
   return (

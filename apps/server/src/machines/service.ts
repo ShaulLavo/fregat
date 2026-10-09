@@ -1,4 +1,9 @@
-import type { MachineConnectionState, Machines, SshMachineDefinition } from '@workspace/contracts'
+import type {
+  MachineConnectionState,
+  MachineEvent,
+  Machines,
+  SshMachineDefinition,
+} from '@workspace/contracts'
 import { createHash } from 'node:crypto'
 import { recordProcessError } from '../observability/runtime'
 import { createSshAuthentication } from './authentication'
@@ -208,12 +213,12 @@ export class MachineService {
     const initial = [...this.entries.values()].flatMap((entry) =>
       entry.launcher
         .listStates()
-        .map((state) => ({ kind: 'state' as const, state: connectionState(entry, state) })),
+        .map<MachineEvent>((state) => ({ kind: 'state', state: connectionState(entry, state) })),
     )
     try {
       yield* this.events.subscribe(
         client,
-        [...initial, { kind: 'auth', prompt: this.prompts.current(client) }],
+        initial.concat([{ kind: 'auth', prompt: this.prompts.current(client) }]),
         signal,
       )
     } finally {

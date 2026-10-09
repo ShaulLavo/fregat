@@ -53,7 +53,7 @@ export function useComposerInbox(
   useEffect(() => {
     if (pending.length === 0) return
 
-    const rootPaths = [rootPath, ...(aliasKey ? aliasKey.split('\0') : [])]
+    const rootPaths = [rootPath].concat(aliasKey ? aliasKey.split('\0') : [])
     drain(editorReady, { environmentId, rootPaths })
   }, [aliasKey, editorReady, environmentId, pending, rootPath])
 }

@@ -85,7 +85,7 @@ export function finishRun(stateDir: string, id: string): readonly JobDuringRun[]
       journal[id] = { ...journal[id], endedAt }
       writeJson(journalFile(stateDir, measurement.id), journal)
     }
-    const jobs = Object.values(readJournal(stateDir, id)).toSorted(
+    const jobs = Object.values(readJournal(stateDir, id)).sort(
       (a, b) => a.startedAt.localeCompare(b.startedAt) || a.id.localeCompare(b.id),
     )
     removeRun(stateDir, id)

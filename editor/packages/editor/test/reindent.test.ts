@@ -328,7 +328,7 @@ function selection(start: number, end = start): ResolvedSelection {
 
 function applyEdits(text: string, edits: readonly TextEdit[]): string {
   let out = text
-  for (const edit of [...edits].sort((left, right) => right.from - left.from)) {
+  for (const edit of edits.toSorted((left, right) => right.from - left.from)) {
     out = out.slice(0, edit.from) + edit.text + out.slice(edit.to)
   }
 

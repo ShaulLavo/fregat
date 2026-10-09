@@ -20,5 +20,5 @@ export function compileLikeBuild(file, source) {
     ...options,
     reactCompiler: { panicThreshold: 'all_errors' },
   })
-  return { code: built.code, errors: [...built.errors, ...checked.errors] }
+  return { code: built.code, errors: built.errors.concat(checked.errors) }
 }

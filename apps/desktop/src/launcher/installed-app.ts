@@ -7,9 +7,9 @@ export function installedIdentity(url: string) {
   // Chromium hashes the URL twice, with the second hash consuming the first raw digest.
   const manifestDigest = createHash('sha256').update(manifestId).digest()
   const digest = createHash('sha256').update(manifestDigest).digest('hex').slice(0, 32)
-  const appId = [...digest]
-    .map((digit) => String.fromCharCode(97 + Number.parseInt(digit, 16)))
-    .join('')
+  const appId = Array.from(digest, (digit) =>
+    String.fromCharCode(97 + Number.parseInt(digit, 16)),
+  ).join('')
   return { manifestId, appId }
 }
 

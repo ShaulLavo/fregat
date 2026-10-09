@@ -1828,7 +1828,7 @@ export async function codeThemePickerIds(page: Page): Promise<string[]> {
  */
 export function paintedTokenWords(target: Locator): Promise<[string, string][]> {
   return target.evaluate((element) => {
-    const sheets = [...document.styleSheets, ...document.adoptedStyleSheets]
+    const sheets = Array.from(document.styleSheets).concat(document.adoptedStyleSheets)
     const rules = sheets.flatMap((sheet) => {
       try {
         return [...sheet.cssRules]

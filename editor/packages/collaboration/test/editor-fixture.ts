@@ -62,7 +62,7 @@ export class EditorRoom {
   }
 
   texts(): readonly string[] {
-    return [...this.alive].map((index) =>
+    return Array.from(this.alive, (index) =>
       this.editors[index]!.getTextSnapshot().materializeFullText(),
     )
   }

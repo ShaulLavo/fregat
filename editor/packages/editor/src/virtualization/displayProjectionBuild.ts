@@ -29,7 +29,9 @@ export function buildContext(
     config.foldMap?.ranges
       .map((range) => ({ start: range.startPoint.row + 1, end: range.endPoint.row + 1 }))
       .filter((range) => range.end > range.start) ?? []
-  const rows = new Set([...(config.inlineMap?.rowReplacements.keys() ?? []), ...injected.keys()])
+  const rows = new Set(
+    Array.from(config.inlineMap?.rowReplacements.keys() ?? []).concat(Array.from(injected.keys())),
+  )
   return {
     snapshot,
     config,
@@ -46,7 +48,7 @@ function indexInjections(
   const map = new Map<number, InjectedTextRow[]>()
   const sorted = inputs
     .filter((input) => input.id.length > 0 && input.anchorBufferRow >= 0)
-    .toSorted(
+    .sort(
       (a, b) =>
         a.anchorBufferRow - b.anchorBufferRow ||
         placement(a) - placement(b) ||
@@ -156,9 +158,9 @@ export function injectedRowCount(rows: readonly InjectedSummary[]): number {
   return rows.reduce((sum, row) => sum + row.wrap.rows, 0)
 }
 
-export function mergeLineRanges(ranges: readonly SourceLineRange[]): SourceLineRange[] {
+export function mergeLineRanges(ranges: SourceLineRange[]): SourceLineRange[] {
   const merged: SourceLineRange[] = []
-  for (const range of ranges.toSorted((a, b) => a.start - b.start)) {
+  for (const range of ranges.sort((a, b) => a.start - b.start)) {
     const previous = merged.at(-1)
     if (previous && range.start <= previous.end) {
       merged[merged.length - 1] = { start: previous.start, end: Math.max(previous.end, range.end) }

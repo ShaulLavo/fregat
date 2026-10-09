@@ -221,17 +221,19 @@ function toJson(census, result, roots) {
 
 function formatReport(census, result, roots) {
   const described = roots.map(({ root, files }) => `${root} ${files}`).join(', ')
-  return [
-    `React Compiler census — ${census.files} .ts/.tsx files: ${described}`,
-    '',
-    ...MEASURES.filter((measure) => TARGETS[measure].histogram).map(
-      (measure) => `${formatHistogram(TARGETS[measure].title, census.hits[measure])}\n`,
-    ),
-    `${formatList(`${TARGETS.bailouts.title} outside the allow-list`, result.offenders.bailouts)}\n`,
-    `${formatList(TARGETS.unclassified.title, census.hits.unclassified)}\n`,
-    formatGate(result),
-    '',
-  ].join('\n')
+  return [`React Compiler census — ${census.files} .ts/.tsx files: ${described}`, '']
+    .concat(
+      MEASURES.filter((measure) => TARGETS[measure].histogram).map(
+        (measure) => `${formatHistogram(TARGETS[measure].title, census.hits[measure])}\n`,
+      ),
+      [
+        `${formatList(`${TARGETS.bailouts.title} outside the allow-list`, result.offenders.bailouts)}\n`,
+        `${formatList(TARGETS.unclassified.title, census.hits.unclassified)}\n`,
+        formatGate(result),
+        '',
+      ],
+    )
+    .join('\n')
 }
 
 function walkRoots(roots) {

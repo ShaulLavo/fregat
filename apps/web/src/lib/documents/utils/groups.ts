@@ -99,7 +99,7 @@ export function openTabInGroups(
 
   const root = replaceNode(groups.root, groupId, {
     ...group,
-    tabs: [...group.tabs, tab],
+    tabs: group.tabs.concat([tab]),
     selectedTabId: tab.id,
   })
   return { root, activeGroupId: groupId }
@@ -244,7 +244,7 @@ function uniqueGroupTabs(group: EditorGroup): readonly EditorTabRecord[] {
     byContent.set(key, tab)
   }
   if (byContent.size === group.tabs.length) return group.tabs
-  return [...byContent.values()]
+  return Array.from(byContent.values())
 }
 
 export function normalizedSelection(selected: TabId | null, tabs: readonly EditorTabRecord[]) {

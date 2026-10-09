@@ -7,10 +7,11 @@ import { bundledLanguages, bundledLanguagesInfo } from 'shiki/langs'
 type BundledLanguageId = keyof typeof bundledLanguages
 
 const GRAMMAR_BY_ALIAS: ReadonlyMap<string, BundledLanguageId> = new Map(
-  bundledLanguagesInfo.flatMap((info) => [
-    [info.id, info.id as BundledLanguageId] as const,
-    ...(info.aliases ?? []).map((alias) => [alias, info.id as BundledLanguageId] as const),
-  ]),
+  bundledLanguagesInfo.flatMap((info) =>
+    [[info.id, info.id as BundledLanguageId] as const].concat(
+      (info.aliases ?? []).map((alias) => [alias, info.id as BundledLanguageId] as const),
+    ),
+  ),
 )
 
 // Editor language ids whose grammar name differs from every Shiki alias.
@@ -31,9 +32,9 @@ export function highlightingGrammar(language: string): BundledLanguageId | null 
 
 /** Every editor language id Shiki can color, for the document highlighter's language map. */
 export const HIGHLIGHTING_DOCUMENT_LANGUAGES: ShikiLanguageMap = Object.fromEntries(
-  [...GRAMMAR_BY_ALIAS, ...Object.entries(EDITOR_LANGUAGE_GRAMMARS)].filter(
-    ([id]) => !EXTENSION_INFERRED_LANGUAGES.has(id),
-  ),
+  Array.from(GRAMMAR_BY_ALIAS)
+    .concat(Object.entries(EDITOR_LANGUAGE_GRAMMARS))
+    .filter(([id]) => !EXTENSION_INFERRED_LANGUAGES.has(id)),
 )
 
 export async function loadGrammar(

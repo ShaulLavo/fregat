@@ -113,9 +113,7 @@ function build(kind, rounds) {
   }
 }
 const percentile = (values, fraction) =>
-  values.toSorted((a, b) => a - b)[
-    Math.min(values.length - 1, Math.floor(values.length * fraction))
-  ]
+  values.sort((a, b) => a - b)[Math.min(values.length - 1, Math.floor(values.length * fraction))]
 function summarize(values) {
   return {
     count: values.length,

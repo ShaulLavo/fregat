@@ -97,12 +97,14 @@ export function liveCheckUnit(target: LiveCheckTarget, root: string): string[] {
     '--expand-environment=no',
     `--unit=${liveCheckUnitName(target)}`,
     `--working-directory=${command.cwd}`,
-    ...setenv,
-    '--property=RuntimeMaxSec=600',
-    // The guarded notifier: a rollback target may predate the SIGUSR2 handler.
-    `--property=ExecStopPost=-${process.execPath} ${path.join(root, 'bin/promote.ts')} notify`,
-    ...command.argv,
-  ]
+  ].concat(
+    setenv,
+    [
+      '--property=RuntimeMaxSec=600', // The guarded notifier: a rollback target may predate the SIGUSR2 handler.
+      `--property=ExecStopPost=-${process.execPath} ${path.join(root, 'bin/promote.ts')} notify`,
+    ],
+    command.argv,
+  )
 }
 
 /** Clears the target's stale verdict and starts the check unit; returns its name, or null. */

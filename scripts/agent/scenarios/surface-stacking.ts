@@ -124,7 +124,7 @@ function scan() {
           box: `${Math.round(box.width)}x${Math.round(box.height)}@${Math.round(box.x)},${Math.round(box.y)}`,
         })
       }
-      next = [...stack, { node, color, alpha }]
+      next = stack.concat([{ node, color, alpha }])
     }
     for (const child of Array.from(node.children)) visit(child, next)
   }

@@ -24,7 +24,8 @@ export function turnTreeRows(
     const fileRow: TurnTreeRow = { kind: 'file', id: `file:${file.path}`, file, diff }
     if (!diff) return [fileRow]
     const own = hunks.filter((row) => row.file === diff)
-    return [fileRow, ...own.map((row) => ({ ...row, kind: 'hunk' as const, path: file.path }))]
+    const fileRows: TurnTreeRow[] = [fileRow]
+    return fileRows.concat(own.map((row) => ({ ...row, kind: 'hunk' as const, path: file.path })))
   })
   return { count: hunks.length, rows }
 }

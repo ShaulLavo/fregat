@@ -42,9 +42,8 @@ import {
  * `spelling`, which the caller builds for the word under the pointer.
  */
 export function editorTextMenu(spelling: MenuSection | null = null, markdown = false): Menu {
-  return [
-    ...(spelling ? [spelling] : []),
-    ...(markdown
+  return (spelling ? [spelling] : []).concat(
+    markdown
       ? [
           section('markdown', [
             submenuItem({
@@ -69,91 +68,92 @@ export function editorTextMenu(spelling: MenuSection | null = null, markdown = f
             }),
           ]),
         ]
-      : []),
-    section('navigate', [
-      commandItem('editor.action.goToDefinition', {
-        icon: ArrowSquareOutIcon,
-        label: 'Go to Definition',
-      }),
-      commandItem('editor.action.goToTypeDefinition', {
-        icon: BracketsCurlyIcon,
-        label: 'Go to Type Definition',
-      }),
-      commandItem('editor.action.goToImplementation', {
-        icon: GitForkIcon,
-        label: 'Go to Implementations',
-      }),
-      commandItem('editor.action.goToReferences', {
-        icon: ListMagnifyingGlassIcon,
-        label: 'Find All References',
-      }),
-      commandItem('editor.action.peekDefinition', {
-        icon: EyeIcon,
-        label: 'Peek Definition',
-      }),
-      commandItem('editor.action.revealDefinitionAside', {
-        icon: ColumnsPlusRightIcon,
-        label: 'Open Definition to the Side',
-      }),
-    ]),
-    section('chat', [
-      commandItem('workspace.addSelectionToChat', {
-        icon: ChatCircleIcon,
-        label: 'Add Selection to Chat',
-      }),
-      commandItem('workspace.addFileToChat', {
-        icon: ChatCircleTextIcon,
-        label: 'Add File to Chat',
-      }),
-    ]),
-    section('edit', [
-      commandItem('editor.action.changeAll', {
-        icon: CursorTextIcon,
-        label: 'Change All Occurrences',
-      }),
-      commandItem('editor.action.commentLine', {
-        icon: CodeIcon,
-        label: 'Toggle Line Comment',
-      }),
-      commandItem('editor.action.blockComment', {
-        icon: CodeBlockIcon,
-        label: 'Toggle Block Comment',
-      }),
-      commandItem('editor.action.rename', {
-        icon: PencilSimpleIcon,
-        label: 'Rename Symbol',
-      }),
-      commandItem('editor.action.formatDocument', {
-        icon: MagicWandIcon,
-        label: 'Format Document',
-      }),
-    ]),
-    // Acts on the active editor, the same surface the caret commands above target —
-    // a right-click never moves the caret or the active tab.
-    //
-    // Revert File is deliberately not here. Unlike VS Code's, our revert rebuilds
-    // the buffer and so discards undo history (workspace-document-service
-    // replacementRecord), making it unrecoverable; it stays in the palette, where
-    // running it is a deliberate act rather than a misclick.
-    section('file', [
-      commandItem('workspace.saveFile', {
-        icon: FloppyDiskIcon,
-        label: 'Save',
-      }),
-      commandItem('workspace.compareWithSaved', {
-        icon: GitDiffIcon,
-        label: 'Compare with Saved',
-      }),
-      commandItem('workspace.openFileAtHead', {
-        icon: ClockCounterClockwiseIcon,
-        label: 'Open File at HEAD',
-      }),
-    ]),
-    section('palette', [
-      commandItem('workspace.showCommandPalette', {
-        icon: CommandIcon,
-        label: 'Command Palette…',
-      }),
-    ]),
-  ]
+      : [],
+    [
+      section('navigate', [
+        commandItem('editor.action.goToDefinition', {
+          icon: ArrowSquareOutIcon,
+          label: 'Go to Definition',
+        }),
+        commandItem('editor.action.goToTypeDefinition', {
+          icon: BracketsCurlyIcon,
+          label: 'Go to Type Definition',
+        }),
+        commandItem('editor.action.goToImplementation', {
+          icon: GitForkIcon,
+          label: 'Go to Implementations',
+        }),
+        commandItem('editor.action.goToReferences', {
+          icon: ListMagnifyingGlassIcon,
+          label: 'Find All References',
+        }),
+        commandItem('editor.action.peekDefinition', {
+          icon: EyeIcon,
+          label: 'Peek Definition',
+        }),
+        commandItem('editor.action.revealDefinitionAside', {
+          icon: ColumnsPlusRightIcon,
+          label: 'Open Definition to the Side',
+        }),
+      ]),
+      section('chat', [
+        commandItem('workspace.addSelectionToChat', {
+          icon: ChatCircleIcon,
+          label: 'Add Selection to Chat',
+        }),
+        commandItem('workspace.addFileToChat', {
+          icon: ChatCircleTextIcon,
+          label: 'Add File to Chat',
+        }),
+      ]),
+      section('edit', [
+        commandItem('editor.action.changeAll', {
+          icon: CursorTextIcon,
+          label: 'Change All Occurrences',
+        }),
+        commandItem('editor.action.commentLine', {
+          icon: CodeIcon,
+          label: 'Toggle Line Comment',
+        }),
+        commandItem('editor.action.blockComment', {
+          icon: CodeBlockIcon,
+          label: 'Toggle Block Comment',
+        }),
+        commandItem('editor.action.rename', {
+          icon: PencilSimpleIcon,
+          label: 'Rename Symbol',
+        }),
+        commandItem('editor.action.formatDocument', {
+          icon: MagicWandIcon,
+          label: 'Format Document',
+        }),
+      ]), // Acts on the active editor, the same surface the caret commands above target —
+      // a right-click never moves the caret or the active tab.
+      //
+      // Revert File is deliberately not here. Unlike VS Code's, our revert rebuilds
+      // the buffer and so discards undo history (workspace-document-service
+      // replacementRecord), making it unrecoverable; it stays in the palette, where
+      // running it is a deliberate act rather than a misclick.
+      section('file', [
+        commandItem('workspace.saveFile', {
+          icon: FloppyDiskIcon,
+          label: 'Save',
+        }),
+        commandItem('workspace.compareWithSaved', {
+          icon: GitDiffIcon,
+          label: 'Compare with Saved',
+        }),
+        commandItem('workspace.openFileAtHead', {
+          icon: ClockCounterClockwiseIcon,
+          label: 'Open File at HEAD',
+        }),
+      ]),
+      section('palette', [
+        commandItem('workspace.showCommandPalette', {
+          icon: CommandIcon,
+          label: 'Command Palette…',
+        }),
+      ]),
+    ],
+  )
 }

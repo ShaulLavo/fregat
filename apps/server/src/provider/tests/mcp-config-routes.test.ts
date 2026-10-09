@@ -81,19 +81,20 @@ function fakeProbe(configDir: string, probes: Options[]): ClaudeCreateQuery {
         reads += 1
         const user = servers(await readJson(path.join(configDir, '.claude.json')), 'mcpServers')
         const project = servers(await readJson(path.join(cwd, '.mcp.json')), 'mcpServers')
-        return [
-          ...Object.entries(user).map(([name, config]) => ({
+        return Object.entries(user)
+          .map<McpServerStatus>(([name, config]) => ({
             config: config as McpServerStatus['config'],
             name,
             source: 'user',
             // The first read finds servers still starting; the probe waits them out.
             status: reads === 1 ? ('pending' as const) : ('connected' as const),
             tools: [{ name: 'search' }],
-          })),
-          ...Object.keys(project)
-            .filter((name) => !gated.has(name))
-            .map((name) => ({ name, source: 'project', status: 'connected' as const })),
-        ]
+          }))
+          .concat(
+            Object.keys(project)
+              .filter((name) => !gated.has(name))
+              .map((name) => ({ name, source: 'project', status: 'connected' as const })),
+          )
       },
       [Symbol.asyncIterator]: () => ({ next: () => new Promise<never>(() => {}) }),
     } as unknown as Query

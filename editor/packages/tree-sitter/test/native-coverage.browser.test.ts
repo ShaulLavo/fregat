@@ -391,7 +391,7 @@ browserTest.each(NATIVE_FIXTURES)(
         astro: ['typescript'],
         svelte: ['typescript', 'css'],
       }
-      expect(new Set(loads)).toEqual(new Set([fixture.id, ...(injected[fixture.id] ?? [])]))
+      expect(new Set(loads)).toEqual(new Set([fixture.id].concat(injected[fixture.id] ?? [])))
       fresh.dispose()
     } finally {
       session.dispose()

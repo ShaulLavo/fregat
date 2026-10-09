@@ -3963,13 +3963,13 @@ export function editorKeymapBindings(
   options: EditorKeymapOptions = {},
   platform: KeymapPlatform,
 ): readonly KeymapEntry[] {
-  return [
-    ...baseEditorKeymap[platform],
-    ...(options.packs ?? defaultEditorPacks).flatMap((pack) => pack[platform]),
-    ...(options.bindings ?? []).map((binding) => ({
+  const base: readonly KeymapEntry[] = baseEditorKeymap[platform]
+  return base.concat(
+    (options.packs ?? defaultEditorPacks).flatMap((pack) => pack[platform]),
+    (options.bindings ?? []).map((binding) => ({
       ...binding,
       context: binding.context ?? 'Editor && !EditorWidget',
       source: 'user' as const,
     })),
-  ]
+  )
 }

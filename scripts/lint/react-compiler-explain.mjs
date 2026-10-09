@@ -57,7 +57,7 @@ function blockKeys(condition, code) {
   if (condition.type === 'LogicalExpression' && condition.operator === '||') {
     const left = blockKeys(condition.left, code)
     const right = blockKeys(condition.right, code)
-    return left && right ? [...left, ...right] : null
+    return left && right ? left.concat(right) : null
   }
   if (condition.type !== 'BinaryExpression' || !isCacheSlot(condition.left)) return null
   if (condition.operator === '===') return []
@@ -136,7 +136,8 @@ function namedKeys(keys, blocks, derived, seen) {
   const resolved = keys.flatMap((key) => {
     if (!/^t\d+$/.test(key) || seen.has(key)) return [key]
     const producer = producerOf(key, blocks)
-    const next = new Set([...seen, key])
+    const next = new Set(seen)
+    next.add(key)
     if (producer) return namedKeys(producer.keys, blocks, derived, next)
     return [derived.get(key) ?? key]
   })
@@ -406,7 +407,7 @@ function tally(rows) {
     const kind = row.verdict.split(':')[0]
     counts.set(kind, (counts.get(kind) ?? 0) + 1)
   }
-  return [...counts].map(([kind, count]) => `${kind} ${count}`).join(', ') || 'no manual memos'
+  return Array.from(counts, ([kind, count]) => `${kind} ${count}`).join(', ') || 'no manual memos'
 }
 
 function print(json, data, text) {

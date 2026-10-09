@@ -318,7 +318,7 @@ function createConstructorOptions(
     tabSize: readReactive(tabSize),
     theme: readReactive(theme) ?? undefined,
     wordWrap: readReactive(wordWrap),
-    plugins: [createSolidSyncPlugin(runtime), ...(plugins ?? [])],
+    plugins: [createSolidSyncPlugin(runtime)].concat(plugins ?? []),
     onChange: (state, change) => {
       syncChange(runtime, state, change)
       onChange?.(state, change)

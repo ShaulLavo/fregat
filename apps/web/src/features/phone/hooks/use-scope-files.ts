@@ -39,7 +39,7 @@ export function useScopeFiles(
 
   if (source?.kind === 'snapshot' && source.target.kind === 'moving') {
     const { staged, worktree } = changeRows(files)
-    const rows = [...staged, ...worktree]
+    const rows = staged.concat(worktree)
     const found = neighbours(
       rows,
       (row) =>
