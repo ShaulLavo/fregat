@@ -47,7 +47,7 @@ import { fontsInUse } from '@/lib/fonts/utils/stack'
 import { runtimeCapabilities } from '@/lib/platform/capabilities'
 import { launchAddress } from '@/components/utils/launch-address'
 import { applyBackdrop, resolveBackdrop } from '@/lib/platform/backdrop.ts'
-import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-trace.ts'
+import { startEditorPerformanceRecording } from '@/features/editor/state/performance-recording-start'
 import { reportReactError } from '@/lib/react-error-reporting.ts'
 import { configureIntentPrediction } from '@/lib/intent-prefetch-options'
 import { takePairingCodeFromLocation } from '@/lib/pairing/state/link-claim'
@@ -56,12 +56,12 @@ import { COARSE_POINTER_QUERY } from '@/lib/shell/utils/kind'
 import { shellQueryOptions } from '@/features/workspace/utils/shell-query'
 import { warmDeferredOverlays } from '@/components/utils/overlay-modules'
 
-installEditorPerformanceTraceFromUrl()
 configureIntentPrediction()
 initializeClientLogging()
+void startEditorPerformanceRecording(resourceQueryClient)
 const htmlBootstrap = readHtmlBootstrap()
 applyBackdrop(htmlBootstrap?.kind === 'app' ? htmlBootstrap.backdrop : resolveBackdrop())
-// Before `createRoot`, deliberately. The mirrored appearance is initial
+// Before `createRoot`, deliberately. The document appearance is initial
 // document state: descendants construct geometry and read computed styles on
 // their first render. `AppearanceProvider` corrects it from the server snapshot
 // in React's insertion phase before later layout effects run.
