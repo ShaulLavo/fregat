@@ -57,6 +57,7 @@ comptime {
 }
 
 const std = @import("std");
+const instance_bytes = @import("instance-bytes.zig");
 
 const c = @cImport({
     @cInclude("ghostty/vt/render.h");
@@ -432,11 +433,11 @@ fn reuseFrameRow(frame: *Frame, y: u32) c.GhosttyResult {
         const glyph = &next_glyph;
         if (cell[3] != 0) cell[1] = top;
         if (glyph[16] != 0) glyph[1] = top + cache.next[y].cells[x].key.?.glyph.offset_y;
-        if (!std.mem.eql(u8, std.mem.asBytes(cell), std.mem.asBytes(&frame.cell_data[start + x]))) {
+        if (!instance_bytes.equal(16, cell, &frame.cell_data[start + x])) {
             cell_first = @min(cell_first, @as(u32, @intCast(x)));
             cell_end = @intCast(x + 1);
         }
-        if (!std.mem.eql(u8, std.mem.asBytes(glyph), std.mem.asBytes(&frame.glyph_data[start + x]))) {
+        if (!instance_bytes.equal(24, glyph, &frame.glyph_data[start + x])) {
             glyph_first = @min(glyph_first, @as(u32, @intCast(x)));
             glyph_end = @intCast(x + 1);
         }
@@ -710,11 +711,11 @@ fn buildRow(frame: *Frame, iterator: c.GhosttyRenderStateRowIterator, cells: *c.
         result = buildCell(frame, raw.ptr[0..raw.len], cells.*, @intCast(x), y, selected);
         if (result != c.GHOSTTY_SUCCESS) return result;
         rememberRenderedCell(frame.row_cache.?, slot, cached.cells[x]);
-        if (force or !std.mem.eql(u8, std.mem.asBytes(&previous_cell), std.mem.asBytes(&frame.cell_data[slot]))) {
+        if (force or !instance_bytes.equal(16, &previous_cell, &frame.cell_data[slot])) {
             cell_first = @min(cell_first, @as(u32, @intCast(x)));
             cell_end = @intCast(x + 1);
         }
-        if (force or !std.mem.eql(u8, std.mem.asBytes(&previous_glyph), std.mem.asBytes(&frame.glyph_data[slot]))) {
+        if (force or !instance_bytes.equal(24, &previous_glyph, &frame.glyph_data[slot])) {
             glyph_first = @min(glyph_first, @as(u32, @intCast(x)));
             glyph_end = @intCast(x + 1);
         }
