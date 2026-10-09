@@ -162,6 +162,11 @@ syntax throughput. Qualify the complete-file baseline, then optimize query mater
 and structural traversal before parser/compiler experiments. Its target is a complete
 parse and highlight within 2 seconds on the reference machine. Viewport-first and
 incremental work follows that full-file gate; Plan 338's asset work can proceed alongside it.
+[340](plans/340-singapore-site-embedding.md) is Approved for editor-produced Singapore
+pages with document scrolling and matching static/live paint. Editor content-height,
+wrap fixes and complete responsive snapshots ship in their own PRs before site integration.
+This replaces the separate Node prerenderer and owns snapshot restore qualification;
+Plan 338's asset work continues alongside it.
 
 [335](plans/335-stroke-icons.md) retains the current stroke-icon migration, shared registry
 and selected morph sites. Its broad swap takes the structural window after the keymap
