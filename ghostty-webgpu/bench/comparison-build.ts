@@ -2,8 +2,10 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
-import { isAbsolute, join, resolve, sep } from 'node:path'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { BunPlugin } from 'bun'
+import { runtimeWasmAssets } from '../src/core/assets.js'
 
 export const sha256 = (bytes: string | Uint8Array) =>
   createHash('sha256').update(bytes).digest('hex')
@@ -26,16 +28,15 @@ export async function sourceInventory(root: string, paths: readonly string[]) {
 }
 
 export function checkoutFiles(root: string, patterns: readonly string[]): string[] {
-  return execFileSync(
-    'git',
-    ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...patterns],
-    {
+  const list = (options: readonly string[]) =>
+    execFileSync('git', ['ls-files', '-z', ...options, '--', ...patterns], {
       cwd: root,
       encoding: 'utf8',
-    },
-  )
-    .split('\0')
-    .filter(Boolean)
+    })
+      .split('\0')
+      .filter(Boolean)
+  const deleted = new Set(list(['--deleted']))
+  return list(['--cached', '--others', '--exclude-standard']).filter((path) => !deleted.has(path))
 }
 
 function runtimePlugin(root: string, extractedRoot: string): BunPlugin {
@@ -54,8 +55,35 @@ function runtimePlugin(root: string, extractedRoot: string): BunPlugin {
   }
 }
 
-// Capture auxiliary WASM too, including assets added by the selected runtime ref.
-export const runtimePatterns = ['src', '*.wasm', 'package.json']
+const packageRoot = fileURLToPath(new URL('../', import.meta.url))
+const runtimeAssets = Object.entries(runtimeWasmAssets).map(([kind, url]) => {
+  const path = relative(packageRoot, fileURLToPath(url)).split(sep).join('/')
+  assert(
+    path !== '..' && !path.startsWith('../') && !isAbsolute(path),
+    'Runtime WASM must be inside its package',
+  )
+  return [kind === 'native' ? 'native.wasm' : path, path] as const
+})
+const runtimePaths = new Set(runtimeAssets.map(([, path]) => path))
+const runtimePatterns = ['src', ...runtimePaths, 'package.json']
+
+function isRuntimeInput(path: string): boolean {
+  if (runtimePaths.has(path) || path === 'package.json') return true
+  return path.startsWith('src/') && !path.endsWith('.wasm')
+}
+
+export function runtimeCheckoutFiles(root: string): string[] {
+  return checkoutFiles(root, runtimePatterns).filter(isRuntimeInput)
+}
+
+export function assetMap(entries: readonly (readonly [string, string])[]): Record<string, string> {
+  const assets: Record<string, string> = {}
+  for (const [name, path] of entries) {
+    assert(!Object.hasOwn(assets, name), `Comparison asset destination collision: ${name}`)
+    assets[name] = path
+  }
+  return assets
+}
 
 async function runtimeInputs(root: string, paths: readonly string[]) {
   const metadata: { version?: unknown } = JSON.parse(
@@ -66,16 +94,12 @@ async function runtimeInputs(root: string, paths: readonly string[]) {
     'Runtime package metadata must contain a version',
   )
   assert(
-    paths.includes('ghostty-vt.wasm') && paths.includes('bridge.wasm'),
-    'Runtime inputs must contain native and bridge WASM',
+    runtimeAssets.every(([, path]) => paths.includes(path)),
+    'Runtime inputs must contain the declared WASM assets',
   )
   return {
     version: metadata.version,
-    assets: Object.fromEntries(
-      paths
-        .filter((path) => path.endsWith('.wasm'))
-        .map((path) => [path === 'ghostty-vt.wasm' ? 'native.wasm' : path, join(root, path)]),
-    ),
+    assets: assetMap(runtimeAssets.map(([name, path]) => [name, join(root, path)])),
     inventory: await sourceInventory(root, paths),
   }
 }
@@ -89,7 +113,7 @@ export async function runtimeSource(root: string, ref?: string) {
       mode: 'checkout' as const,
       commit: git(['rev-parse', 'HEAD']),
       dirty: git(['status', '--porcelain', '--', ...runtimePatterns]),
-      ...(await runtimeInputs(root, checkoutFiles(root, runtimePatterns))),
+      ...(await runtimeInputs(root, runtimeCheckoutFiles(root))),
       plugins: [] as BunPlugin[],
       dispose: async () => {},
     }
@@ -98,17 +122,14 @@ export async function runtimeSource(root: string, ref?: string) {
   const commit = git(['rev-parse', '--verify', `${ref}^{commit}`])
   const prefix = git(['rev-parse', '--show-prefix'])
   const repository = git(['rev-parse', '--show-toplevel'])
-  const inputPaths = git(
-    ['ls-tree', '-r', '--name-only', commit, '--', ...(prefix ? [prefix] : [])],
-    repository,
+  const inputPaths = execFileSync(
+    'git',
+    ['ls-tree', '-r', '-z', '--name-only', commit, '--', ...(prefix ? [prefix] : [])],
+    { cwd: repository, encoding: 'utf8' },
   )
-    .split('\n')
-    .filter(
-      (path) =>
-        path.startsWith(`${prefix}src/`) ||
-        path.endsWith('.wasm') ||
-        path === `${prefix}package.json`,
-    )
+    .split('\0')
+    .filter(Boolean)
+    .filter((path) => isRuntimeInput(path.slice(prefix.length)))
   const paths = inputPaths.map((path) => path.slice(prefix.length))
   assert(
     paths.some((path) => path.startsWith('src/')),

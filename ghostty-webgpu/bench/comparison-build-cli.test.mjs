@@ -28,7 +28,8 @@ async function fixture(context, run) {
   try {
     await mkdir(join(root, 'scripts'), { recursive: true })
     await mkdir(join(root, 'bench/fixtures'), { recursive: true })
-    await mkdir(join(root, 'src'))
+    await mkdir(join(root, 'src/core'), { recursive: true })
+    await cp(join(packageRoot, 'src/core/assets.ts'), join(root, 'src/core/assets.ts'))
     for (const name of await readdir(join(packageRoot, 'scripts'))) {
       if (name.startsWith('comparison') || name === 'build-comparison.ts')
         await cp(join(packageRoot, 'scripts', name), join(root, 'scripts', name))
@@ -47,7 +48,7 @@ async function fixture(context, run) {
     const writeRuntime = async (value) => {
       await writeFile(
         join(root, 'src/runtime.ts'),
-        `export const value = '${value}'; console.log(new URL('../canvas-compose.wasm', import.meta.url))\n`,
+        `import { runtimeWasmAssets } from './core/assets.js'; export const value = '${value}'; console.log(runtimeWasmAssets.canvasCompose)\n`,
       )
       await writeFile(join(root, 'bridge.wasm'), `${value}-bridge\0`)
       await writeFile(join(root, 'ghostty-vt.wasm'), `${value}-native\0`)
@@ -150,15 +151,129 @@ test('packet inventory rejects a composer copied from a different runtime source
   })
 })
 
-test('new runtime WASM assets enter checkout and Git-ref packet seals automatically', async (context) => {
+test('packets inside the package can be rebuilt without ingesting their own assets', async (context) => {
+  await fixture(context, async ({ root, build }) => {
+    const output = join(root, 'bundle')
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const result = build(output)
+      assert.equal(result.status, 0, result.stderr)
+      const manifest = await assertBundle(output, '0.1.2', {
+        'canvas-compose.wasm': await readFile(join(root, 'canvas-compose.wasm')),
+      })
+      assert.ok(Object.keys(manifest.runtime.files).every((path) => !path.startsWith('bundle/')))
+    }
+  })
+})
+
+test('benchmark fixtures, test fixtures and build WASM stay outside the runtime assets', async (context) => {
   await fixture(context, async ({ repository, root, git, build }) => {
-    const name = 'wasm/auxiliary.wasm'
+    const unused = [
+      'bench/fixtures/driver.wasm',
+      'tests/fixtures/sample.wasm',
+      'src/core/tests/fixtures/sample.wasm',
+      'build/stray.wasm',
+    ]
+    for (const path of unused) {
+      await mkdir(dirname(join(root, path)), { recursive: true })
+      await writeFile(join(root, path), `unused-${path}\0`)
+    }
+    git(['add', '.'])
+    git(['commit', '--quiet', '-m', 'unused WASM'])
+    for (const args of [[], ['--runtime-ref', 'HEAD']]) {
+      const output = join(repository, '.artifacts/unused', args.length ? 'ref' : 'checkout')
+      const result = build(output, args)
+      assert.equal(result.status, 0, result.stderr)
+      const manifest = JSON.parse(await readFile(join(output, 'manifest.json'), 'utf8'))
+      for (const path of unused) {
+        assert.equal(manifest.assets[path], undefined, path)
+        assert.equal(manifest.runtime.files[path], undefined, path)
+      }
+    }
+  })
+})
+
+test('Git-ref inventories preserve non-ASCII source filenames', async (context) => {
+  await fixture(context, async ({ repository, root, git, build }) => {
+    const path = 'src/é.ts'
+    const bytes = Buffer.from('export const accent = true\n')
+    await writeFile(join(root, path), bytes)
+    git(['add', '.'])
+    git(['commit', '--quiet', '-m', 'Unicode source'])
+    const output = join(repository, '.artifacts/unicode')
+    const result = build(output, ['--runtime-ref', 'HEAD'])
+    assert.equal(result.status, 0, result.stderr)
+    const manifest = JSON.parse(await readFile(join(output, 'manifest.json'), 'utf8'))
+    assert.equal(manifest.runtime.files[path], sha256(bytes))
+  })
+})
+
+test('an unrelated native.wasm cannot replace the native runtime packet asset', async (context) => {
+  await fixture(context, async ({ repository, root, git, build }) => {
+    await writeFile(join(root, 'native.wasm'), 'unrelated-native\0')
+    git(['add', '.'])
+    git(['commit', '--quiet', '-m', 'unrelated native artifact'])
+    const output = join(repository, '.artifacts/native-alias')
+    const result = build(output)
+    assert.equal(result.status, 0, result.stderr)
+    await assertBundle(output, '0.1.2', {
+      'native.wasm': await readFile(join(root, 'ghostty-vt.wasm')),
+    })
+  })
+})
+
+test('declared assets reject reserved native and counterpart destination collisions', async (context) => {
+  await fixture(context, async ({ repository, root, build }) => {
+    const manifestPath = join(root, 'src/core/assets.ts')
+    const manifest = await readFile(manifestPath, 'utf8')
+    for (const name of ['native.wasm', 'legacy.wasm']) {
+      await writeFile(join(root, name), 'reserved-name\0')
+      await writeFile(
+        manifestPath,
+        manifest.replace(
+          '} as const',
+          `  auxiliary: new URL('../../${name}', import.meta.url),\n} as const`,
+        ),
+      )
+      const output = join(repository, '.artifacts/collision', name)
+      const result = build(output)
+      assert.notEqual(result.status, 0)
+      assert.ok(result.stderr.includes(`Comparison asset destination collision: ${name}`))
+      await assert.rejects(readFile(join(output, 'manifest.json')), { code: 'ENOENT' })
+    }
+  })
+})
+
+test('unstaged deletion of unused WASM does not prevent a checkout packet', async (context) => {
+  await fixture(context, async ({ repository, root, git, build }) => {
+    const path = 'src/core/tests/fixtures/obsolete.wasm'
+    await mkdir(dirname(join(root, path)), { recursive: true })
+    await writeFile(join(root, path), 'obsolete\0')
+    git(['add', '.'])
+    git(['commit', '--quiet', '-m', 'unused artifact'])
+    await rm(join(root, path))
+    const output = join(repository, '.artifacts/deleted')
+    const result = build(output)
+    assert.equal(result.status, 0, result.stderr)
+    const manifest = JSON.parse(await readFile(join(output, 'manifest.json'), 'utf8'))
+    assert.equal(manifest.runtime.files[path], undefined)
+    assert.match(manifest.dirty, /obsolete\.wasm/)
+  })
+})
+
+test('declared non-ASCII runtime WASM enters checkout and Git-ref packet seals', async (context) => {
+  await fixture(context, async ({ repository, root, git, build }) => {
+    const name = 'wasm/é.wasm'
     const bytes = Buffer.from('auxiliary-wasm\0')
     await mkdir(dirname(join(root, name)), { recursive: true })
     await writeFile(join(root, name), bytes)
+    const manifestPath = join(root, 'src/core/assets.ts')
+    const manifest = await readFile(manifestPath, 'utf8')
     await writeFile(
-      join(root, 'src/runtime.ts'),
-      `export const value = '0.1.2'; console.log(new URL('../${name}', import.meta.url))\n`,
+      manifestPath,
+      manifest.replace(
+        '} as const',
+        `  auxiliary: new URL('../../${name}', import.meta.url),\n} as const`,
+      ),
     )
     const output = join(repository, '.artifacts/auxiliary')
     const result = build(output)
@@ -180,7 +295,13 @@ test('missing ref, missing snapshot input and failed builds leave no staging dir
       build(join(repository, '.artifacts/missing-ref'), ['--runtime-ref', 'missing-ref']).status,
       0,
     )
-    for (const path of ['bridge.wasm', 'ghostty-vt.wasm', 'package.json', 'src/runtime.ts']) {
+    for (const path of [
+      'bridge.wasm',
+      'ghostty-vt.wasm',
+      'canvas-compose.wasm',
+      'package.json',
+      'src/runtime.ts',
+    ]) {
       const bytes = await readFile(join(root, path))
       git(['rm', `ghostty-webgpu/${path}`])
       git(['commit', '--quiet', '-m', `remove ${path}`])
