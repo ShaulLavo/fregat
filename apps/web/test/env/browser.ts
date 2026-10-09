@@ -1,5 +1,6 @@
 import { healthDescriptorSchema } from '@workspace/contracts'
-import { beforeAll } from 'vitest'
+import { beforeAll, afterEach } from 'vitest'
+import { removeHtmlBootstrap } from '../factories/html-bootstrap'
 import * as v from 'valibot'
 import { activeServerOrigin, getClient } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
@@ -10,3 +11,5 @@ beforeAll(async () => {
   const descriptor = v.parse(healthDescriptorSchema, (await getClient().health.get()).data)
   useEnvironmentsStore.getState().recordDescriptor(activeServerOrigin(), descriptor)
 })
+
+afterEach(removeHtmlBootstrap)

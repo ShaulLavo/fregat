@@ -20,14 +20,9 @@ describe('applyPaletteStylesheet', () => {
 })
 
 describe('bootPaletteStylesheet', () => {
-  it('restores the document palette while obsolete storage is ignored', () => {
-    localStorage.setItem(
-      'platform.palette-boot.v1',
-      JSON.stringify({ ids: ['sage'], css: ':root { --wrong: 1; }' }),
-    )
+  it('restores the document palette', () => {
     installHtmlBootstrap({ 'workbench.palette': 'sage' })
     expect(bootPaletteStylesheet('sage')).toContain('--background-solid: oklch(0.98 0.003 90);')
-    expect(bootPaletteStylesheet('sage')).not.toContain('--wrong')
   })
 
   it('resolves a bundled palette without a cache and Graphite to the stylesheet default', () => {
@@ -36,13 +31,7 @@ describe('bootPaletteStylesheet', () => {
     expect(bootPaletteStylesheet('sage')).toContain('--background-solid: oklch(0.98 0.003 90);')
   })
 
-  it('uses no obsolete palette storage for an unknown palette', () => {
-    localStorage.setItem(
-      'platform.palette-boot.v1',
-      JSON.stringify({ ids: ['mine'], css: ':root { --mine: 1; }' }),
-    )
-    expect(bootPaletteStylesheet('mine')).toBeNull()
-    localStorage.setItem('platform.palette-boot.v1', '{not json')
+  it('returns no stylesheet for an unknown palette without document data', () => {
     expect(bootPaletteStylesheet('mine')).toBeNull()
   })
 })

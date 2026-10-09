@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 import { expect, test } from '../../../../test/fixtures'
 import { settingsSnapshot } from '../../../../test/factories/settings'
-import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
+import { AppProviders, createTestQueryClient, seedHtmlTheme } from '../../../../test/render'
 import { useTheme } from '@/features/settings/hooks/use-theme'
 import {
   resetSettingsIntentStore,
@@ -18,7 +18,7 @@ test('submitted theme intent hands preview to projection and updates boot mirror
   client,
 }) => {
   expect(client).toBeDefined()
-  seedBootMirrorTheme('light')
+  seedHtmlTheme('light')
   resetSettingsIntentStore()
   const queryClient = confirmedLightQueryClient()
   const theme = renderHook(() => useTheme(), { wrapper: wrapper(queryClient) })
@@ -56,7 +56,7 @@ test('final rejection removes the matching handoff without an intermediate theme
     message: 'Injected final rejection',
     status: 400,
   })
-  seedBootMirrorTheme('light')
+  seedHtmlTheme('light')
   resetSettingsIntentStore()
   const queryClient = confirmedLightQueryClient()
   const theme = renderHook(() => useTheme(), { wrapper: wrapper(queryClient) })
