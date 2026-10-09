@@ -88,6 +88,7 @@ import {
   estimatedColumnToBufferColumn,
   estimatedDisplayCellForColumn,
   offsetFromDomBoundary,
+  knownRowScrollWidth,
   offsetToX,
   setInlineWidgetMeasuredWidth,
 } from './virtualizedTextViewGeometry'
@@ -2903,12 +2904,14 @@ export function updateContentWidth(
 ): void {
   const first = items[0]
   const last = items.at(-1)
+  if (view.wrapEnabled) view.maxVisualColumnsSeen = 0
   if (!first || !last) {
     applyContentWidth(view, view.maxVisualColumnsSeen)
     return
   }
 
-  scanVisualWidthRange(view, first.index, last.index)
+  if (view.wrapEnabled) scanVisualColumns(view, first.index, last.index)
+  else scanVisualWidthRange(view, first.index, last.index)
   applyContentWidth(view, view.maxVisualColumnsSeen)
 }
 
@@ -2957,6 +2960,11 @@ function scanVisualColumns(
 // Only document text contributes to the horizontal extent; injected rows are measured for real
 // once they mount. A proportional row counts in average-width columns of its measured advances.
 function estimatedDisplayRowColumns(view: VirtualizedTextViewInternal, rowIndex: number): number {
+  const mounted = view.rowElements.get(rowIndex)
+  if (view.wrapEnabled && mounted?.kind === 'text') {
+    const width = knownRowScrollWidth(view, mounted)
+    if (width !== null) return width / characterWidth(view)
+  }
   const displayRow = view.model.projection.getRow(rowIndex)
   if (!isDocumentTextDisplayRow(displayRow)) return 0
   const glyphs = view.wrapEnabled ? (view.wrapAdvance ?? view.glyphs) : view.glyphs
