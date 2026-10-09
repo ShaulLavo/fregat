@@ -56,6 +56,8 @@ interface MountedRow {
 class DomSurface implements RowRendererSurface {
   private readonly container: HTMLDivElement
   private readonly canvas: HTMLCanvasElement
+  private canvasStyle: CSSStyleDeclaration
+  private styleDocument: Document
   private readonly previousOpacity: string
   private font: TerminalFittedFont
   private grid: RendererGridSize
@@ -68,6 +70,8 @@ class DomSurface implements RowRendererSurface {
       throw new TypeError('The DOM renderer requires a canvas mounted in a terminal host')
     }
     this.canvas = options.canvas
+    this.styleDocument = this.canvas.ownerDocument
+    this.canvasStyle = this.styleDocument.defaultView!.getComputedStyle(this.canvas)
     this.font = copyFittedFont(options.font)
     this.grid = normalizeRendererGrid(options)
     this.theme = canonicalRendererTheme(mergeRendererTheme(options.theme))
@@ -166,7 +170,13 @@ class DomSurface implements RowRendererSurface {
   }
 
   private position(): void {
-    const style = this.canvas.ownerDocument.defaultView!.getComputedStyle(this.canvas)
+    const document = this.canvas.ownerDocument
+    if (this.styleDocument !== document) {
+      this.canvasStyle = document.defaultView!.getComputedStyle(this.canvas)
+      this.styleDocument = document
+    }
+    // The declaration stays live; flow offsets and padding are read for every frame.
+    const style = this.canvasStyle
     const left = this.canvas.offsetLeft + (parseFloat(style.paddingLeft) || 0)
     const top = this.canvas.offsetTop + (parseFloat(style.paddingTop) || 0)
     const declarations = this.container.style

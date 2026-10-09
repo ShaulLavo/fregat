@@ -793,6 +793,50 @@ it('keeps live flow offsets through fractional CSS, sibling flow and stylesheet 
   expectFlowOffsets()
 })
 
+it('reuses the live canvas style declaration while reading changed flow and padding each frame', async () => {
+  const probe = await rendererProbe('dom')
+  const canvas = probe.canvas
+  const container = canvas.nextElementSibling as HTMLElement
+  const computed = vi.spyOn(window, 'getComputedStyle')
+  for (const padding of ['11.5px', '19.25px']) {
+    canvas.style.paddingLeft = padding
+    canvas.style.marginLeft = padding
+    probe.terminal.write('\rnext')
+    probe.renderer.notifyWrite()
+    probe.clock.flush()
+    expect(container.style.left).toBe(`${canvas.offsetLeft + parseFloat(padding)}px`)
+  }
+  expect(computed.mock.calls.filter(([element]) => element === canvas)).toHaveLength(0)
+})
+
+it('rebinds the live canvas declaration after its host moves into another document', async () => {
+  const probe = await rendererProbe('dom')
+  const iframe = document.createElement('iframe')
+  document.body.append(iframe)
+  cleanups.push(() => iframe.remove())
+  const destination = iframe.contentDocument!
+  destination.body.append(probe.canvas.parentElement!)
+  const canvas = probe.canvas
+  canvas.style.paddingLeft = '23.5px'
+  canvas.style.marginLeft = '7.25px'
+  const computed = vi.spyOn(destination.defaultView!, 'getComputedStyle')
+  probe.terminal.write('\rnext')
+  probe.renderer.notifyWrite()
+  probe.clock.flush()
+  expect(canvas.nextElementSibling!.getAttribute('style')).toContain(
+    `left: ${canvas.offsetLeft + 23.5}px`,
+  )
+  expect(computed.mock.calls.filter(([element]) => element === canvas)).toHaveLength(1)
+  canvas.style.paddingLeft = '31.25px'
+  probe.terminal.write('\rlater')
+  probe.renderer.notifyWrite()
+  probe.clock.flush()
+  expect(canvas.nextElementSibling!.getAttribute('style')).toContain(
+    `left: ${canvas.offsetLeft + 31.25}px`,
+  )
+  expect(computed.mock.calls.filter(([element]) => element === canvas)).toHaveLength(1)
+})
+
 it('isolates fixed-grid layout through theme and font changes', async () => {
   const probe = await rendererProbe('dom')
   const frame = () =>
