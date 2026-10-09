@@ -8,6 +8,7 @@ import { WebGlTextPass } from '../../render/webgl/text-pass.js'
 import { CanvasTerminalRenderer } from '../../render/canvas/renderer.js'
 import { WebGpuTerminalRenderer } from '../../render/renderer.js'
 import type { TerminalSubmittedSnapshot, TerminalSubmittedText } from '../submitted-frame.js'
+import type { RendererTextFrameSnapshot } from '../../render/renderer.js'
 import type { RenderSchedulerClock } from '../../render/scheduler.js'
 import type { RowRendererSurface } from '../../render/row-renderer.js'
 import { TerminalSession } from '../../term/session.js'
@@ -71,6 +72,7 @@ async function fixture(backend: 'webgl' | 'webgpu' | 'canvas' | 'dom' = 'webgl')
     runtime: { kind: 'borrowed', runtime },
   })
   const clock = new DeferredClock()
+  const snapshots: RendererTextFrameSnapshot[] = []
   let renderer:
     | WebGlTerminalRenderer
     | WebGpuTerminalRenderer
@@ -86,7 +88,14 @@ async function fixture(backend: 'webgl' | 'webgpu' | 'canvas' | 'dom' = 'webgl')
         webgpu: WebGpuTerminalRenderer,
         canvas: CanvasTerminalRenderer,
         dom: DomTerminalRenderer,
-      }[backend].create({ ...options, schedulerClock: clock })
+      }[backend].create({
+        ...options,
+        schedulerClock: clock,
+        onTextFrame: (snapshot) => {
+          snapshots.push(snapshot)
+          options.onTextFrame?.(snapshot)
+        },
+      })
       return renderer
     },
   })
@@ -95,7 +104,7 @@ async function fixture(backend: 'webgl' | 'webgpu' | 'canvas' | 'dom' = 'webgl')
   terminal.on('error', (event) => errors.push(event))
   await terminal.open(host)
   clock.flush()
-  return { terminal, session, clock, errors, host, renderer: renderer! }
+  return { terminal, session, clock, errors, host, renderer: renderer!, snapshots }
 }
 
 function extractionCount() {
@@ -456,6 +465,23 @@ describe('WebGPU retained displayed-text acceptance', () => {
 })
 
 describe('DOM retained displayed-text acceptance', () => {
+  it('accepts the already-owned native snapshot without a second lazy wrapper', async () => {
+    const { terminal, clock, snapshots } = await fixture('dom')
+    terminal.write('accepted native 界 é')
+    clock.flush()
+    const snapshot = snapshots.at(-1)!
+    expect(Object.isFrozen(snapshot)).toBe(true)
+    expect(Object.isFrozen(snapshot.cursor)).toBe(true)
+    const execution = Reflect.get(terminal, 'execution') as {
+      textFrame(): RendererTextFrameSnapshot | undefined
+    }
+    expect(execution.textFrame()).toBe(snapshot)
+    const owned = terminal.visibleLines()
+    terminal.write('\rnext native')
+    clock.flush()
+    expect(owned[0]).toContain('accepted native')
+  })
+
   it('captures successful DOM paint before acknowledging damage and leaves failed paint unpublished', async () => {
     const retain = vi.spyOn(runtime.bridge, 'captureRetainedFrame')
     cleanups.push(() => retain.mockRestore())

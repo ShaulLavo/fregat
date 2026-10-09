@@ -429,14 +429,7 @@ export class LocalTerminalExecution {
     this.lastFullFrame = undefined
     const nativeFrame = (snapshot as RetainedTextFrame).nativeFrame
     if (nativeFrame) {
-      this.lastFrame = Object.freeze({
-        cursor: snapshot.cursor,
-        paintedCursor: snapshot.paintedCursor,
-        nativeFrame,
-        get rows() {
-          return snapshot.rows
-        },
-      })
+      this.lastFrame = snapshot
     } else {
       const rows =
         snapshot.rows.length > 0
