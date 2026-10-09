@@ -243,7 +243,7 @@ export function AgentRail({
     })
   }
   function manageWorktrees(row?: RailRow, origin?: ReturnType<typeof commands.focus.capture>) {
-    const capturedOrigin = origin ?? commands.focus.capture()
+    const capturedOrigin = origin === undefined ? commands.focus.capture() : origin
     const worktree = checkout(row)
     const id = row?.kind === 'project' ? row.project.id : (worktree?.projectId ?? projectId)
     if (id) setModal({ kind: 'worktrees', projectId: id, origin: capturedOrigin })
