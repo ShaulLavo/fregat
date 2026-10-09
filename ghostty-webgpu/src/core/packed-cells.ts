@@ -28,7 +28,12 @@ function style(flags: number, previous: CellStyle | undefined): CellStyle | unde
 }
 
 export function emptyRenderCell(): RenderCell {
-  return { continuation: false, selected: false, text: '', x: 0 }
+  return {
+    continuation: false,
+    selected: false,
+    text: '',
+    x: 0,
+  }
 }
 
 export class PackedCells {
@@ -63,6 +68,14 @@ export class PackedCells {
     )
       span += 1
     return span
+  }
+
+  // The caller owns this mutable scratch; published rows keep their independent materialization.
+  readInto(target: RenderCell[]): readonly RenderCell[] {
+    for (let index = 0; index < this.length; index += 1)
+      target[index] = this.read(index, target[index] ?? emptyRenderCell())
+    target.length = this.length
+    return target
   }
 
   materialize(): readonly RenderCell[] {

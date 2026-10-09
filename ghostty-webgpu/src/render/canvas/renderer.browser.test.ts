@@ -187,7 +187,8 @@ function expectFullRepaint(
   const painter = new CanvasRowPainter(context, font, theme)
   painter.resetContext(font)
   const cursor = renderCursorState(source.readCursor(), true)
-  for (const row of source.readRows()) painter.paint(row, cursor, control.width, false)
+  for (const row of source.readRows())
+    painter.paint({ y: row.y, dirty: row.dirty, cells: row.cells }, cursor, control.width, false)
   const actual = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data
   const expected = context.getImageData(0, 0, control.width, control.height).data
   expect([...actual]).toEqual([...expected])
@@ -314,92 +315,113 @@ describe('CanvasTerminalRenderer', () => {
     expectFullRepaint(canvas, source)
   })
 
-  it('paints packed plain edits with one scan and no complete-row materialization', async () => {
-    const clock = new FakeClock()
-    const canvas = createCanvas()
-    const source = new FakeRenderState([
-      row(
-        0,
-        Array.from({ length: 40 }, (_, x) => cell(x, { text: '0' })),
-      ),
-    ])
-    source.cursor.visible = false
-    const renderer = await createRenderer(options(canvas, source, clock, { columns: 40, rows: 1 }))
-    clock.flushFrame()
+  it.each([
+    { name: 'cell-damage', resetPaintCache: false, expectedMaterializations: 0, reads: 40 },
+    { name: 'full-row', resetPaintCache: true, expectedMaterializations: 1, reads: 80 },
+  ])(
+    'keeps packed plain $name paints on their existing cell path',
+    async ({ resetPaintCache, expectedMaterializations, reads }) => {
+      const clock = new FakeClock()
+      const canvas = createCanvas()
+      const font = fittedFont()
+      const source = new FakeRenderState([
+        row(
+          0,
+          Array.from({ length: 40 }, (_, x) => cell(x, { text: '0' })),
+        ),
+      ])
+      source.cursor.visible = false
+      const renderer = await createRenderer(
+        options(canvas, source, clock, { columns: 40, rows: 1, font }),
+      )
+      clock.flushFrame()
+      if (resetPaintCache) renderer.clearTextureAtlas()
 
-    const words = new Uint32Array(40 * PACKED_CELL_WORDS)
-    for (let x = 0; x < 40; x += 1) {
-      words[x * PACKED_CELL_WORDS] = x === 8 ? 49 : 48
-      words[x * PACKED_CELL_WORDS + 1] = 0xffffffff
-      words[x * PACKED_CELL_WORDS + 2] = 0xffffffff
-      words[x * PACKED_CELL_WORDS + 3] = 1
-    }
-    const packed = new PackedCells(words, new Uint32Array())
-    const decode = vi.spyOn(packed, 'read')
-    let materializations = 0
-    let cells: readonly RenderCell[] | undefined
-    source.rows[0] = {
-      y: 0,
-      dirty: true,
-      packed,
-      get cells() {
-        if (!cells) {
-          materializations += 1
-          cells = packed.materialize()
-        }
-        return cells
-      },
-    }
-    source.dirtyRow(0)
-    renderer.notifyWrite()
-    clock.flushFrame()
-    expect(materializations).toBe(0)
-    expect(decode).toHaveBeenCalledTimes(40)
-    expectFullRepaint(canvas, source)
-  })
+      const words = new Uint32Array(40 * PACKED_CELL_WORDS)
+      for (let x = 0; x < 40; x += 1) {
+        words[x * PACKED_CELL_WORDS] = x === 8 ? 49 : 48
+        words[x * PACKED_CELL_WORDS + 1] = 0xffffffff
+        words[x * PACKED_CELL_WORDS + 2] = 0xffffffff
+        words[x * PACKED_CELL_WORDS + 3] = 1
+      }
+      const packed = new PackedCells(words, new Uint32Array())
+      const decode = vi.spyOn(packed, 'read')
+      let materializations = 0
+      let cells: readonly RenderCell[] | undefined
+      source.rows[0] = {
+        y: 0,
+        dirty: true,
+        packed,
+        get cells() {
+          if (!cells) {
+            materializations += 1
+            cells = packed.materialize()
+          }
+          return cells
+        },
+      }
+      source.dirtyRow(0)
+      renderer.notifyWrite()
+      clock.flushFrame()
+      expect(materializations).toBe(expectedMaterializations)
+      expect(decode).toHaveBeenCalledTimes(reads)
+      expectFullRepaint(canvas, source, font)
+    },
+  )
 
-  it('does not rescan packed rows rejected during capture', async () => {
-    const clock = new FakeClock()
-    const canvas = createCanvas()
-    const source = new FakeRenderState([
-      row(
-        0,
-        Array.from({ length: 40 }, (_, x) => cell(x, { text: 'A' })),
-      ),
-    ])
-    source.cursor.visible = false
-    const renderer = await createRenderer(options(canvas, source, clock, { columns: 40, rows: 1 }))
-    clock.flushFrame()
-    expectFullRepaint(canvas, source)
+  it.each([
+    { name: 'batch', batch: true, expectedMaterializations: 0 },
+    { name: 'single-row', batch: false, expectedMaterializations: 1 },
+  ])(
+    'captures and paints packed styled $name rows with independent public cells',
+    async ({ batch, expectedMaterializations }) => {
+      const clock = new FakeClock()
+      const canvas = createCanvas()
+      const source = new FakeRenderState(
+        Array.from({ length: batch ? 2 : 1 }, (_, y) =>
+          row(
+            y,
+            Array.from({ length: 40 }, (_, x) => cell(x, { text: 'A' })),
+          ),
+        ),
+      )
+      source.cursor.visible = false
+      const renderer = await createRenderer(
+        options(canvas, source, clock, { columns: 40, rows: batch ? 2 : 1 }),
+      )
+      clock.flushFrame()
+      expectFullRepaint(canvas, source)
 
-    const words = new Uint32Array(40 * PACKED_CELL_WORDS)
-    for (let x = 0; x < 40; x += 1) {
-      words[x * PACKED_CELL_WORDS] = 65
-      words[x * PACKED_CELL_WORDS + 1] = 0xffffffff
-      words[x * PACKED_CELL_WORDS + 2] = 0xffffffff
-      words[x * PACKED_CELL_WORDS + 3] = x === 39 ? 1 | 8 | (1 << 5) : 1
-    }
-    const packed = new PackedCells(words, new Uint32Array())
-    const decode = vi.spyOn(packed, 'read')
-    const materialize = vi.spyOn(packed, 'materialize')
-    let cells: readonly RenderCell[] | undefined
-    source.rows[0] = {
-      y: 0,
-      dirty: true,
-      packed,
-      get cells() {
-        cells ??= packed.materialize()
-        return cells
-      },
-    }
-    source.dirtyRow(0)
-    renderer.notifyWrite()
-    clock.flushFrame()
-    expect(materialize).toHaveBeenCalledTimes(1)
-    // One eligibility scan and one materialization for the fallback row key.
-    expect(decode).toHaveBeenCalledTimes(80)
-    expectFullRepaint(canvas, source)
-  })
+      const words = new Uint32Array(40 * PACKED_CELL_WORDS)
+      for (let x = 0; x < 40; x += 1) {
+        words[x * PACKED_CELL_WORDS] = 65
+        words[x * PACKED_CELL_WORDS + 1] = 0xffffffff
+        words[x * PACKED_CELL_WORDS + 2] = 0xffffffff
+        words[x * PACKED_CELL_WORDS + 3] = x === 39 ? 1 | 8 | (1 << 5) : 1
+      }
+      const packed = new PackedCells(words, new Uint32Array())
+      const decode = vi.spyOn(packed, 'read')
+      const materialize = vi.spyOn(packed, 'materialize')
+      let cells: readonly RenderCell[] | undefined
+      source.rows[0] = {
+        y: 0,
+        dirty: true,
+        packed,
+        get cells() {
+          cells ??= packed.materialize()
+          return cells
+        },
+      }
+      for (const row of source.rows) source.dirtyRow(row.y)
+      renderer.notifyWrite()
+      clock.flushFrame()
+      expect(materialize).toHaveBeenCalledTimes(expectedMaterializations)
+      // Eligibility, key capture, and painting each read the packed row once.
+      expect(decode).toHaveBeenCalledTimes(120)
+      expectFullRepaint(canvas, source)
+      expect(materialize).toHaveBeenCalledTimes(1)
+    },
+  )
 
   it.each([
     { name: 'plain glyph', style: undefined, method: 'fillText' },

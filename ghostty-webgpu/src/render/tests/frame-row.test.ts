@@ -40,7 +40,20 @@ it.each([
       expect(Object.isFrozen(row)).toBe(true)
       expect(Object.isFrozen(row.cells)).toBe(true)
       expect(Object.isFrozen(row.continuations)).toBe(true)
+      expect(row.cells).toBe(row.cells)
+      expect(row.continuations).toBe(row.continuations)
+      expect(Object.getPrototypeOf(row)).toBe(Object.prototype)
+      expect(Reflect.ownKeys(row)).toEqual(['renderCells', 'cells', 'continuations', 'text', 'y'])
+      for (const key of ['renderCells', 'cells', 'continuations']) {
+        expect(Object.getOwnPropertyDescriptor(row, key)).toMatchObject({
+          configurable: false,
+          enumerable: true,
+          get: expect.any(Function),
+          set: undefined,
+        })
+      }
     }
+    for (const spy of materialize) expect(spy).not.toHaveBeenCalled()
     const styledExpected = decoded.map((row) => copiedFrameRow(row).renderCells)
     runtime.exports.memory.grow(1)
     terminal.resize({ columns: 4, rows: 1 })

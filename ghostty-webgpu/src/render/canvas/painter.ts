@@ -77,6 +77,7 @@ export class CanvasRowPainter {
   private backgroundStart = 0
   private backgroundEnd = 0
   private readonly cellColors: CanvasCellColors[] = []
+  private readonly cells: RenderCell[] = []
   private colors: CanvasColorCache
   private currentAlpha = 1
   private currentFill?: string
@@ -154,6 +155,10 @@ export class CanvasRowPainter {
           )
         : row.cells.slice(damage.first, damage.end)
       // Spreading the source row would invoke its complete-cell getter.
+      row = { y: row.y, dirty: row.dirty, cells }
+    }
+    if (!allowCellDamage && row.packed && !this.context.glyph) {
+      const cells = row.packed.readInto(this.cells)
       row = { y: row.y, dirty: row.dirty, cells }
     }
     const y = row.y * this.font.deviceCellHeight

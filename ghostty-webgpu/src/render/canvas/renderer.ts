@@ -1,5 +1,5 @@
 import { createGhosttyError } from '../../core/error.js'
-import type { RenderRow } from '../../core/types.js'
+import type { RenderCell, RenderRow } from '../../core/types.js'
 import type { TerminalFittedFont } from '../../term/types.js'
 import { canonicalRendererTheme, mergeRendererTheme } from '../config.js'
 import type { CanonicalRendererTheme, CursorState } from '../instances/types.js'
@@ -66,6 +66,7 @@ class CanvasSurface implements RowRendererSurface {
   private image?: PaintedImage
   private capturing = false
   private pending = new Map<number, string>()
+  private readonly captureCells: RenderCell[] = []
   private plan?: CanvasScrollPlan
   private nextImage?: PaintedImage
   private remaining = 0
@@ -126,7 +127,12 @@ class CanvasSurface implements RowRendererSurface {
           if (row.y < 0 || row.y >= this.rowCount) continue
           if (options?.rows && !options.rows.has(row.y)) continue
           const text = this.pixelTarget ? undefined : plainRowText(row)
-          this.pending.set(row.y, text === undefined ? JSON.stringify(row.cells) : `plain:${text}`)
+          if (text !== undefined) {
+            this.pending.set(row.y, `plain:${text}`)
+            continue
+          }
+          const cells = row.packed ? row.packed.readInto(this.captureCells) : row.cells
+          this.pending.set(row.y, JSON.stringify(cells))
         }
         return rows
       },
