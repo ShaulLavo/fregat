@@ -114,7 +114,12 @@ test.for(['shiki', 'tree-sitter'] as const)(
       const current = retentionAcceptanceReference(app, path)
       currentReference = current
       expect(current.identity.revision).toBe(revision)
-      const ready = observations.filter((observation) => observation.status === 'ready')
+      for (const observation of observations.filter((entry) => entry.status === 'ready'))
+        expect(observation.snapshotRevision).toBe(observation.sourceRevision)
+      const ready = observations.filter(
+        (observation) => observation.status === 'ready' && observation.sourceRevision === revision,
+      )
+      expect(ready.length).toBeGreaterThan(0)
       for (const observation of ready) {
         expect(observation.snapshotRevision).toBe(revision)
         assertRetentionAcceptancePaint(observation.sample, current, path)
