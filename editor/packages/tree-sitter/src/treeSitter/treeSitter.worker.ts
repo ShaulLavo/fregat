@@ -3237,7 +3237,12 @@ const queryMergeUnit = async (
       parents: eligibility,
       progressCallback: () => isCancelled(context),
     }
-    const unit = query ? enclosingMergeUnit(tree.rootNode, query, range, queryContext) : null
+    const units =
+      query && request.selection === 'touching'
+        ? touchingMergeUnits(tree.rootNode, query, range, queryContext)
+        : []
+    const unit =
+      units[0] ?? (query ? enclosingMergeUnit(tree.rootNode, query, range, queryContext) : null)
     assertNotCancelled(context)
     const selected =
       unit ??
@@ -3247,7 +3252,13 @@ const queryMergeUnit = async (
         queryContext,
       )
     assertNotCancelled(context)
-    return { ...identity, languageId, status: 'ok', unit: selected }
+    return {
+      ...identity,
+      languageId,
+      status: 'ok',
+      unit: selected,
+      ...(request.selection === 'touching' ? { units: units.length ? units : [selected] } : {}),
+    }
   } catch (error) {
     if (error instanceof SyntaxRequestCancelled)
       return { ...identity, status: 'cancelled', unit: null }

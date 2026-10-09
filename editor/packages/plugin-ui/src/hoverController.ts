@@ -143,7 +143,7 @@ export function createHoverController(options: HoverControllerOptions): HoverCon
       theme,
       loading: current.loading && pending,
       focus: current.focusOnShow && !current.shown,
-      preferredPlacement: 'top',
+      preferredPlacement: parts.some((part) => part.presentation === 'controls') ? 'bottom' : 'top',
     })
     current.shown = true
   }

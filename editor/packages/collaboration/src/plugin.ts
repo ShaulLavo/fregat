@@ -24,11 +24,14 @@ import { Session, type SessionOptions } from './session'
 import type { Message } from './protocol'
 import { Presence, type CharacterGap } from './presence'
 import { PresenceView } from './presence-view'
+import { MergeReview, type MergeReviewOptions } from './review'
+import { ReviewView, reviewGutter } from './review-view'
 
 export interface CollaborationConnection {
   readonly document: CollaborationDocument
   readonly session: Session<Envelope>
   readonly presence?: Presence
+  readonly review?: MergeReview
 }
 
 export interface CollaborationPluginOptions {
@@ -41,6 +44,7 @@ export interface CollaborationPluginOptions {
       'pulseInterval' | 'suspicionTimeout' | 'dependencyTimeout' | 'historyChunkRecords'
     >
   >
+  readonly mergeReview?: MergeReviewOptions
   /** A simulation can drive session.tick itself; browser attachments run a bounded interval. */
   readonly manualClock?: boolean
   readonly onReady?: (connection: CollaborationConnection) => void | (() => void)
@@ -50,6 +54,7 @@ export interface CollaborationPluginOptions {
 export function createCollaborationPlugin(options: CollaborationPluginOptions): EditorPlugin {
   return createPlugin({
     name: 'editor.collaboration',
+    uses: options.mergeReview ? [reviewGutter] : undefined,
     view(scope) {
       let recoverHistory = false
       const document = new CollaborationDocument(options.session, {
@@ -159,10 +164,12 @@ export function createCollaborationPlugin(options: CollaborationPluginOptions): 
         // Identity authoring runs before mutation; only committed transactions enter the network.
         for (const envelope of authored.splice(0)) session.submit(envelope)
       })
+      let review: MergeReview | undefined
       let detached = false
       const detach = () => {
         if (detached) return
         detached = true
+        review?.dispose()
         clearInterval(timer)
         unsubscribe()
         registration.dispose()
@@ -251,7 +258,29 @@ export function createCollaborationPlugin(options: CollaborationPluginOptions): 
           scope.view.container.removeEventListener('focusout', publish)
         })
       }
-      const cleanup = options.onReady?.({ document, session, presence })
+      review = options.mergeReview
+        ? new MergeReview(document, options.session.peer, options.mergeReview, (edit) => {
+            if (attached()) scope.applyEdits([edit])
+          })
+        : undefined
+      if (review) {
+        const activeReview = review
+        const view = new ReviewView(scope.view, activeReview, (author) => {
+          if (author === options.session.peer) return options.presence?.displayName ?? author
+          return (
+            presence?.states.find((state) => state.peerSessionId === author)?.displayName ?? author
+          )
+        })
+        const input: EditorInput<EditorViewSnapshot> = {
+          id: 'collaboration.review-view',
+          kinds: ['content', 'viewport', 'layout'],
+          read: (snapshot) => snapshot,
+        }
+        scope.own(view)
+        scope.onDispose(() => review?.dispose())
+        scope.watch(input, (snapshot) => view.update(snapshot, attached() ? 'document' : 'clear'))
+      }
+      const cleanup = options.onReady?.({ document, session, presence, review })
       if (cleanup) scope.onDispose(cleanup)
       if (!options.manualClock && !detached) {
         // @justification The protocol needs elapsed time for failure detection; this opt-in

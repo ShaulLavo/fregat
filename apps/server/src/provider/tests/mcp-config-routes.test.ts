@@ -185,7 +185,7 @@ async function list(app: App, folder: string) {
 describe('MCP config routes', () => {
   it('lists servers with their files, keeps unapproved project servers off, and sends no values', async () => {
     const { app, configDir, probes, project } = await harness()
-    const mcp = await list(app, project)
+    const mcp = await list(app, 'project')
 
     expect(mcp.scopes).toEqual(['user', 'local', 'project'])
     expect(
@@ -206,7 +206,7 @@ describe('MCP config routes', () => {
     const added = await send(app, 'POST', '/providers/claude/mcp', {
       name: 'docs',
       scope: 'project',
-      folder: project,
+      folder: 'project',
       definition: { transport: 'stdio', command: 'docs-server', args: ['--port', '1'], env: {} },
     })
 
@@ -224,7 +224,7 @@ describe('MCP config routes', () => {
         cwd: project,
       },
     ])
-    const mcp = await list(app, project)
+    const mcp = await list(app, 'project')
     expect(mcp.servers.find((server) => server.name === 'docs')?.status).toBe('connected')
   })
 
@@ -259,7 +259,7 @@ describe('MCP config routes', () => {
     const { app, calls, configDir, project } = await harness()
     const copied = await send(app, 'POST', '/providers/claude/mcp/linear/copy', {
       scope: 'user',
-      folder: project,
+      folder: 'project',
       target: { providerInstanceId: 'claude', scope: 'local' },
     })
     expect(copied.status).toBe(200)
@@ -302,7 +302,7 @@ describe('MCP config routes', () => {
         throw mcpConfigErrors.MCP_SIGN_IN_UNSUPPORTED({ internal: { provider: 'fixture' } })
       },
     })
-    const body = { scope: 'project', folder: project, target: { providerInstanceId: 'codex' } }
+    const body = { scope: 'project', folder: 'project', target: { providerInstanceId: 'codex' } }
     const denied = await send(app, 'POST', '/providers/claude/mcp/deploy/copy', body)
     expect(denied.status).toBe(409)
     expect(denied.body).toMatchObject({ error: { code: 'provider.MCP_APPROVAL_REQUIRED' } })
@@ -322,10 +322,10 @@ describe('MCP config routes', () => {
   it.each(['user', 'local'] as const)(
     'refuses copying an unapproved project server into Claude %s scope',
     async (scope) => {
-      const { app, calls, project } = await harness()
+      const { app, calls } = await harness()
       const result = await send(app, 'POST', '/providers/claude/mcp/deploy/copy', {
         scope: 'project',
-        folder: project,
+        folder: 'project',
         target: { providerInstanceId: 'claude', scope },
       })
       expect(result.status).toBe(409)
@@ -340,7 +340,7 @@ describe('MCP config routes', () => {
     const result = await send(app, 'POST', '/providers/claude/mcp', {
       name: 'deploy',
       scope: 'project',
-      folder,
+      folder: 'project/packages/web',
       definition: { transport: 'stdio', command: 'owner-server', args: [], env: {} },
     })
     expect(result.status).toBe(409)
@@ -355,5 +355,73 @@ describe('MCP config routes', () => {
     const result = await send(app, 'GET', '/providers/codex/mcp')
 
     expect(result.status).toBe(409)
+  })
+})
+
+describe('MCP picked folder ownership', () => {
+  it('resolves root-relative folders before every harness operation and rejects escapes', async () => {
+    const calls: Array<{ operation: string; folder: string }> = []
+    const config: ProviderMcpConfigAccess = {
+      scopes: ['user', 'local', 'project'],
+      list: async ({ folder }) => {
+        calls.push({ operation: 'list', folder })
+        return []
+      },
+      add: async ({ folder }) => {
+        calls.push({ operation: 'add', folder })
+      },
+      remove: async ({ folder }) => {
+        calls.push({ operation: 'remove', folder })
+      },
+      read: async ({ folder }) => {
+        calls.push({ operation: 'read', folder })
+        return { transport: 'stdio', command: 'fixture', args: [], env: {} }
+      },
+      signIn: async ({ folder }) => {
+        calls.push({ operation: 'sign-in', folder })
+        const done = Promise.withResolvers<void>()
+        return {
+          authorizationUrl: 'https://auth.example.test',
+          done: done.promise,
+          finish: async () => done.resolve(),
+          cancel: () => done.resolve(),
+        }
+      },
+    }
+    const { app, project } = await harness(config)
+    const listed = await send(app, 'GET', '/providers/codex/mcp?folder=project')
+    expect(listed.status).toBe(200)
+    expect(listed.body).toMatchObject({ folder: project })
+    const results = [
+      await send(app, 'POST', '/providers/codex/mcp', {
+        folder: 'project',
+        name: 'docs',
+        scope: 'local',
+        definition: { transport: 'stdio', command: 'fixture', args: [], env: {} },
+      }),
+      await send(app, 'DELETE', '/providers/codex/mcp/docs', { folder: 'project', scope: 'local' }),
+      await send(app, 'POST', '/providers/codex/mcp/docs/copy', {
+        folder: 'project',
+        scope: 'local',
+        target: { providerInstanceId: 'codex' },
+      }),
+      await send(app, 'POST', '/providers/codex/mcp/docs/sign-in', { folder: 'project' }),
+    ]
+    expect(results.map((result) => result.status)).toEqual([200, 200, 200, 200])
+    expect(calls).toEqual(
+      ['list', 'add', 'remove', 'read', 'add', 'sign-in'].map((operation) => ({
+        operation,
+        folder: project,
+      })),
+    )
+    expect((await send(app, 'GET', '/providers/codex/mcp?folder=.')).body).toMatchObject({
+      folder: path.dirname(project),
+    })
+    const count = calls.length
+    expect((await send(app, 'GET', '/providers/codex/mcp?folder=../outside')).status).toBe(403)
+    expect(
+      (await send(app, 'GET', `/providers/codex/mcp?folder=${encodeURIComponent(project)}`)).status,
+    ).toBe(403)
+    expect(calls).toHaveLength(count)
   })
 })

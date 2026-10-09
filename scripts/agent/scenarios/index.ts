@@ -472,7 +472,10 @@ import { treeParityBehaviour } from './tree-parity-behaviour'
 
 import { devPackageUpdates } from './dev-package-updates'
 
+import { collaborationMergeReview } from './collaboration-merge-review'
+
 export const scenarios: readonly Scenario[] = [
+  collaborationMergeReview,
   overlayAlignment,
   unknownWorkspaceSettings,
   releaseInstallationSettings,

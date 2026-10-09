@@ -64,6 +64,16 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
   private confirmations: HostMessage[] = []
   private allocated: Envelope[] = []
   private batching = 0
+  private readonly confirmedObservers = new Set<(reset: boolean, remote: boolean) => void>()
+
+  confirmedSnapshot(): ReturnType<TextbufferEngine['snapshot']> {
+    return this.hostEngine.snapshot()
+  }
+
+  subscribeConfirmed(observer: (reset: boolean, remote: boolean) => void): () => void {
+    this.confirmedObservers.add(observer)
+    return () => this.confirmedObservers.delete(observer)
+  }
 
   constructor(
     private readonly options: CollaborationDocumentOptions,
@@ -212,6 +222,10 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
     this.confirmations = []
     this.allocated = []
     this.participant.receive(messages, allocated)
+    const remote = messages.some(
+      (message) => message.status === 'accepted' && message.envelope.id.actor !== this.options.peer,
+    )
+    for (const observer of this.confirmedObservers) observer(false, remote)
   }
 
   private append(record: Confirmation<Envelope>): void {
@@ -281,6 +295,10 @@ export class CollaborationDocument implements DocumentEngine<Envelope> {
       recovered,
       history.filter((record) => record.outcome.kind === 'rejected').map((record) => record.edit),
     )
+    const remote = history.some(
+      (record) => record.outcome.kind === 'accepted' && record.id.actor !== this.options.peer,
+    )
+    for (const observer of this.confirmedObservers) observer(true, remote)
   }
 
   private restoreHost(): void {

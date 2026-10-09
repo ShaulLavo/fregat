@@ -1,5 +1,10 @@
 export { createTreeSitterInputEdits } from './treeSitter/edits'
 export {
+  createTreeSitterReviewSyntax,
+  type TreeSitterReviewSyntax,
+  type TreeSitterReviewUnit,
+} from './mergeReview'
+export {
   TreeSitterLanguageRegistry,
   createTreeSitterLanguageRegistry,
   isTreeSitterLanguageId,

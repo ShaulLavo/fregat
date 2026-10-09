@@ -1,3 +1,10 @@
+export {
+  MergeReview,
+  type MergeReviewOptions,
+  type MergeReviewVersions,
+  type MergeReviewAction,
+} from './review'
+export type { MergeReviewMark, MergeReviewUnit, MergeReviewSyntax } from './merge-review'
 export { Session, type SessionOptions } from './session'
 export {
   editKey,

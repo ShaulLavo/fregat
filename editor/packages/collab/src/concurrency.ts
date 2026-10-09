@@ -160,6 +160,16 @@ export class ConfirmedWindow {
     this.document = document
   }
 
+  /** Whether a retained edit causally follows every supplied identity. Evicted identities are unknown. */
+  isAfter(id: EditId, predecessors: readonly EditId[]): boolean {
+    const entry = this.byId.get(editKey(id))
+    if (!entry) return false
+    return predecessors.every((predecessor) => {
+      const before = this.byId.get(editKey(predecessor))
+      return before !== undefined && contains(entry.ancestors, before.position)
+    })
+  }
+
   /** Exact pairs; a supplied batch limits results to pairs touching that batch. */
   pairs(batch?: readonly EditId[]): readonly ConcurrentPair[] {
     if (this.authors.size < 2) return []
