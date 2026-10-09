@@ -1,3 +1,4 @@
+import type { RevealBlock } from './revealBlock'
 import { assertContentLayout, contentReadingBounds, revealContentRow } from './contentLayout'
 import { isElementNode, isTextareaElement } from '../dom'
 import {
@@ -188,7 +189,6 @@ import {
 } from './virtualizedTextViewRows'
 import type {
   CreateRangeOptions,
-  RevealBlock,
   VirtualizedTextHighlightRange,
   VirtualizedTextHighlightStyle,
   VirtualizedTextSelection,

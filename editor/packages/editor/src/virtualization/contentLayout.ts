@@ -1,5 +1,5 @@
 import { createError } from '../logging/errors'
-import type { RevealBlock } from './virtualizedTextViewInternals'
+import type { RevealBlock } from './revealBlock'
 
 const MAX_CONTENT_TEXT_LENGTH = 1_048_576
 const MAX_CONTENT_ROWS = 10_000

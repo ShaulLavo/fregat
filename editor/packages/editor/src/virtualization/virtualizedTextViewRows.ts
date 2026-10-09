@@ -72,7 +72,8 @@ import type {
   VirtualizedCaretPosition,
   VirtualizedCaretPositions,
 } from './virtualizedTextViewTypes'
-import type { RevealBlock, VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
+import type { RevealBlock } from './revealBlock'
+import type { VirtualizedTextViewInternal } from './virtualizedTextViewInternals'
 import {
   type RowInlineMapping,
   offsetForLocalIndex,
