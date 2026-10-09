@@ -61,8 +61,9 @@ palette load and closing/reopening the pending picker.
 `bundle-report.ts` and compares first-load script gzip ([disk]) in total and per owner against
 `apps/web/scripts/first-load-pins.json`. The total may grow 1%. Each owner may grow by the larger of
 5% or 2 KB; an owner new to first load counts from zero. The failure names every owner that grew.
-`--write --reason=…` re-pins and appends the reason to the file's history. It runs in `verify` and
-in CI's typecheck job. First pin: 1,607,295 B gz, after Plan 129 Q2 and the evlog dedupe.
+`--write --reason=…` re-pins and appends the reason to the file's history. It runs on demand
+only: the owner turned it off in `verify` and CI on 2026-10-09 because small additions kept
+tripping it. First pin: 1,607,295 B gz, after Plan 129 Q2 and the evlog dedupe.
 
 Verified: a static import of `features/settings/components/page` in `main.tsx` fails the gate with
 `grew: apps/web/src/features/settings 12379 -> 57583` and `packages/contracts 32403 -> 37700`
