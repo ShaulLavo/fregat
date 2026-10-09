@@ -56,8 +56,9 @@ export function fullDocumentTransform(code, id) {
       'type Runtime = {',
       `let compareMatchLimitExceeded = false
     let compareQueryCalls = 0
-    for (const method of ['matches', 'captures'] as const) {
+    for (const method of ['matches', 'captures', 'captureRanges'] as const) {
       const original = Query.prototype[method]
+      if (typeof original !== 'function') continue
       ;(Query.prototype as any)[method] = function (...args: any[]) {
         const result = (original as any).apply(this, args)
         compareQueryCalls++

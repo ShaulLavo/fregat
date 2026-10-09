@@ -496,3 +496,92 @@ Verification runs the standalone action's install, build, typecheck, lint and
 format checks, then both runtime identity and host-loaded Markdown tests in
 isolated and hoisted installations. The updater and authored-pin tests cover
 the mirror override, documentation site and exact required Markdown peer.
+
+### Candidate experiments and overlap attribution, 2026-10-09
+
+Approved. Candidate PRs now use a short paired A/B experiment with identical
+canonical output. Experiment numbers stay labelled as experiments. Run the full
+frozen qualified protocol when a candidate appears to meet M1, M2 or M3. The
+original structural and predicate-read failed windows remain failed and retained.
+
+The independent review of [#1086](https://github.com/ShaulLavo/fregat/pull/1086#issuecomment-6071208625)
+attributed approximately 45.8 ms of its original 47.2 ms warm overlap increase to
+worker garbage collection. All five original warm candidates collected the old
+generation in that phase; no original warm baseline did. This is an upstream
+allocation/retention effect in unchanged overlap code. The review did not isolate
+bounded strings from the query-local text cache.
+
+A separate four-run warm ABBA experiment added direct worker overlap markers.
+Canonical hashes, actual coverage and query-limit proof remain identical in both
+pairs. Baseline overlap was 251.511 and 187.135 ms, including 143.989 and 88.228 ms
+of top-level worker GC pauses. Candidate overlap was 203.272 and 209.749 ms,
+including 98.225 and 101.562 ms of GC. Both candidates collected the old generation;
+neither baseline did. Wall time after subtracting those GC intervals was
+107.522/98.907 ms baseline and 105.047/108.187 ms candidate.
+
+The phase's GC mechanism is confirmed directly. The exact 47 ms delta is not
+stable across these exploratory runs, and this experiment does not establish
+the responsible allocation or rescue the original failed qualification.
+[Raw traces and experiment proofs](https://github.com/ShaulLavo/fregat/tree/main/editor/docs/performance/singapore-full-parse-2026-10-08/overlap-experiment)
+retain both pairs and the marker/GC attribution.
+
+Two capture-allocation experiments were rejected. Both retain complete canonical
+hashes, root coverage, query-limit proofs and all four cold/warm observations.
+The full query-local native-node cache passed 151 native and grammar differential
+tests, but increased highlight-query work from 1247.8 to 1435.0 ms cold and from
+1134.0 to 1346.3 ms warm. Complete frames changed from 4558.8 to 4735.9 ms cold
+and from 4396.1 to 4546.3 ms warm.
+
+Lazy public start-position objects and reused rejected-match arrays passed 150
+native tests and a fresh TypeScript graph, but produced no consistent gain.
+Complete frames changed from 4556.0 to 4606.2 ms cold and from 4391.8 to
+4408.1 ms warm. Highlight queries changed from 1232.6 to 1207.0 ms cold and
+from 1141.7 to 1200.1 ms warm. Overlap changed from 137.7 to 163.6 ms cold
+and from 209.4 to 224.8 ms warm. The source and exact compiled bundles of both
+rejected designs are retained with their original measurements. Neither was
+published or rerun as an acceptance window.
+
+The next experiment uses flat capture ranges in accepted-match order. It decodes
+predicate-free native records without public Node or Point wrappers, and only
+materializes predicate-bearing matches. Native execution, options, properties,
+text predicates and query-limit semantics stay shared with ordinary matches.
+Injection and fold consumers retain grouped node-bearing matches. A separately
+reviewed runtime PR must precede any consumer dependency pin.
+
+### Compact capture range experiment, 2026-10-09
+
+The native binding candidate adds `Query.captureRanges`, a flat array of capture names and UTF-16 ranges in accepted match order. Predicate-free patterns decode native records without constructing public nodes or points. Predicate-bearing patterns retain grouped node captures in a query-local scratch array. Injection discovery and folds still use ordinary grouped matches. The runtime WASM is unchanged.
+
+A prospective paired experiment used byte-identical root lockfiles after the standalone peer repair. Cold ran baseline then candidate, warm ran candidate then baseline. Both sides observed `matches`, `captures` and `captureRanges` for query calls and match limits. Strict comparison passed environment, fixture, dependency and canonical-output checks. Each sample returned 1,198,376 tokens with the same token, style and structural hashes, 42 query calls, no exceeded match limit and complete coverage through UTF-16 index 10,485,760. These are diagnostic experiments with one repetition per side and condition, not qualification.
+
+| Diagnostic experiment          | Cold baseline | Cold compact ranges | Warm baseline | Warm compact ranges |
+| ------------------------------ | ------------: | ------------------: | ------------: | ------------------: |
+| Complete highlighted frame     |    4,453.6 ms |          4,252.1 ms |    4,447.5 ms |          4,045.4 ms |
+| Worker parse plus query        |    4,264.4 ms |          4,074.9 ms |    4,320.2 ms |          3,891.6 ms |
+| Highlight query and predicates |    1,169.0 ms |            986.8 ms |    1,158.2 ms |            975.1 ms |
+| Overlap resolution             |      138.5 ms |            161.9 ms |      214.7 ms |            223.2 ms |
+
+Runtime PR [tree-sitter-x #25](https://github.com/ShaulLavo/tree-sitter-x/pull/25) passed independent review and merged. Consumer integration pins published artifact `0fb6e61c7396727c49b8c6e4d757f6bf8dcfd6ed` and compatible Markdown source `e2ae3f735f614b3b618b5de71fc41644a180b9e7`. Full highlights use `captureRanges`; range highlights retain `captures`, and injection discovery and folds retain `matches`. The updater validates the required Markdown caret peer against the artifact version before changing exact host pins. Compatible runtime updates can keep the Markdown source unchanged. M1 remains unpassed. Cold worker work exceeds 4,000 ms and both conditions exceed the frozen 25% diagnostic-work reduction ceilings. A qualified window is premature. Capture normalization remains the next bounded allocation experiment; compact ranges still construct a separate normalized capture and string deduplication key for each accepted range.
+
+[Complete evidence](https://github.com/ShaulLavo/fregat/tree/lane/plan-339-capture-profile/editor/docs/performance/singapore-full-parse-2026-10-08/materialization-ranges-experiment) preserves the interrupted initial attempt, the completed dependency-confounded attempt rejected by strict comparison, and the prospective aligned experiment. No raw metadata was edited. Both prior rejected allocation designs, their runtime source snapshots and their traces remain beside it. The aligned runtime JavaScript hash is `011f537e049147dd89e23d8d8335b7f0c46111a42fa1b728e728a54b4c7c413b`.
+
+The real native suite passed 167 tests across 17 files, including grouped and repeated capture predicates, properties, Unicode, range/containing/depth options, disabled captures, match-limit status, callback failure recovery and five grammar fixtures. ESLint, a forced TypeScript build and the ESM bundle build passed. The local immutable dependency cache provides Vitest 3.2.4 while the source manifest declares Vitest 5.0.3; actual CI remains required. The expanded fixture's first run failed an explicit expected-capture count while both APIs agreed. A repeated capture pattern corrected the fixture, and the complete rerun passed.
+
+The published consumer also passed a fresh 10 MiB full-document output smoke. Its 1,198,376 tokens, token/style/structural hashes, complete coverage, 42 query calls and unexceeded match limit match the frozen canonical output. The screenshot was read back. This is a correctness check with the real published artifact, not a paired performance claim or qualification. [Published consumer evidence](https://github.com/ShaulLavo/fregat/tree/lane/plan-339-capture-profile/editor/docs/performance/singapore-full-parse-2026-10-08/capture-consumer-published-smoke) retains the raw observation and trace.
+
+### Capture normalization experiment, 2026-10-09
+
+A separate prospective experiment kept compact ranges on both sides and changed only full-capture normalization. The candidate sorts its fresh capture array by span, then records the last span stamp for each capture name. This removes per-capture concatenated deduplication keys. The API's flattened match order is unchanged. This candidate is an experimental transform and is not included in the shipping compact-range consumer.
+
+Cold ran baseline then candidate; warm reversed that order. Strict comparison passed environment, lockfile, fixture and canonical-output checks for all four fresh-document samples. These are single observations per side and condition, not qualification.
+
+| Diagnostic experiment          | Cold string keys | Cold span stamps | Warm string keys | Warm span stamps |
+| ------------------------------ | ---------------: | ---------------: | ---------------: | ---------------: |
+| Complete highlighted frame     |       4,144.9 ms |       3,820.3 ms |       4,046.0 ms |       3,630.4 ms |
+| Worker parse plus query        |       3,956.2 ms |       3,646.2 ms |       3,894.6 ms |       3,503.6 ms |
+| Main-thread union work         |        23.959 ms |        15.675 ms |        10.267 ms |        10.140 ms |
+| Highlight query and predicates |         961.7 ms |         957.0 ms |         962.1 ms |         972.7 ms |
+
+Cold diagnostic work is 3,661.875 ms, above the frozen 3,539.053 ms ceiling. Warm diagnostic work is 3,513.740 ms in this one observation. M1 remains unpassed; no full qualification window was run. Span stamps need focused equal-span precedence, injection and deduplication tests before shipping. Continue bounded allocation experiments to close the cold diagnostic-work gap.
+
+[Raw observations, traces, source probes and host recipe](https://github.com/ShaulLavo/fregat/tree/lane/plan-339-capture-profile/editor/docs/performance/singapore-full-parse-2026-10-08/normalization-span-map-experiment) retain both sides separately from the earlier API-only experiment. Raw JSON and source snapshots are lossless gzip archives, with byte sizes and hashes in `artifacts.json`.

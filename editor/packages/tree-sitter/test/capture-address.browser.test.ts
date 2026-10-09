@@ -26,6 +26,14 @@ it('decodes captures allocated above the signed Wasm address boundary', async ()
     expect(heap().length).toBeGreaterThan(2 ** 31)
     expect(query.captures(tree.rootNode).length).toBe(50_000)
     expect(query.matches(tree.rootNode).length).toBe(50_000)
+    const ranges = query.captureRanges(tree.rootNode)
+    expect(ranges).toHaveLength(50_000)
+    expect(ranges[0]).toMatchObject({ name: 'variable', startIndex: 6, endIndex: 11 })
+    expect(ranges.at(-1)).toMatchObject({
+      name: 'variable',
+      startIndex: text.lastIndexOf('value'),
+      endIndex: text.lastIndexOf('value') + 5,
+    })
   } finally {
     for (const buffer of buffers) buffer.delete()
     query.delete()
