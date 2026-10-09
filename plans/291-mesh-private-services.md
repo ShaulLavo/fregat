@@ -4,6 +4,7 @@
 - Date: 2026-10-03
 - Owner clarification: 2026-10-09.
 - Implementation owner: `ShaulLavo/mesh`.
+- Implementation: [Mesh PR #285](https://github.com/ShaulLavo/mesh/pull/285), pending merge and release.
 - Reported in: [Mesh #81](https://github.com/ShaulLavo/mesh/issues/81).
 - Coordination: Preserve the private-app observability work from [Mesh #55](https://github.com/ShaulLavo/mesh/issues/55). Device authorization remains [Plan 290](290-mesh-device-authorization.md).
 
