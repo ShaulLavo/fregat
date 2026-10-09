@@ -7,6 +7,11 @@ import { WebGlTerminalRenderer } from '../../render/webgl/renderer.js'
 import { WebGlTextPass } from '../../render/webgl/text-pass.js'
 import { CanvasTerminalRenderer } from '../../render/canvas/renderer.js'
 import { WebGpuTerminalRenderer } from '../../render/renderer.js'
+import {
+  observeDisplayedFrame,
+  type DisplayedFrameOptions,
+  type DisplayedTextFrame,
+} from '../../render/displayed-frame.js'
 import type { TerminalSubmittedSnapshot, TerminalSubmittedText } from '../submitted-frame.js'
 import type { RendererTextFrameSnapshot } from '../../render/renderer.js'
 import type { RenderSchedulerClock } from '../../render/scheduler.js'
@@ -58,7 +63,10 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
 })
 
-async function fixture(backend: 'webgl' | 'webgpu' | 'canvas' | 'dom' = 'webgl') {
+async function fixture(
+  backend: 'webgl' | 'webgpu' | 'canvas' | 'dom' = 'webgl',
+  publicText = false,
+) {
   const host = document.createElement('div')
   host.style.cssText = 'width:400px;height:160px;position:relative'
   document.body.append(host)
@@ -72,7 +80,8 @@ async function fixture(backend: 'webgl' | 'webgpu' | 'canvas' | 'dom' = 'webgl')
     runtime: { kind: 'borrowed', runtime },
   })
   const clock = new DeferredClock()
-  const snapshots: RendererTextFrameSnapshot[] = []
+  const snapshots: DisplayedTextFrame[] = []
+  const publicSnapshots: RendererTextFrameSnapshot[] = []
   let renderer:
     | WebGlTerminalRenderer
     | WebGpuTerminalRenderer
@@ -83,6 +92,13 @@ async function fixture(backend: 'webgl' | 'webgpu' | 'canvas' | 'dom' = 'webgl')
     autoFit: false,
     elements: createTerminalElements(host),
     rendererFactory: async (options) => {
+      const onDisplayedFrame = (options as DisplayedFrameOptions)[observeDisplayedFrame]
+      const displayedOptions: DisplayedFrameOptions = {
+        [observeDisplayedFrame]: (snapshot) => {
+          snapshots.push(snapshot)
+          onDisplayedFrame?.(snapshot)
+        },
+      }
       renderer = await {
         webgl: WebGlTerminalRenderer,
         webgpu: WebGpuTerminalRenderer,
@@ -90,11 +106,11 @@ async function fixture(backend: 'webgl' | 'webgpu' | 'canvas' | 'dom' = 'webgl')
         dom: DomTerminalRenderer,
       }[backend].create({
         ...options,
+        ...displayedOptions,
         schedulerClock: clock,
-        onTextFrame: (snapshot) => {
-          snapshots.push(snapshot)
-          options.onTextFrame?.(snapshot)
-        },
+        onTextFrame: publicText
+          ? (snapshot) => publicSnapshots.push(snapshot)
+          : options.onTextFrame,
       })
       return renderer
     },
@@ -104,7 +120,16 @@ async function fixture(backend: 'webgl' | 'webgpu' | 'canvas' | 'dom' = 'webgl')
   terminal.on('error', (event) => errors.push(event))
   await terminal.open(host)
   clock.flush()
-  return { terminal, session, clock, errors, host, renderer: renderer!, snapshots }
+  return {
+    terminal,
+    session,
+    clock,
+    errors,
+    host,
+    renderer: renderer!,
+    snapshots,
+    publicSnapshots,
+  }
 }
 
 function extractionCount() {
@@ -492,8 +517,6 @@ describe('DOM retained displayed-text acceptance', () => {
     const snapshot = snapshots.at(-1)!
     expect(Object.isFrozen(snapshot)).toBe(true)
     expect(Object.isFrozen(snapshot.cursor)).toBe(true)
-    expect('nativeFrame' in snapshot).toBe(false)
-    expect('token' in snapshot).toBe(false)
     const execution = Reflect.get(terminal, 'execution') as {
       textFrame(): RendererTextFrameSnapshot | undefined
     }
@@ -502,6 +525,21 @@ describe('DOM retained displayed-text acceptance', () => {
     terminal.write('\rnext native')
     clock.flush()
     expect(owned[0]).toContain('accepted native')
+  })
+
+  it('keeps public DOM renderer text owned and free of private native readers', async () => {
+    const { terminal, clock, publicSnapshots } = await fixture('dom', true)
+    terminal.write('public accepted 界 é')
+    clock.flush()
+    const snapshot = publicSnapshots.at(-1)!
+    expect('nativeFrame' in snapshot).toBe(false)
+    expect('token' in snapshot).toBe(false)
+    expect(Object.isFrozen(snapshot)).toBe(true)
+    expect(Object.isFrozen(snapshot.rows)).toBe(true)
+    terminal.write('\rnext accepted 🧑‍💻')
+    clock.flush()
+    expect(snapshot.rows[0]!.text).toContain('public accepted 界 é')
+    expect(publicSnapshots.at(-1)!.rows[0]!.text).toContain('next accepted 🧑‍💻')
   })
 
   it('keeps the accepted native reader when acknowledging a painted frame fails', async () => {

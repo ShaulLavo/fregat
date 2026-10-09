@@ -341,6 +341,7 @@ stays safe to read, share and export.
 | Setting                              | Default | Scope       | What it does                                                               |
 | ------------------------------------ | ------- | ----------- | -------------------------------------------------------------------------- |
 | `terminal.shellKeys`                 | `false` | application | Send Ctrl+letter and readline Alt shortcuts to the focused terminal shell. |
+| `terminal.integrated.screenReader`   | `true`  | application | Expose terminal text and announce new output to screen readers.            |
 | `terminal.integrated.fontSize`       | `12`    | window      | Terminal font size in pixels.                                              |
 | `terminal.integrated.scrollback`     | `10000` | window      | How many lines of output the terminal keeps.                               |
 | `terminal.integrated.cursorBlinking` | `true`  | window      | Blink the terminal cursor while the terminal has focus.                    |

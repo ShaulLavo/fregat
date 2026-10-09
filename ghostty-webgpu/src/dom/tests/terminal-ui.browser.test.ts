@@ -1,3 +1,9 @@
+import {
+  observeDisplayedFrame,
+  displayedFrameListener,
+  type DisplayedFrameOptions,
+  type DisplayedTextFrame,
+} from '../../render/displayed-frame.js'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { GhosttyRuntime } from '../../core/runtime.js'
@@ -354,7 +360,7 @@ async function createIntegratedHarness(
     rendererFactory: async (rendererOptions) => {
       const canvas = rendererOptions.canvas
       if (!(canvas instanceof HTMLCanvasElement)) throw new TypeError('Expected an HTML canvas')
-      renderer = new FrameRenderer(canvas, rendererOptions.onTextFrame, rendererOptions)
+      renderer = new FrameRenderer(canvas, displayedFrameListener(rendererOptions), rendererOptions)
       return renderer
     },
     runtime: { kind: 'borrowed', runtime },
@@ -416,16 +422,16 @@ async function createObservedRendererHarness(
         readTextRows.mockRestore()
         update.mockRestore()
       })
-      const observedOptions: WebGpuTerminalRendererOptions = {
+      const observedOptions: WebGpuTerminalRendererOptions & DisplayedFrameOptions = {
         ...rendererOptions,
         onCleanUpdate: () => {
           beforeCleanUpdate?.()
           rendererOptions.onCleanUpdate?.()
           afterCleanUpdate?.()
         },
-        onTextFrame: (snapshot) => {
+        [observeDisplayedFrame]: (snapshot: DisplayedTextFrame) => {
           snapshots.push(snapshot)
-          rendererOptions.onTextFrame?.(snapshot)
+          displayedFrameListener(rendererOptions)?.(snapshot)
           if (renderer) afterTextFrame?.(terminal, renderer)
         },
       }
@@ -2325,8 +2331,8 @@ describe('integrated terminal UI host', () => {
       rendererFactory: async (options) => {
         const canvas = options.canvas
         if (!(canvas instanceof HTMLCanvasElement)) throw new TypeError('Expected an HTML canvas')
-        options.onTextFrame?.(frame([text, '', '', '']))
-        renderer = new FrameRenderer(canvas, options.onTextFrame, options)
+        displayedFrameListener(options)?.(frame([text, '', '', '']))
+        renderer = new FrameRenderer(canvas, displayedFrameListener(options), options)
         return renderer
       },
       runtime: { kind: 'borrowed', runtime },
@@ -2613,7 +2619,7 @@ describe('integrated terminal UI host', () => {
       rendererFactory: async (options) => {
         const canvas = options.canvas
         if (!(canvas instanceof HTMLCanvasElement)) throw new TypeError('Expected an HTML canvas')
-        return new FrameRenderer(canvas, options.onTextFrame, options)
+        return new FrameRenderer(canvas, displayedFrameListener(options), options)
       },
       runtime: { kind: 'borrowed', runtime },
     })
@@ -2661,7 +2667,7 @@ describe('integrated terminal UI host', () => {
       rendererFactory: async (options) => {
         const canvas = options.canvas
         if (!(canvas instanceof HTMLCanvasElement)) throw new TypeError('Expected an HTML canvas')
-        renderer = new FrameRenderer(canvas, options.onTextFrame, options)
+        renderer = new FrameRenderer(canvas, displayedFrameListener(options), options)
         return renderer
       },
       runtime: { kind: 'borrowed', runtime },

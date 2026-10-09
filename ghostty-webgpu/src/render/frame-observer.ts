@@ -1,5 +1,12 @@
-import type { NativeDisplayedFrame } from '../core/displayed-frame.js'
 import type { RenderCursorSnapshot, RenderRow } from '../core/types.js'
+import {
+  observeDisplayedFrame,
+  retainDisplayedFrame,
+  type DisplayedFrameOptions,
+  type DisplayedFrameSource,
+  type DisplayedTextFrame,
+} from './displayed-frame.js'
+import type { NativeDisplayedFrame } from '../core/displayed-frame.js'
 import type { CursorState } from './instances/types.js'
 import { copiedFrameRow } from './frame-row.js'
 import type {
@@ -13,6 +20,7 @@ export class FrameObserver {
   private generation = 0
   private current = false
   private retained = false
+  private displayedFrame?: NativeDisplayedFrame
   private fullRows: (RendererFrameRow | undefined)[] = []
   private textRows: (RendererTextFrameRow | undefined)[] = []
 
@@ -27,7 +35,7 @@ export class FrameObserver {
   }
 
   private get rowsNeeded(): boolean {
-    return this.options.needsFrameRows?.() ?? true
+    return Boolean(this.options.onTextFrame) || (this.options.needsFrameRows?.() ?? true)
   }
 
   resize(rows = this.rowCount): void {
@@ -66,13 +74,23 @@ export class FrameObserver {
     const generation = ++this.generation
     const { onFrame, onTextFrame, onRowsChanged, onRowsPainted } = this.options
     const changedRows = Object.freeze([...changed])
-    if (!onFrame && !onTextFrame) return this.rowDelivery(generation, changedRows, rows)
-    const nativeFrame = this.options.retainDisplayedText
-      ? state.retainDisplayedFrame?.({ full: !this.retained })
-      : undefined
-    if (nativeFrame) this.retained = true
-    if (this.rowsNeeded) this.updateRows(state, changed, rows)
+    const onDisplayedFrame = (this.options as DisplayedFrameOptions)[observeDisplayedFrame]
+    if (!onFrame && !onTextFrame && !onDisplayedFrame)
+      return this.rowDelivery(generation, changedRows, rows)
+    const retain = (state as DisplayedFrameSource)[retainDisplayedFrame]
+    const needsRows =
+      this.rowsNeeded || Boolean(onDisplayedFrame && (!this.options.retainDisplayedText || !retain))
+    // Extraction can fail; finish it before rotating the accepted native reader.
+    const previousTextRows = needsRows ? this.displayedFrame?.readTextRows() : undefined
+    if (needsRows) this.updateRows(state, changed, rows)
     else this.clearRows()
+    const nativeFrame = this.options.retainDisplayedText
+      ? retain?.call(state, { full: !this.retained })
+      : undefined
+    if (nativeFrame) {
+      this.retained = true
+      this.displayedFrame = nativeFrame
+    }
     const viewport = cursor.viewport ? Object.freeze({ ...cursor.viewport }) : undefined
     const snapshot = {
       cursor: Object.freeze({ ...cursor, viewport }),
@@ -84,22 +102,22 @@ export class FrameObserver {
           rows: Object.freeze(this.fullRows.filter(defined)),
         })
       : undefined
-    const ownedTextRows = this.rowsNeeded ? Object.freeze(this.textRows.filter(defined)) : undefined
-    const nativeTextFrame = nativeFrame
-      ? Object.freeze(
-          new NativeTextFrame(snapshot.cursor, snapshot.paintedCursor, nativeFrame, ownedTextRows),
+    const ownedTextRows = needsRows ? Object.freeze(this.textRows.filter(defined)) : undefined
+    const displayedFrame = onDisplayedFrame
+      ? displayedTextFrame(
+          snapshot.cursor,
+          snapshot.paintedCursor,
+          nativeFrame,
+          ownedTextRows,
+          previousTextRows,
         )
       : undefined
-    const textFrame = onTextFrame
-      ? (nativeTextFrame ??
-        Object.freeze({
-          ...snapshot,
-          rows: Object.freeze(this.textRows.filter(defined)),
-        }))
-      : undefined
+    const textFrame = onTextFrame ? Object.freeze({ ...snapshot, rows: ownedTextRows! }) : undefined
     return () => {
       if (generation !== this.generation) return
       if (fullFrame) onFrame?.(fullFrame)
+      if (generation !== this.generation) return
+      if (displayedFrame) onDisplayedFrame?.(displayedFrame)
       if (generation !== this.generation) return
       if (textFrame) onTextFrame?.(textFrame)
       if (generation !== this.generation) return
@@ -134,7 +152,10 @@ export class FrameObserver {
         rows && (this.current || rows.length === this.rowCount) ? rows : state.readRows(options)
       for (const row of source) this.fullRows[row.y] = copiedFrameRow(row)
     }
-    if (this.options.onTextFrame) {
+    if (
+      this.options.onTextFrame ||
+      (this.options as DisplayedFrameOptions)[observeDisplayedFrame]
+    ) {
       const source = this.readTextRows(state, options, rows)
       for (const row of source) this.textRows[row.y] = row
     }
@@ -154,6 +175,20 @@ export class FrameObserver {
   }
 }
 
+function displayedTextFrame(
+  cursor: RenderCursorSnapshot,
+  paintedCursor: Readonly<CursorState> | undefined,
+  nativeFrame: NativeDisplayedFrame | undefined,
+  ownedRows: readonly RendererTextFrameRow[] | undefined,
+  previousTextRows: readonly RendererTextFrameRow[] | undefined,
+): DisplayedTextFrame {
+  if (nativeFrame)
+    return Object.freeze(
+      new NativeTextFrame(cursor, paintedCursor, nativeFrame, ownedRows, previousTextRows),
+    )
+  return Object.freeze({ cursor, paintedCursor, rows: ownedRows! })
+}
+
 class NativeTextFrame {
   readonly #ownedRows: readonly RendererTextFrameRow[] | undefined
 
@@ -162,6 +197,7 @@ class NativeTextFrame {
     readonly paintedCursor: Readonly<CursorState> | undefined,
     readonly nativeFrame: NativeDisplayedFrame,
     ownedRows: readonly RendererTextFrameRow[] | undefined,
+    readonly previousTextRows: readonly RendererTextFrameRow[] | undefined,
   ) {
     this.#ownedRows = ownedRows
   }

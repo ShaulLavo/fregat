@@ -327,6 +327,10 @@ export const SETTINGS_PRESENTATION = {
     widget: 'boolean',
     category: 'Terminal',
   },
+  'terminal.integrated.screenReader': {
+    widget: 'boolean',
+    category: 'Terminal',
+  },
   'terminal.integrated.fontSize': {
     widget: 'number',
     category: 'Terminal',

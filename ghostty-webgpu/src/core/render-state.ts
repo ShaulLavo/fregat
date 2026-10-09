@@ -10,6 +10,7 @@ import { assertGhosttyResult, createGhosttyError } from './error.js'
 import { requireLayout } from './memory.js'
 import { ZigFrameBuilder } from './zig-frame.js'
 import { DisplayedFrameStore } from './displayed-frame.js'
+import { retainDisplayedFrame } from '../render/displayed-frame.js'
 import { RowReader } from './row-reader.js'
 import { TextRowReader } from './text-row-reader.js'
 import type { GhosttyRuntime } from './runtime.js'
@@ -265,7 +266,7 @@ export class GhosttyRenderState {
     )
   }
 
-  retainDisplayedFrame(options: { full?: boolean } = {}) {
+  [retainDisplayedFrame](options: { full?: boolean } = {}) {
     this.ensureActive()
     this.displayedFrames ??= new DisplayedFrameStore(this.runtime)
     return this.displayedFrames.capture(

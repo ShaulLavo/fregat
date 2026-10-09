@@ -1,3 +1,8 @@
+import {
+  observeDisplayedFrame,
+  displayedFrameListener,
+  type DisplayedTextFrame,
+} from '../../render/displayed-frame.js'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { Terminal as MainTerminal } from '../../../dist/index.js'
@@ -92,9 +97,11 @@ async function fixture() {
       renderer = await CanvasTerminalRenderer.create({
         ...options,
         schedulerClock: clock,
-        onTextFrame: (snapshot) => {
-          options.onTextFrame?.(snapshot)
-          snapshots.push(snapshot)
+        ...{
+          [observeDisplayedFrame]: (snapshot: DisplayedTextFrame) => {
+            displayedFrameListener(options)?.(snapshot)
+            snapshots.push(snapshot)
+          },
         },
       })
       return renderer
