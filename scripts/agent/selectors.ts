@@ -1413,6 +1413,7 @@ export const selectors = {
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
   phoneTerminalCanvas: (page: Page) => page.locator('[data-phone-level="terminal"] canvas').first(),
   phoneFirstScreenSelector: '[data-phone-level="sessions"] section[aria-label="Sessions"]',
+  phoneViewportPolicy: `({virtualKeyboard:'virtualKeyboard' in navigator,resizesContent:document.querySelector('meta[name="viewport"]')?.content.includes('interactive-widget=resizes-content') ?? false})`,
   phoneLevelSelector: '[data-phone-level]',
   desktopFirstScreenSelector: '[aria-label="Window toolbar"]',
   phoneShell: (page: Page) => page.locator('[data-phone-shell]'),
