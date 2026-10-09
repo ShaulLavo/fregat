@@ -1625,6 +1625,15 @@ export async function openGitPanel(page: Page) {
   await selectors.gitPanel(page).waitFor({ timeout: 15_000 })
 }
 
+/** Opens the folder picker from the project menu in its List view; wide windows open in Columns. */
+export async function openFolderPickerList(page: Page) {
+  await selectors.folderTree(page).waitFor()
+  await selectors.projectMenu(page).click()
+  await selectors.openFolderMenu(page).click()
+  await selectors.pickerDialog(page).waitFor()
+  await selectors.pickerView(page, 'List').click()
+}
+
 /** Holds a hold-to-confirm button until `done` resolves, the way a user keeps the mouse down. */
 export async function holdToConfirm(page: Page, button: Locator, done: () => Promise<unknown>) {
   await button.hover()
