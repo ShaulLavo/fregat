@@ -25,10 +25,8 @@ export type FilesystemConflict = {
   eventType: FilesystemConflictEventType
   id: string
   localPath: FilesystemPath
-  localText: string
   remoteFile: FileResult | null
   remotePath: FilesystemPath
-  remoteText: string | null
   toastId?: string | number
 }
 

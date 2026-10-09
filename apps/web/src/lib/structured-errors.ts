@@ -29,6 +29,12 @@ export const clientErrors = defineErrorCatalog('client', {
     why: 'The browser refused screen capture or never delivered a frame.',
     fix: 'Your browser did not allow screen capture. Attach the image as a file instead.',
   },
+  CONFLICT_LOCAL_CLOSED: {
+    status: 409,
+    message: ({ path }: { path: string }) => `Your changes to ${path} were closed`,
+    why: 'The editor tab holding your changes closed before the save started.',
+    fix: 'Use the disk version, or open the file and make your changes again.',
+  },
   CONTEXT_MISSING: {
     status: 500,
     message: ({ message }: { message: string }) => message,
